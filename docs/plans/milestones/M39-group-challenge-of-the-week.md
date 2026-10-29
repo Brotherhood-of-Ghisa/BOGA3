@@ -88,10 +88,11 @@ Use `src/groups/api.ts` as the sole RPC caller, the existing cache/resource
 and action hooks, group picker, rank rows, notices and UI primitives. Reads
 follow existing refresh/offline behavior; admin writes require a connection.
 The draft [CoW UX brief](../M39-cow-ux.md) is attached to this milestone and
-T04. The operator confirmed: the CoW summary appears immediately on At a
-glance; admins schedule from the individual group page, which opens a secondary
-CoW page for creation/editing or member viewing/browsing. The summary is a
-reading entry, with no scheduling controls. The operator selected the
+T04. The operator clarified: the detailed browser is reached from Groups;
+Today / Groups gets a separate compact card for this week's CoW only. It is
+a reading entry, with no upcoming/history rows or scheduling controls; the
+previous At a glance summary placement was a misunderstanding. Admins schedule
+from the individual group page into secondary creation/editing. The operator selected the
 chronological browser (This week / Next week / Past CoWs) with the exercise
 and status left, dates/zone right, preserving the mockup's formatting. Its
 revised image is attached to the brief. Review that revision, the remaining
@@ -161,7 +162,7 @@ the owning fact/contract, and update later cards if the answer changes them:
 
 This plan changes no accepted runtime fact. New planned product choices are
 the group calendar, next-week-only scheduling, fixed participation and stored
-finality (D7–D9), plus the D6 summary and group-page navigation;
+finality (D7–D9), plus the D6 Today summary and Groups/group-page navigation;
 deadline acceptance is explicitly still proposed. The
 implementation introduces weekly rules affecting server and mobile readers. T01 must
 apply `docs/procedures/product-facts-authoring.md` and record qualifying
@@ -189,7 +190,7 @@ contract. Review the attached UX brief now; add visual references and settle
 the remaining rule-dependent states before UI implementation. Design work
 needs no separate implementation PR. Only T01 is ready
 to start once the planning PR merges. Delete each card in its shipping PR;
-delete this milestone, its UX brief and selected mockup with the last card.
+delete this milestone, its UX brief and attached mockups with the last card.
 Evidence belongs in the PRs.
 
 ## Risks and completion

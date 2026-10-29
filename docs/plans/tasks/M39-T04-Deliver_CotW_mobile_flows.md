@@ -13,7 +13,8 @@ two-member results, usable unavailable/offline states and visual evidence.
 
 ## Scope
 
-- In: current/next/prior CoW discovery, admin next-week scheduling/management,
+- In: compact current-CoW card on Today / Groups, detailed current/next/prior
+  browser reached from Groups, admin next-week scheduling/management,
   group-zone setup where needed, live/finalizing/final results,
   permission/state/error handling, targeted integration and issue closeout.
 - Out: a new top-level tab, combined winner, recurring creation, notifications,
@@ -26,10 +27,12 @@ T02/T03, existing group resource/action hooks, exercise picker and rank/UI
 primitives. A missing improvement baseline does not hide a valid 1RM or
 Volume result. Group %BW 1RM and personal improvement % need distinct labels.
 
-The operator confirmed the CoW summary appears immediately on At a glance.
-Scheduling starts on the individual group page and opens a secondary CoW page:
-owners/admins create/edit; members view/browse. The summary opens that page
-for reading, with no admin scheduling controls on At a glance.
+The operator clarified: Today / Groups shows a small card for this week's CoW
+only; the detailed secondary browser is accessible from Groups. The earlier
+At a glance summary placement is replaced by this distinction. The Today card
+opens that group's current CoW in the browser. Scheduling starts on the
+individual group page and opens secondary creation/editing for owners/admins;
+members view/browse. No admin scheduling controls on Today.
 
 The member browser direction is selected: chronological This week, Next week
 and Past CoWs sections, with the current metric's top-three preview and Full
@@ -44,7 +47,8 @@ mockup is attached to the brief; no browser tabs or week stepper.
   targets before accepting the complete design target.
   Apply `docs/specs/ui/ai-design-policy.md`; accepted directions are build
   inputs, never a replacement for the merged T01 contract.
-- Refine the agreed summary, selected browser revision, next-CoW form,
+- Review the proposed compact Today card, selected browser revision,
+  Groups entry-link layout, next-CoW form,
   results/history and group-zone control; placement and navigation above are
   settled. Scheduling always targets next week; no date picker or later-week
   queue. Retain group/CoW identity, its shared zone and Back to the origin.
@@ -65,7 +69,9 @@ mockup is attached to the brief; no browser tabs or week stepper.
    choice, no baseline/no result, normalized labels, stale responses, lost
    role/access, offline cached/no-cache states, finalizing/final outcomes,
    fixed next-week dates, membership eligibility and revision conflicts. Prove
-   the summary is immediately visible, group-page admin scheduling opens the
+   the Today card is immediately visible and current-week-only in the group's
+   zone (no upcoming/past fallback), group switching cannot retain stale CoW
+   context, Groups opens the detailed browser, group-page admin scheduling opens the
    secondary form, members can browse without edit controls, and Back retains
    the originating group/page. Use
    existing test fixtures and read `apps/mobile/__tests__/README.md` first.
@@ -84,7 +90,7 @@ mockup is attached to the brief; no browser tabs or week stepper.
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
-| Find challenge | Select a group; read the immediate At a glance summary; open its CoW on the secondary page | Correct shared week, exercise and selected metric rankings | No current CoW stays empty; browsing remains available; no inline admin controls |
+| Find challenge | Read the compact current-CoW card on Today / Groups, or open the detailed browser from Groups | Correct selected group and authoritative CoW week; Today opens its current detail | No current CoW is explicit; Today never substitutes an upcoming or past CoW; no inline admin controls |
 | Set challenge | Owner/admin opens Schedule next CoW from the individual group page; reviews fixed dates/zone on the secondary form, picks exercise/metrics and publishes | One upcoming CoW is visible to all members | Missing zone/eligible exercise, offline, validation or conflict preserves input; members cannot write |
 | Read results | Choose a metric; inspect live standings or stored final rank | Values/units and finality match the server CoW | Missing baseline is unranked only for improvement; finalizing is never shown as final |
 | Manage challenge | Admin opens Edit next CoW from the group page and edits/cancels on the secondary page | Server lifecycle is reflected immediately; Back returns to the originating group | State/role changed: refresh with input retained; destructive actions confirm |
@@ -114,7 +120,7 @@ also require `backend` / `groups-competitions`. On Linux the group UI trigger
 selects `android-smoke`; use any broader Android lanes the actual diff requires.
 
 Use `./boga test for`, obtain lane agreement and independent code/product
-review. Delete this card, the attached UX brief/mockup and the milestone in the shipping PR, link the
+review. Delete this card, the attached UX brief/mockups and the milestone in the shipping PR, link the
 feature's evidence there, and close #927 only when its complete acceptance
 holds. After the human merges, confirm the remote merge and release this
 task's worktree/slot in the same session.

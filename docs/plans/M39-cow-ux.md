@@ -1,8 +1,9 @@
 # CoW — draft UX brief
 
 - Status: placement/navigation and chronological browser direction selected
-  on 2026-10-29; revised horizontal banner shown for review. The remaining
-  screens are still draft, not yet a complete accepted design target.
+  on 2026-10-29; revised horizontal banner and compact Today card shown for
+  review. The remaining screens are still draft, not yet a complete accepted
+  design target.
 - Owner: [M39](milestones/M39-group-challenge-of-the-week.md), implemented by
   [T04](tasks/M39-T04-Deliver_CotW_mobile_flows.md).
 - Authority: milestone D1–D9 for agreed product direction; remaining T01
@@ -12,7 +13,8 @@
   and comparison-form screenshots in the worktree's gitignored mobile
   artifacts tree; link them here or in the implementation PR. The generated
   browser mockup below is a design input, not a running-app screenshot or an
-  interaction-tested prototype.
+  interaction-tested prototype. The user supplied the current Today / Groups
+  screenshot as the reference for a separate compact card.
 
 ## Selected browser direction
 
@@ -35,7 +37,7 @@ Generated with the built-in image-generation tool. Prompt: edit the selected
 chronological concept only, use the first concept solely for two-column header
 alignment, retain the same date range/zone, and preserve all other content and
 formatting. This image covers the member browser only; admin forms and the
-At a glance summary still need their own visual review.
+Today summary still need their own visual review.
 
 ## Intended outcome
 
@@ -46,38 +48,60 @@ even in controls whose surrounding labels use uppercase.
 
 ## Agreed placement and navigation
 
-The operator confirmed that the CoW summary belongs on the selected group's
-At a glance page and appears immediately, without opening another page first.
-Proposed placement is before the existing viewer-local period stepper. The
-CoW has fixed group-calendar dates; the summary's week selector cannot move it.
+The operator clarified two distinct surfaces: the selected detailed browser
+is accessible from Groups; Today / Groups gets a separate small card showing
+only this week's CoW for the selected group. The earlier At a glance summary
+placement was a misunderstanding and is replaced by this distinction.
 
-Show the current CoW's exercise, dates, metrics and state directly in that
-summary. Open CoW opens the secondary CoW page with that CoW selected. A week
-without a CoW shows No CoW this week and a browsing link; it cannot be created
-midweek. No new main tab.
+Today shows the current exercise, week, status and enabled metrics immediately.
+The whole card opens the detailed browser with that group and current CoW
+selected. It has no rankings, metric controls, upcoming/history rows or admin
+actions. A week without a CoW shows No CoW this week, never a prior result or
+next week's challenge presented as current. The authoritative group-calendar
+window determines this card; the existing Today working-set board keeps its
+own viewer-local week. No new main tab.
+
+Proposed placement: between Today's existing group week board and Recent.
+Keep the group's existing header/switch and board intact. Recent remains the
+elastic, internally scrollable part; adding the small card must not push it
+or the tab bar off-screen. Long names wrap without reducing type size.
+
+![Proposed compact current-CoW card on Today / Groups](assets/M39-cow-today.png)
+
+Generated with the built-in image-generation tool. Prompt: edit the supplied
+Today / Groups screenshot to insert one small current-CoW card between its
+board and Recent; preserve its theme, type, existing board/session content and
+tab bar; use the existing Recent whitespace. Placement/content are proposed
+for review. The full browser target above stays separate.
+
+Groups provides an entry to the secondary detailed CoW browser. Its exact
+entry-link layout remains to be designed; it does not embed the full browser
+or require another duplicate weekly summary card.
 
 Scheduling belongs on the individual group page (the existing group
 management screen), which opens a secondary CoW page. Owners/admins can create
-or edit there; every member can view and browse CoWs. The At a glance summary
+or edit there; every member can view and browse CoWs. The Today summary
 is a reading entry, with no scheduling/editing controls. Keep the same selected
 group/CoW across both entries, and return Back to the page that opened it.
 
 The secondary page uses the selected chronological browser for current/upcoming
 CoWs and past results. Concrete route names and form layout remain for T04; creation/editing
-must happen on a secondary page, not an inline At a glance form.
+must happen on a secondary page, not an inline Today form.
 
 These are layout sketches, not pixel targets:
 
 ```text
-Group: Brotherhood                     [switch]
-At a glance | Stream | Leaderboards
+Today: Plan | You | Groups
+...existing selected group's header and week board...
 
-CoW                              2–8 November
-Bench press                              Live
-1RM · Improvement · Total Volume
-[Open CoW]
+CoW                         26 Oct – 1 Nov 26
+Bench press                         Live   >
+1RM · Improvement · Volume
 
-...existing group week summary...
+...existing Recent sessions...
+
+Groups
+CoWs                                       >
 
 Individual group page
 CoWs                                       >
@@ -92,7 +116,8 @@ Past CoWs: final results
 The group-page admin action is Edit next CoW when the next slot is full;
 both actions open the secondary CoW page in the appropriate mode. The sketch's
 admin controls remain proposals; the browser direction is selected above.
-Date formatting follows the account preference; dates refer to the CoW zone.
+Browser/form date formatting follows the account preference; Today uses
+[[copy.calendar-dates]]. CoW dates refer to the group zone on both surfaces.
 
 ## Schedule next CoW
 
@@ -149,11 +174,10 @@ the rankings, or No qualifying results. Tie presentation follows T01; never
 invent an overall winner. A user's ineligible/not-yet-participating state is
 visible without an enrolment control.
 
-After finalization, the At a glance summary can show the latest final outcome
-until a new current CoW starts. Browsing from the group page or summary opens
-the secondary CoW page, where History lists stored results newest first and
-opens the same final detail. The exact latest-result summary remains a visual
-design proposal. This is persistent in-app
+Today never falls back to an ended previous week's CoW. Stored outcomes live
+under Past CoWs in the detailed browser, newest first, with the same final
+detail opened from there. Both Groups and the Today card can reach the browser;
+admin scheduling remains on the individual group page. This is persistent in-app
 reporting, not a modal, a seen-once celebration or a push notification.
 Final results never imply a drill-down source workout is still available.
 Only provide permitted detail links that remain valid; hide unsafe historical
@@ -172,5 +196,5 @@ Before visual acceptance, review the summary and secondary-page layouts,
 reporting, scheduling/edit/cancel, group-zone setup, long names, small/large phones, keyboard and scroll,
 VoiceOver, touch targets and non-colour state cues. T04's UX Contract owns the
 flow/acceptance mapping; its PR supplies fresh running-app screenshots against
-this accepted target. Delete this brief and its selected mockup with T04 and
+this accepted target. Delete this brief and its attached mockups with T04 and
 the milestone.

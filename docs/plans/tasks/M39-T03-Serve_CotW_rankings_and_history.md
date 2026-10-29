@@ -64,7 +64,9 @@ definition, current results, history and linked session reads.
 4. Add exact guards, API methods and account/group/week/revision-bound cache
    keys through the existing group modules. Do not cache full result pages
    where the existing online-paged pattern suffices. Evict incompatible new
-   payload generations and drop stale account/group responses.
+   payload generations and drop stale account/group responses. Provide the
+   small current-CoW summary Today consumes, using the authoritative group
+   week; never return upcoming or previous-week data as its current result.
 5. Extend the existing group backend and real-client API suites with at least
    two members, several sessions, pre-week and boundary sets, several selected
    metrics, missing baseline/reading, ordinary and normalized exercises, and
