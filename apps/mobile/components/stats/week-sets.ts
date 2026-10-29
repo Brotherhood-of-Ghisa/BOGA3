@@ -129,23 +129,27 @@ export type WeekSetsState = { groups: WeekSetGroup[]; loading: boolean; error: s
 
 /**
  * The selected week's sets; a superseded week or an unmount cannot publish its
- * read. While a newer request loads, the last read's cards stay listed, so a
- * week or filter change swaps the cards once instead of blanking the list.
+ * read. While a newer request for the same subject loads, the last read's
+ * cards stay listed, so a week, gym or secondary-set change swaps the cards
+ * once instead of blanking the list; another subject's cards never show.
  */
 export function useWeekSets(target: WeekSetsTarget | null, weekKey: string | null, revision = 0): WeekSetsState {
   const dateFormat = useDateFormat();
   // The last read and the request it answered; a newer request is loading until its read lands.
-  const [read, setRead] = useState<{ groups: WeekSetGroup[]; error: string | null; for: string | null }>({ groups: [], error: null, for: null });
+  const [read, setRead] = useState<{ groups: WeekSetGroup[]; error: string | null; for: string | null; subject: string | null }>(
+    { groups: [], error: null, for: null, subject: null });
+  const subjectKey = target === null ? null : 'exerciseDefinitionId' in target
+    ? `exercise:${target.exerciseDefinitionId}` : `muscle:${target.muscleGroupIds.join(',')}`;
   const targetKey = target === null ? null : 'exerciseDefinitionId' in target
-    ? `${target.exerciseDefinitionId}:${encodeGymRouteParam(target.gymId) ?? ''}` : `${target.muscleGroupIds.join(',')}:${encodeGymRouteParam(target.gymId) ?? ''}:${target.countSecondary ?? true}`;
+    ? `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}` : `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}:${target.countSecondary ?? true}`;
   const requestKey = target === null || weekKey === null ? null : `${targetKey}|${weekKey}|${revision}|${dateFormat}`;
   useEffect(() => {
     if (target === null || weekKey === null) return;
     let active = true;
     loadWeekGroups(target, weekKey, dateFormat).then(
-      (groups) => { if (active) setRead({ groups, error: null, for: requestKey }); },
+      (groups) => { if (active) setRead({ groups, error: null, for: requestKey, subject: subjectKey }); },
       (cause: unknown) => {
-        if (active) setRead({ groups: [], error: cause instanceof Error ? cause.message : 'Unknown error', for: requestKey });
+        if (active) setRead({ groups: [], error: cause instanceof Error ? cause.message : 'Unknown error', for: requestKey, subject: subjectKey });
       },
     );
     return () => { active = false; };
@@ -154,5 +158,5 @@ export function useWeekSets(target: WeekSetsTarget | null, weekKey: string | nul
   }, [requestKey]);
   if (requestKey === null) return { groups: [], loading: false, error: null };
   const current = read.for === requestKey;
-  return { groups: read.groups, loading: !current, error: current ? read.error : null };
+  return { groups: current || read.subject === subjectKey ? read.groups : [], loading: !current, error: current ? read.error : null };
 }

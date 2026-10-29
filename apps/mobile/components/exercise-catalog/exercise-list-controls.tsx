@@ -307,8 +307,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
-    // Leave the search query and its clear control room on narrow phones.
+    // Leave the search query and its clear control room on narrow phones;
+    // in a full row it shrinks, its label truncating, before the row overflows.
     maxWidth: 112,
+    flexShrink: 1,
     paddingHorizontal: uiSpace.sm,
     paddingVertical: uiSpace.xs,
   },

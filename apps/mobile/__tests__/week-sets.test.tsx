@@ -109,10 +109,15 @@ describe('useWeekSets over local data', () => {
     expect(third.rows.map(row => [row.oneRepMaxRecord, row.weightRecord])).toEqual([[true, true], [false, false], [false, false]]);
     expect([first.record, second.record]).toEqual([[], []]);
 
-    rerender({ target: { muscleGroupIds: ['chest'] }, week: '2026-09-28' });
-    // The last week's cards stay listed until the next week's read lands.
+    rerender({ target: { exerciseDefinitionId: 'seed_barbell_bench_press' }, week: '2026-09-28' });
+    // The same subject's last cards stay listed until the next week's read lands.
     expect(result.current.loading).toBe(true);
     expect(result.current.groups.map(group => group.title)).toEqual(['09-10-2026', '07-10-2026', '05-10-2026']);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    rerender({ target: { muscleGroupIds: ['chest'] }, week: '2026-09-28' });
+    // Another subject never shows this one's cards.
+    expect(result.current).toMatchObject({ loading: true, groups: [] });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.groups.map(group => [group.title, group.detail, group.role])).toEqual([
       ['Barbell Bench Press', '02-10-2026', 'primary'], ['Barbell Bench Press', '29-09-2026', 'primary'],

@@ -38,9 +38,10 @@ const loadHistory = async (subject: HistorySubject, id: string, weeks: number) =
  * The read behind one history page. A superseded window, a changed subject or
  * an account unmount cannot publish its read: every published value carries the
  * (subject, window, revision) it was read for. Until the current one lands the
- * hook is loading, and keeps returning the account's last read, so a gym,
- * secondary-set or muscle change redraws the chart once instead of tearing it
- * down for a spinner; a failed read returns nothing.
+ * hook is loading, and keeps returning the subject's last read, so a gym or
+ * secondary-set change redraws the chart once instead of tearing it down for a
+ * spinner. Another subject or account never shows this one's figures, and a
+ * failed read returns nothing.
  */
 export function useHistory(subject: HistorySubject | null, weeks: number, revision: number, accountRevision: number) {
   const kind = subject?.kind ?? null;
@@ -52,7 +53,7 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
   const context = `${subjectKey}:${gymKey}:${primaryOnly ? 'primary' : 'all'}:${weeks}:${revision}`;
   const [loading, setLoading] = useState(id !== null);
   const [loaded, setLoaded] = useState<{
-    context: string; subjectKey: string; accountRevision: number; daily: DailyEffortMetrics[]; weekly: SelectedMuscleWeeklyEffort[]; gyms: GymScopeOption[];
+    context: string; subjectKey: string; daily: DailyEffortMetrics[]; weekly: SelectedMuscleWeeklyEffort[]; gyms: GymScopeOption[];
   } | null>(null);
   const [failure, setFailure] = useState<{ context: string; message: string } | null>(null);
   const [retryRevision, setRetryRevision] = useState(0);
@@ -65,7 +66,7 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
       try {
         const next = await loadHistory(subject, id, weeks);
         if (!active) return;
-        setLoaded({ context, subjectKey, accountRevision, daily: next.daily, weekly: next.weekly, gyms: next.gyms });
+        setLoaded({ context, subjectKey, daily: next.daily, weekly: next.weekly, gyms: next.gyms });
       } catch (cause) {
         if (active) setFailure({ context, message: cause instanceof Error ? cause.message : 'Unknown error' });
       } finally {
@@ -85,7 +86,7 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
   }, [kind, id, gymKey, primaryOnly, weeks, revision, accountRevision, retryRevision]);
   const current = loaded?.context === context ? loaded : null;
   const error = failure?.context === context ? failure.message : null;
-  const shown = id === null ? null : current ?? (error === null && loaded?.accountRevision === accountRevision ? loaded : null);
+  const shown = id === null ? null : current ?? (error === null && loaded?.subjectKey === subjectKey ? loaded : null);
   return {
     daily: shown?.daily ?? [], weekly: shown?.weekly ?? [],
     // The gym choices outlive a gym or secondary-set change on the same

@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { compareFamilySections, countFamilyMuscles, familyHasHeader } from '@/components/stats/progress-tables';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
@@ -10,14 +11,16 @@ import { uiRoles, uiSpace } from '@/components/ui/tokens';
 /** A muscle the title can switch to, as the user's muscle setup names and groups it. */
 export type HistoryTitleMuscle = { id: string; displayName: string; familyName: string };
 
-// Wide enough for a muscle's name; the back arrow and ⋮ keep their slots.
-const TITLE_MAX_WIDTH = 260;
+// Wide enough for a muscle's name, and clear of the back arrow and ⋮ on a
+// 375pt phone.
+const TITLE_MAX_WIDTH = 220;
 
 /**
  * The history page's native header title, in the sheet-title role: a step
  * above the stack's title role; a long exercise name shrinks before it truncates.
  * Given muscles, it is a button: a chevron follows the name, and a tap opens a
- * sheet of the user's muscles by family, the current one checked.
+ * sheet of the user's muscles in Progress's family sections
+ * ([[muscle.family-sections]]), the current one checked.
  */
 export function HistoryTitle({ title, muscles, currentId, onChoose }: {
   title: string;
@@ -46,9 +49,10 @@ export function HistoryTitle({ title, muscles, currentId, onChoose }: {
       <Sheet dismissLabel="Dismiss muscles" onDismiss={() => setOpen(false)} testID="progress-history-muscle-sheet"
         title="Muscle" visible={open}>
         <ScrollView contentContainerStyle={styles.content}>
-          {familiesOf(muscles).map(({ familyName, members }) => (
+          {familySections(muscles).map(({ familyName, header, members }) => (
             <Fragment key={familyName}>
-              <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, styles.family]}>{familyName}</Text>
+              {header ? <Text accessibilityRole="header" allowFontScaling={false}
+                style={[uiText.label, styles.family]}>{familyName}</Text> : null}
               {members.map(muscle => {
                 const checked = muscle.id === currentId;
                 return <ListRow checked={checked} key={muscle.id} label={muscle.displayName}
@@ -63,15 +67,22 @@ export function HistoryTitle({ title, muscles, currentId, onChoose }: {
   );
 }
 
-/** The muscles under their families, both in the order given. */
-export const familiesOf = (muscles: readonly HistoryTitleMuscle[]) => {
+/**
+ * The muscles under their families as Progress sections them: a family header
+ * only above two or more of the user's muscles, headerless families first, then
+ * the fixed family order; muscles keep the order given.
+ */
+export const familySections = (muscles: readonly HistoryTitleMuscle[]) => {
+  const counts = countFamilyMuscles(muscles.map(muscle => muscle.familyName));
   const families = new Map<string, HistoryTitleMuscle[]>();
   for (const muscle of muscles) {
     const members = families.get(muscle.familyName) ?? [];
     members.push(muscle);
     families.set(muscle.familyName, members);
   }
-  return [...families].map(([familyName, members]) => ({ familyName, members }));
+  return [...families]
+    .sort(([left], [right]) => compareFamilySections(left, right, counts))
+    .map(([familyName, members]) => ({ familyName, header: familyHasHeader(familyName, counts), members }));
 };
 
 const styles = StyleSheet.create({

@@ -487,7 +487,7 @@ describe('ProgressHistoryScreen', () => {
     expect(screen.queryByTestId('progress-history-view-sessions')).toBeNull();
   });
 
-  it('makes a muscle page\'s title a switch between the user\'s muscles, by family, in place', async () => {
+  it('makes a muscle page\'s title a switch between the user\'s muscles, in Progress\'s family sections, in place', async () => {
     const setup = buildMuscleSetup(mockCatalog.muscleGroups);
     Object.assign(mockCatalog, { muscleSetup: setup });
     mockPush.mockClear();
@@ -497,7 +497,9 @@ describe('ProgressHistoryScreen', () => {
       const title = screen.getByLabelText('Side delts, switch muscle');
       fireEvent.press(title);
       const sheet = screen.getByTestId('progress-history-muscle-sheet');
-      expect(sheet).toHaveTextContent(/Shoulders.*Side delts.*Arms.*Triceps.*Core.*Core/);
+      // One muscle per family: no family header repeats its muscle ([[muscle.family-sections]]).
+      expect(sheet).toHaveTextContent(/^Muscle(Side delts|Triceps|Core){3}$/);
+      expect(within(sheet).queryAllByRole('header').map(header => header.props.children)).not.toContain('Core');
       expect(screen.getByTestId('progress-history-muscle-option-front_delts')).toHaveProp('accessibilityState', { checked: true });
       // The current muscle is no change.
       fireEvent.press(screen.getByTestId('progress-history-muscle-option-front_delts'));

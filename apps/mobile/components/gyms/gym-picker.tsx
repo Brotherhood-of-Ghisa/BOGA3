@@ -1,5 +1,5 @@
 import { useRef, useState, type ComponentRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, Platform, ScrollView, Text, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import { Icon } from '@/components/ui/icon';
@@ -75,7 +75,7 @@ export function GymPicker({ value, options, onChange, allSessionCount, size = 'p
   if (!showsGymPicker(value, offeredOptions(value, options))) return null;
   return (
     <>
-      <View ref={origin} collapsable={false}>
+      <View ref={origin} collapsable={false} style={styles.origin}>
         <GymPickerButton onPress={() => setOpen(true)} options={options} size={size} testID={testID} value={value} />
       </View>
       <GymPickerSheet allSessionCount={allSessionCount} onChange={onChange} onClose={() => setOpen(false)}
@@ -165,3 +165,8 @@ export const offersGymChoice = (value: string | null | undefined, options: reado
   showsGymPicker(value, offeredOptions(value, options));
 
 const HINT = 'Chooses the gym this view counts';
+
+const styles = StyleSheet.create({
+  // Lets a compact button shrink in a full selector row.
+  origin: { flexShrink: 1, minWidth: 0 },
+});
