@@ -24,12 +24,16 @@ export type WeekSetGroup = {
   sessionId: string;
   title: string;
   detail: string;
-  workingSetCount: number;
   rows: SessionViewSetRow[];
   record: RecordLine[];
   // The block's exercise, on a muscle's list only: the card links to its progress.
   exerciseDefinitionId: string | null;
+  // How the block worked the muscle, on a muscle's list only.
+  role: WeekBlockRole | null;
 };
+
+/** A block counts as primary work when any of its sets worked the muscle as primary. */
+export type WeekBlockRole = 'primary' | 'secondary';
 
 /** One session block to list: its card's title, or the card's exercise name when absent. */
 export type WeekBlock = {
@@ -39,6 +43,7 @@ export type WeekBlock = {
   title?: string;
   detail: string;
   exerciseDefinitionId?: string;
+  role?: WeekBlockRole;
 };
 
 /** Each list follows its page's three-state gym scope. */
@@ -62,8 +67,14 @@ export const exerciseWeekBlocks = (entries: ExerciseHistorySessionEntry[], dateF
 export const muscleWeekBlocks = (contributions: MuscleSetContribution[], dateFormat: ExerciseDateFormat): WeekBlock[] => {
   const blocks = new Map<string, WeekBlock>();
   for (const contribution of contributions) {
-    if (blocks.has(contribution.sessionExerciseId)) continue;
+    const role: WeekBlockRole = contribution.role === 'primary' ? 'primary' : 'secondary';
+    const block = blocks.get(contribution.sessionExerciseId);
+    if (block) {
+      if (role === 'primary') block.role = role;
+      continue;
+    }
     blocks.set(contribution.sessionExerciseId, {
+      role,
       sessionId: contribution.sessionId,
       sessionExerciseId: contribution.sessionExerciseId,
       completedAt: contribution.sessionCompletedAt,
@@ -74,13 +85,13 @@ export const muscleWeekBlocks = (contributions: MuscleSetContribution[], dateFor
   return [...blocks.values()];
 };
 
-/** The listed blocks' cards, oldest first; a block without a card (no performed set) is left out. */
+/** The listed blocks' cards, newest first; a block without a card (no performed set) is left out. */
 export const weekSetGroups = (
   blocks: WeekBlock[],
   cardsBySessionId: ReadonlyMap<string, CompletedSessionDetailCard[]>
 ): WeekSetGroup[] =>
   [...blocks]
-    .sort((left, right) => left.completedAt.getTime() - right.completedAt.getTime())
+    .sort((left, right) => right.completedAt.getTime() - left.completedAt.getTime())
     .flatMap((block) => {
       const card = cardsBySessionId.get(block.sessionId)?.find((candidate) => candidate.id === block.sessionExerciseId);
       return card ? [{
@@ -88,10 +99,10 @@ export const weekSetGroups = (
         sessionId: block.sessionId,
         title: block.title ?? card.name,
         detail: block.detail,
-        workingSetCount: card.setCount,
         rows: card.rows,
         record: card.record,
         exerciseDefinitionId: block.exerciseDefinitionId ?? null,
+        role: block.role ?? null,
       }] : [];
     });
 
@@ -116,21 +127,29 @@ const loadWeekGroups = async (target: WeekSetsTarget, weekKey: string, dateForma
 
 export type WeekSetsState = { groups: WeekSetGroup[]; loading: boolean; error: string | null };
 
-/** The selected week's sets; a superseded week or an unmount cannot publish its read. */
+/**
+ * The selected week's sets; a superseded week or an unmount cannot publish its
+ * read. While a newer request for the same subject loads, the last read's
+ * cards stay listed, so a week, gym or secondary-set change swaps the cards
+ * once instead of blanking the list; another subject's cards never show.
+ */
 export function useWeekSets(target: WeekSetsTarget | null, weekKey: string | null, revision = 0): WeekSetsState {
   const dateFormat = useDateFormat();
   // The last read and the request it answered; a newer request is loading until its read lands.
-  const [read, setRead] = useState<{ groups: WeekSetGroup[]; error: string | null; for: string | null }>({ groups: [], error: null, for: null });
+  const [read, setRead] = useState<{ groups: WeekSetGroup[]; error: string | null; for: string | null; subject: string | null }>(
+    { groups: [], error: null, for: null, subject: null });
+  const subjectKey = target === null ? null : 'exerciseDefinitionId' in target
+    ? `exercise:${target.exerciseDefinitionId}` : `muscle:${target.muscleGroupIds.join(',')}`;
   const targetKey = target === null ? null : 'exerciseDefinitionId' in target
-    ? `${target.exerciseDefinitionId}:${encodeGymRouteParam(target.gymId) ?? ''}` : `${target.muscleGroupIds.join(',')}:${encodeGymRouteParam(target.gymId) ?? ''}:${target.countSecondary ?? true}`;
+    ? `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}` : `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}:${target.countSecondary ?? true}`;
   const requestKey = target === null || weekKey === null ? null : `${targetKey}|${weekKey}|${revision}|${dateFormat}`;
   useEffect(() => {
     if (target === null || weekKey === null) return;
     let active = true;
     loadWeekGroups(target, weekKey, dateFormat).then(
-      (groups) => { if (active) setRead({ groups, error: null, for: requestKey }); },
+      (groups) => { if (active) setRead({ groups, error: null, for: requestKey, subject: subjectKey }); },
       (cause: unknown) => {
-        if (active) setRead({ groups: [], error: cause instanceof Error ? cause.message : 'Unknown error', for: requestKey });
+        if (active) setRead({ groups: [], error: cause instanceof Error ? cause.message : 'Unknown error', for: requestKey, subject: subjectKey });
       },
     );
     return () => { active = false; };
@@ -139,5 +158,5 @@ export function useWeekSets(target: WeekSetsTarget | null, weekKey: string | nul
   }, [requestKey]);
   if (requestKey === null) return { groups: [], loading: false, error: null };
   const current = read.for === requestKey;
-  return { groups: current ? read.groups : [], loading: !current, error: current ? read.error : null };
+  return { groups: current || read.subject === subjectKey ? read.groups : [], loading: !current, error: current ? read.error : null };
 }

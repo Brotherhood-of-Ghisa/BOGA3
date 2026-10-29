@@ -12,7 +12,8 @@ import {
 import type { WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { useHistory, type HistorySubject } from '@/components/stats/use-history';
 import { GymPicker, type GymPickerSheetProps } from '@/components/gyms/gym-picker';
-import { ProgressFilters } from '@/components/stats/progress-filters';
+import { HistoryTitle, type HistoryTitleMuscle } from '@/components/stats/history-title';
+import { SecondarySetsChip } from '@/components/stats/secondary-sets-chip';
 import { decodeGymRouteParam, encodeGymRouteParam } from '@/src/utils/gym-scope-route';
 import {
   ActionButton, Icon, IconButton, ListRow, Notice, Screen, Sheet, StatePanel, uiRoles, uiSpace,
@@ -33,9 +34,9 @@ import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
 // One exercise's or one muscle's history, pushed from Progress. The subject is
-// the page's native title, and the view selector, metric chip and gym sit in
-// one row above the chart; a muscle's gym and secondary sets share a Filters
-// sheet there. The header's ⋮ holds the Timeline's focused week's sessions
+// the page's native title (on a muscle, a button that switches to another of
+// the user's muscles), and the view selector, metric chip, gym and, on a
+// muscle, the secondary-set chip sit in one row above the chart. The header's ⋮ holds the Timeline's focused week's sessions
 // and, for an exercise, its session history, RM curve and counted muscles. The
 // params carry an id, never a name: the page resolves the name from the
 // exercise catalogue cache, which also decides the unavailable state
@@ -107,8 +108,10 @@ type HistoryGymChoice = Pick<GymPickerSheetProps, 'value' | 'options' | 'onChang
 
 // The page's ⋮ offers applicable week, muscle and exercise-chart actions.
 // With no applicable action, hide the button rather than opening an empty sheet.
-function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve }: {
+function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve }: {
   title: string;
+  /** A muscle page's title switches between the user's muscles. */
+  titleSwitch?: { muscles: readonly HistoryTitleMuscle[]; currentId: string; onChoose: (muscleGroupId: string) => void };
   week: FocusedTimelineWeek | null;
   muscles: readonly HistoryMuscleLink[];
   onOpenWeek: (weekStartDateKey: string) => void;
@@ -132,6 +135,7 @@ function HistoryHeader({ title, week, muscles, onOpenWeek, onOpenMuscle, onOpenH
       <Stack.Screen
         options={{
           title,
+          headerTitle: () => <HistoryTitle title={title} {...titleSwitch} />,
           // Named either way — options are merged across renders, so leaving
           // the key out would keep the last button on screen.
           headerRight: hasOptions ? () => (
@@ -243,6 +247,16 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     }) : [],
     [catalog, exercise, muscleSetup]
   );
+  // A muscle page's title switches in place to another of the user's muscles,
+  // keeping this visit's metric, gym and secondary-set choices.
+  const titleSwitch = useMemo(
+    () => subject?.kind === 'muscle' ? {
+      muscles: muscleSetup.muscles,
+      currentId: subject.id,
+      onChoose: (muscleGroupId: string) => router.setParams({ muscleGroupId }),
+    } : undefined,
+    [muscleSetup, router, subject]
+  );
   // Stable, so the muscle window is not rebuilt on every render of the page.
   const muscleTargets = useMemo(
     () => subject?.kind === 'muscle' ? { muscleIds: [subject.id],
@@ -292,7 +306,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         {/* Both keys are named: options merge across renders, so a subject that
             disappears from the catalogue while its page is open would otherwise
             keep its name and a live options button over this panel. */}
-        <Stack.Screen options={{ headerRight: undefined, title: PROGRESS_HISTORY_TITLE }} />
+        <Stack.Screen options={{ headerRight: undefined, headerTitle: undefined, title: PROGRESS_HISTORY_TITLE }} />
         <StatePanel
           body="Open it again from Progress."
           testID="progress-history-unavailable"
@@ -345,6 +359,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         onOpenMuscle={openMuscle}
         onOpenWeek={openWeek}
         title={name ?? PROGRESS_HISTORY_TITLE}
+        titleSwitch={titleSwitch}
         week={focusedWeek}
       />
       {/* The view selector writes a preference; this is the only screen that
@@ -365,8 +380,11 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         <HistoryView
           {...shared}
           kind="muscle"
-          filters={<ProgressFilters testID="progress-history-filters" gym={gym}
-            secondary={{ value: subject.countSecondary !== false, onChange: setChosenSecondary }} />}
+          filters={<>
+            <GymPicker {...gym} size="compact" testID="stats-muscle-history-gym" />
+            <SecondarySetsChip onChange={setChosenSecondary} testID="stats-muscle-history-secondary"
+              value={subject.countSecondary !== false} />
+          </>}
           metric={muscleMetric}
           metricOptions={MUSCLE_HISTORY_METRIC_OPTIONS}
           muscleTargets={muscleTargets}

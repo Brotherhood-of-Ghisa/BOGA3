@@ -156,30 +156,18 @@ const chooseMetric = async (kind: HistoryKind, metric: HistoryMetric) => {
   expect(shownMetric(kind)).toBe(metric);
 };
 
-// A muscle page's gym sits in its Filters sheet, which stays open across
-// choices: open it, act, dismiss it. An exercise's gym is its own picker.
-const inFilters = <T,>(inside: () => T): T => {
-  fireEvent.press(screen.getByTestId('progress-history-filters'));
-  const result = inside();
-  fireEvent(screen.getByTestId('progress-history-filters-sheet'), 'accessibilityEscape');
-  return result;
-};
-const GYM_BUTTON = { exercise: 'stats-exercise-history-gym', muscle: 'progress-history-filters' } as const;
+// Each page's gym is its own picker in the selector row.
+const GYM_BUTTON = { exercise: 'stats-exercise-history-gym', muscle: 'stats-muscle-history-gym' } as const;
+const SECONDARY_CHIP = 'stats-muscle-history-secondary';
 const chooseGym = (kind: HistoryKind, key: string) => {
-  if (kind === 'muscle') {
-    inFilters(() => fireEvent.press(screen.getByTestId(`stats-gym-option-${key}`)));
-  } else {
-    fireEvent.press(screen.getByTestId(GYM_BUTTON.exercise));
-    fireEvent.press(screen.getByTestId(`stats-exercise-history-gym-option-${key}`));
-  }
+  fireEvent.press(screen.getByTestId(GYM_BUTTON[kind]));
+  fireEvent.press(screen.getByTestId(`${GYM_BUTTON[kind]}-option-${key}`));
 };
-/** The gym the page's button names: the picker's own, or the Filters' changed choices. */
-const gymButtonLabel = (kind: HistoryKind, gym: string) =>
-  kind === 'exercise' ? `Gym: ${gym}` : gym === 'All gyms' ? 'Filters' : `Filters: ${gym}`;
+/** The gym the page's button names. */
+const gymButtonLabel = (gym: string) => `Gym: ${gym}`;
 const allGymsLabel = (kind: HistoryKind): string => {
-  if (kind === 'muscle') return inFilters(() => screen.getByTestId('stats-gym-option-all').props.accessibilityLabel);
-  fireEvent.press(screen.getByTestId(GYM_BUTTON.exercise));
-  return screen.getByTestId('stats-exercise-history-gym-option-all').props.accessibilityLabel;
+  fireEvent.press(screen.getByTestId(GYM_BUTTON[kind]));
+  return screen.getByTestId(`${GYM_BUTTON[kind]}-option-all`).props.accessibilityLabel;
 };
 
 beforeEach(async () => {
@@ -349,7 +337,7 @@ describe('The history page over real data', () => {
     expect(trainingDays()).toEqual([noGymDay]);
     // The gym sits in the body's selector row, not the native header.
     expect(within(screen.getByTestId(`stats-${kind}-history-overlay`)).getByTestId(GYM_BUTTON[kind]))
-      .toHaveProp('accessibilityLabel', gymButtonLabel(kind, 'No gym'));
+      .toHaveProp('accessibilityLabel', gymButtonLabel('No gym'));
 
     chooseGym(kind, EXERCISE_BLOCK_HISTORY_FIXTURE.gymId);
     await waitFor(() => expect(trainingDays().length).toBeGreaterThan(1));
@@ -357,7 +345,7 @@ describe('The history page over real data', () => {
 
     chooseGym(kind, 'all');
     await waitFor(() => expect(trainingDays()).toContain(noGymDay));
-    expect(screen.getByTestId(GYM_BUTTON[kind])).toHaveProp('accessibilityLabel', gymButtonLabel(kind, 'All gyms'));
+    expect(screen.getByTestId(GYM_BUTTON[kind])).toHaveProp('accessibilityLabel', gymButtonLabel('All gyms'));
     // `All gyms` counts every session of the window, each gym's own beside it.
     expect(allGymsLabel(kind)).toMatch(/^All gyms, \d+ sessions$/);
   });
@@ -689,14 +677,15 @@ describe('The history page over real data', () => {
     await waitFor(() => expect(week).toHaveBeenCalledWith(expect.objectContaining({ muscleGroupIds: ['quads'], countSecondary: false })));
     expect(await screen.findByTestId('stats-muscle-history-empty')).toBeTruthy();
     expect(screen.queryAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).toHaveLength(0);
-    // The page's own Filters open on Progress's choice and change it for this visit.
-    expect(screen.getByTestId('progress-history-filters')).toHaveProp('accessibilityLabel', 'Filters: secondary sets not counted');
-    expect(inFilters(() => screen.getByTestId('stats-secondary-toggle').props.accessibilityState.checked)).toBe(false);
-    inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
+    // The page's own chip opens on Progress's choice and changes it for this visit.
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: false });
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('Pri');
+    fireEvent.press(screen.getByTestId(SECONDARY_CHIP));
     await waitFor(() => expect(history).toHaveBeenLastCalledWith(expect.not.objectContaining({ countSecondary: false })));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-empty'));
     expect((await screen.findAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).length).toBeGreaterThan(0);
-    expect(screen.getByTestId('progress-history-filters')).toHaveProp('accessibilityLabel', 'Filters');
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('Sec');
   });
 
   it('combines the linked gym with secondary sets, keeping the gym rows while either choice re-reads', async () => {
@@ -709,30 +698,34 @@ describe('The history page over real data', () => {
         : new Promise(resolve => { release = () => resolve(real(options)); }));
     await openHistory({ muscleGroupId: 'quads', gymId: gym, secondary: 'hidden' });
     await waitFor(() => expect(history).toHaveBeenCalledWith(expect.objectContaining({ gymId: gym, countSecondary: false })));
-    await waitFor(() => expect(screen.getByTestId('progress-history-filters').props.accessibilityLabel)
-      .toBe('Filters: Maestro Block History Gym, secondary sets not counted'));
+    await waitFor(() => expect(screen.getByTestId(GYM_BUTTON.muscle).props.accessibilityLabel)
+      .toBe(gymButtonLabel('Maestro Block History Gym')));
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: false });
+    const cards = () => screen.queryAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/).length;
+    const shownCards = cards();
 
-    fireEvent.press(screen.getByTestId('progress-history-filters'));
-    fireEvent.press(screen.getByTestId('stats-secondary-toggle'));
+    fireEvent.press(screen.getByTestId(SECONDARY_CHIP));
     await waitFor(() => expect(history).toHaveBeenLastCalledWith(expect.not.objectContaining({ countSecondary: false })));
-    // The read is pending: the open sheet keeps its gym rows.
-    expect(screen.getByTestId(`stats-gym-option-${gym}`)).toHaveProp('accessibilityState', { checked: true });
-    expect(screen.getByTestId(`stats-gym-option-${gym}`)).toHaveTextContent(/Maestro Block History Gym/);
+    // The read is pending: the gym picker keeps its rows, and the last read stays drawn rather than a loading panel.
+    expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull();
+    expect(cards()).toBe(shownCards);
+    fireEvent.press(screen.getByTestId(GYM_BUTTON.muscle));
+    expect(screen.getByTestId(`${GYM_BUTTON.muscle}-option-${gym}`)).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId(`${GYM_BUTTON.muscle}-option-${gym}`)).toHaveTextContent(/Maestro Block History Gym/);
     await act(async () => release());
-    fireEvent.press(screen.getByTestId('stats-gym-option-all'));
-    fireEvent(screen.getByTestId('progress-history-filters-sheet'), 'accessibilityEscape');
+    fireEvent.press(screen.getByTestId(`${GYM_BUTTON.muscle}-option-all`));
     await waitFor(() => expect(history.mock.lastCall?.[0]).not.toHaveProperty('gymId'));
     expect(history.mock.lastCall?.[0]).not.toHaveProperty('countSecondary');
     await act(async () => release());
-    expect(screen.getByTestId('progress-history-filters')).toHaveProp('accessibilityLabel', 'Filters');
+    expect(screen.getByTestId(GYM_BUTTON.muscle)).toHaveProp('accessibilityLabel', gymButtonLabel('All gyms'));
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: true });
   });
 
   it('offers secondary sets only on a muscle page: an exercise page keeps a plain gym button', async () => {
     await loadMaestroFixture('exercise-block-history');
     await openHistory({ exerciseDefinitionId: SQUAT });
     expect(await screen.findByTestId('stats-exercise-history-gym')).toBeTruthy();
-    expect(screen.queryByTestId('progress-history-filters')).toBeNull();
-    expect(screen.queryByTestId('stats-secondary-toggle')).toBeNull();
+    expect(screen.queryByTestId(SECONDARY_CHIP)).toBeNull();
   });
 
   it('retries a failed muscle history read without leaving the page', async () => {

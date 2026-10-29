@@ -31,7 +31,8 @@ Signature: `primary + ½ secondary`
 
 ### muscle.secondary-filter · presentation · accepted
 
-Progress and muscle history Filters offer `Count secondary sets` per visit:
+Progress's Filters (`Count secondary sets`) and muscle history's chip (`Sec` /
+`Pri`, spoken `Count secondary sets`) offer counting secondary sets per visit:
 Progress opens on Settings' default, history on Progress's. Off counts primary
 work only. The default is per account, synced like [[muscle.weekly-targets]].
 

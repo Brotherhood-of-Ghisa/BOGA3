@@ -37,8 +37,11 @@ const loadHistory = async (subject: HistorySubject, id: string, weeks: number) =
 /**
  * The read behind one history page. A superseded window, a changed subject or
  * an account unmount cannot publish its read: every published value carries the
- * (subject, window, revision) it was read for, and the page shows nothing until
- * the current one has landed.
+ * (subject, window, revision) it was read for. Until the current one lands the
+ * hook is loading, and keeps returning the subject's last read, so a gym or
+ * secondary-set change redraws the chart once instead of tearing it down for a
+ * spinner. Another subject or account never shows this one's figures, and a
+ * failed read returns nothing.
  */
 export function useHistory(subject: HistorySubject | null, weeks: number, revision: number, accountRevision: number) {
   const kind = subject?.kind ?? null;
@@ -83,8 +86,9 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
   }, [kind, id, gymKey, primaryOnly, weeks, revision, accountRevision, retryRevision]);
   const current = loaded?.context === context ? loaded : null;
   const error = failure?.context === context ? failure.message : null;
+  const shown = id === null ? null : current ?? (error === null && loaded?.subjectKey === subjectKey ? loaded : null);
   return {
-    daily: current?.daily ?? [], weekly: current?.weekly ?? [],
+    daily: shown?.daily ?? [], weekly: shown?.weekly ?? [],
     // The gym choices outlive a gym or secondary-set change on the same
     // subject, so the picker stays put while the new read loads.
     gyms: loaded?.subjectKey === subjectKey ? loaded.gyms : NO_GYMS,
