@@ -679,13 +679,13 @@ describe('The history page over real data', () => {
     expect(screen.queryAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).toHaveLength(0);
     // The page's own chip opens on Progress's choice and changes it for this visit.
     expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: false });
-    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('Pri');
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('Sec');
     fireEvent.press(screen.getByTestId(SECONDARY_CHIP));
     await waitFor(() => expect(history).toHaveBeenLastCalledWith(expect.not.objectContaining({ countSecondary: false })));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-empty'));
     expect((await screen.findAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).length).toBeGreaterThan(0);
     expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: true });
-    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('+ Sec');
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('Sec');
   });
 
   it('combines the linked gym with secondary sets, keeping the gym rows while either choice re-reads', async () => {

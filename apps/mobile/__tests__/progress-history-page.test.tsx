@@ -468,7 +468,7 @@ describe('ProgressHistoryScreen', () => {
     // The newest week in the window is focused, and it is the week trained.
     await waitFor(() => expect(screen.getByTestId('progress-history-options-button')).toBeTruthy());
     expect(mockScreenOptions.title).toBe('Side delts');
-    // The title is drawn in the page-title role; with no muscle setup to switch through, it is no button.
+    // The title is drawn in the sheet-title role; with no muscle setup to switch through, it is no button.
     expect(screen.getByTestId('progress-history-title-text')).toHaveTextContent('Side delts');
     expect(screen.getByTestId('progress-history-title')).toHaveProp('accessibilityRole', 'header');
     expect(screen.queryByTestId('progress-history-view-sessions')).toBeNull();

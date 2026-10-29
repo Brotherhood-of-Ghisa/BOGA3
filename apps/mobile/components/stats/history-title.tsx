@@ -14,8 +14,8 @@ export type HistoryTitleMuscle = { id: string; displayName: string; familyName: 
 const TITLE_MAX_WIDTH = 260;
 
 /**
- * The history page's native header title, in the page-title role rather than
- * the stack's smaller one; a long exercise name shrinks before it truncates.
+ * The history page's native header title, in the sheet-title role: a step
+ * above the stack's title role; a long exercise name shrinks before it truncates.
  * Given muscles, it is a button: a chevron follows the name, and a tap opens a
  * sheet of the user's muscles by family, the current one checked.
  */
@@ -27,7 +27,7 @@ export function HistoryTitle({ title, muscles, currentId, onChoose }: {
 }) {
   const [open, setOpen] = useState(false);
   const label = <Text adjustsFontSizeToFit allowFontScaling={false} minimumFontScale={0.75} numberOfLines={1}
-    style={[uiText.pageTitle, styles.text]} testID="progress-history-title-text">{title}</Text>;
+    style={[uiText.sheetTitle, styles.text]} testID="progress-history-title-text">{title}</Text>;
   if (!muscles || muscles.length < 2 || !onChoose) {
     return <View accessibilityRole="header" accessible style={styles.root} testID="progress-history-title">{label}</View>;
   }
