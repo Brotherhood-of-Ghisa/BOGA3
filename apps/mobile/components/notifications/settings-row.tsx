@@ -109,7 +109,7 @@ export function NotificationSettingsRow({ userId, divider = false }: { userId: s
 
 function notificationStatus(state: NotificationSnapshot, userId: string | null): string {
   if (!userId) return 'Sign in';
-  if (!state.supported) return 'Unavailable on this device';
+  if (!state.supported) return 'Unavailable';
   if (state.permission === 'denied') return 'Off in iOS Settings';
   if (!state.enabled) return 'Not enabled';
   if (!state.registered) return 'Not registered';

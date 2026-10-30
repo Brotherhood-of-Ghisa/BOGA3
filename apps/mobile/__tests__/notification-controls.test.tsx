@@ -197,7 +197,7 @@ it('keeps unsupported builds usable without offering registration or showing act
   render(<NotificationSettingsRow userId={USER} />);
   fireEvent.press(screen.getByTestId('settings-notifications-row'));
   const sheet = within(screen.getByTestId('settings-notifications-sheet'));
-  expect(screen.getByLabelText('Notifications, Unavailable on this device')).toBeTruthy();
+  expect(screen.getByLabelText('Notifications, Unavailable')).toBeTruthy();
   expect(sheet.queryByTestId('settings-notifications-enable')).toBeNull();
   expect(sheet.queryByTestId('settings-notifications-activity')).toBeNull();
   expect(native.requestPermission).not.toHaveBeenCalled();
