@@ -98,3 +98,14 @@ export const historyDayHref = (dateKey: string, sessionIds: readonly string[], a
   if (sessionIds.length > 1) return sessionsDayHref(dateKey);
   return sessionIds[0] === activeSessionId ? sessionViewHref(sessionIds[0]) : completedSessionHref(sessionIds[0]);
 };
+
+
+/** CoW links carry public identity and one opening metric, never a score/context. */
+export const coWsHref = (groupId: string, cowId?: string, metric?: string): Href => {
+  const query = [cowId ? `cowId=${encodeURIComponent(cowId)}` : null, metric ? `metric=${encodeURIComponent(metric)}` : null].filter(Boolean).join('&');
+  return `/group/${encodeURIComponent(groupId)}/cows${query ? `?${query}` : ''}` as Href;
+};
+export const coWStandingsHref = (groupId: string, cowId: string, metric: string): Href =>
+  `/group/${encodeURIComponent(groupId)}/cows/${encodeURIComponent(cowId)}?metric=${encodeURIComponent(metric)}` as Href;
+export const coWScheduleHref = (groupId: string, cowId?: string): Href =>
+  `/group/${encodeURIComponent(groupId)}/cows/schedule${cowId ? `?cowId=${encodeURIComponent(cowId)}` : ''}` as Href;

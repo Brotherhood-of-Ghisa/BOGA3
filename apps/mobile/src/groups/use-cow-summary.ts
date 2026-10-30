@@ -21,5 +21,5 @@ export function useCoWSummary(groupId: string | null, userId: string | null) {
     return () => clearTimeout(timer);
   }, [deadline, refresh]);
   const observedNow = Math.max(now, resource.lastUpdatedAtMs ?? now);
-  return { ...resource, data: deadline !== null && observedNow < deadline ? resource.data : null };
+  return { ...resource, data: unset || deadline !== null && observedNow < deadline ? resource.data : null };
 }

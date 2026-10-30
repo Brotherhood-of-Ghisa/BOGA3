@@ -1,3 +1,4 @@
+import { CoWGroupPreview } from '@/components/groups/cow-group-preview';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -265,6 +266,7 @@ export function TodayGroupCard({
         onOpenGroup={() => onOpenGroup(selectedGroupId)}
         range={range}
       />
+      <CoWGroupPreview key={`${myUserId}:${selectedGroupId}`} groupId={selectedGroupId} userId={myUserId} today />
       {/* Members training now, then the latest completed sessions: a card each. */}
       {sessions.live.length > 0 ? (
         <SessionsCard fill={!showRecent} testID="today-group-live">

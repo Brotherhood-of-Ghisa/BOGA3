@@ -24,7 +24,7 @@ draws the same fixed bar on every screen that shows tabs.
 
 | Route | What it is for | File |
 | --- | --- | --- |
-| `/today` | Landing page: You (this week, N-week period, a session's exercises), Plan (muscles' last three days, today and week against targets; week's plans; `Sessions` opens Sessions), Groups (a group's week, sessions). Swiped cards: Plan first, opens on You. Starts nothing | `(tabs)/today.tsx`, `components/today/`, `src/progress-summary/`, `src/today-plan/` |
+| `/today` | Landing page: You (this week, N-week period, a session's exercises), Plan (muscles' last three days, today and week against targets; week's plans; `Sessions` opens Sessions), Groups (a group's week, CoW, sessions). Swiped cards: Plan first, opens on You. Starts nothing | `(tabs)/today.tsx`, `components/today/`, `src/progress-summary/`, `src/today-plan/` |
 | `/train` | The single entry surface for starting a personal workout | `(tabs)/train.tsx` |
 | `/progress` | Frozen breakdown / period / metric chips over table search and a Filters button, whose sheet holds the family-grouping switch, `Count secondary sets` ([[muscle.secondary-filter]]) and the gym's radio rows — each only where the view uses it; Muscle uses Settings' saved layout (`List`/`3D`, default `List`), Exercise always uses its full exercise list; both follow [[comparison.change-display]]. Exercise sorts Now / Prev / Change / recency; Muscle sorts name / Now / Prev / Change, within fixed family sections or globally with grouping off. Search matches Exercise names/primary muscles or Muscle names/families. Each breakdown retains its own search, grouping and sort for the visit. Exercise opens on its configured metric (Sets by default), with 1RM available explicitly. Muscle List uses the Exercise table’s separate columns and responsive rows; names open history and chevrons disclose contributors; 3D reveals effort-grouped contributors and Timeline / Grid / Weekly links. Table history and contributor links carry the chosen gym and metric; 3D muscle contributors open all-gym exercise Timeline. Visits open on Settings' defaults ([[comparison.window]]); choices last the visit, a changed default replaces one; `breakdown` / `period` links override on entry or change. Sessions remains last | `(tabs)/progress.tsx` |
 | `/more` | Hub for secondary capabilities, so the tab bar stays at four. Two untitled cards: Groups, Exercises, Gyms; then Connect an AI (names the connected agents and opens `/connected-agents`; with none, or signed out, opens the setup instructions in the browser) and Settings | `(tabs)/more.tsx` |
@@ -80,9 +80,12 @@ the tab bar (`TabOwnedPage`), owned by More.
 | `/group/mine` | My groups: active memberships, `Join group` / `Create group` — the way into a group's management page | `group/mine.tsx` |
 | `/group/new` | Create a group (inline username gate first when the username is blank) | `group/new.tsx` |
 | `/group/join` | Join by code: code field, preview card, `Join group` | `group/join.tsx` |
-| `/group/[groupId]` | The group screen, for *managing* the group: header, owner/admin Invite + Edit, and the group's exercises with link / unlink. Stream and leaderboards live on `/groups` | `group/[groupId]/index.tsx` |
+| `/group/[groupId]` | The group screen, for *managing* the group: header, owner/admin Invite + Edit, CoW preview and persistent View CoWs, and the group's exercises with link / unlink. Stream and leaderboards live on `/groups` | `group/[groupId]/index.tsx` |
 | `/group/[groupId]/members` | The member list behind the header's member count, with role actions and `Leave group` | `group/[groupId]/members.tsx` |
-| `/group/[groupId]/edit` | Owner/admin edit of name and description | `group/[groupId]/edit.tsx` |
+| `/group/[groupId]/edit` | Owner/admin edit of name, description and group calendar time zone | `group/[groupId]/edit.tsx` |
+| `/group/[groupId]/cows` | This week, next week and past CoWs; independent metric preview, online history and admin next-week entry | `group/[groupId]/cows/index.tsx` |
+| `/group/[groupId]/cows/[cowId]` | Online full standings, server ranks/units and finality; metric switch replaces pages | `group/[groupId]/cows/[cowId].tsx` |
+| `/group/[groupId]/cows/schedule` | Admin create/edit/cancel before start; fixed next week, active exercise picker, independent metric choices and uncertain-write recovery | `group/[groupId]/cows/schedule.tsx` |
 | `/group/[groupId]/invite` | Owner/admin invite: the code, its `boga3://` link, Share, Regenerate | `group/[groupId]/invite.tsx` |
 | `/group/[groupId]/exercises/new` | Owner/admin add a group exercise, `From catalogue` or `Custom` | `group/[groupId]/exercises/new.tsx` |
 | `/group/[groupId]/exercises/[exerciseId]/edit` | Owner/admin rename a group exercise or change its weight entry | `group/[groupId]/exercises/[exerciseId]/edit.tsx` |
@@ -107,21 +110,6 @@ the tab bar (`TabOwnedPage`), owned by More.
 
 ## Reachability rules
 
-- The root stack declares every root route under **one `Stack.Protected` group
-  per access level** — `sign-in`, `sync-setup`, `app` — and
-  `apps/mobile/src/navigation/root-route-access.ts` enables exactly one at a
-  time. Login-on-start and the first-sync block are therefore enforced by the
-  navigator, which is never unmounted to gate access (on expo-router 57
-  unmounting it reverts the route, so a gate rendered in its place loops).
-- `/sign-in` stays reachable at the `app` level so an auth-unconfigured build
-  can show its disabled credential path when opened directly.
-- Every root route file must be declared in the root stack; an undeclared one
-  is appended outside every `Protected` group. `/maestro-harness` is declared
-  last and the router must never land on it.
-- `/sync-setup` **renders through** for a signed-out or auth-unconfigured app,
-  so it never traps a build that can have no session; `/sign-in` is exempt from
-  its redirect so the two cannot loop. It redirects to `/sign-in` with no Retry
-  when the latest cycle outcome is `AUTH_REQUIRED`.
 - Detail screens use the native **minimal** back-button display mode (arrow,
   no text label), which also keeps the internal `(tabs)` group name off screen.
 - Screens whose header title is the name of a thing (`exercise-history`,

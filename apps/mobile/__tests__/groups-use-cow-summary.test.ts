@@ -38,10 +38,10 @@ it('drops an old account/group response supplied as absent by the resource bound
   expect(refresh).not.toHaveBeenCalled();
 });
 
-it('does not spin on the zero-lifetime absence returned by an unset group calendar', () => {
+it('preserves confirmed unset-calendar absence without a zero-delay refresh loop', () => {
   mockResource.mockReturnValue({ data: { ...summary, week_start: null, selection: 'none', result: null, valid_until_us: summary.observed_at_us }, lastUpdatedAtMs: now, refresh });
   const { result } = renderHook(() => useCoWSummary('g1', 'u1'));
   act(() => jest.advanceTimersByTime(1000));
-  expect(result.current.data).toBeNull();
+  expect(result.current.data).toMatchObject({ selection: 'none', result: null });
   expect(refresh).not.toHaveBeenCalled();
 });

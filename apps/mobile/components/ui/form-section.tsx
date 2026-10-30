@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 
 import { Card } from '@/components/ui/card';
@@ -43,6 +43,7 @@ export function FormError({ message, testID }: { message?: string | null; testID
 }
 
 export type ChoiceRowProps = {
+  ref?: ComponentProps<typeof ListRow>['ref'];
   label: string;
   // The current choice, muted at the row's end; `placeholder` (faint) until one is made.
   value?: string | null;
@@ -55,10 +56,11 @@ export type ChoiceRowProps = {
 };
 
 /** A field whose value is chosen elsewhere (a picker sheet, a page): label, value, chevron. */
-export function ChoiceRow({ label, value, placeholder, onPress, divider = false, disabled, accessibilityLabel, testID }: ChoiceRowProps) {
+export function ChoiceRow({ label, value, placeholder, onPress, divider = false, disabled, accessibilityLabel, testID, ref }: ChoiceRowProps) {
   const shown = value && value.length > 0 ? value : null;
   return (
     <ListRow
+      ref={ref}
       accessibilityLabel={accessibilityLabel ?? `${label}: ${shown ?? placeholder ?? 'none'}`}
       density="list"
       disabled={disabled}

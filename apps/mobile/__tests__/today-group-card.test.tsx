@@ -43,6 +43,7 @@ jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
+  ...jest.requireActual('./helpers/cow-fixtures').coWReadMocks(),
   listMyGroups: jest.fn(),
   getCompetitionWeek: jest.fn(),
   getCompetitionStream: jest.fn(),

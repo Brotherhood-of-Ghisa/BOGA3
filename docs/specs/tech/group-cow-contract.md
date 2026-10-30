@@ -1,8 +1,7 @@
 # Challenge of the Week contract
 
 > **Owns:** CoW intake, cutoff, aggregation and publication boundaries.
-> **Status:** aggregation, intake, publication and typed readers implemented;
-> mobile screens pending. **Load when:** changing CoW.
+> **Status:** aggregation, intake, publication, typed readers and mobile flows implemented. **Load when:** changing CoW.
 
 Product rules belong to [[groups.cow-metrics]], [[groups.cow-baseline]],
 [[groups.cow-calendar]], [[groups.cow-participation]],
@@ -179,6 +178,23 @@ older, finalizing and terminal-unavailable outcomes cannot supply the fallback. 
 group, calendar week/revision, CoW/revision, publication and current policy.
 It participates in account-wide disclosure retirement and expires at the server's
 next selection edge, including offline; a rollover triggers a fresh read.
+
+## Mobile reads and writes
+
+Today and group management reuse `components/groups/cow-group-preview.tsx`:
+independent metric podiums, exact displayed identity on header navigation and no
+viewer substitution. Confirmed absence takes no Today space; loading/errors
+remain explicit. Group management retains View CoWs even without a preview.
+The browser refreshes its online list/calendar at summary selection edges.
+Full standings/history use online pages; only the bounded summary is cached.
+Unavailable/unranked rows never infer participation or baseline reasons absent
+from the wire. Final labels require server finality, never elapsed device time.
+
+`use-cow-editor.ts` retains choices across refresh/return paths, validates active
+comparisons, pins edit revisions and refuses offline writes. Creation retains one
+request UUID. An uncertain outcome disables another publish until an exact-ID
+status read and authoritative slot/calendar refresh resolve it. Existing group
+Edit owns IANA-zone setup; scheduling never supplies a date picker.
 
 ## Pure reducer
 
