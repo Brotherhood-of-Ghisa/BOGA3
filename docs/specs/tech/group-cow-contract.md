@@ -183,8 +183,8 @@ next selection edge, including offline; a rollover triggers a fresh read.
 
 Today and group management reuse `components/groups/cow-group-preview.tsx`:
 independent metric podiums, exact displayed identity on header navigation and no
-viewer substitution. Confirmed absence takes no Today space; loading/errors
-remain explicit. Group management retains View CoWs even without a preview.
+viewer substitution. Confirmed absence takes no preview space; loading/errors
+remain explicit. The CoWs tab and standalone browser share `components/groups/group-cows-page.tsx`.
 The browser refreshes its online list/calendar at summary selection edges.
 Full standings/history use online pages; only the bounded summary is cached.
 Unavailable/unranked rows never infer participation or baseline reasons absent

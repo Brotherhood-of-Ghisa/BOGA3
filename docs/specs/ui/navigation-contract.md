@@ -104,6 +104,7 @@ access level, and `useRootRouteAccess`
 | `/exercise-catalog` | `source=session` | a save returns by `router.back()` |
 | | `intent` | `add` auto-opens the create editor once on first load; the session picker passes `manage` |
 | `/groups` | `groupId` | selects that group when it is in My groups, else the one last shown this app session, else the first by name |
+| | `section=stream\|glance\|leaderboards\|cows` | selects a group's page; absent opens Stream |
 | `/group/join` | `code` | prefills the code field and runs the preview once the username gate is satisfied |
 | `/group-session/[memberId]/[sessionId]` | `groupId` | required authorised scope, read through the group-scoped safe reader/cache; missing renders generic session unavailable |
 | `/session-plan/new` | `edit` | edits that plan: prefill, then the guarded per-operation sync; back returns to the plan detail |
@@ -183,8 +184,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/groups`, `/today`, a board | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | a stream session card, Today's one-member training-now row or completed session, or the row detail sheet's `View full session` (`push`). Every full-session exit carries `groupId` |
 | `/today` | `/groups?groupId=<groupId>`, `/group/mine` | The board card's group name, the week board and the `<n> training now` row, carrying Today's selected group; `Find a group` when there is none. Picking a chip changes the selection Today shares with `/groups`; it does not navigate |
 | `/today`, `/group/<groupId>` | `/group/<groupId>/cows?cowId=…&metric=…` | preview header pushes the browser carrying the displayed CoW/metric; in-card switching never navigates |
-| `/groups` | `/group/<groupId>/cows` | CoWs link (`push`) |
-| CoW browser | CoW standings or schedule | row/header opens standings; admins schedule/edit next week. Save/cancel returns `back()` and focus re-reads |
+| CoWs tab or browser | CoW standings or schedule | row/header opens standings; admins schedule/edit next week. Save/cancel returns `back()` and focus re-reads |
 | Group management | group Edit | Set time zone pushes `edit?focusTimeZone=1` ([[groups.cow-calendar]]) |
 | CoW schedule | new exercise | Add exercise opens its form; Back retains and revalidates choices. Dismissal refocuses Exercise |
 | `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | invite link; static `group/join` wins over `[groupId]`. A changed code remounts the form. Signed-out links lose the code through sign-in; reopening works (`__tests__/groups-join-deep-link.test.tsx`) |

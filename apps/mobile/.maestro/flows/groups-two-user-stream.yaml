@@ -279,9 +279,11 @@ appId: com.dinoderek.mobile
 - assertNotVisible: { text: "View CoWs" }
 - openLink: "boga3://groups?groupId=${output.groupsGroupId}"
 - extendedWaitUntil:
-    visible: { id: "groups-cows-link" }
+    visible: { id: "groups-tab-cows" }
     timeout: 15000
-- tapOn: { id: "groups-cows-link" }
+- waitForAnimationToEnd
+- takeScreenshot: "groups-stream-tabs"
+- tapOn: { id: "groups-tab-cows" }
 - extendedWaitUntil:
     visible: { id: "cows-schedule" }
     timeout: 15000
@@ -318,10 +320,8 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "cows-next" }
     timeout: 10000
-- tapOn: { id: "BackButton" }
-- extendedWaitUntil:
-    visible: { id: "groups-cows-link" }
-    timeout: 10000
+- assertVisible: { id: "groups-tab-cows", selected: true }
+- takeScreenshot: "groups-cows-tab"
 
 # --- 5. Active session -> one "Training now" card with its metrics ---------------
 - runScript:
