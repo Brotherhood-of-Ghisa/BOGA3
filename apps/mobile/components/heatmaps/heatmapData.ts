@@ -4,6 +4,7 @@
 // bucket helpers so the heat ramp matches the rest of the stats screen.
 // No React / react-native imports — safe to unit-test in isolation.
 
+import { addCompensated, createCompensatedSum, type CompensatedSum } from '@/src/utils/sum';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
 import { groupedTargetAttainment } from '@/src/preferences/targets';
@@ -174,6 +175,8 @@ type WeekTotals = {
   unavailable: boolean;
   hasKnown: boolean;
   workingSetCountsByMuscle: Record<string, number>;
+  workingSetSumsByMuscle: Map<string, CompensatedSum>;
+  workingSetSum: CompensatedSum;
 };
 
 const emptyWeek = (weekStartDateKey: string): WeekTotals => ({
@@ -184,19 +187,24 @@ const emptyWeek = (weekStartDateKey: string): WeekTotals => ({
   unavailable: false,
   hasKnown: false,
   workingSetCountsByMuscle: {},
+  workingSetSumsByMuscle: new Map(),
+  workingSetSum: createCompensatedSum(),
 });
 
 const addDayToWeek = (week: WeekTotals, day: DayCell, metric: CalendarHeatmapMetric): void => {
   week.prCount += day.prCount ?? 0;
   for (const [id, count] of Object.entries(day.workingSetCountsByMuscle ?? {})) {
-    week.workingSetCountsByMuscle[id] = (week.workingSetCountsByMuscle[id] ?? 0) + count;
+    const sum = week.workingSetSumsByMuscle.get(id) ?? createCompensatedSum();
+    week.workingSetSumsByMuscle.set(id, sum);
+    week.workingSetCountsByMuscle[id] = addCompensated(sum, count);
   }
   const combine = isAdditiveMetric(metric) ? addFiniteVolume : bestOf;
   if (day.hasTraining) week.sessions++;
   if (day.hasTraining && !day.unavailable) week.hasKnown = true;
   if (metric === 'totalVolume' && day.unavailable) week.unavailable = true;
   if (day.value > 0) {
-    const next = combine(week.value, day.value);
+    const next = metric === 'workingSetCount'
+      ? addCompensated(week.workingSetSum, day.value) : combine(week.value, day.value);
     if (next === null) week.unavailable = true;
     week.value = next ?? 0;
   }

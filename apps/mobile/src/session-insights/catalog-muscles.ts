@@ -24,7 +24,7 @@ type CatalogExercise = {
  * Anatomy mappings and entries read through the user's muscle setup
  * ([[muscle.report-groups]]), so the completed-session breakdown, the by-muscle
  * comparison and live insights all report the same muscles. Detailed returns
- * them unchanged.
+ * their allocated figures unchanged.
  */
 export const reportSessionMuscles = (
   catalog: Pick<SessionMuscleCatalog, 'muscleMappings' | 'muscleGroups'>,

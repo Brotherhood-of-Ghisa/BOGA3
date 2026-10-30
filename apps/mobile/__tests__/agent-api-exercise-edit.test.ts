@@ -1,7 +1,7 @@
 /**
  * Outcome: an agent can only write an exercise the app's own editor could
  * save — a trimmed non-empty name, a known load mode, a 0..1 bodyweight
- * contribution, exactly one primary muscle at weight 1 and distinct
+ * contribution, one or more primary muscles at weight 1 and distinct
  * secondaries at weight ½ — and an edit always quotes the revision it read.
  *
  * The Edge Function (`supabase/functions/agent-api`) applies these pure rules
@@ -34,6 +34,8 @@ const rejection = (read: () => unknown): string => {
 
 const primary = { muscle_id: 'chest_sternal', role: 'primary' };
 const secondary = { muscle_id: 'triceps_long', role: 'secondary' };
+const coPrimary = { muscle_id: 'triceps_long', role: 'primary' };
+const deltoid = { muscle_id: 'deltoid_anterior', role: 'secondary' };
 
 const REST_REJECTION = 'rest_timer_sec must be null or a whole number of seconds from 15 to 600.';
 
@@ -83,14 +85,25 @@ describe('agent exercise create', () => {
     ['a fractional rest timer', { name: 'Row', rest_timer_sec: 90.5, muscles: [primary] }, REST_REJECTION],
     ['a text rest timer', { name: 'Row', rest_timer_sec: '90', muscles: [primary] }, REST_REJECTION],
     ['no muscles', { name: 'Row', muscles: [] }, `muscles must list 1 to ${MAX_EXERCISE_MUSCLES} muscles.`],
-    ['no primary', { name: 'Row', muscles: [secondary] }, 'muscles must have exactly one primary muscle.'],
-    ['two primaries', { name: 'Row', muscles: [primary, { muscle_id: 'lats', role: 'primary' }] }, 'muscles must have exactly one primary muscle.'],
+    ['no primary', { name: 'Row', muscles: [secondary] }, 'muscles must have at least one primary muscle.'],
     ['a repeated muscle', { name: 'Row', muscles: [primary, { muscle_id: 'chest_sternal', role: 'secondary' }] }, 'muscles lists chest_sternal twice.'],
     ['a stabilizer role', { name: 'Row', muscles: [primary, { muscle_id: 'abs', role: 'stabilizer' }] }, 'muscles[1].role must be primary or secondary.'],
     ['a weight the caller chose', { name: 'Row', muscles: [{ ...primary, weight: 0.8 }] }, 'Unsupported field: weight'],
     ['an unknown field', { name: 'Row', muscles: [primary], equipment: 'cable' }, 'Unsupported field: equipment'],
   ])('rejects %s', (_label, body, message) => {
     expect(rejection(() => normalizeExerciseCreate(body))).toBe(message);
+  });
+
+  it.each([
+    { secondaries: [] },
+    { secondaries: [deltoid] },
+    { secondaries: [deltoid, { muscle_id: 'lats', role: 'secondary' }] },
+  ])('accepts Machine Dips co-primaries with $secondaries', ({ secondaries }) => {
+    const created = normalizeExerciseCreate({ name: 'Machine Dips', muscles: [...secondaries, primary, coPrimary] });
+    expect(created.muscles).toEqual([
+      { ...primary, weight: 1 }, { ...coPrimary, weight: 1 },
+      ...secondaries.map((muscle) => ({ ...muscle, weight: 0.5 })),
+    ]);
   });
 
   it('rejects more muscles than the cap', () => {
@@ -124,11 +137,21 @@ describe('agent exercise update', () => {
     expect(update.changes.muscles?.map((muscle) => muscle.muscle_id)).toEqual(['chest_sternal', 'triceps_long']);
   });
 
+  it('replaces mappings with co-primaries without changing stored role weights', () => {
+    expect(normalizeExerciseUpdate({ expected_revision: 5, muscles: [deltoid, primary, coPrimary] })).toEqual({
+      expected_revision: 5,
+      changes: { muscles: [{ ...primary, weight: 1 }, { ...coPrimary, weight: 1 }, { ...deltoid, weight: 0.5 }] },
+    });
+  });
+
   it.each([
+    ['empty mappings', { expected_revision: 5, muscles: [] }, `muscles must list 1 to ${MAX_EXERCISE_MUSCLES} muscles.`],
+    ['duplicate primaries', { expected_revision: 5, muscles: [primary, primary] }, 'muscles lists chest_sternal twice.'],
+    ['overlapping roles', { expected_revision: 5, muscles: [primary, coPrimary, secondary] }, 'muscles lists triceps_long twice.'],
     ['no revision', { name: 'Row' }, 'expected_revision must be the revision the exercise was read with.'],
     ['a text revision', { expected_revision: '5', name: 'Row' }, 'expected_revision must be the revision the exercise was read with.'],
     ['nothing to change', { expected_revision: 5 }, 'Name at least one field to change.'],
-    ['an invalid change', { expected_revision: 5, muscles: [secondary] }, 'muscles must have exactly one primary muscle.'],
+    ['an invalid change', { expected_revision: 5, muscles: [secondary] }, 'muscles must have at least one primary muscle.'],
     ['an unknown field', { expected_revision: 5, deleted: true }, 'Unsupported field: deleted'],
   ])('rejects %s', (_label, body, message) => {
     expect(rejection(() => normalizeExerciseUpdate(body))).toBe(message);

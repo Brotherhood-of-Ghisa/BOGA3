@@ -56,7 +56,7 @@ Two create-only planning tools (require write access, idempotent):
 
 Four exercise tools (require the same write access, idempotent; edits quote the
 `revision` they read and fail `REVISION_CONFLICT` when it moved):
-- `create_exercise` — name, muscles (one primary, distinct secondaries), load
+- `create_exercise` — name, muscles (one or more primaries, distinct secondaries), load
   mode, bodyweight contribution, `split_by_gym`, `rest_timer_sec`
   ([[timer.rest-default]]).
 - `update_exercise` — change any of those; `muscles` replaces the mapping and
@@ -88,7 +88,7 @@ Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled
 values remain untrusted JSON output.
 
-Training projections with `metric_revision: "working_sets_v7"` pass through
+Training projections with `metric_revision: "working_sets_v8"` pass through
 unchanged in structured and text JSON output. Tool names and strict input
 schemas remain compatible. Every derived figure and count reads working sets
 only: a set that is not a working set ([[set.eligibility]]) is listed with its own per-set figures but feeds no record,

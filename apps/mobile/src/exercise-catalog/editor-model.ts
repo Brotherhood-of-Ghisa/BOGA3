@@ -1,5 +1,5 @@
 // The exercise editor's decisions, as plain functions: how an exercise's
-// mappings become one primary and unique secondary muscles, what the form
+// mappings become unique primary and secondary muscles, what the form
 // opens with, which muscles the selector offers, and what Save would send.
 // The editor works in the user's muscles ([[muscle.no-breakdown]]); Save turns
 // them back into mappings to anatomy entries.
@@ -75,43 +75,35 @@ const pickPrimaryMapping = (mappings: ExerciseCatalogExercise['mappings']) =>
   [...mappings].sort((left, right) => right.weight - left.weight)[0] ??
   null;
 
-/**
- * The form's muscles, in the user's muscles: the primary is the muscle a
- * mapping marks primary, else the heaviest; each other muscle appears once as
- * a secondary. Mappings to untracked entries are left out, and when one of
- * them is the primary the form opens with none, so an untouched Save promotes
- * no visible muscle.
- */
+/** The form shows each tracked reported muscle once, at its strongest role. */
 export const buildEditorMuscleSelectionsFromExercise = (
   exercise: ExerciseCatalogExercise,
   assignment: MuscleReportAssignment = NO_ASSIGNMENT
-): { primaryMuscleGroupId: string | null; secondaryMuscleRows: EditableSecondaryMuscleRow[] } => {
+): { primaryMuscleGroupIds: string[]; secondaryMuscleRows: EditableSecondaryMuscleRow[] } => {
   const mappings = reportedMappings(exercise.mappings, assignment);
-  const primaryIsHidden = !mappings.some((mapping) => mapping.role === 'primary')
-    && exercise.mappings.some((mapping) => mapping.role === 'primary');
-  const primaryMuscleGroupId = primaryIsHidden ? null : pickPrimaryMapping(mappings)?.muscleGroupId ?? null;
-  const seenSecondaryMuscleIds = new Set<string>();
-  const secondaryMuscleRows = mappings
-    .filter((mapping) => mapping.muscleGroupId !== primaryMuscleGroupId)
-    .filter((mapping) => {
-      if (seenSecondaryMuscleIds.has(mapping.muscleGroupId)) {
-        return false;
-      }
-      seenSecondaryMuscleIds.add(mapping.muscleGroupId);
-      return true;
-    })
-    .map((mapping) => ({
-      // Built during render, so derived, not random: secondary rows are unique per muscle.
-      rowId: mapping.id || `muscle-link-row-prefill-${mapping.muscleGroupId}`,
-      muscleGroupId: mapping.muscleGroupId,
-    }));
-  return { primaryMuscleGroupId, secondaryMuscleRows };
+  const primaries = mappings.filter((mapping) => mapping.role === 'primary');
+  // Legacy exercises without a primary still open on their heaviest mapping.
+  if (!exercise.mappings.some((mapping) => mapping.role === 'primary')) {
+    const fallback = pickPrimaryMapping(mappings);
+    if (fallback) primaries.push(fallback);
+  }
+  const primaryMuscleGroupIds = [...new Set(primaries.map((mapping) => mapping.muscleGroupId))];
+  const seenMuscleIds = new Set(primaryMuscleGroupIds);
+  const secondaryMuscleRows = mappings.filter((mapping) => {
+    if (seenMuscleIds.has(mapping.muscleGroupId)) return false;
+    seenMuscleIds.add(mapping.muscleGroupId);
+    return true;
+  }).map((mapping) => ({
+    rowId: mapping.id || `muscle-link-row-prefill-${mapping.muscleGroupId}`,
+    muscleGroupId: mapping.muscleGroupId,
+  }));
+  return { primaryMuscleGroupIds, secondaryMuscleRows };
 };
 
 export type EditorOpenState = {
   name: string;
   loadInputMode: EditorLoadInputMode;
-  primaryMuscleGroupId: string | null;
+  primaryMuscleGroupIds: string[];
   secondaryMuscleRows: EditableSecondaryMuscleRow[];
   contributionPercentage: string;
   splitByGym: boolean;
@@ -162,7 +154,7 @@ export const editorOpenState = (
   return {
     name: '',
     loadInputMode: 'total_load',
-    primaryMuscleGroupId: null,
+    primaryMuscleGroupIds: [],
     secondaryMuscleRows: [],
     contributionPercentage,
     splitByGym: false,
@@ -182,16 +174,16 @@ export const parseRestTimerText = (text: string): ExerciseRestTimerValidation =>
   return validateExerciseRestTimerSec(/^\d+$/.test(trimmed) ? Number(trimmed) : NaN);
 };
 
-/** The muscles the selector offers: the current primary or any unchosen muscle; for secondaries (a multi-select), every muscle but the primary. */
+/** Each multi-select excludes the muscles chosen for the other role. */
 export const muscleSelectorOptions = (
   mode: MuscleSelectorMode,
   muscleGroups: ReportedMuscle[],
-  primaryMuscleGroupId: string | null,
+  selectedPrimaryMuscleIds: Set<string>,
   selectedSecondaryMuscleIds: Set<string>
 ): ReportedMuscle[] =>
   mode === 'primary'
-    ? muscleGroups.filter((muscleGroup) => muscleGroup.id === primaryMuscleGroupId || !selectedSecondaryMuscleIds.has(muscleGroup.id))
-    : muscleGroups.filter((muscleGroup) => muscleGroup.id !== primaryMuscleGroupId);
+    ? muscleGroups.filter((muscleGroup) => !selectedSecondaryMuscleIds.has(muscleGroup.id))
+    : muscleGroups.filter((muscleGroup) => !selectedPrimaryMuscleIds.has(muscleGroup.id));
 
 /** The exercise's mappings to entries the user does not track: hidden by the editor and kept on Save. */
 export const untrackedMappings = <M extends { muscleGroupId: string }>(
@@ -211,7 +203,8 @@ const keptMapping = ({ muscleGroupId, weight, role }: SavedMapping): EditorMappi
 /**
  * The mappings Save writes for the chosen muscles, given the mappings the form
  * opened with ([[muscle.no-breakdown]]). A muscle the exercise did not map
- * gets one mapping to its anchor entry (the muscle's id). A muscle that keeps
+ * gets one mapping to its anchor, or a tracked entry if the anchor is hidden.
+ * A muscle that keeps
  * the strongest role it opened with keeps each mapping's role; one whose
  * role changed has every mapping to its entries rewritten to the new role. A
  * muscle no longer chosen loses all of them. Mappings to untracked entries are
@@ -232,7 +225,10 @@ export const resolveEditorMappings = (
   for (const muscle of chosen) {
     const entries = openedByMuscle.get(muscle.muscleGroupId) ?? [];
     if (entries.length === 0) {
-      byEntry.set(muscle.muscleGroupId, muscle);
+      const entryId = isUntrackedEntry(assignment, muscle.muscleGroupId)
+        ? [...assignment].find(([, entry]) => entry.tracked && entry.muscle.id === muscle.muscleGroupId)?.[0]
+        : muscle.muscleGroupId;
+      if (entryId) byEntry.set(entryId, { ...muscle, muscleGroupId: entryId });
       continue;
     }
     const keepsRole = strongestRoleWeight(entries) === getMuscleContributionRoleWeight(muscle.role);
@@ -241,26 +237,26 @@ export const resolveEditorMappings = (
     }
   }
   for (const { muscleGroupId, weight, role } of untrackedMappings(opened, assignment)) {
-    if (!byEntry.has(muscleGroupId)) byEntry.set(muscleGroupId, { muscleGroupId, weight, role });
+    byEntry.set(muscleGroupId, { muscleGroupId, weight, role });
   }
   return [...byEntry.values()];
 };
 
 /**
  * The editor's inline errors, and the mappings Save would send when there are
- * none. A primary is required unless a kept untracked mapping is primary.
+ * none. The resolved mappings must include a primary, visible or hidden.
  */
 export const validateEditorInput = ({
   name,
   loadInputMode,
-  primaryMuscleGroupId,
+  primaryMuscleGroupIds,
   secondaryMuscleRows,
   openedMappings = [],
   assignment = NO_ASSIGNMENT,
 }: {
   name: string;
   loadInputMode: EditorLoadInputMode;
-  primaryMuscleGroupId: string | null;
+  primaryMuscleGroupIds: string[];
   secondaryMuscleRows: EditableSecondaryMuscleRow[];
   /** The mappings the form opened with: the edited exercise's, else the prefill's. */
   openedMappings?: readonly SavedMapping[];
@@ -274,32 +270,28 @@ export const validateEditorInput = ({
   }
   const mappings: EditorMapping[] = [];
   const seenMuscleIds = new Set<string>();
-  if (primaryMuscleGroupId) {
-    seenMuscleIds.add(primaryMuscleGroupId);
-    mappings.push({ muscleGroupId: primaryMuscleGroupId, weight: PRIMARY_MUSCLE_WEIGHT, role: 'primary' });
-  } else if (!untrackedMappings(openedMappings, assignment).some((mapping) => mapping.role === 'primary')) {
-    validation.primaryMuscleError = 'Select a primary muscle before saving.';
+  for (const muscleGroupId of primaryMuscleGroupIds) {
+    if (seenMuscleIds.has(muscleGroupId)) {
+      validation.primaryMuscleError = 'Duplicate primary muscle.';
+      continue;
+    }
+    seenMuscleIds.add(muscleGroupId);
+    mappings.push({ muscleGroupId, weight: PRIMARY_MUSCLE_WEIGHT, role: 'primary' });
   }
-  const visibleMappings = reportedMappings(openedMappings, assignment);
-  const originalPrimary = visibleMappings.find((mapping) => mapping.role === 'primary')?.muscleGroupId;
   for (const row of secondaryMuscleRows) {
     if (seenMuscleIds.has(row.muscleGroupId)) {
       validation.secondaryMusclesError = 'Duplicate secondary muscle.';
       continue;
     }
     seenMuscleIds.add(row.muscleGroupId);
-    // Extra primaries appear as secondary rows; preserve only an untouched row.
-    const originalRow = visibleMappings.find((mapping) =>
-      (mapping.id || `muscle-link-row-prefill-${mapping.muscleGroupId}`) === row.rowId);
-    const keepsPrimary = primaryMuscleGroupId === originalPrimary
-      && originalRow?.muscleGroupId === row.muscleGroupId
-      && visibleMappings.some((mapping) => mapping.muscleGroupId === row.muscleGroupId && mapping.role === 'primary');
-    mappings.push({ muscleGroupId: row.muscleGroupId,
-      weight: keepsPrimary ? PRIMARY_MUSCLE_WEIGHT : SECONDARY_MUSCLE_WEIGHT,
-      role: keepsPrimary ? 'primary' : 'secondary' });
+    mappings.push({ muscleGroupId: row.muscleGroupId, weight: SECONDARY_MUSCLE_WEIGHT, role: 'secondary' });
+  }
+  const resolved = resolveEditorMappings(mappings, openedMappings, assignment);
+  if (!resolved.some((mapping) => mapping.role === 'primary') && !validation.primaryMuscleError) {
+    validation.primaryMuscleError = 'Select a primary muscle before saving.';
   }
   const hasErrors = Object.values(validation).some((error) => error !== null);
-  return { validation, mappings: hasErrors ? null : resolveEditorMappings(mappings, openedMappings, assignment) };
+  return { validation, mappings: hasErrors ? null : resolved };
 };
 
 /** The contribution field as a percentage; anything but a plain non-negative decimal is NaN (invalid). */

@@ -1,7 +1,7 @@
 // The session views report the user's muscles ([[muscle.report-groups]]): the
 // completed-session breakdown, the by-muscle volume comparison and live
 // insights read one reading of the catalogue, so a session's figures agree
-// everywhere. Under Broad a set counts once per muscle at its strongest role
+// everywhere. Broad sums each member entry’s allocated shares
 // ([[muscle.set-count]]), and the comparison keeps a muscle that is primary for
 // any of its entries — a secondary-only muscle gets no comparison.
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
@@ -84,17 +84,17 @@ describe('completed-session muscle breakdown under Broad', () => {
     const summary = summarize(broadRows);
     expect(summary.workingSetsByMuscle.map(({ id, displayName, primarySetCount, secondarySetCount, weightedSetCount }) =>
       ({ id, displayName, primarySetCount, secondarySetCount, weightedSetCount }))).toEqual([
-      // RDL ×3 primary + squat ×3 secondary (Glute Max and Adductors collapse to one) = 3 + 1.5.
-      { id: 'glutes_max', displayName: 'Glutes & Hams', primarySetCount: 3, secondarySetCount: 3, weightedSetCount: 4.5 },
-      { id: 'quads', displayName: 'Quads', primarySetCount: 3, secondarySetCount: 0, weightedSetCount: 3 },
+      // RDL keeps its whole Primary pool; squat splits its Secondary pool between the two Broad muscles.
+      { id: 'quads', displayName: 'Quads', primarySetCount: 3, secondarySetCount: 1.5, weightedSetCount: 3.75 },
+      { id: 'glutes_max', displayName: 'Glutes & Hams', primarySetCount: 3, secondarySetCount: 1.5, weightedSetCount: 3.75 },
     ]);
     expect(summary.muscles.map((muscle) => muscle.displayName).sort()).toEqual(['Glutes & Hams', 'Quads']);
   });
 
-  it('counts the squat alone as Quads 3 and Glutes & Hams 1.5', () => {
+  it('adds the squat’s Primary and allocated Secondary entries under Broad', () => {
     const summary = summarize(broadRows, [row('squat', 3, 0)]);
     expect(summary.workingSetsByMuscle.map((muscle) => [muscle.displayName, muscle.weightedSetCount])).toEqual([
-      ['Quads', 3], ['Glutes & Hams', 1.5],
+      ['Quads', 3.75], ['Glutes & Hams', 0.75],
     ]);
   });
 
@@ -152,7 +152,7 @@ describe('by-muscle volume comparison under Broad', () => {
       sessionOf('earlier', '10', [row('squat', 2, 0)]),
     ]);
     expect(rows.find((comparison) => comparison.exerciseName === 'Quads')).toMatchObject({
-      historicalSessionCount: 1, state: 'single-baseline', workingSetCount: 1,
+      historicalSessionCount: 1, state: 'single-baseline', workingSetCount: 1.25,
     });
   });
 });

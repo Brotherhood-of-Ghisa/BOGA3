@@ -383,7 +383,7 @@ it.each(['muscle', 'exercise'] as const)('shows only the current-week Sets media
     todayDateKey={TODAY} weeklyEffort={[]}
     dailyMetrics={dates.map((date, index) => day(date, index * 2))} />);
   const prefix = `stats-${kind}-history`;
-  expect(screen.getByTestId(`${prefix}-heatmap-median`)).toHaveProp('accessibilityLabel', '7-week median 5.0');
+  expect(screen.getByTestId(`${prefix}-heatmap-median`)).toHaveProp('accessibilityLabel', '7-week median 5');
   expect(style(`${prefix}-heatmap-median`).left).toBe('50%');
   expect(screen.queryByTestId(`${prefix}-heatmap-p25`)).toBeNull();
   expect(screen.queryByTestId(`${prefix}-heatmap-p75`)).toBeNull();
@@ -449,7 +449,7 @@ it.each([
   expect(style(`${prefix}-median`).left).toBe(strength ? '50%' : '17.5%');
   if (kind === 'muscle' && metric === 'workingSetCount') {
     expect(screen.getByTestId(`${prefix}-value-${DATES[0]}`)).toHaveTextContent(/^0.5$/);
-    expect(screen.getByTestId(`${prefix}-median`)).toHaveProp('accessibilityLabel', '9-week median 1.8');
+    expect(screen.getByTestId(`${prefix}-median`)).toHaveProp('accessibilityLabel', '9-week median 1.75');
   }
   if (metric === 'workingSetCount') {
     expect(screen.queryByTestId(`${prefix}-p25`)).toBeNull();

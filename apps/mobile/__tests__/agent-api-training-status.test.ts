@@ -146,6 +146,44 @@ describe('training status: muscles', () => {
     expect(result.counts_secondary_sets).toBe(true);
   });
 
+  it.each([true, false])('allocates Machine Dips pools before hiding muscles, secondary %s', (countSecondary) => {
+    const result = status({
+      timeZone: 'UTC',
+      settings: { weekly_working_set_target: 10, muscle_target_mode: 'single', muscle_target_overrides: {},
+        count_secondary_muscles: countSecondary, client_updated_at_ms: 7 },
+      muscleRows: [...MUSCLES, muscleRow('deltoid', 3)],
+      mappings: [
+        { exercise_definition_id: 'bench', muscle_group_id: 'chest', role: 'primary' },
+        { exercise_definition_id: 'bench', muscle_group_id: 'triceps', role: 'primary' },
+        { exercise_definition_id: 'bench', muscle_group_id: 'lats', role: 'secondary' },
+        { exercise_definition_id: 'bench', muscle_group_id: 'deltoid', role: 'secondary' },
+      ],
+      definitions: definitionsOf(definition('bench', { name: 'Machine Dips' })),
+      training: training([benchSession('dips', daysAgo(1), 3)]),
+    });
+    expect(result.metric_revision).toBe('working_sets_v8');
+    expect(result.muscles.find((muscle) => muscle.id === 'chest')).toMatchObject({ week_sets: 1.5, weekly_target: 10,
+      recovery_days: [{ sets: null }, { sets: null }, { sets: 1.5 }] });
+    expect(result.muscles.find((muscle) => muscle.id === 'triceps')?.week_sets).toBe(1.5);
+    expect(result.muscles.find((muscle) => muscle.id === 'deltoid')?.week_sets).toBe(countSecondary ? 0.75 : 0);
+    expect(result.muscles.map((muscle) => muscle.id)).not.toContain('lats');
+  });
+
+  it('sums allocated co-primary shares when the reporting setup merges them', () => {
+    const result = status({
+      timeZone: 'UTC',
+      muscleRows: [muscleRow('chest', 0, { report_group: 'chest' }), muscleRow('serratus_anterior', 1, { report_group: 'chest' })],
+      mappings: [
+        { exercise_definition_id: 'bench', muscle_group_id: 'chest', role: 'primary' },
+        { exercise_definition_id: 'bench', muscle_group_id: 'serratus_anterior', role: 'primary' },
+      ],
+      training: training([benchSession('dips', daysAgo(1), 3)]),
+    });
+    expect(result.muscles).toHaveLength(1);
+    expect(result.muscles[0]).toMatchObject({ id: 'chest', week_sets: 3,
+      recovery_days: [{ sets: null }, { sets: null }, { sets: 3 }] });
+  });
+
   it('reads nothing older than 56 local days', () => {
     const result = status({ timeZone: 'UTC', training: training([benchSession('old', daysAgo(56))]) });
     expect(result.muscles.find((muscle) => muscle.id === 'chest')?.last_trained_on).toBeNull();

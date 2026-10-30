@@ -1,9 +1,11 @@
+import { editorOpenState, validateEditorInput } from '@/src/exercise-catalog/editor-model';
 import {
   decodeExerciseSharePayload,
   encodeExerciseSharePayload,
   buildExerciseShareLink,
   buildExerciseShareMessage,
   type ExerciseSharePayload,
+  buildSharePrefill,
 } from '@/src/exercise-share';
 
 describe('exercise-share serialization & link builders', () => {
@@ -27,6 +29,19 @@ describe('exercise-share serialization & link builders', () => {
 
     const decoded = decodeExerciseSharePayload(encoded);
     expect(decoded).toEqual(samplePayload);
+  });
+
+  it('keeps both Machine Dips Primaries through sharing, editor prefill and save', () => {
+    const payload: ExerciseSharePayload = { ...samplePayload, name: 'Machine Dips', mappings: [
+      { muscleGroupId: 'chest', weight: 1, role: 'primary' },
+      { muscleGroupId: 'triceps', weight: 1, role: 'primary' },
+      { muscleGroupId: 'delts_front', weight: 0.5, role: 'secondary' },
+    ] };
+    const decoded = decodeExerciseSharePayload(encodeExerciseSharePayload(payload))!;
+    const prefill = buildSharePrefill(decoded);
+    const opened = editorOpenState(null, prefill);
+    expect(opened.primaryMuscleGroupIds).toEqual(['chest', 'triceps']);
+    expect(validateEditorInput({ ...opened, openedMappings: prefill.mappings }).mappings).toEqual(payload.mappings);
   });
 
   it('preserves non-ASCII unicode characters in exercise names', () => {

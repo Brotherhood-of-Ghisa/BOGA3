@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent, 
 import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
-import { formatVolume, formatWeight } from '@/src/exercise-calculations/format';
+import { formatVolume, formatWeight, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import type { SessionBreakdownExerciseRow, SessionBreakdownMuscleRow } from '@/src/session-insights';
 
 export type BreakdownCatalogState = 'loading' | 'ready' | 'error';
@@ -103,8 +103,8 @@ function MuscleTable({ rows, testID }: { rows: SessionBreakdownMuscleRow[]; test
           style={[styles.row, styles.bodyRow]}
           testID={`${testID}-${row.id}`}>
           <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.nameCell]}>{row.displayName}</Text>
-          <Figure total value={count(row.primarySetCount)} />
-          <Figure total value={count(row.secondarySetCount)} />
+          <Figure total value={row.primarySetCount === 0 ? '—' : formatWorkingSetCount(row.primarySetCount)} />
+          <Figure total value={row.secondarySetCount === 0 ? '—' : formatWorkingSetCount(row.secondarySetCount)} />
           <Figure total value={volume(row.volume)} wide />
           <Figure value={count(row.recordCount)} />
         </View>

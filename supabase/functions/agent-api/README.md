@@ -351,7 +351,7 @@ returns one bounded object; days and Monday-start weeks are the profile
 
 ```json
 {
-  "metric_revision": "working_sets_v7", "as_of": "2026-10-28T12:00:00.000Z",
+  "metric_revision": "working_sets_v8", "as_of": "2026-10-28T12:00:00.000Z",
   "time_zone": "Europe/London", "today": "2026-10-28", "week_start": "2026-10-26",
   "muscle_setup": "broad", "counts_secondary_sets": true,
   "targets": { "mode": "per_muscle", "default_weekly_sets": 8, "uploaded": true, "revision": 1761650000000 },
@@ -419,7 +419,7 @@ never a device's effort settings.
 tie keeps the earliest session; a zero result is never a record
 ([[1rm.formula]] for a zero 1RM).
 
-`metric_revision: "working_sets_v7"` reports a split exercise as the whole
+`metric_revision: "working_sets_v8"` reports a split exercise as the whole
 exercise unless `gym_bucket` names a gym ([gym buckets](#gym-buckets)). For what
 an earlier `metric_revision` meant, see the
 [revision history](../../../docs/procedures/rule-upgrade.md#revision-history).
@@ -429,7 +429,7 @@ an earlier `metric_revision` meant, see the
 > **Status: accepted current response contract.**
 
 Exercise-context and workout responses carry
-`metric_revision: "working_sets_v7"`, which includes this bodyweight contract. Routes, arguments, authorization
+`metric_revision: "working_sets_v8"`, which includes this bodyweight contract. Routes, arguments, authorization
 and envelopes stay at API v1. Every weight is kg. The existing set `load` and
 `top_weight` are raw entered Weight and never include bodyweight contribution.
 
@@ -554,9 +554,9 @@ behave as for plans. Bodies are strict JSON:
 - `POST /v1/agent/exercises/{id}/delete` and `/restore` — `{expected_revision}`.
   Soft delete only; logged history keeps its rows.
 
-`muscles` is `[{muscle_id, role}]`: exactly one `primary`, distinct
-`secondary` entries, at most 12 — the app editor's rules and role weights
-([[muscle.set-count]]; `exercise-edit.ts`). A muscle that is not the owner's live row returns `400
+`muscles` is `[{muscle_id, role}]`: one or more `primary` entries and optional
+`secondary` entries; at most 12 distinct muscles. Analytics use
+[[muscle.set-count]] (`exercise-edit.ts`). A muscle that is not the owner's live row returns `400
 FOREIGN_RESOURCE_REFERENCE`; a missing or foreign exercise `404`; a stale
 `expected_revision` `409 REVISION_CONFLICT`; editing a deleted exercise `409
 EXERCISE_DELETED`. Exercise writes have their own 30-per-minute window.

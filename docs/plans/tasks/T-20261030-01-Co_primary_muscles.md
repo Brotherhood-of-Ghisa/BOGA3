@@ -1,6 +1,6 @@
 # Co-primary muscles and shared muscle allocation
 
-Status: planned. Source: [#1029](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/1029).
+Status: implementation in progress; human graphical validation pending. Source: [#1029](https://github.com/Brotherhood-of-Ghisa/BOGA3/issues/1029).
 
 Implement support for multiple Primary muscles per exercise in one PR. Follow
 `AGENTS.md` and the ponytail skill; reuse existing UI and analytics. Delete this
@@ -44,3 +44,36 @@ task when its implementation ships.
 - Update affected product facts/contracts and pass the repository's required gates.
 
 Choose the smallest complete implementation after inspecting current code.
+
+## UX Contract and design target (build input)
+
+Target: reuse the current editor's Secondary muscle multiselect for Primary,
+with the same Sheet, checkboxes, tokens and dismissal. No visual restyle.
+
+- Edit mappings: open an exercise, open Primary muscles, toggle multiple
+  muscles, dismiss and Save. Reopening and duplication retain every role;
+  sharing carries all mappings. Secondary cannot select a Primary.
+- Empty Primary: deselect all visible Primaries and Save. Show the existing
+  field error unless a preserved hidden Primary still satisfies the rule.
+- Broad/hidden mappings: opening and saving keeps underlying entries and hidden
+  roles. Editing a reported muscle changes its entries, following the existing
+  reporting model.
+
+Product changes: **muscle.set-count**, **muscle.secondary-filter** and
+**muscle.report-groups**, and **muscle.no-breakdown**. Primary and Secondary pools split before reporting.
+Recovery keeps its compact floor above one; below one, non-half allocations
+show two significant decimal digits instead of incorrectly showing a half.
+Human GUI validation precedes the final UI gate; screenshots stay in artifacts.
+
+### Execution checkpoint
+
+- Worktree: `codex/co-primary-muscles`, isolated slot 6.
+- Independent code/security review: clean after fractional-target and hidden-anchor fixes.
+- Product review: fact changes to the four IDs highlighted above; no violations.
+- Jest: 397 suites / 6048 tests green; coverage 87.89% branches, 95.20% lines.
+- Complexity, dependency direction, documentation and MCP unit checks green.
+- Backend validation in progress; graphical preview, human acceptance and the final
+  `ios-data-smoke` / `ios-session-view` lanes await Xcode system-component setup.
+- Lane agreement: independent reviewer accepts fast + backend + the three quality
+  targets; lower frontend-ui to the two affected iOS lanes after human validation.
+- No PR or merge yet. Delete this card when opening the implementation PR.

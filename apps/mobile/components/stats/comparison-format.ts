@@ -1,5 +1,5 @@
 import type { ChangeTone } from '@/components/ui';
-import { formatOneRepMax } from '@/src/exercise-calculations/format';
+import { formatOneRepMax, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 
 // How a change between two periods is said ([[comparison.change-display]]).
 // The tone is its direction, drawn by `changeToneColour`; the text carries the
@@ -15,8 +15,11 @@ const signed = (difference: number, magnitude: string): DeltaDisplay => ({
 export const formatCountDelta = (current: number, previous: number): DeltaDisplay => {
   const difference = current - previous;
   if (!Number.isFinite(difference)) return { text: '—', tone: 'neutral' };
-  if (difference === 0) return { text: '0', tone: 'neutral' };
-  return signed(difference, String(Math.abs(difference)));
+  const magnitude = formatWorkingSetCount(Math.abs(difference));
+  if (Number(magnitude) === 0 || formatWorkingSetCount(current) === formatWorkingSetCount(previous)) {
+    return { text: '0', tone: 'neutral' };
+  }
+  return signed(difference, magnitude);
 };
 
 export const formatVolumeDelta = (current: number | null, previous: number | null): DeltaDisplay => {

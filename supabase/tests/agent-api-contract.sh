@@ -573,7 +573,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     .data as $s
     | ($s.muscles | map(select(.id == $muscle)) | first) as $m
     | ($s.favourite_exercises | map(select(.exercise_id == $exercise)) | first) as $f
-    | $s.metric_revision == "working_sets_v7"
+    | $s.metric_revision == "working_sets_v8"
     and $s.time_zone == "UTC"
     and $s.complete == true
     and ($s.today | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))
@@ -762,7 +762,7 @@ echo "[agent-api-test] verifying warm-ups are listed but feed no derived figure"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "working-set exercise context"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v7"
+  .data.metric_revision == "working_sets_v8"
   and .data.recent_performances[0].volume.value == 1325
   and .data.recent_performances[0].volume.eligible_set_count == 2
   and .data.recent_performances[0].estimated_one_rep_max.value < 140
@@ -788,7 +788,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 agent_get "workouts/recent?limit=1"
 assert_status "200" "working-set recent workouts"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v7"
+  .data.metric_revision == "working_sets_v8"
   and .data.workouts[0].exercise_count == 1
   and (.data.workouts[0].exercises | length) == 2
   and .data.workouts[0].completed_set_count == 2
@@ -1019,7 +1019,7 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "working_sets_v7"
+  .data.metric_revision == "working_sets_v8"
   and (.data.exercise | has("bodyweight_contribution") | not)
   and (.data.recent_performances[0] | has("session_body_weight") | not)
   and .data.recent_performances[0].volume.value == 1325
@@ -2053,10 +2053,19 @@ assert_status "400" "exercise create with another owner's muscle"
   fail "another owner's muscle did not return FOREIGN_RESOURCE_REFERENCE"
 agent_post "exercises" "$(jq -nc --arg name "agent-api-${RUN_TAG} Two primaries" --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_A2}" \
   '{name:$name,muscles:[{muscle_id:$a,role:"primary"},{muscle_id:$a2,role:"primary"}]}')" "agent-api-${RUN_TAG}-ex-two"
-assert_status "400" "exercise create with two primaries"
+assert_status "200" "exercise create with two primaries"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+  .data.exercise.muscles | length == 2 and all(.role == "primary" and .weight == 1)
+' >/dev/null || fail "exercise create lost a co-primary or changed its role weight"
+agent_post "exercises" "$(jq -nc --arg name "agent-api-${RUN_TAG} No primary" --arg a "${MUSCLE_A}" \
+  '{name:$name,muscles:[{muscle_id:$a,role:"secondary"}]}')" "agent-api-${RUN_TAG}-ex-no-primary"
+assert_status "400" "exercise create without a primary"
+agent_post "exercises" "$(jq -nc --arg name "agent-api-${RUN_TAG} Duplicate" --arg a "${MUSCLE_A}" \
+  '{name:$name,muscles:[{muscle_id:$a,role:"primary"},{muscle_id:$a,role:"secondary"}]}')" "agent-api-${RUN_TAG}-ex-duplicate"
+assert_status "400" "exercise create with overlapping roles"
 [[ "$(run_psql "select count(*) from app_public.exercise_definitions
   where owner_user_id = '${USER_A_UUID}'::uuid and name in
-    ('agent-api-${RUN_TAG} Foreign','agent-api-${RUN_TAG} Two primaries','agent-api-${RUN_TAG} Denied');")" == "0" ]] ||
+    ('agent-api-${RUN_TAG} Foreign','agent-api-${RUN_TAG} No primary','agent-api-${RUN_TAG} Duplicate','agent-api-${RUN_TAG} Denied');")" == "0" ]] ||
   fail "a rejected exercise create left a row"
 
 echo "[agent-api-test] verifying revision-checked exercise update and muscle reconciliation"
@@ -2083,6 +2092,31 @@ agent_post "exercises/${EXERCISE_A}" "$(jq -nc --argjson rev "${NOW_MS}" '{expec
 assert_status "409" "stale exercise revision"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "REVISION_CONFLICT" ]] ||
   fail "a stale revision did not return REVISION_CONFLICT"
+agent_post "exercises/${EXERCISE_A}" "$(jq -nc --argjson rev "${REVISION_A}" --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_A2}" \
+  '{expected_revision:$rev,muscles:[{muscle_id:$a,role:"primary"},{muscle_id:$a2,role:"primary"}]}')" "agent-api-${RUN_TAG}-ex-co-primary"
+assert_status "200" "exercise update with co-primaries"
+REVISION_A="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.revision')"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+  .data.exercise.muscles | length == 2 and all(.role == "primary" and .weight == 1)
+' >/dev/null || fail "exercise update lost a co-primary or changed its role weight"
+# The dated-reading vector above left SET_A2 unperformed: one working set
+# remains, split 0.5 each between the visible and hidden Primary mappings.
+agent_get "training-status"
+assert_status "200" "co-primary historical training status"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg muscle "${MUSCLE_A}" --arg hidden "${MUSCLE_A2}" '
+  .data as $s
+  | ($s.muscles | map(select(.id == $muscle)) | first) as $m
+  | $s.metric_revision == "working_sets_v8"
+  and ([$m.recovery_days[].sets // 0] | add) + ($m.today_sets // 0) == 0.5
+  and ($s.muscles | map(.id) | index($hidden)) == null
+' >/dev/null || fail "co-primary history redistributed the hidden muscle share"
+
+agent_post "exercises/${EXERCISE_A}" "$(jq -nc --argjson rev "${REVISION_A}" --arg a "${MUSCLE_A}" \
+  '{expected_revision:$rev,muscles:[{muscle_id:$a,role:"secondary"}]}')" "agent-api-${RUN_TAG}-ex-update-no-primary"
+assert_status "400" "exercise update without a primary"
+agent_post "exercises/${EXERCISE_A}" "$(jq -nc --argjson rev "${REVISION_A}" --arg a "${MUSCLE_A}" \
+  '{expected_revision:$rev,muscles:[{muscle_id:$a,role:"primary"},{muscle_id:$a,role:"primary"}]}')" "agent-api-${RUN_TAG}-ex-update-duplicate"
+assert_status "400" "exercise update with duplicate primaries"
 agent_post "exercises/${EXERCISE_A}" "$(jq -nc --argjson rev "${REVISION_A}" --arg a "${MUSCLE_A}" \
   '{expected_revision:$rev,muscles:[{muscle_id:$a,role:"primary"}]}')" "agent-api-${RUN_TAG}-ex-drop"
 assert_status "200" "exercise update dropping a muscle"

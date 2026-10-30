@@ -29,9 +29,10 @@ const sets = (count: number) => `${count} ${count === 1 ? 'set' : 'sets'}`;
 // A plan's rows are targets, never working sets ([[set.count-display]]).
 const targetSets = (count: number) => `${count} ${count === 1 ? 'target set' : 'target sets'}`;
 // The grid shows whole sets, rounded down, so a total reads at its target only
-// when it is met; a lone secondary's half set shows as ½, never as 0.
-// Spoken labels keep the exact half-steps ([[muscle.set-count]]).
-export const wholeSets = (count: number) => (count > 0 && count < 1 ? '½' : String(Math.floor(count)));
+// when it is met; sub-one shares stay visible ([[muscle.set-count]]).
+// Spoken labels keep the unrounded allocation.
+export const wholeSets = (count: number) => count === 0.5 ? '½'
+  : count > 0 && count < 1 ? String(Number(count.toPrecision(2))) : String(Math.floor(count));
 
 // No sets that day reads as a rest day ([[copy.blank-history]]); none yet today, as none.
 const recoveryRowLabel = (row: RecoveryRow, days: Date[]) =>

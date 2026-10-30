@@ -274,6 +274,15 @@ describe('formatCountDelta', () => {
     expect(formatCountDelta(4, 0)).toEqual({ text: '+4', tone: 'positive' });
   });
 
+  it('rounds fractional deltas and treats floating point equality as level', () => {
+    expect(formatCountDelta(2 / 3, 1 / 3)).toEqual({ text: '+0.33', tone: 'positive' });
+    expect(formatCountDelta(1 / 3, 2 / 3)).toEqual({ text: '−0.33', tone: 'negative' });
+    expect(formatCountDelta(0.3, 0.1 + 0.2)).toEqual({ text: '0', tone: 'neutral' });
+    expect(formatCountDelta(1 + Number.EPSILON, 1)).toEqual({ text: '0', tone: 'neutral' });
+    expect(formatCountDelta(1.004, 1)).toEqual({ text: '0', tone: 'neutral' });
+    expect(formatCountDelta(1 / 300, 0)).toEqual({ text: '+0.0033', tone: 'positive' });
+  });
+
   it('renders positive and negative count deltas without percentages', () => {
     expect(formatCountDelta(8, 6)).toEqual({ text: '+2', tone: 'positive' });
     expect(formatCountDelta(3, 6)).toEqual({ text: '−3', tone: 'negative' });
@@ -284,6 +293,9 @@ describe('working-count comparison figures', () => {
   const figures = (now: number, previous: number) => comparisonFigures({
     current: { workingSetCount: now, totalVolume: 0 }, previous: { workingSetCount: previous, totalVolume: 0 },
   }, 'workingSetCount');
+  it('compacts thirds without rounding the source figures', () => {
+    expect(figures(2 / 3, 1 / 3)).toEqual({ now: '0.67', previous: '0.33', change: { text: '+0.33', tone: 'positive' } });
+  });
   it('keeps finite weighted half-counts numeric and signed', () => {
     expect(figures(2.5, 1)).toEqual({ now: '2.5', previous: '1', change: { text: '+1.5', tone: 'positive' } });
   });

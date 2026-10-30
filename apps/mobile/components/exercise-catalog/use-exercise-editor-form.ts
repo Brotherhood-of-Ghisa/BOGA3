@@ -58,7 +58,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
   const [splitByGym, setSplitByGym] = useState(false);
   const [restTimerText, setRestTimerText] = useState('');
   const [restTimerError, setRestTimerError] = useState<string | null>(null);
-  const [primaryMuscleGroupId, setPrimaryMuscleGroupId] = useState<string | null>(null);
+  const [primaryMuscleGroupIds, setPrimaryMuscleGroupIds] = useState<string[]>([]);
   const [secondaryMuscleRows, setSecondaryMuscleRows] = useState<EditableSecondaryMuscleRow[]>([]);
   const [validation, setValidation] = useState<EditorValidationState>(createBlankValidationState);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -86,7 +86,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
       setSplitByGym(open.splitByGym);
       setRestTimerText(open.restTimerText);
       setRestTimerError(null);
-      setPrimaryMuscleGroupId(open.primaryMuscleGroupId);
+      setPrimaryMuscleGroupIds(open.primaryMuscleGroupIds);
       setSecondaryMuscleRows(open.secondaryMuscleRows);
       setBodyweightContributionField({ percentage: open.contributionPercentage });
       setBodyweightContributionError(null);
@@ -96,6 +96,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     }
   }
 
+  const selectedPrimaryMuscleIds = new Set(primaryMuscleGroupIds);
   const selectedSecondaryMuscleIds = new Set(secondaryMuscleRows.map((row) => row.muscleGroupId));
   // The mappings the form opened with; Save keeps what the user cannot see.
   const openedMappings = editingExercise?.mappings ?? prefill?.mappings ?? [];
@@ -114,19 +115,18 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     onRequestClose();
   };
 
-  const selectPrimaryMuscle = (muscleGroupId: string) => {
-    setPrimaryMuscleGroupId(muscleGroupId);
-    setSecondaryMuscleRows((current) => current.filter((row) => row.muscleGroupId !== muscleGroupId));
-    setValidation((current) => ({ ...current, primaryMuscleError: null, secondaryMusclesError: null }));
-    setMuscleSelectorMode(null);
+  /** Both pickers stay open as muscles are added or removed. */
+  const togglePrimaryMuscle = (muscleGroupId: string) => {
+    if (selectedSecondaryMuscleIds.has(muscleGroupId)) return;
+    setPrimaryMuscleGroupIds((current) => current.includes(muscleGroupId)
+      ? current.filter((id) => id !== muscleGroupId)
+      : [...current, muscleGroupId]);
+    setValidation((current) => ({ ...current, primaryMuscleError: null }));
     setSaveError(null);
   };
 
-  /** The secondary picker is a multi-select: a tap adds or removes, and the picker stays open. */
   const toggleSecondaryMuscle = (muscleGroupId: string) => {
-    if (muscleGroupId === primaryMuscleGroupId) {
-      return;
-    }
+    if (selectedPrimaryMuscleIds.has(muscleGroupId)) return;
     setSecondaryMuscleRows((current) =>
       current.some((row) => row.muscleGroupId === muscleGroupId)
         ? current.filter((row) => row.muscleGroupId !== muscleGroupId)
@@ -160,7 +160,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     const checked = validateEditorInput({
       name: exerciseName,
       loadInputMode,
-      primaryMuscleGroupId,
+      primaryMuscleGroupIds,
       secondaryMuscleRows,
       openedMappings,
       assignment: shownFor?.assignment ?? muscleSetup.assignment,
@@ -202,7 +202,8 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     splitByGym,
     restTimerText,
     restTimerError,
-    primaryMuscleGroupId,
+    primaryMuscleGroupIds,
+    selectedPrimaryMuscleIds,
     secondaryMuscleRows,
     selectedSecondaryMuscleIds,
     validation,
@@ -214,7 +215,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     changeRestTimer,
     openMuscleSelector,
     closeMuscleSelector: () => setMuscleSelectorMode(null),
-    selectPrimaryMuscle,
+    togglePrimaryMuscle,
     toggleSecondaryMuscle,
     close,
     save,

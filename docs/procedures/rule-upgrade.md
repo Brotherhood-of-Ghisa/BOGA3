@@ -69,6 +69,8 @@ Test delayed publication across the upgrade before deploying it.
 
 Agent API `metric_revision` values, newest first.
 
+- `working_sets_v8` allocates muscle work using [[muscle.set-count]], including
+  co-primary and shared-secondary pools, before hiding or merging mappings.
 - `working_sets_v7` reports a split exercise as the whole exercise unless
   `gym_bucket` names a gym.
 - `working_sets_v6` reported it one bucket at a time, defaulting to the most

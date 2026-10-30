@@ -286,24 +286,25 @@ choices may change which recorded set qualifies.
 
 **Muscle volume.**
 
-- It is calculated total load / 2 × reps, then the mapping role factor
-  (primary `1`, secondary `0.5`).
+- Its base is calculated total load / 2 × reps, allocated by
+  [[muscle.set-count]] before filtering or reporting.
 - Ordinary total input contributes `E / 2` per side, and per-side input
   contributes `E`, retaining the same muscle Volume.
 
 **A muscle's set count** is [[muscle.set-count]], derived everywhere by
-`countMuscleSets` (`muscle-analytics.ts`). Family
-counts deduplicate physical sets at the strongest role across the family's
-muscles; overlapping individual muscle counts must never be summed into a
-global total. Figures are shown unrounded. Nothing is
-stored: these are read-time derivations, so no `*_RULES_VERSION` moves with
-them. The window's own working-set total stays a count of physical sets.
+`countMuscleSets` (`muscle-analytics.ts`). Family counts sum their muscles'
+allocated shares once per source mapping. Figures remain unrounded through
+aggregation. Nothing is stored: these are read-time derivations, so local
+facts and group scoring versions stay unchanged. Coaching publishes the
+allocation change under its own metric revision. The window's own working-set
+total stays a count of physical sets.
 
 **The user's muscles.** Surfaces reading the muscle setup apply
 `applyMuscleReport` (`muscle-analytics.ts`) after `withoutSecondaryMappings`.
-It re-keys mappings from entry to muscle ([[muscle.report-groups]]), keeps one
-per exercise and muscle at the strongest role (Volume counts once) and drops
-untracked muscles ([[muscle.untracked]]). A merged muscle takes its anchor's id;
+It allocates raw mappings before re-keying entries to muscles
+([[muscle.report-groups]]) and dropping untracked entries
+([[muscle.untracked]]). Merged entries add their allocated shares;
+their strongest role labels the result. A merged muscle takes its anchor's id;
 Detailed is the identity. Exercise figures never read it.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and
@@ -335,6 +336,7 @@ groups' included. Figures have no thousands separators; unit labels follow
 | Weight (entered, top, group Weight) | as entered, one decimal on whole kg | `60.0`, `82.5`, `2.25` |
 | 1RM (personal and group) | one decimal ([[1rm.formula]]) | `104.7` |
 | Volume | whole kg·reps | `2560` |
+| Muscle sets | [[muscle.set-count]] (`formatWorkingSetCount`) | `1.5`, `0.33` |
 
 The agent API, the group evaluator and the SQL group functions call this
 kernel rather than copying it; the group load-mode factor is

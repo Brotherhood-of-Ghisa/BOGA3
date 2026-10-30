@@ -5,7 +5,7 @@ import {
 } from './muscle-analytics';
 
 export type ProgressPeriodValues = {
-  /** The row's [[muscle.set-count]], so a half-step figure. */
+  /** The row's allocated [[muscle.set-count]], without rounding. */
   workingSetCount: number;
   /** Null only when the sum is not finite (`sumVolume`). */
   totalVolume: number | null;

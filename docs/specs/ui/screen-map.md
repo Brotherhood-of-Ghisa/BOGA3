@@ -70,7 +70,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 | `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-other`, `/settings-experiments`, `/settings-data-sync`, `/settings-developer-tools` | Settings' sub pages: rest timer; Progress defaults, view and periods; the effort table; date format, gym filter; title-bar timer; sync and Backups; Developer mode, dev-only tools and logs | `settings-*.tsx`, `components/settings/` |
 | `/settings-muscles`, `/settings-muscle-targets`, `/settings-enabled-muscles` | Muscles' Weekly targets and Muscle breakdown cards link to full target/enablement pages ([[muscle.weekly-targets]], [[muscle.report-groups]]). Native Back; loading, retryable errors, empty targets | `settings-*.tsx`, `components/preferences/muscle-settings.tsx` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |
-| `/exercise-edit` | The exercise editor; `?exerciseDefinitionId=` edits, else creates; `?request=` carries a caller's callbacks | `exercise-edit.tsx`, `components/exercise-catalog/exercise-editor-screen.tsx` |
+| `/exercise-edit` | The exercise editor; Primary and Secondary use the same multi-select sheet, with at least one Primary required; `?exerciseDefinitionId=` edits, else creates; `?request=` carries a caller's callbacks | `exercise-edit.tsx`, `components/exercise-catalog/exercise-editor-screen.tsx` |
 | `/exercise-link` | Link one of my exercises to my groups' exercises, or unlink it | `exercise-link.tsx` |
 
 ## Groups

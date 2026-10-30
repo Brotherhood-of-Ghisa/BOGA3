@@ -1,3 +1,4 @@
+import { formatWorkingSetCount } from '@/src/exercise-calculations/format';
 /* eslint-disable import/first */
 
 /**
@@ -644,7 +645,7 @@ describe('The history page over real data', () => {
     expect(shownMetric('muscle')).toBe('workingSetCount');
   });
 
-  it('shows a secondary muscle\'s day cells its half-steps, unrounded', async () => {
+  it('shows a secondary muscle\'s allocated day cells, unrounded', async () => {
     await loadMaestroFixture('exercise-block-history');
     // Quads becomes a secondary mapping, keeping the fixture's real sets
     // ([[muscle.set-count]]) and the production aggregation/rendering path.
@@ -656,12 +657,12 @@ describe('The history page over real data', () => {
 
     const trained = renderedDailySample('muscle').filter(tile => tile.day?.hasTraining);
     expect(trained.length).toBeGreaterThan(0);
-    // Every day is a half-step, and at least one is a genuine half.
-    expect(trained.every(tile => (tile.day!.value * 2) % 1 === 0)).toBe(true);
-    expect(trained.some(tile => tile.day!.value % 1 === 0.5)).toBe(true);
+    // Quads shares the half-pool with three other Secondaries: one eighth per set.
+    expect(trained.every(tile => (tile.day!.value * 8) % 1 === 0)).toBe(true);
+    expect(trained.some(tile => tile.day!.value % 0.5 !== 0)).toBe(true);
     for (const tile of trained) {
       expect(screen.getByTestId(`stats-muscle-history-heatmap-cell-${tile.dateKey}-value`))
-        .toHaveTextContent(String(tile.day!.value));
+        .toHaveTextContent(formatWorkingSetCount(tile.day!.value));
     }
   });
 
