@@ -1,13 +1,16 @@
+import { isCoWStreamItemWire } from './cow-stream-wire.ts';
 import { isNormalizedSetMetrics } from './competition-set-display.ts';
 
 // Exact schemas are a privacy boundary, including every nested history/session.
 import { isCompetitionMetric } from './competition-contract.ts';
-import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionPerformanceWire, isCompetitionRulesWire } from './competition-wire-guards.ts';
+import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionPerformanceWire, isCompetitionExerciseWire } from './competition-wire-guards.ts';
 import type { CompetitionCertifyResultWire, CompetitionCertificationResultWire, CompetitionEventWire,
-  CompetitionExerciseListWire, CompetitionExerciseWire, CompetitionExerciseWriteWire, CompetitionHistoryWire,
+  CompetitionExerciseListWire, CompetitionExerciseWriteWire, CompetitionHistoryWire,
   CompetitionPodiumsWire, CompetitionRevisionWire, CompetitionRevisionsWire, CompetitionSessionDetailWire,
   CompetitionPeriodTotalsWire, CompetitionSessionRecordsWire, CompetitionSessionWire, CompetitionStreamWire, CompetitionWeekSummaryWire,
   GroupSharedExerciseDeleteWire, GroupSharedExerciseItemWire, GroupSharedExercisesListWire, GroupSharedExerciseWriteWire } from './competition-wire.ts';
+
+export { isCompetitionExerciseWire } from './competition-wire-guards.ts';
 
 const exact = (v: unknown, fields: readonly string[]): v is Record<string, unknown> => v !== null && typeof v === 'object' &&
   !Array.isArray(v) && Object.keys(v).length === fields.length && fields.every(f => Object.prototype.hasOwnProperty.call(v,f));
@@ -25,12 +28,7 @@ const arrayOf = (v: unknown, guard: (entry: unknown) => boolean) => Array.isArra
 const historicalMetric = (v: unknown) => ['weight','volume','e1rm','bodyweight_reps','relative_strength','absolute_strength'].includes(String(v));
 const nullableCertification = (v: unknown) => v === null || isCompetitionCertificationWire(v);
 
-export function isCompetitionExerciseWire(v: unknown): v is CompetitionExerciseWire {
-  return exact(v,['group_exercise_id','name','source_exercise_id','archived_at_ms','rules','published_revision','rebuilding']) &&
-    id(v.group_exercise_id) && id(v.name) && nullableText(v.source_exercise_id) && nullableInteger(v.archived_at_ms) &&
-    isCompetitionRulesWire(v.rules) && (v.published_revision === null || positive(v.published_revision) && v.published_revision <= v.rules.rules_revision) &&
-    typeof v.rebuilding === 'boolean' && v.rebuilding === (v.archived_at_ms === null && v.published_revision !== v.rules.rules_revision);
-}
+
 export function isCompetitionExerciseListWire(v: unknown): v is CompetitionExerciseListWire {
   return exact(v,['contract_version','exercises']) && v.contract_version === 4 && arrayOf(v.exercises,isCompetitionExerciseWire);
 }
@@ -187,6 +185,7 @@ export function isGroupSharedExerciseDeleteWire(v: unknown): v is GroupSharedExe
     v.contract_version === 4 && id(v.group_id) && id(v.shared_exercise_id) && typeof v.deleted === 'boolean';
 }
 function streamItem(v: unknown): boolean {
+  if (v && typeof v === 'object' && 'kind' in v && v.kind === 'cow') return isCoWStreamItemWire(v);
   if (exact(v,['kind','key','sort_at_ms','event']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
     isCompetitionEventWire(v.event) && v.event.event_id === v.key;
   if (exact(v,['kind','key','sort_at_ms','event','record']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&

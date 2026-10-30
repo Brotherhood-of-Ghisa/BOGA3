@@ -45,6 +45,7 @@ function currentPolicyObservations(key: string,value: unknown): CompetitionPolic
   if (isCompetitionPodiumsWire(value)) return [catalogueObservation(groupId,value.podiums.map(row=>row.exercise))];
   if (isCompetitionSessionDetailWire(value)) return [{ groupId: value.group_id,sessions: publicSession(value.session) }];
   if (isCompetitionStreamWire(value)) return value.items.flatMap<CompetitionPolicyObservation>(item => {
+    if (item.kind === 'cow') return item.result ? currentPolicyObservations(key,item.result) : [];
     if (item.kind === 'session') return item.groups.map(group => ({ groupId: group.group_id,sessions: publicSession(item.session) }));
     if (item.kind === 'competition') return item.event.record_context
       ?[catalogueObservation(item.event.group.group_id,[item.event.record_context.exercise])]:[{ groupId: item.event.group.group_id }];

@@ -36,8 +36,9 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
     scope.length === 3 && isCompetitionPeriodTotalsWire(value) && value.group_id === groupId;
   if (kind === 'session') return isCompetitionSessionDetailWire(value) && value.group_id === groupId &&
     value.session.member.user_id === scope[1] && value.session.session_id === scope.slice(2).join(':');
-  if (kind === 'stream') return isCompetitionStreamWire(value) && value.items.every(item => item.kind === 'session'
+  if (kind === 'stream') return scope.length === 2 && scope[1] === 'cow-events-v1' && isCompetitionStreamWire(value) && value.items.every(item => item.kind === 'session'
     ? item.groups.every(group => group.group_id === groupId)
+    : item.kind === 'cow' ? item.definition.group_id === groupId
     : item.kind === 'shared_exercise' ? item.group_id === groupId
     : (item.kind === 'competition' ? item.event.group.group_id : item.group.group_id) === groupId);
   return false;
