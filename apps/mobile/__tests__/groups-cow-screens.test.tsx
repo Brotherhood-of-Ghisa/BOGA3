@@ -24,6 +24,8 @@ jest.mock('expo-router', () => ({ useRouter: () => mockRouter, useLocalSearchPar
 jest.mock('@/src/groups/api', () => ({ ...jest.requireActual('@/src/groups/api'), getGroup: jest.fn(), listCompetitionExercises: jest.fn(),
   getCoWSummary: jest.fn(), getCoWCalendar: jest.fn(), listCoWs: jest.fn(), getCoW: jest.fn(), getCoWResults: jest.fn(),
   createCoW: jest.fn(), updateCoW: jest.fn(), cancelCoW: jest.fn(), setCoWCalendar: jest.fn() }));
+jest.mock('@/components/groups/cow-time-zone', () =>
+  jest.requireActual('./helpers/react-compiler').requireWithReactCompiler('components/groups/cow-time-zone.tsx'));
 import * as groupApi from '@/src/groups/api';
 import { GroupApiError } from '@/src/groups/api';
 import type { CoWDefinitionWire, CoWResultWire } from '@/src/groups/cow-wire';
@@ -275,6 +277,22 @@ it('opens group time-zone setup with the form retained, then revalidates next we
   mockFocused = false; view.rerender(<CoWScheduleRoute />); api.getCoWCalendar.mockResolvedValue({ ...calendar(), revision: 2 });
   mockFocused = true; view.rerender(<CoWScheduleRoute />); await waitFor(() => expect(screen.getByTestId('cow-form-submit')).toBeEnabled());
   expect(screen.getByLabelText('Exercise: Bench press')).toBeTruthy(); expect(screen.getByTestId('cow-form-metric-volume').props.accessibilityState.checked).toBe(true);
+});
+it('opens compiled time-zone setup while its calendar loads, then saves only after an explicit press', async () => {
+  let resolveCalendar!: (value: ReturnType<typeof calendar>) => void;
+  api.getCoWCalendar.mockImplementationOnce(() => new Promise(resolve => { resolveCalendar = resolve; }));
+  mockParams.focusTimeZone = '1';
+  render(<EditGroupRoute />);
+  expect(await screen.findByTestId('cow-zone-loading')).toBeTruthy();
+  expect(api.setCoWCalendar).not.toHaveBeenCalled();
+  await act(async () => resolveCalendar({ ...calendar(), revision: 7 }));
+  const input = await screen.findByTestId('cow-zone-input');
+  expect(input.props.autoFocus).toBe(true);
+  expect(api.setCoWCalendar).not.toHaveBeenCalled();
+  fireEvent.changeText(input, ' Europe/London ');
+  fireEvent.press(screen.getByTestId('cow-zone-save'));
+  expect(await screen.findByTestId('cow-zone-saved')).toBeTruthy();
+  expect(api.setCoWCalendar).toHaveBeenCalledWith('g1', 7, 'Europe/London');
 });
 it('saves a validated group calendar explicitly from group Edit while retaining invalid text', async () => {
   api.setCoWCalendar.mockRejectedValueOnce(new GroupApiError('VALIDATION', 'invalid zone'));

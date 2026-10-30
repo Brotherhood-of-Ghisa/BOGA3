@@ -26,6 +26,7 @@ export function requireWithReactCompiler<T>(relativePath: string): T {
   }
   const compiled = { exports: {} as T };
   // Evaluate the compiled module with Jest's require.
-  new Function('exports', 'require', 'module', result.code)(compiled.exports, require, compiled);
+  const sourceRequire = (id: string) => require(id.startsWith('.') ? path.resolve(path.dirname(filename), id) : id);
+  new Function('exports', 'require', 'module', result.code)(compiled.exports, sourceRequire, compiled);
   return compiled.exports;
 }
