@@ -196,11 +196,12 @@ stateDiagram-v2
 
 - **Pending:** available for use; eligible unattached blocks stay fully editable.
 - **Attached:** materialized onto an active session card, and read-only.
-- **Completed:** requires explicit user completion or automatic completion on
-  finishing the active session with ≥1 confirmed source-derived set
-  (`source_plan_set_id IS NOT NULL`). Manual warm-ups alone cannot complete a
-  block; target deviations do not prevent completion. On read, a pending block
-  claimed by a completed session derives `completed`.
+- **Completed:** [[planner.block-completion]] requires explicit user completion
+  or automatic completion on finishing the active session with ≥1 confirmed
+  source-derived set (`source_plan_set_id IS NOT NULL`). Manual warm-ups alone
+  cannot complete a block; target deviations do not prevent completion. On read,
+  a pending block claimed by a completed session derives `completed` when it has
+  confirmed source-derived work.
 - **Skipped:** explicitly skipped from programme detail (no performed rows).
 - **Derived progress:** parent progress (`planned | in_progress | completed`)
   is computed on the fly from child block states, never stored.

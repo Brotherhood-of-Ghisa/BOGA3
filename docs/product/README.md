@@ -1,9 +1,9 @@
 # Product facts
 
-Load a subject's file when your task matches its trigger or a doc cites one of
-its facts (`[[set.eligibility]]` → `set.md`). `./boga docs facts` lists the
-IDs. An `open` fact is undecided: decide it if you need it. Writing a fact:
-load `docs/procedures/product-facts-authoring.md`.
+Load a subject file when your task matches its trigger or a doc cites one of
+its facts (`[[set.eligibility]]` → `set.md`). `./boga docs facts` lists IDs. An
+`open` fact is undecided: decide it if needed. Writing a fact: load
+`docs/procedures/product-facts-authoring.md`.
 
 | File | Load when your task touches |
 | --- | --- |
@@ -18,3 +18,4 @@ load `docs/procedures/product-facts-authoring.md`.
 | `notifications.md` | which notifications are sent, to whom, with what counts |
 | `timer.md` | rest timer defaults |
 | `agents.md` | what a coaching agent (MCP) may read or change |
+| `planner.md` | session plans, programmes, block completion or consumption |

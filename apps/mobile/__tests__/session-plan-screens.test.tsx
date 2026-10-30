@@ -713,6 +713,11 @@ describe('recorder: complete block on a sourced card', () => {
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '5');
     fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
 
+    await waitFor(async () => {
+      const graph = await loadActiveSessionGraph(sessionId);
+      expect(graph?.session.exercises[0].sets.some((s) => s.reps === '5' && s.weight === '100')).toBe(true);
+    });
+
     // Complete the session through the session lifecycle path
     const activeGraph = await loadActiveSessionGraph(sessionId);
     await completeActiveSession({
@@ -726,6 +731,27 @@ describe('recorder: complete block on a sourced card', () => {
     expect(detail?.progress).toBe('completed');
     expect(detail?.blocks[0].status).toBe('completed');
     expect(detail?.blockCounts).toEqual({ pending: 0, attached: 0, completed: 1, skipped: 0 });
+  });
+
+  it('finishing an active session without confirming planned sets leaves plan blocks pending', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    await startFromPlan(planId);
+    const sessionId = await determineSessionId();
+
+    // Finish session without performing any sets
+    const activeGraph = await loadActiveSessionGraph(sessionId);
+    await completeActiveSession({
+      sessionId,
+      gymId: null,
+      startedAt: activeGraph!.startedAt,
+      completedHistorySession: activeGraph!.session,
+    });
+
+    const detail = await planQueries.loadPlanDetail(planId);
+    expect(detail?.progress).toBe('planned');
+    expect(detail?.blocks[0].status).toBe('pending');
+    expect(detail?.blockCounts).toEqual({ pending: 1, attached: 0, completed: 0, skipped: 0 });
   });
 });
 
