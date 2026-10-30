@@ -89,6 +89,7 @@ import * as groupsApi from '@/src/groups/api';
 import { uiRoles } from '@/components/ui';
 
 import GroupsTabRoute from '../app/groups';
+import { sortPodiumCards } from '@/components/groups/group-leaderboards-page';
 import GroupBoardRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/index';
 import GroupBoardHistoryRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/history';
 
@@ -177,6 +178,17 @@ beforeEach(() => {
 
 afterEach(() => {
   fixture.close();
+});
+
+describe('sortPodiumCards', () => {
+  const card = (name: string, latestRecordAtMs: number | null, archived = false) => ({ name, latestRecordAtMs, archived });
+  const names = (cards: { name: string }[]) => cards.map((entry) => entry.name);
+
+  it('keeps archived exercises last in either order', () => {
+    const cards = [card('Bench', 3, true), card('squat', 1), card('Deadlift', null), card('Row', 5)];
+    expect(names(sortPodiumCards(cards, 'name'))).toEqual(['Deadlift', 'Row', 'squat', 'Bench']);
+    expect(names(sortPodiumCards(cards, 'recent'))).toEqual(['Row', 'squat', 'Deadlift', 'Bench']);
+  });
 });
 
 describe('Groups screen Leaderboards segment (E1.1)', () => {

@@ -45,6 +45,8 @@ const TITLE_MAX_WIDTH_WITH_ACTION = 150;
 export function GroupScreenHeader({ groups, selectedGroupId, groupName, onSelectGroup, onOpenManage, headerAction }: GroupScreenHeaderProps) {
   const [switching, setSwitching] = useState(false);
   const canSwitch = groups.length > 1;
+  // Down to one group with the switch open: it closes, and stays closed.
+  if (!canSwitch && switching) setSwitching(false);
   return (
     <>
       <Stack.Screen

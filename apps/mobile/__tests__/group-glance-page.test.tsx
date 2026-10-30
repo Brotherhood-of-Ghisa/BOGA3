@@ -224,6 +224,16 @@ describe('At a glance: a held read while the next one lands', () => {
 
 });
 
+describe('At a glance: a held read that does not reach the selection', () => {
+  it('shows its nearest week with one before it, and words the comparison for that week', () => {
+    // Ten weeks back; the read in hand ends at this week.
+    renderPage({ offset: -10, series: seriesFor('week', 0), held: { period: 'week', offset: 0 } });
+    expect(byId('group-rank-chart-label-1').props.accessibilityState).toEqual({ selected: true });
+    // Against the oldest week (249 sets, my 99 among them): never against nothing.
+    expect(byId('group-week-totals-sets-previous')).toHaveTextContent('vs 249 wk before');
+  });
+});
+
 describe('At a glance: position over time', () => {
   it('charts every member over the last six periods and opens on the newest', () => {
     renderPage();

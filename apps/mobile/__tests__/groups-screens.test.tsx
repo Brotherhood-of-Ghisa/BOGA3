@@ -426,6 +426,14 @@ describe('Groups tab', () => {
     }
   });
 
+  it("draws each page's own read state: a failed Stream shows its error while At a glance is in view", async () => {
+    api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'stream failed'));
+    render(<GroupsTabRoute />);
+    expect(await screen.findByTestId('group-home-board')).toBeTruthy();
+    expect(await within(screen.getByTestId('groups-stream-list')).findByTestId('groups-stream-error-state')).toBeTruthy();
+    expect(screen.queryByTestId('group-glance-error-state')).toBeNull();
+  });
+
   it('draws no event-type menu outside dev mode', async () => {
     render(<GroupsTabRoute />);
     await openStream();

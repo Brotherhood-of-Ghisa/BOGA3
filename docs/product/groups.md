@@ -14,9 +14,10 @@ or set a record) on a live group exercise. One certification per set:
 | Member exercise's per-side/total entry mode changes | Ends affected certifications; switching back restores none |
 | Group target-mode, formula or bodyweight preference/contribution/reading changes | Preserve unchanged witnesses |
 | After it ends | Only a new certification re-certifies the set |
+| Which boards open first | All; Certified is a toggle |
 
 Why: one witness attests one performance.
-Code: `supabase/migrations/20261008160000_group_competition_set_certification.sql`; `apps/mobile/src/groups/competition-session-records-view-model.ts`.
+Code: `supabase/migrations/20261008160000_group_competition_set_certification.sql`; `apps/mobile/src/groups/competition-session-records-view-model.ts`; `DEFAULT_BOARD_SCOPE` in `apps/mobile/src/groups/board-view-model.ts`.
 
 ### groups.cow-metrics · calculation · accepted
 

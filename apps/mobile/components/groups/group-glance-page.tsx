@@ -182,9 +182,12 @@ function GlanceCards({
   // A held series is drawn as the periods it was read for, until its successor lands.
   const figures = held ?? { period, offset: groupRankSeriesEnd(offset) };
   const last = series.length - 1;
-  // The selection's column; a held read may not reach it, and then shows its nearest.
-  const selectedIndex = Math.min(last, Math.max(0, last - (figures.offset - offset)));
+  // The selection's column. A held read may not reach it: it then shows its
+  // nearest week that has one before it, faded, until the read in view lands.
+  const selectedIndex = Math.min(last, Math.max(1, last - (figures.offset - offset)));
   const selected = series[selectedIndex];
+  // The week the figures are for, so the comparison's wording matches them.
+  const figuresOffset = figures.offset - (last - selectedIndex);
   const board = buildGroupHomeBoard({ members: selected?.members ?? [], metric, myUserId });
   const totals = buildGroupWeekTotals(series.slice(0, selectedIndex + 1));
   const rankSeries = buildGroupRankSeries({ period: figures.period, reads: series, metric });
@@ -197,7 +200,7 @@ function GlanceCards({
       <Card testID="group-week-totals-card">
         <View style={styles.card}>
           <CardTitle testID="group-week-totals-title" title="Group stats" />
-          <GroupWeekTotalsFigures current={totals.current} offset={offset} previous={totals.previous} />
+          <GroupWeekTotalsFigures current={totals.current} offset={figuresOffset} previous={totals.previous} />
         </View>
       </Card>
 

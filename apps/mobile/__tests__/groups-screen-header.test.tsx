@@ -66,6 +66,21 @@ describe('the Groups header', () => {
     expect(screen.queryByTestId('groups-switch-sheet')).toBeNull();
   });
 
+  it('closes the switch when only one group is left, and does not reopen it when another returns', () => {
+    renderHeader();
+    fireEvent.press(screen.getByTestId('groups-title'));
+    expect(screen.getByTestId('groups-switch-sheet').props.visible ?? true).toBeTruthy();
+
+    screen.rerender(
+      <GroupScreenHeader groupName="Garage Gym" groups={[GROUPS[0]!]} onOpenManage={jest.fn()} onSelectGroup={jest.fn()} selectedGroupId="g1" />,
+    );
+    expect(screen.queryByTestId('groups-switch-sheet')).toBeNull();
+    screen.rerender(
+      <GroupScreenHeader groupName="Garage Gym" groups={GROUPS} onOpenManage={jest.fn()} onSelectGroup={jest.fn()} selectedGroupId="g1" />,
+    );
+    expect(screen.queryByTestId('groups-switch-g2')).toBeNull();
+  });
+
   it('puts the manage icon in the title bar', () => {
     const onOpenManage = jest.fn();
     renderHeader({ onOpenManage });

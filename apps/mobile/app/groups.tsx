@@ -162,6 +162,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Only a page change reads; a new group reads by its own key.
   }, [segment]);
 
+  // The banner speaks for the page in view; each page draws its own read's state.
   const segmentResource = segment === 'leaderboards' ? boards : segment === 'glance' ? glance.resource : stream;
   const offline = mine.offline || segmentResource.offline;
   const inlineError = pickInlineError(mine.error, segmentResource.error);
@@ -221,8 +222,8 @@ function GroupsTabContent({ userId }: { userId: string }) {
       <View style={frameStyle(frame)}>
         <GroupsStreamPage
           hiddenEventKinds={hiddenEventKinds}
-          inlineError={inlineError}
-          offline={offline}
+          inlineError={pickInlineError(mine.error, stream.error)}
+          offline={mine.offline || stream.offline}
           onCertificationChanged={() => void refreshAll()}
           onOpenSession={(path) => router.push(path)}
           onRefresh={onRefresh}
@@ -236,12 +237,12 @@ function GroupsTabContent({ userId }: { userId: string }) {
     // Its stepper and metric stay put; the cards scroll under them.
     glance: (frame) => (
       <GroupGlancePage
-        error={inlineError}
+        error={pickInlineError(mine.error, glance.resource.error)}
         held={glance.held}
         metric={metric}
         myUserId={userId}
         now={new Date()}
-        offline={offline}
+        offline={mine.offline || glance.resource.offline}
         offset={glanceOffset}
         onMetricChange={setMetric}
         onOffsetChange={setGlanceOffset}
@@ -258,9 +259,9 @@ function GroupsTabContent({ userId }: { userId: string }) {
         'groups-leaderboards-scroll',
         <GroupLeaderboardsPage
           boards={boards}
-          error={inlineError}
+          error={pickInlineError(mine.error, boards.error)}
           groupId={selectedGroupId}
-          offline={offline}
+          offline={mine.offline || boards.offline}
           onRetry={onRefresh}
           userId={userId}
         />,
@@ -366,7 +367,6 @@ function GroupsStreamPage({ stream, inlineError, offline, onRefresh, onOpenSessi
       {...list}
       contentContainerStyle={styles.pageContent}
       emptyState={emptyState}
-      header={<View />}
       onPressSession={(card) =>
         onOpenSession(`/group-session/${card.memberUserId}/${card.sessionId}?groupId=${encodeURIComponent(card.groupId)}`)
       }

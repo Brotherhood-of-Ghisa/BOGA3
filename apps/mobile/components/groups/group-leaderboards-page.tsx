@@ -103,14 +103,18 @@ export function filterPodiumCards<T extends { name: string }>(cards: readonly T[
 }
 
 /**
- * The cards in `order`: by name, ignoring case; or the newest podium set first,
- * empty podiums last, ties by name.
+ * The cards in `order`, archived exercises last either way: by name, ignoring
+ * case; or the newest podium set first, empty podiums last, ties by name.
  */
-export function sortPodiumCards<T extends { name: string; latestRecordAtMs: number | null }>(cards: readonly T[], order: PodiumOrder): T[] {
+export function sortPodiumCards<T extends { name: string; archived: boolean; latestRecordAtMs: number | null }>(
+  cards: readonly T[],
+  order: PodiumOrder,
+): T[] {
   const byName = (left: T, right: T) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
-  if (order === 'name') return [...cards].sort(byName);
-  return [...cards].sort((left, right) =>
-    (right.latestRecordAtMs ?? -Infinity) - (left.latestRecordAtMs ?? -Infinity) || byName(left, right));
+  const byRecent = (left: T, right: T) =>
+    (right.latestRecordAtMs ?? -Infinity) - (left.latestRecordAtMs ?? -Infinity) || byName(left, right);
+  const within = order === 'name' ? byName : byRecent;
+  return [...cards].sort((left, right) => Number(left.archived) - Number(right.archived) || within(left, right));
 }
 
 /**
