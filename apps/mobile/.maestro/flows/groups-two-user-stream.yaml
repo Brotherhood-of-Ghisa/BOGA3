@@ -276,7 +276,12 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "groups-04b-1-exercises-added"
 
 # --- 4c. CoW: native picker, next-week publish and stack Back ------------------
-- tapOn: { id: "group-cow-browse" }
+- assertNotVisible: { text: "View CoWs" }
+- openLink: "boga3://groups?groupId=${output.groupsGroupId}"
+- extendedWaitUntil:
+    visible: { id: "groups-cows-link" }
+    timeout: 15000
+- tapOn: { id: "groups-cows-link" }
 - extendedWaitUntil:
     visible: { id: "cows-schedule" }
     timeout: 15000
@@ -315,7 +320,7 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - tapOn: { id: "BackButton" }
 - extendedWaitUntil:
-    visible: { id: "group-screen-name", text: "Maestro Groups E2E" }
+    visible: { id: "groups-cows-link" }
     timeout: 10000
 
 # --- 5. Active session -> one "Training now" card with its metrics ---------------

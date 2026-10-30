@@ -125,14 +125,11 @@ it.each(['pending','unavailable','empty'] as const)('keeps current %s distinct f
   expect(await screen.findByTestId('today-cow')).toBeTruthy(); expect(screen.getByText('Pull-up')).toBeTruthy();
   expect(screen.getAllByText(state === 'pending' ? 'Updating' : state === 'unavailable' ? 'Group comparisons unavailable' : 'No qualifying results').length).toBeGreaterThan(0);
 });
-it('hides confirmed absence without a gap but preserves the group browse link', async () => {
+it.each([true, false])('hides confirmed absence without a gap (today: %s)', async today => {
   api.getCoWSummary.mockResolvedValue({ ...summary(), selection: 'none', result: null });
-  const view = render(<CoWGroupPreview groupId="g1" userId="u1" today />);
-  await waitForGone(() => screen.queryByTestId('today-cow-section'));
+  const view = render(<CoWGroupPreview groupId="g1" userId="u1" today={today} />);
+  await waitForGone(() => screen.queryByTestId(`${today ? 'today' : 'group'}-cow-section`));
   expect(view.toJSON()).toBeNull();
-  view.rerender(<CoWGroupPreview groupId="g1" userId="u1" />);
-  fireEvent.press(await screen.findByTestId('group-cow-browse'));
-  expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows');
 });
 it('labels a stored fallback with its own date and preserves selected metric/group/CoW on open', async () => {
   const value = summary(); value.selection = 'previous_final' as typeof value.selection;
@@ -150,11 +147,21 @@ it('shows retry on failed reads and offline state without declaring absence', as
   expect(screen.getByText('Please try again.')).toBeTruthy(); expect(screen.queryByText('failed')).toBeNull();
   expect(screen.queryByText('No CoW this week')).toBeNull();
 });
-it('adds the persistent group preview above exercises and does not expose scheduling there', async () => {
+it('opens the group preview without a View CoWs row or scheduling controls', async () => {
   render(<GroupRoute />);
-  expect(await screen.findByTestId('group-cow-browse')).toBeTruthy(); expect(screen.queryByTestId('cows-schedule')).toBeNull();
-  fireEvent.press(await screen.findByTestId('group-cow-metric-improvement')); fireEvent.press(screen.getByTestId('group-cow-browse'));
+  expect(await screen.findByTestId('group-cow-open')).toBeTruthy(); expect(screen.queryByTestId('cows-schedule')).toBeNull();
+  expect(screen.queryByText('View CoWs')).toBeNull();
+  fireEvent.press(await screen.findByTestId('group-cow-metric-improvement')); fireEvent.press(screen.getByTestId('group-cow-open'));
   expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows?cowId=cow1&metric=improvement');
+});
+it('keeps group summary failures retryable without a View CoWs row', async () => {
+  api.getCoWSummary.mockRejectedValue(new GroupApiError('INTERNAL', 'failed'));
+  render(<GroupRoute />);
+  expect(await screen.findByTestId('group-cow-error-state')).toBeTruthy();
+  expect(screen.queryByText('View CoWs')).toBeNull();
+  api.getCoWSummary.mockResolvedValue(summary());
+  fireEvent.press(screen.getByTestId('group-cow-error-state-retry'));
+  expect(await screen.findByTestId('group-cow-open')).toBeTruthy();
 });
 it('browses current, next and past with archived names retained, and management only for admins', async () => {
   api.listCoWs.mockResolvedValue({ cows: [scheduled(), current().cow, { ...past(), group_exercise_id: 'old' }], next_cursor: null });

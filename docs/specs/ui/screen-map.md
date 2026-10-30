@@ -80,7 +80,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 | `/group/mine` | My groups: active memberships, `Join group` / `Create group` — the way into a group's management page | `group/mine.tsx` |
 | `/group/new` | Create a group (inline username gate first when the username is blank) | `group/new.tsx` |
 | `/group/join` | Join by code: code field, preview card, `Join group` | `group/join.tsx` |
-| `/group/[groupId]` | The group screen, for *managing* the group: header, owner/admin Invite + Edit, CoW preview and persistent View CoWs, and the group's exercises with link / unlink. Stream and leaderboards live on `/groups` | `group/[groupId]/index.tsx` |
+| `/group/[groupId]` | The group screen, for *managing* the group: header, owner/admin Invite + Edit, CoW preview, and the group's exercises with link / unlink. Stream and leaderboards live on `/groups` | `group/[groupId]/index.tsx` |
 | `/group/[groupId]/members` | The member list behind the header's member count, with role actions and `Leave group` | `group/[groupId]/members.tsx` |
 | `/group/[groupId]/edit` | Owner/admin edit of name, description and group calendar time zone | `group/[groupId]/edit.tsx` |
 | `/group/[groupId]/cows` | This week, next week and past CoWs; independent metric preview, online history and admin next-week entry | `group/[groupId]/cows/index.tsx` |
