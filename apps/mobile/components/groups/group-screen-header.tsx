@@ -2,8 +2,8 @@ import { Stack } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
+import { IconButton } from '@/components/ui/icon-button';
 import { uiText } from '@/components/ui/text-roles';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 
@@ -28,18 +28,18 @@ export type GroupScreenHeaderProps = {
   groupName: string;
   onSelectGroup: (groupId: string) => void;
   onOpenManage: () => void;
-  /** A control before `Manage`: the stream's dev-only event-type menu. */
+  /** A control before the manage button: the stream's dev-only event-type menu. */
   headerAction?: ReactNode;
 };
 
-// Clear of the back arrow and `Manage` on a 375pt phone; narrower beside a page action too.
+// Clear of the back arrow and the manage button on a 375pt phone; narrower beside a page action too.
 const TITLE_MAX_WIDTH = 200;
 const TITLE_MAX_WIDTH_WITH_ACTION = 150;
 
 /**
  * The Groups screen's native header: the group's name as the title — with
  * two or more groups a button, a chevron after the name, that opens the group
- * switch — and `Manage` on the right, the way into joining, creating and each
+ * switch — and the manage button on the right, the way into joining, creating and each
  * group's page.
  */
 export function GroupScreenHeader({ groups, selectedGroupId, groupName, onSelectGroup, onOpenManage, headerAction }: GroupScreenHeaderProps) {
@@ -61,7 +61,13 @@ export function GroupScreenHeader({ groups, selectedGroupId, groupName, onSelect
           headerRight: () => (
             <View style={styles.actions}>
               {headerAction}
-              <ActionButton label="Manage" onPress={onOpenManage} testID="groups-manage-button" variant="text" />
+              <IconButton
+                accessibilityHint="Join, create and manage your groups"
+                accessibilityLabel="Manage groups"
+                name="settings"
+                onPress={onOpenManage}
+                testID="groups-manage-button"
+              />
             </View>
           ),
         }}

@@ -66,11 +66,11 @@ describe('the Groups header', () => {
     expect(screen.queryByTestId('groups-switch-sheet')).toBeNull();
   });
 
-  it('puts Manage in the title bar', () => {
+  it('puts the manage icon in the title bar', () => {
     const onOpenManage = jest.fn();
     renderHeader({ onOpenManage });
 
-    expect(screen.getByTestId('groups-manage-button')).toHaveTextContent(/manage/i);
+    expect(screen.getByTestId('groups-manage-button').props.accessibilityLabel).toBe('Manage groups');
     fireEvent.press(screen.getByTestId('groups-manage-button'));
     expect(onOpenManage).toHaveBeenCalledTimes(1);
   });
