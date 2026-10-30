@@ -194,6 +194,42 @@ it('a missing CoW is unavailable rather than a false loss of group membership', 
   mockParams = { groupId: 'g1', cowId: 'missing' }; render(<CoWStandingsRoute />);
   expect(await screen.findByTestId('cow-missing')).toBeTruthy(); expect(screen.queryByTestId('cow-lost-access')).toBeNull();
 });
+it('keeps Upcoming in the heading without an empty status panel or Refresh button', async () => {
+  mockParams = { groupId: 'g1', cowId: 'next' };
+  api.getCoWResults.mockResolvedValue({ ...current(), cow: scheduled(), state: 'pending', publication_id: null,
+    rankings: [{ ...current().rankings[0], entries: [] }] });
+  render(<CoWStandingsRoute />);
+  expect(await screen.findByText('Upcoming')).toBeTruthy();
+  expect(screen.getAllByText('Upcoming')).toHaveLength(1);
+  expect(screen.queryByTestId('cow-standings-state')).toBeNull();
+  expect(screen.queryByText('Refresh')).toBeNull();
+  const calls = api.getCoWResults.mock.calls.length;
+  await act(async () => { await screen.getByTestId('cow-standings').props.refreshControl.props.onRefresh(); });
+  expect(api.getCoWResults.mock.calls.length).toBeGreaterThan(calls);
+});
+it.each(['pending', 'unavailable'] as const)('keeps the %s message without a Refresh button', async state => {
+  mockParams = { groupId: 'g1', cowId: 'cow1' };
+  api.getCoWResults.mockResolvedValue({ ...current(), state, publication_id: null,
+    rankings: [{ ...current().rankings[0], entries: [] }] });
+  render(<CoWStandingsRoute />);
+  expect(await screen.findByTestId('cow-standings-state')).toBeTruthy();
+  expect(screen.getAllByText(state === 'pending' ? 'Updating' : 'Group comparisons unavailable').length).toBeGreaterThan(0);
+  expect(screen.queryByText('Refresh')).toBeNull();
+});
+it('retains stale standings feedback without a Refresh button', async () => {
+  mockParams = { groupId: 'g1', cowId: 'cow1' };
+  api.getCoWResults.mockImplementation(async (_group, _cow, _metric, before) => {
+    if (before) throw new GroupApiError('CONFLICT', 'publication changed');
+    return { ...current(), rankings: [{ ...current().rankings[0], next_cursor: 'next-page' }] };
+  });
+  render(<CoWStandingsRoute />);
+  fireEvent.press(await screen.findByTestId('cow-standings-more'));
+  expect(await screen.findByTestId('cow-standings-stale')).toBeTruthy();
+  expect(screen.queryByText('Refresh')).toBeNull();
+  await act(async () => { screen.getByTestId('cow-standings').props.refreshControl.props.onRefresh(); });
+  await waitForGone(() => screen.queryByTestId('cow-standings-stale'));
+  expect(screen.getByTestId('cow-standings-more')).toBeTruthy();
+});
 it('renders server Finalizing without calling it Final and suppresses unsafe figures', async () => {
   mockParams = { groupId: 'g1', cowId: 'cow1' };
   api.getCoWResults.mockResolvedValue({ ...current(), cow: { ...current().cow, state: 'finalizing' }, state: 'pending', publication_id: null,

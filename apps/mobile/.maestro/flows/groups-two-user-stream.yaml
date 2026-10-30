@@ -315,6 +315,11 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "cow-standings" }
     timeout: 15000
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Upcoming"
+    timeout: 10000
+- assertNotVisible: "(?i)Refresh"
 - takeScreenshot: "cow-standings-upcoming"
 - tapOn: { id: "BackButton" }
 - extendedWaitUntil:
