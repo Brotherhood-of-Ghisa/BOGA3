@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Text } from 'react-native';
 
-import { FormActionRow, FormSection, Icon, ListRow, uiRoles, uiText, uiTextTone } from '@/components/ui';
+import { ActionRow, FormSection, Icon, ListRow, uiRoles, uiText, uiTextTone } from '@/components/ui';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { buildLinkScreenModel } from '@/src/groups';
@@ -47,7 +47,7 @@ export function ExerciseLinksSection({ exercise, userId }: { exercise: ExerciseC
           trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
         />
       )) : null}
-      <FormActionRow
+      <ActionRow
         divider={linking.linksReady && linked.length > 0}
         icon="link"
         label="Link to a group exercise"

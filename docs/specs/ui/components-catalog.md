@@ -43,13 +43,14 @@ Two standing rules:
 | A loading, empty, message or error state — whole-screen or inside a card | `StatePanel` (`state-panel.tsx`) |
 | The inline outcome of an action | `Notice` (`notice.tsx`) |
 | A labelled free-text input (a form's name or title) | `FormField` (`form-field.tsx`) |
-| A form's section and its rows: a choice that opens a picker, a short figure in place, an action that leaves for a page, a section error | `FormSection`, `ChoiceRow`, `InputRow`, `FormActionRow`, `FormError` (`form-section.tsx`; `ux-rules.md` "Forms") |
+| A form's section (optional `footnote`) and its rows: a choice that opens a picker (optional leading `icon`), a short figure in place, an action (`ActionRow` `kind`: `navigate` chevron, `act` accent, `danger`), a section error | `FormSection`, `ChoiceRow`, `InputRow`, `ActionRow`, `FormError` (`form-section.tsx`; `ux-rules.md` "Forms") |
+| A Settings row: one of ≤3 options under its label, the one chosen of many (radio, optional `meta` swatch), several (checkbox), a read-only value (one accessible element) | `SegmentRow`, `RadioRow`, `CheckRow`, `ValueRow` (`form-rows.tsx`; `ux-rules.md` "Settings pages") |
 | A search input | `SearchField` (`search-field.tsx`) |
 | Full-width pages swiped between under tabs that name them (UX pattern 15) | `SwipePages` (`swipe-pages.tsx`) — Today's cards, the Groups screen's pages |
 | One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral or fixed black/white filter selection |
 | One filter of a few values where a row of them cannot afford every label | `ToggleChip` (`toggle-chip.tsx`) — the value in force plus the `swap` glyph; a tap steps to the next |
 | Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
-| One option or setting on or off, in a sheet (`Show deleted sessions`) or a form card (`Track each gym separately`, `density="list"`) | `SwitchRow` (`switch-row.tsx`) |
+| One option or setting on or off, in a sheet (`Show deleted sessions`) or a form card (`Track each gym separately`, `density="list"`, optional `description`) | `SwitchRow` (`switch-row.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`); every other page takes the native header (`ux-rules.md` "Pages") |
 | Colour roles, fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
