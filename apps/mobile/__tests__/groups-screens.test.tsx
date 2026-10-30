@@ -581,18 +581,22 @@ describe('Groups tab', () => {
     // The server's figures, ranked here; my own row reads as You.
     expect(screen.getByTestId('group-home-board-row-friend-1-value')).toHaveTextContent('12');
     expect(within(screen.getByTestId(`group-home-board-row-${USER_ID}`)).getByText('You')).toBeTruthy();
-    expect(within(screen.getByTestId('group-rank-table')).getByText('alex')).toBeTruthy();
+    expect(within(screen.getByTestId('group-home-board')).getByText('alex')).toBeTruthy();
     expect(cached(groupCacheKeys.glance('group-a', 'week', 0))?.payload).toEqual(periodTotals('group-a', windows));
 
-    // A step back is its own read: the same six-window span, one week earlier.
-    // Until it lands this week's figures stay in place, held: no loading state.
+    // The selection stays fourth in the chart, so the first two steps back move
+    // only the selection: no new read.
+    fireEvent.press(screen.getByTestId('group-home-period-earlier'));
+    fireEvent.press(screen.getByTestId('group-home-period-earlier'));
+    expect(api.getCompetitionPeriodTotals).toHaveBeenCalledTimes(1);
+    // The third moves the chart: its own read, the same six-window span one week earlier.
+    // Until it lands the figures in view stay in place, held: no loading state.
     const earlierRead = deferred<CompetitionPeriodTotalsWire>();
     api.getCompetitionPeriodTotals.mockReturnValueOnce(earlierRead.promise);
     fireEvent.press(screen.getByTestId('group-home-period-earlier'));
     await waitFor(() => expect(api.getCompetitionPeriodTotals).toHaveBeenCalledTimes(2));
     const [, earlier] = api.getCompetitionPeriodTotals.mock.calls[1]!;
     expect(earlier[5]).toEqual(windows[4]);
-    expect(screen.getByTestId('group-home-period-title')).toHaveTextContent('Last week');
     expect(screen.queryByTestId('group-glance-loading')).toBeNull();
     expect(screen.getByTestId('group-glance-figures').props.accessibilityState).toEqual({ busy: true });
     expect(screen.getByTestId('group-home-board-row-friend-1-value')).toHaveTextContent('12');
@@ -601,7 +605,7 @@ describe('Groups tab', () => {
     await waitFor(() => {
       if (screen.getByTestId('group-glance-figures').props.accessibilityState.busy) throw new Error('still held');
     });
-    expect(screen.getByTestId('group-home-period-title')).toHaveTextContent('Last week');
+    expect(screen.getByTestId('group-home-period-later')).not.toBeDisabled();
   });
 
   it('never shows a cached At a glance read for other windows, and reads the current ones at once', async () => {
@@ -615,8 +619,8 @@ describe('Groups tab', () => {
 
     expect(await screen.findByTestId('group-glance-loading')).toBeTruthy();
     expect(screen.queryByTestId('group-home-board')).toBeNull();
-    // The stepper stays, so the period in view is still dated.
-    expect(screen.getByTestId('group-home-period-detail')).toBeTruthy();
+    // The stepper stays, so the period in view is still named.
+    expect(screen.getByTestId('group-home-period-title')).toHaveTextContent('This week');
     const [, windows] = api.getCompetitionPeriodTotals.mock.calls[0]!;
     await act(async () => read.resolve(periodTotals('group-a', windows)));
     expect(await screen.findByTestId('group-home-board')).toBeTruthy();

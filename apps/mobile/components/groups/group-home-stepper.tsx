@@ -6,8 +6,8 @@ import { uiSpace } from '@/components/ui/tokens';
 import type { GroupHomePeriod } from '@/src/groups/home-periods';
 
 export type GroupHomeStepperProps = {
-  /** The week's dates; the card under the stepper names it (`This week`). */
-  range: string;
+  /** The week: `This week`, `Last week`, or its dates. */
+  label: string;
   period: GroupHomePeriod;
   /** Steps one period back; there is always an earlier one. */
   onEarlier: () => void;
@@ -17,11 +17,11 @@ export type GroupHomeStepperProps = {
 };
 
 /**
- * The period stepper, one line beside the metric: the dates of the week the
- * cards below are reading, between the chevrons that walk backwards and
+ * The period stepper, one line beside the metric: the week the cards below
+ * are reading, between the chevrons that walk backwards and
  * forwards through the weeks.
  */
-export function GroupHomeStepper({ range, onEarlier, onLater, canGoLater }: GroupHomeStepperProps) {
+export function GroupHomeStepper({ label, onEarlier, onLater, canGoLater }: GroupHomeStepperProps) {
   const noun = 'week';
   return (
     <View style={styles.stepper} testID="group-home-period-stepper">
@@ -38,8 +38,8 @@ export function GroupHomeStepper({ range, onEarlier, onLater, canGoLater }: Grou
         minimumFontScale={0.8}
         numberOfLines={1}
         style={[uiText.label, uiTextTone.ink, styles.stepperLabel]}
-        testID="group-home-period-detail">
-        {range}
+        testID="group-home-period-title">
+        {label}
       </Text>
       <IconButton
         accessibilityLabel={`Next ${noun}`}

@@ -1,8 +1,8 @@
 /**
- * The Groups screen's At a glance page: the stepper and the metric on one row,
- * then three cards titled inside — the week (its total), the period board by
- * the chosen metric, and `Over time` (the position chart with the selected
- * period's table); a held read drawn as its own period, faded after a delay. The read, the metric, the period and the
+ * The Groups screen's At a glance page: the stepper and the metric pinned on
+ * one row, then three cards headed inside — `Group stats` (the week's total),
+ * `Top brothers` (the period board by the chosen metric) and `Rankings over
+ * time` (the position chart, the selected week fourth where it can be); a held read drawn as its own period, faded after a delay. The read, the metric, the period and the
  * offset are the screen's (groups-screens.test.tsx), so they arrive as props;
  * here a fixed six-week series pins every figure.
  */
@@ -17,6 +17,7 @@ import {
   GROUP_HOME_BOARD_SIZE,
   GROUP_RANK_PERIODS,
   groupHomeSeriesWindows,
+  groupRankSeriesEnd,
   type GroupHomeMemberTotals,
   type GroupHomeMetric,
   type GroupHomePeriod,
@@ -59,7 +60,7 @@ const renderPage = ({
   metric = 'sets',
   period = 'week',
   offset = 0,
-  series = seriesFor(period, offset),
+  series = seriesFor(period, groupRankSeriesEnd(offset)),
   held = null,
   onOffsetChange = jest.fn(),
   onMetricChange = jest.fn(),
@@ -98,31 +99,30 @@ const boardValues = (): string[] =>
   screen.getAllByTestId(/^group-home-board-row-.*-value$/).map((node) => String(node.props.children));
 
 describe('At a glance: the board', () => {
-  it('sets the period and the metric on one row above the cards, each card titled inside', () => {
+  it('pins the period and the metric on one row above the scrolling cards, each card headed inside', () => {
     const onMetricChange = jest.fn();
     renderPage({ onMetricChange });
 
     const controls = within(byId('group-glance-controls'));
     expect(controls.getByTestId('group-home-period-stepper')).toBeTruthy();
     expect(controls.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
-    expect(within(byId('group-glance-figures')).queryByTestId('group-home-period-stepper')).toBeNull();
-    expect(within(byId('group-home-board-card')).getByTestId('group-home-board')).toBeTruthy();
-    // The titles sit in their cards; nothing heads a card from outside.
-    expect(within(byId('group-week-totals-card')).getByTestId('group-home-period-title')).toHaveTextContent('This week');
-    expect(within(byId('group-position-card')).getByTestId('group-position-title')).toHaveTextContent('Over time');
-    expect(screen.queryByText('Rankings')).toBeNull();
+    // The controls sit outside the scroller, so they never scroll away.
+    expect(within(byId('groups-glance-scroll')).queryByTestId('group-glance-controls')).toBeNull();
+    expect(within(byId('group-week-totals-card')).getByTestId('group-week-totals-title')).toHaveTextContent('Group stats');
+    expect(within(byId('group-home-board-card')).getByText('Top brothers')).toBeTruthy();
+    expect(within(byId('group-position-card')).getByTestId('group-position-title')).toHaveTextContent('Rankings over time');
+    // The board is the ranking: the chart card repeats no table.
+    expect(screen.queryByTestId('group-rank-table')).toBeNull();
 
     fireEvent.press(byId('groups-filter-metric'));
     expect(onMetricChange).toHaveBeenCalledWith('prs');
   });
-
   it('opens on this week by sets: the top five, and my place on its own line', () => {
     renderPage();
 
     expect(byId('group-home-period-title')).toHaveTextContent('This week');
-    expect(byId('group-home-period-detail')).toHaveTextContent('12-10-2026 – 18-10-2026');
     expect(within(byId('group-home-board')).getByText('Sets')).toBeTruthy();
-    expect(within(byId('group-home-board')).getByText(`Top ${GROUP_HOME_BOARD_SIZE}`)).toBeTruthy();
+    expect(screen.getAllByTestId(/^group-home-board-row-[a-z]+$/)).toHaveLength(GROUP_HOME_BOARD_SIZE);
     expect(boardValues()).toEqual(['40', '35', '30', '25', '20']);
     expect(screen.queryByTestId(`group-home-board-row-${ME}`)).toBeNull();
     expect(byId('group-home-board-me-value')).toHaveTextContent('10');
@@ -147,9 +147,8 @@ describe('At a glance: the board', () => {
 
     screen.unmount();
     renderPage({ offset: -2, onOffsetChange });
-    // A week with no name is titled by its dates.
+    // A week with no name is named by its dates.
     expect(byId('group-home-period-title')).toHaveTextContent('28-09-2026 – 04-10-2026');
-    expect(byId('group-home-period-detail')).toHaveTextContent('28-09-2026 – 04-10-2026');
     fireEvent.press(byId('group-home-period-later'));
     expect(onOffsetChange).toHaveBeenLastCalledWith(-1);
   });
@@ -160,7 +159,7 @@ describe('At a glance: before the read lands', () => {
   it('keeps the stepper and shows the loading state in place of the cards', () => {
     renderPage({ series: null });
 
-    expect(byId('group-home-period-detail')).toHaveTextContent('12-10-2026 – 18-10-2026');
+    expect(byId('group-home-period-title')).toHaveTextContent('This week');
     expect(screen.queryByTestId('group-week-totals-card')).toBeNull();
     expect(byId('group-glance-loading')).toBeTruthy();
     expect(screen.queryByTestId('group-home-board')).toBeNull();
@@ -187,10 +186,10 @@ describe('At a glance: a held read while the next one lands', () => {
 
   it('keeps the figures in place under the new period, fading them only if the read is slow', () => {
     jest.useFakeTimers();
-    // Stepped back to last week; this week's read is still on screen.
-    renderPage({ offset: -1, series: seriesFor('week', 0), held: { period: 'week', offset: 0 } });
+    // Stepped back three weeks, which moves the chart one week back; its read is still on the way.
+    renderPage({ offset: -3, series: seriesFor('week', 0), held: { period: 'week', offset: 0 } });
 
-    expect(byId('group-home-period-title')).toHaveTextContent('Last week');
+    expect(byId('group-home-period-title')).toHaveTextContent('21-09-2026 – 27-09-2026');
     expect(screen.queryByTestId('group-glance-loading')).toBeNull();
     expect(boardValues()).toEqual(['40', '35', '30', '25', '20']);
     // Drawn as the week it was read for: its newest column is still this week.
@@ -210,7 +209,7 @@ describe('At a glance: a held read while the next one lands', () => {
         myUserId={ME}
         now={NOW}
         offline={false}
-        offset={-1}
+        offset={-3}
         onMetricChange={jest.fn()}
         onOffsetChange={jest.fn()}
         onRetry={jest.fn()}
@@ -250,23 +249,34 @@ describe('At a glance: position over time', () => {
     expect(within(byId('group-rank-chart-plot')).UNSAFE_getByType(Svg).props.height).toBe(NEWEST.length * 30);
   });
 
-  it('reads the selected period into the table: place, sets and PRs for every member', () => {
-    renderPage();
-    const table = () => within(byId('group-rank-table'));
+  it('keeps the selected week fourth, except near the current week, and selects a week by its column', () => {
+    const onOffsetChange = jest.fn();
+    const selectedColumn = () =>
+      screen.getAllByTestId(/^group-rank-chart-label-\d+$/).findIndex((node) => node.props.accessibilityState?.selected);
 
-    expect(table().getByText('Sets')).toBeTruthy();
-    expect(table().getByText('PRs')).toBeTruthy();
-    expect(table().queryByText('Vol')).toBeNull();
-    expect(table().getAllByTestId(/^group-rank-table-row-[a-z]+$/)).toHaveLength(NEWEST.length);
-    expect(byId(`group-rank-table-row-${ME}`).props.accessibilityLabel).toBe('6, You, 10 working sets, 4 group records');
+    renderPage({ offset: -4, onOffsetChange });
+    expect(selectedColumn()).toBe(3);
+    // The newest column is two weeks after the selection.
+    expect(byId(`group-rank-chart-label-${GROUP_RANK_PERIODS - 1}`)).toHaveTextContent('28 Sep');
 
-    // The oldest column: six weeks back, never "so far", and I led it.
+    // The oldest column: three weeks earlier; every card follows the screen's selection.
     fireEvent.press(byId('group-rank-chart-label-0'));
-    expect(byId('group-rank-chart-label-0').props.accessibilityState).toEqual({ selected: true });
-    expect(byId(`group-rank-table-row-${ME}-sets`)).toHaveTextContent('99');
-    expect(byId(`group-rank-table-row-${ME}`).props.accessibilityLabel).toMatch(/^1, You,/);
+    expect(onOffsetChange).toHaveBeenLastCalledWith(-7);
+
+    screen.unmount();
+    renderPage({ offset: -1, onOffsetChange });
+    // Only one later week exists: the chart ends at the current one.
+    expect(selectedColumn()).toBe(4);
+    fireEvent.press(byId(`group-rank-chart-label-${GROUP_RANK_PERIODS - 1}`));
+    expect(onOffsetChange).toHaveBeenLastCalledWith(0);
   });
 
+  it('reads the selected week into the board and the totals', () => {
+    // The oldest column is the selection: six weeks back, and I led it.
+    renderPage({ offset: -5, series: seriesFor('week', groupRankSeriesEnd(-5)).map((read, index) => (index === 0 ? read : { ...read, members: index === 3 ? OLDEST : NEWEST })) });
+    expect(byId(`group-home-board-row-${ME}-value`)).toHaveTextContent('99');
+    expect(byId(`group-home-board-row-${ME}-rank`)).toHaveTextContent('1');
+  });
 });
 
 describe('At a glance: the group total', () => {
@@ -285,7 +295,7 @@ describe('At a glance: the group total', () => {
       'group-home-board-card',
       'group-position-card',
     ]);
-    expect(totals.getByTestId('group-home-period-title')).toHaveTextContent('This week');
+    expect(totals.getByTestId('group-week-totals-title')).toHaveTextContent('Group stats');
     expect(byId('group-week-totals-sets-value')).toHaveTextContent('160');
     expect(byId('group-week-totals-sets-previous')).toHaveTextContent('vs 80 last wk');
     expect(byId('group-week-totals-prs-value')).toHaveTextContent('7');
@@ -294,7 +304,11 @@ describe('At a glance: the group total', () => {
   });
 
   it('follows the stepper: an earlier week compares with the week before it', () => {
-    renderPage({ offset: -2, series: withPreviousWeek(seriesFor('week', -2)) });
+    // The chart ends at the current week; the selection is its fourth column.
+    const series = seriesFor('week', 0).map((read, index) =>
+      index === 2 ? { ...read, members: [member('marco', 'Marco', 50, 3), member(ME, 'You', 30, 6)] } : read,
+    );
+    renderPage({ offset: -2, series });
 
     expect(byId('group-week-totals-sets-previous')).toHaveTextContent('vs 80 wk before');
     expect(byId('group-week-totals-prs').props.accessibilityLabel).toBe('PRs 7, vs 9 the week before');
@@ -307,15 +321,15 @@ describe('At a glance: text roles', () => {
   const body = { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base };
   const figureSmall = { fontFamily: uiFonts.figure.family, fontWeight: '500' as const, fontSize: uiTypography.size.sm };
 
-  it('titles the cards and labels the stepper\'s range', () => {
+  it('heads the cards with micro-labels, and names the week in the stepper', () => {
     renderPage();
 
-    const title = { fontFamily: uiFonts.display.family, fontWeight: '700' as const, fontSize: uiTypography.size.lg };
-    expect(byId('group-home-period-title')).toHaveStyle(title);
-    expect(byId('group-position-title')).toHaveStyle(title);
-    expect(byId('group-home-period-detail')).toHaveStyle({ textTransform: 'uppercase', color: uiRoles.ink });
+    const label = { textTransform: 'uppercase' as const, color: uiRoles.ink };
+    expect(byId('group-week-totals-title')).toHaveStyle(label);
+    expect(byId('group-position-title')).toHaveStyle(label);
+    expect(within(byId('group-home-board-card')).getByText('Top brothers')).toHaveStyle(label);
+    expect(byId('group-home-period-title')).toHaveStyle(label);
   });
-
   it('draws board names as body and figures as small ink figures', () => {
     renderPage({ metric: 'prs' });
 
@@ -338,12 +352,5 @@ describe('At a glance: text roles', () => {
     expect(line).toHaveTextContent('You · 6th');
   });
 
-  it('draws the rank table the same way: body names, small ink figures', () => {
-    renderPage();
 
-    const mine = byId(`group-rank-table-row-${ME}`);
-    expect(within(mine).getByText('You')).toHaveStyle({ ...body, fontWeight: '600' });
-    expect(within(byId('group-rank-table-row-marco')).getByText('Marco')).toHaveStyle({ ...body, fontWeight: '400' });
-    expect(byId(`group-rank-table-row-${ME}-sets`)).toHaveStyle({ ...figureSmall, color: uiRoles.ink });
-  });
 });

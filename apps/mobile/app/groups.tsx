@@ -28,7 +28,7 @@ import { TabOwnedPage } from '@/components/navigation/tab-owned-page';
 import { coWsHref } from '@/src/navigation/routes';
 import { Card, Icon, IconButton, ListRow, ScreenScroll, SwipePages, uiSpace, type SwipePageFrame } from '@/components/ui';
 import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
-import type { GroupHomeMetric } from '@/src/groups/home-periods';
+import { groupRankSeriesEnd, type GroupHomeMetric } from '@/src/groups/home-periods';
 import { useGroupGlance } from '@/src/groups/use-group-glance';
 import { isDevMode } from '@/src/utils/isDevMode';
 import { useAuth } from '@/src/auth';
@@ -97,7 +97,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
   // At a glance ranks the selected metric by calendar week for this visit.
   const [metric, setMetric] = useState<GroupHomeMetric>('sets');
   const period = 'week' as const;
-  // The stepper: 0 is the period in progress, -1 the one before.
+  // The selected week, set by the stepper or the chart: 0 is the one in progress, -1 the one before.
   const [glanceOffset, setGlanceOffset] = useState(0);
   const [hiddenEventKinds, setHiddenEventKinds] = useState<readonly StreamEventKind[]>(DEFAULT_HIDDEN_STREAM_EVENT_KINDS);
   const [eventsSheet, setEventsSheet] = useState(false);
@@ -127,12 +127,12 @@ function GroupsTabContent({ userId }: { userId: string }) {
     evictGroupIdOnNotFound: selectedGroupId,
   });
 
-  // Cache-first, read once At a glance has been shown.
+  // Cache-first, read once At a glance has been shown: the chart's six weeks around the selection.
   const glance = useGroupGlance({
     userId,
     groupId: visited.includes('glance') ? selectedGroupId : null,
     period,
-    offset: glanceOffset,
+    offset: groupRankSeriesEnd(glanceOffset),
     now: new Date(),
   });
 
@@ -233,25 +233,25 @@ function GroupsTabContent({ userId }: { userId: string }) {
         />
       </View>
     ),
-    glance: (frame) =>
-      scrollPage(
-        frame,
-        'groups-glance-scroll',
-        <GroupGlancePage
-          error={inlineError}
-          held={glance.held}
-          metric={metric}
-          myUserId={userId}
-          now={new Date()}
-          offline={offline}
-          offset={glanceOffset}
-          onMetricChange={setMetric}
-          onOffsetChange={setGlanceOffset}
-          onRetry={onRefresh}
-          period={period}
-          series={glance.series}
-        />,
-      ),
+    // Its stepper and metric stay put; the cards scroll under them.
+    glance: (frame) => (
+      <GroupGlancePage
+        error={inlineError}
+        held={glance.held}
+        metric={metric}
+        myUserId={userId}
+        now={new Date()}
+        offline={offline}
+        offset={glanceOffset}
+        onMetricChange={setMetric}
+        onOffsetChange={setGlanceOffset}
+        onRetry={onRefresh}
+        period={period}
+        refreshControl={refreshControl}
+        series={glance.series}
+        style={frameStyle(frame)}
+      />
+    ),
     leaderboards: (frame) =>
       scrollPage(
         frame,

@@ -1,14 +1,15 @@
 import { useDateFormat } from '@/src/preferences/hooks';
-import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState, type ReactElement } from 'react';
+import { ScrollView, StyleSheet, Text, View, type RefreshControlProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { uiText } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 import type { GroupApiError } from '@/src/groups/api';
 import {
   GROUP_RANK_PERIODS,
   groupHomeWindowFor,
+  groupRankSeriesEnd,
   type GroupHomeMetric,
   type GroupHomePeriod,
   type GroupHomeWindow,
@@ -20,15 +21,12 @@ import {
   buildGroupWeekTotals,
   GROUP_HOME_METRIC_LABELS,
 } from '@/src/groups/home-view-model';
-import { formatWeekRange } from '@/components/today/progress-format';
 
 import { GroupCycleButton } from './group-cycle-button';
-
 import { GroupHomeBoard } from './group-home-board';
 import { groupHomeColumnLabel, groupHomePeriodLabel } from './group-home-labels';
 import { GroupHomeStepper } from './group-home-stepper';
 import { GroupRankChart } from './group-rank-chart';
-import { GroupRankTable } from './group-rank-table';
 import { GroupMissingDataState } from './group-state-view';
 import { GroupWeekTotalsFigures } from './group-week-totals';
 
@@ -38,13 +36,19 @@ export type GroupGlancePageProps = {
   metric: GroupHomeMetric;
   onMetricChange: (next: GroupHomeMetric) => void;
   period: GroupHomePeriod;
-  /** 0 is the period in progress; the stepper only walks backwards from it. */
+  /** The selected period: 0 is the one in progress, -1 the one before. Every card reads it. */
   offset: number;
   onOffsetChange: (next: number) => void;
-  /** The period at `offset` and the five before it, oldest first; null until read. */
+  /**
+   * The six periods the chart draws, oldest first, ending at
+   * `groupRankSeriesEnd(offset)`; null until read.
+   */
   series: GroupHomeWindow[] | null;
-  /** Set when `series` is an earlier read, held while the one for `offset` loads: the period and offset it is for. */
+  /** Set when `series` is an earlier read, held while the one for `offset` loads: the period and the chart end it is for. */
   held?: GroupGlanceHeld | null;
+  /** The page scrolls under the pinned controls, pulled to refresh. */
+  refreshControl?: ReactElement<RefreshControlProps>;
+  style?: StyleProp<ViewStyle>;
   error: GroupApiError | null;
   offline: boolean;
   onRetry: () => void;
@@ -77,13 +81,13 @@ function useHoldFade(holding: boolean): boolean {
 }
 
 /**
- * At a glance: one row of controls — the period stepper and the metric pill —
- * since they set everything under them; then three cards: the period, titled
- * by its name (`This week`), with the group's own total against the period
- * before; the period's top five by the chosen metric; and `Over time`, every
- * member's place over the six periods ending at it. Selecting a column in
- * the chart reads that period's full ranking into the table under it. The
- * figures are the screen's period-totals read.
+ * At a glance: the period stepper and the metric pinned in one row, since
+ * they set everything under them; then three cards, each headed by a
+ * micro-label: `Group stats`, the group's own total against the period
+ * before; `Top brothers`, the period's top five by the chosen metric; and
+ * `Rankings over time`, every member's place over six periods with the
+ * selected one fourth where later periods allow. A column tap selects its
+ * period, as the stepper does, and every card follows.
  */
 export function GroupGlancePage({
   myUserId,
@@ -98,23 +102,21 @@ export function GroupGlancePage({
   error,
   offline,
   onRetry,
+  refreshControl,
+  style,
 }: GroupGlancePageProps) {
   const dateFormat = useDateFormat();
-  // The chart column is held by its period, so it survives a metric change and
-  // follows the same calendar period while the stepper keeps it in range.
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const faded = useHoldFade(held !== null);
-  const window = groupHomeWindowFor(period, now, offset);
-  const label = groupHomePeriodLabel(period, window, offset, dateFormat);
+  const label = groupHomePeriodLabel(period, groupHomeWindowFor(period, now, offset), offset, dateFormat);
   const controls = (
     <View style={styles.controls} testID="group-glance-controls">
       <View style={styles.stepper}>
         <GroupHomeStepper
           canGoLater={offset < 0}
+          label={label.title}
           onEarlier={() => onOffsetChange(offset - 1)}
           onLater={() => onOffsetChange(Math.min(0, offset + 1))}
           period={period}
-          range={formatWeekRange(window, dateFormat)}
         />
       </View>
       <GroupCycleButton
@@ -128,81 +130,115 @@ export function GroupGlancePage({
     </View>
   );
 
-  if (!series) {
-    return (
-      <View style={styles.sections} testID="group-glance">
-        {controls}
-        <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-glance" />
-      </View>
-    );
-  }
-
-  // A held series is drawn as the period it was read for, until its successor lands.
-  const figures = held ?? { period, offset };
-  const read = series[series.length - 1];
-  const board = buildGroupHomeBoard({ members: read?.members ?? [], metric, myUserId });
-  const totals = buildGroupWeekTotals(series);
-  const rankSeries = buildGroupRankSeries({ period: figures.period, reads: series, metric });
-  const found = rankSeries.periods.findIndex((entry) => entry.key === selectedKey);
-  const selectedIndex = found >= 0 ? found : rankSeries.periods.length - 1;
-  const selected = rankSeries.periods[selectedIndex];
-
   return (
-    <View style={styles.sections} testID="group-glance">
+    <View style={[styles.page, style]} testID="group-glance">
       {controls}
-
-      <View
-        accessibilityState={{ busy: held !== null }}
-        style={[styles.sections, faded ? styles.held : null]}
-        testID="group-glance-figures">
-        <Card testID="group-week-totals-card">
-          <View style={styles.card}>
-            <CardTitle testID="group-home-period-title" title={label.title} />
-            <GroupWeekTotalsFigures current={totals.current} offset={figures.offset} previous={totals.previous} />
-          </View>
-        </Card>
-
-        <Card testID="group-home-board-card">
-          <View style={styles.card}>
-            <GroupHomeBoard board={board} metric={metric} />
-          </View>
-        </Card>
-
-        <Card testID="group-position-card">
-          <View style={styles.card}>
-            <CardTitle testID="group-position-title" title="Over time" />
-            <GroupRankChart
-              accessibilityLabel={`Place over the last ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} by ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`}
-              columnLabels={rankSeries.periods.map((entry) => groupHomeColumnLabel(figures.period, entry.window, dateFormat))}
-              onSelect={(index) => setSelectedKey(rankSeries.periods[index]?.key ?? null)}
-              selectedIndex={selectedIndex}
-              series={rankSeries}
-            />
-            {selected ? (
-              <>
-                <View style={styles.divider} />
-                <GroupRankTable entries={selected.entries} />
-              </>
-            ) : null}
-          </View>
-        </Card>
-      </View>
+      <ScrollView
+        contentContainerStyle={styles.sections}
+        refreshControl={refreshControl}
+        showsVerticalScrollIndicator={false}
+        testID="groups-glance-scroll">
+        {series ? (
+          <GlanceCards
+            dateFormat={dateFormat}
+            faded={faded}
+            held={held}
+            metric={metric}
+            myUserId={myUserId}
+            offset={offset}
+            onOffsetChange={onOffsetChange}
+            period={period}
+            series={series}
+          />
+        ) : (
+          <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-glance" />
+        )}
+      </ScrollView>
     </View>
   );
 }
 
-/** A card's own title, inside it: the card needs no heading above it. */
+function GlanceCards({
+  series,
+  held,
+  faded,
+  offset,
+  onOffsetChange,
+  period,
+  metric,
+  myUserId,
+  dateFormat,
+}: {
+  series: GroupHomeWindow[];
+  held: GroupGlanceHeld | null;
+  faded: boolean;
+  offset: number;
+  onOffsetChange: (next: number) => void;
+  period: GroupHomePeriod;
+  metric: GroupHomeMetric;
+  myUserId: string;
+  dateFormat: ReturnType<typeof useDateFormat>;
+}) {
+  // A held series is drawn as the periods it was read for, until its successor lands.
+  const figures = held ?? { period, offset: groupRankSeriesEnd(offset) };
+  const last = series.length - 1;
+  // The selection's column; a held read may not reach it, and then shows its nearest.
+  const selectedIndex = Math.min(last, Math.max(0, last - (figures.offset - offset)));
+  const selected = series[selectedIndex];
+  const board = buildGroupHomeBoard({ members: selected?.members ?? [], metric, myUserId });
+  const totals = buildGroupWeekTotals(series.slice(0, selectedIndex + 1));
+  const rankSeries = buildGroupRankSeries({ period: figures.period, reads: series, metric });
+
+  return (
+    <View
+      accessibilityState={{ busy: held !== null }}
+      style={[styles.sections, faded ? styles.held : null]}
+      testID="group-glance-figures">
+      <Card testID="group-week-totals-card">
+        <View style={styles.card}>
+          <CardTitle testID="group-week-totals-title" title="Group stats" />
+          <GroupWeekTotalsFigures current={totals.current} offset={offset} previous={totals.previous} />
+        </View>
+      </Card>
+
+      <Card testID="group-home-board-card">
+        <View style={styles.card}>
+          <GroupHomeBoard board={board} metric={metric} title="Top brothers" />
+        </View>
+      </Card>
+
+      <Card testID="group-position-card">
+        <View style={styles.card}>
+          <CardTitle testID="group-position-title" title="Rankings over time" />
+          <GroupRankChart
+            accessibilityLabel={`Place over ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} by ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`}
+            columnLabels={rankSeries.periods.map((entry) => groupHomeColumnLabel(figures.period, entry.window, dateFormat))}
+            onSelect={(index) => onOffsetChange(Math.min(0, figures.offset - (last - index)))}
+            selectedIndex={selectedIndex}
+            series={rankSeries}
+          />
+        </View>
+      </Card>
+    </View>
+  );
+}
+
+/** A card's heading, inside it: a micro-label, as every card on the other pages. */
 function CardTitle({ title, testID }: { title: string; testID: string }) {
   return (
-    <Text accessibilityRole="header" allowFontScaling={false} numberOfLines={1} style={uiText.title} testID={testID}>
+    <Text accessibilityRole="header" allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.ink]} testID={testID}>
       {title}
     </Text>
   );
 }
 
 const styles = StyleSheet.create({
+  page: {
+    gap: uiSpace.md,
+  },
   sections: {
     gap: uiSpace.md,
+    paddingBottom: uiSpace.lg,
   },
   controls: {
     flexDirection: 'row',
@@ -223,12 +259,6 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: uiSpace.md,
-    gap: uiSpace.lg,
-  },
-  // A `rule-soft` hairline across the card, edge to edge.
-  divider: {
-    height: 1,
-    marginHorizontal: -uiSpace.md,
-    backgroundColor: uiRoles.ruleSoft,
+    gap: uiSpace.md,
   },
 });

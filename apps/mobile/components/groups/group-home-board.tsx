@@ -49,15 +49,16 @@ function BoardRow({ metric, row }: { metric: GroupHomeMetric; row: GroupHomeBoar
 }
 
 /**
- * The period's top five by the chosen metric: rank, member, a bar against the
+ * The period's top five by the chosen metric, under `title` (`Top 5` when
+ * none): rank, member, a bar against the
  * leader, the figure. My own line closes the board when I am outside the five.
  */
-export function GroupHomeBoard({ board, metric }: { board: GroupHomeBoard; metric: GroupHomeMetric }) {
+export function GroupHomeBoard({ board, metric, title }: { board: GroupHomeBoard; metric: GroupHomeMetric; title?: string }) {
   return (
     <View accessible accessibilityLabel={board.accessibilityLabel} style={styles.board} testID="group-home-board">
       <View style={styles.heading}>
         <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink, styles.headingTitle]}>
-          Top {board.rows.length}
+          {title ?? `Top ${board.rows.length}`}
         </Text>
         <Text
           allowFontScaling={false}

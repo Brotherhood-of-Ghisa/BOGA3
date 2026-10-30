@@ -20,6 +20,17 @@ export const GROUP_HOME_BOARD_SIZE = 5;
 /** The position chart's columns: the period in view and the five before it. */
 export const GROUP_RANK_PERIODS = 6;
 
+/** Where the selected period sits in the rank chart: fourth of six, two later periods after it. */
+export const GROUP_RANK_SELECTED_POSITION = 3;
+
+/**
+ * The offset of the newest period the chart draws for a selected `offset`:
+ * the selection fourth, unless fewer later periods exist (the current one
+ * is the last), when the chart ends at the current period.
+ */
+export const groupRankSeriesEnd = (offset: number): number =>
+  Math.min(0, offset + (GROUP_RANK_PERIODS - 1 - GROUP_RANK_SELECTED_POSITION));
+
 export type GroupHomeMemberTotals = {
   userId: string;
   name: string;
