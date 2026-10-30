@@ -39,6 +39,24 @@ Load `docs/specs/tech/group-cow-contract.md` and consume `scoreCoW` from
 versions under the pinned context; its pure tests do not establish actual
 transaction, authorization, scheduling or durable-finality guarantees.
 
+The lifecycle migration now supplies `group_cows`, candidate admission periods,
+context/source versions, pending seals and durable uncertainty markers.
+Read `docs/specs/tech/group-cow-contract.md` for final-seal semantics, strict definition
+deadlines, same-transaction reseals after end, and current CoW reading-context
+precedence over later ordinary worker bindings. The raw envelope's `eligible`
+is only live/link eligibility: apply the existing performed/working scorer
+before mapping to `CoWSetVersion`. Select latest pre-start baseline states
+under the bound context, then retain all in-week transitions; never pass older
+pre-start contexts indiscriminately to the reducer. Decode PostgreSQL receipts
+with `group_cow_us`, without a `Date` millisecond round-trip.
+
+Implement the scheduled start/close barriers and populate their high-water
+marks and frozen participants; storage alone does not perform those jobs.
+Check applicable CoW-specific, group/member and unscoped intake failures before publication.
+Uncertainty cannot be cleared just because a later capture succeeds. Define
+explicit safe recovery or keep Finalizing; source history lost through a
+failed intake cannot be reconstructed from today's mutable graph.
+
 - Trace source/projection freshness fences and choose how to retain the
   deadline's eligible source versions before later mutations. Finalizing on
   first history read from mutable rows is insufficient. Reuse/extend existing
