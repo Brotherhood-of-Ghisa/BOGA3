@@ -58,7 +58,7 @@ export type CoWResultWire = { cow: CoWDefinitionWire; exercise: CompetitionExerc
   bodyweight_calculations_enabled: boolean; state: 'pending' | 'ready' | 'unavailable';
   normalized: boolean | null; publication_id: string | null; rankings: CoWRankingWire[] };
 export type CoWSummaryWire = { group_id: string; week_start: string | null; calendar_revision: number;
-  observed_at_us: number; valid_until_us: number; selection: 'current' | 'previous_final' | 'none'; result: CoWResultWire | null };
+  observed_at_us: number; valid_until_us: number; selection: 'current' | 'previous_final' | 'previous' | 'none'; result: CoWResultWire | null };
 
 function isCoWRow(value: unknown, metric: CoWMetric): value is CoWRowWire {
   if (!record(value) || !exact(value, ['rank', 'member', 'former', 'value', 'state']) ||
@@ -113,14 +113,22 @@ export function isCoWSummaryWire(value: unknown): value is CoWSummaryWire {
     value.result.rankings.length !== value.result.cow.metrics.length || value.result.rankings.some(ranking =>
       ranking.entries.length > 3 || ranking.entries.some(row => row.rank === null || row.rank > 3))) return false;
   if (value.selection === 'current') return value.result.cow.starts_at_us <= value.observed_at_us && value.result.cow.ends_at_us > value.observed_at_us;
+  if (value.selection === 'previous') {
+    if (!dateKey(value.week_start)) return false;
+    const previousWeek = new Date(`${value.week_start}T00:00:00Z`);
+    previousWeek.setUTCDate(previousWeek.getUTCDate() - 7);
+    return value.result.cow.week_start === previousWeek.toISOString().slice(0, 10) &&
+      value.result.cow.ends_at_us <= value.observed_at_us &&
+      ['final', 'finalizing', 'unavailable'].includes(value.result.cow.state);
+  }
   return value.selection === 'previous_final' && value.result.cow.state === 'final' && value.result.state === 'ready' &&
     value.result.cow.ends_at_us <= value.observed_at_us;
 }
 
 /** The read alias is group-scoped; the stored key also pins the server's selection and publication. */
-export function coWSummaryCacheKey(value: CoWSummaryWire): string {
+export function coWSummaryCacheKey(value: CoWSummaryWire, previous = false): string {
   const result = value.result;
-  return `cow-summary:v7:${value.group_id}:${value.week_start ?? 'unset'}:${value.calendar_revision}:` +
+  return `${previous ? 'cow-previous-summary' : 'cow-summary'}:v7:${value.group_id}:${value.week_start ?? 'unset'}:${value.calendar_revision}:` +
     `${result?.cow.cow_id ?? 'none'}:${result?.cow.revision ?? 0}:${result?.publication_id ?? 'pending'}:` +
     `${result?.exercise?.rules.rules_revision ?? 0}:${result?.bodyweight_calculations_enabled ?? 'unset'}`;
 }

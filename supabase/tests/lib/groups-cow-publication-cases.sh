@@ -66,7 +66,7 @@ run_cow_publication_cases() {
   check 'improvement compares normalized baseline and weekly 1RM' '.rankings[0].unit=="percent" and (.rankings[0].entries[0].value-20|fabs)<0.000000001 and .rankings[0].entries[0].member.user_id==$u' --arg u "${OWNER_UID}"
   rpc "${OWNER_TOKEN}" group_cow_summary "$(jq -nc --arg g "${g}" '{p_group_id:$g}')"
   check 'Today serves all independent top-three metrics under one CoW and valid boundary' '.selection=="current" and .result.cow.cow_id==$c and (.result.rankings|length)==3 and .valid_until_us>.observed_at_us' --arg c "${c}"
-  for name in group_cow_results group_cow_summary; do
+  for name in group_cow_results group_cow_summary group_cow_previous_summary; do
     args="$(jq -nc --arg g "${g}" --arg c "${c}" '{p_group_id:$g,p_cow_id:$c,p_metric:"volume"}')"
     [[ "${name}" == group_cow_results ]] || args="$(jq -nc --arg g "${g}" '{p_group_id:$g}')"
     old_header="${GROUP_CONTRACT_HEADER}"; GROUP_CONTRACT_HEADER='x-boga-group-contract: 3'
@@ -94,6 +94,7 @@ run_cow_publication_cases() {
   [[ "$(run_psql "select final_rankings::text from app_public.group_cows where id='${c}';")" == "${saved}" ]] || fail 'stored final reranked'
   rpc "${OWNER_TOKEN}" group_cow_summary "$(jq -nc --arg g "${g}" '{p_group_id:$g}')"
   check 'exactly last-week stored final is the fallback' '.selection=="previous_final" and .result.cow.state=="final" and .result.state=="ready"'
+  run_cow_previous_summary_cases "${g}" "${c}"
   run_cow_worker_cases "${g}" "${c}" "${secret}"
   run_cow_priority_privacy_cases "${g}" "${c}" "${secret}"
   pass 'CoW elected %BW units, normalized improvement, automatic finalization, frozen results and authorization'
@@ -104,7 +105,7 @@ run_cow_publication_cases() {
 cow_worker_fixture() {
   local template="$1" id="$2" offset="$3"
   run_psql "begin; set local session_replication_role=replica; insert into app_public.group_cows select (jsonb_populate_record(null::app_public.group_cows,to_jsonb(c)||
-      jsonb_build_object('id','${id}','week_start',c.week_start-${offset},'start_context',null,'start_high_water',null,
+      jsonb_build_object('id','${id}','week_start',c.week_start-(${offset}),'start_context',null,'start_high_water',null,
         'end_high_water',null,'context_changed_at',null,'finalized_at',null,'final_outcome',null,'final_rankings',null,
         'published_at',null,'published_generation',null,'live_rankings',null,'publication_id',null,
         'claim_id',null,'lease_until',null,'attempts',0,'last_error',null,'available_at',clock_timestamp()+interval '1 day'))).* 
@@ -260,4 +261,45 @@ run_cow_priority_privacy_cases() {
   local actual; actual="$(run_psql "select md5(final_rankings::text) from app_public.group_cows where id='${ordinary}';")"
   [[ "${actual}" == "${saved}" ]] || fail "privacy change reranked stored outcome (expected ${saved}, got ${actual})"
   pass 'CoW input revisions/removals and UUID ties; ordinary totals and paired baseline disclosure after unlink'
+}
+
+
+# Reader-only fixtures retain the real scorer's final rows; only identity/window and publication state move.
+run_cow_previous_summary_cases() {
+  local g="$1" c="$2" current
+  current="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+  cow_worker_fixture "${c}" "${current}" -7
+  run_psql "update app_public.group_cows set starts_at=clock_timestamp(),ends_at=clock_timestamp()+interval '1 day',
+    available_at=clock_timestamp()+interval '1 day' where id='${current}';" >/dev/null
+  rpc "${OWNER_TOKEN}" group_cow_summary "$(jq -nc --arg g "${g}" '{p_group_id:$g}')"
+  check 'legacy summary still selects this week' '.selection=="current" and .result.cow.cow_id==$c' --arg c "${current}"
+  rpc "${OWNER_TOKEN}" group_cow_previous_summary "$(jq -nc --arg g "${g}" '{p_group_id:$g}')"
+  check 'last week is available while a current CoW exists' '.selection=="previous" and .result.cow.cow_id==$c and
+    .result.cow.state=="final" and .result.state=="ready" and (.result.rankings|length)==3 and .valid_until_us>.observed_at_us' --arg c "${c}"
+  # Each read-only state probe rolls back in the same connection; the scored final never changes.
+  local state patch
+  for state in pending unavailable older cancelled; do
+    case "${state}" in
+      pending) patch="finalized_at=null,final_outcome=null,final_rankings=null,published_generation=null" ;;
+      unavailable) patch="final_outcome='unavailable',final_rankings='[]'::jsonb" ;;
+      older) patch="week_start=week_start-7" ;;
+      cancelled) patch="cancelled_at=clock_timestamp()" ;;
+    esac
+    BODY="$(run_psql "begin; set local session_replication_role=replica;
+      update app_public.group_cows set ${patch} where id='${c}';
+      do \$claims\$ begin
+        perform set_config('request.jwt.claims',jsonb_build_object('sub','${OWNER_UID}','role','authenticated')::text,true);
+        perform set_config('request.headers','{\"x-boga-group-contract\":\"4\",\"x-boga-group-set-metrics\":\"1\"}',true);
+      end \$claims\$;
+      select app_public.group_cow_previous_summary('${g}'); rollback;")"
+    case "${state}" in
+      pending) check 'a pending close is not absence or a winner' '.selection=="previous" and .result.cow.state=="finalizing" and
+        .result.state=="pending" and ([.result.rankings[].entries[]]|length)==0' ;;
+      unavailable) check 'an unavailable final remains distinct' '.selection=="previous" and .result.cow.state=="unavailable" and .result.state=="unavailable"' ;;
+      older) check 'older final is not substituted for last week' '.selection=="none" and .result==null' ;;
+      cancelled) check 'cancelled previous challenge is absent' '.selection=="none" and .result==null' ;;
+    esac
+  done
+  run_psql "delete from app_public.group_cows where id='${current}';" >/dev/null
+  pass 'independent last-week read, state distinctions and exact previous-week selection'
 }

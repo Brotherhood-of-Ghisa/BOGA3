@@ -181,10 +181,15 @@ next selection edge, including offline; a rollover triggers a fresh read.
 
 ## Mobile reads and writes
 
-Today and group management reuse `components/groups/cow-group-preview.tsx`:
-independent metric podiums, exact displayed identity on header navigation and no
-viewer substitution. Confirmed absence takes no preview space; loading/errors
-remain explicit. The CoWs tab and standalone browser share `components/groups/group-cows-page.tsx`.
+Group management uses `components/groups/cow-group-preview.tsx` for independent
+metric podiums. Today uses `components/today/group-cow-summary.tsx`: current
+exercise/metrics link to that challenge, and each previous-week winner follows
+its original rank with its metric. Its separate `group_cow_previous_summary`
+reader selects exactly the previous group week, retaining finalizing/unavailable
+states; only ready finals supply winners. Suppressed rank one never promotes
+another member. Both views have separate scoped, expiring summary cache aliases;
+Today hides a previous read from a different week/calendar revision. Confirmed
+absence takes no space; loading/errors remain explicit. The CoWs tab and standalone browser share `components/groups/group-cows-page.tsx`.
 The browser refreshes its online list/calendar at summary selection edges.
 Full standings/history use online pages; only the bounded summary is cached.
 Unavailable/unranked rows never infer participation or baseline reasons absent

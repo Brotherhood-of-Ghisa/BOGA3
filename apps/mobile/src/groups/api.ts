@@ -138,7 +138,8 @@ export type GroupRpcName =
   | 'group_cow_get'
   | 'group_cow_list'
   | 'group_cow_results'
-  | 'group_cow_summary';
+  | 'group_cow_summary'
+  | 'group_cow_previous_summary';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -455,4 +456,8 @@ export const getCoWResults = (groupId: string, cowId: string, metric: CoWMetric,
       p.rankings.length === 1 && p.rankings[0].metric === metric);
 
 export const getCoWSummary = (groupId: string): Promise<CoWSummaryWire> =>
-  competitionRpc('group_cow_summary', { p_group_id: groupId }, isCoWSummaryWire, p => p.group_id === groupId);
+  competitionRpc('group_cow_summary', { p_group_id: groupId }, isCoWSummaryWire, p => p.group_id === groupId && p.selection !== 'previous');
+
+export const getPreviousCoWSummary = (groupId: string): Promise<CoWSummaryWire> =>
+  competitionRpc('group_cow_previous_summary', { p_group_id: groupId }, isCoWSummaryWire,
+    p => p.group_id === groupId && (p.selection === 'previous' || p.selection === 'none'));
