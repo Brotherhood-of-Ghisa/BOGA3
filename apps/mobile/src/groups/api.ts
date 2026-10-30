@@ -294,6 +294,7 @@ const isNotFoundMessage = (error: unknown, message: string): boolean =>
  * order). Only the latter may evict the group.
  */
 export const isGroupExerciseNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'group exercise not found');
+export const isCoWNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'cow not found');
 
 /** `NOT_FOUND: group not found`: the caller is not (or no longer) a member. The only `NOT_FOUND` that evicts. */
 export const isGroupNotFound = (error: unknown): boolean => isNotFoundMessage(error, 'group not found');

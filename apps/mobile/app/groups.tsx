@@ -23,7 +23,8 @@ import {
   type GroupsSection,
 } from '@/components/groups';
 import { TabOwnedPage } from '@/components/navigation/tab-owned-page';
-import { IconButton, ScreenScroll } from '@/components/ui';
+import { coWsHref } from '@/src/navigation/routes';
+import { Card, Icon, IconButton, ListRow, ScreenScroll } from '@/components/ui';
 import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
 import type { GroupHomeMetric } from '@/src/groups/home-periods';
 import { useGroupGlance } from '@/src/groups/use-group-glance';
@@ -175,6 +176,8 @@ function GroupsTabContent({ userId }: { userId: string }) {
         section={segment}
         selectedGroupId={selectedGroupId}
       />
+      {hasGroups && selectedGroupId ? <Card><ListRow label="CoWs" density="list" onPress={() => router.push(coWsHref(selectedGroupId))}
+        testID="groups-cows-link" trailing={<Icon name="chevron-right" size="sm" />} /></Card> : null}
       {offline ? <GroupOfflineBanner lastUpdatedAtMs={segmentResource.lastUpdatedAtMs ?? mine.lastUpdatedAtMs} /> : null}
       {inlineError && (groups !== null || segmentResource.data !== null) ? (
         <GroupInlineError error={inlineError} onRetry={onRefresh} testID="groups-inline-error" />

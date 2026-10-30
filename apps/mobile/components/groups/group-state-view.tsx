@@ -160,4 +160,4 @@ const styles = StyleSheet.create({
 });
 
 const publicGroupReadError = (error: GroupApiError): string => error.code === 'UPDATE_REQUIRED' || error.invalidPayload
-  ? 'Group comparisons are unavailable. Please try again later.' : error.message;
+  ? 'Group comparisons are unavailable. Please try again later.' : error.code === 'INTERNAL' ? 'Please try again.' : error.message;

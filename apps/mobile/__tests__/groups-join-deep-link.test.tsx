@@ -36,6 +36,7 @@ jest.mock('@/src/auth/profile', () => ({
 
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
+  ...jest.requireActual('./helpers/cow-fixtures').coWReadMocks(),
   previewGroupInvite: jest.fn(async () => ({ group_id: 'group-a', name: 'Garage Gym', member_count: 3, already_member: false })),
 }));
 

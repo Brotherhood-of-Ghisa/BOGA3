@@ -62,6 +62,7 @@ jest.mock('@/src/auth', () => ({
 
 jest.mock('@/src/groups/api', () => ({
   ...jest.requireActual('@/src/groups/api'),
+  ...jest.requireActual('./helpers/cow-fixtures').coWReadMocks(),
   getGroup: jest.fn(),
   getCompetitionStream: jest.fn(),
   listCompetitionExercises: jest.fn(),

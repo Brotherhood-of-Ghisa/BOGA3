@@ -10,7 +10,7 @@
 //   - items are deduplicated by `itemKey`, keeping the first seen, so a rank
 //     shift between pages never shows a row twice;
 //   - a response for a stale identity, or one overtaken by a refresh, is dropped;
-//   - `NOT_FOUND: group exercise not found` sets `exerciseMissing`; any other
+//   - A missing exercise or CoW target sets `resourceMissing`; any other
 //     `NOT_FOUND` evicts the group's cache and sets `lostAccess`.
 //
 // Group code never runs inside the sync cycle.
@@ -20,7 +20,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
 
-import { GroupApiError, isGroupExerciseNotFound, toGroupApiError } from './api';
+import { GroupApiError, isCoWNotFound, isGroupExerciseNotFound, toGroupApiError } from './api';
 import { getCompetitionCacheGeneration, subscribeCompetitionCache,observeGroupCompetitionPolicy } from './cache';
 import { retireCompetitionAccount } from './competition-cache-retirement';
 import { useNetworkOnline } from './use-network-online';
@@ -51,7 +51,7 @@ export type GroupOnlinePagesState<TPage, TItem> = {
   /** The latest first-page failure, cleared by the next success. */
   error: GroupApiError | null;
   lostAccess: boolean;
-  exerciseMissing: boolean;
+  resourceMissing: boolean;
   hasMore: boolean;
   loadingMore: boolean;
   loadMoreError: GroupApiError | null;
@@ -74,7 +74,7 @@ type InternalState<TPage, TItem, TCursor> = {
   networkFailed: boolean;
   error: GroupApiError | null;
   lostAccess: boolean;
-  exerciseMissing: boolean;
+  resourceMissing: boolean;
   loadingMore: boolean;
   loadMoreError: GroupApiError | null;
 };
@@ -91,7 +91,7 @@ const initialState = <TPage, TItem, TCursor>(identity: string | null): InternalS
   networkFailed: false,
   error: null,
   lostAccess: false,
-  exerciseMissing: false,
+  resourceMissing: false,
   loadingMore: false,
   loadMoreError: null,
 });
@@ -168,8 +168,8 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
 
   const handleNotFound = useCallback(
     async (error: GroupApiError) => {
-      if (isGroupExerciseNotFound(error)) {
-        setState({ ...initialState<TPage, TItem, TCursor>(identity), exerciseMissing: true });
+      if (isGroupExerciseNotFound(error) || isCoWNotFound(error)) {
+        setState({ ...initialState<TPage, TItem, TCursor>(identity), resourceMissing: true });
         return;
       }
       if (!userId) return;
@@ -320,7 +320,7 @@ export function useGroupOnlinePages<TPage, TItem, TCursor>({
     offline: online === false || state.networkFailed,
     error: state.error,
     lostAccess: state.lostAccess,
-    exerciseMissing: state.exerciseMissing,
+    resourceMissing: state.resourceMissing,
     hasMore: state.hasMore && state.cursor !== null,
     loadingMore: state.loadingMore,
     loadMoreError: state.loadMoreError,

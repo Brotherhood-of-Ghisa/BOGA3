@@ -56,6 +56,7 @@ jest.mock('@/src/groups/api', () => {
   const streamRead = jest.fn();
   return {
   ...jest.requireActual('@/src/groups/api'),
+  ...jest.requireActual('./helpers/cow-fixtures').coWReadMocks(),
   listMyGroups: jest.fn(),
   getGroup: jest.fn(),
   listCompetitionExercises: jest.fn(),

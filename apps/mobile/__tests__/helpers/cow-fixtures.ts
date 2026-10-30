@@ -13,3 +13,12 @@ export const cowResult = (): CoWResultWire => ({
 });
 export const cowSummary = (): CoWSummaryWire => ({ group_id: 'g1', week_start: '2026-10-26', calendar_revision: 1,
   observed_at_us: 1793404800000000, valid_until_us: 1793577600000000, selection: 'current', result: cowResult() });
+
+
+/** Old group fixtures have no CoW and an explicit calendar; new feature tests override these reads. */
+export const absentCoWSummary = (groupId: string): CoWSummaryWire => ({ group_id: groupId, week_start: null, calendar_revision: 1,
+  observed_at_us: Math.max(1, Date.now() * 1000), valid_until_us: Math.max(1, Date.now() * 1000), selection: 'none', result: null });
+export const coWReadMocks = () => ({
+  getCoWSummary: jest.fn(async (groupId: string) => absentCoWSummary(groupId)),
+  getCoWCalendar: jest.fn(async () => ({ time_zone: 'UTC', revision: 1, next_week_start: '2026-11-02' })),
+});

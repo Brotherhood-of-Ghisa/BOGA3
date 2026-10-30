@@ -50,6 +50,7 @@ jest.mock('@/src/groups/api', () => {
   const streamRead = jest.fn();
   return {
   ...jest.requireActual('@/src/groups/api'),
+  ...jest.requireActual('./helpers/cow-fixtures').coWReadMocks(),
   listMyGroups: jest.fn(),
   getGroup: jest.fn(),
   getCompetitionStream: streamRead,
@@ -520,7 +521,8 @@ describe('Groups tab', () => {
     api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'Groups are unavailable in this build.'));
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-error-state')).toBeTruthy();
-    expect(screen.getByText('Groups are unavailable in this build.')).toBeTruthy();
+    expect(screen.getByText('Please try again.')).toBeTruthy();
+    expect(screen.queryByText('Groups are unavailable in this build.')).toBeNull();
 
     api.listMyGroups.mockResolvedValue({ groups: [GROUP_A] });
     api.getCompetitionStream.mockResolvedValue(page([completedItem()]));
