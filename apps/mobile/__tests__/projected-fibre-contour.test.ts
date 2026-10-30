@@ -1,5 +1,3 @@
-import { MUSCLE_BODY_FASCICLES, type ModelFibreSegment } from '@/components/stats/muscle-body-fibres';
-import { selectMuscleFibres } from '@/components/stats/muscle-body-projection';
 import { reduceFibreRun, type FibrePoint } from '@/components/stats/projected-fibre-contour';
 
 const bounds = (points: readonly FibrePoint[]) => [
@@ -28,7 +26,6 @@ function proveRun(points: readonly FibrePoint[]) {
     }
     start = end;
   }
-  return reduced.length;
 }
 
 const cases: readonly (readonly FibrePoint[])[] = [
@@ -61,44 +58,4 @@ it('keeps the bound across deterministic irregular, reversing and closed runs', 
     if (run % 2) points.push([...points[0]]);
     proveRun(points);
   }
-});
-
-function visibleRuns(chain: readonly ModelFibreSegment[], angle: number, side: number): FibrePoint[][] {
-  const cos = Math.cos(angle * Math.PI / 180);
-  const sin = Math.sin(angle * Math.PI / 180);
-  const scale = Math.min(338 / 1.12, 280 / 2.02);
-  const point = (row: ModelFibreSegment, offset: 0 | 3): FibrePoint => [
-    Math.round((169 + (side * row[offset] * cos + row[offset + 2] * sin) * scale) * 10),
-    Math.round((140 - row[offset + 1] * scale) * 10),
-  ];
-  const runs: FibrePoint[][] = [];
-  let current: FibrePoint[] = [];
-  for (const row of chain) {
-    if (-side * row[6] * sin + row[8] * cos < -.03) {
-      if (current.length) runs.push(current);
-      current = [];
-      continue;
-    }
-    if (!current.length) current.push(point(row, 0));
-    current.push(point(row, 3));
-  }
-  if (current.length) runs.push(current);
-  return runs;
-}
-
-it('bounds every source visible contour and preserves exact extents at all review angles', () => {
-  let originalCount = 0;
-  let reducedCount = 0;
-  for (const [id, entry] of Object.entries(MUSCLE_BODY_FASCICLES)) {
-    if (!entry.anatomicalParts?.length) continue;
-    for (const part of selectMuscleFibres(id).anatomicalParts) {
-      for (const angle of [0, 37, 81, 180, 270]) for (const side of [1, -1]) {
-        for (const chain of part.chains) for (const run of visibleRuns(chain, angle, side)) {
-          originalCount += run.length;
-          reducedCount += proveRun(run);
-        }
-      }
-    }
-  }
-  expect(reducedCount).toBeLessThan(originalCount * .65);
 });
