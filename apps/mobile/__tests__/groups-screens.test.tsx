@@ -86,7 +86,7 @@ import * as groupsApi from '@/src/groups/api';
 import * as notificationApi from '@/src/notifications/api';
 import type { CompetitionPeriodWindow } from '@/src/groups/api';
 import type { CompetitionPeriodTotalsWire } from '@/src/groups/competition-wire';
-import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
+import { coWsHref, SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { resolveMainTab } from '@/src/navigation/main-tabs';
 
 import GroupsTabRoute from '../app/groups';
@@ -432,6 +432,14 @@ describe('Groups tab', () => {
     expect(await screen.findByTestId('group-home-board')).toBeTruthy();
     expect(await within(screen.getByTestId('groups-stream-list')).findByTestId('groups-stream-error-state')).toBeTruthy();
     expect(screen.queryByTestId('group-glance-error-state')).toBeNull();
+  });
+
+  it('keeps the CoWs link above every page, opening the group\'s challenges', async () => {
+    render(<GroupsTabRoute />);
+    await screen.findByTestId('groups-tab-glance');
+    expect(within(screen.getByTestId('groups-screen-pager')).queryByTestId('groups-cows-link')).toBeNull();
+    fireEvent.press(await screen.findByTestId('groups-cows-link'));
+    expect(mockPush).toHaveBeenLastCalledWith(coWsHref('group-a'));
   });
 
   it('draws no event-type menu outside dev mode', async () => {
