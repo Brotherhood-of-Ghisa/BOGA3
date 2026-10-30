@@ -1,8 +1,8 @@
 /* eslint-disable import/first */
 
 /**
- * The Settings list: its cards in order, the sub page each card pushes, the
- * status line under each label, release metadata and the signed-out state.
+ * The Settings home: its sections and rows in order, the page each row pushes,
+ * the value at each row's end, release metadata and the signed-out state.
  * Nothing here reads or writes app data; the screen runs over the in-memory
  * SQLite fixture (helpers/local-data.ts) with its real preferences store.
  * Replaced: the router, the auth hook, dev mode, build metadata, the sync
@@ -42,7 +42,6 @@ jest.mock('@/src/utils/isDevMode', () => ({
 }));
 
 jest.mock('@/src/utils/runtime-metadata', () => ({
-  formatVersionBuild: () => 'Version 1.2.3 (build 45)',
   readAppRuntimeMetadata: () => ({
     buildNumber: '45',
     displayFlavor: 'preview',
@@ -55,7 +54,6 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 
 import SettingsRoute from '../app/settings';
 import { DataSyncSettingsScreen } from '@/components/settings/sub-pages';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import {
   __resetExerciseListPreferencesForTests,
   ensureExerciseListPreferencesLoaded,
@@ -89,23 +87,25 @@ const renderSettings = async () => {
 
 const statusOf = (testID: string) => screen.getByTestId(testID).props.accessibilityLabel as string;
 
-const CARD_ORDER = [
+const SECTIONS = ['Account', 'Training', 'App', 'About'];
+
+const ROW_ORDER = [
   'settings-profile-row',
-  'settings-appearance-row',
-  'settings-body-weight-row',
   'settings-rest-timer-row',
-  'settings-notifications-row',
-  'settings-progress-row',
+  'settings-body-weight-row',
   'settings-muscles-row',
   'settings-effort-row',
-  'settings-developer-tools-row',
+  'settings-progress-row',
+  'settings-appearance-row',
+  'settings-notifications-row',
   'settings-data-sync-row',
-  'settings-other-row',
-  'settings-experiments-row',
-  'settings-about-card',
+  'settings-everything-else-row',
+  'settings-about-version',
+  'settings-about-release',
+  'settings-about-flavor',
 ];
 
-describe('the Settings list', () => {
+describe('the Settings home', () => {
   afterEach(() => {
     closeLocalData();
   });
@@ -120,24 +120,33 @@ describe('the Settings list', () => {
     });
   });
 
-  it('shows every card in the agreed order and the release metadata, under the native header', async () => {
+  it('groups the rows into Account, Training, App and About, in the agreed order, under the native header', async () => {
     const result = await renderSettings();
     const tree = JSON.stringify(result.toJSON());
-    const positions = CARD_ORDER.map((id) => tree.indexOf(`"testID":"${id}"`));
+    const rowAt = ROW_ORDER.map((id) => tree.indexOf(`"testID":"${id}"`));
 
     // The root stack's native header titles the page; the list draws no title.
     expect(screen.queryByText('Settings')).toBeNull();
-    expect(positions.every((position) => position >= 0)).toBe(true);
-    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    expect(screen.getAllByRole('header').map((header) => header.props.children)).toEqual(SECTIONS);
+    expect(rowAt.every((at) => at >= 0)).toBe(true);
+    expect([...rowAt].sort((a, b) => a - b)).toEqual(rowAt);
     expect(screen.getByText('member@example.test')).toBeTruthy();
-    const about = within(screen.getByTestId('settings-about-card'));
-    expect(about.getByText('Version 1.2.3 (build 45)')).toBeTruthy();
-    expect(about.getByText('Release Ziocleziano')).toBeTruthy();
-    expect(about.getByText('Flavor Preview')).toBeTruthy();
+    // The three retired destinations have no row; Everything else replaces them.
+    ['settings-other-row', 'settings-experiments-row', 'settings-developer-tools-row'].forEach((id) =>
+      expect(screen.queryByTestId(id)).toBeNull());
     // Connecting an AI coach moved to More.
     expect(screen.queryByTestId('settings-connect-agent-row')).toBeNull();
     expect(screen.queryByTestId('settings-connected-agents-row')).toBeNull();
     await waitFor(() => expect(statusOf('settings-data-sync-row')).toBe('Data & sync, Up to date'));
+  });
+
+  it('reads the version, release and flavor as About rows', async () => {
+    await renderSettings();
+    const about = within(screen.getByTestId('settings-about-card'));
+    expect(about.getByText('About')).toBeTruthy();
+    expect(statusOf('settings-about-version')).toBe('Version: 1.2.3 (build 45)');
+    expect(statusOf('settings-about-release')).toBe('Release: Ziocleziano');
+    expect(statusOf('settings-about-flavor')).toBe('Flavor: Preview');
   });
 
   it.each([
@@ -147,42 +156,29 @@ describe('the Settings list', () => {
     ['settings-progress-row', '/settings-progress'],
     ['settings-muscles-row', '/settings-muscles'],
     ['settings-effort-row', '/settings-effort'],
-    ['settings-developer-tools-row', '/settings-developer-tools'],
     ['settings-data-sync-row', '/settings-data-sync'],
-    ['settings-other-row', '/settings-other'],
-    ['settings-experiments-row', '/settings-experiments'],
+    ['settings-everything-else-row', '/settings-everything-else'],
   ])('%s opens %s', async (testID, route) => {
     await renderSettings();
     fireEvent.press(screen.getByTestId(testID));
     expect(mockPush).toHaveBeenCalledWith(route);
   });
 
-  it('titles the About card and draws its lines as muted body, the version figures in Plex Mono', async () => {
+  it('presses nothing from the About rows', async () => {
     await renderSettings();
-    const about = within(screen.getByTestId('settings-about-card'));
-    expect(about.getByText('About')).toHaveStyle({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg });
-    const version = screen.getByTestId('settings-about-version');
-    expect(version).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', color: uiRoles.inkMuted });
-    expect(within(version).getByText('1.2.3')).toHaveStyle({ fontFamily: uiFonts.figure.family });
-    expect(within(version).getByText('45')).toHaveStyle({ fontFamily: uiFonts.figure.family });
-  });
-
-  it('presses nothing from the About card', async () => {
-    await renderSettings();
-    fireEvent.press(screen.getByTestId('settings-about-card'));
+    ['settings-about-version', 'settings-about-release', 'settings-about-flavor'].forEach((id) =>
+      fireEvent.press(screen.getByTestId(id)));
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('summarises what each sub page has set under its label', async () => {
+  it('summarises what each page has set at the end of its row', async () => {
     await renderSettings();
 
     expect(statusOf('settings-rest-timer-row')).toBe('Rest timer, 90 s · Auto-start on');
     expect(statusOf('settings-progress-row')).toBe('Progress, List · 4-week period');
     expect(statusOf('settings-muscles-row')).toBe('Muscles, Single target');
     expect(statusOf('settings-effort-row')).toBe('Effort, Default');
-    expect(statusOf('settings-other-row')).toBe('Other, DD-MM-YYYY');
-    expect(statusOf('settings-developer-tools-row')).toBe('Developer tools, Developer mode off');
-    expect(statusOf('settings-experiments-row')).toBe('Experiments, Off');
+    expect(statusOf('settings-everything-else-row')).toBe('Everything else, DD-MM-YYYY');
 
     await waitFor(() => {
       updatePreferences({
@@ -192,25 +188,17 @@ describe('the Settings list', () => {
         targetWindowWeeks: 6,
         displayEfforts: ['rir_0'],
         dateFormat: 'YYYY-MM-DD',
-        timerInTitleBar: true,
       });
       expect(statusOf('settings-rest-timer-row')).toBe('Rest timer, 120 s · Auto-start off');
     });
     expect(statusOf('settings-progress-row')).toBe('Progress, 3D · 6-week period');
     expect(statusOf('settings-effort-row')).toBe('Effort, Custom');
-    expect(statusOf('settings-other-row')).toBe('Other, YYYY-MM-DD');
-    expect(statusOf('settings-experiments-row')).toBe('Experiments, Title-bar timer');
+    expect(statusOf('settings-everything-else-row')).toBe('Everything else, YYYY-MM-DD');
   });
 
-  it('keeps the Developer mode switch off the list, naming its state on Developer tools', async () => {
+  it('keeps the Developer mode switch off the home', async () => {
     await renderSettings();
     expect(screen.queryByTestId('settings-developer-mode-switch')).toBeNull();
-
-    await waitFor(() => {
-      updatePreferences({ developerMode: true });
-      expect(statusOf('settings-developer-tools-row')).toBe('Developer tools, Developer mode on');
-    });
-    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it.each<[string, Partial<SyncStatusSnapshot>, string]>([
@@ -225,12 +213,13 @@ describe('the Settings list', () => {
     await waitFor(() => expect(statusOf('settings-data-sync-row')).toBe(`Data & sync, ${status}`));
   });
 
-  it('shows the signed-out list and sync guidance', async () => {
+  it('shows the signed-out home and sync guidance', async () => {
     mockUseAuth.mockReturnValue({ user: null });
     await renderSettings();
 
     expect(statusOf('settings-profile-row')).toBe('Account, Signed out');
     expect(statusOf('settings-data-sync-row')).toBe('Data & sync, Signed out');
+    expect(statusOf('settings-notifications-row')).toBe('Notifications, Sign in');
     expect(mockGetSyncStatus).not.toHaveBeenCalled();
     expect(screen.queryByText('Sign in and manage your account.')).toBeNull();
     expect(screen.queryByTestId('settings-connect-agent-row')).toBeNull();

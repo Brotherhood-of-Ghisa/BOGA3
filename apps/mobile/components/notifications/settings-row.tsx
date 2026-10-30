@@ -3,7 +3,7 @@ import { useRef, useState, useSyncExternalStore } from 'react';
 import { ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import {
-  ActionButton, Icon, ListRow, Notice, Sheet, SwitchRow,
+  ActionButton, ChoiceRow, Icon, ListRow, Notice, Sheet, SwitchRow,
   uiBorder, uiRoles, uiSpace, uiText,
 } from '@/components/ui';
 import {
@@ -19,7 +19,7 @@ const CATEGORIES = [
   { key: 'ranks', label: 'Leaderboard changes' },
 ] as const;
 
-export function NotificationSettingsRow({ userId }: { userId: string | null }) {
+export function NotificationSettingsRow({ userId, divider = false }: { userId: string | null; divider?: boolean }) {
   const router = useRouter();
   const state = useSyncExternalStore(subscribeNotificationState, getNotificationSnapshot);
   const [visible, setVisible] = useState(false);
@@ -44,21 +44,18 @@ export function NotificationSettingsRow({ userId }: { userId: string | null }) {
 
   return (
     <>
-      <ListRow
-        accessibilityHint="Opens notification controls"
+      <ChoiceRow
         accessibilityLabel={`Notifications, ${status}`}
-        density="list"
-        description={status}
-        divider={false}
+        divider={divider}
+        icon="bell"
         label="Notifications"
-        leading={<Icon color={uiRoles.inkMuted} name="bell" />}
         onPress={() => {
           retryCategories.current = null;
           setVisible(true);
           if (available) void refreshNotificationStatus();
         }}
         testID="settings-notifications-row"
-        trailing={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />}
+        value={status}
       />
       <Sheet dismissLabel="Dismiss notifications" onDismiss={() => setVisible(false)} onDismissed={() => {
         if (signInAfterDismiss.current) { signInAfterDismiss.current = false; router.push(SIGN_IN_ROUTE); }

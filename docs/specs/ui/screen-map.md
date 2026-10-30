@@ -39,7 +39,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
 | `/exercise-catalog` | Catalogue create/edit/delete/restore; ⋮ `Merge into…` above Delete: picker → native confirmation → refreshed catalogue; failures retain Retry. Gym-scoped stats; linked rows marked; shared browser ([[muscle.no-breakdown]]) | `exercise-catalog.tsx` |
 | `/groups` | One group, titled (and switched) by name, a settings icon; swiped pages, opening mid: `Stream` of sessions, records, membership and CoW lifecycle events (a record card shows its set and certification status, then values; its sheet: the set, one Certify, each value, the previous #1 per board, `Session`, `Leaderboard`); `At a glance` (pinned stepper, metric; stats, top five, rank chart); `Leaderboards` (All podiums, search, order); `CoWs` (current, next and past challenges) | `groups.tsx`, `components/groups/` |
-| `/settings` | Destination cards show current settings; About is last and unpressable. Appearance and Notifications open sheets, the rest pages | `settings.tsx`, `components/settings/` |
+| `/settings` | One grouped list: Account; Training (Rest timer, Bodyweight, Muscles, Effort, Progress); App (Appearance, Notifications, Data & sync, Everything else); About, last, read-only. Each row shows its current setting; Appearance and Notifications open sheets, the rest pages | `settings.tsx`, `components/settings/` |
 
 ## Sessions
 
@@ -67,7 +67,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 | `/connected-agents` | Signed-in review and revocation of OAuth grants, plus the per-coach **Allow this coach to make changes** permission (default off) | `connected-agents.tsx` |
 | `/theme-colour` | Custom theme hue: ring, live preview, `Use this colour` | `theme-colour.tsx`, `components/appearance/` |
 | `/body-weight` | Settings → Bodyweight: the `Bodyweight calculations` On/Off, then private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
-| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-other`, `/settings-experiments`, `/settings-data-sync`, `/settings-developer-tools` | Settings' sub pages: rest timer; Progress defaults, view and periods; the effort table; date format, gym filter; title-bar timer; sync and Backups; Developer mode, dev-only tools and logs | `settings-*.tsx`, `components/settings/` |
+| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-data-sync`, `/settings-everything-else` | Settings' sub pages: rest timer; Progress defaults, view and periods; the effort table; sync and Backups; Everything else: Display (date format), Records (gym filter), Experiments (title-bar timer), Developer (mode; dev-only logs and data tools) | `settings-*.tsx`, `components/settings/` |
 | `/settings-muscles`, `/settings-muscle-targets`, `/settings-enabled-muscles` | Muscles' Weekly targets and Muscle breakdown cards link to full target/enablement pages ([[muscle.weekly-targets]], [[muscle.report-groups]]). Native Back; loading, retryable errors, empty targets | `settings-*.tsx`, `components/preferences/muscle-settings.tsx` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |
 | `/exercise-edit` | The exercise editor; Primary and Secondary use the same multi-select sheet, with at least one Primary required; `?exerciseDefinitionId=` edits, else creates; `?request=` carries a caller's callbacks | `exercise-edit.tsx`, `components/exercise-catalog/exercise-editor-screen.tsx` |
@@ -97,7 +97,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 
 | Route | What it is for | File |
 | --- | --- | --- |
-| `/dev-logs` | In-app recent-log viewer, reached from Settings → Developer tools only under `isDevMode()` | `dev-logs.tsx` |
+| `/dev-logs` | In-app recent-log viewer, reached from Settings → Everything else only under `isDevMode()` | `dev-logs.tsx` |
 | `/maestro-harness` | Test harness: fixtures, resets, gate actions, teleports. Self-gated | `maestro-harness.tsx` |
 
 ## Shells (not user-facing screens)

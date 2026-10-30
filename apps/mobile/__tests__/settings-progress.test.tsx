@@ -16,11 +16,10 @@ import { Storage } from 'expo-sqlite/kv-store';
 import {
   DataSyncSettingsScreen,
   EffortSettingsScreen,
-  ExperimentsSettingsScreen,
-  OtherSettingsScreen,
   ProgressSettingsScreen,
   RestTimerSettingsScreen,
 } from '@/components/settings/sub-pages';
+import { EverythingElseSettingsScreen } from '@/components/settings/everything-else';
 import ProgressRoute from '../app/(tabs)/progress';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
@@ -73,14 +72,6 @@ it('labels every control as a micro-label and names each effort row in bodyStron
   expect(effort.getByText('Effort')).toHaveStyle(LABEL);
   expect(effort.getByText('Volume')).toHaveStyle(LABEL);
   expect(effort.getByText('Warm-up')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
-});
-
-it('labels the Other page controls as micro-labels', async () => {
-  setAccountLocalPreferenceAccount('A', true);
-  await ensureAccountLocalPreferencesLoaded();
-  render(<OtherSettingsScreen />);
-  expect(screen.getByText('Date format')).toHaveStyle(LABEL);
-  expect(screen.getByText('Past records gym filter')).toHaveStyle(LABEL);
 });
 
 const openSettingsAndProgress = async () => {
@@ -358,10 +349,10 @@ it('updates a mounted picker while keeping its hidden selected effort intact', a
   await act(async () => { await ensureAccountLocalPreferencesLoaded(); });
 });
 
-it('turns the title-bar timer on and off on Experiments, off by default and saved per account', async () => {
+it('turns the title-bar timer on and off on Everything else, off by default and saved per account', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  render(<ExperimentsSettingsScreen />);
+  render(<EverythingElseSettingsScreen />);
   const toggle = screen.getByTestId('settings-timer-in-title-bar');
   expect(toggle).toHaveProp('accessibilityState', { checked: false });
   fireEvent.press(toggle);
@@ -372,15 +363,12 @@ it('turns the title-bar timer on and off on Experiments, off by default and save
   expect(values().timerInTitleBar).toBe(false);
 });
 
-// Today is always cards, so neither page offers a Today layout.
-it('offers no Today layout on Experiments or Other', async () => {
+// Today is always cards, so Everything else offers no Today layout.
+it('offers no Today layout on Everything else', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  render(<ExperimentsSettingsScreen />);
+  render(<EverythingElseSettingsScreen />);
   expect(screen.getByTestId('settings-timer-in-title-bar')).toBeTruthy();
-  expect(screen.queryByText('Today layout')).toBeNull();
-  screen.unmount();
-  render(<OtherSettingsScreen />);
   expect(screen.getByTestId('settings-date-format-row')).toBeTruthy();
   expect(screen.queryByText('Today layout')).toBeNull();
 });

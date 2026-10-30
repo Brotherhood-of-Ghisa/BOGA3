@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
+  ChoiceRow,
   Icon,
   ListRow,
   Notice,
@@ -32,7 +33,7 @@ import { THEME_COLOUR_ROUTE } from '@/src/navigation/routes';
 // at once and applies on the next launch; the app cannot restart itself, so a
 // pending choice is labelled `Next launch` on the row and in the sheet. The
 // last row opens the custom colour picker.
-export function AppearanceSettingsRow() {
+export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }) {
   const router = useRouter();
   const [chosenId, setChosenId] = useState<string>(readChosenId);
   const [sheetVisible, setSheetVisible] = useState(false);
@@ -42,6 +43,7 @@ export function AppearanceSettingsRow() {
   const chosenLabel = themeLabel(chosenId);
   const customHue = parseHueThemeId(chosenId);
   const pending = chosenId !== storedThemeId(launchTheme.preset);
+  const shown = pending ? `${chosenLabel} from next launch` : chosenLabel;
 
   const choose = async (id: ThemePresetId) => {
     // Re-choosing the current preset saves nothing, unless this launch could
@@ -67,17 +69,14 @@ export function AppearanceSettingsRow() {
 
   return (
     <>
-      <ListRow
-        accessibilityHint="Opens the theme choices"
-        accessibilityLabel={`Appearance, ${pending ? `${chosenLabel} from next launch` : chosenLabel}`}
-        density="list"
-        description={pending ? `${chosenLabel} from next launch` : chosenLabel}
-        divider={false}
+      <ChoiceRow
+        accessibilityLabel={`Appearance, ${shown}`}
+        divider={divider}
+        icon="palette"
         label="Appearance"
-        leading={<Icon color={uiRoles.inkMuted} name="palette" />}
         onPress={() => setSheetVisible(true)}
         testID="settings-appearance-row"
-        trailing={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />}
+        value={shown}
       />
       <Sheet
         dismissLabel="Dismiss appearance"

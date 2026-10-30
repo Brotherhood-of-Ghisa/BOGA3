@@ -18,10 +18,8 @@ export const SETTINGS_SUB_PAGES = {
   muscleTargets: '/settings-muscle-targets',
   enabledMuscles: '/settings-enabled-muscles',
   effort: '/settings-effort',
-  other: '/settings-other',
-  experiments: '/settings-experiments',
+  everythingElse: '/settings-everything-else',
   dataSync: '/settings-data-sync',
-  developerTools: '/settings-developer-tools',
 } as const;
 
 /** The Link screen for one of my exercises (E0.3). */

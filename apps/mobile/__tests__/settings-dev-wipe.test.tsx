@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * The developer-only data affordances on Settings → Developer tools, over real data:
+ * The developer-only data affordances on Settings → Everything else → Developer, over real data:
  * the dev-mode visibility gate, the log viewer link, the catalog reset ("Reset
  * local data"), the local wipe, and the two-step "wipe remote then wipe local" flow that keeps
  * the just-deleted server rows from being re-pushed by the next sync cycle.
@@ -43,7 +43,7 @@ import {
   getExerciseListPreferencesSnapshot,
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
-import DeveloperToolsRoute from '../app/settings-developer-tools';
+import EverythingElseRoute from '../app/settings-everything-else';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import * as devReset from '@/src/data/dev-reset';
 import * as devAffordances from '@/src/sync/dev-affordances';
@@ -65,7 +65,7 @@ const openSettings = async () => {
     .prepare("INSERT INTO exercise_definitions (id, name) VALUES ('custom-press', 'Custom Press')")
     .run();
   await bootLocalApp();
-  render(<DeveloperToolsRoute />);
+  render(<EverythingElseRoute />);
   // Let any post-mount reads land inside act.
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -93,33 +93,38 @@ describe('settings developer data affordances', () => {
 
     await openSettings();
 
-    expect(screen.getByTestId('settings-developer-tools-screen')).toBeTruthy();
+    expect(screen.getByTestId('settings-everything-else-screen')).toBeTruthy();
     expect(screen.getByTestId('settings-developer-mode-switch')).toBeTruthy();
-    expect(screen.queryByTestId('settings-dev-tools-card')).toBeNull();
+    expect(screen.queryByTestId('settings-dev-logs-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-reset-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-local-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-remote-button')).toBeNull();
   });
 
-  it('heads the tools with a micro-label and explains each in muted body', async () => {
+  it('draws the tools as rows of the Developer section: acts in accent words, Wipe remote in danger words, last', async () => {
     await openSettings();
-    expect(screen.getByText('Developer tools')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
-    expect(screen.getByText(/^Drop the local database/)).toHaveStyle({
-      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: uiRoles.inkMuted,
-    });
+    expect(screen.getByText('Developer')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
+    expect(screen.getByText('Reset local data')).toHaveStyle({ color: uiRoles.accent });
+    expect(screen.getByText('Wipe local')).toHaveStyle({ color: uiRoles.accent });
+    expect(screen.getByText('Wipe remote')).toHaveStyle({ color: uiRoles.danger });
+    const tree = JSON.stringify(screen.toJSON());
+    const order = ['settings-developer-mode-switch', 'settings-dev-logs-button', 'settings-dev-reset-button', 'settings-dev-wipe-local-button', 'settings-dev-wipe-remote-button']
+      .map((id) => tree.indexOf(`"testID":"${id}"`));
+    expect(order.every((at) => at >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
   it('switches Developer mode on the page in every build', async () => {
     mockIsDevMode.mockReturnValue(false);
     await openSettings();
 
-    expect(screen.getByTestId('settings-developer-mode-switch').props.value).toBe(false);
-    fireEvent(screen.getByTestId('settings-developer-mode-switch'), 'valueChange', true);
+    expect(screen.getByTestId('settings-developer-mode-switch')).toHaveProp('accessibilityState', { checked: false });
+    fireEvent.press(screen.getByTestId('settings-developer-mode-switch'));
 
-    await waitFor(() => expect(screen.getByTestId('settings-developer-mode-switch').props.value).toBe(true));
+    await waitFor(() => expect(screen.getByTestId('settings-developer-mode-switch')).toHaveProp('accessibilityState', { checked: true }));
   });
 
-  it('opens the in-app log viewer from Developer tools', async () => {
+  it('opens the in-app log viewer from the Developer section', async () => {
     await openSettings();
 
     fireEvent.press(screen.getByTestId('settings-dev-logs-button'));
@@ -132,7 +137,7 @@ describe('settings developer data affordances', () => {
     expect(count('sessions')).toBeGreaterThan(0);
     act(() => setExerciseListPreferences({ dateFormat: 'YYYY-MM-DD' }));
 
-    expect(screen.getByTestId('settings-dev-tools-card')).toBeTruthy();
+    expect(screen.getByTestId('settings-dev-reset-button')).toBeTruthy();
     fireEvent.press(screen.getByTestId('settings-dev-reset-button'));
 
     expect(mockAlert).toHaveBeenCalledTimes(1);

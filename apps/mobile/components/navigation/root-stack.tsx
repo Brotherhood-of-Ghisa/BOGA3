@@ -83,17 +83,15 @@ export function RootStack() {
         <Stack.Screen name="exercise-link" options={{ title: 'Link exercise' }} />
         <Stack.Screen name="exercise-share" options={{ title: 'Shared exercise' }} />
         <Stack.Screen name="body-weight" options={{ title: 'Bodyweight' }} />
-        {/* Settings' sub pages, one per Settings card. */}
+        {/* Settings' sub pages, one per Settings row. */}
         <Stack.Screen name="settings-rest-timer" options={{ title: 'Rest timer' }} />
         <Stack.Screen name="settings-progress" options={{ title: 'Progress' }} />
         <Stack.Screen name="settings-muscles" options={{ title: 'Muscles' }} />
         <Stack.Screen name="settings-muscle-targets" options={{ title: 'Per muscle targets' }} />
         <Stack.Screen name="settings-enabled-muscles" options={{ title: 'Enabled muscles' }} />
         <Stack.Screen name="settings-effort" options={{ title: 'Effort' }} />
-        <Stack.Screen name="settings-other" options={{ title: 'Other' }} />
-        <Stack.Screen name="settings-experiments" options={{ title: 'Experiments' }} />
+        <Stack.Screen name="settings-everything-else" options={{ title: 'Everything else' }} />
         <Stack.Screen name="settings-data-sync" options={{ title: 'Data & sync' }} />
-        <Stack.Screen name="settings-developer-tools" options={{ title: 'Developer tools' }} />
         <Stack.Screen name="gyms" options={{ title: 'Gyms' }} />
         <Stack.Screen name="theme-colour" options={{ title: 'Custom colour' }} />
         <Stack.Screen name="group/mine" options={{ title: 'My groups' }} />

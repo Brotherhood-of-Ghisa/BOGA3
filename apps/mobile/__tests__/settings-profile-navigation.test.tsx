@@ -61,7 +61,8 @@ import * as syncStatusSource from '@/src/sync/sync-status';
 import ProfileRoute from '../app/profile';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
 import SettingsRoute from '../app/settings';
-import { DataSyncSettingsScreen, OtherSettingsScreen } from '@/components/settings/sub-pages';
+import { EverythingElseSettingsScreen } from '@/components/settings/everything-else';
+import { DataSyncSettingsScreen } from '@/components/settings/sub-pages';
 
 type MockUseAuthValue = {
   clearAuthError: jest.Mock;
@@ -158,16 +159,16 @@ describe('settings and profile routes', () => {
 
   it('reports a failed date-format save only under Data & Sync and retries it through Refresh', async () => {
     await ensureExerciseListPreferencesLoaded();
-    // Settings' list, the Other page that saves and the Data & sync page that
+    // Settings' list, the Everything else page that saves and the Data & sync page that
     // reports, over the one preferences store.
-    render(<><SettingsRoute /><OtherSettingsScreen /><DataSyncSettingsScreen /></>);
+    render(<><SettingsRoute /><EverythingElseSettingsScreen /><DataSyncSettingsScreen /></>);
     const save = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
     fireEvent.press(screen.getByTestId('settings-date-format-YYYY-MM-DD'));
     const error = /Preferences could not be saved\./;
     expect(within(screen.getByTestId('settings-data-sync-screen')).getByTestId('settings-sync-status-error'))
       .toHaveTextContent(error);
     expect(screen.getByTestId('settings-data-sync-row').props.accessibilityLabel).toBe('Data & sync, Error');
-    expect(within(screen.getByTestId('settings-preferences-card')).queryByText(error)).toBeNull();
+    expect(within(screen.getByTestId('settings-everything-else-screen')).queryByText(error)).toBeNull();
     expect(screen.queryByTestId('preferences-error')).toBeNull();
     expect(screen.queryByText('Retry')).toBeNull();
     expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('DD-MM-YYYY');
@@ -175,7 +176,7 @@ describe('settings and profile routes', () => {
     await waitFor(() => expect(getExerciseListPreferencesSnapshot().dateFormat).toBe('YYYY-MM-DD'));
     expect(screen.queryByTestId('settings-sync-status-error')).toBeNull();
     expect(screen.getByTestId('settings-data-sync-row').props.accessibilityLabel).toBe('Data & sync, Signed out');
-    expect(screen.getByTestId('settings-other-row').props.accessibilityLabel).toBe('Other, YYYY-MM-DD');
+    expect(screen.getByTestId('settings-everything-else-row').props.accessibilityLabel).toBe('Everything else, YYYY-MM-DD');
     save.mockRestore();
   });
 
@@ -203,12 +204,11 @@ describe('settings and profile routes', () => {
     expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('1');
   });
 
-  it('renders the Preferences card on Other and allows changing the date format setting', async () => {
+  it('changes the date format and the past records gym filter on Everything else', async () => {
     await ensureExerciseListPreferencesLoaded();
 
-    render(<OtherSettingsScreen />);
+    render(<EverythingElseSettingsScreen />);
 
-    expect(screen.getByTestId('settings-preferences-card')).toBeTruthy();
     expect(screen.getByTestId('settings-date-format-DD-MM-YYYY')).toBeTruthy();
     expect(screen.getByTestId('settings-date-format-MM-DD-YYYY')).toBeTruthy();
     expect(screen.getByTestId('settings-date-format-YYYY-MM-DD')).toBeTruthy();

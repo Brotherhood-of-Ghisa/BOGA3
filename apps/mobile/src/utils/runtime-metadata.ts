@@ -56,16 +56,6 @@ export const readAppRuntimeMetadata = (): AppRuntimeMetadata =>
     nativeBuildVersion: Application.nativeBuildVersion,
   });
 
-export const formatVersionBuild = ({
-  buildNumber,
-  version,
-}: Pick<AppRuntimeMetadata, 'buildNumber' | 'version'>): string | null => {
-  if (version && buildNumber) return `Version ${version} (build ${buildNumber})`;
-  if (version) return `Version ${version}`;
-  if (buildNumber) return `Build ${buildNumber}`;
-  return null;
-};
-
 /** Runtime values consumed by logging, preserving the pre-extraction payload. */
 export const readLoggingRuntimeMetadata = () => {
   const expoConfig = Constants.expoConfig as ExpoConfigMetadata;
