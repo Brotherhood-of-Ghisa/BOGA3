@@ -1,4 +1,5 @@
 import { isConfirmedPerformedSet } from '@/src/exercise-calculations/set-semantics';
+import { loadSessionSnapshotById } from '@/src/data/session-drafts';
 import {
   createDrizzleSessionPlanStore,
   type SessionPlanStore,
@@ -102,4 +103,37 @@ export const loadPlanBlockProgressStatus = async (
     return 'not-found';
   }
   return block.exercise.progressStatus;
+};
+
+/**
+ * Automatically resolves pending plan blocks associated with a completed session.
+ * For each block with a `sourcePlanExerciseId`, if the block has at least one
+ * confirmed performed planned set, resolves it to 'completed'.
+ */
+export const autoCompletePlanBlocksForSession = async (
+  sessionId: string,
+  options?: { sourcedBlockIds?: string[]; now?: Date } | Date,
+): Promise<string[]> => {
+  const now = options instanceof Date ? options : options?.now ?? new Date();
+  let blockIds = options instanceof Date ? undefined : options?.sourcedBlockIds;
+  if (!blockIds) {
+    const snapshot = await loadSessionSnapshotById(sessionId);
+    if (!snapshot) {
+      return [];
+    }
+    blockIds = snapshot.exercises
+      .map((exercise) => exercise.sourcePlanExerciseId)
+      .filter((id): id is string => id != null);
+  }
+  if (blockIds.length === 0) {
+    return [];
+  }
+  const resolvedIds: string[] = [];
+  for (const blockId of blockIds) {
+    const result = await completePlanBlock(blockId, now);
+    if (result.status === 'completed') {
+      resolvedIds.push(blockId);
+    }
+  }
+  return resolvedIds;
 };

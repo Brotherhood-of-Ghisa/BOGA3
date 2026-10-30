@@ -35,9 +35,10 @@ jest.mock('@/src/data/bootstrap', () =>
 // Imported AFTER the bootstrap mock so the domain code binds to it.
 import { __resetClockForTests } from '@/src/data/clock';
 import { loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
-import { exerciseDefinitions, sessionPlanExercises } from '@/src/data/schema';
+import { exerciseDefinitions, exerciseSets, sessionPlanExercises } from '@/src/data/schema';
 import {
   addPlanBlockToSession,
+  autoCompletePlanBlocksForSession,
   completePlanBlock,
   planQueries,
   planRepository,
@@ -277,5 +278,93 @@ describe('skipPlanBlock', () => {
     await skipPlanBlock(blockId, T2);
     expect(await skipPlanBlock(blockId, T2)).toEqual({ status: 'not-resolvable' });
     expect(await skipPlanBlock('no-such-block', T2)).toEqual({ status: 'block-not-found' });
+  });
+});
+
+describe('autoCompletePlanBlocksForSession', () => {
+  it('automatically completes pending plan blocks that have confirmed performed work', async () => {
+    const { blockId } = await planWithBlock();
+    const attached = await attachBlock(blockId);
+    await performSets(attached.sessionId, [{ reps: '5', weight: '100' }]);
+
+    const resolved = await autoCompletePlanBlocksForSession(attached.sessionId, T2);
+    expect(resolved).toEqual([blockId]);
+
+    const block = db()
+      .select()
+      .from(sessionPlanExercises)
+      .where(eq(sessionPlanExercises.id, blockId))
+      .get();
+    expect(block).toMatchObject({ progressStatus: 'completed', resolvedAt: T2 });
+  });
+
+  it('leaves blocks without confirmed performed work pending', async () => {
+    const { blockId } = await planWithBlock();
+    const attached = await attachBlock(blockId);
+    // No sets performed.
+
+    const resolved = await autoCompletePlanBlocksForSession(attached.sessionId, T2);
+    expect(resolved).toEqual([]);
+
+    const block = db()
+      .select()
+      .from(sessionPlanExercises)
+      .where(eq(sessionPlanExercises.id, blockId))
+      .get();
+    expect(block?.progressStatus).toBe('pending');
+  });
+
+  it('leaves blocks with only manual warmups pending on finish', async () => {
+    const { blockId } = await planWithBlock();
+    const attached = await attachBlock(blockId);
+    const graph = await loadSessionSnapshotById(attached.sessionId);
+    if (!graph) throw new Error('seed failed');
+    const card = graph.exercises[0];
+    await persistSessionDraftSnapshot(
+      {
+        sessionId: graph.sessionId,
+        gymId: graph.gymId,
+        startedAt: graph.startedAt,
+        exercises: [
+          {
+            id: card.id,
+            exerciseDefinitionId: card.exerciseDefinitionId,
+            name: card.name,
+            machineName: card.machineName,
+            sourcePlanExerciseId: card.sourcePlanExerciseId ?? null,
+            sets: [
+              ...card.sets.map((row) => ({
+                id: row.id,
+                repsValue: row.repsValue,
+                weightValue: row.weightValue,
+                setType: row.setType,
+                plannedRepsValue: row.plannedRepsValue ?? null,
+                plannedWeightValue: row.plannedWeightValue ?? null,
+                plannedSetType: row.plannedSetType ?? null,
+                performanceStatus: row.performanceStatus ?? null,
+                sourcePlanSetId: row.sourcePlanSetId ?? null,
+              })),
+              { repsValue: '10', weightValue: '20', setType: 'warm_up', performanceStatus: null },
+            ],
+          },
+        ],
+      },
+      { now: T2 },
+    );
+
+    const resolved = await autoCompletePlanBlocksForSession(attached.sessionId, T2);
+    expect(resolved).toEqual([]);
+
+    const block = db()
+      .select()
+      .from(sessionPlanExercises)
+      .where(eq(sessionPlanExercises.id, blockId))
+      .get();
+    expect(block?.progressStatus).toBe('pending');
+  });
+
+  it('handles unknown sessions gracefully', async () => {
+    const resolved = await autoCompletePlanBlocksForSession('no-such-session', T2);
+    expect(resolved).toEqual([]);
   });
 });

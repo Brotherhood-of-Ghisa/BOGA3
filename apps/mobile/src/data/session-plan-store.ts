@@ -352,33 +352,93 @@ const findLiveSourcedCardForBlockInTransaction = (tx: Transaction, planExerciseI
     )
     .get();
 
-const listSourcedCardsForBlocksInTransaction = (tx: Transaction, planExerciseIds: string[]) =>
-  planExerciseIds.length === 0
-    ? []
-    : tx
-        .select({
-          id: sessionExercises.id,
-          sessionId: sessionExercises.sessionId,
-          sourcePlanExerciseId: sessionExercises.sourcePlanExerciseId,
-        })
-        .from(sessionExercises)
-        .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
-        .where(
-          and(
-            inArray(sessionExercises.sourcePlanExerciseId, planExerciseIds),
-            isNull(sessionExercises.deletedAt),
-            // A card whose session was discarded no longer claims the block:
-            // the block returns to pending (available) again.
-            isNull(sessions.deletedAt),
-          ),
-        )
-        .all()
-        .map((row) => ({
-          id: row.id,
-          sessionId: row.sessionId,
-          // The `inArray` filter above excludes the null link (manual cards).
-          sourcePlanExerciseId: row.sourcePlanExerciseId as string,
-        }));
+export type SourcedCardSet = {
+  id: string;
+  sourcePlanSetId: string | null;
+  repsValue: string;
+  weightValue: string;
+  performanceStatus: string | null;
+};
+
+export type SourcedCardClaim = {
+  id: string;
+  sessionId: string;
+  sessionStatus: 'active' | 'completed';
+  sessionCompletedAt: Date | null;
+  sourcePlanExerciseId: string;
+  sets: SourcedCardSet[];
+};
+
+const listSourcedCardsForBlocksInTransaction = (
+  tx: Transaction,
+  planExerciseIds: string[],
+): SourcedCardClaim[] => {
+  if (planExerciseIds.length === 0) {
+    return [];
+  }
+  const cardRows = tx
+    .select({
+      id: sessionExercises.id,
+      sessionId: sessionExercises.sessionId,
+      sessionStatus: sessions.status,
+      sessionCompletedAt: sessions.completedAt,
+      sourcePlanExerciseId: sessionExercises.sourcePlanExerciseId,
+    })
+    .from(sessionExercises)
+    .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
+    .where(
+      and(
+        inArray(sessionExercises.sourcePlanExerciseId, planExerciseIds),
+        isNull(sessionExercises.deletedAt),
+        // A card whose session was discarded no longer claims the block:
+        // the block returns to pending (available) again.
+        isNull(sessions.deletedAt),
+      ),
+    )
+    .all();
+
+  if (cardRows.length === 0) {
+    return [];
+  }
+
+  const cardIds = cardRows.map((card) => card.id);
+  const setRows = tx
+    .select({
+      id: exerciseSets.id,
+      sessionExerciseId: exerciseSets.sessionExerciseId,
+      sourcePlanSetId: exerciseSets.sourcePlanSetId,
+      repsValue: exerciseSets.repsValue,
+      weightValue: exerciseSets.weightValue,
+      performanceStatus: exerciseSets.performanceStatus,
+    })
+    .from(exerciseSets)
+    .where(and(inArray(exerciseSets.sessionExerciseId, cardIds), isNull(exerciseSets.deletedAt)))
+    .orderBy(asc(exerciseSets.orderIndex))
+    .all();
+
+  const setsByCardId = new Map<string, SourcedCardSet[]>();
+  for (const set of setRows) {
+    const list = setsByCardId.get(set.sessionExerciseId) ?? [];
+    list.push({
+      id: set.id,
+      sourcePlanSetId: set.sourcePlanSetId,
+      repsValue: set.repsValue,
+      weightValue: set.weightValue,
+      performanceStatus: set.performanceStatus,
+    });
+    setsByCardId.set(set.sessionExerciseId, list);
+  }
+
+  return cardRows.map((row) => ({
+    id: row.id,
+    sessionId: row.sessionId,
+    sessionStatus: row.sessionStatus as 'active' | 'completed',
+    sessionCompletedAt: row.sessionCompletedAt,
+    // The `inArray` filter above excludes the null link (manual cards).
+    sourcePlanExerciseId: row.sourcePlanExerciseId as string,
+    sets: setsByCardId.get(row.id) ?? [],
+  }));
+};
 
 const listBlocksForPlansInTransaction = (tx: Transaction, planIds: string[]) =>
   planIds.length === 0
@@ -467,9 +527,7 @@ export type SessionPlanStore = {
     now: Date;
   }): Promise<boolean>;
   /** Live performed cards claiming any of these blocks (attachment lookup in one query). */
-  listSourcedCardsForBlocks(planExerciseIds: string[]): Promise<
-    { id: string; sessionId: string; sourcePlanExerciseId: string }[]
-  >;
+  listSourcedCardsForBlocks(planExerciseIds: string[]): Promise<SourcedCardClaim[]>;
   /** Live blocks of the given plans, ordered by plan then block order. */
   listBlocksForPlans(planIds: string[]): Promise<PlanExerciseRow[]>;
   /** Live targets of the given blocks, ordered by block then target order. */
@@ -910,14 +968,16 @@ const resolvePlanBlock = async (input: { planExerciseId: string; status: 'comple
 
 
 /** See {@link SessionPlanStore}. */
-const listSourcedCardsForBlocks = async (planExerciseIds: string[]): Promise<{ id: string; sessionId: string; sourcePlanExerciseId: string }[]> => {
-    const database = await bootstrapLocalDataLayer();
-    let cards: { id: string; sessionId: string; sourcePlanExerciseId: string }[] = [];
-    database.transaction((tx) => {
-      cards = listSourcedCardsForBlocksInTransaction(tx, planExerciseIds);
-    });
-    return cards;
-  };
+const listSourcedCardsForBlocks = async (
+  planExerciseIds: string[],
+): Promise<SourcedCardClaim[]> => {
+  const database = await bootstrapLocalDataLayer();
+  let cards: SourcedCardClaim[] = [];
+  database.transaction((tx) => {
+    cards = listSourcedCardsForBlocksInTransaction(tx, planExerciseIds);
+  });
+  return cards;
+};
 
 
 /** See {@link SessionPlanStore}. */

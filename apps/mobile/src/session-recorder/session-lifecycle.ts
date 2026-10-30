@@ -23,6 +23,7 @@ import {
 } from './session-model';
 import { clearRestTimerAutoStartSuppression, dismissRestTimer } from './rest-timer';
 import type { SessionTimes } from './session-times';
+import { autoCompletePlanBlocksForSession } from '@/src/session-planner';
 
 /**
  * Ends an active session the way the recorder always has: persist the
@@ -46,6 +47,12 @@ export const completeActiveSession = async (input: {
   });
 
   await completeSessionDraft(persisted.sessionId);
+  const sourcedBlockIds = input.completedHistorySession.exercises
+    .map((exercise) => exercise.sourcePlanExerciseId)
+    .filter((id): id is string => id != null);
+  if (sourcedBlockIds.length > 0) {
+    await autoCompletePlanBlocksForSession(persisted.sessionId, { sourcedBlockIds });
+  }
   dismissRestTimer(persisted.sessionId, { suppressAutoStart: false });
   clearRestTimerAutoStartSuppression(persisted.sessionId);
   snapshotAfterSessionCompleted();

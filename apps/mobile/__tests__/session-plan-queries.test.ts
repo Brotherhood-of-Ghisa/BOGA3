@@ -34,8 +34,10 @@ import { __resetClockForTests } from '@/src/data/clock';
 import { createDrizzleSessionPlanStore } from '@/src/data/session-plan-store';
 import {
   exerciseDefinitions,
+  exerciseSets,
   sessionExercises,
   sessionPlanExercises,
+  sessionPlanSets,
   sessionPlans,
   sessions,
 } from '@/src/data/schema';
@@ -198,6 +200,156 @@ describe('plan detail with block consumption state', () => {
     resolveBlock(ids[0], 'completed');
     const resolvedDetail = await planQueries.loadPlanDetail(created.id);
     expect(resolvedDetail?.progress).toBe('completed');
+  });
+
+  it('falls back to completed on read when a claiming session is completed with confirmed work', async () => {
+    const created = await planRepository.createPlan(
+      planDraft('Legacy Done', {
+        exercises: [exercise('Squat'), exercise('Bench', { exerciseDefinitionId: 'def-bench' })],
+      }),
+      T0,
+    );
+    if (created.status !== 'saved') throw new Error('seed failed');
+    const ids = await blockIdsByPlan(created.id);
+    const planSets = db().select().from(sessionPlanSets).all();
+    const set1 = planSets.find((s) => s.sessionPlanExerciseId === ids[0])!;
+    const set2 = planSets.find((s) => s.sessionPlanExerciseId === ids[1])!;
+
+    db()
+      .insert(sessions)
+      .values({ id: 'sess-completed', startedAt: T0, completedAt: T1, status: 'completed' })
+      .run();
+    db()
+      .insert(sessionExercises)
+      .values([
+        {
+          id: 'card-1',
+          sessionId: 'sess-completed',
+          exerciseDefinitionId: 'def-squat',
+          orderIndex: 0,
+          name: 'Back Squat',
+          sourcePlanExerciseId: ids[0],
+        },
+        {
+          id: 'card-2',
+          sessionId: 'sess-completed',
+          exerciseDefinitionId: 'def-bench',
+          orderIndex: 1,
+          name: 'Bench Press',
+          sourcePlanExerciseId: ids[1],
+        },
+      ])
+      .run();
+    db()
+      .insert(exerciseSets)
+      .values([
+        {
+          id: 'set-1',
+          sessionExerciseId: 'card-1',
+          sourcePlanSetId: set1.id,
+          orderIndex: 0,
+          repsValue: '5',
+          weightValue: '100',
+        },
+        {
+          id: 'set-2',
+          sessionExerciseId: 'card-2',
+          sourcePlanSetId: set2.id,
+          orderIndex: 0,
+          repsValue: '8',
+          weightValue: '60',
+        },
+      ])
+      .run();
+
+    // In the database, both blocks still have stored progressStatus = 'pending'.
+    const detail = await planQueries.loadPlanDetail(created.id);
+    expect(detail).not.toBeNull();
+    expect(detail?.progress).toBe('completed');
+    expect(detail?.blockCounts).toEqual({ pending: 0, attached: 0, completed: 2, skipped: 0 });
+    expect(detail?.blocks.map((b) => b.status)).toEqual(['completed', 'completed']);
+    expect(detail?.blocks[0].resolvedAt).toEqual(T1);
+  });
+
+  it('leaves block pending on read when claiming session is completed but has no performed sets (legacy zero-work claim)', async () => {
+    const created = await planRepository.createPlan(
+      planDraft('Legacy Zero Work', {
+        exercises: [exercise('Squat')],
+      }),
+      T0,
+    );
+    if (created.status !== 'saved') throw new Error('seed failed');
+    const ids = await blockIdsByPlan(created.id);
+    db()
+      .insert(sessions)
+      .values({ id: 'sess-zero-work', startedAt: T0, completedAt: T1, status: 'completed' })
+      .run();
+    db()
+      .insert(sessionExercises)
+      .values({
+        id: 'card-zero-work',
+        sessionId: 'sess-zero-work',
+        exerciseDefinitionId: 'def-squat',
+        orderIndex: 0,
+        name: 'Back Squat',
+        sourcePlanExerciseId: ids[0],
+      })
+      .run();
+
+    // No performed sets on the card.
+    const detail = await planQueries.loadPlanDetail(created.id);
+    expect(detail).not.toBeNull();
+    expect(detail?.progress).toBe('planned');
+    expect(detail?.blockCounts).toEqual({ pending: 1, attached: 0, completed: 0, skipped: 0 });
+    expect(detail?.blocks[0].status).toBe('pending');
+    expect(detail?.blocks[0].resolvedAt).toBeNull();
+    expect(detail?.blocks[0].attachedSessionId).toBeNull();
+  });
+
+  it('leaves block pending on read when claiming session completed with only manual work', async () => {
+    const created = await planRepository.createPlan(
+      planDraft('Manual Only', {
+        exercises: [exercise('Squat')],
+      }),
+      T0,
+    );
+    if (created.status !== 'saved') throw new Error('seed failed');
+    const ids = await blockIdsByPlan(created.id);
+    db()
+      .insert(sessions)
+      .values({ id: 'sess-manual-only', startedAt: T0, completedAt: T1, status: 'completed' })
+      .run();
+    db()
+      .insert(sessionExercises)
+      .values({
+        id: 'card-manual-only',
+        sessionId: 'sess-manual-only',
+        exerciseDefinitionId: 'def-squat',
+        orderIndex: 0,
+        name: 'Back Squat',
+        sourcePlanExerciseId: ids[0],
+      })
+      .run();
+    // Manual warmup set (sourcePlanSetId is null)
+    db()
+      .insert(exerciseSets)
+      .values({
+        id: 'manual-set-1',
+        sessionExerciseId: 'card-manual-only',
+        sourcePlanSetId: null,
+        orderIndex: 0,
+        repsValue: '10',
+        weightValue: '40',
+      })
+      .run();
+
+    const detail = await planQueries.loadPlanDetail(created.id);
+    expect(detail).not.toBeNull();
+    expect(detail?.progress).toBe('planned');
+    expect(detail?.blockCounts).toEqual({ pending: 1, attached: 0, completed: 0, skipped: 0 });
+    expect(detail?.blocks[0].status).toBe('pending');
+    expect(detail?.blocks[0].resolvedAt).toBeNull();
+    expect(detail?.blocks[0].attachedSessionId).toBeNull();
   });
 });
 
