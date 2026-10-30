@@ -224,12 +224,11 @@ the thresholds; this is where they live.
 
 ## What CI runs
 
-CI (`.github/workflows/ci.yml`) runs exactly the lanes marked `CI? ✅` above,
-installing each workspace from its own lockfile; a docs-only PR runs
-`docs-check` alone (`06`, "CI posture"). **Everything else is
-local-only** — backend/sync by choice, Maestro iOS/Android by necessity — so
-breakage there accumulates on `main` invisibly until a human runs the gate. Run
-the slow gate for your area before the PR.
+CI (`.github/workflows/ci.yml`) runs the `CI? ✅` lanes above, installing each
+workspace from its lockfile. Compatible runs reuse Jest's transform cache.
+Docs-only PRs run `docs-check` alone (`06`, "CI posture"). **Other lanes run
+locally** — backend/sync by choice, Maestro by host requirements — so CI cannot
+catch their regressions. Run your area's gates before the PR.
 
 Updates: [workflow](../../.github/workflows/daily-development-log.yml).
 

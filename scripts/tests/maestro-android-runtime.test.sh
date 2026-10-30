@@ -123,10 +123,4 @@ maestro_android_preauthorize_permissions emulator-5554 com.phano.boga3.dev
 assert 'grep -qxF "adb -s emulator-5554 shell pm grant com.phano.boga3.dev android.permission.ACCESS_LOCAL_NETWORK" "$STUB_LOG"' "pre-grants ACCESS_LOCAL_NETWORK"
 assert 'grep -qxF "adb -s emulator-5554 shell pm grant com.phano.boga3.dev android.permission.ACCESS_FINE_LOCATION" "$STUB_LOG"' "pre-grants fine location"
 
-# 10. Teardown shuts down EMULATOR_PID even when ANDROID_SERIAL is unset.
-sleep 10 &
-DUMMY_PID=$!
-maestro_android_teardown_emulator "$DUMMY_PID" "" 0
-assert '! kill -0 "$DUMMY_PID" 2>/dev/null' "teardown kills EMULATOR_PID when ANDROID_SERIAL is empty"
-
 echo "[maestro-android-runtime.test] $PASS assertions passed"

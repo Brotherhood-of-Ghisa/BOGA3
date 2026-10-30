@@ -74,6 +74,15 @@ jobs:
             apps/agent-auth-web/package-lock.json
             services/boga-mcp/package-lock.json
 
+      - name: Restore Jest cache
+        if: steps.changes.outputs.docs_only != 'true'
+        uses: actions/cache@v5
+        with:
+          path: apps/mobile/.jest-cache
+          key: ${{ runner.os }}-jest-node24-${{ hashFiles('apps/mobile/package-lock.json', 'apps/mobile/jest.config.js', 'apps/mobile/tsconfig.json', 'apps/mobile/babel.config.*') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-jest-node24-${{ hashFiles('apps/mobile/package-lock.json', 'apps/mobile/jest.config.js', 'apps/mobile/tsconfig.json', 'apps/mobile/babel.config.*') }}-
+
       - name: Install dependencies
         if: steps.changes.outputs.docs_only != 'true'
         run: npm ci
