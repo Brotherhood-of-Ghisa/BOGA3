@@ -1,3 +1,4 @@
+export { GroupCoWsPage } from './group-cows-page';
 export { FriendSessionContent } from './friend-session-content';
 export { GroupSessionHeaderTitle } from './group-session-header-title';
 export { GroupSessionRecordsCard } from './group-session-records-card';

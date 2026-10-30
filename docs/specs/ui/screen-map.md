@@ -38,7 +38,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 | --- | --- | --- |
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
 | `/exercise-catalog` | Catalogue create/edit/delete/restore; ⋮ `Merge into…` above Delete: picker → native confirmation → refreshed catalogue; failures retain Retry. Gym-scoped stats; linked rows marked; shared browser ([[muscle.no-breakdown]]) | `exercise-catalog.tsx` |
-| `/groups` | One group, titled (and switched) by name, a settings icon; swiped pages, opening mid: `Stream` of sessions, records and membership events (a record card shows its set and certification status, then values; its sheet: the set, one Certify, each value, the previous #1 per board, `Session`, `Leaderboard`); `At a glance` (pinned stepper, metric; stats, top five, rank chart); `Leaderboards` (All podiums, search, order) | `groups.tsx`, `components/groups/` |
+| `/groups` | One group, titled (and switched) by name, a settings icon; swiped pages, opening mid: `Stream` of sessions, records and membership events (a record card shows its set and certification status, then values; its sheet: the set, one Certify, each value, the previous #1 per board, `Session`, `Leaderboard`); `At a glance` (pinned stepper, metric; stats, top five, rank chart); `Leaderboards` (All podiums, search, order); `CoWs` (current, next and past challenges) | `groups.tsx`, `components/groups/` |
 | `/settings` | Destination cards show current settings; About is last and unpressable. Appearance and Notifications open sheets, the rest pages | `settings.tsx`, `components/settings/` |
 
 ## Sessions
@@ -80,7 +80,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 | `/group/mine` | My groups: active memberships, `Join group` / `Create group` — the way into a group's management page | `group/mine.tsx` |
 | `/group/new` | Create a group (inline username gate first when the username is blank) | `group/new.tsx` |
 | `/group/join` | Join by code: code field, preview card, `Join group` | `group/join.tsx` |
-| `/group/[groupId]` | The group screen, for *managing* the group: header, owner/admin Invite + Edit, CoW preview and persistent View CoWs, and the group's exercises with link / unlink. Stream and leaderboards live on `/groups` | `group/[groupId]/index.tsx` |
+| `/group/[groupId]` | The group screen, for *managing* the group: header, owner/admin Invite + Edit, CoW preview, and the group's exercises with link / unlink. Stream and leaderboards live on `/groups` | `group/[groupId]/index.tsx` |
 | `/group/[groupId]/members` | The member list behind the header's member count, with role actions and `Leave group` | `group/[groupId]/members.tsx` |
 | `/group/[groupId]/edit` | Owner/admin edit of name, description and group calendar time zone | `group/[groupId]/edit.tsx` |
 | `/group/[groupId]/cows` | This week, next week and past CoWs; independent metric preview, online history and admin next-week entry | `group/[groupId]/cows/index.tsx` |

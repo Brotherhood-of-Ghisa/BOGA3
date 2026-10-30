@@ -25,8 +25,8 @@ import {
   type GroupsSection,
 } from '@/components/groups';
 import { TabOwnedPage } from '@/components/navigation/tab-owned-page';
-import { coWsHref } from '@/src/navigation/routes';
-import { Card, Icon, IconButton, ListRow, ScreenScroll, SwipePages, uiSpace, type SwipePageFrame } from '@/components/ui';
+import { GroupCoWsPage } from '@/components/groups/group-cows-page';
+import { Icon, IconButton, ScreenScroll, SwipePages, uiSpace, type SwipePageFrame } from '@/components/ui';
 import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
 import { groupRankSeriesEnd, type GroupHomeMetric } from '@/src/groups/home-periods';
 import { useGroupGlance } from '@/src/groups/use-group-glance';
@@ -47,12 +47,12 @@ const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
 
 const toSection = (value: string | null): GroupsSection | null =>
-  value === 'glance' || value === 'stream' || value === 'leaderboards' ? value : null;
+  value === 'glance' || value === 'stream' || value === 'leaderboards' || value === 'cows' ? value : null;
 
 /**
  * The Groups screen (groups contract): one group at a time, named by the
- * native title and picked from it, in three pages swiped between — Stream,
- * At a glance (where it opens), Leaderboards — under tabs naming them.
+ * native title and picked from it, in four pages swiped between — Stream,
+ * At a glance (where it opens), Leaderboards, CoWs — under tabs naming them.
  * Managing groups (join, create, the group page) lives behind the header's
  * `Manage`. `?groupId=` preselects a group and `?section=` its page.
  */
@@ -87,8 +87,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
     rerender();
   }, []);
   const [segment, setSegment] = useState<GroupsSection>('glance');
-  // A page is read from the first time it is shown, and kept read after, so a
-  // swipe back never finds it blank.
+  // Keep the glance and leaderboard reads after their first visit.
   const [visited, setVisited] = useState<readonly GroupsSection[]>(['glance']);
   const showSection = (next: GroupsSection) => {
     setSegment(next);
@@ -103,9 +102,10 @@ function GroupsTabContent({ userId }: { userId: string }) {
   const [eventsSheet, setEventsSheet] = useState(false);
   // A new link (Today's group title, a membership row) wins over the last
   // pick; it opens the page it names, and the Stream when it names none.
+  const requestKey = JSON.stringify([requestedGroupId, requestedSection]);
   const [followedRequest, setFollowedRequest] = useState<string | null>(null);
-  if (followedRequest !== requestedGroupId) {
-    setFollowedRequest(requestedGroupId);
+  if (followedRequest !== requestKey) {
+    setFollowedRequest(requestKey);
     if (requestedGroupId) {
       setLastViewedGroupId(requestedGroupId);
       showSection(requestedSection ?? 'stream');
@@ -180,14 +180,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
       selectedGroupId={selectedGroupId}
     />
   );
-  // Challenges of the week, for the group in view, on every page.
-  const cowsLink = hasGroups && selectedGroupId ? (
-    <Card>
-      <ListRow density="list" label="CoWs" onPress={() => router.push(coWsHref(selectedGroupId))} testID="groups-cows-link"
-        trailing={<Icon name="chevron-right" size="sm" />} />
-    </Card>
-  ) : null;
-  const notices = (
+  const notices = segment === 'cows' ? null : (
     <>
       {offline ? <GroupOfflineBanner lastUpdatedAtMs={segmentResource.lastUpdatedAtMs ?? mine.lastUpdatedAtMs} /> : null}
       {inlineError && (groups !== null || segmentResource.data !== null) ? (
@@ -253,6 +246,11 @@ function GroupsTabContent({ userId }: { userId: string }) {
         style={frameStyle(frame)}
       />
     ),
+    cows: (frame) => (
+      <View style={frameStyle(frame)}>
+        {segment === 'cows' ? <GroupCoWsPage key={`${userId}:${selectedGroupId}`} userId={userId} groupId={selectedGroupId} embedded /> : null}
+      </View>
+    ),
     leaderboards: (frame) =>
       scrollPage(
         frame,
@@ -274,7 +272,6 @@ function GroupsTabContent({ userId }: { userId: string }) {
       <SwipePages
         banner={
           <View style={styles.notices}>
-            {cowsLink}
             {notices}
           </View>
         }

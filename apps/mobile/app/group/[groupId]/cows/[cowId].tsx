@@ -73,9 +73,10 @@ function CoWStandingsBody({ board, definitionOffline, error, metric, userId, onS
         <CoWMetricTabs metrics={result.cow.metrics} metric={metric} onChange={onSelect} testID="cow-standings" /></View></Card>
       {error ? <GroupInlineError error={error} onRetry={() => void refresh()} testID="cow-standings-error" /> : null}
       {result.state === 'ready' ? <Card><View style={{ padding: uiSpace.md }}><CoWRows ranking={{ ...result.rankings[0], entries: board.items }} userId={userId} testID="cow-standings-rows" /></View></Card>
-        : <GroupStateView title={result.state === 'unavailable' ? 'Group comparisons unavailable' : coWStatus(result.cow, result.state)}
-            testID="cow-standings-state" actionLabel="Refresh" onAction={() => void refresh()} />}
-      {stale ? <GroupStateView title="The standings changed" actionLabel="Refresh" onAction={() => void refresh()} testID="cow-standings-stale" /> : null}
+        : result.cow.state === 'scheduled' && result.state === 'pending' ? null
+          : <GroupStateView title={result.state === 'unavailable' ? 'Group comparisons unavailable' : coWStatus(result.cow, result.state)}
+              testID="cow-standings-state" />}
+      {stale ? <GroupStateView title="The standings changed" testID="cow-standings-stale" /> : null}
       {board.hasMore && !stale ? <ActionButton label={board.loadingMore ? 'Loading…' : 'More members'} disabled={board.loadingMore} variant="outline" onPress={() => void board.loadMore()} testID="cow-standings-more" /> : null}
       {board.loadMoreError && !stale ? <GroupInlineError error={board.loadMoreError} onRetry={() => void board.loadMore()} testID="cow-standings-more-error" /> : null}
     </> : <GroupMissingDataState error={error} offline={board.offline || definitionOffline} onRetry={() => void refresh()} testIDPrefix="cow-standings" />}

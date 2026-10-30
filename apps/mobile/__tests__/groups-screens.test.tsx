@@ -14,6 +14,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 import { waitForGone } from './helpers/wait-for-gone';
+import { cowResult } from './helpers/cow-fixtures';
 
 let fixture: InMemoryDatabaseFixture;
 const mockCurrentDatabase = () => fixture.database;
@@ -55,6 +56,7 @@ jest.mock('@/src/groups/api', () => {
   ...jest.requireActual('@/src/groups/api'),
   ...jest.requireActual('./helpers/cow-fixtures').coWReadMocks(),
   listMyGroups: jest.fn(),
+  listCoWs: jest.fn(),
   getGroup: jest.fn(),
   getCompetitionStream: streamRead,
   getCompetitionSession: jest.fn(),
@@ -86,7 +88,7 @@ import * as groupsApi from '@/src/groups/api';
 import * as notificationApi from '@/src/notifications/api';
 import type { CompetitionPeriodWindow } from '@/src/groups/api';
 import type { CompetitionPeriodTotalsWire } from '@/src/groups/competition-wire';
-import { coWsHref, SIGN_IN_ROUTE } from '@/src/navigation/routes';
+import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { resolveMainTab } from '@/src/navigation/main-tabs';
 
 import GroupsTabRoute from '../app/groups';
@@ -264,9 +266,9 @@ const pullToRefresh = async (testID: string) => {
 
 const cardID = (key: string) => `group-stream-session-card-${key}`;
 
-// The screen opens At a glance, the middle of three pages; a tab names each
+// The screen opens At a glance, the second of four pages; a tab names each
 // page and moves to it.
-const SECTION_TABS: Record<string, string> = { Stream: 'stream', 'At a glance': 'glance', Leaderboards: 'leaderboards' };
+const SECTION_TABS: Record<string, string> = { Stream: 'stream', 'At a glance': 'glance', Leaderboards: 'leaderboards', CoWs: 'cows' };
 const sectionLabel = () =>
   Object.keys(SECTION_TABS).find(
     (label) => screen.getByTestId(`groups-tab-${SECTION_TABS[label]}`).props.accessibilityState?.selected,
@@ -294,6 +296,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: USER_ID } });
   api.listMyGroups.mockResolvedValue({ groups: [GROUP_A, GROUP_B] });
   api.getCompetitionStream.mockResolvedValue(page([]));
+  api.listCoWs.mockResolvedValue({ cows: [], next_cursor: null });
   api.getGroup.mockResolvedValue(GROUP_A_DETAIL);
   api.getCompetitionPeriodTotals.mockImplementation(async (groupId, windows) => periodTotals(groupId, windows));
   api.getCompetitionSession.mockResolvedValue(sessionDetail());
@@ -434,12 +437,59 @@ describe('Groups tab', () => {
     expect(screen.queryByTestId('group-glance-error-state')).toBeNull();
   });
 
-  it('keeps the CoWs link above every page, opening the group\'s challenges', async () => {
+  it('replaces the CoWs row with a fourth pager tab for the selected group', async () => {
+    api.listCoWs.mockImplementation(async groupId => ({ cows: [{ ...cowResult().cow, group_id: groupId, cow_id: groupId, state: 'final' }], next_cursor: null }));
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-tab-glance');
-    expect(within(screen.getByTestId('groups-screen-pager')).queryByTestId('groups-cows-link')).toBeNull();
-    fireEvent.press(await screen.findByTestId('groups-cows-link'));
-    expect(mockPush).toHaveBeenLastCalledWith(coWsHref('group-a'));
+    await screen.findByTestId('groups-tab-cows');
+    expect(within(screen.getByTestId('groups-screen')).getAllByRole('tab').map(tab => tab.props.testID)).toEqual([
+      'groups-tab-stream', 'groups-tab-glance', 'groups-tab-leaderboards', 'groups-tab-cows',
+    ]);
+    expect(screen.queryByTestId('groups-cows-link')).toBeNull();
+    expect(api.listCoWs).not.toHaveBeenCalled();
+    goToSection('CoWs');
+    expect(await screen.findByText('Nothing scheduled')).toBeTruthy();
+    expect(sectionLabel()).toBe('CoWs');
+    expect(api.listCoWs).toHaveBeenCalledWith('group-a', null);
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(shownGroupName()).toHaveTextContent('Garage Gym');
+    expect(screen.getByTestId('cows-past-group-a')).toBeTruthy();
+    pickGroup('group-b');
+    expect(await screen.findByTestId('cows-past-group-b')).toBeTruthy();
+    expect(screen.queryByTestId('cows-past-group-a')).toBeNull();
+    expect(api.listCoWs).toHaveBeenLastCalledWith('group-b', null);
+    expect(shownGroupName()).toHaveTextContent('Lunch Lifters');
+  });
+
+  it('opens CoWs when swiping to the fourth page', async () => {
+    render(<GroupsTabRoute />);
+    await screen.findByTestId('groups-tab-cows');
+    const pager = screen.getByTestId('groups-screen-pager');
+    fireEvent(pager, 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 3 * pager.props.snapToInterval } } });
+    expect(await screen.findByText('Nothing scheduled')).toBeTruthy();
+    expect(sectionLabel()).toBe('CoWs');
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('keeps a failed CoWs read retryable inside its tab', async () => {
+    api.listCoWs.mockRejectedValue(new GroupApiError('INTERNAL', 'failed CoWs'));
+    render(<GroupsTabRoute />);
+    await screen.findByTestId('groups-tab-cows');
+    goToSection('CoWs');
+    expect(await screen.findByTestId('cows-list-error-state')).toBeTruthy();
+    api.listCoWs.mockResolvedValue({ cows: [], next_cursor: null });
+    fireEvent.press(screen.getByTestId('cows-list-error-state-retry'));
+    expect(await screen.findByText('Nothing scheduled')).toBeTruthy();
+    expect(screen.queryByTestId('groups-cows-link')).toBeNull();
+  });
+
+  it('honors a CoWs page link for the same selected group', async () => {
+    mockParams = { groupId: 'group-a', section: 'stream' };
+    render(<GroupsTabRoute />);
+    await screen.findByTestId('groups-tab-stream');
+    mockParams = { groupId: 'group-a', section: 'cows' };
+    screen.rerender(<GroupsTabRoute />);
+    expect(await screen.findByText('Nothing scheduled')).toBeTruthy();
+    expect(sectionLabel()).toBe('CoWs');
   });
 
   it('draws no event-type menu outside dev mode', async () => {

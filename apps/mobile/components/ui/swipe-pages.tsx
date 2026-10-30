@@ -96,9 +96,10 @@ export function SwipePages({ pages, page, onPageChange, banner, testID }: SwipeP
   return (
     <View onLayout={onLayout} style={styles.screen} testID={testID}>
       <View style={styles.header}>
-        <View accessibilityRole="tablist" style={styles.tabs}>
+        <View accessibilityRole="tablist" style={[styles.tabs, pages.length > 3 ? styles.compactTabs : null]}>
           {pages.map((candidate, index) => (
             <Tab
+              compact={pages.length > 3}
               key={candidate.key}
               label={candidate.label}
               onPress={() => {
@@ -132,7 +133,7 @@ export function SwipePages({ pages, page, onPageChange, banner, testID }: SwipeP
   );
 }
 
-function Tab({ label, selected, onPress, testID }: { label: string; selected: boolean; onPress: () => void; testID: string }) {
+function Tab({ label, selected, onPress, testID, compact }: { label: string; selected: boolean; onPress: () => void; testID: string; compact: boolean }) {
   return (
     <Pressable
       accessibilityRole="tab"
@@ -142,6 +143,8 @@ function Tab({ label, selected, onPress, testID }: { label: string; selected: bo
       testID={testID}>
       <Text
         allowFontScaling={false}
+        adjustsFontSizeToFit={compact}
+        minimumFontScale={0.75}
         ellipsizeMode="tail"
         numberOfLines={1}
         style={[uiText.title, selected ? null : uiTextTone.faint]}>
@@ -174,6 +177,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     gap: uiSpace.xl,
   },
+  compactTabs: { gap: uiSpace.md },
   tab: {
     flexShrink: 1,
     minWidth: uiGeometry.tapTarget,

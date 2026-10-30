@@ -9,15 +9,16 @@ import { uiRoles, uiSpace } from '@/components/ui/tokens';
 
 import { GroupSwitchSheet, type GroupSwitchOption } from './group-switch-sheet';
 
-/** The Groups screen's three views of one group, in page order. */
-export type GroupsSection = 'stream' | 'glance' | 'leaderboards';
+/** The Groups screen's four views of one group, in page order. */
+export type GroupsSection = 'stream' | 'glance' | 'leaderboards' | 'cows';
 
-export const GROUP_SECTIONS: readonly GroupsSection[] = ['stream', 'glance', 'leaderboards'];
+export const GROUP_SECTIONS: readonly GroupsSection[] = ['stream', 'glance', 'leaderboards', 'cows'];
 
 export const GROUP_SECTION_LABELS: Record<GroupsSection, string> = {
   glance: 'At a glance',
   stream: 'Stream',
   leaderboards: 'Leaderboards',
+  cows: 'CoWs',
 };
 
 export type GroupScreenHeaderProps = {
