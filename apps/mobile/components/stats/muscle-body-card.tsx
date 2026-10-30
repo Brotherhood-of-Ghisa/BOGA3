@@ -19,6 +19,7 @@ import {
   type SegmentedControlOption,
 } from '@/components/ui';
 import { useNovemberAppearance } from '@/components/appearance/use-november-appearance';
+import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
@@ -33,6 +34,7 @@ import {
   projectMuscleBody,
   selectMuscleFibres,
   type BodyOrientation,
+  type MuscleOverlayStyle,
   type MuscleSetTargets,
   type ThemeShadePalette,
 } from './muscle-body-projection';
@@ -45,6 +47,9 @@ type Props = {
   /** The user's muscle setup, so merged entries shade and select together and untracked ones stay neutral. */
   readonly report?: MuscleReportAssignment;
   readonly setTargets?: MuscleSetTargets;
+  readonly defaultOverlay?: MuscleOverlayStyle;
+  readonly overlay?: MuscleOverlayStyle;
+  readonly onOverlayChange?: (next: MuscleOverlayStyle) => void;
 };
 
 const ORIENTATION_OPTIONS: readonly SegmentedControlOption<BodyOrientation>[] = [
@@ -60,6 +65,7 @@ const PAN_FAIL_Y = 12;
 const DEGREES_PER_POINT = 0.85;
 const ACCESSIBILITY_ANGLE_STEP = 30;
 const FACET_STROKE_WIDTH = 0.35;
+const CONTOUR_STROKE_WIDTH = 1.5;
 
 const LEGACY_REVERSE_ALIASES: Readonly<Record<string, readonly string[]>> = {
   delts_front: ['delts_front', 'front_delts'],
@@ -82,6 +88,8 @@ const resolveDatasetMuscleId = (
 type HeaderProps = {
   readonly orientation: BodyOrientation;
   readonly onOrientationChange: (next: BodyOrientation) => void;
+  readonly overlay: MuscleOverlayStyle;
+  readonly onOverlayChange: (next: MuscleOverlayStyle) => void;
   readonly selectedMuscle: ProgressMuscleComparison | null;
   readonly onPrev: () => void;
   readonly onNext: () => void;
@@ -91,6 +99,8 @@ type HeaderProps = {
 function MuscleBodyHeader({
   orientation,
   onOrientationChange,
+  overlay,
+  onOverlayChange,
   selectedMuscle,
   onPrev,
   onNext,
@@ -98,16 +108,28 @@ function MuscleBodyHeader({
 }: HeaderProps) {
   return (
     <View style={styles.headerRow}>
-      <SegmentedControl
-        accessibilityLabel="Body orientation"
-        density="compact"
-        layout="inline"
-        onChange={onOrientationChange}
-        options={ORIENTATION_OPTIONS}
-        selectedGround="selection"
-        testIDPrefix="stats-muscle-body-angle"
-        value={orientation}
-      />
+      <View style={styles.controlsLeft}>
+        <SegmentedControl
+          accessibilityLabel="Body orientation"
+          density="compact"
+          layout="inline"
+          onChange={onOrientationChange}
+          options={ORIENTATION_OPTIONS}
+          selectedGround="selection"
+          testIDPrefix="stats-muscle-body-angle"
+          value={orientation}
+        />
+        <FilterChip
+          accessibilityHint="Switches between fibres and contour overlay"
+          accessibilityLabel={`Muscle overlay: ${overlay === 'contour' ? 'Contour' : 'Fibres'}`}
+          accessibilityRole="button"
+          label={overlay === 'contour' ? 'Contour' : 'Fibres'}
+          on={false}
+          onPress={() => onOverlayChange(overlay === 'contour' ? 'fibres' : 'contour')}
+          size="compact"
+          testID="stats-muscle-body-overlay-toggle"
+        />
+      </View>
       <View style={styles.stepperContainer}>
         <Pressable
           accessibilityLabel="Previous muscle"
@@ -233,6 +255,88 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
   );
 }
 
+type SvgProps = {
+  readonly projected: ReturnType<typeof projectMuscleBody>;
+  readonly viewportWidth: number;
+  readonly overlay: MuscleOverlayStyle;
+  readonly relief: ThemeShadePalette['relief'];
+};
+
+function MuscleBodySvg({ projected, viewportWidth, overlay, relief }: SvgProps) {
+  return (
+    <Svg
+      height={VIEWPORT_HEIGHT}
+      pointerEvents="none"
+      testID="stats-muscle-body-svg"
+      width={viewportWidth}>
+      {projected.batches.map(batch => (
+        <Path
+          d={batch.d}
+          fill={batch.fill}
+          key={batch.key}
+          stroke={batch.fill}
+          strokeLinejoin="round"
+          strokeWidth={FACET_STROKE_WIDTH}
+        />
+      ))}
+      {overlay === 'contour' && projected.contour ? (
+        <Path
+          d={projected.contour.d}
+          fill="none"
+          key="stats-muscle-contour"
+          stroke={projected.contour.stroke}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={CONTOUR_STROKE_WIDTH}
+          testID="stats-muscle-body-contour"
+        />
+      ) : null}
+      {overlay === 'fibres' &&
+        (['surface', 'deep'] as const).map(layer =>
+          projected.fibres[layer] ? (
+            <ReliefFibres key={layer} d={projected.fibres[layer]} layer={layer} relief={relief} />
+          ) : null
+        )}
+      {overlay === 'fibres' &&
+        projected.fibres.anatomicalParts?.map(part =>
+          part.d ? (
+            <ReliefFibres key={part.id} d={part.d} id={`anatomy-${part.id}`} layer="deep" relief={relief} />
+          ) : null
+        )}
+    </Svg>
+  );
+}
+
+type ComparisonSectionProps = {
+  readonly selectedMuscle: ProgressMuscleComparison;
+  readonly metric: ProgressMetric;
+  readonly viewportWidth: number;
+};
+
+function MuscleBodyComparison({ selectedMuscle, metric, viewportWidth }: ComparisonSectionProps) {
+  const colWidth = (viewportWidth - uiSpace.sm * 2) / 3;
+  return (
+    <View testID="stats-muscle-body-comparison">
+      <View style={styles.comparisonLabels}>
+        {COLUMN_LABELS.map(label => (
+          <Text
+            key={label}
+            allowFontScaling={false}
+            style={[uiText.label, uiTextTone.muted, { width: colWidth, textAlign: 'right' }]}>
+            {label}
+          </Text>
+        ))}
+      </View>
+      <ComparisonValues
+        layout={{ columns: Array(3).fill(colWidth), stacked: false }}
+        metric={metric}
+        prefix="stats-muscle-body-comparison"
+        row={selectedMuscle}
+      />
+    </View>
+  );
+}
+
 /**
  * Interactive 3D low-poly anatomical muscle model for the Progress Muscle breakdown.
  * Colours follow [[comparison.colour-scale]], with CIE LCh lighting,
@@ -242,12 +346,30 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
  * independent normals hide their own far surface. Body colours and hit targets stay live.
  * Decoration follows [[appearance.november]] without changing hit testing.
  */
-export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, setTargets }: Props) {
+export function MuscleBodyCard({
+  muscles,
+  metric,
+  selectedId,
+  onSelect,
+  report,
+  setTargets,
+  defaultOverlay = 'fibres',
+  overlay: controlledOverlay,
+  onOverlayChange,
+}: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const november = useNovemberAppearance();
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
   const [dragOffsetDeg, setDragOffsetDeg] = useState(0);
+  const [internalOverlay, setInternalOverlay] = useState<MuscleOverlayStyle>(defaultOverlay);
+
+  const overlay = controlledOverlay ?? internalOverlay;
+
+  const handleOverlayChange = (next: MuscleOverlayStyle) => {
+    setInternalOverlay(next);
+    onOverlayChange?.(next);
+  };
 
   const angleDeg = normaliseBodyAngle(baseAngleDeg + dragOffsetDeg);
 
@@ -272,8 +394,9 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
         report,
         palette,
         november,
+        overlay,
       }),
-    [angleDeg, scores, palette, report, selectedId, selectedFibres, viewportWidth, november]
+    [angleDeg, scores, palette, report, selectedId, selectedFibres, viewportWidth, november, overlay]
   );
 
   const selectedMuscle = useMemo(
@@ -350,8 +473,10 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
           setDragOffsetDeg(0);
           setBaseAngleDeg(next === 'front' ? 0 : 180);
         }}
+        onOverlayChange={handleOverlayChange}
         onPrev={handlePrevMuscle}
         orientation={orientation}
+        overlay={overlay}
         selectedMuscle={selectedMuscle}
       />
       <View>
@@ -380,28 +505,12 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
             }}
             style={styles.viewport}
             testID="stats-muscle-body-viewport">
-            <Svg
-              height={VIEWPORT_HEIGHT}
-              pointerEvents="none"
-              testID="stats-muscle-body-svg"
-              width={viewportWidth}>
-              {projected.batches.map(batch => (
-                <Path
-                  d={batch.d}
-                  fill={batch.fill}
-                  key={batch.key}
-                  stroke={batch.fill}
-                  strokeLinejoin="round"
-                  strokeWidth={FACET_STROKE_WIDTH}
-                />
-              ))}
-              {(['surface', 'deep'] as const).map(layer => projected.fibres[layer] ? (
-                <ReliefFibres key={layer} d={projected.fibres[layer]} layer={layer} relief={palette.relief} />
-              ) : null)}
-              {projected.fibres.anatomicalParts?.map(part => part.d ? (
-                <ReliefFibres key={part.id} d={part.d} layer="deep" id={`anatomy-${part.id}`} relief={palette.relief} />
-              ) : null)}
-            </Svg>
+            <MuscleBodySvg
+              overlay={overlay}
+              projected={projected}
+              relief={palette.relief}
+              viewportWidth={viewportWidth}
+            />
           </View>
         </GestureDetector>
         <View style={styles.information}>
@@ -410,14 +519,13 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
             sections={[[ 'Anatomical source', 'BodyParts3D © The Database Center for Life Science, CC BY 4.0. Adapted by pose alignment, bilateral mirroring and schematic fibre generation. Source and licence: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html' ]]} />
         </View>
       </View>
-      {selectedMuscle ? <View testID="stats-muscle-body-comparison">
-        <View style={styles.comparisonLabels}>
-          {COLUMN_LABELS.map(label => <Text key={label} allowFontScaling={false}
-            style={[uiText.label, uiTextTone.muted, { width: (viewportWidth - uiSpace.sm * 2) / 3, textAlign: 'right' }]}>{label}</Text>)}
-        </View>
-        <ComparisonValues row={selectedMuscle} metric={metric} prefix="stats-muscle-body-comparison"
-          layout={{ columns: Array(3).fill((viewportWidth - uiSpace.sm * 2) / 3), stacked: false }} />
-      </View> : null}
+      {selectedMuscle ? (
+        <MuscleBodyComparison
+          metric={metric}
+          selectedMuscle={selectedMuscle}
+          viewportWidth={viewportWidth}
+        />
+      ) : null}
       <MuscleAccessibilityTargets
         metric={metric}
         muscles={muscles}
@@ -476,11 +584,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: uiSpace.sm,
   },
+  controlsLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+    flexShrink: 0,
+  },
   stepperContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
-    maxWidth: '65%',
+    flexShrink: 1,
+    minWidth: 0,
   },
   stepperButton: {
     padding: uiSpace.xs,
@@ -495,6 +610,8 @@ const styles = StyleSheet.create({
     gap: uiSpace.xs,
     paddingHorizontal: uiSpace.xs,
     paddingVertical: uiSpace.xs,
+    flexShrink: 1,
+    minWidth: 0,
     maxWidth: 160,
   },
   sheetScroll: {

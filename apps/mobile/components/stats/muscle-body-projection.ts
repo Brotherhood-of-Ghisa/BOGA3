@@ -35,6 +35,7 @@ export type ThemeShadePalette = {
   readonly moustache: string;
   // A selected muscle's fibre relief: a light edge, then a dark one.
   readonly relief: { readonly highlight: string; readonly shade: string };
+  readonly selectedStroke: string;
 };
 
 export type ProjectedTriangle = {
@@ -60,10 +61,18 @@ export type ProjectedPathBatch = {
   readonly selected: boolean;
 };
 
+export type ProjectedMuscleContour = {
+  readonly d: string;
+  readonly stroke: string;
+};
+
+export type MuscleOverlayStyle = 'fibres' | 'contour';
+
 export type ProjectedMuscleBody = {
   readonly triangles: readonly ProjectedTriangle[];
   readonly batches: readonly ProjectedPathBatch[];
   readonly fibres: { readonly surface: string; readonly deep: string; readonly anatomicalParts?: readonly { readonly id: string; readonly d: string }[] };
+  readonly contour?: ProjectedMuscleContour | null;
 };
 
 export const SHADE_STEPS = 12;
@@ -221,6 +230,7 @@ export function buildThemeShadePalette(
       mode === 'light'
         ? { highlight: roles.onInk, shade: roles.inkMuted }
         : { highlight: roles.ink, shade: roles.paper },
+    selectedStroke: roles.ink,
   };
 }
 
@@ -394,6 +404,100 @@ const pointInTriangle = (
   return !(hasNeg && hasPos);
 };
 
+const depthAtPoint = (
+  triangle: ProjectedTriangle,
+  x: number,
+  y: number,
+  verts: RotatedVertices
+): number => {
+  const { x0, y0, x1, y1, x2, y2, v0, v1, v2 } = triangle;
+  const denominator = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
+  if (Math.abs(denominator) < 1e-9) return -Infinity;
+  const a = ((y1 - y2) * (x - x2) + (x2 - x1) * (y - y2)) / denominator;
+  const b = ((y2 - y0) * (x - x2) + (x0 - x2) * (y - y2)) / denominator;
+  return a * verts.rz[v0] + b * verts.rz[v1] + (1 - a - b) * verts.rz[v2];
+};
+
+const OCCLUSION_DEPTH_BIAS = 0.005;
+
+const isEdgeOccluded = (
+  v0: number,
+  v1: number,
+  verts: RotatedVertices,
+  triangles: readonly ProjectedTriangle[]
+): boolean => {
+  const mx = (verts.sx[v0] + verts.sx[v1]) * 0.5;
+  const my = (verts.sy[v0] + verts.sy[v1]) * 0.5;
+  const mz = (verts.rz[v0] + verts.rz[v1]) * 0.5;
+  const minDepth = mz + OCCLUSION_DEPTH_BIAS;
+
+  for (let i = triangles.length - 1; i >= 0; i -= 1) {
+    const tri = triangles[i];
+    if (
+      tri.v0 === v0 ||
+      tri.v0 === v1 ||
+      tri.v1 === v0 ||
+      tri.v1 === v1 ||
+      tri.v2 === v0 ||
+      tri.v2 === v1
+    ) {
+      continue;
+    }
+    const minX = Math.min(tri.x0, tri.x1, tri.x2);
+    if (mx < minX) continue;
+    const maxX = Math.max(tri.x0, tri.x1, tri.x2);
+    if (mx > maxX) continue;
+    const minY = Math.min(tri.y0, tri.y1, tri.y2);
+    if (my < minY) continue;
+    const maxY = Math.max(tri.y0, tri.y1, tri.y2);
+    if (my > maxY) continue;
+
+    if (pointInTriangle(mx, my, tri) && depthAtPoint(tri, mx, my, verts) > minDepth) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const recordFaceEdges = (
+  i0: number,
+  i1: number,
+  i2: number,
+  counts: Map<number, number>
+) => {
+  const addEdge = (a: number, b: number) => {
+    const min = a < b ? a : b;
+    const max = a < b ? b : a;
+    const key = (min << 16) | max;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  };
+  addEdge(i0, i1);
+  addEdge(i1, i2);
+  addEdge(i2, i0);
+};
+
+const buildBoundaryContour = (
+  edgeCounts: ReadonlyMap<number, number>,
+  verts: RotatedVertices,
+  stroke: string,
+  sortedTriangles: readonly ProjectedTriangle[]
+): ProjectedMuscleContour | null => {
+  const segments: string[] = [];
+  edgeCounts.forEach((count, key) => {
+    if (count === 1) {
+      const a = key >>> 16;
+      const b = key & 0xffff;
+      if (!isEdgeOccluded(a, b, verts, sortedTriangles)) {
+        segments.push(
+          `M${roundCoord(verts.sx[a])} ${roundCoord(verts.sy[a])}L${roundCoord(verts.sx[b])} ${roundCoord(verts.sy[b])}`
+        );
+      }
+    }
+  });
+  if (segments.length === 0) return null;
+  return { d: segments.join(''), stroke };
+};
+
 const prepareModelContour = (
   segments: readonly MuscleBodyFibreSegment[],
   offset: number,
@@ -528,15 +632,6 @@ const batchSlabTriangles = (
   return batches;
 };
 
-const depthAtPoint = (triangle: ProjectedTriangle, x: number, y: number, verts: RotatedVertices): number => {
-  const { x0, y0, x1, y1, x2, y2, v0, v1, v2 } = triangle;
-  const denominator = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
-  if (Math.abs(denominator) < 1e-9) return -Infinity;
-  const a = ((y1 - y2) * (x - x2) + (x2 - x1) * (y - y2)) / denominator;
-  const b = ((y2 - y0) * (x - x2) + (x0 - x2) * (y - y2)) / denominator;
-  return a * verts.rz[v0] + b * verts.rz[v1] + (1 - a - b) * verts.rz[v2];
-};
-
 const projectMoustache = (
   angleDeg: number, width: number, height: number,
   ctx: ProjectionContext, body: readonly ProjectedTriangle[],
@@ -567,6 +662,7 @@ export type ProjectMuscleBodyOptions = {
   /** Prepared for this selection/report; omit to resolve directly from the source asset. */
   readonly selectedFibres?: MuscleBodyFibreSelection;
   readonly november?: boolean;
+  readonly overlay?: MuscleOverlayStyle;
 };
 
 /**
@@ -584,6 +680,7 @@ export function projectMuscleBody({
   mesh = MUSCLE_BODY_MESH,
   selectedFibres = selectMuscleFibres(selectedId, report),
   november = false,
+  overlay = 'fibres',
 }: ProjectMuscleBodyOptions): ProjectedMuscleBody {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0 || !mesh.vertices.length || !mesh.faces.length) {
     return { triangles: [], batches: [], fibres: { surface: '', deep: '' } };
@@ -599,11 +696,15 @@ export function projectMuscleBody({
     palette,
   };
   const triangles: ProjectedTriangle[] = [];
+  const edgeCounts = overlay === 'contour' && selectedCanonicalId ? new Map<number, number>() : null;
 
   for (const face of mesh.faces) {
     const projected = projectSingleFace(face, ctx);
     if (projected) {
       triangles.push(projected);
+      if (edgeCounts && projected.selected) {
+        recordFaceEdges(face[0], face[1], face[2], edgeCounts);
+      }
     }
   }
 
@@ -621,8 +722,20 @@ export function projectMuscleBody({
     batches.push(...batchSlabTriangles(projectMoustache(angleDeg, width, height, ctx, triangles), DEPTH_SLABS));
   }
 
-  const fibres = projectFibreSegments(selectedFibres, mesh, verts, projectionFrame(angleDeg, width, height));
-  return { triangles, batches, fibres };
+  const contour = edgeCounts
+    ? buildBoundaryContour(edgeCounts, verts, palette.selectedStroke, triangles)
+    : null;
+
+  const fibres = overlay === 'contour'
+    ? { surface: '', deep: '' }
+    : projectFibreSegments(selectedFibres, mesh, verts, projectionFrame(angleDeg, width, height));
+
+  return {
+    triangles,
+    batches,
+    fibres,
+    ...(contour ? { contour } : {}),
+  };
 }
 
 /**
