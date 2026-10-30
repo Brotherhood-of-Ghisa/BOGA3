@@ -10,7 +10,7 @@ export const EXERCISE_LINK_ROUTE = '/exercise-link';
 export const GYMS_ROUTE = '/gyms';
 export const BODY_WEIGHT_ROUTE = '/body-weight';
 
-/** Settings' sub pages, one per Settings card; Bodyweight's is `BODY_WEIGHT_ROUTE`. */
+/** Settings' sub pages, one per Settings row; Bodyweight's is `BODY_WEIGHT_ROUTE`. */
 export const SETTINGS_SUB_PAGES = {
   restTimer: '/settings-rest-timer',
   progress: '/settings-progress',
@@ -18,10 +18,8 @@ export const SETTINGS_SUB_PAGES = {
   muscleTargets: '/settings-muscle-targets',
   enabledMuscles: '/settings-enabled-muscles',
   effort: '/settings-effort',
-  other: '/settings-other',
-  experiments: '/settings-experiments',
+  everythingElse: '/settings-everything-else',
   dataSync: '/settings-data-sync',
-  developerTools: '/settings-developer-tools',
 } as const;
 
 /** The Link screen for one of my exercises (E0.3). */

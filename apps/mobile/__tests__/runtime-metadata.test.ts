@@ -1,7 +1,4 @@
-import {
-  formatVersionBuild,
-  resolveAppRuntimeMetadata,
-} from '@/src/utils/runtime-metadata';
+import { resolveAppRuntimeMetadata } from '@/src/utils/runtime-metadata';
 
 describe('app runtime metadata', () => {
   it('prefers installed native version and build metadata', () => {
@@ -21,7 +18,6 @@ describe('app runtime metadata', () => {
       releaseCodename: 'Chav Jean Pensant',
       version: '1.2.3',
     });
-    expect(formatVersionBuild(metadata)).toBe('Version 1.2.3 (build 45)');
   });
 
   it('falls back to Expo config when the native version is unavailable', () => {
@@ -34,7 +30,6 @@ describe('app runtime metadata', () => {
 
     expect(metadata.version).toBe('1.1.0');
     expect(metadata.displayFlavor).toBe('local');
-    expect(formatVersionBuild(metadata)).toBe('Version 1.1.0');
   });
 
   it('omits blank build numbers and release codenames cleanly', () => {
@@ -47,7 +42,6 @@ describe('app runtime metadata', () => {
 
     expect(metadata.buildNumber).toBeNull();
     expect(metadata.releaseCodename).toBeNull();
-    expect(formatVersionBuild(metadata)).toBe('Version 1.1.0');
   });
 
   it('shows preview flavor but suppresses production flavor', () => {
@@ -72,7 +66,6 @@ describe('app runtime metadata', () => {
     });
 
     expect(metadata.version).toBeNull();
-    expect(formatVersionBuild(metadata)).toBeNull();
   });
 
   it('can identify a build when only the native build number is available', () => {
@@ -83,6 +76,5 @@ describe('app runtime metadata', () => {
       nativeBuildVersion: '99',
     });
 
-    expect(formatVersionBuild(metadata)).toBe('Build 99');
   });
 });

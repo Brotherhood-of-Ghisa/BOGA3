@@ -1,9 +1,8 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { SettingsCard } from '@/components/settings/settings-card';
 import { bodyweightStatus } from '@/components/settings/statuses';
-import { FormError, SwitchRow, uiSpace } from '@/components/ui';
+import { ChoiceRow, FormError, SwitchRow, uiSpace } from '@/components/ui';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { readCurrentBodyWeight } from '@/src/data/bodyweight';
 import {
@@ -13,20 +12,22 @@ import {
 } from '@/src/bodyweight/calculation-preference';
 import { BODY_WEIGHT_ROUTE } from '@/src/navigation/routes';
 
-// Settings' Bodyweight card: the calculation switch's state and the current
+// Settings' Bodyweight row: the calculation switch's state and the current
 // reading. The sub page (`/body-weight`) holds the switch and the log.
-export function BodyWeightSettingsRow() {
+export function BodyWeightSettingsRow({ divider = false }: { divider?: boolean }) {
   const router = useRouter();
   const enabled = useBodyweightCalculationsEnabled();
   const currentKg = useCurrentBodyWeightKg();
+  const status = bodyweightStatus(enabled, currentKg);
   return (
-    <SettingsCard
-      accessibilityHint="Opens bodyweight calculations and the body weight log"
+    <ChoiceRow
+      accessibilityLabel={`Bodyweight, ${status}`}
+      divider={divider}
       icon="weight"
       label="Bodyweight"
       onPress={() => router.push(BODY_WEIGHT_ROUTE)}
-      status={bodyweightStatus(enabled, currentKg)}
       testID="settings-body-weight-row"
+      value={status}
     />
   );
 }

@@ -18,7 +18,7 @@ tutorials or rule provenance (`Rules N · …`).
 
 - **Test:** replace explanations with clearer labels/design.
 - **Exceptions:** a Settings section's one-line footnote stating when a change
-  applies or its status (`Applies next launch`); an error line with its
+  applies or its status (`Applies next launch`, `Off by default while we try it` under Experiments); an error line with its
   action; an empty state's one line, never a tutorial; a destructive alert naming what goes (`its N sets`); the
   agent-consent page's grant; the explicitly opened RM curve explainer.
 - **Incomplete figures:** plain `Volume`, even when excluding uncalculable

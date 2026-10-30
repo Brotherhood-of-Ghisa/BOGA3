@@ -13,12 +13,12 @@
  *
  * This file asserts:
  *
- *   1. With the dev signal false, the Developer tools page (reached in every
+ *   1. With the dev signal false, the Everything else page (reached in every
  *      build, for its Developer mode switch) renders neither wipe button (nor
- *      the dev-tools card).
- *   2. With the dev signal true, Settings shows the card and the page renders
- *      both buttons.
- *   3. The Settings screen, Developer tools page and wipe-helper sources contain no bare
+ *      the other dev rows).
+ *   2. With the dev signal true, the page renders the dev rows, both wipe
+ *      buttons among them.
+ *   3. The Settings screen, Everything else page and wipe-helper sources contain no bare
  *      `__DEV__` token used as a runtime guard (only the helper's own
  *      explanatory comments may mention it).
  */
@@ -66,11 +66,11 @@ jest.mock('@/src/sync/dev-affordances', () => ({
 
 import { render, screen } from '@testing-library/react-native';
 
-import DeveloperToolsRoute from '../../app/settings-developer-tools';
+import EverythingElseRoute from '../../app/settings-everything-else';
 
 const MOBILE_ROOT = join(__dirname, '..', '..');
 const SETTINGS_PATH = join(MOBILE_ROOT, 'app', 'settings.tsx');
-const DEVELOPER_TOOLS_PATH = join(MOBILE_ROOT, 'components', 'settings', 'developer-tools.tsx');
+const DEVELOPER_TOOLS_PATH = join(MOBILE_ROOT, 'components', 'settings', 'everything-else.tsx');
 const DEV_AFFORDANCES_PATH = join(MOBILE_ROOT, 'src', 'sync', 'dev-affordances.ts');
 
 beforeEach(() => {
@@ -84,9 +84,9 @@ describe('the dev gate on the wipe affordances', () => {
   it('renders neither wipe button when the dev signal is false', () => {
     mockIsDevMode.mockReturnValue(false);
 
-    render(<DeveloperToolsRoute />);
+    render(<EverythingElseRoute />);
     expect(screen.getByTestId('settings-developer-mode-switch')).toBeTruthy();
-    expect(screen.queryByTestId('settings-dev-tools-card')).toBeNull();
+    expect(screen.queryByTestId('settings-dev-logs-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-local-button')).toBeNull();
     expect(screen.queryByTestId('settings-dev-wipe-remote-button')).toBeNull();
   });
@@ -94,7 +94,7 @@ describe('the dev gate on the wipe affordances', () => {
   it('renders both wipe buttons when the dev signal is true', () => {
     mockIsDevMode.mockReturnValue(true);
 
-    render(<DeveloperToolsRoute />);
+    render(<EverythingElseRoute />);
     expect(screen.getByTestId('settings-developer-mode-switch')).toBeTruthy();
     expect(screen.getByTestId('settings-dev-wipe-local-button')).toBeTruthy();
     expect(screen.getByTestId('settings-dev-wipe-remote-button')).toBeTruthy();
@@ -109,7 +109,7 @@ describe('the affordances are not gated on the bare metro-only global', () => {
 
   const targets: [string, string][] = [
     ['Settings screen', SETTINGS_PATH],
-    ['Developer tools page', DEVELOPER_TOOLS_PATH],
+    ['Everything else page', DEVELOPER_TOOLS_PATH],
     ['wipe helper', DEV_AFFORDANCES_PATH],
   ];
 
@@ -118,7 +118,7 @@ describe('the affordances are not gated on the bare metro-only global', () => {
     expect(code.includes('__DEV__')).toBe(false);
   });
 
-  it('the Developer tools page gates on the dev-mode helper', () => {
+  it('the Everything else page gates on the dev-mode helper', () => {
     expect(readFileSync(DEVELOPER_TOOLS_PATH, 'utf8')).toContain('isDevMode');
   });
 });

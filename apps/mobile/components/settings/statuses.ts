@@ -6,18 +6,14 @@ import {
 import type { AccountLocalPreferences } from '@/src/preferences/model';
 import type { SyncStatusSnapshot } from '@/src/sync/sync-status';
 
-// The one-line status under each Settings card's label: what is set now, in
-// the words its sub page uses.
+// The value at the end of each Settings home row: what is set now, in the
+// words its page uses.
 
 export const restTimerStatus = (values: AccountLocalPreferences): string =>
   `${values.restTimerDurationSec} s · Auto-start ${values.restTimerAutoStart ? 'on' : 'off'}`;
 
 export const progressStatus = (values: AccountLocalPreferences): string =>
   `${values.progressMuscleLayout === '3d' ? '3D' : 'List'} · ${values.targetWindowWeeks}-week period`;
-
-// The experiments turned on, by their Settings names, or `Off`.
-export const experimentsStatus = (values: AccountLocalPreferences): string =>
-  [values.timerInTitleBar ? 'Title-bar timer' : null].filter(Boolean).join(' · ') || 'Off';
 
 const sameChoices = (a: readonly EffortChoice[], b: readonly EffortChoice[]) =>
   a.length === b.length && a.every((choice) => b.includes(choice));
