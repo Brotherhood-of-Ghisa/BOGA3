@@ -11,7 +11,7 @@ import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
 // Settings' sub pages, each pushed over the tabs with a native header that
-// carries its title. Each holds what its Settings card summarises.
+// carries its title. Each holds what its Settings row summarises.
 
 export function RestTimerSettingsScreen() {
   const preferences = useAccountLocalPreferenceState();

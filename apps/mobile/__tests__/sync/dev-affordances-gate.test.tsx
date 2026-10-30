@@ -15,9 +15,9 @@
  *
  *   1. With the dev signal false, the Everything else page (reached in every
  *      build, for its Developer mode switch) renders neither wipe button (nor
- *      the dev-tools card).
- *   2. With the dev signal true, Settings shows the card and the page renders
- *      both buttons.
+ *      the other dev rows).
+ *   2. With the dev signal true, the page renders the dev rows, both wipe
+ *      buttons among them.
  *   3. The Settings screen, Everything else page and wipe-helper sources contain no bare
  *      `__DEV__` token used as a runtime guard (only the helper's own
  *      explanatory comments may mention it).

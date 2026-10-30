@@ -10,7 +10,7 @@ export const EXERCISE_LINK_ROUTE = '/exercise-link';
 export const GYMS_ROUTE = '/gyms';
 export const BODY_WEIGHT_ROUTE = '/body-weight';
 
-/** Settings' sub pages, one per Settings card; Bodyweight's is `BODY_WEIGHT_ROUTE`. */
+/** Settings' sub pages, one per Settings row; Bodyweight's is `BODY_WEIGHT_ROUTE`. */
 export const SETTINGS_SUB_PAGES = {
   restTimer: '/settings-rest-timer',
   progress: '/settings-progress',
