@@ -33,5 +33,14 @@ export const absentCoWSummary = (groupId: string): CoWSummaryWire => ({ group_id
   observed_at_us: Math.max(1, Date.now() * 1000), valid_until_us: Math.max(1, Date.now() * 1000), selection: 'none', result: null });
 export const coWReadMocks = () => ({
   getCoWSummary: jest.fn(async (groupId: string) => absentCoWSummary(groupId)),
+  getPreviousCoWSummary: jest.fn(async (groupId: string) => absentCoWSummary(groupId)),
   getCoWCalendar: jest.fn(async () => ({ time_zone: 'UTC', revision: 1, next_week_start: '2026-11-02' })),
 });
+
+export const previousCowSummary = (): CoWSummaryWire => {
+  const summary = cowSummary();
+  const result = cowResult();
+  result.cow = { ...result.cow, cow_id: 'previous-cow', week_start: '2026-10-19', state: 'final',
+    starts_at_us: result.cow.starts_at_us - 7 * 86400000000, ends_at_us: result.cow.starts_at_us };
+  return { ...summary, selection: 'previous', result };
+};

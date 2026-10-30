@@ -2,9 +2,9 @@
 import * as mockReact from 'react';
 import { AccessibilityInfo, Alert, Modal } from 'react-native';
 import * as Native from 'react-native';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
-import { cowResult, cowSummary } from './helpers/cow-fixtures';
+import { cowResult, cowSummary, previousCowSummary } from './helpers/cow-fixtures';
 import { competitionExercise, competitionGroupDetail } from './helpers/competition-fixtures';
 
 let mockFixture: InMemoryDatabaseFixture;
@@ -22,7 +22,7 @@ jest.mock('@react-native-community/netinfo', () => ({ __esModule: true, default:
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter, useLocalSearchParams: () => mockParams, Stack: { Screen: () => null },
   useFocusEffect: (callback: () => void | (() => void)) => { mockReact.useEffect(() => mockFocused ? callback() : undefined, [callback, mockFocused]); } }));
 jest.mock('@/src/groups/api', () => ({ ...jest.requireActual('@/src/groups/api'), getGroup: jest.fn(), listCompetitionExercises: jest.fn(),
-  getCoWSummary: jest.fn(), getCoWCalendar: jest.fn(), listCoWs: jest.fn(), getCoW: jest.fn(), getCoWResults: jest.fn(),
+  getCoWSummary: jest.fn(), getPreviousCoWSummary: jest.fn(), getCoWCalendar: jest.fn(), listCoWs: jest.fn(), getCoW: jest.fn(), getCoWResults: jest.fn(),
   createCoW: jest.fn(), updateCoW: jest.fn(), cancelCoW: jest.fn(), setCoWCalendar: jest.fn() }));
 jest.mock('@/components/groups/cow-time-zone', () =>
   jest.requireActual('./helpers/react-compiler').requireWithReactCompiler('components/groups/cow-time-zone.tsx'));
@@ -33,6 +33,7 @@ import { createCoWId } from '@/src/groups/cow-draft';
 import { ChoiceRow } from '@/components/ui';
 import { CoWPreview } from '@/components/groups/cow-preview';
 import { CoWGroupPreview } from '@/components/groups/cow-group-preview';
+import { TodayCoWSummaries } from '@/components/today/group-cow-summary';
 import CoWsRoute from '@/app/group/[groupId]/cows';
 import CoWStandingsRoute from '@/app/group/[groupId]/cows/[cowId]';
 import CoWScheduleRoute from '@/app/group/[groupId]/cows/schedule';
@@ -71,7 +72,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({ isConfigured: true, user: { id: 'u1' } });
   api.getGroup.mockImplementation(async groupId => ({ ...competitionGroupDetail, group: { ...competitionGroupDetail.group, group_id: groupId, my_role: 'owner' } }));
   api.listCompetitionExercises.mockResolvedValue({ contract_version: 4, exercises: [competitionExercise, bench, archived] });
-  api.getCoWSummary.mockResolvedValue(summary()); api.getCoWCalendar.mockResolvedValue(calendar());
+  api.getCoWSummary.mockResolvedValue(summary()); api.getPreviousCoWSummary.mockResolvedValue(previousCowSummary()); api.getCoWCalendar.mockResolvedValue(calendar());
   api.listCoWs.mockResolvedValue({ cows: [current().cow, past()], next_cursor: null });
   api.getCoW.mockImplementation(async (_groupId, id) => {
     if (id === 'cow1') return { cow: current().cow };
@@ -611,4 +612,102 @@ it('has no calendar setup controls in the CoW browser', async () => {
   api.getCoWCalendar.mockResolvedValue({ time_zone: null, revision: 1, next_week_start: null });
   render(<CoWsRoute />); await screen.findByTestId('cows-schedule');
   expect(screen.queryByText('Set time zone')).toBeNull(); expect(screen.queryByText('Set group time zone')).toBeNull();
+});
+
+
+it('Today shows the current exercise and every enabled metric, then last week’s single-line winners', async () => {
+  const previous = previousCowSummary();
+  previous.result!.exercise = { ...previous.result!.exercise!, name: 'Single-Arm Incline Dumbbell Bench Press' };
+  previous.result!.rankings[0].entries[0].member.username = 'Contessa Serbelloni Mazzanti Vien dal Mare';
+  previous.result!.rankings[1].entries = [{ ...previous.result!.rankings[0].entries[0], value: 1800 }];
+  api.getPreviousCoWSummary.mockResolvedValue(previous);
+  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  await screen.findByText('1RM · Volume · Improvement');
+  const currentSection = screen.getByTestId('today-cow-current');
+  expect(within(currentSection).getByText('Current CoW')).toBeTruthy();
+  expect(within(currentSection).getByText('1RM · Volume · Improvement')).toBeTruthy();
+  expect(within(currentSection).queryByText('Alex')).toBeNull();
+  expect(within(currentSection).queryByTestId('today-cow-metric-e1rm')).toBeNull();
+  const winner = await screen.findByTestId('today-cow-winner-e1rm');
+  expect(winner.props.accessibilityLabel).toBe('Contessa Serbelloni Mazzanti Vien dal Mare [1RM]');
+  expect(screen.getByTestId('today-cow-winner-e1rm-name').props.numberOfLines).toBe(1);
+  expect(screen.getByTestId('today-cow-winner-e1rm-name').props.ellipsizeMode).toBe('tail');
+  expect(screen.getByTestId('today-cow-previous-exercise').props.numberOfLines).toBe(1);
+  expect(screen.getByText('[Volume]')).toBeTruthy();
+  expect(screen.getByText('[Improvement]')).toBeTruthy();
+  fireEvent.press(currentSection);
+  expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows?cowId=cow1&metric=e1rm');
+});
+
+it('Today retains the public winner identity when its figure is redacted and never promotes a runner-up', async () => {
+  const previous = previousCowSummary();
+  const ranking = previous.result!.rankings[0];
+  ranking.entries = [
+    { ...ranking.entries[0], member: { user_id: 'u1', username: 'Contessa Serbelloni Mazzanti Vien dal Mare' }, state: 'unavailable', value: null },
+    { ...ranking.entries[0], rank: 2, member: { user_id: 'u2', username: 'Runner up' } },
+  ];
+  ranking.entry_count = 2;
+  api.getPreviousCoWSummary.mockResolvedValue(previous);
+  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  expect((await screen.findByTestId('today-cow-winner-e1rm')).props.accessibilityLabel).toBe('Contessa Serbelloni Mazzanti Vien dal Mare [1RM]');
+  expect(screen.queryByText('Runner up')).toBeNull();
+});
+
+it.each(['finalizing', 'unavailable', 'empty'] as const)('Today keeps last week %s distinct without declaring a winner', async state => {
+  const previous = previousCowSummary();
+  previous.result!.rankings.forEach(row => { row.entries = []; });
+  if (state !== 'empty') {
+    previous.result!.cow.state = state;
+    previous.result!.state = state === 'finalizing' ? 'pending' : 'unavailable';
+    if (state === 'finalizing') previous.result!.publication_id = null;
+  }
+  api.getPreviousCoWSummary.mockResolvedValue(previous);
+  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  const lastWeek = await screen.findByText('Last Week CoW');
+  expect(lastWeek).toBeTruthy();
+  if (state === 'empty') expect((await screen.findByTestId('today-cow-winner-e1rm')).props.accessibilityLabel).toBe('No qualifying results [1RM]');
+  else expect(await screen.findByText(state === 'finalizing' ? 'Finalizing' : 'Unavailable')).toBeTruthy();
+});
+
+it('Today does not relabel a legacy fallback as current', async () => {
+  const previous = previousCowSummary();
+  api.getCoWSummary.mockResolvedValue({ ...previous, selection: 'previous_final' });
+  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  expect(await screen.findByText('Last Week CoW')).toBeTruthy();
+  expect(screen.queryByText('Current CoW')).toBeNull();
+});
+
+it('Today exposes a retry for read failure and refreshes both week resources', async () => {
+  api.getCoWSummary.mockRejectedValue(new GroupApiError('INTERNAL', 'failed'));
+  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  const retry = await screen.findByTestId('today-cow-current-error-state-retry');
+  api.getCoWSummary.mockResolvedValue(summary());
+  fireEvent.press(retry);
+  expect(await screen.findByText('1RM · Volume · Improvement')).toBeTruthy();
+  expect(api.getPreviousCoWSummary.mock.calls.length).toBeGreaterThan(1);
+});
+
+it('Today suppresses a previous result from a different calendar revision until both reads agree', async () => {
+  const previous = previousCowSummary();
+  api.getPreviousCoWSummary.mockResolvedValueOnce({ ...previous, calendar_revision: 2 }).mockResolvedValue(previous);
+  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  expect(await screen.findByTestId('today-cow-winner-e1rm')).toBeTruthy();
+  expect(api.getPreviousCoWSummary.mock.calls.length).toBeGreaterThan(1);
+});
+
+
+it('Today keeps readable previous winners when the independent current read fails', async () => {
+  api.getCoWSummary.mockRejectedValue(new GroupApiError('INTERNAL', 'failed'));
+  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  expect(await screen.findByTestId('today-cow-current-error-state')).toBeTruthy();
+  expect(await screen.findByTestId('today-cow-winner-e1rm')).toBeTruthy();
+});
+
+it('Today uses no summary space when both weeks are confirmed absent', async () => {
+  const absent = { ...cowSummary(), selection: 'none' as const, result: null };
+  api.getCoWSummary.mockResolvedValue(absent);
+  api.getPreviousCoWSummary.mockResolvedValue(absent);
+  const view = render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  await waitForGone(() => screen.queryByTestId('today-cow-summaries'));
+  expect(view.toJSON()).toBeNull();
 });

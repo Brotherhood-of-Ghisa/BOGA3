@@ -45,3 +45,11 @@ it('preserves confirmed unset-calendar absence without a zero-delay refresh loop
   expect(result.current.data).toMatchObject({ selection: 'none', result: null });
   expect(refresh).not.toHaveBeenCalled();
 });
+
+it('uses an independent read/cache view for last week and still expires at the current server edge', () => {
+  const { result } = renderHook(() => useCoWSummary('g1', 'u1', true));
+  expect(result.current.data).toBe(summary);
+  act(() => jest.advanceTimersByTime(edge - now));
+  expect(result.current.data).toBeNull();
+  expect(refresh).toHaveBeenCalledTimes(1);
+});

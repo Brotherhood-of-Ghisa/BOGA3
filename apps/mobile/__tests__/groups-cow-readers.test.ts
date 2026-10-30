@@ -2,7 +2,7 @@ import { groupCache } from '@/src/data/schema';
 import { groupCacheKeys, readGroupCache, writeGroupCache, evictGroup, observeGroupCompetitionPolicy } from '@/src/groups/cache';
 import { coWSummaryCacheKey, coWSummaryExpiresAt, isCoWResultWire, isCoWSummaryWire } from '@/src/groups/cow-wire';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
-import { cowResult, cowSummary } from './helpers/cow-fixtures';
+import { cowResult, cowSummary, previousCowSummary } from './helpers/cow-fixtures';
 import { competitionSession } from './helpers/competition-fixtures';
 
 let fixture: InMemoryDatabaseFixture;
@@ -90,6 +90,54 @@ it('marks absolute aggregate projections so a newly normalized session retires t
   result.exercise = { ...result.exercise!, rules: { ...result.exercise!.rules, bodyweight_calculations_enabled: false } };
   result.rankings[0].unit = 'kg'; result.rankings[1].unit = 'kg_reps';
   const alias = groupCacheKeys.cowSummary('g1');
+  writeGroupCache(fixture.database, { cacheKey: alias, userId: 'u1', payload, fetchedAtMs: Date.now() });
+  observeGroupCompetitionPolicy(fixture.database, 'g1', 'u1', competitionSession);
+  expect(readGroupCache(fixture.database, alias, 'u1')).toBeNull();
+});
+
+it('validates exactly last week while retaining finalizing, empty and unavailable states', () => {
+  const payload = previousCowSummary();
+  expect(isCoWSummaryWire(payload)).toBe(true);
+  for (const state of ['pending', 'unavailable', 'ready'] as const) {
+    const result = { ...payload.result!, state, cow: { ...payload.result!.cow,
+      state: state === 'pending' ? 'finalizing' as const : state === 'unavailable' ? 'unavailable' as const : 'final' as const },
+      publication_id: state === 'pending' ? null : 'stored', rankings: payload.result!.rankings.map(row => ({ ...row, entries: [] })) };
+    expect(isCoWSummaryWire({ ...payload, result })).toBe(true);
+  }
+  for (const patch of [{ week_start: '2026-10-12' }, { week_start: '2026-10-26' }, { state: 'active' },
+    { ends_at_us: payload.observed_at_us + 1 }]) {
+    expect(isCoWSummaryWire({ ...payload, result: { ...payload.result!, cow: { ...payload.result!.cow, ...patch } } })).toBe(false);
+  }
+});
+
+it('isolates the two summary views in cache, retires both on access loss, and expires last week', () => {
+  const current = cowSummary(); const previous = previousCowSummary(); const fetchedAtMs = Date.now();
+  const currentKey = groupCacheKeys.cowSummary('g1'); const previousKey = groupCacheKeys.cowSummary('g1', true);
+  writeGroupCache(fixture.database, { cacheKey: currentKey, userId: 'u1', payload: current, fetchedAtMs });
+  writeGroupCache(fixture.database, { cacheKey: previousKey, userId: 'u1', payload: previous, fetchedAtMs });
+  expect(readGroupCache(fixture.database, currentKey, 'u1')?.payload).toEqual(current);
+  expect(readGroupCache(fixture.database, previousKey, 'u1')?.payload).toEqual(previous);
+  expect(readGroupCache(fixture.database, previousKey, 'u2')).toBeNull();
+  expect(readGroupCache(fixture.database, groupCacheKeys.cowSummary('g2', true), 'u1')).toBeNull();
+  expect(() => writeGroupCache(fixture.database, { cacheKey: previousKey, userId: 'u1', payload: current, fetchedAtMs })).toThrow();
+  expect(() => writeGroupCache(fixture.database, { cacheKey: currentKey, userId: 'u1', payload: previous, fetchedAtMs })).toThrow();
+  writeGroupCache(fixture.database, { cacheKey: previousKey, userId: 'u1', payload: previous, fetchedAtMs });
+  jest.setSystemTime(previous.valid_until_us / 1000);
+  expect(readGroupCache(fixture.database, previousKey, 'u1')).toBeNull();
+  jest.setSystemTime(fetchedAtMs);
+  writeGroupCache(fixture.database, { cacheKey: currentKey, userId: 'u1', payload: current, fetchedAtMs });
+  writeGroupCache(fixture.database, { cacheKey: previousKey, userId: 'u1', payload: previous, fetchedAtMs });
+  evictGroup(fixture.database, 'g1');
+  expect(readGroupCache(fixture.database, currentKey, 'u1')).toBeNull();
+  expect(readGroupCache(fixture.database, previousKey, 'u1')).toBeNull();
+});
+
+it('retires a previous-week absolute total when current disclosure becomes normalized', () => {
+  const payload = previousCowSummary(); const result = payload.result!;
+  result.normalized = false; result.bodyweight_calculations_enabled = false;
+  result.exercise = { ...result.exercise!, rules: { ...result.exercise!.rules, bodyweight_calculations_enabled: false } };
+  result.rankings[0].unit = 'kg'; result.rankings[1].unit = 'kg_reps';
+  const alias = groupCacheKeys.cowSummary('g1', true);
   writeGroupCache(fixture.database, { cacheKey: alias, userId: 'u1', payload, fetchedAtMs: Date.now() });
   observeGroupCompetitionPolicy(fixture.database, 'g1', 'u1', competitionSession);
   expect(readGroupCache(fixture.database, alias, 'u1')).toBeNull();

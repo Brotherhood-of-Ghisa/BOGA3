@@ -218,7 +218,7 @@ export type CoWResultWire = { cow: CoWDefinitionWire; exercise: CompetitionExerc
   bodyweight_calculations_enabled: boolean; state: 'pending' | 'ready' | 'unavailable';
   normalized: boolean | null; publication_id: string | null; rankings: CoWRankingWire[] };
 export type CoWSummaryWire = { group_id: string; week_start: string | null; calendar_revision: number;
-  observed_at_us: number; valid_until_us: number; selection: 'current' | 'previous_final' | 'none'; result: CoWResultWire | null };
+  observed_at_us: number; valid_until_us: number; selection: 'current' | 'previous_final' | 'previous' | 'none'; result: CoWResultWire | null };
 
 
 export type CoWStreamDefinitionWire = Omit<CoWDefinitionWire, 'state'> & { exercise_name: string };

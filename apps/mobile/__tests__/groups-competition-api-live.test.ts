@@ -16,7 +16,7 @@ jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () =>
 import { archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
   getCompetitionBoard,getCompetitionCertification,getCompetitionHistory,getCompetitionPodiums,
   getCompetitionPeriodTotals,getCompetitionRevisions,getCompetitionSession,getCompetitionSessionRecords,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
-  joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup,createCoW,getCoWCalendar,getCoWResults,getCoWSummary } from '@/src/groups/api';
+  joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup,createCoW,getCoWCalendar,getCoWResults,getCoWSummary,getPreviousCoWSummary } from '@/src/groups/api';
 
 const env=readGroupsLiveEnv();
 let owner: LiveClient;let member: LiveClient;
@@ -181,4 +181,9 @@ it('decodes stored CoW pages, independent podium units, fallback and empty curre
   const current = await as(member, () => getCoWSummary(groupId));
   expect(current).toMatchObject({ selection: 'current', result: { cow: { cow_id: nextId }, state: 'pending' } });
   expect(current.result!.rankings.every(row => row.entries.length === 0)).toBe(true);
+  const previous = await as(member, () => getPreviousCoWSummary(groupId));
+  expect(previous).toMatchObject({ selection: 'previous', result: { cow: { cow_id: cowId, state: 'final' }, state: 'ready' } });
+  expect(previous.result!.rankings).toEqual(summary.result!.rankings);
+  expect(previous.week_start).toBe(current.week_start);
+  expect(previous.valid_until_us).toBeGreaterThan(previous.observed_at_us);
 });

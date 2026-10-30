@@ -23,7 +23,12 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
     Array.isArray(value.groups) && value.groups.every(summary);
   const groupId = scope[0];
   if (!groupId) return false;
-  if (kind === 'cow-summary') return isCoWSummaryWire(value) && value.group_id === groupId && key === coWSummaryCacheKey(value);
+  if (kind === 'cow-summary' || kind === 'cow-previous-summary') {
+    const previous = kind === 'cow-previous-summary';
+    return isCoWSummaryWire(value) && value.group_id === groupId &&
+      (value.selection === 'none' || (previous ? value.selection === 'previous' : value.selection !== 'previous')) &&
+      key === coWSummaryCacheKey(value, previous);
+  }
   if (kind === 'group-policy') return isObservedCompetitionPolicy(value);
   if (kind === 'group') return exact(value,['group','members']) && summary(value.group) && record(value.group) &&
     value.group.group_id === groupId && Array.isArray(value.members) && value.members.every(member);
