@@ -149,7 +149,7 @@ run_cow_contract_cases() {
     where n.nspname='app_public' and (c.relname='group_cows' or c.relname like 'group_cow_%') and c.relkind='r'
       and has_table_privilege(r,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER');")" == 0 ]] || fail "direct CoW privilege granted"
   [[ "$(run_psql "select count(*) from pg_policies where schemaname='app_public' and (tablename='group_cows' or tablename like 'group_cow_%');")" == 0 ]] || fail "CoW table has a permissive policy"
-  for name in group_cows group_cow_sources group_cow_contexts group_cow_admissions group_cow_participants group_cow_pending group_cow_intake_failures; do
+  for name in group_cows group_cow_sources group_cow_contexts group_cow_admissions group_cow_participants group_cow_pending group_cow_intake_failures group_cow_source_refs; do
     rest GET "${OWNER_TOKEN}" "${name}" 'select=*'; [[ "${STATUS}" != 200 ]] || fail "direct select ${name}"
     rest POST "${OWNER_TOKEN}" "${name}" '' '{}'; [[ "${STATUS}" != 201 ]] || fail "direct insert ${name}"
     rest PATCH "${OWNER_TOKEN}" "${name}" 'id=eq.00000000-0000-0000-0000-000000000000' '{}'; [[ "${STATUS}" != 200 ]] || fail "direct update ${name}"

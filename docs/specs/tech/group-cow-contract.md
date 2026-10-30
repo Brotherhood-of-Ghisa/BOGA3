@@ -1,8 +1,8 @@
 # Challenge of the Week contract
 
 > **Owns:** CoW intake, cutoff, aggregation and publication boundaries.
-> **Status:** aggregation, server definitions, intake and typed API implemented;
-> worker publication and mobile screens pending. **Load when:** changing CoW.
+> **Status:** aggregation, intake, publication and typed readers implemented;
+> mobile screens pending. **Load when:** changing CoW.
 
 Product rules belong to [[groups.cow-metrics]], [[groups.cow-baseline]],
 [[groups.cow-calendar]], [[groups.cow-participation]],
@@ -17,8 +17,8 @@ load conversion, effort and 1RM stay in the existing scorer/kernel
 ([[set.performed]], [[set.eligibility]], [[1rm.formula]]).
 If changing those, load [group-competition-contract.md](group-competition-contract.md).
 Existing lifetime boards retain their single-set aggregation and achieved-time
-tie ordering. CoW aggregation has no worker/UI caller yet; existing board
-publication and private Sync v2 payloads remain unchanged.
+tie ordering. The existing group worker also runs `cow-evaluation.ts`;
+private Sync v2 payloads remain unchanged.
 
 If changing lifecycle or endpoints, load [groups-contract.md](groups-contract.md)
 for server-only group storage, role checks, OAuth denial, protocol-4 negotiation,
@@ -149,12 +149,36 @@ applicable unscoped failure markers;
 later successful input cannot reconstruct lost intermediate priority or
 silently clear uncertainty.
 
-Start/close high-water marks, frozen participants and claim/generation fields
-are storage for the worker's barriers. Automatic discovery, bound-start
-selection, final publication and uncertainty recovery are still pending;
-definition reads return Finalizing after end, never a fabricated final.
-`apps/mobile/src/groups/cow-wire.ts` owns exact public definition/calendar
-shapes, and `api.ts` remains the sole group RPC caller.
+Publication migrations `supabase/migrations/20261030062725_group_cow_publication.sql`
+and `supabase/migrations/20261030064514_group_cow_readers.sql` extend the existing
+worker. Claim freezes the roster, latest pre-start context and source checkpoint;
+close records the source high-water mark. Prepare/publish both take the intake
+fence. Publication checks claim, generation, exact source token and uncertainty,
+then stores every metric atomically. An expired claim retries; failures retain
+sanitized SQLSTATE and bounded backoff. Lost intermediate intake remains
+Finalizing until an explicit evidence-based recovery; later success cannot repair it.
+Final rows reject updates. The existing kick and sweep discover work without reads.
+
+`cow-evaluation.ts` supports pinned scorer 7 independently of lifetime rebuild
+versions. Before changing its arithmetic imports, retain a callable implementation
+for every unfinished pinned version (load `docs/procedures/rule-upgrade.md`).
+Original set/definition references remain service-only for historical disclosure.
+Legacy receipts lacking definition identity keep their versions and priority;
+an empty private identity requests conservative member-wide suppression rather
+than guessing today's graph. Metadata enrichment alone never revises a receipt.
+
+`apps/mobile/src/groups/cow-wire.ts` owns exact public result/calendar shapes;
+`api.ts` remains the sole group RPC caller. Full metric pages stay online, with
+opaque cursors bound to group, CoW/revision, metric and publication. Disclosure
+keeps original places and supplies unavailable rows without unsafe values.
+The bounded summary supplies all enabled metric podiums, displayed identity,
+dates, units and finality. `group_cow_summary` selects the current UTC window,
+including empty or unavailable; otherwise exactly the previous group week's
+stored ready final, including valid empty, else explicit absence. Upcoming,
+older, finalizing and terminal-unavailable outcomes cannot supply the fallback. Its cache pins account,
+group, calendar week/revision, CoW/revision, publication and current policy.
+It participates in account-wide disclosure retirement and expires at the server's
+next selection edge, including offline; a rollover triggers a fresh read.
 
 ## Pure reducer
 

@@ -15,6 +15,7 @@ import {
   evaluateCompetitionGraph,
   type CompetitionEvaluationGraph,
 } from '../../../src/groups/competition-evaluation.ts';
+import { evaluateCoWGraph, type CoWEvaluationGraph } from '../../../src/groups/cow-evaluation.ts';
 
 export const CLAIM_LIMIT = 20;
 export const MAX_CLAIM_ROUNDS = 10;
@@ -24,6 +25,7 @@ export type Rpc = <T>(name: string, args: Record<string, unknown>) => Promise<T>
 
 type Job = { job_id: number; kind: 'session' | 'target'; member_user_id: string; session_id: string | null; generation: number };
 type MetricJob = { job_id: number; generation: number; claim_id: string };
+type CoWJob = { cow_id: string; generation: number; claim_id: string };
 
 export type DrainSummary = {
   claimed: number;
@@ -115,6 +117,27 @@ const processMetricJob = async (rpc: Rpc, job: MetricJob, summary: DrainSummary)
   }
 };
 
+const processCoWJob = async (rpc: Rpc, job: CoWJob, summary: DrainSummary): Promise<void> => {
+  const claim = { p_cow_id: job.cow_id, p_generation: job.generation, p_claim_id: job.claim_id };
+  try {
+    const prepared = await rpc<{ prepared: boolean; graph?: CoWEvaluationGraph }>('group_cow_eval_prepare', claim);
+    if (!prepared.prepared) { summary.requeued += 1; return; }
+    if (!prepared.graph) throw new Error('Missing CoW source graph');
+    summary.graphBytes += Buffer.byteLength(JSON.stringify(prepared.graph));
+    summary.setsScored += prepared.graph.sources.length;
+    const done = await rpc<{ completed: boolean }>('group_cow_eval_publish', { ...claim,
+      p_before_us: prepared.graph.window.readBeforeUs, p_source_token: prepared.graph.sourceToken,
+      p_result: evaluateCoWGraph(prepared.graph) });
+    if (done.completed) summary.completed += 1;
+    else summary.requeued += 1;
+  } catch (error) {
+    summary.failed += 1;
+    summary.failures.push(`CoW ${job.cow_id}: ${(error as Error).message}`);
+    try { await rpc('group_cow_eval_fail', { ...claim, p_sqlstate: sqlstateOf(error) }); }
+    catch (failError) { summary.failures.push(`group_cow_eval_fail ${job.cow_id}: ${(failError as Error).message}`); }
+  }
+};
+
 /** One group-eval invocation: rules requeue, session/target jobs, then comparison jobs. */
 export const runGroupEval = async (rpc: Rpc): Promise<DrainSummary> => {
   const summary = emptySummary();
@@ -131,6 +154,12 @@ export const runGroupEval = async (rpc: Rpc): Promise<DrainSummary> => {
     summary.metricClaimed += jobs.length;
     summary.claimed += jobs.length;
     for (const job of jobs) await processMetricJob(rpc, job, summary);
+  }
+  for (let round = 0; round < MAX_CLAIM_ROUNDS; round += 1) {
+    const { jobs } = await rpc<{ jobs: CoWJob[] }>('group_cow_eval_claim', { p_limit: CLAIM_LIMIT });
+    if (jobs.length === 0) break;
+    summary.claimed += jobs.length;
+    for (const job of jobs) await processCoWJob(rpc, job, summary);
   }
   return summary;
 };

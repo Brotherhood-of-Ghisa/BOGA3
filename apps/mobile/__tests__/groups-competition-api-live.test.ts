@@ -1,4 +1,5 @@
 /* eslint-disable import/first */
+import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -15,7 +16,7 @@ jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () =>
 import { archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
   getCompetitionBoard,getCompetitionCertification,getCompetitionHistory,getCompetitionPodiums,
   getCompetitionPeriodTotals,getCompetitionRevisions,getCompetitionSession,getCompetitionSessionRecords,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
-  joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup } from '@/src/groups/api';
+  joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup,createCoW,getCoWCalendar,getCoWResults,getCoWSummary } from '@/src/groups/api';
 
 const env=readGroupsLiveEnv();
 let owner: LiveClient;let member: LiveClient;
@@ -139,3 +140,45 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   expect((await as(owner,() => archiveCompetitionExercise(groupId,exerciseId,true))).exercise.archived_at_ms).not.toBeNull();
   expect((await as(owner,() => archiveCompetitionExercise(groupId,exerciseId,false))).exercise.archived_at_ms).toBeNull();
 },840_000);
+
+
+it('decodes stored CoW pages, independent podium units, fallback and empty current precedence with the real client', async () => {
+  const { group_id: groupId } = await as(owner, () => createGroup({ name: 'CoW wire results', description: null, timeZone: 'UTC' }));
+  const { code } = await as(owner, () => getGroupInviteCode(groupId));
+  await as(member, () => joinGroup(code));
+  await as(owner, () => updateGroup(groupId, { name: 'CoW wire results', description: null, bodyweightCalculationsEnabled: true }));
+  const exercise = await as(owner, () => createCompetitionExercise({ groupId, name: 'CoW wire target', mode: 'total_load', contribution: 1, metric: 'e1rm' }));
+  const calendar = await as(owner, () => getCoWCalendar(groupId));
+  const cowId = randomUUID();
+  const input = { cowId, groupExerciseId: exercise.exercise.group_exercise_id, metrics: ['e1rm', 'volume', 'improvement'] as const,
+    calendarRevision: calendar.revision, weekStart: calendar.next_week_start! };
+  await as(owner, () => createCoW(groupId, { ...input, metrics: [...input.metrics] }));
+  const container = process.env.GROUPS_LIVE_DB_CONTAINER;
+  if (!container) throw new Error('Missing leased database container');
+  const sql = (input: string) => execFileSync('docker', ['exec', '-i', container, 'psql', '-X', '-U', 'postgres', '-d', 'postgres', '-Atq', '-v', 'ON_ERROR_STOP=1'], { input, encoding: 'utf8', timeout: 10000 });
+  // The backend lane proves scoring; this fixture isolates exact public decoding.
+  sql(`insert into app_public.group_cow_participants select '${cowId}',user_id,id,null from app_public.group_memberships where group_id='${groupId}' and ended_at is null;
+    update app_public.group_cows set starts_at=clock_timestamp()-interval '7 days',ends_at=clock_timestamp()-interval '1 second',
+      week_start=app_public.group_cow_week('UTC',clock_timestamp())-7,start_context=jsonb_build_object('available',true,'normalized',true),
+      publication_id=extensions.gen_random_uuid(),finalized_at=clock_timestamp(),final_outcome='ready',final_rankings='${JSON.stringify([
+        { metric: 'e1rm', unit: 'percent_bw', unavailableMemberIds: [], entries: [{ memberId: owner.userId, rank: 1, value: 150 }, { memberId: member.userId, rank: 2, value: 140 }] },
+        { metric: 'volume', unit: 'percent_bw_reps', unavailableMemberIds: [], entries: [{ memberId: member.userId, rank: 1, value: 600 }, { memberId: owner.userId, rank: 2, value: 500 }] },
+        { metric: 'improvement', unit: 'percent', unavailableMemberIds: [], entries: [{ memberId: owner.userId, rank: 1, value: -5 }] },
+      ])}'::jsonb where id='${cowId}';`);
+  const summary = await as(member, () => getCoWSummary(groupId));
+  expect(summary).toMatchObject({ selection: 'previous_final', result: { cow: { cow_id: cowId, state: 'final' }, state: 'ready', normalized: true } });
+  expect(summary.result!.rankings.map(row => [row.metric, row.unit, row.entries.map(entry => entry.member.user_id)])).toEqual([
+    ['e1rm', 'percent_bw', [owner.userId, member.userId]], ['improvement', 'percent', [owner.userId]], ['volume', 'percent_bw_reps', [member.userId, owner.userId]],
+  ]);
+  const first = await as(member, () => getCoWResults(groupId, cowId, 'e1rm', null, 1));
+  expect(first.rankings[0].entries).toHaveLength(1);
+  const second = await as(member, () => getCoWResults(groupId, cowId, 'e1rm', first.rankings[0].next_cursor, 1));
+  expect(second.rankings[0].entries[0]).toMatchObject({ rank: 2, member: { user_id: member.userId } });
+  const nextId = randomUUID();
+  await as(owner, () => createCoW(groupId, { ...input, cowId: nextId, metrics: [...input.metrics] }));
+  sql(`update app_public.group_cows set starts_at=clock_timestamp()-interval '1 second',ends_at=clock_timestamp()+interval '1 day',
+    week_start=app_public.group_cow_week('UTC',clock_timestamp()),available_at=clock_timestamp()+interval '1 day' where id='${nextId}';`);
+  const current = await as(member, () => getCoWSummary(groupId));
+  expect(current).toMatchObject({ selection: 'current', result: { cow: { cow_id: nextId }, state: 'pending' } });
+  expect(current.result!.rankings.every(row => row.entries.length === 0)).toBe(true);
+});

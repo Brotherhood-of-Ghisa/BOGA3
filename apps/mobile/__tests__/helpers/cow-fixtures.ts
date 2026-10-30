@@ -1,0 +1,15 @@
+import type { CoWResultWire, CoWSummaryWire } from '@/src/groups/cow-wire';
+import { competitionExercise } from './competition-fixtures';
+
+export const cowResult = (): CoWResultWire => ({
+  cow: { cow_id: 'cow1', group_id: 'g1', group_exercise_id: 'ge1', week_start: '2026-10-26', time_zone: 'Europe/London',
+    starts_at_us: 1792972800000000, ends_at_us: 1793577600000000, metrics: ['e1rm', 'volume', 'improvement'], revision: 1, state: 'active' },
+  exercise: competitionExercise, bodyweight_calculations_enabled: true, state: 'ready', normalized: true, publication_id: 'publication1',
+  rankings: [
+    { metric: 'e1rm', unit: 'percent_bw', entries: [{ rank: 1, member: { user_id: 'u1', username: 'Me' }, former: false, value: 150, state: 'ranked' }], entry_count: 1, next_cursor: null },
+    { metric: 'volume', unit: 'percent_bw_reps', entries: [], entry_count: 1, next_cursor: null },
+    { metric: 'improvement', unit: 'percent', entries: [], entry_count: 1, next_cursor: null },
+  ],
+});
+export const cowSummary = (): CoWSummaryWire => ({ group_id: 'g1', week_start: '2026-10-26', calendar_revision: 1,
+  observed_at_us: 1793404800000000, valid_until_us: 1793577600000000, selection: 'current', result: cowResult() });

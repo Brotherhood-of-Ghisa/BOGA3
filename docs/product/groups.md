@@ -31,7 +31,7 @@ that member's affected metric unavailable, with no partial score.
 
 Why: compare the same performances without inventing another scoring system.
 Code: `apps/mobile/src/groups/cow-scoring.ts`.
-Pending: server publication and mobile readers in `supabase/functions/group-eval/` and `apps/mobile/src/groups/`.
+Code: server adapter in `apps/mobile/src/groups/cow-evaluation.ts`; public readers in `apps/mobile/src/groups/cow-wire.ts`.
 
 ### groups.cow-baseline · calculation · accepted
 
@@ -46,7 +46,7 @@ baseline.
 
 Why: reward personal progress against a stable shared reference.
 Code: `apps/mobile/src/groups/cow-scoring.ts`.
-Pending: freezing the start baseline from retained intake in `supabase/functions/group-eval/`.
+Code: start checkpoint and retained baseline in `supabase/migrations/20261030062725_group_cow_publication.sql`.
 
 ### groups.cow-calendar · definition · accepted
 
@@ -70,7 +70,7 @@ authorization still controls reads, including former members' loss of access.
 
 Why: membership changes cannot recruit a different field halfway through a week.
 Code: `apps/mobile/src/groups/cow-scoring.ts` consumes the starting roster and first membership end.
-Pending: freezing the start roster from admission receipts in `supabase/functions/group-eval/`.
+Code: admission barrier in `supabase/migrations/20261030062725_group_cow_publication.sql`.
 
 ### groups.cow-submissions · definition · accepted
 
@@ -87,7 +87,7 @@ decide ties.
 
 Why: timely submissions remain deterministic through offline sync and evaluator delays.
 Code: `apps/mobile/src/groups/cow-scoring.ts`; receipt intake in `supabase/migrations/20261029205006_group_cow_intake.sql`.
-Pending: server ranking publication from those receipts in `supabase/functions/group-eval/`.
+Code: publication in `supabase/functions/group-eval/`.
 
 ### groups.cow-finality · definition · accepted
 
@@ -103,4 +103,4 @@ distinct outcomes.
 
 Why: a finished competition has a durable outcome without weakening current privacy.
 Code: `apps/mobile/src/groups/cow-scoring.ts` classifies context availability.
-Pending: automatic finalization and immutable results in `supabase/functions/group-eval/` and `supabase/migrations/`.
+Code: automatic publication and immutable results in `supabase/migrations/20261030062725_group_cow_publication.sql`.

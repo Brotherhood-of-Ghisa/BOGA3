@@ -1,6 +1,7 @@
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 import {
   calculateSetMetrics,
+  calculateSetMetricCandidates,
   resolveCalculatedLoad,
   summarizeVolume,
   sumVolume,
@@ -116,6 +117,15 @@ describe('shared load metrics', () => {
     expect(resolveCalculatedLoad(input)).toEqual({ status: 'invalid', reason: 'numeric_overflow' });
     expect(calculateSetMetrics(input)).toMatchObject({ load: { status: 'invalid', reason: 'numeric_overflow' },
       volumeKgReps: null, estimatedOneRepMaxKg: null });
+  });
+
+  it('retains independent raw projections for metric-specific overflow handling', () => {
+    const input = { ...pullUp, policy: 'ordinary' as const, loadInputMode: 'total_load' as const,
+      weightValue: `1${'0'.repeat(307)}`, repsValue: '2' };
+    expect(calculateSetMetricCandidates(input)).toMatchObject({ volumeKgReps: 2e307,
+      estimatedOneRepMaxKg: Infinity });
+    expect(calculateSetMetrics(input)).toMatchObject({ volumeKgReps: null,
+      load: { status: 'invalid', reason: 'numeric_overflow' } });
   });
 
   it('keeps planned and unperformed rows out of metrics', () => {

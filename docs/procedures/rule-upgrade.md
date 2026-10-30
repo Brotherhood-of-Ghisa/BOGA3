@@ -18,6 +18,16 @@ calculation, eligibility or record rule), or the sync protocol.
 - Re-check `main` right before merge: two PRs have claimed the same revision.
 - Forward-only (no bump) is the operator's call, never the default.
 
+## Unfinished weekly challenges
+
+Before changing a shared scorer/kernel dependency, retain callable pinned CoW
+implementations and their arithmetic imports for every unfinished version.
+`apps/mobile/src/groups/cow-evaluation.ts` pins its supported scorer separately
+from lifetime rebuilds. A new lifetime version must not strand ended challenges
+or rescore their retained inputs under new mathematics. In-week context changes
+follow [[groups.cow-finality]]; post-cutoff upgrades still finish the old version.
+Test delayed publication across the upgrade before deploying it.
+
 ## Roll out
 
 - Order: migrations → `group-eval` and `agent-api` redeployed in the same

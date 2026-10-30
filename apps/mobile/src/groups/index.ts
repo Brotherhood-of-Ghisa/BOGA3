@@ -82,7 +82,8 @@ export {
   createGroupSharedExercise, listGroupSharedExercises, deleteGroupSharedExercise,
 } from './api';
 export type * from './competition-wire';
-export { getCoWCalendar, setCoWCalendar, createCoW, updateCoW, cancelCoW, getCoW, listCoWs,
+export { getCoWCalendar, setCoWCalendar, createCoW, updateCoW, cancelCoW, getCoW, listCoWs, getCoWResults, getCoWSummary,
   type CoWCreateInput, type CoWUpdateInput } from './api';
 export type { CoWMetric } from './cow-scoring';
 export type * from './cow-wire';
+export { useCoWSummary } from './use-cow-summary';

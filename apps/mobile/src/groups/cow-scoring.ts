@@ -14,7 +14,8 @@ export type CoWSetVersion = {
   sessionStartedAtUs: number; completed: boolean; shared: boolean; eligible: boolean;
   scores: readonly CompetitionValue[];
 };
-export type CoWEntry = { memberId: string; value: number; receivedAtUs: number; rank: number };
+export type CoWEntry = { memberId: string; value: number; receivedAtUs: number; rank: number;
+  /** Private contributing/winning sets; public readers must omit these. */ sourceSetIds: string[] };
 export type CoWRanking = { metric: CoWMetric; unit: CompetitionValue['unit'] | 'percent';
   entries: CoWEntry[]; unavailableMemberIds: string[] };
 export type CoWResult = { state: 'ready' | 'unavailable'; rankings: CoWRanking[] };
@@ -91,16 +92,17 @@ function summarize(rows: readonly CoWSetVersion[], metric: CompetitionMetric) {
   let value = 0;
   let receivedAtUs = Infinity;
   let unavailable = false;
+  let sourceSetIds: string[] = [];
   for (const row of rows) {
     const score = valueOf(row, metric);
     if (score === undefined) continue;
     if (!Number.isFinite(score)) { unavailable = true; continue; }
     if (score <= 0) continue;
-    if (metric === 'volume') value += score;
-    else if (score > value) { value = score; receivedAtUs = row.receivedAtUs; }
-    else if (score === value) receivedAtUs = Math.min(receivedAtUs, row.receivedAtUs);
+    if (metric === 'volume') { value += score; sourceSetIds.push(row.setId); }
+    else if (score > value) { value = score; receivedAtUs = row.receivedAtUs; sourceSetIds = [row.setId]; }
+    else if (score === value) { receivedAtUs = Math.min(receivedAtUs, row.receivedAtUs); sourceSetIds.push(row.setId); }
   }
-  return { value, receivedAtUs, unavailable: unavailable || !Number.isFinite(value) };
+  return { value, receivedAtUs, unavailable: unavailable || !Number.isFinite(value), sourceSetIds: sourceSetIds.sort(compareIds) };
 }
 
 function memberValue(states: ReturnType<typeof memberStates>, metric: CoWMetric) {
@@ -111,7 +113,8 @@ function memberValue(states: ReturnType<typeof memberStates>, metric: CoWMetric)
   if (weekly.unavailable || baseline.unavailable) return { ...weekly, unavailable: true };
   if (weekly.value <= 0 || baseline.value <= 0) return null;
   const value = (weekly.value / baseline.value - 1) * 100;
-  return { value, receivedAtUs: weekly.receivedAtUs, unavailable: !Number.isFinite(value) };
+  return { value, receivedAtUs: weekly.receivedAtUs, unavailable: !Number.isFinite(value),
+    sourceSetIds: [...new Set([...weekly.sourceSetIds, ...baseline.sourceSetIds])].sort(compareIds) };
 }
 
 const compareIds = (left: string, right: string) => left < right ? -1 : left > right ? 1 : 0;
@@ -149,7 +152,8 @@ export function scoreCoW(window: CoWWindow, metrics: readonly CoWMetric[],
       if (!result) continue;
       if (result.unavailable) ranking.unavailableMemberIds.push(member.memberId);
       else if (ranking.metric === 'improvement' || result.value > 0) {
-        ranking.entries.push({ memberId: member.memberId, value: result.value, receivedAtUs: result.receivedAtUs, rank: 0 });
+        ranking.entries.push({ memberId: member.memberId, value: result.value, receivedAtUs: result.receivedAtUs, rank: 0,
+          sourceSetIds: result.sourceSetIds });
       }
     }
   }

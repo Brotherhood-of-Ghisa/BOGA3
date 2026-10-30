@@ -49,7 +49,7 @@ import {
   setGroupMemberRole,
   transferGroupOwnership,
   updateGroup,
-  getCoWCalendar, setCoWCalendar, createCoW, updateCoW, cancelCoW, getCoW, listCoWs,
+  getCoWResults, getCoWSummary, getCoWCalendar, setCoWCalendar, createCoW, updateCoW, cancelCoW, getCoW, listCoWs,
   createCompetitionExercise,
 } from '@/src/groups/api';
 
@@ -100,6 +100,8 @@ describe('groups client against the live server', () => {
     const input = { cowId: randomUUID(), groupExerciseId: exercise.exercise.group_exercise_id,
       metrics: ['e1rm', 'volume'] as ('e1rm' | 'volume')[], calendarRevision: zone.revision, weekStart: zone.next_week_start! };
     const created = await as(owner, () => createCoW(groupId, input));
+    expect(await as(member, () => getCoWSummary(groupId))).toMatchObject({ selection: 'none', result: null });
+    expect(await as(member, () => getCoWResults(groupId, input.cowId, 'volume'))).toMatchObject({ state: 'pending', normalized: null, rankings: [{ metric: 'volume', unit: null, entries: [] }] });
     expect(created.cow).toMatchObject({ cow_id: input.cowId, time_zone: 'UTC', state: 'scheduled', revision: 1 });
     expect(await as(owner, () => createCoW(groupId, input))).toEqual(created);
     expect(await as(member, () => getCoW(groupId, input.cowId))).toEqual(created);
