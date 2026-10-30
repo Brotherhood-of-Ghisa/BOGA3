@@ -116,7 +116,7 @@ access level, and `useRootRouteAccess`
 
 | `/group/[groupId]/cows`, `…/cows/[cowId]` | `cowId`, `metric=e1rm\|improvement\|volume` | public identity and opening metric only; invalid/disabled metric uses the first enabled metric. A metric change replaces result pages without pushing a route |
 | `/group/[groupId]/cows/schedule` | `cowId` | absent creates next week; present edits that definition before start only. The static schedule segment wins over cowId |
-| `/group/[groupId]/edit` | `focusTimeZone=1` | focuses calendar setup; Back returns to the retained scheduling draft |
+| `/group/[groupId]/edit` | `focusTimeZone=1` | focuses calendar; Back refreshes management ([[groups.cow-calendar]]) |
 
 ## Allowed transitions
 
@@ -185,7 +185,8 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/today`, `/group/<groupId>` | `/group/<groupId>/cows?cowId=…&metric=…` | preview header pushes the browser carrying the displayed CoW/metric; in-card switching never navigates |
 | `/groups`, `/group/<groupId>` | `/group/<groupId>/cows` | persistent View CoWs; a displayed preview carries CoW/metric (`push`) |
 | CoW browser | CoW standings or schedule | row/header opens standings; admins schedule/edit next week. Save/cancel returns `back()` and focus re-reads |
-| CoW schedule | group Edit or new exercise | missing zone/active exercise opens the existing form; Back retains choices and revalidates. Picker dismissal changes nothing and returns focus to Exercise |
+| Group management | group Edit | Set time zone pushes `edit?focusTimeZone=1` ([[groups.cow-calendar]]) |
+| CoW schedule | new exercise | Add exercise opens its form; Back retains and revalidates choices. Dismissal refocuses Exercise |
 | `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | invite link; static `group/join` wins over `[groupId]`. A changed code remounts the form. Signed-out links lose the code through sign-in; reopening works (`__tests__/groups-join-deep-link.test.tsx`) |
 
 Progress filters stay in-route; Sessions last. Muscle 3D discloses the selected muscle’s contributors;

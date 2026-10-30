@@ -21,10 +21,12 @@ import {
   FigureText,
   ListRow,
   uiRoles,
+  uiSpace,
   uiText,
   uiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
+import { useCoWCalendar } from '@/src/groups/use-cow-calendar';
 import { GroupNotificationMuteRow } from '@/components/notifications/group-mute-row';
 import type { CompetitionExerciseListWire } from '@/src/groups/competition-wire';
 import {
@@ -45,8 +47,9 @@ const firstParam = (value: string | string[] | undefined): string | null =>
  * The group screen (groups contract; product D10, D14), for managing the
  * group: the header card with the member count, which opens the Members
  * screen; the role-gated Invite (the screen's one `accent`) and Edit;
- * then the group's Exercises. The stream and leaderboards live on the Groups
- * screen.
+ * the current group time zone (all members), its focused Edit entry (managers),
+ * then the CoW preview and the group's Exercises. The stream and leaderboards
+ * live on the Groups screen.
  */
 export default function GroupScreenRoute() {
   const { isConfigured, user } = useAuth();
@@ -85,21 +88,24 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
     evictGroupIdOnNotFound: groupId,
   });
 
+  const calendar = useCoWCalendar(groupId, userId);
+  const refreshCalendar = calendar.refresh;
   const refreshGroup = group.refresh;
   const refreshExercises = exercises.refresh;
   const refreshAll = useCallback(
-    () => Promise.all([refreshGroup(), refreshExercises()]),
-    [refreshGroup, refreshExercises],
+    () => Promise.all([refreshGroup(), refreshExercises(), refreshCalendar()]),
+    [refreshGroup, refreshExercises, refreshCalendar],
   );
   const { pulling, onRefresh } = usePullToRefresh(refreshAll);
 
   // After removal, hide everything cached (the hooks already evicted it).
-  if (group.lostAccess || exercises.lostAccess) {
+  if (group.lostAccess || exercises.lostAccess || calendar.lostAccess) {
     return <LostAccessState />;
   }
 
-  const offline = group.offline || exercises.offline;
+  const offline = group.offline || exercises.offline || calendar.offline;
   const inlineError = pickInlineError(group.error, exercises.error);
+  const calendarError = pickInlineError(calendar.error);
   const lastUpdatedAtMs = exercises.lastUpdatedAtMs ?? group.lastUpdatedAtMs;
   const refreshControl = <RefreshControl onRefresh={onRefresh} refreshing={pulling} />;
   const data = group.data;
@@ -169,6 +175,15 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
       style={groupScreenStyles.screen}
       testID="group-screen">
       {header}
+      <View style={styles.calendar} testID="group-screen-time-zone">
+        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>Group time zone</Text>
+        {calendar.firstPage ? <>
+          <Text allowFontScaling={false} style={uiText.body} testID="group-screen-time-zone-value">{calendar.firstPage.time_zone ?? 'Not set'}</Text>
+          {calendarError ? <GroupInlineError error={calendarError} onRetry={() => void refreshCalendar()} testID="group-screen-time-zone-error" /> : null}
+        </> : <GroupMissingDataState error={calendarError} offline={calendar.offline} onRetry={() => void refreshCalendar()} testIDPrefix="group-screen-time-zone" />}
+        {canManageGroup(summary.my_role) ? <ActionButton label="Set time zone" variant="outline"
+          testID="group-screen-set-time-zone" onPress={() => router.push(`/group/${groupId}/edit?focusTimeZone=1`)} /> : null}
+      </View>
       <CoWGroupPreview key={`${userId}:${groupId}`} groupId={groupId} userId={userId} />
       <GroupExercisesPage
         error={inlineError}
@@ -186,6 +201,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
 }
 
 const styles = StyleSheet.create({
+  calendar: { gap: uiSpace.sm },
   memberLine: {
     flexShrink: 1,
   },

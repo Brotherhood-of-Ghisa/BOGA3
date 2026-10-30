@@ -194,7 +194,10 @@ from the wire. Final labels require server finality, never elapsed device time.
 comparisons, pins edit revisions and refuses offline writes. Creation retains one
 request UUID. An uncertain outcome disables another publish until an exact-ID
 status read and authoritative slot/calendar refresh resolve it. Existing group
-Edit owns IANA-zone setup; scheduling never supplies a date picker.
+Edit owns IANA-zone setup, entered from group management under
+[[groups.cow-calendar]]. Management reads the current calendar on focus; CoW
+previews retain their published zone. Scheduling shows an unset state without
+a setup action and cannot publish until the calendar is set; it has no date picker.
 
 ## Pure reducer
 

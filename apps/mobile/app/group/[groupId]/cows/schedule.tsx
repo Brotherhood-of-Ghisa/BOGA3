@@ -76,7 +76,7 @@ function CoWEditorFields({ model, groupId, editing, picker, setPicker, onSave, o
       {week ? <View style={styles.dates}><Text allowFontScaling={false} style={uiText.figure} accessibilityLabel={coWAccessibleDates(week, dateFormat)}><FigureText>{coWDateRange(week, dateFormat)}</FigureText></Text><Text allowFontScaling={false} style={uiText.meta}>{zone}</Text></View> : null}
     </View>
     {!model.calendar.firstPage ? <GroupMissingDataState error={pickInlineError(model.calendar.error)} offline={model.calendar.offline} onRetry={() => void model.calendar.refresh()} testIDPrefix="cow-form-calendar" />
-      : !zone ? <ActionButton label="Set group time zone" variant="outline" testID="cow-form-set-zone" onPress={() => router.push(`/group/${groupId}/edit?focusTimeZone=1`)} /> : null}
+      : !zone ? <GroupStateView title="Group time zone not set" testID="cow-form-zone-unset" /> : null}
     <FormSection title="Exercise" error={model.errors.exercise} errorTestID="cow-form-exercise-error">
       <ChoiceRow ref={launcher} label={chosen?.name ?? (model.draft.exerciseId && model.exercises.data ? 'Exercise unavailable' : 'Choose exercise')}
         accessibilityLabel={`Exercise: ${chosen?.name ?? 'Choose exercise'}`} disabled={disabled} testID="cow-form-exercise"
