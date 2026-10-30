@@ -1,4 +1,4 @@
-import { CoWGroupPreview } from '@/components/groups/cow-group-preview';
+import { TodayCoWSummaries } from './group-cow-summary';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -90,15 +90,17 @@ const boardAccessibilityLabel = (range: string, board: WeekBoardViewModel): stri
 // The group's name and switch, then this week's leaders by working sets,
 // `PRs` being group records: the top five, then the caller's own line when
 // they are outside them.
-function WeekBoardCard({ board, range, onOpenGroup, header }: {
+function WeekBoardCard({ board, range, onOpenGroup, header, challenges }: {
   board: WeekBoardViewModel;
   range: string;
   onOpenGroup: () => void;
   header: ReactNode;
+  challenges: ReactNode;
 }) {
   return (
     <Card style={styles.boardCard} testID="today-group-card">
       {header}
+      {challenges}
       <View style={styles.boardHeading}>
         <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.ink]}>
           This week
@@ -254,6 +256,7 @@ export function TodayGroupCard({
     <View style={[styles.stack, styles.fill]}>
       <WeekBoardCard
         board={board}
+        challenges={<TodayCoWSummaries key={`${myUserId}:${selectedGroupId}`} groupId={selectedGroupId} userId={myUserId} />}
         header={
           <TodayGroupHeader
             groupName={groupName}
@@ -266,7 +269,6 @@ export function TodayGroupCard({
         onOpenGroup={() => onOpenGroup(selectedGroupId)}
         range={range}
       />
-      <CoWGroupPreview key={`${myUserId}:${selectedGroupId}`} groupId={selectedGroupId} userId={myUserId} today />
       {/* Members training now, then the latest completed sessions: a card each. */}
       {sessions.live.length > 0 ? (
         <SessionsCard fill={!showRecent} testID="today-group-live">

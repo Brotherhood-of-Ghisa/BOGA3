@@ -33,10 +33,11 @@ export const groupCacheKeys = {
   /** At a glance: one period-totals read per period and stepper offset (0 the current period, -1 the one before). */
   glance: (groupId: string, period: 'week', offset: number) => `glance:v7:${groupId}:${period}:${offset}`,
   /** Read alias; stored summaries also pin server week, CoW/revision and publication. */
-  cowSummary: (groupId: string) => `cow-summary:v7:${groupId}`,
+  cowSummary: (groupId: string, previous = false) => `${previous ? 'cow-previous-summary' : 'cow-summary'}:v7:${groupId}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';
+const isCoWSummaryKey = (key: string) => key.startsWith('cow-summary:') || key.startsWith('cow-previous-summary:');
 const glanceKeyPattern = (groupId: string) => `glance:v7:${groupId}:%`;
 
 export type GroupCacheEntry<T> = {
@@ -59,7 +60,7 @@ export const readGroupCache = <T>(
   const row = database
     .select()
     .from(groupCache)
-    .where(and(cacheKey.startsWith('cow-summary:') ? like(groupCache.cacheKey, `${cacheKey}:%`) : eq(groupCache.cacheKey, cacheKey), eq(groupCache.userId, userId)))
+    .where(and(isCoWSummaryKey(cacheKey) ? like(groupCache.cacheKey, `${cacheKey}:%`) : eq(groupCache.cacheKey, cacheKey), eq(groupCache.userId, userId)))
     .orderBy(desc(groupCache.fetchedAtMs))
     .get();
   if (!row) {
@@ -85,12 +86,15 @@ export const writeGroupCache = <T>(
 ): void => {
   if (quarantinedAccounts.has(entry.userId)) deleteAccountCompetitionCache(database,entry.userId);
   evictObsoleteGroupCache(database,entry.userId);
-  if (entry.cacheKey.startsWith('cow-summary:')) {
-    if (!isCoWSummaryWire(entry.payload) || entry.cacheKey !== groupCacheKeys.cowSummary(entry.payload.group_id)) throw new Error('Unsafe CoW cache scope.');
-    const groupId = entry.payload.group_id;
-    entry = { ...entry, cacheKey: coWSummaryCacheKey(entry.payload) };
+  if (isCoWSummaryKey(entry.cacheKey)) {
+    const previous = entry.cacheKey.startsWith('cow-previous-summary:');
+    if (!isCoWSummaryWire(entry.payload) || entry.cacheKey !== groupCacheKeys.cowSummary(entry.payload.group_id, previous)) throw new Error('Unsafe CoW cache scope.');
+    const alias = entry.cacheKey;
+    const storedKey = coWSummaryCacheKey(entry.payload, previous);
+    if (!isCompetitionCachePayload(storedKey, entry.payload)) throw new Error('Unsafe CoW cache view.');
+    entry = { ...entry, cacheKey: storedKey };
     database.delete(groupCache).where(and(eq(groupCache.userId,entry.userId),
-      like(groupCache.cacheKey, `${groupCacheKeys.cowSummary(groupId)}:%`))).run();
+      like(groupCache.cacheKey, `${alias}:%`))).run();
   }
   if (!isCompetitionCachePayload(entry.cacheKey,entry.payload)) throw new Error('Unsafe group cache payload.');
   observeCompetitionPolicy(database,entry.cacheKey,entry.userId,entry.payload,entry.fetchedAtMs);
@@ -125,7 +129,7 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
 export const evictGroup = (database: GroupCacheDatabase, groupId: string): void => {
   const scope = or(inArray(groupCache.cacheKey,[groupCacheKeys.group(groupId),groupCacheKeys.stream(groupId),
     groupCacheKeys.groupExercises(groupId),groupCacheKeys.boards(groupId),`boards:v7:${groupId}`,groupCacheKeys.weekSummary(groupId),`group-policy:v7:${groupId}`]),
-    like(groupCache.cacheKey,glanceKeyPattern(groupId)),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId)}:%`),like(groupCache.cacheKey,SESSION_KEY_PATTERN));
+    like(groupCache.cacheKey,glanceKeyPattern(groupId)),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId)}:%`),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId, true)}:%`),like(groupCache.cacheKey,SESSION_KEY_PATTERN));
   const accounts = new Set(database.select({ userId: groupCache.userId }).from(groupCache).where(scope).all().map(row => row.userId));
   database.delete(groupCache).where(scope).run();
   accounts.forEach(invalidateCompetitionMemory);
