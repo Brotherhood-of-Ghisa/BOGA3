@@ -30,7 +30,14 @@ and does not offer server-sent event sessions.
 
 ## Tool surface
 
-Eight read-only tools:
+Nine read-only tools:
+- `get_training_status` — one bounded check-in: per tracked muscle, sets on the
+  three recovery days, today, this week and the four weeks before, with its
+  weekly target and last trained date (Today's Plan's counting and order, under
+  the coaching working-set rule, completed workouts only); the
+  top ten exercises of the last 28 days with best 1RM in that window and the 28
+  days before and the last record date; the target mode, default and
+  `revision`. Days are the profile `time_zone`'s.
 - `get_training_profile` — training preferences, equipment, gyms.
 - `list_muscles` — the muscle ids exercise mappings name, each with the
   person's `report_group` and `tracked` setup.
@@ -59,6 +66,14 @@ Four exercise tools (require the same write access, idempotent; edits quote the
 - `restore_exercise` — undo a soft delete.
 Rules and errors: the
 [agent API contract](../../supabase/functions/agent-api/README.md#exercise-editing).
+
+One targets tool (same write access, idempotent, marked destructive):
+`set_muscle_targets` sets the default weekly target, the mode and per-muscle
+overrides (`null` clears one) on the person's setup; devices show them after
+their next sync. `expected_revision` is `targets.revision` from
+`get_training_status`; before any device has uploaded targets it builds on the
+app's defaults. Rules and errors: the
+[agent API contract](../../supabase/functions/agent-api/README.md#muscle-targets).
 
 `get_exercise_context` reports `gym_usage` for every exercise: sessions with a
 working set per gym and with no gym, so a coach can judge `split_by_gym`.

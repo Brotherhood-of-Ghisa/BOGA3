@@ -135,7 +135,9 @@ red=0
 while IFS= read -r lane; do
   [[ -n "${lane}" ]] || continue
   start=$(date +%s)
-  if "${REPO_ROOT}/boga" test "${lane}" >"${OUT}/${lane}.log" 2>&1; then
+  # The loop reads the lane list on stdin; a lane that reads stdin would
+  # swallow the rest of the sweep.
+  if "${REPO_ROOT}/boga" test "${lane}" </dev/null >"${OUT}/${lane}.log" 2>&1; then
     result="GREEN"
   else
     result="RED  "

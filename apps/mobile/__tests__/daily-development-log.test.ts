@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 // Run the repository workflow module in Node, as actions/github-script does.
 const script = resolve(__dirname, '../../../scripts/publish-daily-development-log.cjs');
 const run = (source: string) => JSON.parse(execFileSync(process.execPath, ['-e', `
-  const { buildEntry, findCheckpoint, publish } = require(${JSON.stringify(script)});
+  const { buildEntry, findCheckpoint, publish, automaticPostDue } = require(${JSON.stringify(script)});
   const repo = { owner: 'test', repo: 'boga' };
   ${source}
 `], { encoding: 'utf8' }));
@@ -32,15 +32,29 @@ describe('daily development log', () => {
         id: 'discussion', comments: {
           nodes: calls++ === 0
             ? [{ body: '<!-- boga-daily-log: ' + 'f'.repeat(40) + ' -->', author: { login: 'reader' } }]
-            : [{ body: '<!-- boga-daily-log: ' + 'a'.repeat(40) + ' -->', author: { login: 'github-actions' } }],
+            : [{ body: '<!-- boga-daily-log: ' + 'a'.repeat(40) + ' -->', createdAt: '2026-10-27T08:00:00Z', author: { login: 'github-actions' } }],
           pageInfo: { hasPreviousPage: calls === 1, startCursor: 'previous' }
         }
       } } }) };
       findCheckpoint(github, repo).then(value => console.log(JSON.stringify({ value, calls })));
-    `)).toEqual({ value: { id: 'discussion', sha: 'a'.repeat(40) }, calls: 2 });
+    `)).toEqual({ value: { id: 'discussion', sha: 'a'.repeat(40), createdAt: '2026-10-27T08:00:00Z' }, calls: 2 });
   });
 
-  it('publishes missing first-parent commits once and preserves the cursor on a failed post', () => {
+  it.each([
+    [null, '2026-10-28T07:29:59Z', false],
+    [null, '2026-10-28T07:30:00Z', true],
+    ['2026-10-27T08:00:00Z', '2026-10-28T08:00:00Z', true],
+    ['2026-10-28T07:30:00Z', '2026-10-28T22:00:00Z', false],
+    [null, '2026-07-01T06:29:59Z', false],
+    [null, '2026-07-01T06:30:00Z', true],
+    ['2026-06-30T23:15:00Z', '2026-07-01T06:30:00Z', false],
+    ['2026-10-24T06:30:00Z', '2026-10-25T07:30:00Z', true],
+  ])('uses London day and 07:30 boundary (%s, %s)', (previous, now, expected) => {
+    expect(run(`console.log(JSON.stringify(automaticPostDue(
+      ${JSON.stringify(previous)}, new Date(${JSON.stringify(now)}))));`)).toBe(expected);
+  });
+
+  it('recovers missing commits once daily, retries failed posts, and allows manual recovery', () => {
     const fixture = mkdtempSync(join(tmpdir(), 'boga-daily-log-'));
     try {
       const result = run(`
@@ -56,14 +70,15 @@ describe('daily development log', () => {
         commit('WIP should not be listed');
         git('checkout', '-');
         git('merge', '-q', '--no-ff', 'feature', '-m', 'feat: Add timer (#1)');
-        let comments = [{ body: '<!-- boga-daily-log: ' + baseline + ' -->', author: { login: 'bozothegrey' } }];
+        let now = new Date('2026-10-28T07:30:00Z');
+        let comments = [{ body: '<!-- boga-daily-log: ' + baseline + ' -->', createdAt: '2026-10-27T08:00:00Z', author: { login: 'bozothegrey' } }];
         const posts = [];
         let fail = true;
         const github = { graphql: async (query, variables) => {
           if (query.includes('addDiscussionComment')) {
             if (fail) throw new Error('API failed');
             posts.push(variables.body);
-            comments.push({ body: variables.body, author: { login: 'github-actions' } });
+            comments.push({ body: variables.body, createdAt: now.toISOString(), author: { login: 'github-actions' } });
             return { addDiscussionComment: { comment: { url: 'posted' } } };
           }
           return { repository: { discussion: { id: 'discussion', comments: {
@@ -71,20 +86,37 @@ describe('daily development log', () => {
           } } } };
         } };
         (async () => {
-          const args = { github, context: { repo }, core: { info() {} } };
+          const args = { github, context: { repo, eventName: 'push' }, core: { info() {} }, now };
           let failed = false;
           try { await publish(args); } catch { failed = true; }
           fail = false;
+          await publish(args);
+          commit('feat: Later change (#2)');
+          await publish(args);
+          now = args.now = new Date('2026-10-29T07:29:00Z');
+          await publish(args);
+          now = args.now = new Date('2026-10-29T07:30:00Z');
+          args.context.eventName = 'schedule';
+          await publish(args);
+          await publish(args);
+          commit('fix: Manual recovery (#3)');
+          args.context.eventName = 'workflow_dispatch';
           await publish(args);
           await publish(args);
           console.log(JSON.stringify({ failed, posts }));
         })();
       `);
       expect(result.failed).toBe(true);
-      expect(result.posts).toHaveLength(1);
+      expect(result.posts).toHaveLength(3);
       expect(result.posts[0]).toContain('Add timer');
       expect(result.posts[0]).not.toContain('WIP');
       expect(result.posts[0]).not.toContain('- Initial');
+      expect(result.posts[0]).not.toContain('Later change');
+      expect(result.posts[1]).toContain('Later change');
+      expect(result.posts[1]).not.toContain('Add timer');
+      expect(result.posts[1]).toContain('29 October 2026');
+      expect(result.posts[2]).toContain('Manual recovery');
+      expect(result.posts[2]).not.toContain('Later change');
     } finally {
       rmSync(fixture, { recursive: true, force: true });
     }

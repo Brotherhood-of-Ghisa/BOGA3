@@ -130,7 +130,8 @@ describe('programme screens', () => {
       fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-reps'), '5');
       fireEvent.press(screen.getByTestId('programme-child-plan-done-button'));
 
-      // Save programme
+      // Add the programme: a new programme's primary names what it adds.
+      expect(screen.getByTestId('programme-form-save')).toHaveTextContent('Add programme');
       await act(async () => {
         fireEvent.press(screen.getByTestId('programme-form-save'));
       });

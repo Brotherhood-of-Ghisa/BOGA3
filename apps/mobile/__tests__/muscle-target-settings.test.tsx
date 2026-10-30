@@ -5,14 +5,19 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule());
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Storage } from 'expo-sqlite/kv-store';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 import MusclesRoute from '../app/settings-muscles';
 import TargetsRoute from '../app/settings-muscle-targets';
 import EnabledRoute from '../app/settings-enabled-muscles';
+import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { muscleGroups } from '@/src/data/schema';
+import { stampLocalDataOwner } from '@/src/data/local-wipe';
 import * as setup from '@/src/data/muscle-report-settings';
+import * as userSettingsData from '@/src/data/user-settings';
+import '@/src/sync/synced-preferences-store';
+import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
+import { Storage } from 'expo-sqlite/kv-store';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState,
   setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
@@ -48,6 +53,30 @@ it('keeps choices and the default on Muscles, opening full target and enablement
   await waitFor(() => expect(screen.getByTestId('settings-muscle-preset-broad')).toHaveProp('accessibilityState', { selected: true }));
   expect(screen.getByTestId('settings-enabled-muscles-row')).toBeTruthy();
   expect(screen.getByTestId('settings-weekly-working-set-target')).toHaveProp('value', '11');
+});
+
+const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' } as const;
+const META = { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm } as const;
+
+it('draws Muscles on the text roles: headings and control labels as micro-labels, statuses as meta with figures', async () => {
+  render(<MusclesRoute />);
+  await waitFor(() => expect(screen.getByTestId('settings-muscle-preset-detailed')).toHaveProp('accessibilityState', { selected: true }));
+  expect(screen.getByText('Weekly targets')).toHaveStyle(LABEL);
+  expect(screen.getByText('Target mode')).toHaveStyle(LABEL);
+  expect(screen.getByText('Default target (sets / week)')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+  const status = within(screen.getByTestId('settings-enabled-muscles-row')).getByText(/\d+ \/ \d+/);
+  expect(status).toHaveStyle(META);
+  within(status).getAllByText(/^\d+$/).forEach(figure => expect(figure).toHaveStyle({ fontFamily: uiFonts.figure.family }));
+});
+
+it('draws a muscle target row: the name in bodyStrong, Default and an error as meta', async () => {
+  updatePreferences({ muscleTargetMode: 'per-muscle' });
+  render(<TargetsRoute />);
+  await screen.findByTestId('settings-muscle-target-chest');
+  expect(screen.getByText('Pectoralis')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+  expect(screen.getByTestId('settings-muscle-target-chest-default')).toHaveStyle(META);
+  edit('settings-muscle-target-chest', '0');
+  expect(screen.getByTestId('settings-muscle-target-chest-error')).toHaveStyle({ ...META, color: uiRoles.danger });
 });
 
 it('lists only enabled muscles, including custom muscles, and restores hidden overrides on re-enable', async () => {
@@ -99,13 +128,16 @@ it.each(['0', '-1', '1.5', 'bad', '9007199254740992'])('keeps invalid target dra
 });
 
 it('retains and retries failed saves, then clears drafts on account change', async () => {
+  // A synced store belongs to one account; account B never reads A's settings row.
+  stampLocalDataOwner(localDatabase(), 'A');
+  Storage.setItemSync(syncedTargetsAdoptedKey('account:A'), 'true');
   render(<TargetsRoute />);
   await screen.findByTestId('settings-muscle-target-chest');
-  const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('full'); });
+  const write = jest.spyOn(userSettingsData, 'writeMuscleTargetSettings').mockRejectedValueOnce(Error('full'));
   edit('settings-muscle-target-chest', '12');
   expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('value', '12');
+  expect(await screen.findByTestId('settings-muscle-preferences-error')).toHaveTextContent(/could not be saved/);
   expect(values().muscleTargetOverrides).toEqual({});
-  expect(screen.getByTestId('settings-muscle-preferences-error')).toHaveTextContent(/could not be saved/);
   write.mockRestore();
   fireEvent.press(screen.getByText('Retry'));
   await waitForGone(() => screen.queryByTestId('settings-muscle-preferences-error'));
@@ -132,7 +164,7 @@ it('shows the default with a usable empty state when no muscles are enabled', as
   const rows = await setup.listMuscleReportRows();
   await setup.setMuscleTracked(rows.map(row => row.id), false);
   render(<TargetsRoute />);
-  await screen.findByTestId('settings-muscle-targets-empty');
+  expect(await screen.findByTestId('settings-muscle-targets-empty')).toHaveStyle(META);
   expect(screen.getByTestId('settings-weekly-working-set-target')).toHaveProp('value', '8');
 });
 
@@ -152,7 +184,7 @@ it('keeps Custom reporting unchanged until a preset is explicitly selected', asy
   await setup.listMuscleReportRows();
   localDatabase().update(muscleGroups).set({ reportGroup: 'chest' }).where(eq(muscleGroups.id, 'biceps')).run();
   render(<MusclesRoute />);
-  await screen.findByTestId('settings-muscle-custom');
+  expect(await screen.findByTestId('settings-muscle-custom')).toHaveStyle({ ...LABEL, color: uiRoles.ink });
   expect(screen.getByTestId('settings-muscle-preset-detailed')).toHaveProp('accessibilityState', { selected: false });
   expect(screen.getByTestId('settings-muscle-preset-broad')).toHaveProp('accessibilityState', { selected: false });
   fireEvent.press(screen.getByTestId('settings-enabled-muscles-row'));

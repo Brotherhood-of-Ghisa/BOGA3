@@ -70,7 +70,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
 
     name: process.env.APP_NAME ?? "Boga3",
     slug: "boga3",
-    version: "2.1.0",
+    version: "2.2.0",
     orientation: "portrait",
     icon: "./assets/images/app-icons/warm.png",
     scheme: APP_SCHEME,
@@ -116,12 +116,18 @@ export default ({ config }: { config: ExpoConfig }) => ({
         "expo-dev-client",
         [
             "expo-alternate-app-icons",
-            ["Slate", "Forest", "Plum", "Rainbow"].map((name) => ({
+            [
+                ...["Slate", "Forest", "Plum", "Rainbow"].map((name) => ({ name, file: name.toLowerCase() })),
+                ...["Warm", "Slate", "Forest", "Plum", "Rainbow"].map((name) => ({
+                    name: `${name}November`, file: `${name.toLowerCase()}-november`,
+                })),
+            ].map(({ name, file }) => ({
                 name,
-                ios: `./assets/images/app-icons/${name.toLowerCase()}.png`,
-                android: { foregroundImage: `./assets/images/app-icons/${name.toLowerCase()}.png` },
+                ios: `./assets/images/app-icons/${file}.png`,
+                android: { foregroundImage: `./assets/images/app-icons/${file}.png` },
             })),
         ],
+        "./plugins/with-android-app-icon-state",
         "expo-router",
         [
             "expo-splash-screen",
@@ -169,7 +175,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
 
     extra: {
         env: process.env.APP_ENV,
-        releaseCodename: "Ziocleziano",
+        releaseCodename: "Chav Jean Pensant",
         bogaAgentConnectUrl:
             process.env.EXPO_PUBLIC_BOGA_AGENT_CONNECT_URL?.trim() ||
             DEFAULT_BOGA_AGENT_CONNECT_URL,

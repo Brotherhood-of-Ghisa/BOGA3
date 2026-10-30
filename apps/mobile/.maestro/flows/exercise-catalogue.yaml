@@ -3,11 +3,11 @@ appId: com.dinoderek.mobile
 # Exercise catalogue: create an exercise (ios-data-smoke lane, infra-free).
 #
 # Proves:
-#   1. `+` opens the exercise editor sheet; a name typed on the keyboard and a
-#      primary muscle picked in the sheet's muscle list save to the device's
-#      SQLite, and the catalogue shows `Exercise created.`.
+#   1. `+` opens the exercise editor page; a name typed on the keyboard and a
+#      primary muscle picked in its picker sheet save to the device's SQLite,
+#      the page goes back, and the catalogue shows `Exercise created.`.
 # Why device:
-#   1. a real sheet whose body swaps panels, the keyboard, and the on-device
+#   1. a pushed page with a sheet over it, the keyboard, and the on-device
 #      expo-sqlite write.
 # Jest counterpart: __tests__/exercise-catalog-screen.test.tsx (the
 #   catalogue over the browser fixture: the create read back from the database
@@ -51,6 +51,10 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd:
     timeout: 4000
 - takeScreenshot: "editor-filled"
+- scrollUntilVisible:
+    element:
+      id: "exercise-editor-save"
+    direction: DOWN
 - tapOn: "Save exercise definition"
 - extendedWaitUntil:
     visible:

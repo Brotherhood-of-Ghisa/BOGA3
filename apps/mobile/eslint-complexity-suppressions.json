@@ -1,5 +1,5 @@
 {
-  "app/(tabs)/exercise-catalog.tsx": {
+  "app/exercise-catalog.tsx": {
     "max-lines-per-function": {
       "count": 1
     }

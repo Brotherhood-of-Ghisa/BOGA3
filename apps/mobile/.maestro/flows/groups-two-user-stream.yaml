@@ -26,10 +26,13 @@ appId: com.dinoderek.mobile
 #   6. on Leaderboards, the counterparty's linked set opens from its board row
 #      in a sheet, certifying it there writes `Certified by <user_c>`, and the
 #      sheet closes on its backdrop;
-#   7. removing the counterparty through the native confirmation alert shows
+#   7. CoW browser/form entry, native exercise-sheet search/selection, a real
+#      next-week publish and native Back preserve the originating group;
+#   8. removing the counterparty through the native confirmation alert shows
 #      `was removed` and one member.
 # Why device: two real users and real round trips through the app; 1 the cold
 #   boot, real sign-in and keyboard; 3 the focus refresh; 4 the keyboard;
+#   7 the searchable native Modal/keyboard, stack Back and server refresh;
 #   5 react-native-screens' native back (it went dead from the second visit on
 #   iOS 26); 6 the sheet and its backdrop; 7 the native alert.
 # Jest counterpart: __tests__/groups-api-live.test.ts (lane groups-api-live:
@@ -39,7 +42,7 @@ appId: com.dinoderek.mobile
 #   exercise-picker.test.tsx (linked group rows), groups-screens.test.tsx
 #   (cards, friend view), groups-leaderboards-screens.test.tsx,
 #   groups-metric-screens.test.tsx, groups-record-set-sheet.test.tsx,
-#   groups-comparison-form.test.tsx. Server rules: supabase/tests/groups-*.sh
+#   groups-comparison-form.test.tsx, groups-cow-screens.test.tsx. Server rules: supabase/tests/groups-*.sh
 #   (lanes groups-contract, groups-leaderboards).
 #
 # ISOLATION: user_c and user_d are dedicated to this flow (docs/specs/11,
@@ -66,14 +69,16 @@ appId: com.dinoderek.mobile
     clearState: true
     clearKeychain: true
 - openLink: "${MAESTRO_DEV_CLIENT_URL}"
+# SDK 58 can open the developer overlay directly, without the intro.
 - extendedWaitUntil:
     visible:
-      text: "Continue"
+      text: "Continue|Close"
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 4000
-- retry:
-    maxRetries: 3
+- runFlow:
+    when:
+      visible: "Continue"
     commands:
       - tapOn:
           text: "Continue"
@@ -270,6 +275,49 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd
 - takeScreenshot: "groups-04b-1-exercises-added"
 
+# --- 4c. CoW: native picker, next-week publish and stack Back ------------------
+- tapOn: { id: "group-cow-browse" }
+- extendedWaitUntil:
+    visible: { id: "cows-schedule" }
+    timeout: 15000
+- takeScreenshot: "cow-browser-empty"
+- tapOn: { id: "cows-schedule" }
+- extendedWaitUntil:
+    visible: { id: "cow-form-exercise" }
+    timeout: 15000
+- takeScreenshot: "cow-schedule-empty"
+- tapOn: { id: "cow-form-exercise" }
+- extendedWaitUntil:
+    visible: { id: "cow-exercise-search" }
+    timeout: 10000
+- tapOn: { id: "cow-exercise-search" }
+- inputText: "Sled"
+- takeScreenshot: "cow-exercise-search"
+- tapOn: { text: "Sled Push" }
+- assertNotVisible: { id: "cow-exercise-search" }
+- assertVisible: { id: "cow-form-exercise", text: "Exercise: Sled Push" }
+- tapOn: { id: "cow-form-metric-e1rm" }
+- tapOn: { id: "cow-form-metric-volume" }
+- takeScreenshot: "cow-schedule-selected"
+- tapOn: { id: "cow-form-submit" }
+- extendedWaitUntil:
+    visible: { id: "cows-next" }
+    timeout: 15000
+- takeScreenshot: "cow-browser-scheduled"
+- tapOn: { id: "cows-next" }
+- extendedWaitUntil:
+    visible: { id: "cow-standings" }
+    timeout: 15000
+- takeScreenshot: "cow-standings-upcoming"
+- tapOn: { id: "BackButton" }
+- extendedWaitUntil:
+    visible: { id: "cows-next" }
+    timeout: 10000
+- tapOn: { id: "BackButton" }
+- extendedWaitUntil:
+    visible: { id: "group-screen-name", text: "Maestro Groups E2E" }
+    timeout: 10000
+
 # --- 5. Active session -> one "Training now" card with its metrics ---------------
 - runScript:
     file: ../scripts/groups-counterparty.js
@@ -316,9 +364,8 @@ appId: com.dinoderek.mobile
       STEP: push-complete-edit
 # The native back arrow returns to the stream on every visit, not just the first:
 # react-native-screens 4.16 on iOS 26 left it dead from the second visit on.
-# Its accessibility label is the previous route's title: Groups is a tab, and
-# the root stack titles the `(tabs)` group "Back"
-# (components/navigation/root-stack.tsx).
+# Its label is the previous route's title on some iOS runtimes ("Groups"),
+# "Back" on others, so tap it by UIKit's stable `BackButton` identifier.
 - repeat:
     times: 2
     commands:
@@ -328,7 +375,8 @@ appId: com.dinoderek.mobile
           visible:
             id: "group-session-summary"
           timeout: 15000
-      - tapOn: "Back"
+      - tapOn:
+          id: "BackButton"
       - extendedWaitUntil:
           visible:
             id: "groups-stream-list"

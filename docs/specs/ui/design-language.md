@@ -76,7 +76,8 @@ active and retries interruptions after foregrounding. Other native failures
 attempt the primary icon and are logged without blocking boot. Matching icons
 are left alone to avoid repeated OS alerts. `app.config.ts` bundles the PNGs in
 `apps/mobile/assets/images/app-icons/` and supplies Android scheme filters to
-every launcher alias.
+every launcher alias. Seasonal identity follows [[appearance.november]]; its
+alternates require a native build, while ordinary Warm remains primary.
 
 **Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
 empty / rest, `viz1`…`viz4` the lightest to the strongest intensity; the steps
@@ -140,12 +141,20 @@ had grown for nine jobs.
 
 | Role | Face | For |
 | --- | --- | --- |
+| `pageTitle` | Archivo 800 · `xxl` | a page's own title |
+| `sheetTitle` | Archivo 800 · `xl` | a sheet's title |
 | `title` | Archivo 700 · `lg` | a card, section or tab title |
 | `label` | Archivo 700 · `xxs` caps, tracked | a block's heading, a column header, a legend, a unit |
+| `button` | Archivo 700 · `sm` caps, tracked | a button's label |
+| `option` | Archivo 600 · `lg` | a row's name in a card; a form's action row |
+| `optionLarge` | Archivo 600 · `xl` | a sheet's option row |
+| `input` | Source Sans 400 · `base`, no line-height | typed text; a numeric field adds `inlineFigure` |
+| `inputLarge` | Source Sans 400 · `lg`, no line-height | a search field's query |
 | `body` | Source Sans 400 · `base` | a row's name, a line of prose |
 | `bodyStrong` | Source Sans 600 · `base` | the name heading a block of lines |
 | `meta` | Source Sans 400 · `sm`, muted | the supporting line under a name; an empty block's line |
 | `figureHero` | Plex Mono 700 · `xxl` | a block's one headline number |
+| `figureStat` | Plex Mono 700 · `xl` | a `Stat`'s headline figure |
 | `figureLarge` | Plex Mono 600 · `lg` | a second headline number |
 | `figure` | Plex Mono 500 · `base` | every number in a row or table, on `body`'s line |
 | `figureSmall` | Plex Mono 500 · `sm`, muted | a quiet date, time or comparison |
@@ -157,10 +166,16 @@ figures keeps its word role and draws only the figures in Plex Mono 500
 (`FigureText`). A heading's link into a fuller screen is
 `ActionButton variant="link"`: its heading's micro-label, muted, with a chevron,
 so it never outweighs the title. Today, Groups, Sessions, Progress, the
-session flow (recorder, session view, completion, View Session, Train) and the
-session planner take every text from the roles. Display art keeps its own type: the full-screen
-repeating timer, the Train START disc and the share image. Screens not yet moved
-still hold their own styles, and each moves when next touched.
+session flow (recorder, session view, completion, View Session, Train), the
+session planner, the exercise screens (page, catalogue, editor, history, link,
+shared exercise), Settings (its pages, Appearance, Profile, Gyms) and the app
+shell (tab bar, stack header, More, connected agents, logs) take every text
+from the roles, and so do the shared primitives in `apps/mobile/components/ui`
+and the sync gate. Display art keeps its own type: the repeating timer's
+countdown and phase, the Train START disc and the share image; the log viewer's
+context dump, being code, stays wholly in Plex Mono (`figureSmall`). Nothing
+else assembles type: an SVG tick or the native stack header, which take no
+style object, read their role's fields.
 
 ## 4. Surfaces
 
@@ -219,7 +234,7 @@ additionally render faded ([[set.row-figures]], §6).
   Volume `2560` — on every screen (`tech/training-metrics-contract.md` §4,
   `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
-- **A change carries its direction**, in colour as well as in its sign: an
+- **A numeric change carries its direction**, in colour as well as in its sign: an
   improvement is `gain`, a decrease `loss`, and no direction — level,
   unavailable — stays `ink`. A figure with no earlier value to fall from
   (`new`) is an improvement. This holds for a change against an earlier period
@@ -229,7 +244,8 @@ additionally render faded ([[set.row-figures]], §6).
   differ only in hue, so neither shouts. **Colour is never the only channel:**
   the figure still says `+3`, `−12%`, `0`, `new` or `—`. One rule, every
   change figure — `changeToneColour` (`components/ui/change-tone.ts`) is where
-  it lives, and no screen picks a delta colour of its own.
+  it lives, and no screen picks a delta colour of its own. 3D muscle fills
+  follow [[comparison.colour-scale]].
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
   Mono column.
 - **No unit suffix inside an input.** The unit belongs in the field label.

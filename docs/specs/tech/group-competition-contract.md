@@ -60,6 +60,10 @@ nonworking performed projections for audit validation; the publisher applies
 working/counting. A Volume witness covers that set's performance, never
 other sets or a session total.
 
+If changing weekly aggregates, load [group-cow-contract.md](group-cow-contract.md):
+[[groups.cow-metrics]] leaves these lifetime boards unchanged. CoW stored source
+references extend the same current-disclosure helper, including after unlink/move.
+
 Keep finite unrounded kernel values through publication/ranking. Display
 rounding is presentation only; values are never quantized for ranking.
 Per-member ties use achieved instant, exercise order, set order, set-created

@@ -29,6 +29,12 @@ verify(decrypt(envelope)?.identity == clear["identity"] as? String, "WebCrypto e
 verify(decrypt(envelope)?.summary == "2 new group bests · 3 leaderboard changes", "Count preview")
 verify(decrypt(envelope, environment: "production") == nil, "Wrong environment")
 verify(decrypt(envelope, now: 2000) == nil, "Original expiration")
+// A tap's envelope reaches decrypt through the Expo JS bridge, which turns every JS number into a Swift Double.
+var bridged = envelope
+bridged["v"] = Double(1) as Any
+verify(decrypt(bridged)?.identity == clear["identity"] as? String, "JS-bridged envelope version must decrypt")
+bridged["v"] = Double(1.5) as Any
+verify(decrypt(bridged) == nil, "Fractional envelope version")
 let other = BogaNotificationBinding(installationId: binding.installationId, userId: "55555555-5555-4555-8555-555555555555",
   bindingId: bindingID, authSessionId: binding.authSessionId, environment: "preview", encryptionKey: binding.encryptionKey)
 verify(decrypt(envelope, current: other) == nil, "Wrong account")

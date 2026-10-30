@@ -7,8 +7,8 @@
 > `docs/specs/10-api-authn-authz-guidelines.md`. **Load when:** changing the
 > server sync schema, the sync RPCs, or `apps/mobile/src/sync/**`.
 
-This doc states invariants and their reasons; the code is the ground truth
-for the how (fix the doc when they disagree):
+Invariants and reasons live here; the code is the how (fix the doc when they
+disagree):
 `supabase/migrations/20260525120000_sync_v2_clean_room.sql`, the sync RPC
 migrations, `apps/mobile/src/sync/` and
 `apps/mobile/scripts/check-sync-schema-drift.ts`.
@@ -27,22 +27,21 @@ sequence discovery and atomic merge/recovery RPCs, load
 ## Ground rules
 
 - **Composite PK `(owner_user_id, id)`, owner first,** so the canonical pull
-  query (`where owner_user_id = … order by server_received_at`) leads with the
-  PK column.
+  query (by owner, then `server_received_at`) leads with the PK column.
 - **Composite FKs only.** Every cross-entity FK references the parent's
   `(owner_user_id, id)`, so cross-owner references cannot exist.
 - **Timestamps are `bigint` epoch ms.** The only `timestamptz` is the
   server-set `server_received_at`, the pull cursor axis.
 - **Minimal server validation.** The client is the only writer, so the server
   validates nothing it could not itself cause:
-  - No CHECK constraints on enum text, numeric ranges or text content. The one
-    exception is `exercise_definitions_load_input_mode_valid`
-    (`total_load | per_side_load`): analytics consume that field directly, so
-    both stores reject invalid values.
-  - Domain columns are nullable wherever the client may write NULL. Only the
-    structural columns (PK, `owner_user_id`, `client_updated_at_ms`) are
-    NOT NULL.
-  - Provenance guards and merge revision fences supplement structural triggers; group triggers follow "Out of scope".
+  - No CHECK constraints on enum text, numeric ranges or text content, except
+    `exercise_definitions_load_input_mode_valid` (`total_load |
+    per_side_load`; analytics read it, so both stores reject invalid values)
+    and `user_settings_muscle_target_overrides_valid` (the shape the app
+    checks before writing).
+  - Domain columns are nullable wherever the client may write NULL; only the
+    PK, `owner_user_id` and `client_updated_at_ms` are NOT NULL.
+  - Provenance guards and merge revision fences add to structural triggers; group triggers: "Out of scope".
   - No uniqueness beyond the PK, except the three planning provenance guards
     (`sessions_owner_source_plan_unique`,
     `session_exercises_owner_source_block_unique`,
@@ -56,8 +55,8 @@ sequence discovery and atomic merge/recovery RPCs, load
   no `deleted` boolean.
 - **Future-clock clamp.** `sync_push` stores
   `least(client_updated_at_ms, now_ms + 5 min)`, so a fast-clock client cannot
-  write an unbeatable LWW value. The clamp is silent so an NTP glitch is not a
-  sync error.
+  write an unbeatable LWW value. The clamp is silent: an NTP glitch is no
+  error.
 
 ### LWW and undelete
 
@@ -69,11 +68,11 @@ Deletion is `deleted_at` going non-null; undelete is the same id with
 `deleted_at` back to null, under the same rule. There is no special path.
 
 - **Stale undelete loses.** An undelete stamped earlier than a stored tombstone
-  is a no-op, and the next pull tells the device the row is deleted. This is
-  the accepted cost of trusting client clocks.
+  is a no-op; the next pull tells the device the row is deleted (the cost of
+  trusting client clocks).
 - **Newer undelete restores.** Re-emitting the original id with a fresh
-  timestamp and a full payload restores the row losslessly. Reusing the id
-  (relink, a future restore UI) is the only undelete path.
+  timestamp and a full payload restores the row losslessly; it is the only
+  undelete path (relink, a future restore UI).
 
 ### Migration-in-flight contract
 
@@ -114,7 +113,9 @@ listed here:
   pull on the client, omits the key (`split_by_gym` does on push). An explicit
   `rest_timer_sec: null` clears it.
 - **`user_settings`** is a singleton whose client id is `settings`. The
-  singleton is client-enforced; the server is a plain LWW mirror.
+  singleton is client-enforced; the server is a plain LWW mirror. Its four
+  muscle-target columns keep their value when a push or pull omits or nulls
+  them; `muscle_target_overrides` is `jsonb` sent as JSON text.
 - **`exercise_group_links`** is the member's own data, not a group table. Only
   the member's client writes it; server code (the group evaluator included)
   only reads it. Its id must stay `<group_id>:<exercise_definition_id>`: a local
@@ -194,16 +195,17 @@ moved the session chain down a layer; an upgraded client resets `pull_cursor`
 
 `apps/mobile/scripts/check-sync-schema-drift.ts` (`npm run check:sync-drift`,
 run by the backend gate with `--strict`) resets the local Postgres, replays the
-Drizzle schema into in-memory SQLite, and diffs the live catalogs. Its header
-holds the algorithm, flags and exit codes. It guarantees:
+Drizzle schema into in-memory SQLite, and diffs the live catalogs (algorithm,
+flags and exit codes: its header). It guarantees:
 
 - Every client column maps to a typed server column of a compatible type.
-- Server columns with no client counterpart warn, and fail under `--strict`.
+- Unexempted server-only columns warn, and fail under `--strict`.
 - The ground rules and universal objects above hold per table.
 - The topological layers match the FK graph.
 
-Local-only client columns are exempt through
-`apps/mobile/src/data/schema/sync-extras.json`.
+`apps/mobile/src/data/schema/sync-extras.json` exempts local-only client
+columns and the server-only agent API tokens `session_plans.graph_version`,
+`training_programmes.graph_version` (not in push/pull fields).
 
 ---
 

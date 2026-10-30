@@ -1,33 +1,28 @@
-import { hexToLch, lchToHex } from '@/components/ui/lch';
+import { hexToLch, lchToHex, type Lch } from '@/components/ui/lch';
 import { uiRoles } from '@/components/ui/tokens';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
-import { formatCountDelta, formatVolumeDelta } from './comparison-format';
+import { isModelFibre, MUSCLE_BODY_FASCICLES, type ModelFibreSegment, type MuscleBodyFascicles, type MuscleBodyFibreSegment, type MuscleBodyFibreSelection, type TriangleFibreSegment } from './muscle-body-fibres';
 import {
   MUSCLE_BODY_MESH,
   type MuscleBodyFace,
   type MuscleBodyMaterialId,
   type MuscleBodyMesh,
 } from './muscle-body-mesh';
+import { MOUSTACHE_FILL, NOVEMBER_MOUSTACHE_MESH } from './muscle-body-moustache';
+import { reduceFibreRun, type FibrePoint } from './projected-fibre-contour';
 
 export type BodyOrientation = 'front' | 'back';
 
 export type ThemeShadeRoles = Pick<
   typeof uiRoles,
-  'paper' | 'rule' | 'ink' | 'gain' | 'loss'
+  'paper' | 'rule' | 'viz1' | 'viz2' | 'viz4'
 >;
-
-export type MuscleChangeBucket = 0 | 1 | 2;
 
 export type ThemeShadePalette = {
   readonly neutral: readonly string[];
-  readonly buckets: readonly [
-    readonly string[],
-    readonly string[],
-    readonly string[],
-  ];
-  readonly selectedStroke: string;
+  readonly anchors: readonly [Lch, Lch, Lch];
 };
 
 export type ProjectedTriangle = {
@@ -50,19 +45,13 @@ export type ProjectedPathBatch = {
   readonly key: string;
   readonly d: string;
   readonly fill: string;
-  readonly stroke?: string;
   readonly selected: boolean;
-};
-
-export type ProjectedMuscleContour = {
-  readonly d: string;
-  readonly stroke: string;
 };
 
 export type ProjectedMuscleBody = {
   readonly triangles: readonly ProjectedTriangle[];
   readonly batches: readonly ProjectedPathBatch[];
-  readonly contour: ProjectedMuscleContour | null;
+  readonly fibres: { readonly surface: string; readonly deep: string; readonly anatomicalParts?: readonly { readonly id: string; readonly d: string }[] };
 };
 
 export const SHADE_STEPS = 12;
@@ -114,31 +103,58 @@ export function canonicalOrientationForMuscle(muscleId: string): BodyOrientation
 }
 
 const canonicalMuscleId = (id: string): string => LEGACY_MUSCLE_ALIASES[id] ?? id;
+const BODY_MUSCLE_IDS = new Set<string>(MUSCLE_BODY_MESH.materials);
 
-/** Follows the displayed comparison's direction ([[comparison.change-display]]). */
-export function computeMuscleBuckets(
+const muscleChange = (row: ProgressMuscleComparison, metric: ProgressMetric): number | null => {
+  const current = row.current[metric];
+  const previous = row.previous[metric];
+  if (current === null || previous === null || !Number.isFinite(current)
+    || !Number.isFinite(previous) || (current === 0 && previous === 0)) return null;
+  if (metric === 'workingSetCount') return Number.isFinite(row.workingSetChange) ? row.workingSetChange : null;
+  const change = row.volumeChange;
+  // New/overflow gains use the dark anchor without entering the finite extrema.
+  if (change.kind === 'new' || change.kind === 'increased') return Infinity;
+  return change.kind === 'percent' && Number.isFinite(change.percent) ? change.percent : null;
+};
+
+/** Follows [[comparison.colour-scale]] and the displayed change's rounding. */
+export function computeMuscleScores(
   muscles: readonly ProgressMuscleComparison[],
   metric: ProgressMetric,
-): ReadonlyMap<string, MuscleChangeBucket> {
-  const buckets = new Map<string, MuscleChangeBucket>();
+): ReadonlyMap<string, number | null> {
+  const changes = new Map<string, number | null>();
+  const ids = new Set(muscles.map(row => row.muscleGroupId));
+  let largestGain = 0;
+  let largestLoss = 0;
   for (const row of muscles) {
-    const { tone } = metric === 'workingSetCount'
-      ? formatCountDelta(row.current.workingSetCount, row.previous.workingSetCount)
-      : formatVolumeDelta(row.current.totalVolume, row.previous.totalVolume);
-    const bucket = tone === 'negative' ? 1 : tone === 'neutral' ? 0 : 2;
-    buckets.set(row.muscleGroupId, bucket);
-    buckets.set(canonicalMuscleId(row.muscleGroupId), bucket);
+    const id = canonicalMuscleId(row.muscleGroupId);
+    if (!BODY_MUSCLE_IDS.has(id) || (id !== row.muscleGroupId && ids.has(id))) continue;
+    const change = muscleChange(row, metric);
+    changes.set(id, change);
+    if (change !== null && Number.isFinite(change)) {
+      largestGain = Math.max(largestGain, change);
+      largestLoss = Math.max(largestLoss, -change);
+    }
   }
-  return buckets;
+  const scores = new Map<string, number | null>();
+  for (const row of muscles) {
+    const id = canonicalMuscleId(row.muscleGroupId);
+    const change = changes.get(id) ?? null;
+    const score = change === Infinity ? 1 : change === null ? null
+      : change > 0 ? change / largestGain : change < 0 ? change / largestLoss : 0;
+    scores.set(id, score);
+    scores.set(row.muscleGroupId, score);
+  }
+  return scores;
 }
 
 const buildShadeRamp = (
-  baseHex: string,
+  base: Lch,
   lightnessSpan: number,
   lightnessShift = 0,
   chromaBoost = 1
 ): readonly string[] => {
-  const { lightness: baseL, chroma: baseC, hue: baseH } = hexToLch(baseHex);
+  const { lightness: baseL, chroma: baseC, hue: baseH } = base;
   return Array.from({ length: SHADE_STEPS }, (_, step) => {
     const t = step / (SHADE_STEPS - 1);
     const deltaL = (t - 0.55) * lightnessSpan + lightnessShift;
@@ -149,29 +165,38 @@ const buildShadeRamp = (
 };
 
 /**
- * Keeps anatomical lighting while the muscle hue carries gain/loss/neutral.
+ * Keeps anatomical lighting within the theme's shades ([[comparison.colour-scale]]).
  */
 export function buildThemeShadePalette(
   roles: ThemeShadeRoles = uiRoles
 ): ThemeShadePalette {
   const { lightness: paperL, chroma: paperC, hue: paperH } = hexToLch(roles.paper);
   const { lightness: ruleL, chroma: ruleC } = hexToLch(roles.rule);
-  const neutralBase = lchToHex({
+  const neutralBase = hexToLch(lchToHex({
     lightness: (paperL + ruleL) / 2,
     chroma: (paperC + ruleC) / 2,
     hue: paperH,
-  });
+  }));
   const neutral = buildShadeRamp(neutralBase, 18);
 
   return {
     neutral,
-    buckets: [
-      neutral,
-      buildShadeRamp(roles.loss, 22),
-      buildShadeRamp(roles.gain, 22),
-    ],
-    selectedStroke: roles.ink,
+    anchors: [hexToLch(roles.viz1), hexToLch(roles.viz2), hexToLch(roles.viz4)],
   };
+}
+
+/** Interpolate the data shade first; facet lighting remains a separate ramp. */
+export function buildMuscleShadeRamp(score: number | null, palette: ThemeShadePalette): readonly string[] {
+  if (score === null || !Number.isFinite(score)) return palette.neutral;
+  const middle = palette.anchors[1];
+  const end = palette.anchors[score < 0 ? 0 : 2];
+  const t = clamp(Math.abs(score), 0, 1);
+  const hueDelta = ((end.hue - middle.hue + 540) % 360) - 180;
+  return buildShadeRamp({
+    lightness: middle.lightness + (end.lightness - middle.lightness) * t,
+    chroma: middle.chroma + (end.chroma - middle.chroma) * t,
+    hue: middle.hue + hueDelta * t,
+  }, 22);
 }
 
 let cachedDefaultPalette: { roles: ThemeShadeRoles; palette: ThemeShadePalette } | null = null;
@@ -211,7 +236,7 @@ type ProjectionContext = {
   readonly verts: RotatedVertices;
   readonly materials: readonly MuscleBodyMaterialId[];
   readonly report?: MuscleReportAssignment;
-  readonly buckets: ReadonlyMap<string, MuscleChangeBucket>;
+  readonly shades: ReadonlyMap<string, readonly string[]>;
   readonly selectedCanonicalId: string | null;
   readonly palette: ThemeShadePalette;
 };
@@ -219,12 +244,10 @@ type ProjectionContext = {
 const resolveFaceFill = (
   materialId: MuscleBodyMaterialId,
   step: number,
-  _selected: boolean,
   ctx: ProjectionContext
 ): string => {
   if (materialId === 'neutral') return ctx.palette.neutral[step];
-  const bucket = ctx.buckets.get(materialId) ?? 0;
-  return ctx.palette.buckets[bucket][step];
+  return (ctx.shades.get(materialId) ?? ctx.palette.neutral)[step];
 };
 
 type RotatedVertices = {
@@ -235,18 +258,23 @@ type RotatedVertices = {
   readonly sy: Float64Array;
 };
 
+const projectionFrame = (
+  angleDeg: number,
+  width: number,
+  height: number
+) => {
+  const rad = (normaliseBodyAngle(angleDeg) * Math.PI) / 180;
+  return { cos: Math.cos(rad), sin: Math.sin(rad),
+    scale: Math.min(width / MODEL_WIDTH_SPAN, height / MODEL_HEIGHT_SPAN), halfW: width / 2, halfH: height / 2 };
+};
+
 const rotateAndProjectVertices = (
   mesh: MuscleBodyMesh,
   angleDeg: number,
   width: number,
   height: number
 ): RotatedVertices => {
-  const rad = (normaliseBodyAngle(angleDeg) * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  const scale = Math.min(width / MODEL_WIDTH_SPAN, height / MODEL_HEIGHT_SPAN);
-  const halfW = width / 2;
-  const halfH = height / 2;
+  const { cos, sin, scale, halfW, halfH } = projectionFrame(angleDeg, width, height);
   const count = mesh.vertices.length;
 
   const rx = new Float64Array(count);
@@ -293,7 +321,7 @@ const projectSingleFace = (
   const materialId = reportedMaterial(ctx.materials[matIdx] ?? 'neutral', ctx.report);
   const selected = materialId !== 'neutral' && materialId === ctx.selectedCanonicalId;
   const step = computeLightStep(nx / len, ny / len, unitNz);
-  const fill = resolveFaceFill(materialId, step, selected, ctx);
+  const fill = resolveFaceFill(materialId, step, ctx);
 
   return {
     x0: verts.sx[i0],
@@ -327,91 +355,108 @@ const pointInTriangle = (
   return !(hasNeg && hasPos);
 };
 
-const OCCLUSION_DEPTH_BIAS = 0.005;
+const prepareModelContour = (
+  segments: readonly MuscleBodyFibreSegment[],
+  offset: number,
+  indices: readonly number[],
+): readonly ModelFibreSegment[] => indices.map(index => {
+  const s = segments[offset + (index >= 0 ? index : -index - 1)] as ModelFibreSegment;
+  return index >= 0 ? s : [s[3], s[4], s[5], s[0], s[1], s[2], s[6], s[7], s[8]];
+});
 
-const isEdgeOccluded = (
-  v0: number,
-  v1: number,
-  verts: RotatedVertices,
-  sortedTriangles: readonly ProjectedTriangle[]
-): boolean => {
-  const mx = (verts.sx[v0] + verts.sx[v1]) * 0.5;
-  const my = (verts.sy[v0] + verts.sy[v1]) * 0.5;
-  const mz = (verts.rz[v0] + verts.rz[v1]) * 0.5;
-  const minDepth = mz + OCCLUSION_DEPTH_BIAS;
-
-  for (let i = sortedTriangles.length - 1; i >= 0; i -= 1) {
-    const tri = sortedTriangles[i];
-    if (tri.depth <= minDepth) break;
-    if (
-      tri.v0 === v0 ||
-      tri.v0 === v1 ||
-      tri.v1 === v0 ||
-      tri.v1 === v1 ||
-      tri.v2 === v0 ||
-      tri.v2 === v1
-    ) {
-      continue;
-    }
-    const minX = Math.min(tri.x0, tri.x1, tri.x2);
-    if (mx < minX) continue;
-    const maxX = Math.max(tri.x0, tri.x1, tri.x2);
-    if (mx > maxX) continue;
-    const minY = Math.min(tri.y0, tri.y1, tri.y2);
-    if (my < minY) continue;
-    const maxY = Math.max(tri.y0, tri.y1, tri.y2);
-    if (my > maxY) continue;
-
-    if (pointInTriangle(mx, my, tri)) {
-      return true;
-    }
-  }
-  return false;
-};
-
-const recordFaceEdges = (
-  i0: number,
-  i1: number,
-  i2: number,
-  counts: Map<number, number>
-) => {
-  const addEdge = (a: number, b: number) => {
-    const min = a < b ? a : b;
-    const max = a < b ? b : a;
-    const key = (min << 16) | max;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+/** Select and orient topology-checked contours once per setup/selection. */
+export function selectMuscleFibres(
+  selectedId: string | null,
+  report?: MuscleReportAssignment,
+  fascicles: MuscleBodyFascicles = MUSCLE_BODY_FASCICLES,
+): MuscleBodyFibreSelection {
+  if (!selectedId) return { segments: [], anatomicalParts: [] };
+  const selected = canonicalMuscleId(selectedId);
+  const entries = Object.entries(fascicles)
+    .filter(([entry]) => reportedMaterial(entry as MuscleBodyMaterialId, report) === selected)
+    .map(([, muscle]) => muscle);
+  return {
+    segments: entries.flatMap(muscle => muscle.segments.filter((segment): segment is TriangleFibreSegment => !isModelFibre(segment))),
+    anatomicalParts: entries.flatMap(muscle => (muscle.anatomicalParts ?? []).map(part => ({ id: part.id,
+      chains: part.chains.map(indices => prepareModelContour(muscle.segments, part.start, indices)) }))),
   };
-  addEdge(i0, i1);
-  addEdge(i1, i2);
-  addEdge(i2, i0);
+}
+
+const projectFibreSegments = (
+  selection: MuscleBodyFibreSelection,
+  mesh: MuscleBodyMesh,
+  verts: RotatedVertices,
+  frame: ReturnType<typeof projectionFrame>,
+): ProjectedMuscleBody['fibres'] => {
+  const surface: string[] = [];
+  const deep: string[] = [];
+  const endpoint = (face: MuscleBodyFace, weights: readonly number[]): string => {
+    const x = weights[0] * verts.sx[face[0]] + weights[1] * verts.sx[face[1]] + weights[2] * verts.sx[face[2]];
+    const y = weights[0] * verts.sy[face[0]] + weights[1] * verts.sy[face[1]] + weights[2] * verts.sy[face[2]];
+    return `${roundCoord(x)} ${roundCoord(y)}`;
+  };
+  for (const segment of selection.segments) {
+    const face = mesh.faces[segment.face];
+    if (!face) continue;
+    // Selection deliberately surfaces every independent segment, including hidden/deep guides.
+    const target = segment.layer === 'surface' ? surface : deep;
+    target.push(`M${endpoint(face, segment.a)}L${endpoint(face, segment.b)}`);
+  }
+  const fibres: ProjectedMuscleBody['fibres'] = { surface: surface.join(''), deep: deep.join('') };
+  if (!selection.anatomicalParts.length) return fibres;
+  // Keep each component's highlight/shade together; flattening them fills fibre gaps at overlaps.
+  return { ...fibres, anatomicalParts: selection.anatomicalParts.map(part => {
+    const paths: string[] = [];
+    for (const chain of part.chains) projectModelContour(chain, frame, paths);
+    return { id: part.id, d: paths.join('') };
+  }) };
 };
 
-const buildBoundaryContour = (
-  edgeCounts: ReadonlyMap<number, number>,
-  verts: RotatedVertices,
-  stroke: string,
-  sortedTriangles: readonly ProjectedTriangle[]
-): ProjectedMuscleContour | null => {
-  const segments: string[] = [];
-  edgeCounts.forEach((count, key) => {
-    if (count === 1) {
-      const a = key >>> 16;
-      const b = key & 0xffff;
-      if (!isEdgeOccluded(a, b, verts, sortedTriangles)) {
-        segments.push(
-          `M${roundCoord(verts.sx[a])} ${roundCoord(verts.sy[a])}L${roundCoord(verts.sx[b])} ${roundCoord(verts.sy[b])}`
-        );
+const modelEndpoint = (
+  segment: ModelFibreSegment,
+  offset: 0 | 3,
+  side: number,
+  frame: ReturnType<typeof projectionFrame>,
+): FibrePoint => {
+  const { cos, sin, scale, halfW, halfH } = frame;
+  const x = halfW + (side * segment[offset] * cos + segment[offset + 2] * sin) * scale;
+  return [Math.round(x * 10), Math.round((halfH - segment[offset + 1] * scale) * 10)];
+};
+
+const appendModelRun = (points: readonly FibrePoint[], paths: string[]): void => {
+  if (!points.length) return;
+  const reduced = reduceFibreRun(points);
+  paths.push(reduced.map((point, i) => `${i === 0 ? 'M' : 'L'}${point[0] / 10} ${point[1] / 10}`).join(''));
+  // SVG needs a zero-length edge to paint the isolated round cap.
+  if (reduced.length === 1) paths.push(`L${reduced[0][0] / 10} ${reduced[0][1] / 10}`);
+};
+
+const projectModelContour = (
+  chain: readonly ModelFibreSegment[],
+  frame: ReturnType<typeof projectionFrame>,
+  paths: string[],
+): void => {
+  const { cos, sin } = frame;
+  for (const side of [1, -1]) {
+    let points: FibrePoint[] = [];
+    for (const segment of chain) {
+      if (-side * segment[6] * sin + segment[8] * cos < BACKFACE_CULL_NZ) {
+        appendModelRun(points, paths);
+        points = [];
+        continue;
       }
+      if (!points.length) points.push(modelEndpoint(segment, 0, side, frame));
+      const end = modelEndpoint(segment, 3, side, frame);
+      const last = points[points.length - 1];
+      if (end[0] !== last[0] || end[1] !== last[1]) points.push(end);
     }
-  });
-  if (segments.length === 0) return null;
-  return { d: segments.join(''), stroke };
+    appendModelRun(points, paths);
+  }
 };
 
 const batchSlabTriangles = (
   slabTriangles: readonly ProjectedTriangle[],
-  slabIndex: number,
-  selectedStroke: string
+  slabIndex: number
 ): ProjectedPathBatch[] => {
   const unselectedByFill = new Map<string, string[]>();
   const selectedByFill = new Map<string, string[]>();
@@ -438,23 +483,51 @@ const batchSlabTriangles = (
       key: `s${slabIndex}-sel-${fill}`,
       d: segments.join(''),
       fill,
-      stroke: selectedStroke,
       selected: true,
     });
   });
   return batches;
 };
 
+const depthAtPoint = (triangle: ProjectedTriangle, x: number, y: number, verts: RotatedVertices): number => {
+  const { x0, y0, x1, y1, x2, y2, v0, v1, v2 } = triangle;
+  const denominator = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
+  if (Math.abs(denominator) < 1e-9) return -Infinity;
+  const a = ((y1 - y2) * (x - x2) + (x2 - x1) * (y - y2)) / denominator;
+  const b = ((y2 - y0) * (x - x2) + (x0 - x2) * (y - y2)) / denominator;
+  return a * verts.rz[v0] + b * verts.rz[v1] + (1 - a - b) * verts.rz[v2];
+};
+
+const projectMoustache = (
+  angleDeg: number, width: number, height: number,
+  ctx: ProjectionContext, body: readonly ProjectedTriangle[],
+): ProjectedTriangle[] => {
+  const mesh = NOVEMBER_MOUSTACHE_MESH;
+  const verts = rotateAndProjectVertices(mesh, angleDeg, width, height);
+  return mesh.faces.flatMap(face => {
+    const triangle = projectSingleFace(face, { ...ctx, verts, materials: mesh.materials, report: undefined });
+    if (!triangle) return [];
+    const x = (triangle.x0 + triangle.x1 + triangle.x2) / 3;
+    const y = (triangle.y0 + triangle.y1 + triangle.y2) / 3;
+    const occluded = body.some(facet => pointInTriangle(x, y, facet)
+      && depthAtPoint(facet, x, y, ctx.verts) > triangle.depth + .001);
+    return occluded ? [] : [{ ...triangle, fill: MOUSTACHE_FILL, selected: false }];
+  });
+};
+
 export type ProjectMuscleBodyOptions = {
   readonly angleDeg: number;
   readonly width: number;
   readonly height: number;
-  readonly buckets: ReadonlyMap<string, MuscleChangeBucket>;
+  readonly scores: ReadonlyMap<string, number | null>;
   readonly selectedId?: string | null;
   /** The user's muscle setup; unset shows every anatomy entry as its own muscle. */
   readonly report?: MuscleReportAssignment;
   readonly palette?: ThemeShadePalette;
   readonly mesh?: MuscleBodyMesh;
+  /** Prepared for this selection/report; omit to resolve directly from the source asset. */
+  readonly selectedFibres?: MuscleBodyFibreSelection;
+  readonly november?: boolean;
 };
 
 /**
@@ -465,14 +538,16 @@ export function projectMuscleBody({
   angleDeg,
   width,
   height,
-  buckets,
+  scores,
   selectedId = null,
   report,
   palette = getDefaultPalette(),
   mesh = MUSCLE_BODY_MESH,
+  selectedFibres = selectMuscleFibres(selectedId, report),
+  november = false,
 }: ProjectMuscleBodyOptions): ProjectedMuscleBody {
-  if (width <= 0 || height <= 0) {
-    return { triangles: [], batches: [], contour: null };
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0 || !mesh.vertices.length || !mesh.faces.length) {
+    return { triangles: [], batches: [], fibres: { surface: '', deep: '' } };
   }
   const verts = rotateAndProjectVertices(mesh, angleDeg, width, height);
   const selectedCanonicalId = selectedId ? canonicalMuscleId(selectedId) : null;
@@ -480,20 +555,16 @@ export function projectMuscleBody({
     verts,
     materials: mesh.materials,
     report,
-    buckets,
+    shades: new Map([...scores].map(([id, score]) => [id, buildMuscleShadeRamp(score, palette)])),
     selectedCanonicalId,
     palette,
   };
   const triangles: ProjectedTriangle[] = [];
-  const edgeCounts = selectedCanonicalId ? new Map<number, number>() : null;
 
   for (const face of mesh.faces) {
     const projected = projectSingleFace(face, ctx);
     if (projected) {
       triangles.push(projected);
-      if (edgeCounts && projected.selected) {
-        recordFaceEdges(face[0], face[1], face[2], edgeCounts);
-      }
     }
   }
 
@@ -503,14 +574,16 @@ export function projectMuscleBody({
   const batches: ProjectedPathBatch[] = [];
   for (let i = 0; i < triangles.length; i += slabSize) {
     const slice = triangles.slice(i, i + slabSize);
-    batches.push(...batchSlabTriangles(slice, i / slabSize, palette.selectedStroke));
+    batches.push(...batchSlabTriangles(slice, i / slabSize));
   }
 
-  const contour = edgeCounts
-    ? buildBoundaryContour(edgeCounts, verts, palette.selectedStroke, triangles)
-    : null;
+  // Draw only surface-visible decoration, leaving anatomy batches and hit targets unchanged.
+  if (november) {
+    batches.push(...batchSlabTriangles(projectMoustache(angleDeg, width, height, ctx, triangles), DEPTH_SLABS));
+  }
 
-  return { triangles, batches, contour };
+  const fibres = projectFibreSegments(selectedFibres, mesh, verts, projectionFrame(angleDeg, width, height));
+  return { triangles, batches, fibres };
 }
 
 /**

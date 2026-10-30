@@ -305,7 +305,7 @@ path is defined so the permitted operation can never block sync.
 
 - **Today tab:** surfaces the next scheduled workout or programme block as a primary Start card.
 - **Exercise picker:** the historical **Append plan** action is renamed **Repeat
-  last**, and a new **From planner** entry selects available authored blocks.
+  last**, and a new **Planner** chip selects available authored blocks.
 
 Planner **Add set(s)** opens a count-only form, default 1. It appends that
 many exact copies of the last target, preserving weight, reps and effort,

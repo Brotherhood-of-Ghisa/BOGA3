@@ -36,8 +36,8 @@ the configured calendar bounds instead of introducing another duration.
 ## Actions and emphasis
 
 1. **One primary per screen**, the screen's one `accent` action
-   (`design-language.md` "Emphasis"): `Finish`, `Done`, `Edit`, `Save
-   Exercise`, a start disc. Train's disc (an empty start) stays the primary
+   (`design-language.md` "Emphasis"): `Finish`, `Done`, `Edit`, `Save`, a
+   start disc. Train's disc (an empty start) stays the primary
    even with a ready plan, whose `Start` is an outline.
 2. **Everything else is an outline or a text button.** Dismissal is never a
    button inside a sheet (see Sheets).
@@ -45,7 +45,7 @@ the configured calendar bounds instead of introducing another duration.
    primary: a `danger` row in a sheet, a `danger` outline, or the destructive
    style of a native `Alert`.
 4. **Tabs are navigation, not actions.** `MainTabs` uses tab semantics, marks
-   the active tab by weight and an `ink` underline, and never uses `accent`.
+   the active tab in `ink` (the others muted) over an `ink` underline, and never uses `accent`.
    There are exactly four tabs (Today, Train, Progress, More); Settings is a
    row under More, and More and Settings work while signed out.
 5. **A workout in progress is never offered as a Resume button.** Train opens
@@ -58,9 +58,9 @@ the configured calendar bounds instead of introducing another duration.
 1. **A sheet is state within its route, not navigation.** There are two
    kinds. A **picker or menu** (row actions, management options, a choice of
    one value, a short form) opens a design-language `Sheet` over the current
-   screen, sized to its content. A **sub-page** (a browser, an editor, a
-   preview: Swap exercise, the exercise editor, Share session) opens a
-   `PageSheet`, the native iOS page sheet the exercise picker uses. Do not
+   screen, sized to its content. A **sub-page** (a browser or a preview:
+   Swap exercise, Share session) opens a `PageSheet`, the native iOS page
+   sheet the exercise picker uses. An **editor** is a page ("Pages"). Do not
    document opening either as a route transition. A sub-page whose subject
    belongs in a native title and whose chart wants the whole screen is a route
    instead (Progress history, `navigation-contract.md`).
@@ -72,9 +72,9 @@ the configured calendar bounds instead of introducing another duration.
    anywhere and carries an X, since it has no backdrop. A sheet may refuse
    dismissal only while its own write or capture is in flight; a refused drag
    springs back.
-3. **Pickers never stack.** A choice made inside a sheet (an editor's muscle
-   list) swaps the sheet's body, with a `chevron-left` back to the previous
-   body. A sub-page may open over a sub-page, which iOS stacks as cards. A
+3. **Pickers never stack.** A choice made inside a sheet swaps the sheet's
+   body, with a `chevron-left` back to the previous body. A sub-page may open
+   over a sub-page, which iOS stacks as cards. A
    confirmation that follows a sheet opens once the sheet has gone
    (`onDismissed`).
 4. **The keyboard closes before a sheet opens**, so a sheet never opens under
@@ -87,6 +87,45 @@ the configured calendar bounds instead of introducing another duration.
 6. **The exercise picker is the one sub-page with a route**
    (`/session/<id>/add-exercise`, presented as a page sheet), because Manage
    pushes the catalogue over it. Swiping it down leaves without adding.
+
+## Pages
+
+Decided 2026-10-27.
+
+1. **Two kinds of page.** The four tabs open on an in-content `PageHeader`
+   and have no back. Every other page has the one native stack header on the
+   `paper` ground (no white band, no shadow): a minimal back chevron, an
+   Archivo 700 title, and an optional `headerRight` action (⋮, `+`). No page
+   draws a second back of its own; back returns to where you came from.
+2. **Edit in a page, choose in a tray.** An editor (the exercise editor,
+   `/exercise-edit`) is a pushed page; what it opens (Link) pushes over it, so
+   unsaved edits wait beneath. A `Sheet` is for row ⋮ menus and choosing one
+   or a few values (a muscle). A single setting — a switch, a choice of two or
+   three, a number — is edited in place on its page, never in a tray.
+
+## Forms
+
+Decided 2026-10-27. The primitives are `components/ui/form-section.tsx`.
+
+1. **Fields live in sections:** a `FormSection` micro-label over one card of
+   rows. The heading names the group, never one field. Only a free-text name
+   or title stands alone, at the top, as a `FormField`.
+2. **Four row kinds:** a `FormField` (free text), a `ChoiceRow` (label,
+   value, chevron; opens a picker), a `SwitchRow density="list"` or an
+   `InputRow` (a short figure), and a `FormActionRow` (an `accent` action
+   that leaves for another page). No hand-made field frame, no copied
+   micro-label style.
+3. **Group by what a setting affects, order by use.** Name, then
+   relationships used most (an exercise's Groups), required fields, what
+   changes the figures (Weight), behaviour (Options); destructive actions
+   last, in `danger`.
+4. **Rare settings hide behind a switch**; their detail appears only when on,
+   and off saves the neutral value.
+5. **Words:** sentence case, the unit in the label (`Rest timer (s)`), a
+   blank field's placeholder is the default it falls back to. The primary is
+   `Save` when editing and `Add <thing>` when creating; there is no Cancel.
+6. **One error style:** under its field (`FormField`) or section
+   (`FormSection error`).
 
 ## Lists and rows
 
@@ -196,9 +235,9 @@ Every theme is light; the presets, their seeds and why the choice applies at
 next launch are `design-language.md` "Choosing one" and the decision register in
 `docs/specs/03-technical-architecture.md`. Outside the roles: `app/_layout.tsx`
 keeps `<StatusBar style="dark" />`; the splash is a fixed white
-(`app.config.ts`); neither reads a role. The stack header takes `surface`
-and `ink`, read once at launch like every role, so it matches the screen
-beneath it.
+(`app.config.ts`); neither reads a role. The stack header takes `paper`
+(no shadow line) and `ink`, read once at launch like every role, so header
+and page read as one surface ("Pages").
 
 ## Screen rules no other source states
 

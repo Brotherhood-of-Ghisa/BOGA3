@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 
-import { Screen, uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { Screen, uiRoles, uiSpace, uiText } from '@/components/ui';
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
@@ -202,11 +202,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.xl,
   },
   message: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
+    ...uiText.body,
     textAlign: 'center',
   },
   errorMessage: {

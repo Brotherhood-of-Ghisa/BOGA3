@@ -18,6 +18,16 @@ calculation, eligibility or record rule), or the sync protocol.
 - Re-check `main` right before merge: two PRs have claimed the same revision.
 - Forward-only (no bump) is the operator's call, never the default.
 
+## Unfinished weekly challenges
+
+Before changing a shared scorer/kernel dependency, retain callable pinned CoW
+implementations and their arithmetic imports for every unfinished version.
+`apps/mobile/src/groups/cow-evaluation.ts` pins its supported scorer separately
+from lifetime rebuilds. A new lifetime version must not strand ended challenges
+or rescore their retained inputs under new mathematics. In-week context changes
+follow [[groups.cow-finality]]; post-cutoff upgrades still finish the old version.
+Test delayed publication across the upgrade before deploying it.
+
 ## Roll out
 
 - Order: migrations → `group-eval` and `agent-api` redeployed in the same
@@ -54,3 +64,19 @@ calculation, eligibility or record rule), or the sync protocol.
 - Never stop a Supabase lane mid-run and then `./boga db down`: the backup
   saves a half-reset database. Fix:
   `bash -lc 'source supabase/scripts/_common.sh && run_supabase stop --no-backup'`.
+
+## Revision history
+
+Agent API `metric_revision` values, newest first.
+
+- `working_sets_v7` reports a split exercise as the whole exercise unless
+  `gym_bucket` names a gym.
+- `working_sets_v6` reported it one bucket at a time, defaulting to the most
+  recently performed and counting no-gym sessions as their own bucket.
+- `working_sets_v5` applied the source entry factor to total Volume for every
+  exercise, retaining entered Weight and displayed 1RM units.
+- `working_sets_v4` omitted the factor from ordinary exercise Volume.
+- `working_sets_v3` estimated a single's 1RM.
+- `working_sets_v2` counted technique and cooldown sets as working sets.
+- `working_sets_v1` let a zero 1RM, Weight or Volume stand as a record.
+- `bodyweight_optional_v1` (earlier) counted warm-ups in every figure.

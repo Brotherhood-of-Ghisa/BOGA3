@@ -1,3 +1,4 @@
+import { CoWGroupPreview } from '@/components/groups/cow-group-preview';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -168,6 +169,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
       style={groupScreenStyles.screen}
       testID="group-screen">
       {header}
+      <CoWGroupPreview key={`${userId}:${groupId}`} groupId={groupId} userId={userId} />
       <GroupExercisesPage
         error={inlineError}
         exercises={exercises}
@@ -177,6 +179,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
         offline={offline}
         onRetry={onRefresh}
         refreshGroup={refreshGroup}
+        userId={userId}
       />
     </ScrollView>
   );

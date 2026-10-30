@@ -6,7 +6,8 @@ import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionPe
 import type { CompetitionCertifyResultWire, CompetitionCertificationResultWire, CompetitionEventWire,
   CompetitionExerciseListWire, CompetitionExerciseWire, CompetitionExerciseWriteWire, CompetitionHistoryWire,
   CompetitionPodiumsWire, CompetitionRevisionWire, CompetitionRevisionsWire, CompetitionSessionDetailWire,
-  CompetitionPeriodTotalsWire, CompetitionSessionRecordsWire, CompetitionSessionWire, CompetitionStreamWire, CompetitionWeekSummaryWire } from './competition-wire.ts';
+  CompetitionPeriodTotalsWire, CompetitionSessionRecordsWire, CompetitionSessionWire, CompetitionStreamWire, CompetitionWeekSummaryWire,
+  GroupSharedExerciseDeleteWire, GroupSharedExerciseItemWire, GroupSharedExercisesListWire, GroupSharedExerciseWriteWire } from './competition-wire.ts';
 
 const exact = (v: unknown, fields: readonly string[]): v is Record<string, unknown> => v !== null && typeof v === 'object' &&
   !Array.isArray(v) && Object.keys(v).length === fields.length && fields.every(f => Object.prototype.hasOwnProperty.call(v,f));
@@ -154,6 +155,37 @@ function streamRecord(v: unknown, event: CompetitionEventWire): boolean {
       historyValue(p.value,normalized || (p.performance !== null && visibility(p.performance) === 'normalized')) &&
       (!normalized || p.performance === null || visibility(p.performance) === 'normalized'));
 }
+function sharedExerciseMapping(v: unknown): boolean {
+  return exact(v,['muscle_group_id','weight','role']) && id(v.muscle_group_id) &&
+    typeof v.weight === 'number' && Number.isFinite(v.weight) && v.weight > 0 &&
+    (v.role === null || ['primary','secondary','stabilizer'].includes(String(v.role)));
+}
+function sharedExerciseDetails(v: unknown): boolean {
+  return exact(v,['group_exercise_id','group_exercise_name','name','load_input_mode','bodyweight_contribution','mappings','created_at_ms']) &&
+    (v.group_exercise_id === null || id(v.group_exercise_id)) &&
+    (v.group_exercise_name === null || id(v.group_exercise_name)) &&
+    id(v.name) && mode(v.load_input_mode) &&
+    typeof v.bodyweight_contribution === 'number' && Number.isFinite(v.bodyweight_contribution) &&
+    v.bodyweight_contribution >= 0 && v.bodyweight_contribution <= 1 &&
+    arrayOf(v.mappings,sharedExerciseMapping) &&
+    integer(v.created_at_ms);
+}
+export function isGroupSharedExerciseItemWire(v: unknown): v is GroupSharedExerciseItemWire {
+  return exact(v,['id','group_id','shared_by','exercise']) &&
+    id(v.id) && id(v.group_id) && member(v.shared_by) && sharedExerciseDetails(v.exercise);
+}
+export function isGroupSharedExercisesListWire(v: unknown): v is GroupSharedExercisesListWire {
+  return exact(v,['contract_version','group_id','shared_exercises']) &&
+    v.contract_version === 4 && id(v.group_id) && arrayOf(v.shared_exercises,isGroupSharedExerciseItemWire);
+}
+export function isGroupSharedExerciseWriteWire(v: unknown): v is GroupSharedExerciseWriteWire {
+  return exact(v,['contract_version','group_id','shared_exercise']) &&
+    v.contract_version === 4 && id(v.group_id) && isGroupSharedExerciseItemWire(v.shared_exercise);
+}
+export function isGroupSharedExerciseDeleteWire(v: unknown): v is GroupSharedExerciseDeleteWire {
+  return exact(v,['contract_version','group_id','shared_exercise_id','deleted']) &&
+    v.contract_version === 4 && id(v.group_id) && id(v.shared_exercise_id) && typeof v.deleted === 'boolean';
+}
 function streamItem(v: unknown): boolean {
   if (exact(v,['kind','key','sort_at_ms','event']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
     isCompetitionEventWire(v.event) && v.event.event_id === v.key;
@@ -161,6 +193,9 @@ function streamItem(v: unknown): boolean {
     isCompetitionEventWire(v.event) && v.event.event_id === v.key && streamRecord(v.record,v.event);
   if (exact(v,['kind','key','sort_at_ms','groups','session']) && v.kind === 'session') return id(v.key) && integer(v.sort_at_ms) &&
     Array.isArray(v.groups) && v.groups.length > 0 && v.groups.every(group) && isCompetitionSessionWire(v.session);
+  if (exact(v,['kind','key','sort_at_ms','id','group_id','shared_by','exercise']) && v.kind === 'shared_exercise') {
+    return id(v.key) && integer(v.sort_at_ms) && id(v.id) && id(v.group_id) && member(v.shared_by) && sharedExerciseDetails(v.exercise);
+  }
   return exact(v,['kind','key','sort_at_ms','event','group','member']) && v.kind === 'membership' && id(v.key) && integer(v.sort_at_ms) &&
     ['joined','left','removed'].includes(String(v.event)) && group(v.group) && member(v.member);
 }

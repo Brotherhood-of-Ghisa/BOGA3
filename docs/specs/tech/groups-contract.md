@@ -11,6 +11,7 @@
 | Tables, constraints, grants, function bodies | the group migrations in `supabase/migrations/` |
 | Wire shapes | `apps/mobile/src/groups/types.ts`, `competition-wire.ts` |
 | Protocol-4 metrics, units, disclosure, history (changing competition scoring or readers) | [group-competition-contract.md](group-competition-contract.md) |
+| CoW intake, publication and readers (changing CoW) | [group-cow-contract.md](group-cow-contract.md) |
 | Bodyweight policy and privacy (changing group bodyweight scoring) | [bodyweight-load-contract.md](bodyweight-load-contract.md) |
 | Authorization baseline | `docs/specs/10-api-authn-authz-guidelines.md` rules 15–19 |
 | Routes, screens, wording (changing group UI) | `docs/specs/ui/screen-map.md`, `docs/product/copy.md`, the group components (`apps/mobile/components/groups/`) |
@@ -81,13 +82,14 @@ commit with the period change (not isolated) at a fixed position: a writer that
 edits `joined_at` or reopens a period must move the item.
 `group_events_backfill()` idempotently inserts missing items.
 
-**Group exercises.** A comparison identity that members link their own
-exercises to. It shares `ExerciseCore` and `validateExerciseCore` with personal
-exercises; SQL trims with `group_exercise_trim` (Postgres `btrim` is not
-`String#trim`), held by `apps/mobile/src/exercise-core/exercise-core-vectors.json`
-in Jest and `groups-contract`. No name cap or uniqueness. Archiving keeps
-links and a frozen read-only board and takes no new links. Links are the
-member's Sync v2 entity `exercise_group_links`.
+**Group exercises & shared library.** A comparison identity that members link
+their exercises to. Shares `ExerciseCore` with personal exercises; SQL trims with
+`group_exercise_trim`, held by `exercise-core-vectors.json`. Archiving keeps
+links and a frozen board. Members can also share exercises into the group library
+(`app_public.group_shared_exercises`), emitting a `shared_exercise` stream event (`app_public.group_events`).
+Members import into their catalog in one tap; if linked to a competition exercise
+(`group_exercise_id`), both create atomically. Authors and admins can soft-delete.
+Links are the member's Sync v2 entity `exercise_group_links`.
 
 ## Authorization
 

@@ -40,7 +40,7 @@ export const changedFilters = ({ grouping, secondary, gym }: Omit<ProgressFilter
 
 /**
  * Progress's view choices behind one button — family grouping, secondary sets
- * and the gym — also a muscle history page's gym and secondary sets. The button fills while any choice is off its opening value;
+ * and the gym. The button fills while any choice is off its opening value;
  * the sheet stays open across choices, and holds only the ones the view
  * offers. With none, there is no button.
  */

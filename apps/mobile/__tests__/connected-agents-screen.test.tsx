@@ -4,6 +4,7 @@ const mockUseAuth = jest.fn();
 const mockListConnectedAgents = jest.fn();
 const mockRevokeConnectedAgent = jest.fn();
 const mockSetAgentPlanPermission = jest.fn();
+const mockSetAgentPlanEditEnabled = jest.fn();
 const mockAlert = jest.fn();
 
 jest.mock('@/src/auth', () => ({
@@ -14,10 +15,13 @@ jest.mock('@/src/auth/connected-agents', () => ({
   listConnectedAgents: (...args: unknown[]) => mockListConnectedAgents(...args),
   revokeConnectedAgent: (...args: unknown[]) => mockRevokeConnectedAgent(...args),
   setAgentPlanPermission: (...args: unknown[]) => mockSetAgentPlanPermission(...args),
+  setAgentPlanEditEnabled: (...args: unknown[]) => mockSetAgentPlanEditEnabled(...args),
 }));
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
+
+import { uiFonts, uiRoles, uiText } from '@/components/ui';
 
 import ConnectedAgentsScreen from '../app/connected-agents';
 
@@ -27,6 +31,7 @@ const agent = {
   lastAccessAt: '2026-07-25T13:00:00.000Z',
   name: 'Coach Agent',
   planAccessEnabled: false,
+  planEditEnabled: false,
   scopes: ['openid', 'profile'],
 };
 
@@ -37,6 +42,7 @@ describe('Connected agents screen', () => {
     mockListConnectedAgents.mockResolvedValue([agent]);
     mockRevokeConnectedAgent.mockResolvedValue(undefined);
     mockSetAgentPlanPermission.mockResolvedValue(undefined);
+    mockSetAgentPlanEditEnabled.mockResolvedValue(undefined);
     jest.spyOn(Alert, 'alert').mockImplementation((...args: unknown[]) => mockAlert(...args));
   });
 
@@ -49,6 +55,31 @@ describe('Connected agents screen', () => {
     expect(screen.getByTestId('connected-agent-granted-client-a')).toBeTruthy();
     expect(screen.getByTestId('connected-agent-last-access-client-a')).toBeTruthy();
     expect(screen.queryByText(/email|billing/i)).toBeNull();
+  });
+
+  it('takes every text from the shared roles, with the dates in words and figures', async () => {
+    mockListConnectedAgents.mockResolvedValue([{ ...agent, lastAccessAt: null, planAccessEnabled: 'unavailable' }]);
+    render(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+
+    const role = (name: keyof typeof uiText) => StyleSheet.flatten(uiText[name]);
+    expect(screen.getByText('Coach Agent')).toHaveStyle(role('title'));
+    expect(screen.getByText('Read training data')).toHaveStyle(role('meta'));
+    expect(screen.getByText('Access granted')).toHaveStyle(role('body'));
+    expect(screen.getByText('Last access')).toHaveStyle(role('body'));
+
+    // A date's words stay in the line's face; only its digits take Plex Mono.
+    const granted = screen.getByTestId('connected-agent-granted-client-a');
+    expect(granted).toHaveStyle({ ...role('meta'), color: uiRoles.ink });
+    const digits = granted.findAll((node) => String(node.type) === 'Text' && node !== granted && /^\d/.test(String(node.props.children)));
+    expect(digits.length).toBeGreaterThan(0);
+    for (const digit of digits) expect(digit).toHaveStyle({ fontFamily: uiFonts.figure.family });
+    const never = screen.getByTestId('connected-agent-last-access-client-a');
+    expect(never).toHaveTextContent('Never');
+    expect(never).toHaveStyle({ ...role('meta'), color: uiRoles.ink });
+
+    expect(screen.getByTestId('connected-agent-plan-unavailable-client-a')).toHaveStyle({ ...role('meta'), color: uiRoles.danger });
+    expect(screen.getByTestId('connected-agent-plan-disclosure-client-a')).toHaveStyle(role('meta'));
   });
 
   it('leaves the title to the native header, with no intro under it', async () => {
@@ -90,7 +121,7 @@ describe('Connected agents screen', () => {
     expect(screen.getByText('Retry')).toBeTruthy();
   });
 
-  it('shows change access off by default with the client named in the disclosure', async () => {
+  it('shows change access and edit access off by default with the client named in disclosures', async () => {
     render(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
@@ -103,6 +134,16 @@ describe('Connected agents screen', () => {
     expect(String(disclosure.props.children)).toMatch(/create new plans and programmes/);
     expect(String(disclosure.props.children)).toMatch(/add, edit, delete or restore exercises and their muscles/);
     expect(String(disclosure.props.children)).toMatch(/recalculate your past figures/);
+    expect(String(disclosure.props.children)).toMatch(/never start a workout or change your logged sets/);
+    expect(String(disclosure.props.children)).not.toMatch(/never edit or delete plans/);
+
+    expect(
+      screen.getByTestId('connected-agent-plan-edit-client-a').props.accessibilityState,
+    ).toEqual({ checked: false });
+    const editDisclosure = screen.getByTestId('connected-agent-plan-edit-disclosure-client-a');
+    expect(String(editDisclosure.props.children)).toContain('Coach Agent');
+    expect(String(editDisclosure.props.children)).toMatch(/edit pending session plans and training programmes/);
+    expect(String(editDisclosure.props.children)).toMatch(/never edit workouts in progress or change logged workout history/);
   });
 
   it('enables plan access optimistically and persists it for the live grant', async () => {
@@ -125,6 +166,44 @@ describe('Connected agents screen', () => {
     });
   });
 
+  it('enables plan edit optimistically and persists it for the live grant', async () => {
+    render(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('connected-agent-plan-edit-client-a'));
+    });
+
+    expect(mockSetAgentPlanEditEnabled).toHaveBeenCalledWith(
+      'client-a',
+      true,
+      '2026-07-24T12:00:00.000Z',
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('connected-agent-plan-edit-client-a').props.accessibilityState,
+      ).toEqual({ checked: true });
+    });
+  });
+
+  it('reverts the edit toggle and shows a retryable error when the write fails', async () => {
+    mockSetAgentPlanEditEnabled.mockRejectedValue(
+      new Error('Unable to update access for this coach right now.'),
+    );
+    render(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('connected-agent-plan-edit-client-a'));
+    });
+
+    expect(await screen.findByTestId('connected-agents-error')).toBeTruthy();
+    expect(screen.getByText('Unable to update access for this coach right now.')).toBeTruthy();
+    expect(
+      screen.getByTestId('connected-agent-plan-edit-client-a').props.accessibilityState,
+    ).toEqual({ checked: false });
+  });
+
   it('reverts the toggle and shows a retryable error when the write fails', async () => {
     mockSetAgentPlanPermission.mockRejectedValue(
       new Error('Unable to update access for this coach right now.'),
@@ -143,25 +222,29 @@ describe('Connected agents screen', () => {
     ).toEqual({ checked: false });
   });
 
-  it('renders switch disabled and shows a warning when plan permission is unavailable', async () => {
+  it('renders switches disabled and shows a warning when plan permission is unavailable', async () => {
     mockListConnectedAgents.mockResolvedValue([
-      { ...agent, planAccessEnabled: 'unavailable' },
+      { ...agent, planAccessEnabled: 'unavailable', planEditEnabled: 'unavailable' },
     ]);
     render(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
     const switchComponent = screen.getByTestId('connected-agent-plan-access-client-a');
     expect(switchComponent.props.accessibilityState).toEqual({ checked: false, disabled: true });
+    const editSwitchComponent = screen.getByTestId('connected-agent-plan-edit-client-a');
+    expect(editSwitchComponent.props.accessibilityState).toEqual({ checked: false, disabled: true });
     expect(screen.getByTestId('connected-agent-plan-unavailable-client-a')).toBeTruthy();
     expect(
       screen.getByText('Change settings are temporarily unavailable for this coach.'),
     ).toBeTruthy();
 
-    // Pressing it does not invoke setAgentPlanPermission
+    // Pressing does not invoke permissions update
     await act(async () => {
       fireEvent.press(switchComponent);
+      fireEvent.press(editSwitchComponent);
     });
     expect(mockSetAgentPlanPermission).not.toHaveBeenCalled();
+    expect(mockSetAgentPlanEditEnabled).not.toHaveBeenCalled();
   });
 
   it('serializes toggles per client so concurrent writes across distinct clients settle independently', async () => {
@@ -171,6 +254,7 @@ describe('Connected agents screen', () => {
       lastAccessAt: null,
       name: 'Coach B',
       planAccessEnabled: false,
+      planEditEnabled: false,
       scopes: ['openid'],
     };
     mockListConnectedAgents.mockResolvedValue([agent, agentB]);
@@ -237,6 +321,83 @@ describe('Connected agents screen', () => {
     await waitFor(() => {
       expect(
         screen.getByTestId('connected-agent-plan-access-client-a').props.accessibilityState,
+      ).toEqual({ checked: true });
+    });
+  });
+
+  it('serializes edit toggles per client so concurrent writes across distinct clients settle independently', async () => {
+    const agentB = {
+      clientId: 'client-b',
+      grantedAt: '2026-07-25T12:00:00.000Z',
+      lastAccessAt: null,
+      name: 'Coach B',
+      planAccessEnabled: false,
+      planEditEnabled: false,
+      scopes: ['openid'],
+    };
+    mockListConnectedAgents.mockResolvedValue([agent, agentB]);
+
+    let resolveA: () => void = () => {};
+    let resolveB: () => void = () => {};
+    const promiseA = new Promise<void>((resolve) => {
+      resolveA = resolve;
+    });
+    const promiseB = new Promise<void>((resolve) => {
+      resolveB = resolve;
+    });
+
+    mockSetAgentPlanEditEnabled.mockImplementation((clientId: string) => {
+      if (clientId === 'client-a') return promiseA;
+      if (clientId === 'client-b') return promiseB;
+      return Promise.resolve();
+    });
+
+    render(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+    await screen.findByTestId('connected-agent-client-b');
+
+    // Toggle client A then client B edit switches concurrently
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('connected-agent-plan-edit-client-a'));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('connected-agent-plan-edit-client-b'));
+    });
+
+    // Both writes have been initiated
+    expect(mockSetAgentPlanEditEnabled).toHaveBeenCalledWith('client-a', true, agent.grantedAt);
+    expect(mockSetAgentPlanEditEnabled).toHaveBeenCalledWith('client-b', true, agentB.grantedAt);
+
+    // Both edit switches show disabled while in flight
+    expect(
+      screen.getByTestId('connected-agent-plan-edit-client-a').props.accessibilityState,
+    ).toEqual({ checked: true, disabled: true });
+    expect(
+      screen.getByTestId('connected-agent-plan-edit-client-b').props.accessibilityState,
+    ).toEqual({ checked: true, disabled: true });
+
+    // Client B completes first
+    await act(async () => {
+      resolveB();
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('connected-agent-plan-edit-client-b').props.accessibilityState,
+      ).toEqual({ checked: true });
+      expect(
+        screen.getByTestId('connected-agent-plan-edit-client-a').props.accessibilityState,
+      ).toEqual({ checked: true, disabled: true });
+    });
+
+    // Client A completes second
+    await act(async () => {
+      resolveA();
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId('connected-agent-plan-edit-client-a').props.accessibilityState,
       ).toEqual({ checked: true });
     });
   });

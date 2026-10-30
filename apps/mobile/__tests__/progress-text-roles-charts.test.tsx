@@ -55,17 +55,18 @@ describe('Daily heatmap', () => {
 });
 
 describe('Weekly heatmap', () => {
-  it('draws the bar value as a figure, PRs as a record meta line, an empty month in ink meta and the axis faint', () => {
+  it('draws the bar value as a figure, PRs as a record meta line, an empty month with a smaller muted year and the axis faint', () => {
     render(<WeeklyHeatmap data={data} metric="totalVolume" testIDPrefix="w" formatValue={String} />);
     expect(style(screen.getByTestId('w-heatmap-value-2026-10-05'))).toMatchObject({ ...FIGURE, color: uiRoles.ink, textAlign: 'right' });
     const prs = screen.getByTestId('w-heatmap-prs-2026-10-05');
     expect(prs).toHaveTextContent('2 PRs');
-    expect(style(prs)).toMatchObject({ ...META, color: uiRoles.record, fontWeight: '700', position: 'absolute' });
+    expect(style(prs)).toMatchObject({ ...META, color: uiRoles.record, fontWeight: '700', position: 'absolute', top: uiTypography.lineHeight.base });
+    expect(style(screen.getByTestId('w-heatmap-value-column-2026-10-05'))).toMatchObject({ position: 'relative' });
     // The record line's figure is as heavy as its words.
     expect(style(within(prs).getByText('2'))).toMatchObject({ ...PLEX, color: uiRoles.record, fontWeight: '700' });
     const empty = within(screen.getByTestId('w-heatmap-empty-month-2026-08')).getByText(/August/);
-    expect(style(empty)).toMatchObject({ ...META, color: uiRoles.ink });
-    expect(style(within(empty).getByText('2026'))).toMatchObject(PLEX);
+    expect(style(empty)).toMatchObject({ ...BODY, color: uiRoles.ink });
+    expect(style(within(screen.getByTestId('w-heatmap-empty-month-2026-08')).getByText('2026'))).toMatchObject(FIGURE_SMALL);
     expect(style(screen.getAllByTestId(/^w-heatmap-axis-value-/, { includeHiddenElements: true })[0])).toMatchObject({ ...FAINT_LABEL, position: 'absolute' });
   });
 });

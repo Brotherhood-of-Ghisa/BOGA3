@@ -2,11 +2,13 @@ import { memo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { StatePanel } from '@/components/ui/state-panel';
 import { Tag } from '@/components/ui/tag';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   type ExerciseListItem,
   type ExerciseListPreferences,
@@ -24,7 +26,8 @@ type PreferenceControlsProps = {
 const SORT_LABELS = { favourite: 'Favourite', name: 'A–Z' } as const;
 
 // One row of everyday controls on all three personal browsers: the Never-done
-// filter, the host's own chips, and Sort, which switches between the two orders.
+// filter, the host's own chips, and Sort, which switches between the two orders
+// and shows the current one (`Favourite ⌄`; spoken `Sort: Favourite`).
 export function ExerciseListPreferenceControls({ preferences, onChangePreferences, children }: PreferenceControlsProps) {
   const nextSort = preferences.sort === 'favourite' ? 'name' : 'favourite';
   return (
@@ -43,8 +46,9 @@ export function ExerciseListPreferenceControls({ preferences, onChangePreference
         accessibilityHint={`Sorts by ${nextSort === 'name' ? 'name A to Z' : 'favourite'}`}
         accessibilityLabel={`Sort: ${SORT_LABELS[preferences.sort]}`}
         accessibilityRole="button"
-        label={`Sort: ${SORT_LABELS[preferences.sort]}`}
+        label={SORT_LABELS[preferences.sort]}
         on={false}
+        trailing={<Icon color={uiRoles.inkMuted} name="chevron-down" size="sm" />}
         onPress={() => onChangePreferences({ sort: nextSort })}
         testID="exercise-list-sort"
       />
@@ -55,6 +59,7 @@ export function ExerciseListPreferenceControls({ preferences, onChangePreference
 type FilterChipProps = {
   label: string;
   size?: 'pill' | 'compact';
+  leading?: ReactNode;
   trailing?: ReactNode;
   on: boolean;
   onPress: () => void;
@@ -67,7 +72,7 @@ type FilterChipProps = {
 
 // Full-height filters or compact row controls share their pill and selected
 // state. Compact controls keep a 44pt tap target through hit slop.
-export function FilterChip({ label, size = 'pill', trailing, on, onPress, testID, ...a11y }: FilterChipProps) {
+export function FilterChip({ label, size = 'pill', leading, trailing, on, onPress, testID, ...a11y }: FilterChipProps) {
   const compact = size === 'compact';
   return (
     <Pressable
@@ -76,7 +81,8 @@ export function FilterChip({ label, size = 'pill', trailing, on, onPress, testID
       onPress={onPress}
       style={({ pressed }) => [styles.chip, compact && styles.compact, on ? styles.chipOn : null, pressed && !on ? styles.chipPressed : null]}
       testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.chipLabel, compact && styles.compactLabel, on ? styles.chipLabelOn : null]}>
+      {leading}
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, compact ? styles.compactLabel : uiTextTone.ink, on ? styles.chipLabelOn : null]}>
         {label}
       </Text>
       {trailing}
@@ -127,6 +133,8 @@ type ExerciseListContentProps = {
   onPressExercise: (exercise: ExerciseListItem) => void;
   getExerciseAccessibilityLabel?: (exercise: ExerciseListItem) => string;
   renderActions?: (exercise: ExerciseListItem) => ReactNode;
+  /** My exercises linked to a group exercise: a `link` glyph after the name (the catalogue). */
+  linkedExerciseIds?: ReadonlySet<string>;
 };
 
 // The exercise list the catalogue, the session's exercise picker and the
@@ -142,6 +150,7 @@ export function ExerciseListContent({
   onPressExercise,
   getExerciseAccessibilityLabel,
   renderActions,
+  linkedExerciseIds,
 }: ExerciseListContentProps) {
   if (historyStatus === 'error') {
     return <StatePanel body="Unable to load exercise history." fill={false} kind="error"
@@ -159,6 +168,7 @@ export function ExerciseListContent({
       onPressExercise={onPressExercise}
       getAccessibilityLabel={getExerciseAccessibilityLabel}
       renderActions={renderActions}
+      linked={linkedExerciseIds?.has(exercise.id) ?? false}
     />
   );
 
@@ -177,7 +187,7 @@ export function ExerciseListContent({
               divider={false}
               expanded={isExpanded}
               label={section.familyName}
-              meta={<Text allowFontScaling={false} style={[styles.familyCount, empty ? styles.familyCountEmpty : null]}>{section.count}</Text>}
+              meta={<Text allowFontScaling={false} style={[uiText.figureSmall, empty ? uiTextTone.faint : null]}>{section.count}</Text>}
               onPress={() => familyExpansion.toggle(section.familyName)}
               testID={getFamilyGroupTestId(section.familyName)}
               trailing={
@@ -198,24 +208,29 @@ export function ExerciseListContent({
 
 type ExerciseListRowProps = {
   exercise: ExerciseListItem;
+  linked?: boolean;
   divider: boolean;
   onPressExercise: (exercise: ExerciseListItem) => void;
   getAccessibilityLabel?: (exercise: ExerciseListItem) => string;
   renderActions?: (exercise: ExerciseListItem) => ReactNode;
 };
 
-// Name, wrapping Primary/Secondary muscles and stats. Deleted rows use a faint
-// `Deleted` tag and faint text, never a warning hue.
+// Four lines, in falling emphasis: the name; when it was last done and how
+// often; then Primary and Secondary, both always (`Secondary: None`), the
+// quietest. Deleted rows use a faint `Deleted` tag and faint text, never a
+// warning hue.
 const ExerciseListRow = memo(function ExerciseListRow({
   exercise,
+  linked = false,
   divider,
   onPressExercise,
   getAccessibilityLabel,
   renderActions,
 }: ExerciseListRowProps) {
   const deleted = Boolean(exercise.deletedAt);
+  const faint = deleted ? uiTextTone.faint : null;
   const accessibilityLabel = getAccessibilityLabel?.(exercise) ?? `Select exercise ${exercise.name}`;
-  const accessibilityHint = `${exercise.muscleSummary}. ${exercise.statsSummary}.`;
+  const accessibilityHint = `${linked ? 'Linked to a group exercise. ' : ''}${exercise.muscleLines.primary}. ${exercise.muscleLines.secondary}. ${exercise.statsSummary}.`;
   const text = (
     <View style={styles.rowText}>
       <View style={styles.titleRow}>
@@ -224,18 +239,17 @@ const ExerciseListRow = memo(function ExerciseListRow({
           ellipsizeMode="clip"
           minimumFontScale={0.82}
           numberOfLines={2}
-          style={[styles.name, deleted ? styles.faded : null]}>
+          style={[uiText.option, faint, styles.name]}>
           {exercise.name}
         </Text>
+        {linked ? <Icon color={uiRoles.inkMuted} name="link" size="sm" testID={`exercise-linked-${exercise.id}`} /> : null}
         {deleted ? <Tag label="Deleted" tone="faint" /> : null}
       </View>
-      <Text allowFontScaling={false}
-        style={[styles.muscles, deleted ? styles.faded : null]}>
-        {exercise.muscleSummary}
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.body, faint]}>
+        <FigureText>{exercise.statsSummary}</FigureText>
       </Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.stats, deleted ? styles.faded : null]}>
-        {exercise.statsSummary}
-      </Text>
+      <Text allowFontScaling={false} style={[uiText.meta, faint]}>{exercise.muscleLines.primary}</Text>
+      <Text allowFontScaling={false} style={[uiText.meta, faint]}>{exercise.muscleLines.secondary}</Text>
     </View>
   );
 
@@ -272,12 +286,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: uiSpace.sm,
+    gap: uiSpace.xs,
   },
+  // `sm` insets and an `xs` gap, so the picker's four chips fit one row on a
+  // 390pt phone.
   chip: {
     minHeight: uiGeometry.tapTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: uiSpace.md,
+    gap: uiSpace.xs,
+    paddingHorizontal: uiSpace.sm,
     backgroundColor: uiRoles.surface,
     borderWidth: uiBorder.width,
     borderColor: uiRoles.rule,
@@ -288,20 +307,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
-    // Leave the search query and its clear control room on narrow phones.
+    // Leave the search query and its clear control room on narrow phones;
+    // in a full row it shrinks, its label truncating, before the row overflows.
     maxWidth: 112,
+    flexShrink: 1,
     paddingHorizontal: uiSpace.sm,
     paddingVertical: uiSpace.xs,
   },
   compactLabel: {
     flexShrink: 1,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
   chipOn: {
     backgroundColor: uiRoles.ink,
@@ -310,28 +324,13 @@ const styles = StyleSheet.create({
   chipPressed: {
     backgroundColor: uiRoles.paper,
   },
-  chipLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
+  // The ink pill's label: no text tone draws on ink, so the selected chip keeps
+  // the surface colour here.
   chipLabelOn: {
     color: uiRoles.surface,
   },
   sections: {
     gap: uiSpace.sm,
-  },
-  familyCount: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
-  familyCountEmpty: {
-    color: uiRoles.inkGhost,
   },
   rowText: {
     paddingVertical: uiSpace.sm,
@@ -344,27 +343,5 @@ const styles = StyleSheet.create({
   name: {
     flexShrink: 1,
     minWidth: 0,
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  muscles: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.inkMuted,
-  },
-  stats: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
-  faded: {
-    color: uiRoles.inkFaint,
   },
 });

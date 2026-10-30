@@ -1,3 +1,4 @@
+import { CoWTimeZone } from '@/components/groups/cow-time-zone';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 
@@ -43,6 +44,7 @@ export default function EditGroupRoute() {
 
 function EditGroupContent({ userId, groupId }: { userId: string; groupId: string }) {
   const router = useRouter();
+  const focusTimeZone = useLocalSearchParams<{ focusTimeZone?: string }>().focusTimeZone === '1';
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({
     userId,
@@ -110,6 +112,7 @@ function EditGroupContent({ userId, groupId }: { userId: string; groupId: string
   return (
     <ScreenScroll keyboardShouldPersistTaps="handled" testID="group-edit-screen">
       {body}
+      {group.data && canManageGroup(group.data.group.my_role) && !group.lostAccess ? <CoWTimeZone groupId={groupId} userId={userId} autoFocus={focusTimeZone} onAccessChange={() => void group.refresh()} /> : null}
     </ScreenScroll>
   );
 }

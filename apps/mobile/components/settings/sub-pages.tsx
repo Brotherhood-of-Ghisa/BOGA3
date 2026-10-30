@@ -11,10 +11,8 @@ import {
   ScreenScroll,
   SegmentedControl,
   SwitchRow,
-  uiFonts,
-  uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
@@ -27,9 +25,7 @@ export function RestTimerSettingsScreen() {
   const preferences = useAccountLocalPreferenceState();
   return (
     <SubPage testID="settings-rest-timer-screen">
-      <Card style={styles.cardBody}>
-        <RestTimerSettings state={preferences} />
-      </Card>
+      <RestTimerSettings state={preferences} />
     </SubPage>
   );
 }
@@ -61,7 +57,7 @@ export function OtherSettingsScreen() {
     <SubPage testID="settings-other-screen">
       <Card style={styles.cardBody} testID="settings-preferences-card">
         <View style={styles.preference}>
-          <Text allowFontScaling={false} style={styles.fieldLabel}>Date format</Text>
+          <Text allowFontScaling={false} style={uiText.label}>Date format</Text>
           <SegmentedControl
             accessibilityLabel="Date format"
             onChange={(format) => setExerciseListPreferences({ dateFormat: format })}
@@ -71,7 +67,7 @@ export function OtherSettingsScreen() {
           />
         </View>
         <View style={styles.preference}>
-          <Text allowFontScaling={false} style={styles.fieldLabel}>Past records gym filter</Text>
+          <Text allowFontScaling={false} style={uiText.label}>Past records gym filter</Text>
           <SegmentedControl
             accessibilityLabel="Past records gym filter"
             onChange={(scope) => setExerciseListPreferences({ pastRecordsGymScope: scope })}
@@ -93,6 +89,7 @@ export function ExperimentsSettingsScreen() {
     <SubPage testID="settings-experiments-screen">
       <Card>
         <SwitchRow
+          density="list"
           label="Timer in title bar"
           onValueChange={(timerInTitleBar) => updatePreferences({ timerInTitleBar })}
           testID="settings-timer-in-title-bar"
@@ -162,12 +159,5 @@ const styles = StyleSheet.create({
   },
   preference: {
     gap: uiSpace.sm,
-  },
-  fieldLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
   },
 });

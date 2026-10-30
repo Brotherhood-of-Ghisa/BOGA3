@@ -1,7 +1,8 @@
-// Device-local account choices. Keep this module free of data, auth and UI imports.
-import { DEFAULT_DISPLAY_EFFORTS, DEFAULT_PERSONAL_EFFORT_POLICY, isEffortSelection, type EffortChoice } from '../exercise-calculations/effort-policy';
-import { isRestTimerSec, MAX_REST_TIMER_SECONDS, MIN_REST_TIMER_SECONDS, REST_TIMER_RANGE_MESSAGE } from '../exercise-core/rest-timer';
-import { isMuscleTargetOverrides, type MuscleTargetMode, type MuscleTargetOverrides } from './muscle-targets';
+// Account choices: device-local in the kv store, except the four `synced.ts`
+// keeps on the synced settings row. Keep this module free of data, auth and UI imports.
+import { DEFAULT_DISPLAY_EFFORTS, DEFAULT_PERSONAL_EFFORT_POLICY, isEffortSelection, type EffortChoice } from '../exercise-calculations/effort-policy.ts';
+import { isRestTimerSec, MAX_REST_TIMER_SECONDS, MIN_REST_TIMER_SECONDS, REST_TIMER_RANGE_MESSAGE } from '../exercise-core/rest-timer.ts';
+import { isMuscleTargetOverrides, type MuscleTargetMode, type MuscleTargetOverrides } from './muscle-targets.ts';
 
 export { MAX_REST_TIMER_SECONDS, MIN_REST_TIMER_SECONDS };
 export type ExerciseDateFormat = 'DD-MM-YYYY' | 'MM-DD-YYYY' | 'YYYY-MM-DD';
@@ -123,7 +124,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   progressPeriod: 'Choose the Progress period or This week for Progress.',
   progressGrouped: 'Choose whether Progress groups by muscle family.',
   progressCountSecondary: 'Choose whether Progress counts secondary sets.',
-  progressMuscleLayout: 'Choose List or 3D for Progress.',
+  progressMuscleLayout: 'Choose List or 3D for Progress muscles.',
   progressMetric: 'Choose Sets or Volume for Progress.',
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
   restTimerAutoStart: 'Choose whether to start the rest timer automatically.',

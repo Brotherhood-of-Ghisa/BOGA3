@@ -50,6 +50,7 @@ jest.mock('@/src/groups/api', () => {
   const streamRead = jest.fn();
   return {
   ...jest.requireActual('@/src/groups/api'),
+  ...jest.requireActual('./helpers/cow-fixtures').coWReadMocks(),
   listMyGroups: jest.fn(),
   getGroup: jest.fn(),
   getCompetitionStream: streamRead,
@@ -85,7 +86,7 @@ import type { CompetitionPeriodTotalsWire } from '@/src/groups/competition-wire'
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { resolveMainTab } from '@/src/navigation/main-tabs';
 
-import GroupsTabRoute from '../app/(tabs)/groups';
+import GroupsTabRoute from '../app/groups';
 import GroupScreenRoute from '../app/group/[groupId]/index';
 import GroupMembersRoute from '../app/group/[groupId]/members';
 import MyGroupsRoute from '../app/group/mine';
@@ -301,11 +302,15 @@ afterEach(() => {
 });
 
 describe('Groups tab', () => {
-  it('has no Back to More affordance, whichever way it was opened', async () => {
+  it('keeps the tab bar with More selected and draws no back of its own (the native header has it)', async () => {
     mockParams = { source: 'more' };
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-title')).toBeTruthy();
     expect(screen.queryByTestId('back-to-more-button')).toBeNull();
+    expect(screen.getByTestId('top-level-tab-more')).toHaveProp(
+      'accessibilityState',
+      expect.objectContaining({ selected: true })
+    );
   });
 
   it('shows the sign-in-required state when signed out or unconfigured, and calls no group RPC', () => {
@@ -516,7 +521,8 @@ describe('Groups tab', () => {
     api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'Groups are unavailable in this build.'));
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-error-state')).toBeTruthy();
-    expect(screen.getByText('Groups are unavailable in this build.')).toBeTruthy();
+    expect(screen.getByText('Please try again.')).toBeTruthy();
+    expect(screen.queryByText('Groups are unavailable in this build.')).toBeNull();
 
     api.listMyGroups.mockResolvedValue({ groups: [GROUP_A] });
     api.getCompetitionStream.mockResolvedValue(page([completedItem()]));
@@ -983,7 +989,7 @@ describe('Groups ownership in the main navigation', () => {
     expect(tab.props.accessibilityState).toMatchObject({ selected: true });
     fireEvent.press(tab);
     expect(onSelect).toHaveBeenCalledWith('more');
-    expect(resolveMainTab(['(tabs)', 'groups'])).toBe('more');
+    expect(resolveMainTab(['groups'])).toBe('more');
     expect(resolveMainTab(['(tabs)', 'stats-history'])).toBe('progress');
   });
 });

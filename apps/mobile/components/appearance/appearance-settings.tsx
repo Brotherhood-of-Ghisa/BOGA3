@@ -8,11 +8,10 @@ import {
   Notice,
   Sheet,
   uiBorder,
-  uiFonts,
   uiGeometry,
   uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
 } from '@/components/ui';
 import { generateRoles } from '@/components/ui/theme';
 import { hueName, parseHueThemeId } from '@/components/ui/theme-hue';
@@ -106,11 +105,11 @@ export function AppearanceSettingsRow() {
               }}
               testID={`settings-appearance-option-${preset.id}`}>
               <View style={styles.optionText}>
-                <Text allowFontScaling={false} style={styles.optionLabel}>
+                <Text allowFontScaling={false} style={uiText.bodyStrong}>
                   {preset.label}
                 </Text>
                 {details.length > 0 ? (
-                  <Text allowFontScaling={false} style={styles.detail}>
+                  <Text allowFontScaling={false} style={uiText.meta}>
                     {details.join(' · ')}
                   </Text>
                 ) : null}
@@ -201,20 +200,6 @@ function PresetSwatch({ preset }: { preset: ThemePreset }) {
 const styles = StyleSheet.create({
   optionText: {
     paddingVertical: uiSpace.sm,
-  },
-  optionLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  detail: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
   },
   swatch: {
     flexDirection: 'row',

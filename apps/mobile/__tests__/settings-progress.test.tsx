@@ -23,6 +23,7 @@ import {
 } from '@/components/settings/sub-pages';
 import ProgressRoute from '../app/(tabs)/progress';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
@@ -58,6 +59,30 @@ const editNumber = (id: string, value: string) => {
 beforeEach(() => { mockUserId = 'A'; resetLocalData(); });
 afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
 
+const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' } as const;
+
+it('labels every control as a micro-label and names each effort row in bodyStrong', async () => {
+  await openSettings();
+  for (const label of ['Muscle view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric']) {
+    expect(screen.getByText(label)).toHaveStyle(LABEL);
+  }
+  // Auto-start is a form card's switch row under the `Rest timer` section heading.
+  expect(screen.getByRole('switch', { name: 'Auto-start rest timer' })).toBeOnTheScreen();
+  expect(screen.getByRole('header', { name: 'Rest timer' })).toHaveStyle(LABEL);
+  const effort = within(screen.getByTestId('settings-effort-selections'));
+  expect(effort.getByText('Effort')).toHaveStyle(LABEL);
+  expect(effort.getByText('Volume')).toHaveStyle(LABEL);
+  expect(effort.getByText('Warm-up')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+});
+
+it('labels the Other page controls as micro-labels', async () => {
+  setAccountLocalPreferenceAccount('A', true);
+  await ensureAccountLocalPreferencesLoaded();
+  render(<OtherSettingsScreen />);
+  expect(screen.getByText('Date format')).toHaveStyle(LABEL);
+  expect(screen.getByText('Past records gym filter')).toHaveStyle(LABEL);
+});
+
 const openSettingsAndProgress = async () => {
   await loadMaestroFixture('exercise-block-history');
   setAccountLocalPreferenceAccount('A', true);
@@ -67,7 +92,7 @@ const openSettingsAndProgress = async () => {
   return page;
 };
 
-it('offers only List and 3D for both breakdowns, persists 3D and falls back to List for 1RM', async () => {
+it('saves List or 3D for Muscle while Exercise always lists full figures and opens on Sets', async () => {
   const page = await openSettingsAndProgress();
   const selector = within(screen.getByTestId('settings-muscle-view-row'));
   expect(selector.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(['List', '3D']);
@@ -76,7 +101,8 @@ it('offers only List and 3D for both breakdowns, persists 3D and falls back to L
   await screen.findByTestId('stats-muscle-body-card');
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-exercise-list');
-  expect(screen.getByTestId('stats-muscle-body-card')).toBeTruthy();
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+  expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
   expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('1RM');
@@ -84,6 +110,9 @@ it('offers only List and 3D for both breakdowns, persists 3D and falls back to L
   expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
   expect(values().progressMuscleLayout).toBe('3d');
   fireEvent.press(screen.getByTestId('stats-metric-chip'));
+  expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+  fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-muscle-body-card');
   page.unmount();
   __resetAccountLocalPreferencesForTests();
@@ -140,7 +169,7 @@ it('offers no period default when the Progress period is one week', async () => 
   expect(screen.queryByTestId('settings-progress-period-window')).toBeNull();
 });
 
-it('keeps an unsaved 3D choice as a Settings draft and applies it to Exercise after Refresh', async () => {
+it('keeps an unsaved 3D choice as a Settings draft and applies it only to Muscle after Refresh', async () => {
   await openSettingsAndProgress();
   fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   await screen.findByTestId('stats-exercise-list');
@@ -153,15 +182,16 @@ it('keeps an unsaved 3D choice as a Settings draft and applies it to Exercise af
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(/could not be saved/);
   write.mockRestore();
   fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
+  expect(screen.getByTestId('stats-exercise-list')).toBeTruthy();
+  expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
+  fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
   expect(await screen.findByTestId('stats-muscle-body-card')).toBeTruthy();
   expect(values().progressMuscleLayout).toBe('3d');
   expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
 });
 
-it('restores the shared Exercise layout per account without carrying another account’s 3D choice', async () => {
+it('restores the Muscle layout per account without carrying another account’s 3D choice', async () => {
   const page = await openSettingsAndProgress();
-  fireEvent.press(screen.getByTestId('stats-view-mode-chip'));
-  await screen.findByTestId('stats-exercise-list');
   fireEvent.press(screen.getByTestId('settings-muscle-view-3d'));
   await screen.findByTestId('stats-muscle-body-card');
 
@@ -278,12 +308,13 @@ it('retains a failed calculation checkbox edit and retries through the centraliz
 it('edits rest timer auto-start and duration on its page and surfaces invalid durations in the centralized error flow', async () => {
   await openSettings();
   expect(screen.getByTestId('settings-rest-timer-duration')).toHaveProp('value', '90');
-  expect(screen.getByTestId('settings-rest-timer-auto-start-on')).toHaveProp('accessibilityState', { selected: true });
-  expect(screen.getByTestId('settings-rest-timer-auto-start-off')).toHaveProp('accessibilityState', { selected: false });
+  // On/off is a switch row, not a two-choice control (`ux-rules.md` "Forms").
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityRole', 'switch');
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityState', { checked: true });
 
-  fireEvent.press(screen.getByTestId('settings-rest-timer-auto-start-off'));
+  fireEvent.press(screen.getByTestId('settings-rest-timer-auto-start'));
   expect(values().restTimerAutoStart).toBe(false);
-  expect(screen.getByTestId('settings-rest-timer-auto-start-off')).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.getByTestId('settings-rest-timer-auto-start')).toHaveProp('accessibilityState', { checked: false });
 
   editNumber('settings-rest-timer-duration', '150');
   expect(values().restTimerDurationSec).toBe(150);

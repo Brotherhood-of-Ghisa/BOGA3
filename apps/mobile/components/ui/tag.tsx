@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 // `neutral`: a fact about the row (`Archived`, a role). `faint`: a row that has
 // stepped back (`Deleted`), drawn fainter still.
@@ -17,7 +18,7 @@ export type TagProps = {
 export function Tag({ label, tone = 'neutral', testID }: TagProps) {
   return (
     <View style={[styles.tag, tone === 'faint' ? styles.tagFaint : null]} testID={testID}>
-      <Text allowFontScaling={false} style={[styles.label, tone === 'faint' ? styles.labelFaint : null]}>{label}</Text>
+      <Text allowFontScaling={false} style={[uiText.label, tone === 'faint' ? styles.labelFaint : null]}>{label}</Text>
     </View>
   );
 }
@@ -33,15 +34,6 @@ const styles = StyleSheet.create({
   },
   tagFaint: {
     borderColor: uiRoles.ruleSoft,
-  },
-  label: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkMuted,
   },
   labelFaint: {
     color: uiRoles.inkFaint,

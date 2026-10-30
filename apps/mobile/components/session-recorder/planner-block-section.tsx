@@ -23,7 +23,7 @@ export function PickerPlannerToggle({ active, onToggle }: { active: boolean; onT
       accessibilityLabel="Show planned blocks only"
       accessibilityRole="switch"
       accessibilityState={{ checked: active }}
-      label="From planner"
+      label="Planner"
       on={active}
       onPress={onToggle}
       testID="exercise-picker-planner-toggle"

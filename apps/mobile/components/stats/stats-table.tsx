@@ -16,7 +16,7 @@ import { Card, Icon, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone,
 const FIGURE_ADVANCE = 0.61;
 // Archivo 700 is proportional, so this is a safe upper bound for an uppercase
 // micro-label with its 0.1em tracking (`W` is the widest glyph at 1.0em),
-// measured on the simulator; the paired heading can use two lines on a phone.
+// measured on the simulator, so each label keeps its full width.
 const MICRO_LABEL_ADVANCE = 0.95;
 
 /**
@@ -50,9 +50,8 @@ export function StatsTableFigures({ children, style, testID }: {
 
 /** One header column: the micro-label, plus any sort indicator as children. */
 export function StatsTableHeaderLabel({ label, active = false }: { label: string; active?: boolean }) {
-  const multiline = label.includes('\n');
-  return <Text allowFontScaling={false} numberOfLines={multiline ? 2 : 1}
-    style={[uiText.label, active && uiTextTone.ink, multiline && styles.pairedLabel]}>{label}</Text>;
+  return <Text allowFontScaling={false} numberOfLines={1}
+    style={[uiText.label, active && uiTextTone.ink]}>{label}</Text>;
 }
 
 /** Shared sortable header; the caller names its ordering and next action. */
@@ -94,7 +93,6 @@ export const statsTableStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   numericSortHeader: { flexDirection: 'row-reverse', justifyContent: 'flex-start' },
-  pairedLabel: { textAlign: 'right' },
   family: { paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
     paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderColor: uiRoles.rule },
   pressed: { backgroundColor: uiRoles.paper },

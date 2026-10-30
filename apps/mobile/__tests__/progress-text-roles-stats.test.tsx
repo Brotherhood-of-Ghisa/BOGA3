@@ -8,7 +8,6 @@ import { fireEvent, render, screen, within } from '@testing-library/react-native
 import { StyleSheet, type TextStyle } from 'react-native';
 
 import { ComparisonValues } from '@/components/stats/comparison-columns';
-import { ExerciseBodyView } from '@/components/stats/exercise-body-view';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { ProgressFilters } from '@/components/stats/progress-filters';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
@@ -53,14 +52,14 @@ describe('Progress tables', () => {
   it('heads its family and columns with the micro-label, the sorted column in ink', () => {
     render(<ProgressTables {...tableProps} sortMode="now-desc" />);
     expect(style(screen.getByTestId('stats-family-header-back'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
-    expect(style(within(screen.getByTestId('stats-muscle-sort-now')).getByText(/Now\s+\(Prev\)/))).toMatchObject({ ...LABEL, color: uiRoles.ink });
+    expect(style(within(screen.getByTestId('stats-muscle-sort-now')).getByText('Now'))).toMatchObject({ ...LABEL, color: uiRoles.ink });
     expect(style(within(screen.getByTestId('stats-muscle-sort-muscle')).getByText('Muscle'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
   });
 
-  it('draws figure cells in the figure role, the previous period muted', () => {
+  it('draws separate period cells in the figure role and the change in its tone', () => {
     render(<ProgressTables {...tableProps} />);
-    expect(style(screen.getByTestId('stats-muscle-row-back_lats-periods'))).toMatchObject({ ...FIGURE, color: uiRoles.ink, textAlign: 'right' });
-    expect(style(within(screen.getByTestId('stats-muscle-row-back_lats-periods')).getByText('(1)'))).toMatchObject({ color: uiRoles.inkMuted });
+    expect(style(screen.getByTestId('stats-muscle-row-back_lats-now'))).toMatchObject({ ...FIGURE, color: uiRoles.ink, textAlign: 'right' });
+    expect(style(screen.getByTestId('stats-muscle-row-back_lats-previous'))).toMatchObject({ ...FIGURE, color: uiRoles.ink, textAlign: 'right' });
     expect(style(screen.getByTestId('stats-muscle-row-back_lats-change'))).toMatchObject({ ...FIGURE, color: uiRoles.gain });
   });
 
@@ -92,13 +91,6 @@ describe('Progress muscle views', () => {
     expect(style(within(meta).getByText('3'))).toMatchObject({ fontFamily: uiFonts.figure.family });
   });
 
-  it('titles the selected muscle on the exercise body view', () => {
-    render(<ExerciseBodyView muscles={muscles} metric="workingSetCount" selectedMuscleId="back_lats"
-      selectedMuscle={{ muscleGroupId: 'back_lats', displayName: 'Lats', exercises: [], secondary: [] }}
-      onSelectMuscle={jest.fn()} renderAll={() => null} renderDetail={() => null} />);
-    expect(style(screen.getByRole('header', { name: 'Lats' }))).toMatchObject({ ...TITLE, color: uiRoles.ink });
-  });
-
   it('titles the selected muscle on the muscle view', () => {
     render(<ProgressMuscleView muscles={muscles} metric="workingSetCount" selectedId="back_lats" muscleLayout="3d"
       onSelect={jest.fn()} onMuscleHistory={jest.fn()} onExerciseHistory={jest.fn()} />);
@@ -117,8 +109,8 @@ describe('Progress filters and week list', () => {
   });
 
   it('draws a week card\'s detail and the empty week in meta, its figures in the figure face', () => {
-    const group = { key: 'se1', sessionId: 's1', title: 'Barbell Bench Press', detail: 'Mon 5 Oct', workingSetCount: 1,
-      exerciseDefinitionId: null, record: [], rows: [] };
+    const group = { key: 'se1', sessionId: 's1', title: 'Barbell Bench Press', detail: 'Mon 5 Oct',
+      exerciseDefinitionId: null, role: null, record: [], rows: [] };
     const view = render(<WeekSetList groups={[group]} loading={false} error={null} onOpenSession={jest.fn()} testID="week" />);
     const detail = screen.getByText(/Mon/);
     expect(style(detail)).toMatchObject(META);

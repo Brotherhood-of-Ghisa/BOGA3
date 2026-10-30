@@ -10,6 +10,9 @@ A muscle counts a set once, at the strongest role any of its entries has
 Totals use half-steps (`1.5`), unlike the session's physical `Sets`
 ([[set.count-display]]). Whether to show secondaries is separate
 ([[muscle.secondary-filter]]).
+Today's Recovery grid is the exception: it shows whole sets, rounded down
+(a lone ½ stays `½`), so a total reads at its target only once met; its
+spoken labels keep the half-steps.
 
 <!-- fact-table: muscle.set-count -->
 | Working sets mapped to one muscle | It gets |
@@ -22,14 +25,16 @@ Totals use half-steps (`1.5`), unlike the session's physical `Sets`
 
 Why: a secondary mapping is real work, but not what the lift is for.
 Code: `countMuscleSets` in `apps/mobile/src/data/muscle-analytics.ts`, read by
-the session summary, Progress, the muscle heatmaps and Stats.
+the session summary, Progress, the muscle heatmaps and Stats; the Recovery
+grid's rounding is `wholeSets` in `apps/mobile/components/today/plan-cards.tsx`.
 Signature: `primary + ½ secondary`
 
 ### muscle.secondary-filter · presentation · accepted
 
-Progress and muscle history Filters offer `Count secondary sets` per visit:
+Progress's Filters (`Count secondary sets`) and muscle history's chip (`Sec` /
+`Pri`, spoken `Count secondary sets`) offer counting secondary sets per visit:
 Progress opens on Settings' default, history on Progress's. Off counts primary
-work only.
+work only. The default is per account, synced like [[muscle.weekly-targets]].
 
 Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
 
@@ -45,23 +50,25 @@ A merged muscle is enabled while any entry is tracked; untracked entries' work s
 
 
 Why: a simpler view.
-Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/components/preferences/muscle-settings.tsx`.
+Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `deriveMuscleReportPreset` in `apps/mobile/src/data/muscle-report-setup.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/components/preferences/muscle-settings.tsx`.
 
 ### muscle.weekly-targets · definition · accepted
 
-Weekly working-set targets repeat until changed, per account on this device.
-Single uses the default for every muscle; Per muscle uses an override or the
-live default. Broad and Detailed remember separate overrides; Custom setups
-keep their own. Mode changes and disabling a muscle retain its overrides.
+Weekly working-set targets repeat until changed, per account, synced: a
+change reaches every signed-in device on its next sync. On upgrade the first
+device to sync uploads its targets (of two at once, the later wins); a device
+finding them adopts them, replacing its own. Single uses the default for
+every muscle; Per muscle uses an override or the live default. Broad and
+Detailed remember separate overrides; Custom setups keep their own. Mode changes and disabling a muscle retain its overrides.
 Targets list only enabled reported muscles, including custom muscles. Clearing
 an override restores inheritance; targets are positive whole numbers.
 
-History Sets target grading, Progress Sets references and Today's Plan week
-column use the effective target of each reported muscle, scaled to the period.
+History Sets target grading and Today's Plan week column use the effective
+target of each reported muscle, scaled to the period.
 Counting is unchanged.
 
 Why: individual training goals without losing a shared fallback.
-Code: `apps/mobile/src/preferences/muscle-targets.ts`; `deriveRecoveryRows` in `apps/mobile/src/today-plan/calculations.ts`.
+Code: `apps/mobile/src/preferences/muscle-targets.ts`; `deriveRecoveryRows` in `apps/mobile/src/today-plan/calculations.ts`; `apps/mobile/src/sync/muscle-target-adoption.ts`.
 
 ### muscle.no-breakdown · presentation · accepted
 

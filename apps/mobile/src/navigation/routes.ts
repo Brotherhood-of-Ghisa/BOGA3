@@ -6,8 +6,7 @@ import { encodeGymRouteParam } from '@/src/utils/gym-scope-route';
 
 export const SIGN_IN_ROUTE = '/sign-in';
 export const EXERCISE_LINK_ROUTE = '/exercise-link';
-// The Gyms screen, from the session view's gym sheet (`Manage gyms`). More
-// opens it as `/gyms?source=more`, which adds its `Back to More`.
+// The Gyms screen, from the session view's gym sheet (`Manage gyms`) and More.
 export const GYMS_ROUTE = '/gyms';
 export const BODY_WEIGHT_ROUTE = '/body-weight';
 
@@ -28,6 +27,16 @@ export const SETTINGS_SUB_PAGES = {
 /** The Link screen for one of my exercises (E0.3). */
 export const exerciseLinkHref = (exerciseDefinitionId: string): Href =>
   `${EXERCISE_LINK_ROUTE}?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` as Href;
+
+/** The exercise editor page: edit one of my exercises by id, or create one. `request` names the caller's in-memory request (prefill, save callbacks). */
+export const EXERCISE_EDIT_ROUTE = '/exercise-edit';
+export const exerciseEditHref = ({ exerciseDefinitionId, request }: { exerciseDefinitionId?: string | null; request?: string | null }): Href => {
+  const params = [
+    exerciseDefinitionId ? `exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` : null,
+    request ? `request=${encodeURIComponent(request)}` : null,
+  ].filter(Boolean);
+  return `${EXERCISE_EDIT_ROUTE}${params.length > 0 ? `?${params.join('&')}` : ''}` as Href;
+};
 export const THEME_COLOUR_ROUTE = '/theme-colour';
 
 /** One muscle's or one exercise's effort history, pushed from Progress. */
@@ -89,3 +98,14 @@ export const historyDayHref = (dateKey: string, sessionIds: readonly string[], a
   if (sessionIds.length > 1) return sessionsDayHref(dateKey);
   return sessionIds[0] === activeSessionId ? sessionViewHref(sessionIds[0]) : completedSessionHref(sessionIds[0]);
 };
+
+
+/** CoW links carry public identity and one opening metric, never a score/context. */
+export const coWsHref = (groupId: string, cowId?: string, metric?: string): Href => {
+  const query = [cowId ? `cowId=${encodeURIComponent(cowId)}` : null, metric ? `metric=${encodeURIComponent(metric)}` : null].filter(Boolean).join('&');
+  return `/group/${encodeURIComponent(groupId)}/cows${query ? `?${query}` : ''}` as Href;
+};
+export const coWStandingsHref = (groupId: string, cowId: string, metric: string): Href =>
+  `/group/${encodeURIComponent(groupId)}/cows/${encodeURIComponent(cowId)}?metric=${encodeURIComponent(metric)}` as Href;
+export const coWScheduleHref = (groupId: string, cowId?: string): Href =>
+  `/group/${encodeURIComponent(groupId)}/cows/schedule${cowId ? `?cowId=${encodeURIComponent(cowId)}` : ''}` as Href;

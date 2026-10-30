@@ -61,10 +61,10 @@ Stable error tokens:
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
 | `M38-T01-Contract_specifications_and_schema_design` | Update session planning & authz specs; add DB migration for permissions, receipts, and `last_modified_by`; update sync projections and Drizzle schema | none | completed |
-| `M38-T02-Service_role_atomic_mutation_RPCs` | Implement 9 atomic mutation RPCs with graph version check, pending checks, monotonic timestamps, and contract tests | T01 | planned |
+| `M38-T02-Service_role_atomic_mutation_RPCs` | Implement 9 atomic mutation RPCs with graph version check, pending checks, monotonic timestamps, and contract tests | T01 | completed |
 | `M38-T03-Agent_API_edit_endpoints_and_validation` | Add PATCH/GET routes in Edge Function, wire validation, edit permission check, and version token emissions | T02 | planned |
 | `M38-T04-MCP_edit_tools_and_smoke_verification` | Implement MCP edit tools, destructive hints, API client methods, and mcp-smoke tests | T03 | planned |
-| `M38-T05-Mobile_Connected_Agents_edit_toggle_and_store_wiring` | Add Connected Agents edit switch, wire store human writes to stamp `last_modified_by = 'human'`, and mobile tests | T01 | planned |
+| `M38-T05-Mobile_Connected_Agents_edit_toggle_and_store_wiring` | Add Connected Agents edit switch, wire store human writes to stamp `last_modified_by = 'human'`, and mobile tests | T01 | completed |
 | `M38-T06-Milestone_closeout_and_full_verification` | Run full quality gates (coverage, complexity, deps), update as-built specs, and archive cards | T04, T05 | planned |
 
 ## Risks / dependencies

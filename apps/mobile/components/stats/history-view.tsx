@@ -302,9 +302,12 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
   const prefix = `stats-${kind}-history`;
   const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
   const named = subject ? `${subject} ` : '';
+  // A reload keeps the last read's chart up (`useHistory`), so only a page with
+  // nothing drawn yet shows its loading panel.
+  const firstLoad = isLoading && dailyMetrics.length === 0 && weeklyEffort.length === 0;
 
   const status = <>
-    {isLoading ? (
+    {firstLoad ? (
       <StatePanel body={`Loading ${named}history...`} fill={false} kind="loading" testID={`${prefix}-loading`} />
     ) : null}
 
@@ -358,7 +361,7 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
         {filters}
       </View>
 
-      {!!errorMessage || (isLoading && dailyMetrics.length === 0) ? (
+      {!!errorMessage || firstLoad ? (
         <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>{status}</ScrollView>
       ) : <HistoryHeatmap
         dailyMetrics={dailyMetrics}

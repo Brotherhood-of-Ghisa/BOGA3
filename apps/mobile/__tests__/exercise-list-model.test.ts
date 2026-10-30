@@ -3,7 +3,7 @@ import {
   DEFAULT_EXERCISE_LIST_PREFERENCES,
   buildExerciseListModel,
   formatExerciseListStatsSummary,
-  formatExerciseMuscleSummary,
+  formatExerciseMuscleLines,
   type ExerciseListPreferences,
 } from '@/src/exercise-catalog/list-model';
 import { buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
@@ -54,31 +54,31 @@ describe('exercise browser model', () => {
       { id: 's2', muscleGroupId: 'triceps', role: 'secondary', weight: 0.5 },
       { id: 's3', muscleGroupId: 'chest', role: 'secondary', weight: 0.5 },
     ] };
-    expect(formatExerciseMuscleSummary(exercise, groups)).toBe('Primary: Chest\nSecondary: Front Delts · Triceps');
+    expect(formatExerciseMuscleLines(exercise, groups)).toEqual({ primary: 'Primary: Chest', secondary: 'Secondary: Front Delts · Triceps' });
     exercise.mappings.push({ id: 'p2', muscleGroupId: 'triceps', role: 'primary', weight: 1 });
-    expect(formatExerciseMuscleSummary(exercise, groups)).toBe('Primary: Chest · Triceps\nSecondary: Front Delts');
+    expect(formatExerciseMuscleLines(exercise, groups)).toEqual({ primary: 'Primary: Chest · Triceps', secondary: 'Secondary: Front Delts' });
   });
 
   it('omits absent role lines and keeps unmapped or unknown muscles readable', () => {
-    expect(formatExerciseMuscleSummary(exercises[0], muscleSetup)).toBe('Primary: Chest');
-    expect(formatExerciseMuscleSummary(exercises[1], muscleSetup)).toBe('Secondary: Chest');
-    expect(formatExerciseMuscleSummary(exercises[3], muscleSetup)).toBe('No muscle links');
-    expect(formatExerciseMuscleSummary(exercises[0], buildMuscleSetup([]))).toBe('Primary: chest');
+    expect(formatExerciseMuscleLines(exercises[3], muscleSetup)).toEqual({ primary: 'Primary: None', secondary: 'Secondary: None' });
+    expect(formatExerciseMuscleLines(exercises[0], muscleSetup)).toEqual({ primary: 'Primary: Chest', secondary: 'Secondary: None' });
+    expect(formatExerciseMuscleLines(exercises[1], muscleSetup)).toEqual({ primary: 'Primary: None', secondary: 'Secondary: Chest' });
+    expect(formatExerciseMuscleLines(exercises[0], buildMuscleSetup([])).primary).toBe('Primary: chest');
   });
 
   it("names the user's muscles: a merged muscle once at its strongest role, untracked ones left out", () => {
     const broad = buildMuscleSetup(broadMuscleRows());
     const mapped = (mappings: IndexedExerciseCatalogExercise['mappings']) => ({ ...exercises[0], mappings });
-    expect(formatExerciseMuscleSummary(mapped([
+    expect(formatExerciseMuscleLines(mapped([
       { id: 'q', muscleGroupId: 'quads', role: 'primary', weight: 1 },
       { id: 'a', muscleGroupId: 'adductors', role: 'secondary', weight: 0.5 },
       { id: 'g', muscleGroupId: 'glutes_max', role: 'secondary', weight: 0.5 },
       { id: 'h', muscleGroupId: 'hamstrings', role: 'secondary', weight: 0.5 },
       { id: 's', muscleGroupId: 'spinal_erectors', role: 'secondary', weight: 0.5 },
-    ]), broad)).toBe('Primary: Quads\nSecondary: Glutes & Hams');
-    expect(formatExerciseMuscleSummary(mapped([
+    ]), broad)).toEqual({ primary: 'Primary: Quads', secondary: 'Secondary: Glutes & Hams' });
+    expect(formatExerciseMuscleLines(mapped([
       { id: 'f', muscleGroupId: 'forearms_grip', role: 'primary', weight: 1 },
-    ]), broad)).toBe('No muscle links');
+    ]), broad)).toEqual({ primary: 'Primary: None', secondary: 'Secondary: None' });
   });
 
   it('always keeps taxonomy order and the existing fallback mapping, with Other last', () => {
@@ -141,4 +141,5 @@ describe('browser last-performed date', () => {
   it('never invents a date for an unused exercise', () => {
     expect(formatExerciseListStatsSummary(undefined, false, null, 'DD-MM-YYYY')).toBe('Never done');
   });
+
 });

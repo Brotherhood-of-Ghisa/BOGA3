@@ -113,10 +113,8 @@ Two traps:
 
 ## Choosing lanes
 
-Lane choice is **judgement** — paths give a
-default, not a requirement, because a path match says little about risk (a
-restyle of a screen matches the same rows as a rewrite of its logic) and the
-simulator and Docker lanes are the expensive part of the ladder.
+Lane choice is **judgement**: paths give defaults, not requirements. A restyle
+and a logic rewrite can match the same paths; select by risk.
 
 1. **Jest is always required**, and is the one gate that is never negotiable:
    every code change adds or updates the Jest coverage for the behaviour it
@@ -148,10 +146,14 @@ simulator and Docker lanes are the expensive part of the ladder.
    the change. Some areas have no Maestro lane at all (bodyweight: Jest over
    real data plus `ios-sync-e2e` covers it); adding a flow needs a written
    justification first (spec `06`, "Maestro scope policy").
-5. **Run the chosen lanes to green before opening the PR**, and record each one
-   there with its result, its evidence (command output or Maestro artifact path)
-   and any agreement your build protocol requires. No checker validates this;
-   reviewers read it.
+5. **Run the chosen lanes to green before opening the PR.** Record each result,
+   evidence (command output or Maestro artifact path), and protocol-required
+   agreement in the PR.
+
+Focused development checks can guide unfinished work. Begin the final agreed
+gate pass only when runtime assets and configuration are complete. Repeat
+affected checks when code, base or native inputs change, or failures invalidate
+their results; reuse still-valid results.
 
 **Why the UI default is `frontend-ui`, not `frontend`:** the three
 Supabase-backed e2e lanes (`ios-auth-profile`, `ios-sync-e2e`, `ios-groups-e2e`)
@@ -166,11 +168,12 @@ generic `${prefix}-${value}` joins, which are only loosely checked.
 
 A new or changed **native** dependency — an iOS pod, a native Expo module, or an
 iOS- or Android-affecting native field / config plugin in `app.config.ts` — needs
-a forced rebuild **before** the Maestro lanes, or they fail at boot with
-`Cannot find native module`: `./boga ios build-client --force` (iOS),
+a forced rebuild **before** the Maestro lanes: `./boga ios build-client --force` (iOS),
 `./scripts/maestro-android-dev-client-build.sh --force` (Android). Pure-JS and
 config-only changes never need it (Metro bundles them at runtime). Cache rules:
 spec `11`.
+
+Complete native inputs before that rebuild, then run the relevant native gates.
 
 ### Full sweep
 

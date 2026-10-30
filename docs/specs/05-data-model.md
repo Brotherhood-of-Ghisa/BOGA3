@@ -53,9 +53,8 @@ round-trip and the drift checker ignores it.
 | Every `app_public.group_*` table | out — server-authoritative, multi-reader rows with no per-owner LWW, so they can never be Sync v2 entities | `supabase/migrations/`, [`tech/groups-contract.md`](tech/groups-contract.md) |
 
 No group table carries `owner_user_id` or an FK into a Sync v2 table, so the
-group domain is invisible to `sync-drift --strict`; its only Sync v2 touch
-point is failure-isolated triggers on `sessions` that can never abort
-`sync_push`. Group projections add no Sync v2 entity and no session snapshot
+group domain is invisible to `sync-drift --strict`; failure-isolated triggers
+on scoring dependencies cannot abort personal `sync_push`. Group projections add no Sync v2 entity or session snapshot
 and never rewrite source kg or readings. Load
 [`tech/groups-contract.md`](tech/groups-contract.md) for group tables, triggers
 and RPCs, and
@@ -73,12 +72,14 @@ what the effort selections mean.
 
 - **Out of sync scope.** No dirty bits, no sync nudges, no `user_settings`
   column, no server counterpart; groups and coaching never read these keys
-  ([[set.eligibility]]). The private bodyweight toggle, by contrast, is
-  account-synced through `user_settings`.
+  ([[set.eligibility]]). Exceptions, account-synced through `user_settings`:
+  the private bodyweight toggle, and the weekly muscle targets and
+  count-secondary default (rule 12), whose kv copy is read only until sync
+  uploads or adopts them.
 - Keys live in `expo-sqlite/kv-store` scoped to the authenticated account id,
   with a distinct profile for local-only builds, so they **survive sign-out,
   account switches and sync database rebuilds** — the wipe below empties SQL
-  rows, not the key-value store.
+  rows and the target adoption markers (rule 12).
 - **Any future explicit preference reset must address only its intended
   profile and fields** — never clear the whole key-value store.
 
@@ -297,6 +298,11 @@ the data-model-level invariants.
    seeding and bundle migrations never write either.
 11. `exercise_definitions.rest_timer_sec` is `in sync scope`, unchecked
    ([[timer.rest-default]]).
+12. `user_settings` weekly muscle targets (`weekly_working_set_target`,
+   `muscle_target_mode`, `muscle_target_overrides`, `count_secondary_muscles`)
+   are `in sync scope` ([[muscle.weekly-targets]]). Null = not yet uploaded:
+   no backfill. A device writes all four; after a wipe, edits stay in kv
+   until sync re-adopts.
 
 ### Entity coverage (Sync v2)
 
@@ -325,12 +331,11 @@ under `supabase/migrations/` that adds the matching `app_public.<entity>`
 column with a compatible Postgres type, **and the server migration must be
 deployed to production before the client change ships**.
 
-Why server first: a client cannot round-trip a typed server column that is not
-deployed yet — the server has nowhere to store it. An
+Server first: a client cannot round-trip a column the server lacks. An
 additive column never moves the protocol version: `sync_push` reads named keys
 only and ignores the rest. Keeping a stored value when a key is omitted is per
-column — only a branch guarding on `_fields ? '<key>'` does, which a new column
-needs so an older writer cannot clear it.
+column — only a `_fields ? '<key>'` branch or a `coalesce` does, which a new
+column needs so an older writer cannot clear it.
 Server-first additions must also keep unknown entity types out of old-reader
 pulls. The kg-only rename was a protocol-3 cutover, not an
 additive change.
@@ -349,6 +354,5 @@ every entity table carries a nullable `deleted_at` and an unchecked
 table.
 
 Adding a value to an existing column (a new enum literal) is out of scope: the
-column exists on both sides and the server stores arbitrary text per the v2
-no-server-validation policy (`tech/sync-v2-server-contract.md`,
-"Ground rules").
+server stores arbitrary text (`tech/sync-v2-server-contract.md`, "Ground
+rules").

@@ -385,6 +385,49 @@ GX="${ZERO_GX}"; board e1rm; check 'ordinary counterpart from normalized source 
 GX="${MAIN_GX}"
 pass 'actual catalog/podium/revision/history/stream/session/week/period payloads decode with enabled privacy'
 
+# Shared exercises: validation, creation, decoding, mixed-event stream, and deletion.
+rpc "${OWNER_TOKEN}" group_shared_exercise_create "$(jq -nc --arg g "${GID}" \
+  '{p_group_id:$g,p_name:"Bad Mappings",p_load_input_mode:"total_load",p_mappings:[{}]}')"
+expect_error VALIDATION 'rejects mapping object without muscle_group_id'
+
+rpc "${OWNER_TOKEN}" group_shared_exercise_create "$(jq -nc --arg g "${GID}" \
+  '{p_group_id:$g,p_name:"Null Mappings",p_load_input_mode:"total_load",p_mappings:[null]}')"
+expect_error VALIDATION 'rejects non-object mapping'
+
+rpc "${OWNER_TOKEN}" group_shared_exercise_create "$(jq -nc --arg g "${GID}" \
+  '{p_group_id:$g,p_name:"Negative Weight",p_load_input_mode:"total_load",p_mappings:[{muscle_group_id:"chest",weight:-1}]}')"
+expect_error VALIDATION 'rejects negative mapping weight'
+
+rpc "${OWNER_TOKEN}" group_shared_exercise_create "$(jq -nc --arg g "${GID}" \
+  '{p_group_id:$g,p_name:"Invalid Role",p_load_input_mode:"total_load",p_mappings:[{muscle_group_id:"chest",weight:1,role:"arbitrary"}]}')"
+expect_error VALIDATION 'rejects invalid mapping role'
+
+rpc "${OWNER_TOKEN}" group_shared_exercise_create "$(jq -nc --arg g "${GID}" --arg x "${MAIN_GX}" \
+  '{p_group_id:$g,p_name:"Shared Paused Bench",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_mappings:[{muscle_group_id:"chest",weight:1,role:"primary"}],p_group_exercise_id:$x}')"
+expect_ok 'create shared exercise'; assert_wire isGroupSharedExerciseWriteWire
+SHARED_EX_ID="$(jq -er '.shared_exercise.id' <<<"${BODY}")"
+
+rpc "${OWNER_TOKEN}" group_shared_exercises_list "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"
+expect_ok 'list shared exercises'; assert_wire isGroupSharedExercisesListWire
+check 'list contains shared exercise' 'any(.shared_exercises[];.id==$id and .exercise.name=="Shared Paused Bench")' --arg id "${SHARED_EX_ID}"
+
+rpc "${OWNER_TOKEN}" group_competition_stream "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"
+expect_ok 'stream with shared exercise'; assert_wire isCompetitionStreamWire
+check 'stream contains shared exercise item' 'any(.items[];.kind=="shared_exercise" and .id==$id and .exercise.name=="Shared Paused Bench")' --arg id "${SHARED_EX_ID}"
+
+rpc_display "${OWNER_TOKEN}" group_competition_stream_v2 "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"
+expect_ok 'stream v2 with shared exercise'; assert_wire isCompetitionStreamWire
+check 'stream v2 contains shared exercise item' 'any(.items[];.kind=="shared_exercise" and .id==$id and .exercise.name=="Shared Paused Bench")' --arg id "${SHARED_EX_ID}"
+
+rpc "${OWNER_TOKEN}" group_shared_exercise_delete "$(jq -nc --arg g "${GID}" --arg s "${SHARED_EX_ID}" '{p_group_id:$g,p_shared_exercise_id:$s}')"
+expect_ok 'delete shared exercise'; assert_wire isGroupSharedExerciseDeleteWire
+
+rpc "${OWNER_TOKEN}" group_shared_exercises_list "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"
+expect_ok 'list shared exercises after delete'; assert_wire isGroupSharedExercisesListWire
+check 'deleted shared exercise is gone from list' 'all(.shared_exercises[];.id!=$id)' --arg id "${SHARED_EX_ID}"
+
+pass 'shared exercise contract: validation, projection decoders, stream wire, and deletion'
+
 # A published percentage remains joinable by set ID while source work is
 # queued. Moving that source to an ordinary definition cannot reveal its kg.
 next_cuam

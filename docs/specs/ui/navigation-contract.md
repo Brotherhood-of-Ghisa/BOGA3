@@ -8,19 +8,21 @@ For the route inventory and owning files, load `screen-map.md`.
 - `expo-router`, file-based. Root layout `apps/mobile/app/_layout.tsx`; the root
   stack and every root screen declaration
   `apps/mobile/components/navigation/root-stack.tsx`.
-- Navigation uses string paths; href builders in
+- Parameterized links use encoding builders in
   `apps/mobile/src/navigation/routes.ts` and
-  `apps/mobile/src/navigation/active-session-entry.ts` encode ids. Use the
-  builder for parameterised links.
+  `apps/mobile/src/navigation/active-session-entry.ts` encode ids.
 - Tab roots live in the `(tabs)` group (`apps/mobile/app/(tabs)/`), whose
   parenthesised name never appears in a URL (`/stats-history` is
   `app/(tabs)/stats-history.tsx`). Every other screen is a root-stack route.
+- **Two kinds of page.** Tabs use `PageHeader`, without Back. Other pages use native headers; Back returns to origin.
+  `/exercise-catalog`, `/groups` and `/settings` also keep the tab bar
+  (`apps/mobile/components/navigation/tab-owned-page.tsx`).
 - The shell is the four-tab model in `apps/mobile/src/navigation/main-tabs.ts`
   — Today / Train / Progress / More — rendered by `MainTabBar`
   (`apps/mobile/components/navigation/main-tab-bar.tsx`), the same bar on every
   screen that shows tabs. Only those four are visible destinations; the
-  preserved roots `/stats-history`, `/exercise-catalog`, `/groups` and
-  `/settings` stay addressable and each maps to a canonical owner
+  preserved root `/stats-history` and the tab-owned pages `/exercise-catalog`,
+  `/groups` and `/settings` each map to a canonical owner
   (`resolveMainTab`), so every recognised root keeps exactly one tab selected
   and an unrecognised one selects none. A tab root in
   `apps/mobile/app/(tabs)/_layout.tsx` must appear in `main-tabs.ts` as a
@@ -57,14 +59,9 @@ access level, and `useRootRouteAccess`
   lands on the first route still declared: `/sign-in`, `/sync-setup`, or `index`
   (which redirects to `/today`). A deep link to another level's route lands the
   same way. Group order in the root stack therefore matters.
-- **Never unmount or swap out the navigator to gate access.** On expo-router 57
-  unmounting it reverts the route, so a gate rendered in its place loops
-  ("Maximum update depth exceeded"). The sole exception is the restore guard's
-  neutral loading view
-  (`apps/mobile/components/navigation/auth-route-guard.tsx`), rendered only
-  before the navigator first mounts — until session restore resolves and, for a
-  signed-in user, the persisted first-sync flag has been read — so a cold launch
-  and its deep link land on the right level the first time.
+- Never unmount the navigator to gate access: expo-router 57 reverts routes
+  and loops. Only the restore guard's neutral view precedes its first mount,
+  until session restore and the persisted first-sync flag resolve.
 - Every root route file must be declared in the root stack: Expo Router appends
   an undeclared one outside every `Stack.Protected` group
   (`__tests__/root-stack-routes.test.ts` fails on one).
@@ -81,7 +78,7 @@ access level, and `useRootRouteAccess`
   unavailable state.** No route crashes on a bad param and none redirects away:
   an out-of-reach `groupId` shows the lost-access state, a dead session or group
   exercise "no longer available", a bad `exerciseDefinitionId` an error state.
-- **Params carry ids and small enum values, nothing else.** Never a token,
+- **Params carry ids and small enums only.** Never a token,
   session, credential, serialized object, or private reading context, nor OAuth
   state, a callback or a user identifier on the one external transition (the
   first-party `/connect` page); a record sheet never routes private context
@@ -106,7 +103,6 @@ access level, and `useRootRouteAccess`
 | | `presentation=completion` | the post-submit summary; `summary`, absent and invalid all open View Session with Summary active |
 | `/exercise-catalog` | `source=session` | a save returns by `router.back()` |
 | | `intent` | `add` auto-opens the create editor once on first load; the session picker passes `manage` |
-| `/settings`, `/gyms`, `/exercise-catalog` | `source=more` | adds `Back to More` (below) |
 | `/groups` | `groupId` | selects that group when it is in My groups, else the one last shown this app session, else the first by name |
 | `/group/join` | `code` | prefills the code field and runs the preview once the username gate is satisfied |
 | `/group-session/[memberId]/[sessionId]` | `groupId` | required authorised scope, read through the group-scoped safe reader/cache; missing renders generic session unavailable |
@@ -118,13 +114,9 @@ access level, and `useRootRouteAccess`
 | `/programme/[programmeId]` | `programmeId` | required; missing, unknown or deleted renders the in-route unavailable state |
 | `/group/[groupId]/leaderboards/[exerciseId]`, `…/history` | `metric=volume\|e1rm`, `scope=certified\|all` | absent or invalid metric uses the comparison's current default, absent or invalid scope `certified` |
 
-`source=more` is a navigation marker, not screen state:
-`apps/mobile/components/navigation/more-hub-back-button.tsx` renders the
-`Back to More` arrow only when it is present, returning by `router.replace` for
-a destination inside the tabs and `router.dismissTo` for one pushed over them on
-the root stack (`/gyms`). Every such route stays valid, and looks the same,
-without the marker. The More rows that carry it are declared in
-`apps/mobile/src/navigation/more-destinations.ts`.
+| `/group/[groupId]/cows`, `…/cows/[cowId]` | `cowId`, `metric=e1rm\|improvement\|volume` | public identity and opening metric only; invalid/disabled metric uses the first enabled metric. A metric change replaces result pages without pushing a route |
+| `/group/[groupId]/cows/schedule` | `cowId` | absent creates next week; present edits that definition before start only. The static schedule segment wins over cowId |
+| `/group/[groupId]/edit` | `focusTimeZone=1` | focuses calendar setup; Back returns to the retained scheduling draft |
 
 ## Allowed transitions
 
@@ -152,7 +144,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress-history?exerciseDefinitionId=<id>` | `/exercise-history?exerciseDefinitionId=<id>` | ⋮ `History` (`exerciseHistoryHref`, `push`), preserving gym selection |
 | `/exercise-catalog` | `/exercise-history?exerciseDefinitionId=<id>` | exercise actions `History` (`exerciseHistoryHref`, `push`), no pre-applied filters |
-| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; 3D muscle header → chosen view; contributor → Timeline; Exercise list or 3D-detail row → saved view with its exercise metric and gym; all carry `metric`; tables carry gym (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
+| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; 3D muscle header → chosen view; contributor → Timeline; Exercise list row → saved view with its exercise metric and gym; all carry `metric`; tables carry gym (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
 | `/progress-history` | `/session/<id>`, `/completed-session/<id>`, `/sessions?day=`, `?week=` | Grid single: active → session, else completed (`historyDayHref`); several/lookup failure → day list. Weeks and ⋮ → week list; Timeline → completed session; muscle exercise links carry metric/gym (`push`) |
 | `/progress-history` | `/rm-curve?exerciseDefinitionId=<id>` | live exercise Options → RM curve (`rmCurveHref`, `push`); chart scope stays local |
@@ -172,7 +164,8 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`replace`) |
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
-| `/more` | `/groups`, `/exercise-catalog?source=more`, `/gyms?source=more`, `/connected-agents`, `/settings?source=more` | hub rows; `Connect an AI` only with an agent connected |
+| `/more` | `/groups`, `/exercise-catalog`, `/gyms`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
+| `/exercise-catalog`, `/groups`, `/settings` | a tab | `MainTabBar` (`dismissTo`, so the tabs below are reused rather than stacked) |
 | `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
 | `/settings`, `/settings-muscles` | `/profile`, `/body-weight`, `/theme-colour`, `/settings-*` | cards (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never reached from workouts |
 | `/settings-developer-tools` | `/dev-logs` | `View logs` (`push`), only under `isDevMode()` |
@@ -184,27 +177,28 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/groups`, `/group/mine` | `/group/new`, `/group/join` | `Join group` / `Create group` and the empty-state actions (`push`) |
 | `/group/new`, `/group/join` | `/group/<groupId>` | after create, join, or `Open group` when already a member (`replace`, so Back returns to where the flow started) |
 | `/group/<groupId>` | `/group/<groupId>/invite`, `/edit`, `/members`, `/exercises/new`, `/exercises/<exerciseId>/edit` | role-gated `Invite` / `Edit` actions, the member-count line, and owner/admin `Add exercise` / the exercise sheet's `Rename` (`push`); each returns `back()` after saving |
-| `/group/<groupId>/members` | `/groups` | after a successful leave (`dismissTo('/groups')`); the tab's focus refresh drops the group from the chips |
+| `/group/<groupId>/members` | `/groups` | after a successful leave (`dismissTo('/groups')`); the screen's focus refresh drops the group from the chips |
 | `/groups` | `/group/<groupId>/leaderboards/<exerciseId>` | a podium card on the Leaderboards segment (`push`, no query) |
 | `…/leaderboards/<exerciseId>` | `…/history?metric=&scope=` | the header `History`, passing the current toggles and rules revision |
 | `/groups`, `/today`, a board | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | a stream session card, Today's one-member training-now row or completed session, or the row detail sheet's `View full session` (`push`). Every full-session exit carries `groupId` |
 | `/today` | `/groups?groupId=<groupId>`, `/group/mine` | The board card's group name, the week board and the `<n> training now` row, carrying Today's selected group; `Find a group` when there is none. Picking a chip changes the selection Today shares with `/groups`; it does not navigate |
-| `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | the invite share link. The static `group/join` segment wins over `group/[groupId]` (`__tests__/groups-join-deep-link.test.tsx`), and a new link while the screen is open remounts it with the new code. **Known limitation:** opening the link while signed out goes through `/sign-in` and lands on `/`, dropping the code (there is no return-to); reopening the link works |
+| `/today`, `/group/<groupId>` | `/group/<groupId>/cows?cowId=…&metric=…` | preview header pushes the browser carrying the displayed CoW/metric; in-card switching never navigates |
+| `/groups`, `/group/<groupId>` | `/group/<groupId>/cows` | persistent View CoWs; a displayed preview carries CoW/metric (`push`) |
+| CoW browser | CoW standings or schedule | row/header opens standings; admins schedule/edit next week. Save/cancel returns `back()` and focus re-reads |
+| CoW schedule | group Edit or new exercise | missing zone/active exercise opens the existing form; Back retains choices and revalidates. Picker dismissal changes nothing and returns focus to Exercise |
+| `boga3://group/join?code=XXXXXXXX` | `/group/join?code=…` | invite link; static `group/join` wins over `[groupId]`. A changed code remounts the form. Signed-out links lose the code through sign-in; reopening works (`__tests__/groups-join-deep-link.test.tsx`) |
 
-Progress filters stay in-route; Sessions last. Tapping a muscle in Exercise 3D discloses contributions;
-their links open history within [[comparison.history-window]] at the selected metric/gym. Exercise 1RM always uses List; layout switches reset scroll.
+Progress filters stay in-route; Sessions last. Muscle 3D discloses the selected muscle’s contributors;
+their links open history within [[comparison.history-window]] at the selected metric/gym. Exercise always uses List; breakdown and muscle-layout switches reset scroll.
 
-Modals, sheets and `Alert` stay in-route. That includes the picker's `Add new` editor, group-pick sheet
-and `Add as new` editor, catalogue merge picker/confirmation and Data & Sync review, the exercise page's effort / options / swap sheets and
-its shared exercise editor, the Sessions row and active-session menus, and the
-record set row detail sheet on the Stream and the full board. A back *gesture* is disabled rather than handled where leaving
+Modals, sheets and `Alert` stay in-route. A back *gesture* is disabled rather than handled where leaving
 would be wrong: the session view of a workout in progress and the completion
 summary both set `gestureEnabled: false`.
 
 ## Header titles
 
 Title strings live in `apps/mobile/components/navigation/root-stack.tsx`, and in
-`apps/mobile/app/(tabs)/_layout.tsx` for the tab group. The conventions:
+`apps/mobile/app/(tabs)/_layout.tsx` for the tab group. Conventions:
 
 - A static title is declared in the root stack. Dynamic titles are set in the
   route's `Stack.Screen`, falling back to the placeholder until resolved.
@@ -212,9 +206,11 @@ Title strings live in `apps/mobile/components/navigation/root-stack.tsx`, and in
   screens drawing their own top bar or needing none (`session/[sessionId]/index`,
   the exercise page, picker, `completed-session/[sessionId]`, `sign-in`,
   `sync-setup`). Headerless screens still declare a title for VoiceOver back
-  labels. `exercise-history` is the one hybrid: native header with `MainTabBar`.
-- Native headers take styling from the root stack's `screenOptions`: `surface`
-  background, Archivo 700 `ink` title at `xl`, and minimal arrow-only back.
+  labels. `exercise-history` and the tab-owned pages are hybrids: native
+  header (actions in `headerRight`) with `MainTabBar`.
+- Native headers take styling from the root stack's `screenOptions`: `paper`
+  background with no shadow line, the `title` text role (Archivo 700 `ink` at
+  `lg`), and minimal arrow-only back.
   **Never add a `headerBackTitle`**: react-native-screens builds a custom back
   item that ignores display mode.
 - Three screens replace the native back item with the shared `IconButton` arrow

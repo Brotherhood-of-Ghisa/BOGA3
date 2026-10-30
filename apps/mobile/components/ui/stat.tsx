@@ -1,12 +1,13 @@
 import { StyleSheet, Text, View, type TextStyle } from 'react-native';
 
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 export type StatLayout = 'stacked' | 'inline';
 export type StatRank = 'primary' | 'secondary';
 export type StatState = 'realised' | 'planned';
 export type StatEmphasis = 'none' | 'record';
-export type StatKind = 'figure' | 'text';
+export type StatKind = 'figure' | 'text' | 'heading';
 export type StatGround = 'plain' | 'viz';
 
 export type StatProps = {
@@ -30,13 +31,19 @@ export type StatProps = {
   // `record`: bold `record`, an all-time best — the one superlative. Ignored
   // for planned values, which cannot be one (`design-language.md` §5).
   emphasis?: StatEmphasis;
-  // `text` sets the value in the body face (a gym name), not the figure face.
+  // `text` sets the value in the body face (a profile's email), not the figure
+  // face; `heading` in the card-title face, on a headline figure's line so it
+  // shares that figure's baseline beside it (the session's gym).
   kind?: StatKind;
   // Stacked only: `end` right-aligns label and value (a trailing column).
   align?: 'start' | 'end';
   // `viz`: the stat sits on a data-viz ground (`viz1`–`viz4`), where
   // `ink-faint` is illegible, so the legend is `ink` (`design-language.md` §2).
   ground?: StatGround;
+  // Inline only: `fixed` sets the value in `metricValueWidth`, so legends
+  // align down a list; `hug` keeps the legend a fixed gap from its value, for
+  // a caller that sets the column's width itself (the set summary row).
+  valueWidth?: 'fixed' | 'hug';
   testID?: string;
 };
 
@@ -53,11 +60,13 @@ export function Stat({
   kind = 'figure',
   align = 'start',
   ground = 'plain',
+  valueWidth = 'fixed',
   testID,
 }: StatProps) {
   const planned = state === 'planned';
   const legendStyle = [
-    styles.legend,
+    uiText.label,
+    uiTextTone.faint,
     planned ? styles.legendPlanned : null,
     ground === 'viz' ? styles.legendOnViz : null,
   ];
@@ -72,9 +81,9 @@ export function Stat({
 
   if (layout === 'inline') {
     return (
-      <View accessibilityLabel={`${spokenLabel} ${value}`} accessible style={styles.inline} testID={testID}>
+      <View accessibilityLabel={`${spokenLabel} ${value}`} accessible style={[styles.inline, valueWidth === 'hug' ? styles.inlineHug : null]} testID={testID}>
         <Text allowFontScaling={false} style={legendStyle}>{label}</Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[valueStyle, styles.inlineValue]}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[valueStyle, valueWidth === 'fixed' ? styles.inlineValue : styles.inlineValueHug]}>
           {value}
         </Text>
       </View>
@@ -96,15 +105,6 @@ export function Stat({
 }
 
 const styles = StyleSheet.create({
-  legend: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-    textTransform: 'uppercase',
-    color: uiRoles.inkFaint,
-  },
   legendPlanned: {
     color: uiRoles.inkGhost,
   },
@@ -124,60 +124,39 @@ const styles = StyleSheet.create({
     width: uiGeometry.metricValueWidth,
     textAlign: 'right',
   },
+  // Kept inside the caller's column: a value too wide for it ellipsizes
+  // rather than spilling under the column beside it.
+  inlineHug: {
+    maxWidth: '100%',
+  },
+  inlineValueHug: {
+    flexShrink: 1,
+  },
   stackedEnd: {
     alignItems: 'flex-end',
   },
 });
 
-const figure = uiFonts.figure.family;
+// A headline figure; in a list row, the row's `figure`; a profile's text value,
+// the name that heads a block; a heading beside headline figures.
+const stackedValueStyles = {
+  figure: uiText.figureStat,
+  rowFigure: uiText.figure,
+  text: uiText.bodyStrong,
+  // `title`, on `figureStat`'s line height, set to the line's bottom so the
+  // word sits on the figures' bottom line (iOS puts the extra leading above;
+  // Android needs `textAlignVertical`).
+  heading: [uiText.title, { lineHeight: uiText.figureStat.lineHeight, textAlignVertical: 'bottom' as const }],
+};
 
-const stackedValueStyles = StyleSheet.create({
-  figure: {
-    fontFamily: figure,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xl,
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-  // A figure in a list row: one rung above body, lighter than a headline.
-  rowFigure: {
-    fontFamily: figure,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  text: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.lg,
-    // The figure's line-height, so a text value sits level with the figures
-    // beside it in a summary row.
-    lineHeight: uiTypography.lineHeight.xl,
-    color: uiRoles.ink,
-  },
-});
-
-// Plex Mono ships 500/600/700 only; 500 is its lightest embedded face, and
-// the realised default so that a `record` (700) stands out from it.
-const inlineValueStyles = StyleSheet.create({
-  primary: {
-    fontFamily: figure,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
-  secondary: {
-    fontFamily: figure,
-    fontWeight: '500',
-    fontSize: uiTypography.size.xs,
-    lineHeight: uiTypography.lineHeight.xs,
-    color: uiRoles.inkMuted,
-  },
-});
+// The set row's 1RM line in ink, its quieter VOL line muted. Plex Mono 500 is
+// its lightest embedded face, so a `record` (700) stands out from it.
+const inlineValueStyles = {
+  primary: [uiText.figureSmall, uiTextTone.ink],
+  secondary: uiText.figureSmall,
+};
 
 const emphasisStyles: Record<StatEmphasis, TextStyle | null> = {
   none: null,
-  record: { fontWeight: '700', color: uiRoles.record },
+  record: uiTextTone.record,
 };

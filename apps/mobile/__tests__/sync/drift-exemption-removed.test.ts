@@ -3,7 +3,8 @@
  * regression are gone from the schema-extras file.
  *
  * Two exemptions were waivers granted only while a column had no real
- * counterpart on the other side of the wire:
+ * counterpart on the other side of the wire (the server-only list now holds
+ * only the documented agent concurrency tokens, which never cross the wire):
  *
  *   - a server-only exemption that existed while the client schemas lacked the
  *     soft-delete column; and
@@ -29,7 +30,7 @@ const SYNC_EXTRAS_PATH = join(MOBILE_ROOT, 'src', 'data', 'schema', 'sync-extras
 
 interface SyncExtras {
   exemptions?: {
-    server_only_columns?: unknown;
+    server_only_columns?: { column: string; rationale?: string }[];
     untyped_text_references?: { entity: string; column: string }[];
   };
 }
@@ -39,11 +40,16 @@ function loadExtras(): SyncExtras {
 }
 
 describe('schema drift exemptions', () => {
-  it('no longer carries the server-only exemption that masked the soft-delete column', () => {
+  it('waives only the server-maintained graph_version tokens as server-only columns', () => {
     const extras = loadExtras();
-    // The exemption key must be absent entirely, not merely emptied — an empty
-    // array would still be a standing waiver hook for the same masking.
-    expect(extras.exemptions?.server_only_columns).toBeUndefined();
+    // An exact list: any new server-only waiver (the soft-delete column above
+    // included) must be a deliberate co-edit of this test and the server
+    // contract's "Drift checker" section.
+    const waived = (extras.exemptions?.server_only_columns ?? []).map((r) => r.column).sort();
+    expect(waived).toEqual(['session_plans.graph_version', 'training_programmes.graph_version']);
+    for (const entry of extras.exemptions?.server_only_columns ?? []) {
+      expect(entry.rationale).toEqual(expect.stringContaining('never in sync_push or sync_pull'));
+    }
   });
 
   it('no longer carries the untyped-text waiver for the mapping muscle-group FK column', () => {

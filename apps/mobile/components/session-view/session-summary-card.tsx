@@ -17,7 +17,8 @@ type SessionSummaryCardProps = {
   times?: SessionTimesFieldsProps;
 };
 
-// Gym / Ex (exercises) / Sets / Volume, labels above values;
+// Gym / Ex (exercises) / Sets / Volume, labels above values; the gym name at
+// the card-title size, on the figures' bottom line;
 // the elapsed time is in the top bar's title. Editing a completed session,
 // Start and End sit above the row.
 export function SessionSummaryCard({
@@ -40,7 +41,7 @@ export function SessionSummaryCard({
           onPress={onPressGym}
           style={styles.gym}
           testID="session-view-summary-gym-button">
-          <Stat kind="text" label="Gym" testID="session-view-summary-gym" value={gymName ?? 'No gym'} />
+          <Stat kind="heading" label="Gym" testID="session-view-summary-gym" value={gymName ?? 'No gym'} />
         </Pressable>
         <Stat label="Ex" spokenLabel="Exercises" testID="session-view-summary-exercises" value={String(exerciseCount)} />
         <Stat label="Sets" testID="session-view-summary-sets" value={String(workingSetCount)} />

@@ -7,7 +7,7 @@ Workouts save locally as you train and sync when you are connected.
 
 ## Development updates
 
-To follow recent development, read the [daily development log](https://github.com/Brotherhood-of-Ghisa/BOGA3/discussions/920). The workflow posts new `main` commit titles daily at 07:30 Europe/London and stays quiet when nothing has changed. These are merged changes; release availability is separate.
+To follow recent development, read the [daily development log](https://github.com/Brotherhood-of-Ghisa/BOGA3/discussions/920). Updates are scheduled for 07:30 Europe/London. If GitHub misses the timed run, the first `main` push after 07:30 publishes the missing entry. Automatic runs post at most once per London calendar day and stay quiet when nothing has changed; manual recovery can publish additional updates. These are merged changes; release availability is separate.
 
 ## Analytics: understand the work behind your progress
 

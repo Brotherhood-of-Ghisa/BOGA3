@@ -69,7 +69,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
   const { pulling, onRefresh } = usePullToRefresh(resource.refresh);
   const error = pickInlineError(resource.error, resource.loadMoreError);
   if (resource.lostAccess) return <GroupLostAccessState testID="group-board-history-lost-access" />;
-  if (resource.exerciseMissing) return <GroupStateView title="This exercise isn't in this group" testID="group-board-history-exercise-missing" />;
+  if (resource.resourceMissing) return <GroupStateView title="This exercise isn't in this group" testID="group-board-history-exercise-missing" />;
   const header = <View style={groupScreenStyles.header}>
     <Stack.Screen options={{ title: exercise.name }} />
     <View style={styles.filters} testID="group-history-filters">

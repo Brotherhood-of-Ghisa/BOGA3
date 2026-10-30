@@ -74,7 +74,7 @@
   `local-wipe.test.ts`, `sync-status-composer.test.ts`,
   `sync-gate-decision.test.ts`, `settings-profile-navigation.test.tsx`, and the
   `__tests__/sync/**` directory (cycle-round-trip, cycle-multidevice-lww,
-  cycle-fresh-device-and-account-switch,
+  cycle-fresh-device-and-account-switch, muscle-targets-live,
   drift-check,
   auth-required-envelope, dirty-bit-per-entity, scheduler-state-table,
   topo-order-imported, now-monotonic-cross-restart,

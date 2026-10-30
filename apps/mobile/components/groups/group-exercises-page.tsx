@@ -1,15 +1,14 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, findNodeHandle, StyleSheet, Text, View, type ViewInstance } from 'react-native';
 
-import {
-  ExerciseEditorModal,
-  type ExerciseEditorSaveInput,
-} from '@/components/exercise-catalog/exercise-editor-modal';
+import { useOpenExerciseEditor, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-request';
 import {
   ActionButton,
   Card,
   Notice,
+  SegmentedControl,
+  type SegmentedControlOption,
   uiGeometry,
   uiSpace,
   uiText,
@@ -47,6 +46,7 @@ import { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-ex
 import { GroupExerciseRow } from './group-exercise-row';
 import { GroupExerciseUnlinkSheet } from './group-exercise-unlink-sheet';
 import { GroupMissingDataState, GroupStateView } from './group-state-view';
+import { GroupSharedExercisesList } from './group-shared-exercises-list';
 import { GroupWriteNotice } from './write-notice';
 
 type Feedback = { tone: 'error' | 'success'; message: string };
@@ -62,7 +62,13 @@ type GroupExercisesPageProps = {
   onRetry: () => void;
   /** Re-reads `group_get` after a refusal, so a demoted admin loses the actions. */
   refreshGroup: () => Promise<void>;
+  userId?: string | null;
 };
+
+const TAB_OPTIONS: readonly SegmentedControlOption<'leaderboards' | 'shared'>[] = [
+  { value: 'leaderboards', label: 'Leaderboards' },
+  { value: 'shared', label: 'Shared library' },
+];
 
 const runArchiveWrite = (groupId: string, action: 'archive' | 'unarchive', groupExerciseId: string) =>
   archiveCompetitionExercise(groupId,groupExerciseId,action === 'archive');
@@ -89,12 +95,14 @@ export function GroupExercisesPage({
   error,
   onRetry,
   refreshGroup,
+  userId,
 }: GroupExercisesPageProps) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'leaderboards' | 'shared'>('leaderboards');
   const links = useMyGroupExerciseLinks(groupId);
   const [sheetExercise, setSheetExercise] = useState<GroupExercise | null>(null);
   const [pickTarget, setPickTarget] = useState<GroupExercisePickTarget | null>(null);
-  const [addAsNewTarget, setAddAsNewTarget] = useState<GroupExercise | null>(null);
+  const openExerciseEditor = useOpenExerciseEditor();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const unlink = useExerciseUnlink({ offline, reloadLinks: links.reload, onNotice: setFeedback });
   const [unlinkExercise, setUnlinkExercise] = useState<GroupExercise | null>(null);
@@ -132,7 +140,6 @@ export function GroupExercisesPage({
   };
   const archiveWrite = useGroupAction(runArchiveWrite);
   const canManage = canManageGroup(myRole);
-  const addAsNewPrefill = useMemo(() => (addAsNewTarget ? buildAddAsNewPrefill(addAsNewTarget) : null), [addAsNewTarget]);
 
   const performArchiveWrite = async (action: 'archive' | 'unarchive', exercise: GroupExercise) => {
     setFeedback(null);
@@ -183,46 +190,63 @@ export function GroupExercisesPage({
     setFeedback({ tone: 'success', message: groupExerciseLinkedMessage(exercise.name, target.groupExercise.name) });
   };
 
+  // "Add as new": my exercise and its link commit in one local transaction,
+  // from the editor page opened over this one.
   const openAddAsNew = () => {
-    setAddAsNewTarget(pickTarget?.groupExercise ?? null);
+    const target = pickTarget?.groupExercise ?? null;
     setPickTarget(null);
-  };
-
-  // "Add as new": my exercise and its link commit in one local transaction.
-  const saveAddAsNew = async (input: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> => {
-    const target = addAsNewTarget;
-    if (!target) {
-      throw new Error('No group exercise selected.');
-    }
-    const { exercise } = await createExerciseWithGroupLink(input, { groupId, groupExerciseId: target.group_exercise_id });
-    return exercise;
-  };
-
-  const onAddAsNewSaved = (exercise: ExerciseCatalogExercise) => {
-    const target = addAsNewTarget;
-    setAddAsNewTarget(null);
-    void links.reload();
-    if (target) {
-      setFeedback({ tone: 'success', message: groupExerciseLinkedMessage(exercise.name, target.name) });
-    }
+    if (!target) return;
+    openExerciseEditor({
+      prefill: buildAddAsNewPrefill(target),
+      title: 'Add as new exercise',
+      onSave: async (input: ExerciseEditorSaveInput): Promise<ExerciseCatalogExercise> =>
+        (await createExerciseWithGroupLink(input, { groupId, groupExerciseId: target.group_exercise_id })).exercise,
+      onSaved: (exercise) => {
+        void links.reload();
+        setFeedback({ tone: 'success', message: groupExerciseLinkedMessage(exercise.name, target.name) });
+      },
+    });
   };
 
   const header = (
-    <View style={styles.header}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.microLabel]} testID="group-screen-exercises-title">
-        Exercises
-      </Text>
-      {canManage ? (
-        <ActionButton
-          accessibilityLabel="Add exercise"
-          label="Add exercise"
-          onPress={() => router.push(`/group/${groupId}/exercises/new`)}
-          testID="group-exercises-add-button"
-          variant="outline"
-        />
-      ) : null}
+    <View style={styles.headerBlock}>
+      <View style={styles.header}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.microLabel]} testID="group-screen-exercises-title">
+          Exercises
+        </Text>
+        {activeTab === 'leaderboards' && canManage ? (
+          <ActionButton
+            accessibilityLabel="Add exercise"
+            label="Add exercise"
+            onPress={() => router.push(`/group/${groupId}/exercises/new`)}
+            testID="group-exercises-add-button"
+            variant="outline"
+          />
+        ) : null}
+      </View>
+      <SegmentedControl
+        onChange={setActiveTab}
+        options={TAB_OPTIONS}
+        testIDPrefix="group-exercises-tab"
+        value={activeTab}
+      />
     </View>
   );
+
+  if (activeTab === 'shared') {
+    return (
+      <View style={styles.page} testID="group-screen-exercises">
+        {header}
+        <GroupSharedExercisesList
+          groupId={groupId}
+          groupName={groupName}
+          myRole={myRole}
+          offline={offline}
+          userId={userId ?? null}
+        />
+      </View>
+    );
+  }
 
   if (!exercises.data) {
     return (
@@ -327,15 +351,6 @@ export function GroupExercisesPage({
         purpose="link-only"
         target={pickTarget}
       />
-      <ExerciseEditorModal
-        editingExercise={null}
-        onRequestClose={() => setAddAsNewTarget(null)}
-        onSave={saveAddAsNew}
-        onSaved={onAddAsNewSaved}
-        prefill={addAsNewPrefill}
-        title="Add as new exercise"
-        visible={addAsNewTarget !== null}
-      />
     </View>
   );
 }
@@ -343,6 +358,9 @@ export function GroupExercisesPage({
 const styles = StyleSheet.create({
   page: {
     gap: uiSpace.md,
+  },
+  headerBlock: {
+    gap: uiSpace.sm,
   },
   header: {
     flexDirection: 'row',

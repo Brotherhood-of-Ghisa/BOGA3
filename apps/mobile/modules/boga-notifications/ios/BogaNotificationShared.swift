@@ -57,10 +57,18 @@ enum BogaNotificationCrypto {
       !location.unicodeScalars.contains(where: { $0.value < 32 || (127...159).contains($0.value) })
   }
 
+  /// APNs payloads arrive as NSNumber, but the Expo JS bridge hands every JS
+  /// number over as a Swift `Double`, which never casts to `Int`. Accept both.
+  static func integer(_ value: Any?) -> Int? {
+    if let value = value as? Int { return value }
+    if let value = value as? Double { return Int(exactly: value) }
+    return nil
+  }
+
   static func decrypt(_ envelope: [String: Any], binding: BogaNotificationBinding,
                       environment: String, now: Double = Date().timeIntervalSince1970 * 1000) -> BogaNotificationProjection? {
     guard Set(envelope.keys) == Set(["v", "bindingId", "nonce", "ciphertext"]),
-          envelope["v"] as? Int == 1,
+          integer(envelope["v"]) == 1,
           envelope["bindingId"] as? String == binding.bindingId,
           binding.environment == environment,
           let encodedNonce = envelope["nonce"] as? String,

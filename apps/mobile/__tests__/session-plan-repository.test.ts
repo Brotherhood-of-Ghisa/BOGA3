@@ -137,6 +137,7 @@ describe('plan repository — create', () => {
       gymId: null,
       scheduledFor: T1,
       provenance: 'human',
+      lastModifiedBy: 'human',
       deletedAt: null,
       localDirty: true,
     });
@@ -147,8 +148,10 @@ describe('plan repository — create', () => {
       name: 'Back Squat',
       exerciseDefinitionId: 'def-squat',
       progressStatus: 'pending',
+      lastModifiedBy: 'human',
       localDirty: true,
     });
+    expect(setRows().every((row) => row.lastModifiedBy === 'human')).toBe(true);
     expect(setRows().map((row) => [row.orderIndex, row.targetWeightValue, row.targetReps])).toEqual([
       [0, '80.5', 8],
       [1, null, 8],
@@ -227,7 +230,7 @@ describe('plan repository — meta, duplicate and delete lifecycle', () => {
     const setStampBefore = setRows()[0].localUpdatedAtMs;
     const result = await planRepository.updatePlanMeta(planId, { title: 'Renamed', scheduledFor: T1 }, T1);
     expect(result).toEqual({ status: 'updated' });
-    expect(planRows()[0]).toMatchObject({ title: 'Renamed', scheduledFor: T1 });
+    expect(planRows()[0]).toMatchObject({ title: 'Renamed', scheduledFor: T1, lastModifiedBy: 'human' });
     expect(setRows()[0].localUpdatedAtMs).toBe(setStampBefore);
   });
 
@@ -489,8 +492,9 @@ describe('programme repository', () => {
     expect(result).toEqual({ status: 'saved', id: expect.any(String) });
     if (result.status !== 'saved') throw new Error(`unexpected ${JSON.stringify(result)}`);
     const programme = await store.loadProgramme(result.id);
-    expect(programme).toMatchObject({ name: 'Squat Wave', description: null, deletedAt: null });
+    expect(programme).toMatchObject({ name: 'Squat Wave', description: null, deletedAt: null, lastModifiedBy: 'human' });
     const graphs = await store.listPlanGraphsByProgramme(result.id);
+    expect(graphs.every((graph) => graph.plan.lastModifiedBy === 'human')).toBe(true);
     expect(graphs.map((graph) => [graph.plan.title, graph.plan.programmeOrderIndex])).toEqual([
       ['Week 1', 0],
       ['Week 2', 1],

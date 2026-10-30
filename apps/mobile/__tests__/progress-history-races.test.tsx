@@ -136,3 +136,48 @@ it.each(['success', 'failure'])('ignores a superseded muscle gym’s late %s', a
   expect(result.current.weekly).toEqual(weekly(8));
   expect(result.current.error).toBeNull();
 });
+
+it('keeps the subject’s last read drawn while a gym or secondary-set change loads, never another muscle’s, and returns nothing once a read fails', async () => {
+  const next = deferred();
+  const failing = deferred();
+  jest.spyOn(stats, 'computeSelectedMuscleHistoryEffort').mockResolvedValueOnce(history(4))
+    .mockReturnValueOnce(next.promise).mockReturnValueOnce(failing.promise);
+  const { result, rerender } = renderHistory(muscle('quads'));
+  await waitFor(() => expect(result.current.weekly).toEqual(weekly(4)));
+  rerender({ subject: { kind: 'muscle', id: 'quads', gymId: 'gym-a' }, weeks: 52, revision: 0 });
+  await started(2);
+  // Loading, with the last chart still up rather than torn down for a spinner.
+  expect(result.current.loading).toBe(true);
+  expect(result.current.weekly).toEqual(weekly(4));
+  await act(async () => next.resolve(weekly(6)));
+  expect(result.current).toMatchObject({ loading: false, weekly: weekly(6) });
+  rerender({ subject: { kind: 'muscle', id: 'quads', countSecondary: false }, weeks: 52, revision: 0 });
+  await started(3);
+  expect(result.current).toMatchObject({ loading: true, weekly: weekly(6) });
+  await act(async () => failing.reject(Error('read failed')));
+  expect(result.current).toMatchObject({ loading: false, weekly: [], error: 'read failed' });
+});
+
+it('shows nothing of the last muscle while a switched-to muscle loads', async () => {
+  const next = deferred();
+  jest.spyOn(stats, 'computeSelectedMuscleHistoryEffort').mockResolvedValueOnce(history(4)).mockReturnValueOnce(next.promise);
+  const { result, rerender } = renderHistory(muscle('quads'));
+  await waitFor(() => expect(result.current.weekly).toEqual(weekly(4)));
+  rerender({ subject: muscle('chest'), weeks: 52, revision: 0 });
+  expect(result.current).toMatchObject({ loading: true, weekly: [] });
+  await started(2);
+  await act(async () => next.resolve(weekly(2)));
+  expect(result.current.weekly).toEqual(weekly(2));
+});
+
+it('never shows another account’s last read while the next account’s loads', async () => {
+  const next = deferred();
+  jest.spyOn(stats, 'computeSelectedMuscleHistoryEffort').mockResolvedValueOnce(history(4)).mockReturnValueOnce(next.promise);
+  const { result, rerender } = renderHistory(muscle('quads'));
+  await waitFor(() => expect(result.current.weekly).toEqual(weekly(4)));
+  rerender({ subject: muscle('quads'), weeks: 52, revision: 0, accountRevision: 1 });
+  expect(result.current).toMatchObject({ loading: true, weekly: [] });
+  await started(2);
+  await act(async () => next.resolve(weekly(2)));
+  expect(result.current.weekly).toEqual(weekly(2));
+});

@@ -1,8 +1,7 @@
 // Progress reads the user's muscles ([[muscle.report-groups]]): the data path, the
-// 3D body, the exercise 3D shading and the helpers the screens share.
-import { buildExerciseBodyMuscle, buildExerciseBodyMuscles, type ExerciseBodyItem } from '@/components/stats/exercise-body-data';
+// 3D body and the helpers the screens share.
 import {
-  buildThemeShadePalette, hitTestProjectedMuscle, projectMuscleBody,
+  buildThemeShadePalette, buildMuscleShadeRamp, hitTestProjectedMuscle, projectMuscleBody,
 } from '@/components/stats/muscle-body-projection';
 import { MUSCLE_BODY_MESH } from '@/components/stats/muscle-body-mesh';
 import {
@@ -12,7 +11,6 @@ import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { buildMuscleReportAssignment } from '@/src/data/muscle-report-presets';
 import type { ProgressMuscleComparison } from '@/src/data/progress-comparisons';
-import { reportMuscleTrainingStarts } from '@/src/data/progress-muscle-tickers';
 import { createStatsRepository, type StatsAggregationInput, type StatsStore } from '@/src/data/stats';
 import {
   NO_MUSCLE_REPORT, reportedExerciseMuscles, reportedMuscleName, reportedPrimaryFamilyName,
@@ -35,9 +33,9 @@ const exercise = (mappings: [string, 'primary' | 'secondary' | 'stabilizer'][]):
 });
 
 describe('3D body under the user’s muscles', () => {
-  const buckets = new Map([['back_lats', 2 as const], ['chest', 1 as const]]);
+  const scores = new Map([['back_lats', 1], ['chest', -1]]);
   const project = (report?: typeof BROAD, angleDeg = 180) =>
-    projectMuscleBody({ angleDeg, width: 300, height: 560, buckets, report });
+    projectMuscleBody({ angleDeg, width: 300, height: 560, scores, report });
   const palette = buildThemeShadePalette();
 
   it('gives every member mesh of a muscle its shade and the muscle’s id', () => {
@@ -48,7 +46,7 @@ describe('3D body under the user’s muscles', () => {
     const back = broad.triangles.filter(tri => tri.muscleGroupId === 'back_lats');
     expect(back).toHaveLength(memberTriangles.length);
     expect(new Set(back.map(tri => tri.fill)).size).toBeLessThanOrEqual(12);
-    expect(back.every(tri => palette.buckets[2].includes(tri.fill))).toBe(true);
+    expect(back.every(tri => buildMuscleShadeRamp(1, palette).includes(tri.fill))).toBe(true);
     expect(broad.triangles.some(tri => MERGED_BACK.includes(tri.muscleGroupId))).toBe(false);
   });
 
@@ -79,7 +77,7 @@ describe('3D body under the user’s muscles', () => {
   });
 
   it('marks a muscle selected across all its member meshes', () => {
-    const selected = projectMuscleBody({ angleDeg: 180, width: 300, height: 560, buckets, report: BROAD, selectedId: 'back_lats' });
+    const selected = projectMuscleBody({ angleDeg: 180, width: 300, height: 560, scores, report: BROAD, selectedId: 'back_lats' });
     const back = selected.triangles.filter(tri => tri.muscleGroupId === 'back_lats');
     expect(back.length).toBeGreaterThan(0);
     expect(back.every(tri => tri.selected)).toBe(true);
@@ -89,39 +87,6 @@ describe('3D body under the user’s muscles', () => {
     const detailedReport = buildMuscleReportAssignment(broadMuscleRows().map(row => ({ ...row, reportGroup: null, tracked: 1 })));
     expect(project(detailedReport)).toEqual(project(undefined));
     expect(MUSCLE_BODY_MESH.materials).toContain('serratus_anterior');
-  });
-});
-
-describe('Exercise 3D shading under the user’s muscles', () => {
-  const period = (sets = 0, volume: number | null = 0) => ({ workingSetCount: sets, totalVolume: volume, volumeSetCount: sets });
-  const muscle = (id: string): ProgressMuscleComparison => ({
-    muscleGroupId: id, displayName: id, familyName: 'Legs', sortOrder: 0,
-    current: period(), previous: period(), exercises: [], workingSetChange: 0, volumeChange: { kind: 'empty' },
-  });
-  const item: ExerciseBodyItem = { id: 'squat', name: 'Squat', current: period(3, 300), previous: period(), lastCompletedAt: null };
-  const squat = exercise([['quads', 'primary'], ['glutes_max', 'secondary'], ['hamstrings', 'secondary'],
-    ['adductors', 'secondary'], ['forearms_grip', 'primary']]);
-  const input = { items: [item], exercises: [squat], muscles: [muscle('quads'), muscle('glutes_max')], report: BROAD };
-
-  it('counts a set once per muscle at its strongest entry, as Quads 3 and Glutes & Hams 1.5', () => {
-    const [quads, glutes] = buildExerciseBodyMuscles(input);
-    expect(quads.current.workingSetCount).toBe(3);
-    expect(glutes.current.workingSetCount).toBe(1.5);
-    expect(glutes.current.totalVolume).toBe(150);
-  });
-
-  it('lists an exercise under the muscle one of its entries maps and ignores untracked mappings', () => {
-    const hamstringsOnly = exercise([['hamstrings', 'primary'], ['forearms_grip', 'secondary']]);
-    const detail = buildExerciseBodyMuscle({ ...input, exercises: [hamstringsOnly], muscleGroupId: 'glutes_max' })!;
-    expect(detail.exercises.map(entry => entry.item.id)).toEqual(['squat']);
-    expect(buildExerciseBodyMuscle({ ...input, exercises: [hamstringsOnly], muscleGroupId: 'forearms_grip' })).toBeNull();
-    expect(buildExerciseBodyMuscles({ ...input, exercises: [hamstringsOnly], countSecondary: false })[1].current.workingSetCount).toBe(3);
-  });
-
-  it('drops a muscle reached only as a secondary when secondary work is off', () => {
-    const secondaryOnly = exercise([['adductors', 'secondary']]);
-    const [quads] = buildExerciseBodyMuscles({ ...input, exercises: [secondaryOnly], countSecondary: false });
-    expect(quads.current.workingSetCount).toBe(0);
   });
 });
 
@@ -192,26 +157,6 @@ describe('family headers follow the user’s muscles', () => {
   });
 });
 
-describe('training starts under the user’s muscles', () => {
-  const at = (day: number) => new Date(Date.UTC(2026, 0, day));
-
-  it('starts a muscle when its earliest entry did and drops untracked entries', () => {
-    const starts = {
-      back_lats: { workingSetCount: at(9), totalVolume: undefined },
-      back_upper: { workingSetCount: at(3), totalVolume: at(5) },
-      traps_lower: { workingSetCount: at(20), totalVolume: at(2) },
-      forearms_grip: { workingSetCount: at(1) },
-      quads: { workingSetCount: at(7) },
-    };
-    expect(reportMuscleTrainingStarts(starts, BROAD)).toEqual({
-      back_lats: { workingSetCount: at(3), totalVolume: at(2) },
-      quads: { workingSetCount: at(7) },
-    });
-    expect(reportMuscleTrainingStarts(undefined, BROAD)).toBeUndefined();
-    expect(reportMuscleTrainingStarts(starts, NO_MUSCLE_REPORT)).toEqual(starts);
-  });
-});
-
 describe('Progress reads under the user’s muscles', () => {
   const NOW = new Date('2026-10-14T12:00:00Z');
   const baseInput = (): StatsAggregationInput => ({
@@ -226,11 +171,6 @@ describe('Progress reads under the user’s muscles', () => {
     ],
     muscleGroups: SYSTEM_MUSCLE_GROUP_SEEDS.map(({ id, displayName, familyName, sortOrder }) => ({ id, displayName, familyName, sortOrder })),
     muscleReport: BROAD,
-    muscleTrainingStarts: {
-      back_upper: { workingSetCount: new Date('2026-09-01T00:00:00Z') },
-      back_lats: { workingSetCount: new Date('2026-08-01T00:00:00Z') },
-      forearms_grip: { workingSetCount: new Date('2026-07-01T00:00:00Z') },
-    },
   });
   const repository = (input = baseInput()) => {
     const store: StatsStore = { loadAggregationInput: jest.fn().mockResolvedValue(input), loadMuscleGroupTaxonomy: jest.fn() };
@@ -261,7 +201,7 @@ describe('Progress reads under the user’s muscles', () => {
     expect(muscles.find(row => row.muscleGroupId === 'back_upper')!.current.workingSetCount).toBe(1);
   });
 
-  it('reads a muscle’s history across its entries and its ticker from the earliest entry start', async () => {
+  it('reads a muscle’s history across its entries', async () => {
     const { repo } = repository();
     const daily = await repo.computeSelectedMuscleHistoryEffort({
       start: new Date('2026-10-01T00:00:00Z'), end: NOW, muscleGroupIds: ['back_lats'], timeZone: 'UTC',
@@ -271,13 +211,5 @@ describe('Progress reads under the user’s muscles', () => {
       start: new Date('2026-10-01T00:00:00Z'), end: NOW, muscleGroupIds: ['back_lats'], timeZone: 'UTC', countSecondary: false,
     });
     expect(noSecondary.daily.map(day => day.workingSetCount)).toEqual([1]);
-
-    // Only the merged-away entry has a training start: the muscle still gets its ticker values.
-    const merged = baseInput();
-    delete merged.muscleTrainingStarts!.back_lats;
-    const { repo: mergedRepo } = repository(merged);
-    const tickers = await mergedRepo.computeMuscleTickers({ historyWeeks: 1, rollingWeeks: 1, weeklyTarget: 10, now: NOW });
-    expect(Object.keys(tickers.muscles)).toEqual(['back_lats']);
-    expect(tickers.muscles.back_lats.workingSetCount.observations.map(row => row.value)).toEqual([1]);
   });
 });

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Sourced by sync-push-contract.sh: current kg-only readings, the private
-# calculation preference and contribution fields share the normal sync v3 LWW
-# contract. Reuse the parent lane's isolated owners, helpers and cleanup.
+# calculation preference, the synced muscle targets and contribution fields
+# share the normal sync v3 LWW contract. Reuse the parent lane's isolated
+# owners, helpers and cleanup.
 
 echo "[sync-push] optional bodyweight sync v3 round-trip and owner isolation"
 BW_SETTING_ID="settings"
@@ -14,7 +15,9 @@ BW_BODY="$(jq -nc --arg reading "${BW_ID}" --arg session "${BW_SESSION_ID}" \
   --arg def "${BW_DEF_ID}" --arg sx "${BW_SX_ID}" --arg set "${BW_SET_ID}" --argjson ts "${BASE_MS}" '
   {entities: [
     {type: "user_settings", id: "settings", client_updated_at_ms: $ts,
-     fields: {bodyweight_calculations_enabled: true, created_at: $ts, updated_at: $ts, deleted_at: null}},
+     fields: {bodyweight_calculations_enabled: true, weekly_working_set_target: 10, muscle_target_mode: "per_muscle",
+              muscle_target_overrides: "{\"broad\": {\"chest\": 12}}", count_secondary_muscles: false,
+              created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "body_weight_measurements", id: $reading, client_updated_at_ms: $ts,
      fields: {weight_kg: 79.83225712, measured_at: $ts, created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "sessions", id: $session, client_updated_at_ms: $ts,
@@ -104,6 +107,43 @@ sync_push "${USER_A_TOKEN}" "$(printf '%s' "${BW_BODY}" | jq '{entities:[.entiti
 assert_status 200 "stale preference acknowledged"
 user_select user_settings "id=eq.settings&select=bodyweight_calculations_enabled" "${USER_A_TOKEN}"
 assert_json_expr '.[0].bodyweight_calculations_enabled == false' "stale preference cannot overwrite"
+
+# Synced muscle targets: a push that omits the keys (an app predating them) or
+# carries null (a device that has not adopted them yet) keeps the stored
+# values; the overrides must have the shape the app validates.
+bw_push_settings() {
+  local at="$1" fields="$2"
+  sync_push "${USER_A_TOKEN}" "$(jq -nc --argjson at "${at}" --argjson extra "${fields}" '
+    {entities: [{type: "user_settings", id: "settings", client_updated_at_ms: $at,
+      fields: ({bodyweight_calculations_enabled: true, created_at: $at, updated_at: $at, deleted_at: null} + $extra)}]}')"
+}
+bw_targets_unchanged() {
+  user_select user_settings "id=eq.settings&select=bodyweight_calculations_enabled,weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles" "${USER_A_TOKEN}"
+  assert_json_expr '.[0] == {bodyweight_calculations_enabled: true, weekly_working_set_target: 10,
+    muscle_target_mode: "per_muscle", muscle_target_overrides: {broad: {chest: 12}}, count_secondary_muscles: false}' "$1"
+}
+bw_push_settings "$((BASE_MS + 300))" '{}'
+assert_status 200 "old-shape settings push"
+bw_targets_unchanged "a push without the target keys keeps the stored targets"
+bw_push_settings "$((BASE_MS + 310))" '{"weekly_working_set_target": null, "muscle_target_mode": null, "muscle_target_overrides": null, "count_secondary_muscles": null}'
+assert_status 200 "null-target settings push"
+bw_targets_unchanged "a push with null targets keeps the stored targets"
+for bw_invalid in '{"broad": {"chest": 0}}' '{"broad": {"chest": 1.5}}' '{"region": {"chest": 8}}' \
+  '{"custom": {" ": 8}}' '{"detailed": []}' '[]' '"text"' '{broken'; do
+  bw_push_settings "$((BASE_MS + 320))" "$(jq -nc --arg overrides "${bw_invalid}" '{muscle_target_overrides: $overrides}')"
+  assert_non_2xx "invalid overrides ${bw_invalid} rejected"
+done
+bw_targets_unchanged "a rejected push leaves the stored targets"
+# The largest target the app accepts (a safe integer) is stored, not rejected.
+bw_push_settings "$((BASE_MS + 325))" '{"weekly_working_set_target": 9007199254740991}'
+assert_status 200 "settings push with the largest safe target"
+user_select user_settings "id=eq.settings&select=weekly_working_set_target" "${USER_A_TOKEN}"
+assert_json_expr '.[0].weekly_working_set_target == 9007199254740991' "the largest safe target round-trips"
+bw_push_settings "$((BASE_MS + 330))" '{"weekly_working_set_target": 14, "muscle_target_mode": "single", "muscle_target_overrides": "{}", "count_secondary_muscles": true}'
+assert_status 200 "settings push with new targets"
+user_select user_settings "id=eq.settings&select=weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles" "${USER_A_TOKEN}"
+assert_json_expr '.[0] == {weekly_working_set_target: 14, muscle_target_mode: "single", muscle_target_overrides: {}, count_secondary_muscles: true}' \
+  "a newer push replaces the targets"
 
 BW_READING_NEW="$(printf '%s' "${BW_BODY}" | jq '
   {entities: [.entities[] | select(.type=="body_weight_measurements") |

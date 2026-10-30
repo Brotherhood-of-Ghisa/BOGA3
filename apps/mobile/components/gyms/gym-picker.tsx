@@ -5,7 +5,8 @@ import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
+import { uiRoles } from '@/components/ui/tokens';
 import {
   ALL_GYMS_LABEL,
   SELECTED_GYM_LABEL,
@@ -74,7 +75,7 @@ export function GymPicker({ value, options, onChange, allSessionCount, size = 'p
   if (!showsGymPicker(value, offeredOptions(value, options))) return null;
   return (
     <>
-      <View ref={origin} collapsable={false}>
+      <View ref={origin} collapsable={false} style={styles.origin}>
         <GymPickerButton onPress={() => setOpen(true)} options={options} size={size} testID={testID} value={value} />
       </View>
       <GymPickerSheet allSessionCount={allSessionCount} onChange={onChange} onClose={() => setOpen(false)}
@@ -150,10 +151,10 @@ export function GymScopeChoices({ value, options, allSessionCount, onChoose, tes
         checked={checked}
         key={choice.key}
         leading={<Icon name={checked ? 'radio-on' : 'radio-off'} />}
-        meta={choice.count === undefined ? undefined : <Text allowFontScaling={false} style={styles.count}>{choice.count}</Text>}
+        meta={choice.count === undefined ? undefined : <Text allowFontScaling={false} style={uiText.figureSmall}>{choice.count}</Text>}
         onPress={() => onChoose(choice.gymId)}
         testID={`${testID}-option-${choice.key}`}>
-        <Text allowFontScaling={false} style={styles.label}>{choice.label}</Text>
+        <Text allowFontScaling={false} style={uiText.body}>{choice.label}</Text>
       </ListRow>
     );
   });
@@ -166,16 +167,6 @@ export const offersGymChoice = (value: string | null | undefined, options: reado
 const HINT = 'Chooses the gym this view counts';
 
 const styles = StyleSheet.create({
-  label: {
-    fontFamily: uiFonts.body.family,
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  count: {
-    fontFamily: uiFonts.figure.family,
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
-  },
+  // Lets a compact button shrink in a full selector row.
+  origin: { flexShrink: 1, minWidth: 0 },
 });

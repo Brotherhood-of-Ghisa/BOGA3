@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { uiBorder, uiFonts, uiGeometry, uiSpace, uiTypography } from '@/components/ui';
+import { FigureText, uiBorder, uiGeometry, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
@@ -31,40 +31,40 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
       testID={testID}>
       <View style={[styles.card, { backgroundColor: roles.surface, borderColor: roles.rule }]}>
         <View style={styles.cardHeader}>
-          <Text allowFontScaling={false} style={[styles.title, text(roles.ink)]}>
+          <Text allowFontScaling={false} style={[uiText.title, text(roles.ink)]}>
             Bench Press
           </Text>
-          <Text allowFontScaling={false} style={[styles.body, text(roles.inkMuted)]}>
-            1 set · 1RM {PREVIEW_ONE_REP_MAX.performed}
+          <Text allowFontScaling={false} style={[uiText.meta, text(roles.inkMuted)]}>
+            <FigureText>{`1 set · 1RM ${PREVIEW_ONE_REP_MAX.performed}`}</FigureText>
           </Text>
         </View>
         <View style={[styles.setRow, { borderTopColor: roles.ruleSoft }]}>
-          <Text allowFontScaling={false} style={[styles.setIndex, text(roles.inkFaint)]}>
+          <Text allowFontScaling={false} style={[uiText.figure, styles.setIndex, text(roles.inkFaint)]}>
             1
           </Text>
-          <Text allowFontScaling={false} style={[styles.figure, text(roles.ink)]}>
+          <Text allowFontScaling={false} style={[uiText.figure, styles.figureCell, text(roles.ink)]}>
             80 × 8
           </Text>
-          <Text allowFontScaling={false} style={[styles.meta, text(roles.inkFaint)]}>
-            1RM {PREVIEW_ONE_REP_MAX.performed}
+          <Text allowFontScaling={false} style={[uiText.meta, text(roles.inkFaint)]}>
+            <FigureText>{`1RM ${PREVIEW_ONE_REP_MAX.performed}`}</FigureText>
           </Text>
         </View>
         <View style={[styles.setRow, { borderTopColor: roles.ruleSoft, backgroundColor: roles.accentWash }]}>
-          <Text allowFontScaling={false} style={[styles.setIndex, text(roles.accent)]}>
+          <Text allowFontScaling={false} style={[uiText.figure, styles.setIndex, text(roles.accent)]}>
             2
           </Text>
-          <Text allowFontScaling={false} style={[styles.figure, text(roles.ink)]}>
+          <Text allowFontScaling={false} style={[uiText.figure, styles.figureCell, text(roles.ink)]}>
             82.5 × 8
           </Text>
-          <Text allowFontScaling={false} style={[styles.meta, text(roles.inkGhost)]}>
-            1RM {PREVIEW_ONE_REP_MAX.planned}
+          <Text allowFontScaling={false} style={[uiText.meta, text(roles.inkGhost)]}>
+            <FigureText>{`1RM ${PREVIEW_ONE_REP_MAX.planned}`}</FigureText>
           </Text>
         </View>
         <View style={[styles.record, { backgroundColor: roles.recordWash, borderTopColor: roles.recordRule }]}>
-          <Text allowFontScaling={false} style={[styles.microLabel, text(roles.record)]}>
+          <Text allowFontScaling={false} style={[uiText.label, text(roles.record)]}>
             BEST EVER
           </Text>
-          <Text allowFontScaling={false} style={[styles.figure, styles.recordFigure, text(roles.record)]}>
+          <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.record, styles.figureCell, styles.recordFigure, text(roles.record)]}>
             105.0
           </Text>
         </View>
@@ -83,12 +83,12 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
       </View>
       <View style={styles.actions}>
         <View style={[styles.button, styles.buttonOutline, { borderColor: roles.danger, backgroundColor: roles.surface }]}>
-          <Text allowFontScaling={false} style={[styles.buttonLabel, text(roles.danger)]}>
+          <Text allowFontScaling={false} style={[uiText.button, text(roles.danger)]}>
             DELETE
           </Text>
         </View>
         <View style={[styles.button, styles.buttonPrimary, { backgroundColor: roles.accent }]}>
-          <Text allowFontScaling={false} style={[styles.buttonLabel, text(roles.surface)]}>
+          <Text allowFontScaling={false} style={[uiText.button, text(roles.surface)]}>
             LOG SET
           </Text>
         </View>
@@ -113,18 +113,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
   },
-  title: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-  },
-  body: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-  },
   setRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -135,23 +123,9 @@ const styles = StyleSheet.create({
   },
   setIndex: {
     width: uiSpace.lg,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '600',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
   },
-  figure: {
+  figureCell: {
     flex: 1,
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-  },
-  meta: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
   },
   record: {
     flexDirection: 'row',
@@ -161,15 +135,7 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.sm,
     borderTopWidth: uiBorder.width,
   },
-  microLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.xxs,
-    lineHeight: uiTypography.lineHeight.xxs,
-    letterSpacing: uiTypography.size.xxs * uiGeometry.microLabelTracking,
-  },
   recordFigure: {
-    fontWeight: '700',
     textAlign: 'right',
   },
   heatmap: {
@@ -197,12 +163,5 @@ const styles = StyleSheet.create({
   },
   buttonPrimary: {
     flex: 2,
-  },
-  buttonLabel: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    letterSpacing: uiTypography.size.sm * uiGeometry.microLabelTracking,
   },
 });

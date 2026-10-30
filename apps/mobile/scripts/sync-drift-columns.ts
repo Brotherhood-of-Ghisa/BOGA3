@@ -18,7 +18,8 @@ export interface ServerColumn {
 
 export interface ColumnExemptions {
   local_only_columns: string[];
-  // Server-side columns tolerated with no client counterpart.
+  // Server-side columns tolerated with no client counterpart, each named
+  // `<entity>.<column>` so a waiver never covers another table's column.
   server_only_columns?: { column: string; rationale?: string }[];
   // Client columns whose server counterpart is intentionally untyped text.
   untyped_text_references?: { entity: string; column: string }[];
@@ -47,7 +48,17 @@ export const WIRE_ENVELOPE_COLUMNS: ReadonlySet<string> = new Set([
  */
 const SQLITE_BOOLEAN_COLUMNS: ReadonlySet<string> = new Set([
   'user_settings.bodyweight_calculations_enabled',
+  'user_settings.count_secondary_muscles',
   'exercise_definitions.split_by_gym',
+]);
+
+/**
+ * The synced JSON values the client stores as SQLite text against a server
+ * `jsonb` (JSON text on the wire). Listed one by one, so a new text column
+ * cannot silently pair with a server jsonb.
+ */
+const SQLITE_JSON_TEXT_COLUMNS: ReadonlySet<string> = new Set([
+  'user_settings.muscle_target_overrides',
 ]);
 
 /**
@@ -60,7 +71,8 @@ const SQLITE_BOOLEAN_COLUMNS: ReadonlySet<string> = new Set([
  * timestamp_ms discriminator on the client is reflected as `integer` by the SQLite catalog; bigint on the
  * server is `int8`. The narrow map accepts client `integer` against either
  * `int4` or `int8`, plus the synced SQLite booleans stored as integer
- * (SQLITE_BOOLEAN_COLUMNS).
+ * (SQLITE_BOOLEAN_COLUMNS), and the synced JSON values stored as text against
+ * `jsonb` (SQLITE_JSON_TEXT_COLUMNS).
  * Default-expression equality is NOT compared.
  */
 export function isTypeCompatible(sqliteType: string, udtName: string, entity: string, wireName: string): boolean {
@@ -71,6 +83,8 @@ export function isTypeCompatible(sqliteType: string, udtName: string, entity: st
   if (c === 'integer' && s === 'bool'
     && SQLITE_BOOLEAN_COLUMNS.has(`${entity}.${wireName}`)) return true;
   if (c === 'real' && (s === 'float8' || s === 'numeric')) return true;
+  if (c === 'text' && s === 'jsonb'
+    && SQLITE_JSON_TEXT_COLUMNS.has(`${entity}.${wireName}`)) return true;
   return false;
 }
 
@@ -107,7 +121,8 @@ export function diffEntityColumns(
           message:
             `${entity}.${wireName}: type mismatch — client ${col.type} vs server ${serverCol.udt_name} (udt). ` +
             `Type-compat map: text↔text, integer↔int4|int8, real↔float8|numeric; ` +
-            `${[...SQLITE_BOOLEAN_COLUMNS].join(' and ')} integer↔bool (see isTypeCompatible).`,
+            `${[...SQLITE_BOOLEAN_COLUMNS].join(' and ')} integer↔bool, ` +
+            `${[...SQLITE_JSON_TEXT_COLUMNS].join(' and ')} text↔jsonb (see isTypeCompatible).`,
         });
       }
       continue;
@@ -125,7 +140,7 @@ export function diffEntityColumns(
   for (const serverCol of serverColumns) {
     if (WIRE_ENVELOPE_COLUMNS.has(serverCol.column_name)) continue;
     if (clientWireNames.has(serverCol.column_name)) continue;
-    if (serverOnlyExempt.has(serverCol.column_name)) continue;
+    if (serverOnlyExempt.has(`${entity}.${serverCol.column_name}`)) continue;
     findings.push({
       kind: 'server_only_column',
       message:

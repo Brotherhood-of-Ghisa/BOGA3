@@ -128,7 +128,9 @@ run_gate() {
     [[ "${spec}" == *:* ]] && infra="${spec#*:}"
     while IFS= read -r row; do
       matched=1
-      run_lane_row "${row}" "${dry}"
+      # The loop reads the lane list on stdin; a lane that reads stdin would
+      # swallow the rest of the gate.
+      run_lane_row "${row}" "${dry}" </dev/null
     done < <(lanes_rows | awk -F'\t' -v g="${gate}" -v i="${infra}" '$2 == g && (i == "" || $3 == i)')
   done
   [[ "${matched}" == "1" ]] || fail "no lanes found for gate(s): ${gates[*]}"

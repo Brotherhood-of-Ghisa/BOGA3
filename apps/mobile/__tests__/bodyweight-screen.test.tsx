@@ -236,18 +236,17 @@ describe('bodyweight calculations and the Settings card', () => {
   it('keeps the body weight log available while the private preference turns off and on', async () => {
     await bootLocalApp();
     render(<><BodyWeightSettingsRow /><BodyWeightScreen /></>);
-    await waitFor(() => expect(toggle()).toHaveTextContent('Off'));
+    await waitFor(() => expect(toggle().props.accessibilityState).toEqual({ checked: false }));
     // The switch sits at the top of the log, above the current reading.
     const tree = JSON.stringify(screen.toJSON());
     expect(tree.indexOf('settings-bodyweight-calculations-toggle')).toBeLessThan(tree.indexOf('body-weight-current'));
 
-    // The switch's word is a control label: ink on its outline, surface on the accent fill.
-    const word = () => StyleSheet.flatten(within(toggle()).getByText(/^O(n|ff)$/).props.style);
-    expect(word()).toMatchObject({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, color: uiRoles.ink });
+    // A form card's switch row: one accessible switch named for the setting.
+    expect(toggle().props.accessibilityRole).toBe('switch');
+    expect(toggle().props.accessibilityLabel).toBe('Bodyweight calculations');
     for (const [label, enabled] of [['On', true], ['Off', false], ['On', true]] as const) {
       fireEvent.press(toggle());
-      expect(toggle()).toHaveTextContent(label);
-      expect(word().color).toBe(enabled ? uiRoles.surface : uiRoles.ink);
+      expect(toggle().props.accessibilityState).toEqual({ checked: enabled });
       expect(cardStatus()).toBe(`Bodyweight, ${label}`);
       expect(screen.getByTestId('body-weight-add')).toBeTruthy();
       await waitFor(() => expect(storedPreference()).toBe(enabled), AFTER_WRITE);
@@ -257,7 +256,7 @@ describe('bodyweight calculations and the Settings card', () => {
   it('reverts an optimistic toggle and shows a retryable error when the write fails', async () => {
     await bootLocalApp();
     render(<BodyWeightScreen />);
-    await waitFor(() => expect(toggle()).toHaveTextContent('Off'));
+    await waitFor(() => expect(toggle().props.accessibilityState).toEqual({ checked: false }));
 
     // A failed preference write.
     jest.spyOn(userSettingsRepository, 'writeBodyweightCalculationsEnabled')

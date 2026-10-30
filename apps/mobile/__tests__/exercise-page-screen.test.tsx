@@ -31,8 +31,11 @@ jest.mock('expo-router', () => {
   const mockReact = jest.requireActual('react');
   return {
     useRouter: () => mockRouter,
-    useNavigation: () => undefined,
+    // No beforeRemove listener; `getState` for the exercise editor page's stack read.
+    useNavigation: () => ({ getState: () => ({ routes: [] }), isFocused: () => true }),
     useLocalSearchParams: () => mockRouteParams,
+    // The exercise editor page's title (helpers/exercise-editor-page.tsx).
+    Stack: { Screen: () => null },
     useFocusEffect: (callback: () => void | (() => void)) => {
       mockReact.useEffect(() => callback(), [callback]);
     },
@@ -72,6 +75,7 @@ import {
   resetLocalData,
 } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
+import { exerciseEditorPage, WithExerciseEditorPage } from './helpers/exercise-editor-page';
 
 const SESSION = EXERCISE_PAGE_FIXTURE.activeSessionId;
 const BENCH = EXERCISE_PAGE_FIXTURE.benchSessionExerciseId;
@@ -159,6 +163,7 @@ describe('ExercisePageScreen', () => {
     __resetExerciseListPreferencesForTests();
     mockLinkingUserId = null;
     mockRouteParams = {};
+    exerciseEditorPage.reset();
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
@@ -631,7 +636,7 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-records-last-set-0')).toHaveTextContent(/^W-Up60\.0 × 10/);
     expect(screen.getByTestId('exercise-records-last-set-3')).toHaveTextContent(/^RIR 082\.5 × 6/);
 
-    fireEvent.press(screen.getByRole('link', { name: 'Open exercise progress' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Open exercise progress' }));
     expect(screen.getByTestId('exercise-records-progress')).toHaveTextContent('Progress');
     expect(mockRouter.push).toHaveBeenCalledWith(`/progress-history?exerciseDefinitionId=${BENCH_DEF}`);
   });
@@ -788,7 +793,35 @@ describe('ExercisePageScreen', () => {
     );
   });
 
-  it('offers Link to group exercise… in the ⋮ only when signed in, opening the Link screen', async () => {
+  it('opens the exercise editor page from Edit exercise, and a rename there renames the page', async () => {
+    await seedPage();
+    mockRouter.push.mockImplementation((href: unknown) => exerciseEditorPage.push(href));
+    mockRouter.back.mockImplementation(() => exerciseEditorPage.back());
+    render(
+      <WithExerciseEditorPage>
+        <ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />
+      </WithExerciseEditorPage>
+    );
+    await waitFor(() => expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent('1RM102.1'));
+
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    fireEvent.press(await screen.findByTestId('exercise-options-edit'));
+    // The editor opens after the page's pending edits are written.
+    await waitFor(() =>
+      expect(mockRouter.push).toHaveBeenCalledWith(expect.stringMatching(new RegExp(`^/exercise-edit\\?exerciseDefinitionId=${BENCH_DEF}&request=`)))
+    );
+    expect(screen.queryByTestId('exercise-options-sheet')).toBeNull();
+
+    fireEvent.changeText(await screen.findByTestId('exercise-editor-name-input'), 'Paused Bench Press');
+    await act(async () => fireEvent.press(screen.getByLabelText('Save exercise definition')));
+
+    await waitForGone(() => screen.queryByTestId('exercise-editor'));
+    await waitFor(() => expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Paused Bench Press'));
+    expect(localDatabase().select().from(exerciseDefinitions).where(eq(exerciseDefinitions.id, BENCH_DEF)).get()?.name)
+      .toBe('Paused Bench Press');
+  });
+
+  it('offers Link to group exercise in the ⋮ only when signed in, opening the Link screen', async () => {
     await openPage();
 
     fireEvent.press(screen.getByTestId('exercise-page-options'));
@@ -801,7 +834,7 @@ describe('ExercisePageScreen', () => {
     await renderPage();
     fireEvent.press(screen.getByTestId('exercise-page-options'));
     const sheet = await screen.findByTestId('exercise-options-sheet');
-    fireEvent.press(within(sheet).getByText('Link to group exercise…'));
+    fireEvent.press(within(sheet).getByText('Link to group exercise'));
 
     // The Link screen opens after the page's pending edits are written,
     // so the push resolves through the flush.

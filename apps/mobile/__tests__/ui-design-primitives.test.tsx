@@ -21,7 +21,6 @@ import {
   ListRow,
   Notice,
   PageHeader,
-  TitleBar,
   ScreenScroll,
   SearchField,
   SectionHeader,
@@ -33,6 +32,7 @@ import {
   Tag,
   ToggleChip,
   uiGeometry,
+  uiText,
   uiRoles,
   uiSpace,
   uiTypography,
@@ -106,10 +106,7 @@ describe('Stat', () => {
   it('sets a text value in the body face', () => {
     render(<Stat kind="text" label="Gym" value="Iron Works" />);
 
-    expect(flatStyle(screen.getByText('Iron Works'))).toMatchObject({
-      fontFamily: 'Source Sans 3',
-      fontWeight: '600',
-    });
+    expect(flatStyle(screen.getByText('Iron Works'))).toMatchObject(uiText.bodyStrong);
   });
 
   it('puts an inline value in the fixed-width, right-aligned metric column', () => {
@@ -125,25 +122,34 @@ describe('Stat', () => {
     });
   });
 
-  it('sets the secondary inline value smaller and muted', () => {
-    render(<Stat label="Vol" layout="inline" rank="secondary" value="2560" />);
+  it('lets an inline value hug its legend for a caller that sizes the column', () => {
+    render(<Stat label="1RM" layout="inline" value="102.1" valueWidth="hug" />);
 
-    expect(flatStyle(screen.getByText('2560'))).toMatchObject({
-      fontSize: uiTypography.size.xs,
-      fontWeight: '500',
-      color: uiRoles.inkMuted,
-    });
+    expect(flatStyle(screen.getByText('102.1'))).toMatchObject({ flexShrink: 1 });
+    expect(flatStyle(screen.getByText('102.1')).width).toBeUndefined();
+    expect(screen.getByLabelText('1RM 102.1')).toHaveStyle({ maxWidth: '100%' });
   });
 
-  it('sets a secondary stacked figure at the row size, lighter than a headline', () => {
+  it('sets a heading value in the card-title face on the headline figure line', () => {
+    render(<Stat kind="heading" label="Gym" value="Maestro Block History Gym" />);
+
+    expect(flatStyle(screen.getByText('Maestro Block History Gym'))).toMatchObject({
+      ...uiText.title,
+      lineHeight: uiText.figureStat.lineHeight,
+    });
+    expect(screen.getByText('Maestro Block History Gym')).toHaveProp('numberOfLines', 1);
+  });
+
+  it('sets the secondary inline value as the quiet figureSmall, muted beside the ink 1RM', () => {
+    render(<Stat label="Vol" layout="inline" rank="secondary" value="2560" />);
+
+    expect(flatStyle(screen.getByText('2560'))).toMatchObject({ ...uiText.figureSmall, color: uiRoles.inkMuted });
+  });
+
+  it('sets a secondary stacked figure as the row figure, lighter than a headline', () => {
     render(<Stat align="end" label="Sets" rank="secondary" value="10 (8)" />);
 
-    expect(flatStyle(screen.getByText('10 (8)'))).toMatchObject({
-      fontFamily: 'IBM Plex Mono',
-      fontWeight: '600',
-      fontSize: uiTypography.size.base,
-      color: uiRoles.ink,
-    });
+    expect(flatStyle(screen.getByText('10 (8)'))).toMatchObject({ ...uiText.figure, color: uiRoles.ink });
   });
 
   it('turns the legend ink on a data-viz ground, where ink-faint is illegible', () => {
@@ -995,26 +1001,6 @@ describe('PageHeader / SectionHeader', () => {
       fontWeight: '800',
       fontSize: uiTypography.size.xxl,
     });
-  });
-
-  it('draws a top bar on one line: back, an Archivo 700 title at xl, then actions', () => {
-    render(
-      <TitleBar
-        actions={<Text testID="actions">⋮</Text>}
-        back={<Text testID="back">‹</Text>}
-        testID="bar"
-        title="A long screen title that must not wrap"
-      />,
-    );
-    const title = screen.getByRole('header', { name: 'A long screen title that must not wrap' });
-    expect(title.props.numberOfLines).toBe(1);
-    expect(flatStyle(title)).toMatchObject({ fontFamily: 'Archivo', fontWeight: '700', fontSize: uiTypography.size.xl });
-    expect(flatStyle(screen.getByTestId('bar')).flexDirection).toBe('row');
-    const order = screen.getByTestId('bar').findAll(
-      (node) => ['back', 'actions'].includes(node.props.testID) || node.props.accessibilityRole === 'header',
-      { deep: true },
-    ).map((node) => node.props.testID ?? 'title');
-    expect(order.filter((id, index) => order.indexOf(id) === index)).toEqual(['back', 'title', 'actions']);
   });
 
   it('heads a section with an optional caps text action, never a primary', () => {

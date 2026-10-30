@@ -49,6 +49,8 @@ import {
   setGroupMemberRole,
   transferGroupOwnership,
   updateGroup,
+  getCoWResults, getCoWSummary, getCoWCalendar, setCoWCalendar, createCoW, updateCoW, cancelCoW, getCoW, listCoWs,
+  createCompetitionExercise,
 } from '@/src/groups/api';
 
 import { getNotificationPreferences, registerNotificationInstallation, setGroupNotificationMuted,
@@ -87,6 +89,36 @@ afterAll(async () => {
 });
 
 describe('groups client against the live server', () => {
+  it('round-trips every CoW definition/calendar RPC through the real client guards', async () => {
+    const { groupId } = await groupWithMember('Live CoW');
+    const calendar = await as(owner, () => getCoWCalendar(groupId));
+    expect(calendar.time_zone).toBe('Europe/London');
+    const zone = await as(owner, () => setCoWCalendar(groupId, calendar.revision, 'UTC'));
+    const exercise = await as(owner, () => createCompetitionExercise({
+      groupId, name: 'CoW bench', mode: 'total_load', contribution: 0, metric: 'e1rm',
+    }));
+    const input = { cowId: randomUUID(), groupExerciseId: exercise.exercise.group_exercise_id,
+      metrics: ['e1rm', 'volume'] as ('e1rm' | 'volume')[], calendarRevision: zone.revision, weekStart: zone.next_week_start! };
+    const created = await as(owner, () => createCoW(groupId, input));
+    expect(await as(member, () => getCoWSummary(groupId))).toMatchObject({ selection: 'none', result: null });
+    expect(await as(member, () => getCoWResults(groupId, input.cowId, 'volume'))).toMatchObject({ state: 'pending', normalized: null, rankings: [{ metric: 'volume', unit: null, entries: [] }] });
+    expect(created.cow).toMatchObject({ cow_id: input.cowId, time_zone: 'UTC', state: 'scheduled', revision: 1 });
+    expect(await as(owner, () => createCoW(groupId, input))).toEqual(created);
+    expect(await as(member, () => getCoW(groupId, input.cowId))).toEqual(created);
+    expect((await as(member, () => listCoWs(groupId))).cows).toEqual([created.cow]);
+    await expect(as(member, () => createCoW(groupId, { ...input, cowId: randomUUID() }))).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    const edited = await as(owner, () => updateCoW(groupId, input.cowId, {
+      revision: 1, groupExerciseId: input.groupExerciseId, metrics: ['improvement'],
+    }));
+    expect(edited.cow).toMatchObject({ metrics: ['improvement'], revision: 2 });
+    const cancelled = await as(owner, () => cancelCoW(groupId, input.cowId, 2));
+    expect(cancelled.cow.state).toBe('cancelled');
+    expect((await as(owner, () => listCoWs(groupId))).cows).toEqual([]);
+    await as(owner, () => createCoW(groupId, { ...input, cowId: randomUUID() }));
+    await as(owner, () => removeGroupMember(groupId, member.userId));
+    await expect(as(member, () => getCoW(groupId, input.cowId))).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
   it('creates, invites, previews, joins, reads and updates a group', async () => {
     const { group_id: groupId } = await as(owner, () => createGroup({ name: 'Live create', description: 'd' }));
     const first = await as(owner, () => getGroupInviteCode(groupId));

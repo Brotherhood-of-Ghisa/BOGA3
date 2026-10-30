@@ -3,11 +3,12 @@
 // handle explicitly so it runs unchanged against the production expo-sqlite
 // database and the in-memory test fixture.
 
-import { and, eq, inArray, like, notLike, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, like, notLike, or } from 'drizzle-orm';
 import type { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core';
 
 import * as schema from '@/src/data/schema';
 import { isCompetitionCachePayload } from './competition-cache-guards';
+import { coWSummaryCacheKey, coWSummaryExpiresAt, isCoWSummaryWire } from './cow-wire';
 import { applyCompetitionPolicy, bootstrapCompetitionPolicy, competitionPolicyObservations, emptyCompetitionPolicy, isObservedCompetitionPolicy,
   type ObservedCompetitionPolicy } from './competition-cache-policy';
 
@@ -23,12 +24,16 @@ export const groupCacheKeys = {
   session: (groupId: string, memberUserId: string, sessionId: string) => `session:v7:${groupId}:${memberUserId}:${sessionId}`,
   /** Versioned comparison catalogue; v1 cache entries are not reused. */
   groupExercises: (groupId: string) => `group-exercises:v7:${groupId}`,
+  /** Group shared exercises list (Option C persistent library). */
+  sharedExercises: (groupId: string) => `shared-exercises:v7:${groupId}`,
   /** Versioned podium payload. Full boards and history are never cached. */
   boards: (groupId: string) => `boards:v7:${groupId}`,
   /** Today's group card: the latest week read, stamped with its window (one entry per group). */
   weekSummary: (groupId: string) => `week:v7:${groupId}`,
   /** At a glance: one period-totals read per period and stepper offset (0 the current period, -1 the one before). */
   glance: (groupId: string, period: 'week', offset: number) => `glance:v7:${groupId}:${period}:${offset}`,
+  /** Read alias; stored summaries also pin server week, CoW/revision and publication. */
+  cowSummary: (groupId: string) => `cow-summary:v7:${groupId}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';
@@ -54,18 +59,20 @@ export const readGroupCache = <T>(
   const row = database
     .select()
     .from(groupCache)
-    .where(and(eq(groupCache.cacheKey, cacheKey), eq(groupCache.userId, userId)))
+    .where(and(cacheKey.startsWith('cow-summary:') ? like(groupCache.cacheKey, `${cacheKey}:%`) : eq(groupCache.cacheKey, cacheKey), eq(groupCache.userId, userId)))
+    .orderBy(desc(groupCache.fetchedAtMs))
     .get();
   if (!row) {
     return null;
   }
   let payload: unknown;
   try { payload=JSON.parse(row.payloadJson); } catch {
-    deleteGroupCacheEntry(database,cacheKey);
+    deleteGroupCacheEntry(database,row.cacheKey);
     return null;
   }
-  if (!isCompetitionCachePayload(cacheKey,payload)) {
-    deleteGroupCacheEntry(database,cacheKey);
+  if (!isCompetitionCachePayload(row.cacheKey,payload) || isCoWSummaryWire(payload) &&
+    (Date.now() < row.fetchedAtMs || Date.now() >= coWSummaryExpiresAt(payload,row.fetchedAtMs))) {
+    deleteGroupCacheEntry(database,row.cacheKey);
     return null;
   }
   return { payload: payload as T, fetchedAtMs: row.fetchedAtMs };
@@ -78,6 +85,13 @@ export const writeGroupCache = <T>(
 ): void => {
   if (quarantinedAccounts.has(entry.userId)) deleteAccountCompetitionCache(database,entry.userId);
   evictObsoleteGroupCache(database,entry.userId);
+  if (entry.cacheKey.startsWith('cow-summary:')) {
+    if (!isCoWSummaryWire(entry.payload) || entry.cacheKey !== groupCacheKeys.cowSummary(entry.payload.group_id)) throw new Error('Unsafe CoW cache scope.');
+    const groupId = entry.payload.group_id;
+    entry = { ...entry, cacheKey: coWSummaryCacheKey(entry.payload) };
+    database.delete(groupCache).where(and(eq(groupCache.userId,entry.userId),
+      like(groupCache.cacheKey, `${groupCacheKeys.cowSummary(groupId)}:%`))).run();
+  }
   if (!isCompetitionCachePayload(entry.cacheKey,entry.payload)) throw new Error('Unsafe group cache payload.');
   observeCompetitionPolicy(database,entry.cacheKey,entry.userId,entry.payload,entry.fetchedAtMs);
   clearObservedGroupLoss(entry.userId,entry.cacheKey,entry.payload);
@@ -111,7 +125,7 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
 export const evictGroup = (database: GroupCacheDatabase, groupId: string): void => {
   const scope = or(inArray(groupCache.cacheKey,[groupCacheKeys.group(groupId),groupCacheKeys.stream(groupId),
     groupCacheKeys.groupExercises(groupId),groupCacheKeys.boards(groupId),groupCacheKeys.weekSummary(groupId),`group-policy:v7:${groupId}`]),
-    like(groupCache.cacheKey,glanceKeyPattern(groupId)),like(groupCache.cacheKey,SESSION_KEY_PATTERN));
+    like(groupCache.cacheKey,glanceKeyPattern(groupId)),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId)}:%`),like(groupCache.cacheKey,SESSION_KEY_PATTERN));
   const accounts = new Set(database.select({ userId: groupCache.userId }).from(groupCache).where(scope).all().map(row => row.userId));
   database.delete(groupCache).where(scope).run();
   accounts.forEach(invalidateCompetitionMemory);

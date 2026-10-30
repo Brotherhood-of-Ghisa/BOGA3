@@ -88,7 +88,7 @@ import { competitionExercise,competitionRow,competitionBoard,competitionCertific
 import * as groupsApi from '@/src/groups/api';
 import { uiRoles } from '@/components/ui';
 
-import GroupsTabRoute from '../app/(tabs)/groups';
+import GroupsTabRoute from '../app/groups';
 import GroupBoardRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/index';
 import GroupBoardHistoryRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/history';
 
@@ -423,7 +423,8 @@ describe('Full board (E1.2)', () => {
   it('a non-network failure with nothing loaded shows the error state with Retry', async () => {
     api.getCompetitionBoard.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'bad payload'));
     openBoard();
-    expect(await screen.findByTestId('group-board-error-state')).toHaveTextContent(/bad payload/);
+    expect(await screen.findByTestId('group-board-error-state')).toHaveTextContent(/Please try again\./);
+    expect(screen.queryByText('bad payload')).toBeNull();
     api.getCompetitionBoard.mockResolvedValueOnce(boardPage([row(1, 'u1', 'Dave')]));
     fireEvent.press(screen.getByTestId('group-board-error-state-retry'));
     expect(await screen.findByTestId('group-board-row-1')).toBeTruthy();

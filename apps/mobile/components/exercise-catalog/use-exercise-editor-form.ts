@@ -35,7 +35,9 @@ const createRowId = () => `muscle-link-row-${Date.now()}-${Math.random().toStrin
  * The exercise editor's form state. Opening, or a different exercise or
  * prefill, fills the form in the render that shows it — not in an effect, so
  * the autofocused name field never shows stale values. The form holds the
- * user's muscles, so it fills again once the muscle setup first loads.
+ * user's muscles, so it fills again once the muscle setup first loads. The
+ * page passes `visible` true for its whole life and a frozen exercise, so a
+ * catalogue refresh while it is open (back from Link) keeps the user's edits.
  */
 export function useExerciseEditorForm({ visible, editingExercise, prefill, muscleSetup, muscleSetupLoaded, onRequestClose, onSaved, onSave }: {
   visible: boolean;
@@ -120,18 +122,15 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     setSaveError(null);
   };
 
-  const addSecondaryMuscle = (muscleGroupId: string) => {
-    if (muscleGroupId === primaryMuscleGroupId || selectedSecondaryMuscleIds.has(muscleGroupId)) {
+  /** The secondary picker is a multi-select: a tap adds or removes, and the picker stays open. */
+  const toggleSecondaryMuscle = (muscleGroupId: string) => {
+    if (muscleGroupId === primaryMuscleGroupId) {
       return;
     }
-    setSecondaryMuscleRows((current) => [...current, { rowId: createRowId(), muscleGroupId }]);
-    setValidation((current) => ({ ...current, secondaryMusclesError: null }));
-    setMuscleSelectorMode(null);
-    setSaveError(null);
-  };
-
-  const removeSecondaryMuscle = (rowId: string) => {
-    setSecondaryMuscleRows((current) => current.filter((row) => row.rowId !== rowId));
+    setSecondaryMuscleRows((current) =>
+      current.some((row) => row.muscleGroupId === muscleGroupId)
+        ? current.filter((row) => row.muscleGroupId !== muscleGroupId)
+        : [...current, { rowId: createRowId(), muscleGroupId }]);
     setValidation((current) => (current.secondaryMusclesError === null ? current : { ...current, secondaryMusclesError: null }));
     setSaveError(null);
   };
@@ -216,8 +215,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     openMuscleSelector,
     closeMuscleSelector: () => setMuscleSelectorMode(null),
     selectPrimaryMuscle,
-    addSecondaryMuscle,
-    removeSecondaryMuscle,
+    toggleSecondaryMuscle,
     close,
     save,
   };

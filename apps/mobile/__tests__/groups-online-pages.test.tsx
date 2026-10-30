@@ -324,19 +324,19 @@ describe('useGroupOnlinePages', () => {
     await flush();
 
     expect(result.current.lostAccess).toBe(true);
-    expect(result.current.exerciseMissing).toBe(false);
+    expect(result.current.resourceMissing).toBe(false);
     expect(fixture.database.select().from(groupCache).all()).toEqual([]);
   });
 
-  it('exercise NOT_FOUND reports exerciseMissing and evicts nothing', async () => {
+  it.each(['group exercise not found', 'CoW not found'])('%s reports a missing resource and evicts nothing', async message => {
     writeGroupCache(fixture.database, { cacheKey: groupCacheKeys.boards(GROUP), userId: USER, payload: { contract_version: 4,certified: true,podiums: [] }, fetchedAtMs: 1 });
     const fetchPage = jest
       .fn<Promise<Page>, [Cursor | null]>()
-      .mockRejectedValue(new GroupApiError('NOT_FOUND', 'group exercise not found'));
+      .mockRejectedValue(new GroupApiError('NOT_FOUND', message));
     const { result } = renderPages({ viewKey: 'v1', fetchPage });
     await flush();
 
-    expect(result.current.exerciseMissing).toBe(true);
+    expect(result.current.resourceMissing).toBe(true);
     expect(result.current.lostAccess).toBe(false);
     expect(fixture.database.select().from(groupCache).all().filter(row => !row.cacheKey.startsWith('group-policy:'))).toHaveLength(1);
   });

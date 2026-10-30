@@ -10,14 +10,31 @@
 
 import { eq } from 'drizzle-orm';
 
-import { applyPullPage, type WireEntity } from '@/src/sync/cycle';
+import {
+  applyPullPage,
+  createPullDrainTracker,
+  finalizePullDrain,
+  readPendingProvisionalMoves,
+  writeCursorAndPendingMoves,
+  selectPushBatch,
+  BATCH_CAP,
+  type WireEntity,
+} from '@/src/sync/cycle';
 import {
   __resetClockForTests,
   nowMonotonic,
   PRIMARY_RUNTIME_STATE_ID,
   type Transaction,
 } from '@/src/data/clock';
-import { exerciseDefinitions, gyms, muscleGroups, sessions, syncRuntimeState } from '@/src/data/schema';
+import {
+  exerciseDefinitions,
+  gyms,
+  muscleGroups,
+  sessionPlanExercises,
+  sessionPlanSets,
+  sessions,
+  syncRuntimeState,
+} from '@/src/data/schema';
 
 import {
   createInMemoryDatabase,
@@ -418,5 +435,542 @@ describe('pull cursor advances only after a committed page', () => {
 
     expect(readCursorJson()).toMatchObject({ '0': { type: 'gyms', id: 'gym-1' } });
     expect(database.select().from(gyms).all()).toHaveLength(1);
+  });
+});
+
+describe('applyPullPage collision-safe order application and tombstone parking', () => {
+  beforeEach(() => {
+    fixture = createInMemoryDatabase();
+    database = fixture.database;
+  });
+
+  const planWire = (id: string, ms: number, title: string): WireEntity => ({
+    type: 'session_plans',
+    id,
+    client_updated_at_ms: ms,
+    fields: {
+      programme_id: null,
+      programme_order_index: null,
+      gym_id: null,
+      title,
+      scheduled_for: null,
+      provenance: 'agent',
+      last_modified_by: 'agent',
+      created_at: ms,
+      updated_at: ms,
+      deleted_at: null,
+    },
+  });
+
+  const blockWire = (
+    id: string,
+    planId: string,
+    orderIndex: number,
+    ms: number,
+    deletedAt: number | null = null,
+  ): WireEntity => ({
+    type: 'session_plan_exercises',
+    id,
+    client_updated_at_ms: ms,
+    fields: {
+      session_plan_id: planId,
+      exercise_definition_id: null,
+      order_index: orderIndex,
+      name: `Block ${id}`,
+      progress_status: 'pending',
+      resolved_at: null,
+      last_modified_by: 'agent',
+      created_at: ms,
+      updated_at: ms,
+      deleted_at: deletedAt,
+    },
+  });
+
+  const setWire = (
+    id: string,
+    blockId: string,
+    orderIndex: number,
+    ms: number,
+    deletedAt: number | null = null,
+  ): WireEntity => ({
+    type: 'session_plan_sets',
+    id,
+    client_updated_at_ms: ms,
+    fields: {
+      session_plan_exercise_id: blockId,
+      order_index: orderIndex,
+      target_weight_value: null,
+      target_reps: 10,
+      target_set_type: null,
+      last_modified_by: 'agent',
+      created_at: ms,
+      updated_at: ms,
+      deleted_at: deletedAt,
+    },
+  });
+
+  it('handles collision-safe block reordering on an already populated store', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Push Day')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-a', 'plan-1', 0, 100),
+          blockWire('block-b', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    // Server reorders to [B, A], so B is now 0 and A is 1
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-b', 'plan-1', 0, 200),
+          blockWire('block-a', 'plan-1', 1, 200),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const b = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+    const a = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(b?.orderIndex).toBe(0);
+    expect(a?.orderIndex).toBe(1);
+  });
+
+  it('handles block tombstone parking above occupied slots on populated and wiped stores', () => {
+    // Populated store: A at 0, B at 1
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Pull Day')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-a', 'plan-1', 0, 100),
+          blockWire('block-b', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    // Server tombstones A (parked at 2000000) and redensifies B to 0
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-b', 'plan-1', 0, 200),
+          blockWire('block-a', 'plan-1', 2_000_000, 200, 200),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const b = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+    const a = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(b?.orderIndex).toBe(0);
+    expect(a?.orderIndex).toBe(2_000_000);
+    expect(a?.deletedAt).not.toBeNull();
+
+    // Wiped (fresh restore) store: apply both rows from scratch
+    const freshFixture = createInMemoryDatabase();
+    freshFixture.database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Pull Day')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-a', 'plan-1', 2_000_000, 200, 200),
+          blockWire('block-b', 'plan-1', 0, 200),
+        ],
+        'session_plan_exercises',
+      );
+    });
+    const freshA = freshFixture.database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    const freshB = freshFixture.database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+    expect(freshA?.orderIndex).toBe(2_000_000);
+    expect(freshB?.orderIndex).toBe(0);
+    freshFixture.close();
+  });
+
+  it('handles collision-safe set reordering and set tombstone parking', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Legs')], 'session_plans');
+      applyPullPage(tx as Transaction, [blockWire('block-1', 'plan-1', 0, 100)], 'session_plan_exercises');
+      applyPullPage(
+        tx as Transaction,
+        [
+          setWire('set-1', 'block-1', 0, 100),
+          setWire('set-2', 'block-1', 1, 100),
+        ],
+        'session_plan_sets',
+      );
+    });
+
+    // Swapped order
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          setWire('set-2', 'block-1', 0, 200),
+          setWire('set-1', 'block-1', 1, 200),
+        ],
+        'session_plan_sets',
+      );
+    });
+    const s2 = database.select().from(sessionPlanSets).where(eq(sessionPlanSets.id, 'set-2')).get();
+    const s1 = database.select().from(sessionPlanSets).where(eq(sessionPlanSets.id, 'set-1')).get();
+    expect(s2?.orderIndex).toBe(0);
+    expect(s1?.orderIndex).toBe(1);
+
+    // Set 1 tombstoned and parked at 2000000
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          setWire('set-1', 'block-1', 2_000_000, 300, 300),
+          setWire('set-2', 'block-1', 0, 300),
+        ],
+        'session_plan_sets',
+      );
+    });
+    const s1Dead = database.select().from(sessionPlanSets).where(eq(sessionPlanSets.id, 'set-1')).get();
+    expect(s1Dead?.orderIndex).toBe(2_000_000);
+    expect(s1Dead?.deletedAt).not.toBeNull();
+  });
+
+  it('preserves local newer dirty row and repairs colliding incoming slot with monotonic timestamp', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Legs')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-a', 'plan-1', 0, 100),
+          blockWire('block-b', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    // Simulate local dirty edit on block-a at timestamp 300
+    database
+      .update(sessionPlanExercises)
+      .set({ localDirty: true, localUpdatedAtMs: 300, name: 'Local Edited Squat' })
+      .where(eq(sessionPlanExercises.id, 'block-a'))
+      .run();
+
+    // Server sends reorder generated at timestamp 200: B -> 0, A -> 1
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-b', 'plan-1', 0, 200),
+          blockWire('block-a', 'plan-1', 1, 200),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const a = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    const b = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+
+    // Local winner A must retain its slot 0, dirty bit, and timestamp 300
+    expect(a?.orderIndex).toBe(0);
+    expect(a?.localDirty).toBeTruthy();
+    expect(a?.localUpdatedAtMs).toBe(300);
+    expect(a?.name).toBe('Local Edited Squat');
+
+    // Colliding incoming B must be conflict-repaired to slot 1 with dirty bit and fresh monotonic clock
+    expect(b?.orderIndex).toBe(1);
+    expect(b?.localDirty).toBeTruthy();
+    expect(Number(b?.localUpdatedAtMs)).toBeGreaterThan(300);
+
+    // No rows left in scratch band
+    const all = database.select().from(sessionPlanExercises).all();
+    for (const row of all) {
+      expect(row.orderIndex).toBeLessThan(5_000_000);
+    }
+  });
+
+  it('preserves local equal row on slot collision and conflict-repairs incoming row', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Legs')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-a', 'plan-1', 0, 200)],
+        'session_plan_exercises',
+      );
+    });
+
+    // Local block-a is at slot 0 with timestamp 200
+    database
+      .update(sessionPlanExercises)
+      .set({ localDirty: true, localUpdatedAtMs: 200 })
+      .where(eq(sessionPlanExercises.id, 'block-a'))
+      .run();
+
+    // Incoming new block-b also arrives claiming slot 0 with equal timestamp 200
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-b', 'plan-1', 0, 200)],
+        'session_plan_exercises',
+      );
+    });
+
+    const a = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    const b = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+
+    expect(a?.orderIndex).toBe(0);
+    expect(b?.orderIndex).toBe(1);
+    expect(b?.localDirty).toBeTruthy();
+    expect(Number(b?.localUpdatedAtMs)).toBeGreaterThan(200);
+  });
+
+  it('handles split-page pull without leaving temporary scratch slots across cycles', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Push')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-a', 'plan-1', 0, 100),
+          blockWire('block-b', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const tracker = createPullDrainTracker();
+
+    // Page 1 arrives with ONLY block-b moved to slot 0 at timestamp 200 (block-a split to next page)
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-b', 'plan-1', 0, 200)],
+        'session_plan_exercises',
+        tracker,
+      );
+    });
+
+    const bAfterPage1 = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+    const aAfterPage1 = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+
+    // B took slot 0; displaced A is at safe non-colliding slot 1 (NOT in scratch)
+    expect(bAfterPage1?.orderIndex).toBe(0);
+    expect(aAfterPage1?.orderIndex).toBe(1);
+    expect(aAfterPage1?.orderIndex).toBeLessThan(5_000_000);
+
+    // Page 2 arrives with block-a at slot 1
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-a', 'plan-1', 1, 200)],
+        'session_plan_exercises',
+        tracker,
+      );
+      finalizePullDrain(tx as Transaction, tracker);
+    });
+
+    const bFinal = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-b')).get();
+    const aFinal = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+
+    expect(bFinal?.orderIndex).toBe(0);
+    expect(aFinal?.orderIndex).toBe(1);
+    expect(aFinal?.localDirty).toBeFalsy();
+    expect(bFinal?.localDirty).toBeFalsy();
+  });
+
+  it('persists unresolved clean-sibling repair when displaced row is omitted from subsequent pages', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Push')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-0', 'plan-1', 0, 100),
+          blockWire('block-a', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const tracker = createPullDrainTracker();
+
+    // Page 1: incoming block-b claims slot 1 at timestamp 200 (displaces clean block-a)
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-b', 'plan-1', 1, 200)],
+        'session_plan_exercises',
+        tracker,
+      );
+    });
+
+    const aMid = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(aMid?.orderIndex).toBe(2);
+    // Still provisionally clean mid-drain
+    expect(aMid?.localDirty).toBeFalsy();
+    expect(aMid?.localUpdatedAtMs).toBe(100);
+
+    // Page 2: another block arrives; block-a is omitted from all later pages
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-c', 'plan-1', 3, 200)],
+        'session_plan_exercises',
+        tracker,
+      );
+    });
+
+    // Drain finishes: finalize unresolved repairs
+    database.transaction((tx) => {
+      finalizePullDrain(tx as Transaction, tracker);
+    });
+
+    const aFinal = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(aFinal?.orderIndex).toBe(2);
+    expect(aFinal?.localDirty).toBeTruthy();
+    expect(Number(aFinal?.localUpdatedAtMs)).toBeGreaterThan(200);
+
+    // Push leg selection picks up the repaired row
+    const batch = database.transaction((tx) => selectPushBatch(tx as Transaction, BATCH_CAP));
+    const pushedA = batch.find((entity) => entity.id === 'block-a');
+    expect(pushedA).toBeDefined();
+    expect(pushedA?.fields.order_index).toBe(2);
+    expect(pushedA?.client_updated_at_ms).toBe(Number(aFinal?.localUpdatedAtMs));
+  });
+
+  it('advances monotonic clock before ordered reconciliation so repairs beat future remote timestamps', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Legs')], 'session_plans');
+    });
+
+    const futureStamp = Date.now() + 120_000;
+
+    // Two colliding incoming blocks at slot 0 with futureStamp
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-x', 'plan-1', 0, futureStamp),
+          blockWire('block-y', 'plan-1', 0, futureStamp),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const x = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-x')).get();
+    const y = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-y')).get();
+
+    const winner = x?.orderIndex === 0 ? x : y;
+    const loser = x?.orderIndex === 1 ? x : y;
+
+    expect(winner?.orderIndex).toBe(0);
+    expect(winner?.localDirty).toBeFalsy();
+    expect(winner?.localUpdatedAtMs).toBe(futureStamp);
+
+    expect(loser?.orderIndex).toBe(1);
+    expect(loser?.localDirty).toBeTruthy();
+    // Repair timestamp must strictly exceed the future incoming timestamp
+    expect(Number(loser?.localUpdatedAtMs)).toBeGreaterThan(futureStamp);
+
+    // Push batch assertion: the repaired losing row is selected with client_updated_at_ms > futureStamp
+    const batch = database.transaction((tx) => selectPushBatch(tx as Transaction, BATCH_CAP));
+    const pushedLoser = batch.find((entity) => entity.id === loser?.id);
+    expect(pushedLoser).toBeDefined();
+    expect(pushedLoser?.fields.order_index).toBe(1);
+    expect(pushedLoser?.client_updated_at_ms).toBeGreaterThan(futureStamp);
+
+    // Pull assertion: a subsequent pull of the loser with the older futureStamp loses to local repair
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire(loser!.id, 'plan-1', 0, futureStamp)],
+        'session_plan_exercises',
+      );
+    });
+
+    const loserAfterPull = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, loser!.id)).get();
+    expect(loserAfterPull?.orderIndex).toBe(1);
+    expect(loserAfterPull?.localDirty).toBeTruthy();
+    expect(loserAfterPull?.localUpdatedAtMs).toBe(loser?.localUpdatedAtMs);
+  });
+
+  it('persists pending provisional moves atomically with cursor across network failure and process restart', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Legs')], 'session_plans');
+      applyPullPage(
+        tx as Transaction,
+        [
+          blockWire('block-0', 'plan-1', 0, 100),
+          blockWire('block-a', 'plan-1', 1, 100),
+        ],
+        'session_plan_exercises',
+      );
+    });
+
+    const tracker1 = createPullDrainTracker();
+
+    // Page 1 arrives: block-b arrives at slot 1 (displacing clean block-a to slot 2)
+    database.transaction((tx) => {
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-b', 'plan-1', 1, 200)],
+        'session_plan_exercises',
+        tracker1,
+      );
+      // Persist cursor and pending moves atomically with page 1
+      writeCursorAndPendingMoves(
+        tx as Transaction,
+        2,
+        { server_received_at: '2026-10-28T10:00:00Z', owner_user_id: 'u1', type: 'session_plan_exercises', id: 'block-b' },
+        Array.from(tracker1.provisionalMoves.values()),
+      );
+    });
+
+    // Verify pending move is persisted in SQLite
+    const persistedBeforeCrash = database.transaction((tx) => readPendingProvisionalMoves(tx as Transaction));
+    expect(persistedBeforeCrash).toHaveLength(1);
+    expect(persistedBeforeCrash[0].id).toBe('block-a');
+    expect(persistedBeforeCrash[0].type).toBe('session_plan_exercises');
+
+    // Simulate network drop on Page 2 and process restart
+    __resetClockForTests();
+
+    // Next cycle / process restart: create fresh tracker and restore persisted moves from SQLite
+    const tracker2 = createPullDrainTracker();
+    const restored = database.transaction((tx) => readPendingProvisionalMoves(tx as Transaction));
+    for (const move of restored) {
+      tracker2.provisionalMoves.set(move.id, move);
+    }
+    expect(tracker2.provisionalMoves.has('block-a')).toBe(true);
+
+    // Case 1: Page 2 does NOT deliver block-a; drain finishes
+    database.transaction((tx) => {
+      finalizePullDrain(tx as Transaction, tracker2);
+    });
+
+    const aFinal = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(aFinal?.orderIndex).toBe(2);
+    expect(aFinal?.localDirty).toBeTruthy();
+    expect(Number(aFinal?.localUpdatedAtMs)).toBeGreaterThan(200);
+
+    // Persisted moves are cleared on finalization
+    const persistedAfterFinalize = database.transaction((tx) => readPendingProvisionalMoves(tx as Transaction));
+    expect(persistedAfterFinalize).toHaveLength(0);
+
+    // Case 2: Verify later-page arrival preserves LWW when server delivers block-a
+    const futureServerStamp = Number(aFinal!.localUpdatedAtMs) + 100;
+    database.transaction((tx) => {
+      // Server delivers block-a at slot 2 with timestamp > aFinal timestamp
+      applyPullPage(
+        tx as Transaction,
+        [blockWire('block-a', 'plan-1', 2, futureServerStamp)],
+        'session_plan_exercises',
+      );
+    });
+
+    const aLww = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
+    expect(aLww?.orderIndex).toBe(2);
+    expect(aLww?.localDirty).toBeFalsy();
+    expect(aLww?.localUpdatedAtMs).toBe(futureServerStamp);
   });
 });

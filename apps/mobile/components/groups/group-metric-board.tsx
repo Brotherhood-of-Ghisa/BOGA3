@@ -66,7 +66,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const error = pickInlineError(board.error);
   const staleCursor = board.loadMoreError?.code === 'CONFLICT' || board.loadMoreError?.code === 'VALIDATION';
   if (board.lostAccess || group.lostAccess) return <GroupLostAccessState testID="group-board-lost-access" />;
-  if (board.exerciseMissing) return <GroupStateView title="This exercise isn't in this group" testID="group-board-exercise-missing" />;
+  if (board.resourceMissing) return <GroupStateView title="This exercise isn't in this group" testID="group-board-exercise-missing" />;
   const rebuilding = board.firstPage?.state === 'rebuilding';
   const header = <View style={groupScreenStyles.header}>
     <Stack.Screen options={{ title: exercise.name }} />

@@ -84,11 +84,13 @@ try {
     'get_exercise_history',
     'get_recent_workouts',
     'get_training_profile',
+    'get_training_status',
     'get_upcoming_session_plans',
     'get_workout_detail',
     'list_muscles',
     'restore_exercise',
     'search_exercises',
+    'set_muscle_targets',
     'update_exercise',
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
@@ -144,6 +146,25 @@ try {
     )
   ) {
     throw new Error('Recent workouts did not return the test user session.');
+  }
+
+  // One bounded status: the seeded exercise is a favourite of the last 28 days.
+  const trainingStatus = structured(
+    await client.callTool({ arguments: {}, name: 'get_training_status' }),
+    'get_training_status',
+  );
+  const favourites = Array.isArray(trainingStatus.favourite_exercises) ? trainingStatus.favourite_exercises : [];
+  if (
+    trainingStatus.metric_revision !== 'working_sets_v7' ||
+    !Array.isArray(trainingStatus.muscles) ||
+    !isObject(trainingStatus.targets) ||
+    typeof trainingStatus.complete !== 'boolean' ||
+    !favourites.some((favourite) =>
+      isObject(favourite) && favourite.exercise_id === expectedExerciseId &&
+      typeof favourite.sessions_28d === 'number' && favourite.sessions_28d >= 1
+    )
+  ) {
+    throw new Error('Training status did not return the bounded shape with the test exercise as a favourite.');
   }
 
   // Drain exact exercise history across pages
@@ -242,6 +263,14 @@ try {
       });
       if (!unauthExercise.isError || !JSON.stringify(unauthExercise).includes('PLAN_PERMISSION_REQUIRED')) {
         throw new Error('create_exercise succeeded or failed without PLAN_PERMISSION_REQUIRED when disabled.');
+      }
+
+      const unauthTargets = await client.callTool({
+        arguments: { default_weekly_sets: 12, expected_revision: 0, idempotency_key: `smoke-targets-denied-${Date.now()}` },
+        name: 'set_muscle_targets',
+      });
+      if (!unauthTargets.isError || !JSON.stringify(unauthTargets).includes('PLAN_PERMISSION_REQUIRED')) {
+        throw new Error('set_muscle_targets succeeded or failed without PLAN_PERMISSION_REQUIRED when disabled.');
       }
     }
   } else {
@@ -443,6 +472,66 @@ try {
       if (deleted.deleted !== true || restored.deleted !== false) {
         throw new Error('delete_exercise / restore_exercise did not round-trip.');
       }
+
+      // The coach's targets: set, replay, stale, foreign id, then the status shows them.
+      const before = isObject(trainingStatus.targets) ? trainingStatus.targets : {};
+      const targetsArguments = {
+        default_weekly_sets: 11,
+        expected_revision: Number(before.revision),
+        idempotency_key: `smoke-targets-${Date.now()}`,
+        mode: 'per_muscle',
+        overrides: { [smokeMuscleId]: 14 },
+      };
+      const targets = structured(
+        await client.callTool({ arguments: targetsArguments, name: 'set_muscle_targets' }),
+        'set_muscle_targets',
+      );
+      const replayed = structured(
+        await client.callTool({ arguments: targetsArguments, name: 'set_muscle_targets' }),
+        'set_muscle_targets replay',
+      );
+      const newTargets = isObject(targets.targets) ? targets.targets : {};
+      if (
+        newTargets.default_weekly_sets !== 11 || newTargets.mode !== 'per_muscle' ||
+        !(Number(newTargets.revision) > Number(before.revision)) ||
+        !isObject(targets.overrides) || targets.overrides[smokeMuscleId] !== 14 ||
+        targets.idempotent_replay !== false || replayed.idempotent_replay !== true
+      ) {
+        throw new Error('set_muscle_targets did not apply, or its replay did not return the first result.');
+      }
+      const staleTargets = await client.callTool({
+        arguments: { ...targetsArguments, default_weekly_sets: 9, idempotency_key: `smoke-targets-stale-${Date.now()}` },
+        name: 'set_muscle_targets',
+      });
+      if (!staleTargets.isError || !JSON.stringify(staleTargets).includes('REVISION_CONFLICT')) {
+        throw new Error('A stale set_muscle_targets revision did not fail with REVISION_CONFLICT.');
+      }
+      const foreignTargets = await client.callTool({
+        arguments: {
+          expected_revision: Number(newTargets.revision),
+          idempotency_key: `smoke-targets-foreign-${Date.now()}`,
+          overrides: { [`${smokeMuscleId}-missing`]: 9 },
+        },
+        name: 'set_muscle_targets',
+      });
+      if (!foreignTargets.isError || !JSON.stringify(foreignTargets).includes('VALIDATION_ERROR')) {
+        throw new Error('set_muscle_targets accepted an override for a muscle outside the setup.');
+      }
+      const after = structured(
+        await client.callTool({ arguments: {}, name: 'get_training_status' }),
+        'get_training_status after set_muscle_targets',
+      );
+      const afterMuscle = Array.isArray(after.muscles)
+        ? after.muscles.find((muscle) => isObject(muscle) && muscle.id === smokeMuscleId)
+        : null;
+      if (
+        !isObject(after.targets) || after.targets.default_weekly_sets !== 11 ||
+        after.targets.mode !== 'per_muscle' || after.targets.uploaded !== true ||
+        after.targets.revision !== newTargets.revision ||
+        !isObject(afterMuscle) || afterMuscle.weekly_target !== 14
+      ) {
+        throw new Error('get_training_status did not show the targets the coach set.');
+      }
     }
   }
 
@@ -468,5 +557,5 @@ try {
   await client.close();
 }
 
-console.log('[boga-mcp-smoke] PASS: rejected token challenged; fourteen tools discovered and verified');
+console.log('[boga-mcp-smoke] PASS: rejected token challenged; sixteen tools discovered and verified');
 

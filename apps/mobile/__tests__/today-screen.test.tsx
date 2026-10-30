@@ -13,7 +13,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { AppState, StyleSheet, type AppStateStatus } from 'react-native';
+import { AppState, ScrollView, StyleSheet, type AppStateStatus } from 'react-native';
 import Svg from 'react-native-svg';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -99,6 +99,8 @@ const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
 };
 
 const text = (testID: string) => screen.getByTestId(testID);
+// The session table's rows: hidden from assistive tech, since the summary's button speaks for them.
+const rowText = (testID: string) => screen.getByTestId(testID, { includeHiddenElements: true });
 
 beforeEach(() => {
   resetLocalData();
@@ -268,26 +270,36 @@ describe('Today: the Progress card over real data', () => {
     // The start reads as a Sessions row: a body line, ink, only its figures in the figure face.
     expect(text('today-latest-session-start')).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.ink });
     expect(within(text('today-latest-session-start')).getByText('07:12')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
+    // The month takes the figure face with its day and year, as a Sessions row's stamp does.
+    expect(within(text('today-latest-session-start')).getByText('15 Oct 26')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
     // A faint separator holds the date and the time apart.
     expect(within(text('today-latest-session-start')).getByText(' · ')).toHaveStyle({ color: uiRoles.inkFaint });
     // Sets are ink like the other figure columns, not muted.
-    expect(text('today-latest-session-exercise-0-sets')).toHaveStyle({ color: uiRoles.ink });
+    expect(rowText('today-latest-session-exercise-0-sets')).toHaveStyle({ color: uiRoles.ink });
     // The figure columns sit a clear step apart.
-    expect(text('today-latest-session-exercise-0')).toHaveStyle({ gap: uiSpace.md });
+    expect(rowText('today-latest-session-exercise-0')).toHaveStyle({ gap: uiSpace.md });
     expect(text('today-latest-session-figures')).toHaveTextContent('2 exercises · 6 sets · 3 PRs @ Iron House');
     // One row per exercise: working sets, best set, its 1RM; the bench's 1RM a PR.
-    expect(text('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3115.0 × 5134.1');
-    expect(text('today-latest-session-exercise-0-1rm')).toHaveStyle({ color: uiRoles.record });
-    expect(text('today-latest-session-exercise-1')).toHaveTextContent('Barbell Back Squat3100.0 × 5116.6');
-    expect(text('today-latest-session-exercise-1-1rm')).not.toHaveStyle({ color: uiRoles.record });
+    expect(rowText('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3115.0 × 5134.1');
+    expect(rowText('today-latest-session-exercise-0-1rm')).toHaveStyle({ color: uiRoles.record });
+    expect(rowText('today-latest-session-exercise-1')).toHaveTextContent('Barbell Back Squat3100.0 × 5116.6');
+    expect(rowText('today-latest-session-exercise-1-1rm')).not.toHaveStyle({ color: uiRoles.record });
     expect(body.props.accessibilityLabel).toBe(
       'Session on 15 Oct 26 07:12; 2 exercises; 6 sets; 3 PRs; at Iron House; '
         + 'Barbell Bench Press, 3 sets, best 115.0 × 5, 1RM 134.1, a 1RM PR; Barbell Back Squat, 3 sets, best 100.0 × 5, 1RM 116.6',
     );
 
+    // Two exercises fit the table: no page arrows.
+    expect(screen.queryByTestId('today-latest-session-rows-down', { includeHiddenElements: true })).toBeNull();
+    // The summary's button speaks for the table, so the table is hidden from assistive tech.
+    expect(screen.queryByTestId('today-latest-session-rows')).toBeNull();
+
     fireEvent.press(body);
+    // The rows sit outside the summary's button, so they scroll, and open the session themselves.
+    fireEvent.press(rowText('today-latest-session-rows-open'));
     fireEvent.press(text('today-sessions-button'));
-    expect(mockPush.mock.calls).toEqual([['/completed-session/oct-15'], ['/sessions']]);
+    expect(mockPush.mock.calls).toEqual([['/completed-session/oct-15'], ['/completed-session/oct-15'], ['/sessions']]);
+    expect(within(body).queryByTestId('today-latest-session-rows', { includeHiddenElements: true })).toBeNull();
     // The link is the session card's own; the section heading carries none.
     expect(within(text('today-session-card')).getByTestId('today-sessions-button')).toBeTruthy();
     // The header row keeps a tap height of its own: the compact link no longer holds it open.
@@ -334,7 +346,7 @@ describe('Today: the Progress card over real data', () => {
     fireEvent.press(text('today-latest-session-step-older'));
     await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('8 Oct 26 · 09:00'));
     expect(text('today-latest-session-figures')).toHaveTextContent('2 exercises · 6 sets · 3 PRs @ Iron House');
-    expect(text('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3110.0 × 5128.2');
+    expect(rowText('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3110.0 × 5128.2');
     // The figures above it stay on this week and period.
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 18 sets');
 
@@ -484,7 +496,34 @@ describe('Today: the today-progress harness fixture', () => {
     expect(text('today-latest-session-start')).toHaveTextContent('16 Oct 26 · 07:00');
     expect(text('today-latest-session-figures')).toHaveTextContent('6 exercises · 18 sets · 3 PRs @ Canal Street Gym');
     // More exercises than the card shows without scrolling.
-    expect(text('today-latest-session-exercise-5')).toHaveTextContent('Barbell Bent Over Row370.0 × 581.6');
+    expect(rowText('today-latest-session-exercise-5')).toHaveTextContent('Barbell Bent Over Row370.0 × 581.6');
+    // The arrows beside the heading page the rows; the scroller's own events say where it is.
+    const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo').mockImplementation(() => {});
+    const scrolled = (y: number) => fireEvent.scroll(rowText('today-latest-session-rows'), { nativeEvent: { contentOffset: { x: 0, y } } });
+    expect(rowText('today-latest-session-rows-up')).toBeDisabled();
+    fireEvent.press(rowText('today-latest-session-rows-down'));
+    // One page, short of a whole one: two rows past four.
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 2 * 32, animated: true });
+    scrolled(2 * 32);
+    await waitFor(() => expect(rowText('today-latest-session-rows-down')).toBeDisabled());
+    expect(rowText('today-latest-session-rows-up')).toBeEnabled();
+    fireEvent.press(rowText('today-latest-session-rows-up'));
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 0, animated: true });
+    // A swipe part-way leaves both ends ahead.
+    scrolled(32);
+    await waitFor(() => expect(rowText('today-latest-session-rows-down')).toBeEnabled());
+    expect(rowText('today-latest-session-rows-up')).toBeEnabled();
+    // Stepping away and back starts the table at the top again.
+    fireEvent.press(text('today-latest-session-step-older'));
+    await waitFor(() => expect(text('today-latest-session-start')).not.toHaveTextContent('16 Oct 26 · 07:00'));
+    fireEvent.press(text('today-latest-session-step-newer'));
+    await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('16 Oct 26 · 07:00'));
+    expect(rowText('today-latest-session-rows-up')).toBeDisabled();
+    expect(rowText('today-latest-session-rows-down')).toBeEnabled();
+    // On a phone too short for four rows the table still pages, though the arrows were about more than four.
+    fireEvent(rowText('today-latest-session-rows'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 6 * 32 } } });
+    await waitFor(() => expect(screen.queryByTestId('today-latest-session-rows-down', { includeHiddenElements: true })).toBeNull());
+    scrollTo.mockRestore();
   });
 });
 
@@ -564,14 +603,14 @@ describe('Today: the cards', () => {
 
   const selected = (testID: string) => text(testID).props.accessibilityState?.selected;
 
-  it('gives You and the group a full-height page each, the next one peeking', async () => {
+  it('gives You and the group a full-width, full-height page each', async () => {
     await bootLocalApp();
     await seedTodayProgressFixture({ now: NOW, periodWeeks: 4 });
     await renderCards();
 
-    // 393 less both 16pt gutters and the 16pt peek; 700 less the track's 12 + 16.
-    expect(text('today-progress-section')).toHaveStyle({ width: 345, height: 672 });
-    expect(text('today-group-section')).toHaveStyle({ width: 345, height: 672 });
+    // 393 less both 16pt gutters, no peek of the next page; 700 less the track's 12 + 16.
+    expect(text('today-progress-section')).toHaveStyle({ width: 361, height: 672 });
+    expect(text('today-group-section')).toHaveStyle({ width: 361, height: 672 });
     // You draws its two cards; the signed-out panel takes the page's one card.
     expect(within(text('today-progress-section')).getByTestId('today-progress-card')).toBeTruthy();
     expect(within(text('today-progress-section')).getByTestId('today-session-card')).toBeTruthy();
@@ -627,10 +666,10 @@ describe('Today: the cards', () => {
     // A swipe back settles on the first card's offset, the Plan page.
     fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 0, y: 0 } } });
     expect(selected('today-plan-section-tab')).toBe(true);
-    // One card's step (345 + the 8pt gap) on.
-    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 353, y: 0 } } });
+    // One card's step (361 + the 32pt gap) on.
+    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 393, y: 0 } } });
     expect(selected('today-progress-section-tab')).toBe(true);
-    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 706, y: 0 } } });
+    fireEvent(text('today-screen-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 786, y: 0 } } });
     expect(selected('today-group-section-tab')).toBe(true);
 
     fireEvent.press(text('today-sessions-button'));
@@ -657,8 +696,8 @@ describe('Today: the cards', () => {
     await renderCards();
 
     // A fixed height, not a cap: fewer exercises leave blank rows, so the card keeps its height between sessions.
-    expect(text('today-latest-session-rows')).toHaveStyle({ flexShrink: 1, height: 4 * 32 });
-    expect(text('today-latest-session-rows').props.style).not.toMatchObject({ maxHeight: expect.anything() });
+    expect(rowText('today-latest-session-rows')).toHaveStyle({ flexShrink: 1, height: 4 * 32 });
+    expect(rowText('today-latest-session-rows').props.style).not.toMatchObject({ maxHeight: expect.anything() });
     // A page of cards scrolls as a whole on a phone too short for them, rather than clipping.
     expect(within(text('today-progress-section')).getByTestId('today-progress-section-scroll')).toBeTruthy();
   });

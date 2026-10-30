@@ -7,20 +7,21 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import {
   ActionButton,
   Card,
+  FigureText,
   ListRow,
   ScreenScroll,
   StatePanel,
   SwitchRow,
   Tag,
-  uiFonts,
-  uiRoles,
   uiSpace,
-  uiTypography,
+  uiText,
+  uiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   listConnectedAgents,
   revokeConnectedAgent,
+  setAgentPlanEditEnabled,
   setAgentPlanPermission,
   type ConnectedAgent,
 } from '@/src/auth/connected-agents';
@@ -36,75 +37,98 @@ type ConnectedAgentCardProps = {
   agent: ConnectedAgent;
   onRevoke: (agent: ConnectedAgent) => void;
   onTogglePlanAccess: (agent: ConnectedAgent, next: boolean) => void;
+  onTogglePlanEdit: (agent: ConnectedAgent, next: boolean) => void;
   revokeDisabled: boolean;
   revoking: boolean;
-  saving: boolean;
+  savingAccess: boolean;
+  savingEdit: boolean;
 };
 
 function ConnectedAgentCard({
   agent,
   onRevoke,
   onTogglePlanAccess,
+  onTogglePlanEdit,
   revokeDisabled,
   revoking,
-  saving,
+  savingAccess,
+  savingEdit,
 }: ConnectedAgentCardProps) {
   const dateFormat = useDateFormat();
-  const isUnavailable = agent.planAccessEnabled === 'unavailable';
-  const isSwitchDisabled = saving || isUnavailable;
-  const switchValue = agent.planAccessEnabled === true;
+  const isAccessUnavailable = agent.planAccessEnabled === 'unavailable';
+  const isEditUnavailable = agent.planEditEnabled === 'unavailable';
+  const isUnavailable = isAccessUnavailable || isEditUnavailable;
+  const isAccessSwitchDisabled = savingAccess || isAccessUnavailable;
+  const isEditSwitchDisabled = savingEdit || isEditUnavailable;
+  const accessSwitchValue = agent.planAccessEnabled === true;
+  const editSwitchValue = agent.planEditEnabled === true;
 
   return (
     <Card testID={`connected-agent-${agent.clientId}`}>
       <View style={styles.agentHeader}>
         <View style={styles.agentTitle}>
-          <Text allowFontScaling={false} style={styles.agentName}>{agent.name}</Text>
-          <Text allowFontScaling={false} style={styles.agentScope}>Read training data</Text>
+          <Text allowFontScaling={false} style={uiText.title}>{agent.name}</Text>
+          <Text allowFontScaling={false} style={uiText.meta}>Read training data</Text>
         </View>
         <Tag label="AI" />
       </View>
       <ListRow
         density="list"
         meta={
-          <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-granted-${agent.clientId}`}>
-            {formatTimestamp(agent.grantedAt, dateFormat)}
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`connected-agent-granted-${agent.clientId}`}>
+            <FigureText>{formatTimestamp(agent.grantedAt, dateFormat)}</FigureText>
           </Text>
         }>
-        <Text allowFontScaling={false} style={styles.rowLabel}>Access granted</Text>
+        <Text allowFontScaling={false} style={uiText.body}>Access granted</Text>
       </ListRow>
       <ListRow
         density="list"
         meta={
-          <Text allowFontScaling={false} style={styles.date} testID={`connected-agent-last-access-${agent.clientId}`}>
-            {formatTimestamp(agent.lastAccessAt, dateFormat)}
+          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`connected-agent-last-access-${agent.clientId}`}>
+            <FigureText>{formatTimestamp(agent.lastAccessAt, dateFormat)}</FigureText>
           </Text>
         }>
-        <Text allowFontScaling={false} style={styles.rowLabel}>Last access</Text>
+        <Text allowFontScaling={false} style={uiText.body}>Last access</Text>
       </ListRow>
       {/* A separate, opt-in authorization: the base OAuth grant stays read-only. */}
       <View style={styles.permission}>
         <SwitchRow
-          disabled={isSwitchDisabled}
+          disabled={isAccessSwitchDisabled}
           label="Allow this coach to make changes"
           onValueChange={(value) => {
             onTogglePlanAccess(agent, value);
           }}
           testID={`connected-agent-plan-access-${agent.clientId}`}
-          value={switchValue}
+          value={accessSwitchValue}
         />
         {isUnavailable ? (
           <Text
             allowFontScaling={false}
-            style={styles.permissionUnavailable}
+            style={[uiText.meta, uiTextTone.danger, styles.permissionUnavailable]}
             testID={`connected-agent-plan-unavailable-${agent.clientId}`}>
             Change settings are temporarily unavailable for this coach.
           </Text>
         ) : null}
         <Text
           allowFontScaling={false}
-          style={styles.permissionDisclosure}
+          style={[uiText.meta, styles.permissionDisclosure]}
           testID={`connected-agent-plan-disclosure-${agent.clientId}`}>
-          {`Lets ${agent.name} read your upcoming and unscheduled plans, create new plans and programmes, and add, edit, delete or restore exercises and their muscles. Exercise changes also recalculate your past figures. It can never edit or delete plans, start a workout, or change your logged sets.`}
+          {`Lets ${agent.name} read your upcoming and unscheduled plans, create new plans and programmes, and add, edit, delete or restore exercises and their muscles. Exercise changes also recalculate your past figures. It can never start a workout or change your logged sets.`}
+        </Text>
+        <SwitchRow
+          disabled={isEditSwitchDisabled}
+          label="Allow this coach to edit plans"
+          onValueChange={(value) => {
+            onTogglePlanEdit(agent, value);
+          }}
+          testID={`connected-agent-plan-edit-${agent.clientId}`}
+          value={editSwitchValue}
+        />
+        <Text
+          allowFontScaling={false}
+          style={[uiText.meta, styles.permissionDisclosure]}
+          testID={`connected-agent-plan-edit-disclosure-${agent.clientId}`}>
+          {`Lets ${agent.name} edit pending session plans and training programmes. It can never edit workouts in progress or change logged workout history.`}
         </Text>
       </View>
       {/* An outline in `danger`, behind the unchanged Alert confirm. */}
@@ -123,13 +147,13 @@ function ConnectedAgentCard({
   );
 }
 
-export default function ConnectedAgentsScreen() {
-  const { user } = useAuth();
+function useConnectedAgents(userId: string | null) {
   const [agents, setAgents] = useState<ConnectedAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [revokingClientId, setRevokingClientId] = useState<string | null>(null);
-  const [savingClientIds, setSavingClientIds] = useState<ReadonlySet<string>>(new Set());
+  const [savingAccessClientIds, setSavingAccessClientIds] = useState<ReadonlySet<string>>(new Set());
+  const [savingEditClientIds, setSavingEditClientIds] = useState<ReadonlySet<string>>(new Set());
 
   // Fetches and applies the agents; the caller has already shown loading.
   const fetchAgents = () =>
@@ -153,7 +177,6 @@ export default function ConnectedAgentsScreen() {
 
   // A session change reloads this data boundary through its user ID: shown
   // in the render that sees it, fetched by the effect below.
-  const userId = user?.id ?? null;
   const [shownUserId, setShownUserId] = useState<string | null | undefined>(undefined);
   if (shownUserId !== userId) {
     setShownUserId(userId);
@@ -211,8 +234,8 @@ export default function ConnectedAgentsScreen() {
   // Writes are serialized per client ID so concurrent toggles across distinct
   // coaches settle independently without clobbering each other.
   const togglePlanAccess = async (agent: ConnectedAgent, next: boolean) => {
-    if (savingClientIds.has(agent.clientId)) return;
-    setSavingClientIds((current) => new Set([...current, agent.clientId]));
+    if (savingAccessClientIds.has(agent.clientId)) return;
+    setSavingAccessClientIds((current) => new Set([...current, agent.clientId]));
     setError(null);
     setAgents((current) =>
       current.map((candidate) =>
@@ -237,13 +260,78 @@ export default function ConnectedAgentsScreen() {
           : 'Unable to update access for this coach right now.',
       );
     } finally {
-      setSavingClientIds((current) => {
+      setSavingAccessClientIds((current) => {
         const nextSet = new Set(current);
         nextSet.delete(agent.clientId);
         return nextSet;
       });
     }
   };
+
+  const togglePlanEdit = async (agent: ConnectedAgent, next: boolean) => {
+    if (savingEditClientIds.has(agent.clientId)) return;
+    setSavingEditClientIds((current) => new Set([...current, agent.clientId]));
+    setError(null);
+    setAgents((current) =>
+      current.map((candidate) =>
+        candidate.clientId === agent.clientId
+          ? { ...candidate, planEditEnabled: next }
+          : candidate
+      )
+    );
+    try {
+      await setAgentPlanEditEnabled(agent.clientId, next, agent.grantedAt);
+    } catch (toggleError) {
+      setAgents((current) =>
+        current.map((candidate) =>
+          candidate.clientId === agent.clientId
+            ? { ...candidate, planEditEnabled: agent.planEditEnabled }
+            : candidate
+        )
+      );
+      setError(
+        toggleError instanceof Error
+          ? toggleError.message
+          : 'Unable to update access for this coach right now.',
+      );
+    } finally {
+      setSavingEditClientIds((current) => {
+        const nextSet = new Set(current);
+        nextSet.delete(agent.clientId);
+        return nextSet;
+      });
+    }
+  };
+
+  return {
+    agents,
+    error,
+    isLoading,
+    revokingClientId,
+    savingAccessClientIds,
+    savingEditClientIds,
+    loadAgents,
+    confirmRevoke,
+    togglePlanAccess,
+    togglePlanEdit,
+  };
+}
+
+export default function ConnectedAgentsScreen() {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const {
+    agents,
+    error,
+    isLoading,
+    revokingClientId,
+    savingAccessClientIds,
+    savingEditClientIds,
+    loadAgents,
+    confirmRevoke,
+    togglePlanAccess,
+    togglePlanEdit,
+  } = useConnectedAgents(userId);
 
   // The native header carries the title (G4).
   return (
@@ -287,9 +375,11 @@ export default function ConnectedAgentsScreen() {
           key={agent.clientId}
           onRevoke={confirmRevoke}
           onTogglePlanAccess={togglePlanAccess}
+          onTogglePlanEdit={togglePlanEdit}
           revokeDisabled={revokingClientId !== null}
           revoking={revokingClientId === agent.clientId}
-          saving={savingClientIds.has(agent.clientId)}
+          savingAccess={savingAccessClientIds.has(agent.clientId)}
+          savingEdit={savingEditClientIds.has(agent.clientId)}
         />
       ))}
 
@@ -325,53 +415,16 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: uiSpace.xs,
   },
-  agentName: {
-    fontFamily: uiFonts.display.family,
-    fontWeight: '700',
-    fontSize: uiTypography.size.lg,
-    lineHeight: uiTypography.lineHeight.lg,
-    color: uiRoles.ink,
-  },
-  agentScope: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.inkMuted,
-  },
-  rowLabel: {
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.base,
-    lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
-  },
-  date: {
-    fontFamily: uiFonts.figure.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.ink,
-  },
   permission: {
     paddingBottom: uiSpace.sm,
   },
   permissionUnavailable: {
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.xs,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '500',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.danger,
   },
   permissionDisclosure: {
     paddingHorizontal: uiSpace.lg,
-    fontFamily: uiFonts.body.family,
-    fontWeight: '400',
-    fontSize: uiTypography.size.sm,
-    lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
+    paddingBottom: uiSpace.xs,
   },
   agentActions: {
     padding: uiSpace.lg,

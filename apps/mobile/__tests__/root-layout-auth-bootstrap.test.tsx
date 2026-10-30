@@ -212,12 +212,14 @@ describe('RootLayout auth bootstrap wiring', () => {
     expect(mockStack).toHaveBeenCalledWith({
       screenOptions: {
         headerBackButtonDisplayMode: 'minimal',
-        // One design-language header style on every stack route.
-        headerStyle: { backgroundColor: uiRoles.surface },
+        // One design-language header style on every stack route: the page's
+        // own `paper` ground with no shadow line, and the title role.
+        headerStyle: { backgroundColor: uiRoles.paper },
+        headerShadowVisible: false,
         headerTitleStyle: {
           fontFamily: uiFonts.display.family,
           fontWeight: '700',
-          fontSize: uiTypography.size.xl,
+          fontSize: uiTypography.size.lg,
           color: uiRoles.ink,
         },
         headerTintColor: uiRoles.ink,

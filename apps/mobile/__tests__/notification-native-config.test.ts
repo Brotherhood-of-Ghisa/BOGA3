@@ -206,6 +206,6 @@ it('generates real extension plists, sources and fonts through the production co
     fs.writeFileSync(fixture, JSON.stringify({ envelope, projection }));
     const result = spawnSync(binary, [fixture], { encoding: 'utf8', timeout: 10000 });
     expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
-    expect(result.stdout).toBe('Native authenticated notification checks passed: 32\n');
+    expect(result.stdout).toBe('Native authenticated notification checks passed: 34\n');
   });
 });

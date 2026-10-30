@@ -3,6 +3,16 @@
     "local_only_columns": [
       "local_dirty",
       "local_updated_at_ms"
+    ],
+    "server_only_columns": [
+      {
+        "column": "session_plans.graph_version",
+        "rationale": "Agent API optimistic-concurrency token for a plan graph. Server-maintained by triggers and agent RPCs; never in sync_push or sync_pull fields (only the exercise-merge snapshot carries the whole row)."
+      },
+      {
+        "column": "training_programmes.graph_version",
+        "rationale": "Agent API optimistic-concurrency token for a programme graph. Server-maintained by triggers and agent RPCs; never in sync_push or sync_pull fields (only the exercise-merge snapshot carries the whole row)."
+      }
     ]
   }
 }

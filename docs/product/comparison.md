@@ -35,7 +35,8 @@ Code: `apps/mobile/app/exercise-history.tsx`; `apps/mobile/src/rm-curve/model.ts
 
 ### comparison.window · definition · accepted
 
-Weeks start Monday, local time.
+Weeks start Monday. Presentation uses local time; CoW uses the authoritative
+group calendar of [[groups.cow-calendar]].
 
 | Screen | Current period | Compared with |
 | --- | --- | --- |
@@ -62,10 +63,12 @@ Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 
 ### comparison.colour-scale · presentation · accepted
 
-Progress 3D colours each muscle by its change against [[comparison.window]],
-using the displayed change's direction: gain, loss or neutral. Both breakdowns
-follow their filtered comparisons; History look-back and weekly targets do not
-set 3D colours. The selected muscle shows its current, previous and change figures.
+Muscle 3D shades change against [[comparison.window]]: Sets use signed differences,
+Volume rounded percentages. Across front/back, finite gains scale middle-to-dark
+against the largest gain, losses middle-to-light against the largest loss.
+Filters may rescale; rotation/selection cannot. Unchanged activity is middle;
+empty/unavailable neutral; `new`/overflow darkest, outside finite extrema.
+History/targets have no effect. No legend; selection shows Now/Prev/Change.
 
 History legends precede their charts and run 0%–100%. Muscle Sets reads
 `% of target`, capped at the effective weekly muscle target; other legends read

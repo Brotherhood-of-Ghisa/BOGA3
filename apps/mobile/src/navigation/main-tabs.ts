@@ -55,7 +55,8 @@ const SEGMENT_TO_MAIN_TAB: Readonly<Record<string, MainTabKey>> = {
   train: 'train',
   progress: 'progress',
   more: 'more',
-  // Preserved legacy roots keep an explicit canonical owner.
+  // A preserved legacy root and More's root-stack destinations that keep the
+  // tab bar (`TabOwnedPage`) each have an explicit canonical owner.
   'stats-history': 'progress',
   'exercise-catalog': 'more',
   groups: 'more',

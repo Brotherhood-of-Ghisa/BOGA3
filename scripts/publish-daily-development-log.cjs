@@ -12,7 +12,7 @@ async function findCheckpoint(github, repo) {
           discussion(number: $number) {
             id
             comments(last: 100, before: $before) {
-              nodes { body author { login } }
+              nodes { body createdAt author { login } }
               pageInfo { hasPreviousPage startCursor }
             }
           }
@@ -24,7 +24,7 @@ async function findCheckpoint(github, repo) {
       // Readers can comment too; only trusted publishers may advance the cursor.
       if (!['github-actions', 'bozothegrey'].includes(comment.author?.login)) continue;
       const match = comment.body.match(MARKER);
-      if (match) return { id: discussion.id, sha: match[1] };
+      if (match) return { id: discussion.id, sha: match[1], createdAt: comment.createdAt };
     }
     if (!discussion.comments.pageInfo.hasPreviousPage) return { id: discussion.id, sha: null };
     before = discussion.comments.pageInfo.startCursor;
@@ -50,14 +50,27 @@ function buildEntry(commits, head, repo, now = new Date()) {
   return `## ${date}\n\nChanges merged into main since the previous update (the first update covers the past 24 hours). Release availability is separate.\n\n${bullets.join('\n')}\n\n<!-- boga-daily-log: ${head} -->`;
 }
 
-async function publish({ github, context, core }) {
+function automaticPostDue(publishedAt, now) {
+  const day = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', dateStyle: 'short' });
+  const clock = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  });
+  return clock.format(now) >= '07:30'
+    && (!publishedAt || day.format(new Date(publishedAt)) !== day.format(now));
+}
+
+async function publish({ github, context, core, now = new Date() }) {
   const checkpoint = await findCheckpoint(github, context.repo);
+  if (context.eventName !== 'workflow_dispatch' && !automaticPostDue(checkpoint.createdAt, now)) {
+    core.info('Before 07:30 London or already published today; no update posted.');
+    return;
+  }
   const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
   const head = git('rev-parse', 'HEAD');
   if (checkpoint.sha) git('merge-base', '--is-ancestor', checkpoint.sha, head);
   const range = checkpoint.sha ? [`${checkpoint.sha}..${head}`] : ['--since=24 hours ago', head];
   const commits = git('log', '--first-parent', '--reverse', '--format=%H%x09%s', ...range);
-  const body = buildEntry(commits, head, context.repo);
+  const body = buildEntry(commits, head, context.repo, now);
   if (!body) {
     core.info('No new main commits; no update posted.');
     return;
@@ -69,4 +82,4 @@ async function publish({ github, context, core }) {
   core.info(result.addDiscussionComment.comment.url);
 }
 
-module.exports = { publish, buildEntry, findCheckpoint };
+module.exports = { publish, buildEntry, findCheckpoint, automaticPostDue };

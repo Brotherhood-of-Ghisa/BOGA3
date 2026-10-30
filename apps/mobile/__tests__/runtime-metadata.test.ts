@@ -8,7 +8,7 @@ describe('app runtime metadata', () => {
     const metadata = resolveAppRuntimeMetadata({
       appFlavor: 'production',
       expoConfig: {
-        extra: { releaseCodename: ' Ziocleziano ' },
+        extra: { releaseCodename: ' Chav Jean Pensant ' },
         version: '1.0.0-config',
       },
       nativeApplicationVersion: ' 1.2.3 ',
@@ -18,7 +18,7 @@ describe('app runtime metadata', () => {
     expect(metadata).toEqual({
       buildNumber: '45',
       displayFlavor: null,
-      releaseCodename: 'Ziocleziano',
+      releaseCodename: 'Chav Jean Pensant',
       version: '1.2.3',
     });
     expect(formatVersionBuild(metadata)).toBe('Version 1.2.3 (build 45)');

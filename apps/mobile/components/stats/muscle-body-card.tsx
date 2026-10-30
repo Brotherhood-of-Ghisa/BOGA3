@@ -1,12 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Defs, Path, Use } from 'react-native-svg';
 
 import {
   Card,
   FigureText,
   Icon,
+  Information,
   ListRow,
   SegmentedControl,
   Sheet,
@@ -16,6 +17,7 @@ import {
   uiTextTone,
   type SegmentedControlOption,
 } from '@/components/ui';
+import { useNovemberAppearance } from '@/components/appearance/use-november-appearance';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
@@ -24,10 +26,11 @@ import {
   bodyOrientationForAngle,
   buildThemeShadePalette,
   canonicalOrientationForMuscle,
-  computeMuscleBuckets,
+  computeMuscleScores,
   hitTestProjectedMuscle,
   normaliseBodyAngle,
   projectMuscleBody,
+  selectMuscleFibres,
   type BodyOrientation,
 } from './muscle-body-projection';
 
@@ -53,7 +56,6 @@ const PAN_FAIL_Y = 12;
 const DEGREES_PER_POINT = 0.85;
 const ACCESSIBILITY_ANGLE_STEP = 30;
 const FACET_STROKE_WIDTH = 0.35;
-const CONTOUR_STROKE_WIDTH = 1.5;
 
 const LEGACY_REVERSE_ALIASES: Readonly<Record<string, readonly string[]>> = {
   delts_front: ['delts_front', 'front_delts'],
@@ -231,10 +233,14 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
  * Interactive 3D low-poly anatomical muscle model for the Progress Muscle breakdown.
  * Colours follow [[comparison.colour-scale]], with CIE LCh lighting,
  * supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
- * and selects/deselects a muscle group on tap.
+ * and selects a muscle group on tap. Selected schematic fibres reveal
+ * full source-shape extents through covering anatomy, with provisional registration;
+ * independent normals hide their own far surface. Body colours and hit targets stay live.
+ * Decoration follows [[appearance.november]] without changing hit testing.
  */
 export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }: Props) {
   const { width: windowWidth } = useWindowDimensions();
+  const november = useNovemberAppearance();
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
   const [dragOffsetDeg, setDragOffsetDeg] = useState(0);
@@ -247,20 +253,23 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
       : Math.max(MIN_VIEWPORT_WIDTH, windowWidth - CARD_HORIZONTAL_INSET);
 
   const orientation = bodyOrientationForAngle(angleDeg);
-  const buckets = useMemo(() => computeMuscleBuckets(muscles, metric), [muscles, metric]);
+  const scores = useMemo(() => computeMuscleScores(muscles, metric), [muscles, metric]);
   const palette = useMemo(() => buildThemeShadePalette(uiRoles), []);
+  const selectedFibres = useMemo(() => selectMuscleFibres(selectedId, report), [selectedId, report]);
   const projected = useMemo(
     () =>
       projectMuscleBody({
         angleDeg,
         width: viewportWidth,
         height: VIEWPORT_HEIGHT,
-        buckets,
+        scores,
         selectedId,
+        selectedFibres,
         report,
         palette,
+        november,
       }),
-    [angleDeg, buckets, palette, report, selectedId, viewportWidth]
+    [angleDeg, scores, palette, report, selectedId, selectedFibres, viewportWidth, november]
   );
 
   const selectedMuscle = useMemo(
@@ -330,16 +339,6 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
 
   return (
     <Card style={styles.card} testID="stats-muscle-body-card">
-      <View style={styles.legend} testID="stats-muscle-body-legend">
-        {[
-          { label: 'Decrease', color: uiRoles.loss },
-          { label: 'Unchanged', color: uiRoles.rule },
-          { label: 'Increase', color: uiRoles.gain },
-        ].map(({ label, color }) => <View key={label} style={styles.legendItem}>
-          <View style={[styles.swatch, { backgroundColor: color }]} />
-          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.muted]}>{label}</Text>
-        </View>)}
-      </View>
       <MuscleBodyHeader
         onNext={handleNextMuscle}
         onOpenPicker={() => setSheetVisible(true)}
@@ -351,61 +350,62 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
         orientation={orientation}
         selectedMuscle={selectedMuscle}
       />
-      <GestureDetector gesture={gesture}>
-        <View
-          accessible
-          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-          accessibilityLabel="Muscle body model"
-          accessibilityRole="adjustable"
-          accessibilityValue={{
-            text: `${orientation === 'front' ? 'Front' : 'Back'} view, ${angleDeg} degrees`,
-          }}
-          onAccessibilityAction={event => {
-            const delta =
-              event.nativeEvent.actionName === 'increment'
-                ? ACCESSIBILITY_ANGLE_STEP
-                : -ACCESSIBILITY_ANGLE_STEP;
-            setDragOffsetDeg(0);
-            setBaseAngleDeg(current => normaliseBodyAngle(current + delta));
-          }}
-          onLayout={event => {
-            const nextWidth = Math.round(event.nativeEvent.layout.width);
-            if (nextWidth > 0 && nextWidth !== measuredWidth) {
-              setMeasuredWidth(nextWidth);
-            }
-          }}
-          style={styles.viewport}
-          testID="stats-muscle-body-viewport">
-          <Svg
-            height={VIEWPORT_HEIGHT}
-            pointerEvents="none"
-            testID="stats-muscle-body-svg"
-            width={viewportWidth}>
-            {projected.batches.map(batch => (
-              <Path
-                d={batch.d}
-                fill={batch.fill}
-                key={batch.key}
-                stroke={batch.fill}
-                strokeLinejoin="round"
-                strokeWidth={FACET_STROKE_WIDTH}
-              />
-            ))}
-            {projected.contour ? (
-              <Path
-                d={projected.contour.d}
-                fill="none"
-                key="stats-muscle-contour"
-                stroke={projected.contour.stroke}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={CONTOUR_STROKE_WIDTH}
-                testID="stats-muscle-body-contour"
-              />
-            ) : null}
-          </Svg>
+      <View>
+        <GestureDetector gesture={gesture}>
+          <View
+            accessible
+            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+            accessibilityLabel="Muscle body model"
+            accessibilityRole="adjustable"
+            accessibilityValue={{
+              text: `${orientation === 'front' ? 'Front' : 'Back'} view, ${angleDeg} degrees`,
+            }}
+            onAccessibilityAction={event => {
+              const delta =
+                event.nativeEvent.actionName === 'increment'
+                  ? ACCESSIBILITY_ANGLE_STEP
+                  : -ACCESSIBILITY_ANGLE_STEP;
+              setDragOffsetDeg(0);
+              setBaseAngleDeg(current => normaliseBodyAngle(current + delta));
+            }}
+            onLayout={event => {
+              const nextWidth = Math.round(event.nativeEvent.layout.width);
+              if (nextWidth > 0 && nextWidth !== measuredWidth) {
+                setMeasuredWidth(nextWidth);
+              }
+            }}
+            style={styles.viewport}
+            testID="stats-muscle-body-viewport">
+            <Svg
+              height={VIEWPORT_HEIGHT}
+              pointerEvents="none"
+              testID="stats-muscle-body-svg"
+              width={viewportWidth}>
+              {projected.batches.map(batch => (
+                <Path
+                  d={batch.d}
+                  fill={batch.fill}
+                  key={batch.key}
+                  stroke={batch.fill}
+                  strokeLinejoin="round"
+                  strokeWidth={FACET_STROKE_WIDTH}
+                />
+              ))}
+              {(['surface', 'deep'] as const).map(layer => projected.fibres[layer] ? (
+                <ReliefFibres key={layer} d={projected.fibres[layer]} layer={layer} />
+              ) : null)}
+              {projected.fibres.anatomicalParts?.map(part => part.d ? (
+                <ReliefFibres key={part.id} d={part.d} layer="deep" id={`anatomy-${part.id}`} />
+              ) : null)}
+            </Svg>
+          </View>
+        </GestureDetector>
+        <View style={styles.information}>
+          <Information title="About the muscle model" testIDPrefix="stats-muscle-body"
+            body="Fibre directions are schematic, not measured anatomy. Selected guides reveal the full muscle shape through covering muscles as you rotate. Anatomical shapes are provisionally aligned to this model."
+            sections={[[ 'Anatomical source', 'BodyParts3D © The Database Center for Life Science, CC BY 4.0. Adapted by pose alignment, bilateral mirroring and schematic fibre generation. Source and licence: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html' ]]} />
         </View>
-      </GestureDetector>
+      </View>
       {selectedMuscle ? <View testID="stats-muscle-body-comparison">
         <View style={styles.comparisonLabels}>
           {COLUMN_LABELS.map(label => <Text key={label} allowFontScaling={false}
@@ -435,10 +435,23 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
   );
 }
 
+function ReliefFibres({ d, layer, id = layer }: { d: string; layer: 'surface' | 'deep'; id?: string }) {
+  const definitionId = useId();
+  // Share native path parsing and stroked bounds between the ordered relief paints.
+  // Transparent fill and stroke alpha avoid native outline clips and offscreen opacity layers.
+  return <>
+    <Defs><Path id={definitionId} d={d} /></Defs>
+    <Use href={`#${definitionId}`} fill="transparent" stroke={uiRoles.surface} strokeWidth={1.1} strokeOpacity={0.95}
+      translateX={0.45} translateY={-0.45} strokeLinecap="round" strokeLinejoin="round"
+      testID={`stats-muscle-body-fibres-${id}-highlight`} />
+    <Use href={`#${definitionId}`} fill="transparent" stroke={uiRoles.inkMuted} strokeWidth={0.9}
+      strokeOpacity={layer === 'surface' ? 0.72 : 0.70} strokeLinecap="round" strokeLinejoin="round"
+      testID={`stats-muscle-body-fibres-${id}-shade`} />
+  </>;
+}
+
 const styles = StyleSheet.create({
-  legend: { flexDirection: 'row', justifyContent: 'space-between', gap: uiSpace.sm },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
-  swatch: { width: 12, height: 12 },
+  information: { position: 'absolute', top: 0, right: 0 },
   comparisonLabels: { flexDirection: 'row', gap: uiSpace.sm },
   card: {
     padding: uiSpace.md,

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, type Insets } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
@@ -27,7 +27,22 @@ const HIT_SLOP = {
   right: { top: VERTICAL_SLOP, bottom: VERTICAL_SLOP, left: ARROW_GAP / 2, right: OUTER_SLOP },
 };
 
-function Arrow({ direction, onPress, label, testID }: { direction: 'left' | 'right'; onPress: (() => void) | null; label: string; testID: string }) {
+type ArrowDirection = 'left' | 'right' | 'up' | 'down';
+
+/** One step arrow, disabled (ghost ink) when `onPress` is null; up and down pass their own reach. */
+export function StepArrow({
+  direction,
+  onPress,
+  label,
+  testID,
+  hitSlop,
+}: {
+  direction: ArrowDirection;
+  onPress: (() => void) | null;
+  label: string;
+  testID: string;
+  hitSlop?: Insets;
+}) {
   const disabled = onPress === null;
   return (
     <Pressable
@@ -35,7 +50,7 @@ function Arrow({ direction, onPress, label, testID }: { direction: 'left' | 'rig
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       disabled={disabled}
-      hitSlop={HIT_SLOP[direction]}
+      hitSlop={hitSlop ?? (direction === 'left' || direction === 'right' ? HIT_SLOP[direction] : undefined)}
       onPress={onPress ?? undefined}
       style={({ pressed }) => [styles.arrow, pressed && !disabled ? styles.pressed : null]}
       testID={testID}>
@@ -51,9 +66,9 @@ function Arrow({ direction, onPress, label, testID }: { direction: 'left' | 'rig
 export function StepAround({ onOlder, onNewer, noun, testID, children }: StepArrowsProps & { children: ReactNode }) {
   return (
     <View style={styles.around} testID={testID}>
-      <Arrow direction="left" label={`Previous ${noun}`} onPress={onOlder} testID={`${testID}-older`} />
+      <StepArrow direction="left" label={`Previous ${noun}`} onPress={onOlder} testID={`${testID}-older`} />
       <View style={styles.aroundLabel}>{children}</View>
-      <Arrow direction="right" label={`Next ${noun}`} onPress={onNewer} testID={`${testID}-newer`} />
+      <StepArrow direction="right" label={`Next ${noun}`} onPress={onNewer} testID={`${testID}-newer`} />
     </View>
   );
 }

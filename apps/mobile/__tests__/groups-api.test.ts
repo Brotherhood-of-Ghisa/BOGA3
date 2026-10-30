@@ -111,7 +111,7 @@ describe('groups api client', () => {
       {
         rpc: 'group_create',
         invoke: () => createGroup({ name: 'Crew', description: null }),
-        args: { p_name: 'Crew', p_description: null },
+        args: { p_name: 'Crew', p_description: null, p_time_zone: 'Europe/London' },
         data: { group_id: 'g1' },
         expected: { group_id: 'g1' },
       },

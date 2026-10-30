@@ -35,6 +35,7 @@ TESTS=(
   "sync-v2-deferrable-fk.sh"       # outcome 4
   "sync-v2-muscle-group-fk-target.sh" # composite muscle-group FK target mapping
   "sync-v2-rls-cross-owner.sh"     # outcome 5
+  "sync-v2-plan-graph-identity.sh" # outcome 5a (plan graph triggers never set the request identity)
   "sync-v2-push-roundtrip.sh"      # outcome 6
   "sync-v2-pull-drain.sh"          # outcomes 7, 8 (cross-task push→pull integration)
   "sync-v2-pull-fk-closure.sh"     # outcome 8a (layered drain FK closure)

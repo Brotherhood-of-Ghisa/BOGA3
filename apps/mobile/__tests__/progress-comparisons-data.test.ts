@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { computeProgressMuscleTickers, computeProgressComparisons, computeStatsSummary, computeSelectedMuscleHistoryEffort, computeSelectedMuscleDailyEffort } from '@/src/data/stats';
+import { computeProgressComparisons, computeStatsSummary, computeSelectedMuscleHistoryEffort, computeSelectedMuscleDailyEffort } from '@/src/data/stats';
 import { exerciseDefinitions, exerciseMuscleMappings, exerciseSets, muscleGroups, sessionExercises,
   sessions, gyms, bodyWeightMeasurements, userSettings } from '@/src/data/schema';
 import { ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount, setAccountLocalPreferences,
@@ -263,33 +263,8 @@ it('scopes both Muscle periods, contributors and history to gym sessions, includ
 });
 
 
-it('reads exact first eligible muscle dates beyond the bounded graph, per gym, and refreshes current policy', async () => {
-  const db = mockFixture.database;
-  db.insert(gyms).values([{ id: 'ticker-a', name: 'A' }, { id: 'ticker-b', name: 'B' }]).run();
-  db.update(sessions).set({ gymId: 'ticker-a' }).where(eq(sessions.id, 'now')).run();
-  db.update(sessions).set({ gymId: 'ticker-b' }).where(eq(sessions.id, 'prev')).run();
-  const completedAt = new Date('2020-01-06T10:00:00Z');
-  db.insert(sessions).values({ id: 'ticker-first', status: 'completed', startedAt: completedAt, completedAt, gymId: 'ticker-a' }).run();
-  db.insert(sessionExercises).values({ id: 'ticker-first-block', sessionId: 'ticker-first', exerciseDefinitionId: 'lift', name: 'Lift', orderIndex: 0 }).run();
-  db.insert(exerciseSets).values({ id: 'ticker-first-set', sessionExerciseId: 'ticker-first-block', orderIndex: 0,
-    weightValue: '40', repsValue: '5', setType: 'rir_2' }).run();
-  const config = { historyWeeks: 1, rollingWeeks: 1, weeklyTarget: 8, now };
-  const a = await computeProgressMuscleTickers({ ...config, gymId: 'ticker-a' });
-  expect(a.muscles.back.workingSetCount.reference).toBe(8);
-  expect(a.muscles.back.workingSetCount.observations).toEqual([
-    { at: new Date('2026-05-20T10:00:00Z'), value: 1 },
-  ]);
-  expect((await computeProgressMuscleTickers({ ...config, gymId: 'ticker-b' })).muscles.back.workingSetCount.observations[0].value).toBeNull();
-  expect((await computeProgressMuscleTickers({ ...config, gymId: null })).muscles).toEqual({});
-  // Existing facts rebuild against the changed account policy before first-date reads.
-  setAccountLocalPreferences({ workingSetEfforts: ['rir_2'], volumeEfforts: ['warm_up'] });
-  const changed = await computeProgressMuscleTickers({ ...config, gymId: 'ticker-a' });
-  expect(changed.muscles.back.totalVolume.observations[0].value).toBeNull();
-  expect(changed.muscles.back.workingSetCount.observations[0].value).toBe(1);
-});
-
 // [[muscle.secondary-filter]]: Back is secondary on `lift`, primary on `volume-only` and `previous-only`.
-it('counts primary work only when secondary sets are hidden, in both periods, contributors, tickers and history', async () => {
+it('counts primary work only when secondary sets are hidden, in both periods, contributors and history', async () => {
   const counted = await readAndReconcile();
   const hidden = await computeProgressComparisons({ ...options, countSecondary: false });
   const oracle = await computeStatsSummary({ ...options, countSecondary: false });
@@ -312,18 +287,5 @@ it('counts primary work only when secondary sets are hidden, in both periods, co
   expect((await computeSelectedMuscleDailyEffort({ ...bounds, countSecondary: false })).flatMap(day => day.contributions)
     .map(row => row.exerciseDefinitionId)).toEqual(['previous-only']);
 
-  // A secondary-only first session no longer starts the muscle's training.
-  const completedAt = new Date('2020-01-06T10:00:00Z');
-  const db = mockFixture.database;
-  db.insert(sessions).values({ id: 'first', status: 'completed', startedAt: completedAt, completedAt }).run();
-  db.insert(sessionExercises).values({ id: 'first-block', sessionId: 'first', exerciseDefinitionId: 'lift', name: 'Lift', orderIndex: 0 }).run();
-  db.insert(exerciseSets).values({ id: 'first-set', sessionExerciseId: 'first-block', orderIndex: 0,
-    weightValue: '40', repsValue: '5', setType: 'rir_2' }).run();
-  const config = { historyWeeks: 2, rollingWeeks: 1, weeklyTarget: 8, now };
-  const values = async (countSecondary?: boolean) => (await computeProgressMuscleTickers({ ...config, countSecondary }))
-    .muscles.back?.workingSetCount.observations.map(row => row.value);
-  // Counted, the 2020 session completes both windows; hidden, only the primary
-  // day is observed, and it is incomplete without that earlier start.
-  expect(await values()).toEqual([1.5, 2.5]);
-  expect(await values(false)).toEqual([null]);
+
 });

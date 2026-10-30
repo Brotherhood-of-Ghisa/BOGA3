@@ -38,6 +38,11 @@ import {
 } from '@/src/data/local-wipe';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { logEvent } from '@/src/logging/logEvent';
+import {
+  drainAccountLocalSyncedWrites,
+  forgetSyncedTargetsAdoption,
+  refreshAccountLocalSyncedPreferences,
+} from '@/src/preferences/account-local';
 
 // -----------------------------------------------------------------------------
 // The local-data lock
@@ -99,15 +104,19 @@ export const __resetAccountWipeForTests = (): void => {
 
 /**
  * Wipes the store and drops the in-memory state derived from it. The bodyweight
- * preference reset goes FIRST: it drains a pending preference write, which would
- * otherwise land a dirty `user_settings` row in the emptied store for the next
- * account to push.
+ * preference reset and the synced-preference drain go FIRST: a pending write
+ * would otherwise land a dirty `user_settings` row in the emptied store for the
+ * next account to push.
  */
 const wipeStore = async (database: LocalDatabase, accountUserId: string | null): Promise<void> => {
   await resetBodyweightCalculationPreferenceForAccountSwitch();
+  await drainAccountLocalSyncedWrites();
   wipeLocalDatabaseRows(database, { accountUserId });
   invalidateExerciseCatalogCache();
   notifyLocalDataReset();
+  // The emptied row no longer overrides the kv fallback until sync restores it.
+  forgetSyncedTargetsAdoption();
+  await refreshAccountLocalSyncedPreferences();
 };
 
 /** Best-effort structured log; never changes what the guard does. */

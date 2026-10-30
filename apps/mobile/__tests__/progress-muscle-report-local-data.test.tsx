@@ -6,7 +6,7 @@
  * over the migrated in-memory SQLite database, with Broad (Calves off) written
  * onto the `muscle_groups` rows as the Settings choice does. The pure
  * transform is `muscle-report.test.ts`; the 3D projection, helpers and
- * ticker re-keying are `progress-muscle-report.test.ts`. This suite proves
+ * report re-keying are `progress-muscle-report.test.ts`. This suite proves
  * the user's setup reaches each Progress surface.
  */
 
@@ -159,7 +159,7 @@ const tapEntryOnBody = async (entry: string) => {
   const viewport = screen.getByTestId('stats-muscle-body-viewport');
   fireEvent(viewport, 'layout', { nativeEvent: { layout: { width: 280, height: 280 } } });
   fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
-  const detailed = projectMuscleBody({ angleDeg: 180, width: 280, height: 280, buckets: new Map() });
+  const detailed = projectMuscleBody({ angleDeg: 180, width: 280, height: 280, scores: new Map() });
   const facet = detailed.triangles.filter(tri => tri.muscleGroupId === entry).at(-1)!;
   const tap = viewport.props.gesture.gestures.find((gesture: { type: string }) => gesture.type === 'tap');
   await act(async () => {
@@ -187,16 +187,6 @@ describe('The 3D body on the Progress screens under Broad', () => {
     await tapEntryOnBody('spinal_erectors');
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent(initialSelected);
     expect(screen.queryByText('Spinal erectors')).toBeNull();
-  });
-
-  it('selects Back when a member facet is tapped in Exercise 3D', async () => {
-    await choose('broad');
-    act(() => updatePreferences({ progressMuscleLayout: '3d' }));
-    await renderProgress('exercise');
-    await screen.findByTestId('stats-muscle-body-card');
-    await tapEntryOnBody('back_upper');
-    expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Back');
-    expect(screen.getByTestId('stats-exercise-body-detail')).toBeTruthy();
   });
 
   it('selects the entry itself under Detailed', async () => {
