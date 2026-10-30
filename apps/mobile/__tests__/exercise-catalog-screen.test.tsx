@@ -587,6 +587,37 @@ describe('ExerciseCatalogScreen', () => {
     );
   });
 
+  it('saves, reopens and duplicates Machine Dips without demoting either Primary', async () => {
+    await openCatalog();
+    const expected = [
+      { muscleGroupId: 'chest', role: 'primary' as const, weight: 1 },
+      { muscleGroupId: 'delts_front', role: 'secondary' as const, weight: 0.5 },
+      { muscleGroupId: 'triceps', role: 'primary' as const, weight: 1 },
+    ];
+    // Machine Dips is in the legacy catalogue; create its mappings through the real repository.
+    await act(async () => { await catalogRepository.saveExerciseCatalogExercise({
+      name: 'Machine Dips', loadInputMode: 'total_load', mappings: expected,
+    }); });
+    const dips = definitionNamed('Machine Dips')!;
+    fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'Machine Dips');
+    fireEvent.press(await screen.findByLabelText('Edit exercise definition Machine Dips'));
+    expect(await screen.findByTestId('exercise-editor-primary-muscle-trigger')).toHaveTextContent('Pectoralis, Triceps', { exact: false });
+    await saveEditor();
+    expect(await screen.findByText('Exercise updated.')).toBeTruthy();
+    expect(activeMappingsOf(dips.id)).toEqual(expected);
+
+    fireEvent.press(await screen.findByLabelText('Edit exercise definition Machine Dips'));
+    expect(await screen.findByTestId('exercise-editor-primary-muscle-trigger')).toHaveTextContent('Pectoralis, Triceps', { exact: false });
+    act(() => exerciseEditorPage.back());
+    await waitForGone(() => screen.queryByTestId('exercise-editor'));
+    fireEvent.press(await screen.findByLabelText('Exercise actions Machine Dips'));
+    fireEvent.press(await screen.findByLabelText('Duplicate exercise from actions'));
+    expect(await screen.findByTestId('exercise-editor-primary-muscle-trigger')).toHaveTextContent('Pectoralis, Triceps', { exact: false });
+    await saveEditor();
+    expect(await screen.findByText('Exercise created.')).toBeTruthy();
+    expect(activeMappingsOf(definitionNamed('Machine Dips (Copy)')!.id)).toEqual(expected);
+  });
+
   describe('design language', () => {
     it('puts its ⋮ in the native header (titled by the root stack), with a labelled Add as its one accent', async () => {
       await openCatalog();
@@ -679,23 +710,25 @@ describe('ExerciseCatalogScreen', () => {
       expect(screen.queryByTestId('exercise-catalog-feedback')).toBeNull();
     });
 
-    it('picks the primary muscle in a sheet over the page, which closes on the choice', async () => {
+    it('picks primary muscles in a sheet that stays open until dismissed', async () => {
       await openCatalog();
 
       await createExercise('Cable Fly Variation');
       expect(screen.getByTestId('exercise-editor-primary-muscle-trigger')).toHaveTextContent('Choose', { exact: false });
       openPrimaryPicker();
 
-      expect(await screen.findByRole('header', { name: 'Primary muscle' })).toBeTruthy();
+      expect(await screen.findByRole('header', { name: 'Primary muscles' })).toBeTruthy();
       fireEvent.press(screen.getByLabelText('Select primary muscle Pectoralis'));
-      await waitForGone(() => screen.queryByRole('header', { name: 'Primary muscle' }));
+      expect(screen.getByRole('header', { name: 'Primary muscles' })).toBeTruthy();
+      fireEvent(screen.getByTestId('exercise-editor-muscle-selector-list'), 'accessibilityEscape');
+      await waitForGone(() => screen.queryByRole('header', { name: 'Primary muscles' }));
       expect(screen.getByDisplayValue('Cable Fly Variation')).toBeTruthy();
       expect(screen.getByTestId('exercise-editor-primary-muscle-trigger')).toHaveTextContent('Pectoralis', { exact: false });
 
       // The chosen primary is marked in the list when it opens again.
       openPrimaryPicker();
       expect(screen.getByTestId('exercise-editor-muscle-option-chest').props.accessibilityState).toMatchObject({
-        checked: true,
+        selected: true,
       });
     });
   });
@@ -757,6 +790,33 @@ describe('ExerciseCatalogScreen', () => {
       expect(await screen.findByLabelText('Edit exercise definition Barbell Back Squat')).toHaveTextContent(
         /Never donePrimary: Glutes & Hams · Quads/
       );
+    });
+
+    it('keeps a hidden Primary anchor when adding its visible muscle as Secondary', async () => {
+      await openCatalog({ prepare: () => {
+        chooseBroad();
+        localDatabase().update(muscleGroups).set({ tracked: 0 }).where(eq(muscleGroups.id, 'chest')).run();
+      } });
+      await act(async () => { await catalogRepository.saveExerciseCatalogExercise({
+        name: 'Hidden Chest Press', loadInputMode: 'total_load',
+        mappings: [{ muscleGroupId: 'chest', role: 'primary', weight: 1 }],
+      }); });
+      const press = definitionNamed('Hidden Chest Press')!;
+      fireEvent.changeText(screen.getByLabelText('Exercise filter input'), press.name);
+      fireEvent.press(await screen.findByLabelText('Edit exercise definition Hidden Chest Press'));
+      expect(await screen.findByTestId('exercise-editor-primary-muscle-trigger')).toHaveTextContent('Choose', { exact: false });
+      openSecondaryPicker();
+      fireEvent.press(screen.getByLabelText('Secondary muscle Chest'));
+      fireEvent(screen.getByTestId('exercise-editor-muscle-selector-list'), 'accessibilityEscape');
+      await saveEditor();
+      expect(await screen.findByText('Exercise updated.')).toBeTruthy();
+      expect(activeMappingsOf(press.id)).toEqual([
+        { muscleGroupId: 'chest', role: 'primary', weight: 1 },
+        { muscleGroupId: 'serratus_anterior', role: 'secondary', weight: 0.5 },
+      ]);
+      fireEvent.press(await screen.findByLabelText('Edit exercise definition Hidden Chest Press'));
+      expect(await screen.findByTestId('exercise-editor-primary-muscle-trigger')).toHaveTextContent('Choose', { exact: false });
+      expect(screen.getByTestId('exercise-editor-secondary-muscle-trigger')).toHaveTextContent('Chest', { exact: false });
     });
 
     it('saves an edit without touching the mappings it hides or merges', async () => {

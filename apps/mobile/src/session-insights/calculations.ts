@@ -19,7 +19,6 @@ import {
   countMuscleSet,
   createMuscleSetCounter,
   type MuscleAnalyticsInput,
-  type MuscleContributionRole,
   type MuscleSetCounter,
 } from "@/src/data/muscle-analytics";
 import {
@@ -53,12 +52,7 @@ export type SessionInsightExerciseDefinition = {
   bodyweightContribution: number;
 };
 
-export type SessionInsightMuscleMapping = {
-  exerciseDefinitionId: string;
-  muscleGroupId: string;
-  role: MuscleContributionRole;
-  weight?: number;
-};
+export type SessionInsightMuscleMapping = MuscleAnalyticsInput['muscleMappings'][number];
 
 export type SessionInsightMuscleGroup = {
   id: string;
@@ -85,9 +79,9 @@ export type SessionMuscleLoadEntry = SessionInsightMuscleGroup & {
 };
 
 export type SessionMuscleWorkingSetEntry = SessionInsightMuscleGroup & {
-  /** Physical working sets that map to the muscle as primary. */
+  /** Allocated Primary-pool working-set shares. */
   primarySetCount: number;
-  /** Physical working sets that map to the muscle as secondary (and not primary). */
+  /** Allocated Secondary shares before the half-pool multiplier. */
   secondarySetCount: number;
   /** `primarySetCount + secondarySetCount / 2`: the muscle's [[muscle.set-count]]. */
   weightedSetCount: number;
@@ -732,7 +726,7 @@ export const deriveSessionMuscleVolumeComparisons = (
   // A muscle is observed when it has a valid mapped working set at its primary
   // role, even when its volume is zero. A muscle only ever trained as a
   // secondary has no distribution, in this session or in the baseline; a
-  // primary muscle's volume still counts secondary work at half weight and uses
+  // primary muscle's volume still counts allocated secondary work and uses
   // the independent selection. The positive-only muscle-load bars are a
   // separate presentation and cannot supply a distribution's observations or
   // counts.
@@ -750,27 +744,27 @@ export const deriveSessionMuscleVolumeComparisons = (
     );
     const byMuscle = new Map<string, {
       weightedVolume: number | null;
-      workingSetIds: Set<string>;
+      setCounter: MuscleSetCounter;
       primary: boolean;
     }>();
     for (const contribution of contributions) {
       if (!groupById.has(contribution.muscleGroupId)) continue;
       const observation = byMuscle.get(contribution.muscleGroupId) ?? {
         weightedVolume: 0,
-        workingSetIds: new Set<string>(),
+        setCounter: createMuscleSetCounter(),
         primary: false,
       };
       byMuscle.set(contribution.muscleGroupId, observation);
       observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume ?? 0);
       if (contribution.working !== false) {
-        observation.workingSetIds.add(contribution.setIdentity);
+        countMuscleSet(observation.setCounter, contribution);
         if (contribution.role === 'primary') observation.primary = true;
       }
     }
     return Array.from(byMuscle, ([id, observation]) => ({
       ...groupById.get(id)!,
       weightedVolume: observation.weightedVolume,
-      workingSetCount: observation.workingSetIds.size,
+      workingSetCount: observation.setCounter.counts.weightedSetCount,
       primary: observation.primary,
     })).filter((muscle) => muscle.primary).sort((left, right) =>
       (right.weightedVolume ?? -1) - (left.weightedVolume ?? -1) ||

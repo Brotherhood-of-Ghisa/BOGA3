@@ -201,9 +201,9 @@ type StatsMuscleAccumulator = { setCounter: MuscleSetCounter; totalVolume: numbe
 
 /**
  * Per-muscle and per-family [[muscle.set-count]] and Volume, from one pass over
- * the contributions. A family counts each physical set once at its strongest
- * role across the family's muscles, so overlapping muscle counts are never
- * summed into it. A contribution for a muscle outside the taxonomy joins no family.
+ * the contributions. A family sums the allocated shares of its muscles,
+ * deduplicating repeated copies of each physical set/muscle contribution.
+ * A contribution for a muscle outside the taxonomy joins no family.
  */
 const accumulateMuscleTotals = (input: StatsAggregationInput) => {
   const byMuscleId = new Map<string, StatsMuscleAccumulator>();

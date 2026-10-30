@@ -186,7 +186,7 @@ const muscleNames = (ids: readonly string[], musclesById: Record<string, Reporte
 
 function MusclesSection({ form, error }: { form: EditorFormState; error: string | null }) {
   const { musclesById } = useExerciseCatalog().muscleSetup;
-  const primary = form.primaryMuscleGroupId;
+  const primary = form.primaryMuscleGroupIds;
   return (
     <FormSection error={error} errorTestID="exercise-editor-muscles-error" title="Muscles">
       <ChoiceRow
@@ -194,7 +194,7 @@ function MusclesSection({ form, error }: { form: EditorFormState; error: string 
         onPress={() => form.openMuscleSelector('primary')}
         placeholder="Choose"
         testID="exercise-editor-primary-muscle-trigger"
-        value={primary ? muscleNames([primary], musclesById) : null}
+        value={muscleNames(primary, musclesById)}
       />
       <ChoiceRow
         divider
@@ -237,36 +237,33 @@ function OptionsSection({ form }: { form: EditorFormState }) {
 }
 
 /**
- * The muscle picker, a sheet over the page. Primary is one choice and closes
- * on it; Secondary is a multi-select that stays open while muscles are ticked.
+ * The muscle picker stays open while Primary or Secondary muscles are ticked.
  */
 function MusclePickerSheet({ form }: { form: EditorFormState }) {
   const { muscles } = useExerciseCatalog().muscleSetup;
   const mode = form.muscleSelectorMode;
   const isPrimary = mode === 'primary';
-  const selected = form.selectedSecondaryMuscleIds;
-  const options = mode ? muscleSelectorOptions(mode, muscles, form.primaryMuscleGroupId, selected) : [];
+  const selected = isPrimary ? form.selectedPrimaryMuscleIds : form.selectedSecondaryMuscleIds;
+  const options = mode ? muscleSelectorOptions(mode, muscles, form.selectedPrimaryMuscleIds, form.selectedSecondaryMuscleIds) : [];
   return (
     <Sheet
       dismissLabel="Close muscle picker"
       onDismiss={form.closeMuscleSelector}
       testID="exercise-editor-muscle-selector-list"
-      title={isPrimary ? 'Primary muscle' : 'Secondary muscles'}
+      title={isPrimary ? 'Primary muscles' : 'Secondary muscles'}
       visible={mode !== null}>
       {options.map((muscle, index) => {
-        const isOn = isPrimary ? muscle.id === form.primaryMuscleGroupId : selected.has(muscle.id);
+        const isOn = selected.has(muscle.id);
         return (
           <ListRow
             accessibilityLabel={`${isPrimary ? 'Select primary muscle' : 'Secondary muscle'} ${muscle.displayName}`}
-            // Primary is a radio; a secondary is ticked, announced as selected.
-            checked={isPrimary ? isOn : undefined}
             divider={index > 0}
             key={muscle.id}
             label={muscle.displayName}
-            leading={<Icon color={isOn ? uiRoles.accent : uiRoles.inkMuted} name={isPrimary ? (isOn ? 'radio-on' : 'radio-off') : (isOn ? 'check' : 'circle')} size="md" />}
+            leading={<Icon color={isOn ? uiRoles.accent : uiRoles.inkMuted} name={isOn ? 'check' : 'circle'} size="md" />}
             meta={<Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.muted]}>{muscle.familyName}</Text>}
-            selected={!isPrimary && isOn}
-            onPress={() => (isPrimary ? form.selectPrimaryMuscle(muscle.id) : form.toggleSecondaryMuscle(muscle.id))}
+            selected={isOn}
+            onPress={() => (isPrimary ? form.togglePrimaryMuscle(muscle.id) : form.toggleSecondaryMuscle(muscle.id))}
             testID={`exercise-editor-muscle-option-${muscle.id}`}
           />
         );

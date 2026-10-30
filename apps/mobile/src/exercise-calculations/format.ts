@@ -13,3 +13,10 @@ export const formatOneRepMax = (kg: number): string => kg.toFixed(1);
 
 /** Volume in whole kg·reps: `2560`. */
 export const formatVolume = (kgReps: number): string => String(Math.round(kgReps));
+
+/** Allocated muscle sets: two decimal places, retaining tiny positive shares. */
+export const formatWorkingSetCount = (count: number): string => {
+  if (!Number.isFinite(count)) return '—';
+  const rounded = Math.abs(count) > 0 && Math.abs(count) < 0.01 ? count.toPrecision(2) : count.toFixed(2);
+  return String(Number(rounded));
+};

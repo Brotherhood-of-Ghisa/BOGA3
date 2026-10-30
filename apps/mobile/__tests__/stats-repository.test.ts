@@ -120,7 +120,7 @@ describe('aggregateStats', () => {
     expect(familiesByName.get('Legs')?.totalVolume).toBe(0);
   });
 
-  it('deduplicates one physical set mapped to multiple muscles in the same family', () => {
+  it('sums allocated shares of a set across its family muscles', () => {
     const input = buildAggregationInput();
     input.muscleMappings.push({
       exerciseDefinitionId: 'ex-bench',
@@ -131,11 +131,10 @@ describe('aggregateStats', () => {
     const totals = aggregateStats(input);
     const arms = totals.muscleFamilies.find((family) => family.familyName === 'Arms');
 
-    // The three working bench sets contribute to both biceps and triceps, but
-    // count once at family level, at the strongest role of the two (biceps'
-    // primary); the two curl sets remain distinct.
+    // Biceps gets half the Primary pool; Triceps gets the Secondary half-pool.
+    // Their allocated shares sum, while the two curl sets remain whole.
     expect(arms?.workingSetCount).toBe(5);
-    expect(arms?.totalVolume).toBe(360 + 1300 + 650);
+    expect(arms?.totalVolume).toBe(360 + 650 + 650);
   });
 
   it('halves total-load volume before role weighting and ignores legacy mapping weight', () => {

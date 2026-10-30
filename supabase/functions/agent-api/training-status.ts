@@ -3,6 +3,7 @@
 // route reads owner-filtered rows and this derives. Muscle figures run Today's
 // Plan's own functions over the same counting, so the coach and the app agree
 // for the same data; only the clock is the profile time zone's.
+import { sumNumbers } from '../../../apps/mobile/src/utils/sum.ts';
 import {
   applyMuscleReport, withoutSecondaryMappings, type MuscleAnalyticsInput, type MuscleContributionRole,
 } from '../../../apps/mobile/src/data/muscle-analytics.ts';
@@ -181,7 +182,7 @@ export const statusMuscleInput = (
 const sumDays = (byDay: Record<string, number>, from: Date, to: Date): number => {
   const start = localDateKey(from);
   const end = localDateKey(to);
-  return Object.entries(byDay).reduce((total, [key, sets]) => (key >= start && key < end ? total + sets : total), 0);
+  return sumNumbers(Object.entries(byDay).filter(([key]) => key >= start && key < end).map(([, sets]) => sets));
 };
 
 /**

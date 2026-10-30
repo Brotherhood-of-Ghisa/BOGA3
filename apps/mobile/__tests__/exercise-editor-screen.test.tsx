@@ -531,31 +531,56 @@ describe('muscle groups', () => {
 describe('muscle picker sheets', () => {
   const picker = () => screen.queryByTestId('exercise-editor-muscle-selector-list');
 
-  it('picks a primary muscle, which leaves the secondaries, and closes', async () => {
-    renderEditor({ prefill: { name: 'Dip', loadInputMode: 'total_load', mappings: [{ muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' }] } });
-    expect(primaryRow()).toHaveTextContent('Triceps', { exact: false });
-    fireEvent.press(primaryRow());
-    expect(screen.getByText('Primary muscle')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Select primary muscle Triceps')).toBeOnTheScreen();
-    fireEvent.press(screen.getByTestId('exercise-editor-muscle-option-chest'));
-    expect(primaryRow()).toHaveTextContent('Chest', { exact: false });
-    expect(screen.queryByText('Primary muscle')).toBeNull();
-    await save();
-    expect(onSave.mock.calls[0][0]).toMatchObject({
-      name: 'Dip',
-      mappings: [{ muscleGroupId: 'chest', weight: 1, role: 'primary' }],
-    });
-  });
-
-  it('changes the primary muscle and keeps the other secondaries', async () => {
+  it('ticks and unticks primaries in one open picker, excluding secondaries', async () => {
     renderEditor({ editing: exercise() });
     fireEvent.press(primaryRow());
+    expect(screen.getByText('Primary muscles')).toBeOnTheScreen();
+    expect(screen.getByTestId('exercise-editor-muscle-option-chest').props.accessibilityState).toMatchObject({ selected: true });
     expect(screen.queryByTestId('exercise-editor-muscle-option-triceps')).toBeNull();
     fireEvent.press(screen.getByTestId('exercise-editor-muscle-option-delts'));
+    expect(primaryRow()).toHaveTextContent('Chest, Front delts', { exact: false });
+    expect(picker()).toBeOnTheScreen();
+    fireEvent.press(screen.getByTestId('exercise-editor-muscle-option-chest'));
+    expect(primaryRow()).toHaveTextContent('Front delts', { exact: false });
     await save();
     expect(onSave.mock.calls[0][0].mappings).toEqual([
       { muscleGroupId: 'delts', weight: 1, role: 'primary' },
       { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
+    ]);
+  });
+
+  it('requires a primary after all primaries are unticked and keeps the rest of the form', async () => {
+    renderEditor({ editing: exercise() });
+    fireEvent.press(primaryRow());
+    fireEvent.press(screen.getByTestId('exercise-editor-muscle-option-chest'));
+    await save();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(screen.getByTestId('exercise-editor-muscles-error')).toHaveTextContent('Select a primary muscle before saving.');
+    fireEvent.press(screen.getByTestId('exercise-editor-muscle-option-delts'));
+    expect(screen.queryByTestId('exercise-editor-muscles-error')).toBeNull();
+    await save();
+    expect(onSave.mock.calls[0][0].mappings).toEqual([
+      { muscleGroupId: 'delts', weight: 1, role: 'primary' },
+      { muscleGroupId: 'triceps', weight: 0.5, role: 'secondary' },
+    ]);
+  });
+
+  it('opens Machine Dips with both Chest and Triceps as Primary and keeps them on save', async () => {
+    renderEditor({ editing: exercise({ name: 'Machine Dips', mappings: [
+      { id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' },
+      { id: 'm2', muscleGroupId: 'triceps', weight: 1, role: 'primary' },
+      { id: 'm3', muscleGroupId: 'delts', weight: 0.5, role: 'secondary' },
+    ] }) });
+    expect(primaryRow()).toHaveTextContent('Chest, Triceps', { exact: false });
+    expect(secondaryRow()).toHaveTextContent('Front delts', { exact: false });
+    fireEvent.press(secondaryRow());
+    expect(screen.queryByTestId('exercise-editor-muscle-option-chest')).toBeNull();
+    expect(screen.queryByTestId('exercise-editor-muscle-option-triceps')).toBeNull();
+    await save();
+    expect(onSave.mock.calls[0][0].mappings).toEqual([
+      { muscleGroupId: 'chest', weight: 1, role: 'primary' },
+      { muscleGroupId: 'triceps', weight: 1, role: 'primary' },
+      { muscleGroupId: 'delts', weight: 0.5, role: 'secondary' },
     ]);
   });
 

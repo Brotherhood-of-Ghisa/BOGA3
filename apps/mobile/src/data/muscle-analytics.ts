@@ -1,3 +1,4 @@
+import { addCompensated, compensatedValue, createCompensatedSum, sumNumbers, type CompensatedSum } from '../utils/sum.ts';
 import type { SessionWeightContext } from '../bodyweight/as-of.ts';
 import type { EffortCalculationPolicy } from '../exercise-calculations/effort-policy.ts';
 import { type SetMetrics } from '../exercise-calculations/load-metrics.ts';
@@ -10,6 +11,9 @@ import {
 } from '../exercise-calculations/set-semantics.ts';
 
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;
+
+/** Read-time shares, assigned before visibility filtering or Broad grouping. */
+export type MuscleAllocation = { primary: number; secondary: number };
 
 export type MuscleAnalyticsInput = {
   effortPolicy?: EffortCalculationPolicy;
@@ -42,6 +46,7 @@ export type MuscleAnalyticsInput = {
     role: MuscleContributionRole;
     /** Persisted for compatibility; muscle analytics derives its factor from role. */
     weight?: number;
+    allocation?: MuscleAllocation;
   }[];
   muscleGroups: {
     id: string;
@@ -58,7 +63,9 @@ export type MuscleSetContribution = {
   setIdentity: string;
   muscleGroupId: string;
   role: MuscleContributionRole;
+  /** Sum of the allocated Primary and Secondary shares. */
   roleWeight: number;
+  allocation?: MuscleAllocation;
   weightedVolume: number | null;
   setVolume: number | null;
   metrics: SetMetrics;
@@ -134,24 +141,31 @@ const isSameMuscle = (left: ReportedMuscle, right: ReportedMuscle): boolean =>
 
 /**
  * The input a view reads under the user's muscle setup ([[muscle.report-groups]]):
- * mappings are re-keyed from anatomy entry to muscle, a muscle's repeated
- * mappings per exercise collapse to the strongest role, mappings to untracked
+ * mappings receive their shares, are re-keyed from anatomy entry to muscle,
+ * and grouped shares sum while retaining the strongest display role. Untracked
  * entries drop ([[muscle.untracked]]), and `muscleGroups` becomes the tracked
  * muscles in first-seen order. With every entry its own tracked muscle (Detailed)
- * the input comes back unchanged. Run it after `withoutSecondaryMappings`.
+ * the allocation is unchanged. Run it after `withoutSecondaryMappings`.
  */
 export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
   input: T, assignment: MuscleReportAssignment,
 ): T => {
-  const strongest = new Map<string, MuscleAnalyticsInput['muscleMappings'][number]>();
-  for (const mapping of input.muscleMappings) {
+  const grouped = new Map<string, {
+    mapping: MuscleAnalyticsInput['muscleMappings'][number];
+    primary: CompensatedSum; secondary: CompensatedSum;
+  }>();
+  for (const mapping of allocatedMuscleMappings(input.muscleMappings)) {
     const assigned = assignment.get(mapping.muscleGroupId);
     if (assigned?.tracked === false) continue;
     const muscleId = assigned?.muscle.id ?? mapping.muscleGroupId;
     const key = JSON.stringify([mapping.exerciseDefinitionId, muscleId]);
-    const existing = strongest.get(key);
-    if (existing && getMuscleContributionRoleWeight(existing.role) >= getMuscleContributionRoleWeight(mapping.role)) continue;
-    strongest.set(key, muscleId === mapping.muscleGroupId ? mapping : { ...mapping, muscleGroupId: muscleId });
+    const existing = grouped.get(key) ?? { mapping, primary: createCompensatedSum(), secondary: createCompensatedSum() };
+    addCompensated(existing.primary, mapping.allocation.primary);
+    addCompensated(existing.secondary, mapping.allocation.secondary);
+    const role = getMuscleContributionRoleWeight(existing.mapping.role) > getMuscleContributionRoleWeight(mapping.role)
+      ? existing.mapping.role : mapping.role;
+    existing.mapping = { ...mapping, muscleGroupId: muscleId, role };
+    grouped.set(key, existing);
   }
 
   const muscles = new Map<string, ReportedMuscle>();
@@ -162,7 +176,9 @@ export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
     if (!muscles.has(muscle.id)) muscles.set(muscle.id, muscle);
   }
 
-  return { ...input, muscleMappings: [...strongest.values()], muscleGroups: [...muscles.values()] };
+  return { ...input, muscleMappings: [...grouped.values()].map(({ mapping, primary, secondary }) => ({
+    ...mapping, allocation: { primary: compensatedValue(primary), secondary: compensatedValue(secondary) },
+  })), muscleGroups: [...muscles.values()] };
 };
 
 /**
@@ -171,43 +187,45 @@ export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
  * role figures are there for a surface that names them.
  */
 export type MuscleSetCounts = {
-  /** Sets counted at the muscle's primary role. */
+  /** Primary-pool working-set shares. */
   primarySetCount: number;
-  /** Sets counted at its secondary role, having no primary mapping. */
+  /** Secondary shares before the half-pool multiplier. */
   secondarySetCount: number;
-  /** The combined total the fact defines, always an exact half-step. */
+  /** The combined allocated working-set shares, without rounding. */
   weightedSetCount: number;
 };
 
-/**
- * One bucket's running [[muscle.set-count]] — a muscle, or a family over its
- * muscles. Read `counts`; fold with `countMuscleSet`. A set counts once per
- * bucket at its strongest role there, so primary + secondary to one muscle is
- * 1 and not 1½, and a stabilizer adds nothing.
- */
+/** One bucket's allocated sets; repeated copies of one set/muscle count once. */
 export type MuscleSetCounter = {
   counts: MuscleSetCounts;
-  /** The strongest role weight each counted set holds in this bucket, by set identity. */
-  roleWeightBySet: Map<string, number>;
+  primary: CompensatedSum;
+  secondary: CompensatedSum;
+  allocationBySetAndMuscle: Map<string, MuscleAllocation>;
 };
 
 export const createMuscleSetCounter = (): MuscleSetCounter => ({
   counts: { primarySetCount: 0, secondarySetCount: 0, weightedSetCount: 0 },
-  roleWeightBySet: new Map(),
+  primary: createCompensatedSum(),
+  secondary: createCompensatedSum(),
+  allocationBySetAndMuscle: new Map(),
 });
 
-/** Folds one contribution in. A non-working set or a stabilizer adds nothing. */
+/** Folds allocated shares, preserving both pools when muscles are grouped. */
 export const countMuscleSet = (counter: MuscleSetCounter, contribution: MuscleSetContribution): void => {
   if (contribution.working === false || contribution.roleWeight === 0) return;
-  const previous = counter.roleWeightBySet.get(contribution.setIdentity) ?? 0;
-  if (previous >= contribution.roleWeight) return;
-  counter.roleWeightBySet.set(contribution.setIdentity, contribution.roleWeight);
+  const allocation = contribution.allocation ?? {
+    primary: contribution.role === 'primary' ? contribution.roleWeight : 0,
+    secondary: contribution.role === 'secondary' ? contribution.roleWeight : 0,
+  };
+  const key = JSON.stringify([contribution.setIdentity, contribution.muscleGroupId]);
+  const previous = counter.allocationBySetAndMuscle.get(key) ?? { primary: 0, secondary: 0 };
+  if (previous.primary + previous.secondary > contribution.roleWeight
+    || (previous.primary + previous.secondary === contribution.roleWeight && previous.primary >= allocation.primary)) return;
+  counter.allocationBySetAndMuscle.set(key, allocation);
   const counts = counter.counts;
-  // A set upgraded from secondary to primary leaves the secondary tally.
-  if (previous === 0.5) counts.secondarySetCount -= 1;
-  if (contribution.roleWeight === 1) counts.primarySetCount += 1;
-  else counts.secondarySetCount += 1;
-  counts.weightedSetCount = counts.primarySetCount + counts.secondarySetCount / 2;
+  counts.primarySetCount = addCompensated(counter.primary, allocation.primary - previous.primary);
+  counts.secondarySetCount = addCompensated(counter.secondary, (allocation.secondary - previous.secondary) * 2);
+  counts.weightedSetCount = sumNumbers([counts.primarySetCount, counts.secondarySetCount / 2]);
 };
 
 /** One bucket's [[muscle.set-count]] over a whole list of contributions. */
@@ -256,17 +274,36 @@ export const countedMuscleAnalyticsSessionIds = (input: MuscleAnalyticsInput): S
   }), input.effortPolicy);
 };
 
-const buildMappingsByExerciseDefinitionId = (input: MuscleAnalyticsInput) => {
-  const mappingsByExerciseDefinitionId = new Map<string, Map<string, MuscleAnalyticsInput['muscleMappings'][number]>>();
-  for (const mapping of input.muscleMappings) {
-    const bucket = mappingsByExerciseDefinitionId.get(mapping.exerciseDefinitionId) ?? new Map();
+/** Deduplicate raw mappings before splitting each exercise's independent pools. */
+const allocatedMuscleMappings = (mappings: MuscleAnalyticsInput['muscleMappings']) => {
+  const byExercise = new Map<string, Map<string, MuscleAnalyticsInput['muscleMappings'][number]>>();
+  for (const mapping of mappings) {
+    const bucket = byExercise.get(mapping.exerciseDefinitionId) ?? new Map();
     const existing = bucket.get(mapping.muscleGroupId);
     if (!existing || getMuscleContributionRoleWeight(mapping.role) > getMuscleContributionRoleWeight(existing.role)) {
       bucket.set(mapping.muscleGroupId, mapping);
     }
-    mappingsByExerciseDefinitionId.set(mapping.exerciseDefinitionId, bucket);
+    byExercise.set(mapping.exerciseDefinitionId, bucket);
   }
-  return new Map([...mappingsByExerciseDefinitionId].map(([id, bucket]) => [id, [...bucket.values()]]));
+  return [...byExercise.values()].flatMap(bucket => {
+    const entries = [...bucket.values()];
+    const primaryCount = entries.filter(mapping => mapping.role === 'primary').length;
+    const secondaryCount = entries.filter(mapping => mapping.role === 'secondary').length;
+    return entries.map(mapping => ({ ...mapping, allocation: mapping.allocation ?? {
+      primary: mapping.role === 'primary' ? 1 / primaryCount : 0,
+      secondary: mapping.role === 'secondary' ? 0.5 / secondaryCount : 0,
+    } }));
+  });
+};
+
+const buildMappingsByExerciseDefinitionId = (input: MuscleAnalyticsInput) => {
+  const byExercise = new Map<string, ReturnType<typeof allocatedMuscleMappings>>();
+  for (const mapping of allocatedMuscleMappings(input.muscleMappings)) {
+    const bucket = byExercise.get(mapping.exerciseDefinitionId) ?? [];
+    bucket.push(mapping);
+    byExercise.set(mapping.exerciseDefinitionId, bucket);
+  }
+  return byExercise;
 };
 
 const compareContribution = (left: MuscleSetContribution, right: MuscleSetContribution) => {
@@ -336,7 +373,7 @@ export const collectMuscleSetContributions = (
     const setVolume = rawSetVolume !== null && Number.isFinite(rawSetVolume) ? rawSetVolume : null;
 
     for (const mapping of mappings) {
-      const roleWeight = getMuscleContributionRoleWeight(mapping.role);
+      const roleWeight = mapping.allocation.primary + mapping.allocation.secondary;
       if (roleWeight === 0) continue;
 
       contributions.push({
@@ -344,7 +381,7 @@ export const collectMuscleSetContributions = (
         setIdentity: set.id !== undefined ? `id:${set.id}` : `row:${setIndex}`,
         muscleGroupId: mapping.muscleGroupId,
         role: mapping.role,
-        roleWeight,
+        roleWeight, allocation: mapping.allocation,
         weightedVolume: setVolume === null ? null : setVolume * roleWeight,
         metrics, enteredWeightKg: enteredWeightKg(set),
         setVolume,

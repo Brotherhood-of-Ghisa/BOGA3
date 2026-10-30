@@ -5,6 +5,7 @@ import { SessionInsightPresentation, type SessionComparisonMode } from '@/compon
 import { ActionButton } from '@/components/ui/action-button';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import type {
   CurrentSessionMuscleSummary, ExerciseVolumeComparison, SessionMuscleWorkingSetEntry,
 } from '@/src/session-insights';
@@ -26,7 +27,7 @@ const muscleRowLabel = (muscle: SessionMuscleWorkingSetEntry): string =>
 function RoleCount({ count }: { count: number }) {
   return (
     <Text allowFontScaling={false} style={[uiText.figure, count === 0 ? uiTextTone.faint : uiTextTone.muted, styles.countCell]}>
-      {count === 0 ? '—' : String(count)}
+      {count === 0 ? '—' : formatWorkingSetCount(count)}
     </Text>
   );
 }
@@ -64,7 +65,7 @@ export function SessionMuscleBreakdown({
                   <RoleCount count={muscle.primarySetCount} />
                   <RoleCount count={muscle.secondarySetCount} />
                   <Text allowFontScaling={false} style={[uiText.figure, styles.countCell]}>
-                    {String(muscle.weightedSetCount)}
+                    {formatWorkingSetCount(muscle.weightedSetCount)}
                   </Text>
                 </View>
               ))}

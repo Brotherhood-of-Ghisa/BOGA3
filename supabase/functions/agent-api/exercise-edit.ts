@@ -3,7 +3,7 @@
 // (`apps/mobile/src/exercise-catalog/editor-model.ts`), which they mirror:
 // a trimmed non-empty name, a known load mode, a 0..1 bodyweight contribution,
 // a rest timer of null (the global timer) or 15..600 whole seconds,
-// exactly one primary muscle (weight 1) plus distinct secondaries (weight ½).
+// one or more distinct primary muscles (weight 1) plus distinct secondaries (weight ½).
 //
 // The SQL writers (`agent_*_exercise` in
 // supabase/migrations/20261019120000_agent_exercise_edit.sql) trust this shape
@@ -128,10 +128,10 @@ const readMuscles = (value: unknown): ExerciseMuscleInput[] => {
     if (seen.has(muscle.muscle_id)) fail(`muscles lists ${muscle.muscle_id} twice.`);
     seen.add(muscle.muscle_id);
   }
-  // Primary first, then secondaries in the caller's order, so equal input
+  // Primaries first, then secondaries in the caller's order, so equal input
   // normalizes (and hashes for idempotency) the same.
   const primaries = muscles.filter((muscle) => muscle.role === 'primary');
-  if (primaries.length !== 1) fail('muscles must have exactly one primary muscle.');
+  if (primaries.length === 0) fail('muscles must have at least one primary muscle.');
   return [...primaries, ...muscles.filter((muscle) => muscle.role === 'secondary')];
 };
 

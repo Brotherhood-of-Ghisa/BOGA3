@@ -4,6 +4,7 @@
 // fixed period of their own ([[comparison.allowed-periods]]); the week is
 // [[comparison.window]]'s.
 
+import { sumNumbers } from '../utils/sum.ts';
 import type { MuscleDailySets } from '../data/muscle-daily-sets.ts';
 import { localDateKey } from '../utils/calendar-weeks.ts';
 import { localWeekWindow, startOfLocalDay, type LocalWindow } from '../utils/local-calendar.ts';
@@ -48,7 +49,7 @@ export type RecoveryRow = {
 /** The default weekly target, and the per-muscle overrides in force, by reported muscle id. */
 export type RecoveryTargets = { weeklyTarget: number; overrides: Readonly<Record<string, number>> };
 
-const sumDays = (byDay: Record<string, number>, keys: string[]) => keys.reduce((total, key) => total + (byDay[key] ?? 0), 0);
+const sumDays = (byDay: Record<string, number>, keys: string[]) => sumNumbers(keys.map(key => byDay[key] ?? 0));
 
 /**
  * One row per muscle, least trained over the recovery days first (today's

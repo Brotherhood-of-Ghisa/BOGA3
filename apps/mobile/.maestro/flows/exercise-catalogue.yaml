@@ -44,6 +44,12 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - tapOn:
     id: "exercise-editor-muscle-option-chest"
+# Primary now uses the existing stay-open multiselect. Dismiss on the exposed
+# backdrop (hidden from the modal accessibility tree, as in the group sheets).
+- tapOn: { point: "50%,8%" }
+- extendedWaitUntil:
+    notVisible: { id: "exercise-editor-muscle-selector-list" }
+    timeout: 10000
 - extendedWaitUntil:
     visible:
       id: "exercise-editor-secondary-muscle-trigger"

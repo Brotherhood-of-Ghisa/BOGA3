@@ -1,6 +1,6 @@
 // One rule for a muscle's set count ([[muscle.set-count]]) across every surface
 // that derives one: a working set gives a muscle 1 where it maps as primary and
-// half where it maps as secondary, counted once per muscle at its strongest role.
+// shares one primary pool and a separate half secondary pool.
 // The last test is the cross-surface one: the session summary and Progress must
 // report the same figure for the same session.
 import {
@@ -78,7 +78,7 @@ const sessionInput = (): CurrentSessionMuscleSummaryInput => ({
 const analyticsInput = (): MuscleAnalyticsInput => adaptCurrentSessionToMuscleAnalyticsInput(sessionInput());
 
 /** The figure every unqualified `Sets` for a muscle must show. */
-const EXPECTED_WEIGHTED = { chest: 4, triceps: 1.5, biceps: 2, delts: 3, core: 0 };
+const EXPECTED_WEIGHTED = { chest: 2.5, triceps: 1.5, biceps: 2, delts: 1.5, core: 0 };
 
 describe('the muscle set-count rule itself', () => {
   it('splits primary, secondary and stabilizer, and counts a doubly mapped muscle once', () => {
@@ -86,14 +86,14 @@ describe('the muscle set-count rule itself', () => {
     const forMuscle = (muscleGroupId: string) =>
       countMuscleSets(contributions.filter((contribution) => contribution.muscleGroupId === muscleGroupId));
 
-    // Mixed: three primary bench sets and two secondary curl sets.
-    expect(forMuscle('chest')).toEqual({ primarySetCount: 3, secondarySetCount: 2, weightedSetCount: 4 });
+    // Mixed: half of three bench sets, and two half-weight curl sets.
+    expect(forMuscle('chest')).toEqual({ primarySetCount: 1.5, secondarySetCount: 2, weightedSetCount: 2.5 });
     // Secondary only: three halves.
     expect(forMuscle('triceps')).toEqual({ primarySetCount: 0, secondarySetCount: 3, weightedSetCount: 1.5 });
     // Primary only.
     expect(forMuscle('biceps')).toEqual({ primarySetCount: 2, secondarySetCount: 0, weightedSetCount: 2 });
-    // Mapped primary and secondary on one exercise: the primary mapping wins, so 3 and never 4.5.
-    expect(forMuscle('delts')).toEqual({ primarySetCount: 3, secondarySetCount: 0, weightedSetCount: 3 });
+    // Duplicate raw mapping: the primary role wins before the primary pool splits.
+    expect(forMuscle('delts')).toEqual({ primarySetCount: 1.5, secondarySetCount: 0, weightedSetCount: 1.5 });
     // Stabilizer only: no contribution is even emitted.
     expect(forMuscle('core')).toEqual({ primarySetCount: 0, secondarySetCount: 0, weightedSetCount: 0 });
   });
@@ -117,7 +117,7 @@ describe('Progress muscle comparisons', () => {
     }
     // Chest's two contributors hold different roles and still sum to its row.
     expect(byId.get('chest')?.exercises.map((row) => [row.exerciseDefinitionId, row.current.workingSetCount]))
-      .toEqual([['bench', 3], ['curl', 1]]);
+      .toEqual([['bench', 1.5], ['curl', 1]]);
     // A stabilizer-only muscle has no contributor at all.
     expect(byId.get('core')?.exercises).toEqual([]);
   });
@@ -155,7 +155,7 @@ describe('the muscle heatmaps', () => {
 
   it('grades the weekly target on the same weighted count the cell shows', () => {
     const [day] = aggregateSelectedMuscleDailyEffortMetrics(dailyFor(['chest', 'triceps']));
-    expect(day.workingSetCountsByMuscle).toEqual({ chest: 4, triceps: 1.5 });
+    expect(day.workingSetCountsByMuscle).toEqual({ chest: 2.5, triceps: 1.5 });
   });
 
   it('counts a set once across a multi-muscle selection, at its strongest role', () => {
@@ -205,10 +205,10 @@ describe('cross-surface agreement', () => {
     const summary = summarizeCurrentSessionMuscleLoad(sessionInput());
     expect(summary.workingSetsByMuscle.map((entry) =>
       [entry.id, entry.primarySetCount, entry.secondarySetCount, entry.weightedSetCount])).toEqual([
-      ['chest', 3, 2, 4],
-      ['delts', 3, 0, 3],
+      ['chest', 1.5, 2, 2.5],
       ['biceps', 2, 0, 2],
       ['triceps', 0, 3, 1.5],
+      ['delts', 1.5, 0, 1.5],
     ]);
   });
 });

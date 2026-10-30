@@ -1,7 +1,7 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { formatCalendarWeek } from '@/src/utils/local-time';
 import type { HeatmapView } from '@/src/preferences/model';
-import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
+import { formatOneRepMax, formatVolume, formatWeight, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
@@ -63,7 +63,7 @@ export const MUSCLE_HISTORY_METRIC_OPTIONS: readonly HistoryMetricOption<MuscleH
 // One day's value inside its calendar tile, in the metric's format.
 const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string => {
   switch (metric) {
-    case 'workingSetCount': return String(value);
+    case 'workingSetCount': return formatWorkingSetCount(value);
     case 'totalVolume': return formatVolume(value);
     case 'estimatedRM1': return formatOneRepMax(value);
     case 'highestWeight': return formatWeight(value);
@@ -204,7 +204,7 @@ function HistoryHeatmap({
         testIDPrefix={testIDPrefix}
         formatValue={formatDailyValue}
         metricLabel={metricLabel}
-        formatReferenceValue={metric === 'totalVolume' ? formatVolume : formatOneRepMax}
+        formatReferenceValue={metric === 'totalVolume' ? formatVolume : metric === 'workingSetCount' ? formatWorkingSetCount : formatOneRepMax}
         header={status}
       />
     ),

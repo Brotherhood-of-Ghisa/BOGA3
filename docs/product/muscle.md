@@ -2,17 +2,18 @@
 
 ### muscle.set-count · definition · accepted
 
-Every screen counts working sets per muscle as **primary 1, secondary ½**.
-Decided 2026-10-09.
+Every exercise splits two independent pools across its distinct raw mappings:
+Primary work is shared equally; Secondary work shares a separate half pool.
+The same allocation applies to working sets and per-side muscle Volume.
+Stabilizers contribute nothing. Stored mapping weights do not set shares.
+Allocation happens before filtering or Broad grouping: merged entries add their
+shares, and hidden/untracked entries never redistribute work. Exercise figures
+stay unchanged ([[set.count-display]]).
 
-A muscle counts a set once, at the strongest role any of its entries has
-([[muscle.report-groups]]).
-Totals use half-steps (`1.5`), unlike the session's physical `Sets`
-([[set.count-display]]). Whether to show secondaries is separate
-([[muscle.secondary-filter]]).
-Today's Recovery grid is the exception: it shows whole sets, rounded down
-(a lone ½ stays `½`), so a total reads at its target only once met; its
-spoken labels keep the half-steps.
+Keep fractions through aggregation; tables and history show at most two
+decimal places, retaining two significant digits for nonzero shares below
+0.01. Recovery alone floors totals of at least one; below one, it shows `½` for a half and two significant decimal digits for
+other shares. Its spoken labels retain unrounded values.
 
 <!-- fact-table: muscle.set-count -->
 | Working sets mapped to one muscle | It gets |
@@ -20,21 +21,22 @@ spoken labels keep the half-steps.
 | 3 primary | 3 |
 | 3 secondary | 1.5 |
 | 2 primary, 3 secondary | 3.5 |
-| 1 set, primary and secondary to that muscle | 1 |
+| 1 set, duplicate roles on the same raw muscle | 1 |
+| 3 sets, one of two primaries | 1.5 |
+| 1 set, one of three primaries | 0.3333333333333333 |
+| 3 sets, one of two secondaries | 0.75 |
 | 4 stabilizer | 0 |
 
-Why: a secondary mapping is real work, but not what the lift is for.
-Code: `countMuscleSets` in `apps/mobile/src/data/muscle-analytics.ts`, read by
-the session summary, Progress, the muscle heatmaps and Stats; the Recovery
-grid's rounding is `wholeSets` in `apps/mobile/components/today/plan-cards.tsx`.
-Signature: `primary + ½ secondary`
+Why: co-primary muscles share the lift; secondary assistance is a separate pool.
+Code: `collectMuscleSetContributions`, `countMuscleSets` and `applyMuscleReport`
+in `apps/mobile/src/data/muscle-analytics.ts`; Recovery's display is `wholeSets`
+in `apps/mobile/components/today/plan-cards.tsx`.
 
 ### muscle.secondary-filter · presentation · accepted
 
 Progress's Filters (`Count secondary sets`) and muscle history's chip (`Sec` /
 `Pri`, spoken `Count secondary sets`) offer counting secondary sets per visit:
-Progress opens on Settings' default, history on Progress's. Off counts primary
-work only. The default is per account, synced like [[muscle.weekly-targets]].
+Progress opens on Settings' default, history on Progress's. Off excludes Secondary sets and Volume without changing Primary shares. The default is per account, synced like [[muscle.weekly-targets]].
 
 Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
 
@@ -46,7 +48,7 @@ available, with individual anatomy switches and their enabled/total count,
 regardless of breakdown. A preset changes merging, never a switch; merges
 matching neither read `Custom`. Broad merges entries (first listed is the anchor);
 Other entries and custom muscles stay their own.
-A merged muscle is enabled while any entry is tracked; untracked entries' work still drops. Each muscle stays in one family.
+A merged muscle sums its tracked entries' allocated shares; untracked entries' work still drops. Each muscle stays in one family.
 
 
 Why: a simpler view.
@@ -74,9 +76,9 @@ Code: `apps/mobile/src/preferences/muscle-targets.ts`; `deriveRecoveryRows` in `
 
 Every screen, the exercise editor and search show only the user's muscles, never
 an entry inside its muscle. An exercise mapped to two entries of one muscle shows
-it once, at the strongest role. Adding a muscle maps its anchor; changing a role
-or removing it rewrites every entry of the muscle. Mappings to untracked muscles
-are hidden and kept.
+it once, at the strongest role. Adding a muscle maps its anchor, or a tracked
+entry when the anchor is untracked. Changing a role or removing it rewrites
+tracked entries of the muscle. Mappings to untracked muscles are hidden and kept.
 
 Why: a merged entry is gone, and an edit never deletes what the user cannot see.
 Code: `resolveEditorMappings`: `apps/mobile/src/exercise-catalog/editor-model.ts`; `buildMuscleSetup`: `apps/mobile/src/exercise-catalog/muscle-setup.ts`; `apps/mobile/src/exercise-catalog/reported-muscles.ts`; searches: `apps/mobile/src/exercise-catalog/search.ts`.

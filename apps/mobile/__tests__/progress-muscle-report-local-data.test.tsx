@@ -116,11 +116,12 @@ describe('Progress muscle list under Broad', () => {
     expect(muscleBlocks()).not.toContain('serratus_anterior');
   });
 
-  it('counts a squat once per muscle: Quads at its primary role, Glutes & Hams at half', async () => {
+  it('retains each Broad muscle’s original shares without reallocating hidden work', async () => {
     await choose('broad');
     await renderProgress('muscle');
     await waitFor(() => expect(now('quads')).toBeGreaterThan(0));
-    expect(now('glutes_max')).toBe(now('quads') / 2);
+    expect(now('quads')).toBe(8.17);
+    expect(now('glutes_max')).toBe(1.17);
   });
 
   it('shows a family header only above two or more muscles and lists headerless muscles first', async () => {
@@ -249,7 +250,7 @@ describe('Muscle history under Broad', () => {
     await waitFor(() => expect(mockScreenOptions.title).toBe('Glutes & Hams'));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-loading'));
     const hams = await history(['glutes_max']);
-    expect(hams.daily.reduce((sum, day) => sum + day.workingSetCount, 0)).toBe(squatSets / 2);
+    expect(hams.daily.reduce((sum, day) => sum + day.workingSetCount, 0)).toBeCloseTo(squatSets / 7, 10);
   });
 
   it('opens a merged muscle whose anchor entry alone is switched off, as the Progress list shows it', async () => {
@@ -265,13 +266,16 @@ describe('Muscle history under Broad', () => {
     expect(back.daily.reduce((sum, day) => sum + day.workingSetCount, 0)).toBeGreaterThan(0);
   });
 
-  it('reads the same days as Detailed for a single-entry muscle', async () => {
+  it('adds Broad entry shares on the same days as Detailed', async () => {
     await choose('broad');
     const broad = await history(['quads']);
     localDataClient().prepare('UPDATE muscle_groups SET report_group = NULL, tracked = 1').run();
     const detailed = await history(['quads']);
-    // Detailed's Quads has the squat primary only; Broad adds nothing to its sets.
-    expect(broad.daily.map(day => day.workingSetCount)).toEqual(detailed.daily.map(day => day.workingSetCount));
+    // Broad Quads adds Adductors' one-sixth share to the unchanged Primary pool.
+    expect(broad.daily.map(day => day.dateKey)).toEqual(detailed.daily.map(day => day.dateKey));
+    for (let index = 0; index < broad.daily.length; index += 1) {
+      expect(broad.daily[index].workingSetCount).toBeCloseTo(detailed.daily[index].workingSetCount * 7 / 6, 10);
+    }
   });
 
   it.each(['serratus_anterior', 'back_upper', 'forearms_grip', 'calves'])(

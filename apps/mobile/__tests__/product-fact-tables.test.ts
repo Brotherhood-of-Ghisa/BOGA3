@@ -210,16 +210,25 @@ describe('muscle.set-count', () => {
     '2 primary, 3 secondary': [
       ['primary'], ['primary'], ['secondary'], ['secondary'], ['secondary'],
     ],
-    '1 set, primary and secondary to that muscle': [['primary', 'secondary']],
+    '1 set, duplicate roles on the same raw muscle': [['primary', 'secondary']],
+    '3 sets, one of two primaries': [['primary'], ['primary'], ['primary']],
+    '1 set, one of three primaries': [['primary']],
+    '3 sets, one of two secondaries': [['secondary'], ['secondary'], ['secondary']],
     '4 stabilizer': [['stabilizer'], ['stabilizer'], ['stabilizer'], ['stabilizer']],
+  };
+
+  const OTHER_ROLES: Record<string, ('primary' | 'secondary')[]> = {
+    '3 sets, one of two primaries': ['primary'],
+    '1 set, one of three primaries': ['primary', 'primary'],
+    '3 sets, one of two secondaries': ['primary', 'secondary'],
   };
 
   const AT = new Date('2026-10-09T18:00:00.000Z');
   // The fact applies on every screen that shows sets per muscle, so a row is
   // only satisfied when all of them agree. One exercise definition per set, so
   // a set's roles are its own: each surface takes the strongest role a set
-  // holds for the muscle, not the strongest in the session.
-  const sessionFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][]): CurrentSessionMuscleSummaryInput => ({
+  // holds for the same raw muscle; other raw mappings share each role's pool.
+  const sessionFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][], others: ('primary' | 'secondary')[]): CurrentSessionMuscleSummaryInput => ({
     sessionId: 'session',
     sessionAt: AT,
     exercises: sets.map((_roles, index) => ({
@@ -235,15 +244,18 @@ describe('muscle.set-count', () => {
       bodyweightContribution: 0,
     })),
     muscleMappings: sets.flatMap((roles, index) =>
-      roles.map((role): SessionInsightMuscleMapping =>
-        ({ exerciseDefinitionId: `def-${index}`, muscleGroupId: 'chest', role }))),
-    muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Upper', sortOrder: 1 }],
+      [...roles.map((role): SessionInsightMuscleMapping =>
+        ({ exerciseDefinitionId: `def-${index}`, muscleGroupId: 'chest', role })),
+      ...others.map((role, otherIndex): SessionInsightMuscleMapping =>
+        ({ exerciseDefinitionId: `def-${index}`, muscleGroupId: `other-${otherIndex}`, role }))]),
+    muscleGroups: [{ id: 'chest', displayName: 'Chest', familyName: 'Upper', sortOrder: 1 },
+      ...others.map((_role, index) => ({ id: `other-${index}`, displayName: `Other ${index}`, familyName: 'Other', sortOrder: index + 2 }))],
   });
 
   /** What each surface reports for the muscle. A muscle that gets nothing is absent, which is zero. */
-  const figuresFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][]): Record<string, number> => {
-    const summary = summarizeCurrentSessionMuscleLoad(sessionFor(sets));
-    const input = adaptCurrentSessionToMuscleAnalyticsInput(sessionFor(sets));
+  const figuresFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][], others: ('primary' | 'secondary')[] = []): Record<string, number> => {
+    const summary = summarizeCurrentSessionMuscleLoad(sessionFor(sets, others));
+    const input = adaptCurrentSessionToMuscleAnalyticsInput(sessionFor(sets, others));
     const periods = { current: { start: new Date(AT.getTime() - 1), end: new Date(AT.getTime() + 1) },
       previous: { start: new Date(AT.getTime() - 3), end: new Date(AT.getTime() - 1) } };
     const daily = aggregateSelectedMuscleDailyEffort(input, { muscleGroupIds: ['chest'], timeZone: 'UTC' });
@@ -267,7 +279,7 @@ describe('muscle.set-count', () => {
   for (const row of table.rows) {
     runCell('muscle.set-count', row[KEY], COLUMN, () => {
       const want = Number(row[COLUMN]);
-      const figures = figuresFor(ROLES[row[KEY]]);
+      const figures = figuresFor(ROLES[row[KEY]], OTHER_ROLES[row[KEY]]);
       return {
         actual: figures,
         want: Object.fromEntries(Object.keys(figures).map((surface) => [surface, want])),

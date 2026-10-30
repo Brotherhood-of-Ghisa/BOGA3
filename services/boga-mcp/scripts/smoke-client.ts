@@ -155,7 +155,7 @@ try {
   );
   const favourites = Array.isArray(trainingStatus.favourite_exercises) ? trainingStatus.favourite_exercises : [];
   if (
-    trainingStatus.metric_revision !== 'working_sets_v7' ||
+    trainingStatus.metric_revision !== 'working_sets_v8' ||
     !Array.isArray(trainingStatus.muscles) ||
     !isObject(trainingStatus.targets) ||
     typeof trainingStatus.complete !== 'boolean' ||
@@ -399,11 +399,13 @@ try {
         }
       }
 
+      const coPrimaries = [smokeMuscleId, ...(smokeGroupedMuscleId ? [smokeGroupedMuscleId] : [])]
+        .map((muscle_id) => ({ muscle_id, role: 'primary' }));
       const created = structured(
         await client.callTool({
           arguments: {
             exercise: {
-              muscles: [{ muscle_id: smokeMuscleId, role: 'primary' }],
+              muscles: coPrimaries,
               name: `${exerciseQuery} Created`,
               split_by_gym: true,
             },
@@ -414,14 +416,16 @@ try {
         'create_exercise',
       );
       const createdId = String(created.exercise_id ?? '');
-      if (!createdId || !isObject(created.exercise) || created.exercise.split_by_gym !== true) {
+      if (!createdId || !isObject(created.exercise) || created.exercise.split_by_gym !== true ||
+        !Array.isArray(created.exercise.muscles) || created.exercise.muscles.length !== coPrimaries.length ||
+        !created.exercise.muscles.every((m) => isObject(m) && m.role === 'primary' && m.weight === 1)) {
         throw new Error('create_exercise did not return the created per-gym exercise.');
       }
 
       const updated = structured(
         await client.callTool({
           arguments: {
-            changes: { split_by_gym: false },
+            changes: { muscles: coPrimaries, split_by_gym: false },
             exercise_id: createdId,
             expected_revision: Number(created.revision),
             idempotency_key: `smoke-ex-update-${Date.now()}`,
@@ -430,7 +434,9 @@ try {
         }),
         'update_exercise',
       );
-      if (!isObject(updated.exercise) || updated.exercise.split_by_gym !== false) {
+      if (!isObject(updated.exercise) || updated.exercise.split_by_gym !== false ||
+        !Array.isArray(updated.exercise.muscles) || updated.exercise.muscles.length !== coPrimaries.length ||
+        !updated.exercise.muscles.every((m) => isObject(m) && m.role === 'primary' && m.weight === 1)) {
         throw new Error('update_exercise did not apply the change.');
       }
 
@@ -542,7 +548,7 @@ try {
     const warmUp = sets[1];
     const workout = workoutRows.find(row => isObject(row) && row.id === expectedSessionId);
     // The seeded warm-up is listed with its set_type but feeds no volume or count.
-    if (context.metric_revision !== 'working_sets_v7' || !isObject(performance) ||
+    if (context.metric_revision !== 'working_sets_v8' || !isObject(performance) ||
       sets.length !== 2 || !isObject(warmUp) || warmUp.set_type !== 'warm_up' ||
       !isObject(performance.volume) || performance.volume.value !== 800 || performance.volume.complete !== true ||
       !isObject(performance.session_body_weight) || performance.session_body_weight.value !== 80 ||

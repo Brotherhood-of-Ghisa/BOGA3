@@ -105,25 +105,25 @@ describe('Broad', () => {
   const GLUTES_HAMS = broadId('glutes_hams');
   const QUADS = broadId('quads');
 
-  it('counts a squat x 3 as Quads 3 and Glutes & Hams 1.5, Volume once per muscle', () => {
+  it('adds each Broad muscle’s allocated shares without reallocating hidden work', () => {
     const input = inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS);
     const byMuscle = statsByMuscle(reported(input, broadRows()));
 
-    expect(byMuscle.get(QUADS)).toMatchObject({ displayName: 'Quads', familyName: 'Legs', workingSetCount: 3 });
-    expect(byMuscle.get(GLUTES_HAMS)).toMatchObject({ displayName: 'Glutes & Hams', workingSetCount: 1.5 });
+    expect(byMuscle.get(QUADS)).toMatchObject({ displayName: 'Quads', familyName: 'Legs', workingSetCount: 3.5 });
+    expect(byMuscle.get(GLUTES_HAMS)).toMatchObject({ displayName: 'Glutes & Hams', workingSetCount: 0.5 });
 
-    // Per-side 100 kg x 5 reps x 3 sets. Quads has a primary and a secondary entry
-    // (Adductors): the collapse gives it the primary set's Volume, not both added.
+    // Broad Quads adds its Primary share and Adductors' allocated Secondary share.
+    // Hidden Spinal Erectors' share is dropped without reallocating it.
     const detailed = statsByMuscle(input);
-    expect(byMuscle.get(QUADS)?.totalVolume).toBe(detailed.get('quads')?.totalVolume);
+    expect(byMuscle.get(QUADS)?.totalVolume).toBe(detailed.get('quads')!.totalVolume! + detailed.get('adductors')!.totalVolume!);
     expect(byMuscle.get(GLUTES_HAMS)?.totalVolume).toBe(detailed.get('glutes_max')?.totalVolume);
   });
 
-  it('collapses one exercise\'s entries of a muscle to one mapping at the strongest role', () => {
+  it('groups one exercise\'s entry shares while retaining its strongest display role', () => {
     const output = reported(inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS), broadRows());
     expect(output.muscleMappings).toEqual([
-      { exerciseDefinitionId: 'squat', muscleGroupId: QUADS, role: 'primary' },
-      { exerciseDefinitionId: 'squat', muscleGroupId: GLUTES_HAMS, role: 'secondary' },
+      { exerciseDefinitionId: 'squat', muscleGroupId: QUADS, role: 'primary', allocation: { primary: 1, secondary: 1 / 6 } },
+      { exerciseDefinitionId: 'squat', muscleGroupId: GLUTES_HAMS, role: 'secondary', allocation: { primary: 0, secondary: 1 / 6 } },
     ]);
   });
 
@@ -134,7 +134,7 @@ describe('Broad', () => {
       { exerciseDefinitionId: 'squat', muscleGroupId: 'hip_abductors', role: 'stabilizer' },
     ], SYSTEM_MUSCLE_GROUP_SEEDS), broadRows());
     expect(output.muscleMappings).toEqual([
-      { exerciseDefinitionId: 'squat', muscleGroupId: GLUTES_HAMS, role: 'primary' },
+      { exerciseDefinitionId: 'squat', muscleGroupId: GLUTES_HAMS, role: 'primary', allocation: { primary: 1, secondary: 0.5 } },
     ]);
   });
 
@@ -259,7 +259,8 @@ describe('Detailed', () => {
     const input = FIXTURES[name]();
     const output = reported(input, detailedRows());
 
-    expect(output).toEqual(input);
+    expect(output.muscleMappings.map(({ allocation: _allocation, ...mapping }) => mapping)).toEqual(input.muscleMappings);
+    expect(output.muscleGroups).toEqual(input.muscleGroups);
     expect(aggregateStats(output)).toEqual(aggregateStats(input));
     const ids = input.muscleMappings.map((mapping) => mapping.muscleGroupId);
     expect(aggregateSelectedMuscleDailyEffort(output, { muscleGroupIds: ids, timeZone: 'UTC' }))
@@ -281,7 +282,7 @@ describe('Detailed', () => {
 
   it('is the identity under an empty assignment too', () => {
     const input = rich();
-    expect(applyMuscleReport(input, new Map() as MuscleReportAssignment)).toEqual(input);
+    expect(aggregateStats(applyMuscleReport(input, new Map() as MuscleReportAssignment))).toEqual(aggregateStats(input));
   });
 });
 
@@ -292,7 +293,7 @@ describe('with the secondary filter', () => {
     const primaryOnly = applyMuscleReport(withoutSecondaryMappings(input), buildMuscleReportAssignment(rows));
 
     expect(primaryOnly.muscleMappings).toEqual([
-      { exerciseDefinitionId: 'squat', muscleGroupId: broadId('quads'), role: 'primary' },
+      { exerciseDefinitionId: 'squat', muscleGroupId: broadId('quads'), role: 'primary', allocation: { primary: 1, secondary: 0 } },
     ]);
     const byMuscle = statsByMuscle(primaryOnly);
     expect(byMuscle.get(broadId('quads'))?.workingSetCount).toBe(3);
