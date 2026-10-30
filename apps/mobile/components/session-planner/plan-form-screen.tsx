@@ -4,7 +4,7 @@ import { useDateFormat, useAccountLocalPreferenceState } from '@/src/preferences
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Card, ChoiceRow, FormActionRow, FormError, FormField, FormSection, ListRow, Notice, Sheet, StatePanel, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, ActionRow, Card, ChoiceRow, FormError, FormField, FormSection, ListRow, Notice, Sheet, StatePanel, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import { PlanScheduleSheet } from '@/components/session-planner/plan-schedule-sheet';
@@ -237,7 +237,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
           />
         ))}
         <Card>
-          <FormActionRow
+          <ActionRow
             accessibilityLabel="Add exercise block to the plan"
             icon="plus"
             label="Add exercise"

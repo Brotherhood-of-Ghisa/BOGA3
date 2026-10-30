@@ -238,7 +238,7 @@ describe('request-scoped protocol-4 API', () => {
     ['podiums',() => api.getCompetitionPodiums('g'),podiums],
     ['revisions',() => api.getCompetitionRevisions('g','ge'),{ contract_version: 4, exercise, revisions: [revision] }],
     ['history',() => api.getCompetitionHistory({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm',certified: false }),history],
-    ['stream_v2',() => api.getCompetitionStream('g'),stream],
+    ['stream_v3',() => api.getCompetitionStream('g'),stream],
     ['session_detail',() => api.getCompetitionSession('g','u1','s'),detail],
     ['session_records',() => api.getCompetitionSessionRecords('g','u1','s'),records],
     ['week_summary',() => api.getCompetitionWeek('g',0,1000),week],
@@ -276,6 +276,7 @@ describe('request-scoped protocol-4 API', () => {
       if ('groups' in foreign) foreign.groups[0].group_id = 'other';
       else if ('group' in foreign) foreign.group.group_id = 'other';
       else if (foreign.kind === 'shared_exercise') foreign.group_id = 'other';
+      else if (foreign.kind === 'cow') foreign.definition.group_id = 'other';
       else foreign.event.group.group_id = 'other';
       respond({ ...stream,items: [foreign] }); await expect(api.getCompetitionStream('g')).rejects.toMatchObject({ code: 'INTERNAL' });
       respond({ ...stream,items: [foreign] }); await expect(api.getCompetitionStream()).resolves.toEqual({ ...stream,items: [foreign] });

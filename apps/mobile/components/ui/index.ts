@@ -14,16 +14,27 @@ export {
 } from '@/components/ui/chip-group';
 export { FigureText } from '@/components/ui/figure-text';
 export {
+  ActionRow,
   ChoiceRow,
-  FormActionRow,
   FormError,
   FormSection,
   InputRow,
+  type ActionRowKind,
+  type ActionRowProps,
   type ChoiceRowProps,
-  type FormActionRowProps,
   type FormSectionProps,
   type InputRowProps,
 } from '@/components/ui/form-section';
+export {
+  CheckRow,
+  RadioRow,
+  SegmentRow,
+  ValueRow,
+  type CheckRowProps,
+  type RadioRowProps,
+  type SegmentRowProps,
+  type ValueRowProps,
+} from '@/components/ui/form-rows';
 export { FormField, type FormFieldFace, type FormFieldProps } from '@/components/ui/form-field';
 export { Icon, type IconName, type IconProps } from '@/components/ui/icon';
 export { IconButton, type IconButtonProps, type IconButtonTone } from '@/components/ui/icon-button';

@@ -11,6 +11,8 @@ export type SwitchRowProps = {
   // A `rule-soft` hairline above the row, as `ListRow`'s.
   divider?: boolean;
   label: string;
+  // A muted line under the label (a setting's state).
+  description?: string;
   value: boolean;
   onValueChange: (value: boolean) => void;
   testID?: string;
@@ -21,10 +23,10 @@ export type SwitchRowProps = {
  * across the row, the native switch at its end. The whole row is the target and one
  * accessible switch; the drawn switch is its glyph.
  */
-export function SwitchRow({ density = 'sheet', disabled = false, divider = false, label, value, onValueChange, testID }: SwitchRowProps) {
+export function SwitchRow({ density = 'sheet', disabled = false, divider = false, label, description, value, onValueChange, testID }: SwitchRowProps) {
   return (
     <Pressable
-      accessibilityLabel={label}
+      accessibilityLabel={description !== undefined ? `${label}, ${description}` : label}
       accessibilityRole="switch"
       accessibilityState={disabled ? { checked: value, disabled: true } : { checked: value }}
       {...(disabled ? { disabled: true } : {})}
@@ -39,9 +41,12 @@ export function SwitchRow({ density = 'sheet', disabled = false, divider = false
         pressed && !disabled ? styles.pressed : null,
       ]}
       testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[styles.label, density === 'list' ? uiText.option : null, disabled ? styles.labelDisabled : null]}>
-        {label}
-      </Text>
+      <View style={styles.text}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[density === 'list' ? uiText.option : uiText.optionLarge, disabled ? styles.labelDisabled : null]}>
+          {label}
+        </Text>
+        {description !== undefined ? <Text allowFontScaling={false} style={styles.description}>{description}</Text> : null}
+      </View>
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <Switch
           disabled={disabled}
@@ -80,10 +85,13 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
-  label: {
-    ...uiText.optionLarge,
+  text: {
     flex: 1,
     minWidth: 0,
+  },
+  description: {
+    ...uiText.body,
+    color: uiRoles.inkMuted,
   },
   labelDisabled: {
     color: uiRoles.inkMuted,

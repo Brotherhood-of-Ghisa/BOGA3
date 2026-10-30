@@ -107,3 +107,17 @@ distinct outcomes.
 Why: a finished competition has a durable outcome without weakening current privacy.
 Code: `apps/mobile/src/groups/cow-scoring.ts` classifies context availability.
 Code: automatic publication and immutable results in `supabase/migrations/20261030062725_group_cow_publication.sql`.
+
+
+### groups.cow-stream · presentation · accepted
+
+CoW scheduling, meaningful edits, cancellation, start, cutoff and final
+outcomes appear in the group Stream. Cutoff and final publication are separate:
+processing delay remains Finalizing, never an unavailable final. Events keep
+their challenge identity after cancellation/replacement. Final cards show each
+selected metric's original winner under current disclosure, without promotion.
+Only transitions captured after rollout appear; missing historical actions are
+never invented.
+
+Why: members can follow a challenge's lifecycle without confusing the end of submissions with a final result.
+Code: `supabase/migrations/20261030203502_group_cow_stream_events.sql`; `apps/mobile/src/groups/cow-stream-view-model.ts`.

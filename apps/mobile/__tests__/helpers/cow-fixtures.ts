@@ -1,5 +1,6 @@
 import type { CoWResultWire, CoWSummaryWire } from '@/src/groups/cow-wire';
 import { competitionExercise } from './competition-fixtures';
+import type { CoWStreamEvent, CoWStreamItemWire } from '@/src/groups/competition-wire';
 
 export const cowResult = (): CoWResultWire => ({
   cow: { cow_id: 'cow1', group_id: 'g1', group_exercise_id: 'ge1', week_start: '2026-10-26', time_zone: 'Europe/London',
@@ -13,6 +14,18 @@ export const cowResult = (): CoWResultWire => ({
 });
 export const cowSummary = (): CoWSummaryWire => ({ group_id: 'g1', week_start: '2026-10-26', calendar_revision: 1,
   observed_at_us: 1793404800000000, valid_until_us: 1793577600000000, selection: 'current', result: cowResult() });
+
+export function cowStreamItem(event: CoWStreamEvent = 'scheduled'): CoWStreamItemWire {
+  const result=cowResult();
+  const { state: _state, ...cow }=result.cow;
+  const definition={ ...cow,exercise_name: 'Bench press' };
+  result.cow.state=event === 'unavailable' ? 'unavailable' : 'final';
+  if (event === 'unavailable') { result.state='unavailable'; result.rankings.forEach(r => { r.entries=[]; }); }
+  return { kind: 'cow',key: '00000000000000000001',sort_at_ms: cow.ends_at_us / 1000,event,definition,
+    previous: event === 'updated' ? { ...definition,revision: 1,exercise_name: 'Squat',group_exercise_id: 'old' } : null,
+    actor: { user_id: 'u1',username: 'Me' },result: event === 'results' || event === 'unavailable' ? result : null,
+    ...(event === 'updated' ? { definition: { ...definition,revision: 2 } } : {}) };
+}
 
 
 /** Old group fixtures have no CoW and an explicit calendar; new feature tests override these reads. */

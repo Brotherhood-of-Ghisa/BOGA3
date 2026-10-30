@@ -9,8 +9,9 @@ import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
 // The form grammar (`ux-rules.md` "Forms"): every field of an edit page sits in
 // a `FormSection` — a micro-label naming the group over one card of rows — and
-// each row is a `ChoiceRow`, an `InputRow`, a `SwitchRow density="list"` or a
-// `FormActionRow`. Only a free-text name stands alone, as a `FormField`.
+// each row is a `ChoiceRow`, an `InputRow`, a `SwitchRow density="list"`, an
+// `ActionRow`, or one of `form-rows.tsx` (`SegmentRow`, `RadioRow`, `CheckRow`,
+// `ValueRow`). Only a free-text name stands alone, as a `FormField`.
 
 export type FormSectionProps = {
   title: string;
@@ -18,16 +19,23 @@ export type FormSectionProps = {
   // The section's one validation message, under its card in `danger`.
   error?: string | null;
   errorTestID?: string;
+  // A muted note under the card, above any error (`Applies next launch`).
+  footnote?: string;
   testID?: string;
 };
 
-export function FormSection({ title, children, error, errorTestID, testID }: FormSectionProps) {
+export function FormSection({ title, children, error, errorTestID, footnote, testID }: FormSectionProps) {
   return (
     <View style={styles.section} testID={testID}>
       <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
         {title}
       </Text>
       <Card style={error ? styles.cardInvalid : null}>{children}</Card>
+      {footnote ? (
+        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.muted]} testID={testID ? `${testID}-footnote` : undefined}>
+          {footnote}
+        </Text>
+      ) : null}
       <FormError message={error} testID={errorTestID} />
     </View>
   );
@@ -48,6 +56,8 @@ export type ChoiceRowProps = {
   // The current choice, muted at the row's end; `placeholder` (faint) until one is made.
   value?: string | null;
   placeholder?: string;
+  // A leading glyph naming the destination (a Settings home row), muted.
+  icon?: IconName;
   onPress: () => void;
   divider?: boolean;
   disabled?: boolean;
@@ -56,7 +66,7 @@ export type ChoiceRowProps = {
 };
 
 /** A field whose value is chosen elsewhere (a picker sheet, a page): label, value, chevron. */
-export function ChoiceRow({ label, value, placeholder, onPress, divider = false, disabled, accessibilityLabel, testID, ref }: ChoiceRowProps) {
+export function ChoiceRow({ label, value, placeholder, icon, onPress, divider = false, disabled, accessibilityLabel, testID, ref }: ChoiceRowProps) {
   const shown = value && value.length > 0 ? value : null;
   return (
     <ListRow
@@ -66,6 +76,7 @@ export function ChoiceRow({ label, value, placeholder, onPress, divider = false,
       disabled={disabled}
       divider={divider}
       label={label}
+      leading={icon ? <Icon color={disabled ? uiRoles.inkGhost : uiRoles.inkMuted} name={icon} size="md" /> : undefined}
       meta={
         <Text
           allowFontScaling={false}
@@ -127,9 +138,15 @@ export function InputRow({
   );
 }
 
-export type FormActionRowProps = {
+// `navigate`: leaves for another page, `accent` words and a chevron. `act`:
+// does something now, `accent` words, no chevron. `danger`: destroys, `danger`
+// words, no chevron; the caller confirms it in a native `Alert`.
+export type ActionRowKind = 'navigate' | 'act' | 'danger';
+
+export type ActionRowProps = {
   label: string;
-  icon: IconName;
+  kind?: ActionRowKind;
+  icon?: IconName;
   onPress: () => void;
   divider?: boolean;
   disabled?: boolean;
@@ -137,19 +154,19 @@ export type FormActionRowProps = {
   testID?: string;
 };
 
-/** A form's action that leaves for another page (Link to a group exercise): `accent` icon and words. */
-export function FormActionRow({ label, icon, onPress, divider = false, disabled, accessibilityLabel, testID }: FormActionRowProps) {
-  const colour = disabled ? uiRoles.inkGhost : uiRoles.accent;
+/** A form's action row: the kind says whether it leaves (chevron), acts now, or destroys. */
+export function ActionRow({ label, kind = 'navigate', icon, onPress, divider = false, disabled, accessibilityLabel, testID }: ActionRowProps) {
+  const colour = disabled ? uiRoles.inkGhost : kind === 'danger' ? uiRoles.danger : uiRoles.accent;
   return (
     <ListRow
       accessibilityLabel={accessibilityLabel ?? label}
       density="list"
       disabled={disabled}
       divider={divider}
-      leading={<Icon color={colour} name={icon} size="md" />}
+      leading={icon ? <Icon color={colour} name={icon} size="md" /> : undefined}
       onPress={onPress}
       testID={testID}
-      trailing={<Icon color={colour} name="chevron-right" size="sm" />}>
+      trailing={kind === 'navigate' ? <Icon color={colour} name="chevron-right" size="sm" /> : undefined}>
       <Text allowFontScaling={false} numberOfLines={1} style={[uiText.option, { color: colour }]}>
         {label}
       </Text>

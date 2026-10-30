@@ -80,7 +80,9 @@ the share trigger (same-event triggers fire in name order); card content,
 position (live `started_at`) and visibility are read live. Membership items
 commit with the period change (not isolated) at a fixed position: a writer that
 edits `joined_at` or reopens a period must move the item.
-`group_events_backfill()` idempotently inserts missing items.
+`group_events_backfill()` inserts missing session/membership items.
+CoW lifecycle uses a dedicated Stream family ([[groups.cow-stream]]); load
+[group-cow-contract.md](group-cow-contract.md) when changing its capture/readers.
 
 **Group exercises & shared library.** A comparison identity that members link
 their exercises to. Shares `ExerciseCore` with personal exercises; SQL trims with
@@ -259,11 +261,10 @@ ids changed, else the All attribution. Reads count a Certified entry only
 while its certification is active and pinned, so withdraw and cancel apply at
 once.
 
-**Known limits.** Silent recomputes move #1 without history. Link attribution
-compares two device clocks. A retracted provisional lead change rolls back only
-if it was the latest. A frozen target promotes nothing until a catch-up. A
-withdraw racing a void can deadlock; Postgres aborts one side and the state
-converges.
+**Known limits.** Silent recomputes have no history. Link attribution compares
+device clocks. Only the latest provisional lead change rolls back. Frozen
+targets await catch-up. Racing withdraw/void can deadlock; one aborts, then
+state converges.
 
 ## Certification
 

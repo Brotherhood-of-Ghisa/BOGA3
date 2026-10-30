@@ -97,6 +97,7 @@ run_cow_publication_cases() {
   run_cow_previous_summary_cases "${g}" "${c}"
   run_cow_worker_cases "${g}" "${c}" "${secret}"
   run_cow_priority_privacy_cases "${g}" "${c}" "${secret}"
+  run_cow_stream_final_cases "${g}" "${c}" "${secret}"
   pass 'CoW elected %BW units, normalized improvement, automatic finalization, frozen results and authorization'
 }
 

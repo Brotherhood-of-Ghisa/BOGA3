@@ -328,6 +328,24 @@ appId: com.dinoderek.mobile
 - assertVisible: { id: "groups-tab-cows", selected: true }
 - takeScreenshot: "groups-cows-tab"
 
+# Native-stack proof: Jest cannot prove Back returns to the same group's
+# Stream after a lifecycle card has opened a challenge through a live RPC read.
+- tapOn: { id: "groups-tab-stream" }
+- extendedWaitUntil:
+    visible: { id: "cow-stream-.*" }
+    timeout: 15000
+- takeScreenshot: "cow-stream-scheduled"
+- tapOn: { id: "cow-stream-.*" }
+- extendedWaitUntil:
+    visible: { id: "cow-standings" }
+    timeout: 15000
+- assertVisible: "Upcoming"
+- takeScreenshot: "cow-stream-exact-challenge"
+- tapOn: { id: "BackButton" }
+- extendedWaitUntil:
+    visible: { id: "groups-stream-list" }
+    timeout: 10000
+
 # --- 5. Active session -> one "Training now" card with its metrics ---------------
 - runScript:
     file: ../scripts/groups-counterparty.js

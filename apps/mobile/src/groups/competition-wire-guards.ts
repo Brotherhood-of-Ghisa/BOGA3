@@ -3,7 +3,7 @@ import { isNormalizedSetMetrics } from './competition-set-display.ts';
 // Closed protocol-4 schemas prevent cache/history fields from smuggling kg/B.
 import { isCompetitionMetric, isCompetitionValue, validateCompetitionRules } from './competition-contract.ts';
 import type { CompetitionBoardWire, CompetitionPerformanceWire,
-  CompetitionRulesWire, CompetitionCertificationWire } from './competition-wire.ts';
+  CompetitionRulesWire, CompetitionCertificationWire, CompetitionExerciseWire } from './competition-wire.ts';
 
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -61,4 +61,11 @@ export function isCompetitionBoardWire(value: unknown): value is CompetitionBoar
   const normalized = board.rules.bodyweight_calculations_enabled && board.rules.bodyweight_contribution > 0;
   if (board.state === 'rebuilding') return board.entries.length === 0 && board.entry_count === 0 && board.me === null && board.next_cursor === null;
   return board.entries.every(entry => row(entry, board, normalized)) && (board.me === null || row(board.me, board, normalized));
+}
+
+export function isCompetitionExerciseWire(v: unknown): v is CompetitionExerciseWire {
+  return exact(v,['group_exercise_id','name','source_exercise_id','archived_at_ms','rules','published_revision','rebuilding']) &&
+    id(v.group_exercise_id) && id(v.name) && nullableString(v.source_exercise_id) && (v.archived_at_ms === null || integer(v.archived_at_ms)) &&
+    isCompetitionRulesWire(v.rules) && (v.published_revision === null || (integer(v.published_revision) && v.published_revision > 0) && v.published_revision <= v.rules.rules_revision) &&
+    typeof v.rebuilding === 'boolean' && v.rebuilding === (v.archived_at_ms === null && v.published_revision !== v.rules.rules_revision);
 }

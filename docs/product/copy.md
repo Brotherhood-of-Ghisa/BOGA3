@@ -17,8 +17,9 @@ Screens show data and controls: no explanatory footnotes, formulas, hints,
 tutorials or rule provenance (`Rules N · …`).
 
 - **Test:** replace explanations with clearer labels/design.
-- **Exceptions:** an error line with its action; an empty state's one line,
-  never a tutorial; a destructive alert naming what goes (`its N sets`); the
+- **Exceptions:** a Settings section's one-line footnote stating when a change
+  applies or its status (`Applies next launch`); an error line with its
+  action; an empty state's one line, never a tutorial; a destructive alert naming what goes (`its N sets`); the
   agent-consent page's grant; the explicitly opened RM curve explainer.
 - **Incomplete figures:** plain `Volume`, even when excluding uncalculable
   loads or kg a group cannot see.

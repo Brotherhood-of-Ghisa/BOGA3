@@ -8,7 +8,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet, Text, type TextStyle } from 'react-native';
 
 import { ActionButton, ChipGroup, FormField, ListRow, Notice, PageHeader, SearchField, SectionHeader, SegmentedControl, Sheet, Stat, StatePanel, SwitchRow, Tag, ToggleChip } from '@/components/ui';
-import { FormActionRow, InputRow } from '@/components/ui/form-section';
+import { ActionRow, InputRow } from '@/components/ui/form-section';
 import { Information } from '@/components/ui/information';
 import { PageSheetHeader } from '@/components/ui/page-sheet';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
@@ -62,7 +62,7 @@ describe('option rows', () => {
       <ListRow density="list" description="Search, create, edit." label="List row" />
       <SwitchRow label="Sheet switch" onValueChange={jest.fn()} value />
       <SwitchRow density="list" label="List switch" onValueChange={jest.fn()} value />
-      <FormActionRow icon="link" label="Link exercise" onPress={jest.fn()} />
+      <ActionRow icon="link" label="Link exercise" onPress={jest.fn()} />
     </>);
     expect(style(screen.getByText('Sheet row'))).toMatchObject(uiText.optionLarge);
     expect(style(screen.getByText('Sheet switch'))).toMatchObject(uiText.optionLarge);

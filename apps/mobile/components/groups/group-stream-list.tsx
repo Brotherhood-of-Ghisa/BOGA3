@@ -11,6 +11,7 @@ import { groupScreenStyles } from './screen-styles';
 import { GroupStreamMembershipItem } from './stream-membership-item';
 import { GroupStreamSessionCard } from './stream-session-card';
 import { StreamSharedExerciseCard } from './stream-shared-exercise-card';
+import { CoWStreamCard } from './cow-stream-card';
 
 type Props = {
   stream: GroupStreamState; userId: string; roleForGroup: (groupId: string) => GroupRole | null;
@@ -33,6 +34,7 @@ export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChan
   const models = useMemo(() => buildCompetitionStreamModels(stream.items,hiddenEventKinds,dateFormat),[stream.items,hiddenEventKinds,dateFormat]);
   const refresh = async () => { await stream.refresh(); onCertificationChanged(); };
   const renderItem = ({ item }: { item: CompetitionStreamModel }) => {
+    if (item.kind === 'cow') return <CoWStreamCard item={item} userId={userId} />;
     if (item.kind === 'session') return <GroupStreamSessionCard card={item} onPress={onPressSession}
       onPressRecord={setSelectedKey} showGroupNames={showGroupNames} />;
     if (item.kind === 'membership') return <GroupStreamMembershipItem item={item} onPress={onPressMembership} showGroupName={showGroupNames} />;

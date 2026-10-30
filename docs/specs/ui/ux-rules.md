@@ -105,16 +105,15 @@ Decided 2026-10-27.
 
 ## Forms
 
-Decided 2026-10-27. The primitives are `components/ui/form-section.tsx`.
+Decided 2026-10-27. The primitives are `components/ui/form-section.tsx` and `form-rows.tsx`.
 
 1. **Fields live in sections:** a `FormSection` micro-label over one card of
    rows. The heading names the group, never one field. Only a free-text name
    or title stands alone, at the top, as a `FormField`.
-2. **Four row kinds:** a `FormField` (free text), a `ChoiceRow` (label,
+2. **Row kinds:** a `FormField` (free text), a `ChoiceRow` (label,
    value, chevron; opens a picker), a `SwitchRow density="list"` or an
-   `InputRow` (a short figure), and a `FormActionRow` (an `accent` action
-   that leaves for another page). No hand-made field frame, no copied
-   micro-label style.
+   `InputRow` (a short figure), and an `ActionRow`. No hand-made field frame,
+   no copied micro-label style.
 3. **Group by what a setting affects, order by use.** Name, then
    relationships used most (an exercise's Groups), required fields, what
    changes the figures (Weight), behaviour (Options); destructive actions
@@ -126,6 +125,19 @@ Decided 2026-10-27. The primitives are `components/ui/form-section.tsx`.
    `Save` when editing and `Add <thing>` when creating; there is no Cancel.
 6. **One error style:** under its field (`FormField`) or section
    (`FormSection error`).
+
+### Settings pages
+
+Decided 2026-10-30. A `footnote` states only when a change applies or its
+status ([[copy.no-inline-explanation]]). Every destination is a pushed page of `FormSection`s
+(optional muted `footnote`), built only from `SwitchRow`, `SegmentRow` (≤3
+options), `RadioRow` (one of many), `CheckRow` (several), `InputRow` (blank =
+default), `FormField`, `ValueRow` (read-only), `ChoiceRow` and `ActionRow`.
+Four buttons: **rows** (chevron = a page; `accent` words = acts now; `danger`
+words = destroys, confirmed by an `Alert`), **primary** (≤1 per page, only to
+create or commit what is not saved instantly), **text** (only in a `Notice`:
+Retry), **icon** (headers). No outline. Changes save instantly; an action's failure is
+a `Notice` beside it, but preference-storage errors stay on Data & sync.
 
 ## Lists and rows
 

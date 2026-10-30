@@ -1,3 +1,4 @@
+import type { CoWMetric } from './cow-scoring.ts';
 import type { LoadInputMode } from '../exercise-core/index.ts';
 import type { CompetitionMetric, CompetitionValue } from './competition-contract.ts';
 import type { GroupMemberRef } from './types.ts';
@@ -182,7 +183,8 @@ export type CompetitionStreamItemWire =
   | { kind: 'session'; key: string; sort_at_ms: number; groups: { group_id: string; name: string }[]; session: CompetitionSessionWire }
   | { kind: 'membership'; key: string; sort_at_ms: number; event: 'joined' | 'left' | 'removed';
       group: { group_id: string; name: string }; member: GroupMemberRef }
-  | CompetitionStreamSharedExerciseWire;
+  | CompetitionStreamSharedExerciseWire
+  | CoWStreamItemWire;
 export type CompetitionStreamWire = { contract_version: 4; items: CompetitionStreamItemWire[]; next_cursor: string | null; has_more: boolean };
 /** At a glance: every current member's working sets and group records per requested window, in request order. */
 export type CompetitionPeriodTotalsWire = {
@@ -196,4 +198,33 @@ export type CompetitionWeekSummaryWire = {
     working_sets: number; exercise_count: number }[];
   latest_completed: null | { member: GroupMemberRef; session_id: string; started_at_ms: number; completed_at_ms: number | null;
     duration_sec: number | null; gym_name: string | null; working_sets: number; exercise_count: number; group_records: CompetitionEventWire[] };
+};
+
+export type CoWCalendarWire = { time_zone: string | null; revision: number; next_week_start: string | null };
+export type CoWDefinitionWire = {
+  cow_id: string; group_id: string; group_exercise_id: string;
+  week_start: string; time_zone: string; starts_at_us: number; ends_at_us: number;
+  metrics: CoWMetric[]; revision: number;
+  state: 'scheduled' | 'active' | 'finalizing' | 'final' | 'unavailable' | 'cancelled';
+};
+export type CoWWriteWire = { cow: CoWDefinitionWire };
+export type CoWListWire = { cows: CoWDefinitionWire[]; next_cursor: string | null };
+
+export type CoWRowWire = { rank: number | null; member: GroupMemberRef; former: boolean;
+  value: number | null; state: 'ranked' | 'unranked' | 'unavailable' };
+export type CoWRankingWire = { metric: CoWMetric; unit: CompetitionValue['unit'] | 'percent' | null;
+  entries: CoWRowWire[]; entry_count: number; next_cursor: string | null };
+export type CoWResultWire = { cow: CoWDefinitionWire; exercise: CompetitionExerciseWire | null;
+  bodyweight_calculations_enabled: boolean; state: 'pending' | 'ready' | 'unavailable';
+  normalized: boolean | null; publication_id: string | null; rankings: CoWRankingWire[] };
+export type CoWSummaryWire = { group_id: string; week_start: string | null; calendar_revision: number;
+  observed_at_us: number; valid_until_us: number; selection: 'current' | 'previous_final' | 'previous' | 'none'; result: CoWResultWire | null };
+
+
+export type CoWStreamDefinitionWire = Omit<CoWDefinitionWire, 'state'> & { exercise_name: string };
+export type CoWStreamEvent = 'scheduled' | 'updated' | 'cancelled' | 'started' | 'ended' | 'results' | 'unavailable';
+export type CoWStreamItemWire = {
+  kind: 'cow'; key: string; sort_at_ms: number; event: CoWStreamEvent;
+  definition: CoWStreamDefinitionWire; previous: CoWStreamDefinitionWire | null;
+  actor: GroupMemberRef | null; result: CoWResultWire | null;
 };
