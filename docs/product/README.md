@@ -1,9 +1,8 @@
 # Product facts
 
-Load a subject file when your task matches its trigger or a doc cites one of
-its facts (`[[set.eligibility]]` → `set.md`). `./boga docs facts` lists IDs. An
-`open` fact is undecided: decide it if needed. Writing a fact: load
-`docs/procedures/product-facts-authoring.md`.
+Load a file when a task matches its trigger or cites a fact
+(`[[set.eligibility]]` → `set.md`). `./boga docs facts` lists IDs. Decide `open`
+facts as needed. Authoring: load `docs/procedures/product-facts-authoring.md`.
 
 | File | Load when your task touches |
 | --- | --- |
