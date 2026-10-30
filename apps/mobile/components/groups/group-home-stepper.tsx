@@ -5,10 +5,9 @@ import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import type { GroupHomePeriod } from '@/src/groups/home-periods';
 
-import type { GroupHomePeriodLabel } from './group-home-labels';
-
 export type GroupHomeStepperProps = {
-  label: GroupHomePeriodLabel;
+  /** The week: `This week`, `Last week`, or its dates. */
+  label: string;
   period: GroupHomePeriod;
   /** Steps one period back; there is always an earlier one. */
   onEarlier: () => void;
@@ -18,9 +17,9 @@ export type GroupHomeStepperProps = {
 };
 
 /**
- * The period stepper: which week the cards below are reading. Which
- * metric, and the weekly step, are the screen's filter
- * bar; this only walks backwards and forwards through them.
+ * The period stepper, one line beside the metric: the week the cards below
+ * are reading, between the chevrons that walk backwards and
+ * forwards through the weeks.
  */
 export function GroupHomeStepper({ label, onEarlier, onLater, canGoLater }: GroupHomeStepperProps) {
   const noun = 'week';
@@ -33,14 +32,15 @@ export function GroupHomeStepper({ label, onEarlier, onLater, canGoLater }: Grou
         testID="group-home-period-earlier"
         tone="muted"
       />
-      <View style={styles.stepperLabel}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title} testID="group-home-period-title">
-          {label.title}
-        </Text>
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]} testID="group-home-period-detail">
-          {label.detail}
-        </Text>
-      </View>
+      <Text
+        adjustsFontSizeToFit
+        allowFontScaling={false}
+        minimumFontScale={0.8}
+        numberOfLines={1}
+        style={[uiText.label, uiTextTone.ink, styles.stepperLabel]}
+        testID="group-home-period-title">
+        {label}
+      </Text>
       <IconButton
         accessibilityLabel={`Next ${noun}`}
         disabled={!canGoLater}
@@ -57,14 +57,11 @@ const styles = StyleSheet.create({
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: uiSpace.sm,
-    // The chevrons sit on the card's edges, their tap targets paying no inset.
-    marginHorizontal: -uiSpace.sm,
+    gap: uiSpace.xs,
   },
   stepperLabel: {
     flex: 1,
     minWidth: 0,
-    alignItems: 'center',
-    gap: uiSpace.xs,
+    textAlign: 'center',
   },
 });

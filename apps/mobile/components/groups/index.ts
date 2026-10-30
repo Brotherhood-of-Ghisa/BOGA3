@@ -11,7 +11,7 @@ export { GroupExercisesPage } from './group-exercises-page';
 export { GroupFilterChips } from './group-filter-chips';
 export { GroupHeaderCard } from './group-header-card';
 export { GroupGlancePage, type GroupGlancePageProps } from './group-glance-page';
-export { GroupScreenHeader, GROUP_SECTION_LABELS, type GroupsSection } from './group-screen-header';
+export { GroupScreenHeader, GROUP_SECTIONS, GROUP_SECTION_LABELS, type GroupsSection } from './group-screen-header';
 export { GroupStreamEventsSheet } from './stream-events-sheet';
 export { GroupSwitchSheet, type GroupSwitchOption } from './group-switch-sheet';
 export { GroupLeaderboardsPage, GroupPodiumCard } from './group-leaderboards-page';

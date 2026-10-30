@@ -43,6 +43,9 @@ jest.mock('expo-router', () => ({
     typeof options?.headerRight === 'function' ? options.headerRight({}) : null) },
 }));
 
+let mockDevMode = false;
+jest.mock('@/src/utils/isDevMode', () => ({ isDevMode: () => mockDevMode }));
+
 const mockUseAuth = jest.fn();
 jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 
@@ -83,7 +86,7 @@ import * as groupsApi from '@/src/groups/api';
 import * as notificationApi from '@/src/notifications/api';
 import type { CompetitionPeriodWindow } from '@/src/groups/api';
 import type { CompetitionPeriodTotalsWire } from '@/src/groups/competition-wire';
-import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
+import { coWsHref, SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { resolveMainTab } from '@/src/navigation/main-tabs';
 
 import GroupsTabRoute from '../app/groups';
@@ -261,16 +264,18 @@ const pullToRefresh = async (testID: string) => {
 
 const cardID = (key: string) => `group-stream-session-card-${key}`;
 
-// The screen opens At a glance; the section pill names the view and cycles
-// At a glance -> Stream -> Leaderboards.
-const sectionLabel = () => String(screen.getByTestId('groups-filter-section').props.accessibilityLabel);
+// The screen opens At a glance, the middle of three pages; a tab names each
+// page and moves to it.
+const SECTION_TABS: Record<string, string> = { Stream: 'stream', 'At a glance': 'glance', Leaderboards: 'leaderboards' };
+const sectionLabel = () =>
+  Object.keys(SECTION_TABS).find(
+    (label) => screen.getByTestId(`groups-tab-${SECTION_TABS[label]}`).props.accessibilityState?.selected,
+  ) ?? '';
 const goToSection = (label: string) => {
-  for (let step = 0; step < 3 && !sectionLabel().includes(label); step += 1) {
-    fireEvent.press(screen.getByTestId('groups-filter-section'));
-  }
+  fireEvent.press(screen.getByTestId(`groups-tab-${SECTION_TABS[label]}`));
 };
 const openStream = async () => {
-  await screen.findByTestId('groups-filters');
+  await screen.findByTestId('groups-tab-glance');
   goToSection('Stream');
   await screen.findByTestId('groups-stream-list');
 };
@@ -294,7 +299,7 @@ beforeEach(() => {
   api.getCompetitionSession.mockResolvedValue(sessionDetail());
   api.getCompetitionSessionRecords.mockResolvedValue({ ...sessionRecords(), records: [] });
   api.listCompetitionExercises.mockResolvedValue({ contract_version: 4, exercises: [] } as unknown as Awaited<ReturnType<typeof api.listCompetitionExercises>>);
-  api.getCompetitionPodiums.mockResolvedValue({ contract_version: 4,certified: true,podiums: [] });
+  api.getCompetitionPodiums.mockResolvedValue({ contract_version: 4,certified: false,podiums: [] });
 });
 
 afterEach(() => {
@@ -334,7 +339,7 @@ describe('Groups tab', () => {
     expect(await screen.findByTestId('groups-empty-state')).toBeTruthy();
     expect(screen.getByText('No groups yet')).toBeTruthy();
     // Nothing to filter and nowhere to be: the title stands alone.
-    expect(screen.queryByTestId('groups-filters')).toBeNull();
+    expect(screen.queryByTestId('groups-tab-glance')).toBeNull();
     // No group selected: the stream reads nothing (there is no all-groups stream).
     expect(api.getCompetitionStream).not.toHaveBeenCalled();
   });
@@ -342,7 +347,7 @@ describe('Groups tab', () => {
   it('with a single group the title names it and does not switch', async () => {
     api.listMyGroups.mockResolvedValue({ groups: [GROUP_A] });
     render(<GroupsTabRoute />);
-    expect(await screen.findByTestId('groups-filters')).toBeTruthy();
+    expect(await screen.findByTestId('groups-tab-glance')).toBeTruthy();
     await waitFor(() => expect(api.getCompetitionStream).toHaveBeenCalledWith('group-a'));
     expect(shownGroupName()).toHaveTextContent('Garage Gym');
     fireEvent.press(screen.getByTestId('groups-title'));
@@ -387,7 +392,7 @@ describe('Groups tab', () => {
     // Already on this group: membership items do not navigate.
     fireEvent.press(screen.getByTestId('group-stream-membership-m-1:joined'));
     expect(mockPush).toHaveBeenCalledTimes(1);
-    fireEvent.press(screen.getByTestId('groups-my-groups-button'));
+    fireEvent.press(screen.getByTestId('groups-manage-button'));
     expect(mockPush).toHaveBeenLastCalledWith('/group/mine');
   });
 
@@ -407,6 +412,42 @@ describe('Groups tab', () => {
     expect(api.getCompetitionStream).toHaveBeenCalledWith('group-b');
   });
 
+  it('puts the dev-only event-type menu in the title bar, on the Stream alone', async () => {
+    mockDevMode = true;
+    try {
+      render(<GroupsTabRoute />);
+      await screen.findByTestId('groups-tab-glance');
+      expect(screen.queryByTestId('groups-stream-events-button')).toBeNull();
+      await openStream();
+      fireEvent.press(screen.getByTestId('groups-stream-events-button'));
+      expect(await screen.findByTestId('groups-stream-events-sheet')).toBeTruthy();
+    } finally {
+      mockDevMode = false;
+    }
+  });
+
+  it("draws each page's own read state: a failed Stream shows its error while At a glance is in view", async () => {
+    api.getCompetitionStream.mockRejectedValue(new GroupApiError('INTERNAL', 'stream failed'));
+    render(<GroupsTabRoute />);
+    expect(await screen.findByTestId('group-home-board')).toBeTruthy();
+    expect(await within(screen.getByTestId('groups-stream-list')).findByTestId('groups-stream-error-state')).toBeTruthy();
+    expect(screen.queryByTestId('group-glance-error-state')).toBeNull();
+  });
+
+  it('keeps the CoWs link above every page, opening the group\'s challenges', async () => {
+    render(<GroupsTabRoute />);
+    await screen.findByTestId('groups-tab-glance');
+    expect(within(screen.getByTestId('groups-screen-pager')).queryByTestId('groups-cows-link')).toBeNull();
+    fireEvent.press(await screen.findByTestId('groups-cows-link'));
+    expect(mockPush).toHaveBeenLastCalledWith(coWsHref('group-a'));
+  });
+
+  it('draws no event-type menu outside dev mode', async () => {
+    render(<GroupsTabRoute />);
+    await openStream();
+    expect(screen.queryByTestId('groups-stream-events-button')).toBeNull();
+  });
+
   it('opens on the group named by ?groupId=', async () => {
     mockParams = { groupId: 'group-b' };
     api.getCompetitionStream.mockImplementation(async (groupId) =>
@@ -423,7 +464,7 @@ describe('Groups tab', () => {
       groupId === 'group-b' ? page([liveItem]) : page([completedItem()]),
     );
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-filters');
+    await screen.findByTestId('groups-tab-glance');
     goToSection('Leaderboards');
     expect(await screen.findByTestId('group-leaderboards-empty')).toBeTruthy();
 
@@ -470,12 +511,12 @@ describe('Groups tab', () => {
 
   it("switches to the selected group's leaderboards", async () => {
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-filters');
+    await screen.findByTestId('groups-tab-glance');
     expect(api.getCompetitionPodiums).not.toHaveBeenCalled();
 
     goToSection('Leaderboards');
     expect(await screen.findByTestId('group-leaderboards-empty')).toBeTruthy();
-    expect(api.getCompetitionPodiums).toHaveBeenCalledWith('group-a');
+    expect(api.getCompetitionPodiums).toHaveBeenCalledWith('group-a', false);
   });
 
   it('pull-to-refresh refetches My groups and the stream', async () => {
@@ -543,7 +584,7 @@ describe('Groups tab', () => {
 
   it('opens At a glance with its metric control and weekly stepper', async () => {
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-filters');
+    await screen.findByTestId('groups-tab-glance');
 
     expect(sectionLabel()).toContain('At a glance');
     expect(await screen.findByTestId('group-home-board')).toBeTruthy();
@@ -558,10 +599,9 @@ describe('Groups tab', () => {
     fireEvent.press(screen.getByTestId('groups-filter-metric'));
     expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
 
-    // The metric and period pills belong to At a glance alone; the section pill stays.
-    goToSection('Stream');
-    expect(screen.queryByTestId('groups-filter-metric')).toBeNull();
-    expect(screen.getByTestId('groups-filter-section')).toBeTruthy();
+    // The metric belongs to At a glance alone: the other pages draw none.
+    expect(within(screen.getByTestId('groups-stream-list')).queryByTestId('groups-filter-metric')).toBeNull();
+    expect(within(screen.getByTestId('groups-leaderboards-scroll')).queryByTestId('groups-filter-metric')).toBeNull();
   });
 
   it('reads At a glance from the selected group: six windows, the newest the current week', async () => {
@@ -580,18 +620,22 @@ describe('Groups tab', () => {
     // The server's figures, ranked here; my own row reads as You.
     expect(screen.getByTestId('group-home-board-row-friend-1-value')).toHaveTextContent('12');
     expect(within(screen.getByTestId(`group-home-board-row-${USER_ID}`)).getByText('You')).toBeTruthy();
-    expect(within(screen.getByTestId('group-rank-table')).getByText('alex')).toBeTruthy();
+    expect(within(screen.getByTestId('group-home-board')).getByText('alex')).toBeTruthy();
     expect(cached(groupCacheKeys.glance('group-a', 'week', 0))?.payload).toEqual(periodTotals('group-a', windows));
 
-    // A step back is its own read: the same six-window span, one week earlier.
-    // Until it lands this week's figures stay in place, held: no loading state.
+    // The selection stays fourth in the chart, so the first two steps back move
+    // only the selection: no new read.
+    fireEvent.press(screen.getByTestId('group-home-period-earlier'));
+    fireEvent.press(screen.getByTestId('group-home-period-earlier'));
+    expect(api.getCompetitionPeriodTotals).toHaveBeenCalledTimes(1);
+    // The third moves the chart: its own read, the same six-window span one week earlier.
+    // Until it lands the figures in view stay in place, held: no loading state.
     const earlierRead = deferred<CompetitionPeriodTotalsWire>();
     api.getCompetitionPeriodTotals.mockReturnValueOnce(earlierRead.promise);
     fireEvent.press(screen.getByTestId('group-home-period-earlier'));
     await waitFor(() => expect(api.getCompetitionPeriodTotals).toHaveBeenCalledTimes(2));
     const [, earlier] = api.getCompetitionPeriodTotals.mock.calls[1]!;
     expect(earlier[5]).toEqual(windows[4]);
-    expect(screen.getByTestId('group-home-period-title')).toHaveTextContent('Last week');
     expect(screen.queryByTestId('group-glance-loading')).toBeNull();
     expect(screen.getByTestId('group-glance-figures').props.accessibilityState).toEqual({ busy: true });
     expect(screen.getByTestId('group-home-board-row-friend-1-value')).toHaveTextContent('12');
@@ -600,7 +644,7 @@ describe('Groups tab', () => {
     await waitFor(() => {
       if (screen.getByTestId('group-glance-figures').props.accessibilityState.busy) throw new Error('still held');
     });
-    expect(screen.getByTestId('group-home-period-title')).toHaveTextContent('Last week');
+    expect(screen.getByTestId('group-home-period-later')).not.toBeDisabled();
   });
 
   it('never shows a cached At a glance read for other windows, and reads the current ones at once', async () => {
@@ -610,7 +654,7 @@ describe('Groups tab', () => {
     const read = deferred<CompetitionPeriodTotalsWire>();
     api.getCompetitionPeriodTotals.mockReturnValue(read.promise);
     render(<GroupsTabRoute />);
-    await screen.findByTestId('groups-filters');
+    await screen.findByTestId('groups-tab-glance');
 
     expect(await screen.findByTestId('group-glance-loading')).toBeTruthy();
     expect(screen.queryByTestId('group-home-board')).toBeNull();

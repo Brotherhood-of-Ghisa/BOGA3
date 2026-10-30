@@ -13,6 +13,7 @@ import {
   type PodiumCardViewModel,
 } from '@/src/groups';
 
+import { GroupCycleButton } from './group-cycle-button';
 import { GroupMissingDataState, GroupStateView } from './group-state-view';
 import { scoreStyle } from './score-style';
 
@@ -26,16 +27,26 @@ type GroupLeaderboardsPageProps = {
   onRetry: () => void;
 };
 
+/** How the podium cards are ordered: by exercise name, or newest podium set first. */
+export type PodiumOrder = 'name' | 'recent';
+
+const ORDER_OPTIONS = [
+  { value: 'name' as const, label: 'Name' },
+  { value: 'recent' as const, label: 'Recent' },
+];
+
 /**
- * The group page's Leaderboards segment (product E1.1, P8, D11): one podium
- * card per group exercise on Certified · 1RM, archived exercises last, under a
- * search box that narrows them by exercise name. A card opens its full board.
+ * The Groups screen's Leaderboards page (product E1.1, P8, D11): one podium
+ * card per group exercise on All · its default metric, under a search box
+ * that narrows them by exercise name and a pill that orders them by name or
+ * by most recent record. A card opens its full board.
  */
 export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error, onRetry }: GroupLeaderboardsPageProps) {
   const dateFormat = useDateFormat();
   const router = useRouter();
   const cards = useMemo(() => (boards.data ? buildGroupMetricPodiums(boards.data, userId, dateFormat) : null), [boards.data, userId, dateFormat]);
   const [query, setQuery] = useState('');
+  const [order, setOrder] = useState<PodiumOrder>('name');
 
   if (!cards) {
     return <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-leaderboards" />;
@@ -49,16 +60,28 @@ export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error,
       />
     );
   }
-  const shown = filterPodiumCards(cards, query);
+  const shown = sortPodiumCards(filterPodiumCards(cards, query), order);
   return (
     <View style={styles.list} testID="group-leaderboards-page">
-      <SearchField
-        accessibilityLabel="Search leaderboards"
-        onChangeText={setQuery}
-        placeholder="Search exercises"
-        testID="group-leaderboards-search"
-        value={query}
-      />
+      <View style={styles.controls}>
+        <View style={styles.search}>
+          <SearchField
+            accessibilityLabel="Search leaderboards"
+            onChangeText={setQuery}
+            placeholder="Search exercises"
+            testID="group-leaderboards-search"
+            value={query}
+          />
+        </View>
+        <GroupCycleButton
+          accessibilityLabel="Order"
+          onChange={setOrder}
+          options={ORDER_OPTIONS}
+          style={styles.order}
+          testID="group-leaderboards-order"
+          value={order}
+        />
+      </View>
       {shown.length === 0 ? (
         <GroupStateView testID="group-leaderboards-no-match" title="No exercises match" />
       ) : null}
@@ -77,6 +100,21 @@ export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error,
 export function filterPodiumCards<T extends { name: string }>(cards: readonly T[], query: string): T[] {
   const needle = query.trim().toLocaleLowerCase();
   return needle ? cards.filter((card) => card.name.toLocaleLowerCase().includes(needle)) : [...cards];
+}
+
+/**
+ * The cards in `order`, archived exercises last either way: by name, ignoring
+ * case; or the newest podium set first, empty podiums last, ties by name.
+ */
+export function sortPodiumCards<T extends { name: string; archived: boolean; latestRecordAtMs: number | null }>(
+  cards: readonly T[],
+  order: PodiumOrder,
+): T[] {
+  const byName = (left: T, right: T) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+  const byRecent = (left: T, right: T) =>
+    (right.latestRecordAtMs ?? -Infinity) - (left.latestRecordAtMs ?? -Infinity) || byName(left, right);
+  const within = order === 'name' ? byName : byRecent;
+  return [...cards].sort((left, right) => Number(left.archived) - Number(right.archived) || within(left, right));
 }
 
 /**
@@ -139,6 +177,19 @@ export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; 
 const styles = StyleSheet.create({
   list: {
     gap: uiSpace.md,
+  },
+  controls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+  },
+  search: {
+    flex: 1,
+    minWidth: 0,
+  },
+  order: {
+    flex: 0,
+    minWidth: 88,
   },
   card: {
     paddingHorizontal: uiSpace.md,

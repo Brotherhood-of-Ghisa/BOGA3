@@ -1,14 +1,24 @@
 /**
- * The Groups screen's heading: the group name as the one-line title (the
- * `title` role at any length, clipped when too long), the picker behind it, and the
- * filter row. The screen's own behaviour is groups-screens.test.tsx.
+ * The Groups screen's native header: the group name as the one-line title
+ * (the sheet-title role, shrinking before it clips), the group switch behind
+ * it, and `Manage` on the right. The screen's own behaviour is
+ * groups-screens.test.tsx.
  */
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet, type TextStyle } from 'react-native';
+import * as mockReact from 'react';
+import { StyleSheet, Text, type TextStyle } from 'react-native';
 
-import { uiFonts, uiTypography } from '@/components/ui/tokens';
+import { uiText } from '@/components/ui/text-roles';
 
 import { GroupScreenHeader } from '@/components/groups/group-screen-header';
+
+jest.mock('expo-router', () => ({
+  // The header's custom title and right action render inline, so a test can read them.
+  Stack: {
+    Screen: ({ options }: { options: { headerTitle?: () => mockReact.ReactNode; headerRight?: () => mockReact.ReactNode } }) =>
+      mockReact.createElement(mockReact.Fragment, null, options.headerTitle?.(), options.headerRight?.()),
+  },
+}));
 
 const GROUPS = [
   { groupId: 'g1', name: 'Garage Gym' },
@@ -20,57 +30,76 @@ const renderHeader = (overrides: Partial<Parameters<typeof GroupScreenHeader>[0]
     <GroupScreenHeader
       groupName="Garage Gym"
       groups={GROUPS}
-      metric="sets"
-      onMetricChange={jest.fn()}
-      onOpenMyGroups={jest.fn()}
-      onSectionChange={jest.fn()}
+      onOpenManage={jest.fn()}
       onSelectGroup={jest.fn()}
-      section="glance"
       selectedGroupId="g1"
       {...overrides}
     />,
   );
 
 const titleStyle = (): TextStyle => StyleSheet.flatten(screen.getByTestId('groups-title-name').props.style) as TextStyle;
-const TITLE = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg, lineHeight: uiTypography.lineHeight.lg };
 
-describe('the Groups heading', () => {
-  it('keeps the title on one line, in the title role whatever the name\'s length', () => {
-    renderHeader();
-    expect(screen.getByTestId('groups-title-name').props.numberOfLines).toBe(1);
-    expect(screen.getByTestId('groups-title-name').props.ellipsizeMode).toBe('tail');
-    expect(titleStyle()).toMatchObject(TITLE);
-
-    screen.unmount();
+describe('the Groups header', () => {
+  it('keeps the title on one line in the sheet-title role, shrinking a long name before it clips', () => {
     renderHeader({ groupName: 'The Brotherhood of the Iron Ghisa' });
-    expect(titleStyle()).toMatchObject(TITLE);
+    const name = screen.getByTestId('groups-title-name');
+    expect(name).toHaveTextContent('The Brotherhood of the Iron Ghisa');
+    expect(name.props.numberOfLines).toBe(1);
+    expect(name.props.adjustsFontSizeToFit).toBe(true);
+    expect(titleStyle()).toMatchObject(StyleSheet.flatten(uiText.sheetTitle) ?? {});
     // A title says where you are on its own: no line under it.
     expect(screen.queryByTestId('groups-subtitle')).toBeNull();
   });
 
-  it('opens the picker from the title, and leaves a single group unpressable', () => {
+  it('opens the switch from the title, and leaves a single group a plain heading', () => {
     const onSelectGroup = jest.fn();
     renderHeader({ onSelectGroup });
 
+    expect(screen.getByTestId('groups-title').props.accessibilityRole).toBe('button');
     fireEvent.press(screen.getByTestId('groups-title'));
     fireEvent.press(screen.getByTestId('groups-switch-g2'));
     expect(onSelectGroup).toHaveBeenCalledWith('g2');
 
     screen.unmount();
     renderHeader({ groups: [GROUPS[0]!] });
-    fireEvent.press(screen.getByTestId('groups-title'));
+    expect(screen.getByTestId('groups-title').props.accessibilityRole).toBe('header');
     expect(screen.queryByTestId('groups-switch-sheet')).toBeNull();
   });
 
-  it('shows the metric on At a glance and offers no non-weekly period switch', () => {
+  it('closes the switch when only one group is left, and does not reopen it when another returns', () => {
     renderHeader();
-    expect(screen.getByTestId('groups-filter-metric')).toBeTruthy();
-    expect(screen.queryByTestId('groups-filter-period')).toBeNull();
+    fireEvent.press(screen.getByTestId('groups-title'));
+    expect(screen.getByTestId('groups-switch-sheet').props.visible ?? true).toBeTruthy();
+
+    screen.rerender(
+      <GroupScreenHeader groupName="Garage Gym" groups={[GROUPS[0]!]} onOpenManage={jest.fn()} onSelectGroup={jest.fn()} selectedGroupId="g1" />,
+    );
+    expect(screen.queryByTestId('groups-switch-sheet')).toBeNull();
+    screen.rerender(
+      <GroupScreenHeader groupName="Garage Gym" groups={GROUPS} onOpenManage={jest.fn()} onSelectGroup={jest.fn()} selectedGroupId="g1" />,
+    );
+    expect(screen.queryByTestId('groups-switch-g2')).toBeNull();
+  });
+
+  it('puts the manage icon in the title bar', () => {
+    const onOpenManage = jest.fn();
+    renderHeader({ onOpenManage });
+
+    expect(screen.getByTestId('groups-manage-button').props.accessibilityLabel).toBe('Manage groups');
+    fireEvent.press(screen.getByTestId('groups-manage-button'));
+    expect(onOpenManage).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws a page action before Manage, and none when not given', () => {
+    renderHeader({ headerAction: <Text testID="extra-action">⋮</Text> });
+    expect(screen.getByTestId('extra-action')).toBeTruthy();
+    // The title gives up width for it, so the two never overlap.
+    const narrow = StyleSheet.flatten(screen.getByTestId('groups-title').props.style).maxWidth;
+    expect(screen.getByTestId('groups-manage-button')).toBeTruthy();
 
     screen.unmount();
-    renderHeader({ section: 'leaderboards' });
-    expect(screen.getByTestId('groups-filter-section')).toHaveTextContent('Leaderboards');
-    expect(screen.queryByTestId('groups-filter-metric')).toBeNull();
-    expect(screen.queryByTestId('groups-filter-period')).toBeNull();
+    renderHeader();
+    expect(screen.queryByTestId('extra-action')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('groups-title').props.style).maxWidth).toBeGreaterThan(narrow);
   });
 });

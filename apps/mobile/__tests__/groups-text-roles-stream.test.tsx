@@ -61,7 +61,8 @@ describe('podium card', () => {
   const card: PodiumCardViewModel = {
     exerciseId: 'bench', name: 'Bench Press', archived: false, viewLabel: 'All · 1RM (kg)',
     rows: [{ key: 'sam', rank: 1, memberLabel: 'Sam', isMe: false, valueLabel: '142.5', dateLabel: '12-10-2026' }],
-    youLabel: 'You: 5th', emptyLabel: null, accessibilityLabel: 'Bench Press',
+    youLabel: 'You: 5th', emptyLabel: null,
+    latestRecordAtMs: null, accessibilityLabel: 'Bench Press',
   };
 
   it('draws rank and value as row figures, 500 not 600', () => {

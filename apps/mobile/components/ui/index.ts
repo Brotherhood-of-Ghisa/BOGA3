@@ -51,6 +51,7 @@ export {
   type SegmentedControlProps,
 } from '@/components/ui/segmented-control';
 export { Sheet, type SheetProps } from '@/components/ui/sheet';
+export { SwipePages, pageAtOffset, type SwipePage, type SwipePageFrame, type SwipePagesProps } from '@/components/ui/swipe-pages';
 export { SwitchRow, type SwitchRowProps } from '@/components/ui/switch-row';
 export {
   Stat,

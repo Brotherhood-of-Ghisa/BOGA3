@@ -172,13 +172,13 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/profile`, `/connected-agents` | themselves | sign-in/sign-out rerender, and grant load / retry / confirmed revocation, update the route in place |
 | `/connected-agents` | `/sign-in` | its auth guard on a signed-out direct entry |
 | `/groups`, `/exercise-link` (signed out, auth configured) | `/sign-in` | the sign-in-required card's `Sign in` |
-| `/groups` | `/group/mine` | the `My groups` header action — the only route to group management; nothing else there opens the group page |
+| `/groups` | `/group/mine` | the header's `Manage groups` icon — the only way to group management; nothing else opens a group page |
 | `/group/mine` | `/group/<groupId>` | a row tap — the only way to the group page (stream membership items do not navigate) |
 | `/groups`, `/group/mine` | `/group/new`, `/group/join` | `Join group` / `Create group` and the empty-state actions (`push`) |
 | `/group/new`, `/group/join` | `/group/<groupId>` | after create, join, or `Open group` when already a member (`replace`, so Back returns to where the flow started) |
 | `/group/<groupId>` | `/group/<groupId>/invite`, `/edit`, `/members`, `/exercises/new`, `/exercises/<exerciseId>/edit` | role-gated `Invite` / `Edit` actions, the member-count line, and owner/admin `Add exercise` / the exercise sheet's `Rename` (`push`); each returns `back()` after saving |
 | `/group/<groupId>/members` | `/groups` | after a successful leave (`dismissTo('/groups')`); the screen's focus refresh drops the group from the chips |
-| `/groups` | `/group/<groupId>/leaderboards/<exerciseId>` | a podium card on the Leaderboards segment (`push`, no query) |
+| `/groups` | `/group/<groupId>/leaderboards/<exerciseId>` | a podium card on the Leaderboards page (`push`, no query: opens on All) |
 | `…/leaderboards/<exerciseId>` | `…/history?metric=&scope=` | the header `History`, passing the current toggles and rules revision |
 | `/groups`, `/today`, a board | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | a stream session card, Today's one-member training-now row or completed session, or the row detail sheet's `View full session` (`push`). Every full-session exit carries `groupId` |
 | `/today` | `/groups?groupId=<groupId>`, `/group/mine` | The board card's group name, the week board and the `<n> training now` row, carrying Today's selected group; `Find a group` when there is none. Picking a chip changes the selection Today shares with `/groups`; it does not navigate |

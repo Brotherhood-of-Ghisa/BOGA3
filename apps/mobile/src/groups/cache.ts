@@ -26,8 +26,8 @@ export const groupCacheKeys = {
   groupExercises: (groupId: string) => `group-exercises:v7:${groupId}`,
   /** Group shared exercises list (Option C persistent library). */
   sharedExercises: (groupId: string) => `shared-exercises:v7:${groupId}`,
-  /** Versioned podium payload. Full boards and history are never cached. */
-  boards: (groupId: string) => `boards:v7:${groupId}`,
+  /** Versioned podium payload, All scope. Full boards and history are never cached. */
+  boards: (groupId: string) => `boards:v7:${groupId}:all`,
   /** Today's group card: the latest week read, stamped with its window (one entry per group). */
   weekSummary: (groupId: string) => `week:v7:${groupId}`,
   /** At a glance: one period-totals read per period and stepper offset (0 the current period, -1 the one before). */
@@ -117,14 +117,14 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
 };
 
 /**
- * Access loss removes the current versioned group, stream, exercise, board,
- * week summary, At a glance, and every session entry. A session can be shared into several
+ * Access loss removes the current versioned group, stream, exercise, board
+ * (and the podiums cached before they read All), week summary, At a glance, and every session entry. A session can be shared into several
  * groups, so all cached group-specific session projections go. The member's `exercise_group_links` rows are synced data and are never
  * touched here.
  */
 export const evictGroup = (database: GroupCacheDatabase, groupId: string): void => {
   const scope = or(inArray(groupCache.cacheKey,[groupCacheKeys.group(groupId),groupCacheKeys.stream(groupId),
-    groupCacheKeys.groupExercises(groupId),groupCacheKeys.boards(groupId),groupCacheKeys.weekSummary(groupId),`group-policy:v7:${groupId}`]),
+    groupCacheKeys.groupExercises(groupId),groupCacheKeys.boards(groupId),`boards:v7:${groupId}`,groupCacheKeys.weekSummary(groupId),`group-policy:v7:${groupId}`]),
     like(groupCache.cacheKey,glanceKeyPattern(groupId)),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId)}:%`),like(groupCache.cacheKey,SESSION_KEY_PATTERN));
   const accounts = new Set(database.select({ userId: groupCache.userId }).from(groupCache).where(scope).all().map(row => row.userId));
   database.delete(groupCache).where(scope).run();

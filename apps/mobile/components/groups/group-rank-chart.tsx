@@ -31,7 +31,7 @@ export type GroupRankChartProps = {
  * Place over time: one line per member across the periods, rank 1 at the top,
  * each point marked with the member's initial. The selected period's column
  * sits on a `ruleSoft` band with its markers filled; tapping a column, or its
- * label, selects it. The table under the chart reads that period.
+ * label, selects it: the screen's selected period, which every card reads.
  */
 export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, accessibilityLabel }: GroupRankChartProps) {
   const [plotWidth, setPlotWidth] = useState(FALLBACK_PLOT_WIDTH);

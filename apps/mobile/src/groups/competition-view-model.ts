@@ -63,16 +63,18 @@ export function buildCompetitionRow(row: CompetitionBoardRowWire,scope: GroupBoa
 export function buildCompetitionPodiums(payload: CompetitionPodiumsWire,userId: string | null,
   dateFormat: ExerciseDateFormat): PodiumCardViewModel[] {
   return payload.podiums.map(({ exercise,board }) => {
-    const rows=board.state === 'rebuilding' ? [] : board.entries.slice(0,3).map(row => ({ key: row.member.user_id,
+    const podium=board.state === 'rebuilding' ? [] : board.entries.slice(0,3);
+    const rows=podium.map(row => ({ key: row.member.user_id,
       rank: row.rank,memberLabel: formatBoardMemberLabel(row.member,row.former,userId),isMe: row.member.user_id === userId,
       valueLabel: formatCompetitionValue(row),dateLabel: formatBoardDate(row.performance.achieved_at_ms,dateFormat) }));
     const viewLabel=`${board.certified ? 'Certified' : 'All'} · ${competitionViewLabel(board.metric,board.rules)}`;
     const emptyLabel=board.state === 'rebuilding' ? 'Recalculating under the new rules…'
-      : rows.length === 0 ? board.certified ? 'No certified sets yet' : 'Score unavailable' : null;
+      : rows.length === 0 ? board.certified ? 'No certified sets yet' : 'No sets yet' : null;
     const youLabel=board.state === 'rebuilding' ? null : board.me && board.me.rank > 3 ? `You: ${formatOrdinal(board.me.rank)}`
       : !board.me && rows.length > 0 ? 'You: not ranked' : null;
     const archived=exercise.archived_at_ms !== null;
-    return { exerciseId: exercise.group_exercise_id,name: exercise.name,archived,viewLabel,rows,emptyLabel,youLabel,
+    const latestRecordAtMs=podium.length > 0 ? Math.max(...podium.map(row => row.performance.achieved_at_ms)) : null;
+    return { exerciseId: exercise.group_exercise_id,name: exercise.name,archived,viewLabel,rows,emptyLabel,youLabel,latestRecordAtMs,
       accessibilityLabel: [exercise.name,archived ? 'archived' : null,viewLabel,
         ...rows.map(row => `${formatOrdinal(row.rank)} ${row.memberLabel} ${row.valueLabel} ${row.dateLabel}`),emptyLabel,youLabel].filter(Boolean).join(', ') };
   });

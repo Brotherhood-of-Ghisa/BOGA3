@@ -17,7 +17,7 @@ type Props = {
   onCertificationChanged: () => void; showGroupNames: boolean;
   onPressSession: (card: CompetitionSessionCard) => void;
   onPressMembership?: (item: StreamMembershipViewModel) => void;
-  pulling: boolean; onRefresh: () => void; header: ReactElement; emptyState: ReactElement;
+  pulling: boolean; onRefresh: () => void; header?: ReactElement; emptyState: ReactElement;
   contentContainerStyle?: StyleProp<ViewStyle>; testID: string;
   /** Event kinds the stream leaves out; the debug drawer moves them. */
   hiddenEventKinds?: readonly StreamEventKind[];

@@ -93,11 +93,12 @@ beforeEach(() => {
   api.certifyCompetition.mockResolvedValue({ contract_version: 4,certification: certificate,created: true });
   api.getCompetitionCertification.mockResolvedValue({ contract_version: 4,certification: certificate });
   api.getCompetitionStream.mockResolvedValue({ contract_version: 4,items: [],next_cursor: null,has_more: false });
-  api.getCompetitionPodiums.mockResolvedValue({ contract_version: 4,certified: true,podiums: [] });
+  api.getCompetitionPodiums.mockResolvedValue({ contract_version: 4,certified: false,podiums: [] });
 });
 afterEach(() => fixture.close());
 const settleReads=()=>act(async()=>{});
 it('shows normalized 1RM and Volume with explicit units and independent Certified/All controls',async()=>{
+  mockParams={ ...mockParams,scope: 'certified' };
   render(<GroupBoardRoute />);await settleReads();
   expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('145.7 %BW');
   expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm',certified: true }));
@@ -141,6 +142,7 @@ it('holds a stale-input refusal for explicit review',async()=>{
   expect(screen.getByTestId('group-metric-record-certify')).toBeDisabled();expect(api.certifyCompetition).toHaveBeenCalledTimes(1);
 });
 it('history: one row of three tap-to-cycle filters on the current rules, with no rules text',async()=>{
+  mockParams={ ...mockParams,scope: 'certified' };
   render(<GroupBoardHistoryRoute />);
   expect(await screen.findByTestId('group-board-history-item-3-sentence')).toHaveTextContent('Group rules changed.');
   expect(api.getCompetitionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm',certified: true }));
