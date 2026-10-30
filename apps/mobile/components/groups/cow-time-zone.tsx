@@ -11,10 +11,11 @@ export function CoWTimeZone({ groupId, userId, autoFocus, onAccessChange }: { gr
   const calendar = useCoWCalendar(groupId, userId);
   const [draft, setDraft] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const action = useGroupAction(() => setCoWCalendar(groupId, calendar.firstPage!.revision, (draft ?? calendar.firstPage!.time_zone ?? '').trim()));
+  const action = useGroupAction((revision: number, timeZone: string) => setCoWCalendar(groupId, revision, timeZone));
   const save = async () => {
+    if (!calendar.firstPage) return;
     setSaved(false);
-    const result = await action.run();
+    const result = await action.run(calendar.firstPage.revision, (draft ?? calendar.firstPage.time_zone ?? '').trim());
     if (result.ok) { setSaved(true); await calendar.refresh(); }
     else if (result.error.code === 'CONFLICT') await calendar.refresh();
     else if (result.error.code === 'FORBIDDEN' || result.error.code === 'NOT_FOUND') onAccessChange();
