@@ -4,6 +4,7 @@ process.env.TZ = 'Europe/London';
 
 module.exports = {
   preset: 'jest-expo',
+  cacheDirectory: '<rootDir>/.jest-cache',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   // Edge worker tests import code outside this directory; resolve its transforms from this worktree's mobile deps.
   modulePaths: ['<rootDir>/node_modules'],

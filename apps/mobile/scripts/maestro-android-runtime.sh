@@ -223,6 +223,8 @@ maestro_android_teardown_emulator() {
   if [[ -n "$serial" ]]; then
     echo "[maestro-android-teardown] Shutting down emulator $serial"
     adb -s "$serial" emu kill >/dev/null 2>&1 || true
+  else
+    kill "$pid" >/dev/null 2>&1 || true
   fi
 
   if ! maestro_wait_for_process_exit "$pid" 10; then

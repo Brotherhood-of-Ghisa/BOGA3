@@ -39,6 +39,7 @@ yarn-error.*
 
 # Jest coverage output (npm run test:coverage)
 coverage/
+.jest-cache/
 
 # typescript
 *.tsbuildinfo
