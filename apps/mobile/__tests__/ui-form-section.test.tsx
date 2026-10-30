@@ -7,7 +7,9 @@
 
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
-import { ChoiceRow, FormActionRow, FormError, FormSection, InputRow, SwitchRow } from '@/components/ui';
+import { ActionRow, ChoiceRow, FormError, FormSection, InputRow, SwitchRow, uiRoles } from '@/components/ui';
+
+import { drawsGlyph } from './helpers/draws-glyph';
 
 describe('FormSection', () => {
   it('heads its card with the group name and shows one error under it', () => {
@@ -18,6 +20,21 @@ describe('FormSection', () => {
     );
     expect(screen.getByRole('header')).toHaveTextContent('Muscles');
     expect(screen.getByTestId('section-error')).toHaveTextContent('Pick one.');
+  });
+
+  it('shows its footnote under the card, muted, above any error', () => {
+    render(
+      <FormSection error="Pick one." errorTestID="section-error" footnote="Applies next launch" testID="section" title="Theme">
+        <ChoiceRow label="Primary" onPress={jest.fn()} />
+      </FormSection>,
+    );
+    expect(screen.getByTestId('section-footnote')).toHaveTextContent('Applies next launch');
+    expect(screen.getByTestId('section-error')).toHaveTextContent('Pick one.');
+  });
+
+  it('shows no footnote without one', () => {
+    render(<FormSection testID="section" title="Theme"><ChoiceRow label="Primary" onPress={jest.fn()} /></FormSection>);
+    expect(screen.queryByTestId('section-footnote')).toBeNull();
   });
 
   it('shows no error line without an error', () => {
@@ -39,6 +56,13 @@ describe('ChoiceRow', () => {
   it.each([[null], ['']])('shows the placeholder for an empty value (%p)', (value) => {
     render(<ChoiceRow label="Secondary" onPress={jest.fn()} placeholder="None" testID="choice" value={value} />);
     expect(screen.getByLabelText('Secondary: None')).toBeOnTheScreen();
+  });
+
+  it('draws its leading icon only when given one', () => {
+    const view = render(<ChoiceRow icon="bell" label="Notifications" onPress={jest.fn()} />);
+    expect(drawsGlyph(view.root, 'bell')).toBe(true);
+    view.rerender(<ChoiceRow label="Notifications" onPress={jest.fn()} />);
+    expect(drawsGlyph(view.root, 'bell')).toBe(false);
   });
 
   it('says none without a value or placeholder', () => {
@@ -64,14 +88,46 @@ describe('InputRow', () => {
   });
 });
 
-describe('FormActionRow', () => {
+describe('ActionRow', () => {
   it('is one labelled target, and does nothing while disabled', () => {
     const onPress = jest.fn();
-    const view = render(<FormActionRow icon="link" label="Link to a group exercise" onPress={onPress} testID="action" />);
+    const view = render(<ActionRow icon="link" label="Link to a group exercise" onPress={onPress} testID="action" />);
     fireEvent.press(screen.getByLabelText('Link to a group exercise'));
     expect(onPress).toHaveBeenCalledTimes(1);
-    view.rerender(<FormActionRow disabled icon="link" label="Link to a group exercise" onPress={onPress} testID="action" />);
+    view.rerender(<ActionRow disabled icon="link" label="Link to a group exercise" onPress={onPress} testID="action" />);
     fireEvent.press(screen.getByTestId('action'));
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a chevron only for a row that navigates, which is the default kind', () => {
+    const view = render(<ActionRow label="Review changes" onPress={jest.fn()} />);
+    expect(drawsGlyph(view.root, 'chevron-right')).toBe(true);
+    view.rerender(<ActionRow kind="navigate" label="Review changes" onPress={jest.fn()} />);
+    expect(drawsGlyph(view.root, 'chevron-right')).toBe(true);
+    view.rerender(<ActionRow kind="act" label="Refresh" onPress={jest.fn()} />);
+    expect(drawsGlyph(view.root, 'chevron-right')).toBe(false);
+    view.rerender(<ActionRow kind="danger" label="Wipe local" onPress={jest.fn()} />);
+    expect(drawsGlyph(view.root, 'chevron-right')).toBe(false);
+  });
+
+  it('puts accent words on navigate and act, and danger words on danger', () => {
+    const view = render(<ActionRow label="Review changes" onPress={jest.fn()} />);
+    expect(screen.getByText('Review changes')).toHaveStyle({ color: uiRoles.accent });
+    view.rerender(<ActionRow kind="act" label="Export database" onPress={jest.fn()} />);
+    expect(screen.getByText('Export database')).toHaveStyle({ color: uiRoles.accent });
+    view.rerender(<ActionRow kind="danger" label="Wipe local" onPress={jest.fn()} />);
+    expect(screen.getByText('Wipe local')).toHaveStyle({ color: uiRoles.danger });
+    view.rerender(<ActionRow kind="danger" disabled label="Wipe local" onPress={jest.fn()} />);
+    expect(screen.getByText('Wipe local')).toHaveStyle({ color: uiRoles.inkGhost });
+  });
+
+  it('presses a danger or act row, and blocks a disabled one', () => {
+    const onPress = jest.fn();
+    const view = render(<ActionRow kind="danger" label="Wipe local" onPress={onPress} />);
+    fireEvent.press(screen.getByLabelText('Wipe local'));
+    expect(onPress).toHaveBeenCalledTimes(1);
+    view.rerender(<ActionRow disabled kind="danger" label="Wipe local" onPress={onPress} />);
+    fireEvent.press(screen.getByLabelText('Wipe local'));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 });
@@ -84,5 +140,22 @@ describe('SwitchRow in a form card', () => {
     expect(row).toHaveStyle({ borderTopWidth: 1 });
     fireEvent.press(row);
     expect(onValueChange).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('SwitchRow description', () => {
+  it('shows a muted line under the label and reads it with the switch', () => {
+    const onValueChange = jest.fn();
+    render(<SwitchRow density="list" description="Allowed" label="Notifications" onValueChange={onValueChange} testID="switch" value />);
+    expect(screen.getByText('Allowed')).toBeOnTheScreen();
+    const row = screen.getByRole('switch', { name: 'Notifications, Allowed' });
+    expect(row).toBeChecked();
+    fireEvent.press(row);
+    expect(onValueChange).toHaveBeenCalledWith(false);
+  });
+
+  it('keeps the label as its name without a description', () => {
+    render(<SwitchRow label="Notifications" onValueChange={jest.fn()} value={false} />);
+    expect(screen.getByRole('switch', { name: 'Notifications' })).not.toBeChecked();
   });
 });

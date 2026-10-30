@@ -32,8 +32,9 @@ export type ListRowProps = {
   // A disclosure row's state (a collapsible section's header): announced as
   // expanded or collapsed. The glyph that shows it is the caller's `trailing`.
   expanded?: boolean;
-  // Makes the row a radio: announced as checked or not, with no ground change.
-  // The glyph that shows it (`radio-on` / `radio-off`) is the caller's `leading`.
+  // Makes the row a radio (a checkbox with `accessibilityRole="checkbox"`):
+  // announced as checked or not, with no ground change. The glyph that shows
+  // it (`radio-on` / `radio-off`, or a `check`) is the caller's.
   checked?: boolean;
   // Makes the whole row one target (sheet options). Leave unset when the
   // trailing control owns the action (set rows).
@@ -43,8 +44,9 @@ export type ListRowProps = {
   // What pressing the row does, when the label does not say (`Opens the
   // completed session`).
   accessibilityHint?: string;
-  // `link` for a row that leaves the app (it opens the system browser).
-  accessibilityRole?: 'button' | 'link';
+  // `link` for a row that leaves the app (it opens the system browser);
+  // `checkbox` for a checked row that is one of several.
+  accessibilityRole?: 'button' | 'link' | 'checkbox';
   // A row with no `onPress` read as one element (its `accessibilityLabel`),
   // like a pressable row. Leave unset when a control inside must stay reachable.
   accessible?: boolean;
@@ -120,7 +122,7 @@ export function ListRow({
     <Pressable
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityRole={checked === undefined ? accessibilityRole : 'radio'}
+      accessibilityRole={checked === undefined ? accessibilityRole : accessibilityRole === 'checkbox' ? 'checkbox' : 'radio'}
       accessibilityState={
         checked !== undefined
           ? disabled
