@@ -56,7 +56,9 @@ UTC Monday-to-Monday half-open bounds respecting DST. Zone changes never move
 a published CoW. Admins schedule next week only, before start, with one
 non-cancelled published CoW per group/week and no overlapping windows across
 zone changes. Exercise/metric edits and cancellation are pre-start only.
-Cancellation retains audit and releases the slot for replacement.
+Cancellation retains audit and releases the slot for replacement. Every current
+member sees the saved group zone on group management; only owners/admins get
+its setup entry there, through group Edit. CoW flows have no zone setup controls.
 
 Why: every member competes in the same week, independently of viewer location.
 Code: `supabase/migrations/20261029204606_group_cow_lifecycle.sql`; `apps/mobile/src/groups/api.ts`.

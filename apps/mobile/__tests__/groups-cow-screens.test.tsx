@@ -270,10 +270,12 @@ it('handles live role loss without discarding the user draft or navigating', asy
   await prepareCreate(); api.getGroup.mockResolvedValue({ ...competitionGroupDetail, group: { ...competitionGroupDetail.group, my_role: 'member' } });
   fireEvent.press(screen.getByTestId('cow-form-submit')); expect(await screen.findByTestId('cow-form-forbidden')).toBeTruthy(); expect(mockRouter.back).not.toHaveBeenCalled();
 });
-it('opens group time-zone setup with the form retained, then revalidates next week on focus', async () => {
+it('blocks unset scheduling without zone setup controls and revalidates on focus', async () => {
   api.getCoWCalendar.mockResolvedValue({ time_zone: null, revision: 1, next_week_start: null });
   const view = render(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-metric-volume'));
-  fireEvent.press(await screen.findByTestId('cow-form-set-zone')); expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/edit?focusTimeZone=1');
+  expect(await screen.findByTestId('cow-form-zone-unset')).toBeTruthy();
+  expect(screen.getByTestId('cow-form-submit')).toBeDisabled();
+  expect(screen.queryByText('Set group time zone')).toBeNull(); expect(mockRouter.push).not.toHaveBeenCalled();
   mockFocused = false; view.rerender(<CoWScheduleRoute />); api.getCoWCalendar.mockResolvedValue({ ...calendar(), revision: 2 });
   mockFocused = true; view.rerender(<CoWScheduleRoute />); await waitFor(() => expect(screen.getByTestId('cow-form-submit')).toBeEnabled());
   expect(screen.getByLabelText('Exercise: Bench press')).toBeTruthy(); expect(screen.getByTestId('cow-form-metric-volume').props.accessibilityState.checked).toBe(true);
@@ -439,4 +441,131 @@ it('keeps the tallest measured podium when switching to a shorter metric', () =>
   fireEvent.press(screen.getByTestId('preview-metric-volume'));
   expect(screen.getByTestId('preview-podium')).toHaveStyle({ minHeight: 180 });
   expect(screen.getByText('1800')).toBeTruthy(); expect(screen.queryByText('150.0')).toBeNull();
+});
+
+
+it.each(['owner', 'admin', 'member'] as const)('shows the current calendar to %s with setup only for managers above CoW', async role => {
+  api.getGroup.mockResolvedValue({ ...competitionGroupDetail, group: { ...competitionGroupDetail.group, my_role: role } });
+  const view = render(<GroupRoute />);
+  const zone = await screen.findByTestId('group-screen-time-zone-value');
+  expect(zone).toHaveTextContent('UTC'); // The published preview remains Europe/London.
+  expect(screen.getByText('Group time zone')).toBeTruthy();
+  if (role === 'member') {
+    expect(screen.queryByTestId('group-screen-set-time-zone')).toBeNull();
+  } else {
+    fireEvent.press(screen.getByTestId('group-screen-set-time-zone'));
+    expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/edit?focusTimeZone=1');
+    expect(screen.getByTestId('group-screen-invite-button')).toHaveProp('accessibilityRole', 'button');
+    const tree = JSON.stringify(view.toJSON(), (key, value) => key === 'props' ? { testID: value.testID } : value);
+    expect(tree.indexOf('group-screen-edit-button')).toBeLessThan(tree.indexOf('group-screen-time-zone-value'));
+    expect(tree.indexOf('group-screen-time-zone-value')).toBeLessThan(tree.indexOf('group-screen-set-time-zone'));
+    expect(tree.indexOf('group-screen-set-time-zone')).toBeLessThan(tree.indexOf('group-cow-section'));
+  }
+});
+it('only declares Not set after a successful calendar read confirms it', async () => {
+  let finish!: (value: Awaited<ReturnType<typeof groupApi.getCoWCalendar>>) => void;
+  api.getCoWCalendar.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+  render(<GroupRoute />);
+  await screen.findByTestId('group-screen-time-zone-loading');
+  expect(screen.queryByText('Not set')).toBeNull();
+  const unset = { time_zone: null, revision: 1, next_week_start: null };
+  api.getCoWCalendar.mockResolvedValue(unset);
+  await act(async () => finish(unset));
+  expect(await screen.findByTestId('group-screen-time-zone-value')).toHaveTextContent('Not set');
+});
+it('offers calendar retry without implying an unset zone after a read failure', async () => {
+  api.getCoWCalendar.mockRejectedValue(new GroupApiError('INTERNAL', 'failed'));
+  render(<GroupRoute />);
+  await screen.findByTestId('group-screen-time-zone-error-state');
+  api.getCoWCalendar.mockResolvedValue(calendar());
+  fireEvent.press(screen.getByTestId('group-screen-time-zone-error-state-retry'));
+  expect(screen.queryByText('Not set')).toBeNull();
+  expect(await screen.findByTestId('group-screen-time-zone-value')).toHaveTextContent('UTC');
+});
+it('keeps an unavailable offline calendar distinct from Not set', async () => {
+  api.getCoWCalendar.mockRejectedValue(new GroupApiError('NETWORK', 'offline'));
+  render(<GroupRoute />);
+  expect(await screen.findByTestId('group-screen-time-zone-offline-empty-state')).toBeTruthy();
+  expect(screen.queryByText('Not set')).toBeNull();
+});
+it('retains the saved zone beside refresh failure and retry, and during offline use', async () => {
+  const view = render(<GroupRoute />);
+  await screen.findByTestId('group-screen-time-zone-value');
+  mockFocused = false; view.rerender(<GroupRoute />);
+  api.getCoWCalendar.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'failed'));
+  mockFocused = true; view.rerender(<GroupRoute />);
+  fireEvent.press(await screen.findByTestId('group-screen-time-zone-error-retry'));
+  await waitForGone(() => screen.queryByTestId('group-screen-time-zone-error'));
+  emitNetwork(false);
+  expect(screen.getByTestId('group-screen-time-zone-value')).toHaveTextContent('UTC');
+  expect(screen.getAllByTestId('groups-offline-banner').length).toBeGreaterThan(0);
+});
+it('refreshes the current group zone on first and subsequent editor returns', async () => {
+  api.getCoWCalendar.mockResolvedValue({ time_zone: null, revision: 1, next_week_start: null });
+  const view = render(<GroupRoute />);
+  expect(await screen.findByTestId('group-screen-time-zone-value')).toHaveTextContent('Not set');
+  for (const [index, time_zone] of ['Europe/London', 'Pacific/Auckland'].entries()) {
+    fireEvent.press(screen.getByTestId('group-screen-set-time-zone'));
+    expect(mockRouter.push).toHaveBeenLastCalledWith('/group/g1/edit?focusTimeZone=1');
+    mockFocused = false; view.rerender(<GroupRoute />);
+    api.getCoWCalendar.mockResolvedValue({ time_zone, revision: index + 2, next_week_start: '2026-11-02' });
+    mockFocused = true; view.rerender(<GroupRoute />);
+    await waitFor(() => expect(screen.getByTestId('group-screen-time-zone-value')).toHaveTextContent(time_zone));
+  }
+});
+it('focuses the existing editor and can save consecutive zone changes', async () => {
+  mockParams = { groupId: 'g1', focusTimeZone: '1' };
+  render(<EditGroupRoute />);
+  const input = await screen.findByTestId('cow-zone-input');
+  expect(input.props.autoFocus).toBe(true);
+  for (const [index, time_zone] of ['Europe/London', 'Pacific/Auckland'].entries()) {
+    fireEvent.changeText(input, time_zone);
+    api.setCoWCalendar.mockImplementationOnce(async () => {
+      const saved = { time_zone, revision: index + 2, next_week_start: '2026-11-02' };
+      api.getCoWCalendar.mockResolvedValue(saved);
+      return saved;
+    });
+    fireEvent.press(screen.getByTestId('cow-zone-save'));
+    await screen.findByTestId('cow-zone-saved');
+    await waitFor(() => expect(api.getCoWCalendar).toHaveBeenCalledTimes(index + 2));
+    expect(api.setCoWCalendar).toHaveBeenLastCalledWith('g1', index + 1, time_zone);
+  }
+});
+it('hides management and cached content after a calendar read loses membership', async () => {
+  api.getCoWCalendar.mockRejectedValue(new GroupApiError('NOT_FOUND', 'Group not found'));
+  render(<GroupRoute />);
+  expect(await screen.findByTestId('group-screen-lost-access')).toBeTruthy();
+  expect(screen.queryByTestId('group-screen-set-time-zone')).toBeNull();
+});
+it('keeps calendar input on conflict, refreshes its revision and saves only online', async () => {
+  api.setCoWCalendar.mockRejectedValueOnce(new GroupApiError('CONFLICT', 'changed'));
+  render(<EditGroupRoute />);
+  fireEvent.changeText(await screen.findByTestId('cow-zone-input'), 'Pacific/Auckland');
+  api.getCoWCalendar.mockResolvedValue({ ...calendar(), revision: 2 });
+  fireEvent.press(screen.getByTestId('cow-zone-save'));
+  await screen.findByText('Check the time zone and try again.');
+  await waitFor(() => expect(api.getCoWCalendar).toHaveBeenCalledTimes(2));
+  expect(screen.getByTestId('cow-zone-input').props.value).toBe('Pacific/Auckland');
+  emitNetwork(false); fireEvent.press(screen.getByTestId('cow-zone-save'));
+  await screen.findByText("You're offline. Connect to save.");
+  expect(api.setCoWCalendar).toHaveBeenCalledTimes(1);
+  emitNetwork(true); fireEvent.press(screen.getByTestId('cow-zone-save'));
+  await screen.findByTestId('cow-zone-saved');
+  expect(api.setCoWCalendar).toHaveBeenLastCalledWith('g1', 2, 'Pacific/Auckland');
+});
+it.each(['FORBIDDEN', 'NOT_FOUND'] as const)('refreshes editor access after %s without another write', async code => {
+  render(<EditGroupRoute />);
+  fireEvent.changeText(await screen.findByTestId('cow-zone-input'), 'Pacific/Auckland');
+  api.setCoWCalendar.mockRejectedValueOnce(new GroupApiError(code, 'access changed'));
+  if (code === 'NOT_FOUND') api.getGroup.mockRejectedValue(new GroupApiError(code, 'Group not found'));
+  else api.getGroup.mockResolvedValue({ ...competitionGroupDetail, group: { ...competitionGroupDetail.group, my_role: 'member' } });
+  fireEvent.press(screen.getByTestId('cow-zone-save'));
+  expect(await screen.findByTestId(code === 'NOT_FOUND' ? 'group-edit-lost-access' : 'group-edit-forbidden')).toBeTruthy();
+  expect(screen.queryByTestId('cow-zone-save')).toBeNull();
+  expect(api.setCoWCalendar).toHaveBeenCalledTimes(1);
+});
+it('has no calendar setup controls in the CoW browser', async () => {
+  api.getCoWCalendar.mockResolvedValue({ time_zone: null, revision: 1, next_week_start: null });
+  render(<CoWsRoute />); await screen.findByTestId('cows-schedule');
+  expect(screen.queryByText('Set time zone')).toBeNull(); expect(screen.queryByText('Set group time zone')).toBeNull();
 });
