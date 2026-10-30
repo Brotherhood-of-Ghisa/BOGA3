@@ -26,20 +26,69 @@ export default function SettingsRoute() {
 // a destination — an icon, a label, what is set now and a chevron — and every
 // setting lives on its page.
 function SettingsScreen() {
-  const router = useRouter();
   const { user } = useAuth();
   const preferences = useAccountLocalPreferenceState();
   const values = { ...preferences.values, ...preferences.pending };
   const syncSnapshot = useSyncStatusSnapshot(Boolean(user));
 
-  const destination = (
-    testID: string,
-    label: string,
-    icon: IconName,
-    route: Href,
-    value: string | undefined,
-    divider = true,
-  ) => (
+  return (
+    <ScreenScroll
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+      testID="settings-screen">
+      <FormSection title="Account">
+        <DestinationRow
+          icon="user" label="Account" route="/profile" testID="settings-profile-row"
+          value={user ? user.email?.trim() || undefined : 'Signed out'}
+        />
+      </FormSection>
+      <FormSection title="Training">
+        <DestinationRow
+          icon="timer" label="Rest timer" route={SETTINGS_SUB_PAGES.restTimer} testID="settings-rest-timer-row"
+          value={restTimerStatus(values)}
+        />
+        <BodyWeightSettingsRow divider />
+        <DestinationRow
+          divider icon="sliders" label="Muscles" route={SETTINGS_SUB_PAGES.muscles} testID="settings-muscles-row"
+          value={values.muscleTargetMode === 'per-muscle' ? 'Per muscle targets' : 'Single target'}
+        />
+        <DestinationRow
+          divider icon="gauge" label="Effort" route={SETTINGS_SUB_PAGES.effort} testID="settings-effort-row"
+          value={effortStatus(values)}
+        />
+        <DestinationRow
+          divider icon="progress" label="Progress" route={SETTINGS_SUB_PAGES.progress} testID="settings-progress-row"
+          value={progressStatus(values)}
+        />
+      </FormSection>
+      <FormSection title="App">
+        <AppearanceSettingsRow />
+        <NotificationSettingsRow divider key={user?.id ?? 'signed-out'} userId={user?.id ?? null} />
+        <DestinationRow
+          divider icon="refresh" label="Data & sync" route={SETTINGS_SUB_PAGES.dataSync} testID="settings-data-sync-row"
+          value={syncStatus(syncSnapshot, { isSignedIn: Boolean(user), preferenceError: preferences.error })}
+        />
+        <DestinationRow
+          divider icon="settings" label="Everything else" route={SETTINGS_SUB_PAGES.everythingElse}
+          testID="settings-everything-else-row" value={values.dateFormat}
+        />
+      </FormSection>
+      <AboutSection />
+    </ScreenScroll>
+  );
+}
+
+// One destination: an icon, a label, what is set now and a chevron.
+function DestinationRow({ divider = false, icon, label, route, testID, value }: {
+  divider?: boolean;
+  icon: IconName;
+  label: string;
+  route: Href;
+  testID: string;
+  value: string | undefined;
+}) {
+  const router = useRouter();
+  return (
     <ChoiceRow
       accessibilityLabel={value ? `${label}, ${value}` : label}
       divider={divider}
@@ -49,37 +98,6 @@ function SettingsScreen() {
       testID={testID}
       value={value}
     />
-  );
-
-  return (
-    <ScreenScroll
-      contentContainerStyle={styles.content}
-      contentInsetAdjustmentBehavior="automatic"
-      testID="settings-screen">
-      <FormSection title="Account">
-        {destination('settings-profile-row', 'Account', 'user', '/profile', user ? user.email?.trim() || undefined : 'Signed out', false)}
-      </FormSection>
-      <FormSection title="Training">
-        {destination('settings-rest-timer-row', 'Rest timer', 'timer', SETTINGS_SUB_PAGES.restTimer, restTimerStatus(values), false)}
-        <BodyWeightSettingsRow divider />
-        {destination(
-          'settings-muscles-row', 'Muscles', 'sliders', SETTINGS_SUB_PAGES.muscles,
-          values.muscleTargetMode === 'per-muscle' ? 'Per muscle targets' : 'Single target',
-        )}
-        {destination('settings-effort-row', 'Effort', 'gauge', SETTINGS_SUB_PAGES.effort, effortStatus(values))}
-        {destination('settings-progress-row', 'Progress', 'progress', SETTINGS_SUB_PAGES.progress, progressStatus(values))}
-      </FormSection>
-      <FormSection title="App">
-        <AppearanceSettingsRow />
-        <NotificationSettingsRow divider key={user?.id ?? 'signed-out'} userId={user?.id ?? null} />
-        {destination(
-          'settings-data-sync-row', 'Data & sync', 'refresh', SETTINGS_SUB_PAGES.dataSync,
-          syncStatus(syncSnapshot, { isSignedIn: Boolean(user), preferenceError: preferences.error }),
-        )}
-        {destination('settings-everything-else-row', 'Everything else', 'settings', SETTINGS_SUB_PAGES.everythingElse, values.dateFormat)}
-      </FormSection>
-      <AboutSection />
-    </ScreenScroll>
   );
 }
 
