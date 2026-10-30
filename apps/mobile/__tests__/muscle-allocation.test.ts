@@ -42,19 +42,19 @@ const comparisonPeriods = {
   previous: { start: new Date(2026, 9, 19), end: new Date(2026, 9, 26) },
 };
 
-describe('independent muscle allocation pools', () => {
+describe('muscle allocation: shared Primary, ½ per Secondary', () => {
   it.each([[1, 0], [1, 2], [2, 0], [2, 2], [3, 3]])(
-    '%s Primaries and %s Secondaries split each pool once', (primaries, secondaries) => {
+    '%s Primaries share one set; each of %s Secondaries gets ½', (primaries, secondaries) => {
       const input = inputFor(primaries, secondaries);
       for (const contribution of collectMuscleSetContributions(input)) {
-        const expected = contribution.role === 'primary' ? 1 / primaries : 0.5 / secondaries;
+        const expected = contribution.role === 'primary' ? 1 / primaries : 0.5;
         expect(contribution.roleWeight).toBe(expected);
         expect(contribution.weightedVolume).toBeCloseTo(300 * expected, 10);
       }
       const stats = aggregateStats(input);
       expect(stats.workingSetCount).toBe(3);
-      expect(stats.muscleFamilies[0].workingSetCount).toBeCloseTo(secondaries ? 4.5 : 3, 10);
-      expect(stats.muscleFamilies[0].totalVolume).toBeCloseTo(secondaries ? 1350 : 900, 10);
+      expect(stats.muscleFamilies[0].workingSetCount).toBeCloseTo(3 + 1.5 * secondaries, 10);
+      expect(stats.muscleFamilies[0].totalVolume).toBeCloseTo(900 + 450 * secondaries, 10);
     },
   );
 
@@ -112,22 +112,22 @@ describe('allocated shares under Broad and hidden mappings', () => {
     }]),
   );
 
-  it('adds Broad member shares from both pools and keeps Secondary off independent', () => {
+  it('adds Broad member Primary and Secondary shares and keeps Secondary off independent', () => {
     const input = inputFor(2, 2);
     const all = applyMuscleReport(input, setup(input));
     const off = applyMuscleReport(withoutSecondaryMappings(input), setup(input));
     expect(muscleRows(all).find(row => row.muscleGroupId === 'chest'))
-      .toMatchObject({ workingSetCount: 2.25, totalVolume: 675 });
+      .toMatchObject({ workingSetCount: 3, totalVolume: 900 });
     expect(muscleRows(off).find(row => row.muscleGroupId === 'chest'))
       .toMatchObject({ workingSetCount: 1.5, totalVolume: 450 });
-    expect(countMuscleSets(collectMuscleSetContributions(all)).weightedSetCount).toBe(4.5);
+    expect(countMuscleSets(collectMuscleSetContributions(all)).weightedSetCount).toBe(6);
   });
 
-  it('drops hidden shares without redistributing either pool or mutating input', () => {
+  it('drops hidden shares without redistributing them or mutating input', () => {
     const input = inputFor(2, 2);
     const original = input.muscleMappings.map(mapping => ({ ...mapping }));
     const reported = applyMuscleReport(input, setup(input, ['triceps', 'forearms']));
-    expect(muscleRows(reported)).toEqual([expect.objectContaining({ muscleGroupId: 'chest', workingSetCount: 2.25, totalVolume: 675 })]);
+    expect(muscleRows(reported)).toEqual([expect.objectContaining({ muscleGroupId: 'chest', workingSetCount: 3, totalVolume: 900 })]);
     expect(input.muscleMappings).toEqual(original);
   });
 

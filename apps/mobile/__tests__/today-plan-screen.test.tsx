@@ -143,13 +143,14 @@ describe('Today: the Plan page over real data', () => {
     expect(chest.getByTestId('today-plan-muscle-chest-day-1')).toHaveTextContent('');
     expect(chest.getByTestId('today-plan-muscle-chest-day-2')).toHaveTextContent('2');
     expect(text('today-plan-muscle-chest-week')).toHaveTextContent('6/8');
-    // Bench's two Secondaries split the half pool: a quarter set each.
-    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('½');
+    // Each of Bench's Secondaries gets ½ a set: two sets make one.
+    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('1');
     expect(text('today-plan-muscle-quads-day-1')).toHaveTextContent('1');
 
     const order = muscleRows();
-    // Untrained first; triceps (.5), squat's co-primaries (1.5 each), then chest (2).
-    expect(order.slice(-3)).toEqual(['quads', 'glutes_max', 'chest']);
+    // Untrained first; triceps (1), squat's co-primaries and Secondary adductors (4 each), then chest (6).
+    expect(order.at(-1)).toBe('chest');
+    expect(order.slice(-4, -1).sort()).toEqual(['adductors', 'glutes_max', 'quads']);
     expect(order.indexOf('triceps')).toBeLessThan(order.indexOf('chest'));
     expect(order.indexOf('biceps')).toBeLessThan(order.indexOf('triceps'));
     expect(text('today-plan-muscle-chest').props.accessibilityLabel).toBe(
@@ -185,33 +186,33 @@ describe('Today: the Plan page over real data', () => {
   });
 
   it.each([
-    ['below', 31, uiRoles.ink],
-    ['at', 32, uiRoles.gain],
-    ['above', 33, uiRoles.gain],
+    ['below', 15, uiRoles.ink],
+    ['at', 16, uiRoles.gain],
+    ['above', 17, uiRoles.gain],
   ])('colours the weekly total %s target, flooring allocated shares only for display', async (_state, count, color) => {
     await bootLocalApp();
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count }]);
     await renderToday();
 
-    // Triceps gets 7.75, 8 and 8.25 allocated sets; colour uses the unrounded target comparison.
+    // Triceps gets 7.5, 8 and 8.5 allocated sets; colour uses the unrounded target comparison.
     const week = within(text('today-plan-muscle-triceps-week'));
-    expect(week.getByText(String(Math.floor(count / 4)))).toHaveStyle({ color });
+    expect(week.getByText(String(Math.floor(count / 2)))).toHaveStyle({ color });
     expect(week.getByText('/8')).toHaveStyle({ color: uiRoles.inkMuted });
-    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent(String(Math.floor(count / 4)));
-    // The spoken label keeps the exact count.
-    expect(text('today-plan-muscle-triceps').props.accessibilityLabel).toContain(`this week ${count / 4} of 8 sets`);
+    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent(String(Math.floor(count / 2)));
+    // The spoken label keeps one decimal.
+    expect(text('today-plan-muscle-triceps').props.accessibilityLabel).toContain(`this week ${count / 2} of 8 sets`);
   });
 
   it('shows a lone secondary half set as ½, never 0', async () => {
     await bootLocalApp();
-    await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 2 }]);
+    await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 1 }]);
     await renderToday();
 
     expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('½');
     expect(within(text('today-plan-muscle-triceps-week')).getByText('½')).toBeTruthy();
   });
 
-  it('shows a third share accurately in Recovery and keeps its raw count for target grading', async () => {
+  it('shows a third share as <1 in Recovery, says it to one decimal and keeps its raw count for target grading', async () => {
     await bootLocalApp();
     await exerciseCatalogData.saveExerciseCatalogExercise({
       id: BENCH.id, name: BENCH.name,
@@ -220,9 +221,9 @@ describe('Today: the Plan page over real data', () => {
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 1 }]);
     await renderToday();
 
-    expect(text('today-plan-muscle-chest-day-2')).toHaveTextContent('0.33');
-    expect(within(text('today-plan-muscle-chest-week')).getByText('0.33')).toHaveStyle({ color: uiRoles.ink });
-    expect(text('today-plan-muscle-chest').props.accessibilityLabel).toContain(`this week ${1 / 3} of 8 sets`);
+    expect(text('today-plan-muscle-chest-day-2')).toHaveTextContent('<1');
+    expect(within(text('today-plan-muscle-chest-week')).getByText('<1')).toHaveStyle({ color: uiRoles.ink });
+    expect(text('today-plan-muscle-chest').props.accessibilityLabel).toContain('today: none yet, this week 0.3 of 8 sets');
   });
 
   it("takes the target from Settings and counts secondary sets as Settings' Progress default says", async () => {
@@ -246,7 +247,7 @@ describe('Today: the Plan page over real data', () => {
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 2 }]);
     await renderToday();
     expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/8');
-    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('½');
+    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('1');
 
     // The settings row another device or the coach changed, as the pull applies it.
     localDatabase().transaction(tx => applyPullPage(tx as Transaction, [{
@@ -280,12 +281,12 @@ describe('Today: the Plan page over real data', () => {
 
     expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/2');
     // Other muscles inherit the default.
-    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('½/10');
+    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('1/10');
 
     // A target changed while Today shows reads again.
     act(() => updatePreferences({ muscleTargetOverrides: { detailed: { chest: 4, triceps: 3 } } }));
     await waitFor(() => expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/4'));
-    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('½/3');
+    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('1/3');
   });
 
   it('reports a failed catalogue in Per muscle mode, and Retry loads it again (a failed catalogue read)', async () => {

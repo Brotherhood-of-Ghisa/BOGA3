@@ -187,9 +187,9 @@ export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
  * role figures are there for a surface that names them.
  */
 export type MuscleSetCounts = {
-  /** Primary-pool working-set shares. */
+  /** Allocated Primary working-set shares. */
   primarySetCount: number;
-  /** Secondary shares before the half-pool multiplier. */
+  /** Secondary sets, each before its ½ weight. */
   secondarySetCount: number;
   /** The combined allocated working-set shares, without rounding. */
   weightedSetCount: number;
@@ -210,7 +210,7 @@ export const createMuscleSetCounter = (): MuscleSetCounter => ({
   allocationBySetAndMuscle: new Map(),
 });
 
-/** Folds allocated shares, preserving both pools when muscles are grouped. */
+/** Folds allocated shares, keeping Primary and Secondary apart when muscles are grouped. */
 export const countMuscleSet = (counter: MuscleSetCounter, contribution: MuscleSetContribution): void => {
   if (contribution.working === false || contribution.roleWeight === 0) return;
   const allocation = contribution.allocation ?? {
@@ -274,7 +274,7 @@ export const countedMuscleAnalyticsSessionIds = (input: MuscleAnalyticsInput): S
   }), input.effortPolicy);
 };
 
-/** Deduplicate raw mappings before splitting each exercise's independent pools. */
+/** Deduplicate raw mappings, then share Primary work and give each Secondary ½. */
 const allocatedMuscleMappings = (mappings: MuscleAnalyticsInput['muscleMappings']) => {
   const byExercise = new Map<string, Map<string, MuscleAnalyticsInput['muscleMappings'][number]>>();
   for (const mapping of mappings) {
@@ -288,10 +288,9 @@ const allocatedMuscleMappings = (mappings: MuscleAnalyticsInput['muscleMappings'
   return [...byExercise.values()].flatMap(bucket => {
     const entries = [...bucket.values()];
     const primaryCount = entries.filter(mapping => mapping.role === 'primary').length;
-    const secondaryCount = entries.filter(mapping => mapping.role === 'secondary').length;
     return entries.map(mapping => ({ ...mapping, allocation: mapping.allocation ?? {
       primary: mapping.role === 'primary' ? 1 / primaryCount : 0,
-      secondary: mapping.role === 'secondary' ? 0.5 / secondaryCount : 0,
+      secondary: mapping.role === 'secondary' ? 0.5 : 0,
     } }));
   });
 };

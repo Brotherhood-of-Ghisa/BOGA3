@@ -22,7 +22,7 @@ const set = (id: string, weight: string, reps: string, setType: string | null,
 
 describe('agent-api training projection', () => {
   it('labels the working-set meaning of its figures', () => {
-    expect(METRIC_REVISION).toBe('working_sets_v8');
+    expect(METRIC_REVISION).toBe('working_sets_v9');
   });
 
   it.each(GROUP_COACHING_ELIGIBILITY)("applies set.eligibility's fixed coaching rule to %s", (_label, setType, counts) => {

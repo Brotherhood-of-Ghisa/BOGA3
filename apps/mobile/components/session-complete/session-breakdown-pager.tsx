@@ -25,7 +25,7 @@ const plural = (value: number, singular: string): string =>
   `${value} ${value === 1 ? singular : `${singular}s`}`;
 
 const muscleRowLabel = (row: SessionBreakdownMuscleRow): string =>
-  `${row.displayName}, ${row.primarySetCount} primary, ${row.secondarySetCount} secondary; ` +
+  `${row.displayName}, ${formatWorkingSetCount(row.primarySetCount)} primary, ${formatWorkingSetCount(row.secondarySetCount)} secondary; ` +
   `volume ${volume(row.volume)}; ${plural(row.recordCount, 'record')}`;
 
 const exerciseRowLabel = (row: SessionBreakdownExerciseRow): string =>

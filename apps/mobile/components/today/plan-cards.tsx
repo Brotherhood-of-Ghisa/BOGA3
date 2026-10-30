@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 import type { NextPlannedSession, PlanWeekDay, RecoveryRow, TodayPlan } from '@/src/today-plan';
@@ -25,14 +26,14 @@ const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frida
 const weekdayLetter = (date: Date) => WEEKDAYS[date.getDay()].charAt(0);
 const weekdayShort = (date: Date) => WEEKDAYS[date.getDay()].slice(0, 3);
 const spokenDate = (date: Date) => `${WEEKDAYS[date.getDay()]} ${formatCompactDate(date)}`;
-const sets = (count: number) => `${count} ${count === 1 ? 'set' : 'sets'}`;
+const sets = (count: number) => `${formatWorkingSetCount(count)} ${formatWorkingSetCount(count) === '1' ? 'set' : 'sets'}`;
 // A plan's rows are targets, never working sets ([[set.count-display]]).
 const targetSets = (count: number) => `${count} ${count === 1 ? 'target set' : 'target sets'}`;
 // The grid shows whole sets, rounded down, so a total reads at its target only
-// when it is met; sub-one shares stay visible ([[muscle.set-count]]).
-// Spoken labels keep the unrounded allocation.
+// when it is met; work under one set reads `½` or `<1` ([[muscle.set-count]]).
+// Spoken labels keep one decimal.
 export const wholeSets = (count: number) => count === 0.5 ? '½'
-  : count > 0 && count < 1 ? String(Number(count.toPrecision(2))) : String(Math.floor(count));
+  : count > 0 && count < 1 ? '<1' : String(Math.floor(count));
 
 // No sets that day reads as a rest day ([[copy.blank-history]]); none yet today, as none.
 const recoveryRowLabel = (row: RecoveryRow, days: Date[]) =>
@@ -40,7 +41,7 @@ const recoveryRowLabel = (row: RecoveryRow, days: Date[]) =>
     row.name,
     ...row.days.map((count, index) => `${spokenDate(days[index])}: ${count === null ? 'rest' : sets(count)}`),
     `today: ${row.today === null ? 'none yet' : sets(row.today)}`,
-    `this week ${row.weekSets} of ${row.target} sets`,
+    `this week ${formatWorkingSetCount(row.weekSets)} of ${row.target} sets`,
   ].join(', ');
 
 // A wider gutter only at the Monday boundary; the line stays centred in it.

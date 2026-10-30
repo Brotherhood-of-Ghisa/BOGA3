@@ -2,18 +2,19 @@
 
 ### muscle.set-count · definition · accepted
 
-Every exercise splits two independent pools across its distinct raw mappings:
-Primary work is shared equally; Secondary work shares a separate half pool.
+Every exercise shares one set of Primary work equally across its distinct raw
+Primary mappings; each Secondary mapping gets ½, however many there are.
+Decided 2026-10-30 (secondaries no longer share one ½ pool).
 The same allocation applies to working sets and per-side muscle Volume.
 Stabilizers contribute nothing. Stored mapping weights do not set shares.
 Allocation happens before filtering or Broad grouping: merged entries add their
 shares, and hidden/untracked entries never redistribute work. Exercise figures
 stay unchanged ([[set.count-display]]).
 
-Keep fractions through aggregation; tables and history show at most two
-decimal places, retaining two significant digits for nonzero shares below
-0.01. Recovery alone floors totals of at least one; below one, it shows `½` for a half and two significant decimal digits for
-other shares. Its spoken labels retain unrounded values.
+Keep fractions through aggregation; every figure and spoken label shows at most
+one decimal (`1.5`, `0.3`). Today and Progress show whole sets: Progress rounds,
+and its change is the difference of the rounded figures. Today's Recovery floors
+totals of at least one; below one, it shows `½` for a half and `<1` otherwise.
 
 <!-- fact-table: muscle.set-count -->
 | Working sets mapped to one muscle | It gets |
@@ -24,10 +25,11 @@ other shares. Its spoken labels retain unrounded values.
 | 1 set, duplicate roles on the same raw muscle | 1 |
 | 3 sets, one of two primaries | 1.5 |
 | 1 set, one of three primaries | 0.3333333333333333 |
-| 3 sets, one of two secondaries | 0.75 |
+| 3 sets, one of two secondaries | 1.5 |
 | 4 stabilizer | 0 |
 
-Why: co-primary muscles share the lift; secondary assistance is a separate pool.
+Why: co-primary muscles share the lift; a secondary does half a set of work
+whatever else assists.
 Code: `collectMuscleSetContributions`, `countMuscleSets` and `applyMuscleReport`
 in `apps/mobile/src/data/muscle-analytics.ts`; Recovery's display is `wholeSets`
 in `apps/mobile/components/today/plan-cards.tsx`.

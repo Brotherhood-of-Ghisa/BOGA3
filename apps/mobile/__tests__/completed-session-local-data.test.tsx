@@ -415,10 +415,10 @@ describe('completed-session detail over real data', () => {
       invalidateExerciseCatalogCache();
     });
 
-    // Glute Max gets one third of the independent Secondary half-pool; hidden Spinal Erectors retains its share.
+    // Glute Max gets ½ as a Secondary; hidden Spinal Erectors keeps its own ½.
     const glutes = await screen.findByTestId('session-completion-muscle-glutes_max');
-    expect(glutes).toHaveTextContent('Glutes & Hams—0.330.17');
-    expect(glutes).toHaveProp('accessibilityLabel', `Glutes & Hams, ${1 / 6} sets: 0 primary, ${1 / 3} secondary`);
+    expect(glutes).toHaveTextContent('Glutes & Hams—10.5');
+    expect(glutes).toHaveProp('accessibilityLabel', 'Glutes & Hams, 0.5 sets: 0 primary, 1 secondary');
     expect(screen.getByTestId('session-completion-muscle-quads')).toBeTruthy();
     expect(screen.queryByTestId('session-completion-muscle-adductors')).toBeNull();
     expect(screen.queryByTestId('session-completion-muscle-spinal_erectors')).toBeNull();
@@ -682,11 +682,11 @@ describe('a session written through the app', () => {
       .toBe('Pectoralis, 3 primary, 0 secondary; volume 1758; 0 records');
     // Bench maps triceps as secondary: its 3 sets count half, with no primary sets.
     expect(label('session-completion-breakdown-muscle-triceps'))
-      .toBe('Triceps, 0 primary, 1.5 secondary; volume 439; 0 records');
+      .toBe('Triceps, 0 primary, 3 secondary; volume 879; 0 records');
     // The row carries the roles as counted, then the muscle's weighted volume
     // and its record count; a zero is a dash, as the role columns have drawn.
     expect(screen.getByTestId('session-completion-breakdown-muscle-triceps'))
-      .toHaveTextContent('Triceps—1.5439—');
+      .toHaveTextContent('Triceps—3879—');
     // The page's title is a header; the table carries no formula footnote.
     expect(screen.getByRole('header', { name: 'By muscle' })).toBeTruthy();
     expect(screen.queryByText('Sets = primary + ½ secondary')).toBeNull();

@@ -227,7 +227,8 @@ describe('muscle.set-count', () => {
   // The fact applies on every screen that shows sets per muscle, so a row is
   // only satisfied when all of them agree. One exercise definition per set, so
   // a set's roles are its own: each surface takes the strongest role a set
-  // holds for the same raw muscle; other raw mappings share each role's pool.
+  // holds for the same raw muscle; other primaries share the set, other
+  // secondaries change nothing.
   const sessionFor = (sets: ('primary' | 'secondary' | 'stabilizer')[][], others: ('primary' | 'secondary')[]): CurrentSessionMuscleSummaryInput => ({
     sessionId: 'session',
     sessionAt: AT,

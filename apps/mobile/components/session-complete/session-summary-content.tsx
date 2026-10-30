@@ -15,13 +15,13 @@ import { SessionShareSheet, type SessionShareSnapshot } from './session-share-sh
 export type MuscleCatalogState = 'loading' | 'ready' | 'error';
 
 const formatCount = (count: number, singular: string): string =>
-  `${count} ${count === 1 ? singular : `${singular}s`}`;
+  `${formatWorkingSetCount(count)} ${formatWorkingSetCount(count) === '1' ? singular : `${singular}s`}`;
 
 const MUSCLE_TABLE_COLUMNS = ['Pri', 'Sec', 'Sets'] as const;
 
 const muscleRowLabel = (muscle: SessionMuscleWorkingSetEntry): string =>
   `${muscle.displayName}, ${formatCount(muscle.weightedSetCount, 'set')}: ` +
-  `${muscle.primarySetCount} primary, ${muscle.secondarySetCount} secondary`;
+  `${formatWorkingSetCount(muscle.primarySetCount)} primary, ${formatWorkingSetCount(muscle.secondarySetCount)} secondary`;
 
 // A role with no sets is an absent value: a dash in `faint`.
 function RoleCount({ count }: { count: number }) {

@@ -109,8 +109,8 @@ describe('Broad', () => {
     const input = inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS);
     const byMuscle = statsByMuscle(reported(input, broadRows()));
 
-    expect(byMuscle.get(QUADS)).toMatchObject({ displayName: 'Quads', familyName: 'Legs', workingSetCount: 3.5 });
-    expect(byMuscle.get(GLUTES_HAMS)).toMatchObject({ displayName: 'Glutes & Hams', workingSetCount: 0.5 });
+    expect(byMuscle.get(QUADS)).toMatchObject({ displayName: 'Quads', familyName: 'Legs', workingSetCount: 4.5 });
+    expect(byMuscle.get(GLUTES_HAMS)).toMatchObject({ displayName: 'Glutes & Hams', workingSetCount: 1.5 });
 
     // Broad Quads adds its Primary share and Adductors' allocated Secondary share.
     // Hidden Spinal Erectors' share is dropped without reallocating it.
@@ -122,8 +122,8 @@ describe('Broad', () => {
   it('groups one exercise\'s entry shares while retaining its strongest display role', () => {
     const output = reported(inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS), broadRows());
     expect(output.muscleMappings).toEqual([
-      { exerciseDefinitionId: 'squat', muscleGroupId: QUADS, role: 'primary', allocation: { primary: 1, secondary: 1 / 6 } },
-      { exerciseDefinitionId: 'squat', muscleGroupId: GLUTES_HAMS, role: 'secondary', allocation: { primary: 0, secondary: 1 / 6 } },
+      { exerciseDefinitionId: 'squat', muscleGroupId: QUADS, role: 'primary', allocation: { primary: 1, secondary: 0.5 } },
+      { exerciseDefinitionId: 'squat', muscleGroupId: GLUTES_HAMS, role: 'secondary', allocation: { primary: 0, secondary: 0.5 } },
     ]);
   });
 

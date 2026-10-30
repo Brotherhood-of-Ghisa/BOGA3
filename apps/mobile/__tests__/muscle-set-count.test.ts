@@ -1,6 +1,6 @@
 // One rule for a muscle's set count ([[muscle.set-count]]) across every surface
 // that derives one: a working set gives a muscle 1 where it maps as primary and
-// shares one primary pool and a separate half secondary pool.
+// shares one set across its primaries, and ½ where it maps as secondary.
 // The last test is the cross-surface one: the session summary and Progress must
 // report the same figure for the same session.
 import {

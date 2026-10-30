@@ -1,4 +1,4 @@
-import { formatWorkingSetCount } from '@/src/exercise-calculations/format';
+import { formatWholeSetCount } from '@/src/exercise-calculations/format';
 /* eslint-disable import/first */
 
 /**
@@ -645,7 +645,7 @@ describe('The history page over real data', () => {
     expect(shownMetric('muscle')).toBe('workingSetCount');
   });
 
-  it('shows a secondary muscle\'s allocated day cells, unrounded', async () => {
+  it('shows a secondary muscle\'s allocated day cells as whole sets', async () => {
     await loadMaestroFixture('exercise-block-history');
     // Quads becomes a secondary mapping, keeping the fixture's real sets
     // ([[muscle.set-count]]) and the production aggregation/rendering path.
@@ -657,12 +657,12 @@ describe('The history page over real data', () => {
 
     const trained = renderedDailySample('muscle').filter(tile => tile.day?.hasTraining);
     expect(trained.length).toBeGreaterThan(0);
-    // Quads shares the half-pool with three other Secondaries: one eighth per set.
-    expect(trained.every(tile => (tile.day!.value * 8) % 1 === 0)).toBe(true);
-    expect(trained.some(tile => tile.day!.value % 0.5 !== 0)).toBe(true);
+    // Quads gets ½ per set, however many other Secondaries the squat has.
+    expect(trained.every(tile => (tile.day!.value * 2) % 1 === 0)).toBe(true);
+    expect(trained.some(tile => tile.day!.value % 1 !== 0)).toBe(true);
     for (const tile of trained) {
       expect(screen.getByTestId(`stats-muscle-history-heatmap-cell-${tile.dateKey}-value`))
-        .toHaveTextContent(formatWorkingSetCount(tile.day!.value));
+        .toHaveTextContent(new RegExp(`^${formatWholeSetCount(tile.day!.value)}$`));
     }
   });
 

@@ -146,7 +146,7 @@ describe('training status: muscles', () => {
     expect(result.counts_secondary_sets).toBe(true);
   });
 
-  it.each([true, false])('allocates Machine Dips pools before hiding muscles, secondary %s', (countSecondary) => {
+  it.each([true, false])('allocates Machine Dips shares before hiding muscles, secondary %s', (countSecondary) => {
     const result = status({
       timeZone: 'UTC',
       settings: { weekly_working_set_target: 10, muscle_target_mode: 'single', muscle_target_overrides: {},
@@ -161,11 +161,11 @@ describe('training status: muscles', () => {
       definitions: definitionsOf(definition('bench', { name: 'Machine Dips' })),
       training: training([benchSession('dips', daysAgo(1), 3)]),
     });
-    expect(result.metric_revision).toBe('working_sets_v8');
+    expect(result.metric_revision).toBe('working_sets_v9');
     expect(result.muscles.find((muscle) => muscle.id === 'chest')).toMatchObject({ week_sets: 1.5, weekly_target: 10,
       recovery_days: [{ sets: null }, { sets: null }, { sets: 1.5 }] });
     expect(result.muscles.find((muscle) => muscle.id === 'triceps')?.week_sets).toBe(1.5);
-    expect(result.muscles.find((muscle) => muscle.id === 'deltoid')?.week_sets).toBe(countSecondary ? 0.75 : 0);
+    expect(result.muscles.find((muscle) => muscle.id === 'deltoid')?.week_sets).toBe(countSecondary ? 1.5 : 0);
     expect(result.muscles.map((muscle) => muscle.id)).not.toContain('lats');
   });
 
