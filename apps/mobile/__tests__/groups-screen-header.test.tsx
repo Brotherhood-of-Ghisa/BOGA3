@@ -78,10 +78,13 @@ describe('the Groups header', () => {
   it('draws a page action before Manage, and none when not given', () => {
     renderHeader({ headerAction: <Text testID="extra-action">⋮</Text> });
     expect(screen.getByTestId('extra-action')).toBeTruthy();
+    // The title gives up width for it, so the two never overlap.
+    const narrow = StyleSheet.flatten(screen.getByTestId('groups-title').props.style).maxWidth;
     expect(screen.getByTestId('groups-manage-button')).toBeTruthy();
 
     screen.unmount();
     renderHeader();
     expect(screen.queryByTestId('extra-action')).toBeNull();
+    expect(StyleSheet.flatten(screen.getByTestId('groups-title').props.style).maxWidth).toBeGreaterThan(narrow);
   });
 });

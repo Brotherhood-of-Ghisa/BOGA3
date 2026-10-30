@@ -325,7 +325,6 @@ function StreamEventsButton({ onPress }: { onPress: () => void }) {
       accessibilityHint="Chooses which event types the stream draws"
       accessibilityLabel="Event types"
       name="more-vertical"
-      nativeHeader
       onPress={onPress}
       testID="groups-stream-events-button"
       tone="muted"

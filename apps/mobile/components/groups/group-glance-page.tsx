@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, View, type RefreshControlProps, type Styl
 
 import { Card } from '@/components/ui/card';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 import type { GroupApiError } from '@/src/groups/api';
 import {
   GROUP_RANK_PERIODS,
@@ -223,14 +223,12 @@ function GlanceCards({
   );
 }
 
-/** A card's heading, as Today's cards head theirs: an ink micro-label on a tap-height row at the card's top. */
+/** A card's heading, as Today's cards head theirs: an ink micro-label at the card's top. */
 function CardTitle({ title, testID }: { title: string; testID: string }) {
   return (
-    <View style={styles.cardHeader}>
-      <Text accessibilityRole="header" allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.ink]} testID={testID}>
-        {title}
-      </Text>
-    </View>
+    <Text accessibilityRole="header" allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.ink]} testID={testID}>
+      {title}
+    </Text>
   );
 }
 
@@ -259,14 +257,9 @@ const styles = StyleSheet.create({
   held: {
     opacity: 0.5,
   },
-  // Today's card frame: side and bottom padding, the header row taking the top.
+  // Today's card frame: `md` all round, the heading `sm` above the body.
   card: {
-    paddingHorizontal: uiSpace.md,
-    paddingBottom: uiSpace.md,
+    padding: uiSpace.md,
     gap: uiSpace.sm,
-  },
-  cardHeader: {
-    minHeight: uiGeometry.tapTarget,
-    justifyContent: 'center',
   },
 });
