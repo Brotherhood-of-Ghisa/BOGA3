@@ -6,7 +6,7 @@
  */
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import * as mockReact from 'react';
-import { StyleSheet, type TextStyle } from 'react-native';
+import { StyleSheet, Text, type TextStyle } from 'react-native';
 
 import { uiText } from '@/components/ui/text-roles';
 
@@ -73,5 +73,15 @@ describe('the Groups header', () => {
     expect(screen.getByTestId('groups-manage-button')).toHaveTextContent(/manage/i);
     fireEvent.press(screen.getByTestId('groups-manage-button'));
     expect(onOpenManage).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws a page action before Manage, and none when not given', () => {
+    renderHeader({ headerAction: <Text testID="extra-action">⋮</Text> });
+    expect(screen.getByTestId('extra-action')).toBeTruthy();
+    expect(screen.getByTestId('groups-manage-button')).toBeTruthy();
+
+    screen.unmount();
+    renderHeader();
+    expect(screen.queryByTestId('extra-action')).toBeNull();
   });
 });

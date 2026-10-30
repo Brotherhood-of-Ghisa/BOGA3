@@ -95,10 +95,12 @@ const styles = StyleSheet.create({
   board: {
     gap: uiSpace.xs,
   },
+  // A tap-height row, as a card header on Today.
   heading: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     gap: uiSpace.sm,
+    minHeight: uiGeometry.tapTarget,
   },
   headingTitle: {
     flex: 1,

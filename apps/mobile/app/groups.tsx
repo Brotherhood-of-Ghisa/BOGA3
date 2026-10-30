@@ -173,6 +173,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
     <GroupScreenHeader
       groupName={groupName}
       groups={(groups ?? []).map((group) => ({ groupId: group.group_id, name: group.name }))}
+      headerAction={segment === 'stream' && isDevMode() ? <StreamEventsButton onPress={() => setEventsSheet(true)} /> : null}
       onOpenManage={() => router.push('/group/mine')}
       onSelectGroup={pickGroup}
       selectedGroupId={selectedGroupId}
@@ -219,7 +220,6 @@ function GroupsTabContent({ userId }: { userId: string }) {
     stream: (frame) => (
       <View style={frameStyle(frame)}>
         <GroupsStreamPage
-          header={<StreamTools onOpenEvents={() => setEventsSheet(true)} />}
           hiddenEventKinds={hiddenEventKinds}
           inlineError={inlineError}
           offline={offline}
@@ -318,27 +318,24 @@ function GroupsScrollPage({ frame, refreshControl, testID, children }: {
   );
 }
 
-/** Over the stream, in dev mode only: the event-type menu. */
-function StreamTools({ onOpenEvents }: { onOpenEvents: () => void }) {
-  if (!isDevMode()) return <View />;
+/** In the title bar on the Stream, in dev mode only: the event-type menu. */
+function StreamEventsButton({ onPress }: { onPress: () => void }) {
   return (
-    <View style={styles.streamTools}>
-      <IconButton
-        accessibilityHint="Chooses which event types the stream draws"
-        accessibilityLabel="Event types"
-        name="more-vertical"
-        onPress={onOpenEvents}
-        testID="groups-stream-events-button"
-        tone="muted"
-      />
-    </View>
+    <IconButton
+      accessibilityHint="Chooses which event types the stream draws"
+      accessibilityLabel="Event types"
+      name="more-vertical"
+      nativeHeader
+      onPress={onPress}
+      testID="groups-stream-events-button"
+      tone="muted"
+    />
   );
 }
 
 type GroupsStreamPageProps = {
   stream: ReturnType<typeof useGroupStream>;
   userId: string;
-  header: ReactElement;
   hiddenEventKinds: readonly StreamEventKind[];
   inlineError: ReturnType<typeof pickInlineError>;
   offline: boolean;
@@ -370,6 +367,7 @@ function GroupsStreamPage({ stream, inlineError, offline, onRefresh, onOpenSessi
       {...list}
       contentContainerStyle={styles.pageContent}
       emptyState={emptyState}
+      header={<View />}
       onPressSession={(card) =>
         onOpenSession(`/group-session/${card.memberUserId}/${card.sessionId}?groupId=${encodeURIComponent(card.groupId)}`)
       }
@@ -393,9 +391,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.lg,
     paddingTop: uiSpace.sm,
     gap: uiSpace.sm,
-  },
-  streamTools: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
   },
 });

@@ -43,6 +43,9 @@ jest.mock('expo-router', () => ({
     typeof options?.headerRight === 'function' ? options.headerRight({}) : null) },
 }));
 
+let mockDevMode = false;
+jest.mock('@/src/utils/isDevMode', () => ({ isDevMode: () => mockDevMode }));
+
 const mockUseAuth = jest.fn();
 jest.mock('@/src/auth', () => ({ useAuth: () => mockUseAuth() }));
 
@@ -407,6 +410,26 @@ describe('Groups tab', () => {
     await waitForGone(() => screen.queryByTestId(cardID('friend-1:s-1')));
     await screen.findByTestId(cardID('friend-2:s-2'));
     expect(api.getCompetitionStream).toHaveBeenCalledWith('group-b');
+  });
+
+  it('puts the dev-only event-type menu in the title bar, on the Stream alone', async () => {
+    mockDevMode = true;
+    try {
+      render(<GroupsTabRoute />);
+      await screen.findByTestId('groups-tab-glance');
+      expect(screen.queryByTestId('groups-stream-events-button')).toBeNull();
+      await openStream();
+      fireEvent.press(screen.getByTestId('groups-stream-events-button'));
+      expect(await screen.findByTestId('groups-stream-events-sheet')).toBeTruthy();
+    } finally {
+      mockDevMode = false;
+    }
+  });
+
+  it('draws no event-type menu outside dev mode', async () => {
+    render(<GroupsTabRoute />);
+    await openStream();
+    expect(screen.queryByTestId('groups-stream-events-button')).toBeNull();
   });
 
   it('opens on the group named by ?groupId=', async () => {

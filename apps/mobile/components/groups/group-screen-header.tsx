@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
@@ -28,6 +28,8 @@ export type GroupScreenHeaderProps = {
   groupName: string;
   onSelectGroup: (groupId: string) => void;
   onOpenManage: () => void;
+  /** A control before `Manage`: the stream's dev-only event-type menu. */
+  headerAction?: ReactNode;
 };
 
 // Clear of the back arrow and `Manage` on a 375pt phone.
@@ -39,7 +41,7 @@ const TITLE_MAX_WIDTH = 200;
  * switch — and `Manage` on the right, the way into joining, creating and each
  * group's page.
  */
-export function GroupScreenHeader({ groups, selectedGroupId, groupName, onSelectGroup, onOpenManage }: GroupScreenHeaderProps) {
+export function GroupScreenHeader({ groups, selectedGroupId, groupName, onSelectGroup, onOpenManage, headerAction }: GroupScreenHeaderProps) {
   const [switching, setSwitching] = useState(false);
   const canSwitch = groups.length > 1;
   return (
@@ -49,7 +51,10 @@ export function GroupScreenHeader({ groups, selectedGroupId, groupName, onSelect
           title: groupName,
           headerTitle: () => <GroupsTitle canSwitch={canSwitch} name={groupName} onPress={() => setSwitching(true)} />,
           headerRight: () => (
-            <ActionButton label="Manage" onPress={onOpenManage} testID="groups-manage-button" variant="text" />
+            <View style={styles.actions}>
+              {headerAction}
+              <ActionButton label="Manage" onPress={onOpenManage} testID="groups-manage-button" variant="text" />
+            </View>
           ),
         }}
       />
@@ -113,6 +118,10 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.6,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   text: {
     flexShrink: 1,
