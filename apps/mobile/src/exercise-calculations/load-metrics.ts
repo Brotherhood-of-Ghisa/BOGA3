@@ -131,8 +131,9 @@ export const resolveCalculatedLoad = (input: LoadContext & {
   };
 };
 
-/** Actual performed values only. Warm-ups count; effort does not alter maths. */
-export const calculateSetMetrics = (input: SetMetricInput): SetMetrics => {
+/** Performed projections before the finite guard, for aggregators that isolate
+ * overflow by metric. The ordinary reader below keeps its all-or-none result. */
+export const calculateSetMetricCandidates = (input: SetMetricInput): SetMetrics => {
   const weight = canonicalizeWeightForReps(input.weightValue ?? '', input.repsValue ?? '');
   const reps = parseSetReps(input.repsValue);
   if (reps === null || parseSetWeight(weight) === null || !isConfirmedPerformedSet({
@@ -157,11 +158,6 @@ export const calculateSetMetrics = (input: SetMetricInput): SetMetrics => {
   const enteredWeightFactor = input.loadInputMode === 'per_side_load' ? 2 : 1;
   const estimatedOneRepMaxKg = estimatedTotalOneRepMaxKg === null ? null
     : (estimatedTotalOneRepMaxKg - load.bodyweightPartKg) / enteredWeightFactor;
-  if (![volumeKgReps, estimatedOneRepMaxKg, estimatedTotalOneRepMaxKg].every(
-    value => value === null || Number.isFinite(value)
-  )) {
-    return { eligible: true, reps, load: invalid('numeric_overflow'), ...unavailableMetrics };
-  }
   return {
     eligible: true,
     reps,
@@ -170,6 +166,17 @@ export const calculateSetMetrics = (input: SetMetricInput): SetMetrics => {
     estimatedOneRepMaxKg,
     estimatedTotalOneRepMaxKg,
   };
+};
+
+/** Actual performed values only. Warm-ups count; effort does not alter maths. */
+export const calculateSetMetrics = (input: SetMetricInput): SetMetrics => {
+  const result = calculateSetMetricCandidates(input);
+  if (result.eligible && result.load.status === 'known' &&
+    ![result.volumeKgReps, result.estimatedOneRepMaxKg, result.estimatedTotalOneRepMaxKg].every(
+      value => value === null || Number.isFinite(value))) {
+    return { eligible: true, reps: result.reps, load: invalid('numeric_overflow'), ...unavailableMetrics };
+  }
+  return result;
 };
 
 /**

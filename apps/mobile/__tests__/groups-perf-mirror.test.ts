@@ -67,6 +67,7 @@ test('one drain runs session jobs, then comparison jobs, and counts what each ev
   expect(calls.map((call) => call.name)).toEqual([
     'group_eval_requeue_rules', 'group_eval_claim', 'group_eval_session_rows', 'group_eval_complete', 'group_eval_claim',
     'group_metric_eval_claim', 'group_metric_eval_prepare', 'group_metric_eval_publish', 'group_metric_eval_claim',
+    'group_cow_eval_claim',
   ]);
   expect(calls[3].args).toEqual({ p_job_id: 1, p_generation: 3, p_facts: [] });
   expect(calls[0].args).toEqual({ p_rules_version: GROUP_EVAL_RULES_VERSION, p_limit: RULES_REQUEUE_LIMIT });

@@ -1,4 +1,5 @@
 import { isObservedCompetitionPolicy } from './competition-cache-policy';
+import { coWSummaryCacheKey, isCoWSummaryWire } from './cow-wire';
 import { isCompetitionExerciseListWire, isCompetitionPodiumsWire, isCompetitionSessionDetailWire,
   isCompetitionPeriodTotalsWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire, isGroupSharedExercisesListWire } from './competition-reader-guards';
 
@@ -22,6 +23,7 @@ export function isCompetitionCachePayload(key: string, value: unknown): boolean 
     Array.isArray(value.groups) && value.groups.every(summary);
   const groupId = scope[0];
   if (!groupId) return false;
+  if (kind === 'cow-summary') return isCoWSummaryWire(value) && value.group_id === groupId && key === coWSummaryCacheKey(value);
   if (kind === 'group-policy') return isObservedCompetitionPolicy(value);
   if (kind === 'group') return exact(value,['group','members']) && summary(value.group) && record(value.group) &&
     value.group.group_id === groupId && Array.isArray(value.members) && value.members.every(member);

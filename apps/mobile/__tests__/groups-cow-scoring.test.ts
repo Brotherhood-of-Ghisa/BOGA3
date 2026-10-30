@@ -174,7 +174,7 @@ it.each([false, true])('aggregates the existing scorer with ordinary/normalized 
   expect(values(result, 'volume')).toEqual([scores[0].value * 2]);
   expect(values(result, 'e1rm')).toEqual([scores[1].value]);
   expect(values(result, 'improvement')).toEqual([0]);
-  expect(Object.keys(ranking(result, 'e1rm').entries[0]).sort()).toEqual(['memberId', 'rank', 'receivedAtUs', 'value']);
+  expect(Object.keys(ranking(result, 'e1rm').entries[0]).sort()).toEqual(['memberId', 'rank', 'receivedAtUs', 'sourceSetIds', 'value']);
   expect(JSON.stringify(result)).not.toContain('private-reading');
 });
 

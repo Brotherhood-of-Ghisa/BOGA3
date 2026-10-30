@@ -7,8 +7,10 @@ jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () =>
   }); },
 }) }) }));
 
-import { cancelCoW, createCoW, createGroup, getCoW, getCoWCalendar, listCoWs, setCoWCalendar, updateCoW } from '@/src/groups/api';
+import { getCoWResults, getCoWSummary, cancelCoW, createCoW, createGroup, getCoW, getCoWCalendar, listCoWs, setCoWCalendar, updateCoW } from '@/src/groups/api';
 import { isCoWCalendarWire, isCoWDefinitionWire, isCoWListWire, isCoWWriteWire } from '@/src/groups/cow-wire';
+
+import { cowResult, cowSummary } from './helpers/cow-fixtures';
 
 const cow = { cow_id: 'c', group_id: 'g', group_exercise_id: 'e', week_start: '2026-11-02', time_zone: 'Europe/London',
   starts_at_us: 1793577600000000, ends_at_us: 1794182400000000, metrics: ['e1rm', 'volume'], revision: 1, state: 'scheduled' };
@@ -85,4 +87,20 @@ it('rejects response identities from another group or CoW before a caller can ca
   await expect(cancelCoW('g', 'c', 1)).rejects.toMatchObject({ code: 'INTERNAL', invalidPayload: true });
   respond({ cows: [{ ...cow, group_id: 'other-group' }], next_cursor: null });
   await expect(listCoWs('g')).rejects.toMatchObject({ code: 'INTERNAL', invalidPayload: true });
+});
+
+
+it('reads scoped result pages and summaries through the same protocol and rejects crossed identities', async () => {
+  const result = cowResult(); result.rankings = [result.rankings[0]];
+  respond(result);
+  expect(await getCoWResults('g1', 'cow1', 'e1rm', 'opaque', 2)).toEqual(result);
+  expect(mockRpc).toHaveBeenLastCalledWith('group_cow_results', { p_group_id: 'g1', p_cow_id: 'cow1', p_metric: 'e1rm', p_before: 'opaque', p_limit: 2 });
+  respond(cowSummary());
+  expect(await getCoWSummary('g1')).toEqual(cowSummary());
+  respond(result);
+  await expect(getCoWResults('g1', 'cow2', 'e1rm')).rejects.toMatchObject({ invalidPayload: true });
+  respond(result);
+  await expect(getCoWResults('g1', 'cow1', 'volume')).rejects.toMatchObject({ invalidPayload: true });
+  respond(cowSummary());
+  await expect(getCoWSummary('g2')).rejects.toMatchObject({ invalidPayload: true });
 });

@@ -2,6 +2,7 @@ import { isCompetitionBoardWire,isCompetitionRulesWire } from './competition-wir
 import { isCompetitionExerciseListWire, isCompetitionPodiumsWire, isCompetitionHistoryWire,isCompetitionRevisionsWire,isCompetitionSessionDetailWire,
   isCompetitionPeriodTotalsWire,isCompetitionStreamWire,isCompetitionWeekSummaryWire } from './competition-reader-guards';
 import type { CompetitionExerciseWire, CompetitionRulesWire, CompetitionSessionWire } from './competition-wire';
+import { isCoWResultWire, isCoWSummaryWire } from './cow-wire';
 
 type ExercisePolicy = { id: string; rules: CompetitionRulesWire; archived: boolean };
 type SessionDisclosure = { member_id: string; session_id: string; exercise_id: string; visibility: 'normalized' | 'ordinary' };
@@ -34,6 +35,9 @@ function catalogueObservation(groupId: string,exercises: CompetitionExerciseWire
 /** Current public context only. An event's historic rules are never a current policy observation. */
 function currentPolicyObservations(key: string,value: unknown): CompetitionPolicyObservation[] {
   const groupId = key.split(':')[2];
+  if (isCoWSummaryWire(value)) return value.result ? currentPolicyObservations(key, value.result) : [];
+  if (isCoWResultWire(value)) return [{ groupId: value.cow.group_id, enabled: value.bodyweight_calculations_enabled,
+    exercises: value.exercise ? [publicExercise(value.exercise)] : [] }];
   if (isCompetitionBoardWire(value)) return [{ groupId,enabled: value.rules.bodyweight_contribution>0?value.rules.bodyweight_calculations_enabled:undefined,exercises: [{ id: value.group_exercise_id,
     rules: value.rules,archived: value.state === 'archived' }] }];
   if (isCompetitionHistoryWire(value) || isCompetitionRevisionsWire(value)) return [catalogueObservation(groupId,[value.exercise])];
@@ -65,7 +69,8 @@ function hasAbsoluteProjection(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(hasAbsoluteProjection);
   const row=value as Record<string,unknown>;
   if (Object.hasOwn(row,'weight_value') && row.weight_value!==null ||
-    (row.unit==='kg' || row.unit==='kg_reps') && typeof row.value==='number') return true;
+    (row.unit==='kg' || row.unit==='kg_reps') && (typeof row.value==='number' ||
+      Array.isArray(row.entries) && row.entries.some(entry => entry && typeof entry.value==='number'))) return true;
   return Object.values(row).some(hasAbsoluteProjection);
 }
 const sessionKey = (row: SessionDisclosure) => JSON.stringify([row.member_id,row.session_id,row.exercise_id]);

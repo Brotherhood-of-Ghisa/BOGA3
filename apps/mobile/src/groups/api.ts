@@ -10,8 +10,8 @@ import type { CompetitionBoardWire, CompetitionCertifyResultWire, CompetitionCer
   GroupSharedExerciseDeleteWire, GroupSharedExercisesListWire, GroupSharedExerciseWriteWire } from './competition-wire';
 import type { CompetitionMetric } from './competition-contract';
 import type { CoWMetric } from './cow-scoring';
-import { isCoWCalendarWire, isCoWListWire, isCoWWriteWire,
-  type CoWCalendarWire, type CoWListWire, type CoWWriteWire } from './cow-wire';
+import { isCoWCalendarWire, isCoWListWire, isCoWWriteWire, isCoWResultWire, isCoWSummaryWire,
+  type CoWCalendarWire, type CoWListWire, type CoWWriteWire, type CoWResultWire, type CoWSummaryWire } from './cow-wire';
 
 // The typed group RPC client (`docs/specs/tech/groups-contract.md`).
 // It is the ONLY code that calls Supabase for groups. Every failure leaves this
@@ -136,7 +136,9 @@ export type GroupRpcName =
   | 'group_cow_update'
   | 'group_cow_cancel'
   | 'group_cow_get'
-  | 'group_cow_list';
+  | 'group_cow_list'
+  | 'group_cow_results'
+  | 'group_cow_summary';
 
 type RpcResponse = { data: unknown; error: RpcErrorLike | null; status?: number | null };
 
@@ -444,3 +446,12 @@ export const listCoWs = (groupId: string, before: string | null = null, limit = 
   competitionRpc('group_cow_list', {
     p_group_id: groupId, p_before: before, p_limit: limit,
   }, isCoWListWire, p => p.cows.every(cow => cow.group_id === groupId));
+
+export const getCoWResults = (groupId: string, cowId: string, metric: CoWMetric,
+  before: string | null = null, limit = 20): Promise<CoWResultWire> =>
+  competitionRpc('group_cow_results', { p_group_id: groupId, p_cow_id: cowId, p_metric: metric, p_before: before, p_limit: limit },
+    isCoWResultWire, p => p.cow.group_id === groupId && p.cow.cow_id === cowId &&
+      p.rankings.length === 1 && p.rankings[0].metric === metric);
+
+export const getCoWSummary = (groupId: string): Promise<CoWSummaryWire> =>
+  competitionRpc('group_cow_summary', { p_group_id: groupId }, isCoWSummaryWire, p => p.group_id === groupId);

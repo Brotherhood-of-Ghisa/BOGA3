@@ -20,6 +20,7 @@ import {
 } from '../../../apps/mobile/src/groups/set-facts.ts';
 
 import { evaluateCompetitionGraph, type CompetitionEvaluationGraph } from '../../../apps/mobile/src/groups/competition-evaluation.ts';
+import { CoWEvaluationError, evaluateCoWGraph, type CoWEvaluationGraph } from '../../../apps/mobile/src/groups/cow-evaluation.ts';
 
 const CLAIM_LIMIT = 20;
 const MAX_CLAIM_ROUNDS = 10;
@@ -152,6 +153,26 @@ const processMetricJob = async (db: SupabaseClient, job: MetricJob): Promise<Met
   }
 };
 
+type CoWJob = { cow_id: string; generation: number; claim_id: string };
+type CoWJobResult = CoWJob & { outcome: 'completed' | 'requeued' | 'failed'; sqlstate: string | null };
+const processCoWJob = async (db: SupabaseClient, job: CoWJob): Promise<CoWJobResult> => {
+  const claim = { p_cow_id: job.cow_id, p_generation: job.generation, p_claim_id: job.claim_id };
+  try {
+    const prepared = await rpc<{ prepared: boolean; graph?: CoWEvaluationGraph }>(db, 'group_cow_eval_prepare', claim);
+    if (!prepared.prepared) return { ...job, outcome: 'requeued', sqlstate: null };
+    if (!prepared.graph) throw new Error('Missing CoW source graph');
+    const result = evaluateCoWGraph(prepared.graph);
+    const done = await rpc<{ completed: boolean }>(db, 'group_cow_eval_publish', { ...claim,
+      p_before_us: prepared.graph.window.readBeforeUs, p_source_token: prepared.graph.sourceToken, p_result: result });
+    return { ...job, outcome: done.completed ? 'completed' : 'requeued', sqlstate: null };
+  } catch (error) {
+    const sqlstate = error instanceof RpcError || error instanceof CoWEvaluationError ? error.sqlstate : NON_DB_ERROR;
+    await rpc(db, 'group_cow_eval_fail', { ...claim, p_sqlstate: sqlstate })
+      .catch(() => console.error(`group-eval: could not record CoW failure ${job.cow_id}`));
+    return { ...job, outcome: 'failed', sqlstate };
+  }
+};
+
 export const handleRequest = async (request: Request): Promise<Response> => {
   if (request.method !== 'POST') {
     return json(405, { error: 'METHOD_NOT_ALLOWED' });
@@ -196,12 +217,19 @@ export const handleRequest = async (request: Request): Promise<Response> => {
       if (claimed.length === 0) break;
       for (const job of claimed) metricJobs.push(await processMetricJob(db, job));
     }
+    const cowJobs: CoWJobResult[] = [];
+    for (let round = 0; round < MAX_CLAIM_ROUNDS; round += 1) {
+      const { jobs: claimed } = await rpc<{ jobs: CoWJob[] }>(db, 'group_cow_eval_claim', { p_limit: CLAIM_LIMIT });
+      if (claimed.length === 0) break;
+      for (const job of claimed) cowJobs.push(await processCoWJob(db, job));
+    }
     const count = (outcome: JobResult['outcome']) =>
-      jobs.filter((job) => job.outcome === outcome).length + metricJobs.filter((job) => job.outcome === outcome).length;
+      [...jobs, ...metricJobs, ...cowJobs].filter(job => job.outcome === outcome).length;
     const work = {
       rules_requeued: rulesRequeued,
-      claimed: jobs.length + metricJobs.length,
+      claimed: jobs.length + metricJobs.length + cowJobs.length,
       metric_claimed: metricJobs.length,
+      cow_claimed: cowJobs.length,
       completed: count('completed'),
       requeued: count('requeued'),
       failed: count('failed'),
@@ -217,6 +245,7 @@ export const handleRequest = async (request: Request): Promise<Response> => {
       ...work,
       jobs,
       metric_jobs: metricJobs,
+      cow_jobs: cowJobs,
     });
   } catch (error) {
     const sqlstate = error instanceof RpcError ? error.sqlstate : NON_DB_ERROR;

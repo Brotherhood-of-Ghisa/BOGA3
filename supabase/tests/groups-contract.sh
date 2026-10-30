@@ -1819,6 +1819,8 @@ pass "backfill: one item per share and per membership edge, idempotent; three us
 
 source "${SUPABASE_DIR}/tests/lib/groups-cow-cases.sh"
 run_cow_contract_cases
+source "${SUPABASE_DIR}/tests/lib/groups-cow-publication-cases.sh"
+run_cow_publication_cases
 
 COMPLETED=1
 echo "[groups-contract] PASS (run ${RUN_TAG})"
