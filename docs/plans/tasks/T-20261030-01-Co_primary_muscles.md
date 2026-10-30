@@ -72,8 +72,10 @@ Human GUI validation precedes the final UI gate; screenshots stay in artifacts.
 - Product review: fact changes to the four IDs highlighted above; no violations.
 - Jest: 397 suites / 6048 tests green; coverage 87.89% branches, 95.20% lines.
 - Complexity, dependency direction, documentation and MCP unit checks green.
-- Backend validation in progress; graphical preview, human acceptance and the final
-  `ios-data-smoke` / `ios-session-view` lanes await Xcode system-component setup.
+- All 14 backend lanes green, including real API/MCP writes and local sync contracts.
+- Fast metadata tests reach the Xcode first-launch administrator setup; the other
+  fast lanes pass. Graphical preview, human acceptance and final `ios-data-smoke` /
+  `ios-session-view` lanes await that setup.
 - Lane agreement: independent reviewer accepts fast + backend + the three quality
   targets; lower frontend-ui to the two affected iOS lanes after human validation.
 - No PR or merge yet. Delete this card when opening the implementation PR.
