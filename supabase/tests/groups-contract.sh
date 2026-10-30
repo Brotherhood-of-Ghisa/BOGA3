@@ -1817,6 +1817,7 @@ BACKFILLED="$(run_psql "select app_public.group_events_backfill();")"
 [[ "$(stream_all "${VIEWER_TOKEN}")" == "${SNAP_VIEWER}" ]] || fail "viewer's All stream differs after the backfill"
 pass "backfill: one item per share and per membership edge, idempotent; three users' streams rebuild byte-identical"
 
+source "${SUPABASE_DIR}/tests/lib/groups-cow-stream-cases.sh"
 source "${SUPABASE_DIR}/tests/lib/groups-cow-cases.sh"
 run_cow_contract_cases
 source "${SUPABASE_DIR}/tests/lib/groups-cow-publication-cases.sh"

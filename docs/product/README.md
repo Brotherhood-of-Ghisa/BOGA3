@@ -14,7 +14,7 @@ facts as needed. Authoring: load `docs/procedures/product-facts-authoring.md`.
 | `1rm.md` | the 1RM estimate or its display |
 | `muscle.md` | attributing sets or work to muscles; muscle setup, tracking, lists |
 | `gym.md` | gyms, gym pickers, or per-gym exercise figures |
-| `groups.md` | certification and CoW |
+| `groups.md` | certification, CoW rules and Stream lifecycle |
 | `notifications.md` | which notifications are sent, to whom, with what counts |
 | `timer.md` | rest timer defaults |
 | `agents.md` | what a coaching agent (MCP) may read or change |

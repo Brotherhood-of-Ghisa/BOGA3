@@ -1,18 +1,10 @@
-import type { CoWMetric } from './cow-scoring';
-import type { CompetitionExerciseWire } from './competition-wire';
-import { competitionUnit, type CompetitionValue } from './competition-contract';
-import { isCompetitionExerciseWire } from './competition-reader-guards';
-import type { GroupMemberRef } from './types';
+import type { CoWMetric } from './cow-scoring.ts';
+import { competitionUnit } from './competition-contract.ts';
+import { isCompetitionExerciseWire } from './competition-wire-guards.ts';
 
-export type CoWCalendarWire = { time_zone: string | null; revision: number; next_week_start: string | null };
-export type CoWDefinitionWire = {
-  cow_id: string; group_id: string; group_exercise_id: string;
-  week_start: string; time_zone: string; starts_at_us: number; ends_at_us: number;
-  metrics: CoWMetric[]; revision: number;
-  state: 'scheduled' | 'active' | 'finalizing' | 'final' | 'unavailable' | 'cancelled';
-};
-export type CoWWriteWire = { cow: CoWDefinitionWire };
-export type CoWListWire = { cows: CoWDefinitionWire[]; next_cursor: string | null };
+import type { CoWCalendarWire, CoWDefinitionWire, CoWWriteWire, CoWListWire, CoWRowWire, CoWRankingWire, CoWResultWire, CoWSummaryWire } from './competition-wire.ts';
+
+export type { CoWCalendarWire, CoWDefinitionWire, CoWWriteWire, CoWListWire, CoWRowWire, CoWRankingWire, CoWResultWire, CoWSummaryWire } from './competition-wire.ts';
 
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -50,15 +42,6 @@ export const isCoWListWire = (value: unknown): value is CoWListWire =>
   record(value) && exact(value, ['cows', 'next_cursor']) && Array.isArray(value.cows) && value.cows.every(isCoWDefinitionWire) &&
   (value.next_cursor === null || identity(value.next_cursor));
 
-export type CoWRowWire = { rank: number | null; member: GroupMemberRef; former: boolean;
-  value: number | null; state: 'ranked' | 'unranked' | 'unavailable' };
-export type CoWRankingWire = { metric: CoWMetric; unit: CompetitionValue['unit'] | 'percent' | null;
-  entries: CoWRowWire[]; entry_count: number; next_cursor: string | null };
-export type CoWResultWire = { cow: CoWDefinitionWire; exercise: CompetitionExerciseWire | null;
-  bodyweight_calculations_enabled: boolean; state: 'pending' | 'ready' | 'unavailable';
-  normalized: boolean | null; publication_id: string | null; rankings: CoWRankingWire[] };
-export type CoWSummaryWire = { group_id: string; week_start: string | null; calendar_revision: number;
-  observed_at_us: number; valid_until_us: number; selection: 'current' | 'previous_final' | 'none'; result: CoWResultWire | null };
 
 function isCoWRow(value: unknown, metric: CoWMetric): value is CoWRowWire {
   if (!record(value) || !exact(value, ['rank', 'member', 'former', 'value', 'state']) ||

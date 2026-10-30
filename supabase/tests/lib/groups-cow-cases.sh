@@ -96,6 +96,7 @@ run_cow_contract_cases() {
   check "cancel preserves audit" '.cow.state=="cancelled" and .cow.revision==3'
   rpc "${OWNER_TOKEN}" group_cow_cancel "$(jq -nc --arg g "${cg}" --arg c "${ci}" '{p_group_id:$g,p_cow_id:$c,p_expected_revision:2}')"
   check "cancel retry retains revision" '.cow.revision==3'
+  run_cow_stream_management_cases "${cg}" "${ci}"
   ci="${other}"; create_body="$(jq --arg c "${ci}" '.p_cow_id=$c' <<<"${create_body}")"
   other="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
   COW_TEST_LOG_DIR="$(mktemp -d)"; race_a="${COW_TEST_LOG_DIR}/owner"; race_b="${COW_TEST_LOG_DIR}/admin"

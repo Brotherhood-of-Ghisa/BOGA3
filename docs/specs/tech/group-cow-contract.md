@@ -262,6 +262,29 @@ paired endpoint tests must prevent reconstruction of suppressed kg values
 from totals, baselines or other sessions. Do not reinterpret stored finals
 through this reducer under later rules.
 
+## Stream lifecycle
+
+Implements [[groups.cow-stream]]. The CoW after-write trigger appends to
+`group_events` in the management/barrier/publication transaction. Source-only
+generation updates emit nothing. Payloads hold published definition snapshots,
+edit before-values and a final publication reference; no scores, receipts or
+private context. A partial unique index pins challenge/event/revision.
+Emitting workers lock the group FK row before the intake fence, matching
+management and avoiding event-insert lock inversion.
+
+Capture is forward-only: existing scheduled definitions can produce their next
+edit, cancellation or worker barrier; already sealed barriers/finals gain no
+invented history. Started/Ended use stored boundaries, finals their publication
+time. CoW keys are twenty-digit padded ledger sequences, preserving causal
+order inside a display millisecond under the existing SQL/client sort.
+
+The app opts into `group_competition_stream_v3`; older readers stay unchanged.
+Its opaque cursor has a distinct binding. The new page projects final winners
+through the existing CoW reader, checking current disclosure every time.
+Stream cache keys add `cow-events-v1`; nested results observe current policy
+and participate in account-wide projection retirement. Cards link the exact
+challenge, including cancelled definitions, rather than the current summary.
+
 ## Verification ownership
 
 `apps/mobile/__tests__/groups-cow-scoring.test.ts` proves aggregation, signed

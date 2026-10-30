@@ -96,6 +96,7 @@ run_cow_publication_cases() {
   check 'exactly last-week stored final is the fallback' '.selection=="previous_final" and .result.cow.state=="final" and .result.state=="ready"'
   run_cow_worker_cases "${g}" "${c}" "${secret}"
   run_cow_priority_privacy_cases "${g}" "${c}" "${secret}"
+  run_cow_stream_final_cases "${g}" "${c}" "${secret}"
   pass 'CoW elected %BW units, normalized improvement, automatic finalization, frozen results and authorization'
 }
 
