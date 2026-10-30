@@ -152,6 +152,7 @@ const savePlanGraphInTransaction = (
         gymId: input.gymId,
         title: input.title,
         scheduledFor: input.scheduledFor,
+        lastModifiedBy: 'human',
         deletedAt: null,
         localDirty: true,
         localUpdatedAtMs,
@@ -164,6 +165,7 @@ const savePlanGraphInTransaction = (
       gymId: input.gymId,
       title: input.title,
       scheduledFor: input.scheduledFor,
+      lastModifiedBy: 'human',
       deletedAt: null,
       localDirty: true,
       localUpdatedAtMs,
@@ -238,6 +240,7 @@ const savePlanGraphInTransaction = (
         .set({
           orderIndex: exerciseIndex,
           name: exerciseInput.name,
+          lastModifiedBy: 'human',
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs,
@@ -253,6 +256,7 @@ const savePlanGraphInTransaction = (
           exerciseDefinitionId: exerciseInput.exerciseDefinitionId,
           orderIndex: exerciseIndex,
           name: exerciseInput.name,
+          lastModifiedBy: 'human',
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs,
@@ -275,6 +279,7 @@ const savePlanGraphInTransaction = (
         targetWeightValue: setInput.targetWeightValue,
         targetReps: setInput.targetReps,
         targetSetType: setInput.targetSetType,
+        lastModifiedBy: 'human' as const,
         deletedAt: null,
         localDirty: true,
         localUpdatedAtMs,
@@ -298,7 +303,7 @@ const savePlanGraphInTransaction = (
       return;
     }
     tx.update(sessionPlanExercises)
-      .set({ deletedAt: now, localDirty: true, localUpdatedAtMs, updatedAt: now })
+      .set({ deletedAt: now, lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: now })
       .where(eq(sessionPlanExercises.id, row.id))
       .run();
   });
@@ -312,6 +317,7 @@ const savePlanGraphInTransaction = (
       tx.update(sessionPlanSets)
         .set({
           orderIndex: setTombstoneCursor,
+          lastModifiedBy: 'human',
           deletedAt: now,
           localDirty: true,
           localUpdatedAtMs,
@@ -509,6 +515,7 @@ const saveProgrammeGraph = async (input: SaveProgrammeGraphInput, now: Date = ne
             id: programmeId,
             name: input.name,
             description: input.description,
+            lastModifiedBy: 'human',
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs,
@@ -521,6 +528,7 @@ const saveProgrammeGraph = async (input: SaveProgrammeGraphInput, now: Date = ne
           .set({
             name: input.name,
             description: input.description,
+            lastModifiedBy: 'human',
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs,
@@ -556,6 +564,7 @@ const updateProgrammeMeta = async (input: { programmeId: string; name: string; d
         .set({
           name: input.name,
           description: input.description,
+          lastModifiedBy: 'human',
           localDirty: true,
           localUpdatedAtMs,
           updatedAt: input.now,
@@ -583,6 +592,7 @@ const updatePlanMeta = async (input: { planId: string; title: string; gymId: str
           title: input.title,
           gymId: input.gymId,
           scheduledFor: input.scheduledFor,
+          lastModifiedBy: 'human',
           localDirty: true,
           localUpdatedAtMs,
           updatedAt: input.now,
@@ -616,6 +626,7 @@ const savePlanExerciseGraph = async (input: { planExerciseId: string; exerciseDe
         .set({
           exerciseDefinitionId: input.exerciseDefinitionId,
           name: input.name,
+          lastModifiedBy: 'human',
           localDirty: true,
           localUpdatedAtMs,
           updatedAt: input.now,
@@ -650,6 +661,7 @@ const savePlanExerciseGraph = async (input: { planExerciseId: string; exerciseDe
           targetWeightValue: setInput.targetWeightValue,
           targetReps: setInput.targetReps,
           targetSetType: setInput.targetSetType,
+          lastModifiedBy: 'human' as const,
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs,
@@ -672,6 +684,7 @@ const savePlanExerciseGraph = async (input: { planExerciseId: string; exerciseDe
         tx.update(sessionPlanSets)
           .set({
             orderIndex: setTombstoneCursor,
+            lastModifiedBy: 'human',
             deletedAt: input.now,
             localDirty: true,
             localUpdatedAtMs,
@@ -715,6 +728,7 @@ const insertPlanExercise = async (input: { planId: string; exercise: SavePlanExe
           exerciseDefinitionId: input.exercise.exerciseDefinitionId,
           orderIndex: nextIndex,
           name: input.exercise.name,
+          lastModifiedBy: 'human',
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs,
@@ -731,6 +745,7 @@ const insertPlanExercise = async (input: { planId: string; exercise: SavePlanExe
             targetWeightValue: setInput.targetWeightValue,
             targetReps: setInput.targetReps,
             targetSetType: setInput.targetSetType,
+            lastModifiedBy: 'human',
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs,
@@ -872,6 +887,7 @@ const resolvePlanBlock = async (input: { planExerciseId: string; status: 'comple
         .set({
           progressStatus: input.status,
           resolvedAt: input.now,
+          lastModifiedBy: 'human',
           localDirty: true,
           localUpdatedAtMs,
           updatedAt: input.now,
@@ -951,13 +967,13 @@ const reorderProgrammePlans = async (input: { programmeId: string; orderedPlanId
         ),
         (id, index) => {
           tx.update(sessionPlans)
-            .set({ programmeOrderIndex: index, localDirty: true, localUpdatedAtMs, updatedAt: input.now })
+            .set({ programmeOrderIndex: index, lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: input.now })
             .where(eq(sessionPlans.id, id))
             .run();
         },
       );
       tx.update(trainingProgrammes)
-        .set({ localDirty: true, localUpdatedAtMs, updatedAt: input.now })
+        .set({ lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: input.now })
         .where(eq(trainingProgrammes.id, input.programmeId))
         .run();
     });
@@ -989,7 +1005,7 @@ const reorderPlanExercises = async (input: { planId: string; orderedExerciseIds:
         liftBase,
         (id, index) => {
           tx.update(sessionPlanExercises)
-            .set({ orderIndex: index, localDirty: true, localUpdatedAtMs, updatedAt: input.now })
+            .set({ orderIndex: index, lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: input.now })
             .where(eq(sessionPlanExercises.id, id))
             .run();
         },
@@ -1028,7 +1044,7 @@ const reorderPlanSets = async (input: { planExerciseId: string; orderedSetIds: s
         liftBase,
         (id, index) => {
           tx.update(sessionPlanSets)
-            .set({ orderIndex: index, localDirty: true, localUpdatedAtMs, updatedAt: input.now })
+            .set({ orderIndex: index, lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: input.now })
             .where(eq(sessionPlanSets.id, id))
             .run();
         },
@@ -1053,6 +1069,7 @@ const tombstonePlan = async (input: { planId: string; now: Date }): Promise<bool
           // standalone schedule.
           programmeId: null,
           programmeOrderIndex: null,
+          lastModifiedBy: 'human',
           localDirty: true,
           localUpdatedAtMs,
           updatedAt: input.now,
@@ -1069,7 +1086,7 @@ const tombstonePlan = async (input: { planId: string; now: Date }): Promise<bool
         .where(and(eq(sessionPlanExercises.sessionPlanId, input.planId), isNull(sessionPlanExercises.deletedAt)))
         .all()) {
         tx.update(sessionPlanExercises)
-          .set({ deletedAt: input.now, localDirty: true, localUpdatedAtMs, updatedAt: input.now })
+          .set({ deletedAt: input.now, lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: input.now })
           .where(eq(sessionPlanExercises.id, exercise.id))
           .run();
         for (const set of tx
@@ -1078,7 +1095,7 @@ const tombstonePlan = async (input: { planId: string; now: Date }): Promise<bool
           .where(and(eq(sessionPlanSets.sessionPlanExerciseId, exercise.id), isNull(sessionPlanSets.deletedAt)))
           .all()) {
           tx.update(sessionPlanSets)
-            .set({ deletedAt: input.now, localDirty: true, localUpdatedAtMs, updatedAt: input.now })
+            .set({ deletedAt: input.now, lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: input.now })
             .where(eq(sessionPlanSets.id, set.id))
             .run();
         }
@@ -1099,7 +1116,7 @@ const tombstoneProgramme = async (input: { programmeId: string; now: Date }): Pr
       const localUpdatedAtMs = nowMonotonic(tx);
       const result = tx
         .update(trainingProgrammes)
-        .set({ deletedAt: input.now, localDirty: true, localUpdatedAtMs, updatedAt: input.now })
+        .set({ deletedAt: input.now, lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: input.now })
         .where(and(eq(trainingProgrammes.id, input.programmeId), isNull(trainingProgrammes.deletedAt)))
         .run();
       tombstoned = result.changes > 0;
@@ -1109,7 +1126,7 @@ const tombstoneProgramme = async (input: { programmeId: string; now: Date }): Pr
       // Match the server FK's ON DELETE SET NULL: the plans survive as
       // standalone plans with their schedules and targets intact.
       tx.update(sessionPlans)
-        .set({ programmeId: null, programmeOrderIndex: null, localDirty: true, localUpdatedAtMs, updatedAt: input.now })
+        .set({ programmeId: null, programmeOrderIndex: null, lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: input.now })
         .where(and(eq(sessionPlans.programmeId, input.programmeId), isNull(sessionPlans.deletedAt)))
         .run();
     });
@@ -1158,7 +1175,7 @@ const tombstonePlanExercise = async (input: { planExerciseId: string; now: Date 
         )
         .all()) {
         tx.update(sessionPlanSets)
-          .set({ orderIndex: setTombstoneCursor, deletedAt: input.now, localDirty: true, localUpdatedAtMs, updatedAt: input.now })
+          .set({ orderIndex: setTombstoneCursor, deletedAt: input.now, lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: input.now })
           .where(eq(sessionPlanSets.id, set.id))
           .run();
         setTombstoneCursor += 1;
@@ -1173,6 +1190,7 @@ const tombstonePlanExercise = async (input: { planExerciseId: string; now: Date 
         .set({
           orderIndex: maxIndex + 1,
           deletedAt: input.now,
+          lastModifiedBy: 'human',
           localDirty: true,
           localUpdatedAtMs,
           updatedAt: input.now,
