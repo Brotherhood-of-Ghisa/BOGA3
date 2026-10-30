@@ -142,7 +142,8 @@ const isSameMuscle = (left: ReportedMuscle, right: ReportedMuscle): boolean =>
 /**
  * The input a view reads under the user's muscle setup ([[muscle.report-groups]]):
  * mappings receive their shares, are re-keyed from anatomy entry to muscle,
- * and grouped shares sum while retaining the strongest display role. Untracked
+ * and grouped Primary shares sum; Secondary counts ½ once, and only without
+ * Primary work, so the strongest role labels and counts the muscle. Untracked
  * entries drop ([[muscle.untracked]]), and `muscleGroups` becomes the tracked
  * muscles in first-seen order. With every entry its own tracked muscle (Detailed)
  * the allocation is unchanged. Run it after `withoutSecondaryMappings`.
@@ -152,16 +153,17 @@ export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
 ): T => {
   const grouped = new Map<string, {
     mapping: MuscleAnalyticsInput['muscleMappings'][number];
-    primary: CompensatedSum; secondary: CompensatedSum;
+    primary: CompensatedSum; secondary: number;
   }>();
   for (const mapping of allocatedMuscleMappings(input.muscleMappings)) {
     const assigned = assignment.get(mapping.muscleGroupId);
     if (assigned?.tracked === false) continue;
     const muscleId = assigned?.muscle.id ?? mapping.muscleGroupId;
     const key = JSON.stringify([mapping.exerciseDefinitionId, muscleId]);
-    const existing = grouped.get(key) ?? { mapping, primary: createCompensatedSum(), secondary: createCompensatedSum() };
+    const existing = grouped.get(key) ?? { mapping, primary: createCompensatedSum(), secondary: 0 };
     addCompensated(existing.primary, mapping.allocation.primary);
-    addCompensated(existing.secondary, mapping.allocation.secondary);
+    // A muscle counts its Secondary ½ once per set, however many entries assist.
+    existing.secondary = Math.max(existing.secondary, mapping.allocation.secondary);
     const role = getMuscleContributionRoleWeight(existing.mapping.role) > getMuscleContributionRoleWeight(mapping.role)
       ? existing.mapping.role : mapping.role;
     existing.mapping = { ...mapping, muscleGroupId: muscleId, role };
@@ -176,9 +178,11 @@ export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
     if (!muscles.has(muscle.id)) muscles.set(muscle.id, muscle);
   }
 
-  return { ...input, muscleMappings: [...grouped.values()].map(({ mapping, primary, secondary }) => ({
-    ...mapping, allocation: { primary: compensatedValue(primary), secondary: compensatedValue(secondary) },
-  })), muscleGroups: [...muscles.values()] };
+  // A muscle with Primary work takes no Secondary share on top: its strongest role counts.
+  return { ...input, muscleMappings: [...grouped.values()].map(({ mapping, primary, secondary }) => {
+    const primaryShare = compensatedValue(primary);
+    return { ...mapping, allocation: { primary: primaryShare, secondary: primaryShare > 0 ? 0 : secondary } };
+  }), muscleGroups: [...muscles.values()] };
 };
 
 /**

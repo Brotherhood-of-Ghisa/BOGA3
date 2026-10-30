@@ -14,7 +14,7 @@ const signed = (difference: number, magnitude: string): DeltaDisplay => ({
 
 // A set change is the difference of the whole sets drawn, so it always adds up.
 export const formatCountDelta = (current: number, previous: number): DeltaDisplay => {
-  const difference = Math.round(current) - Math.round(previous);
+  const difference = Math.floor(current) - Math.floor(previous);
   if (!Number.isFinite(difference)) return { text: '—', tone: 'neutral' };
   if (difference === 0) return { text: '0', tone: 'neutral' };
   return signed(difference, formatWholeSetCount(Math.abs(difference)));

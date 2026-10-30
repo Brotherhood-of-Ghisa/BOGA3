@@ -73,7 +73,7 @@ const formatDayValue = (value: number, metric: CalendarHeatmapMetric): string =>
 // The Timeline readout's unit word for a figure.
 const UNIT_LABELS: Record<CalendarHeatmapMetric, (value: number) => string> = {
   totalVolume: () => 'volume',
-  workingSetCount: value => value === 1 ? 'set' : 'sets',
+  workingSetCount: value => formatWholeSetCount(value) === '1' ? 'set' : 'sets',
   estimatedRM1: () => '',
   highestWeight: () => '',
 };

@@ -109,20 +109,20 @@ describe('Broad', () => {
     const input = inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS);
     const byMuscle = statsByMuscle(reported(input, broadRows()));
 
-    expect(byMuscle.get(QUADS)).toMatchObject({ displayName: 'Quads', familyName: 'Legs', workingSetCount: 4.5 });
+    expect(byMuscle.get(QUADS)).toMatchObject({ displayName: 'Quads', familyName: 'Legs', workingSetCount: 3 });
     expect(byMuscle.get(GLUTES_HAMS)).toMatchObject({ displayName: 'Glutes & Hams', workingSetCount: 1.5 });
 
-    // Broad Quads adds its Primary share and Adductors' allocated Secondary share.
+    // Broad Quads counts at its strongest role, Primary: Adductors' Secondary adds nothing.
     // Hidden Spinal Erectors' share is dropped without reallocating it.
     const detailed = statsByMuscle(input);
-    expect(byMuscle.get(QUADS)?.totalVolume).toBe(detailed.get('quads')!.totalVolume! + detailed.get('adductors')!.totalVolume!);
+    expect(byMuscle.get(QUADS)?.totalVolume).toBe(detailed.get('quads')!.totalVolume);
     expect(byMuscle.get(GLUTES_HAMS)?.totalVolume).toBe(detailed.get('glutes_max')?.totalVolume);
   });
 
   it('groups one exercise\'s entry shares while retaining its strongest display role', () => {
     const output = reported(inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS), broadRows());
     expect(output.muscleMappings).toEqual([
-      { exerciseDefinitionId: 'squat', muscleGroupId: QUADS, role: 'primary', allocation: { primary: 1, secondary: 0.5 } },
+      { exerciseDefinitionId: 'squat', muscleGroupId: QUADS, role: 'primary', allocation: { primary: 1, secondary: 0 } },
       { exerciseDefinitionId: 'squat', muscleGroupId: GLUTES_HAMS, role: 'secondary', allocation: { primary: 0, secondary: 0.5 } },
     ]);
   });
@@ -134,7 +134,7 @@ describe('Broad', () => {
       { exerciseDefinitionId: 'squat', muscleGroupId: 'hip_abductors', role: 'stabilizer' },
     ], SYSTEM_MUSCLE_GROUP_SEEDS), broadRows());
     expect(output.muscleMappings).toEqual([
-      { exerciseDefinitionId: 'squat', muscleGroupId: GLUTES_HAMS, role: 'primary', allocation: { primary: 1, secondary: 0.5 } },
+      { exerciseDefinitionId: 'squat', muscleGroupId: GLUTES_HAMS, role: 'primary', allocation: { primary: 1, secondary: 0 } },
     ]);
   });
 

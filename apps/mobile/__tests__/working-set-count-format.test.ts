@@ -9,8 +9,8 @@ it.each([
 });
 
 it.each([
-  [0, '0'], [-0.4, '0'], [3, '3'], [1.5, '2'], [1 / 3, '0'], [2.49, '2'], [3.75, '4'],
+  [0, '0'], [-0, '0'], [3, '3'], [1.5, '1'], [7.99, '7'], [0.5, '½'], [1 / 3, '<1'], [0.96, '<1'],
   [NaN, '—'], [Infinity, '—'],
-])('formats allocated count %s as whole sets %s', (count, expected) => {
+])('formats allocated count %s as whole sets, rounded down, %s', (count, expected) => {
   expect(formatWholeSetCount(count)).toBe(expected);
 });

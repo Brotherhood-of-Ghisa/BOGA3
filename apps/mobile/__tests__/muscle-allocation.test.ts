@@ -112,22 +112,36 @@ describe('allocated shares under Broad and hidden mappings', () => {
     }]),
   );
 
-  it('adds Broad member Primary and Secondary shares and keeps Secondary off independent', () => {
+  it('counts a Broad muscle with Primary work at its Primary share alone, Secondary on or off', () => {
     const input = inputFor(2, 2);
     const all = applyMuscleReport(input, setup(input));
     const off = applyMuscleReport(withoutSecondaryMappings(input), setup(input));
-    expect(muscleRows(all).find(row => row.muscleGroupId === 'chest'))
-      .toMatchObject({ workingSetCount: 3, totalVolume: 900 });
-    expect(muscleRows(off).find(row => row.muscleGroupId === 'chest'))
+    for (const reported of [all, off]) {
+      expect(muscleRows(reported).find(row => row.muscleGroupId === 'chest'))
+        .toMatchObject({ workingSetCount: 1.5, totalVolume: 450 });
+    }
+    // Chest 1.5, Triceps 1.5 and Forearms' Secondary 1.5; merged Serratus adds nothing.
+    expect(countMuscleSets(collectMuscleSetContributions(all)).weightedSetCount).toBe(4.5);
+  });
+
+  it('gives a Broad muscle of several Secondary entries ½ per set, once', () => {
+    const input = inputFor(1, 3);
+    const upperBack = { ...input.muscleGroups[1], displayName: 'Upper back' };
+    const assignment: MuscleReportAssignment = new Map(input.muscleGroups.map(group => [group.id, {
+      tracked: true, muscle: group.id === 'chest' ? group : upperBack,
+    }]));
+    const reported = applyMuscleReport(input, assignment);
+    expect(muscleRows(reported).find(row => row.muscleGroupId === 'serratus'))
       .toMatchObject({ workingSetCount: 1.5, totalVolume: 450 });
-    expect(countMuscleSets(collectMuscleSetContributions(all)).weightedSetCount).toBe(6);
+    expect(countMuscleSets(collectMuscleSetContributions(reported).filter(row => row.muscleGroupId === 'serratus')))
+      .toEqual({ primarySetCount: 0, secondarySetCount: 3, weightedSetCount: 1.5 });
   });
 
   it('drops hidden shares without redistributing them or mutating input', () => {
     const input = inputFor(2, 2);
     const original = input.muscleMappings.map(mapping => ({ ...mapping }));
     const reported = applyMuscleReport(input, setup(input, ['triceps', 'forearms']));
-    expect(muscleRows(reported)).toEqual([expect.objectContaining({ muscleGroupId: 'chest', workingSetCount: 3, totalVolume: 900 })]);
+    expect(muscleRows(reported)).toEqual([expect.objectContaining({ muscleGroupId: 'chest', workingSetCount: 1.5, totalVolume: 450 })]);
     expect(input.muscleMappings).toEqual(original);
   });
 

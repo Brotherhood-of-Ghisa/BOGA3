@@ -2,19 +2,16 @@
 
 ### muscle.set-count · definition · accepted
 
-Every exercise shares one set of Primary work equally across its distinct raw
-Primary mappings; each Secondary mapping gets ½, however many there are.
-Decided 2026-10-30 (secondaries no longer share one ½ pool).
-The same allocation applies to working sets and per-side muscle Volume.
-Stabilizers contribute nothing. Stored mapping weights do not set shares.
-Allocation happens before filtering or Broad grouping: merged entries add their
-shares, and hidden/untracked entries never redistribute work. Exercise figures
-stay unchanged ([[set.count-display]]).
+An exercise's Primary mappings share one set equally; each Secondary mapping
+gets ½. Decided 2026-10-30 (no shared ½ pool). Volume is allocated alike.
+Stabilizers and stored mapping weights add nothing. Allocation precedes
+filtering and Broad grouping; hidden entries never redistribute work. A merged
+muscle adds its entries' Primary shares; Secondary entries give it ½ once, and
+none beside Primary work. Exercise figures are unchanged ([[set.count-display]]).
 
-Keep fractions through aggregation; every figure and spoken label shows at most
-one decimal (`1.5`, `0.3`). Today and Progress show whole sets: Progress rounds,
-and its change is the difference of the rounded figures. Today's Recovery floors
-totals of at least one; below one, it shows `½` for a half and `<1` otherwise.
+Figures and spoken labels show at most one decimal. Today and Progress draw
+whole sets, rounded down (`½`, `<1` below one); a change is the difference of
+the drawn figures.
 
 <!-- fact-table: muscle.set-count -->
 | Working sets mapped to one muscle | It gets |
@@ -31,8 +28,8 @@ totals of at least one; below one, it shows `½` for a half and `<1` otherwise.
 Why: co-primary muscles share the lift; a secondary does half a set of work
 whatever else assists.
 Code: `collectMuscleSetContributions`, `countMuscleSets` and `applyMuscleReport`
-in `apps/mobile/src/data/muscle-analytics.ts`; Recovery's display is `wholeSets`
-in `apps/mobile/components/today/plan-cards.tsx`.
+in `apps/mobile/src/data/muscle-analytics.ts`; the whole-set display is
+`formatWholeSetCount` in `apps/mobile/src/exercise-calculations/format.ts`.
 
 ### muscle.secondary-filter · presentation · accepted
 
@@ -50,7 +47,7 @@ available, with individual anatomy switches and their enabled/total count,
 regardless of breakdown. A preset changes merging, never a switch; merges
 matching neither read `Custom`. Broad merges entries (first listed is the anchor);
 Other entries and custom muscles stay their own.
-A merged muscle sums its tracked entries' allocated shares; untracked entries' work still drops. Each muscle stays in one family.
+A merged muscle counts its tracked entries as [[muscle.set-count]] says; untracked entries' work still drops. Each muscle stays in one family.
 
 
 Why: a simpler view.

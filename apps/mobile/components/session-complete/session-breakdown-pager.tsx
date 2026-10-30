@@ -18,6 +18,8 @@ const PAGES = [
 // columns have always drawn one. The card's `Records` fact keeps the figure
 // rule instead and shows `0` (`design-language.md` §6).
 const count = (value: number): string => (value === 0 ? '—' : String(value));
+// A role share that shows as 0 is absent: a dash.
+const roleFigure = (value: number): string => (formatWorkingSetCount(value) === '0' ? '—' : formatWorkingSetCount(value));
 const volume = (value: number | null): string => (value === null ? '—' : formatVolume(value));
 const weight = (value: number | null): string => (value === null ? '—' : formatWeight(value));
 
@@ -103,8 +105,8 @@ function MuscleTable({ rows, testID }: { rows: SessionBreakdownMuscleRow[]; test
           style={[styles.row, styles.bodyRow]}
           testID={`${testID}-${row.id}`}>
           <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.nameCell]}>{row.displayName}</Text>
-          <Figure total value={row.primarySetCount === 0 ? '—' : formatWorkingSetCount(row.primarySetCount)} />
-          <Figure total value={row.secondarySetCount === 0 ? '—' : formatWorkingSetCount(row.secondarySetCount)} />
+          <Figure total value={roleFigure(row.primarySetCount)} />
+          <Figure total value={roleFigure(row.secondarySetCount)} />
           <Figure total value={volume(row.volume)} wide />
           <Figure value={count(row.recordCount)} />
         </View>

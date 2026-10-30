@@ -303,8 +303,8 @@ total stays a count of physical sets.
 `applyMuscleReport` (`muscle-analytics.ts`) after `withoutSecondaryMappings`.
 It allocates raw mappings before re-keying entries to muscles
 ([[muscle.report-groups]]) and dropping untracked entries
-([[muscle.untracked]]). Merged entries add their allocated shares;
-their strongest role labels the result. A merged muscle takes its anchor's id;
+([[muscle.untracked]]). Merged entries combine as [[muscle.set-count]]
+says; their strongest role labels the result. A merged muscle takes its anchor's id;
 Detailed is the identity. Exercise figures never read it.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and

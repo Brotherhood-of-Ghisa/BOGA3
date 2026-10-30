@@ -18,6 +18,13 @@ export const formatVolume = (kgReps: number): string => String(Math.round(kgReps
 export const formatWorkingSetCount = (count: number): string =>
   Number.isFinite(count) ? String(Number(count.toFixed(1)) + 0) : '—';
 
-/** Allocated muscle sets on Today and Progress: whole sets, `2`. */
-export const formatWholeSetCount = (count: number): string =>
-  Number.isFinite(count) ? String(Math.round(count) + 0) : '—';
+/**
+ * Allocated muscle sets on Today and Progress: whole sets, rounded down so a
+ * total reads at its target only once met; work under one set reads `½` or `<1`.
+ */
+export const formatWholeSetCount = (count: number): string => {
+  if (!Number.isFinite(count)) return '—';
+  if (count === 0.5) return '½';
+  if (count > 0 && count < 1) return '<1';
+  return String(Math.floor(count) + 0);
+};

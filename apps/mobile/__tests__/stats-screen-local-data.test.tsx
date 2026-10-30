@@ -390,7 +390,7 @@ describe('Stats over real data', () => {
     expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=biceps&metric=sets');
 
     inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
-    await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^1$/));
+    await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^½$/));
     expect(secondaryOn()).toBe(false);
     expect(screen.getByTestId('stats-filters')).toHaveProp('accessibilityLabel', 'Filters: secondary sets not counted');
     fireEvent.press(screen.getByRole('link', { name: 'Open Biceps history' }));
@@ -398,10 +398,10 @@ describe('Stats over real data', () => {
 
     await showBody();
     fireEvent.press(await screen.findByTestId('stats-muscle-body-target-biceps'));
-    expect(screen.getByTestId(`stats-contribution-${BENCH}-now`)).toHaveTextContent(/^1$/);
+    expect(screen.getByTestId(`stats-contribution-${BENCH}-now`)).toHaveTextContent(/^½$/);
     expect(screen.queryByTestId(`stats-contribution-${SQUAT}`)).toBeNull();
     inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
-    expect(await screen.findByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^4$/);
+    expect(await screen.findByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^3$/);
     chooseFilter('view-mode', 'Exercise');
     expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
     expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^7$/);
@@ -425,7 +425,7 @@ describe('Stats over real data', () => {
     expect(muscle.getByText('Secondary effort')).toHaveProp('accessibilityRole', 'header');
     expect(muscle.getAllByTestId(new RegExp(`^stats-contribution-(${BENCH}|${SQUAT})$`)).map(row => row.props.testID))
       .toEqual([`stats-contribution-${BENCH}`, `stats-contribution-${SQUAT}`]);
-    expect(muscle.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^4$/);
+    expect(muscle.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^3$/);
     expect(muscle.queryByText('Total')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-muscle-body-target-calves'));
     expect(screen.getByTestId('stats-contributions-empty')).toHaveTextContent('No working sets for Calves in either period');
@@ -934,10 +934,10 @@ describe('Stats over real data', () => {
     localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'secondary' WHERE muscle_group_id = 'quads'").run();
     await renderStats();
     await screen.findByTestId('stats-muscle-row-quads-now');
-    // 3.5 and 1 allocated sets; the change is between the whole sets shown.
-    expect(value('quads', 'now')).toHaveTextContent(/^4$/);
+    // 3.5 and 1 allocated sets, drawn rounded down; the change is between the figures shown.
+    expect(value('quads', 'now')).toHaveTextContent(/^3$/);
     expect(previous('quads')).toMatch(/^1$/);
-    expect(value('quads', 'change')).toHaveTextContent('+3');
+    expect(value('quads', 'change')).toHaveTextContent('+2');
     // The contributor block still reconciles with its muscle row.
     select('quads');
     for (const column of ['now', 'change']) {
