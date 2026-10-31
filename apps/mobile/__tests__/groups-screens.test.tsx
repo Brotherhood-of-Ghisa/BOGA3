@@ -310,12 +310,11 @@ afterEach(() => {
 });
 
 describe('Groups tab', () => {
-  it('keeps the tab bar with More selected and draws no back of its own (the native header has it)', async () => {
-    mockParams = { source: 'more' };
+  it('keeps the tab bar with Groups selected and draws no back of its own (the native header has it)', async () => {
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-title')).toBeTruthy();
     expect(screen.queryByTestId('back-to-more-button')).toBeNull();
-    expect(screen.getByTestId('top-level-tab-more')).toHaveProp(
+    expect(screen.getByTestId('top-level-tab-groups')).toHaveProp(
       'accessibilityState',
       expect.objectContaining({ selected: true })
     );
@@ -1074,16 +1073,16 @@ describe("Friend's session view", () => {
 });
 
 describe('Groups ownership in the main navigation', () => {
-  it('selects More for the preserved groups route', () => {
+  it('is its own tab: the groups route selects Groups', () => {
     const onSelect = jest.fn();
     render(
-      <MainTabs activeTab="more" onSelect={onSelect} />,
+      <MainTabs activeTab="groups" onSelect={onSelect} />,
     );
-    const tab = screen.getByTestId('top-level-tab-more');
+    const tab = screen.getByTestId('top-level-tab-groups');
     expect(tab.props.accessibilityState).toMatchObject({ selected: true });
     fireEvent.press(tab);
-    expect(onSelect).toHaveBeenCalledWith('more');
-    expect(resolveMainTab(['groups'])).toBe('more');
+    expect(onSelect).toHaveBeenCalledWith('groups');
+    expect(resolveMainTab(['groups'])).toBe('groups');
     expect(resolveMainTab(['(tabs)', 'stats-history'])).toBe('progress');
   });
 });

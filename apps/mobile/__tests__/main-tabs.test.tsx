@@ -20,20 +20,29 @@ import {
 } from '@/src/navigation/main-tabs';
 
 describe('main tab model', () => {
-  it('defines four unique tabs in the approved order', () => {
-    expect(MAIN_TAB_KEYS).toEqual(['today', 'train', 'progress', 'more']);
+  it('defines four labelled tabs and More as the overflow, in the approved order', () => {
+    expect(MAIN_TAB_KEYS).toEqual(['today', 'train', 'progress', 'groups', 'more']);
     expect(MAIN_TAB_DEFINITIONS.map((tab) => tab.label)).toEqual([
       'Today',
       'Train',
       'Progress',
+      'Groups',
       'More',
     ]);
-    expect(new Set(MAIN_TAB_DEFINITIONS.map((tab) => tab.testID)).size).toBe(4);
-    expect(new Set(MAIN_TAB_DEFINITIONS.map((tab) => tab.accessibilityLabel)).size).toBe(4);
+    expect(MAIN_TAB_DEFINITIONS.map((tab) => tab.presentation)).toEqual([
+      'label',
+      'label',
+      'label',
+      'label',
+      'overflow',
+    ]);
+    expect(new Set(MAIN_TAB_DEFINITIONS.map((tab) => tab.testID)).size).toBe(5);
+    expect(new Set(MAIN_TAB_DEFINITIONS.map((tab) => tab.accessibilityLabel)).size).toBe(5);
     expect(MAIN_TAB_KEYS.map(mainTabHref)).toEqual([
       '/today',
       '/train',
       '/progress',
+      '/groups',
       '/more',
     ]);
   });
@@ -42,11 +51,11 @@ describe('main tab model', () => {
     expect(resolveMainTab(['(tabs)', 'today'])).toBe('today');
     expect(resolveMainTab(['(tabs)', 'train', 'planning'])).toBe('train');
     expect(resolveMainTab(['(tabs)', 'progress', 'history'])).toBe('progress');
-    expect(resolveMainTab(['(tabs)', 'more', 'groups'])).toBe('more');
+    expect(resolveMainTab(['(tabs)', 'more', 'settings'])).toBe('more');
 
     expect(resolveMainTab(['(tabs)', 'stats-history'])).toBe('progress');
     expect(resolveMainTab(['(tabs)', 'exercise-catalog'])).toBe('more');
-    expect(resolveMainTab(['(tabs)', 'groups'])).toBe('more');
+    expect(resolveMainTab(['(tabs)', 'groups'])).toBe('groups');
     expect(resolveMainTab(['(tabs)', 'settings'])).toBe('more');
   });
 
@@ -101,11 +110,13 @@ describe('MainTabs', () => {
     expect(onSelect.mock.calls.map(([tab]) => tab)).toEqual(MAIN_TAB_KEYS);
   });
 
-  it('fits four production tabs without the legacy utility-button fifth column', () => {
+  it('draws four labelled tabs and More as a bare ⋮, with no Settings tab', () => {
     render(<MainTabs activeTab="more" onSelect={jest.fn()} />);
 
     expect(screen.getByTestId('main-bottom-tabs')).toBeTruthy();
-    expect(screen.getAllByRole('tab')).toHaveLength(4);
+    expect(screen.getAllByRole('tab')).toHaveLength(5);
+    expect(screen.queryByText('More')).toBeNull();
+    expect(screen.getByLabelText('Open More').props.accessibilityState.selected).toBe(true);
     expect(screen.queryByLabelText('Open Settings')).toBeNull();
   });
 });
@@ -117,14 +128,15 @@ describe('MainTabs presentation', () => {
 
     expect(screen.getByTestId('main-bottom-tabs').props.accessibilityRole).toBe('tablist');
     expect(screen.getByLabelText('Open Today').props.accessibilityState.selected).toBe(true);
-    for (const label of ['Open Train', 'Open Progress', 'Open More']) {
+    for (const label of ['Open Train', 'Open Progress', 'Open Groups', 'Open More']) {
       expect(screen.getByLabelText(label).props.accessibilityState.selected).toBe(false);
     }
 
     fireEvent.press(screen.getByLabelText('Open Train'));
     fireEvent.press(screen.getByLabelText('Open Progress'));
+    fireEvent.press(screen.getByLabelText('Open Groups'));
     fireEvent.press(screen.getByLabelText('Open More'));
-    expect(onSelect.mock.calls.map(([tab]) => tab)).toEqual(['train', 'progress', 'more']);
+    expect(onSelect.mock.calls.map(([tab]) => tab)).toEqual(['train', 'progress', 'groups', 'more']);
   });
 
   it('draws each tab as a micro-label, the active one in ink over an underline, never accent', () => {
@@ -139,7 +151,7 @@ describe('MainTabs presentation', () => {
     const underlines = MAIN_TAB_DEFINITIONS.map(
       (tab) => StyleSheet.flatten(screen.getByTestId(`${tab.testID}-indicator`).props.style).backgroundColor,
     );
-    expect(underlines).toEqual(['transparent', 'transparent', uiRoles.ink, 'transparent']);
+    expect(underlines).toEqual(['transparent', 'transparent', uiRoles.ink, 'transparent', 'transparent']);
     expect(JSON.stringify(screen.toJSON())).not.toContain(uiRoles.accent);
   });
 });

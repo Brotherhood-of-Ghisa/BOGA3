@@ -9,7 +9,7 @@ import type { MainTabKey } from '@/src/navigation/main-tabs';
 
 type TabOwnedPageProps = {
   children: ReactNode;
-  // The tab the page belongs to (`resolveMainTab`); More owns all of them today.
+  // The tab the page belongs to (`resolveMainTab`): Groups for `/groups`, else More.
   activeTab?: MainTabKey;
 };
 

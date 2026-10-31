@@ -58,7 +58,7 @@ export function RootStack() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Back' }} />
         <Stack.Screen name="exercise-history" />
-        {/* More's destinations that keep the tab bar (`TabOwnedPage`). */}
+        {/* Groups and More's destinations that keep the tab bar (`TabOwnedPage`). */}
         <Stack.Screen name="exercise-catalog" options={{ title: 'Exercises' }} />
         <Stack.Screen name="groups" options={{ title: 'Groups' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />

@@ -1,9 +1,8 @@
 import type { IconName } from '@/components/ui/icon-glyphs';
 
-export type MoreDestinationKey = 'groups' | 'exercises' | 'gyms' | 'connect-ai' | 'settings';
+export type MoreDestinationKey = 'exercises' | 'gyms' | 'connect-ai' | 'settings';
 
 export type MoreRoute =
-  | '/groups'
   | '/exercise-catalog'
   | '/gyms'
   | '/settings';
@@ -21,13 +20,6 @@ export type MoreDestination = {
 /** More's two cards, top to bottom; no group is titled. */
 export const MORE_GROUPS: readonly (readonly MoreDestination[])[] = [
   [
-    {
-      key: 'groups',
-      label: 'Groups',
-      icon: 'users',
-      testID: 'more-groups-row',
-      action: { type: 'route', href: '/groups' },
-    },
     {
       key: 'exercises',
       label: 'Exercises',

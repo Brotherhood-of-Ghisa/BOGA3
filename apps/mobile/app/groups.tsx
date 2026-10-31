@@ -58,9 +58,9 @@ const toSection = (value: string | null): GroupsSection | null =>
  */
 export default function GroupsRoute() {
   const { isConfigured, user } = useAuth();
-  // A root-stack page under the native "Groups" header, keeping the tab bar (More).
+  // A root-stack page under the native "Groups" header, keeping the tab bar (Groups).
   return (
-    <TabOwnedPage>
+    <TabOwnedPage activeTab="groups">
       {!isConfigured || !user ? (
         <GroupsSignInRequired isConfigured={isConfigured} />
       ) : (

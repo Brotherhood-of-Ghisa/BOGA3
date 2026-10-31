@@ -17,12 +17,11 @@ For the route inventory and owning files, load `screen-map.md`.
 - **Two kinds of page.** Tabs use `PageHeader`, without Back. Other pages use native headers; Back returns to origin.
   `/exercise-catalog`, `/groups` and `/settings` also keep the tab bar
   (`apps/mobile/components/navigation/tab-owned-page.tsx`).
-- The shell is the four-tab model in `apps/mobile/src/navigation/main-tabs.ts`
-  — Today / Train / Progress / More — rendered by `MainTabBar`
-  (`apps/mobile/components/navigation/main-tab-bar.tsx`), the same bar on every
-  screen that shows tabs. Only those four are visible destinations; the
-  preserved root `/stats-history` and the tab-owned pages `/exercise-catalog`,
-  `/groups` and `/settings` each map to a canonical owner
+- The shell is `apps/mobile/src/navigation/main-tabs.ts` — Today / Train /
+  Progress / Groups, then More as a ⋮ — drawn by `MainTabBar`
+  (`apps/mobile/components/navigation/main-tab-bar.tsx`) on every screen that
+  shows tabs. Groups is the tab-owned page `/groups`; `/stats-history`,
+  `/exercise-catalog` and `/settings` each map to a canonical owner
   (`resolveMainTab`), so every recognised root keeps exactly one tab selected
   and an unrecognised one selects none. A tab root in
   `apps/mobile/app/(tabs)/_layout.tsx` must appear in `main-tabs.ts` as a
@@ -131,7 +130,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/sign-in` | `/sync-setup`, else `index` → `/today` | a successful sign-in removes the route |
 | `/sync-setup` | `index` → `/today` | the first sync drains. Neither gate screen ever navigates itself: the stack drops it and the router lands |
 | `/sync-setup` | `/sign-in` | the latest cycle outcome is `AUTH_REQUIRED` (no Retry offered) |
-| `/today` ↔ `/train` ↔ `/progress` ↔ `/more` | | `MainTabBar` |
+| `/today` ↔ `/train` ↔ `/progress` ↔ `/groups` ↔ `/more` | | `MainTabBar` |
 | any tab strip | `/session/<sessionId>` | the Train tab with a workout in progress: `push` from the tab bar and `exercise-history`, `dismissTo` from a completed session view, and nothing on that session's own view |
 | `/train`, `/sessions`, `/completed-session/<id>` | `/session/<sessionId>` | every active-session entry, through `sessionViewHref` (`push`): Train's launch and Sessions' review/complete. Train rechecks for a draft and `apps/mobile/src/session-entry/coordinator.ts` serialises requests: never two drafts |
 | `/session/<id>` | `/completed-session/<id>?presentation=completion` | Finish, after its cleanup prompts and the completion write (`replace`) |
@@ -165,7 +164,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`replace`) |
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
-| `/more` | `/groups`, `/exercise-catalog`, `/gyms`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
+| `/more` | `/exercise-catalog`, `/gyms`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
 | `/exercise-catalog`, `/groups`, `/settings` | a tab | `MainTabBar` (`dismissTo`, so the tabs below are reused rather than stacked) |
 | `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
 | `/settings`, `/settings-muscles`, `/settings-appearance`, `/settings-data-sync` | `/profile`, `/body-weight`, `/theme-colour`, `/settings-*` | rows (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never from workouts |
