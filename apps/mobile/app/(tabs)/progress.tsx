@@ -239,8 +239,11 @@ export type StatsScreenShellProps = {
   /** Whether muscle figures count secondary work ([[muscle.secondary-filter]]); this visit's choice. */
   countSecondary?: boolean;
   onChangeCountSecondary?: (countSecondary: boolean) => void;
+  countSecondaryVolume?: boolean;
+  onChangeCountSecondaryVolume?: (countSecondaryVolume: boolean) => void;
   /** What Settings says each visit opens on for secondary work and family grouping. */
   defaultCountSecondary?: boolean;
+  defaultCountSecondaryVolume?: boolean;
   defaultGrouped?: boolean;
 };
 
@@ -248,8 +251,10 @@ export type StatsScreenShellProps = {
 // view's choices sit behind its Filters button. Muscle 3D has no table to
 // search, so its row holds the button alone.
 function ProgressSearchControls({ viewMode, tableVisible, grouped, onToggleGroup, query, onChangeQuery,
-  gymId, gymOptions, onSelectGym, countSecondary = true, onChangeCountSecondary, defaultCountSecondary = true, defaultGrouped = true }: Pick<StatsScreenShellProps,
-  'viewMode' | 'gymId' | 'gymOptions' | 'onSelectGym' | 'countSecondary' | 'onChangeCountSecondary' | 'defaultCountSecondary' | 'defaultGrouped'> & {
+  gymId, gymOptions, onSelectGym, countSecondary = true, onChangeCountSecondary, defaultCountSecondary = true,
+  countSecondaryVolume = true, onChangeCountSecondaryVolume, defaultCountSecondaryVolume = true, defaultGrouped = true }: Pick<StatsScreenShellProps,
+  'viewMode' | 'gymId' | 'gymOptions' | 'onSelectGym' | 'countSecondary' | 'onChangeCountSecondary' | 'defaultCountSecondary'
+  | 'countSecondaryVolume' | 'onChangeCountSecondaryVolume' | 'defaultCountSecondaryVolume' | 'defaultGrouped'> & {
   tableVisible: boolean; grouped: boolean; onToggleGroup: () => void; query: string; onChangeQuery: (query: string) => void;
 }) {
   const exercise = viewMode === 'exercise';
@@ -265,6 +270,8 @@ function ProgressSearchControls({ viewMode, tableVisible, grouped, onToggleGroup
       grouping={tableVisible ? { value: grouped, onChange: onToggleGroup, opening: defaultGrouped } : undefined}
       secondary={!exercise && onChangeCountSecondary
         ? { value: countSecondary, onChange: onChangeCountSecondary, opening: defaultCountSecondary } : undefined}
+      secondaryVolume={!exercise && onChangeCountSecondaryVolume
+        ? { value: countSecondaryVolume, onChange: onChangeCountSecondaryVolume, opening: defaultCountSecondaryVolume } : undefined}
       gym={searchable && onSelectGym ? { value: gymId, options: gymOptions ?? [], onChange: onSelectGym } : undefined} />
   </View>;
 }
@@ -303,7 +310,10 @@ export function StatsScreenShell({
   onSelectGym,
   countSecondary = true,
   onChangeCountSecondary,
+  countSecondaryVolume = true,
+  onChangeCountSecondaryVolume,
   defaultCountSecondary = true,
+  defaultCountSecondaryVolume = true,
   defaultGrouped = true,
 }: StatsScreenShellProps) {
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
@@ -420,6 +430,8 @@ export function StatsScreenShell({
           onChangeQuery={viewMode === 'exercise' ? onSearchQueryChange : setMuscleSearch}
           gymId={gymId} gymOptions={gymOptions} onSelectGym={onSelectGym}
           countSecondary={countSecondary} onChangeCountSecondary={onChangeCountSecondary}
+          countSecondaryVolume={countSecondaryVolume} onChangeCountSecondaryVolume={onChangeCountSecondaryVolume}
+          defaultCountSecondaryVolume={defaultCountSecondaryVolume}
           defaultCountSecondary={defaultCountSecondary} defaultGrouped={defaultGrouped} />
       </View>
       <ScreenScroll key={viewMode === 'exercise' ? 'exercise' : muscleLayout} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
@@ -597,12 +609,12 @@ function StatsContent() {
   const catalog = useExerciseCatalog();
   // The tables' gym ([[gym.view-filter]]); this visit's choice only.
   const [gymId, setGymId] = useState<string | null | undefined>(undefined);
-  const { countSecondary } = filters;
+  const { countSecondary, countSecondaryVolume } = filters;
   const { current: thisPeriod, previous: lastPeriod, gymOptions, reload, hasSnapshot: exerciseSnapshot, lastError: exerciseError } = useExerciseCatalogComparison(weeks, gymId);
   const revision = useBodyWeightContextRevision();
   const summaryGymId = filters.breakdown === 'muscle' && values.progressMuscleLayout === 'list' ? gymId : undefined;
   const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload,
-    { gymId: summaryGymId, countSecondary: filters.breakdown === 'muscle' ? countSecondary : true });
+    { gymId: summaryGymId, countSecondary, countSecondaryVolume });
   const [searchQuery, setSearchQuery] = useState('');
   // An exercise is listed when either period counted a set for it: one that
   // stopped is as much a comparison as one that started.
@@ -631,7 +643,7 @@ function StatsContent() {
     exerciseFamilies={exerciseFamilies} muscleReport={muscleReport} muscleFamilyCounts={muscleFamilyCounts} exerciseSearchIndex={exerciseSearchIndex} exerciseDataReady={catalog.status === 'ready' && exerciseSnapshot}
     exerciseDataError={catalog.lastError ?? exerciseError} period={filters.period} targetWindowWeeks={values.targetWindowWeeks}
     onSelectPeriod={filters.selectPeriod} onPressSessionsCard={() => router.push('/sessions')}
-    onOpenMuscleHistory={(muscle, view) => router.push(progressHistoryHref({ ...muscle, gymId: summaryGymId, countSecondary }, filters.metric, view))}
+    onOpenMuscleHistory={(muscle, view) => router.push(progressHistoryHref({ ...muscle, gymId: summaryGymId, countSecondary, countSecondaryVolume }, filters.metric, view))}
     onOpenExerciseHistory={exercise => router.push(progressHistoryHref(
       { ...exercise, gymId: filters.breakdown === 'exercise' ? gymId : summaryGymId },
       filters.breakdown === 'exercise' && filters.exerciseMetric !== 'estimatedOneRepMax' ? filters.exerciseMetric : filters.metric,
@@ -645,7 +657,9 @@ function StatsContent() {
     searchQuery={searchQuery} onSearchQueryChange={setSearchQuery}
     gymId={gymId} gymOptions={gymOptions} onSelectGym={setGymId}
     countSecondary={countSecondary} onChangeCountSecondary={filters.selectCountSecondary}
-    defaultCountSecondary={values.progressCountSecondary} defaultGrouped={values.progressGrouped} />;
+    countSecondaryVolume={countSecondaryVolume} onChangeCountSecondaryVolume={filters.selectCountSecondaryVolume}
+    defaultCountSecondary={values.progressCountSecondary} defaultCountSecondaryVolume={!values.muscleVolumePrimaryOnly}
+    defaultGrouped={values.progressGrouped} />;
 }
 
 // A period the exercise has no aggregate for is a genuine nothing: zero sets,

@@ -584,6 +584,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     // JSON text on the wire; the server stores jsonb.
     TARGET('muscle_target_overrides', 'muscleTargetOverrides'),
     TARGET('count_secondary_muscles', 'countSecondaryMuscles'),
+    TARGET('volume_primary_only', 'volumePrimaryOnly'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),

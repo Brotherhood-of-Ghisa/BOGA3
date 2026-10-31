@@ -13,6 +13,7 @@ import { eq } from 'drizzle-orm';
 
 import { stampLocalDataOwner } from '@/src/data/local-wipe';
 import { userSettings } from '@/src/data/schema';
+import { configurePersonalMuscleCounting } from '@/src/config/personal-muscles';
 import {
   adoptMuscleTargetSettings,
   readMuscleTargetSettings,
@@ -25,13 +26,22 @@ import { closeLocalData, localDatabase, resetLocalData } from './helpers/local-d
 const row = () => localDatabase().select().from(userSettings).where(eq(userSettings.id, 'settings')).get();
 const TARGETS = {
   weeklyWorkingSetTarget: 12, muscleTargetMode: 'per_muscle', muscleTargetOverrides: '{"broad":{"chest":16}}',
-  countSecondaryMuscles: false,
+  countSecondaryMuscles: false, volumePrimaryOnly: false,
 };
 
 beforeEach(() => resetLocalData());
 afterEach(() => closeLocalData());
 
 describe('settings row', () => {
+  it('pins a legacy profile choice on creation and never resets it on later bodyweight edits', async () => {
+    configurePersonalMuscleCounting({ countSecondarySets: true, countSecondaryVolume: true });
+    await writeBodyweightCalculationsEnabled(true);
+    expect(row()).toMatchObject({ countSecondaryMuscles: true, volumePrimaryOnly: null });
+    configurePersonalMuscleCounting({ countSecondarySets: false, countSecondaryVolume: true });
+    await writeBodyweightCalculationsEnabled(false);
+    expect(row()).toMatchObject({ countSecondaryMuscles: true, volumePrimaryOnly: null });
+  });
+
   it('reads null before any row exists, then round-trips an edit as one dirty row', async () => {
     expect(await readMuscleTargetSettings('A')).toBeNull();
     await writeMuscleTargetSettings(TARGETS);
@@ -39,10 +49,11 @@ describe('settings row', () => {
     expect(row()).toMatchObject({ localDirty: true, deletedAt: null });
   });
 
-  it('reads null columns on a row only the bodyweight switch wrote', async () => {
+  it('keeps targets and Volume unknown while pinning fresh Sets when bodyweight creates a row', async () => {
     await writeBodyweightCalculationsEnabled(true);
     expect(await readMuscleTargetSettings('A')).toEqual({
-      weeklyWorkingSetTarget: null, muscleTargetMode: null, muscleTargetOverrides: null, countSecondaryMuscles: null,
+      weeklyWorkingSetTarget: null, muscleTargetMode: null, muscleTargetOverrides: null,
+      countSecondaryMuscles: false, volumePrimaryOnly: null,
     });
   });
 
@@ -75,6 +86,7 @@ describe('stored values', () => {
     expect(syncedPreferencesFromStored({ ...TARGETS })).toEqual({
       weeklyWorkingSetTarget: 12, muscleTargetMode: 'per-muscle', muscleTargetOverrides: { broad: { chest: 16 } },
       progressCountSecondary: false,
+      muscleVolumePrimaryOnly: false,
     });
     expect(syncedPreferencesFromStored({ ...TARGETS, muscleTargetMode: 'single' }).muscleTargetMode).toBe('single');
   });
@@ -89,12 +101,12 @@ describe('stored values', () => {
     expect(syncedPreferencesFromStored(stored)).toEqual({});
   });
 
-  it('writes all four columns, filling an unset field with its default', () => {
+  it('writes all settings columns, filling unset fields with independent defaults', () => {
     expect(storedFromSyncedPreferences({ weeklyWorkingSetTarget: 10 })).toEqual({
-      weeklyWorkingSetTarget: 10, muscleTargetMode: 'single', muscleTargetOverrides: '{}', countSecondaryMuscles: true,
+      weeklyWorkingSetTarget: 10, muscleTargetMode: 'single', muscleTargetOverrides: '{}', countSecondaryMuscles: false, volumePrimaryOnly: false,
     });
     const values = { weeklyWorkingSetTarget: 9, muscleTargetMode: 'per-muscle' as const,
-      muscleTargetOverrides: { detailed: { chest: 12 } }, progressCountSecondary: false };
+      muscleTargetOverrides: { detailed: { chest: 12 } }, progressCountSecondary: false, muscleVolumePrimaryOnly: false };
     expect(syncedPreferencesFromStored(storedFromSyncedPreferences(values))).toEqual(values);
   });
 });

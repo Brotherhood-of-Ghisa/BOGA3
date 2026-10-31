@@ -1,4 +1,4 @@
-// Account choices: device-local in the kv store, except the four `synced.ts`
+// Account choices: device-local in the kv store, except those `synced.ts`
 // keeps on the synced settings row. Keep this module free of data, auth and UI imports.
 import { DEFAULT_DISPLAY_EFFORTS, DEFAULT_PERSONAL_EFFORT_POLICY, isEffortSelection, type EffortChoice } from '../exercise-calculations/effort-policy.ts';
 import { isRestTimerSec, MAX_REST_TIMER_SECONDS, MIN_REST_TIMER_SECONDS, REST_TIMER_RANGE_MESSAGE } from '../exercise-core/rest-timer.ts';
@@ -47,6 +47,7 @@ export type AccountLocalPreferences = {
   progressPeriod: ProgressPeriod;
   progressGrouped: boolean;
   progressCountSecondary: boolean;
+  muscleVolumePrimaryOnly: boolean;
   progressMuscleLayout: ProgressMuscleLayout;
   progressMetric: ProgressMetric;
   progressExerciseMetric: ProgressExerciseMetric;
@@ -79,7 +80,8 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   progressBreakdown: 'muscle',
   progressPeriod: 'window',
   progressGrouped: true,
-  progressCountSecondary: true,
+  progressCountSecondary: false,
+  muscleVolumePrimaryOnly: false,
   progressMuscleLayout: 'list',
   progressMetric: 'workingSetCount',
   progressExerciseMetric: 'workingSetCount',
@@ -99,7 +101,7 @@ export const textPreferenceFields: (keyof AccountLocalPreferences)[] = [
 ];
 // Stored as `true` / `false`.
 export const booleanPreferenceFields: (keyof AccountLocalPreferences)[] = [
-  'showNeverDone', 'restTimerAutoStart', 'developerMode', 'progressGrouped', 'progressCountSecondary',
+  'showNeverDone', 'restTimerAutoStart', 'developerMode', 'progressGrouped', 'progressCountSecondary', 'muscleVolumePrimaryOnly',
   'timerInTitleBar',
 ];
 export const preferenceFields = Object.keys(DEFAULT_ACCOUNT_LOCAL_PREFERENCES) as (keyof AccountLocalPreferences)[];
@@ -124,6 +126,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   progressPeriod: 'Choose the Progress period or This week for Progress.',
   progressGrouped: 'Choose whether Progress groups by muscle family.',
   progressCountSecondary: 'Choose whether Progress counts secondary sets.',
+  muscleVolumePrimaryOnly: 'Choose whether muscle Volume counts primary work only.',
   progressMuscleLayout: 'Choose List or 3D for Progress muscles.',
   progressMetric: 'Choose Sets or Volume for Progress.',
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
@@ -143,6 +146,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'restTimerAutoStart':
     case 'progressGrouped':
     case 'progressCountSecondary':
+    case 'muscleVolumePrimaryOnly':
     case 'timerInTitleBar':
     case 'developerMode': return typeof value === 'boolean';
     case 'dateFormat': return value === 'DD-MM-YYYY' || value === 'MM-DD-YYYY' || value === 'YYYY-MM-DD';

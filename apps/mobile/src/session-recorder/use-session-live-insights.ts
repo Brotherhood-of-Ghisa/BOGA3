@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
+import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import {
   deriveSessionExerciseVolumeComparisons,
   deriveSessionMuscleVolumeComparisons,
@@ -23,6 +24,7 @@ export type SessionLiveInsights = {
  */
 export function useSessionLiveInsights(sessionId: string | null, state: SessionViewState) {
   const exerciseCatalog = useExerciseCatalog();
+  const { values: musclePreferences } = useAccountLocalPreferenceState();
 
   const insights = useMemo((): SessionLiveInsights | null => {
     if (state.status !== 'ready' || !sessionId) return null;
@@ -46,7 +48,8 @@ export function useSessionLiveInsights(sessionId: string | null, state: SessionV
             })
           : [],
     };
-  }, [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.muscleSetup, exerciseCatalog.status, sessionId, state]);
+  }, [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.muscleSetup, exerciseCatalog.status,
+    musclePreferences.progressCountSecondary, musclePreferences.muscleVolumePrimaryOnly, sessionId, state]);
 
   const muscleCatalogState = exerciseCatalog.status === 'idle' ? 'loading' : exerciseCatalog.status;
   return { insights, muscleCatalogState };

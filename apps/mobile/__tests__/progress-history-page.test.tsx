@@ -197,7 +197,7 @@ describe('resolveHistorySubject', () => {
     const params = (href: string) => Object.fromEntries(new URLSearchParams(href.split('?')[1]));
     expect(resolveHistorySubject(params(String(progressHistoryHref({ muscleGroupId: 'quads', countSecondary: false })))))
       .toEqual({ kind: 'muscle', id: 'quads', countSecondary: false });
-    expect(resolveHistorySubject({ muscleGroupId: 'quads', secondary: 'shown' })).toEqual({ kind: 'muscle', id: 'quads' });
+    expect(resolveHistorySubject({ muscleGroupId: 'quads', secondary: 'shown' })).toEqual({ kind: 'muscle', id: 'quads', countSecondary: true });
     expect(resolveHistorySubject({ exerciseDefinitionId: 'lift', secondary: 'hidden' })).toEqual({ kind: 'exercise', id: 'lift' });
   });
 
@@ -462,6 +462,21 @@ describe('ProgressHistoryScreen', () => {
     expect(mockScreenOptions.title).toBe('Bench Press');
   });
 
+  it.each([['sets', 'secondary'], ['volume', 'secondaryVolume']] as const)(
+    'replaces a local %s choice when a same-subject link explicitly includes secondary work', async (metric, parameter) => {
+      mockSearchParams = { muscleGroupId: 'front_delts', metric };
+      const page = render(<ProgressHistoryRoute />);
+      const chip = () => screen.getByTestId('stats-muscle-history-secondary');
+      await screen.findByTestId('stats-muscle-history-overlay');
+      if (chip().props.accessibilityState.checked) fireEvent.press(chip());
+      fireEvent.press(chip());
+      expect(chip()).toHaveProp('accessibilityState', { checked: true });
+      mockSearchParams = { ...mockSearchParams, [parameter]: 'shown' };
+      page.rerender(<ProgressHistoryRoute />);
+      await waitFor(() => expect(chip()).toHaveProp('accessibilityState', { checked: false }));
+    },
+  );
+
   it('titles the page with the subject alone, and puts the focused week\'s sessions behind the header ⋮', async () => {
     await act(async () => { updatePreferences({ heatmapView: 'timeline' }); });
     render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
@@ -548,7 +563,7 @@ describe('ProgressHistoryScreen', () => {
     expect(mockScreenOptions).toHaveProperty('headerRight', undefined);
     // The page's own choices are no header item: its secondary-set chip sits in the body's selector row.
     expect(within(screen.getByTestId('stats-muscle-history-overlay')).getByTestId('stats-muscle-history-secondary'))
-      .toHaveProp('accessibilityState', { checked: true });
+      .toHaveProp('accessibilityState', { checked: false });
   });
 
   it('drops the ⋮ when the Timeline is left for another view on a muscle page', async () => {

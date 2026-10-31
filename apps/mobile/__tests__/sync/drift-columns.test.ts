@@ -123,6 +123,13 @@ describe('sync drift column rules', () => {
     expect(findings.map((f) => f.kind)).toEqual(['missing_server_column', 'server_only_column']);
   });
 
+  it('accepts the independent Volume boolean only on its owned wire column', () => {
+    expect(diffEntityColumns('user_settings', [{ name: 'volume_primary_only', type: 'INTEGER' }],
+      [{ column_name: 'volume_primary_only', udt_name: 'bool' }], noExemptions)).toEqual([]);
+    expect(isTypeCompatible('integer', 'bool', 'gyms', 'volume_primary_only')).toBe(false);
+    expect(isTypeCompatible('text', 'bool', 'user_settings', 'volume_primary_only')).toBe(false);
+  });
+
   it('accepts only the narrow type-compat map', () => {
     expect(isTypeCompatible('TEXT', 'text', 'gyms', 'name')).toBe(true);
     expect(isTypeCompatible('integer', 'int4', 'gyms', 'n')).toBe(true);

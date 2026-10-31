@@ -194,7 +194,11 @@ it('a partially failed update publishes only durable scalar edits and retries th
 });
 
 it('reserves a failed owner claim for A during account switches and retries it when A returns', async () => {
-  write.mockImplementationOnce(() => { throw Error('disk full'); });
+  let failed = false;
+  write.mockImplementation((key, value) => {
+    if (key === LEGACY_PREFERENCES_OWNER_KEY && !failed) { failed = true; throw Error('disk full'); }
+    nativeWrite(key, value);
+  });
   read.mockResolvedValue('{"sort":"name"}');
   await select('A');
   expect(Storage.getItemSync(LEGACY_PREFERENCES_OWNER_KEY)).toBeNull();

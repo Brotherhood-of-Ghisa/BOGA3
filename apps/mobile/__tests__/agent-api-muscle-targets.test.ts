@@ -63,6 +63,7 @@ describe('normalizeMuscleTargetsWrite', () => {
     [{ overrides: [['chest', 9]] }, 'overrides must map muscle ids to a target or null.'],
     [{ overrides: null }, 'overrides must map muscle ids to a target or null.'],
     [{ default_weekly_sets: 8, count_secondary_muscles: false }, 'Unsupported field: count_secondary_muscles'],
+    [{ default_weekly_sets: 8, volume_primary_only: true }, 'Unsupported field: volume_primary_only'],
     [{}, 'Name at least one of'],
     [{ overrides: {} }, 'Name at least one of'],
   ])('rejects %j', (body, message) => {

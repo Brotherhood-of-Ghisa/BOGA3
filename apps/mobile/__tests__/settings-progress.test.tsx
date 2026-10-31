@@ -61,6 +61,24 @@ afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
 
 const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' } as const;
 
+it('keeps adjacent Primary only settings independent and persists their choices', async () => {
+  await openSettings();
+  const sets = () => screen.getByRole('switch', { name: 'Sets: Primary only' });
+  const volume = () => screen.getByRole('switch', { name: 'Volume: Primary only' });
+  expect(sets()).toHaveProp('accessibilityState', { checked: true });
+  expect(volume()).toHaveProp('accessibilityState', { checked: false });
+  fireEvent.press(volume());
+  expect(values()).toMatchObject({ progressCountSecondary: false, muscleVolumePrimaryOnly: true });
+  expect(sets()).toHaveProp('accessibilityState', { checked: true });
+  fireEvent.press(sets());
+  expect(values()).toMatchObject({ progressCountSecondary: true, muscleVolumePrimaryOnly: true });
+  expect(volume()).toHaveProp('accessibilityState', { checked: true });
+  __resetAccountLocalPreferencesForTests();
+  setAccountLocalPreferenceAccount('A', true);
+  await ensureAccountLocalPreferencesLoaded();
+  expect(values()).toMatchObject({ progressCountSecondary: true, muscleVolumePrimaryOnly: true });
+});
+
 it('draws Progress and Effort as sections of rows: micro-label headings, option-role row names', async () => {
   await openSettings();
   const progress = within(screen.getByTestId('settings-section-progress'));
@@ -68,7 +86,7 @@ it('draws Progress and Effort as sections of rows: micro-label headings, option-
     expect(progress.getByRole('header', { name: heading })).toHaveStyle(LABEL);
   }
   for (const label of ['Muscle view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric',
-    'Progress period (weeks)', 'History look-back (weeks)', 'Group by muscle family', 'Count secondary sets']) {
+    'Progress period (weeks)', 'History look-back (weeks)', 'Group by muscle family', 'Sets: Primary only', 'Volume: Primary only']) {
     expect(progress.getByText(label)).toHaveStyle(uiText.option);
   }
   // Auto-start is a form card's switch row under the `Rest timer` section heading.
@@ -136,7 +154,7 @@ it('sets what Progress opens on: view, period, each metric, grouping and seconda
   fireEvent.press(screen.getByTestId('settings-progress-grouped'));
   fireEvent.press(screen.getByTestId('settings-progress-count-secondary'));
   expect(values()).toMatchObject({ progressBreakdown: 'exercise', progressPeriod: 'this-week', progressMetric: 'totalVolume',
-    progressExerciseMetric: 'estimatedOneRepMax', progressGrouped: false, progressCountSecondary: false });
+    progressExerciseMetric: 'estimatedOneRepMax', progressGrouped: false, progressCountSecondary: true });
   expect(screen.getByTestId('settings-progress-grouped')).toHaveProp('accessibilityState', { checked: false });
 
   // The mounted page follows each default as it changes.

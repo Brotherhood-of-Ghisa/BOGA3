@@ -351,9 +351,9 @@ returns one bounded object; days and Monday-start weeks are the profile
 
 ```json
 {
-  "metric_revision": "working_sets_v9", "as_of": "2026-10-28T12:00:00.000Z",
+  "metric_revision": "working_sets_v10", "as_of": "2026-10-28T12:00:00.000Z",
   "time_zone": "Europe/London", "today": "2026-10-28", "week_start": "2026-10-26",
-  "muscle_setup": "broad", "counts_secondary_sets": true,
+  "muscle_setup": "broad", "counts_secondary_sets": true, "volume_primary_only": false,
   "targets": { "mode": "per_muscle", "default_weekly_sets": 8, "uploaded": true, "revision": 1761650000000 },
   "muscles": [{ "id": "chest", "name": "Chest", "family": "Chest", "weekly_target": 12,
     "week_sets": 6.5, "recovery_days": [{ "date": "2026-10-25", "sets": null }],
@@ -366,10 +366,11 @@ returns one bounded object; days and Monday-start weeks are the profile
 }
 ```
 
-`training-status.ts` derives the muscles with Today's Plan's own functions,
-under coaching's working-set rule and completed workouts only. Favourites are
-a coach-only order: most sessions with a working set in 28 days, then latest
-done, then name; never the app's recency-weighted Favourites sort. `revision` is the settings row's `client_updated_at_ms` (0
+`training-status.ts` uses Today's Plan functions with coaching eligibility and
+completed workouts. `counts_secondary_sets` controls Sets; `volume_primary_only`
+reports the independent Volume choice ([[muscle.secondary-filter]]). Favourites
+rank by working-set sessions in 28 days, latest done, then name; the app uses
+recency-weighted sorting. `revision` is the settings row's `client_updated_at_ms` (0
 with no row); `uploaded: false` shows app defaults. Sets older than 56 days are
 not read, except each favourite's own history, which dates its records;
 `record_history_complete: false` when it hit the exercise-context cap (500
@@ -419,7 +420,7 @@ never a device's effort settings.
 tie keeps the earliest session; a zero result is never a record
 ([[1rm.formula]] for a zero 1RM).
 
-`metric_revision: "working_sets_v9"` reports a split exercise as the whole
+`metric_revision: "working_sets_v10"` reports a split exercise as the whole
 exercise unless `gym_bucket` names a gym ([gym buckets](#gym-buckets)). For what
 an earlier `metric_revision` meant, see the
 [revision history](../../../docs/procedures/rule-upgrade.md#revision-history).
@@ -429,7 +430,7 @@ an earlier `metric_revision` meant, see the
 > **Status: accepted current response contract.**
 
 Exercise-context and workout responses carry
-`metric_revision: "working_sets_v9"`, which includes this bodyweight contract. Routes, arguments, authorization
+`metric_revision: "working_sets_v10"`, which includes this bodyweight contract. Routes, arguments, authorization
 and envelopes stay at API v1. Every weight is kg. The existing set `load` and
 `top_weight` are raw entered Weight and never include bodyweight contribution.
 

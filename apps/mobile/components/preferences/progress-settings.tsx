@@ -32,8 +32,11 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
     <FormSection title="Counting">
       <SwitchRow density="list" label="Group by muscle family" testID="settings-progress-grouped" value={values.progressGrouped}
         onValueChange={progressGrouped => updatePreferences({ progressGrouped })} />
-      <SwitchRow density="list" divider label="Count secondary sets" testID="settings-progress-count-secondary"
-        value={values.progressCountSecondary} onValueChange={progressCountSecondary => updatePreferences({ progressCountSecondary })} />
+      <SwitchRow density="list" divider label="Sets: Primary only" testID="settings-progress-count-secondary"
+        value={!values.progressCountSecondary} onValueChange={primaryOnly => updatePreferences({ progressCountSecondary: !primaryOnly })} />
+      <SwitchRow density="list" divider label="Volume: Primary only" testID="settings-muscle-volume-primary-only"
+        value={values.muscleVolumePrimaryOnly}
+        onValueChange={muscleVolumePrimaryOnly => updatePreferences({ muscleVolumePrimaryOnly })} />
     </FormSection>
   </View>;
 }

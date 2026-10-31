@@ -18,16 +18,18 @@ export type ProgressFilters = {
   exerciseMetric: ProgressExerciseMetric;
   /** Secondary work in muscle figures ([[muscle.secondary-filter]]). */
   countSecondary: boolean;
+  countSecondaryVolume: boolean;
   selectBreakdown: (next: ProgressBreakdown) => void;
   selectPeriod: (next: ProgressPeriod) => void;
   selectMetric: (next: ProgressMetric) => void;
   selectExerciseMetric: (next: ProgressExerciseMetric) => void;
   selectCountSecondary: (next: boolean) => void;
+  selectCountSecondaryVolume: (next: boolean) => void;
 };
 
 type Choices = {
   breakdown?: ProgressBreakdown; period?: ProgressPeriod; metric?: ProgressMetric;
-  exerciseMetric?: ProgressExerciseMetric; countSecondary?: boolean;
+  exerciseMetric?: ProgressExerciseMetric; countSecondary?: boolean; countSecondaryVolume?: boolean;
 };
 type Defaults = Required<Choices>;
 
@@ -64,6 +66,7 @@ export function useProgressFilters(params: ProgressFilterParams): ProgressFilter
   const defaults: Defaults = {
     breakdown: values.progressBreakdown, period: values.progressPeriod, metric: values.progressMetric,
     exerciseMetric: values.progressExerciseMetric, countSecondary: values.progressCountSecondary,
+    countSecondaryVolume: !values.muscleVolumePrimaryOnly,
   };
   const link = { breakdown: firstParam(params.breakdown), period: firstParam(params.period) };
   const [entered, setEntered] = useState(link);
@@ -90,10 +93,12 @@ export function useProgressFilters(params: ProgressFilterParams): ProgressFilter
     metric: chosen.metric ?? defaults.metric,
     exerciseMetric: chosen.exerciseMetric ?? defaults.exerciseMetric,
     countSecondary: chosen.countSecondary ?? defaults.countSecondary,
+    countSecondaryVolume: chosen.countSecondaryVolume ?? defaults.countSecondaryVolume,
     selectBreakdown: breakdown => choose({ breakdown }),
     selectPeriod: period => choose({ period }),
     selectMetric: metric => choose({ metric }),
     selectExerciseMetric: exerciseMetric => choose({ exerciseMetric }),
     selectCountSecondary: countSecondary => choose({ countSecondary }),
+    selectCountSecondaryVolume: countSecondaryVolume => choose({ countSecondaryVolume }),
   };
 }

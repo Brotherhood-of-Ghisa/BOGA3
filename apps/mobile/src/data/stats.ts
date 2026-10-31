@@ -1,5 +1,6 @@
 import { loadAsOfWeightResolver } from './bodyweight';
 import { getPersonalEffortPolicy } from '@/src/config/personal-effort';
+import { getPersonalMuscleCounting } from '@/src/config/personal-muscles';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import { and, asc, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from './bootstrap';
@@ -16,7 +17,6 @@ import {
   countMuscleAnalyticsWorkingSets,
   countMuscleSet,
   createMuscleSetCounter,
-  withoutSecondaryMappings,
   type AggregateSelectedMuscleDailyEffortOptions,
   type DailyEffortMetrics,
   type MuscleAnalyticsInput,
@@ -104,6 +104,7 @@ export type ComputeStatsSummaryOptions = ({ periodDays: StatsPeriodDays; periodW
   gymId?: string | null;
   /** `false` counts primary work only ([[muscle.secondary-filter]]); unset counts it by [[muscle.set-count]]. */
   countSecondary?: boolean;
+  countSecondaryVolume?: boolean;
 };
 
 /** Every gym; the workout in progress counts, dated at `now`. */
@@ -113,6 +114,7 @@ export type ComputeMuscleDailySetsOptions = {
   now: Date;
   /** `false` counts primary work only ([[muscle.secondary-filter]]). */
   countSecondary?: boolean;
+  countSecondaryVolume?: boolean;
 };
 
 export type ComputeSelectedMuscleDailyEffortOptions =
@@ -123,6 +125,7 @@ export type ComputeSelectedMuscleDailyEffortOptions =
     now?: Date;
     gymId?: string | null;
     countSecondary?: boolean;
+    countSecondaryVolume?: boolean;
   };
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -183,8 +186,12 @@ const inputInGym = (input: StatsAggregationInput, gymId: string | null | undefin
   gymId === undefined ? input : { ...input, sessions: input.sessions.filter(session => (session.gymId ?? null) === gymId) };
 
 // A read's muscle mappings: every counted role, or primary only ([[muscle.secondary-filter]]).
-const inputCountingSecondary = (input: StatsAggregationInput, countSecondary: boolean | undefined): StatsAggregationInput =>
-  countSecondary === false ? withoutSecondaryMappings(input) : input;
+const inputCountingSecondary = (input: StatsAggregationInput,
+  options: { countSecondary?: boolean; countSecondaryVolume?: boolean }): StatsAggregationInput => ({
+  ...input,
+  ...(options.countSecondary === undefined ? {} : { countSecondarySets: options.countSecondary }),
+  ...(options.countSecondaryVolume === undefined ? {} : { countSecondaryVolume: options.countSecondaryVolume }),
+});
 
 // A read's muscles: the user's, not their anatomy entries ([[muscle.report-groups]]).
 // After the secondary filter, so a merged muscle keeps only the roles that count.
@@ -194,15 +201,16 @@ const inputReportingMuscles = (input: StatsAggregationInput): StatsAggregationIn
   return applyMuscleReport(input, muscleReport);
 };
 
-const inputInScope = (input: StatsAggregationInput, options: { gymId?: string | null; countSecondary?: boolean }) =>
-  inputInGym(inputReportingMuscles(inputCountingSecondary(input, options.countSecondary)), options.gymId);
+const inputInScope = (input: StatsAggregationInput,
+  options: { gymId?: string | null; countSecondary?: boolean; countSecondaryVolume?: boolean }) =>
+  inputInGym(inputReportingMuscles(inputCountingSecondary(input, options)), options.gymId);
 
 type StatsMuscleAccumulator = { setCounter: MuscleSetCounter; totalVolume: number | null };
 
 /**
  * Per-muscle and per-family [[muscle.set-count]] and Volume, from one pass over
- * the contributions. A family sums the allocated shares of its muscles,
- * deduplicating repeated copies of each physical set/muscle contribution.
+ * the contributions. A family counts each physical set once at its strongest
+ * role across its muscles.
  * A contribution for a muscle outside the taxonomy joins no family.
  */
 const accumulateMuscleTotals = (input: StatsAggregationInput) => {
@@ -419,6 +427,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
           : [];
 
       return {
+        ...getPersonalMuscleCounting(),
         bodyweightCalculationsEnabled,
         effortPolicy: getPersonalEffortPolicy(),
         sessions: sessionsInPeriod,
@@ -515,7 +524,7 @@ export const createStatsRepository = (store: StatsStore = createDrizzleStatsStor
     ensureDate(options.start, 'start');
     ensureDate(options.end, 'end');
     const input = inputReportingMuscles(inputCountingSecondary(
-      await store.loadAggregationInput({ start: options.start, end: options.end, now: options.now }), options.countSecondary));
+      await store.loadAggregationInput({ start: options.start, end: options.end, now: options.now }), options));
     const allEffort = aggregateSelectedMuscleDailyEffort(input, options);
     const contributingSessions = new Set(allEffort.flatMap(day => day.contributions.map(row => row.sessionId)));
     const effort = options.gymId === undefined ? allEffort : aggregateSelectedMuscleDailyEffort(inputInGym(input, options.gymId), options);

@@ -17,16 +17,18 @@ import type { LogEventParams } from '@/src/logging/logEvent';
 import { __resetClockForTests, PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import { CURRENT_APP_VERSION } from '@/src/data/exercise-catalog-seeds';
 import { syncRuntimeState, userSettings } from '@/src/data/schema';
+import { writeBodyweightCalculationsEnabled } from '@/src/data/user-settings';
 import {
   ensureAccountLocalPreferencesLoaded,
   getAccountLocalPreferenceState,
+  drainAccountLocalSyncedWrites,
   setAccountLocalPreferenceAccount,
   setAccountLocalPreferences,
 } from '@/src/preferences/account-local';
 import { muscleWeeklyTarget } from '@/src/preferences/muscle-targets';
 import { preferenceKey } from '@/src/preferences/storage';
 import '@/src/sync/synced-preferences-store';
-import { syncedTargetsAdoptedKey } from '@/src/preferences/synced';
+import { syncedTargetsAdoptedKey, syncedMuscleVolumeAdoptedKey } from '@/src/preferences/synced';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
 import { applyPullPage, entityToWire, runSyncCycle, type WireEntity } from '@/src/sync/cycle';
 
@@ -93,6 +95,7 @@ const A_TARGETS = {
   muscle_target_mode: 'per_muscle',
   muscle_target_overrides: { detailed: { chest: 14 } },
   count_secondary_muscles: false,
+  volume_primary_only: false,
 };
 const A_WIRE = { ...A_TARGETS, muscle_target_overrides: JSON.stringify(A_TARGETS.muscle_target_overrides) };
 
@@ -151,6 +154,26 @@ const signIn = async () => {
 };
 
 describe('upload once', () => {
+  it('keeps fresh direct Sets after a bodyweight insert pushes through a failed adoption read and retries', async () => {
+    await signIn();
+    expect(values().progressCountSecondary).toBe(false);
+    await writeBodyweightCalculationsEnabled(true);
+    mockSelectSettings.mockResolvedValueOnce({ data: null, error: { message: 'temporary settings read failure' } });
+    await runSyncCycle();
+    const first = pushed.find(entity => entity.type === 'user_settings')!;
+    expect(first.fields).toMatchObject({ bodyweight_calculations_enabled: true,
+      count_secondary_muscles: false, volume_primary_only: null });
+    expect(Storage.getItemSync(syncedMuscleVolumeAdoptedKey(profile))).toBeNull();
+    serverRow({ weekly_working_set_target: null, muscle_target_mode: null, muscle_target_overrides: null,
+      count_secondary_muscles: first.fields.count_secondary_muscles, volume_primary_only: null,
+      client_updated_at_ms: first.client_updated_at_ms });
+    await runSyncCycle();
+    expect(values()).toMatchObject({ progressCountSecondary: false, muscleVolumePrimaryOnly: false });
+    expect(settingsRow()).toMatchObject({ countSecondaryMuscles: false, volumePrimaryOnly: false,
+      bodyweightCalculationsEnabled: true });
+    expect(Storage.getItemSync(syncedMuscleVolumeAdoptedKey(profile))).toBe('true');
+  });
+
   it('uploads the first device\'s kv targets when the server holds none, then drops the kv copy', async () => {
     storeKvTargets();
     Storage.setItemSync(preferenceKey(profile, 'progressCountSecondary'), 'false');
@@ -198,10 +221,13 @@ describe('upload once', () => {
       .toBe(Number.MAX_SAFE_INTEGER);
   });
 
-  it('uploads nothing for a device that never stored a target', async () => {
+  it('uploads the independent new-account defaults even before a target edit', async () => {
     await signIn();
     await runSyncCycle();
-    expect(pushed.filter(entity => entity.type === 'user_settings')).toEqual([]);
+    expect(pushed.filter(entity => entity.type === 'user_settings')).toHaveLength(1);
+    expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({
+      count_secondary_muscles: false, volume_primary_only: false, weekly_working_set_target: 8,
+    });
     expect(Storage.getItemSync(syncedTargetsAdoptedKey(profile))).toBe('true');
   });
 
@@ -303,8 +329,165 @@ describe('upload once', () => {
 });
 
 describe('pulled settings', () => {
+  it('waits for full-row pull before completing newer incomplete settings without reverting bodyweight', async () => {
+    Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
+    database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 8, muscleTargetMode: 'single',
+      muscleTargetOverrides: '{}', countSecondaryMuscles: true, volumePrimaryOnly: null,
+      bodyweightCalculationsEnabled: false, localDirty: false, localUpdatedAtMs: 500 }).run();
+    serverRow({ ...A_TARGETS, weekly_working_set_target: 12, volume_primary_only: null, client_updated_at_ms: 700 });
+    await signIn();
+    await runSyncCycle();
+    expect(pushed).toEqual([]);
+    expect(settingsRow()).toMatchObject({ bodyweightCalculationsEnabled: false, localDirty: false, localUpdatedAtMs: 500 });
+    expect(Storage.getItemSync(syncedMuscleVolumeAdoptedKey(profile))).toBeNull();
+
+    pullPage = [settingsWire(700, { ...A_WIRE, weekly_working_set_target: 12,
+      volume_primary_only: null, bodyweight_calculations_enabled: true })];
+    await runSyncCycle();
+    expect(pushed.filter(entity => entity.type === 'user_settings')).toHaveLength(1);
+    expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({
+      weekly_working_set_target: 12, volume_primary_only: false, bodyweight_calculations_enabled: true,
+    });
+    expect(settingsRow()).toMatchObject({ weeklyWorkingSetTarget: 12, volumePrimaryOnly: false,
+      bodyweightCalculationsEnabled: true, localDirty: false });
+    expect(Storage.getItemSync(syncedMuscleVolumeAdoptedKey(profile))).toBe('true');
+  });
+
+  it('adopts a newer direct server read instead of re-stamping a clean stale pull over it', async () => {
+    Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
+    database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 8, muscleTargetMode: 'single',
+      muscleTargetOverrides: '{}', countSecondaryMuscles: true, volumePrimaryOnly: null,
+      localDirty: false, localUpdatedAtMs: 500 }).run();
+    serverRow({ ...A_TARGETS, weekly_working_set_target: 12, volume_primary_only: true, client_updated_at_ms: 700 });
+    await signIn();
+    await runSyncCycle();
+    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 12, progressCountSecondary: false,
+      muscleVolumePrimaryOnly: true });
+    expect(settingsRow()).toMatchObject({ weeklyWorkingSetTarget: 12, volumePrimaryOnly: true, localDirty: false });
+    expect(pushed).toEqual([]);
+  });
+
+  it('keeps unknown Volume null during a pre-adoption Sets edit, then discovers the other device choice', async () => {
+    Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
+    database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 11, muscleTargetMode: 'single',
+      muscleTargetOverrides: '{}', countSecondaryMuscles: true, volumePrimaryOnly: null,
+      localDirty: false, localUpdatedAtMs: 500 }).run();
+    serverRow({ ...A_TARGETS, muscle_target_mode: 'single', muscle_target_overrides: {},
+      volume_primary_only: true, client_updated_at_ms: 700 });
+    await signIn();
+    setAccountLocalPreferences({ progressCountSecondary: false });
+    await drainAccountLocalSyncedWrites();
+    expect(settingsRow()).toMatchObject({ countSecondaryMuscles: false, volumePrimaryOnly: null });
+    await runSyncCycle();
+    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, progressCountSecondary: false,
+      muscleVolumePrimaryOnly: true });
+    expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({
+      count_secondary_muscles: false, volume_primary_only: true,
+    });
+  });
+
+  it('adopts the known legacy implicit Sets default on a fresh device without inventing a Volume restriction', async () => {
+    serverRow({ ...A_TARGETS, count_secondary_muscles: null, volume_primary_only: null, client_updated_at_ms: 500 });
+    pullPage = [settingsWire(500, { ...A_WIRE, count_secondary_muscles: null, volume_primary_only: null })];
+    await signIn();
+    await runSyncCycle();
+    expect(values()).toMatchObject({ progressCountSecondary: true, muscleVolumePrimaryOnly: false });
+  });
+
+  it('preserves an explicit new Volume edit when the legacy server has not stored that choice yet', async () => {
+    storeKvTargets();
+    Storage.setItemSync(preferenceKey(profile, 'progressCountSecondary'), 'false');
+    await signIn();
+    setAccountLocalPreferences({ muscleVolumePrimaryOnly: true });
+    const legacy = { ...A_TARGETS, volume_primary_only: null };
+    pullPage = [settingsWire(500, { ...A_WIRE, volume_primary_only: null })];
+    serverRow(legacy);
+    await runSyncCycle();
+    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, progressCountSecondary: false,
+      muscleVolumePrimaryOnly: true });
+    expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({ volume_primary_only: true });
+  });
+
+  it.each([null, false])('keeps unuploaded KV targets beside a bodyweight-only row with stored Sets %j', async storedSets => {
+    storeKvTargets();
+    Storage.setItemSync(preferenceKey(profile, 'weeklyWorkingSetTarget'), '12');
+    Storage.setItemSync(preferenceKey(profile, 'progressCountSecondary'), 'false');
+    database.insert(userSettings).values({ id: 'settings', bodyweightCalculationsEnabled: true,
+      countSecondaryMuscles: storedSets, volumePrimaryOnly: false,
+      localDirty: false, localUpdatedAtMs: 500 }).run();
+    const bodyweightOnly = { weekly_working_set_target: null, muscle_target_mode: null, muscle_target_overrides: null,
+      count_secondary_muscles: storedSets, volume_primary_only: false };
+    pullPage = [settingsWire(500, { ...bodyweightOnly, bodyweight_calculations_enabled: true })];
+    serverRow(bodyweightOnly);
+    await signIn();
+    await runSyncCycle();
+    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 12, muscleTargetMode: 'per-muscle',
+      muscleTargetOverrides: { broad: { back: 9 } }, progressCountSecondary: false, muscleVolumePrimaryOnly: false });
+    expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({
+      weekly_working_set_target: 12, muscle_target_mode: 'per_muscle',
+      muscle_target_overrides: '{"broad":{"back":9}}', count_secondary_muscles: false, volume_primary_only: false,
+      bodyweight_calculations_enabled: true,
+    });
+  });
+
+  it('keeps offline target edits when an upgrade projects Volume at the original server edit clock', async () => {
+    Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
+    database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 12, muscleTargetMode: 'per_muscle',
+      muscleTargetOverrides: '{"broad":{"back":17}}', countSecondaryMuscles: null,
+      localDirty: true, localUpdatedAtMs: 500 }).run();
+    serverRow({ ...A_TARGETS, count_secondary_muscles: null });
+    // A schema/default upgrade must not advance the edit clock past offline edits.
+    pullPage = [settingsWire(100, { ...A_WIRE, count_secondary_muscles: null })];
+    await signIn();
+    await runSyncCycle();
+    expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({
+      weekly_working_set_target: 12, muscle_target_mode: 'per_muscle',
+      muscle_target_overrides: '{"broad":{"back":17}}', count_secondary_muscles: true, volume_primary_only: false,
+    });
+    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 12, muscleTargetOverrides: { broad: { back: 17 } },
+      progressCountSecondary: true, muscleVolumePrimaryOnly: false });
+  });
+
+  it.each([true, false])('upgrades an already-adopted legacy Sets choice %s without coupling Volume', async legacy => {
+    Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
+    database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 11, muscleTargetMode: 'single',
+      muscleTargetOverrides: '{}', countSecondaryMuscles: legacy, localUpdatedAtMs: 500 }).run();
+    serverRow({ ...A_TARGETS, muscle_target_mode: 'single', muscle_target_overrides: {}, count_secondary_muscles: legacy,
+      volume_primary_only: null });
+    await signIn();
+    await runSyncCycle();
+    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, progressCountSecondary: legacy,
+      muscleVolumePrimaryOnly: false });
+    expect(settingsRow()).toMatchObject({ countSecondaryMuscles: legacy, volumePrimaryOnly: false });
+    expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({
+      count_secondary_muscles: legacy, volume_primary_only: false, weekly_working_set_target: 11,
+    });
+    await runSyncCycle();
+    expect(mockSelectSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('adopts an explicit server Volume choice instead of resetting it during legacy migration', async () => {
+    Storage.setItemSync(preferenceKey(profile, 'progressCountSecondary'), 'true');
+    await signIn();
+    pullPage = [settingsWire(500, { ...A_WIRE, volume_primary_only: true })];
+    serverRow({ ...A_TARGETS, volume_primary_only: true });
+    await runSyncCycle();
+    expect(values()).toMatchObject({ progressCountSecondary: false, muscleVolumePrimaryOnly: true });
+    expect(pushed).toEqual([]);
+    expect(kv('muscleVolumePrimaryOnly')).toBeNull();
+    const legacyFields: Record<string, unknown> = { ...A_WIRE };
+    delete legacyFields.volume_primary_only;
+    database.transaction(tx => applyPullPage(tx as Transaction,
+      [settingsWire(600, legacyFields)], 'user_settings'));
+    expect(settingsRow()?.volumePrimaryOnly).toBe(true);
+    database.transaction(tx => applyPullPage(tx as Transaction,
+      [settingsWire(700, { ...A_WIRE, volume_primary_only: null })], 'user_settings'));
+    expect(settingsRow()?.volumePrimaryOnly).toBe(true);
+  });
+
   it('refreshes the in-memory targets and count-secondary as soon as a pull changes them', async () => {
     Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
+    Storage.setItemSync(syncedMuscleVolumeAdoptedKey(profile), 'true');
     await signIn();
     expect(muscleWeeklyTarget(values(), 'detailed', 'chest')).toBe(8);
 
@@ -333,6 +516,7 @@ describe('pulled settings', () => {
 
   it('ignores invalid server values and falls back to the kv value or default', async () => {
     Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
+    Storage.setItemSync(syncedMuscleVolumeAdoptedKey(profile), 'true');
     Storage.setItemSync(preferenceKey(profile, 'weeklyWorkingSetTarget'), '9');
     await signIn();
     pullPage = [settingsWire(700, { weekly_working_set_target: 0, muscle_target_mode: 'sometimes',

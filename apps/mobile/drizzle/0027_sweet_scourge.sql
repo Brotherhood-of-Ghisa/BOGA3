@@ -1,0 +1,1 @@
+ALTER TABLE `user_settings` ADD `volume_primary_only` integer;

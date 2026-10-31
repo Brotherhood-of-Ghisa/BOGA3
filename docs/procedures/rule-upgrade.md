@@ -69,6 +69,8 @@ Test delayed publication across the upgrade before deploying it.
 
 Agent API `metric_revision` values, newest first.
 
+- `working_sets_v10` separates muscle Sets credit from Volume allocation and
+  publishes independent counting choices ([[muscle.set-count]], [[muscle.secondary-filter]]).
 - `working_sets_v9` gives each Secondary mapping ½ ([[muscle.set-count]])
   instead of sharing one ½ pool across an exercise's Secondaries.
 - `working_sets_v8` allocated muscle work using co-primary and

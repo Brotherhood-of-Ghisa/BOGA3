@@ -89,6 +89,7 @@ type ServerSettings = {
   muscle_target_mode: string | null;
   muscle_target_overrides: unknown;
   count_secondary_muscles: boolean | null;
+  volume_primary_only: boolean | null;
   client_updated_at_ms: number;
   deleted_at: number | null;
 };
@@ -169,7 +170,7 @@ const todayPlanTargets = async (): Promise<Record<string, number>> => {
 const serverSettings = async (): Promise<ServerSettings | null> => {
   const { data, error } = await createLocalServiceRoleClient(config).schema(SYNC_RPC_SCHEMA)
     .from('user_settings')
-    .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,client_updated_at_ms,deleted_at')
+    .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,volume_primary_only,client_updated_at_ms,deleted_at')
     .eq('owner_user_id', account.userId)
     .eq('id', 'settings')
     .maybeSingle();
@@ -218,6 +219,28 @@ afterEach(() => {
 });
 
 describe('synced muscle targets against a live endpoint', () => {
+  it('round-trips independent choices through another device and reinstall, preserving them on target-only writes', async () => {
+    const phone = newDevice({ progressCountSecondary: 'true' });
+    const tablet = newDevice();
+    await syncOn(phone);
+    expect(preferences()).toMatchObject({ progressCountSecondary: true, muscleVolumePrimaryOnly: false });
+    setAccountLocalPreferences({ muscleVolumePrimaryOnly: true });
+    await drainAccountLocalSyncedWrites();
+    await syncOn(phone);
+    await syncOn(tablet);
+    expect(preferences()).toMatchObject({ progressCountSecondary: true, muscleVolumePrimaryOnly: true });
+    setAccountLocalPreferences({ progressCountSecondary: false });
+    await drainAccountLocalSyncedWrites();
+    await syncOn(tablet);
+    await syncOn(phone);
+    expect(preferences()).toMatchObject({ progressCountSecondary: false, muscleVolumePrimaryOnly: true });
+    await coachSetsTargets({ default_weekly_sets: 13 });
+    await syncOn(newDevice());
+    expect(preferences()).toMatchObject({ weeklyWorkingSetTarget: 13, progressCountSecondary: false,
+      muscleVolumePrimaryOnly: true });
+    expect(await serverSettings()).toMatchObject({ count_secondary_muscles: false, volume_primary_only: true });
+  }, LIVE_TIMEOUT_MS);
+
   it('upgrades two devices with different local targets: the first to sync uploads, the second adopts', async () => {
     const first = newDevice({
       weeklyWorkingSetTarget: '12',
@@ -237,6 +260,7 @@ describe('synced muscle targets against a live endpoint', () => {
     });
     expect(kvTargets()).toEqual({
       weeklyWorkingSetTarget: null, muscleTargetMode: null, muscleTargetOverrides: null, progressCountSecondary: null,
+      muscleVolumePrimaryOnly: null,
     });
 
     await syncOn(second);
@@ -248,6 +272,7 @@ describe('synced muscle targets against a live endpoint', () => {
     });
     expect(kvTargets()).toEqual({
       weeklyWorkingSetTarget: null, muscleTargetMode: null, muscleTargetOverrides: null, progressCountSecondary: null,
+      muscleVolumePrimaryOnly: null,
     });
     expect(Storage.getItemSync(syncedTargetsAdoptedKey(profile))).toBe('true');
     expect(await todayPlanTargets()).toMatchObject({ chest: 15, delts_front: 12 });

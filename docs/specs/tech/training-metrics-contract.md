@@ -1,7 +1,7 @@
 # Training metrics contract
 
-Implements the product facts in `docs/product/` for mobile, groups and coaching,
-and owns the remaining session, record and total rules.
+Implements `docs/product/` for mobile, groups and coaching; owns session,
+record and total rules.
 
 | § | Definition | Code |
 | --- | --- | --- |
@@ -286,25 +286,25 @@ choices may change which recorded set qualifies.
 
 **Muscle volume.**
 
-- Its base is calculated total load / 2 × reps, allocated by
-  [[muscle.set-count]] before filtering or reporting.
+- Its base is calculated total load / 2 × reps. [[muscle.set-count]] allocates
+  separate Primary and Secondary pools before filtering or reporting.
 - Ordinary total input contributes `E / 2` per side, and per-side input
   contributes `E`, retaining the same muscle Volume.
 
 **A muscle's set count** is [[muscle.set-count]], derived everywhere by
-`countMuscleSets` (`muscle-analytics.ts`). Family counts sum their muscles'
-allocated shares once per source mapping. Figures remain unrounded through
+`countMuscleSets` (`muscle-analytics.ts`). Families deduplicate physical
+sets at their strongest role. Figures remain unrounded through
 aggregation. Nothing is stored: these are read-time derivations, so local
 facts and group scoring versions stay unchanged. Coaching publishes the
-allocation change under its own metric revision. The window's own working-set
+allocation change under its own metric revision. The window's working-set
 total stays a count of physical sets.
 
-**The user's muscles.** Surfaces reading the muscle setup apply
-`applyMuscleReport` (`muscle-analytics.ts`) after `withoutSecondaryMappings`.
-It allocates raw mappings before re-keying entries to muscles
+**The user's muscles.** Surfaces pass independent counting flags and apply
+`applyMuscleReport` (`muscle-analytics.ts`) to the complete mapping.
+It allocates raw Volume before re-keying entries to muscles
 ([[muscle.report-groups]]) and dropping untracked entries
 ([[muscle.untracked]]). Merged entries combine as [[muscle.set-count]]
-says; their strongest role labels the result. A merged muscle takes its anchor's id;
+says; the strongest role labels the result. A merged muscle takes its anchor's id;
 Detailed is the identity. Exercise figures never read it.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and

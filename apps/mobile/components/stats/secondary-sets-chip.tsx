@@ -7,6 +7,7 @@ export type SecondarySetsChipProps = {
   value: boolean;
   onChange: (value: boolean) => void;
   testID: string;
+  metric?: 'workingSetCount' | 'totalVolume';
 };
 
 /**
@@ -16,12 +17,12 @@ export type SecondarySetsChipProps = {
  * for primary only. The chip
  * never fills, so the row's ink stays on the view selector.
  */
-export function SecondarySetsChip({ value, onChange, testID }: SecondarySetsChipProps) {
+export function SecondarySetsChip({ value, onChange, testID, metric = 'workingSetCount' }: SecondarySetsChipProps) {
   return (
     <FilterChip
-      accessibilityLabel="Count secondary sets"
+      accessibilityLabel={metric === 'totalVolume' ? 'Volume: Primary only' : 'Sets: Primary only'}
       accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
+      accessibilityState={{ checked: !value }}
       label={value ? 'Sec' : 'Pri'}
       leading={<Icon color={uiRoles.inkMuted} name={value ? 'role-secondary' : 'role-primary'} size="xs" />}
       on={false}

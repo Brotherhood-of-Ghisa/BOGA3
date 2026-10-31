@@ -4,6 +4,7 @@
 // everywhere. Broad sums each member entry’s allocated shares
 // ([[muscle.set-count]]), and the comparison keeps a muscle that is primary for
 // any of its entries — a secondary-only muscle gets no comparison.
+import { configurePersonalMuscleCounting } from '@/src/config/personal-muscles';
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
 import { buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 import {
@@ -211,3 +212,7 @@ describe('live insights and the completed session agree', () => {
     expect(completed?.muscleVolumeComparisons.map((comparison) => comparison.exerciseDefinitionId)).toEqual(['quads']);
   });
 });
+
+// These fixtures exercise the optional secondary Sets mode explicitly.
+beforeEach(() => configurePersonalMuscleCounting({ countSecondarySets: true, countSecondaryVolume: true }));
+afterEach(() => configurePersonalMuscleCounting({ countSecondarySets: false, countSecondaryVolume: true }));

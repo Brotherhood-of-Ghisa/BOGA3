@@ -305,6 +305,8 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
   // A reload keeps the last read's chart up (`useHistory`), so only a page with
   // nothing drawn yet shows its loading panel.
   const firstLoad = isLoading && dailyMetrics.length === 0 && weeklyEffort.length === 0;
+  const hasMetricHistory = weeklyEffort.some(week => metric === 'totalVolume'
+    ? week.volumeSetCount === undefined || week.volumeSetCount > 0 : week.hasWorkingSets !== false);
 
   const status = <>
     {firstLoad ? (
@@ -322,7 +324,7 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
       />
     ) : null}
 
-    {!isLoading && !errorMessage && weeklyEffort.length === 0 ? (
+    {!isLoading && !errorMessage && !hasMetricHistory ? (
       <StatePanel
         body={`No ${named}training was found in the selected ${lookbackWeeks}-week history window.`}
         fill={false}

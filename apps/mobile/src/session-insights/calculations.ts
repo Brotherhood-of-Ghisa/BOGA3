@@ -62,6 +62,8 @@ export type SessionInsightMuscleGroup = {
 };
 
 export type CurrentSessionMuscleSummaryInput = {
+  countSecondarySets?: boolean;
+  countSecondaryVolume?: boolean;
   sessionId: string;
   sessionAt: Date;
   bodyWeightKg?: number | null;
@@ -189,6 +191,8 @@ export type CompletedSessionInsights = {
 
 export type SessionMuscleVolumeComparisonsInput =
   SessionPersonalRecordsInput & {
+    countSecondarySets?: boolean;
+    countSecondaryVolume?: boolean;
     exerciseDefinitions?: SessionInsightExerciseDefinition[];
     muscleMappings?: SessionInsightMuscleMapping[];
     muscleGroups?: SessionInsightMuscleGroup[];
@@ -244,6 +248,8 @@ export const adaptCurrentSessionToMuscleAnalyticsInput = (
     .sort(compareSessionPosition);
 
   return {
+    countSecondarySets: input.countSecondarySets,
+    countSecondaryVolume: input.countSecondaryVolume,
     effortPolicy: exercises.find(exercise => exercise.loadContext?.effortPolicy)?.loadContext?.effortPolicy,
     bodyweightCalculationsEnabled: exercises.some(exercise => exercise.loadContext?.policy === 'personal'),
     sessions: [{ id: input.sessionId, completedAt: input.sessionAt, bodyWeightKg: input.bodyWeightKg ?? exercises[0]?.loadContext?.bodyWeightKg }],
@@ -285,7 +291,8 @@ export const summarizeCurrentSessionMuscleLoad = (
   const contributions = collectMuscleSetContributions(analyticsInput);
   const mappedSetIdentities = new Set(
     contributions
-      .filter((contribution) => contribution.working !== false && muscleGroupById.has(contribution.muscleGroupId))
+      .filter((contribution) => (contribution.physicalWorking ?? contribution.working) !== false
+        && muscleGroupById.has(contribution.muscleGroupId))
       .map((contribution) => contribution.setIdentity),
   );
   const weightedVolumeByMuscle = new Map<string, number | null>();
@@ -297,7 +304,6 @@ export const summarizeCurrentSessionMuscleLoad = (
       contribution.muscleGroupId,
       addFiniteVolume(weightedVolumeByMuscle.get(contribution.muscleGroupId), contribution.weightedVolume ?? 0),
     );
-    if (contribution.working === false || contribution.roleWeight === 0) continue;
     const setCounter = setCounterByMuscle.get(contribution.muscleGroupId) ?? createMuscleSetCounter();
     setCounterByMuscle.set(contribution.muscleGroupId, setCounter);
     countMuscleSet(setCounter, contribution);
@@ -733,6 +739,8 @@ export const deriveSessionMuscleVolumeComparisons = (
   const observe = (session: PersonalRecordSessionInput) => {
     const contributions = collectMuscleSetContributions(
       adaptCurrentSessionToMuscleAnalyticsInput({
+        countSecondarySets: input.countSecondarySets,
+        countSecondaryVolume: input.countSecondaryVolume,
         sessionId: session.sessionId,
         sessionAt: session.completedAt ?? (target.completedAt as Date),
         bodyWeightKg: session.bodyWeightKg,

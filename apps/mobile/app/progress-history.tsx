@@ -60,6 +60,7 @@ export const resolveHistorySubject = (params: {
   muscleGroupId?: string | string[];
   gymId?: string | string[];
   secondary?: string | string[];
+  secondaryVolume?: string | string[];
 }): HistorySubject | null => {
   const exerciseDefinitionId = firstRouteParam(params.exerciseDefinitionId);
   const muscleGroupId = firstRouteParam(params.muscleGroupId);
@@ -68,19 +69,22 @@ export const resolveHistorySubject = (params: {
   const scope = gymId === undefined ? {} : { gymId };
   if (exerciseDefinitionId) return { kind: 'exercise', id: exerciseDefinitionId, ...scope };
   const primaryOnly = firstRouteParam(params.secondary) === PROGRESS_HISTORY_PRIMARY_ONLY_PARAM;
-  if (muscleGroupId) return { kind: 'muscle', id: muscleGroupId, ...scope, ...(primaryOnly ? { countSecondary: false } : {}) };
+  const secondaryShown = firstRouteParam(params.secondary) === 'shown';
+  const volume = firstRouteParam(params.secondaryVolume);
+  if (muscleGroupId) return { kind: 'muscle', id: muscleGroupId, ...scope,
+    ...(primaryOnly || secondaryShown ? { countSecondary: secondaryShown } : {}),
+    ...(volume === PROGRESS_HISTORY_PRIMARY_ONLY_PARAM || volume === 'shown' ? { countSecondaryVolume: volume === 'shown' } : {}) };
   return null;
 };
 
-/** The route's subject with this visit's gym and secondary-set choices over it. */
+/** The route's subject with this visit's gym and independent metric choices over it. */
 const withChoices = (subject: HistorySubject | null, gym: { gymId: string | null | undefined } | null,
-  countSecondary: boolean | null): HistorySubject | null => {
+  countSecondary: boolean | null, countSecondaryVolume: boolean | null): HistorySubject | null => {
   if (!subject) return null;
   const scoped = gym === null ? subject : { ...subject, gymId: gym.gymId };
-  if (scoped.kind !== 'muscle' || countSecondary === null) return scoped;
-  const counted = { ...scoped };
-  delete counted.countSecondary;
-  return countSecondary ? counted : { ...counted, countSecondary: false };
+  if (scoped.kind !== 'muscle') return scoped;
+  return { ...scoped, ...(countSecondary === null ? {} : { countSecondary }),
+    ...(countSecondaryVolume === null ? {} : { countSecondaryVolume }) };
 };
 
 /**
@@ -222,7 +226,12 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   // the ones it was opened on, until this visit changes them.
   const [chosenGym, setChosenGym] = useState<{ gymId: string | null | undefined } | null>(null);
   const [chosenSecondary, setChosenSecondary] = useState<boolean | null>(null);
-  const subject = useMemo(() => withChoices(routeSubject, chosenGym, chosenSecondary), [routeSubject, chosenGym, chosenSecondary]);
+  const [chosenSecondaryVolume, setChosenSecondaryVolume] = useState<boolean | null>(null);
+  const subject = useMemo(() => withChoices(routeSubject?.kind === 'muscle' ? {
+    ...routeSubject, countSecondary: routeSubject.countSecondary ?? values.progressCountSecondary,
+    countSecondaryVolume: routeSubject.countSecondaryVolume ?? !values.muscleVolumePrimaryOnly,
+  } : routeSubject, chosenGym, chosenSecondary, chosenSecondaryVolume),
+  [routeSubject, chosenGym, chosenSecondary, chosenSecondaryVolume, values.progressCountSecondary, values.muscleVolumePrimaryOnly]);
   const gymId = subject?.gymId;
 
   // The catalogue is the one name source for both kinds, and it is already
@@ -343,7 +352,8 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     weeklyEffort: history.weekly,
     timeline: {
       weekSetsTarget: subject.kind === 'muscle'
-        ? { muscleGroupIds: [subject.id], gymId, ...(subject.countSecondary === false ? { countSecondary: false } : {}) }
+        ? { muscleGroupIds: [subject.id], gymId, countSecondary: subject.countSecondary,
+          countSecondaryVolume: subject.countSecondaryVolume, metric: muscleMetric }
         : { exerciseDefinitionId: subject.id, gymId },
       onOpenSession: openSession,
       exerciseLink,
@@ -382,8 +392,10 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
           kind="muscle"
           filters={<>
             <GymPicker {...gym} size="compact" testID="stats-muscle-history-gym" />
-            <SecondarySetsChip onChange={setChosenSecondary} testID="stats-muscle-history-secondary"
-              value={subject.countSecondary !== false} />
+            <SecondarySetsChip metric={muscleMetric}
+              onChange={muscleMetric === 'totalVolume' ? setChosenSecondaryVolume : setChosenSecondary}
+              testID="stats-muscle-history-secondary"
+              value={(muscleMetric === 'totalVolume' ? subject.countSecondaryVolume : subject.countSecondary) !== false} />
           </>}
           metric={muscleMetric}
           metricOptions={MUSCLE_HISTORY_METRIC_OPTIONS}
@@ -412,6 +424,7 @@ export default function ProgressHistoryRoute() {
     view?: string | string[];
     gymId?: string | string[];
     secondary?: string | string[];
+    secondaryVolume?: string | string[];
   }>();
   const subject = resolveHistorySubject(params);
   const metric = resolveHistoryMetric(params.metric);
@@ -421,9 +434,9 @@ export default function ProgressHistoryRoute() {
   // while it is mounted: new params are a new page, opening on their own
   // metric and week rather than keeping the last link's.
   const gym = encodeGymRouteParam(subject?.gymId) ?? '';
-  const primaryOnly = subject?.kind === 'muscle' && subject.countSecondary === false;
+  const countingKey = subject?.kind === 'muscle' ? `${subject.countSecondary}:${subject.countSecondaryVolume}` : '';
   return <ProgressHistoryScreen initialMetric={metric} initialView={view}
-    key={`${subject?.kind}:${subject?.id}:${metric}:${view}:${gym}:${primaryOnly}`} subject={subject} />;
+    key={`${subject?.kind}:${subject?.id}:${metric}:${view}:${gym}:${countingKey}`} subject={subject} />;
 }
 
 const styles = StyleSheet.create({

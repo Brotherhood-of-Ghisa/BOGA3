@@ -5,7 +5,7 @@
 // for the same data; only the clock is the profile time zone's.
 import { sumNumbers } from '../../../apps/mobile/src/utils/sum.ts';
 import {
-  applyMuscleReport, withoutSecondaryMappings, type MuscleAnalyticsInput, type MuscleContributionRole,
+  applyMuscleReport, type MuscleAnalyticsInput, type MuscleContributionRole,
 } from '../../../apps/mobile/src/data/muscle-analytics.ts';
 import { aggregateMuscleDailySets } from '../../../apps/mobile/src/data/muscle-daily-sets.ts';
 import { buildMuscleReportAssignment, type MuscleReportRow } from '../../../apps/mobile/src/data/muscle-report-presets.ts';
@@ -14,7 +14,7 @@ import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations
 import type { SessionSetPerformanceStatus } from '../../../apps/mobile/src/exercise-calculations/set-semantics.ts';
 import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES } from '../../../apps/mobile/src/preferences/model.ts';
 import { effectiveMuscleTargetOverrides } from '../../../apps/mobile/src/preferences/muscle-targets.ts';
-import { syncedPreferencesFromStored } from '../../../apps/mobile/src/preferences/synced.ts';
+import { hasLegacyImplicitSecondarySets, syncedPreferencesFromStored } from '../../../apps/mobile/src/preferences/synced.ts';
 import { deriveRecoveryRows, todayPlanWindow } from '../../../apps/mobile/src/today-plan/calculations.ts';
 import { localDateKey } from '../../../apps/mobile/src/utils/calendar-weeks.ts';
 import { localWeekWindow, startOfLocalDay } from '../../../apps/mobile/src/utils/local-calendar.ts';
@@ -47,6 +47,7 @@ export type StatusSettingsRow = {
   muscle_target_mode: string | null;
   muscle_target_overrides: unknown;
   count_secondary_muscles: boolean | null;
+  volume_primary_only?: boolean | null;
   client_updated_at_ms: number;
 };
 
@@ -113,7 +114,7 @@ export const trainingStatusWindow = (now: Date, timeZone: string) => {
 export type TrainingStatusWindow = ReturnType<typeof trainingStatusWindow>;
 
 /**
- * The targets and count-secondary switch in force: the synced columns read
+ * The targets and independent counting choices: the synced columns read
  * through the app's own guards, an invalid or null column taking the app's
  * default. `revision` is the settings row's LWW stamp (0 with no row).
  */
@@ -123,6 +124,7 @@ export const statusSettings = (row: StatusSettingsRow | null) => {
     muscleTargetMode: row.muscle_target_mode,
     muscleTargetOverrides: row.muscle_target_overrides == null ? null : JSON.stringify(row.muscle_target_overrides),
     countSecondaryMuscles: row.count_secondary_muscles,
+    volumePrimaryOnly: row.volume_primary_only,
   };
   const synced = syncedPreferencesFromStored(stored);
   const values = { ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, ...synced };
@@ -132,7 +134,8 @@ export const statusSettings = (row: StatusSettingsRow | null) => {
       muscleTargetMode: values.muscleTargetMode,
       muscleTargetOverrides: values.muscleTargetOverrides,
     },
-    countSecondary: values.progressCountSecondary,
+    countSecondary: synced.progressCountSecondary ?? (hasLegacyImplicitSecondarySets(stored) || values.progressCountSecondary),
+    volumePrimaryOnly: values.muscleVolumePrimaryOnly,
     uploaded: synced.weeklyWorkingSetTarget !== undefined,
     revision: row === null ? 0 : Number(row.client_updated_at_ms),
   };
@@ -187,7 +190,7 @@ const sumDays = (byDay: Record<string, number>, from: Date, to: Date): number =>
 
 /**
  * Each of the user's muscles in Today's Plan's order with its figures: the
- * same counting (`withoutSecondaryMappings` per the switch, `applyMuscleReport`,
+ * same independent counting settings (`applyMuscleReport`,
  * `aggregateMuscleDailySets`) and the same rows (`deriveRecoveryRows`).
  */
 export const deriveStatusMuscles = (
@@ -195,7 +198,7 @@ export const deriveStatusMuscles = (
   window: TrainingStatusWindow,
 ) => {
   const setup = deriveMuscleReportPreset(muscleRows);
-  const counted = settings.countSecondary ? input : withoutSecondaryMappings(input);
+  const counted = { ...input, countSecondarySets: settings.countSecondary, countSecondaryVolume: !settings.volumePrimaryOnly };
   const daily = aggregateMuscleDailySets(applyMuscleReport(counted, buildMuscleReportAssignment(muscleRows)));
   const rows = deriveRecoveryRows(daily, window.plan, {
     weeklyTarget: settings.preferences.weeklyWorkingSetTarget,
@@ -372,6 +375,7 @@ export const buildTrainingStatus = (input: TrainingStatusInput) => {
     week_start: localDateKey(window.plan.week.start),
     muscle_setup: setup,
     counts_secondary_sets: settings.countSecondary,
+    volume_primary_only: settings.volumePrimaryOnly,
     targets: {
       mode: settings.preferences.muscleTargetMode === 'per-muscle' ? 'per_muscle' : 'single',
       default_weekly_sets: settings.preferences.weeklyWorkingSetTarget,

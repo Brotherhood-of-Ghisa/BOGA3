@@ -226,7 +226,7 @@ describe('The history page over real data', () => {
     await loadMaestroFixture('exercise-block-history');
     // Started last week: only the date finishing it now would give puts it on today.
     await startPulldown(8);
-    act(() => updatePreferences({ heatmapView: 'daily' }));
+    act(() => updatePreferences({ heatmapView: 'daily', progressCountSecondary: true }));
     await openHistory({ ...params, metric: 'sets' });
     await waitForGone(() => screen.queryByTestId(`stats-${subject}-history-loading`));
 
@@ -242,7 +242,7 @@ describe('The history page over real data', () => {
   ] as const)('opens the completed view when a workout finishes after its %s Grid was read', async (subject, params) => {
     await loadMaestroFixture('exercise-block-history');
     await startPulldown(8);
-    act(() => updatePreferences({ heatmapView: 'daily' }));
+    act(() => updatePreferences({ heatmapView: 'daily', progressCountSecondary: true }));
     await openHistory({ ...params, metric: 'sets' });
     await waitForGone(() => screen.queryByTestId(`stats-${subject}-history-loading`));
     await completeSessionDraft('history_pulldown_in_progress', { completedAt: new Date(), now: new Date() });
@@ -258,7 +258,7 @@ describe('The history page over real data', () => {
     await loadMaestroFixture('exercise-block-history');
     await logPulldown(1 / 24);
     await startPulldown(8);
-    act(() => updatePreferences({ heatmapView: 'daily' }));
+    act(() => updatePreferences({ heatmapView: 'daily', progressCountSecondary: true }));
     await openHistory({ ...params, metric: 'sets' });
     await waitForGone(() => screen.queryByTestId(`stats-${subject}-history-loading`));
     const today = localDateKey(new Date());
@@ -271,7 +271,7 @@ describe('The history page over real data', () => {
   it('opens Sessions at the day when the active-workout lookup fails', async () => {
     await loadMaestroFixture('exercise-block-history');
     await startPulldown(8);
-    act(() => updatePreferences({ heatmapView: 'daily' }));
+    act(() => updatePreferences({ heatmapView: 'daily', progressCountSecondary: true }));
     await openHistory({ exerciseDefinitionId: PULLDOWN });
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
     jest.spyOn(sessionEntry, 'loadActiveSessionId').mockRejectedValueOnce(Error('DB busy'));
@@ -284,7 +284,7 @@ describe('The history page over real data', () => {
   it.each(['unmount', 'account change', 'blur'] as const)('ignores an active-workout lookup that finishes after %s', async exit => {
     await loadMaestroFixture('exercise-block-history');
     await startPulldown(8);
-    act(() => updatePreferences({ heatmapView: 'daily' }));
+    act(() => updatePreferences({ heatmapView: 'daily', progressCountSecondary: true }));
     await openHistory({ exerciseDefinitionId: PULLDOWN });
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
     const pending = deferred<string | null>();
@@ -301,7 +301,7 @@ describe('The history page over real data', () => {
 
   it('titles an exercise page with its name and offers all four metrics in both views', async () => {
     await loadMaestroFixture('exercise-block-history');
-    act(() => updatePreferences({ heatmapView: 'daily' }));
+    act(() => updatePreferences({ heatmapView: 'daily', progressCountSecondary: true }));
     await openHistory({ exerciseDefinitionId: SQUAT });
 
     await waitFor(() => expect(mockScreenOptions.title).toMatch(/Squat/));
@@ -331,7 +331,7 @@ describe('The history page over real data', () => {
     localDataClient().prepare('UPDATE sessions SET gym_id = NULL WHERE id = ?').run(noGymSession);
     // The fixture places that session four days before it was loaded.
     const noGymDay = localDateKey(new Date(Date.now() - 4 * DAY_MS));
-    act(() => updatePreferences({ heatmapView: 'daily' }));
+    act(() => updatePreferences({ heatmapView: 'daily', progressCountSecondary: true }));
     await openHistory({ ...(kind === 'exercise' ? { exerciseDefinitionId: SQUAT } : { muscleGroupId: 'quads' }), gymId: 'no-gym' });
     await waitForGone(() => screen.queryByTestId(`stats-${kind}-history-loading`));
     const trainingDays = () => renderedDailySample(kind).filter(tile => tile.day?.hasTraining).map(tile => tile.dateKey);
@@ -650,7 +650,7 @@ describe('The history page over real data', () => {
     // Quads becomes a secondary mapping, keeping the fixture's real sets
     // ([[muscle.set-count]]) and the production aggregation/rendering path.
     localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'secondary' WHERE muscle_group_id = 'quads'").run();
-    act(() => updatePreferences({ heatmapView: 'daily' }));
+    act(() => updatePreferences({ heatmapView: 'daily', progressCountSecondary: true }));
     await openHistory({ muscleGroupId: 'quads' });
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-loading'));
     await chooseMetric('muscle', 'workingSetCount');
@@ -673,19 +673,19 @@ describe('The history page over real data', () => {
     act(() => updatePreferences({ heatmapView: 'timeline' }));
     const history = jest.spyOn(statsRepository, 'computeSelectedMuscleHistoryEffort');
     const week = jest.spyOn(statsRepository, 'computeSelectedMuscleDailyEffort');
-    await openHistory({ muscleGroupId: 'quads', secondary: 'hidden' });
+    await openHistory({ muscleGroupId: 'quads', secondary: 'hidden', metric: 'sets' });
     await waitFor(() => expect(history).toHaveBeenCalledWith(expect.objectContaining({ muscleGroupIds: ['quads'], countSecondary: false })));
     await waitFor(() => expect(week).toHaveBeenCalledWith(expect.objectContaining({ muscleGroupIds: ['quads'], countSecondary: false })));
     expect(await screen.findByTestId('stats-muscle-history-empty')).toBeTruthy();
     expect(screen.queryAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).toHaveLength(0);
     // The page's own chip opens on Progress's choice and changes it for this visit.
-    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: false });
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: true });
     expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('Pri');
     fireEvent.press(screen.getByTestId(SECONDARY_CHIP));
     await waitFor(() => expect(history).toHaveBeenLastCalledWith(expect.not.objectContaining({ countSecondary: false })));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-empty'));
     expect((await screen.findAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)).length).toBeGreaterThan(0);
-    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: false });
     expect(screen.getByTestId(SECONDARY_CHIP)).toHaveTextContent('Sec');
   });
 
@@ -697,11 +697,11 @@ describe('The history page over real data', () => {
     const history = jest.spyOn(statsRepository, 'computeSelectedMuscleHistoryEffort').mockImplementation(options =>
       options.countSecondary === false ? real(options)
         : new Promise(resolve => { release = () => resolve(real(options)); }));
-    await openHistory({ muscleGroupId: 'quads', gymId: gym, secondary: 'hidden' });
+    await openHistory({ muscleGroupId: 'quads', gymId: gym, secondary: 'hidden', metric: 'sets' });
     await waitFor(() => expect(history).toHaveBeenCalledWith(expect.objectContaining({ gymId: gym, countSecondary: false })));
     await waitFor(() => expect(screen.getByTestId(GYM_BUTTON.muscle).props.accessibilityLabel)
       .toBe(gymButtonLabel('Maestro Block History Gym')));
-    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: false });
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: true });
     const cards = () => screen.queryAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/).length;
     const shownCards = cards();
 
@@ -716,10 +716,10 @@ describe('The history page over real data', () => {
     await act(async () => release());
     fireEvent.press(screen.getByTestId(`${GYM_BUTTON.muscle}-option-all`));
     await waitFor(() => expect(history.mock.lastCall?.[0]).not.toHaveProperty('gymId'));
-    expect(history.mock.lastCall?.[0]).not.toHaveProperty('countSecondary');
+    expect(history.mock.lastCall?.[0]).toHaveProperty('countSecondary', true);
     await act(async () => release());
     expect(screen.getByTestId(GYM_BUTTON.muscle)).toHaveProp('accessibilityLabel', gymButtonLabel('All gyms'));
-    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: false });
   });
 
   it('offers secondary sets only on a muscle page: an exercise page keeps a plain gym button', async () => {

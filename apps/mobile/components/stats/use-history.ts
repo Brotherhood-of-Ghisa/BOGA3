@@ -12,7 +12,7 @@ import { encodeGymRouteParam, type GymScopeOption } from '@/src/utils/gym-scope-
  */
 export type HistorySubject =
   | { kind: 'exercise'; id: string; gymId?: string | null }
-  | { kind: 'muscle'; id: string; gymId?: string | null; countSecondary?: boolean };
+  | { kind: 'muscle'; id: string; gymId?: string | null; countSecondary?: boolean; countSecondaryVolume?: boolean };
 
 const historySubjectId = (subject: HistorySubject | null): string | null => {
   const id = subject?.id.trim();
@@ -27,7 +27,7 @@ const loadHistory = async (subject: HistorySubject, id: string, weeks: number) =
   const bounds = { ...historyWeekBounds(weeks, now), now };
   if (subject.kind === 'muscle') {
     return computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: [id], ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }),
-      ...(subject.countSecondary === false ? { countSecondary: false } : {}) });
+      countSecondary: subject.countSecondary, countSecondaryVolume: subject.countSecondaryVolume });
   }
   return computeSelectedExerciseHistoryEffort({
     ...bounds, exerciseDefinitionId: id, ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }),
@@ -49,8 +49,9 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
   const gymId = subject?.gymId;
   const gymKey = encodeGymRouteParam(gymId) ?? '';
   const primaryOnly = subject?.kind === 'muscle' && subject.countSecondary === false;
+  const primaryVolumeOnly = subject?.kind === 'muscle' && subject.countSecondaryVolume === false;
   const subjectKey = `${kind ?? ''}:${id ?? ''}:${accountRevision}`;
-  const context = `${subjectKey}:${gymKey}:${primaryOnly ? 'primary' : 'all'}:${weeks}:${revision}`;
+  const context = `${subjectKey}:${gymKey}:${primaryOnly ? 'primary' : 'all'}:${primaryVolumeOnly}:${weeks}:${revision}`;
   const [loading, setLoading] = useState(id !== null);
   const [loaded, setLoaded] = useState<{
     context: string; subjectKey: string; daily: DailyEffortMetrics[]; weekly: SelectedMuscleWeeklyEffort[]; gyms: GymScopeOption[];
@@ -83,7 +84,7 @@ export function useHistory(subject: HistorySubject | null, weeks: number, revisi
       if (timer !== undefined) clearTimeout(timer);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Retry repeats the same context read; `subject` is read through kind, id, gym and primaryOnly.
-  }, [kind, id, gymKey, primaryOnly, weeks, revision, accountRevision, retryRevision]);
+  }, [kind, id, gymKey, primaryOnly, primaryVolumeOnly, weeks, revision, accountRevision, retryRevision]);
   const current = loaded?.context === context ? loaded : null;
   const error = failure?.context === context ? failure.message : null;
   const shown = id === null ? null : current ?? (error === null && loaded?.subjectKey === subjectKey ? loaded : null);

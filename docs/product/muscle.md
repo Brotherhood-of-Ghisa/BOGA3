@@ -2,12 +2,16 @@
 
 ### muscle.set-count · definition · accepted
 
-An exercise's Primary mappings share one set equally; each Secondary mapping
-gets ½. Decided 2026-10-30 (no shared ½ pool). Volume is allocated alike.
-Stabilizers and stored mapping weights add nothing. Allocation precedes
-filtering and Broad grouping; hidden entries never redistribute work. A merged
-muscle adds its entries' Primary shares; Secondary entries give it ½ once, and
-none beside Primary work. Exercise figures are unchanged ([[set.count-display]]).
+Each Primary muscle gets one working set; each Secondary gets ½ when included
+([[muscle.secondary-filter]]). A reported muscle counts each physical set once
+at its strongest role. Family buckets deduplicate likewise; overlapping muscle
+counts never form a physical-session total.
+
+Volume independently shares its unchanged base equally among Primaries, plus
+a shared ½ pool among Secondaries when included. Allocation precedes filtering
+and Broad grouping; hidden entries never redistribute shares. A merged muscle
+sums surviving Volume, including mixed roles. Absent role pools remain unused.
+Stabilizers and stored weights add nothing. Exercise figures are unchanged.
 
 Figures and spoken labels show at most one decimal. Today and Progress draw
 whole sets, rounded down (`½`, `<1` below one); a change is the difference of
@@ -20,24 +24,29 @@ the drawn figures.
 | 3 secondary | 1.5 |
 | 2 primary, 3 secondary | 3.5 |
 | 1 set, duplicate roles on the same raw muscle | 1 |
-| 3 sets, one of two primaries | 1.5 |
-| 1 set, one of three primaries | 0.3333333333333333 |
+| 3 sets, one of two primaries | 3 |
+| 1 set, one of three primaries | 1 |
 | 3 sets, one of two secondaries | 1.5 |
 | 4 stabilizer | 0 |
 
-Why: co-primary muscles share the lift; a secondary does half a set of work
-whatever else assists.
+Why: Sets describe direct work with optional secondary half-credit; Volume
+describes attributed work with bounded role pools.
 Code: `collectMuscleSetContributions`, `countMuscleSets` and `applyMuscleReport`
 in `apps/mobile/src/data/muscle-analytics.ts`; the whole-set display is
 `formatWholeSetCount` in `apps/mobile/src/exercise-calculations/format.ts`.
 
 ### muscle.secondary-filter · presentation · accepted
 
-Progress's Filters (`Count secondary sets`) and muscle history's chip (`Sec` /
-`Pri`, spoken `Count secondary sets`) offer counting secondary sets per visit:
-Progress opens on Settings' default, history on Progress's. Off excludes Secondary sets and Volume without changing Primary shares. The default is per account, synced like [[muscle.weekly-targets]].
+Two account-synced settings govern every muscle figure: `Sets: Primary only`
+(new-account default on) and `Volume: Primary only` (default off). Existing
+accounts preserve their old secondary Sets choice; the new Volume choice
+starts off. Explicit saved choices survive upgrades. Targets stay unchanged.
+Progress offers independent visit overrides; history inherits both and its
+`Sec`/`Pri` chip changes only the displayed metric. Filtering never redistributes
+Volume. Secondary-only work may show zero Sets in Recovery and positive Volume.
 
-Code: `withoutSecondaryMappings` in `apps/mobile/src/data/muscle-analytics.ts`.
+Code: `apps/mobile/src/preferences/`; `collectMuscleSetContributions` in
+`apps/mobile/src/data/muscle-analytics.ts`.
 
 ### muscle.report-groups · definition · accepted
 
@@ -75,7 +84,7 @@ Code: `apps/mobile/src/preferences/muscle-targets.ts`; `deriveRecoveryRows` in `
 
 Every screen, the exercise editor and search show only the user's muscles, never
 an entry inside its muscle. An exercise mapped to two entries of one muscle shows
-it once, at the strongest role. Adding a muscle maps its anchor, or a tracked
+it once, labelled by the strongest role. Adding a muscle maps its anchor, or a tracked
 entry when the anchor is untracked. Changing a role or removing it rewrites
 tracked entries of the muscle. Mappings to untracked muscles are hidden and kept.
 

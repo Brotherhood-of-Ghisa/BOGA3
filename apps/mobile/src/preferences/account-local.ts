@@ -1,5 +1,6 @@
 import { __resetPreferenceMigrationForTests, migrateBrowsingPreferences } from './migration';
 import { configureDisplayEfforts, configurePersonalEffortPolicy } from '../config/personal-effort';
+import { configurePersonalMuscleCounting } from '../config/personal-muscles';
 import {
   type AccountLocalPreferences,
   DEFAULT_ACCOUNT_LOCAL_PREFERENCES,
@@ -8,12 +9,14 @@ import {
   preferenceValidationMessages,
 } from './model';
 import { Storage } from 'expo-sqlite/kv-store';
-import { type PreferenceProfile, readScopedPreferences, writeScopedPreference } from './storage';
+import { type PreferenceProfile, hasLegacyMuscleCountingProfile, initializeMuscleCountingPreferences, readScopedPreferences, writeScopedPreference } from './storage';
 import {
   pickSyncedPreferences,
   storedFromSyncedPreferences,
   syncedPreferencesFromStored,
   syncedTargetsAdoptedKey,
+  syncedMuscleVolumeAdoptedKey,
+  hasLegacyImplicitSecondarySets,
   type MuscleTargetSettingsWrite,
   type StoredMuscleTargetSettings,
   type SyncedPreferences,
@@ -61,6 +64,13 @@ const requireSyncedStore = (): SyncedPreferenceStore => {
   return syncedStore;
 };
 
+const storedPreferencesForProfile = (row: StoredMuscleTargetSettings | null, activeProfile: PreferenceProfile): Partial<SyncedPreferences> => {
+  const values = syncedPreferencesFromStored(row);
+  if (hasLegacyImplicitSecondarySets(row)) values.progressCountSecondary = hasLegacyMuscleCountingProfile(activeProfile)
+    ? readScopedPreferences(activeProfile).values.progressCountSecondary : true;
+  return values;
+};
+
 const publish = (next: Partial<AccountLocalPreferenceState>) => {
   const values = next.values && preferenceFields.some(field => next.values![field] !== state.values[field])
     ? next.values : state.values;
@@ -69,6 +79,8 @@ const publish = (next: Partial<AccountLocalPreferenceState>) => {
   state = updated;
   configureDisplayEfforts(updated.values.displayEfforts);
   configurePersonalEffortPolicy(updated.values);
+  configurePersonalMuscleCounting({ countSecondarySets: updated.values.progressCountSecondary,
+    countSecondaryVolume: !updated.values.muscleVolumePrimaryOnly });
   for (const listener of listeners) listener();
 };
 export function initializeAccountLocalPreferences(isConfigured: boolean): void {
@@ -101,6 +113,7 @@ export function setAccountLocalPreferenceAccount(userId: string | null, isConfig
 
 function loadScoped(profileAtStart: PreferenceProfile): boolean {
   try {
+    initializeMuscleCountingPreferences(profileAtStart);
     const { values } = readScopedPreferences(profileAtStart);
     loaded = true;
     loadError = null;
@@ -198,7 +211,7 @@ const syncedView = (activeProfile: PreferenceProfile): AccountLocalPreferences =
 };
 
 /**
- * Publishes the synced fields at once and writes all four to the settings row,
+ * Publishes the synced fields at once and writes them to the settings row,
  * which the next sync pushes. The fields the patch leaves out come from the
  * stored row, not from memory, which may not hold the row yet. A failed write
  * restores the previous values and keeps the patch pending for retry.
@@ -214,9 +227,15 @@ function writeSyncedPreferences(activeProfile: `account:${string}`, patch: Parti
   syncedWrites = syncedWrites.then(async () => {
     try {
       const store = requireSyncedStore();
-      const stored = syncedPreferencesFromStored(await store.read(activeProfile.slice('account:'.length)));
+      const row = await store.read(activeProfile.slice('account:'.length));
+      const stored = storedPreferencesForProfile(row, activeProfile);
       const next = { ...optimistic, ...stored, ...patch };
-      await store.write(storedFromSyncedPreferences(next));
+      const write = storedFromSyncedPreferences(next);
+      // A legacy row's unknown Volume must survive unrelated edits until the
+      // direct adoption read can discover another device's explicit choice.
+      if (row?.volumePrimaryOnly == null && patch.muscleVolumePrimaryOnly === undefined
+        && Storage.getItemSync(syncedMuscleVolumeAdoptedKey(activeProfile)) !== 'true') write.volumePrimaryOnly = null;
+      await store.write(write);
       if (version !== syncedVersion) return;
       synced = keepingOverrides(next);
       saveError = null;
@@ -251,7 +270,7 @@ export async function refreshAccountLocalSyncedPreferences(): Promise<void> {
   try { stored = await requireSyncedStore().read(activeProfile.slice('account:'.length)); }
   catch { return; }
   if (capturedGeneration !== generation || version !== syncedVersion) return;
-  synced = keepingOverrides(syncedPreferencesFromStored(stored));
+  synced = keepingOverrides(storedPreferencesForProfile(stored, activeProfile));
   syncedLoaded = true;
   publish({ values: syncedView(activeProfile) });
 }
@@ -263,7 +282,8 @@ export async function refreshAccountLocalSyncedPreferences(): Promise<void> {
  */
 export function forgetSyncedTargetsAdoption(): void {
   for (const key of Storage.getAllKeysSync()) {
-    if (key.startsWith('boga3.accountPreferences.v1.') && key.endsWith('.syncedTargetsAdopted')) Storage.removeItemSync(key);
+    if (key.startsWith('boga3.accountPreferences.v1.')
+      && (key.endsWith('.syncedTargetsAdopted') || key.endsWith('.syncedMuscleVolumeAdopted'))) Storage.removeItemSync(key);
   }
 }
 
@@ -305,6 +325,8 @@ export function __resetAccountLocalPreferencesForTests(): void {
   state = emptyState();
   configureDisplayEfforts(state.values.displayEfforts);
   configurePersonalEffortPolicy(state.values);
+  configurePersonalMuscleCounting({ countSecondarySets: state.values.progressCountSecondary,
+    countSecondaryVolume: !state.values.muscleVolumePrimaryOnly });
   loadError = null;
   saveError = null;
   validationError = null;

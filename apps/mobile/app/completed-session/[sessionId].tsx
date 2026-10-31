@@ -223,7 +223,7 @@ export function CompletedSessionDetailScreenShell({
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const datedWeightRevision = useBodyWeightContextRevision();
-  const { values: { historyLookbackWeeks }, accountRevision } = useAccountLocalPreferenceState();
+  const { values: { historyLookbackWeeks, progressCountSecondary, muscleVolumePrimaryOnly }, accountRevision } = useAccountLocalPreferenceState();
   const [session, setSession] = useState<CompletedSessionDetailRecord | null>(null);
   const [completedInsights, setCompletedInsights] = useState<CompletedSessionInsights | null>(null);
   const [insightState, setInsightState] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -349,7 +349,7 @@ export function CompletedSessionDetailScreenShell({
       return () => { cancelled = true; };
     // Weight corrections invalidate the derived comparisons too.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dataClient, sessionId, isDeleted, maestroInsights, datedWeightRevision, historyLookbackWeeks, accountRevision])
+    }, [dataClient, sessionId, isDeleted, maestroInsights, datedWeightRevision, historyLookbackWeeks, accountRevision, progressCountSecondary, muscleVolumePrimaryOnly])
   );
 
   const formattedStartedAt = useMemo(
@@ -412,7 +412,8 @@ export function CompletedSessionDetailScreenShell({
             exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.muscleSetup.assignment
           )
         : null,
-    [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.muscleSetup, exerciseCatalog.status]
+    [exerciseCatalog.exercises, exerciseCatalog.muscleGroups, exerciseCatalog.muscleSetup, exerciseCatalog.status,
+      progressCountSecondary, muscleVolumePrimaryOnly]
   );
   const catalogMuscleMappings = useMemo(
     () => sessionMuscleCatalog?.muscleMappings ?? [],

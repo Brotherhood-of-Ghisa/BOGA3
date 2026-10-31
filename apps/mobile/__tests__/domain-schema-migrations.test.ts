@@ -142,8 +142,8 @@ describe('domain schema and runtime migrations', () => {
     // m0022 adds last_modified_by across the four authored plan tables, and
     // m0023 adds the muscle report group and tracked flag, and m0024 adds the
     // exercise rest timer default; m0025 adds merge revisions and account-private recovery;
-    // m0026 adds the synced muscle targets to the settings row.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(27);
+    // m0026 adds synced muscle targets; m0027 separates the Volume choice.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(28);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -200,6 +200,7 @@ describe('domain schema and runtime migrations', () => {
       'm0024',
       'm0025',
       'm0026',
+      'm0027',
     ]);
   });
 
@@ -214,6 +215,17 @@ describe('domain schema and runtime migrations', () => {
       'ALTER TABLE `user_settings` ADD `muscle_target_overrides` text;',
       'ALTER TABLE `user_settings` ADD `count_secondary_muscles` integer;',
     ]);
+  });
+
+  it('adds independent Volume in m0027 without rewriting legacy Sets or targets', () => {
+    const { m0027, ...earlier } = localRuntimeMigrations.migrations;
+    const client = new Database(':memory:');
+    for (const migration of Object.values(earlier)) client.exec(migration);
+    client.exec("insert into user_settings (id, weekly_working_set_target, count_secondary_muscles) values ('settings', 12, 0)");
+    client.exec(m0027);
+    expect(client.prepare('select weekly_working_set_target, count_secondary_muscles, volume_primary_only from user_settings').get())
+      .toEqual({ weekly_working_set_target: 12, count_secondary_muscles: 0, volume_primary_only: null });
+    client.close();
   });
 
   it('adds the muscle report group and tracked flag in m0023, keeping every row', () => {

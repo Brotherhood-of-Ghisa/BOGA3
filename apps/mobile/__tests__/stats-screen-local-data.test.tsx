@@ -259,9 +259,9 @@ describe('Stats over real data', () => {
     chooseFilter('period', 'This week');
     expect(change()).toHaveTextContent(/^0%$/);
     fireEvent.press(screen.getByTestId('stats-muscle-body-target-biceps'));
-    // Biceps' Secondary share is half the pulldown's Volume, not split with its other Secondary.
-    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^150$/);
-    inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
+    // Biceps shares the secondary half-pool with the pulldown's other secondary.
+    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^75$/);
+    inFilters(() => fireEvent.press(screen.getByTestId('stats-volume-primary-only-toggle')));
     expect(await screen.findByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^0$/);
     expect(change()).toHaveTextContent(/^—$/);
     expect(scores().get('biceps')).toBeNull();
@@ -373,8 +373,9 @@ describe('Stats over real data', () => {
     expect(screen.queryAllByTestId(/^stats-muscle-ticker-/)).toHaveLength(0);
   });
 
-  it('gives each Secondary ½ across Muscle and its history, without changing Exercise totals', async () => {
+  it('gives each Secondary ½ across Muscle and its history when included, without changing Exercise totals', async () => {
     await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ progressCountSecondary: true }));
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('primary_bench_biceps', ?, 'biceps', 1, 'primary')").run(BENCH);
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('secondary_squat_biceps', ?, 'biceps', 0.5, 'secondary')").run(SQUAT);
     await act(async () => invalidateExerciseCatalogCache());
@@ -382,23 +383,23 @@ describe('Stats over real data', () => {
     await screen.findByTestId(SQUAT_ROW);
     chooseFilter('view-mode', 'Muscle');
     const bicepsNow = () => screen.getByTestId('stats-muscle-row-biceps-now');
-    // Bench's co-primary ½ plus 7 squat sets at ½ each: 4 whole sets.
+    // Bench's whole primary plus 7 squat sets at ½ each: 4 whole sets drawn.
     await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^4$/));
-    const secondaryOn = () => inFilters(() => screen.getByTestId('stats-secondary-toggle').props.accessibilityState.checked);
+    const secondaryOn = () => inFilters(() => !screen.getByTestId('stats-secondary-toggle').props.accessibilityState.checked);
     expect(secondaryOn()).toBe(true);
     fireEvent.press(screen.getByRole('link', { name: 'Open Biceps history' }));
-    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=biceps&metric=sets');
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=biceps&metric=sets&secondary=shown&secondaryVolume=shown');
 
     inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
-    await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^½$/));
+    await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^1$/));
     expect(secondaryOn()).toBe(false);
     expect(screen.getByTestId('stats-filters')).toHaveProp('accessibilityLabel', 'Filters: secondary sets not counted');
     fireEvent.press(screen.getByRole('link', { name: 'Open Biceps history' }));
-    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=biceps&metric=sets&secondary=hidden');
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=biceps&metric=sets&secondary=hidden&secondaryVolume=shown');
 
     await showBody();
     fireEvent.press(await screen.findByTestId('stats-muscle-body-target-biceps'));
-    expect(screen.getByTestId(`stats-contribution-${BENCH}-now`)).toHaveTextContent(/^½$/);
+    expect(screen.getByTestId(`stats-contribution-${BENCH}-now`)).toHaveTextContent(/^1$/);
     expect(screen.queryByTestId(`stats-contribution-${SQUAT}`)).toBeNull();
     inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
     expect(await screen.findByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^3$/);
@@ -410,6 +411,7 @@ describe('Stats over real data', () => {
 
   it('keeps effort-grouped muscle contributions separate from the full Exercise list, which defaults to Sets', async () => {
     await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ progressCountSecondary: true }));
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('primary_bench_biceps', ?, 'biceps', 1, 'primary')").run(BENCH);
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('secondary_squat_biceps', ?, 'biceps', 0.5, 'secondary')").run(SQUAT);
     await act(async () => invalidateExerciseCatalogCache());
@@ -497,7 +499,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Volume');
     expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
     fireEvent.press(screen.getByTestId('stats-contributions-view-daily'));
-    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads&metric=volume&view=daily');
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads&metric=volume&secondary=hidden&secondaryVolume=shown&view=daily');
     await act(async () => updatePreferences({ progressMuscleLayout: 'list' }));
     expect(within(screen.getByTestId('stats-muscle-block-quads')).getByTestId('stats-contributions')).toBeTruthy();
     fireEvent.press(screen.getByTestId('stats-muscle-select-quads'));
@@ -518,7 +520,7 @@ describe('Stats over real data', () => {
     await screen.findByTestId('stats-muscle-table');
     chooseFilter('metric', metric);
     fireEvent.press(screen.getByTestId('stats-muscle-history-quads'));
-    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?muscleGroupId=quads&metric=${metric === 'Sets' ? 'sets' : 'volume'}`);
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?muscleGroupId=quads&metric=${metric === 'Sets' ? 'sets' : 'volume'}&secondary=hidden&secondaryVolume=shown`);
     fireEvent.press(screen.getByTestId('stats-muscle-select-quads'));
     const block = within(screen.getByTestId('stats-muscle-block-quads'));
     expect(block.getByTestId('stats-contributions')).toBeTruthy();
@@ -580,11 +582,11 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^5$/));
     expect(chosenGym()).toBe(gym);
     fireEvent.press(screen.getByRole('link', { name: 'Open Quads history' }));
-    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?muscleGroupId=quads&metric=sets&gymId=${gym}`);
+    expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?muscleGroupId=quads&metric=sets&gymId=${gym}&secondary=hidden&secondaryVolume=shown`);
     chooseGym('no-gym');
     await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^2$/));
     fireEvent.press(screen.getByRole('link', { name: 'Open Quads history' }));
-    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads&metric=sets&gymId=no-gym');
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads&metric=sets&gymId=no-gym&secondary=hidden&secondaryVolume=shown');
     chooseGym('all');
     await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^7$/));
     chooseGym(gym);
@@ -753,7 +755,7 @@ describe('Stats over real data', () => {
     fireEvent.press(await screen.findByTestId('stats-muscle-body-target-quads'));
     for (const view of ['timeline', 'daily', 'weekly'] as const) {
       fireEvent.press(screen.getByTestId(`stats-contributions-view-${view}`));
-      expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?muscleGroupId=quads&metric=${metric === 'Sets' ? 'sets' : 'volume'}&view=${view}`);
+      expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?muscleGroupId=quads&metric=${metric === 'Sets' ? 'sets' : 'volume'}&secondary=hidden&secondaryVolume=shown&view=${view}`);
       expect(screen.getByTestId('stats-contributions')).toHaveTextContent(/Quads/);
     }
   });
@@ -926,9 +928,10 @@ describe('Stats over real data', () => {
     expect(chipValue('period')).toBe('4 weeks');
   });
 
-  it('shows a secondary muscle its allocated shares as whole sets, in the row and the change', async () => {
+  it('shows optional secondary half-credit as whole sets, in the row and the change', async () => {
     mockSearchParams = { period: '7', breakdown: 'muscle' };
     await loadMaestroFixture('exercise-block-history');
+    act(() => updatePreferences({ progressCountSecondary: true }));
     // Quads becomes a secondary mapping, keeping the fixture's real sets
     // (7 now, 2 before) and the production aggregation/rendering path.
     localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'secondary' WHERE muscle_group_id = 'quads'").run();
@@ -996,7 +999,7 @@ describe('Stats over real data', () => {
     // Both links push their own page by id, leaving the open block as it is.
     // Volume is the chosen metric here, and both links carry it over.
     fireEvent.press(muscleLink);
-    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads&metric=volume');
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads&metric=volume&secondary=hidden&secondaryVolume=shown');
     expect(screen.getByTestId('stats-muscle-select-quads')).toHaveProp('accessibilityState', { expanded: true });
     fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
     expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=volume&view=timeline`);
@@ -1023,7 +1026,7 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId('stats-contributions-empty')).toHaveTextContent('No volume-included sets for Calves in either period');
     fireEvent.press(screen.getByTestId('stats-muscle-history-calves'));
     // An empty muscle still opens its page; its empty state is that page's.
-    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=calves&metric=volume');
+    expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=calves&metric=volume&secondary=hidden&secondaryVolume=shown');
   });
 
   it('uses independent saved eligibility and retains zero-load Volume contributors', async () => {

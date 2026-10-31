@@ -4,7 +4,7 @@
 import { type AccountLocalPreferences, DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPreferenceValue } from './model.ts';
 
 /**
- * The settings row's four columns as the data layer stores them (null until
+ * The settings row's columns as the data layer stores them (null until
  * uploaded or adopted; wire mode, JSON-text overrides). Declared here because
  * this directory never imports the data layer.
  */
@@ -13,14 +13,21 @@ export type StoredMuscleTargetSettings = {
   muscleTargetMode: string | null;
   muscleTargetOverrides: string | null;
   countSecondaryMuscles: boolean | null;
+  volumePrimaryOnly?: boolean | null;
 };
-export type MuscleTargetSettingsWrite = { [K in keyof StoredMuscleTargetSettings]: NonNullable<StoredMuscleTargetSettings[K]> };
+export type MuscleTargetSettingsWrite = {
+  [K in Exclude<keyof StoredMuscleTargetSettings, 'volumePrimaryOnly'>]-?: NonNullable<StoredMuscleTargetSettings[K]>
+} & { volumePrimaryOnly: boolean | null };
 
 export const syncedPreferenceFields = [
-  'weeklyWorkingSetTarget', 'muscleTargetMode', 'muscleTargetOverrides', 'progressCountSecondary',
+  'weeklyWorkingSetTarget', 'muscleTargetMode', 'muscleTargetOverrides', 'progressCountSecondary', 'muscleVolumePrimaryOnly',
 ] as const satisfies readonly (keyof AccountLocalPreferences)[];
 export type SyncedPreferenceField = typeof syncedPreferenceFields[number];
 export type SyncedPreferences = Pick<AccountLocalPreferences, SyncedPreferenceField>;
+
+/** Existing null Sets predate the new false default; no stored choice meant secondary Sets. */
+export const hasLegacyImplicitSecondarySets = (stored: StoredMuscleTargetSettings | null): boolean =>
+  stored !== null && stored.countSecondaryMuscles === null;
 
 /**
  * Set once sync has adopted or uploaded the profile's targets, and cleared when
@@ -30,6 +37,9 @@ export type SyncedPreferences = Pick<AccountLocalPreferences, SyncedPreferenceFi
  */
 export const syncedTargetsAdoptedKey = (profile: `account:${string}`) =>
   `boga3.accountPreferences.v1.${encodeURIComponent(profile)}.syncedTargetsAdopted`;
+/** Existing target adoption predates independent Volume and must not skip its upgrade. */
+export const syncedMuscleVolumeAdoptedKey = (profile: `account:${string}`) =>
+  `boga3.accountPreferences.v1.${encodeURIComponent(profile)}.syncedMuscleVolumeAdopted`;
 
 export const pickSyncedPreferences = (values: Partial<AccountLocalPreferences>): Partial<SyncedPreferences> => {
   const picked: Partial<SyncedPreferences> = {};
@@ -52,6 +62,7 @@ export const syncedPreferencesFromStored = (stored: StoredMuscleTargetSettings |
     muscleTargetMode: stored.muscleTargetMode === 'per_muscle' ? 'per-muscle' : stored.muscleTargetMode,
     muscleTargetOverrides: parseOverrides(stored.muscleTargetOverrides),
     progressCountSecondary: stored.countSecondaryMuscles,
+    muscleVolumePrimaryOnly: stored.volumePrimaryOnly,
   };
   const values: Partial<SyncedPreferences> = {};
   for (const field of syncedPreferenceFields) {
@@ -60,7 +71,7 @@ export const syncedPreferencesFromStored = (stored: StoredMuscleTargetSettings |
   return values;
 };
 
-/** The four columns a write sets together; a field left out takes its default. */
+/** The columns a write sets together; a field left out takes its default. */
 export const storedFromSyncedPreferences = (values: Partial<SyncedPreferences>): MuscleTargetSettingsWrite => {
   const complete = { ...pickSyncedPreferences(DEFAULT_ACCOUNT_LOCAL_PREFERENCES), ...values } as SyncedPreferences;
   return {
@@ -68,5 +79,6 @@ export const storedFromSyncedPreferences = (values: Partial<SyncedPreferences>):
     muscleTargetMode: complete.muscleTargetMode === 'per-muscle' ? 'per_muscle' : 'single',
     muscleTargetOverrides: JSON.stringify(complete.muscleTargetOverrides),
     countSecondaryMuscles: complete.progressCountSecondary,
+    volumePrimaryOnly: complete.muscleVolumePrimaryOnly,
   };
 };

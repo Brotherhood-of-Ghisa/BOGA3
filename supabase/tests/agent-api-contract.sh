@@ -573,7 +573,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     .data as $s
     | ($s.muscles | map(select(.id == $muscle)) | first) as $m
     | ($s.favourite_exercises | map(select(.exercise_id == $exercise)) | first) as $f
-    | $s.metric_revision == "working_sets_v9"
+    | $s.metric_revision == "working_sets_v10"
     and $s.time_zone == "UTC"
     and $s.complete == true
     and ($s.today | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))
@@ -581,6 +581,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     and ($s.targets.default_weekly_sets | type) == "number"
     and ($s.targets.revision | type) == "number"
     and ($s.counts_secondary_sets | type) == "boolean"
+    and ($s.volume_primary_only | type) == "boolean"
     and $m != null
     and ($m.weekly_target | type) == "number"
     and ([$m.recovery_days[].sets // 0] | add) + ($m.today_sets // 0) == 2
@@ -762,7 +763,7 @@ echo "[agent-api-test] verifying warm-ups are listed but feed no derived figure"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "working-set exercise context"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v9"
+  .data.metric_revision == "working_sets_v10"
   and .data.recent_performances[0].volume.value == 1325
   and .data.recent_performances[0].volume.eligible_set_count == 2
   and .data.recent_performances[0].estimated_one_rep_max.value < 140
@@ -788,7 +789,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 agent_get "workouts/recent?limit=1"
 assert_status "200" "working-set recent workouts"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v9"
+  .data.metric_revision == "working_sets_v10"
   and .data.workouts[0].exercise_count == 1
   and (.data.workouts[0].exercises | length) == 2
   and .data.workouts[0].completed_set_count == 2
@@ -1019,7 +1020,7 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "working_sets_v9"
+  .data.metric_revision == "working_sets_v10"
   and (.data.exercise | has("bodyweight_contribution") | not)
   and (.data.recent_performances[0] | has("session_body_weight") | not)
   and .data.recent_performances[0].volume.value == 1325
@@ -2100,14 +2101,14 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
   .data.exercise.muscles | length == 2 and all(.role == "primary" and .weight == 1)
 ' >/dev/null || fail "exercise update lost a co-primary or changed its role weight"
 # The dated-reading vector above left SET_A2 unperformed: one working set
-# remains, split 0.5 each between the visible and hidden Primary mappings.
+# remains, credited once to each visible or hidden Primary muscle.
 agent_get "training-status"
 assert_status "200" "co-primary historical training status"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg muscle "${MUSCLE_A}" --arg hidden "${MUSCLE_A2}" '
   .data as $s
   | ($s.muscles | map(select(.id == $muscle)) | first) as $m
-  | $s.metric_revision == "working_sets_v9"
-  and ([$m.recovery_days[].sets // 0] | add) + ($m.today_sets // 0) == 0.5
+  | $s.metric_revision == "working_sets_v10"
+  and ([$m.recovery_days[].sets // 0] | add) + ($m.today_sets // 0) == 1
   and ($s.muscles | map(.id) | index($hidden)) == null
 ' >/dev/null || fail "co-primary history redistributed the hidden muscle share"
 
@@ -2295,18 +2296,19 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
 
 echo "[agent-api-test] verifying the coach sets weekly muscle targets"
 TARGETS_KEY="agent-api-${RUN_TAG}-targets"
-# Another scope's override and the secondary switch already on the row: the
-# write keeps both.
+# Another scope's override and independent counting choices already on the row:
+# a target-only write keeps all three.
 update_training_fixture "insert into app_public.user_settings
     (owner_user_id, id, created_at, updated_at, client_updated_at_ms, weekly_working_set_target,
-     muscle_target_mode, muscle_target_overrides, count_secondary_muscles)
+     muscle_target_mode, muscle_target_overrides, count_secondary_muscles, volume_primary_only)
   values ('${USER_A_UUID}'::uuid, 'settings', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, 6, 'single',
-     '{\"detailed\":{\"agent-api-keep\":3},\"broad\":{\"agent-api-keep\":3}}'::jsonb, false)
+     '{\"detailed\":{\"agent-api-keep\":3},\"broad\":{\"agent-api-keep\":3}}'::jsonb, false, true)
   on conflict (owner_user_id, id) do update set
     weekly_working_set_target = excluded.weekly_working_set_target,
     muscle_target_mode = excluded.muscle_target_mode,
     muscle_target_overrides = excluded.muscle_target_overrides,
     count_secondary_muscles = excluded.count_secondary_muscles,
+    volume_primary_only = excluded.volume_primary_only,
     deleted_at = null, client_updated_at_ms = excluded.client_updated_at_ms;" >/dev/null
 agent_get "training-status"
 assert_status "200" "training status before the coach sets targets"
@@ -2330,9 +2332,9 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" '
 [[ "${TARGETS_NEW_REVISION}" -ge "${TARGETS_BEFORE_MS}" ]] ||
   fail "the targets write was not stamped with the server's now"
 [[ "$(run_psql "select weekly_working_set_target || ',' || muscle_target_mode || ',' || client_updated_at_ms
-    || ',' || (muscle_target_overrides -> '${TARGETS_SCOPE}' ->> '${MUSCLE_A}') || ',' || count_secondary_muscles
+    || ',' || (muscle_target_overrides -> '${TARGETS_SCOPE}' ->> '${MUSCLE_A}') || ',' || count_secondary_muscles || ',' || volume_primary_only
   from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
-  "11,per_muscle,${TARGETS_NEW_REVISION},14,false" ]] ||
+  "11,per_muscle,${TARGETS_NEW_REVISION},14,false,true" ]] ||
   fail "the settings row did not take the coach's targets and stamp"
 OTHER_SCOPE="broad"
 [[ "${TARGETS_SCOPE}" != "broad" ]] || OTHER_SCOPE="detailed"
@@ -2385,6 +2387,7 @@ for BAD in \
   "$(jq -nc --arg m "${MUSCLE_A}" '{overrides:{($m):1.5}}')" \
   "$(jq -nc --arg m "${MUSCLE_A}" '{overrides:{($m):"9"}}')" \
   "$(jq -nc '{count_secondary_muscles:true}')" \
+  "$(jq -nc '{volume_primary_only:true}')" \
   "$(jq -nc '{}')"; do
   BAD="$(printf '%s' "${BAD}" | jq -c --argjson rev "${TARGETS_NEW_REVISION}" '. + {expected_revision:$rev}')"
   agent_put "muscle-targets" "${BAD}" "${TARGETS_KEY}-bad"
@@ -2438,24 +2441,26 @@ echo "[agent-api-test] verifying a coach write before any device uploaded target
 # what it omits and ignores what the stale row holds.
 assert_defaults_after_first_write() {
   local label="$1"
-  [[ "$(run_psql "select weekly_working_set_target || ',' || muscle_target_mode || ',' || count_secondary_muscles
+  local secondary="${2:-false}"
+  [[ "$(run_psql "select weekly_working_set_target || ',' || muscle_target_mode || ',' || count_secondary_muscles || ',' || volume_primary_only
       || ',' || muscle_target_overrides::text || ',' || coalesce(deleted_at::text, 'live')
     from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
-    '8,per_muscle,true,{},live' ]] || fail "${label}: the first write did not build on the app defaults"
+    "8,per_muscle,${secondary},false,{},live" ]] || fail "${label}: the first write did not build on the app defaults"
 }
 update_training_fixture "update app_public.user_settings
   set weekly_working_set_target = null, muscle_target_mode = null, muscle_target_overrides = null,
-      count_secondary_muscles = null, client_updated_at_ms = ${NOW_MS}
+      count_secondary_muscles = null, volume_primary_only = null, client_updated_at_ms = ${NOW_MS}
   where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
 agent_get "training-status"
 printf '%s' "${RESPONSE_BODY}" | jq -e --argjson rev "${NOW_MS}" \
-  '.data.targets.uploaded == false and .data.targets.revision == $rev' >/dev/null ||
+  '.data.targets.uploaded == false and .data.targets.revision == $rev
+    and .data.counts_secondary_sets == true and .data.volume_primary_only == false' >/dev/null ||
   fail "training status did not report the unuploaded row"
 agent_put "muscle-targets" "$(jq -nc --argjson rev "${NOW_MS}" '{mode:"per_muscle",expected_revision:$rev}')" "${TARGETS_KEY}-first"
 assert_status "200" "write before any device uploaded targets"
 printf '%s' "${RESPONSE_BODY}" | jq -e '.data.targets.uploaded == true and .data.targets.default_weekly_sets == 8 and .data.targets.mode == "per_muscle"' \
   >/dev/null || fail "the first write did not return the defaults it built on"
-assert_defaults_after_first_write "null targets"
+assert_defaults_after_first_write "legacy null targets" true
 
 update_training_fixture "update app_public.user_settings
   set weekly_working_set_target = 6, muscle_target_mode = 'single',

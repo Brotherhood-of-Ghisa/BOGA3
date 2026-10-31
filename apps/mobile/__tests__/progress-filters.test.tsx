@@ -15,20 +15,34 @@ import type { GymScopeOption } from '@/src/utils/gym-scope-route';
 
 const OPTIONS: GymScopeOption[] = [{ gymId: 'club', name: 'Club' }, { gymId: null, name: null }];
 
-function Harness({ offered, onGym }: { offered: ('grouping' | 'secondary' | 'gym')[]; onGym?: jest.Mock }) {
+function Harness({ offered, onGym }: { offered: ('grouping' | 'secondary' | 'secondaryVolume' | 'gym')[]; onGym?: jest.Mock }) {
   const [grouped, setGrouped] = useState(true);
   const [secondary, setSecondary] = useState(true);
+  const [secondaryVolume, setSecondaryVolume] = useState(true);
   const [gymId, setGymId] = useState<string | null | undefined>(undefined);
   const props: ProgressFiltersProps = {
     testID: 'filters',
     grouping: offered.includes('grouping') ? { value: grouped, onChange: setGrouped } : undefined,
     secondary: offered.includes('secondary') ? { value: secondary, onChange: setSecondary } : undefined,
+    secondaryVolume: offered.includes('secondaryVolume') ? { value: secondaryVolume, onChange: setSecondaryVolume } : undefined,
     gym: offered.includes('gym') ? { value: gymId, options: OPTIONS, onChange: next => { onGym?.(next); setGymId(next); } } : undefined,
   };
   return <ProgressFilters {...props} />;
 }
 
 describe('ProgressFilters', () => {
+  it('offers adjacent independent Primary only switches for Sets and Volume', () => {
+    render(<Harness offered={['secondary', 'secondaryVolume']} />);
+    fireEvent.press(screen.getByTestId('filters'));
+    expect(screen.getAllByRole('switch').map(row => row.props.accessibilityLabel))
+      .toEqual(['Sets: Primary only', 'Volume: Primary only']);
+    fireEvent.press(screen.getByTestId('stats-secondary-toggle'));
+    expect(screen.getByTestId('stats-secondary-toggle')).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId('stats-volume-primary-only-toggle')).toHaveProp('accessibilityState', { checked: false });
+    fireEvent.press(screen.getByTestId('stats-volume-primary-only-toggle'));
+    expect(screen.getByTestId('stats-secondary-toggle')).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByTestId('stats-volume-primary-only-toggle')).toHaveProp('accessibilityState', { checked: true });
+  });
   it('draws no button without a choice to offer, counting a gym only when there is one to tell apart', () => {
     render(<ProgressFilters testID="filters" />);
     expect(screen.queryByTestId('filters')).toBeNull();
@@ -43,14 +57,14 @@ describe('ProgressFilters', () => {
     expect(button()).toHaveProp('accessibilityLabel', 'Filters');
     fireEvent.press(button());
     expect(screen.getByRole('switch', { name: 'Group by muscle family' })).toHaveProp('accessibilityState', { checked: true });
-    expect(screen.getByRole('switch', { name: 'Count secondary sets' })).toHaveProp('accessibilityState', { checked: true });
+    expect(screen.getByRole('switch', { name: 'Sets: Primary only' })).toHaveProp('accessibilityState', { checked: false });
     expect(screen.getByRole('header', { name: 'Gym' })).toBeTruthy();
     expect(screen.getByTestId('stats-gym-option-all')).toHaveProp('accessibilityState', { checked: true });
 
     fireEvent.press(screen.getByTestId('stats-secondary-toggle'));
     fireEvent.press(screen.getByTestId('stats-gym-option-no-gym'));
     expect(onGym).toHaveBeenLastCalledWith(null);
-    expect(screen.getByTestId('stats-secondary-toggle')).toHaveProp('accessibilityState', { checked: false });
+    expect(screen.getByTestId('stats-secondary-toggle')).toHaveProp('accessibilityState', { checked: true });
     expect(screen.getByTestId('stats-gym-option-no-gym')).toHaveProp('accessibilityState', { checked: true });
     fireEvent(screen.getByTestId('filters-sheet'), 'accessibilityEscape');
     // The label names each changed choice, so the gym in force is never only a count.
