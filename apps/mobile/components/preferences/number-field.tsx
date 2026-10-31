@@ -1,16 +1,19 @@
 import { useState } from 'react';
-import { FormField, InputRow } from '@/components/ui';
+import { InputRow } from '@/components/ui';
 
 export const parseIntegerDraft = (text: string): number => /^\d+$/.test(text.trim()) ? Number(text) : NaN;
 
-/** Keep invalid or unsaved input intact; a new durable/pending value updates it. */
-export function PreferenceNumberField({ value, label, testID, onCommit, row = false, divider = false }: {
+/**
+ * A number setting as a form card's `InputRow` (`ux-rules.md` "Forms"). Clearing
+ * it commits `defaultValue`, which the blank field shows; invalid or unsaved
+ * input stays in the field, and a new durable/pending value replaces it.
+ */
+export function PreferenceNumberField({ value, defaultValue, label, testID, onCommit, divider = false }: {
   value: number;
+  defaultValue: number;
   label: string;
   testID: string;
   onCommit: (value: number) => void;
-  /** A form card's `InputRow` (`ux-rules.md` "Forms") rather than a standalone field. */
-  row?: boolean;
   divider?: boolean;
 }) {
   const [draft, setDraft] = useState(String(value));
@@ -19,11 +22,7 @@ export function PreferenceNumberField({ value, label, testID, onCommit, row = fa
     setPreviousValue(value);
     setDraft(String(value));
   }
-  const commit = () => onCommit(parseIntegerDraft(draft));
-  if (row) {
-    return <InputRow divider={divider} label={label} onChangeText={setDraft} onEndEditing={commit} testID={testID} value={draft} />;
-  }
-  return <FormField label={label} accessibilityLabel={label} keyboardType="number-pad"
-    onChangeText={setDraft} onEndEditing={commit}
-    testID={testID} value={draft} />;
+  const commit = () => onCommit(draft.trim() === '' ? defaultValue : parseIntegerDraft(draft));
+  return <InputRow divider={divider} label={label} onChangeText={setDraft} onEndEditing={commit}
+    placeholder={String(defaultValue)} testID={testID} value={draft} />;
 }

@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm';
 import MusclesRoute from '../app/settings-muscles';
 import TargetsRoute from '../app/settings-muscle-targets';
 import EnabledRoute from '../app/settings-enabled-muscles';
+import { uiText } from '@/components/ui';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { muscleGroups } from '@/src/data/schema';
 import { stampLocalDataOwner } from '@/src/data/local-wipe';
@@ -58,25 +59,51 @@ it('keeps choices and the default on Muscles, opening full target and enablement
 const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' } as const;
 const META = { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm } as const;
 
-it('draws Muscles on the text roles: headings and control labels as micro-labels, statuses as meta with figures', async () => {
+it('draws Muscles on the row vocabulary: section headings as micro-labels, row names as options, values muted', async () => {
   render(<MusclesRoute />);
   await waitFor(() => expect(screen.getByTestId('settings-muscle-preset-detailed')).toHaveProp('accessibilityState', { selected: true }));
   expect(screen.getByText('Weekly targets')).toHaveStyle(LABEL);
-  expect(screen.getByText('Target mode')).toHaveStyle(LABEL);
-  expect(screen.getByText('Default target (sets / week)')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+  expect(screen.getByText('Muscle breakdown')).toHaveStyle(LABEL);
+  expect(screen.getByText('Target mode')).toHaveStyle(uiText.option);
+  expect(screen.getByText('Default target (sets / week)')).toHaveStyle(uiText.option);
+  expect(screen.getByText('Breakdown')).toHaveStyle(uiText.option);
   const status = within(screen.getByTestId('settings-enabled-muscles-row')).getByText(/\d+ \/ \d+/);
-  expect(status).toHaveStyle(META);
+  expect(status).toHaveStyle({ fontFamily: uiFonts.body.family, color: uiRoles.inkMuted });
   within(status).getAllByText(/^\d+$/).forEach(figure => expect(figure).toHaveStyle({ fontFamily: uiFonts.figure.family }));
+  expect(screen.getByTestId('settings-enabled-muscles-row')).toHaveTextContent(/Enabled muscles/);
 });
 
-it('draws a muscle target row: the name in bodyStrong, Default and an error as meta', async () => {
+it('draws a muscle target row: the name as an option, a blank showing the default, an error as meta', async () => {
   updatePreferences({ muscleTargetMode: 'per-muscle' });
   render(<TargetsRoute />);
   await screen.findByTestId('settings-muscle-target-chest');
-  expect(screen.getByText('Pectoralis')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
-  expect(screen.getByTestId('settings-muscle-target-chest-default')).toHaveStyle(META);
+  expect(screen.getByText('Pectoralis')).toHaveStyle(uiText.option);
+  expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('placeholder', '8');
+  expect(screen.queryByTestId('settings-muscle-target-chest-reset')).toBeNull();
   edit('settings-muscle-target-chest', '0');
   expect(screen.getByTestId('settings-muscle-target-chest-error')).toHaveStyle({ ...META, color: uiRoles.danger });
+});
+
+it('names the breakdown the targets apply to under the default', async () => {
+  render(<TargetsRoute />);
+  expect(await screen.findByText('Per-muscle targets apply to the detailed breakdown')).toBeOnTheScreen();
+  await act(async () => { await setup.setMuscleReportPreset('broad'); });
+  expect(await screen.findByText('Per-muscle targets apply to the broad breakdown')).toBeOnTheScreen();
+});
+
+it('clearing the default target commits the standard default, which the blank field shows', async () => {
+  render(<MusclesRoute />);
+  await screen.findByTestId('settings-weekly-working-set-target');
+  expect(screen.getByTestId('settings-weekly-working-set-target')).toHaveProp('placeholder', '8');
+  edit('settings-weekly-working-set-target', '11');
+  expect(values().weeklyWorkingSetTarget).toBe(11);
+  edit('settings-weekly-working-set-target', '');
+  expect(values().weeklyWorkingSetTarget).toBe(8);
+  expect(screen.getByTestId('settings-weekly-working-set-target')).toHaveProp('value', '8');
+  expect(screen.queryByTestId('settings-weekly-working-set-target-error')).toBeNull();
+  edit('settings-weekly-working-set-target', '0');
+  expect(screen.getByTestId('settings-weekly-working-set-target-error')).toHaveTextContent('Enter a positive whole number.');
+  expect(values().weeklyWorkingSetTarget).toBe(8);
 });
 
 it('lists only enabled muscles, including custom muscles, and restores hidden overrides on re-enable', async () => {
@@ -95,7 +122,20 @@ it('lists only enabled muscles, including custom muscles, and restores hidden ov
   expect(values().muscleTargetOverrides.detailed?.chest).toBe(14);
 });
 
-it('inherits the live default, preserves independent breakdown maps and resets one override', async () => {
+it.each([['targets', TargetsRoute, 'settings-muscle-target-solo-muscle'], ['enablement', EnabledRoute, 'settings-track-solo-muscle']] as const)(
+  'titles a family section only above two or more muscles on the %s page', async (_page, Route, rowId) => {
+    await setup.listMuscleReportRows();
+    localDatabase().insert(muscleGroups).values({ id: 'solo-muscle', displayName: 'Solo', familyName: 'Solo family', sortOrder: 99, isEditable: 1 }).run();
+    const rows = await setup.listMuscleReportRows();
+    const sections = setup.buildSettingsMuscleSections(rows);
+    const many = sections.find(section => section.muscles.length >= 2)!;
+    render(<Route />);
+    await screen.findByTestId(rowId);
+    expect(within(screen.getByTestId('settings-muscles-family-Solo family')).queryByRole('header')).toBeNull();
+    expect(within(screen.getByTestId(`settings-muscles-family-${many.family}`)).getByRole('header')).toHaveTextContent(many.family);
+  });
+
+it('inherits the live default, preserves independent breakdown maps and clears one override by blanking it', async () => {
   updatePreferences({ muscleTargetMode: 'per-muscle', muscleTargetOverrides: { detailed: { chest: 12 }, broad: { chest: 18 } } });
   render(<TargetsRoute />);
   await screen.findByTestId('settings-muscle-target-chest');
@@ -104,8 +144,9 @@ it('inherits the live default, preserves independent breakdown maps and resets o
   edit('settings-weekly-working-set-target', '9');
   expect(screen.getByTestId('settings-muscle-target-calves')).toHaveProp('placeholder', '9');
   edit('settings-muscle-target-calves', '6');
-  fireEvent.press(screen.getByTestId('settings-muscle-target-chest-reset'));
-  expect(screen.getByTestId('settings-muscle-target-chest-default')).toHaveTextContent('Default');
+  edit('settings-muscle-target-chest', '');
+  expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('value', '');
+  expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('placeholder', '9');
   expect(values().muscleTargetOverrides).toEqual({ detailed: { calves: 6 }, broad: { chest: 18 } });
   await act(async () => { await setup.setMuscleReportPreset('broad'); });
   await waitFor(() => expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('value', '18'));
@@ -184,7 +225,7 @@ it('keeps Custom reporting unchanged until a preset is explicitly selected', asy
   await setup.listMuscleReportRows();
   localDatabase().update(muscleGroups).set({ reportGroup: 'chest' }).where(eq(muscleGroups.id, 'biceps')).run();
   render(<MusclesRoute />);
-  expect(await screen.findByTestId('settings-muscle-custom')).toHaveStyle({ ...LABEL, color: uiRoles.ink });
+  expect(await screen.findByTestId('settings-muscle-custom')).toHaveProp('accessibilityLabel', 'Grouping: Custom');
   expect(screen.getByTestId('settings-muscle-preset-detailed')).toHaveProp('accessibilityState', { selected: false });
   expect(screen.getByTestId('settings-muscle-preset-broad')).toHaveProp('accessibilityState', { selected: false });
   fireEvent.press(screen.getByTestId('settings-enabled-muscles-row'));

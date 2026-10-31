@@ -3,7 +3,7 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { ActionButton, Card, FigureText, Icon, ListRow, Notice, ScreenScroll, StatePanel, Stat, uiRoles, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, Card, FigureText, FormSection, Icon, ListRow, Notice, ScreenScroll, StatePanel, Stat, uiRoles, uiText, uiTextTone } from '@/components/ui';
 import { deleteBodyWeightReading, listBodyWeightReadings, saveBodyWeightReading } from '@/src/data/bodyweight';
 import type { BodyWeightMeasurement } from '@/src/data/schema';
 import { isValidBodyWeightReading } from '@/src/bodyweight/weight-entry';
@@ -43,10 +43,9 @@ export function BodyWeightScreen() {
   const displayKg = (weightKg: number) => String(Number(weightKg.toFixed(6)));
   return <>
     <ScreenScroll testID="body-weight-screen" contentInsetAdjustmentBehavior="automatic">
-      <Card><BodyweightCalculationsRow /></Card>
-      <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
-        Each session uses the latest reading on or before its start.
-      </Text>
+      <FormSection footnote="Each session uses the latest reading on or before its start." title="Calculations">
+        <BodyweightCalculationsRow />
+      </FormSection>
       {feedback ? <Notice live message={feedback} testID="body-weight-feedback" /> : null}
       {error ? <StatePanel kind="error" title="Could not load weight history."
         action={{ label: 'Retry', onPress: () => void load() }} testID="body-weight-error" />
@@ -62,20 +61,22 @@ export function BodyWeightScreen() {
           </View></Card>
           <ActionButton label="Add reading" variant="primary" testID="body-weight-add"
             onPress={() => openEditor({ reading: null, measuredAt: new Date() })} />
-          <View style={styles.section}>
-            <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>Weight history</Text>
-            {readings.length === 0 ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="body-weight-empty">
-              No readings yet. Weight is saved on this device even when you are offline.
-            </Text> : <Card>{readings.map((reading, index) => <ListRow key={reading.id}
-              divider={index > 0} density="list" testID={`body-weight-reading-${reading.id}`}
-              accessibilityLabel={`Edit ${displayKg(reading.weightKg)}, ${formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)}`}
-              onPress={() => openEditor({ reading, measuredAt: reading.measuredAt })}
-              trailing={<Icon name="chevron-right" size="sm" color={uiRoles.inkFaint} />}>
-              <Stat label={formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)} value={displayKg(reading.weightKg)}
-                rank="secondary" />
-              {!isValidBodyWeightReading(reading) ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>Needs review</Text> : null}
-            </ListRow>)}</Card>}
-          </View>
+          <FormSection title="Weight history">
+            {readings.length === 0 ? <ListRow density="list" divider={false} testID="body-weight-empty">
+              <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
+                No readings yet. Weight is saved on this device even when you are offline.
+              </Text>
+            </ListRow>
+              : readings.map((reading, index) => <ListRow key={reading.id}
+                divider={index > 0} density="list" testID={`body-weight-reading-${reading.id}`}
+                accessibilityLabel={`Edit ${displayKg(reading.weightKg)}, ${formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)}`}
+                onPress={() => openEditor({ reading, measuredAt: reading.measuredAt })}
+                trailing={<Icon name="chevron-right" size="sm" color={uiRoles.inkFaint} />}>
+                <Stat label={formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)} value={displayKg(reading.weightKg)}
+                  rank="secondary" />
+                {!isValidBodyWeightReading(reading) ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>Needs review</Text> : null}
+              </ListRow>)}
+          </FormSection>
         </>}
     </ScreenScroll>
     {editor ? <WeightEntrySheet visible={editorVisible} title={editor.reading ? 'Edit reading' : 'Add reading'}

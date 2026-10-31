@@ -1,12 +1,9 @@
-import { StyleSheet } from 'react-native';
-
 import { BackupPanel } from '@/components/settings/backup-panel';
 import { EffortSettings } from '@/components/preferences/effort-settings';
 import { ProgressSettings } from '@/components/preferences/progress-settings';
 import { RestTimerSettings } from '@/components/preferences/rest-timer-settings';
 import { SubPage } from '@/components/settings/sub-page';
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
-import { Card, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
@@ -36,9 +33,7 @@ export function EffortSettingsScreen() {
   const { values, pending } = useAccountLocalPreferenceState();
   return (
     <SubPage testID="settings-effort-screen">
-      <Card style={styles.cardBody}>
-        <EffortSettings values={{ ...values, ...pending }} />
-      </Card>
+      <EffortSettings values={{ ...values, ...pending }} />
     </SubPage>
   );
 }
@@ -58,11 +53,3 @@ export function DataSyncSettingsScreen() {
     </SubPage>
   );
 }
-
-const styles = StyleSheet.create({
-  // A card holding controls rather than rows.
-  cardBody: {
-    padding: uiSpace.md,
-    gap: uiSpace.md,
-  },
-});

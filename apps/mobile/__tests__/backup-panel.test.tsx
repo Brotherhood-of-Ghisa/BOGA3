@@ -1,12 +1,13 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import { BackupPanel } from '@/components/settings/backup-panel';
+import { uiText } from '@/components/ui';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import type { DatabaseBackups } from '@/src/backup/database-backups';
 import type { Snapshot } from '@/src/backup/snapshots';
 import { formatLocalDateTime } from '@/src/utils/local-time';
 
-// Data & sync's Backups card over a fake backups object (the real one is
+// Data & sync's Backups section over a fake backups object (the real one is
 // `database-backups.test.ts`): the newest snapshot, the count, Export.
 
 const snapshot = (takenAtMs: number): Snapshot => ({ name: `s-${takenAtMs}`, takenAtMs });
@@ -54,14 +55,14 @@ it('shows the newest snapshot in the date format and the count, updating after a
   expect(screen.getByTestId('settings-backup-count')).toHaveTextContent('3');
 });
 
-it('draws the card on the text roles: a label, body row names, values as meta with figures in Plex Mono', () => {
+it('draws the section on the row vocabulary: a micro-label, option-role names, muted values with figures in Plex Mono', () => {
   const newest = new Date(2026, 9, 25, 9, 30).getTime();
   render(<BackupPanel backups={fakeBackups([snapshot(newest)]).backups} />);
 
   expect(screen.getByText('Backups')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
-  expect(screen.getByText('Last backup')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base });
+  expect(screen.getByText('Last backup')).toHaveStyle(uiText.option);
   const last = screen.getByTestId('settings-backup-last');
-  expect(last).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: uiRoles.ink });
+  expect(last).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.inkMuted });
   expect(within(last).getByText('25-10-2026')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
 });
 

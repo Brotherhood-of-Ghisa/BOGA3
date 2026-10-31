@@ -43,8 +43,8 @@ Two standing rules:
 | A loading, empty, message or error state — whole-screen or inside a card | `StatePanel` (`state-panel.tsx`) |
 | The inline outcome of an action | `Notice` (`notice.tsx`) |
 | A labelled free-text input (a form's name or title) | `FormField` (`form-field.tsx`) |
-| A form's section (optional `footnote`) and its rows: a choice that opens a picker (optional leading `icon`), a short figure in place, an action (`ActionRow` `kind`: `navigate` chevron, `act` accent, `danger`), a section error | `FormSection`, `ChoiceRow`, `InputRow`, `ActionRow`, `FormError` (`form-section.tsx`; `ux-rules.md` "Forms") |
-| A Settings row: one of ≤3 options under its label, the one chosen of many (radio, optional `meta` swatch), several (checkbox), a read-only value (one accessible element) | `SegmentRow`, `RadioRow`, `CheckRow`, `ValueRow` (`form-rows.tsx`; `ux-rules.md` "Settings pages") |
+| A form's section (optional `title`, `footnote`) and its rows: a choice that opens a picker (optional leading `icon`), a short figure in place, an action (`ActionRow` `kind`: `navigate` chevron, `act` accent, `danger`), a section error | `FormSection`, `ChoiceRow`, `InputRow`, `ActionRow`, `FormError` (`form-section.tsx`; `ux-rules.md` "Forms") |
+| A Settings row: one of ≤3 options under its label, the one chosen of many (radio, optional `meta` swatch), several (checkbox), a read-only value (one accessible element unless it has a `valueTestID`; optional glyph, `danger` tone) | `SegmentRow`, `RadioRow`, `CheckRow`, `ValueRow` (`form-rows.tsx`; `ux-rules.md` "Settings pages") |
 | A search input | `SearchField` (`search-field.tsx`) |
 | Full-width pages swiped between under tabs that name them (UX pattern 15) | `SwipePages` (`swipe-pages.tsx`) — Today's cards, the Groups screen's pages |
 | One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral or fixed black/white filter selection |
