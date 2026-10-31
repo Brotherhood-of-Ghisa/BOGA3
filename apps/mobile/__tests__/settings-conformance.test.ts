@@ -13,9 +13,12 @@ import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
  * links to the Bodyweight log (`/body-weight`) but imports nothing of it: a log
  * of readings follows "Lists and rows", not this rule.
  *
- * A Settings file draws only the row vocabulary, `Notice`, `StatePanel` and the
- * screen scroll; a button is a primary (at most one per page) or a text button
- * as a `Notice`'s action; a `danger` row is confirmed in a native `Alert`.
+ * A Settings file draws from the primitives only the row vocabulary, `Notice`,
+ * `StatePanel` and the screen scroll, and no raw control or tap target: a row
+ * made by hand from those is caught, one laid out from plain `View`s is not. A
+ * button is a primary (at most one per page) or a text button as a `Notice`'s
+ * action. A file with a `danger` row calls `Alert.alert` (checked per file, not
+ * per row).
  */
 
 const MOBILE_ROOT = join(__dirname, '..');
@@ -51,10 +54,14 @@ const resolveModule = (from: string, specifier: string): string | null => {
 };
 
 const importDeclarations = ({ source }: Parsed) => source.statements.filter(ts.isImportDeclaration);
-const moduleOf = (declaration: ts.ImportDeclaration) => (declaration.moduleSpecifier as ts.StringLiteral).text;
+const moduleOf = (declaration: ts.ImportDeclaration | ts.ExportDeclaration) => (declaration.moduleSpecifier as ts.StringLiteral).text;
+// Imports and re-exports (`export … from`), so a barrel never ends the walk.
+const moduleDeclarations = ({ source }: Parsed) => source.statements.filter((statement): statement is ts.ImportDeclaration | ts.ExportDeclaration =>
+  ts.isImportDeclaration(statement) || (ts.isExportDeclaration(statement) && statement.moduleSpecifier !== undefined));
+const isPrimitive = (parsed: Parsed, specifier: string) => resolveModule(parsed.file, specifier)?.startsWith('components/ui/') ?? false;
 
 const componentImports = (parsed: Parsed): string[] =>
-  importDeclarations(parsed)
+  moduleDeclarations(parsed)
     .map((declaration) => resolveModule(parsed.file, moduleOf(declaration)))
     .filter((file): file is string => file !== null && file.startsWith('components/') && !NOT_SETTINGS_CONTENT.test(file));
 
@@ -71,12 +78,16 @@ const pageFiles = (root: string): string[] => {
   return [...seen].sort();
 };
 
-/** Each name a file imports, mapped to the module it came from. */
+/** Each name a file imports, mapped to the module it came from; a primitive's module is `ui`. */
 const importedFrom = (parsed: Parsed): Map<string, string> => {
   const names = new Map<string, string>();
   importDeclarations(parsed).forEach((declaration) => {
-    const bindings = declaration.importClause?.namedBindings;
-    if (bindings && ts.isNamedImports(bindings)) bindings.elements.forEach((element) => names.set(element.name.text, moduleOf(declaration)));
+    const from = isPrimitive(parsed, moduleOf(declaration)) ? 'ui' : moduleOf(declaration);
+    const clause = declaration.importClause;
+    if (clause?.name) names.set(clause.name.text, from);
+    const bindings = clause?.namedBindings;
+    if (bindings && ts.isNamedImports(bindings)) bindings.elements.forEach((element) => names.set(element.name.text, from));
+    if (bindings && ts.isNamespaceImport(bindings)) names.set(`* as ${bindings.name.text}`, from);
   });
   return names;
 };
@@ -118,7 +129,7 @@ const elementFindings = (element: ts.JsxOpeningElement | ts.JsxSelfClosingElemen
   const name = tagName(element);
   const from = imports.get(name);
   const findings: [string, string][] = [];
-  if (from?.startsWith('@/components/ui') && !VOCABULARY.has(name)) findings.push(['vocabulary', `<${name}> is not Settings vocabulary`]);
+  if (from === 'ui' && !VOCABULARY.has(name)) findings.push(['vocabulary', `<${name}> is not Settings vocabulary`]);
   if (name === 'ActionButton') buttonFindings(element).forEach((detail) => findings.push(['buttons', detail]));
   if (name === 'StatePanel' && attribute(element, 'action')) findings.push(['buttons', 'a StatePanel action (an outline button)']);
   return findings;
@@ -133,6 +144,7 @@ const settingsFindings = (file: string, text?: string): Finding[] => {
   const add = (rule: string, detail: string) => findings.push({ file, rule, detail });
   imports.forEach((from, name) => {
     if (from === 'react-native' && RAW_REACT_NATIVE.has(name)) add('raw control', `${name} from react-native`);
+    if (from === 'ui' && name.startsWith('* as ')) add('vocabulary', `a namespace import of the primitives (${name})`);
   });
   if (/\bSettingsCard\b/.test(body)) add('vocabulary', 'SettingsCard');
   jsxElements(parsed).forEach((element) => elementFindings(element, imports).forEach(([rule, detail]) => add(rule, detail)));
@@ -224,6 +236,15 @@ describe('the Settings language check', () => {
       'vocabulary: SettingsCard',
       'vocabulary: <PageSheet> is not Settings vocabulary',
       'vocabulary: <Card> is not Settings vocabulary',
+    ]);
+  });
+
+  it('finds a primitive outside the vocabulary however it is imported', () => {
+    expect(findingsIn(`import { Sheet } from '../ui/sheet';
+      import * as UI from '@/components/ui';
+      const a = <Sheet visible title="Pick" />;`)).toEqual([
+      'vocabulary: a namespace import of the primitives (* as UI)',
+      'vocabulary: <Sheet> is not Settings vocabulary',
     ]);
   });
 
