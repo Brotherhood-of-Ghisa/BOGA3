@@ -113,9 +113,9 @@ listed here:
   pull on the client, omits the key (`split_by_gym` does on push). An explicit
   `rest_timer_sec: null` clears it.
 - **`user_settings`** is a singleton whose client id is `settings`. The
-  singleton is client-enforced; the server is a plain LWW mirror. Its four
-  muscle-target columns keep their value when a push or pull omits or nulls
-  them; `muscle_target_overrides` is `jsonb` sent as JSON text.
+  client enforces the singleton; the server mirrors LWW. Its muscle
+  targets and independent Sets/Volume choices keep their value when a push or
+  pull omits or nulls them; `muscle_target_overrides` is `jsonb` sent as JSON text.
 - **`exercise_group_links`** is the member's own data, not a group table. Only
   the member's client writes it; server code (the group evaluator included)
   only reads it. Its id must stay `<group_id>:<exercise_definition_id>`: a local

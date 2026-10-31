@@ -15,6 +15,7 @@ const options = { periodWeeks: 1, now };
 const account = async (id = 'A') => {
   setAccountLocalPreferenceAccount(id, true);
   await ensureAccountLocalPreferencesLoaded();
+  setAccountLocalPreferences({ progressCountSecondary: true });
 };
 
 beforeEach(async () => {
@@ -270,10 +271,10 @@ it('counts primary work only when secondary sets are hidden, in both periods, co
   const oracle = await computeStatsSummary({ ...options, countSecondary: false });
   const back = hidden.muscles.find(muscle => muscle.muscleGroupId === 'back')!;
   expect(counted.current.workingSetCount).toBe(1);
-  expect(back).toMatchObject({ current: { workingSetCount: 0, totalVolume: 0 }, previous: { workingSetCount: 1, totalVolume: 0 } });
-  expect(back.exercises.map(row => row.exerciseDefinitionId)).toEqual(['previous-only']);
+  expect(back).toMatchObject({ current: { workingSetCount: 0, totalVolume: 200 }, previous: { workingSetCount: 1, totalVolume: 100 } });
+  expect(back.exercises.map(row => row.exerciseDefinitionId)).toEqual(['lift', 'previous-only']);
   expect(oracle.current.totals.muscleFamilies.flatMap(family => family.muscles).find(row => row.muscleGroupId === 'back'))
-    .toMatchObject({ workingSetCount: 0, totalVolume: 0 });
+    .toMatchObject({ workingSetCount: 0, totalVolume: 200 });
   // Session and set totals count no muscle, so they do not move.
   const all = await computeProgressComparisons(options);
   expect(hidden.current.totals).toMatchObject({ sessionCount: all.current.totals.sessionCount, workingSetCount: all.current.totals.workingSetCount });
@@ -283,8 +284,8 @@ it('counts primary work only when secondary sets are hidden, in both periods, co
   expect(sum((await computeSelectedMuscleHistoryEffort(bounds)).daily)).toBe(2.5);
   const history = await computeSelectedMuscleHistoryEffort({ ...bounds, countSecondary: false });
   expect(sum(history.daily)).toBe(1);
-  expect(history.gyms).toEqual([{ gymId: null, name: null, sessionCount: 1 }]);
-  expect((await computeSelectedMuscleDailyEffort({ ...bounds, countSecondary: false })).flatMap(day => day.contributions)
+  expect(history.gyms).toEqual([{ gymId: null, name: null, sessionCount: 2 }]);
+  expect((await computeSelectedMuscleDailyEffort({ ...bounds, countSecondary: false, countSecondaryVolume: false })).flatMap(day => day.contributions)
     .map(row => row.exerciseDefinitionId)).toEqual(['previous-only']);
 
 

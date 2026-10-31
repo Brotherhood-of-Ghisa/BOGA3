@@ -169,6 +169,12 @@ export const generatedMigrationBundle = {
     tag: "0026_user_settings_muscle_targets",
     breakpoints: true,
   },
+  {
+    idx: 27,
+    when: 1793466472914,
+    tag: "0027_sweet_scourge",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -902,6 +908,7 @@ ALTER TABLE \`session_exercises\` ADD \`merge_revision\` integer DEFAULT 0 NOT N
 ALTER TABLE \`user_settings\` ADD \`muscle_target_mode\` text;--> statement-breakpoint
 ALTER TABLE \`user_settings\` ADD \`muscle_target_overrides\` text;--> statement-breakpoint
 ALTER TABLE \`user_settings\` ADD \`count_secondary_muscles\` integer;`,
+  m0027: `ALTER TABLE \`user_settings\` ADD \`volume_primary_only\` integer;`,
   },
 } as const;
 

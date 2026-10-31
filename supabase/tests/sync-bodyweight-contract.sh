@@ -11,12 +11,25 @@ BW_SESSION_ID="push-session-bodyweight-${RUN_TAG}"
 BW_DEF_ID="push-exdef-bodyweight-${RUN_TAG}"
 BW_SX_ID="push-sx-bodyweight-${RUN_TAG}"
 BW_SET_ID="push-set-bodyweight-${RUN_TAG}"
+# The preceding backend suites share this fixture owner. This scenario owns
+# and cleans its settings row, so remove their choices before testing an insert.
+service_delete user_settings "owner_user_id=eq.${USER_A_UUID}&id=eq.settings"
+assert_status 204 "fresh settings reset"
+# A fresh bodyweight-only insert omits the counting fields. The new Sets
+# default is false, while the unknown Volume choice remains null for adoption.
+sync_push "${USER_A_TOKEN}" "$(jq -nc --argjson ts "$((BASE_MS - 1))" '
+  {entities: [{type: "user_settings", id: "settings", client_updated_at_ms: $ts,
+    fields: {bodyweight_calculations_enabled: true, created_at: $ts, updated_at: $ts, deleted_at: null}}]}')"
+assert_status 200 "fresh bodyweight-only settings"
+user_select user_settings "id=eq.settings&select=count_secondary_muscles,volume_primary_only" "${USER_A_TOKEN}"
+assert_json_expr '.[0] == {count_secondary_muscles: false, volume_primary_only: null}' \
+  "a fresh insert uses direct Sets without inventing a Volume choice"
 BW_BODY="$(jq -nc --arg reading "${BW_ID}" --arg session "${BW_SESSION_ID}" \
   --arg def "${BW_DEF_ID}" --arg sx "${BW_SX_ID}" --arg set "${BW_SET_ID}" --argjson ts "${BASE_MS}" '
   {entities: [
     {type: "user_settings", id: "settings", client_updated_at_ms: $ts,
      fields: {bodyweight_calculations_enabled: true, weekly_working_set_target: 10, muscle_target_mode: "per_muscle",
-              muscle_target_overrides: "{\"broad\": {\"chest\": 12}}", count_secondary_muscles: false,
+              muscle_target_overrides: "{\"broad\": {\"chest\": 12}}", count_secondary_muscles: false, volume_primary_only: true,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "body_weight_measurements", id: $reading, client_updated_at_ms: $ts,
      fields: {weight_kg: 79.83225712, measured_at: $ts, created_at: $ts, updated_at: $ts, deleted_at: null}},
@@ -118,14 +131,14 @@ bw_push_settings() {
       fields: ({bodyweight_calculations_enabled: true, created_at: $at, updated_at: $at, deleted_at: null} + $extra)}]}')"
 }
 bw_targets_unchanged() {
-  user_select user_settings "id=eq.settings&select=bodyweight_calculations_enabled,weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles" "${USER_A_TOKEN}"
+  user_select user_settings "id=eq.settings&select=bodyweight_calculations_enabled,weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,volume_primary_only" "${USER_A_TOKEN}"
   assert_json_expr '.[0] == {bodyweight_calculations_enabled: true, weekly_working_set_target: 10,
-    muscle_target_mode: "per_muscle", muscle_target_overrides: {broad: {chest: 12}}, count_secondary_muscles: false}' "$1"
+    muscle_target_mode: "per_muscle", muscle_target_overrides: {broad: {chest: 12}}, count_secondary_muscles: false, volume_primary_only: true}' "$1"
 }
 bw_push_settings "$((BASE_MS + 300))" '{}'
 assert_status 200 "old-shape settings push"
 bw_targets_unchanged "a push without the target keys keeps the stored targets"
-bw_push_settings "$((BASE_MS + 310))" '{"weekly_working_set_target": null, "muscle_target_mode": null, "muscle_target_overrides": null, "count_secondary_muscles": null}'
+bw_push_settings "$((BASE_MS + 310))" '{"weekly_working_set_target": null, "muscle_target_mode": null, "muscle_target_overrides": null, "count_secondary_muscles": null, "volume_primary_only": null}'
 assert_status 200 "null-target settings push"
 bw_targets_unchanged "a push with null targets keeps the stored targets"
 for bw_invalid in '{"broad": {"chest": 0}}' '{"broad": {"chest": 1.5}}' '{"region": {"chest": 8}}' \
@@ -141,9 +154,14 @@ user_select user_settings "id=eq.settings&select=weekly_working_set_target" "${U
 assert_json_expr '.[0].weekly_working_set_target == 9007199254740991' "the largest safe target round-trips"
 bw_push_settings "$((BASE_MS + 330))" '{"weekly_working_set_target": 14, "muscle_target_mode": "single", "muscle_target_overrides": "{}", "count_secondary_muscles": true}'
 assert_status 200 "settings push with new targets"
-user_select user_settings "id=eq.settings&select=weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles" "${USER_A_TOKEN}"
-assert_json_expr '.[0] == {weekly_working_set_target: 14, muscle_target_mode: "single", muscle_target_overrides: {}, count_secondary_muscles: true}' \
+user_select user_settings "id=eq.settings&select=weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,volume_primary_only" "${USER_A_TOKEN}"
+assert_json_expr '.[0] == {weekly_working_set_target: 14, muscle_target_mode: "single", muscle_target_overrides: {}, count_secondary_muscles: true, volume_primary_only: true}' \
   "a newer push replaces the targets"
+bw_push_settings "$((BASE_MS + 335))" '{"volume_primary_only": false}'
+assert_status 200 "independent Volume settings push"
+user_select user_settings "id=eq.settings&select=weekly_working_set_target,count_secondary_muscles,volume_primary_only" "${USER_A_TOKEN}"
+assert_json_expr '.[0] == {weekly_working_set_target: 14, count_secondary_muscles: true, volume_primary_only: false}' \
+  "changing Volume leaves Sets and target values unchanged"
 
 BW_READING_NEW="$(printf '%s' "${BW_BODY}" | jq '
   {entities: [.entities[] | select(.type=="body_weight_measurements") |

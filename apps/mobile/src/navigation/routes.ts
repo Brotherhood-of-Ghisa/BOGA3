@@ -68,7 +68,7 @@ export const PROGRESS_HISTORY_PRIMARY_ONLY_PARAM = 'hidden';
  * A muscle may open counting primary work only; counting secondary sends none.
  */
 export const progressHistoryHref = (
-  subject: ({ muscleGroupId: string; countSecondary?: boolean } | { exerciseDefinitionId: string }) & { gymId?: string | null },
+  subject: ({ muscleGroupId: string; countSecondary?: boolean; countSecondaryVolume?: boolean } | { exerciseDefinitionId: string }) & { gymId?: string | null },
   metric?: ProgressMetric,
   view?: HeatmapView
 ): Href => {
@@ -77,8 +77,11 @@ export const progressHistoryHref = (
     : `exerciseDefinitionId=${encodeURIComponent(subject.exerciseDefinitionId)}`;
   const gym = encodeGymRouteParam(subject.gymId);
   const carried = metric ? `&metric=${PROGRESS_HISTORY_METRIC_PARAMS[metric]}` : '';
-  const secondary = 'muscleGroupId' in subject && subject.countSecondary === false ? `&secondary=${PROGRESS_HISTORY_PRIMARY_ONLY_PARAM}` : '';
-  return `${PROGRESS_HISTORY_ROUTE}?${id}${carried}${gym === undefined ? '' : `&gymId=${encodeURIComponent(gym)}`}${secondary}${view ? `&view=${view}` : ''}` as Href;
+  const secondary = 'muscleGroupId' in subject && subject.countSecondary !== undefined
+    ? `&secondary=${subject.countSecondary ? 'shown' : PROGRESS_HISTORY_PRIMARY_ONLY_PARAM}` : '';
+  const volume = 'muscleGroupId' in subject && subject.countSecondaryVolume !== undefined
+    ? `&secondaryVolume=${subject.countSecondaryVolume ? 'shown' : PROGRESS_HISTORY_PRIMARY_ONLY_PARAM}` : '';
+  return `${PROGRESS_HISTORY_ROUTE}?${id}${carried}${gym === undefined ? '' : `&gymId=${encodeURIComponent(gym)}`}${secondary}${volume}${view ? `&view=${view}` : ''}` as Href;
 };
 
 /** One completed session's view. */

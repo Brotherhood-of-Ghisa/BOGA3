@@ -14,6 +14,28 @@ export type PreferenceProfile = `account:${string}` | 'local';
 export const preferenceKey = (profile: PreferenceProfile, field: keyof AccountLocalPreferences) =>
   `boga3.accountPreferences.v1.${encodeURIComponent(profile)}.${field}`;
 
+const muscleCountingInitializedKey = (profile: PreferenceProfile) =>
+  `boga3.accountPreferences.v1.${encodeURIComponent(profile)}.muscleCountingInitialized`;
+
+/** Only real pre-existing choices establish legacy provenance; lifecycle markers do not. */
+export function hasLegacyMuscleCountingProfile(profile: PreferenceProfile): boolean {
+  const initialized = Storage.getItemSync(muscleCountingInitializedKey(profile));
+  if (initialized !== null) return initialized === 'legacy';
+  return preferenceFields.some(field => field !== 'muscleVolumePrimaryOnly'
+    && Storage.getItemSync(preferenceKey(profile, field)) !== null)
+    || Storage.getItemSync(`boga3.accountPreferences.v1.${encodeURIComponent(profile)}.visibleEffortGrades`) !== null;
+}
+
+/** Pin defaults before browsing migration can make a new profile look legacy. */
+export function initializeMuscleCountingPreferences(profile: PreferenceProfile): void {
+  if (Storage.getItemSync(muscleCountingInitializedKey(profile)) !== null) return;
+  const legacy = hasLegacyMuscleCountingProfile(profile);
+  const values = readScopedPreferences(profile).values;
+  Storage.setItemSync(preferenceKey(profile, 'progressCountSecondary'), String(values.progressCountSecondary));
+  Storage.setItemSync(preferenceKey(profile, 'muscleVolumePrimaryOnly'), String(values.muscleVolumePrimaryOnly));
+  Storage.setItemSync(muscleCountingInitializedKey(profile), legacy ? 'legacy' : 'current');
+}
+
 export function readScopedPreferences(profile: PreferenceProfile) {
   const valid: Partial<AccountLocalPreferences> = {};
   for (const field of preferenceFields) {
@@ -22,6 +44,10 @@ export function readScopedPreferences(profile: PreferenceProfile) {
       ? raw === 'true' ? true : raw === 'false' ? false : null
       : textPreferenceFields.includes(field) ? raw : parseJsonPreference(raw);
     if (isPreferenceValue(field, value)) Object.assign(valid, { [field]: value });
+  }
+  // Profiles created before independent Volume settings used secondary Sets by default.
+  if (valid.progressCountSecondary === undefined && hasLegacyMuscleCountingProfile(profile)) {
+    valid.progressCountSecondary = true;
   }
   // The former picker allowed arbitrary RIR grades. Keep its choices for fixed
   // grades, add RIR-4 and the two new labels, and leave stored workouts intact.
@@ -46,5 +72,6 @@ function parseJsonPreference(raw: string | null): unknown {
 export function writeScopedPreference<K extends keyof AccountLocalPreferences>(
   profile: PreferenceProfile, field: K, value: AccountLocalPreferences[K],
 ) {
+  initializeMuscleCountingPreferences(profile);
   Storage.setItemSync(preferenceKey(profile, field), typeof value === 'object' ? JSON.stringify(value) : String(value));
 }

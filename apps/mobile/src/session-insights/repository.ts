@@ -355,6 +355,8 @@ export const createCompletedSessionInsightsRepository = (
       exerciseDefinitions: catalog?.definitions,
       muscleMappings: reported?.muscleMappings,
       muscleGroups: reported?.muscleGroups,
+      countSecondarySets: reported?.countSecondarySets,
+      countSecondaryVolume: reported?.countSecondaryVolume,
     });
   },
 });

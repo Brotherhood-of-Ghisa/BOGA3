@@ -1830,7 +1830,7 @@ const getTrainingStatus = async (
     client.schema('app_public').from('user_profiles').select('time_zone').eq('id', userId)
       .maybeSingle<{ time_zone: string | null }>(),
     client.schema('app_public').from('user_settings')
-      .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,client_updated_at_ms')
+      .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,volume_primary_only,client_updated_at_ms')
       .eq('owner_user_id', userId).eq('id', 'settings').is('deleted_at', null).maybeSingle<StatusSettingsRow>(),
     client.schema('app_public').from('muscle_groups')
       .select('id,display_name,family_name,sort_order,report_group,tracked').eq('owner_user_id', userId)

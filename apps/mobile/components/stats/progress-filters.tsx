@@ -21,6 +21,7 @@ export type ProgressFiltersProps = {
   grouping?: Toggle;
   /** Secondary work in muscle figures ([[muscle.secondary-filter]]); absent where none shows. */
   secondary?: Toggle;
+  secondaryVolume?: Toggle;
   /** The view's gym ([[gym.view-filter]]), three-state; offered only as `showsGymPicker` says. */
   gym?: {
     value: string | null | undefined; options: readonly GymScopeOption[]; onChange: (gymId: string | null | undefined) => void;
@@ -32,10 +33,11 @@ export type ProgressFiltersProps = {
 };
 
 /** The offered choices off their opening value, as the button's label names them. */
-export const changedFilters = ({ grouping, secondary, gym }: Omit<ProgressFiltersProps, 'testID'>): string[] => [
+export const changedFilters = ({ grouping, secondary, secondaryVolume, gym }: Omit<ProgressFiltersProps, 'testID'>): string[] => [
   ...(gym && gym.value !== undefined ? [gymScopeLabel(gym.value, gym.options)] : []),
   ...(changedToggle(grouping) ? [grouping.value ? 'grouped' : 'not grouped'] : []),
   ...(changedToggle(secondary) ? [secondary.value ? 'secondary sets counted' : 'secondary sets not counted'] : []),
+  ...(changedToggle(secondaryVolume) ? [secondaryVolume.value ? 'secondary volume counted' : 'secondary volume not counted'] : []),
 ];
 
 /**
@@ -44,12 +46,12 @@ export const changedFilters = ({ grouping, secondary, gym }: Omit<ProgressFilter
  * the sheet stays open across choices, and holds only the ones the view
  * offers. With none, there is no button.
  */
-export function ProgressFilters({ grouping, secondary, gym, testID }: ProgressFiltersProps) {
+export function ProgressFilters({ grouping, secondary, secondaryVolume, gym, testID }: ProgressFiltersProps) {
   const [open, setOpen] = useState(false);
   const origin = useRef<ComponentRef<typeof View> | null>(null);
   const offeredGym = gym && offersGymChoice(gym.value, gym.options) ? gym : undefined;
-  if (!grouping && !secondary && !offeredGym) return null;
-  const changed = changedFilters({ grouping, secondary, gym: offeredGym });
+  if (!grouping && !secondary && !secondaryVolume && !offeredGym) return null;
+  const changed = changedFilters({ grouping, secondary, secondaryVolume, gym: offeredGym });
   // The button that opened the sheet takes the reader's focus back.
   const restoreFocus = () => {
     if (Platform.OS === 'web') return;
@@ -78,8 +80,12 @@ export function ProgressFilters({ grouping, secondary, gym, testID }: ProgressFi
         <ScrollView contentContainerStyle={styles.content}>
           {grouping ? <SwitchRow label="Group by muscle family" onValueChange={grouping.onChange}
             testID="stats-group-toggle" value={grouping.value} /> : null}
-          {secondary ? <SwitchRow label="Count secondary sets" onValueChange={secondary.onChange}
-            testID="stats-secondary-toggle" value={secondary.value} /> : null}
+          {secondary ? <SwitchRow label="Sets: Primary only"
+            onValueChange={primaryOnly => secondary.onChange(!primaryOnly)}
+            testID="stats-secondary-toggle" value={!secondary.value} /> : null}
+          {secondaryVolume ? <SwitchRow label="Volume: Primary only"
+            onValueChange={primaryOnly => secondaryVolume.onChange(!primaryOnly)}
+            testID="stats-volume-primary-only-toggle" value={!secondaryVolume.value} /> : null}
           {offeredGym ? <>
             <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, styles.sectionLabel]}>Gym</Text>
             <GymScopeChoices allSessionCount={offeredGym.allSessionCount} onChoose={offeredGym.onChange} options={offeredGym.options}

@@ -20,13 +20,13 @@ afterEach(() => jest.restoreAllMocks());
 it('extends existing scoped browsing choices and restores all five settings after relaunch', async () => {
   Storage.setItemSync(preferenceKey('account:A', 'dateFormat'), 'MM-DD-YYYY');
   await account();
-  expect(values()).toEqual({ ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, dateFormat: 'MM-DD-YYYY' });
+  expect(values()).toEqual({ ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, dateFormat: 'MM-DD-YYYY', progressCountSecondary: true });
   const choices = { progressMetric: 'totalVolume' as const, displayEfforts: ['warm_up', 'unspecified', 'rir_2', 'rir_0'] as import('@/src/exercise-calculations/effort-policy').EffortChoice[],
     targetWindowWeeks: 1, historyLookbackWeeks: 104, heatmapView: 'weekly' as const };
   setAccountLocalPreferences(choices);
   __resetAccountLocalPreferencesForTests();
   await account();
-  expect(values()).toEqual({ ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, dateFormat: 'MM-DD-YYYY', ...choices });
+  expect(values()).toEqual({ ...DEFAULT_ACCOUNT_LOCAL_PREFERENCES, dateFormat: 'MM-DD-YYYY', progressCountSecondary: true, ...choices });
   await account('B'); expect(values()).toEqual(DEFAULT_ACCOUNT_LOCAL_PREFERENCES);
   await account(null); expect(values()).toEqual(DEFAULT_ACCOUNT_LOCAL_PREFERENCES);
   await account('A'); expect(values().progressMetric).toBe('totalVolume');
@@ -109,7 +109,8 @@ it('restores the Progress defaults after relaunch, per account, as plain text', 
   expect(values().progressMetric).toBe('workingSetCount');
   // Each table has its own metric: only the Exercise table can hold 1RM.
   expect(values().progressExerciseMetric).toBe('workingSetCount');
-  expect(values()).toMatchObject({ progressPeriod: 'window', progressGrouped: true, progressCountSecondary: true });
+  expect(values()).toMatchObject({ progressPeriod: 'window', progressGrouped: true, progressCountSecondary: false,
+    muscleVolumePrimaryOnly: false });
 
   setAccountLocalPreferences({ progressExerciseMetric: 'estimatedOneRepMax' });
   expect(Storage.getItemSync(preferenceKey('account:A', 'progressExerciseMetric'))).toBe('estimatedOneRepMax');
@@ -151,12 +152,42 @@ it('still reads a count-secondary choice an earlier version stored as a kv boole
   expect(values().progressCountSecondary).toBe(false);
 });
 
+it.each([true, false])('preserves legacy secondary Sets %s while initializing Volume independently', async legacy => {
+  Storage.setItemSync(preferenceKey('account:A', 'progressCountSecondary'), String(legacy));
+  await account();
+  expect(values()).toMatchObject({ progressCountSecondary: legacy, muscleVolumePrimaryOnly: false });
+  setAccountLocalPreferences({ muscleVolumePrimaryOnly: true });
+  __resetAccountLocalPreferencesForTests();
+  await account();
+  expect(values()).toMatchObject({ progressCountSecondary: legacy, muscleVolumePrimaryOnly: true });
+  await account('B');
+  expect(values()).toMatchObject({ progressCountSecondary: false, muscleVolumePrimaryOnly: false });
+});
+
+it('keeps new direct-Set defaults after browsing migration, unrelated edits and restart', async () => {
+  await account();
+  expect(values().progressCountSecondary).toBe(false);
+  setAccountLocalPreferences({ dateFormat: 'MM-DD-YYYY' });
+  __resetAccountLocalPreferencesForTests();
+  await account();
+  expect(values()).toMatchObject({ progressCountSecondary: false, muscleVolumePrimaryOnly: false,
+    dateFormat: 'MM-DD-YYYY' });
+});
+
+it.each(['syncedTargetsAdopted', 'syncedMuscleVolumeAdopted', 'browsingMigrated', 'unrelatedLifecycleMarker'])(
+  'keeps new defaults when the profile contains only the %s marker', async marker => {
+    const prefix = preferenceKey('account:A', 'sort').slice(0, -'sort'.length);
+    Storage.setItemSync(`${prefix}${marker}`, 'true');
+    await account();
+    expect(values()).toMatchObject({ progressCountSecondary: false, muscleVolumePrimaryOnly: false });
+  });
+
 it.each([
   ['progressPeriod', '"window"'], ['progressPeriod', '7'], ['progressGrouped', 'yes'], ['progressCountSecondary', '1'],
 ] as const)('opens on the default for an unreadable stored %s %s', async (field, raw) => {
   Storage.setItemSync(preferenceKey('account:A', field), raw);
   await account();
-  expect(values()[field]).toBe(DEFAULT_ACCOUNT_LOCAL_PREFERENCES[field]);
+  expect(values()[field]).toBe(field === 'progressCountSecondary' ? true : DEFAULT_ACCOUNT_LOCAL_PREFERENCES[field]);
   expect(isPreferenceValue(field, raw)).toBe(false);
 });
 

@@ -1,4 +1,5 @@
 import { applyMuscleReport, type MuscleReportAssignment } from '@/src/data/muscle-analytics';
+import { getPersonalMuscleCounting, type MuscleCountingPolicy } from '@/src/config/personal-muscles';
 
 import type {
   SessionInsightExerciseDefinition,
@@ -7,7 +8,7 @@ import type {
 } from './calculations';
 
 /** The catalogue as the session views read it: mappings and groups already keyed by the user's muscles. */
-export type SessionMuscleCatalog = {
+export type SessionMuscleCatalog = MuscleCountingPolicy & {
   exerciseDefinitions: SessionInsightExerciseDefinition[];
   muscleMappings: SessionInsightMuscleMapping[];
   muscleGroups: SessionInsightMuscleGroup[];
@@ -29,12 +30,12 @@ type CatalogExercise = {
 export const reportSessionMuscles = (
   catalog: Pick<SessionMuscleCatalog, 'muscleMappings' | 'muscleGroups'>,
   assignment: MuscleReportAssignment,
-): Pick<SessionMuscleCatalog, 'muscleMappings' | 'muscleGroups'> => {
+): Pick<SessionMuscleCatalog, 'muscleMappings' | 'muscleGroups'> & MuscleCountingPolicy => {
   const { muscleMappings, muscleGroups } = applyMuscleReport(
     { sessions: [], sessionExercises: [], exerciseSets: [], ...catalog },
     assignment,
   );
-  return { muscleMappings, muscleGroups };
+  return { muscleMappings, muscleGroups, ...getPersonalMuscleCounting() };
 };
 
 /** `reportSessionMuscles` over the exercise catalogue cache's exercises and entries. */

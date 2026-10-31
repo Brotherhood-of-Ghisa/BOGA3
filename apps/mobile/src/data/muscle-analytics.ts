@@ -1,4 +1,4 @@
-import { addCompensated, compensatedValue, createCompensatedSum, sumNumbers, type CompensatedSum } from '../utils/sum.ts';
+import { addCompensated, compensatedValue, createCompensatedSum, type CompensatedSum } from '../utils/sum.ts';
 import type { SessionWeightContext } from '../bodyweight/as-of.ts';
 import type { EffortCalculationPolicy } from '../exercise-calculations/effort-policy.ts';
 import { type SetMetrics } from '../exercise-calculations/load-metrics.ts';
@@ -17,6 +17,8 @@ export type MuscleAllocation = { primary: number; secondary: number };
 
 export type MuscleAnalyticsInput = {
   effortPolicy?: EffortCalculationPolicy;
+  countSecondarySets?: boolean;
+  countSecondaryVolume?: boolean;
   bodyweightCalculationsEnabled?: boolean;
   exerciseDefinitions?: {
     id: string;
@@ -58,12 +60,14 @@ export type MuscleAnalyticsInput = {
 
 export type MuscleSetContribution = {
   working: boolean;
+  /** Physical working eligibility before the muscle-role setting. */
+  physicalWorking?: boolean;
   volumeIncluded: boolean;
   /** Stable identity of the physical source set within one aggregation run. */
   setIdentity: string;
   muscleGroupId: string;
   role: MuscleContributionRole;
-  /** Sum of the allocated Primary and Secondary shares. */
+  /** Set credit, independent of the Volume allocation. */
   roleWeight: number;
   allocation?: MuscleAllocation;
   weightedVolume: number | null;
@@ -142,28 +146,27 @@ const isSameMuscle = (left: ReportedMuscle, right: ReportedMuscle): boolean =>
 /**
  * The input a view reads under the user's muscle setup ([[muscle.report-groups]]):
  * mappings receive their shares, are re-keyed from anatomy entry to muscle,
- * and grouped Primary shares sum; Secondary counts ½ once, and only without
- * Primary work, so the strongest role labels and counts the muscle. Untracked
+ * and all Volume shares sum; the strongest role labels and counts the muscle. Untracked
  * entries drop ([[muscle.untracked]]), and `muscleGroups` becomes the tracked
  * muscles in first-seen order. With every entry its own tracked muscle (Detailed)
- * the allocation is unchanged. Run it after `withoutSecondaryMappings`.
+ * the allocation is unchanged. Supply complete raw mappings so hidden entries
+ * and metric settings cannot redistribute either Volume pool.
  */
 export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
   input: T, assignment: MuscleReportAssignment,
 ): T => {
   const grouped = new Map<string, {
     mapping: MuscleAnalyticsInput['muscleMappings'][number];
-    primary: CompensatedSum; secondary: number;
+    primary: CompensatedSum; secondary: CompensatedSum;
   }>();
   for (const mapping of allocatedMuscleMappings(input.muscleMappings)) {
     const assigned = assignment.get(mapping.muscleGroupId);
     if (assigned?.tracked === false) continue;
     const muscleId = assigned?.muscle.id ?? mapping.muscleGroupId;
     const key = JSON.stringify([mapping.exerciseDefinitionId, muscleId]);
-    const existing = grouped.get(key) ?? { mapping, primary: createCompensatedSum(), secondary: 0 };
+    const existing = grouped.get(key) ?? { mapping, primary: createCompensatedSum(), secondary: createCompensatedSum() };
     addCompensated(existing.primary, mapping.allocation.primary);
-    // A muscle counts its Secondary ½ once per set, however many entries assist.
-    existing.secondary = Math.max(existing.secondary, mapping.allocation.secondary);
+    addCompensated(existing.secondary, mapping.allocation.secondary);
     const role = getMuscleContributionRoleWeight(existing.mapping.role) > getMuscleContributionRoleWeight(mapping.role)
       ? existing.mapping.role : mapping.role;
     existing.mapping = { ...mapping, muscleGroupId: muscleId, role };
@@ -178,10 +181,8 @@ export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
     if (!muscles.has(muscle.id)) muscles.set(muscle.id, muscle);
   }
 
-  // A muscle with Primary work takes no Secondary share on top: its strongest role counts.
   return { ...input, muscleMappings: [...grouped.values()].map(({ mapping, primary, secondary }) => {
-    const primaryShare = compensatedValue(primary);
-    return { ...mapping, allocation: { primary: primaryShare, secondary: primaryShare > 0 ? 0 : secondary } };
+    return { ...mapping, allocation: { primary: compensatedValue(primary), secondary: compensatedValue(secondary) } };
   }), muscleGroups: [...muscles.values()] };
 };
 
@@ -191,7 +192,7 @@ export const applyMuscleReport = <T extends MuscleAnalyticsInput>(
  * role figures are there for a surface that names them.
  */
 export type MuscleSetCounts = {
-  /** Allocated Primary working-set shares. */
+  /** Physical working sets at a primary role. */
   primarySetCount: number;
   /** Secondary sets, each before its ½ weight. */
   secondarySetCount: number;
@@ -199,37 +200,28 @@ export type MuscleSetCounts = {
   weightedSetCount: number;
 };
 
-/** One bucket's allocated sets; repeated copies of one set/muscle count once. */
+/** One bucket counts each physical set once, at its strongest role. */
 export type MuscleSetCounter = {
   counts: MuscleSetCounts;
-  primary: CompensatedSum;
-  secondary: CompensatedSum;
-  allocationBySetAndMuscle: Map<string, MuscleAllocation>;
+  roleWeightBySet: Map<string, number>;
 };
 
 export const createMuscleSetCounter = (): MuscleSetCounter => ({
   counts: { primarySetCount: 0, secondarySetCount: 0, weightedSetCount: 0 },
-  primary: createCompensatedSum(),
-  secondary: createCompensatedSum(),
-  allocationBySetAndMuscle: new Map(),
+  roleWeightBySet: new Map(),
 });
 
-/** Folds allocated shares, keeping Primary and Secondary apart when muscles are grouped. */
+/** Set credit never divides by mapping cardinality or adds repeated merged entries. */
 export const countMuscleSet = (counter: MuscleSetCounter, contribution: MuscleSetContribution): void => {
   if (contribution.working === false || contribution.roleWeight === 0) return;
-  const allocation = contribution.allocation ?? {
-    primary: contribution.role === 'primary' ? contribution.roleWeight : 0,
-    secondary: contribution.role === 'secondary' ? contribution.roleWeight : 0,
-  };
-  const key = JSON.stringify([contribution.setIdentity, contribution.muscleGroupId]);
-  const previous = counter.allocationBySetAndMuscle.get(key) ?? { primary: 0, secondary: 0 };
-  if (previous.primary + previous.secondary > contribution.roleWeight
-    || (previous.primary + previous.secondary === contribution.roleWeight && previous.primary >= allocation.primary)) return;
-  counter.allocationBySetAndMuscle.set(key, allocation);
+  const previous = counter.roleWeightBySet.get(contribution.setIdentity) ?? 0;
+  if (previous >= contribution.roleWeight) return;
+  counter.roleWeightBySet.set(contribution.setIdentity, contribution.roleWeight);
   const counts = counter.counts;
-  counts.primarySetCount = addCompensated(counter.primary, allocation.primary - previous.primary);
-  counts.secondarySetCount = addCompensated(counter.secondary, (allocation.secondary - previous.secondary) * 2);
-  counts.weightedSetCount = sumNumbers([counts.primarySetCount, counts.secondarySetCount / 2]);
+  if (previous === 0.5) counts.secondarySetCount -= 1;
+  if (contribution.roleWeight === 1) counts.primarySetCount += 1;
+  else counts.secondarySetCount += 1;
+  counts.weightedSetCount = counts.primarySetCount + counts.secondarySetCount / 2;
 };
 
 /** One bucket's [[muscle.set-count]] over a whole list of contributions. */
@@ -278,7 +270,7 @@ export const countedMuscleAnalyticsSessionIds = (input: MuscleAnalyticsInput): S
   }), input.effortPolicy);
 };
 
-/** Deduplicate raw mappings, then share Primary work and give each Secondary ½. */
+/** Allocate each role's Volume pool before visibility or muscle grouping. */
 const allocatedMuscleMappings = (mappings: MuscleAnalyticsInput['muscleMappings']) => {
   const byExercise = new Map<string, Map<string, MuscleAnalyticsInput['muscleMappings'][number]>>();
   for (const mapping of mappings) {
@@ -292,9 +284,10 @@ const allocatedMuscleMappings = (mappings: MuscleAnalyticsInput['muscleMappings'
   return [...byExercise.values()].flatMap(bucket => {
     const entries = [...bucket.values()];
     const primaryCount = entries.filter(mapping => mapping.role === 'primary').length;
+    const secondaryCount = entries.filter(mapping => mapping.role === 'secondary').length;
     return entries.map(mapping => ({ ...mapping, allocation: mapping.allocation ?? {
       primary: mapping.role === 'primary' ? 1 / primaryCount : 0,
-      secondary: mapping.role === 'secondary' ? 0.5 : 0,
+      secondary: mapping.role === 'secondary' ? 0.5 / secondaryCount : 0,
     } }));
   });
 };
@@ -376,16 +369,19 @@ export const collectMuscleSetContributions = (
     const setVolume = rawSetVolume !== null && Number.isFinite(rawSetVolume) ? rawSetVolume : null;
 
     for (const mapping of mappings) {
-      const roleWeight = mapping.allocation.primary + mapping.allocation.secondary;
-      if (roleWeight === 0) continue;
+      const roleWeight = mapping.role === 'secondary' && input.countSecondarySets === false
+        ? 0 : getMuscleContributionRoleWeight(mapping.role);
+      const volumeWeight = mapping.allocation.primary
+        + (input.countSecondaryVolume === false ? 0 : mapping.allocation.secondary);
+      if ((!working || roleWeight === 0) && (!volumeIncluded || volumeWeight === 0)) continue;
 
       contributions.push({
-        working, volumeIncluded,
+        physicalWorking: working, working: working && roleWeight > 0, volumeIncluded: volumeIncluded && volumeWeight > 0,
         setIdentity: set.id !== undefined ? `id:${set.id}` : `row:${setIndex}`,
         muscleGroupId: mapping.muscleGroupId,
         role: mapping.role,
         roleWeight, allocation: mapping.allocation,
-        weightedVolume: setVolume === null ? null : setVolume * roleWeight,
+        weightedVolume: !volumeIncluded || volumeWeight === 0 ? 0 : setVolume === null ? null : setVolume * volumeWeight,
         metrics, enteredWeightKg: enteredWeightKg(set),
         setVolume,
         sessionId: exercise.sessionId,
@@ -479,6 +475,8 @@ export type SelectedMuscleWeeklyEffort = {
   weekOfMonth: number;
   totalVolume: number | null;
   workingSetCount: number;
+  volumeSetCount?: number;
+  hasWorkingSets?: boolean;
   estimatedRM1: number | null;
   highestWeight: number | null;
 };
@@ -495,9 +493,11 @@ export type DailyEffortMetrics = {
   workingSetCountsByMuscle?: Record<string, number>;
   /** The completed sessions whose sets make up the day, each once: a day tile opens them. */
   sessionIds?: string[];
+  sessionIdsByMetric?: Partial<Record<CalendarHeatmapMetric, string[]>>;
   /** Existing all-time session-fact counts for the history views' record marks. */
   personalRecordCounts?: Record<Exclude<CalendarHeatmapMetric, 'workingSetCount'>, number>;
   totalVolume: number | null;
+  volumeSetCount?: number;
   workingSetCount: number;
   estimatedRM1: number | null;
   highestWeight: number | null;
@@ -505,6 +505,7 @@ export type DailyEffortMetrics = {
 
 type EffortMetricAccumulator = {
   totalVolume: number | null;
+  volumeSetCount: number;
   /** The bucket's [[muscle.set-count]]; `setCounter` keeps it weighted. */
   workingSetCount: number;
   setCounter: MuscleSetCounter;
@@ -514,6 +515,7 @@ type EffortMetricAccumulator = {
 
 export const createEffortMetricAccumulator = (): EffortMetricAccumulator => ({
   totalVolume: 0,
+  volumeSetCount: 0,
   workingSetCount: 0,
   setCounter: createMuscleSetCounter(),
   bestRM1: null,
@@ -527,6 +529,7 @@ export const accumulateContributionMetrics = (
 ): void => {
   // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
   acc.totalVolume = addFiniteVolume(acc.totalVolume, contribution.weightedVolume ?? 0);
+  if (contribution.volumeIncluded) acc.volumeSetCount += 1;
 
   if (contribution.working === false) return;
   countMuscleSet(acc.setCounter, contribution);
@@ -604,6 +607,8 @@ export const aggregateSelectedMuscleWeeklyEffort = (
       monthKey: week.monthKey,
       weekOfMonth,
       totalVolume: week.totalVolume,
+      volumeSetCount: week.volumeSetCount,
+      hasWorkingSets: week.workingSetCount > 0,
       workingSetCount: week.workingSetCount,
       estimatedRM1: week.bestRM1,
       highestWeight: week.highestWeight,
@@ -636,7 +641,12 @@ export const aggregateSelectedMuscleDailyEffortMetrics = (
         workingSetCountsByMuscle: Object.fromEntries(
           [...counterByMuscle].map(([id, counter]) => [id, counter.counts.weightedSetCount])),
         sessionIds: [...new Set(day.contributions.map((contribution) => contribution.sessionId))],
+        sessionIdsByMetric: {
+          workingSetCount: [...new Set(day.contributions.filter(row => row.working).map(row => row.sessionId))],
+          totalVolume: [...new Set(day.contributions.filter(row => row.volumeIncluded).map(row => row.sessionId))],
+        },
         totalVolume: acc.totalVolume,
+        volumeSetCount: acc.volumeSetCount,
         workingSetCount: acc.workingSetCount,
         estimatedRM1: acc.bestRM1,
         highestWeight: acc.highestWeight,

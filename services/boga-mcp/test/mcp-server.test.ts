@@ -57,7 +57,7 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a/context': {
     exercise: { id: 'exercise-a', name: 'Bench Press' },
-    metric_revision: 'working_sets_v9',
+    metric_revision: 'working_sets_v10',
     recent_performances: [{
       session_body_weight: { status: 'known', value: 80, unit: 'kg', measured_at: '2026-09-01T10:00:00Z' },
       volume: { value: null, unit: 'kg_reps', known_subtotal: 500, complete: false },
@@ -67,17 +67,17 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/workouts/recent': {
     next_cursor: null,
-    metric_revision: 'working_sets_v9',
+    metric_revision: 'working_sets_v10',
     workouts: [{ id: 'workout-a', total_volume: { value: null, known_subtotal: 500, unit: 'kg_reps', complete: false } }],
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a/history': {
     exercise: { id: 'exercise-a', name: 'Bench Press' },
-    metric_revision: 'working_sets_v9',
+    metric_revision: 'working_sets_v10',
     next_cursor: null,
     sets: [{ id: 'set-1', reps: 8, load: { value: 100, unit: 'kg' } }],
   },
   '/functions/v1/agent-api/v1/agent/workouts/workout-a': {
-    metric_revision: 'working_sets_v9',
+    metric_revision: 'working_sets_v10',
     workout: {
       id: 'workout-a',
       exercises: [{ id: 'block-1', name: 'Bench Press' }],
@@ -94,8 +94,10 @@ const responses: Record<string, Record<string, unknown>> = {
   },
   '/functions/v1/agent-api/v1/agent/training-status': {
     complete: true,
+    counts_secondary_sets: true,
+    volume_primary_only: false,
     favourite_exercises: [{ exercise_id: 'exercise-a', name: 'Bench Press', sessions_28d: 3 }],
-    metric_revision: 'working_sets_v9',
+    metric_revision: 'working_sets_v10',
     muscles: [{ id: 'chest_sternal', name: 'Chest', week_sets: 4.5, weekly_target: 10 }],
     targets: { default_weekly_sets: 10, mode: 'single', revision: 1_730_000_000_000, uploaded: true },
   },
@@ -525,6 +527,7 @@ describe('BoGa MCP server', () => {
     [{ expected_revision: -1, default_weekly_sets: 9 }],
     [{ default_weekly_sets: 9, omitExpectedRevision: true }],
     [{ default_weekly_sets: 9, count_secondary_muscles: false }],
+    [{ default_weekly_sets: 9, volume_primary_only: true }],
   ])('rejects set_muscle_targets %j before calling the API', async (changes) => {
     const running = await startMcp();
     active.push(running);

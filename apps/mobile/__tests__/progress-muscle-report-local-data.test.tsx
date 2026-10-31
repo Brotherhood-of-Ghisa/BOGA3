@@ -82,6 +82,7 @@ beforeEach(async () => {
   __resetAccountLocalPreferencesForTests();
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
+  updatePreferences({ progressCountSecondary: true });
   jest.useFakeTimers({ doNotFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate', 'nextTick', 'performance', 'queueMicrotask', 'hrtime'] });
   jest.setSystemTime(new Date('2026-10-03T12:00:00Z'));
 });

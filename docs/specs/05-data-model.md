@@ -73,8 +73,8 @@ what the effort selections mean.
 - **Out of sync scope.** No dirty bits, no sync nudges, no `user_settings`
   column, no server counterpart; groups and coaching never read these keys
   ([[set.eligibility]]). Exceptions, account-synced through `user_settings`:
-  the private bodyweight toggle, and the weekly muscle targets and
-  count-secondary default (rule 12), whose kv copy is read only until sync
+  the private bodyweight toggle, weekly muscle targets and independent
+  Sets/Volume counting defaults (rule 12), whose kv copy is read until sync
   uploads or adopts them.
 - Keys live in `expo-sqlite/kv-store` scoped to the authenticated account id,
   with a distinct profile for local-only builds, so they **survive sign-out,
@@ -299,10 +299,11 @@ the data-model-level invariants.
 11. `exercise_definitions.rest_timer_sec` is `in sync scope`, unchecked
    ([[timer.rest-default]]).
 12. `user_settings` weekly muscle targets (`weekly_working_set_target`,
-   `muscle_target_mode`, `muscle_target_overrides`, `count_secondary_muscles`)
-   are `in sync scope` ([[muscle.weekly-targets]]). Null = not yet uploaded:
-   no backfill. A device writes all four; after a wipe, edits stay in kv
-   until sync re-adopts.
+   `muscle_target_mode`, `muscle_target_overrides`) and counting choices
+   (`count_secondary_muscles`, `volume_primary_only`) are `in sync scope`
+   ([[muscle.weekly-targets]], [[muscle.secondary-filter]]). Targets stay null
+   until uploaded. Writes preserve omitted/null choices; after a wipe, edits
+   stay in kv until sync re-adopts.
 
 ### Entity coverage (Sync v2)
 

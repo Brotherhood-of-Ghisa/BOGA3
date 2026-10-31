@@ -153,6 +153,7 @@ const toDayCell = (
   const metricValue = source ? getMetricValue(source, metric) : 0;
   const unavailable = metricValue === null;
   const value = metricValue ?? 0;
+  const metricSessions = source?.sessionIdsByMetric?.[metric];
   return {
     dateKey,
     weekStartDateKey: formatUtcDateKey(startOfMondayWeek(date)),
@@ -161,9 +162,9 @@ const toDayCell = (
     value,
     prCount: metric === 'workingSetCount' ? 0 : source?.personalRecordCounts?.[metric] ?? 0,
     unavailable,
-    hasTraining: source !== undefined,
+    hasTraining: metricSessions === undefined ? source !== undefined : metricSessions.length > 0,
     workingSetCountsByMuscle: source?.workingSetCountsByMuscle,
-    sessionIds: source?.sessionIds ?? [],
+    sessionIds: metricSessions ?? source?.sessionIds ?? [],
   };
 };
 

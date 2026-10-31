@@ -47,7 +47,8 @@ export type WeekBlock = {
 };
 
 /** Each list follows its page's three-state gym scope. */
-export type WeekSetsTarget = ({ exerciseDefinitionId: string } | { muscleGroupIds: string[]; countSecondary?: boolean })
+export type WeekSetsTarget = ({ exerciseDefinitionId: string } | { muscleGroupIds: string[]; countSecondary?: boolean;
+  countSecondaryVolume?: boolean; metric?: 'workingSetCount' | 'totalVolume' })
   & { gymId?: string | null };
 
 export const formatWeekDay = (date: Date, dateFormat: ExerciseDateFormat): string =>
@@ -114,8 +115,9 @@ const loadWeekBlocks = async (target: WeekSetsTarget, weekKey: string, dateForma
     return exerciseWeekBlocks(gymId === undefined ? entries : entries.filter((entry) => (entry.gymId ?? null) === gymId), dateFormat);
   }
   const days = await computeSelectedMuscleDailyEffort({ ...bounds, muscleGroupIds: target.muscleGroupIds, gymId: target.gymId,
-    countSecondary: target.countSecondary });
-  return muscleWeekBlocks(days.flatMap((day) => day.contributions), dateFormat);
+    countSecondary: target.countSecondary, countSecondaryVolume: target.countSecondaryVolume });
+  return muscleWeekBlocks(days.flatMap((day) => day.contributions).filter(contribution =>
+    target.metric === 'totalVolume' ? contribution.volumeIncluded : contribution.working), dateFormat);
 };
 
 const loadWeekGroups = async (target: WeekSetsTarget, weekKey: string, dateFormat: ExerciseDateFormat): Promise<WeekSetGroup[]> => {
@@ -141,7 +143,7 @@ export function useWeekSets(target: WeekSetsTarget | null, weekKey: string | nul
   const subjectKey = target === null ? null : 'exerciseDefinitionId' in target
     ? `exercise:${target.exerciseDefinitionId}` : `muscle:${target.muscleGroupIds.join(',')}`;
   const targetKey = target === null ? null : 'exerciseDefinitionId' in target
-    ? `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}` : `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}:${target.countSecondary ?? true}`;
+    ? `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}` : `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}:${target.countSecondary}:${target.countSecondaryVolume}:${target.metric}`;
   const requestKey = target === null || weekKey === null ? null : `${targetKey}|${weekKey}|${revision}|${dateFormat}`;
   useEffect(() => {
     if (target === null || weekKey === null) return;

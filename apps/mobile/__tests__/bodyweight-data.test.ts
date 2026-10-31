@@ -194,6 +194,7 @@ it('puts only the final preference and contribution fields on the sync wire', ()
     bodyweight_calculations_enabled: true, deleted_at: null, created_at: 1000, updated_at: 1000,
     weekly_working_set_target: null, muscle_target_mode: null, muscle_target_overrides: null,
     count_secondary_muscles: null,
+    volume_primary_only: null,
   });
   const definition = entityToWire({
     id: 'definition', name: 'Pull-Up', loadInputMode: 'total_load', bodyweightContribution: 0.7,

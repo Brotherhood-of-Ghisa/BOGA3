@@ -141,9 +141,10 @@ describe('training status: muscles', () => {
       { week_start: '2026-10-12', sets: 1 },
       { week_start: '2026-10-19', sets: 3 },
     ]);
-    // Secondary sets count half by default.
-    expect(result.muscles[0]).toMatchObject({ id: 'triceps', week_sets: 1 });
-    expect(result.counts_secondary_sets).toBe(true);
+    // New accounts start with direct Sets and independently include secondary Volume.
+    expect(result.muscles[0]).toMatchObject({ id: 'triceps', week_sets: 0 });
+    expect(result.counts_secondary_sets).toBe(false);
+    expect(result.volume_primary_only).toBe(false);
   });
 
   it.each([true, false])('allocates Machine Dips shares before hiding muscles, secondary %s', (countSecondary) => {
@@ -161,10 +162,10 @@ describe('training status: muscles', () => {
       definitions: definitionsOf(definition('bench', { name: 'Machine Dips' })),
       training: training([benchSession('dips', daysAgo(1), 3)]),
     });
-    expect(result.metric_revision).toBe('working_sets_v9');
-    expect(result.muscles.find((muscle) => muscle.id === 'chest')).toMatchObject({ week_sets: 1.5, weekly_target: 10,
-      recovery_days: [{ sets: null }, { sets: null }, { sets: 1.5 }] });
-    expect(result.muscles.find((muscle) => muscle.id === 'triceps')?.week_sets).toBe(1.5);
+    expect(result.metric_revision).toBe('working_sets_v10');
+    expect(result.muscles.find((muscle) => muscle.id === 'chest')).toMatchObject({ week_sets: 3, weekly_target: 10,
+      recovery_days: [{ sets: null }, { sets: null }, { sets: 3 }] });
+    expect(result.muscles.find((muscle) => muscle.id === 'triceps')?.week_sets).toBe(3);
     expect(result.muscles.find((muscle) => muscle.id === 'deltoid')?.week_sets).toBe(countSecondary ? 1.5 : 0);
     expect(result.muscles.map((muscle) => muscle.id)).not.toContain('lats');
   });
@@ -207,8 +208,31 @@ describe('training status: muscles', () => {
 });
 
 describe('training status: targets', () => {
+  it('preserves an existing legacy row\'s implicit secondary Sets while a missing account uses new defaults', () => {
+    expect(statusSettings(null)).toMatchObject({ countSecondary: false, volumePrimaryOnly: false });
+    expect(statusSettings({ weekly_working_set_target: 12, muscle_target_mode: 'single', muscle_target_overrides: {},
+      count_secondary_muscles: null, volume_primary_only: null, client_updated_at_ms: 42 }))
+      .toMatchObject({ countSecondary: true, volumePrimaryOnly: false, preferences: { weeklyWorkingSetTarget: 12 } });
+    expect(statusSettings({ weekly_working_set_target: 12, muscle_target_mode: 'single', muscle_target_overrides: {},
+      count_secondary_muscles: false, volume_primary_only: true, client_updated_at_ms: 43 }))
+      .toMatchObject({ countSecondary: false, volumePrimaryOnly: true });
+  });
+
+  it.each([[true, true], [true, false], [false, true], [false, false]])(
+    'keeps secondary Sets %s independent of Volume primary-only %s', (secondarySets, volumePrimaryOnly) => {
+      const result = status({ timeZone: 'UTC', training: training([benchSession('s', daysAgo(1))]), settings: {
+        weekly_working_set_target: 10, muscle_target_mode: 'single', muscle_target_overrides: {},
+        count_secondary_muscles: secondarySets, volume_primary_only: volumePrimaryOnly, client_updated_at_ms: 42,
+      } });
+      expect(result.counts_secondary_sets).toBe(secondarySets);
+      expect(result.volume_primary_only).toBe(volumePrimaryOnly);
+      expect(result.muscles.find(muscle => muscle.id === 'chest')?.week_sets).toBe(2);
+      expect(result.muscles.find(muscle => muscle.id === 'triceps')?.week_sets).toBe(secondarySets ? 1 : 0);
+      expect(result.targets.default_weekly_sets).toBe(10);
+    });
+
   it('shows the app defaults and revision 0 before any device uploads', () => {
-    expect(statusSettings(null)).toMatchObject({ countSecondary: true, uploaded: false, revision: 0,
+    expect(statusSettings(null)).toMatchObject({ countSecondary: false, volumePrimaryOnly: false, uploaded: false, revision: 0,
       preferences: { weeklyWorkingSetTarget: 8, muscleTargetMode: 'single', muscleTargetOverrides: {} } });
     const unset = statusSettings({ weekly_working_set_target: null, muscle_target_mode: null, muscle_target_overrides: null,
       count_secondary_muscles: null, client_updated_at_ms: 42 });

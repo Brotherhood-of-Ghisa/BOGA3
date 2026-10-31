@@ -82,7 +82,7 @@ it('deduplicates source mappings at the strongest role, regardless of order or l
     { exerciseDefinitionId: 'lift', muscleGroupId: 'back', role: 'secondary' },
     { exerciseDefinitionId: 'lift', muscleGroupId: 'back', role: 'primary' });
   const rows = aggregateProgressComparisons(source, periods);
-  expect(rows[0].current).toMatchObject({ workingSetCount: 1, totalVolume: 125, volumeSetCount: 2 });
+  expect(rows[0].current).toMatchObject({ workingSetCount: 2, totalVolume: 125, volumeSetCount: 2 });
   expect(rows[0].exercises[0].role).toBe('primary');
   source.muscleMappings.reverse();
   expect(aggregateProgressComparisons(source, periods)).toEqual(rows);
