@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { FormSection, SwitchRow, uiSpace } from '@/components/ui';
 import type { AccountLocalPreferenceState } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
+import { DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS, DEFAULT_REST_TIMER_SECONDS } from '@/src/preferences/model';
 
 import { PreferenceNumberField } from './number-field';
 
@@ -25,18 +26,18 @@ export function RestTimerSettings({ state }: { state: AccountLocalPreferenceStat
           value={autoStart}
         />
         <PreferenceNumberField
+          defaultValue={DEFAULT_REST_TIMER_SECONDS}
           divider
           label="Rest timer (s)"
           onCommit={(restTimerDurationSec) => updatePreferences({ restTimerDurationSec })}
-          row
           testID="settings-rest-timer-duration"
           value={durationSec}
         />
         <PreferenceNumberField
+          defaultValue={DEFAULT_REPEATING_TIMER_INTERVAL_SECONDS}
           divider
           label="Repeating interval (s)"
           onCommit={(repeatingTimerIntervalSec) => updatePreferences({ repeatingTimerIntervalSec })}
-          row
           testID="settings-repeating-timer-interval"
           value={intervalSec}
         />

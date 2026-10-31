@@ -5,9 +5,9 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
-import { CheckRow, FormSection, RadioRow, SegmentRow, ValueRow } from '@/components/ui';
+import { CheckRow, FormSection, RadioRow, SegmentRow, ValueRow, uiRoles } from '@/components/ui';
 
 import { drawsGlyph } from './helpers/draws-glyph';
 
@@ -96,6 +96,19 @@ describe('ValueRow', () => {
   it('takes an explicit accessibility label', () => {
     render(<ValueRow accessibilityLabel="Version 1.2" label="Version" value="1.2" />);
     expect(screen.getByLabelText('Version 1.2')).toBeOnTheScreen();
+  });
+
+  it('keeps a value a flow reads by id its own element, with an optional glyph before it', () => {
+    render(<ValueRow label="Network" value="Offline" valueIcon="offline" valueIconTestID="glyph" valueTestID="network" testID="row" />);
+    expect(screen.getByTestId('row')).not.toHaveProp('accessible', true);
+    expect(screen.getByTestId('network')).toHaveTextContent('Offline');
+    expect(screen.getByTestId('glyph', { includeHiddenElements: true })).toBeOnTheScreen();
+  });
+
+  it('draws a failure value in danger words, wrapping a sentence', () => {
+    render(<ValueRow label="Error" tone="danger" value="server unreachable, 3 tries" valueTestID="error" />);
+    expect(StyleSheet.flatten(screen.getByTestId('error').props.style).color).toBe(uiRoles.danger);
+    expect(screen.getByTestId('error')).not.toHaveProp('numberOfLines');
   });
 
   it('stacks in a section as a card of rows', () => {

@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Icon } from '@/components/ui/icon';
+import { FigureText } from '@/components/ui/figure-text';
+import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
@@ -99,24 +100,41 @@ export function CheckRow({ label, checked, onPress, divider = false, disabled, a
 export type ValueRowProps = {
   label: string;
   value: string;
+  // A glyph before the value (offline), muted.
+  valueIcon?: IconName;
+  // On the value text itself, for a figure a flow reads by id. The row then no
+  // longer reads as one element, which would hide the value from the flow.
+  valueTestID?: string;
+  valueIconTestID?: string;
+  // `danger`: the value is a failure (an error row), in `danger` words.
+  tone?: 'default' | 'danger';
   divider?: boolean;
   accessibilityLabel?: string;
   testID?: string;
 };
 
-/** A read-only figure or status: the label and its value, no chevron, read as one element. */
-export function ValueRow({ label, value, divider = false, accessibilityLabel, testID }: ValueRowProps) {
+/** A read-only figure or status: the label and its value (a sentence wraps), no chevron, read as one element. */
+export function ValueRow({
+  label, value, valueIcon, valueTestID, valueIconTestID, tone = 'default', divider = false, accessibilityLabel, testID,
+}: ValueRowProps) {
   return (
     <ListRow
       accessibilityLabel={accessibilityLabel ?? `${label}: ${value}`}
-      accessible
+      accessible={valueTestID ? undefined : true}
       density="list"
       divider={divider}
       label={label}
       meta={
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.body, uiTextTone.muted, styles.value]}>
-          {value}
-        </Text>
+        <View style={styles.valueGroup}>
+          {valueIcon ? <Icon color={uiRoles.inkMuted} name={valueIcon} size="sm" testID={valueIconTestID} /> : null}
+          <Text
+            allowFontScaling={false}
+            accessibilityLiveRegion={tone === 'danger' ? 'polite' : undefined}
+            style={[uiText.body, tone === 'danger' ? uiTextTone.danger : uiTextTone.muted, styles.value]}
+            testID={valueTestID}>
+            <FigureText>{value}</FigureText>
+          </Text>
+        </View>
       }
       testID={testID}
     />
@@ -128,9 +146,15 @@ const styles = StyleSheet.create({
     paddingBottom: uiSpace.sm,
     paddingTop: uiSpace.xs,
   },
+  valueGroup: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: uiSpace.xs,
+    maxWidth: '60%',
+  },
   value: {
     flexShrink: 1,
-    maxWidth: '60%',
     textAlign: 'right',
   },
 });

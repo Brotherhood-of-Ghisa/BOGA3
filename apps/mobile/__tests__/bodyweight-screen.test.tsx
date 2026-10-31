@@ -112,6 +112,8 @@ describe('body weight log', () => {
     await openScreen();
     expect(screen.getByTestId('body-weight-empty')).toBeTruthy();
     expect(screen.getByTestId('body-weight-current')).toHaveProp('accessibilityLabel', 'Current body weight Unknown');
+    expect(screen.getByRole('header', { name: 'Calculations' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Weight history' })).toBeOnTheScreen();
 
     fireEvent.press(screen.getByTestId('body-weight-add'));
     fireEvent.changeText(screen.getByTestId('weight-entry-value'), '82');

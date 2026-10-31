@@ -1,45 +1,31 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Icon, uiBorder, uiGeometry, uiRoles, uiSpace, uiText } from '@/components/ui';
+import { StyleSheet, View } from 'react-native';
+import { CheckRow, FormSection, uiSpace } from '@/components/ui';
 import { EFFORT_CHOICES, type EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import { updatePreferences } from '@/src/preferences/hooks';
 import type { AccountLocalPreferences } from '@/src/preferences/model';
 
-const columns = [
-  { field: 'displayEfforts', label: 'Display' },
-  { field: 'workingSetEfforts', label: 'Working set' },
-  { field: 'volumeEfforts', label: 'Volume' },
+const sections = [
+  { field: 'displayEfforts', title: 'Display' },
+  { field: 'workingSetEfforts', title: 'Working set' },
+  { field: 'volumeEfforts', title: 'Volume' },
 ] as const;
 
+// The effort page: Display, Working set and Volume, each a section of one
+// check row per effort choice.
 export function EffortSettings({ values }: { values: AccountLocalPreferences }) {
-  const toggle = (field: typeof columns[number]['field'], id: EffortChoice) => {
+  const toggle = (field: typeof sections[number]['field'], id: EffortChoice) => {
     const selected = values[field];
     updatePreferences({ [field]: selected.includes(id) ? selected.filter(value => value !== id) : [...selected, id] });
   };
-  return <View testID="settings-effort-selections">
-    <View style={styles.row}>
-      <Text allowFontScaling={false} style={[uiText.label, styles.name]}>Effort</Text>
-      {columns.map(column => <Text key={column.field} allowFontScaling={false} style={[uiText.label, styles.header, styles.column]}>{column.label}</Text>)}
-    </View>
-    {EFFORT_CHOICES.map(choice => <View key={choice.id} style={styles.row}>
-      <Text allowFontScaling={false} style={[uiText.bodyStrong, styles.name]}>{choice.label}</Text>
-      {columns.map(column => <View key={column.field} style={styles.column}>
-        <Pressable accessibilityLabel={`${choice.label}, ${column.label}`} accessibilityRole="checkbox"
-          accessibilityState={{ checked: values[column.field].includes(choice.id) }}
-          onPress={() => toggle(column.field, choice.id)} style={styles.checkbox}
-          testID={`settings-effort-${choice.id}-${column.field}`}>
-          <View style={styles.box}>{values[column.field].includes(choice.id)
-            ? <Icon name="check" size="sm" color={uiRoles.ink} /> : null}</View>
-        </Pressable>
-      </View>)}
-    </View>)}
+  return <View style={styles.page} testID="settings-effort-selections">
+    {sections.map(({ field, title }) => <FormSection key={field} title={title}>
+      {EFFORT_CHOICES.map((choice, index) => <CheckRow key={choice.id} accessibilityLabel={`${choice.label}, ${title}`}
+        checked={values[field].includes(choice.id)} divider={index > 0} label={choice.label}
+        onPress={() => toggle(field, choice.id)} testID={`settings-effort-${choice.id}-${field}`} />)}
+    </FormSection>)}
   </View>;
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', minHeight: uiGeometry.tapTarget, borderBottomWidth: uiBorder.width, borderBottomColor: uiRoles.rule },
-  name: { flex: 1 },
-  header: { textAlign: 'center' },
-  column: { width: uiGeometry.tapTarget * 1.4, alignItems: 'center' },
-  checkbox: { width: uiGeometry.tapTarget, height: uiGeometry.tapTarget, alignItems: 'center', justifyContent: 'center' },
-  box: { width: uiSpace.lg, height: uiSpace.lg, borderWidth: uiBorder.width, borderColor: uiRoles.ink, borderRadius: uiGeometry.radius.control, alignItems: 'center', justifyContent: 'center' },
+  page: { gap: uiSpace.md },
 });

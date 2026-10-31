@@ -1,17 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 
-import {
-  ActionButton,
-  Card,
-  FigureText,
-  ListRow,
-  uiBorder,
-  uiRoles,
-  uiSpace,
-  uiText,
-  uiTextTone,
-} from '@/components/ui';
+import { ActionRow, FormSection, Notice, ValueRow } from '@/components/ui';
 import { getDatabaseBackups, type DatabaseBackups } from '@/src/backup/database-backups';
 import type { Snapshot } from '@/src/backup/snapshots';
 import { useDateFormat } from '@/src/preferences/hooks';
@@ -30,7 +19,7 @@ const readSnapshots = (backups: DatabaseBackups): Snapshot[] | null => {
   }
 };
 
-/** Data & sync's Backups card: the newest snapshot, how many are kept, Export. */
+/** Data & sync's Backups section: the newest snapshot, how many are kept, Export. */
 export function BackupPanel({ backups = getDatabaseBackups() }: BackupPanelProps) {
   const dateFormat = useDateFormat();
   const [snapshots, setSnapshots] = useState(() => readSnapshots(backups));
@@ -53,69 +42,33 @@ export function BackupPanel({ backups = getDatabaseBackups() }: BackupPanelProps
 
   const newest = snapshots?.[0];
   return (
-    <Card testID="settings-backup-card">
-      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.cardLabel]}>Backups</Text>
-      <ListRow
-        density="list"
-        divider={false}
-        meta={
-          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, styles.value]} testID="settings-backup-last">
-            <FigureText>{newest ? formatLocalDateTime(newest.takenAtMs, dateFormat) : 'Never'}</FigureText>
-          </Text>
-        }
-        testID="settings-backup-last-row">
-        <Text allowFontScaling={false} style={uiText.body}>Last backup</Text>
-      </ListRow>
-      <ListRow
-        density="list"
-        meta={
-          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, styles.value]} testID="settings-backup-count">
-            <FigureText>{snapshots === null ? 'Unavailable' : String(snapshots.length)}</FigureText>
-          </Text>
-        }
-        testID="settings-backup-count-row">
-        <Text allowFontScaling={false} style={uiText.body}>Saved backups</Text>
-      </ListRow>
-      <View style={styles.actions}>
-        <ActionButton
-          accessibilityLabel={exporting ? 'Exporting database…' : 'Export database'}
+    <>
+      <FormSection testID="settings-backup-card" title="Backups">
+        <ValueRow
+          label="Last backup"
+          testID="settings-backup-last-row"
+          value={newest ? formatLocalDateTime(newest.takenAtMs, dateFormat) : 'Never'}
+          valueTestID="settings-backup-last"
+        />
+        <ValueRow
+          divider
+          label="Saved backups"
+          testID="settings-backup-count-row"
+          value={snapshots === null ? 'Unavailable' : String(snapshots.length)}
+          valueTestID="settings-backup-count"
+        />
+        <ActionRow
+          divider
           disabled={exporting}
+          kind="act"
           label={exporting ? 'Exporting…' : 'Export database'}
           onPress={() => {
             void handleExport();
           }}
           testID="settings-backup-export-button"
-          variant="outline"
         />
-        {error ? (
-          <Text
-            accessibilityLiveRegion="polite"
-            accessibilityRole="alert"
-            allowFontScaling={false}
-            style={[uiText.meta, uiTextTone.danger]}
-            testID="settings-backup-error">
-            {error}
-          </Text>
-        ) : null}
-      </View>
-    </Card>
+      </FormSection>
+      {error ? <Notice icon="warning" live message={error} testID="settings-backup-error" tone="danger" /> : null}
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  cardLabel: {
-    paddingHorizontal: uiSpace.md,
-    paddingTop: uiSpace.md,
-    paddingBottom: uiSpace.xs,
-  },
-  value: {
-    textAlign: 'right',
-  },
-  actions: {
-    padding: uiSpace.md,
-    gap: uiSpace.sm,
-    borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
-    alignItems: 'flex-start',
-  },
-});
