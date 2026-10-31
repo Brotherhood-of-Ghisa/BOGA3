@@ -97,6 +97,7 @@ export function AppearanceSettingsScreen() {
           );
         })}
         <ChoiceRow
+          accessibilityLabel={customHue !== null ? undefined : 'Custom colour'}
           divider
           label="Custom colour"
           onPress={() => router.push(THEME_COLOUR_ROUTE)}

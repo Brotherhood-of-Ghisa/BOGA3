@@ -103,7 +103,7 @@ it('saves the hue when the ring is let go and says it applies next launch', asyn
   expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBeNull();
   expect(savedStatus()).toBeNull();
 
-  await act(async () => pan().onFinalize());
+  await act(async () => pan().onFinalize(touch(240, 120)));
 
   expect(await screen.findByText('Saved · next launch')).toBeTruthy();
   expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:90');
@@ -111,9 +111,20 @@ it('saves the hue when the ring is let go and says it applies next launch', asyn
   // Moving the ring on hides the status until that hue is let go too.
   act(() => pan().onBegin(touch(120, 240)));
   expect(savedStatus()).toBeNull();
-  await act(async () => pan().onFinalize());
+  await act(async () => pan().onFinalize(touch(120, 240)));
   await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:180'));
   expect(await screen.findByText('Saved · next launch')).toBeTruthy();
+});
+
+it('saves the hue at the release point, not the last hue the ring rendered', async () => {
+  render(<ThemeColourRoute />);
+  act(() => pan().onBegin(touch(120, 0)));
+  expect(ring().props.accessibilityValue).toEqual({ text: 'Pink, 0 degrees' });
+
+  // The finger moved on before the last move was rendered: the event is the truth.
+  await act(async () => pan().onFinalize(touch(240, 120)));
+
+  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:90');
 });
 
 it('saves a VoiceOver step at once', async () => {
@@ -130,7 +141,7 @@ it('writes nothing when the ring is let go at the hue already stored', async () 
   render(<ThemeColourRoute />);
 
   act(() => pan().onBegin(touch(240, 120)));
-  await act(async () => pan().onFinalize());
+  await act(async () => pan().onFinalize(touch(240, 120)));
 
   expect(setItem).not.toHaveBeenCalled();
   expect(savedStatus()).toBeNull();
@@ -141,7 +152,7 @@ it('says nothing changed, and logs why, when the save fails, and saves on the ne
   render(<ThemeColourRoute />);
 
   act(() => pan().onBegin(touch(240, 120)));
-  await act(async () => pan().onFinalize());
+  await act(async () => pan().onFinalize(touch(240, 120)));
 
   expect(await screen.findByText('Couldn’t save the colour. Nothing changed.')).toBeTruthy();
   expect(screen.getByTestId('theme-colour-error').props.accessibilityRole).toBe('alert');
@@ -153,7 +164,7 @@ it('says nothing changed, and logs why, when the save fails, and saves on the ne
 
   // Letting go at the same hue again retries: nothing was stored.
   act(() => pan().onBegin(touch(240, 120)));
-  await act(async () => pan().onFinalize());
+  await act(async () => pan().onFinalize(touch(240, 120)));
   expect(await screen.findByText('Saved · next launch')).toBeTruthy();
   expect(screen.queryByText('Couldn’t save the colour. Nothing changed.')).toBeNull();
   expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:90');

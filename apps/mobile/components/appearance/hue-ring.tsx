@@ -55,8 +55,8 @@ export function HueRing({ hue, onChange, onChangeEnd, size = 240, testID }: HueR
     .onBegin((event) => report(event.x, event.y))
     .onUpdate((event) => report(event.x, event.y))
     // Fires on every ending, a tap that never activated the pan included. The
-    // detector re-reads the handlers each render, so `hue` is the one shown.
-    .onFinalize(() => onChangeEnd?.(hue));
+    // hue comes from the release point, not from the last render, which may lag.
+    .onFinalize((event) => onChangeEnd?.(pointToHue(event.x, event.y, size)));
 
   return (
     <GestureDetector gesture={pan}>

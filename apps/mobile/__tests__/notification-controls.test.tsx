@@ -198,6 +198,19 @@ it('does not claim registration succeeded after failure and retries the native o
   expect(screen.queryByTestId('settings-notifications-error')).toBeNull();
 });
 
+it('shows no failure while switching on is still registering the device', async () => {
+  await openPage();
+  let register!: (value: unknown) => void;
+  mockRpc.mockImplementationOnce(() => response(new Promise(resolve => { register = resolve; })));
+  fireEvent.press(toggle());
+  await waitFor(() => expect(toggle()).toBeDisabled());
+  expect(screen.queryByTestId('settings-notifications-error')).toBeNull();
+
+  await act(async () => { register({ binding_id: BINDING, permission: true, opted_in: true, payload_version: 1 }); });
+  await waitFor(() => expect(status('On')).toBeTruthy());
+  expect(screen.queryByTestId('settings-notifications-error')).toBeNull();
+});
+
 it('keeps registration retryable after a successful category write clears its error', async () => {
   await openPage();
   failRpc = { name: 'notification_register', message: 'unavailable', status: 503 };

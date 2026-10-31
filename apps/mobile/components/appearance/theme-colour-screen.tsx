@@ -24,7 +24,8 @@ export function ThemeColourScreen() {
 
   // `released` is the plain hue the ring was let go at.
   const commit = async (released: number) => {
-    if (released === storedHue) return;
+    // Read the store, not state: two releases can land before a re-render.
+    if (released === storedCustomHue()) return;
     setSaveError(null);
     try {
       await saveThemePresetId(hueThemeId(released));
@@ -46,7 +47,6 @@ export function ThemeColourScreen() {
     <Screen testID="theme-colour-screen">
       <View style={styles.body}>
         <View style={styles.ring}>
-          {/* `setHue` is stable, so the ring's gesture is not rebuilt mid-drag. */}
           <HueRing hue={hue} onChange={setHue} onChangeEnd={commit} testID="theme-colour-ring" />
         </View>
         <ThemePreview roles={roles} testID="theme-colour-preview" />

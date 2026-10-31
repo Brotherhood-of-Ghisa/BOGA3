@@ -47,7 +47,7 @@ export function NotificationSettingsScreen({ userId }: { userId: string | null }
   const forgetFailedCategories = () => { failedCategories.current = null; };
 
   const on = available && state.enabled && isPermitted(state);
-  const failed = available && (state.error !== null || (on && !state.registered));
+  const failed = available && (state.error !== null || (on && !state.registered && !state.busy));
   return (
     <SubPage testID="settings-notifications-screen">
       <FormSection title="Notifications">
