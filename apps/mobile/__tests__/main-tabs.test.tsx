@@ -9,7 +9,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn() }),
 }));
 
-import { TabsBar } from '../app/(tabs)/_layout';
+import TabsLayout, { TabsBar } from '../app/(tabs)/_layout';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { MainTabs } from '@/components/navigation/main-tabs';
 import {
@@ -75,6 +75,15 @@ describe('MainTabBar', () => {
     expect(screen.queryByTestId('bottom-tray-handle')).toBeNull();
     fireEvent.press(screen.getByLabelText('Open More'));
     expect(onSelect).toHaveBeenCalledWith('more');
+  });
+});
+
+describe('TabsLayout', () => {
+  it('paints the status-bar inset on the paper ground, matching the tab pages', () => {
+    render(<TabsLayout />);
+    expect(StyleSheet.flatten(screen.getByTestId('tabs-safe-area').props.style)).toMatchObject({
+      backgroundColor: uiRoles.paper,
+    });
   });
 });
 

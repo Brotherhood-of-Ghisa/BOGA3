@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { HEADER_STYLE_OPTIONS } from '@/components/navigation/header-style';
 import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
+import { uiRoles } from '@/components/ui/tokens';
 import { resolveMainTab } from '@/src/navigation/main-tabs';
 
 /**
@@ -28,7 +29,7 @@ export function TabsBar({ routeName }: { routeName: string | undefined }) {
 
 export default function TabsLayout() {
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
+    <SafeAreaView edges={['top']} style={styles.safeArea} testID="tabs-safe-area">
       <Tabs
         screenOptions={{ headerShown: false }}
         tabBar={({ state }) => <TabsBar routeName={state.routes[state.index]?.name} />}>
@@ -54,7 +55,10 @@ const GROUPS_TAB_OPTIONS = {
 } as const;
 
 const styles = StyleSheet.create({
+  // The status-bar inset sits on the pages' own `paper` ground, so the top
+  // bar and the page read as one surface (not the navigator's default grey).
   safeArea: {
     flex: 1,
+    backgroundColor: uiRoles.paper,
   },
 });
