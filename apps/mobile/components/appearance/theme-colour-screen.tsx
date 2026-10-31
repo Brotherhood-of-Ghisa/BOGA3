@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { isThemePending } from '@/components/appearance/chosen-theme';
 import { HueRing } from '@/components/appearance/hue-ring';
 import { ThemePreview } from '@/components/appearance/theme-preview';
 import { Notice, Screen, uiRoles, uiSpace } from '@/components/ui';
@@ -24,9 +25,9 @@ export function ThemeColourScreen() {
 
   // `released` is the plain hue the ring was let go at.
   const commit = async (released: number) => {
+    setSaveError(null);
     // Read the store, not state: two releases can land before a re-render.
     if (released === storedCustomHue()) return;
-    setSaveError(null);
     try {
       await saveThemePresetId(hueThemeId(released));
     } catch (error) {
@@ -51,8 +52,8 @@ export function ThemeColourScreen() {
         </View>
         <ThemePreview roles={roles} testID="theme-colour-preview" />
         {saveError ? <Notice icon="warning" live message={saveError} testID="theme-colour-error" tone="danger" /> : null}
-        {savedHere && storedHue === hue && !saveError ? (
-          <Notice icon="check" live message="Saved · next launch" testID="theme-colour-status" />
+        {savedHere && storedHue === hue && !saveError && isThemePending(hueThemeId(hue)) ? (
+          <Notice icon="success" live message="Saved · next launch" testID="theme-colour-status" />
         ) : null}
       </View>
     </Screen>
