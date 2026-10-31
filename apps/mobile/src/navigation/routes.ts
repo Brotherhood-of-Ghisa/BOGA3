@@ -22,6 +22,7 @@ export const SETTINGS_SUB_PAGES = {
   notifications: '/settings-notifications',
   everythingElse: '/settings-everything-else',
   dataSync: '/settings-data-sync',
+  reviewChanges: '/settings-review-changes',
 } as const;
 
 /** The Link screen for one of my exercises (E0.3). */

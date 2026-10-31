@@ -138,6 +138,7 @@ words = destroys, confirmed by an `Alert`), **primary** (≤1 per page, only to
 create or commit what is not saved instantly), **text** (only in a `Notice`:
 Retry), **icon** (headers). No outline. Changes save instantly; an action's failure is
 a `Notice` beside it, but preference-storage errors stay on Data & sync.
+Checked by `apps/mobile/__tests__/settings-conformance.test.ts`.
 
 ## Lists and rows
 

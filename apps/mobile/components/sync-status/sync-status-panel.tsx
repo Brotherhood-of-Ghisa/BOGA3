@@ -1,11 +1,11 @@
-import { ExerciseMergeReview } from './exercise-merge-review';
 import { useDateFormat } from '@/src/preferences/hooks';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatLocalDateTime } from '@/src/utils/local-time';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ActionRow, FormSection, StatePanel, ValueRow } from '@/components/ui';
+import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
 import { requestSync } from '@/src/sync/scheduler';
 import {
   getSyncStatus,
@@ -75,7 +75,7 @@ function SyncStatusPanelContent({
 }: SyncStatusPanelProps) {
   const [status, setStatus] = useState<SyncStatusSnapshot | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [reviewVisible, setReviewVisible] = useState(false);
+  const router = useRouter();
   const lifetimeRef = useRef({ active: true });
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -162,9 +162,7 @@ function SyncStatusPanelContent({
       /> : null}
 
       {isSignedIn && (status?.mergeReviewCount ?? 0) > 0 ? <ActionRow divider kind="navigate" label="Review changes"
-        onPress={() => setReviewVisible(true)} testID="settings-merge-review" /> : null}
-      <ExerciseMergeReview visible={reviewVisible} onDismiss={() => setReviewVisible(false)}
-        onChanged={() => { void refresh(); }} />
+        onPress={() => router.push(SETTINGS_SUB_PAGES.reviewChanges)} testID="settings-merge-review" /> : null}
       {(isSignedIn || preferenceError) ? <ActionRow
         accessibilityLabel={isRefreshing ? 'Refreshing data status…' : 'Refresh data and sync status'}
         divider

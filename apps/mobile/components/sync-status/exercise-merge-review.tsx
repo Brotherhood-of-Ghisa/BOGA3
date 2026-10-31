@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert } from 'react-native';
 
-import { ActionButton, Card, FigureText, Notice, PageSheet, StatePanel, uiSpace, uiText } from '@/components/ui';
+import { SubPage } from '@/components/settings/sub-page';
+import { ActionButton, ActionRow, FormSection, Notice, StatePanel, ValueRow } from '@/components/ui';
 import { loadMergeReview, recoverExerciseMerge, resolveMergeReview } from '@/src/exercise-catalog/merge';
 import type { MergeReviewItem, MergeValue } from '@/src/exercise-core/merge-types';
 import { formatSessionSetType } from '@/src/data/set-types';
 import { useDateFormat } from '@/src/preferences/hooks';
 import { formatLocalDateTime } from '@/src/utils/local-time';
-
-type Props = { visible: boolean; onDismiss: () => void; onChanged: () => void };
 
 const SET_FIELDS = [
   ['weight_value', 'Weight'], ['reps_value', 'Reps'], ['planned_weight_value', 'Planned weight'],
@@ -36,8 +35,15 @@ function changes(item: MergeReviewItem) {
   return rows;
 }
 
-// Recovery only: every Apply is checked again against the current server graph.
-export function ExerciseMergeReview({ visible, onDismiss, onChanged }: Props) {
+const confirmRemoval = (onConfirm: () => void) =>
+  Alert.alert('Apply saved removal?', 'The saved removal replaces your current history.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Apply', style: 'destructive', onPress: onConfirm },
+  ]);
+
+// Settings → Data & sync → Review changes. Recovery only: every Apply is
+// checked again against the current server graph.
+export function ExerciseMergeReviewScreen() {
   const [items, setItems] = useState<MergeReviewItem[]>([]);
   const [pending, setPending] = useState(0);
   const [operation, setOperation] = useState(false);
@@ -59,17 +65,16 @@ export function ExerciseMergeReview({ visible, onDismiss, onChanged }: Props) {
   }, []);
   useEffect(() => {
     const current = lifetime.current;
-    current.active = visible;
-    if (visible) void Promise.resolve().then(() => { if (current.active) void reload(); });
+    current.active = true;
+    void Promise.resolve().then(() => { if (current.active) void reload(); });
     return () => { current.active = false; };
-  }, [reload, visible]);
+  }, [reload]);
 
   const resolve = async (item: MergeReviewItem, keep: boolean) => {
     setBusy(true); setError(null);
     try {
       await resolveMergeReview(item, keep);
       await reload();
-      onChanged();
     } catch (failure) {
       if (failure instanceof Error && failure.message.includes('MERGE_STALE')) await reload();
       if (lifetime.current.active) setError(failure instanceof Error && failure.message.includes('MERGE_STALE') ?
@@ -79,50 +84,39 @@ export function ExerciseMergeReview({ visible, onDismiss, onChanged }: Props) {
   };
   const recover = async () => {
     setBusy(true); setError(null);
-    try { await recoverExerciseMerge(); await reload(); onChanged(); }
+    try { await recoverExerciseMerge(); await reload(); }
     catch (failure) { if (lifetime.current.active) setError(failure instanceof Error ? failure.message : 'Unable to check the merge.'); }
     finally { if (lifetime.current.active) setBusy(false); }
   };
 
-  return <PageSheet title="Review changes" closeLabel="Close review changes" visible={visible}
-    onDismiss={onDismiss} dismissDisabled={busy} testID="exercise-merge-review">
-    <ScrollView contentContainerStyle={styles.content} testID="exercise-merge-review-list">
-      {error ? <Notice tone="danger" live message={error} testID="exercise-merge-review-error" /> : null}
-      {operation ? <Card><ActionButton label="Check merge result" variant="outline" disabled={busy}
-        onPress={() => { void recover(); }} testID="exercise-merge-recover" /></Card> : null}
-      {pending ? <StatePanel kind="error" body="Saved changes are waiting to sync." fill={false}
-        action={{ label: 'Retry', onPress: () => { void reload(); } }} /> : null}
-      {busy ? <StatePanel kind="loading" body="Checking saved changes…" fill={false} /> : null}
-      {items.map(item => <Card key={item.id} style={styles.card} testID={'exercise-merge-conflict-' + item.id}>
-        <Text allowFontScaling={false} style={uiText.bodyStrong}>{item.exerciseName}</Text>
-        {item.sessionStartedAt ? <Text allowFontScaling={false} style={uiText.figureSmall}>
-          {formatLocalDateTime(item.sessionStartedAt, dateFormat)}
-        </Text> : null}
-        <View style={styles.row}><Text allowFontScaling={false} style={[uiText.label, styles.column]}>Current</Text>
-          <Text allowFontScaling={false} style={[uiText.label, styles.column]}>Saved</Text></View>
-        {changes(item).map(change => <View key={change.label}>
-          <Text allowFontScaling={false} style={uiText.label}>{change.label}</Text>
-          <View style={styles.row} accessibilityLabel={change.label + ': current ' + change.current + ', saved ' + change.saved}>
-            <Text allowFontScaling={false} style={[uiText.body, styles.column]}><FigureText>{change.current}</FigureText></Text>
-            <Text allowFontScaling={false} style={[uiText.body, styles.column]}><FigureText>{change.saved}</FigureText></Text>
-          </View>
-        </View>)}
-        {item.invalid ? <Notice tone="danger" message="These saved values need correction before they can be applied." /> : null}
-        <ActionButton label="Keep current history" variant="outline" disabled={busy}
+  return <SubPage testID="exercise-merge-review">
+    {error ? <Notice tone="danger" live message={error} testID="exercise-merge-review-error"
+      action={<ActionButton label="Retry" variant="text" disabled={busy} onPress={() => { void reload(); }} />} /> : null}
+    {pending ? <Notice message="Saved changes are waiting to sync." testID="exercise-merge-review-pending"
+      action={<ActionButton label="Retry" variant="text" disabled={busy} onPress={() => { void reload(); }} />} /> : null}
+    {operation ? <FormSection title="Merge">
+      <ActionRow kind="act" label="Check merge result" disabled={busy}
+        onPress={() => { void recover(); }} testID="exercise-merge-recover" />
+    </FormSection> : null}
+    {busy ? <StatePanel kind="loading" body="Checking saved changes…" fill={false} /> : null}
+    {items.map(item => {
+      const removal = Boolean(item.saved?.deleted_at);
+      const apply = () => { void resolve(item, false); };
+      return <FormSection key={item.id} title={item.exerciseName} testID={'exercise-merge-conflict-' + item.id}
+        error={item.invalid ? 'These saved values need correction before they can be applied.' : null}>
+        {item.sessionStartedAt ? <ValueRow label="Session" value={formatLocalDateTime(item.sessionStartedAt, dateFormat)} /> : null}
+        {changes(item).map((change, index) => <ValueRow key={change.label}
+          divider={index > 0 || Boolean(item.sessionStartedAt)} label={change.label}
+          value={change.current + ' → ' + change.saved}
+          accessibilityLabel={change.label + ': current ' + change.current + ', saved ' + change.saved} />)}
+        <ActionRow divider kind="act" label="Keep current history" disabled={busy}
           onPress={() => { void resolve(item, true); }} testID={'exercise-merge-keep-' + item.id} />
-        <ActionButton label={item.saved?.deleted_at ? 'Apply saved removal' : 'Apply saved changes'}
-          variant={item.saved?.deleted_at ? 'outline' : 'primary'} tone={item.saved?.deleted_at ? 'danger' : 'default'}
-          disabled={busy || item.invalid} onPress={() => { void resolve(item, false); }} testID={'exercise-merge-apply-' + item.id} />
-      </Card>)}
-      {!busy && !items.length && !pending && !operation && !error ?
-        <StatePanel body="No changes need review." fill={false} /> : null}
-      {error ? <ActionButton label="Retry" variant="outline" disabled={busy} onPress={() => { void reload(); }} /> : null}
-    </ScrollView>
-  </PageSheet>;
+        <ActionRow divider kind={removal ? 'danger' : 'act'} label={removal ? 'Apply saved removal' : 'Apply saved changes'}
+          disabled={busy || item.invalid} onPress={removal ? () => confirmRemoval(apply) : apply}
+          testID={'exercise-merge-apply-' + item.id} />
+      </FormSection>;
+    })}
+    {!busy && !items.length && !pending && !operation && !error ?
+      <StatePanel body="No changes need review." fill={false} /> : null}
+  </SubPage>;
 }
-const styles = StyleSheet.create({
-  content: { padding: uiSpace.lg, gap: uiSpace.md },
-  card: { padding: uiSpace.md, gap: uiSpace.sm },
-  row: { flexDirection: 'row', gap: uiSpace.md },
-  column: { flex: 1 },
-});

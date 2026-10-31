@@ -370,8 +370,7 @@ appId: com.dinoderek.mobile
     visible: "Apply saved changes"
     timeout: 30000
 - assertVisible: "Maestro Merge Destination"
-- assertVisible: "20"
-- assertVisible: "25"
+- assertVisible: "Weight: current 20, saved 25"
 - takeScreenshot: "26-merge-review"
 - tapOn: "Apply saved changes"
 - extendedWaitUntil:

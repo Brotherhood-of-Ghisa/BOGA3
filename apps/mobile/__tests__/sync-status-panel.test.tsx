@@ -14,6 +14,7 @@
 // invoke the cleanup it returns on unmount. Calling the callback without
 // honoring its cleanup would leak the panel's polling setInterval past the
 // test and hang the --detectOpenHandles guard.
+const mockPush = jest.fn();
 jest.mock('expo-router', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted factory: require resolves at call time, after the import hoist.
   const { useEffect } = require('react');
@@ -21,6 +22,7 @@ jest.mock('expo-router', () => {
     useFocusEffect: (callback: () => void | (() => void)) => {
       useEffect(() => callback(), [callback]);
     },
+    useRouter: () => ({ push: mockPush }),
   };
 });
 
@@ -245,10 +247,12 @@ describe('Settings sync-status panel', () => {
     );
   });
 
-  it('offers Review changes as a navigate row only while there are changes to review', async () => {
+  it('offers Review changes as a navigate row to its page only while there are changes to review', async () => {
     const { rerender } = renderPanel({ mergeReviewCount: 2 });
     expect(await screen.findByTestId('settings-merge-review')).toBeTruthy();
     expect(screen.getByText('Review changes')).toHaveStyle({ color: uiRoles.accent });
+    fireEvent.press(screen.getByTestId('settings-merge-review'));
+    expect(mockPush).toHaveBeenCalledWith('/settings-review-changes');
     rerender(<SyncStatusPanel onRequestSync={jest.fn()} readStatus={jest.fn().mockResolvedValue({ ...baseStatus, mergeReviewCount: 0 })} />);
     await waitFor(() => expect(screen.queryByTestId('settings-merge-review')).toBeNull());
   });
