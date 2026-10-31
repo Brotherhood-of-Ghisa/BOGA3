@@ -1,6 +1,6 @@
 # T-20261031-01 — Independent muscle Sets and Volume attribution
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: none
 - Milestone: none
 - Areas: cross-stack; UI impact: yes
@@ -70,12 +70,15 @@ Both settings govern every muscle figure in scope, including session summaries,
 Today and coaching. Any retained visit overrides must be metric-specific and
 propagate through the relevant history/drill-down navigation; they must never
 silently change the other metric. Saved defaults are account-scoped and synced,
-using the existing preferences mechanism. The operator explicitly chose this
-upgrade policy: existing accounts preserve their effective old secondary-counting
-choice for both new settings. Legacy count-secondary ON maps to Primary only
-OFF for both; legacy OFF maps to Primary only ON for both. Only new accounts
-start with the defaults in the table. Distinguish existing-account adoption
-from new-account initialization; an upgrade must not reset existing choices.
+using the existing preferences mechanism. The agreed upgrade policy is to
+preserve an existing account's effective old secondary-counting choice for
+Sets only. Legacy count-secondary ON maps to Sets Primary only OFF; legacy
+OFF maps to Sets Primary only ON. Initialize the newly introduced Volume
+Primary only to its default OFF for both existing and new accounts, independently
+of the legacy choice. Preserve an explicitly saved new Volume choice thereafter;
+adoption/retry/another device must not reset it. New accounts start with Sets
+Primary only ON and Volume Primary only OFF. Distinguish existing-account
+adoption from new-account initialization; targets remain unchanged.
 Primary-only Sets totals are whole;
 the other mode intentionally allows half-steps. Do not round during derivation.
 Preserve existing shared display policies unless the new controls require a
@@ -177,16 +180,20 @@ all four combinations, no-role pools, duplicates and non-finite/zero Volume.
   `count_secondary_muscles` preference. The preservation policy above is fixed;
   verify legacy local/default/server adoption cases and cross-device upgrade
   ordering without treating an existing account as a new one.
-- Exact placement of the two settings and retained visit controls. Use the
-  repo-native UX target below and preserve total consumer scope; reconcile
-  incompatible legacy route/API names with minimal compatibility handling.
+- Technical handling of retained visit controls and legacy route/API names.
+  Preserve independent choices and total consumer scope with minimal
+  compatibility handling; the saved switches' placement and copy below are fixed.
 - Any actual drift uncovered against newer main; report it before building.
 
 ## UX contract and design target
 
-Repo-native brief: reuse the existing Settings muscle/progress controls, form
-grammar and UI tokens. Show separate Sets and Volume choices named Primary
-only, with the agreed defaults. Retain the existing multi-primary editor UI.
+Repo-native brief, explicitly specified by the operator: at the existing
+Count secondary sets control location, replace it with two adjacent switches
+labelled exactly `Sets: Primary only` and `Volume: Primary only`, in that
+order. Reuse the existing control/card placement, form grammar and UI tokens;
+do not move the controls into a new settings section or redesign their layout.
+Sets defaults ON for new accounts and preserves the legacy choice for existing
+accounts; Volume defaults OFF for both. Retain the existing multi-primary editor UI.
 Before significant UI implementation capture current reference screenshots
 and pin the concrete control design against this brief; capture and compare
 finished states at small and large supported widths. No general restyle.
