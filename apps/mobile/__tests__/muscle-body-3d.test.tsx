@@ -659,4 +659,80 @@ describe('MuscleBodyCard', () => {
     expect(screen.getByTestId('stats-contributions')).toBeTruthy();
   });
 
+  it('projects contour for front-facing selected muscle and culls it at 180 degrees', () => {
+    const scores = computeMuscleScores([makeMuscle('chest', 'Chest', 8), makeMuscle('back_lats', 'Lats', 6)], 'workingSetCount');
+    const front = projectMuscleBody({ angleDeg: 0, width: 280, height: 280, scores, selectedId: 'chest', overlay: 'contour' });
+    expect(front.contour).not.toBeNull();
+    expect(front.contour!.d).toMatch(/^M/);
+
+    const back = projectMuscleBody({ angleDeg: 180, width: 280, height: 280, scores, selectedId: 'chest', overlay: 'contour' });
+    expect(back.contour).toBeFalsy();
+
+    const glutesFront = projectMuscleBody({ angleDeg: 0, width: 280, height: 280, scores, selectedId: 'glutes_max', overlay: 'contour' });
+    expect(glutesFront.contour).toBeFalsy();
+
+    const glutesBack = projectMuscleBody({ angleDeg: 180, width: 280, height: 280, scores, selectedId: 'glutes_max', overlay: 'contour' });
+    expect(glutesBack.contour).not.toBeNull();
+    expect(glutesBack.contour!.d).toMatch(/^M/);
+
+    const unselected = projectMuscleBody({ angleDeg: 0, width: 280, height: 280, scores, selectedId: null, overlay: 'contour' });
+    expect(unselected.contour).toBeFalsy();
+  });
+
+  it('supports controlled overlay and onOverlayChange callback', () => {
+    const rows = [makeMuscle('chest', 'Chest', 8)];
+    const onOverlayChange = jest.fn();
+    const { rerender } = render(
+      <MuscleBodyCard
+        metric="workingSetCount"
+        muscles={rows}
+        onOverlayChange={onOverlayChange}
+        onSelect={jest.fn()}
+        overlay="contour"
+        selectedId="chest"
+      />
+    );
+
+    const toggle = screen.getByTestId('stats-muscle-body-overlay-toggle');
+    expect(toggle).toHaveTextContent('Contour');
+    expect(screen.getByTestId('stats-muscle-body-contour')).toBeTruthy();
+
+    fireEvent.press(toggle);
+    expect(onOverlayChange).toHaveBeenCalledWith('fibres');
+
+    rerender(
+      <MuscleBodyCard
+        metric="workingSetCount"
+        muscles={rows}
+        onOverlayChange={onOverlayChange}
+        onSelect={jest.fn()}
+        overlay="fibres"
+        selectedId="chest"
+      />
+    );
+    expect(toggle).toHaveTextContent('Fibres');
+    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+  });
+
+  it('toggles between fibres and contour overlay and hides contour when muscle is on the far side', () => {
+    const rows = [makeMuscle('chest', 'Chest', 8), makeMuscle('back_lats', 'Lats', 6)];
+    render(<MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} defaultOverlay="fibres" />);
+
+    const toggle = screen.getByTestId('stats-muscle-body-overlay-toggle');
+    expect(toggle).toHaveTextContent('Fibres');
+    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-body-fibres-surface-highlight')).toBeTruthy();
+
+    fireEvent.press(toggle);
+    expect(toggle).toHaveTextContent('Contour');
+    expect(screen.getByTestId('stats-muscle-body-contour')).toBeTruthy();
+    expect(screen.queryByTestId('stats-muscle-body-fibres-surface-highlight')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
+    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+
+    fireEvent.press(toggle);
+    expect(toggle).toHaveTextContent('Fibres');
+  });
+
 });
