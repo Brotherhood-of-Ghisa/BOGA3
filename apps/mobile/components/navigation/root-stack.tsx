@@ -94,6 +94,7 @@ export function RootStack() {
         <Stack.Screen name="settings-notifications" options={{ title: 'Notifications' }} />
         <Stack.Screen name="settings-everything-else" options={{ title: 'Everything else' }} />
         <Stack.Screen name="settings-data-sync" options={{ title: 'Data & sync' }} />
+        <Stack.Screen name="settings-review-changes" options={{ title: 'Review changes' }} />
         <Stack.Screen name="gyms" options={{ title: 'Gyms' }} />
         <Stack.Screen name="theme-colour" options={{ title: 'Custom colour' }} />
         <Stack.Screen name="group/mine" options={{ title: 'My groups' }} />

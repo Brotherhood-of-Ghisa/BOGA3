@@ -168,7 +168,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/more` | `/groups`, `/exercise-catalog`, `/gyms`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
 | `/exercise-catalog`, `/groups`, `/settings` | a tab | `MainTabBar` (`dismissTo`, so the tabs below are reused rather than stacked) |
 | `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
-| `/settings`, `/settings-muscles`, `/settings-appearance` | `/profile`, `/body-weight`, `/theme-colour`, `/settings-*` | rows (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never from workouts |
+| `/settings`, `/settings-muscles`, `/settings-appearance`, `/settings-data-sync` | `/profile`, `/body-weight`, `/theme-colour`, `/settings-*` | rows (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never from workouts |
 | `/settings-everything-else` | `/dev-logs` | `View logs` (`push`), only under `isDevMode()` |
 | `/profile`, `/connected-agents` | themselves | sign-in/sign-out rerender, and grant load / retry / confirmed revocation, update the route in place |
 | `/connected-agents` | `/sign-in` | its auth guard on a signed-out direct entry |

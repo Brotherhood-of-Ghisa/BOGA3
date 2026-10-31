@@ -101,6 +101,12 @@ describe('settings developer data affordances', () => {
     expect(screen.queryByTestId('settings-dev-wipe-remote-button')).toBeNull();
   });
 
+  it('stacks the page as Display, Records, Experiments and Developer, in that order', async () => {
+    await openSettings();
+    expect(screen.getAllByRole('header').map((heading) => heading.props.children)).toEqual(
+      ['Display', 'Records', 'Experiments', 'Developer']);
+  });
+
   it('draws the tools as rows of the Developer section: acts in accent words, Wipe remote in danger words, last', async () => {
     await openSettings();
     expect(screen.getByText('Developer')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
