@@ -17,6 +17,8 @@ import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 export type FormSectionProps = {
   // The group's micro-label; omitted where a heading would only repeat its one row.
   title?: string;
+  // A control beside the micro-label, such as an on-demand explainer.
+  titleAccessory?: ReactNode;
   children: ReactNode;
   // The section's one validation message, under its card in `danger`.
   error?: string | null;
@@ -26,14 +28,13 @@ export type FormSectionProps = {
   testID?: string;
 };
 
-export function FormSection({ title, children, error, errorTestID, footnote, testID }: FormSectionProps) {
+export function FormSection({ title, titleAccessory, children, error, errorTestID, footnote, testID }: FormSectionProps) {
+  const heading = title ? (
+    <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>{title}</Text>
+  ) : null;
   return (
     <View style={styles.section} testID={testID}>
-      {title ? (
-        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
-          {title}
-        </Text>
-      ) : null}
+      {title && titleAccessory ? <View style={styles.heading}>{heading}{titleAccessory}</View> : heading}
       <Card style={error ? styles.cardInvalid : null}>{children}</Card>
       {footnote ? (
         <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.muted]} testID={testID ? `${testID}-footnote` : undefined}>
@@ -179,6 +180,7 @@ export function ActionRow({ label, kind = 'navigate', icon, onPress, divider = f
 }
 
 const styles = StyleSheet.create({
+  heading: { flexDirection: 'row', alignItems: 'center' },
   section: {
     gap: uiSpace.sm,
   },

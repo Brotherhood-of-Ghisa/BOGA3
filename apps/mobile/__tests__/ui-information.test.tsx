@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
-import { Modal, ScrollView, StyleSheet } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { Icon, IconButton, Information, uiFonts, uiGeometry, uiIconSize, uiRoles, uiSpace } from '@/components/ui';
 
@@ -43,4 +43,15 @@ it('supports a short explanation without an adjacent heading, sections or test I
   fireEvent.press(screen.getByRole('button', { name: 'About Example' }));
   expect(screen.getAllByRole('header')).toHaveLength(1);
   expect(screen.getByText('Lorem ipsum.')).toBeTruthy();
+});
+
+it('supports sections alone without adding an empty introductory paragraph', () => {
+  render(<Information title="About Example" sections={[
+    ['Only section', 'Short explanation.'],
+  ]} />);
+  fireEvent.press(screen.getByRole('button', { name: 'About Example' }));
+  expect(screen.getByRole('header', { name: 'Only section' })).toBeTruthy();
+  expect(screen.getByText('Short explanation.')).toBeTruthy();
+  expect(screen.UNSAFE_getByType(ScrollView).findAllByType(Text).map(node => node.props.children))
+    .toEqual(['Only section', 'Short explanation.']);
 });

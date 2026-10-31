@@ -8,7 +8,7 @@ import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
 
 export type InformationProps = {
   title: string;
-  body: string;
+  body?: string;
   sections?: readonly (readonly [title: string, body: string])[];
   /** Optional heading beside the glyph, with a 4pt visual gap. */
   label?: string;
@@ -30,7 +30,7 @@ export function Information({ title, body, sections = [], label, testIDPrefix }:
     <Sheet visible={visible} title={title} dismissLabel={`Dismiss ${title}`}
       testID={testIDPrefix ? `${testIDPrefix}-help` : undefined} onDismiss={() => setVisible(false)}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{body}</Text>
+        {body ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{body}</Text> : null}
         {sections.map(([heading, text]) => <View key={heading} style={styles.section}>
           <Text allowFontScaling={false} accessibilityRole="header" style={uiText.bodyStrong}>{heading}</Text>
           <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{text}</Text>
