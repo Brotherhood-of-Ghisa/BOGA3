@@ -79,6 +79,35 @@ it('keeps adjacent Primary only settings independent and persists their choices'
   expect(values()).toMatchObject({ progressCountSecondary: true, muscleVolumePrimaryOnly: true });
 });
 
+it.each([[false, false], [false, true], [true, false], [true, true]])(
+  'explains Counting on demand without changing secondary Sets=%s or primary-only Volume=%s',
+  async (progressCountSecondary, muscleVolumePrimaryOnly) => {
+    await openSettings();
+    act(() => updatePreferences({ progressCountSecondary, muscleVolumePrimaryOnly }));
+    const saved = { ...values() };
+    const write = jest.spyOn(Storage, 'setItemSync');
+    const trigger = screen.getByRole('button', { name: 'About counting' });
+    expect(trigger).toHaveStyle({ width: 44, height: 44 });
+    expect(screen.getByRole('header', { name: 'Counting' })).toHaveStyle(LABEL);
+    expect(screen.queryByTestId('settings-counting-help')).toBeNull();
+
+    fireEvent.press(trigger);
+    const help = within(screen.getByTestId('settings-counting-help'));
+    expect(help.getAllByRole('header').map(heading => heading.props.children)).toEqual(['About counting', 'Sets', 'Volume']);
+    expect(help.getByText('Each primary muscle gets 1 working set. With “Sets: Primary only” off, each secondary muscle also gets ½ set.')).toBeTruthy();
+    expect(help.getByText('Muscle Volume is load per side × reps. Primary muscles split this equally. With “Volume: Primary only” off, secondary muscles share an additional half of that amount.')).toBeTruthy();
+    expect(help.queryAllByRole('button')).toHaveLength(0);
+    fireEvent.press(screen.getByTestId('settings-counting-help-backdrop', { includeHiddenElements: true }));
+    expect(screen.queryByTestId('settings-counting-help')).toBeNull();
+    expect(screen.getByRole('switch', { name: 'Sets: Primary only' })).toHaveProp('accessibilityState', { checked: !progressCountSecondary });
+    expect(screen.getByRole('switch', { name: 'Volume: Primary only' })).toHaveProp('accessibilityState', { checked: muscleVolumePrimaryOnly });
+    fireEvent.press(screen.getByTestId('settings-counting-info'));
+    expect(screen.getByTestId('settings-counting-help')).toBeTruthy();
+    expect(values()).toEqual(saved);
+    expect(write).not.toHaveBeenCalled();
+  },
+);
+
 it('draws Progress and Effort as sections of rows: micro-label headings, option-role row names', async () => {
   await openSettings();
   const progress = within(screen.getByTestId('settings-section-progress'));

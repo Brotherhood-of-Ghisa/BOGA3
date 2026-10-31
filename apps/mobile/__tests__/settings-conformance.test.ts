@@ -13,7 +13,7 @@ import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
  * links to the Bodyweight log (`/body-weight`) but imports nothing of it: a log
  * of readings follows "Lists and rows", not this rule.
  *
- * A Settings file draws from the primitives only the row vocabulary, `Notice`,
+ * A Settings file draws from the primitives only the row vocabulary, `Information`, `Notice`,
  * `StatePanel` and the screen scroll, and no raw react-native control or tap target: a row
  * made by hand from those is caught, one laid out from plain `View`s is not. A
  * button is a primary (at most one per page) or a text button as a `Notice`'s
@@ -32,7 +32,7 @@ const NOT_SETTINGS_CONTENT = /^components\/(ui|navigation)\//;
 // What a Settings file may draw from `@/components/ui`.
 const VOCABULARY = new Set([
   'FormSection', 'FormError', 'SwitchRow', 'SegmentRow', 'RadioRow', 'CheckRow', 'InputRow', 'FormField',
-  'ValueRow', 'ChoiceRow', 'ActionRow', 'ActionButton', 'Notice', 'StatePanel', 'Screen', 'ScreenScroll', 'FigureText',
+  'ValueRow', 'ChoiceRow', 'ActionRow', 'ActionButton', 'Information', 'Notice', 'StatePanel', 'Screen', 'ScreenScroll', 'FigureText',
 ]);
 // Controls and tap targets that would make a row or a destination by hand.
 const RAW_REACT_NATIVE = new Set([
@@ -204,6 +204,13 @@ describe('the Settings language check', () => {
       const a = <ActionButton label="Add" variant="primary" onPress={add} />;
       const b = <Notice message="Failed" action={<ActionButton label="Retry" variant="text" onPress={retry} />} />;
       const c = <ActionRow kind="danger" label="Wipe" onPress={() => Alert.alert('Wipe?', '', [])} />;`)).toEqual([]);
+  });
+
+  it('allows the standard Information explainer beside a section heading', () => {
+    expect(findingsIn(`import { FormSection, Information } from '@/components/ui';
+      const a = <FormSection title="Counting" titleAccessory={
+        <Information title="About counting" sections={sections} />
+      }><Rows /></FormSection>;`)).toEqual([]);
   });
 
   it('finds outline and link buttons, and a variant it cannot read', () => {

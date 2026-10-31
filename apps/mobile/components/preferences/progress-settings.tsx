@@ -1,5 +1,5 @@
 import { View, StyleSheet } from 'react-native';
-import { FormSection, SegmentRow, SwitchRow, uiSpace } from '@/components/ui';
+import { FormSection, Information, SegmentRow, SwitchRow, uiGeometry, uiIconSize, uiSpace } from '@/components/ui';
 import { updatePreferences } from '@/src/preferences/hooks';
 import type { AccountLocalPreferenceState } from '@/src/preferences/account-local';
 import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES } from '@/src/preferences/model';
@@ -8,10 +8,15 @@ import { PreferenceNumberField } from './number-field';
 const BREAKDOWN_OPTIONS = [{ value: 'muscle', label: 'Muscle' }, { value: 'exercise', label: 'Exercise' }] as const;
 const MUSCLE_METRIC_OPTIONS = [{ value: 'workingSetCount', label: 'Sets' }, { value: 'totalVolume', label: 'Volume' }] as const;
 const EXERCISE_METRIC_OPTIONS = [...MUSCLE_METRIC_OPTIONS, { value: 'estimatedOneRepMax', label: '1RM' }] as const;
+const COUNTING_SECTIONS = [
+  ['Sets', 'Each primary muscle gets 1 working set. With “Sets: Primary only” off, each secondary muscle also gets ½ set.'],
+  ['Volume', 'Muscle Volume is load per side × reps. Primary muscles split this equally. With “Volume: Primary only” off, secondary muscles share an additional half of that amount.'],
+] as const;
 const MUSCLE_VIEW_OPTIONS = [{ value: 'list', label: 'List' }, { value: '3d', label: '3D' }] as const;
 
 // The Progress page: what Progress opens on, how muscles show, the two periods
-// and what counts, as four sections of the Settings row vocabulary.
+// and what counts, as four sections of the Settings row vocabulary. Counting
+// opens the standard explainer without changing any preference.
 export function ProgressSettings({ state }: { state: AccountLocalPreferenceState }) {
   const { values, pending } = state;
   const current = { ...values, ...pending };
@@ -29,7 +34,11 @@ export function ProgressSettings({ state }: { state: AccountLocalPreferenceState
         label="History look-back (weeks)" testID="settings-history-lookback" value={current.historyLookbackWeeks}
         onCommit={historyLookbackWeeks => updatePreferences({ historyLookbackWeeks })} />
     </FormSection>
-    <FormSection title="Counting">
+    <FormSection title="Counting" titleAccessory={
+      <View style={styles.countingInfo}>
+        <Information title="About counting" sections={COUNTING_SECTIONS} testIDPrefix="settings-counting" />
+      </View>
+    }>
       <SwitchRow density="list" label="Group by muscle family" testID="settings-progress-grouped" value={values.progressGrouped}
         onValueChange={progressGrouped => updatePreferences({ progressGrouped })} />
       <SwitchRow density="list" divider label="Sets: Primary only" testID="settings-progress-count-secondary"
@@ -62,4 +71,6 @@ function OpensOn({ values }: { values: AccountLocalPreferenceState['values'] }) 
 
 const styles = StyleSheet.create({
   page: { gap: uiSpace.md },
+  // Keep the glyph 4pt from the micro-label without shrinking its tap target.
+  countingInfo: { marginLeft: uiSpace.xs - (uiGeometry.tapTarget - uiIconSize.sm) / 2 },
 });
