@@ -14,13 +14,13 @@ For the route inventory and owning files, load `screen-map.md`.
 - Tab roots live in the `(tabs)` group (`apps/mobile/app/(tabs)/`), whose
   parenthesised name never appears in a URL (`/stats-history` is
   `app/(tabs)/stats-history.tsx`). Every other screen is a root-stack route.
-- **Two kinds of page.** Tabs use `PageHeader`, without Back. Other pages use native headers; Back returns to origin.
-  `/exercise-catalog`, `/groups` and `/settings` also keep the tab bar
+- **Two kinds of page.** Tabs use `PageHeader` (Groups: a tab header), without Back. Other pages use native headers; Back returns to origin.
+  `/exercise-catalog` and `/settings` also keep the tab bar
   (`apps/mobile/components/navigation/tab-owned-page.tsx`).
 - The shell is `apps/mobile/src/navigation/main-tabs.ts` — Today / Train /
   Progress / Groups, then More as a ⋮ — drawn by `MainTabBar`
   (`apps/mobile/components/navigation/main-tab-bar.tsx`) on every screen that
-  shows tabs. Groups is the tab-owned page `/groups`; `/stats-history`,
+  shows tabs. `/stats-history`,
   `/exercise-catalog` and `/settings` each map to a canonical owner
   (`resolveMainTab`), so every recognised root keeps exactly one tab selected
   and an unrecognised one selects none. A tab root in
@@ -165,7 +165,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`replace`) |
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
 | `/more` | `/exercise-catalog`, `/gyms`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
-| `/exercise-catalog`, `/groups`, `/settings` | a tab | `MainTabBar` (`dismissTo`, so the tabs below are reused rather than stacked) |
+| `/exercise-catalog`, `/settings` | a tab | `MainTabBar` (`dismissTo`, so the tabs below are reused rather than stacked) |
 | `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
 | `/settings`, `/settings-muscles`, `/settings-appearance`, `/settings-data-sync` | `/profile`, `/body-weight`, `/theme-colour`, `/settings-*` | rows (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never from workouts |
 | `/settings-everything-else` | `/dev-logs` | `View logs` (`push`), only under `isDevMode()` |
@@ -202,13 +202,13 @@ Title strings live in `apps/mobile/components/navigation/root-stack.tsx`, and in
 
 - A static title is declared in the root stack. Dynamic titles are set in the
   route's `Stack.Screen`, falling back to the placeholder until resolved.
-- `headerShown: false` for `(tabs)` routes (visible shell is `MainTabBar`) and
+- `headerShown: false` for `(tabs)` routes except Groups (visible shell is `MainTabBar`) and
   screens drawing their own top bar or needing none (`session/[sessionId]/index`,
   the exercise page, picker, `completed-session/[sessionId]`, `sign-in`,
   `sync-setup`). Headerless screens still declare a title for VoiceOver back
   labels. `exercise-history` and the tab-owned pages are hybrids: native
   header (actions in `headerRight`) with `MainTabBar`.
-- Native headers take styling from the root stack's `screenOptions`: `paper`
+- Headers share `HEADER_STYLE_OPTIONS` (`apps/mobile/components/navigation/header-style.ts`): `paper`
   background with no shadow line, the `title` text role (Archivo 700 `ink` at
   `lg`), and minimal arrow-only back.
   **Never add a `headerBackTitle`**: react-native-screens builds a custom back

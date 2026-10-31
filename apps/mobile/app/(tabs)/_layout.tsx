@@ -4,6 +4,7 @@ import { StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
+import { HEADER_STYLE_OPTIONS } from '@/components/navigation/header-style';
 import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import { resolveMainTab } from '@/src/navigation/main-tabs';
 
@@ -34,6 +35,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="today" options={{ title: 'Today' }} />
         <Tabs.Screen name="train" options={{ title: 'Train' }} />
         <Tabs.Screen name="progress" options={{ title: 'Progress' }} />
+        {/* The one tab with a header: the group's name, its switch and Manage (`GroupScreenHeader`). */}
+        <Tabs.Screen name="groups" options={GROUPS_TAB_OPTIONS} />
         <Tabs.Screen name="more" options={{ title: 'More' }} />
         {/* A preserved compatibility root: addressable, owned by Progress. */}
         <Tabs.Screen name="stats-history" options={{ title: 'History' }} />
@@ -41,6 +44,14 @@ export default function TabsLayout() {
     </SafeAreaView>
   );
 }
+
+const GROUPS_TAB_OPTIONS = {
+  title: 'Groups',
+  headerShown: true,
+  ...HEADER_STYLE_OPTIONS,
+  // The layout's safe area already clears the status bar.
+  headerStatusBarHeight: 0,
+} as const;
 
 const styles = StyleSheet.create({
   safeArea: {

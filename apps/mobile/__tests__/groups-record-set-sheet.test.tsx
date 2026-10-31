@@ -26,7 +26,7 @@ import * as groupsApi from '@/src/groups/api';
 import { GroupApiError } from '@/src/groups/api';
 import { groupCacheKeys,writeGroupCache } from '@/src/groups/cache';
 import { setLastViewedGroupId } from '@/src/groups';
-import GroupsTabRoute from '../app/groups';
+import GroupsTabRoute from '../app/(tabs)/groups';
 import GroupBoardRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/index';
 const api=groupsApi as jest.Mocked<typeof groupsApi>;
 const page=(event: CompetitionEventWire=competitionEvent)=>({ contract_version: 4 as const,

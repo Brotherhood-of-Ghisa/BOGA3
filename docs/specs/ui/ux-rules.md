@@ -92,8 +92,8 @@ the configured calendar bounds instead of introducing another duration.
 
 Decided 2026-10-27.
 
-1. **Two kinds of page.** The four tabs open on an in-content `PageHeader`
-   and have no back. Every other page has the one native stack header on the
+1. **Two kinds of page.** Tabs have no back; Groups takes the header style
+   below for its group switch, the others an in-content `PageHeader`. Every other page has the one native stack header on the
    `paper` ground (no white band, no shadow): a minimal back chevron, an
    Archivo 700 title, and an optional `headerRight` action (⋮, `+`). No page
    draws a second back of its own; back returns to where you came from.

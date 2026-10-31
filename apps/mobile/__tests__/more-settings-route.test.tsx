@@ -2,11 +2,10 @@
 
 /**
  * More's destinations and the Groups tab through the real Expo Router: the
- * tab layout under a root stack, as the app is built. Settings, Exercises and
- * Groups are root-stack pages pushed over the tabs (`TabOwnedPage`): More's
- * keep the tab bar with More selected and back returns to More; Groups keeps
- * it with Groups selected; a tab press returns to the tabs underneath instead
- * of stacking another copy. The More screen's own
+ * tab layout under a root stack, as the app is built. Settings and Exercises
+ * are root-stack pages pushed over the tabs (`TabOwnedPage`): each keeps the
+ * tab bar with More selected, back returns to More, and a tab press returns
+ * to the tabs underneath instead of stacking another copy. Groups is a tab. The More screen's own
  * rows and their hrefs are `more-screen.test.tsx`; the Settings screen itself
  * is `settings-profile-navigation.test.tsx` and the settings suites.
  */
@@ -34,10 +33,10 @@ const stub = (testID: string) =>
     return <Text testID={testID}>{testID}</Text>;
   };
 
-const tabOwnedStub = (testID: string, activeTab?: 'groups') =>
+const tabOwnedStub = (testID: string) =>
   function TabOwnedStub() {
     return (
-      <TabOwnedPage activeTab={activeTab}>
+      <TabOwnedPage>
         <Text testID={testID}>{testID}</Text>
       </TabOwnedPage>
     );
@@ -51,10 +50,10 @@ const renderApp = (initialUrl = '/more') =>
       '(tabs)/today': stub('today-stub'),
       '(tabs)/train': stub('train-stub'),
       '(tabs)/progress': stub('progress-stub'),
+      '(tabs)/groups': stub('groups-stub'),
       '(tabs)/more': MoreScreen,
       '(tabs)/stats-history': stub('stats-stub'),
       'exercise-catalog': tabOwnedStub('catalog-stub'),
-      groups: tabOwnedStub('groups-stub', 'groups'),
       settings: tabOwnedStub('settings-stub'),
       gyms: stub('gyms-stub'),
     },
@@ -121,7 +120,7 @@ it('a tab press on a More page returns to the tabs underneath', async () => {
   expect(appRouter.canGoBack()).toBe(false);
 });
 
-it('the Groups tab pushes Groups over the tabs with Groups selected; ⋮ returns to More beneath', async () => {
+it('Groups and the ⋮ switch tabs in place, stacking nothing', async () => {
   const router = await renderApp('/today');
   await screen.findByTestId('today-stub');
 
@@ -137,11 +136,7 @@ it('the Groups tab pushes Groups over the tabs with Groups selected; ⋮ returns
   });
   expect(await screen.findByTestId('more-screen')).toBeTruthy();
   expect(router.getPathname()).toBe('/more');
-  // Groups was dismissed: back is the tabs' own history, not the Groups page.
-  await act(async () => {
-    appRouter.back();
-  });
-  expect(router.getPathname()).toBe('/today');
+  expect(appRouter.canDismiss()).toBe(false);
 });
 
 it('the Groups tab on a More page opens Groups', async () => {
@@ -158,4 +153,7 @@ it('the Groups tab on a More page opens Groups', async () => {
   expect(await screen.findByTestId('groups-stub')).toBeTruthy();
   expect(router.getPathname()).toBe('/groups');
   expectSelected('groups');
+  // The settings page was dismissed, not left under the tabs.
+  expect(screen.queryByTestId('settings-stub')).toBeNull();
+  expect(appRouter.canDismiss()).toBe(false);
 });

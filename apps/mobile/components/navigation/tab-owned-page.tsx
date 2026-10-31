@@ -9,13 +9,12 @@ import type { MainTabKey } from '@/src/navigation/main-tabs';
 
 type TabOwnedPageProps = {
   children: ReactNode;
-  // The tab the page belongs to (`resolveMainTab`): Groups for `/groups`, else More.
+  // The tab the page belongs to (`resolveMainTab`); More owns all of them today.
   activeTab?: MainTabKey;
 };
 
 /**
- * A root-stack page that keeps the bottom tab bar (Exercises, Groups,
- * Settings): the native header on top, its owner tab selected below. A tab
+ * A root-stack page that keeps the bottom tab bar (Exercises, Settings): the native header on top, its owner tab selected below. A tab
  * press returns by `dismissTo`, so the tabs underneath are reused rather than
  * stacked, as from the session view.
  */

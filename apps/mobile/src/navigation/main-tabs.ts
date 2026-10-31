@@ -68,11 +68,10 @@ const SEGMENT_TO_MAIN_TAB: Readonly<Record<string, MainTabKey>> = {
   today: 'today',
   train: 'train',
   progress: 'progress',
-  more: 'more',
-  // Groups is a root-stack page that keeps the tab bar (`TabOwnedPage`), as
-  // are More's destinations; a preserved legacy root and each of those pages
-  // has an explicit canonical owner.
   groups: 'groups',
+  more: 'more',
+  // A preserved legacy root and More's root-stack destinations that keep the
+  // tab bar (`TabOwnedPage`) each have an explicit canonical owner.
   'stats-history': 'progress',
   'exercise-catalog': 'more',
   settings: 'more',

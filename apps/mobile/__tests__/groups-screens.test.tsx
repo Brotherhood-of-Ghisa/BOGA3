@@ -91,7 +91,7 @@ import type { CompetitionPeriodTotalsWire } from '@/src/groups/competition-wire'
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { resolveMainTab } from '@/src/navigation/main-tabs';
 
-import GroupsTabRoute from '../app/groups';
+import GroupsTabRoute from '../app/(tabs)/groups';
 import GroupScreenRoute from '../app/group/[groupId]/index';
 import GroupMembersRoute from '../app/group/[groupId]/members';
 import MyGroupsRoute from '../app/group/mine';
@@ -310,14 +310,11 @@ afterEach(() => {
 });
 
 describe('Groups tab', () => {
-  it('keeps the tab bar with Groups selected and draws no back of its own (the native header has it)', async () => {
+  it('draws no tab bar or back of its own: it is a tab, under the tab layout', async () => {
     render(<GroupsTabRoute />);
     expect(await screen.findByTestId('groups-title')).toBeTruthy();
     expect(screen.queryByTestId('back-to-more-button')).toBeNull();
-    expect(screen.getByTestId('top-level-tab-groups')).toHaveProp(
-      'accessibilityState',
-      expect.objectContaining({ selected: true })
-    );
+    expect(screen.queryByTestId('main-tab-bar')).toBeNull();
   });
 
   it('shows the sign-in-required state when signed out or unconfigured, and calls no group RPC', () => {

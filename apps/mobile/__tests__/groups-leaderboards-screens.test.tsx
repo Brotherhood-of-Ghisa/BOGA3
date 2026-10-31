@@ -88,7 +88,7 @@ import { competitionExercise,competitionRow,competitionBoard,competitionCertific
 import * as groupsApi from '@/src/groups/api';
 import { uiRoles } from '@/components/ui';
 
-import GroupsTabRoute from '../app/groups';
+import GroupsTabRoute from '../app/(tabs)/groups';
 import { sortPodiumCards } from '@/components/groups/group-leaderboards-page';
 import GroupBoardRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/index';
 import GroupBoardHistoryRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/history';

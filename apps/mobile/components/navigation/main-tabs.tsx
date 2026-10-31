@@ -36,7 +36,14 @@ export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
         testID: tab.testID,
       },
       indicator: (
-        <View style={[styles.indicator, active ? styles.indicatorActive : null]} testID={`${tab.testID}-indicator`} />
+        <View
+          style={[
+            styles.indicator,
+            tab.presentation === 'overflow' ? styles.indicatorOverflow : null,
+            active ? styles.indicatorActive : null,
+          ]}
+          testID={`${tab.testID}-indicator`}
+        />
       ),
     };
   };
@@ -121,6 +128,10 @@ const styles = StyleSheet.create({
     marginHorizontal: uiSpace.lg,
     height: uiBorder.width * 2,
     backgroundColor: 'transparent',
+  },
+  // The ⋮ is one tap target wide: a narrower inset keeps its underline legible.
+  indicatorOverflow: {
+    marginHorizontal: uiSpace.sm,
   },
   indicatorActive: {
     backgroundColor: uiRoles.ink,

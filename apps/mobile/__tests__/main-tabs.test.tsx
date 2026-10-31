@@ -51,11 +51,11 @@ describe('main tab model', () => {
     expect(resolveMainTab(['(tabs)', 'today'])).toBe('today');
     expect(resolveMainTab(['(tabs)', 'train', 'planning'])).toBe('train');
     expect(resolveMainTab(['(tabs)', 'progress', 'history'])).toBe('progress');
+    expect(resolveMainTab(['(tabs)', 'groups'])).toBe('groups');
     expect(resolveMainTab(['(tabs)', 'more', 'settings'])).toBe('more');
 
     expect(resolveMainTab(['(tabs)', 'stats-history'])).toBe('progress');
     expect(resolveMainTab(['(tabs)', 'exercise-catalog'])).toBe('more');
-    expect(resolveMainTab(['(tabs)', 'groups'])).toBe('groups');
     expect(resolveMainTab(['(tabs)', 'settings'])).toBe('more');
   });
 
@@ -86,6 +86,10 @@ describe('TabsBar', () => {
 
     render(<TabsBar routeName="stats-history" />);
     expect(screen.getByLabelText('Open Progress').props.accessibilityState.selected).toBe(true);
+    screen.unmount();
+
+    render(<TabsBar routeName="groups" />);
+    expect(screen.getByLabelText('Open Groups').props.accessibilityState.selected).toBe(true);
   });
 
   it('draws nothing for a route no tab owns', () => {
