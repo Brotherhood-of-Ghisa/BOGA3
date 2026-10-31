@@ -65,11 +65,11 @@ the tab bar (`TabOwnedPage`), owned by More.
 | --- | --- | --- |
 | `/profile` | Auth-aware account route: signed-out credentials, signed-in username / email / password management, sign-out | `profile.tsx` |
 | `/connected-agents` | Signed-in review and revocation of OAuth grants, plus the per-coach **Allow this coach to make changes** permission (default off) | `connected-agents.tsx` |
-| `/theme-colour` | Custom theme hue: ring and live preview; the hue saves when the ring is let go, then `Saved · next launch` | `theme-colour.tsx`, `components/appearance/` |
+| `/theme-colour` | Custom theme hue: ring, live preview; saves on release, then `Saved · next launch` | `theme-colour.tsx`, `components/appearance/` |
 | `/body-weight` | Settings → Bodyweight: the `Bodyweight calculations` On/Off, then private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
-| `/settings-appearance`, `/settings-notifications` | Appearance: Theme radio rows with swatches, `Custom colour` (chevron to `/theme-colour`), footnote `Applies next launch`. Notifications: one switch (state as description), or `Open iOS Settings` / `Sign in`; Categories while on; failures one Notice with Retry | `settings-*.tsx`, `components/appearance/`, `components/notifications/` |
-| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-data-sync`, `/settings-everything-else` | Settings' sub pages: rest timer; Progress defaults, view and periods; the effort table; sync and Backups; Everything else: Display (date format), Records (gym filter), Experiments (title-bar timer), Developer (mode; dev-only logs and data tools) | `settings-*.tsx`, `components/settings/` |
-| `/settings-muscles`, `/settings-muscle-targets`, `/settings-enabled-muscles` | Muscles' Weekly targets and Muscle breakdown cards link to full target/enablement pages ([[muscle.weekly-targets]], [[muscle.report-groups]]). Native Back; loading, retryable errors, empty targets | `settings-*.tsx`, `components/preferences/muscle-settings.tsx` |
+| `/settings-appearance`, `/settings-notifications` | Appearance: Theme radio rows with swatches, `Custom colour` (to `/theme-colour`), footnote `Applies next launch`. Notifications: one switch (state as description) or `Open iOS Settings` / `Sign in`; Categories while on; one Notice with Retry | `settings-*.tsx`, `components/appearance/`, `components/notifications/` |
+| `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-data-sync`, `/settings-everything-else` | Settings' sub pages: rest timer; Progress (Opens on, Display, Periods, Counting); Effort (Display, Working set, Volume check rows); Data & sync (Sync status, Backups); Everything else: Display (date format), Records (gym filter), Experiments (title-bar timer), Developer (mode; dev-only logs and data tools) | `settings-*.tsx`, `components/settings/` |
+| `/settings-muscles`, `/settings-muscle-targets`, `/settings-enabled-muscles` | Muscles' Weekly targets and Muscle breakdown sections link to full target/enablement pages; a blank target shows and uses the default ([[muscle.weekly-targets]], [[muscle.report-groups]]). Native Back; loading, retryable errors, empty targets | `settings-*.tsx`, `components/preferences/muscle-settings.tsx` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |
 | `/exercise-edit` | The exercise editor; Primary and Secondary use the same multi-select sheet, with at least one Primary required; `?exerciseDefinitionId=` edits, else creates; `?request=` carries a caller's callbacks | `exercise-edit.tsx`, `components/exercise-catalog/exercise-editor-screen.tsx` |
 | `/exercise-link` | Link one of my exercises to my groups' exercises, or unlink it | `exercise-link.tsx` |
@@ -165,7 +165,7 @@ the tab bar (`TabOwnedPage`), owned by More.
   preference control or exercise browser grows its own error box.
 - An Appearance preset reads `<Preset> from next launch` until the app reopens
   (`design-language.md`, "Choosing one"); meanwhile its checked row reads
-  `Next launch`, and a saved custom colour's page `Saved · next launch`.
+  `Next launch`.
 - The body weight log is reachable from Settings' Bodyweight card regardless
   of the bodyweight-calculation preference, and no session, detail or logger surface shows or links to a
   reading.

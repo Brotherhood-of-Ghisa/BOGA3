@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { changeToneColour, FigureText, uiBorder, uiGeometry, uiIconSize, uiSpace, uiText } from '@/components/ui';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
-import { formatOneRepMax, formatWorkingSetCount } from '@/src/exercise-calculations/format';
+import { formatOneRepMax, formatWholeSetCount } from '@/src/exercise-calculations/format';
 import type { ProgressExerciseMetric } from '@/src/preferences/model';
 
 import {
@@ -56,7 +56,7 @@ const metricValue = (period: ComparisonPeriodFigures, metric: ComparisonMetric):
       : period.estimatedOneRepMax ?? null;
 
 const metricFigure = (period: ComparisonPeriodFigures, metric: ComparisonMetric): string => {
-  if (metric === 'workingSetCount') return formatWorkingSetCount(period.workingSetCount);
+  if (metric === 'workingSetCount') return formatWholeSetCount(period.workingSetCount);
   if (metric === 'totalVolume') return formatVolumeFigure(period.totalVolume);
   const estimate = period.estimatedOneRepMax ?? null;
   return estimate !== null && Number.isFinite(estimate) ? formatOneRepMax(estimate) : '—';

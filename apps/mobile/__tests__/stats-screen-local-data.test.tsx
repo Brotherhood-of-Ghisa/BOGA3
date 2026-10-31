@@ -259,7 +259,8 @@ describe('Stats over real data', () => {
     chooseFilter('period', 'This week');
     expect(change()).toHaveTextContent(/^0%$/);
     fireEvent.press(screen.getByTestId('stats-muscle-body-target-biceps'));
-    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^75$/);
+    // Biceps' Secondary share is half the pulldown's Volume, not split with its other Secondary.
+    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^150$/);
     inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
     expect(await screen.findByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^0$/);
     expect(change()).toHaveTextContent(/^—$/);
@@ -372,7 +373,7 @@ describe('Stats over real data', () => {
     expect(screen.queryAllByTestId(/^stats-muscle-ticker-/)).toHaveLength(0);
   });
 
-  it('shares the Secondary half-pool across Muscle and its history, without changing Exercise totals', async () => {
+  it('gives each Secondary ½ across Muscle and its history, without changing Exercise totals', async () => {
     await loadMaestroFixture('exercise-block-history');
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('primary_bench_biceps', ?, 'biceps', 1, 'primary')").run(BENCH);
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('secondary_squat_biceps', ?, 'biceps', 0.5, 'secondary')").run(SQUAT);
@@ -381,14 +382,15 @@ describe('Stats over real data', () => {
     await screen.findByTestId(SQUAT_ROW);
     chooseFilter('view-mode', 'Muscle');
     const bicepsNow = () => screen.getByTestId('stats-muscle-row-biceps-now');
-    await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^1.38$/));
+    // Bench's co-primary ½ plus 7 squat sets at ½ each: 4 whole sets.
+    await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^4$/));
     const secondaryOn = () => inFilters(() => screen.getByTestId('stats-secondary-toggle').props.accessibilityState.checked);
     expect(secondaryOn()).toBe(true);
     fireEvent.press(screen.getByRole('link', { name: 'Open Biceps history' }));
     expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=biceps&metric=sets');
 
     inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
-    await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^0.5$/));
+    await waitFor(() => expect(bicepsNow()).toHaveTextContent(/^½$/));
     expect(secondaryOn()).toBe(false);
     expect(screen.getByTestId('stats-filters')).toHaveProp('accessibilityLabel', 'Filters: secondary sets not counted');
     fireEvent.press(screen.getByRole('link', { name: 'Open Biceps history' }));
@@ -396,10 +398,10 @@ describe('Stats over real data', () => {
 
     await showBody();
     fireEvent.press(await screen.findByTestId('stats-muscle-body-target-biceps'));
-    expect(screen.getByTestId(`stats-contribution-${BENCH}-now`)).toHaveTextContent(/^0.5$/);
+    expect(screen.getByTestId(`stats-contribution-${BENCH}-now`)).toHaveTextContent(/^½$/);
     expect(screen.queryByTestId(`stats-contribution-${SQUAT}`)).toBeNull();
     inFilters(() => fireEvent.press(screen.getByTestId('stats-secondary-toggle')));
-    expect(await screen.findByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^0.88$/);
+    expect(await screen.findByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^3$/);
     chooseFilter('view-mode', 'Exercise');
     expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
     expect(screen.getByTestId(`stats-exercise-row-${SQUAT}-now`)).toHaveTextContent(/^7$/);
@@ -423,7 +425,7 @@ describe('Stats over real data', () => {
     expect(muscle.getByText('Secondary effort')).toHaveProp('accessibilityRole', 'header');
     expect(muscle.getAllByTestId(new RegExp(`^stats-contribution-(${BENCH}|${SQUAT})$`)).map(row => row.props.testID))
       .toEqual([`stats-contribution-${BENCH}`, `stats-contribution-${SQUAT}`]);
-    expect(muscle.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^0.88$/);
+    expect(muscle.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^3$/);
     expect(muscle.queryByText('Total')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-muscle-body-target-calves'));
     expect(screen.getByTestId('stats-contributions-empty')).toHaveTextContent('No working sets for Calves in either period');
@@ -924,7 +926,7 @@ describe('Stats over real data', () => {
     expect(chipValue('period')).toBe('4 weeks');
   });
 
-  it('shows a secondary muscle its allocated shares unrounded, in the row and the change', async () => {
+  it('shows a secondary muscle its allocated shares as whole sets, in the row and the change', async () => {
     mockSearchParams = { period: '7', breakdown: 'muscle' };
     await loadMaestroFixture('exercise-block-history');
     // Quads becomes a secondary mapping, keeping the fixture's real sets
@@ -932,9 +934,10 @@ describe('Stats over real data', () => {
     localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'secondary' WHERE muscle_group_id = 'quads'").run();
     await renderStats();
     await screen.findByTestId('stats-muscle-row-quads-now');
-    expect(value('quads', 'now')).toHaveTextContent(/^0.88$/);
-    expect(previous('quads')).toMatch(/^0.25$/);
-    expect(value('quads', 'change')).toHaveTextContent('+0.63');
+    // 3.5 and 1 allocated sets, drawn rounded down; the change is between the figures shown.
+    expect(value('quads', 'now')).toHaveTextContent(/^3$/);
+    expect(previous('quads')).toMatch(/^1$/);
+    expect(value('quads', 'change')).toHaveTextContent('+2');
     // The contributor block still reconciles with its muscle row.
     select('quads');
     for (const column of ['now', 'change']) {

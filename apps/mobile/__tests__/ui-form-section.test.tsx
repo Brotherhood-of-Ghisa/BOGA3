@@ -6,6 +6,7 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Text } from 'react-native';
 
 import { ActionRow, ChoiceRow, FormError, FormSection, InputRow, SwitchRow, uiRoles } from '@/components/ui';
 
@@ -157,5 +158,13 @@ describe('SwitchRow description', () => {
   it('keeps the label as its name without a description', () => {
     render(<SwitchRow label="Notifications" onValueChange={jest.fn()} value={false} />);
     expect(screen.getByRole('switch', { name: 'Notifications' })).not.toBeChecked();
+  });
+});
+
+describe('FormSection without a title', () => {
+  it('draws its card with no heading', () => {
+    render(<FormSection testID="bare"><Text>Row</Text></FormSection>);
+    expect(screen.getByText('Row')).toBeOnTheScreen();
+    expect(screen.queryByRole('header')).toBeNull();
   });
 });

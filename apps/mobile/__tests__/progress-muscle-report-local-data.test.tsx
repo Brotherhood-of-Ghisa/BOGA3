@@ -120,8 +120,9 @@ describe('Progress muscle list under Broad', () => {
     await choose('broad');
     await renderProgress('muscle');
     await waitFor(() => expect(now('quads')).toBeGreaterThan(0));
-    expect(now('quads')).toBe(8.17);
-    expect(now('glutes_max')).toBe(1.17);
+    // 7 squat sets: Quads counts its Primary 7 alone; Glutes & Hams' Secondary 3.5 shows as 3.
+    expect(now('quads')).toBe(7);
+    expect(now('glutes_max')).toBe(3);
   });
 
   it('shows a family header only above two or more muscles and lists headerless muscles first', async () => {
@@ -242,7 +243,7 @@ describe('Muscle history under Broad', () => {
 
   it('opens on a merged muscle under its name and counts its entries together', async () => {
     await choose('broad');
-    // The squat's Quads primary and Adductors secondary are one muscle: each set counts once.
+    // The squat's Quads primary and Adductors secondary are one muscle: each set counts once, as Primary.
     const broadQuads = await history(['quads']);
     const squatSets = broadQuads.daily.reduce((sum, day) => sum + day.workingSetCount, 0);
     expect(squatSets).toBeGreaterThan(0);
@@ -250,7 +251,7 @@ describe('Muscle history under Broad', () => {
     await waitFor(() => expect(mockScreenOptions.title).toBe('Glutes & Hams'));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-loading'));
     const hams = await history(['glutes_max']);
-    expect(hams.daily.reduce((sum, day) => sum + day.workingSetCount, 0)).toBeCloseTo(squatSets / 7, 10);
+    expect(hams.daily.reduce((sum, day) => sum + day.workingSetCount, 0)).toBeCloseTo(squatSets / 2, 10);
   });
 
   it('opens a merged muscle whose anchor entry alone is switched off, as the Progress list shows it', async () => {
@@ -271,10 +272,10 @@ describe('Muscle history under Broad', () => {
     const broad = await history(['quads']);
     localDataClient().prepare('UPDATE muscle_groups SET report_group = NULL, tracked = 1').run();
     const detailed = await history(['quads']);
-    // Broad Quads adds Adductors' one-sixth share to the unchanged Primary pool.
+    // Broad Quads counts at its strongest role: Adductors' Secondary adds nothing.
     expect(broad.daily.map(day => day.dateKey)).toEqual(detailed.daily.map(day => day.dateKey));
     for (let index = 0; index < broad.daily.length; index += 1) {
-      expect(broad.daily[index].workingSetCount).toBeCloseTo(detailed.daily[index].workingSetCount * 7 / 6, 10);
+      expect(broad.daily[index].workingSetCount).toBeCloseTo(detailed.daily[index].workingSetCount, 10);
     }
   });
 

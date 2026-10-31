@@ -303,8 +303,8 @@ total stays a count of physical sets.
 `applyMuscleReport` (`muscle-analytics.ts`) after `withoutSecondaryMappings`.
 It allocates raw mappings before re-keying entries to muscles
 ([[muscle.report-groups]]) and dropping untracked entries
-([[muscle.untracked]]). Merged entries add their allocated shares;
-their strongest role labels the result. A merged muscle takes its anchor's id;
+([[muscle.untracked]]). Merged entries combine as [[muscle.set-count]]
+says; their strongest role labels the result. A merged muscle takes its anchor's id;
 Detailed is the identity. Exercise figures never read it.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and
@@ -336,7 +336,7 @@ groups' included. Figures have no thousands separators; unit labels follow
 | Weight (entered, top, group Weight) | as entered, one decimal on whole kg | `60.0`, `82.5`, `2.25` |
 | 1RM (personal and group) | one decimal ([[1rm.formula]]) | `104.7` |
 | Volume | whole kg·reps | `2560` |
-| Muscle sets | [[muscle.set-count]] (`formatWorkingSetCount`) | `1.5`, `0.33` |
+| Muscle sets | one decimal; whole on Today, Progress ([[muscle.set-count]]) | `1.5`, `2` |
 
 The agent API, the group evaluator and the SQL group functions call this
 kernel rather than copying it; the group load-mode factor is

@@ -16,8 +16,8 @@ Which confirmed performed sets feed which figure. A **working set** feeds set
 and session counts and 1RM and Weight records. A **volume-included set** feeds
 Volume and Volume records. The two are independent.
 
-Personal figures follow the account's effort policy (Settings → efforts:
-independent Working set and Volume columns); the table gives its defaults.
+Personal figures follow the account's effort policy (Settings → Effort:
+Working set and Volume, chosen independently); the table gives its defaults.
 Group and coaching figures use one fixed rule — the personal defaults — and
 never read a device's policy.
 

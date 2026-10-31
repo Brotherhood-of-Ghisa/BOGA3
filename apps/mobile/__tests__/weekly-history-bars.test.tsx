@@ -448,8 +448,8 @@ it.each([
   expect(style(`${prefix}-bar-${TODAY}`).width).toBe('100%');
   expect(style(`${prefix}-median`).left).toBe(strength ? '50%' : '17.5%');
   if (kind === 'muscle' && metric === 'workingSetCount') {
-    expect(screen.getByTestId(`${prefix}-value-${DATES[0]}`)).toHaveTextContent(/^0.5$/);
-    expect(screen.getByTestId(`${prefix}-median`)).toHaveProp('accessibilityLabel', '9-week median 1.75');
+    expect(screen.getByTestId(`${prefix}-value-${DATES[0]}`)).toHaveTextContent(/^½$/);
+    expect(screen.getByTestId(`${prefix}-median`)).toHaveProp('accessibilityLabel', '9-week median 1');
   }
   if (metric === 'workingSetCount') {
     expect(screen.queryByTestId(`${prefix}-p25`)).toBeNull();

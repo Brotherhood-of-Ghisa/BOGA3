@@ -28,6 +28,7 @@ import {
   sortExerciseListItems,
 } from '../app/(tabs)/stats-history';
 import { ComparisonHeaders, comparisonFigures } from '@/components/stats/comparison-columns';
+import { formatWholeSetCount } from '@/src/exercise-calculations/format';
 import { compareProgressFamilies, nextMuscleSortMode, sortProgressMuscles } from '@/components/stats/progress-tables';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import { breakdownParam, periodParam } from '@/components/stats/use-progress-filters';
@@ -274,13 +275,12 @@ describe('formatCountDelta', () => {
     expect(formatCountDelta(4, 0)).toEqual({ text: '+4', tone: 'positive' });
   });
 
-  it('rounds fractional deltas and treats floating point equality as level', () => {
-    expect(formatCountDelta(2 / 3, 1 / 3)).toEqual({ text: '+0.33', tone: 'positive' });
-    expect(formatCountDelta(1 / 3, 2 / 3)).toEqual({ text: '−0.33', tone: 'negative' });
+  it('takes the change between the whole sets drawn, rounded down, so it always adds up', () => {
+    expect(formatCountDelta(1.5, 1.4)).toEqual({ text: '0', tone: 'neutral' });
+    expect(formatCountDelta(2.1, 1.9)).toEqual({ text: '+1', tone: 'positive' });
+    expect(formatCountDelta(1.9, 2.1)).toEqual({ text: '−1', tone: 'negative' });
     expect(formatCountDelta(0.3, 0.1 + 0.2)).toEqual({ text: '0', tone: 'neutral' });
-    expect(formatCountDelta(1 + Number.EPSILON, 1)).toEqual({ text: '0', tone: 'neutral' });
-    expect(formatCountDelta(1.004, 1)).toEqual({ text: '0', tone: 'neutral' });
-    expect(formatCountDelta(1 / 300, 0)).toEqual({ text: '+0.0033', tone: 'positive' });
+    expect(formatCountDelta(1 / 300, 0)).toEqual({ text: '0', tone: 'neutral' });
   });
 
   it('renders positive and negative count deltas without percentages', () => {
@@ -293,15 +293,15 @@ describe('working-count comparison figures', () => {
   const figures = (now: number, previous: number) => comparisonFigures({
     current: { workingSetCount: now, totalVolume: 0 }, previous: { workingSetCount: previous, totalVolume: 0 },
   }, 'workingSetCount');
-  it('compacts thirds without rounding the source figures', () => {
-    expect(figures(2 / 3, 1 / 3)).toEqual({ now: '0.67', previous: '0.33', change: { text: '+0.33', tone: 'positive' } });
+  it('shows shares under one set as <1 and ½', () => {
+    expect(figures(2 / 3, 0.5)).toEqual({ now: '<1', previous: '½', change: { text: '0', tone: 'neutral' } });
   });
-  it('keeps finite weighted half-counts numeric and signed', () => {
-    expect(figures(2.5, 1)).toEqual({ now: '2.5', previous: '1', change: { text: '+1.5', tone: 'positive' } });
+  it('rounds weighted half-counts down to whole, signed sets', () => {
+    expect(figures(2.5, 1)).toEqual({ now: '2', previous: '1', change: { text: '+1', tone: 'positive' } });
   });
   it.each([[Infinity, 1], [.5, NaN], [Infinity, Infinity]])('keeps unavailable current/previous counts neutral (%s, %s)', (now, previous) => {
     const result = figures(now, previous);
-    expect(result.now).toBe(Number.isFinite(now) ? String(now) : '—');
+    expect(result.now).toBe(Number.isFinite(now) ? formatWholeSetCount(now) : '—');
     expect(result.previous).toBe(Number.isFinite(previous) ? String(previous) : '—');
     expect(result.change).toEqual({ text: '—', tone: 'neutral' });
   });

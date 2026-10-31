@@ -84,9 +84,10 @@ describe('completed-session muscle breakdown under Broad', () => {
     const summary = summarize(broadRows);
     expect(summary.workingSetsByMuscle.map(({ id, displayName, primarySetCount, secondarySetCount, weightedSetCount }) =>
       ({ id, displayName, primarySetCount, secondarySetCount, weightedSetCount }))).toEqual([
-      // RDL keeps its whole Primary pool; squat splits its Secondary pool between the two Broad muscles.
-      { id: 'quads', displayName: 'Quads', primarySetCount: 3, secondarySetCount: 1.5, weightedSetCount: 3.75 },
-      { id: 'glutes_max', displayName: 'Glutes & Hams', primarySetCount: 3, secondarySetCount: 1.5, weightedSetCount: 3.75 },
+      // RDL's two Primaries make one Glutes & Hams set; squat's Glutes adds ½ there.
+      // Quads already has the squat's Primary, so its Adductors Secondary adds nothing.
+      { id: 'glutes_max', displayName: 'Glutes & Hams', primarySetCount: 3, secondarySetCount: 3, weightedSetCount: 4.5 },
+      { id: 'quads', displayName: 'Quads', primarySetCount: 3, secondarySetCount: 0, weightedSetCount: 3 },
     ]);
     expect(summary.muscles.map((muscle) => muscle.displayName).sort()).toEqual(['Glutes & Hams', 'Quads']);
   });
@@ -94,7 +95,7 @@ describe('completed-session muscle breakdown under Broad', () => {
   it('adds the squat’s Primary and allocated Secondary entries under Broad', () => {
     const summary = summarize(broadRows, [row('squat', 3, 0)]);
     expect(summary.workingSetsByMuscle.map((muscle) => [muscle.displayName, muscle.weightedSetCount])).toEqual([
-      ['Quads', 3.75], ['Glutes & Hams', 0.75],
+      ['Quads', 3], ['Glutes & Hams', 1.5],
     ]);
   });
 
@@ -152,7 +153,7 @@ describe('by-muscle volume comparison under Broad', () => {
       sessionOf('earlier', '10', [row('squat', 2, 0)]),
     ]);
     expect(rows.find((comparison) => comparison.exerciseName === 'Quads')).toMatchObject({
-      historicalSessionCount: 1, state: 'single-baseline', workingSetCount: 1.25,
+      historicalSessionCount: 1, state: 'single-baseline', workingSetCount: 1,
     });
   });
 });

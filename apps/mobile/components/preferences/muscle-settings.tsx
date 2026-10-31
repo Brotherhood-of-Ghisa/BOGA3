@@ -1,12 +1,12 @@
 import { useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { ActionButton, Card, FormSection, Icon, ListRow, Notice, ScreenScroll, SegmentedControl, SwitchRow,
-  FigureText, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { StyleSheet, Text } from 'react-native';
+import { ActionButton, ChoiceRow, FormSection, Notice, ScreenScroll, SegmentRow, SwitchRow, ValueRow,
+  uiSpace, uiText } from '@/components/ui';
 import { buildSettingsMuscleSections, deriveMuscleReportPreset, setMuscleReportPreset, setMuscleTracked,
   type SettingsMuscleSection } from '@/src/data/muscle-report-settings';
 import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
 import { useAccountLocalPreferenceState, updatePreferences } from '@/src/preferences/hooks';
+import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES } from '@/src/preferences/model';
 import { withMuscleTarget, type MuscleTargetScope } from '@/src/preferences/muscle-targets';
 import { getAccountLocalPreferenceAccountRevision, getAccountLocalPreferenceState } from '@/src/preferences/account-local';
 import { MuscleTargetField } from './muscle-target-field';
@@ -15,6 +15,7 @@ import { useMuscleSetup } from './use-muscle-setup';
 type Page = 'muscles' | 'targets' | 'enabled';
 type Preferences = ReturnType<typeof useAccountLocalPreferenceState>;
 type Setup = ReturnType<typeof useMuscleSetup>;
+const TARGET_MODE_OPTIONS = [{ value: 'single', label: 'Single' }, { value: 'per-muscle', label: 'Per muscle' }] as const;
 const PRESET_OPTIONS = [{ value: 'detailed', label: 'Detailed' }, { value: 'broad', label: 'Broad' }] as const;
 
 /** Full stack pages; account changes remount drafts and invalidate setup reads. */
@@ -38,18 +39,20 @@ function MusclePageBody({ page, preferences }: { page: Page; preferences: Prefer
     {page === 'muscles' ? <MuscleChoices preferences={preferences} scope={scope} setup={setup} sections={sections} /> : null}
     {!setup.rows && !setup.error ? <Text allowFontScaling={false} style={uiText.meta}>Loading muscles…</Text> : null}
     {page === 'targets' && scope ? <TargetSections preferences={preferences} scope={scope} sections={sections} /> : null}
-    {page === 'enabled' ? sections.map(section => <MuscleSection key={section.family} section={section}>
+    {page === 'enabled' ? sections.map(section => <FormSection key={section.family} testID={`settings-muscles-family-${section.family}`} title={section.showHeader ? section.family : undefined}>
       {section.muscles.map((muscle, index) => <SwitchRow key={muscle.id} density="list" disabled={setup.busy} divider={index > 0} label={muscle.label}
         testID={`settings-track-${muscle.id}`} value={muscle.tracked}
         onValueChange={tracked => { void setup.change(() => setMuscleTracked(muscle.entryIds, tracked)); }} />)}
-    </MuscleSection>) : null}
+    </FormSection>) : null}
   </ScreenScroll>;
 }
 
-function DefaultTarget({ preferences }: { preferences: Preferences }) {
+function DefaultTarget({ preferences, divider = false }: { preferences: Preferences; divider?: boolean }) {
   const current = { ...preferences.values, ...preferences.pending };
-  return <MuscleTargetField label="Default target (sets / week)" testID="settings-weekly-working-set-target"
-    value={current.weeklyWorkingSetTarget} onCommit={weeklyWorkingSetTarget => {
+  const standard = DEFAULT_ACCOUNT_LOCAL_PREFERENCES.weeklyWorkingSetTarget;
+  return <MuscleTargetField blank={standard} divider={divider} label="Default target (sets / week)" placeholder={standard}
+    testID="settings-weekly-working-set-target" value={current.weeklyWorkingSetTarget}
+    onCommit={weeklyWorkingSetTarget => {
       if (preferences.accountRevision === getAccountLocalPreferenceAccountRevision() && weeklyWorkingSetTarget !== undefined)
         updatePreferences({ weeklyWorkingSetTarget });
     }} />;
@@ -66,27 +69,23 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
   const entries = setup.rows ?? [];
   const trackedEntries = entries.filter(row => row.tracked === true || row.tracked === 1);
   const custom = enabled.filter(muscle => overrides && Object.hasOwn(overrides, muscle.id)).length;
+  const enabledStatus = setup.rows ? `${trackedEntries.length} / ${entries.length}` : 'Loading…';
   return <>
     <FormSection title="Weekly targets">
-        <View style={styles.choice}>
-          <Text allowFontScaling={false} style={uiText.label}>Target mode</Text>
-          <SegmentedControl accessibilityLabel="Target mode" options={[{ value: 'single', label: 'Single' }, { value: 'per-muscle', label: 'Per muscle' }]}
-            value={current.muscleTargetMode} testIDPrefix="settings-muscle-target-mode"
-            onChange={muscleTargetMode => updatePreferences({ muscleTargetMode })} />
-        </View>
-        <DefaultTarget preferences={preferences} />
-        {current.muscleTargetMode === 'per-muscle' ? <Destination label="Per muscle targets"
-          status={`${custom} custom`} testID="settings-muscle-targets-row" onPress={() => router.push(SETTINGS_SUB_PAGES.muscleTargets)} /> : null}
+      <SegmentRow label="Target mode" options={TARGET_MODE_OPTIONS} value={current.muscleTargetMode}
+        testIDPrefix="settings-muscle-target-mode" onChange={muscleTargetMode => updatePreferences({ muscleTargetMode })} />
+      <DefaultTarget divider preferences={preferences} />
+      {current.muscleTargetMode === 'per-muscle' ? <ChoiceRow accessibilityLabel={`Per muscle targets, ${custom} custom`} divider
+        label="Per muscle targets" onPress={() => router.push(SETTINGS_SUB_PAGES.muscleTargets)}
+        testID="settings-muscle-targets-row" value={`${custom} custom`} /> : null}
     </FormSection>
     <FormSection title="Muscle breakdown">
-        <View style={styles.choice}>
-          <SegmentedControl<MuscleTargetScope> accessibilityLabel="Muscle breakdown" disabled={!scope || setup.busy}
-            options={PRESET_OPTIONS} value={scope ?? 'detailed'} testIDPrefix="settings-muscle-preset"
-            onChange={next => { if (next !== 'custom') void setup.change(() => setMuscleReportPreset(next)); }} />
-          {scope === 'custom' ? <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]} testID="settings-muscle-custom">Custom</Text> : null}
-        </View>
-        <Destination label="Enabled muscles" status={setup.rows ? `${trackedEntries.length} / ${entries.length}` : 'Loading…'}
-          testID="settings-enabled-muscles-row" onPress={() => router.push(SETTINGS_SUB_PAGES.enabledMuscles)} />
+      <SegmentRow<MuscleTargetScope> disabled={!scope || setup.busy} label="Breakdown"
+        onChange={next => { if (next !== 'custom') void setup.change(() => setMuscleReportPreset(next)); }}
+        options={PRESET_OPTIONS} testIDPrefix="settings-muscle-preset" value={scope ?? 'detailed'} />
+      {scope === 'custom' ? <ValueRow divider label="Grouping" testID="settings-muscle-custom" value="Custom" /> : null}
+      <ChoiceRow accessibilityLabel={`Enabled muscles, ${enabledStatus}`} divider label="Enabled muscles"
+        onPress={() => router.push(SETTINGS_SUB_PAGES.enabledMuscles)} testID="settings-enabled-muscles-row" value={enabledStatus} />
     </FormSection>
   </>;
 }
@@ -105,37 +104,20 @@ function TargetSections({ preferences, scope, sections }: { preferences: Prefere
       latest.pending.muscleTargetOverrides ?? latest.values.muscleTargetOverrides, scope, id, target) });
   };
   return <>
-    <Card><DefaultTarget preferences={preferences} /></Card>
-    <View style={styles.listHead}><SectionLabel title={scope === 'custom' ? 'Custom' : scope === 'broad' ? 'Broad' : 'Detailed'} />
-      <SectionLabel title="Sets / week" /></View>
-    {enabled.map(section => <MuscleSection key={section.family} section={section}>
-      {section.muscles.map(muscle => <MuscleTargetField key={`${scope}:${muscle.id}`} label={muscle.label}
-        testID={`settings-muscle-target-${muscle.id}`} defaultTarget={current.weeklyWorkingSetTarget}
+    <FormSection footnote={`Per-muscle targets apply to the ${scope} breakdown`} title="Default">
+      <DefaultTarget preferences={preferences} />
+    </FormSection>
+    {enabled.map(section => <FormSection key={section.family} testID={`settings-muscles-family-${section.family}`} title={section.showHeader ? section.family : undefined}>
+      {section.muscles.map((muscle, index) => <MuscleTargetField key={`${scope}:${muscle.id}`} blank={undefined}
+        divider={index > 0} label={muscle.label} placeholder={current.weeklyWorkingSetTarget}
+        testID={`settings-muscle-target-${muscle.id}`}
         value={Object.hasOwn(current.muscleTargetOverrides[scope] ?? {}, muscle.id) ? current.muscleTargetOverrides[scope]![muscle.id] : undefined}
         onCommit={target => save(muscle.id, target)} />)}
-    </MuscleSection>)}
+    </FormSection>)}
     {enabled.length === 0 ? <Text allowFontScaling={false} style={uiText.meta} testID="settings-muscle-targets-empty">No muscles enabled.</Text> : null}
   </>;
 }
 
-function MuscleSection({ section, children }: { section: SettingsMuscleSection; children: ReactNode }) {
-  return <View style={styles.section} testID={`settings-muscles-family-${section.family}`}>
-    {section.showHeader ? <SectionLabel title={section.family} /> : null}
-    <Card>{children}</Card>
-  </View>;
-}
-function SectionLabel({ title }: { title: string }) {
-  return <Text accessibilityRole="header" allowFontScaling={false} style={uiText.label}>{title}</Text>;
-}
-function Destination({ label, status, testID, onPress }: { label: string; status: string; testID: string; onPress: () => void }) {
-  return <ListRow label={label} density="list" onPress={onPress} testID={testID}
-    accessibilityLabel={`${label}, ${status}`} meta={<Text allowFontScaling={false} style={uiText.meta}><FigureText>{status}</FigureText></Text>}
-    trailing={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />} />;
-}
-
 const styles = StyleSheet.create({
-  content: { gap: uiSpace.xl },
-  section: { gap: uiSpace.sm },
-  choice: { padding: uiSpace.md, gap: uiSpace.sm },
-  listHead: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: uiSpace.md },
+  content: { gap: uiSpace.md },
 });

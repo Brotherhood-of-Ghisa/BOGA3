@@ -2,6 +2,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { FigureText } from '@/components/ui/figure-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
@@ -14,7 +15,8 @@ import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 // `ValueRow`). Only a free-text name stands alone, as a `FormField`.
 
 export type FormSectionProps = {
-  title: string;
+  // The group's micro-label; omitted where a heading would only repeat its one row.
+  title?: string;
   children: ReactNode;
   // The section's one validation message, under its card in `danger`.
   error?: string | null;
@@ -27,9 +29,11 @@ export type FormSectionProps = {
 export function FormSection({ title, children, error, errorTestID, footnote, testID }: FormSectionProps) {
   return (
     <View style={styles.section} testID={testID}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
-        {title}
-      </Text>
+      {title ? (
+        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
+          {title}
+        </Text>
+      ) : null}
       <Card style={error ? styles.cardInvalid : null}>{children}</Card>
       {footnote ? (
         <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.muted]} testID={testID ? `${testID}-footnote` : undefined}>
@@ -82,7 +86,7 @@ export function ChoiceRow({ label, value, placeholder, icon, onPress, divider = 
           allowFontScaling={false}
           numberOfLines={1}
           style={[uiText.body, shown ? uiTextTone.muted : uiTextTone.faint, styles.value]}>
-          {shown ?? placeholder ?? ''}
+          <FigureText>{shown ?? placeholder ?? ''}</FigureText>
         </Text>
       }
       onPress={onPress}

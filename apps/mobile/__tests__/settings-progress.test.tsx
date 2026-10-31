@@ -22,6 +22,7 @@ import {
 import { EverythingElseSettingsScreen } from '@/components/settings/everything-else';
 import ProgressRoute from '../app/(tabs)/progress';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
+import { uiText } from '@/components/ui';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
@@ -60,18 +61,23 @@ afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
 
 const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' } as const;
 
-it('labels every control as a micro-label and names each effort row in bodyStrong', async () => {
+it('draws Progress and Effort as sections of rows: micro-label headings, option-role row names', async () => {
   await openSettings();
-  for (const label of ['Muscle view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric']) {
-    expect(screen.getByText(label)).toHaveStyle(LABEL);
+  const progress = within(screen.getByTestId('settings-section-progress'));
+  for (const heading of ['Opens on', 'Display', 'Periods', 'Counting']) {
+    expect(progress.getByRole('header', { name: heading })).toHaveStyle(LABEL);
+  }
+  for (const label of ['Muscle view', 'Default view', 'Default period', 'Default muscle metric', 'Default exercise metric',
+    'Progress period (weeks)', 'History look-back (weeks)', 'Group by muscle family', 'Count secondary sets']) {
+    expect(progress.getByText(label)).toHaveStyle(uiText.option);
   }
   // Auto-start is a form card's switch row under the `Rest timer` section heading.
   expect(screen.getByRole('switch', { name: 'Auto-start rest timer' })).toBeOnTheScreen();
   expect(screen.getByRole('header', { name: 'Rest timer' })).toHaveStyle(LABEL);
   const effort = within(screen.getByTestId('settings-effort-selections'));
-  expect(effort.getByText('Effort')).toHaveStyle(LABEL);
-  expect(effort.getByText('Volume')).toHaveStyle(LABEL);
-  expect(effort.getByText('Warm-up')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
+  expect(effort.getAllByRole('header').map(heading => heading.props.children)).toEqual(['Display', 'Working set', 'Volume']);
+  effort.getAllByRole('header').forEach(heading => expect(heading).toHaveStyle(LABEL));
+  expect(effort.getAllByText('Warm-up')[0]).toHaveStyle(uiText.option);
 });
 
 const openSettingsAndProgress = async () => {
@@ -226,6 +232,22 @@ it('saves both window settings, and retains invalid numeric drafts in the centra
 });
 
 it.each([
+  ['settings-target-window', 'targetWindowWeeks', 4, 'Progress period', 8],
+  ['settings-history-lookback', 'historyLookbackWeeks', 52, 'History look-back', 104],
+  ['settings-rest-timer-duration', 'restTimerDurationSec', 90, 'Rest timer', 120],
+  ['settings-repeating-timer-interval', 'repeatingTimerIntervalSec', 60, 'Repeating interval', 30],
+] as const)('clearing %s commits its default, which the blank field shows', async (id, field, standard, _name, custom) => {
+  await openSettings();
+  expect(screen.getByTestId(id)).toHaveProp('placeholder', String(standard));
+  editNumber(id, String(custom));
+  expect(values()[field]).toBe(custom);
+  editNumber(id, '');
+  expect(values()[field]).toBe(standard);
+  expect(screen.getByTestId(id)).toHaveProp('value', String(standard));
+  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('None');
+});
+
+it.each([
   ['settings-history-lookback', 'historyLookbackWeeks', 52, 104],
 ] as const)('keeps a failed %s save as a draft and retries it with Refresh', async (id, field, previous, next) => {
   await openSettings();
@@ -263,12 +285,14 @@ it('offers nine fixed labels and independent Display, Working set and Volume con
   expect(screen.queryByTestId('settings-add-rir-input')).toBeNull();
   expect(screen.queryByText('Add')).toBeNull();
   expect(screen.getAllByRole('checkbox')).toHaveLength(27);
-  // The column headers name each choice; no sentence explains them (copy.no-inline-explanation).
+  // The section headings name each use; no sentence explains them (copy.no-inline-explanation).
   expect(within(screen.getByTestId('settings-effort-selections')).queryByText(/Display chooses|Groups keep/)).toBeNull();
-  expect(screen.getAllByRole('checkbox').slice(-6).map(checkbox => checkbox.props.accessibilityLabel)).toEqual([
-    'Technique, Display', 'Technique, Working set', 'Technique, Volume',
-    'Cooldown, Display', 'Cooldown, Working set', 'Cooldown, Volume',
-  ]);
+  const checkboxLabels = screen.getAllByRole('checkbox').map(checkbox => checkbox.props.accessibilityLabel);
+  expect(checkboxLabels.slice(0, 9).every(label => label.endsWith(', Display'))).toBe(true);
+  expect(checkboxLabels.slice(9, 18).every(label => label.endsWith(', Working set'))).toBe(true);
+  expect(checkboxLabels.slice(18).every(label => label.endsWith(', Volume'))).toBe(true);
+  expect(checkboxLabels).toEqual(expect.arrayContaining(['Technique, Display', 'Technique, Working set', 'Technique, Volume',
+    'Cooldown, Display', 'Cooldown, Working set', 'Cooldown, Volume']));
   expect(screen.getByLabelText('Technique, Display')).toHaveProp('accessibilityState', { checked: true });
   expect(screen.getByLabelText('Technique, Working set')).toHaveProp('accessibilityState', { checked: false });
   fireEvent.press(screen.getByLabelText('RIR-2, Display'));

@@ -4,21 +4,8 @@ import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatLocalDateTime } from '@/src/utils/local-time';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 
-import {
-  ActionButton,
-  Card,
-  FigureText,
-  Icon,
-  ListRow,
-  StatePanel,
-  uiBorder,
-  uiRoles,
-  uiSpace,
-  uiText,
-  uiTextTone,
-} from '@/components/ui';
+import { ActionRow, FormSection, StatePanel, ValueRow } from '@/components/ui';
 import { requestSync } from '@/src/sync/scheduler';
 import {
   getSyncStatus,
@@ -161,91 +148,64 @@ function SyncStatusPanelContent({
     .filter(error => error && error !== 'None').join('\n') || 'None';
 
   return (
-    <Card testID={isSignedIn ? 'settings-sync-status-card' : 'settings-sync-signed-out-card'}>
+    <FormSection testID={isSignedIn ? 'settings-sync-status-card' : 'settings-sync-signed-out-card'} title="Sync status">
       {isSignedIn ? <SyncStatusDetails status={status} /> :
         <StatePanel body="Sign in through Account to sync your training data." fill={false} />}
 
-      {(isSignedIn || preferenceError) ? <ListRow
-        density="list"
+      {(isSignedIn || preferenceError) ? <ValueRow
         divider={isSignedIn}
-        meta={
-          <Text
-            allowFontScaling={false}
-            accessibilityLiveRegion="polite"
-            style={[uiText.meta, errorText === 'None' ? uiTextTone.ink : uiTextTone.danger, styles.value, styles.errorValue]}
-            testID="settings-sync-status-error">
-            <FigureText>{errorText}</FigureText>
-          </Text>
-        }
-        testID="settings-sync-status-error-row">
-        <Text allowFontScaling={false} style={uiText.body}>Error</Text>
-      </ListRow> : null}
+        label="Error"
+        testID="settings-sync-status-error-row"
+        tone={errorText === 'None' ? 'default' : 'danger'}
+        value={errorText}
+        valueTestID="settings-sync-status-error"
+      /> : null}
 
-      {isSignedIn && (status?.mergeReviewCount ?? 0) > 0 ? <ListRow label="Review changes"
+      {isSignedIn && (status?.mergeReviewCount ?? 0) > 0 ? <ActionRow divider kind="navigate" label="Review changes"
         onPress={() => setReviewVisible(true)} testID="settings-merge-review" /> : null}
       <ExerciseMergeReview visible={reviewVisible} onDismiss={() => setReviewVisible(false)}
         onChanged={() => { void refresh(); }} />
-      {(isSignedIn || preferenceError) ? <View style={styles.actions}>
-        <ActionButton
-          accessibilityLabel={isRefreshing ? 'Refreshing data status…' : 'Refresh data and sync status'}
-          disabled={isRefreshing}
-          label={isRefreshing ? 'Refreshing…' : 'Refresh'}
-          onPress={() => { void handleManualRefresh(); }}
-          testID="settings-sync-status-refresh-button"
-          variant="outline"
-        />
-      </View> : null}
-    </Card>
+      {(isSignedIn || preferenceError) ? <ActionRow
+        accessibilityLabel={isRefreshing ? 'Refreshing data status…' : 'Refresh data and sync status'}
+        divider
+        disabled={isRefreshing}
+        kind="act"
+        label={isRefreshing ? 'Refreshing…' : 'Refresh'}
+        onPress={() => { void handleManualRefresh(); }}
+        testID="settings-sync-status-refresh-button"
+      /> : null}
+    </FormSection>
   );
 }
 
 function SyncStatusDetails({ status }: { status: SyncStatusSnapshot | null }) {
   const dateFormat = useDateFormat();
   const networkState: SyncNetworkState = status?.networkState ?? 'unknown';
-  const offline = networkState === 'offline';
   return <>
-      <Text allowFontScaling={false} style={[uiText.label, styles.cardLabel]}>Sync status</Text>
-      <ListRow
-        density="list"
-        divider={false}
-        meta={
-          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, styles.value]} testID="settings-sync-status-last-success">
-            <FigureText>{formatLastSuccess(status?.lastSuccessAtMs ?? null, dateFormat)}</FigureText>
-          </Text>
-        }
-        testID="settings-sync-status-last-success-row">
-        <Text allowFontScaling={false} style={uiText.body}>Last successful sync</Text>
-      </ListRow>
-
-      <ListRow
-        density="list"
-        meta={
-          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, styles.value]} testID="settings-sync-status-dirty-count">
-            <FigureText>{String(status?.dirtyCount ?? 0)}</FigureText>
-          </Text>
-        }
-        testID="settings-sync-status-dirty-count-row">
-        <Text allowFontScaling={false} style={uiText.body}>Pending changes</Text>
-      </ListRow>
-
-      {/* Offline is the glyph and the word, never a warning hue (G3). */}
-      <ListRow
-        density="list"
-        meta={
-          <View style={styles.network}>
-            {offline ? (
-              <Icon name="offline" size="sm" testID="settings-sync-status-network-offline-glyph" />
-            ) : null}
-            <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, styles.value]} testID="settings-sync-status-network">
-              {NETWORK_LABELS[networkState]}
-            </Text>
-          </View>
-        }
-        testID="settings-sync-status-network-row">
-        <Text allowFontScaling={false} style={uiText.body}>Network</Text>
-      </ListRow>
-
-    </>;
+    <ValueRow
+      label="Last successful sync"
+      testID="settings-sync-status-last-success-row"
+      value={formatLastSuccess(status?.lastSuccessAtMs ?? null, dateFormat)}
+      valueTestID="settings-sync-status-last-success"
+    />
+    <ValueRow
+      divider
+      label="Pending changes"
+      testID="settings-sync-status-dirty-count-row"
+      value={String(status?.dirtyCount ?? 0)}
+      valueTestID="settings-sync-status-dirty-count"
+    />
+    {/* Offline is the glyph and the word, never a warning hue (G3). */}
+    <ValueRow
+      divider
+      label="Network"
+      testID="settings-sync-status-network-row"
+      value={NETWORK_LABELS[networkState]}
+      valueIcon={networkState === 'offline' ? 'offline' : undefined}
+      valueIconTestID="settings-sync-status-network-offline-glyph"
+      valueTestID="settings-sync-status-network"
+    />
+  </>;
 }
 
 /**
@@ -265,30 +225,3 @@ const resolveErrorText = (status: SyncStatusSnapshot | null): string => {
   }
   return 'None';
 };
-
-const styles = StyleSheet.create({
-  cardLabel: {
-    paddingHorizontal: uiSpace.md,
-    paddingTop: uiSpace.md,
-    paddingBottom: uiSpace.xs,
-  },
-  value: {
-    textAlign: 'right',
-  },
-  // A cycle error can be a sentence: it wraps within the row, right-aligned.
-  errorValue: {
-    flexShrink: 1,
-    maxWidth: '60%',
-  },
-  network: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
-  actions: {
-    padding: uiSpace.md,
-    borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
-    alignItems: 'flex-start',
-  },
-});

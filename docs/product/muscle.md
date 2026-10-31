@@ -2,18 +2,16 @@
 
 ### muscle.set-count · definition · accepted
 
-Every exercise splits two independent pools across its distinct raw mappings:
-Primary work is shared equally; Secondary work shares a separate half pool.
-The same allocation applies to working sets and per-side muscle Volume.
-Stabilizers contribute nothing. Stored mapping weights do not set shares.
-Allocation happens before filtering or Broad grouping: merged entries add their
-shares, and hidden/untracked entries never redistribute work. Exercise figures
-stay unchanged ([[set.count-display]]).
+An exercise's Primary mappings share one set equally; each Secondary mapping
+gets ½. Decided 2026-10-30 (no shared ½ pool). Volume is allocated alike.
+Stabilizers and stored mapping weights add nothing. Allocation precedes
+filtering and Broad grouping; hidden entries never redistribute work. A merged
+muscle adds its entries' Primary shares; Secondary entries give it ½ once, and
+none beside Primary work. Exercise figures are unchanged ([[set.count-display]]).
 
-Keep fractions through aggregation; tables and history show at most two
-decimal places, retaining two significant digits for nonzero shares below
-0.01. Recovery alone floors totals of at least one; below one, it shows `½` for a half and two significant decimal digits for
-other shares. Its spoken labels retain unrounded values.
+Figures and spoken labels show at most one decimal. Today and Progress draw
+whole sets, rounded down (`½`, `<1` below one); a change is the difference of
+the drawn figures.
 
 <!-- fact-table: muscle.set-count -->
 | Working sets mapped to one muscle | It gets |
@@ -24,13 +22,14 @@ other shares. Its spoken labels retain unrounded values.
 | 1 set, duplicate roles on the same raw muscle | 1 |
 | 3 sets, one of two primaries | 1.5 |
 | 1 set, one of three primaries | 0.3333333333333333 |
-| 3 sets, one of two secondaries | 0.75 |
+| 3 sets, one of two secondaries | 1.5 |
 | 4 stabilizer | 0 |
 
-Why: co-primary muscles share the lift; secondary assistance is a separate pool.
+Why: co-primary muscles share the lift; a secondary does half a set of work
+whatever else assists.
 Code: `collectMuscleSetContributions`, `countMuscleSets` and `applyMuscleReport`
-in `apps/mobile/src/data/muscle-analytics.ts`; Recovery's display is `wholeSets`
-in `apps/mobile/components/today/plan-cards.tsx`.
+in `apps/mobile/src/data/muscle-analytics.ts`; the whole-set display is
+`formatWholeSetCount` in `apps/mobile/src/exercise-calculations/format.ts`.
 
 ### muscle.secondary-filter · presentation · accepted
 
@@ -48,7 +47,7 @@ available, with individual anatomy switches and their enabled/total count,
 regardless of breakdown. A preset changes merging, never a switch; merges
 matching neither read `Custom`. Broad merges entries (first listed is the anchor);
 Other entries and custom muscles stay their own.
-A merged muscle sums its tracked entries' allocated shares; untracked entries' work still drops. Each muscle stays in one family.
+A merged muscle counts its tracked entries as [[muscle.set-count]] says; untracked entries' work still drops. Each muscle stays in one family.
 
 
 Why: a simpler view.

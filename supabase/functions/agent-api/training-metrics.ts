@@ -12,7 +12,7 @@ import {
   isValidSessionWeight, type ResolvedSessionWeight,
 } from '../../../apps/mobile/src/bodyweight/as-of.ts';
 
-export const METRIC_REVISION = 'working_sets_v8';
+export const METRIC_REVISION = 'working_sets_v9';
 
 export type ExerciseLoadRow = {
   bodyweight_contribution: number;

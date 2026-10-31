@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 /**
- * The Settings sync-status panel: renders the four signed-in fields — last
+ * The Settings sync-status section: renders the four signed-in fields — last
  * successful sync time, pending (dirty) change count, network state (with an
  * unknown network shown as "Checking…", never as offline or online), and error
  * state — from an injected status source, refreshes on focus, and nudges a sync
@@ -29,7 +29,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { StyleSheet } from 'react-native';
 
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
-import { uiRoles } from '@/components/ui';
+import { uiRoles, uiText } from '@/components/ui';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { SyncStatusSnapshot } from '@/src/sync/sync-status';
 
@@ -157,20 +157,20 @@ describe('Settings sync-status panel', () => {
     expect(screen.getByTestId('settings-sync-status-error')).toBeTruthy();
   });
 
-  it('draws the card on the text roles: words in meta, only the figures in Plex Mono', async () => {
+  it('draws the section on the row vocabulary: option-role names, muted values, only the figures in Plex Mono', async () => {
     renderPanel({ dirtyCount: 7, errorMessage: 'HTTP 503 from push' });
     await waitFor(() => {
       expect(screen.getByTestId('settings-sync-status-dirty-count')).toHaveTextContent('7');
     });
     expect(screen.getByText('Sync status')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
-    expect(screen.getByText('Pending changes')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base });
+    expect(screen.getByText('Pending changes')).toHaveStyle(uiText.option);
     const network = screen.getByTestId('settings-sync-status-network');
-    expect(network).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: uiRoles.ink });
+    expect(network).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.inkMuted });
     const dirty = screen.getByTestId('settings-sync-status-dirty-count');
     expect(dirty).toHaveStyle({ fontFamily: uiFonts.body.family });
     expect(within(dirty).getByText('7')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
     const error = screen.getByTestId('settings-sync-status-error');
-    expect(error).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: uiRoles.danger });
+    expect(error).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.danger });
     expect(within(error).getByText('503')).toHaveStyle({ fontFamily: uiFonts.figure.family });
   });
 
@@ -196,14 +196,14 @@ describe('Settings sync-status panel', () => {
     });
   });
 
-  it('renders the offline network state as the wifi-off glyph and the word, in ink', async () => {
+  it('renders the offline network state as the wifi-off glyph and the word, in no warning hue', async () => {
     renderPanel({ networkState: 'offline' });
     await waitFor(() => {
       expect(screen.getByTestId('settings-sync-status-network')).toHaveTextContent('Offline');
     });
     expect(screen.getByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeTruthy();
     expect(StyleSheet.flatten(screen.getByTestId('settings-sync-status-network').props.style).color).toBe(
-      uiRoles.ink,
+      uiRoles.inkMuted,
     );
   });
 
@@ -234,14 +234,23 @@ describe('Settings sync-status panel', () => {
     expect(screen.queryByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeNull();
   });
 
-  it('renders the latest cycle error in danger', async () => {
+  it('renders the latest cycle error in danger, announced when it appears', async () => {
     renderPanel({ errorMessage: 'server unreachable' });
     await waitFor(() => {
       expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent('server unreachable');
     });
+    expect(screen.getByTestId('settings-sync-status-error')).toHaveProp('accessibilityLiveRegion', 'polite');
     expect(StyleSheet.flatten(screen.getByTestId('settings-sync-status-error').props.style).color).toBe(
       uiRoles.danger,
     );
+  });
+
+  it('offers Review changes as a navigate row only while there are changes to review', async () => {
+    const { rerender } = renderPanel({ mergeReviewCount: 2 });
+    expect(await screen.findByTestId('settings-merge-review')).toBeTruthy();
+    expect(screen.getByText('Review changes')).toHaveStyle({ color: uiRoles.accent });
+    rerender(<SyncStatusPanel onRequestSync={jest.fn()} readStatus={jest.fn().mockResolvedValue({ ...baseStatus, mergeReviewCount: 0 })} />);
+    await waitFor(() => expect(screen.queryByTestId('settings-merge-review')).toBeNull());
   });
 
   it('shows a sign-in-required error when the cycle reported no signed-in user', async () => {
