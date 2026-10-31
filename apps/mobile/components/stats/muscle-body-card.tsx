@@ -32,6 +32,7 @@ import {
   projectMuscleBody,
   selectMuscleFibres,
   type BodyOrientation,
+  type MuscleSetTargets,
 } from './muscle-body-projection';
 
 type Props = {
@@ -41,6 +42,7 @@ type Props = {
   readonly onSelect: (id: string) => void;
   /** The user's muscle setup, so merged entries shade and select together and untracked ones stay neutral. */
   readonly report?: MuscleReportAssignment;
+  readonly setTargets?: MuscleSetTargets;
 };
 
 const ORIENTATION_OPTIONS: readonly SegmentedControlOption<BodyOrientation>[] = [
@@ -238,7 +240,7 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
  * independent normals hide their own far surface. Body colours and hit targets stay live.
  * Decoration follows [[appearance.november]] without changing hit testing.
  */
-export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }: Props) {
+export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, setTargets }: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const november = useNovemberAppearance();
   const [measuredWidth, setMeasuredWidth] = useState(0);
@@ -253,7 +255,7 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report }
       : Math.max(MIN_VIEWPORT_WIDTH, windowWidth - CARD_HORIZONTAL_INSET);
 
   const orientation = bodyOrientationForAngle(angleDeg);
-  const scores = useMemo(() => computeMuscleScores(muscles, metric), [muscles, metric]);
+  const scores = useMemo(() => computeMuscleScores(muscles, metric, setTargets), [muscles, metric, setTargets]);
   const palette = useMemo(() => buildThemeShadePalette(uiRoles), []);
   const selectedFibres = useMemo(() => selectMuscleFibres(selectedId, report), [selectedId, report]);
   const projected = useMemo(

@@ -66,9 +66,9 @@ Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 Progress 3D Sets use [[muscle.weekly-targets]] scaled to [[comparison.window]],
 capped at 100%: zero is whitish neutral, positive attainment light-to-dark.
 Volume uses rounded percentage changes, scaled middle-to-dark for gains and
-middle-to-light for losses against body-wide finite extrema. Filters may
+middle-to-light for losses against body-wide finite extrema; −100% is lightest. Filters may
 rescale Volume; rotation/selection cannot. Unchanged activity is middle;
-empty/unavailable neutral; `new`/overflow darkest, outside finite extrema.
+empty in both periods/unavailable neutral; `new`/overflow darkest, outside finite extrema.
 No legend; selection shows Now/Prev/Change.
 
 History legends precede charts: muscle Sets uses `% of target`, capped at
@@ -79,5 +79,3 @@ weekly Sets/Volume sums, weekly strength bests). Empty/all-zero samples stay neu
 Why: Sets show goal attainment; Volume shows period change; history shows training intensity.
 Code: `apps/mobile/components/heatmaps/heatmap-metric.ts`;
 `apps/mobile/components/stats/muscle-body-projection.ts`.
-Pending: Progress 3D Sets still uses comparison scores in
-`apps/mobile/components/stats/muscle-body-projection.ts`; apply target attainment there.

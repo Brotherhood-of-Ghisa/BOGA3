@@ -91,14 +91,31 @@ const comparedMuscle = (id: string, current: number | null, previous: number | n
   return row;
 };
 
+const SET_TARGETS = { weeklyTarget: 8, weeks: 1 };
+
 describe('computeMuscleScores', () => {
   it.each([
-    [12, 8, 1], [8, 12, -1], [8, 8, 0], [0, 8, -1], [8, 0, 1], [0, 0, null],
-    [Number.NaN, 8, null], [8, Infinity, null],
-  ])('compares %s sets with %s previous sets (score %s)', (now, previous, expected) => {
-    const scores = computeMuscleScores([comparedMuscle('front_delts', now, previous, 'workingSetCount')], 'workingSetCount');
+    [12, 8, 1], [8, 12, 1], [4, 4, 0], [2, 8, -.5], [.5, 8, -.875],
+    [0, 8, null], [8, 0, 1], [0, 0, null], [Number.NaN, 8, null], [8, Infinity, 1],
+  ])('grades %s sets against the target independently of %s previous sets (score %s)', (now, previous, expected) => {
+    const scores = computeMuscleScores([comparedMuscle('front_delts', now, previous, 'workingSetCount')], 'workingSetCount', SET_TARGETS);
     expect(scores.get('front_delts')).toBe(expected);
     expect(scores.get('delts_front')).toBe(expected);
+  });
+
+  it('scales effective per-muscle targets to the selected period and caps attainment', () => {
+    const rows = [comparedMuscle('chest', 8, 100, 'workingSetCount'), comparedMuscle('quads', 32, 0, 'workingSetCount')];
+    const targets = { ...SET_TARGETS, weeks: 4, weeklyTargets: { chest: 4 } };
+    expect([...computeMuscleScores(rows, 'workingSetCount', targets).values()]).toEqual([0, 1]);
+    expect([...computeMuscleScores(rows, 'workingSetCount', { ...targets, weeks: 1 }).values()]).toEqual([1, 1]);
+  });
+
+  it.each([
+    undefined, { weeklyTarget: 0, weeks: 1 }, { weeklyTarget: -1, weeks: 1 },
+    { weeklyTarget: Infinity, weeks: 1 }, { weeklyTarget: 8, weeks: 0 },
+    { weeklyTarget: 8, weeks: NaN }, { weeklyTarget: 8, weeks: 1, weeklyTargets: { chest: 0 } },
+  ])('keeps unavailable target scales neutral (%j)', targets => {
+    expect(computeMuscleScores([makeMuscle('chest', 'Chest', 8)], 'workingSetCount', targets).get('chest')).toBeNull();
   });
 
   it.each([
@@ -109,6 +126,12 @@ describe('computeMuscleScores', () => {
     [Number.MAX_VALUE, Number.MIN_VALUE, 1],
   ])('uses the displayed Volume change for %s versus %s (score %s)', (now, previous, expected) => {
     expect(computeMuscleScores([comparedMuscle('chest', now, previous)], 'totalVolume').get('chest')).toBe(expected);
+  });
+
+  it('gives a -100% Volume drop the lightest shade even beside smaller declines', () => {
+    const scores = computeMuscleScores([comparedMuscle('chest', 0, 1000),
+      comparedMuscle('biceps', 500, 1000), comparedMuscle('quads', 1000, 1000)], 'totalVolume');
+    expect([...scores.values()]).toEqual([-1, -.5, 0]);
   });
 
   it('scales finite gains and losses separately, across front and back, with ties and rounded zero', () => {
@@ -144,12 +167,12 @@ describe('computeMuscleScores', () => {
     }
   });
 
-  it('retains half sets, recomputes after filtering, and lets an outlier compress smaller changes', () => {
-    const rows = [.5, 2, 4].map((change, index) => comparedMuscle(['chest', 'biceps', 'quads'][index], 10 + change, 10, 'workingSetCount'));
-    expect([...computeMuscleScores(rows, 'workingSetCount').values()]).toEqual([.125, .5, 1]);
-    expect([...computeMuscleScores(rows.slice(0, 2), 'workingSetCount').values()]).toEqual([.25, 1]);
+  it('retains half sets without rescaling after filtering or another muscle exceeding its target', () => {
+    const rows = [.5, 2, 4].map((count, index) => comparedMuscle(['chest', 'biceps', 'quads'][index], count, 10, 'workingSetCount'));
+    expect([...computeMuscleScores(rows, 'workingSetCount', SET_TARGETS).values()]).toEqual([-.875, -.5, 0]);
+    expect([...computeMuscleScores(rows.slice(0, 2), 'workingSetCount', SET_TARGETS).values()]).toEqual([-.875, -.5]);
     const outlier = comparedMuscle('back_lats', 410, 10, 'workingSetCount');
-    expect([...computeMuscleScores([...rows, outlier], 'workingSetCount').values()]).toEqual([.00125, .005, .01, 1]);
+    expect([...computeMuscleScores([...rows, outlier], 'workingSetCount', SET_TARGETS).values()]).toEqual([-.875, -.5, 0, 1]);
   });
 
   it('keeps all-loss, unchanged-only and empty figures anchored without inventing gains', () => {
@@ -211,11 +234,12 @@ describe('projectMuscleBody & hitTestProjectedMuscle', () => {
     const muscles = [makeMuscle('chest', 'Chest', 8), makeMuscle('quads', 'Quads', 4), makeMuscle('delts_front', 'Front delts', 6), makeMuscle('biceps', 'Biceps', 0)];
     muscles[1] = comparedMuscle('quads', 4, 8, 'workingSetCount');
     muscles[2] = comparedMuscle('delts_front', 6, 6, 'workingSetCount');
-    const scores = computeMuscleScores(muscles, 'workingSetCount');
+    muscles[3] = comparedMuscle('biceps', 0, 8, 'workingSetCount');
+    const scores = computeMuscleScores(muscles, 'workingSetCount', SET_TARGETS);
     const palette = buildThemeShadePalette(generateRoles(preset.seeds));
     for (const selectedId of [null, 'quads']) {
       const projected = projectMuscleBody({ angleDeg: 0, width: 280, height: 280, scores, selectedId, palette });
-      for (const [id, score] of [['chest', 1], ['quads', -1], ['delts_front', 0], ['biceps', null]] as const) {
+      for (const [id, score] of [['chest', 1], ['quads', 0], ['delts_front', .5], ['biceps', null]] as const) {
         const facets = projected.triangles.filter(triangle => triangle.muscleGroupId === id);
         expect(facets.length).toBeGreaterThan(0);
         expect(facets.every(triangle => buildMuscleShadeRamp(score, palette).includes(triangle.fill))).toBe(true);
@@ -370,6 +394,30 @@ describe('MuscleBodyCard', () => {
     makeMuscle('back_lats', 'Lats', 6, 2400),
     makeMuscle('quads', 'Quads', 4, 1600),
   ];
+
+  it('repaints SVG target shades when targets or periods change and keeps untrained muscles neutral', () => {
+    const rows = [comparedMuscle('chest', 2, 8, 'workingSetCount'),
+      comparedMuscle('biceps', 0, 8, 'workingSetCount'), comparedMuscle('quads', 8, 0, 'workingSetCount')];
+    const props = { muscles: rows, metric: 'workingSetCount' as const, selectedId: null, onSelect: jest.fn() };
+    const view = render(<MuscleBodyCard {...props} setTargets={SET_TARGETS} />);
+    fireEvent(screen.getByTestId('stats-muscle-body-viewport'), 'layout', { nativeEvent: { layout: { width: 280, height: 280 } } });
+    const fills = () => screen.getByTestId('stats-muscle-body-svg').findAllByType(Path)
+      .filter(path => path.props.fill).map(path => path.props.fill);
+    const expectedFills = (chest: number, biceps: number | null, quads: number) => projectMuscleBody({ angleDeg: 0, width: 280, height: 280,
+      scores: new Map([['chest', chest], ['biceps', biceps], ['quads', quads]]) }).batches.map(batch => batch.fill);
+    expect(fills()).toEqual(expectedFills(-.5, null, 1));
+    view.rerender(<MuscleBodyCard {...props} setTargets={{ ...SET_TARGETS, weeklyTarget: 4 }} />);
+    expect(fills()).toEqual(expectedFills(0, null, 1));
+    view.rerender(<MuscleBodyCard {...props} setTargets={{ weeklyTarget: 4, weeks: 4 }} />);
+    expect(fills()).toEqual(expectedFills(-.75, null, 0));
+    const volumeProps = { ...props, metric: 'totalVolume' as const,
+      muscles: [comparedMuscle('chest', 0, 1000), comparedMuscle('biceps', 500, 1000), comparedMuscle('quads', 1000, 1000)] };
+    view.rerender(<MuscleBodyCard {...volumeProps} setTargets={SET_TARGETS} />);
+    expect(fills()).toEqual(expectedFills(-1, -.5, 0));
+    const volumeFills = fills();
+    view.rerender(<MuscleBodyCard {...volumeProps} setTargets={{ weeklyTarget: 100, weeks: 4 }} />);
+    expect(fills()).toEqual(volumeFills);
+  });
 
   it('omits the legend and keeps the selected muscle’s signed comparison', () => {
     render(<MuscleBodyCard metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={jest.fn()} />);

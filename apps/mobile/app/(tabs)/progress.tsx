@@ -29,6 +29,9 @@ import { type ProgressComparisons, type ProgressMuscleComparison } from '@/src/d
 import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
+import { effectiveMuscleTargetOverrides } from '@/src/preferences/muscle-targets';
+import { deriveMuscleReportPreset } from '@/src/data/muscle-report-setup';
+import type { MuscleSetTargets } from '@/components/stats/muscle-body-projection';
 import type { HeatmapView, ProgressExerciseMetric, ProgressMetric, ProgressMuscleLayout } from '@/src/preferences/model';
 import {
   compareFamilySections, countFamilyMuscles, familyHasHeader, nextMuscleSortMode, type MuscleSortMode,
@@ -224,6 +227,7 @@ export type StatsScreenShellProps = {
   exerciseFamilies?: ReadonlyMap<string, string>;
   /** The user's muscle setup ([[muscle.report-groups]]); unset shows every anatomy entry as its own muscle. */
   muscleReport?: MuscleReportAssignment;
+  muscleTargets?: Omit<MuscleSetTargets, 'weeks'>;
   /** The user's muscles per family, from their setup; read from `summary` when unset. */
   muscleFamilyCounts?: ReadonlyMap<string, number>;
   exerciseDataReady?: boolean;
@@ -299,6 +303,7 @@ export function StatsScreenShell({
   exerciseSearchIndex,
   exerciseFamilies,
   muscleReport = NO_MUSCLE_REPORT,
+  muscleTargets,
   muscleFamilyCounts,
   exerciseDataReady = true,
   exerciseDataError = null,
@@ -445,6 +450,7 @@ export function StatsScreenShell({
           emptyBody={exerciseEmptyBody(exerciseListItems, exerciseMetric)}
           sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} /> : null : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={effectiveContributionId} muscleLayout={muscleLayout}
           report={muscleReport}
+          setTargets={muscleTargets && { ...muscleTargets, weeks: period === 'this-week' ? 1 : targetWindowWeeks }}
           grouped={grouped.muscle} searchQuery={muscleSearch}
           sortMode={muscleSortMode} onSort={header => setMuscleSortMode(mode => nextMuscleSortMode(mode, header))}
           onSelect={showContributions}
@@ -628,6 +634,7 @@ function StatsContent() {
       lastCompletedAt: thisPeriod.lastCompletedAtById.get(item.id) ?? null,
     })), [catalog.exercises, thisPeriod, lastPeriod]);
   const muscleReport = catalog.muscleSetup?.assignment ?? NO_MUSCLE_REPORT;
+  const weeklyTargets = effectiveMuscleTargetOverrides(values, deriveMuscleReportPreset(catalog.muscleGroups));
   const muscleFamilyCounts = useMemo(
     () => catalog.status === 'ready' && catalog.muscleSetup
       ? countFamilyMuscles(catalog.muscleSetup.muscles.map(muscle => muscle.familyName)) : undefined,
@@ -650,6 +657,7 @@ function StatsContent() {
       filters.breakdown === 'muscle' ? 'timeline' : undefined))}
     viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
     muscleLayout={values.progressMuscleLayout}
+    muscleTargets={{ weeklyTarget: values.weeklyWorkingSetTarget, weeklyTargets }}
     tableMetric={filters.metric} onSelectTableMetric={filters.selectMetric}
     exerciseMetric={filters.exerciseMetric} onSelectExerciseMetric={filters.selectExerciseMetric}
     isFocused={isFocused}
