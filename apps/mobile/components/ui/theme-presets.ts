@@ -16,7 +16,7 @@ export type ThemePresetId = 'warm' | 'slate' | 'forest' | 'plum';
 
 export const DEFAULT_THEME_PRESET_ID: ThemePresetId = 'warm';
 
-// In the order the Appearance sheet lists them. `record` stays a brass in every
+// In the order the Appearance page lists them. `record` stays a brass in every
 // preset: "your best ever" keeps one look whatever the accent.
 export const themePresets: readonly ThemePreset[] = [
   { id: 'warm', label: 'Warm', seeds: defaultThemeSeeds },

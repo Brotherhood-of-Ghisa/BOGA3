@@ -174,7 +174,7 @@ Native and JS readers validate version, recipient, binding, expiry and routing
 shape before use. In the foreground an alert shows the iOS banner without sound and never
 navigates (`apps/mobile/src/notifications/native-adapter.ts`).
 
-Settings' notification sheet reuses shared controls and reflects OS permission,
+Settings' Notifications page reuses shared controls and reflects OS permission,
 registration and confirmed server preference state. Group mute uses the live
 membership RPC. Failed writes retain confirmed values with Retry; account and
 group changes remount their controls. No background write queue is introduced.

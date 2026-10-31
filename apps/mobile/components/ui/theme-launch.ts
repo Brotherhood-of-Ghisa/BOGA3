@@ -34,8 +34,20 @@ export function readStoredThemePresetId(): string | null {
   return Storage.getItemSync(THEME_PRESET_STORAGE_KEY);
 }
 
+const savedListeners = new Set<() => void>();
+
+// Called after every successful save, so a row showing the stored choice
+// (Settings home, Appearance) re-reads it when another page saved.
+export function subscribeThemeSaved(listener: () => void): () => void {
+  savedListeners.add(listener);
+  return () => {
+    savedListeners.delete(listener);
+  };
+}
+
 // Rejects when the write fails; the caller reports that nothing changed. `id`
 // is a preset id or a custom hue's `hue:<deg>`.
 export async function saveThemePresetId(id: ThemePresetId | HueThemeId): Promise<void> {
   await Storage.setItem(THEME_PRESET_STORAGE_KEY, id);
+  savedListeners.forEach((listener) => listener());
 }

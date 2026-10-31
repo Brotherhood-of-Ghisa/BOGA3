@@ -39,7 +39,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
 | `/exercise-catalog` | Catalogue create/edit/delete/restore; ⋮ `Merge into…` above Delete: picker → native confirmation → refreshed catalogue; failures retain Retry. Gym-scoped stats; linked rows marked; shared browser ([[muscle.no-breakdown]]) | `exercise-catalog.tsx` |
 | `/groups` | One group, titled (and switched) by name, a settings icon; swiped pages, opening mid: `Stream` of sessions, records, membership and CoW lifecycle events (a record card shows its set and certification status, then values; its sheet: the set, one Certify, each value, the previous #1 per board, `Session`, `Leaderboard`); `At a glance` (pinned stepper, metric; stats, top five, rank chart); `Leaderboards` (All podiums, search, order); `CoWs` (current, next and past challenges) | `groups.tsx`, `components/groups/` |
-| `/settings` | One grouped list: Account; Training (Rest timer, Bodyweight, Muscles, Effort, Progress); App (Appearance, Notifications, Data & sync, Everything else); About, last, read-only. Each row shows its current setting; Appearance and Notifications open sheets, the rest pages | `settings.tsx`, `components/settings/` |
+| `/settings` | One grouped list: Account; Training (Rest timer, Bodyweight, Muscles, Effort, Progress); App (Appearance, Notifications, Data & sync, Everything else); About, last, read-only. Each row shows its current setting and opens a page | `settings.tsx`, `components/settings/` |
 
 ## Sessions
 
@@ -65,8 +65,9 @@ the tab bar (`TabOwnedPage`), owned by More.
 | --- | --- | --- |
 | `/profile` | Auth-aware account route: signed-out credentials, signed-in username / email / password management, sign-out | `profile.tsx` |
 | `/connected-agents` | Signed-in review and revocation of OAuth grants, plus the per-coach **Allow this coach to make changes** permission (default off) | `connected-agents.tsx` |
-| `/theme-colour` | Custom theme hue: ring, live preview, `Use this colour` | `theme-colour.tsx`, `components/appearance/` |
+| `/theme-colour` | Custom theme hue: ring, live preview; saves on release, then `Saved · next launch` | `theme-colour.tsx`, `components/appearance/` |
 | `/body-weight` | Settings → Bodyweight: the `Bodyweight calculations` On/Off, then private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
+| `/settings-appearance`, `/settings-notifications` | Appearance: Theme radio rows with swatches, `Custom colour` (to `/theme-colour`), footnote `Applies next launch`. Notifications: one switch (state as description) or `Open iOS Settings` / `Sign in`; Categories while on; one Notice with Retry | `settings-*.tsx`, `components/appearance/`, `components/notifications/` |
 | `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-data-sync`, `/settings-everything-else` | Settings' sub pages: rest timer; Progress (Opens on, Display, Periods, Counting); Effort (Display, Working set, Volume check rows); Data & sync (Sync status, Backups); Everything else: Display (date format), Records (gym filter), Experiments (title-bar timer), Developer (mode; dev-only logs and data tools) | `settings-*.tsx`, `components/settings/` |
 | `/settings-muscles`, `/settings-muscle-targets`, `/settings-enabled-muscles` | Muscles' Weekly targets and Muscle breakdown sections link to full target/enablement pages; a blank target shows and uses the default ([[muscle.weekly-targets]], [[muscle.report-groups]]). Native Back; loading, retryable errors, empty targets | `settings-*.tsx`, `components/preferences/muscle-settings.tsx` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |
@@ -163,9 +164,8 @@ the tab bar (`TabOwnedPage`), owned by More.
   place — Settings' Data & sync `Error` row, retried by its `Refresh` — so no
   preference control or exercise browser grows its own error box.
 - An Appearance preset reads `<Preset> from next launch` until the app reopens
-  (`design-language.md`, "Choosing one"); meanwhile its checked sheet row reads
-  `Next launch`, and a saved custom colour's button `Saved · next launch`. No
-  sentence explains the restart ([[copy.no-inline-explanation]]).
+  (`design-language.md`, "Choosing one"); meanwhile its checked row reads
+  `Next launch`.
 - The body weight log is reachable from Settings' Bodyweight card regardless
   of the bodyweight-calculation preference, and no session, detail or logger surface shows or links to a
   reading.

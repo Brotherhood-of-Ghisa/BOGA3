@@ -30,10 +30,10 @@ jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- shared native database boundary.
   require('./helpers/local-data').localDataBootstrapModule());
 
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Modal } from 'react-native';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 import { GroupNotificationMuteRow } from '@/components/notifications/group-mute-row';
+import { NotificationSettingsScreen } from '@/components/notifications/notification-settings-screen';
 import { NotificationSettingsRow } from '@/components/notifications/settings-row';
 import { __resetNotificationsForTests, refreshNotificationStatus, startNotificationLifecycle } from '@/src/notifications';
 import { setNotificationAccount } from '@/src/notifications/auth-boundary';
@@ -42,7 +42,7 @@ import type { NotificationNativeAdapter, NotificationPreferences } from '@/src/n
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { ensurePreferencesLoaded } from '@/src/preferences/hooks';
-import SettingsRoute from '../app/settings';
+import SettingsNotificationsRoute from '../app/settings-notifications';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
 import { fakeNotificationNative } from './helpers/notification-native';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -94,112 +94,160 @@ beforeEach(async () => {
 
 afterEach(() => { cleanup(); __resetNotificationsForTests(); closeLocalData(); });
 
-const openControls = async () => {
-  fireEvent.press(screen.getByTestId('settings-notifications-row'));
-  await waitFor(() => expect(screen.getByTestId('settings-notifications-activity')).toBeEnabled());
-  return within(screen.getByTestId('settings-notifications-sheet'));
+const status = (text: string) => screen.getByLabelText(`Notifications, ${text}`);
+const toggle = () => screen.getByTestId('settings-notifications-enabled');
+const category = (key: string) => screen.getByTestId(`settings-notifications-${key}`);
+const retryButton = () => screen.getByRole('button', { name: 'Retry' });
+
+// The page, once the status refresh on open has settled.
+const openPage = async (userId: string | null = USER) => {
+  render(<NotificationSettingsScreen userId={userId} />);
+  if (userId) await waitFor(() => expect(status('Not enabled')).toBeTruthy());
 };
 
-it('opens a scrolling sheet and asks permission only after Enable, then can disable the installation', async () => {
+// Switches on and waits for the Categories, which show only while on.
+const switchOn = async () => {
+  fireEvent.press(toggle());
+  await waitFor(() => expect(category('activity')).toBeEnabled());
+};
+
+it('names the state on Settings home and pushes the Notifications page', () => {
   render(<NotificationSettingsRow userId={USER} />);
-  expect(native.requestPermission).not.toHaveBeenCalled();
-  const sheet = await openControls();
-  expect(screen.getByTestId('settings-notifications-scroll')).toHaveStyle({ flexShrink: 1 });
-  expect(native.requestPermission).not.toHaveBeenCalled();
-
-  fireEvent.press(sheet.getByTestId('settings-notifications-enable'));
-  await waitFor(() => expect(screen.getByLabelText('Notifications, On')).toBeTruthy());
-  expect(native.requestPermission).toHaveBeenCalledTimes(1);
-  expect(native.readBinding()?.userId).toBe(USER);
-  expect(sheet.getByText('Categories')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
-  for (const category of ['activity', 'bests', 'ranks']) {
-    expect(sheet.getByTestId(`settings-notifications-${category}`).props.accessibilityState.checked).toBe(true);
-  }
-
-  fireEvent(sheet.getByTestId('settings-notifications-enabled'), 'valueChange', false);
-  await waitFor(() => expect(screen.getByLabelText('Notifications, Not enabled')).toBeTruthy());
-  expect(native.readBinding()).toBeNull();
+  fireEvent.press(screen.getByLabelText('Notifications, Not enabled'));
+  expect(mockPush).toHaveBeenCalledWith('/settings-notifications');
 });
 
-it('shows denied permission with iOS Settings and reports an unsuccessful Settings handoff', async () => {
+it('asks permission only after the switch is turned on, then can switch it off', async () => {
+  await openPage();
+  expect(native.requestPermission).not.toHaveBeenCalled();
+  expect(toggle().props.accessibilityState.checked).toBe(false);
+  // Categories show only while on.
+  expect(screen.queryByText('Categories')).toBeNull();
+
+  await switchOn();
+  await waitFor(() => expect(status('On')).toBeTruthy());
+  expect(native.requestPermission).toHaveBeenCalledTimes(1);
+  expect(native.readBinding()?.userId).toBe(USER);
+  expect(screen.getByText('Categories')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
+  for (const key of ['activity', 'bests', 'ranks']) expect(category(key).props.accessibilityState.checked).toBe(true);
+  // No primary or outline button remains on the page.
+  expect(screen.queryByRole('button')).toBeNull();
+
+  fireEvent.press(toggle());
+  await waitFor(() => expect(status('Not enabled')).toBeTruthy());
+  expect(native.readBinding()).toBeNull();
+  expect(screen.queryByText('Categories')).toBeNull();
+});
+
+it('never shows the switch on before permission resolves', async () => {
+  let answer!: (permission: 'granted') => void;
+  (native.requestPermission as jest.Mock).mockReturnValue(new Promise(resolve => { answer = resolve; }));
+  await openPage();
+
+  fireEvent.press(toggle());
+
+  await waitFor(() => expect(toggle()).toBeDisabled());
+  expect(toggle().props.accessibilityState.checked).toBe(false);
+  expect(status('Not enabled')).toBeTruthy();
+  await act(async () => { answer('granted'); });
+  await waitFor(() => expect(status('On')).toBeTruthy());
+  expect(toggle().props.accessibilityState.checked).toBe(true);
+});
+
+it('turns the switch into Open iOS Settings when permission is refused, and reports an unsuccessful handoff', async () => {
   (native.getPermission as jest.Mock).mockResolvedValue('denied');
   await refreshNotificationStatus();
-  render(<NotificationSettingsRow userId={USER} />);
-  const sheet = await openControls();
-  expect(screen.getByLabelText('Notifications, Off in iOS Settings')).toBeTruthy();
-  expect(sheet.queryByTestId('settings-notifications-enable')).toBeNull();
+  render(<NotificationSettingsScreen userId={USER} />);
+  // The status refresh on open must not land after the failure below.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  const open = screen.getByTestId('settings-notifications-open-settings');
+  expect(screen.getByText('Open iOS Settings')).toBeTruthy();
+  expect(screen.queryByTestId('settings-notifications-enabled')).toBeNull();
+  expect(screen.queryByText('Categories')).toBeNull();
   (native.openSettings as jest.Mock).mockRejectedValueOnce(new Error('native failure'));
-  fireEvent.press(sheet.getByTestId('settings-notifications-open-settings'));
-  expect(await sheet.findByTestId('settings-notifications-error')).toBeTruthy();
+  fireEvent.press(open);
+  expect(await screen.findByTestId('settings-notifications-error')).toBeTruthy();
   expect(native.requestPermission).not.toHaveBeenCalled();
 });
 
 it('keeps confirmed categories after a failed write and retries the requested value', async () => {
-  render(<NotificationSettingsRow userId={USER} />);
-  const sheet = await openControls();
+  await openPage();
+  await switchOn();
   failRpc = { name: 'notification_preferences_set', message: 'connection unavailable', status: 0 };
-  fireEvent.press(sheet.getByTestId('settings-notifications-bests'));
-  expect(await sheet.findByTestId('settings-notifications-error')).toBeTruthy();
-  expect(sheet.getByTestId('settings-notifications-bests').props.accessibilityState.checked).toBe(true);
+  fireEvent.press(category('bests'));
+  expect(await screen.findByTestId('settings-notifications-error')).toBeTruthy();
+  expect(category('bests').props.accessibilityState.checked).toBe(true);
 
-  fireEvent.press(sheet.getByRole('button', { name: 'Retry' }));
-  await waitFor(() => expect(sheet.getByTestId('settings-notifications-bests').props.accessibilityState.checked).toBe(false));
+  fireEvent.press(retryButton());
+  await waitFor(() => expect(category('bests').props.accessibilityState.checked).toBe(false));
   expect(mockRpc).toHaveBeenLastCalledWith('notification_preferences_set', { p_activity: true, p_bests: false, p_ranks: true });
   expect(preferences).toEqual({ activity: true, bests: false, ranks: true, muted: false });
 });
 
 it('does not claim registration succeeded after failure and retries the native opt-in', async () => {
-  render(<NotificationSettingsRow userId={USER} />);
-  const sheet = await openControls();
+  await openPage();
   failRpc = { name: 'notification_register', message: 'unavailable', status: 503 };
-  fireEvent.press(sheet.getByTestId('settings-notifications-enable'));
-  expect(await sheet.findByTestId('settings-notifications-error')).toBeTruthy();
-  expect(screen.getByLabelText('Notifications, Not registered')).toBeTruthy();
+  fireEvent.press(toggle());
+  expect(await screen.findByTestId('settings-notifications-error')).toBeTruthy();
+  expect(status('Not registered')).toBeTruthy();
   expect(native.readBinding()).toBeNull();
 
-  fireEvent.press(sheet.getByRole('button', { name: 'Retry' }));
-  await waitFor(() => expect(screen.getByLabelText('Notifications, On')).toBeTruthy());
+  fireEvent.press(retryButton());
+  await waitFor(() => expect(status('On')).toBeTruthy());
   expect(native.readBinding()?.bindingId).toBe(BINDING);
+  expect(screen.queryByTestId('settings-notifications-error')).toBeNull();
+});
+
+it('shows no failure while switching on is still registering the device', async () => {
+  await openPage();
+  let register!: (value: unknown) => void;
+  mockRpc.mockImplementationOnce(() => response(new Promise(resolve => { register = resolve; })));
+  fireEvent.press(toggle());
+  await waitFor(() => expect(toggle()).toBeDisabled());
+  expect(screen.queryByTestId('settings-notifications-error')).toBeNull();
+
+  await act(async () => { register({ binding_id: BINDING, permission: true, opted_in: true, payload_version: 1 }); });
+  await waitFor(() => expect(status('On')).toBeTruthy());
+  expect(screen.queryByTestId('settings-notifications-error')).toBeNull();
 });
 
 it('keeps registration retryable after a successful category write clears its error', async () => {
-  render(<NotificationSettingsRow userId={USER} />);
-  const sheet = await openControls();
+  await openPage();
   failRpc = { name: 'notification_register', message: 'unavailable', status: 503 };
-  fireEvent.press(sheet.getByTestId('settings-notifications-enable'));
-  expect(await sheet.findByTestId('settings-notifications-error')).toBeTruthy();
+  fireEvent.press(toggle());
+  expect(await screen.findByTestId('settings-notifications-error')).toBeTruthy();
   expect(native.readBinding()).toBeNull();
 
-  fireEvent.press(sheet.getByTestId('settings-notifications-bests'));
-  await waitFor(() => expect(sheet.getByTestId('settings-notifications-bests').props.accessibilityState.checked).toBe(false));
-  await waitForGone(() => sheet.queryByTestId('settings-notifications-error'));
-  expect(screen.getByLabelText('Notifications, Not registered')).toBeTruthy();
-  fireEvent.press(sheet.getByRole('button', { name: 'Retry' }));
+  fireEvent.press(category('bests'));
+  await waitFor(() => expect(category('bests').props.accessibilityState.checked).toBe(false));
+  // The write's success clears the error; the failed registration is still one Notice with Retry.
+  expect(await screen.findByText('This device isn’t registered for notifications.')).toBeTruthy();
+  expect(screen.getAllByTestId('settings-notifications-error')).toHaveLength(1);
+  expect(status('Not registered')).toBeTruthy();
+  fireEvent.press(retryButton());
 
-  await waitFor(() => expect(screen.getByLabelText('Notifications, On')).toBeTruthy());
+  await waitFor(() => expect(status('On')).toBeTruthy());
   expect(native.readBinding()?.bindingId).toBe(BINDING);
-  expect(sheet.queryByRole('button', { name: 'Retry' })).toBeNull();
-  expect(sheet.getByTestId('settings-notifications-bests').props.accessibilityState.checked).toBe(false);
+  expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  expect(category('bests').props.accessibilityState.checked).toBe(false);
 });
 
 it('distinguishes provisional quiet delivery from fully granted notifications', async () => {
   (native.requestPermission as jest.Mock).mockResolvedValue('provisional');
-  render(<NotificationSettingsRow userId={USER} />);
-  const sheet = await openControls();
-  fireEvent.press(sheet.getByTestId('settings-notifications-enable'));
-  await waitFor(() => expect(screen.getByLabelText('Notifications, Quiet delivery')).toBeTruthy());
+  await openPage();
+  await switchOn();
+  await waitFor(() => expect(status('Quiet delivery')).toBeTruthy());
+  expect(toggle().props.accessibilityState.checked).toBe(true);
   expect(native.readBinding()?.bindingId).toBe(BINDING);
 });
 
 it('keeps unsupported builds usable without offering registration or showing active defaults', async () => {
   native.supported = false;
   await refreshNotificationStatus();
-  render(<NotificationSettingsRow userId={USER} />);
-  fireEvent.press(screen.getByTestId('settings-notifications-row'));
-  const sheet = within(screen.getByTestId('settings-notifications-sheet'));
-  expect(screen.getByLabelText('Notifications, Unavailable')).toBeTruthy();
-  expect(sheet.queryByTestId('settings-notifications-enable')).toBeNull();
-  expect(sheet.queryByTestId('settings-notifications-activity')).toBeNull();
+  render(<NotificationSettingsScreen userId={USER} />);
+  expect(screen.getByLabelText('Notifications: Unavailable')).toBeTruthy();
+  expect(screen.queryByTestId('settings-notifications-enabled')).toBeNull();
+  expect(screen.queryByText('Categories')).toBeNull();
   expect(native.requestPermission).not.toHaveBeenCalled();
 });
 
@@ -207,52 +255,50 @@ it('does not invent category defaults before a successful server read', async ()
   __resetNotificationsForTests();
   setNotificationAccount({ userId: USER, authSessionId: 'auth-session' }, 'test-bearer-a');
   failRpc = { name: 'notification_preferences_get', message: 'offline', status: 0 };
-  render(<NotificationSettingsRow userId={USER} />);
-  fireEvent.press(screen.getByTestId('settings-notifications-row'));
-  const sheet = within(screen.getByTestId('settings-notifications-sheet'));
-  expect(await sheet.findByTestId('settings-notifications-error')).toBeTruthy();
-  expect(sheet.queryByTestId('settings-notifications-activity')).toBeNull();
+  render(<NotificationSettingsScreen userId={USER} />);
+  expect(await screen.findByTestId('settings-notifications-error')).toBeTruthy();
+  expect(screen.queryByText('Categories')).toBeNull();
 
-  fireEvent.press(sheet.getByRole('button', { name: 'Retry' }));
-  expect(await sheet.findByTestId('settings-notifications-activity')).toBeTruthy();
+  fireEvent.press(retryButton());
+  await waitForGone(() => screen.queryByTestId('settings-notifications-error'));
+  expect(status('Not enabled')).toBeTruthy();
+  expect(screen.queryByText('Categories')).toBeNull();
 });
 
-it('offers sign in after dismissing the modal and never requests permission while signed out', () => {
+it('offers Sign in as a navigate row and never requests permission while signed out', () => {
   setNotificationAccount(null);
-  render(<NotificationSettingsRow userId={null} />);
-  fireEvent.press(screen.getByTestId('settings-notifications-row'));
+  render(<NotificationSettingsScreen userId={null} />);
+  expect(screen.queryByTestId('settings-notifications-enabled')).toBeNull();
   fireEvent.press(screen.getByTestId('settings-notifications-sign-in'));
-  expect(mockPush).not.toHaveBeenCalled();
-  act(() => screen.UNSAFE_getAllByType(Modal).find(modal => modal.props.testID === 'settings-notifications-sheet-modal')!.props.onDismiss());
   expect(mockPush).toHaveBeenCalledWith(SIGN_IN_ROUTE);
   expect(native.requestPermission).not.toHaveBeenCalled();
 });
 
-it('drops account A’s open sheet and failed-save retry when the persistent Settings route switches to B', async () => {
+it('drops account A’s failed-save retry when the persistent route switches to B', async () => {
   resetLocalData();
   await ensurePreferencesLoaded();
   startNotificationLifecycle();
-  const { rerender } = render(<SettingsRoute />);
-  const sheet = await openControls();
+  const { rerender } = render(<SettingsNotificationsRoute />);
+  await waitFor(() => expect(status('Not enabled')).toBeTruthy());
+  await switchOn();
   failRpc = { name: 'notification_preferences_set', message: 'offline', status: 0 };
-  fireEvent.press(sheet.getByTestId('settings-notifications-bests'));
-  expect(await sheet.findByTestId('settings-notifications-error')).toBeTruthy();
+  fireEvent.press(category('bests'));
+  expect(await screen.findByTestId('settings-notifications-error')).toBeTruthy();
 
   act(() => {
     mockUserId = '88888888-8888-4888-8888-888888888888';
     setNotificationAccount({ userId: mockUserId, authSessionId: 'auth-session-b' }, 'test-bearer-b');
   });
-  rerender(<SettingsRoute />);
-  expect(screen.queryByTestId('settings-notifications-sheet')).toBeNull();
-  await openControls();
-  fireEvent.press(screen.getByTestId('settings-notifications-sheet-backdrop', { includeHiddenElements: true }));
+  rerender(<SettingsNotificationsRoute />);
+  await waitForGone(() => screen.queryByTestId('settings-notifications-error'));
+  // B's own failure: Retry re-reads B's state, it does not re-save A's categories.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
   failRpc = { name: 'notification_preferences_get', message: 'offline', status: 0 };
-  fireEvent.press(screen.getByTestId('settings-notifications-row'));
+  await act(async () => { await refreshNotificationStatus(); });
   expect(await screen.findByTestId('settings-notifications-error')).toBeTruthy();
-  fireEvent.press(screen.getByRole('button', { name: 'Retry' }));
+  fireEvent.press(retryButton());
   await waitForGone(() => screen.queryByTestId('settings-notifications-error'));
   expect(mockRpc).toHaveBeenLastCalledWith('notification_preferences_get', { p_group_id: null });
-  expect(screen.getByTestId('settings-notifications-bests').props.accessibilityState.checked).toBe(true);
 });
 
 it('keeps a confirmed group mute after failure, retries it and disables changes offline', async () => {
