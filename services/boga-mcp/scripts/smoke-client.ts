@@ -155,7 +155,7 @@ try {
   );
   const favourites = Array.isArray(trainingStatus.favourite_exercises) ? trainingStatus.favourite_exercises : [];
   if (
-    trainingStatus.metric_revision !== 'working_sets_v8' ||
+    trainingStatus.metric_revision !== 'working_sets_v9' ||
     !Array.isArray(trainingStatus.muscles) ||
     !isObject(trainingStatus.targets) ||
     typeof trainingStatus.complete !== 'boolean' ||
@@ -548,7 +548,7 @@ try {
     const warmUp = sets[1];
     const workout = workoutRows.find(row => isObject(row) && row.id === expectedSessionId);
     // The seeded warm-up is listed with its set_type but feeds no volume or count.
-    if (context.metric_revision !== 'working_sets_v8' || !isObject(performance) ||
+    if (context.metric_revision !== 'working_sets_v9' || !isObject(performance) ||
       sets.length !== 2 || !isObject(warmUp) || warmUp.set_type !== 'warm_up' ||
       !isObject(performance.volume) || performance.volume.value !== 800 || performance.volume.complete !== true ||
       !isObject(performance.session_body_weight) || performance.session_body_weight.value !== 80 ||

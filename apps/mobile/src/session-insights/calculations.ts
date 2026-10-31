@@ -79,9 +79,9 @@ export type SessionMuscleLoadEntry = SessionInsightMuscleGroup & {
 };
 
 export type SessionMuscleWorkingSetEntry = SessionInsightMuscleGroup & {
-  /** Allocated Primary-pool working-set shares. */
+  /** Allocated Primary working-set shares. */
   primarySetCount: number;
-  /** Allocated Secondary shares before the half-pool multiplier. */
+  /** Secondary sets, each before its ½ weight. */
   secondarySetCount: number;
   /** `primarySetCount + secondarySetCount / 2`: the muscle's [[muscle.set-count]]. */
   weightedSetCount: number;

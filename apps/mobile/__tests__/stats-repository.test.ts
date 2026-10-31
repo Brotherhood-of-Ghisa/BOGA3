@@ -131,7 +131,7 @@ describe('aggregateStats', () => {
     const totals = aggregateStats(input);
     const arms = totals.muscleFamilies.find((family) => family.familyName === 'Arms');
 
-    // Biceps gets half the Primary pool; Triceps gets the Secondary half-pool.
+    // Biceps shares the Primary set with Chest; Triceps, the only Secondary, gets ½.
     // Their allocated shares sum, while the two curl sets remain whole.
     expect(arms?.workingSetCount).toBe(5);
     expect(arms?.totalVolume).toBe(360 + 650 + 650);

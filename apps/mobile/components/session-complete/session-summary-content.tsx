@@ -14,20 +14,23 @@ import { SessionShareSheet, type SessionShareSnapshot } from './session-share-sh
 
 export type MuscleCatalogState = 'loading' | 'ready' | 'error';
 
-const formatCount = (count: number, singular: string): string =>
-  `${count} ${count === 1 ? singular : `${singular}s`}`;
+const formatCount = (count: number, singular: string): string => {
+  const figure = formatWorkingSetCount(count);
+  return `${figure} ${figure === '1' ? singular : `${singular}s`}`;
+};
 
 const MUSCLE_TABLE_COLUMNS = ['Pri', 'Sec', 'Sets'] as const;
 
 const muscleRowLabel = (muscle: SessionMuscleWorkingSetEntry): string =>
   `${muscle.displayName}, ${formatCount(muscle.weightedSetCount, 'set')}: ` +
-  `${muscle.primarySetCount} primary, ${muscle.secondarySetCount} secondary`;
+  `${formatWorkingSetCount(muscle.primarySetCount)} primary, ${formatWorkingSetCount(muscle.secondarySetCount)} secondary`;
 
 // A role with no sets is an absent value: a dash in `faint`.
 function RoleCount({ count }: { count: number }) {
+  const figure = formatWorkingSetCount(count);
   return (
-    <Text allowFontScaling={false} style={[uiText.figure, count === 0 ? uiTextTone.faint : uiTextTone.muted, styles.countCell]}>
-      {count === 0 ? '—' : formatWorkingSetCount(count)}
+    <Text allowFontScaling={false} style={[uiText.figure, figure === '0' ? uiTextTone.faint : uiTextTone.muted, styles.countCell]}>
+      {figure === '0' ? '—' : figure}
     </Text>
   );
 }

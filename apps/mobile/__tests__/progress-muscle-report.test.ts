@@ -188,7 +188,7 @@ describe('Progress reads under the user’s muscles', () => {
     expect(muscles.map(row => row.muscleGroupId)).not.toContain('calves');
     const back = muscles.find(row => row.muscleGroupId === 'back_lats')!;
     expect(back.displayName).toBe('Back');
-    expect(back.current.workingSetCount).toBe(1.25);
+    expect(back.current.workingSetCount).toBe(1);
     expect(back.exercises.map(entry => [entry.exerciseDefinitionId, entry.role])).toEqual([['row', 'primary']]);
   });
 
@@ -206,7 +206,7 @@ describe('Progress reads under the user’s muscles', () => {
     const daily = await repo.computeSelectedMuscleHistoryEffort({
       start: new Date('2026-10-01T00:00:00Z'), end: NOW, muscleGroupIds: ['back_lats'], timeZone: 'UTC',
     });
-    expect(daily.daily.map(day => [day.dateKey, day.workingSetCount])).toEqual([['2026-10-13', 1.25]]);
+    expect(daily.daily.map(day => [day.dateKey, day.workingSetCount])).toEqual([['2026-10-13', 1]]);
     const noSecondary = await repo.computeSelectedMuscleHistoryEffort({
       start: new Date('2026-10-01T00:00:00Z'), end: NOW, muscleGroupIds: ['back_lats'], timeZone: 'UTC', countSecondary: false,
     });
