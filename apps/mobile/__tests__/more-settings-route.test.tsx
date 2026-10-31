@@ -1,11 +1,11 @@
 /* eslint-disable import/first */
 
 /**
- * More's destinations through the real Expo Router: the tab layout under a
- * root stack, as the app is built. Settings, Exercises and Groups are
- * root-stack pages pushed over the tabs (`TabOwnedPage`): each keeps the tab
- * bar with More selected, back returns to More, and a tab press returns to
- * the tabs underneath instead of stacking another copy. The More screen's own
+ * More's destinations and the Groups tab through the real Expo Router: the
+ * tab layout under a root stack, as the app is built. Settings and Exercises
+ * are root-stack pages pushed over the tabs (`TabOwnedPage`): each keeps the
+ * tab bar with More selected, back returns to More, and a tab press returns
+ * to the tabs underneath instead of stacking another copy. Groups is a tab. The More screen's own
  * rows and their hrefs are `more-screen.test.tsx`; the Settings screen itself
  * is `settings-profile-navigation.test.tsx` and the settings suites.
  */
@@ -42,7 +42,7 @@ const tabOwnedStub = (testID: string) =>
     );
   };
 
-const renderApp = () =>
+const renderApp = (initialUrl = '/more') =>
   renderRouter(
     {
       _layout: () => <Stack />,
@@ -50,26 +50,26 @@ const renderApp = () =>
       '(tabs)/today': stub('today-stub'),
       '(tabs)/train': stub('train-stub'),
       '(tabs)/progress': stub('progress-stub'),
+      '(tabs)/groups': stub('groups-stub'),
       '(tabs)/more': MoreScreen,
       '(tabs)/stats-history': stub('stats-stub'),
       'exercise-catalog': tabOwnedStub('catalog-stub'),
-      groups: tabOwnedStub('groups-stub'),
       settings: tabOwnedStub('settings-stub'),
       gyms: stub('gyms-stub'),
     },
-    { initialUrl: '/more' }
+    { initialUrl }
   );
 
-const expectMoreSelected = () =>
-  expect(screen.getByTestId('top-level-tab-more')).toHaveProp(
+const expectSelected = (tab: 'more' | 'groups') =>
+  expect(screen.getAllByTestId(`top-level-tab-${tab}`).at(-1)).toHaveProp(
     'accessibilityState',
     expect.objectContaining({ selected: true })
   );
+const expectMoreSelected = () => expectSelected('more');
 
 it.each([
   ['more-settings-row', 'settings-stub', '/settings'],
   ['more-exercises-row', 'catalog-stub', '/exercise-catalog'],
-  ['more-groups-row', 'groups-stub', '/groups'],
 ])('%s pushes %s over the tabs with More still selected, and back returns to More', async (row, stubID, path) => {
   const router = await renderApp();
   expect(await screen.findByTestId('more-screen')).toBeTruthy();
@@ -118,4 +118,42 @@ it('a tab press on a More page returns to the tabs underneath', async () => {
   expect(router.getPathname()).toBe('/today');
   // The settings page was dismissed, not left under a second tab shell.
   expect(appRouter.canGoBack()).toBe(false);
+});
+
+it('Groups and the ⋮ switch tabs in place, stacking nothing', async () => {
+  const router = await renderApp('/today');
+  await screen.findByTestId('today-stub');
+
+  await act(async () => {
+    fireEvent.press(screen.getByTestId('top-level-tab-groups'));
+  });
+  expect(await screen.findByTestId('groups-stub')).toBeTruthy();
+  expect(router.getPathname()).toBe('/groups');
+  expectSelected('groups');
+
+  await act(async () => {
+    fireEvent.press(screen.getAllByTestId('top-level-tab-more').at(-1)!);
+  });
+  expect(await screen.findByTestId('more-screen')).toBeTruthy();
+  expect(router.getPathname()).toBe('/more');
+  expect(appRouter.canDismiss()).toBe(false);
+});
+
+it('the Groups tab on a More page opens Groups', async () => {
+  const router = await renderApp();
+  await screen.findByTestId('more-screen');
+  await act(async () => {
+    fireEvent.press(screen.getByTestId('more-settings-row'));
+  });
+  await screen.findByTestId('settings-stub');
+
+  await act(async () => {
+    fireEvent.press(screen.getAllByTestId('top-level-tab-groups').at(-1)!);
+  });
+  expect(await screen.findByTestId('groups-stub')).toBeTruthy();
+  expect(router.getPathname()).toBe('/groups');
+  expectSelected('groups');
+  // The settings page was dismissed, not left under the tabs.
+  expect(screen.queryByTestId('settings-stub')).toBeNull();
+  expect(appRouter.canDismiss()).toBe(false);
 });

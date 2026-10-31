@@ -24,9 +24,8 @@ import {
   usePullToRefresh,
   type GroupsSection,
 } from '@/components/groups';
-import { TabOwnedPage } from '@/components/navigation/tab-owned-page';
 import { GroupCoWsPage } from '@/components/groups/group-cows-page';
-import { Icon, IconButton, ScreenScroll, SwipePages, uiSpace, type SwipePageFrame } from '@/components/ui';
+import { Icon, IconButton, ScreenScroll, SwipePages, uiRoles, uiSpace, type SwipePageFrame } from '@/components/ui';
 import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
 import { groupRankSeriesEnd, type GroupHomeMetric } from '@/src/groups/home-periods';
 import { useGroupGlance } from '@/src/groups/use-group-glance';
@@ -58,15 +57,15 @@ const toSection = (value: string | null): GroupsSection | null =>
  */
 export default function GroupsRoute() {
   const { isConfigured, user } = useAuth();
-  // A root-stack page under the native "Groups" header, keeping the tab bar (More).
+  // The Groups tab: the tab layout's header (the group's name) above, the tab bar below.
   return (
-    <TabOwnedPage>
+    <View style={styles.page}>
       {!isConfigured || !user ? (
         <GroupsSignInRequired isConfigured={isConfigured} />
       ) : (
         <GroupsTabContent userId={user.id} />
       )}
-    </TabOwnedPage>
+    </View>
   );
 }
 
@@ -376,6 +375,10 @@ function GroupsStreamPage({ stream, inlineError, offline, onRefresh, onOpenSessi
 }
 
 const styles = StyleSheet.create({
+  page: {
+    flex: 1,
+    backgroundColor: uiRoles.paper,
+  },
   // A page sits between the pager's gutters: no side padding of its own.
   pageContent: {
     paddingHorizontal: 0,

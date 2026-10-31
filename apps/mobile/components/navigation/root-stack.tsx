@@ -1,7 +1,6 @@
 import { Stack } from 'expo-router';
 
-import { uiText } from '@/components/ui/text-roles';
-import { uiRoles } from '@/components/ui/tokens';
+import { HEADER_STYLE_OPTIONS } from '@/components/navigation/header-style';
 import { useAuth } from '@/src/auth';
 import { useRootRouteAccess } from '@/src/navigation/root-route-access';
 
@@ -14,19 +13,7 @@ import { useRootRouteAccess } from '@/src/navigation/root-route-access';
  */
 const ROOT_STACK_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: 'minimal',
-  // One header style on every stack route (`navigation-contract.md` "Header
-  // titles"): the page's own `paper` ground with no shadow line, so header and
-  // page read as one surface, the `title` role, an `ink` back arrow. The header
-  // takes no line height, so only the role's face, weight, size and colour.
-  headerStyle: { backgroundColor: uiRoles.paper },
-  headerShadowVisible: false,
-  headerTitleStyle: {
-    fontFamily: uiText.title.fontFamily,
-    fontWeight: uiText.title.fontWeight,
-    fontSize: uiText.title.fontSize,
-    color: uiText.title.color,
-  },
-  headerTintColor: uiRoles.ink,
+  ...HEADER_STYLE_OPTIONS,
 } as const;
 
 /**
@@ -60,7 +47,6 @@ export function RootStack() {
         <Stack.Screen name="exercise-history" />
         {/* More's destinations that keep the tab bar (`TabOwnedPage`). */}
         <Stack.Screen name="exercise-catalog" options={{ title: 'Exercises' }} />
-        <Stack.Screen name="groups" options={{ title: 'Groups' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         {/* The subject's name replaces this title once it resolves. */}
         <Stack.Screen name="progress-history" options={{ title: 'History' }} />

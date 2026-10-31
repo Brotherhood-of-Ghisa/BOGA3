@@ -63,7 +63,7 @@ import { buildCompetitionPodiums } from '@/src/groups/competition-view-model';
 import type { CompetitionExerciseWire,CompetitionHistoryWire } from '@/src/groups/competition-wire';
 import { competitionExercise,competitionRow,competitionBoard,competitionCertification,competitionEvent } from './helpers/competition-fixtures';
 import { GroupMetricRecordSheet } from '@/components/groups/group-metric-record-sheet';
-import GroupsTabRoute from '../app/groups';
+import GroupsTabRoute from '../app/(tabs)/groups';
 import GroupBoardRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/index';
 import GroupBoardHistoryRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/history';
 

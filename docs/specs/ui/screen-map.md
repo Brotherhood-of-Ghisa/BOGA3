@@ -17,7 +17,7 @@ below is relative to that directory. Components live beside the route, under
 | `/sign-in` | Email/password entry. The *only* route while auth is configured and there is no session | `sign-in.tsx` |
 | `/sync-setup` | First-sync waiting room ("Setting up your data…"): phase label, advancing activity indicator, offline message, one Retry. The *only* route until the user's data is restored | `sync-setup.tsx` (screen in `apps/mobile/src/sync/SyncGate.tsx`) |
 
-## Tabs (the four canonical destinations)
+## Tabs (the five canonical destinations)
 
 The production shell is `apps/mobile/src/navigation/main-tabs.ts`; `MainTabBar`
 draws the same fixed bar on every screen that shows tabs.
@@ -27,7 +27,8 @@ draws the same fixed bar on every screen that shows tabs.
 | `/today` | Landing page: You (this week, N-week period, a session's exercises), Plan (muscles' last three days, today and week against targets; week's plans; `Sessions` opens Sessions), Groups (current CoW exercise/metrics, last week’s winners, unchanged week board and sessions). Swiped cards: Plan first, opens on You. Starts nothing | `(tabs)/today.tsx`, `components/today/`, `src/progress-summary/`, `src/today-plan/` |
 | `/train` | The single entry surface for starting a personal workout | `(tabs)/train.tsx` |
 | `/progress` | Frozen breakdown / period / metric chips over table search and a Filters button, whose sheet holds the family-grouping switch, `Count secondary sets` ([[muscle.secondary-filter]]) and the gym's radio rows — each only where the view uses it; Muscle uses Settings' saved layout (`List`/`3D`, default `List`), Exercise always uses its full exercise list; both follow [[comparison.change-display]]. Exercise sorts Now / Prev / Change / recency; Muscle sorts name / Now / Prev / Change, within fixed family sections or globally with grouping off. Search matches Exercise names/primary muscles or Muscle names/families. Each breakdown retains its own search, grouping and sort for the visit. Exercise opens on its configured metric (Sets by default), with 1RM available explicitly. Muscle List uses the Exercise table’s separate columns and responsive rows; names open history and chevrons disclose contributors; 3D reveals effort-grouped contributors and Timeline / Grid / Weekly links. Table history and contributor links carry the chosen gym and metric; 3D muscle contributors open all-gym exercise Timeline. Visits open on Settings' defaults ([[comparison.window]]); choices last the visit, a changed default replaces one; `breakdown` / `period` links override on entry or change. Sessions remains last | `(tabs)/progress.tsx` |
-| `/more` | Hub for secondary capabilities, so the tab bar stays at four. Two untitled cards: Groups, Exercises, Gyms; then Connect an AI (names the connected agents and opens `/connected-agents`; with none, or signed out, opens the setup instructions in the browser) and Settings | `(tabs)/more.tsx` |
+| `/groups` | One group, under a tab header titled (and switched) by name, a settings icon; swiped pages, opening mid: `Stream` of sessions, records, membership and CoW lifecycle events (a record card shows its set and certification status, then values; its sheet: the set, one Certify, each value, the previous #1 per board, `Session`, `Leaderboard`); `At a glance` (pinned stepper, metric; stats, top five, rank chart); `Leaderboards` (All podiums, search, order); `CoWs` (current, next and past challenges) | `(tabs)/groups.tsx`, `components/groups/` |
+| `/more` | Secondary hub, the bar's ⋮. Two untitled cards: Exercises, Gyms; then Connect an AI (names the connected agents and opens `/connected-agents`; with none, or signed out, opens the setup instructions in the browser) and Settings | `(tabs)/more.tsx` |
 
 ### Preserved tab root and More's tab-owned pages
 
@@ -38,7 +39,6 @@ the tab bar (`TabOwnedPage`), owned by More.
 | --- | --- | --- |
 | `/stats-history` | Compatibility path for `/progress` — a re-export, not a second implementation. `period=7`, `breakdown=exercise` | `(tabs)/stats-history.tsx` |
 | `/exercise-catalog` | Catalogue create/edit/delete/restore; ⋮ `Merge into…` above Delete: picker → native confirmation → refreshed catalogue; failures retain Retry. Gym-scoped stats; linked rows marked; shared browser ([[muscle.no-breakdown]]) | `exercise-catalog.tsx` |
-| `/groups` | One group, titled (and switched) by name, a settings icon; swiped pages, opening mid: `Stream` of sessions, records, membership and CoW lifecycle events (a record card shows its set and certification status, then values; its sheet: the set, one Certify, each value, the previous #1 per board, `Session`, `Leaderboard`); `At a glance` (pinned stepper, metric; stats, top five, rank chart); `Leaderboards` (All podiums, search, order); `CoWs` (current, next and past challenges) | `groups.tsx`, `components/groups/` |
 | `/settings` | One grouped list: Account; Training (Rest timer, Bodyweight, Muscles, Effort, Progress); App (Appearance, Notifications, Data & sync, Everything else); About, last, read-only. Each row shows its current setting and opens a page | `settings.tsx`, `components/settings/` |
 
 ## Sessions

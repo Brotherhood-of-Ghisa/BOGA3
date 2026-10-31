@@ -1,4 +1,4 @@
-export const MAIN_TAB_KEYS = ['today', 'train', 'progress', 'more'] as const;
+export const MAIN_TAB_KEYS = ['today', 'train', 'progress', 'groups', 'more'] as const;
 
 export type MainTabKey = (typeof MAIN_TAB_KEYS)[number];
 
@@ -8,6 +8,8 @@ export type MainTabDefinition = {
   accessibilityLabel: string;
   testID: `top-level-tab-${MainTabKey}`;
   href: `/${MainTabKey}`;
+  // `label`: a micro-label in the tab card. `overflow`: the ⋮ beside it (More).
+  presentation: 'label' | 'overflow';
 };
 
 /** Canonical top-level navigation model. */
@@ -18,6 +20,7 @@ export const MAIN_TAB_DEFINITIONS: readonly MainTabDefinition[] = [
     accessibilityLabel: 'Open Today',
     testID: 'top-level-tab-today',
     href: '/today',
+    presentation: 'label',
   },
   {
     key: 'train',
@@ -25,6 +28,7 @@ export const MAIN_TAB_DEFINITIONS: readonly MainTabDefinition[] = [
     accessibilityLabel: 'Open Train',
     testID: 'top-level-tab-train',
     href: '/train',
+    presentation: 'label',
   },
   {
     key: 'progress',
@@ -32,6 +36,15 @@ export const MAIN_TAB_DEFINITIONS: readonly MainTabDefinition[] = [
     accessibilityLabel: 'Open Progress',
     testID: 'top-level-tab-progress',
     href: '/progress',
+    presentation: 'label',
+  },
+  {
+    key: 'groups',
+    label: 'Groups',
+    accessibilityLabel: 'Open Groups',
+    testID: 'top-level-tab-groups',
+    href: '/groups',
+    presentation: 'label',
   },
   {
     key: 'more',
@@ -39,6 +52,7 @@ export const MAIN_TAB_DEFINITIONS: readonly MainTabDefinition[] = [
     accessibilityLabel: 'Open More',
     testID: 'top-level-tab-more',
     href: '/more',
+    presentation: 'overflow',
   },
 ] as const;
 
@@ -54,12 +68,12 @@ const SEGMENT_TO_MAIN_TAB: Readonly<Record<string, MainTabKey>> = {
   today: 'today',
   train: 'train',
   progress: 'progress',
+  groups: 'groups',
   more: 'more',
   // A preserved legacy root and More's root-stack destinations that keep the
   // tab bar (`TabOwnedPage`) each have an explicit canonical owner.
   'stats-history': 'progress',
   'exercise-catalog': 'more',
-  groups: 'more',
   settings: 'more',
 };
 

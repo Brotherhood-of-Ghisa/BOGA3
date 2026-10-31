@@ -14,8 +14,7 @@ type TabOwnedPageProps = {
 };
 
 /**
- * A root-stack page that keeps the bottom tab bar (Exercises, Groups,
- * Settings): the native header on top, its owner tab selected below. A tab
+ * A root-stack page that keeps the bottom tab bar (Exercises, Settings): the native header on top, its owner tab selected below. A tab
  * press returns by `dismissTo`, so the tabs underneath are reused rather than
  * stacked, as from the session view.
  */
