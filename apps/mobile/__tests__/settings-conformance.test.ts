@@ -14,7 +14,7 @@ import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
  * of readings follows "Lists and rows", not this rule.
  *
  * A Settings file draws from the primitives only the row vocabulary, `Notice`,
- * `StatePanel` and the screen scroll, and no raw control or tap target: a row
+ * `StatePanel` and the screen scroll, and no raw react-native control or tap target: a row
  * made by hand from those is caught, one laid out from plain `View`s is not. A
  * button is a primary (at most one per page) or a text button as a `Notice`'s
  * action. A file with a `danger` row calls `Alert.alert` (checked per file, not
