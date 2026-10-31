@@ -1,49 +1,58 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import {
-  ChoiceRow,
-  Icon,
-  ListRow,
-  Notice,
-  Sheet,
-  uiBorder,
-  uiGeometry,
-  uiRoles,
-  uiSpace,
-  uiText,
-} from '@/components/ui';
+  isThemePending,
+  readChosenId,
+  themeLabel,
+  useChosenThemeId,
+} from '@/components/appearance/chosen-theme';
+import { SubPage } from '@/components/settings/sub-page';
+import { ChoiceRow, FormSection, Notice, RadioRow, uiBorder, uiGeometry, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { generateRoles } from '@/components/ui/theme';
 import { hueName, parseHueThemeId } from '@/components/ui/theme-hue';
-import { launchTheme, readStoredThemePresetId, saveThemePresetId } from '@/components/ui/theme-launch';
+import { launchTheme, saveThemePresetId } from '@/components/ui/theme-launch';
 import {
   DEFAULT_THEME_PRESET_ID,
-  resolveThemePreset,
-  storedThemeId,
   themePresets,
   type ThemePreset,
   type ThemePresetId,
 } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
-import { THEME_COLOUR_ROUTE } from '@/src/navigation/routes';
+import { SETTINGS_SUB_PAGES, THEME_COLOUR_ROUTE } from '@/src/navigation/routes';
 
-// Settings → Preferences → Appearance (`docs/specs/ui/design-language.md` "Presets"): a row
-// naming the chosen theme, and a sheet listing the presets. A choice is saved
-// at once and applies on the next launch; the app cannot restart itself, so a
-// pending choice is labelled `Next launch` on the row and in the sheet. The
-// last row opens the custom colour picker.
+// Settings home's Appearance row (`docs/specs/ui/design-language.md` "Presets"):
+// names the chosen theme and opens the Appearance page. A choice applies on the
+// next launch, as the app cannot restart itself, so a pending choice reads
+// `from next launch` here.
 export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }) {
   const router = useRouter();
-  const [chosenId, setChosenId] = useState<string>(readChosenId);
-  const [sheetVisible, setSheetVisible] = useState(false);
+  const [chosenId] = useChosenThemeId();
+  const label = themeLabel(chosenId);
+  const shown = isThemePending(chosenId) ? `${label} from next launch` : label;
+  return (
+    <ChoiceRow
+      accessibilityLabel={`Appearance, ${shown}`}
+      divider={divider}
+      icon="palette"
+      label="Appearance"
+      onPress={() => router.push(SETTINGS_SUB_PAGES.appearance)}
+      testID="settings-appearance-row"
+      value={shown}
+    />
+  );
+}
+
+// Settings → Appearance: the presets as radio rows, a choice saved at once and
+// labelled `Next launch` until the app reopens, then Custom colour, which opens
+// the hue picker.
+export function AppearanceSettingsScreen() {
+  const router = useRouter();
+  const [chosenId, setChosenId] = useChosenThemeId();
   const [saveError, setSaveError] = useState<string | null>(null);
-  // Set when the custom row closes the sheet; the picker opens once it is gone.
-  const openPickerOnDismiss = useRef(false);
-  const chosenLabel = themeLabel(chosenId);
   const customHue = parseHueThemeId(chosenId);
-  const pending = chosenId !== storedThemeId(launchTheme.preset);
-  const shown = pending ? `${chosenLabel} from next launch` : chosenLabel;
+  const pending = isThemePending(chosenId);
 
   const choose = async (id: ThemePresetId) => {
     // Re-choosing the current preset saves nothing, unless this launch could
@@ -68,108 +77,45 @@ export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }
   };
 
   return (
-    <>
-      <ChoiceRow
-        accessibilityLabel={`Appearance, ${shown}`}
-        divider={divider}
-        icon="palette"
-        label="Appearance"
-        onPress={() => setSheetVisible(true)}
-        testID="settings-appearance-row"
-        value={shown}
-      />
-      <Sheet
-        dismissLabel="Dismiss appearance"
-        onDismiss={() => setSheetVisible(false)}
-        onDismissed={() => {
-          if (!openPickerOnDismiss.current) return;
-          openPickerOnDismiss.current = false;
-          router.push(THEME_COLOUR_ROUTE);
-        }}
-        testID="settings-appearance-sheet"
-        title="Appearance"
-        visible={sheetVisible}>
+    <SubPage testID="settings-appearance-screen">
+      <FormSection footnote="Applies next launch" title="Theme">
         {themePresets.map((preset, index) => {
           const details = presetDetails(preset.id, chosenId, pending);
           return (
-            <ListRow
+            <RadioRow
               accessibilityLabel={[preset.label, ...details.map((detail) => detail.toLowerCase())].join(', ')}
               checked={preset.id === chosenId}
               divider={index > 0}
               key={preset.id}
-              leading={<Icon color={uiRoles.ink} name={preset.id === chosenId ? 'radio-on' : 'radio-off'} />}
-              meta={<PresetSwatch preset={preset} />}
+              label={preset.label}
+              meta={<PresetMeta details={details} preset={preset} />}
               onPress={() => {
                 void choose(preset.id);
               }}
-              testID={`settings-appearance-option-${preset.id}`}>
-              <View style={styles.optionText}>
-                <Text allowFontScaling={false} style={uiText.bodyStrong}>
-                  {preset.label}
-                </Text>
-                {details.length > 0 ? (
-                  <Text allowFontScaling={false} style={uiText.meta}>
-                    {details.join(' · ')}
-                  </Text>
-                ) : null}
-              </View>
-            </ListRow>
+              testID={`settings-appearance-option-${preset.id}`}
+            />
           );
         })}
-        <ListRow
-          accessibilityHint="Opens the colour picker"
-          checked={customHue !== null}
-          description={
-            customHue !== null ? `${hueName(customHue)}, ${customHue}°${pending ? ' · Next launch' : ''}` : undefined
-          }
+        <ChoiceRow
           divider
           label="Custom colour"
-          leading={<Icon color={uiRoles.ink} name={customHue !== null ? 'radio-on' : 'radio-off'} />}
-          onPress={() => {
-            openPickerOnDismiss.current = true;
-            setSheetVisible(false);
-          }}
+          onPress={() => router.push(THEME_COLOUR_ROUTE)}
           testID="settings-appearance-option-custom"
-          trailing={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />}
+          value={customHue !== null ? `${hueName(customHue)}, ${customHue}°${pending ? ' · Next launch' : ''}` : undefined}
         />
-        {saveError ? (
-          <View style={styles.footer}>
-            <Notice icon="warning" live message={saveError} testID="settings-appearance-error" tone="danger" />
-          </View>
-        ) : null}
-      </Sheet>
-    </>
+      </FormSection>
+      {saveError ? <Notice icon="warning" live message={saveError} testID="settings-appearance-error" tone="danger" /> : null}
+    </SubPage>
   );
 }
 
-// The stored choice, as stored: a preset id or a custom `hue:<deg>`. Falls
-// back to the theme in use, logged, when the store cannot be read.
-function readChosenId(): string {
-  try {
-    return storedThemeId(resolveThemePreset(readStoredThemePresetId()).preset);
-  } catch (error) {
-    void logEvent({
-      level: 'error',
-      event: 'theme.read_failed',
-      message: 'Could not read the stored theme preset; showing the theme in use.',
-      context: { error: error instanceof Error ? error.message : String(error) },
-    });
-    return storedThemeId(launchTheme.preset);
-  }
-}
-
-// The words under a preset's name: `Default`, and `Next launch` on the chosen
+// The words beside a preset's name: `Default`, and `Next launch` on the chosen
 // preset while it waits for the next launch.
 function presetDetails(id: ThemePresetId, chosenId: string, pending: boolean): string[] {
   return [
     ...(id === DEFAULT_THEME_PRESET_ID ? ['Default'] : []),
     ...(id === chosenId && pending ? ['Next launch'] : []),
   ];
-}
-
-function themeLabel(id: string): string {
-  const hue = parseHueThemeId(id);
-  return hue === null ? resolveThemePreset(id).preset.label : `Custom (${hueName(hue)})`;
 }
 
 // A preset as its own colours: `ink`, `accent`, `record` and the ramp's third
@@ -181,6 +127,19 @@ const swatchColours = new Map(
     return [preset.id, { ground: roles.paper, border: roles.rule, marks: [roles.ink, roles.accent, roles.record, roles.viz3] }];
   }),
 );
+
+function PresetMeta({ details, preset }: { details: string[]; preset: ThemePreset }) {
+  return (
+    <View style={styles.meta}>
+      {details.length > 0 ? (
+        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.muted]}>
+          {details.join(' · ')}
+        </Text>
+      ) : null}
+      <PresetSwatch preset={preset} />
+    </View>
+  );
+}
 
 function PresetSwatch({ preset }: { preset: ThemePreset }) {
   const colours = swatchColours.get(preset.id)!;
@@ -197,8 +156,10 @@ function PresetSwatch({ preset }: { preset: ThemePreset }) {
 }
 
 const styles = StyleSheet.create({
-  optionText: {
-    paddingVertical: uiSpace.sm,
+  meta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
   },
   swatch: {
     flexDirection: 'row',
@@ -211,11 +172,5 @@ const styles = StyleSheet.create({
     width: uiSpace.md,
     height: uiSpace.xl,
     borderRadius: uiGeometry.radius.control / 2,
-  },
-  footer: {
-    gap: uiSpace.sm,
-    paddingHorizontal: uiSpace.lg,
-    paddingTop: uiSpace.sm,
-    paddingBottom: uiSpace.md,
   },
 });

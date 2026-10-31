@@ -2,18 +2,20 @@
 
 /**
  * Settings → Appearance → Custom colour: a hue ring repaints a preview of the
- * theme live; "Use this colour" stores `hue:<deg>` for the next launch and
- * asks a development build to reload. The choice lives in expo-sqlite's
+ * theme live; letting the ring go stores `hue:<deg>` for the next launch and
+ * the page says so. There is no save button. The choice lives in expo-sqlite's
  * key-value store, faked in memory by jest.setup.ts. Replaced: the log sink,
- * which is observed; `DevSettings.reload` is spied.
+ * which is observed. Gesture-handler is stubbed (jest.setup.ts), so the ring's
+ * release is driven by calling the handler the stub kept on the gesture; the
+ * real release path is proved on the simulator.
  */
 
 const mockLogEvent = jest.fn();
 jest.mock('@/src/logging/logEvent', () => ({ logEvent: (...args: unknown[]) => mockLogEvent(...args) }));
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
-import { DevSettings, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { pointToHue } from '@/components/appearance/hue-ring';
 import { generateRoles } from '@/components/ui/theme';
@@ -21,18 +23,25 @@ import { seedsFromHue } from '@/components/ui/theme-hue';
 import { THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import ThemeColourRoute from '../app/theme-colour';
 
-let reload: jest.SpyInstance;
-
 beforeEach(() => {
   mockLogEvent.mockReset();
-  reload = jest.spyOn(DevSettings, 'reload').mockImplementation(() => {});
 });
 
 afterEach(() => {
   jest.restoreAllMocks();
 });
 
+// One VoiceOver step on the ring; it saves, so the save is let settle.
+const step = (actionName: 'increment' | 'decrement') =>
+  act(async () => {
+    fireEvent(ring(), 'accessibilityAction', { nativeEvent: { actionName } });
+  });
 const ring = () => screen.getByRole('adjustable', { name: 'Hue' });
+// What the ring's pan gesture does on the JS thread (see the header).
+const pan = () => ring().props.gesture.handlers as Record<'onBegin' | 'onUpdate' | 'onFinalize', (event?: unknown) => void>;
+// A touch at the top of the 240pt ring is 0°, at its right edge 90°.
+const touch = (x: number, y: number) => ({ x, y });
+const savedStatus = () => screen.queryByTestId('theme-colour-status');
 // The preview is decoration to VoiceOver; its colours are read off the mock.
 const previewBackground = (text: string) => {
   const label = screen.getByText(text, { includeHiddenElements: true });
@@ -51,16 +60,16 @@ it('starts at a custom hue chosen before', () => {
   expect(ring().props.accessibilityValue).toEqual({ text: 'Blue, 265 degrees' });
 });
 
-it('repaints the preview as the hue changes', () => {
+it('repaints the preview as the hue changes', async () => {
   render(<ThemeColourRoute />);
   expect(previewBackground('LOG SET')).toBe(generateRoles(seedsFromHue(47)).accent);
 
-  fireEvent(ring(), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+  await step('increment');
   expect(ring().props.accessibilityValue).toEqual({ text: 'Orange, 57 degrees' });
   expect(previewBackground('LOG SET')).toBe(generateRoles(seedsFromHue(57)).accent);
 
-  for (let step = 0; step < 6; step += 1) {
-    fireEvent(ring(), 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+  for (let count = 0; count < 6; count += 1) {
+    await step('decrement');
   }
   // Wraps past 0°.
   expect(ring().props.accessibilityValue).toEqual({ text: 'Pink, 357 degrees' });
@@ -78,39 +87,76 @@ it('shows the preview sets with their 1RM to one decimal and counts the performe
   expect(screen.queryByText(/1RM (101|102|—)$/, { includeHiddenElements: true })).toBeNull();
 });
 
-it('stores the hue for the next launch and asks to reload', async () => {
+it('has no Use this colour button', () => {
   render(<ThemeColourRoute />);
-  // No sentence explains the ring or the restart (copy.no-inline-explanation).
-  expect(screen.queryByText(/ring|next time/i)).toBeNull();
-  fireEvent(ring(), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
-
-  fireEvent.press(screen.getByTestId('theme-colour-apply'));
-
-  // Wait on the label, not the store: the fake store holds the value before the
-  // write's promise settles, so the saved state may not have rendered yet.
-  // The button carries the restart: saved, from the next launch, until the hue moves.
-  await waitFor(() => expect(screen.getByTestId('theme-colour-apply')).toHaveTextContent('Saved · next launch'));
-  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:57');
-  expect(reload).toHaveBeenCalledTimes(1);
-  expect(screen.getByTestId('theme-colour-apply').props.accessibilityState).toEqual({ disabled: true });
-
-  fireEvent(ring(), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
-  expect(screen.getByTestId('theme-colour-apply')).toHaveTextContent('Use this colour');
-  expect(screen.getByTestId('theme-colour-apply').props.accessibilityState).toEqual({ disabled: false });
+  expect(screen.queryByText('Use this colour')).toBeNull();
+  expect(screen.queryByTestId('theme-colour-apply')).toBeNull();
+  expect(screen.queryByRole('button')).toBeNull();
+  expect(savedStatus()).toBeNull();
 });
 
-it('says nothing changed, and logs why, when the save fails', async () => {
+it('saves the hue when the ring is let go and says it applies next launch', async () => {
+  render(<ThemeColourRoute />);
+  act(() => pan().onBegin(touch(120, 0)));
+  act(() => pan().onUpdate(touch(240, 120)));
+  // Dragging saves nothing.
+  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBeNull();
+  expect(savedStatus()).toBeNull();
+
+  await act(async () => pan().onFinalize());
+
+  expect(await screen.findByText('Saved · next launch')).toBeTruthy();
+  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:90');
+
+  // Moving the ring on hides the status until that hue is let go too.
+  act(() => pan().onBegin(touch(120, 240)));
+  expect(savedStatus()).toBeNull();
+  await act(async () => pan().onFinalize());
+  await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:180'));
+  expect(await screen.findByText('Saved · next launch')).toBeTruthy();
+});
+
+it('saves a VoiceOver step at once', async () => {
+  render(<ThemeColourRoute />);
+  await step('increment');
+
+  expect(await screen.findByText('Saved · next launch')).toBeTruthy();
+  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:57');
+});
+
+it('writes nothing when the ring is let go at the hue already stored', async () => {
+  Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'hue:90');
+  const setItem = jest.spyOn(Storage, 'setItem');
+  render(<ThemeColourRoute />);
+
+  act(() => pan().onBegin(touch(240, 120)));
+  await act(async () => pan().onFinalize());
+
+  expect(setItem).not.toHaveBeenCalled();
+  expect(savedStatus()).toBeNull();
+});
+
+it('says nothing changed, and logs why, when the save fails, and saves on the next release', async () => {
   jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
   render(<ThemeColourRoute />);
 
-  fireEvent.press(screen.getByTestId('theme-colour-apply'));
+  act(() => pan().onBegin(touch(240, 120)));
+  await act(async () => pan().onFinalize());
 
   expect(await screen.findByText('Couldn’t save the colour. Nothing changed.')).toBeTruthy();
+  expect(screen.getByTestId('theme-colour-error').props.accessibilityRole).toBe('alert');
   expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBeNull();
-  expect(reload).not.toHaveBeenCalled();
+  expect(savedStatus()).toBeNull();
   expect(mockLogEvent).toHaveBeenCalledWith(
-    expect.objectContaining({ level: 'warn', event: 'theme.save_failed', context: { hue: 47, error: 'disk full' } }),
+    expect.objectContaining({ level: 'warn', event: 'theme.save_failed', context: { hue: 90, error: 'disk full' } }),
   );
+
+  // Letting go at the same hue again retries: nothing was stored.
+  act(() => pan().onBegin(touch(240, 120)));
+  await act(async () => pan().onFinalize());
+  expect(await screen.findByText('Saved · next launch')).toBeTruthy();
+  expect(screen.queryByText('Couldn’t save the colour. Nothing changed.')).toBeNull();
+  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:90');
 });
 
 describe('pointToHue', () => {

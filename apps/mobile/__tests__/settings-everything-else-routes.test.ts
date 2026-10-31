@@ -47,3 +47,24 @@ describe('the Everything else route', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('the Appearance and Notifications routes', () => {
+  it('are Settings sub pages in the root stack, not sheets', () => {
+    expect(SETTINGS_SUB_PAGES.appearance).toBe('/settings-appearance');
+    expect(SETTINGS_SUB_PAGES.notifications).toBe('/settings-notifications');
+    ['settings-appearance', 'settings-notifications'].forEach((route) =>
+      expect(existsSync(join(MOBILE_ROOT, 'app', `${route}.tsx`))).toBe(true));
+    const stack = readFileSync(join(MOBILE_ROOT, 'components', 'navigation', 'root-stack.tsx'), 'utf8');
+    expect(stack).toContain('name="settings-appearance" options={{ title: \'Appearance\' }}');
+    expect(stack).toContain('name="settings-notifications" options={{ title: \'Notifications\' }}');
+  });
+
+  it('leave no Sheet or outline/primary button in their components', () => {
+    const files = [
+      'components/appearance/appearance-settings.tsx',
+      'components/appearance/theme-colour-screen.tsx',
+      'components/notifications/notification-settings-screen.tsx',
+    ].map((file) => readFileSync(join(MOBILE_ROOT, file), 'utf8'));
+    files.forEach((source) => expect(source).not.toMatch(/<Sheet\b|variant="(primary|outline)"/));
+  });
+});

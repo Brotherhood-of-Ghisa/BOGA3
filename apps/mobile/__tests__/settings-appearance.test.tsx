@@ -2,15 +2,16 @@
 
 /**
  * Settings → Appearance (`docs/specs/ui/design-language.md` "Presets"): the
- * theme presets in a sheet, a choice saved per device at once and applied on
- * the next launch, and the failures that must be logged rather than silent.
+ * theme presets as radio rows on a page, a choice saved per device at once and
+ * applied on the next launch, the Custom colour row that opens the picker, and
+ * the failures that must be logged rather than silent. Settings home's row
+ * names the choice and pushes the page.
  *
  * The choice lives in expo-sqlite's key-value store, faked in memory for every
- * suite by jest.setup.ts and read back here. The row reads no SQLite data.
- * Replaced: the router, the auth hook, the bodyweight row and the sync-status
- * panel (their own specs), and the log sink, which is observed. A failed read
- * or save is forced once with `jest.spyOn`; an unusable stored choice at
- * launch with `jest.replaceProperty`.
+ * suite by jest.setup.ts and read back here. Replaced: the router, the auth
+ * hook, the bodyweight row and the sync-status panel (their own specs), and the
+ * log sink, which is observed. A failed read or save is forced once with
+ * `jest.spyOn`; an unusable stored choice at launch with `jest.replaceProperty`.
  */
 
 // Reading entry/navigation is covered by bodyweight-screen.test.tsx.
@@ -31,14 +32,14 @@ jest.mock('@/src/auth', () => ({ useAuth: () => ({ user: null }) }));
 const mockLogEvent = jest.fn();
 jest.mock('@/src/logging/logEvent', () => ({ logEvent: (...args: unknown[]) => mockLogEvent(...args) }));
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
-import { Modal } from 'react-native';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
 
 import * as themeLaunch from '@/components/ui/theme-launch';
 import { THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { ensureExerciseListPreferencesLoaded } from '@/src/exercise-catalog/list-preferences';
+import SettingsAppearanceRoute from '../app/settings-appearance';
 import SettingsRoute from '../app/settings';
 
 // This suite launches in the default theme (nothing stored at import).
@@ -55,65 +56,61 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-const openSheet = () => {
-  fireEvent.press(screen.getByTestId('settings-appearance-row'));
-  return screen.getByTestId('settings-appearance-sheet');
-};
+const radio = (name: string) => screen.getByRole('radio', { name });
 
-it('names the theme in use and lists every preset, the current one checked', () => {
+it('names the theme in use on Settings home and pushes the Appearance page', () => {
   render(<SettingsRoute />);
-  expect(screen.getByLabelText('Appearance, Warm')).toBeTruthy();
-
-  const sheet = within(openSheet());
-  for (const id of ['warm', 'slate', 'forest', 'plum']) {
-    expect(sheet.getByTestId(`settings-appearance-option-${id}`)).toBeTruthy();
-    // Decoration: hidden from accessibility, the label names the preset.
-    expect(sheet.getByTestId(`settings-appearance-swatch-${id}`, { includeHiddenElements: true })).toBeTruthy();
-  }
-  expect(sheet.getByRole('radio', { name: 'Warm, default' }).props.accessibilityState).toEqual({ checked: true });
-  expect(sheet.getByRole('radio', { name: 'Slate' }).props.accessibilityState).toEqual({ checked: false });
-  // No sentence explains the restart (copy.no-inline-explanation): nothing is pending.
-  expect(sheet.queryByText(/next/i)).toBeNull();
+  fireEvent.press(screen.getByLabelText('Appearance, Warm'));
+  expect(mockPush).toHaveBeenCalledWith('/settings-appearance');
 });
 
-it('names each preset in bodyStrong, its details as meta', () => {
-  render(<SettingsRoute />);
-  const sheet = within(openSheet());
-  expect(sheet.getByText('Slate')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
-  expect(sheet.getByText('Default')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm });
+it('lists every preset as a radio row with its swatch, the current one checked', () => {
+  render(<SettingsAppearanceRoute />);
+  for (const id of ['warm', 'slate', 'forest', 'plum']) {
+    expect(screen.getByTestId(`settings-appearance-option-${id}`)).toBeTruthy();
+    // Decoration: hidden from accessibility, the label names the preset.
+    expect(screen.getByTestId(`settings-appearance-swatch-${id}`, { includeHiddenElements: true })).toBeTruthy();
+  }
+  expect(radio('Warm, default').props.accessibilityState).toEqual({ checked: true });
+  expect(radio('Slate').props.accessibilityState).toEqual({ checked: false });
+  // Only the section's footnote states when a choice applies; nothing is pending.
+  expect(screen.getByText('Applies next launch')).toBeTruthy();
+  expect(screen.queryByText('Next launch')).toBeNull();
+  // The vocabulary's rows only: no button on the page.
+  expect(screen.queryByRole('button', { name: /use this colour|save|apply/i })).toBeNull();
+});
+
+it('shows a preset’s detail as meta beside its swatch', () => {
+  render(<SettingsAppearanceRoute />);
+  expect(screen.getByText('Default')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm });
 });
 
 it('saves a choice at once and labels it as applying next launch', async () => {
-  render(<SettingsRoute />);
-  const sheet = within(openSheet());
+  render(<SettingsAppearanceRoute />);
 
-  fireEvent.press(sheet.getByTestId('settings-appearance-option-slate'));
+  fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
 
   await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('slate'));
-  expect(sheet.getByRole('radio', { name: 'Slate, next launch' }).props.accessibilityState).toEqual({ checked: true });
-  expect(within(sheet.getByTestId('settings-appearance-option-slate')).getByText('Next launch')).toBeTruthy();
-  expect(sheet.queryByText(/next time/i)).toBeNull();
-  expect(screen.getByLabelText('Appearance, Slate from next launch')).toBeTruthy();
+  expect(radio('Slate, next launch').props.accessibilityState).toEqual({ checked: true });
+  expect(within(screen.getByTestId('settings-appearance-option-slate')).getByText('Next launch')).toBeTruthy();
 
   // Choosing the theme in use again leaves nothing pending.
-  fireEvent.press(sheet.getByTestId('settings-appearance-option-warm'));
+  fireEvent.press(screen.getByTestId('settings-appearance-option-warm'));
   await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('warm'));
-  expect(screen.getByLabelText('Appearance, Warm')).toBeTruthy();
-  expect(sheet.queryByText('Next launch')).toBeNull();
-  expect(within(sheet.getByTestId('settings-appearance-option-warm')).getByText('Default')).toBeTruthy();
+  expect(screen.queryByText('Next launch')).toBeNull();
+  expect(within(screen.getByTestId('settings-appearance-option-warm')).getByText('Default')).toBeTruthy();
 });
 
-it('keeps the previous choice and says nothing changed when the save fails', async () => {
+it('keeps the previous choice and says nothing changed, in a danger notice, when the save fails', async () => {
   jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
-  render(<SettingsRoute />);
-  const sheet = within(openSheet());
+  render(<SettingsAppearanceRoute />);
 
-  fireEvent.press(sheet.getByTestId('settings-appearance-option-forest'));
+  fireEvent.press(screen.getByTestId('settings-appearance-option-forest'));
 
-  expect(await sheet.findByText('Couldn’t save the theme. Nothing changed.')).toBeTruthy();
-  expect(sheet.getByRole('radio', { name: 'Warm, default' }).props.accessibilityState).toEqual({ checked: true });
+  expect(await screen.findByText('Couldn’t save the theme. Nothing changed.')).toBeTruthy();
+  expect(screen.getByTestId('settings-appearance-error').props.accessibilityRole).toBe('alert');
+  expect(radio('Warm, default').props.accessibilityState).toEqual({ checked: true });
   expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBeNull();
-  expect(screen.getByLabelText('Appearance, Warm')).toBeTruthy();
   expect(mockLogEvent).toHaveBeenCalledWith(
     expect.objectContaining({
       level: 'warn',
@@ -143,11 +140,10 @@ it('replaces an unusable stored choice when the default is chosen again', async 
     ...themeLaunch.launchTheme,
     problem: { kind: 'unknown-preset', storedId: 'neon' },
   });
-  render(<SettingsRoute />);
-  const sheet = within(openSheet());
-  expect(sheet.getByRole('radio', { name: 'Warm, default' }).props.accessibilityState).toEqual({ checked: true });
+  render(<SettingsAppearanceRoute />);
+  expect(radio('Warm, default').props.accessibilityState).toEqual({ checked: true });
 
-  fireEvent.press(sheet.getByTestId('settings-appearance-option-warm'));
+  fireEvent.press(screen.getByTestId('settings-appearance-option-warm'));
 
   await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('warm'));
 });
@@ -158,34 +154,35 @@ it('shows a choice made earlier this run, read from the store', () => {
   expect(screen.getByLabelText('Appearance, Plum from next launch')).toBeTruthy();
 });
 
-it('offers a custom colour last, opening the picker once the sheet has gone', () => {
-  render(<SettingsRoute />);
-  const sheet = within(openSheet());
-  const custom = sheet.getByTestId('settings-appearance-option-custom');
-  expect(custom.props.accessibilityState).toEqual({ checked: false });
-  // The label and chevron say it opens a picker; no description under it.
-  expect(within(custom).queryByText('Pick any colour')).toBeNull();
+it('updates Settings home when the Appearance page saves a choice', async () => {
+  render(
+    <>
+      <SettingsRoute />
+      <SettingsAppearanceRoute />
+    </>,
+  );
+  expect(screen.getByLabelText('Appearance, Warm')).toBeTruthy();
+
+  fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
+
+  expect(await screen.findByLabelText('Appearance, Slate from next launch')).toBeTruthy();
+});
+
+it('offers a custom colour last, a navigate row that pushes the picker route', () => {
+  render(<SettingsAppearanceRoute />);
+  const custom = screen.getByTestId('settings-appearance-option-custom');
+  // The label and chevron say it opens a picker; no value while no custom colour is chosen.
   expect(within(custom).getAllByText(/./).map(node => node.props.children)).toEqual(['Custom colour']);
 
   fireEvent.press(custom);
-  // The sheet's modal must be gone before a route can be pushed over it.
-  expect(mockPush).not.toHaveBeenCalled();
-  act(() => screen.UNSAFE_getAllByType(Modal).find(modal => modal.props.testID === 'settings-appearance-sheet-modal')!.props.onDismiss());
-  expect(mockPush).toHaveBeenCalledWith('/theme-colour');
 
-  // Dismissing the sheet any other way opens nothing.
-  mockPush.mockReset();
-  act(() => screen.UNSAFE_getAllByType(Modal).find(modal => modal.props.testID === 'settings-appearance-sheet-modal')!.props.onDismiss());
-  expect(mockPush).not.toHaveBeenCalled();
+  expect(mockPush).toHaveBeenCalledWith('/theme-colour');
 });
 
-it('names a custom colour chosen earlier this run, checked in the sheet', () => {
+it('names a custom colour chosen earlier this run on its row, no preset checked', () => {
   Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'hue:200');
-  render(<SettingsRoute />);
-  expect(screen.getByLabelText('Appearance, Custom (Teal) from next launch')).toBeTruthy();
+  render(<SettingsAppearanceRoute />);
 
-  const sheet = within(openSheet());
-  expect(sheet.getByTestId('settings-appearance-option-custom').props.accessibilityState).toEqual({ checked: true });
-  expect(sheet.getByText('Teal, 200° · Next launch')).toBeTruthy();
-  expect(sheet.getByRole('radio', { name: 'Warm, default' }).props.accessibilityState).toEqual({ checked: false });
+  expect(within(screen.getByTestId('settings-appearance-option-custom')).getByText('Teal, 200° · Next launch')).toBeTruthy();
+  expect(radio('Warm, default').props.accessibilityState).toEqual({ checked: false });
 });

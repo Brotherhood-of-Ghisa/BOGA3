@@ -90,6 +90,8 @@ export function RootStack() {
         <Stack.Screen name="settings-muscle-targets" options={{ title: 'Per muscle targets' }} />
         <Stack.Screen name="settings-enabled-muscles" options={{ title: 'Enabled muscles' }} />
         <Stack.Screen name="settings-effort" options={{ title: 'Effort' }} />
+        <Stack.Screen name="settings-appearance" options={{ title: 'Appearance' }} />
+        <Stack.Screen name="settings-notifications" options={{ title: 'Notifications' }} />
         <Stack.Screen name="settings-everything-else" options={{ title: 'Everything else' }} />
         <Stack.Screen name="settings-data-sync" options={{ title: 'Data & sync' }} />
         <Stack.Screen name="gyms" options={{ title: 'Gyms' }} />

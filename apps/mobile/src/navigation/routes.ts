@@ -18,6 +18,8 @@ export const SETTINGS_SUB_PAGES = {
   muscleTargets: '/settings-muscle-targets',
   enabledMuscles: '/settings-enabled-muscles',
   effort: '/settings-effort',
+  appearance: '/settings-appearance',
+  notifications: '/settings-notifications',
   everythingElse: '/settings-everything-else',
   dataSync: '/settings-data-sync',
 } as const;

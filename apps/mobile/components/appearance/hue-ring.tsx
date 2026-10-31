@@ -8,6 +8,8 @@ import { hueName, normaliseHue, seedsFromHue } from '@/components/ui/theme-hue';
 type HueRingProps = {
   hue: number;
   onChange: (hue: number) => void;
+  // The hue the ring was let go at: the end of a drag or tap, or one VoiceOver step.
+  onChangeEnd?: (hue: number) => void;
   size?: number;
   testID?: string;
 };
@@ -32,8 +34,8 @@ export function pointToHue(x: number, y: number, size: number): number {
 }
 
 // A hue picker: drag (or tap) anywhere on the ring. Reports every move, so the
-// caller can repaint a preview live.
-export function HueRing({ hue, onChange, size = 240, testID }: HueRingProps) {
+// caller can repaint a preview live, and the hue it is let go at.
+export function HueRing({ hue, onChange, onChangeEnd, size = 240, testID }: HueRingProps) {
   const centre = size / 2;
   const outer = centre - (THUMB_RADIUS - THICKNESS / 2) - 1;
   const inner = outer - THICKNESS;
@@ -44,12 +46,17 @@ export function HueRing({ hue, onChange, size = 240, testID }: HueRingProps) {
   };
   const thumb = point(hue, middle).split(' ').map(Number);
 
+  // The gesture runs its callbacks on the JS thread (`runOnJS(true)`), so they
+  // call the caller's handlers directly, with a plain hue number.
   const report = (x: number, y: number) => onChange(pointToHue(x, y, size));
   const pan = Gesture.Pan()
     .runOnJS(true)
     .minDistance(0)
     .onBegin((event) => report(event.x, event.y))
-    .onUpdate((event) => report(event.x, event.y));
+    .onUpdate((event) => report(event.x, event.y))
+    // Fires on every ending, a tap that never activated the pan included. The
+    // detector re-reads the handlers each render, so `hue` is the one shown.
+    .onFinalize(() => onChangeEnd?.(hue));
 
   return (
     <GestureDetector gesture={pan}>
@@ -61,7 +68,9 @@ export function HueRing({ hue, onChange, size = 240, testID }: HueRingProps) {
         accessibilityValue={{ text: `${hueName(hue)}, ${hue} degrees` }}
         onAccessibilityAction={(event) => {
           const delta = event.nativeEvent.actionName === 'increment' ? ACCESSIBILITY_STEP : -ACCESSIBILITY_STEP;
-          onChange(normaliseHue(hue + delta));
+          const next = normaliseHue(hue + delta);
+          onChange(next);
+          onChangeEnd?.(next);
         }}
         style={{ width: size, height: size }}
         testID={testID}>
