@@ -1,6 +1,6 @@
 import { Stack, useNavigation, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, StyleSheet, Text } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { ExerciseNameField, ExerciseWeightSection } from '@/components/exercise-core/exercise-core-fields';
 import {
@@ -237,7 +237,8 @@ function OptionsSection({ form }: { form: EditorFormState }) {
 }
 
 /**
- * The muscle picker stays open while Primary or Secondary muscles are ticked.
+ * Primary and Secondary options scroll below the fixed sheet title and handle;
+ * the picker stays open while muscles are ticked.
  */
 function MusclePickerSheet({ form }: { form: EditorFormState }) {
   const { muscles } = useExerciseCatalog().muscleSetup;
@@ -252,28 +253,31 @@ function MusclePickerSheet({ form }: { form: EditorFormState }) {
       testID="exercise-editor-muscle-selector-list"
       title={isPrimary ? 'Primary muscles' : 'Secondary muscles'}
       visible={mode !== null}>
-      {options.map((muscle, index) => {
-        const isOn = selected.has(muscle.id);
-        return (
-          <ListRow
-            accessibilityLabel={`${isPrimary ? 'Select primary muscle' : 'Secondary muscle'} ${muscle.displayName}`}
-            divider={index > 0}
-            key={muscle.id}
-            label={muscle.displayName}
-            leading={<Icon color={isOn ? uiRoles.accent : uiRoles.inkMuted} name={isOn ? 'check' : 'circle'} size="md" />}
-            meta={<Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.muted]}>{muscle.familyName}</Text>}
-            selected={isOn}
-            onPress={() => (isPrimary ? form.togglePrimaryMuscle(muscle.id) : form.toggleSecondaryMuscle(muscle.id))}
-            testID={`exercise-editor-muscle-option-${muscle.id}`}
-          />
-        );
-      })}
-      {mode && options.length === 0 ? <StatePanel body="No muscles to choose from." fill={false} /> : null}
+      <ScrollView style={styles.muscleOptions}>
+        {options.map((muscle, index) => {
+          const isOn = selected.has(muscle.id);
+          return (
+            <ListRow
+              accessibilityLabel={`${isPrimary ? 'Select primary muscle' : 'Secondary muscle'} ${muscle.displayName}`}
+              divider={index > 0}
+              key={muscle.id}
+              label={muscle.displayName}
+              leading={<Icon color={isOn ? uiRoles.accent : uiRoles.inkMuted} name={isOn ? 'check' : 'circle'} size="md" />}
+              meta={<Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.muted]}>{muscle.familyName}</Text>}
+              selected={isOn}
+              onPress={() => (isPrimary ? form.togglePrimaryMuscle(muscle.id) : form.toggleSecondaryMuscle(muscle.id))}
+              testID={`exercise-editor-muscle-option-${muscle.id}`}
+            />
+          );
+        })}
+        {mode && options.length === 0 ? <StatePanel body="No muscles to choose from." fill={false} /> : null}
+      </ScrollView>
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
+  muscleOptions: { flexShrink: 1 },
   content: {
     gap: uiSpace.lg,
   },

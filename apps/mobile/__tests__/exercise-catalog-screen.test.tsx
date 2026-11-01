@@ -17,7 +17,7 @@
 import * as mockReact from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { and, eq, isNull } from 'drizzle-orm';
-import { Alert, Keyboard, Platform, StyleSheet, type ViewStyle } from 'react-native';
+import { Alert, Keyboard, Platform, ScrollView, StyleSheet, type ViewStyle } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -274,6 +274,59 @@ describe('ExerciseCatalogScreen', () => {
 
     await expandFamily('Chest');
     expect(await screen.findByLabelText('Edit exercise definition Incline Press')).toBeTruthy();
+  });
+
+  it('scrolls the full detailed muscle lists below fixed headers and saves both roles', async () => {
+    await openCatalog();
+    await createExercise('Long muscle list');
+    openPrimaryPicker();
+    const primarySheet = await screen.findByTestId('exercise-editor-muscle-selector-list');
+    const primaryOptions = within(primarySheet).UNSAFE_getByType(ScrollView);
+    expect(StyleSheet.flatten(primaryOptions.props.style)).toMatchObject({ flexShrink: 1 });
+    expect(within(primaryOptions).queryByRole('header')).toBeNull();
+    expect(within(primarySheet).getByRole('header', { name: 'Primary muscles' })).toBeTruthy();
+    expect(within(primaryOptions).getAllByLabelText(/^Select primary muscle /)).toHaveLength(SYSTEM_MUSCLE_GROUP_SEEDS.length);
+    fireEvent.press(within(primaryOptions).getByLabelText('Select primary muscle Tibialis Anterior'));
+    fireEvent.press(within(primaryOptions).getByLabelText('Select primary muscle Pectoralis'));
+    expect(within(primarySheet).getByLabelText('Select primary muscle Tibialis Anterior')).toHaveProp('accessibilityState', expect.objectContaining({ selected: true }));
+    fireEvent(primarySheet, 'accessibilityEscape');
+    await waitForGone(() => screen.queryByTestId('exercise-editor-muscle-selector-list'));
+
+    openSecondaryPicker();
+    const secondarySheet = await screen.findByTestId('exercise-editor-muscle-selector-list');
+    const secondaryOptions = within(secondarySheet).UNSAFE_getByType(ScrollView);
+    expect(StyleSheet.flatten(secondaryOptions.props.style)).toMatchObject({ flexShrink: 1 });
+    expect(within(secondaryOptions).queryByRole('header')).toBeNull();
+    expect(within(secondarySheet).getByRole('header', { name: 'Secondary muscles' })).toBeTruthy();
+    expect(within(secondaryOptions).getAllByLabelText(/^Secondary muscle /)).toHaveLength(SYSTEM_MUSCLE_GROUP_SEEDS.length - 2);
+    expect(within(secondaryOptions).queryByLabelText('Secondary muscle Tibialis Anterior')).toBeNull();
+    fireEvent.press(within(secondaryOptions).getByLabelText('Secondary muscle Calves'));
+    fireEvent.press(within(secondaryOptions).getByLabelText('Secondary muscle Serratus Anterior'));
+    fireEvent.press(within(secondaryOptions).getByLabelText('Secondary muscle Serratus Anterior'));
+    expect(within(secondarySheet).getByLabelText('Secondary muscle Calves')).toHaveProp('accessibilityState', expect.objectContaining({ selected: true }));
+    expect(within(secondarySheet).getByLabelText('Secondary muscle Serratus Anterior')).toHaveProp('accessibilityState', expect.objectContaining({ selected: false }));
+    fireEvent.press(screen.getByTestId('exercise-editor-muscle-selector-list-backdrop', { includeHiddenElements: true }));
+    await waitForGone(() => screen.queryByTestId('exercise-editor-muscle-selector-list'));
+    await saveEditor();
+
+    expect(await screen.findByText('Exercise created.')).toBeTruthy();
+    expect(activeMappingsOf(definitionNamed('Long muscle list')!.id)).toEqual([
+      { muscleGroupId: 'calves', role: 'secondary', weight: 0.5 },
+      { muscleGroupId: 'chest', role: 'primary', weight: 1 },
+      { muscleGroupId: 'tibialis_anterior', role: 'primary', weight: 1 },
+    ]);
+  });
+
+  it.each(['primary', 'secondary'] as const)('keeps the %s picker empty state when no muscles are tracked', async (mode) => {
+    await openCatalog({ prepare: () => localDatabase().update(muscleGroups).set({ tracked: 0 }).run() });
+    await createExercise('No tracked muscles');
+    fireEvent.press(screen.getByTestId(`exercise-editor-${mode}-muscle-trigger`));
+    const options = within(await screen.findByTestId('exercise-editor-muscle-selector-list')).UNSAFE_getByType(ScrollView);
+    expect(within(options).getByText('No muscles to choose from.')).toBeTruthy();
+    expect(within(options).queryAllByRole('button')).toHaveLength(0);
+    fireEvent(screen.getByTestId('exercise-editor-muscle-selector-list'), 'accessibilityEscape');
+    await waitForGone(() => screen.queryByTestId('exercise-editor-muscle-selector-list'));
+    expect(screen.getByDisplayValue('No tracked muscles')).toBeTruthy();
   });
 
   it('edits an existing exercise: name, load mode and secondary muscles', async () => {
