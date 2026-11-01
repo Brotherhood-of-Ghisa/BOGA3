@@ -221,7 +221,7 @@ afterEach(() => {
 });
 
 describe('Stats over real data', () => {
-  it('compares Monday-based periods in Muscle 3D independently of targets and History', async () => {
+  it('grades 3D Sets by the selected period target while keeping Volume comparisons independent of targets and History', async () => {
     jest.setSystemTime(new Date(2026, 9, 26, 12));
     mockSearchParams = { period: '7', breakdown: 'muscle' };
     await loadMaestroFixture('exercise-block-history');
@@ -238,16 +238,20 @@ describe('Stats over real data', () => {
     const change = () => screen.getByTestId('stats-muscle-body-comparison-change');
     const scores = () => {
       const props = screen.UNSAFE_getByType(MuscleBodyCard).props;
-      return computeMuscleScores(props.muscles, props.metric);
+      return computeMuscleScores(props.muscles, props.metric, props.setTargets);
     };
     expect(change()).toHaveTextContent(/^0$/);
-    expect(scores().get('back_lats')).toBe(0);
+    expect(scores().get('back_lats')).toBe(-.75);
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^1$/);
     expect(screen.getByTestId('stats-muscle-body-comparison-previous')).toHaveTextContent(/^1$/);
     chooseFilter('period', '4 weeks');
     expect(change()).toHaveTextContent(/^\+1$/);
-    expect(scores().get('back_lats')).toBe(1 / 9);
-    expect(scores().get('quads')).toBe(1);
+    expect(scores().get('back_lats')).toBe(-.875);
+    await act(async () => updatePreferences({ weeklyWorkingSetTarget: 4 }));
+    expect(scores().get('back_lats')).toBe(-.75);
+    await act(async () => updatePreferences({ muscleTargetMode: 'per-muscle',
+      muscleTargetOverrides: { detailed: { back_lats: 1 }, broad: { back_lats: 99 } } }));
+    expect(scores().get('back_lats')).toBe(0);
     chooseFilter('metric', 'Volume');
     expect(change()).toHaveTextContent(/^\+100%$/);
     const before = screen.UNSAFE_getByType(MuscleBodyCard).props.muscles;
@@ -600,7 +604,8 @@ describe('Stats over real data', () => {
     expect(screen.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent(/^7$/);
     const body = screen.UNSAFE_getByType(MuscleBodyCard).props;
     const allGyms = await statsRepository.computeProgressComparisons({ periodWeeks: 1 });
-    expect(computeMuscleScores(body.muscles, body.metric)).toEqual(computeMuscleScores(allGyms.muscles, body.metric));
+    expect(computeMuscleScores(body.muscles, body.metric, body.setTargets))
+      .toEqual(computeMuscleScores(allGyms.muscles, body.metric, body.setTargets));
     fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
     expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=sets&view=timeline`);
     chooseFilter('view-mode', 'Exercise');

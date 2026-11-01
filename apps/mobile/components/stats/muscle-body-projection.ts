@@ -3,6 +3,7 @@ import { uiRoles } from '@/components/ui/tokens';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
+import { muscleTargetAttainment } from '@/src/preferences/targets';
 import { isModelFibre, MUSCLE_BODY_FASCICLES, type ModelFibreSegment, type MuscleBodyFascicles, type MuscleBodyFibreSegment, type MuscleBodyFibreSelection, type TriangleFibreSegment } from './muscle-body-fibres';
 import {
   MUSCLE_BODY_MESH,
@@ -14,6 +15,12 @@ import { MOUSTACHE_FILL, NOVEMBER_MOUSTACHE_MESH } from './muscle-body-moustache
 import { reduceFibreRun, type FibrePoint } from './projected-fibre-contour';
 
 export type BodyOrientation = 'front' | 'back';
+
+export type MuscleSetTargets = {
+  readonly weeklyTarget: number;
+  readonly weeks: number;
+  readonly weeklyTargets?: Readonly<Record<string, number>>;
+};
 
 export type ThemeShadeRoles = Pick<
   typeof uiRoles,
@@ -105,22 +112,41 @@ export function canonicalOrientationForMuscle(muscleId: string): BodyOrientation
 const canonicalMuscleId = (id: string): string => LEGACY_MUSCLE_ALIASES[id] ?? id;
 const BODY_MUSCLE_IDS = new Set<string>(MUSCLE_BODY_MESH.materials);
 
-const muscleChange = (row: ProgressMuscleComparison, metric: ProgressMetric): number | null => {
-  const current = row.current[metric];
-  const previous = row.previous[metric];
+const muscleSetScore = (row: ProgressMuscleComparison, targets?: MuscleSetTargets): number | null => {
+  if (!targets) return null;
+  const count = row.current.workingSetCount;
+  const overrides = targets.weeklyTargets ?? {};
+  const weeklyTarget = Object.hasOwn(overrides, row.muscleGroupId) ? overrides[row.muscleGroupId] : targets.weeklyTarget;
+  if (!Number.isFinite(count) || count <= 0 || !Number.isFinite(weeklyTarget) || weeklyTarget <= 0
+    || !Number.isFinite(targets.weeks) || targets.weeks <= 0) return null;
+  // Reuse the light/middle/dark anchors at 0/50/100% attainment.
+  return 2 * muscleTargetAttainment(count, weeklyTarget, targets.weeks) - 1;
+};
+
+const muscleVolumeChange = (row: ProgressMuscleComparison): number | null => {
+  const current = row.current.totalVolume;
+  const previous = row.previous.totalVolume;
   if (current === null || previous === null || !Number.isFinite(current)
     || !Number.isFinite(previous) || (current === 0 && previous === 0)) return null;
-  if (metric === 'workingSetCount') return Number.isFinite(row.workingSetChange) ? row.workingSetChange : null;
   const change = row.volumeChange;
   // New/overflow gains use the dark anchor without entering the finite extrema.
   if (change.kind === 'new' || change.kind === 'increased') return Infinity;
   return change.kind === 'percent' && Number.isFinite(change.percent) ? change.percent : null;
 };
 
-/** Follows [[comparison.colour-scale]] and the displayed change's rounding. */
+const normaliseVolumeChange = (change: number | null, largestGain: number, largestLoss: number): number | null => {
+  // Keep -100% in the loss scale, but paint it with the head's neutral ramp.
+  if (change === null || change === -100) return null;
+  if (change === Infinity) return 1;
+  if (change === 0) return 0;
+  return change > 0 ? change / largestGain : change / largestLoss;
+};
+
+/** Follows [[comparison.colour-scale]]: target attainment for Sets, displayed change for Volume. */
 export function computeMuscleScores(
   muscles: readonly ProgressMuscleComparison[],
   metric: ProgressMetric,
+  setTargets?: MuscleSetTargets,
 ): ReadonlyMap<string, number | null> {
   const changes = new Map<string, number | null>();
   const ids = new Set(muscles.map(row => row.muscleGroupId));
@@ -129,9 +155,9 @@ export function computeMuscleScores(
   for (const row of muscles) {
     const id = canonicalMuscleId(row.muscleGroupId);
     if (!BODY_MUSCLE_IDS.has(id) || (id !== row.muscleGroupId && ids.has(id))) continue;
-    const change = muscleChange(row, metric);
+    const change = metric === 'workingSetCount' ? muscleSetScore(row, setTargets) : muscleVolumeChange(row);
     changes.set(id, change);
-    if (change !== null && Number.isFinite(change)) {
+    if (metric === 'totalVolume' && change !== null && Number.isFinite(change)) {
       largestGain = Math.max(largestGain, change);
       largestLoss = Math.max(largestLoss, -change);
     }
@@ -140,8 +166,7 @@ export function computeMuscleScores(
   for (const row of muscles) {
     const id = canonicalMuscleId(row.muscleGroupId);
     const change = changes.get(id) ?? null;
-    const score = change === Infinity ? 1 : change === null ? null
-      : change > 0 ? change / largestGain : change < 0 ? change / largestLoss : 0;
+    const score = metric === 'workingSetCount' ? change : normaliseVolumeChange(change, largestGain, largestLoss);
     scores.set(id, score);
     scores.set(row.muscleGroupId, score);
   }

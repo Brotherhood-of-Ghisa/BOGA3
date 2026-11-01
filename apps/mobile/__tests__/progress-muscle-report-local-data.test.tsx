@@ -46,7 +46,8 @@ import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidat
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
-import { projectMuscleBody } from '@/components/stats/muscle-body-projection';
+import { computeMuscleScores, projectMuscleBody } from '@/components/stats/muscle-body-projection';
+import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { chooseBroadLocally } from './helpers/broad-muscle-report';
 import { closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -154,6 +155,25 @@ describe('Progress muscle list under Broad', () => {
     await screen.findByTestId('stats-muscle-body-card');
     const targets = screen.getAllByTestId(/^stats-muscle-body-target-/).map(row => String(row.props.testID).replace('stats-muscle-body-target-', ''));
     expect([...targets].sort()).toEqual([...TRACKED_BROAD].sort());
+  });
+
+  it('uses Broad target overrides for the merged muscle and the live default in Single mode', async () => {
+    await choose('broad');
+    act(() => updatePreferences({ progressMuscleLayout: '3d', weeklyWorkingSetTarget: 14,
+      muscleTargetMode: 'per-muscle', muscleTargetOverrides: { detailed: { quads: 100 }, broad: { quads: 7 } } }));
+    await renderProgress('muscle');
+    await screen.findByTestId('stats-muscle-body-card');
+    const score = () => {
+      const { muscles, metric, setTargets } = screen.UNSAFE_getByType(MuscleBodyCard).props;
+      return computeMuscleScores(muscles, metric, setTargets).get('quads');
+    };
+    fireEvent.press(screen.getByTestId('stats-muscle-body-target-quads'));
+    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^7$/);
+    expect(score()).toBe(1);
+    act(() => updatePreferences({ muscleTargetMode: 'single' }));
+    expect(score()).toBe(0);
+    act(() => updatePreferences({ weeklyWorkingSetTarget: 28 }));
+    expect(score()).toBe(-.5);
   });
 });
 

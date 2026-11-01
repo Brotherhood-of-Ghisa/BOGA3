@@ -63,19 +63,20 @@ Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 
 ### comparison.colour-scale · presentation · accepted
 
-Muscle 3D shades change against [[comparison.window]]: Sets use signed differences,
-Volume rounded percentages. Across front/back, finite gains scale middle-to-dark
-against the largest gain, losses middle-to-light against the largest loss.
-Filters may rescale; rotation/selection cannot. Unchanged activity is middle;
-empty/unavailable neutral; `new`/overflow darkest, outside finite extrema.
-History/targets have no effect. No legend; selection shows Now/Prev/Change.
+Progress 3D Sets use [[muscle.weekly-targets]] scaled to [[comparison.window]],
+capped at 100%: zero is whitish neutral, positive attainment light-to-dark.
+Volume uses rounded percentage changes, scaled middle-to-dark for gains and
+middle-to-light for losses against body-wide finite extrema. Displayed −100%
+uses the head's whitish neutral and still participates in loss scaling. Filters may
+rescale Volume; rotation/selection cannot. Unchanged activity is middle;
+empty in both periods/unavailable neutral; `new`/overflow darkest, outside finite extrema.
+No legend; selection shows Now/Prev/Change.
 
-History legends precede their charts and run 0%–100%. Muscle Sets reads
-`% of target`, capped at the effective weekly muscle target; other legends read
-`% of max`, measured from zero. The maximum comes from History look-back using
-the plotted aggregation: daily Grid values, summed weekly Sets/Volume or best
-weekly strength. Empty or all-zero samples stay neutral.
+History legends precede charts: muscle Sets uses `% of target`, capped at
+the effective weekly muscle target; other metrics `% of max`, from zero to
+the History look-back maximum of the plotted aggregation (daily Grid values,
+weekly Sets/Volume sums, weekly strength bests). Empty/all-zero samples stay neutral.
 
-Why: 3D shows period changes; history shows training intensity.
+Why: Sets show goal attainment; Volume shows period change; history shows training intensity.
 Code: `apps/mobile/components/heatmaps/heatmap-metric.ts`;
 `apps/mobile/components/stats/muscle-body-projection.ts`.
