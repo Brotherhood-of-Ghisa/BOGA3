@@ -4,15 +4,20 @@ appId: com.dinoderek.mobile
 #
 # Proves:
 #   1. `+` opens the exercise editor page; a name typed on the keyboard and a
-#      primary muscle picked in its picker sheet save to the device's SQLite,
+#      muscles picked in both picker sheets save to the device's SQLite,
 #      the page goes back, and the catalogue shows `Exercise created.`.
+#   2. Both detailed lists reach the bottom and return to the top, keep the
+#      title fixed, and accept off-screen choices without dismissing the sheet.
 # Why device:
 #   1. a pushed page with a sheet over it, the keyboard, and the on-device
 #      expo-sqlite write.
+#   2. Native bounded layout, touch scrolling and sheet gesture isolation cannot
+#      run in the Jest renderer.
 # Jest counterpart: __tests__/exercise-catalog-screen.test.tsx (the
 #   catalogue over the browser fixture: the create read back from the database
 #   and listed, grouping, sort and never-done controls, Manage and row sheets,
-#   editor validation and muscle selection, search, no matches, history failure
+#   bounded scroll composition, both role selections and persistence, empty
+#   muscle lists, editor validation, search, no matches, history failure
 #   and Retry), __tests__/exercise-list-controls.test.tsx,
 #   __tests__/exercise-picker.test.tsx (shared preferences, preselection,
 #   plan suggestions, swap, results tappable with the keyboard up),
@@ -42,10 +47,23 @@ appId: com.dinoderek.mobile
     visible:
       id: "exercise-editor-muscle-selector-list"
     timeout: 10000
-- tapOn:
-    id: "exercise-editor-muscle-option-chest"
-# Primary now uses the existing stay-open multiselect. Dismiss on the exposed
-# backdrop (hidden from the modal accessibility tree, as in the group sheets).
+- takeScreenshot: "primary-muscles-top"
+# Tibialis is the last row: it cannot centre, and the sheet's bottom padding
+# keeps its first fully visible position clear of chrome.
+- scrollUntilVisible:
+    element: { id: "exercise-editor-muscle-option-tibialis_anterior" }
+    direction: DOWN
+- assertVisible: "Primary muscles"
+- tapOn: { id: "exercise-editor-muscle-option-tibialis_anterior" }
+- assertVisible: "Primary muscles"
+- takeScreenshot: "primary-muscles-bottom"
+# Pectoralis starts the content, clear of the fixed title; no centring needed.
+- scrollUntilVisible:
+    element: { id: "exercise-editor-muscle-option-chest" }
+    direction: UP
+- tapOn: { id: "exercise-editor-muscle-option-chest" }
+- assertVisible: "Primary muscles"
+# Both modes retain the existing stay-open multiselect. Dismiss via backdrop.
 - tapOn: { point: "50%,8%" }
 - extendedWaitUntil:
     notVisible: { id: "exercise-editor-muscle-selector-list" }
@@ -56,11 +74,35 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - waitForAnimationToEnd:
     timeout: 4000
+- tapOn: { id: "exercise-editor-secondary-muscle-trigger" }
+- extendedWaitUntil:
+    visible: "Secondary muscles"
+    timeout: 10000
+- takeScreenshot: "secondary-muscles-top"
+# The primary Tibialis is excluded, making Calves the final eligible row.
+- scrollUntilVisible:
+    element: { id: "exercise-editor-muscle-option-calves" }
+    direction: DOWN
+- assertVisible: "Secondary muscles"
+- tapOn: { id: "exercise-editor-muscle-option-calves" }
+- assertVisible: "Secondary muscles"
+- takeScreenshot: "secondary-muscles-bottom"
+# Serratus starts this list (Pectoralis is primary), clear of the fixed title.
+- scrollUntilVisible:
+    element: { id: "exercise-editor-muscle-option-serratus_anterior" }
+    direction: UP
+- tapOn: { id: "exercise-editor-muscle-option-serratus_anterior" }
+- assertVisible: "Secondary muscles"
+- tapOn: { point: "50%,8%" }
+- extendedWaitUntil:
+    notVisible: { id: "exercise-editor-muscle-selector-list" }
+    timeout: 10000
 - takeScreenshot: "editor-filled"
 - scrollUntilVisible:
     element:
       id: "exercise-editor-save"
     direction: DOWN
+    centerElement: true
 - tapOn: "Save exercise definition"
 - extendedWaitUntil:
     visible:
