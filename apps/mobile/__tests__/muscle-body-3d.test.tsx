@@ -120,7 +120,7 @@ describe('computeMuscleScores', () => {
 
   it.each([
     [1200, 1000, 1], [800, 1000, -1], [1000, 1000, 0],
-    [0, 1000, -1], [1000, 0, 1], [0, 0, null],
+    [0, 1000, null], [1, 1000, null], [6, 1000, -1], [1000, 0, 1], [0, 0, null],
     [1004, 1000, 0], [996, 1000, 0],
     [null, 1000, null], [1000, null, null], [Infinity, 1000, null], [1000, NaN, null],
     [Number.MAX_VALUE, Number.MIN_VALUE, 1],
@@ -128,10 +128,10 @@ describe('computeMuscleScores', () => {
     expect(computeMuscleScores([comparedMuscle('chest', now, previous)], 'totalVolume').get('chest')).toBe(expected);
   });
 
-  it('gives a -100% Volume drop the lightest shade even beside smaller declines', () => {
+  it('paints -100% Volume like the neutral head without rescaling smaller declines', () => {
     const scores = computeMuscleScores([comparedMuscle('chest', 0, 1000),
       comparedMuscle('biceps', 500, 1000), comparedMuscle('quads', 1000, 1000)], 'totalVolume');
-    expect([...scores.values()]).toEqual([-1, -.5, 0]);
+    expect([...scores.values()]).toEqual([null, -.5, 0]);
   });
 
   it('scales finite gains and losses separately, across front and back, with ties and rounded zero', () => {
@@ -403,7 +403,7 @@ describe('MuscleBodyCard', () => {
     fireEvent(screen.getByTestId('stats-muscle-body-viewport'), 'layout', { nativeEvent: { layout: { width: 280, height: 280 } } });
     const fills = () => screen.getByTestId('stats-muscle-body-svg').findAllByType(Path)
       .filter(path => path.props.fill).map(path => path.props.fill);
-    const expectedFills = (chest: number, biceps: number | null, quads: number) => projectMuscleBody({ angleDeg: 0, width: 280, height: 280,
+    const expectedFills = (chest: number | null, biceps: number | null, quads: number) => projectMuscleBody({ angleDeg: 0, width: 280, height: 280,
       scores: new Map([['chest', chest], ['biceps', biceps], ['quads', quads]]) }).batches.map(batch => batch.fill);
     expect(fills()).toEqual(expectedFills(-.5, null, 1));
     view.rerender(<MuscleBodyCard {...props} setTargets={{ ...SET_TARGETS, weeklyTarget: 4 }} />);
@@ -413,10 +413,14 @@ describe('MuscleBodyCard', () => {
     const volumeProps = { ...props, metric: 'totalVolume' as const,
       muscles: [comparedMuscle('chest', 0, 1000), comparedMuscle('biceps', 500, 1000), comparedMuscle('quads', 1000, 1000)] };
     view.rerender(<MuscleBodyCard {...volumeProps} setTargets={SET_TARGETS} />);
-    expect(fills()).toEqual(expectedFills(-1, -.5, 0));
+    expect(fills()).toEqual(expectedFills(null, -.5, 0));
     const volumeFills = fills();
     view.rerender(<MuscleBodyCard {...volumeProps} setTargets={{ weeklyTarget: 100, weeks: 4 }} />);
     expect(fills()).toEqual(volumeFills);
+    view.rerender(<MuscleBodyCard {...volumeProps} selectedId="chest" setTargets={SET_TARGETS} />);
+    expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^0$/);
+    expect(screen.getByTestId('stats-muscle-body-comparison-previous')).toHaveTextContent(/^1000$/);
+    expect(screen.getByTestId('stats-muscle-body-comparison-change')).toHaveTextContent(/^−100%$/);
   });
 
   it('omits the legend and keeps the selected muscle’s signed comparison', () => {

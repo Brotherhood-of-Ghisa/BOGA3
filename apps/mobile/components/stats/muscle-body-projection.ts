@@ -135,7 +135,8 @@ const muscleVolumeChange = (row: ProgressMuscleComparison): number | null => {
 };
 
 const normaliseVolumeChange = (change: number | null, largestGain: number, largestLoss: number): number | null => {
-  if (change === null) return null;
+  // Keep -100% in the loss scale, but paint it with the head's neutral ramp.
+  if (change === null || change === -100) return null;
   if (change === Infinity) return 1;
   if (change === 0) return 0;
   return change > 0 ? change / largestGain : change / largestLoss;
