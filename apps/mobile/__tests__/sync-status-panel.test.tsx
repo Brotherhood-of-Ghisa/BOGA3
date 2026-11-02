@@ -30,6 +30,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 
 import { StyleSheet } from 'react-native';
 
+import { waitForGone } from './helpers/wait-for-gone';
+
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { uiRoles, uiText } from '@/components/ui';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
@@ -253,8 +255,14 @@ describe('Settings sync-status panel', () => {
     expect(screen.getByText('Review changes')).toHaveStyle({ color: uiRoles.accent });
     fireEvent.press(screen.getByTestId('settings-merge-review'));
     expect(mockPush).toHaveBeenCalledWith('/settings-review-changes');
-    rerender(<SyncStatusPanel onRequestSync={jest.fn()} readStatus={jest.fn().mockResolvedValue({ ...baseStatus, mergeReviewCount: 0 })} />);
-    await waitFor(() => expect(screen.queryByTestId('settings-merge-review')).toBeNull());
+    const readEmptyStatus = jest.fn(() =>
+      new Promise<SyncStatusSnapshot>(resolve => {
+        setTimeout(() => resolve({ ...baseStatus, mergeReviewCount: 0 }), 5);
+      }),
+    );
+    rerender(<SyncStatusPanel onRequestSync={jest.fn()} readStatus={readEmptyStatus} />);
+    expect(screen.getByTestId('settings-merge-review')).toBeTruthy();
+    await waitForGone(() => screen.queryByTestId('settings-merge-review'));
   });
 
   it('shows a sign-in-required error when the cycle reported no signed-in user', async () => {
