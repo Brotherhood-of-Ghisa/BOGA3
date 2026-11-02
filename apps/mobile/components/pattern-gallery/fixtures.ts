@@ -54,6 +54,7 @@ export const COW_GALLERY_STATES = GALLERY_STATES.filter(item =>
   ['ready', 'past', 'pending', 'unavailable', 'empty'].includes(item.value));
 export const GALLERY_SAMPLES = [
   { value: 'stream', label: 'Stream' }, { value: 'cow', label: 'CoW' }, { value: 'embedded', label: 'Today' },
+  { value: 'summary', label: 'Summary' },
 ] as const;
 export type GallerySample = typeof GALLERY_SAMPLES[number]['value'];
 

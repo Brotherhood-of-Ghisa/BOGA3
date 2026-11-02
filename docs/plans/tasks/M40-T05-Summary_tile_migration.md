@@ -1,6 +1,6 @@
 # M40-T05 — SummaryTile and At a glance migration
 
-- Status: `planned`
+- Status: `in_progress` — implementation; coded acceptance pending
 - Depends on: `M40-T02-Compact_card_and_gallery`
 - Milestone: `docs/plans/milestones/M40-coded-ui-patterns.md`
 - Areas: frontend; UI impact: yes
@@ -69,3 +69,14 @@ native UI/group lanes via `./boga test for`; agree any reductions with the
 reviewer, retaining native captures/human review. Run jest-coverage, complexity,
 dependencies and independent code/product reviews. Preserve acceptance/evidence
 in the PR, delete this card in the shipping PR and update the milestone.
+
+## Session approach
+
+Current main matches the selected Group stats extraction. SummaryTile owns the
+existing `md` Card inset, `sm` header/body gap and CompactHeader. Its API takes
+only a title, existing metric content and test IDs; WeekFigure keeps metric
+geometry, bars, formatting and accessible labels. No supporting/action/chart
+slots or new variant. Controls and held/error/refresh reads remain page-owned.
+Review native light/font-scale-1 renders on iOS 27 at 375×667, 402×874 and
+440×956, including long/zero/no-baseline, past, held, loading, offline and Retry.
+Product facts: none intended.

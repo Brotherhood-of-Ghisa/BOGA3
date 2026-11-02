@@ -1,7 +1,6 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { LAST_WEEK, WeekFigure, weekFigureStyles, type PreviousWeekName } from '@/components/today/week-figures';
-import { uiSpace } from '@/components/ui/tokens';
 import type { GroupWeekTotals } from '@/src/groups/home-view-model';
 
 const WEEK_BEFORE: PreviousWeekName = { short: 'wk before', spoken: 'the week before' };
@@ -21,30 +20,22 @@ export type GroupWeekTotalsProps = {
 export function GroupWeekTotalsFigures({ current, previous, offset }: GroupWeekTotalsProps) {
   const previousWeek = offset === 0 ? LAST_WEEK : WEEK_BEFORE;
   return (
-    <View style={styles.block} testID="group-week-totals">
-      <View style={weekFigureStyles.figures}>
-        <WeekFigure
-          current={current.sets}
-          label="Sets"
-          previous={previous.sets}
-          previousWeek={previousWeek}
-          testID="group-week-totals-sets"
-        />
-        <WeekFigure
-          current={current.prs}
-          label="PRs"
-          previous={previous.prs}
-          previousWeek={previousWeek}
-          record
-          testID="group-week-totals-prs"
-        />
-      </View>
+    <View style={weekFigureStyles.figures} testID="group-week-totals">
+      <WeekFigure
+        current={current.sets}
+        label="Sets"
+        previous={previous.sets}
+        previousWeek={previousWeek}
+        testID="group-week-totals-sets"
+      />
+      <WeekFigure
+        current={current.prs}
+        label="PRs"
+        previous={previous.prs}
+        previousWeek={previousWeek}
+        record
+        testID="group-week-totals-prs"
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  block: {
-    gap: uiSpace.md,
-  },
-});

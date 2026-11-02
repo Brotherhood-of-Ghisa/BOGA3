@@ -26,9 +26,9 @@ Two standing rules:
 
 ## Coded compositions
 
-CompactCard and CompactHeader are implemented for Stream and embedded CoW
-headers. The other families remain approved templates, **not production
-exports**. For a new block or derivative, follow the human selection and acceptance workflow in
+CompactCard and CompactHeader serve Stream and embedded CoW headers; SummaryTile
+serves Group stats. ListCard and SortableTable remain approved templates,
+**not production exports**. For a new block or derivative, follow the human selection and acceptance workflow in
 `docs/specs/08-ux-delivery-standard.md` before building.
 
 | Family | Reuse / reference | Boundary to preserve |
@@ -36,7 +36,7 @@ exports**. For a new block or derivative, follow the human selection and accepta
 | CompactCard / CompactHeader | `compact-card.tsx`: fixed compact Card and shared label/metadata header; Stream and CoW | Embedded summaries reuse only the header inside their existing container; Card accessibility actions retain nested record callbacks |
 | ListCard | Card, ListRow; GroupHomeBoard and Today's weekly board | Passive rows and a whole-board action differ from independent row controls |
 | SortableTable | Evolve StatsTable and comparison columns | Keep sorting with its current owner and history/disclosure actions separate |
-| SummaryTile | Card, Stat, WeekFigure; At a glance's Group stats | Keep both Sets/PRs and page-level controls' existing scope |
+| SummaryTile | `summary-tile.tsx`: shared header and existing metric content; At a glance's Group stats | Both Sets/PRs remain visible; period controls stay outside and metric controls govern the board/chart |
 
 ## Existing primitives (`apps/mobile/components/ui/`)
 
@@ -44,6 +44,7 @@ exports**. For a new block or derivative, follow the human selection and accepta
 | --- | --- |
 | The page ground; a scrolling page body with the gutter and card gap | `Screen` / `ScreenScroll` (`screen.tsx`) |
 | A compact summary or an embedded label/date header | `CompactCard` / `CompactHeader` (`compact-card.tsx`); feature content and actions retain their owners |
+| A headline metric tile | `SummaryTile` (`summary-tile.tsx`); fixed frame/header, feature-owned WeekFigure or Stat content |
 | A container for content | `Card` (`card.tsx`) — with `onPress` the whole card is one labelled link |
 | A legend plus a figure | `Stat` (`stat.tsx`) — `stacked` or `inline`; its only emphasis is `record` |
 | A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`) |
@@ -150,3 +151,10 @@ folder rather than re-implementing its row, card or sheet.
   exported from their route files so the surface can be wired from another
   route; they are route composition and test seams, not reusable building
   blocks. Document them in `screen-map.md` and `navigation-contract.md`.
+
+### SummaryTile reference
+
+Group stats in GroupGlancePage uses the fixed headline tile frame with existing
+WeekFigure metrics. Native gallery sample `summary` renders the same page with
+period/metric controls and fixed ready, past, large, zero, no-baseline, held,
+loading, error/retry and offline fixtures. Read state stays outside the tile.
