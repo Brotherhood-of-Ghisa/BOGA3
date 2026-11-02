@@ -1,6 +1,6 @@
 # M40 — Coded UI patterns with human acceptance
 
-- Status: `planned`
+- Status: `in_progress`
 - Created: 2026-11-02
 - Planning baseline: `8f540b3dacd22ca3f934fecda4020e9ffe74d2e5` on `origin/main`
 - Process: task protocol; one task, session, worktree and PR per card.
@@ -123,7 +123,7 @@ and comparisons stay with the task/PR under the existing design policy.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| M40-T01-Agree_pattern_contracts | Agree the four contracts, compact row recipe, reference states and human acceptance workflow | none | planned |
+| M40-T01-Agree_pattern_contracts | Agree the four contracts, compact row recipe, reference states and human acceptance workflow | none | in_progress — contract selection pending |
 | M40-T02-Compact_card_and_gallery | Implement CompactCard, start the native gallery, migrate Stream and CoW references | T01 | planned |
 | M40-T03-List_card_and_shared_rows | Implement ListCard and shared compact rows; migrate leaderboard references | T02 | planned |
 | M40-T04-Sortable_table_migration | Extend StatsTable with the shared rows; migrate Muscle/contributor tables | T03 | planned |

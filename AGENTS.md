@@ -122,6 +122,8 @@ for design targets, external-artifact vs repository authority,
 generated-code integration, screenshot comparison, conflict reporting, and
 commit boundaries. A design target is a build input, kept with the task or PR,
 never a spec of the result: what must outlive the build moves to its owner.
+For new UI blocks, select a pattern with the human before coding; follow
+`docs/specs/08-ux-delivery-standard.md` for derivations and migration acceptance.
 
 ## Always load (every session)
 

@@ -35,6 +35,38 @@ Document boundary:
 3. If a task introduces a new pattern, updating the `UX patterns` section is required in the same task.
 4. If a task intentionally deviates from an existing pattern, record rationale and impact in the PR body (Deviations).
 
+### Select a coded pattern before building
+
+For a new UI block, consult `docs/specs/ui/components-catalog.md`, show the
+applicable families, recommend one, and ask the human to select its pattern and
+bounded variant before implementation. Record that choice in the UX Contract
+and PR. A planned family is not an existing production export.
+
+When none fits, present the nearest parent and the proposed differences,
+including inherited typography, spacing and interaction boundaries. Obtain the
+human's selection of that derivation before coding. Feature content and
+behavior remain with their existing owners; a derivative does not justify
+local typography or density overrides.
+
+### Accept coded patterns and reference migrations
+
+Before a pattern migration ships:
+
+1. Provide the running production component and its migrated reference screen
+   for human inspection. Use the native comparison evidence required by
+   `docs/specs/ui/ai-design-policy.md`: before/after at small and normal phone
+   widths, long names/figures, wrapping or stacking, relevant empty/loading/error
+   states, and the actions the pattern owns. Show list/table rows together when
+   reviewing their shared spacing.
+2. Ask the human to accept the coded result or request changes. Record the
+   acceptor, full reviewed commit, device/viewport and accepted surfaces in the
+   PR. Plan, target or sketch approval, silence, tests and AI review do not
+   constitute acceptance of the running result.
+3. A material UI change after acceptance requires fresh captures and renewed
+   acceptance. Until accepted, label the PR as awaiting visual acceptance;
+   do not merge, declare the migration complete, or expand it to more screens.
+   Dependent work starts from the accepted, merged implementation.
+
 ## UX quality principles
 
 1. Clarity first: primary action and primary data should be obvious within 3 seconds.

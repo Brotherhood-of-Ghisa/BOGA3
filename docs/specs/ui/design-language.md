@@ -195,9 +195,22 @@ style object, read their role's fields.
   adding values (the logger's Effort field leads at two tap targets, its
   Weight field caps at the same two tap targets plus one XL step, and its Reps
   field is one field height wide), and spacing a design draws off-scale snaps to
-  the scale (sheet gutters 20→16, sheet rows ≥60, list rows ≥44).
+  the scale (sheet gutters 20→16, sheet rows ≥60, interactive list rows ≥44).
+  Passive rows inside a card do not acquire a separate tap-target minimum.
+  A row's padding must not inflate an already full-height child control.
 - The primitives implementing all of this live in
   `apps/mobile/components/ui/` (`components-catalog.md`).
+
+**Compact compositions.** Summary cards, list cards, sortable tables and
+headline tiles share the current vocabulary; prominence comes from their
+semantic roles, not a new spacing scale. List/table rows at the same density
+share line heights, vertical insets, alignment, separators and wrapping.
+Nested contributors inherit that rhythm, with indentation or semantic emphasis
+where needed. Distinguish passive content from independent row controls; a
+whole-board target does not turn every passive row into a separate target.
+Never shrink figures to fit. Feature readers retain formatting, ranking and
+navigation; shared presentation owns its bounded styling. For pattern selection
+and human acceptance, load `docs/specs/08-ux-delivery-standard.md`.
 
 ## 5. Emphasis
 

@@ -24,7 +24,21 @@ Two standing rules:
    sheet, summary line or state panel is the failure this catalog exists to
    prevent.
 
-## Primitives (`apps/mobile/components/ui/`)
+## Planned coded compositions
+
+These families are planned contracts, **not production exports**. Until their
+implementations ship, reach for the current components below. For a new block
+or derivative, follow the human selection and acceptance workflow in
+`docs/specs/08-ux-delivery-standard.md` before building.
+
+| Family | Reuse / reference | Boundary to preserve |
+| --- | --- | --- |
+| CompactCard | Card, shared text roles; Stream and CoW summaries | Embedded summaries reuse their existing container; independent actions stay reachable |
+| ListCard | Card, ListRow; GroupHomeBoard and Today's weekly board | Passive rows and a whole-board action differ from independent row controls |
+| SortableTable | Evolve StatsTable and comparison columns | Keep sorting with its current owner and history/disclosure actions separate |
+| SummaryTile | Card, Stat, WeekFigure; At a glance's Group stats | Keep both Sets/PRs and page-level controls' existing scope |
+
+## Existing primitives (`apps/mobile/components/ui/`)
 
 | You need | Reach for |
 | --- | --- |
