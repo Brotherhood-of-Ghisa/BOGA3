@@ -69,6 +69,8 @@ type InternalState<T> = {
   networkFailed: boolean;
   error: GroupApiError | null;
   lostAccess: boolean;
+  /** `data` is the in-memory mirror's, not yet confirmed by SQLite or a refresh. */
+  fromMemory: boolean;
 };
 
 const initialState = <T>(identity: string | null, generation: number): InternalState<T> => ({
@@ -81,6 +83,7 @@ const initialState = <T>(identity: string | null, generation: number): InternalS
   networkFailed: false,
   error: null,
   lostAccess: false,
+  fromMemory: false,
 });
 
 /** The state a (user, key) starts in: its payload from this app run's cache memory, if any. */
@@ -88,7 +91,7 @@ const cachedInitialState = <T>(identity: string | null, generation: number,
   userId: string | null, cacheKey: string | null): InternalState<T> => {
   const entry = identity && userId && cacheKey ? peekGroupCache<T>(cacheKey, userId) : null;
   return entry
-    ? { ...initialState<T>(identity, generation), data: entry.payload, lastUpdatedAtMs: entry.fetchedAtMs, hydrated: true }
+    ? { ...initialState<T>(identity, generation), data: entry.payload, lastUpdatedAtMs: entry.fetchedAtMs, hydrated: true, fromMemory: true }
     : initialState<T>(identity, generation);
 };
 
@@ -151,13 +154,17 @@ export function useGroupResource<T>({
         setState((previous) => {
           if (cancelled || identityRef.current !== identity || getCompetitionCacheGeneration(userId) !== generation ||
             previous.identity !== identity || previous.generation !== generation) return previous;
+          // SQLite wins over the mirror: a store wiped under it has no row.
+          if (entry === null && previous.fromMemory) {
+            return { ...previous, hydrated: true, data: null, lastUpdatedAtMs: null, fromMemory: false };
+          }
           // A refresh that already landed is fresher than the cache: keep it.
           const keepFresher =
             entry === null ||
             (previous.lastUpdatedAtMs !== null && previous.lastUpdatedAtMs >= entry.fetchedAtMs);
           return keepFresher
-            ? { ...previous, hydrated: true }
-            : { ...previous, hydrated: true, data: entry.payload, lastUpdatedAtMs: entry.fetchedAtMs };
+            ? { ...previous, hydrated: true, fromMemory: false }
+            : { ...previous, hydrated: true, data: entry.payload, lastUpdatedAtMs: entry.fetchedAtMs, fromMemory: false };
         });
       } catch (error) {
         if (cancelled) return;

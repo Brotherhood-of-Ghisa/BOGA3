@@ -272,6 +272,21 @@ describe('useGroupResource', () => {
     expect(result.current).toMatchObject({ data: payload('cached'), refreshing: true });
   });
 
+  it('drops a mirrored payload once SQLite shows its row was wiped', async () => {
+    seedCache(groupCacheKeys.mine, payload('cached'));
+    const fetcher = jest.fn(() => new Promise<Payload>(() => undefined));
+    const first = renderResource({ fetcher });
+    await flush();
+    first.unmount();
+    // A wipe that bypasses the cache module (the dev reset deletes the table).
+    fixture.database.delete(groupCache).run();
+
+    const { result } = renderResource({ fetcher });
+    expect(result.current.data).toEqual(payload('cached'));
+    await flush();
+    expect(result.current).toMatchObject({ data: null, lastUpdatedAtMs: null, hydrated: true });
+  });
+
   it('first-renders the payload its last refresh wrote, and never one another user cached', async () => {
     const fetcher = jest.fn(() => Promise.resolve(payload('fresh')));
     const first = renderResource({ fetcher });
