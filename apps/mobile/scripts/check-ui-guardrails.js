@@ -5,6 +5,7 @@ const path = require('path');
 
 const { legacyVocabularyRule, rawColorLiteralRule, ratchetRules } = require('./ui-guardrails.config');
 const { findCompactPatternViolations } = require('./compact-pattern-guardrail');
+const { findListPatternViolations } = require('./list-pattern-guardrail');
 
 const RAW_COLOR_LITERAL_REGEX =
   /#[0-9A-Fa-f]{3,8}\b|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)/g;
@@ -423,6 +424,9 @@ function runUiGuardrailCheck(options = {}) {
   write('');
   write(`Compact patterns: ${compactViolations.length === 0 ? 'PASS' : 'FAIL'}`);
   for (const violation of compactViolations) write(`  ${violation.file}:${violation.line} — ${violation.rule}`);
+  const listViolations = findListPatternViolations(options);
+  write(`List patterns: ${listViolations.length === 0 ? 'PASS' : 'FAIL'}`);
+  for (const violation of listViolations) write(`  ${violation.file}:${violation.line} — ${violation.rule}`);
 
   const ratchetResults = [];
   const counts = {};
@@ -450,6 +454,7 @@ function runUiGuardrailCheck(options = {}) {
 
   const ok =
     compactViolations.length === 0 &&
+    listViolations.length === 0 &&
     colorResult.blockingViolations.length === 0 &&
     legacyResult.blockingViolations.length === 0 &&
     ratchetResults.every((entry) => entry.ratchet.ok);

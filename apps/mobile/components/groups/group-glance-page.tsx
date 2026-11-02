@@ -204,11 +204,7 @@ function GlanceCards({
         </View>
       </Card>
 
-      <Card testID="group-home-board-card">
-        <View style={styles.card}>
-          <GroupHomeBoard board={board} metric={metric} title="Top brothers" />
-        </View>
-      </Card>
+      <GroupHomeBoard board={board} metric={metric} title="Top brothers" />
 
       <Card testID="group-position-card">
         <View style={styles.card}>

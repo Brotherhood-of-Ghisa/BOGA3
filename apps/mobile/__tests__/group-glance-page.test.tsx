@@ -329,7 +329,7 @@ describe('At a glance: the group total', () => {
 // body face, my own one step heavier; figures in Plex Mono; words never in it.
 describe('At a glance: text roles', () => {
   const body = { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base };
-  const figureSmall = { fontFamily: uiFonts.figure.family, fontWeight: '500' as const, fontSize: uiTypography.size.sm };
+  const figure = { fontFamily: uiFonts.figure.family, fontWeight: '500' as const, fontSize: uiTypography.size.base, lineHeight: uiTypography.lineHeight.base };
 
   it('heads the cards with micro-labels, and names the week in the stepper', () => {
     renderPage();
@@ -340,13 +340,13 @@ describe('At a glance: text roles', () => {
     expect(within(byId('group-home-board-card')).getByText('Top brothers')).toHaveStyle(label);
     expect(byId('group-home-period-title')).toHaveStyle(label);
   });
-  it('draws board names as body and figures as small ink figures', () => {
+  it('draws board names and figures on the shared compact base line', () => {
     renderPage({ metric: 'prs' });
 
     expect(byId('group-home-board-row-marco-name')).toHaveStyle({ ...body, fontWeight: '400' });
     expect(byId(`group-home-board-row-${ME}-name`)).toHaveStyle({ ...body, fontWeight: '600' });
-    expect(byId('group-home-board-row-marco-rank')).toHaveStyle({ ...figureSmall, color: uiRoles.inkMuted });
-    expect(byId('group-home-board-row-luca-value')).toHaveStyle({ ...figureSmall, color: uiRoles.ink });
+    expect(byId('group-home-board-row-marco-rank')).toHaveStyle({ ...figure, color: uiRoles.inkMuted });
+    expect(byId('group-home-board-row-luca-value')).toHaveStyle({ ...figure, color: uiRoles.ink });
     // A PR count above zero is a record: the record colour, drawn heavy.
     expect(byId(`group-home-board-row-${ME}-value`)).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '700', color: uiRoles.record });
   });

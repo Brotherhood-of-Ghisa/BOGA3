@@ -1,6 +1,6 @@
 # M40-T03 — ListCard and shared compact rows
 
-- Status: `planned`
+- Status: `in_progress` — awaiting coded native acceptance before closeout
 - Depends on: `M40-T02-Compact_card_and_gallery`
 - Milestone: `docs/plans/milestones/M40-coded-ui-patterns.md`
 - Areas: frontend; UI impact: yes
@@ -34,6 +34,21 @@ paging, scoring or certification rewrite.
   parent/delta before coding it.
 
 ## Deliverables and acceptance
+
+### Session implementation choice
+
+Carry forward the approved native after template; no new semantic variant.
+Extend `ListRow` with compact density and own-row emphasis, leaving list/sheet
+defaults intact. Content slots own 4pt vertical insets; the control column owns
+its full 44pt target. `ListCard` composes the shared header, optional columns,
+rows and footer in standalone or embedded form; its optional action wraps only
+the board region. Keep fixed board-name ellipses and feature-sized figure
+columns. Extract Today's board presenter for native gallery reuse without
+changing its parent read or destinations. No product facts change intended.
+
+Independent reviewer lane agreement: fast, ios-smoke, ios-groups-e2e,
+jest-coverage, complexity, dependencies. Narrow unrelated frontend-ui flows as
+covered-by-jest; retain native three-width before/after and edge/action evidence.
 
 1. ListCard/header/optional column-label composition and one compact row recipe
    reusable by ListCard and StatsTable. Single-line and wrapped rows use the

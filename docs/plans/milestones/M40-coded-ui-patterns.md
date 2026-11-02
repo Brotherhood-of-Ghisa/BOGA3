@@ -126,7 +126,7 @@ coded migration still requires the acceptance in D5. Evidence stays in the PR.
 | --- | --- | --- | --- |
 | M40-T01-Agree_pattern_contracts | Agree the four contracts, compact row recipe, reference states and human acceptance workflow | none | completed |
 | M40-T02-Compact_card_and_gallery | Implement CompactCard, start the native gallery, migrate Stream and CoW references | T01 | completed — effective when this PR merges |
-| M40-T03-List_card_and_shared_rows | Implement ListCard and shared compact rows; migrate leaderboard references | T02 | planned |
+| M40-T03-List_card_and_shared_rows | Implement ListCard and shared compact rows; migrate leaderboard references | T02 | in_progress — awaiting coded native acceptance |
 | M40-T04-Sortable_table_migration | Extend StatsTable with the shared rows; migrate Muscle/contributor tables | T03 | planned |
 | M40-T05-Summary_tile_migration | Implement SummaryTile; migrate At a glance's headline tile | T02 | planned |
 | M40-T06-Enforce_pattern_adoption | Complete guardrails, catalog routing and the accepted four-pattern gallery | T04, T05 | planned |

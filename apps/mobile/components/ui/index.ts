@@ -7,6 +7,7 @@ export {
 } from '@/components/ui/action-button';
 export { Card } from '@/components/ui/card';
 export { CompactCard, CompactHeader } from '@/components/ui/compact-card';
+export { ListCard, ListCardHeader } from '@/components/ui/list-card';
 export { changeToneColour, type ChangeTone } from '@/components/ui/change-tone';
 export {
   ChipGroup,
@@ -43,6 +44,7 @@ export { Information, type InformationProps } from '@/components/ui/information'
 export {
   ListRow,
   type ListRowDensity,
+  type ListRowContentAction,
   type ListRowProps,
   type ListRowTone,
 } from '@/components/ui/list-row';
