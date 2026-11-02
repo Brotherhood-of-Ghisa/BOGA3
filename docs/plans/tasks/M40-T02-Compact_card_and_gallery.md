@@ -53,7 +53,9 @@ normal, long, current/past/pending/unavailable/absent and error/retry states.
 Lane agreement (independent Codex contract reviewer): fast, ios-smoke,
 ios-groups-e2e, jest-coverage, complexity and dependencies. Lower unrelated
 frontend defaults as covered-by-jest with gallery access/registration tests;
-no base Card/auth policy/runtime script/native dependency changes. Native
+no base Card/auth policy/runtime script/native dependency changes. The existing
+Groups flow dismisses only the observed seasonal icon confirmation before Expo
+setup; it must pass twice consecutively. Native
 captures cover375pt/402pt and the approved440pt reference; no new Maestro lane.
 Product facts: none intended.
 
