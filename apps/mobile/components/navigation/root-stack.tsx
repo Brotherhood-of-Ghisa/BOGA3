@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { HEADER_STYLE_OPTIONS } from '@/components/navigation/header-style';
 import { useAuth } from '@/src/auth';
 import { useRootRouteAccess } from '@/src/navigation/root-route-access';
+import { isUiGalleryAllowed } from '@/src/utils/isUiGalleryAllowed';
 
 /**
  * Arrow-only native back affordance on every detail screen. No custom
@@ -138,6 +139,9 @@ export function RootStack() {
           what lifts the block in tests. Not while signed out. */}
       <Stack.Protected guard={access !== 'sign-in'}>
         <Stack.Screen name="maestro-harness" options={{ headerShown: false }} />
+      </Stack.Protected>
+      <Stack.Protected guard={access !== 'sign-in' && isUiGalleryAllowed()}>
+        <Stack.Screen name="ui-gallery" options={{ title: 'UI gallery' }} />
       </Stack.Protected>
     </Stack>
   );

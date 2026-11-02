@@ -213,12 +213,10 @@ interpolation and fixed formatter preferences. Calendar keys and canonical form 
 
 ## Styling guardrails
 
-`apps/mobile/scripts/check-ui-guardrails.js` runs as the `ui-guardrails` lane
-of `boga test fast` and in CI; its rules, budgets and remedies are stated in
-the header of `apps/mobile/scripts/ui-guardrails.config.js`, and the token
-values in `apps/mobile/components/ui/tokens.ts`. In short: no raw colour
-literals, no retired styling vocabulary, and no raw `fontSize`, spacing or
-radius literal in `app/` or `components/` (every budget is 0).
+`apps/mobile/scripts/check-ui-guardrails.js` runs in fast and CI.
+Rules and budgets live in `apps/mobile/scripts/ui-guardrails.config.js`,
+values in `apps/mobile/components/ui/tokens.ts`. Raw colour, `fontSize`,
+spacing/radius literals and retired vocabulary are forbidden in app/components.
 
 1. **Raising a budget is never the fix.** A value the scale lacks is a case
    for changing the scale in `tokens.ts` and `design-language.md`, agreed as a
@@ -237,6 +235,10 @@ radius literal in `app/` or `components/` (every budget is 0).
    `__tests__/ui-icon.test.tsx` fails on a retired glyph. An icon-only control
    is a labelled `IconButton`, and an icon never carries state alone: the
    words or the row's accessibility label say it.
+
+For adopted CompactCard rules and scope, load
+`apps/mobile/scripts/compact-pattern-guardrail.js`; for their safe/failing
+cases, load `apps/mobile/__tests__/compact-pattern-guardrail.test.ts`.
 
 Guardrail commands (from `apps/mobile/`): `npm run lint:ui-guardrails`, with
 `--verbose` for each ratchet violation, `--include-allowlisted` for the colour

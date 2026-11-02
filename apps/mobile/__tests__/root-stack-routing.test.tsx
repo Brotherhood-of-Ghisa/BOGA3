@@ -12,6 +12,8 @@
 
 type MockAuth = { isConfigured: boolean; session: unknown; status: 'idle' | 'restoring' | 'ready' };
 let mockAuth: MockAuth;
+let mockGalleryAllowed = true;
+jest.mock('@/src/utils/isUiGalleryAllowed', () => ({ isUiGalleryAllowed: () => mockGalleryAllowed }));
 const mockAuthListeners = new Set<() => void>();
 const mockSetAuth = (next: Partial<MockAuth>) => {
   mockAuth = { ...mockAuth, ...next };
@@ -81,6 +83,7 @@ const render = async (initialUrl: string) =>
       profile: () => <Text testID="profile-stub">Profile</Text>,
       'rm-curve': () => <Text testID="curve-stub">RM curve</Text>,
       'maestro-harness': () => <Text testID="harness-stub">Harness</Text>,
+      'ui-gallery': () => <Text testID="gallery-stub">Gallery</Text>,
     },
     { initialUrl },
   );
@@ -105,6 +108,7 @@ const signIn = () =>
 let consoleErrors: string[];
 
 beforeEach(() => {
+  mockGalleryAllowed = true;
   mockAuth = { isConfigured: true, session: null, status: 'ready' };
   mockAuthListeners.clear();
   __resetAuthRequiredSignalForTests();
@@ -257,4 +261,26 @@ it('opens the app on an unconfigured build and still reaches the disabled sign-i
 
   expect(screen.getByTestId('sign-in-screen')).toBeTruthy();
   expect(router.getPathname()).toBe('/sign-in');
+});
+
+it('keeps the gallery behind auth while allowing its selected development context through first sync', async () => {
+  mockAuth = { ...mockAuth, session: SESSION };
+  await setBootstrapped(false);
+  const signedIn = await render('/ui-gallery');
+  expect(await screen.findByTestId('gallery-stub')).toBeTruthy();
+  expect(signedIn.getPathname()).toBe('/ui-gallery');
+  signedIn.unmount();
+  mockAuth = { ...mockAuth, session: null };
+  const signedOut = await render('/ui-gallery');
+  expect(await screen.findByTestId('sign-in-screen')).toBeTruthy();
+  expect(signedOut.getPathname()).toBe('/sign-in');
+});
+
+it('never declares the gallery as reachable when its runtime guard is false', async () => {
+  mockAuth = { ...mockAuth, session: SESSION };
+  mockGalleryAllowed = false;
+  await setBootstrapped(true);
+  const blocked = await render('/ui-gallery');
+  expect(await screen.findByTestId('today-stub')).toBeTruthy();
+  expect(blocked.getPathname()).toBe('/today');
 });

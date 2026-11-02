@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Card, FigureText, Icon, ListRow, SegmentedControl, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextEmphasis, uiTextTone } from '@/components/ui';
+import { Card, CompactHeader, FigureText, Icon, ListRow, SegmentedControl, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextEmphasis, uiTextTone } from '@/components/ui';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { CoWMetric } from '@/src/groups/cow-scoring';
 import type { CoWRankingWire, CoWResultWire } from '@/src/groups/cow-wire';
@@ -35,11 +35,9 @@ export function CoWResultHeading({ result, dateFormat, today = false, previous =
   result: CoWResultWire; dateFormat: ExerciseDateFormat; today?: boolean; previous?: boolean;
 }) {
   return <View style={styles.heading}>
-    <View style={[styles.headingRow, styles.headingLabel]}>
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>CoW</Text>
-      <Text allowFontScaling={false} style={[uiText.meta, styles.date]} accessibilityLabel={coWAccessibleDates(result.cow.week_start, dateFormat)}>
-        <FigureText>{coWDateRange(result.cow.week_start, dateFormat, today)}</FigureText>
-      </Text>
+    <View style={styles.headingLabel}>
+      <CompactHeader label="CoW" metadata={coWDateRange(result.cow.week_start, dateFormat, today)}
+        metadataAccessibilityLabel={coWAccessibleDates(result.cow.week_start, dateFormat)} />
     </View>
     {!today ? <Text allowFontScaling={false} style={[uiText.meta, styles.zone]}>{result.cow.time_zone}</Text> : null}
     <View style={styles.headingRow}>
@@ -96,7 +94,7 @@ const styles = StyleSheet.create({
   open: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm, minHeight: uiGeometry.tapTarget },
   heading: { gap: 0 }, headingRow: { flexDirection: 'row', alignItems: 'baseline', gap: uiSpace.xs, justifyContent: 'space-between', flexWrap: 'wrap' },
   headingLabel: { marginBottom: uiSpace.xs },
-  date: { marginLeft: 'auto', textAlign: 'right' }, zone: { textAlign: 'right' },
+  zone: { textAlign: 'right' },
   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm, borderTopColor: uiRoles.ruleSoft, borderTopWidth: uiBorder.width, paddingVertical: uiSpace.sm },
   rank: { minWidth: uiSpace.lg }, name: { flex: 1 }, figure: { textAlign: 'right', flexShrink: 0 },
   column: { textAlign: 'right', paddingVertical: uiSpace.sm }, empty: { paddingVertical: uiSpace.md },

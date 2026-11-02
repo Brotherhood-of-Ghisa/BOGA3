@@ -1,6 +1,6 @@
 # M40-T02 — CompactCard, native gallery and reference migration
 
-- Status: `planned`
+- Status: `in_progress`
 - Depends on: `M40-T01-Agree_pattern_contracts`
 - Milestone: `docs/plans/milestones/M40-coded-ui-patterns.md`
 - Areas: frontend; UI impact: yes
@@ -32,6 +32,30 @@ actions into one target, alter data/copy rules or migrate unrelated screens.
   show derivations from the accepted family before implementing them.
 - Use the selected development-only sibling route and review viewports in the
   approved brief; settle only implementation details and report any mismatch.
+
+## Implementation design
+
+Current main is `1a6665d6a41d92a5fa699a1284018e33f68d7c18`; the selected
+references match the approved native preview. Use CompactCard for the two
+standalone Stream cards and CompactHeader for their label/metadata row and the
+existing embedded CoW/Today headers. Fixed container insets and header geometry
+have no consumer style override. Subjects, facts, formatted content and callbacks
+remain feature-owned. Preserve existing CoW subject/status geometry and Today
+current-link/previous-passive/retry boundaries. Expose existing session record
+callbacks through Card's accessibility-action convention as well as touch.
+
+The sibling UI gallery is explicitly registered after normal root routes,
+self-gated by isDevMode and StoreClient exclusion, and has no normal navigation
+entry. Fixture-only read states use the same pure production presenters; never
+replace production hooks or introduce a parallel styled implementation. Include
+normal, long, current/past/pending/unavailable/absent and error/retry states.
+
+Lane agreement (independent Codex contract reviewer): fast, ios-smoke,
+ios-groups-e2e, jest-coverage, complexity and dependencies. Lower unrelated
+frontend defaults as covered-by-jest with gallery access/registration tests;
+no base Card/auth policy/runtime script/native dependency changes. Native
+captures cover375pt/402pt and the approved440pt reference; no new Maestro lane.
+Product facts: none intended.
 
 ## Deliverables and acceptance
 
