@@ -35,16 +35,16 @@ export function CoWResultHeading({ result, dateFormat, today = false, previous =
   result: CoWResultWire; dateFormat: ExerciseDateFormat; today?: boolean; previous?: boolean;
 }) {
   return <View style={styles.heading}>
-    <View style={styles.headingRow}>
-      <Text allowFontScaling={false} style={uiText.title}>CoW</Text>
-      <Text allowFontScaling={false} style={[uiText.figureSmall, styles.date]} accessibilityLabel={coWAccessibleDates(result.cow.week_start, dateFormat)}>
+    <View style={[styles.headingRow, styles.headingLabel]}>
+      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>CoW</Text>
+      <Text allowFontScaling={false} style={[uiText.meta, styles.date]} accessibilityLabel={coWAccessibleDates(result.cow.week_start, dateFormat)}>
         <FigureText>{coWDateRange(result.cow.week_start, dateFormat, today)}</FigureText>
       </Text>
     </View>
     {!today ? <Text allowFontScaling={false} style={[uiText.meta, styles.zone]}>{result.cow.time_zone}</Text> : null}
     <View style={styles.headingRow}>
-      <Text allowFontScaling={false} style={[uiText.title, styles.name]}>{result.exercise?.name ?? 'Exercise unavailable'}</Text>
-      <Text allowFontScaling={false} style={[uiText.bodyStrong, uiTextTone.muted]}>{previous ? 'Last week · Final' : coWStatus(result.cow, result.state)}</Text>
+      <Text allowFontScaling={false} style={[uiText.bodyStrong, styles.name]}>{result.exercise?.name ?? 'Exercise unavailable'}</Text>
+      <Text allowFontScaling={false} style={uiText.meta}>{previous ? 'Last week · Final' : coWStatus(result.cow, result.state)}</Text>
     </View>
   </View>;
 }
@@ -92,10 +92,11 @@ function CoWPodium({ rankings, metric, userId, testID }: { rankings: CoWRankingW
 
 const styles = StyleSheet.create({
   hiddenPodium: { position: 'absolute', top: 0, left: 0, right: 0, opacity: 0 },
-  content: { padding: uiSpace.md, gap: uiSpace.md },
+  content: { padding: uiSpace.md, gap: uiSpace.sm },
   open: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm, minHeight: uiGeometry.tapTarget },
-  heading: { gap: uiSpace.sm }, headingRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.md, justifyContent: 'space-between', flexWrap: 'wrap' },
-  date: { flexShrink: 1 }, zone: { textAlign: 'right' },
+  heading: { gap: 0 }, headingRow: { flexDirection: 'row', alignItems: 'baseline', gap: uiSpace.xs, justifyContent: 'space-between', flexWrap: 'wrap' },
+  headingLabel: { marginBottom: uiSpace.xs },
+  date: { marginLeft: 'auto', textAlign: 'right' }, zone: { textAlign: 'right' },
   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm, borderTopColor: uiRoles.ruleSoft, borderTopWidth: uiBorder.width, paddingVertical: uiSpace.sm },
   rank: { minWidth: uiSpace.lg }, name: { flex: 1 }, figure: { textAlign: 'right', flexShrink: 0 },
   column: { textAlign: 'right', paddingVertical: uiSpace.sm }, empty: { paddingVertical: uiSpace.md },

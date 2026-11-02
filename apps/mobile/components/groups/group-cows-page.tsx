@@ -82,10 +82,13 @@ function CoWNextSection({ calendar, cows, next, manager, groupId, name, open, da
   const zone = next?.time_zone ?? calendar.firstPage?.time_zone;
   return <>
     <Text allowFontScaling={false} style={uiText.label}>Next week</Text>
-    {week ? <Text allowFontScaling={false} style={uiText.figureSmall} accessibilityLabel={`${coWAccessibleDates(week, dateFormat)} · ${zone ?? ''}`}><FigureText>{`${coWDateRange(week, dateFormat)} · ${zone ?? ''}`}</FigureText></Text> : null}
-    {cows.firstPage ? next ? <Card><ListRow label={name(next)} density="list" onPress={() => open(next)}
-      description={coWStatus(next)} meta={<Text allowFontScaling={false} style={uiText.figureSmall} accessibilityLabel={coWAccessibleDates(next.week_start, dateFormat)}><FigureText>{coWDateRange(next.week_start, dateFormat)}</FigureText></Text>}
-      testID="cows-next" trailing={<Icon name="chevron-right" color={uiRoles.inkMuted} size="sm" />} /></Card>
+    {week ? <Text allowFontScaling={false} style={[uiText.meta, { textAlign: 'right' }]} accessibilityLabel={`${coWAccessibleDates(week, dateFormat)} · ${zone ?? ''}`}><FigureText>{`${coWDateRange(week, dateFormat)} · ${zone ?? ''}`}</FigureText></Text> : null}
+    {cows.firstPage ? next ? <Card><ListRow density="list" onPress={() => open(next)} accessibilityLabel={`${name(next)}, ${coWStatus(next)}`}
+      meta={<Text allowFontScaling={false} style={[uiText.meta, { textAlign: 'right' }]} accessibilityLabel={coWAccessibleDates(next.week_start, dateFormat)}><FigureText>{coWDateRange(next.week_start, dateFormat)}</FigureText></Text>}
+      testID="cows-next" trailing={<Icon name="chevron-right" color={uiRoles.inkMuted} size="sm" />}>
+      <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>{name(next)}</Text>
+      <Text allowFontScaling={false} style={uiText.meta}>{coWStatus(next)}</Text>
+    </ListRow></Card>
       : <Text allowFontScaling={false} style={uiText.meta}>Nothing scheduled</Text>
       : <GroupMissingDataState error={pickInlineError(cows.error)} offline={cows.offline} onRetry={() => void cows.refresh()} testIDPrefix="cows-list" />}
     {manager && cows.firstPage ? <ActionButton variant="outline" label={next ? 'Edit next CoW' : 'Schedule next CoW'}
@@ -97,9 +100,12 @@ function CoWPastSection({ cows, past, name, open, dateFormat }: {
   cows: GroupOnlinePagesState<CoWListWire, CoWDefinitionWire>; past: CoWDefinitionWire[];
   name: (cow: CoWDefinitionWire) => string; open: (cow: CoWDefinitionWire) => void; dateFormat: ExerciseDateFormat;
 }) {
-  return cows.firstPage ? <View style={{ gap: uiSpace.sm }}>{past.map(cow => <Card key={cow.cow_id}><ListRow label={name(cow)} density="list" description={coWStatus(cow)}
+  return cows.firstPage ? <View style={{ gap: uiSpace.sm }}>{past.map(cow => <Card key={cow.cow_id}><ListRow density="list" accessibilityLabel={`${name(cow)}, ${coWStatus(cow)}`}
       onPress={() => open(cow)} testID={`cows-past-${cow.cow_id}`} trailing={<Icon name="chevron-right" color={uiRoles.inkMuted} size="sm" />}
-      meta={<Text allowFontScaling={false} style={uiText.figureSmall} accessibilityLabel={coWAccessibleDates(cow.week_start, dateFormat)}><FigureText>{coWDateRange(cow.week_start, dateFormat)}</FigureText></Text>} /></Card>)}
+      meta={<Text allowFontScaling={false} style={[uiText.meta, { textAlign: 'right' }]} accessibilityLabel={coWAccessibleDates(cow.week_start, dateFormat)}><FigureText>{coWDateRange(cow.week_start, dateFormat)}</FigureText></Text>}>
+      <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>{name(cow)}</Text>
+      <Text allowFontScaling={false} style={uiText.meta}>{coWStatus(cow)}</Text>
+    </ListRow></Card>)}
       {past.length === 0 ? <Text allowFontScaling={false} style={uiText.meta}>No past CoWs</Text> : null}
       {cows.hasMore ? <ActionButton label={cows.loadingMore ? 'Loading…' : 'More CoWs'} variant="outline" onPress={() => void cows.loadMore()} testID="cows-more" /> : null}
       {cows.loadMoreError ? <GroupInlineError error={cows.loadMoreError} onRetry={() => void cows.loadMore()} testID="cows-more-error" /> : null}

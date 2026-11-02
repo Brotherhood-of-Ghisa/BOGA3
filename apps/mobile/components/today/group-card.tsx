@@ -104,7 +104,9 @@ function WeekBoardCard({ board, range, onOpenGroup, header, challenges }: {
       <View style={styles.boardHeading}>
         <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.ink]}>
           This week
-          <Text allowFontScaling={false} style={uiTextTone.faint} testID="today-group-board-range">{`  ${range}`}</Text>
+        </Text>
+        <Text allowFontScaling={false} style={[uiText.meta, styles.boardRange]} testID="today-group-board-range">
+          <FigureText>{range}</FigureText>
         </Text>
       </View>
       <Pressable
@@ -320,9 +322,18 @@ const styles = StyleSheet.create({
   },
   // `This week` and its range, under the header row.
   boardHeading: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: uiSpace.xs,
     paddingHorizontal: uiSpace.md,
     paddingTop: uiSpace.sm,
     paddingBottom: uiSpace.xs,
+  },
+  boardRange: {
+    marginLeft: 'auto',
+    textAlign: 'right',
   },
   board: {
     gap: 0,
