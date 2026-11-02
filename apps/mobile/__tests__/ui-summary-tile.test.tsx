@@ -50,6 +50,7 @@ it('cycles states, toggles long content and normalizes unknown state input', () 
   render(<SummaryGallery initialState="unknown" />);
   fireEvent.press(screen.getByTestId('ui-gallery-summary-long'));
   expect(screen.getByTestId('group-week-totals-sets-value')).toHaveTextContent('123456');
-  fireEvent.press(screen.getByTestId('ui-gallery-summary-state'));
+  expect(screen.getByTestId('ui-gallery-summary-controls')).toHaveStyle({ flexDirection: 'row' });
+  fireEvent.press(within(screen.getByTestId('ui-gallery-summary-controls')).getByTestId('ui-gallery-summary-state'));
   expect(screen.getByTestId('ui-gallery-summary-past-long')).toBeTruthy();
 });

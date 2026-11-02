@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Notice, Screen, SwitchRow, ToggleChip, uiSpace } from '@/components/ui';
 import { GroupGlancePage } from '@/components/groups/group-glance-page';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
@@ -20,8 +20,8 @@ export function SummaryGallery({ initialState, initialLong = false, review = fal
   return <Screen style={styles.page} testID={`ui-gallery-summary-${state}-${long ? 'long' : 'normal'}`}>
     {!review ? <>
       {children}
-      <ToggleChip options={SUMMARY_STATES} value={state} onChange={next => { setState(next); setOffset(next === 'past' ? -1 : next === 'held' ? -10 : 0); }}
-        accessibilityLabel="Example state" testID="ui-gallery-summary-state" />
+      <View style={styles.controls} testID="ui-gallery-summary-controls"><ToggleChip options={SUMMARY_STATES} value={state} onChange={next => { setState(next); setOffset(next === 'past' ? -1 : next === 'held' ? -10 : 0); }}
+        accessibilityLabel="Example state" testID="ui-gallery-summary-state" /></View>
       <SwitchRow label="Long content" value={long} onValueChange={setLong} testID="ui-gallery-summary-long" />
     </> : null}
     {offline && state !== 'offline-empty' ? <GroupOfflineBanner lastUpdatedAtMs={SUMMARY_NOW.getTime()} /> : null}
@@ -37,4 +37,5 @@ export function SummaryGallery({ initialState, initialLong = false, review = fal
 const styles = StyleSheet.create({
   page: { flex: 1, padding: uiSpace.md, gap: uiSpace.md },
   reference: { flex: 1 },
+  controls: { flexDirection: 'row' },
 });
