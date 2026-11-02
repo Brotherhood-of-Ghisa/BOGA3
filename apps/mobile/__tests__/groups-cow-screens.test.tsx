@@ -30,7 +30,7 @@ import * as groupApi from '@/src/groups/api';
 import { GroupApiError } from '@/src/groups/api';
 import type { CoWDefinitionWire, CoWResultWire } from '@/src/groups/cow-wire';
 import { createCoWId } from '@/src/groups/cow-draft';
-import { ChoiceRow } from '@/components/ui';
+import { ChoiceRow, uiText, uiTextTone } from '@/components/ui';
 import { CoWPreview } from '@/components/groups/cow-preview';
 import { CoWGroupPreview } from '@/components/groups/cow-group-preview';
 import { TodayCoWSummaries } from '@/components/today/group-cow-summary';
@@ -117,6 +117,16 @@ it('shows only enabled metrics and never substitutes the viewer into a short pod
   render(<CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" onOpen={jest.fn()} testID="preview" />);
   expect(screen.queryByTestId('preview-metric-e1rm')).toBeNull(); expect(screen.queryByText('You')).toBeNull(); expect(screen.getByText('Jules')).toBeTruthy();
 });
+it.each([false, true])('uses the same compact card typography and right-aligned dates for a preview (past: %s)', previous => {
+  const result = previous ? previousCowSummary().result! : current();
+  render(<CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" previous={previous} onOpen={jest.fn()} testID="preview" />);
+  const title = screen.getByText('CoW');
+  const date = screen.getByLabelText(previous ? '19-10-2026 – 25-10-2026' : '26-10-2026 – 01-11-2026');
+  expect(title).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
+  expect(date).toHaveStyle({ ...uiText.meta, textAlign: 'right', marginLeft: 'auto' });
+  expect(screen.getByText('Pull-up')).toHaveStyle(uiText.bodyStrong);
+  expect(screen.getByText(previous ? 'Last week · Final' : 'Live')).toHaveStyle(uiText.meta);
+});
 it.each(['pending','unavailable','empty'] as const)('keeps current %s distinct from absence', async state => {
   const value = summary();
   value.result.rankings.forEach(row => { row.entries = []; });
@@ -169,6 +179,11 @@ it('browses current, next and past with archived names retained, and management 
   render(<CoWsRoute />);
   expect(await screen.findByTestId('cows-preview')).toBeTruthy(); expect(await screen.findByTestId('cows-next')).toBeTruthy();
   expect(screen.getByText('Archived squat')).toBeTruthy();
+  expect(screen.getByText('Archived squat')).toHaveStyle(uiText.bodyStrong);
+  expect(within(screen.getByTestId('cows-past-past')).getByText('Final')).toHaveStyle(uiText.meta);
+  expect(within(screen.getByTestId('cows-next')).getByText('Pull-up')).toHaveStyle(uiText.bodyStrong);
+  fireEvent.press(screen.getByTestId('cows-past-past'));
+  expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows/past?metric=e1rm');
   fireEvent.press(screen.getByTestId('cows-schedule')); expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows/schedule?cowId=next');
   expect(screen.getByText('Full standings')).toBeTruthy();
 });
@@ -637,6 +652,24 @@ it('Today shows the current exercise and every enabled metric, then last week’
   expect(screen.getByText('[Improvement]')).toBeTruthy();
   fireEvent.press(currentSection);
   expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows?cowId=cow1&metric=e1rm');
+});
+
+it('Today shares uppercase headings, right-aligned date rows and compact text between current and past blocks', async () => {
+  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  await screen.findByText('1RM · Volume · Improvement');
+  await screen.findByTestId('today-cow-winner-e1rm');
+  for (const [prefix, title, date] of [
+    ['today-cow-current', 'Current CoW', '26 Oct – 1 Nov 26'],
+    ['today-cow-previous', 'Last Week CoW', '19 – 25 Oct 26'],
+  ]) {
+    const section = within(screen.getByTestId(prefix));
+    const heading = section.getByText(title);
+    const range = section.getByText(date);
+    expect(heading).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
+    expect(range).toHaveStyle({ ...uiText.meta, textAlign: 'right', marginLeft: 'auto' });
+    expect(section.getByTestId(`${prefix}-exercise`)).toHaveStyle(uiText.bodyStrong);
+  }
+  expect(screen.getByTestId('today-cow-winner-e1rm-name')).toHaveStyle({ ...uiText.meta, ...uiTextTone.ink });
 });
 
 it('Today retains the public winner identity when its figure is redacted and never promotes a runner-up', async () => {

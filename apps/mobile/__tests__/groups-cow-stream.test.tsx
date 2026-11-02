@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { CoWStreamCard } from '@/components/groups/cow-stream-card';
+import { uiText } from '@/components/ui';
 import { isCompetitionStreamWire } from '@/src/groups/competition-reader-guards';
 import { isCoWStreamItemWire } from '@/src/groups/cow-stream-wire';
 import { buildCoWStreamCard } from '@/src/groups/cow-stream-view-model';
@@ -25,6 +26,10 @@ it.each(events)('accepts the closed %s projection and renders one default-visibl
   const card=screen.getByTestId(`cow-stream-${item.key}`);
   expect(card).toHaveTextContent('Bench press',{ exact: false });
   expect(card).toHaveTextContent('Europe/London',{ exact: false });
+  const model = buildCoWStreamCard(item, 'u1', 'DD-MM-YYYY');
+  expect(screen.getByText(model.label)).toHaveStyle(uiText.label);
+  expect(screen.getByText(model.date)).toHaveStyle({ ...uiText.meta, textAlign: 'right' });
+  expect(screen.getByText(model.week)).toHaveStyle({ ...uiText.meta, textAlign: 'right' });
   fireEvent.press(card);
   expect(mockPush).toHaveBeenLastCalledWith('/group/g1/cows/cow1');
 });

@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, Icon, ListRow, uiBorder, uiRoles, uiSpace, uiText } from '@/components/ui';
+import { FigureText, Icon, ListRow, uiBorder, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { GroupInlineError, GroupMissingDataState, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
 import { formatBoardMemberLabel } from '@/src/groups/board-view-model';
@@ -27,9 +27,9 @@ function WinnerRows({ result }: { result: CoWResultWire }) {
     const suffix = `[${COW_METRIC_LABELS[metric]}]`;
     return <View key={metric} accessible accessibilityLabel={`${name} ${suffix}`} style={styles.winner}
       testID={`today-cow-winner-${metric}`}>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.body, styles.name]}
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.meta, uiTextTone.ink, styles.name]}
         testID={`today-cow-winner-${metric}-name`}>{name}</Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.body, styles.metric]}><FigureText>{suffix}</FigureText></Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.ink, styles.metric]}><FigureText>{suffix}</FigureText></Text>
     </View>;
   });
 }
@@ -58,15 +58,22 @@ function CoWSummarySection({ resource, previous, dateFormat, onOpen, onRetry }: 
     <ListRow density="list" divider accessibilityLabel={!previous ? label : undefined}
     accessibilityHint={!previous && result ? 'Opens this challenge in the group' : undefined}
     onPress={!previous && result ? () => onOpen(result) : undefined}
-    trailing={!previous && result ? <Icon name="chevron-right" color={uiRoles.inkMuted} size="sm" /> : undefined}
     testID={prefix}>
     <View style={styles.content}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>{title}</Text>
+      <View style={styles.heading}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.ink]}>{title}</Text>
+        {result ? <Text allowFontScaling={false} style={[uiText.meta, styles.date]}
+          accessibilityLabel={coWAccessibleDates(result.cow.week_start, dateFormat)}>
+          <FigureText>{coWDateRange(result.cow.week_start, dateFormat, true)}</FigureText>
+        </Text> : null}
+      </View>
       {result ? <>
-        <Text allowFontScaling={false} style={uiText.figureSmall}>{coWDateRange(result.cow.week_start, dateFormat, true)}</Text>
-        <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={uiText.bodyStrong}
-          accessibilityLabel={exercise} testID={`${prefix}-exercise`}>{exercise}</Text>
-        {previous ? <WinnerRows result={result} /> : <Text allowFontScaling={false} style={uiText.body}>
+        <View style={styles.exerciseRow}>
+          <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={[uiText.bodyStrong, styles.name]}
+            accessibilityLabel={exercise} testID={`${prefix}-exercise`}>{exercise}</Text>
+          {!previous ? <Icon name="chevron-right" color={uiRoles.inkMuted} size="sm" /> : null}
+        </View>
+        {previous ? <WinnerRows result={result} /> : <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]}>
           <FigureText>{metrics ?? ''}</FigureText>
         </Text>}
       </> : <GroupMissingDataState error={inlineError} offline={offline} onRetry={onRetry} testIDPrefix={prefix} />}
@@ -99,7 +106,10 @@ export function TodayCoWSummaries({ groupId, userId }: { groupId: string; userId
 
 const styles = StyleSheet.create({
   sections: { borderBottomWidth: uiBorder.width, borderBottomColor: uiRoles.ruleSoft },
-  content: { gap: uiSpace.sm, paddingVertical: uiSpace.sm },
+  content: { paddingVertical: uiSpace.sm },
+  heading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: uiSpace.xs, marginBottom: uiSpace.xs },
+  date: { marginLeft: 'auto', textAlign: 'right' },
+  exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
   winner: { flexDirection: 'row', alignItems: 'baseline', gap: uiSpace.xs, maxWidth: '100%' },
   name: { flexShrink: 1, minWidth: 0 },
   metric: { flexShrink: 0 },
