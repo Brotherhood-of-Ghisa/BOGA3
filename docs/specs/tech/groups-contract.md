@@ -299,27 +299,30 @@ the failure-isolated source-mode trigger implements [[groups.certification]].
 
 ## Mobile client
 
-- `apps/mobile/src/groups/api.ts` is the only Supabase caller. A message prefix
-  `<TOKEN>` maps to the token; transport status 0 or a throw to `NETWORK`;
-  anything else, including missing contract keys, to `INTERNAL`.
-- Group code never runs in the sync cycle; its one `src/sync` touch is the
-  `group_cache` delete in `apps/mobile/src/sync/account-wipe.ts`.
+- `apps/mobile/src/groups/api.ts` is the only Supabase caller. A `<TOKEN>`
+  message prefix maps to the token; status 0 or a throw to `NETWORK`; anything
+  else to `INTERNAL`.
+- Group code never runs in the sync cycle; it only wipes on
+  `apps/mobile/src/sync/account-wipe.ts` and arms timers on
+  `apps/mobile/src/sync/push-signal.ts`.
 - **Reads** are cache-first (`useGroupResource`): focus, 30 s while focused,
-  pull-to-refresh; skipped offline; concurrent refreshes share a request;
-  stale responses are dropped. Full boards and history are never cached.
+  2 s and 6 s after this device pushes, pull-to-refresh; skipped offline;
+  concurrent refreshes share a request; stale responses are dropped. Full
+  boards and history are never cached. Entries seen this run draw on first
+  render, never behind a loader.
 - **Writes** (`useGroupAction`) are refused offline, never queued or cached;
-  the screen refreshes after success.
+  success refreshes.
 - **Linking** is a local synced write and works offline; only cached,
   live exercises are offered. Unlink keeps past activity and certifications
   and checks the expected group exercise in its transaction: a moved mapping
   is left alone and the screen refreshes.
-- **Offline:** cached data stays under "Offline · last updated HH:MM"; with no
+- **Offline:** cached data stays under "Offline · last updated HH:MM"; no
   cache, an offline empty state.
 - An invite link opened signed out loses its code at sign-in.
 
 **Cache** (`group_cache`, `apps/mobile/src/data/schema/group-cache.ts`): a
-disposable copy of server data, out of sync scope. Rows carry `user_id`; a read
-for another user returns null. Streams cache the first page only. A group
+disposable copy of server data, out of sync scope. Rows carry `user_id`;
+another user reads null. Streams cache the first page only. A group
 `NOT_FOUND` evicts the group's and session entries, never synced links. A
 payload or calculation change bumps the versioned keys (`cache.ts`).
 

@@ -101,6 +101,7 @@ import { migrationCompleteKey } from '@/src/preferences/migration';
 import { preferenceKey } from '@/src/preferences/storage';
 import * as writeNudge from '@/src/sync/write-nudge';
 import { wipeLocalForAccountSwitch } from '@/src/sync/account-wipe';
+import { groupCacheKeys, peekGroupCache, readGroupCache } from '@/src/groups/cache';
 
 // The sixteen syncable, per-user entity tables the wipe must clear, paired with
 // a label for readable assertions.
@@ -292,12 +293,17 @@ describe('sign-out / account-switch local wipe', () => {
       .values([
         { cacheKey: 'groups:mine', userId: 'user-a', payloadJson: '{"groups":[]}', fetchedAtMs: 1 },
         { cacheKey: 'stream:all', userId: 'user-a', payloadJson: '{"items":[]}', fetchedAtMs: 1 },
+        { cacheKey: groupCacheKeys.mine, userId: 'user-a', payloadJson: '{"groups":[]}', fetchedAtMs: 1 },
       ])
       .run();
+    // A read this run leaves the entry in the in-memory mirror too.
+    readGroupCache(db(), groupCacheKeys.mine, 'user-a');
+    expect(peekGroupCache(groupCacheKeys.mine, 'user-a')).not.toBeNull();
 
     await wipeLocalForAccountSwitch();
 
     expect(db().select().from(groupCache).all()).toHaveLength(0);
+    expect(peekGroupCache(groupCacheKeys.mine, 'user-a')).toBeNull();
   });
 
   it('clears the derived exercise session facts, their stale queue and the built marker', async () => {

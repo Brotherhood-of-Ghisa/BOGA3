@@ -1,7 +1,11 @@
 // Cache-first group read hook (`docs/specs/tech/groups-contract.md`).
 //
-//   - renders the cached payload for (user, cacheKey) first;
-//   - refreshes on focus, every 30 s while focused, and on `refresh()`;
+//   - renders the cached payload for (user, cacheKey) first: on the first
+//     render when this app run already read or wrote it, else once SQLite is
+//     read; a refresh never hides it behind a loading state;
+//   - refreshes on focus, every 30 s while focused, on `refresh()`, and
+//     2 s and 6 s after a sync cycle pushes this device's rows (once the
+//     evaluator has usually caught up), including a push just before focus;
 //   - `offline` is true when the device is offline or the last refresh failed
 //     with `NETWORK`; cached data and `lastUpdatedAtMs` stay;
 //   - `NOT_FOUND` evicts the entry (plus the group's entries when
@@ -15,14 +19,17 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect,useRef, useState, useSyncExternalStore } from 'react';
 
 import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
+import { getLastRowsPushedAtMs, subscribeToRowsPushed } from '@/src/sync/push-signal';
 
 import { GroupApiError, toGroupApiError } from './api';
-import { deleteGroupCacheEntry, getCompetitionCacheGeneration,
+import { deleteGroupCacheEntry, getCompetitionCacheGeneration, peekGroupCache,
   readGroupCache, subscribeCompetitionCache, writeGroupCache } from './cache';
 import { retireCompetitionAccount } from './competition-cache-retirement';
 import { useNetworkOnline } from './use-network-online';
 
 export const GROUP_RESOURCE_POLL_INTERVAL_MS = 30_000;
+/** Delays after a push that reads refresh at: the evaluator usually lands within the first. */
+export const GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS = [2_000, 6_000] as const;
 
 export type GroupResourceOptions<T> = {
   /** Signed-in user id (`useAuth().user?.id`). Null disables reads and fetches. */
@@ -76,6 +83,22 @@ const initialState = <T>(identity: string | null, generation: number): InternalS
   lostAccess: false,
 });
 
+/** The state a (user, key) starts in: its payload from this app run's cache memory, if any. */
+const cachedInitialState = <T>(identity: string | null, generation: number,
+  userId: string | null, cacheKey: string | null): InternalState<T> => {
+  const entry = identity && userId && cacheKey ? peekGroupCache<T>(cacheKey, userId) : null;
+  return entry
+    ? { ...initialState<T>(identity, generation), data: entry.payload, lastUpdatedAtMs: entry.fetchedAtMs, hydrated: true }
+    : initialState<T>(identity, generation);
+};
+
+/** Arms one refresh per after-push delay still ahead of `pushedAtMs`; returns their handles. */
+const armAfterPushRefreshes = (pushedAtMs: number, refresh: () => void): ReturnType<typeof setTimeout>[] =>
+  GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS
+    .map(delay => pushedAtMs + delay - Date.now())
+    .filter(wait => wait > 0)
+    .map(wait => setTimeout(refresh, wait));
+
 export function useGroupResource<T>({
   userId,
   cacheKey,
@@ -87,10 +110,10 @@ export function useGroupResource<T>({
   const identity = userId && cacheKey ? `${userId}\u0000${cacheKey}` : null;
   const generation = useSyncExternalStore(subscribeCompetitionCache,
     () => getCompetitionCacheGeneration(userId), () => getCompetitionCacheGeneration(userId));
-  const [state, setState] = useState<InternalState<T>>(() => initialState(identity,generation));
+  const [state, setState] = useState<InternalState<T>>(() => cachedInitialState(identity,generation,userId,cacheKey));
   // Account, group and disclosure changes hide prior data in this render.
   const visible = state.identity === identity && state.generation === generation
-    ? state : initialState<T>(identity,generation);
+    ? state : cachedInitialState<T>(identity,generation,userId,cacheKey);
   const visibleRef=useRef(visible);
   useLayoutEffect(() => { visibleRef.current=visible; });
   const focusedEpoch=useRef(generation);
@@ -112,7 +135,7 @@ export function useGroupResource<T>({
     identityRef.current = identity;
     inFlightRef.current = null;
     setState(previous => previous.identity === identity && previous.generation === generation
-      ? previous : initialState<T>(identity,generation));
+      ? previous : cachedInitialState<T>(identity,generation,userId,cacheKey));
 
     if (!userId || !cacheKey || identity === null) {
       setState({ ...initialState<T>(identity,generation), hydrated: true });
@@ -241,8 +264,18 @@ export function useGroupResource<T>({
       const handle = setInterval(() => {
         void refresh();
       }, pollIntervalMs);
+      // A push shortly before focus still has its later refreshes to come.
+      const refreshNow = () => void refresh();
+      const lastPushedAtMs = getLastRowsPushedAtMs();
+      let afterPush = lastPushedAtMs === null ? [] : armAfterPushRefreshes(lastPushedAtMs, refreshNow);
+      const unsubscribe = subscribeToRowsPushed(() => {
+        afterPush.forEach(clearTimeout);
+        afterPush = armAfterPushRefreshes(Date.now(), refreshNow);
+      });
       return () => {
         clearInterval(handle);
+        afterPush.forEach(clearTimeout);
+        unsubscribe();
       };
     }, [refresh, pollIntervalMs,generation]),
   );

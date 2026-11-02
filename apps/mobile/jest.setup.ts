@@ -2,9 +2,11 @@ import { cleanup, configure } from '@testing-library/react-native';
 import { AppState } from 'react-native';
 
 import { createUncaughtErrorSink } from '@/__tests__/helpers/uncaught-react-errors';
+import { forgetGroupCacheMemory } from '@/src/groups/cache';
 import {
   __resetAccountLocalPreferencesForTests,
 } from '@/src/preferences/account-local';
+import { __resetRowsPushedForTests } from '@/src/sync/push-signal';
 
 // Under multi-core parallel Jest runs across 200+ suites, 1s async timeout
 // causes flaky timeouts under CPU scheduling contention; raise default to 5s.
@@ -13,6 +15,9 @@ configure({ asyncUtilTimeout: 5000 });
 beforeEach(() => {
   AppState.currentState = 'active';
   __resetAccountLocalPreferencesForTests();
+  // Module state that outlives a test's database fixture.
+  forgetGroupCacheMemory();
+  __resetRowsPushedForTests();
   // The kv-store mock below keeps one store per test file; start each test
   // empty. The launch theme was read at import, before any test.
   (jest.requireMock('expo-sqlite/kv-store') as typeof import('expo-sqlite/kv-store')).Storage.clearSync();
