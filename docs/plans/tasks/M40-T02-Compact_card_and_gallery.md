@@ -13,6 +13,11 @@ can judge the coded pattern and its integration before it ships.
 
 ## Decided and scope
 
+Load `docs/plans/M40-pattern-contracts.md` for the operator-approved native
+templates and shared row contract. This selection is settled; recheck current
+main for drift, and obtain a new template decision only for a material deviation
+or new derivative. Coded-result acceptance remains required for this migration.
+
 Follow D1–D6 and T01's accepted contract. Extract the compact header/metadata
 recipe using existing primitives and text roles. Cover the selected Stream
 event/session references and current/past CoW headings, including their real
@@ -25,7 +30,8 @@ actions into one target, alter data/copy rules or migrate unrelated screens.
   current main; expose any mismatch before coding.
 - Settle the smallest content/action API and any necessary semantic variants;
   show derivations from the accepted family before implementing them.
-- Confirm the gallery host chosen in T01 and the review fixtures/viewports.
+- Use the selected development-only sibling route and review viewports in the
+  approved brief; settle only implementation details and report any mismatch.
 
 ## Deliverables and acceptance
 

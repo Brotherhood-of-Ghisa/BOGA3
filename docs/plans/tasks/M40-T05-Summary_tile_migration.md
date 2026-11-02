@@ -13,20 +13,27 @@ metric hierarchy, density, comparisons and integration before it ships.
 
 ## Decided and scope
 
+Load `docs/plans/M40-pattern-contracts.md` for the operator-approved native
+templates and shared row contract. This selection is settled; recheck current
+main for drift, and obtain a new template decision only for a material deviation
+or new derivative. Coded-result acceptance remains required for this migration.
+
 Follow D1–D6. This family's prominence comes from headline figures and grouped
 metrics; compact spacing remains the default. Reuse the shared header and the
 existing WeekFigure/Stat presentation instead of inventing sizes or comparison
-graphics. The current reference is Group stats in GroupGlancePage. Period/metric
-controls that govern several cards keep their current scope and placement.
+graphics. The approved reference is Group stats in GroupGlancePage. Preserve its
+existing appearance as an extraction; no extra supporting section is needed.
+Period/metric controls that govern several cards keep their current scope and
+placement.
 No calculation, comparison, date-formatting or PR-emphasis changes are intended.
 
 ## Open — resolve with the human at session start
 
-- Confirm the exact top tile selected in T01 and the current main composition;
-  report any mismatch between the intended reference and the code.
-- Agree the smallest metric/header/supporting-section API, including whether a
-  supporting section is actually needed for this first consumer. Do not add
-  unused chart/action slots or a universal dashboard builder.
+- Recheck the selected Group stats tile against current main and report drift;
+  preserve the approved appearance and both headline metrics.
+- Agree the smallest metric/header API; the first consumer has no additional
+  supporting section. Do not add unused chart/action slots or a universal
+  dashboard builder.
 - Show any new variant's inherited parent rules and proposed differences before
   coding; reconfirm native review states/viewports.
 
