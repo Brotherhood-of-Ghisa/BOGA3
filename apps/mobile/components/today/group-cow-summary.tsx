@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, Icon, ListRow, uiBorder, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { CompactHeader, FigureText, Icon, ListRow, uiBorder, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { GroupInlineError, GroupMissingDataState, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
 import { formatBoardMemberLabel } from '@/src/groups/board-view-model';
@@ -42,7 +42,7 @@ type SectionProps = {
   onRetry: () => void;
 };
 
-function CoWSummarySection({ resource, previous, dateFormat, onOpen, onRetry }: SectionProps) {
+export function TodayCoWSummarySection({ resource, previous, dateFormat, onOpen, onRetry }: SectionProps) {
   const { data, offline, error, lastUpdatedAtMs } = resource;
   const prefix = previous ? 'today-cow-previous' : 'today-cow-current';
   const result = data?.result;
@@ -61,24 +61,29 @@ function CoWSummarySection({ resource, previous, dateFormat, onOpen, onRetry }: 
     testID={prefix}>
     <View style={styles.content}>
       <View style={styles.heading}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.ink]}>{title}</Text>
-        {result ? <Text allowFontScaling={false} style={[uiText.meta, styles.date]}
-          accessibilityLabel={coWAccessibleDates(result.cow.week_start, dateFormat)}>
-          <FigureText>{coWDateRange(result.cow.week_start, dateFormat, true)}</FigureText>
-        </Text> : null}
+        <CompactHeader label={title} accessibilityRole="header"
+          metadata={result ? coWDateRange(result.cow.week_start, dateFormat, true) : undefined}
+          metadataAccessibilityLabel={result ? coWAccessibleDates(result.cow.week_start, dateFormat) : undefined} />
       </View>
-      {result ? <>
-        <View style={styles.exerciseRow}>
-          <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={[uiText.bodyStrong, styles.name]}
-            accessibilityLabel={exercise} testID={`${prefix}-exercise`}>{exercise}</Text>
-          {!previous ? <Icon name="chevron-right" color={uiRoles.inkMuted} size="sm" /> : null}
-        </View>
-        {previous ? <WinnerRows result={result} /> : <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]}>
-          <FigureText>{metrics ?? ''}</FigureText>
-        </Text>}
-      </> : <GroupMissingDataState error={inlineError} offline={offline} onRetry={onRetry} testIDPrefix={prefix} />}
+      {result ? <SummaryResult result={result} previous={previous} prefix={prefix} />
+        : <GroupMissingDataState error={inlineError} offline={offline} onRetry={onRetry} testIDPrefix={prefix} />}
     </View>
     </ListRow>
+  </>;
+}
+
+function SummaryResult({ result, previous, prefix }: { result: CoWResultWire; previous: boolean; prefix: string }) {
+  const exercise = result.exercise?.name ?? 'Exercise unavailable';
+  const metrics = result.cow.metrics.map(metric => COW_METRIC_LABELS[metric]).join(' · ');
+  return <>
+    <View style={styles.exerciseRow}>
+      <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={[uiText.bodyStrong, styles.name]}
+        accessibilityLabel={exercise} testID={`${prefix}-exercise`}>{exercise}</Text>
+      {!previous ? <Icon name="chevron-right" color={uiRoles.inkMuted} size="sm" /> : null}
+    </View>
+    {previous ? <WinnerRows result={result} /> : <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]}>
+      <FigureText>{metrics}</FigureText>
+    </Text>}
   </>;
 }
 
@@ -98,8 +103,8 @@ export function TodayCoWSummaries({ groupId, userId }: { groupId: string; userId
   if (current.data?.selection === 'none' && previous.data?.selection === 'none') return null;
   const open = (result: CoWResultWire) => router.push(coWsHref(groupId, result.cow.cow_id, result.cow.metrics[0]));
   return <View style={styles.sections} testID="today-cow-summaries">
-    <CoWSummarySection resource={current} previous={false} dateFormat={dateFormat} onOpen={open} onRetry={retry} />
-    <CoWSummarySection resource={{ ...previous, data: !mismatch ? previous.data : null }}
+    <TodayCoWSummarySection resource={current} previous={false} dateFormat={dateFormat} onOpen={open} onRetry={retry} />
+    <TodayCoWSummarySection resource={{ ...previous, data: !mismatch ? previous.data : null }}
       previous dateFormat={dateFormat} onOpen={open} onRetry={retry} />
   </View>;
 }
@@ -107,8 +112,7 @@ export function TodayCoWSummaries({ groupId, userId }: { groupId: string; userId
 const styles = StyleSheet.create({
   sections: { borderBottomWidth: uiBorder.width, borderBottomColor: uiRoles.ruleSoft },
   content: { paddingVertical: uiSpace.sm },
-  heading: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: uiSpace.xs, marginBottom: uiSpace.xs },
-  date: { marginLeft: 'auto', textAlign: 'right' },
+  heading: { marginBottom: uiSpace.xs },
   exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
   winner: { flexDirection: 'row', alignItems: 'baseline', gap: uiSpace.xs, maxWidth: '100%' },
   name: { flexShrink: 1, minWidth: 0 },

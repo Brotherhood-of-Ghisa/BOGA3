@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Card, FigureText, Icon, uiRoles, uiSpace, uiText, uiTextEmphasis, uiTextTone } from '@/components/ui';
+import { CompactCard, CompactHeader, FigureText, uiRoles, uiSpace, uiText, uiTextEmphasis, uiTextTone } from '@/components/ui';
 import type {
   CompetitionSessionCard as StreamSessionCardViewModel,
   CompetitionSessionRecordLine,
@@ -48,28 +48,21 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressR
   const records = card.records;
 
   return (
-    <Card
+    <CompactCard
       accessibilityLabel={[card.memberName, card.statusLabel, context, card.setsLabel, card.exercisesLabel,
         records.length > 0 ? `${records.length} group record${records.length === 1 ? '' : 's'}` : null].filter(Boolean).join(', ')}
       onPress={() => onPress(card)}
-      style={styles.card}
+      accessibilityActions={onPressRecord ? records.map(line => ({ name: `record-${line.key}`, label: `Open ${line.accessibilityLabel}` })) : undefined}
+      onAccessibilityAction={onPressRecord ? event => {
+        const record = records.find(line => `record-${line.key}` === event.nativeEvent.actionName);
+        if (record) onPressRecord(record.key);
+      } : undefined}
       testID={testID}>
-      <View style={styles.headerRow}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.title, styles.member]} testID={`${testID}-member`}>
-          {card.memberName}
-        </Text>
-        <View style={styles.status}>
-          {card.isTrainingNow ? <Icon name="set-current" size="xs" /> : null}
-          <Text
-            allowFontScaling={false}
-            style={[uiText.meta, card.isTrainingNow ? [uiTextTone.ink, uiTextEmphasis.strong] : null]}
-            testID={`${testID}-status`}>
-            {card.statusLabel}
-          </Text>
-        </View>
-      </View>
-      <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta} testID={`${testID}-context`}>
-        <FigureText>{context}</FigureText>
+      <CompactHeader label={card.statusLabel} metadata={context}
+        icon={card.isTrainingNow ? 'set-current' : undefined} tone={card.isTrainingNow ? 'ink' : 'muted'}
+        labelTestID={`${testID}-status`} metadataTestID={`${testID}-context`} />
+      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.member]} testID={`${testID}-member`}>
+        {card.memberName}
       </Text>
       <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`${testID}-metrics`}>
         <FigureText>{`${card.setsLabel} · ${card.exercisesLabel}`}</FigureText>
@@ -91,30 +84,12 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressR
           {card.groupNames.join(', ')}
         </Text>
       ) : null}
-    </Card>
+    </CompactCard>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-    gap: uiSpace.xs,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
-  member: {
-    flex: 1,
-    minWidth: 0,
-  },
-  status: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-  },
+  member: { flexShrink: 1, minWidth: 0 },
   // The records sit under the figures, behind a `rule-soft` hairline.
   records: {
     marginTop: uiSpace.xs,

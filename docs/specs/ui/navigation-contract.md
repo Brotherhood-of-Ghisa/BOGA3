@@ -38,10 +38,9 @@ For route owners, load `screen-map.md`.
 
 ### Root route access
 
-The navigator enforces access; no screen redirects to gate itself. The root
-stack declares every root route under exactly one `Stack.Protected` group per
-access level, and `useRootRouteAccess`
-(`apps/mobile/src/navigation/root-route-access.ts`) enables one level at a time:
+The navigator declares every root route under a `Stack.Protected` group;
+`useRootRouteAccess` (`apps/mobile/src/navigation/root-route-access.ts`) selects
+one access level. Screens never redirect to gate themselves:
 
 | Level | When | What exists |
 | --- | --- | --- |
@@ -64,9 +63,10 @@ access level, and `useRootRouteAccess`
 - Every root route file must be declared in the root stack: Expo Router appends
   an undeclared one outside every `Stack.Protected` group
   (`__tests__/root-stack-routes.test.ts` fails on one).
-- `/maestro-harness` (dev/test, self-gated) is declared last and exists at every
-  level except `sign-in`: it is what lifts the first-sync block in tests, and it
-  must never be where the router lands.
+- Dev/test routes follow app routes and never become a landing route.
+  `/maestro-harness` lifts first sync; `/ui-gallery` uses
+  `src/utils/isUiGalleryAllowed.ts` in both navigator and route. Both exclude
+  `sign-in`; gallery also excludes release/StoreClient and has no navigation entry.
 
 ## Param rules
 

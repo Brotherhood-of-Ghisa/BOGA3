@@ -24,16 +24,16 @@ Two standing rules:
    sheet, summary line or state panel is the failure this catalog exists to
    prevent.
 
-## Planned coded compositions
+## Coded compositions
 
-These families have approved templates and planned implementations, **not
-production exports**. Until they ship, reach for the current components below.
-For a new block or derivative, follow the human selection and acceptance workflow in
+CompactCard and CompactHeader are implemented for Stream and embedded CoW
+headers. The other families remain approved templates, **not production
+exports**. For a new block or derivative, follow the human selection and acceptance workflow in
 `docs/specs/08-ux-delivery-standard.md` before building.
 
 | Family | Reuse / reference | Boundary to preserve |
 | --- | --- | --- |
-| CompactCard | Card, shared text roles; Stream and CoW summaries | Embedded summaries reuse their existing container; independent actions stay reachable |
+| CompactCard / CompactHeader | `compact-card.tsx`: fixed compact Card and shared label/metadata header; Stream and CoW | Embedded summaries reuse only the header inside their existing container; Card accessibility actions retain nested record callbacks |
 | ListCard | Card, ListRow; GroupHomeBoard and Today's weekly board | Passive rows and a whole-board action differ from independent row controls |
 | SortableTable | Evolve StatsTable and comparison columns | Keep sorting with its current owner and history/disclosure actions separate |
 | SummaryTile | Card, Stat, WeekFigure; At a glance's Group stats | Keep both Sets/PRs and page-level controls' existing scope |
@@ -43,6 +43,7 @@ For a new block or derivative, follow the human selection and acceptance workflo
 | You need | Reach for |
 | --- | --- |
 | The page ground; a scrolling page body with the gutter and card gap | `Screen` / `ScreenScroll` (`screen.tsx`) |
+| A compact summary or an embedded label/date header | `CompactCard` / `CompactHeader` (`compact-card.tsx`); feature content and actions retain their owners |
 | A container for content | `Card` (`card.tsx`) — with `onPress` the whole card is one labelled link |
 | A legend plus a figure | `Stat` (`stat.tsx`) — `stacked` or `inline`; its only emphasis is `record` |
 | A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`) |
@@ -105,6 +106,7 @@ folder rather than re-implementing its row, card or sheet.
 
 | Folder | What it owns |
 | --- | --- |
+| `pattern-gallery/` | Development-only native gallery of production pattern presenters and fixed fixtures; reached by explicit deep link, with access owned by `src/utils/isUiGalleryAllowed.ts` |
 | `rm-curve/` | `RmCurveScreen` / `RmCurveContent`, the experimental reps–load scatter, fitted temporal curves, model/scope controls, dated set inspection and `RmCurveHelp` explainer; reads `src/rm-curve/`, hosted by `app/rm-curve.tsx` |
 | `navigation/` | `MainTabBar` / `MainTabs` — the one bottom bar, drawn identically by the tab layout, the session view, exercise history and `TabOwnedPage`; `TabOwnedPage` (a root-stack page that keeps the tab bar under its native header: Exercises, Groups, Settings); the root stack and the auth route guard. The tab order, labels, routes and testIDs live in the non-visual model `apps/mobile/src/navigation/main-tabs.ts`, and presses go through `apps/mobile/components/navigation/use-open-main-tab.ts` so Train opens a workout in progress |
 | `exercise-core/` | `ExerciseNameField` and `ExerciseWeightSection` (weight entry, `Uses bodyweight` and its share) with `validateExerciseCore`, composed by both the personal editor and the group exercise form, so the two never diverge |

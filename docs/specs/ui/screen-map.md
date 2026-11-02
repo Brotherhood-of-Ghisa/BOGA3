@@ -1,12 +1,10 @@
 # Screen Map (Authoritative Current UI)
 
-What screens exist, what each one is for, and which are reachable at all. Load
-this when you add, remove, rename or repurpose a route. Paths, params and
-transitions: `navigation-contract.md`. Visual language: `design-language.md`.
-Render logic: the route file.
+Load when adding, removing, renaming or repurposing a route. Params and
+transitions: `navigation-contract.md`; visual rules: `design-language.md`.
 
-Routes are `expo-router` file routes under `apps/mobile/app/`; the file column
-below is relative to that directory. Components live beside the route, under
+`expo-router` route files live under `apps/mobile/app/`; the file column is
+relative to it. Rendering belongs there; components live under
 `apps/mobile/components/`.
 
 ## Entry and gates
@@ -99,6 +97,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 | Route | What it is for | File |
 | --- | --- | --- |
 | `/dev-logs` | In-app recent-log viewer, reached from Settings → Everything else only under `isDevMode()` | `dev-logs.tsx` |
+| `/ui-gallery` | Native pattern gallery: fixed examples, long content and read states; explicit deep link only, dev client required | `ui-gallery.tsx` |
 | `/maestro-harness` | Test harness: fixtures, resets, gate actions, teleports. Self-gated | `maestro-harness.tsx` |
 
 ## Shells (not user-facing screens)

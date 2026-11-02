@@ -76,6 +76,12 @@ appId: com.dinoderek.mobile
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 4000
+# A wiped November launch changes the native icon. Jest cannot dismiss UIKit's confirmation.
+- runFlow:
+    when:
+      visible: "You have changed the icon.*"
+    commands:
+      - tapOn: "OK"
 - runFlow:
     when:
       visible: "Continue"
