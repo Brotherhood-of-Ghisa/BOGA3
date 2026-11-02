@@ -26,9 +26,9 @@ Two standing rules:
 
 ## Planned coded compositions
 
-These families are planned contracts, **not production exports**. Until their
-implementations ship, reach for the current components below. For a new block
-or derivative, follow the human selection and acceptance workflow in
+These families have approved templates and planned implementations, **not
+production exports**. Until they ship, reach for the current components below.
+For a new block or derivative, follow the human selection and acceptance workflow in
 `docs/specs/08-ux-delivery-standard.md` before building.
 
 | Family | Reuse / reference | Boundary to preserve |

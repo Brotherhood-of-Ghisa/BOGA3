@@ -112,18 +112,19 @@ agreement. Follow-on work adopts the accepted patterns as screens are touched.
 
 ## Design inputs and freshness
 
-The conversation's four-family sketches are structural build inputs only; they
-were not verified on a device. T01 must capture the current native references
-and agree a task-level target with the human. The baseline already includes the
-CoW typography correction and revised At a glance composition, so preserve the
-current labels and controls rather than copying an older screenshot. Targets
-and comparisons stay with the task/PR under the existing design policy.
+On 2026-11-02 the operator approved all four native iPhone Pro Max after
+previews as templates. For the selected families, compact row recipe, exact
+references and remaining review scope, load `docs/plans/M40-pattern-contracts.md`
+before implementing a card. This approved native brief supersedes the earlier
+conceptual HTML sketches. The baseline includes the CoW typography correction
+and revised At a glance composition. Template selection is settled; each later
+coded migration still requires the acceptance in D5. Evidence stays in the PR.
 
 ## Task breakdown
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| M40-T01-Agree_pattern_contracts | Agree the four contracts, compact row recipe, reference states and human acceptance workflow | none | in_progress — contract selection pending |
+| M40-T01-Agree_pattern_contracts | Agree the four contracts, compact row recipe, reference states and human acceptance workflow | none | completed — effective when this PR merges |
 | M40-T02-Compact_card_and_gallery | Implement CompactCard, start the native gallery, migrate Stream and CoW references | T01 | planned |
 | M40-T03-List_card_and_shared_rows | Implement ListCard and shared compact rows; migrate leaderboard references | T02 | planned |
 | M40-T04-Sortable_table_migration | Extend StatsTable with the shared rows; migrate Muscle/contributor tables | T03 | planned |

@@ -13,6 +13,11 @@ drift fail the existing gates, with clear scope and actionable errors.
 
 ## Decided and scope
 
+Load `docs/plans/M40-pattern-contracts.md` for the operator-approved native
+templates and shared row contract. This selection is settled; recheck current
+main for drift, and obtain a new template decision only for a material deviation
+or new derivative. Coded-result acceptance remains required for this migration.
+
 Follow D1–D6 and the accepted implementations. Complete the existing
 ui-guardrails/ESLint/Jest mechanisms; no replacement framework, repo-wide restyle
 or unapproved baseline. Rules must distinguish legitimate foundation definitions

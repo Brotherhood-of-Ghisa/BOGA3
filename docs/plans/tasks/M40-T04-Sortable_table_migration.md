@@ -13,6 +13,11 @@ view. Human review must confirm that list and table spacing match in native UI.
 
 ## Decided and scope
 
+Load `docs/plans/M40-pattern-contracts.md` for the operator-approved native
+templates and shared row contract. This selection is settled; recheck current
+main for drift, and obtain a new template decision only for a material deviation
+or new derivative. Coded-result acceptance remains required for this migration.
+
 Follow D1–D6. Reuse StatsTable, its sort headers and ComparisonHeaders/Values;
 do not create a parallel table framework. Share the accepted row recipe with
 ListCard. Column structure, sorting indicators and disclosure are table concerns;

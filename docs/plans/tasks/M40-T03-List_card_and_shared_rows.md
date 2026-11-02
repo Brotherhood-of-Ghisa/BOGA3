@@ -13,16 +13,21 @@ acceptance of real rows, figures, separators and long-content behavior.
 
 ## Decided and scope
 
+Load `docs/plans/M40-pattern-contracts.md` for the operator-approved native
+templates and shared row contract. This selection is settled; recheck current
+main for drift, and obtain a new template decision only for a material deviation
+or new derivative. Coded-result acceptance remains required for this migration.
+
 Follow D1–D6 and the accepted T01/T02 contracts. Build on Card, ListRow and the
 shared header; keep ranking/order and model construction with the feature.
-Reference candidates are GroupHomeBoard and Today's weekly board, confirmed in
-T01. Preserve whole-board versus row-level interaction semantics. This is not a
-ranking, paging, scoring or certification rewrite.
+The selected references are GroupHomeBoard and Today's weekly board. Preserve
+whole-board versus row-level interaction semantics. This is not a ranking,
+paging, scoring or certification rewrite.
 
 ## Open — resolve with the human at session start
 
-- Confirm the exact reference consumers, their row interactivity and any
-  accepted passive/interactive density variants against current main.
+- Recheck GroupHomeBoard and Today's weekly board against current main; retain
+  the accepted passive/interactive row variants and report any drift.
 - Settle the smallest shared row implementation and fixed leading/name/value/
   control slots; extend existing ListRow where possible.
 - Reconfirm whether a new semantic variant is needed; obtain approval of its
