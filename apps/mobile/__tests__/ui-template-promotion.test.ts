@@ -36,7 +36,7 @@ const body = (files: unknown[], promotions: unknown[] = []) => `\`\`\`ui-pattern
 function write(file: string, source: string) {
   const target = path.join(repo, file); fs.mkdirSync(path.dirname(target), { recursive: true }); fs.writeFileSync(target, source);
 }
-const custom = (file: string) => ({ path: file, mode: 'custom', parents: [parent], delta: 'Passive status derivation.', preBuildApproval: approval });
+const custom = (file: string) => ({ path: file, mode: 'custom', parents: [parent], delta: 'Passive status derivation.' });
 function context(overrides = {}) {
   return { files: [], body: body([], [proposal()]), head, finalReview: true, author: 'agent[bot]',
     comments: [], permissions: { human: 'write' }, readBase: (file: string) => base[file] ?? null, ...overrides };
@@ -130,8 +130,8 @@ it('reuses an accepted merged-base template without new human acceptance', () =>
   expect(findUiPatternSelections({ rootDir, selectionContext }).violations).toEqual([]);
   expect(runUiGuardrailCheck({ rootDir, selectionContext, stdout: { write() {} } }).ok).toBe(true);
 });
-it.each([{ use: 'unaccepted-use' }, { variant: 'interactive' }, { template: 'DifferentId' }, { family: 'ListCard' }])('requires custom acceptance outside promoted bounds: %j', overrides => {
-  expect(rules(reuse(overrides))).toContainEqual(expect.stringContaining('outside scope needs custom human acceptance'));
+it.each([{ use: 'unaccepted-use' }, { variant: 'interactive' }, { template: 'DifferentId' }, { family: 'ListCard' }])('requires a custom declaration outside promoted bounds: %j', overrides => {
+  expect(rules(reuse(overrides))).toContainEqual(expect.stringContaining('outside scope needs a custom design declaration'));
 });
 
 it.each(['style={existingStyle}', 'contentStyle={existingStyle}', '{...props}', 'variant="interactive"', 'variant={choice}'])('rejects promoted-template override %s even with an unchanged imported style', attribute => {
@@ -141,7 +141,7 @@ it.each(['style={existingStyle}', 'contentStyle={existingStyle}', '{...props}', 
   base['apps/mobile/components/existing-styles.ts'] = fs.readFileSync(path.join(repo, 'apps/mobile/components/existing-styles.ts'), 'utf8');
   write(file, `import { existingStyle } from './existing-styles'; import { FixturePanel as Chosen } from './ui/fixture-panel'; export function Status(){return <Chosen ${attribute}/>;}`);
   const selectionContext = context(selection);
-  expect(findUiPatternSelections({ rootDir, selectionContext }).violations).toContainEqual(expect.objectContaining({ rule: expect.stringContaining('custom human acceptance') }));
+  expect(findUiPatternSelections({ rootDir, selectionContext }).violations).toContainEqual(expect.objectContaining({ rule: expect.stringContaining('custom design declaration') }));
   expect(runUiGuardrailCheck({ rootDir, selectionContext, stdout: { write() {} } }).ok).toBe(false);
 });
 
@@ -169,13 +169,14 @@ it('checks proposed contract changes even when implementation is unchanged', () 
   expect(rules({ comments: [acceptance(next)] })).toEqual([]);
 });
 
-it('uses promotion acceptance for its owned custom files without accepting unrelated files', () => {
+it('requires template promotion acceptance separately from custom component declarations', () => {
   delete base[template().source];
   const files = template().files;
   const declarations = files.map(custom);
   expect(rules({ files, body: body(declarations, [proposal()]), comments: [acceptance()] })).toEqual([]);
   const other = 'apps/mobile/components/other.tsx'; write(other, 'export function Other(){return <View/>;}');
-  expect(rules({ files: [...files, other], body: body([...declarations, custom(other)], [proposal()]), comments: [acceptance()] })).toEqual([expect.stringContaining('exact custom paths')]);
+  expect(rules({ files: [...files, other], body: body([...declarations, custom(other)], [proposal()]), comments: [acceptance()] })).toEqual([]);
+  expect(rules({ files, body: body(declarations, [proposal()]), comments: [] })).toEqual([expect.stringContaining('awaiting authorized human template promotion')]);
 });
 
 it('requires pre-build scope approval, native extremes/states/actions evidence and real gallery/test files', () => {

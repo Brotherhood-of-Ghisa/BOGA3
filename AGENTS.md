@@ -117,15 +117,15 @@ place each under `docs/specs/**`, routed from here.
 ## Design work (all contributors and agents)
 
 For UI blocks, first load `docs/specs/ui/components-catalog.md`; pattern selection,
-derivation and coded-result acceptance follow `docs/specs/08-ux-delivery-standard.md`.
+derivation, review and template promotion follow `docs/specs/08-ux-delivery-standard.md`.
 For every significant UI/design task, load and follow
 `docs/specs/ui/ai-design-policy.md`. It is the single provider-neutral policy
 for design targets, external-artifact vs repository authority,
 generated-code integration, screenshot comparison, conflict reporting, and
 commit boundaries. A design target is a build input, kept with the task or PR,
 never a spec of the result: what must outlive the build moves to its owner.
-Custom/derived UI needs human design acceptance before coding (spec `08`).
-Agents never post acceptance. Template reuse needs no fresh acceptance.
+Custom/derived UI follows ordinary PR review. Only reusable-template promotion
+needs separate human acceptance (spec `08`); agents never post that acceptance.
 
 ## Always load (every session)
 

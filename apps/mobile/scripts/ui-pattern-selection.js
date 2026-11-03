@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const ts = require('typescript');
-const { meaningful, approvalReference, acceptedCommentEntries } = require('./ui-design-acceptance');
+const { meaningful } = require('./ui-design-acceptance');
 const { reviewTemplatePromotions, registeredTemplateError } = require('./ui-template-promotion');
 const { PATTERN_FOUNDATIONS, attributeValue } = require('./pattern-guardrail-source');
 const { COMPACT_PATTERN_FILES } = require('./compact-pattern-guardrail');
@@ -48,7 +48,10 @@ function presentationProperties(source) {
     if (ts.isPropertyAssignment(node)) {
       const name = scopeName(node.name);
       next = [...scope, name];
-      if (PRESENTATION_FIELD.test(name)) properties.set(next.join('.'), { value: printer.printNode(ts.EmitHint.Unspecified, node.initializer, source), recipe: printer.printNode(ts.EmitHint.Unspecified, node.parent, source) });
+      if (PRESENTATION_FIELD.test(name)) properties.set(next.join('.'), { node: node.initializer, value: printer.printNode(ts.EmitHint.Unspecified, node.initializer, source), recipe: printer.printNode(ts.EmitHint.Unspecified, node.parent, source) });
+    }
+    if (ts.isSpreadAssignment(node) && (scope.some(name => /style/i.test(name)) || /^ui(Text|Typography|Fonts|Geometry|Space|Border)\b/.test(node.expression.getText(source)))) {
+      properties.set([...scope, `...${node.expression.getText(source)}`].join('.'), { node: node.expression, value: printer.printNode(ts.EmitHint.Unspecified, node.expression, source), recipe: printer.printNode(ts.EmitHint.Unspecified, node.parent, source) });
     }
     ts.forEachChild(node, child => visit(child, next));
   }
@@ -101,6 +104,44 @@ function changedComponents(rootDir, context, file) {
   return [...head.entries()].filter(([name, value]) => base.get(name)?.signature !== value.signature).map(([, value]) => value.node);
 }
 
+function designSignature(source) {
+  const jsx = [];
+  const bindings = new Map();
+  const used = new Set();
+  const printer = ts.createPrinter({ removeComments: true });
+  for (const statement of source.statements) {
+    if (!ts.isImportDeclaration(statement) || statement.importClause?.isTypeOnly) continue;
+    const clause = statement.importClause;
+    const module = statement.moduleSpecifier.getText(source);
+    if (clause?.name) bindings.set(clause.name.text, [module, 'default']);
+    if (clause?.namedBindings && ts.isNamespaceImport(clause.namedBindings)) bindings.set(clause.namedBindings.name.text, [module, '*']);
+    if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings)) for (const item of clause.namedBindings.elements) {
+      if (!item.isTypeOnly) bindings.set(item.name.text, [module, (item.propertyName ?? item.name).text]);
+    }
+  }
+  function rememberBindings(node) {
+    if (ts.isIdentifier(node) && bindings.has(node.text)) used.add(node.text);
+    ts.forEachChild(node, rememberBindings);
+  }
+  function visit(node) {
+    if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)) {
+      const normalized = ts.transform(node, [context => function normalize(child) {
+        if (ts.isJsxAttribute(child) && /^on[A-Z]/.test(child.name.getText(source))) return ts.factory.updateJsxAttribute(child, child.name, ts.factory.createStringLiteral('handler'));
+        return ts.visitEachChild(child, normalize, context);
+      }]);
+      rememberBindings(normalized.transformed[0]);
+      jsx.push(printer.printNode(ts.EmitHint.Unspecified, normalized.transformed[0], source));
+      normalized.dispose();
+    } else ts.forEachChild(node, visit);
+  }
+  visit(source);
+  const styles = [...presentationProperties(source)].map(([name, property]) => {
+    rememberBindings(property.node);
+    return [name, property.value];
+  });
+  return JSON.stringify({ jsx, styles, bindings: [...used].sort().map(name => [name, bindings.get(name)]) });
+}
+
 function reviewContext(rootDir) {
   if (process.env.GITHUB_ACTIONS === 'true' && process.env.GITHUB_WORKFLOW === 'CI' && process.env.BOGA_UI_SELECTION_DELEGATED === '1') {
     return { files: [], delegated: true };
@@ -115,7 +156,7 @@ function reviewContext(rootDir) {
   if (!event.pull_request) paths.push(...gitPaths(repoRoot, ['ls-files', '--others', '--exclude-standard']));
   const readBase = file => { try { return git(repoRoot, ['show', `${base}:${file}`]); } catch { return null; } };
   const files = [...new Set(paths)].filter(file => isSource(file) && fs.existsSync(path.join(rootDir, mobilePath(file))))
-    .filter(file => [fs.readFileSync(path.join(rootDir, mobilePath(file)), 'utf8'), readBase(file) ?? ''].some(text => { const source = parse(file, text); return hasJsx(source) || presentationProperties(source).size > 0; }));
+    .filter(file => designSignature(parse(file, fs.readFileSync(path.join(rootDir, mobilePath(file)), 'utf8'))) !== designSignature(parse(file, readBase(file) ?? '')));
   const draft = process.env.BOGA_UI_REVIEW_BODY || path.join(rootDir, 'artifacts/ui-review.md');
   return { files, head, finalReview: Boolean(event.pull_request), author: event.pull_request?.user.login,
     number: event.pull_request?.number, repository: process.env.GITHUB_REPOSITORY,
@@ -198,8 +239,8 @@ function usesParent(rootDir, file, parent, componentNode) {
 function promotedPropsError(rootDir, file, parent, parents) {
   const variants = parents.filter(item => item.source === parent.source && item.export === parent.export).map(item => item.variant);
   for (const element of parentElements(rootDir, file, parent)) for (const attribute of element.attributes.properties) {
-    if (ts.isJsxSpreadAttribute(attribute) || /style$/i.test(attribute.name.getText())) return 'promoted template style/spread overrides need custom human acceptance';
-    if (attribute.name.getText() === 'variant' && !variants.includes(attributeValue(attribute))) return 'rendered template variant must match its accepted declaration; dynamic variants need custom human acceptance';
+    if (ts.isJsxSpreadAttribute(attribute) || /style$/i.test(attribute.name.getText())) return 'promoted template style/spread overrides need a custom design declaration';
+    if (attribute.name.getText() === 'variant' && !variants.includes(attributeValue(attribute))) return 'rendered template variant must match its accepted declaration; dynamic variants need a custom design declaration';
   }
   return null;
 }
@@ -212,10 +253,6 @@ function parentError(rootDir, context, file, parent, requireUse) {
   const unchangedDefinition = parent.source === file && changedComponents(rootDir, context, file).length === 0;
   if (requireUse && !unchangedDefinition && !usesParent(rootDir, file, parent)) return 'declared parent must be imported and rendered from its production module';
   return null;
-}
-
-function acceptedDesignPaths(context) {
-  return acceptedCommentEntries(context, `UI design accepted at ${context.head}:`, /^- `?(apps\/mobile\/(?:app|components)\/[^`\r\n]+\.[jt]sx?)`?$/);
 }
 
 /** @param {{rootDir?: string, selectionContext?: object | null}} options */
@@ -236,7 +273,6 @@ function findUiPatternSelections({ rootDir = path.resolve(__dirname, '..'), sele
     violations.push(...promotion.violations);
     if (!data) return { violations, filesByFamily, context };
     const seen = new Set();
-    const custom = [];
     const headRecipes = new Set(context.files.flatMap(file => [...presentationProperties(parse(file, fs.readFileSync(path.join(rootDir, mobilePath(file)), 'utf8'))).values()].map(property => property.recipe)));
     const priorRecipes = new Set(context.files.flatMap(file => [...presentationProperties(parse(file, context.readBase(file) ?? '')).values()].map(property => property.recipe)));
     for (const record of data.files) {
@@ -255,7 +291,7 @@ function findUiPatternSelections({ rootDir = path.resolve(__dirname, '..'), sele
         const previousScopes = objectScopes(before), currentScopes = objectScopes(after);
         const scopeOf = key => key.slice(0, key.lastIndexOf('.'));
         const removed = [...previous].some(([key, value]) => !current.has(key) && (definition || currentScopes.has(scopeOf(key)) || !headRecipes.has(value.recipe)));
-        if (removed || [...current].some(([key, value]) => previous.has(key) ? previous.get(key).recipe !== value.recipe : !(definition && !previousScopes.has(scopeOf(key)) && priorRecipes.has(value.recipe)))) report(file, 'new or changed template typography/geometry needs custom design acceptance');
+        if (removed || [...current].some(([key, value]) => previous.has(key) ? previous.get(key).recipe !== value.recipe : !(definition && !previousScopes.has(scopeOf(key)) && priorRecipes.has(value.recipe)))) report(file, 'new or changed template typography/geometry needs a custom design declaration');
       }
       for (const parent of record.parents) {
         const error = parentError(rootDir, context, file, parent, record.mode === 'template');
@@ -269,23 +305,15 @@ function findUiPatternSelections({ rootDir = path.resolve(__dirname, '..'), sele
         }
         const expectedFamily = Object.keys(TEMPLATE_SOURCES).find(family => TEMPLATE_SOURCES[family].includes(mobilePath(parent.source)));
         if (expectedFamily && parent.family !== expectedFamily) { report(file, 'known template parent must retain its inherited family'); continue; }
-        if (record.mode === 'template' && !isGalleryParent(file, parent) && !TEMPLATE_SOURCES[parent.family]?.includes(mobilePath(parent.source)) && !registered) report(file, 'this parent is not an approved design template; declare custom and obtain human design acceptance');
+        if (record.mode === 'template' && !isGalleryParent(file, parent) && !TEMPLATE_SOURCES[parent.family]?.includes(mobilePath(parent.source)) && !registered) report(file, 'this parent is not an approved design template; declare custom design');
         if (record.mode === 'template' && parent.family !== 'catalog' && !definition) filesByFamily[parent.family].push(mobilePath(file));
       }
       if (record.mode === 'template') for (const component of components) {
-        if (!record.parents.some(parent => usesParent(rootDir, file, parent, component))) report(file, `changed component ${component.name?.getText() ?? 'render'} does not inherit a declared design template; obtain custom design acceptance`);
-      }
-      if (record.mode === 'custom') {
-        custom.push(file);
-        if (!approvalReference(record.preBuildApproval)) report(file, 'custom design needs its explicit pre-build human approval reference');
+        if (!record.parents.some(parent => usesParent(rootDir, file, parent, component))) report(file, `changed component ${component.name?.getText() ?? 'render'} does not inherit a declared design template; declare custom design`);
       }
     }
     for (const file of context.files) if (!seen.has(file)) report(file, 'missing UI pattern declaration for changed JSX/style source');
-    if (custom.length && context.finalReview) {
-      const accepted = new Set([...acceptedDesignPaths(context), ...promotion.acceptedPaths]);
-      for (const file of custom) if (!accepted.has(file)) report(file, 'awaiting authorized human design acceptance comment at this head and exact custom paths');
-    }
-    return { violations, filesByFamily, context, custom };
+    return { violations, filesByFamily, context };
   } catch (error) {
     report('UI selection', error.message);
     return { violations, filesByFamily };

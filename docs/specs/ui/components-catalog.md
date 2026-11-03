@@ -20,7 +20,7 @@ Token guardrails apply to every composition (`ux-rules.md`, "Styling guardrails"
 CompactCard/CompactHeader serve Stream and embedded CoW headers; SummaryTile
 serves Group stats. ListCard and compact ListRow serve the two weekly boards.
 StatsTable now composes the compact row foundation for Muscle/contributor tables.
-For a new block or derivative, follow the human selection and acceptance workflow in
+For a new block or derivative, follow the selection and review workflow in
 `docs/specs/08-ux-delivery-standard.md` before building.
 
 | Family | Reuse / reference | Boundary to preserve |
@@ -86,8 +86,8 @@ and independent-control rows. Compact samples cover Stream, CoW and embedded sum
 
 Adoption lists in the four `apps/mobile/scripts/*-pattern-guardrail.js`
 modules protect Stream/CoW, both weekly boards, Muscle/contributor tables and
-Group stats. Every changed JSX/style source additionally declares template reuse or
-custom design in its PR UX Contract; spec 08 owns that process and acceptance.
+Group stats. New or changed JSX/presentation additionally declares template reuse or
+custom design in its PR UX Contract; spec 08 owns that process and review.
 Missing declarations fail the existing guardrail lane. Template selections extend
 the checks to new consumers, including TS/TSX style companions and
 imported/re-exported style modules. Cases:
@@ -98,14 +98,14 @@ Foundation definitions own geometry and retain their component tests. Template c
 cannot override their selected family's type/casing or pattern style props;
 compact list/table consumers cannot add row insets/minimums. Page/chart layout,
 CoW podiums and record targets retain their existing contracts. Figure widths
-remain feature-owned. Untouched legacy screens keep their recipes; new or
+remain feature-owned. Existing compositions keep their recipes; new or
 changed JSX cannot silently opt out. Other catalog primitives are useful parents
-for custom design, not automatic approval of a new composition. Gallery fixtures
+for custom design; they do not make it an approved template. Gallery fixtures
 are parents only inside the existing guarded development route.
 
 Use `template` for approved families/variants, `custom` for everything beyond
-them. Reuse needs no fresh design acceptance; custom design needs the explicit
-human acceptance in spec 08. Humans decide semantic fit. No new
+them. Custom use follows normal PR review; only reusable-template promotion
+needs separate human acceptance in spec 08. Humans decide semantic fit. No new
 suppression or increased budget substitutes for fixing drift.
 
 ### List pattern adoption

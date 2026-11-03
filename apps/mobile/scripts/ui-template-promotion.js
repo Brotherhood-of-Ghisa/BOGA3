@@ -58,10 +58,10 @@ function proposalError(proposal) {
 }
 
 function reviewTemplatePromotions({ rootDir, context, data, exported, usesParent, parentError }) {
-  const violations = [], acceptedPaths = new Set();
+  const violations = [];
   let templates = [];
   const report = rule => violations.push({ file: CATALOG, line: 1, rule });
-  if (context.delegated || context.merged) return { violations, templates, acceptedPaths };
+  if (context.delegated || context.merged) return { violations, templates };
   try {
     const prior = templateCatalog(context.readBase?.(CATALOG), true);
     const target = path.resolve(rootDir, '../..', CATALOG);
@@ -69,7 +69,7 @@ function reviewTemplatePromotions({ rootDir, context, data, exported, usesParent
     // Only registrations already admitted to the trusted base are reusable.
     templates = prior.filter(entry => current.some(candidate => templateDigest(entry) === templateDigest(candidate)));
     const changed = current.filter(entry => !prior.some(base => templateDigest(entry) === templateDigest(base)));
-    if (!changed.length && !data) return { violations, templates, acceptedPaths };
+    if (!changed.length && !data) return { violations, templates };
     if (!data) throw new Error('Provide one ui-pattern-selection JSON block for template promotions.');
     if (data.promotions !== undefined && !Array.isArray(data.promotions)) throw new Error('ui-pattern-selection.promotions must be an array.');
     const proposals = data.promotions ?? [];
@@ -94,18 +94,17 @@ function reviewTemplatePromotions({ rootDir, context, data, exported, usesParent
       if (!exported(source, entry.export) || !exported(gallery, entry.gallery.export) || !usesParent(rootDir, entry.gallery.source, entry)) report(`${entry.id}: production and representative gallery exports must exist; gallery must render the production export`);
       const key = `${entry.id} sha256:${promotionDigest(entry, proposal)}`;
       if (context.finalReview && !accepted.has(key)) report(`awaiting authorized human template promotion acceptance: UI template accepted at ${context.head}:\n- ${key}`);
-      if (accepted.has(key) && !error && declaredParent) for (const file of entry.files) acceptedPaths.add(file);
     }
     for (const entry of changed) if (!seen.has(entry.id)) report(`${entry.id}: missing template promotion proposal (one-off design acceptance is insufficient)`);
   } catch (error) { report(error.message); }
-  return { violations, templates, acceptedPaths };
+  return { violations, templates };
 }
 
 function registeredTemplateError(templates, parent) {
   const entry = templates.find(template => template.source === parent.source && template.export === parent.export);
   if (!entry) return null;
   if (parent.family !== 'catalog' || parent.template !== entry.id || !entry.uses.includes(parent.use) || !Object.hasOwn(entry.variants, parent.variant)) {
-    return 'promoted template reuse must name its catalog id, intended use and bounded variant; outside scope needs custom human acceptance';
+    return 'promoted template reuse must name its catalog id, intended use and bounded variant; outside scope needs a custom design declaration';
   }
   return null;
 }

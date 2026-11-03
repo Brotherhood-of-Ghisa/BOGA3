@@ -427,7 +427,6 @@ function runUiGuardrailCheck(options = {}) {
   const selection = findUiPatternSelections(options);
   write(`UI pattern selection: ${selection.violations.length === 0 ? 'PASS' : 'FAIL'}`);
   if (selection.context?.delegated) write('  Selection and new consumers are checked by the required UI pattern review check.');
-  if (selection.custom?.length && !selection.context?.finalReview) write('  Custom designs still require authorized human design acceptance in the PR check before merge.');
   for (const violation of selection.violations) write(`  ${violation.file}:${violation.line} — ${violation.rule}`);
   const selected = family => ({ ...options, adoptedFiles: selection.filesByFamily[family] });
   const compactViolations = findCompactPatternViolations(selected('CompactCard'));
