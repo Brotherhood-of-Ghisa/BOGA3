@@ -251,6 +251,12 @@ describe('Today: the Progress card over real data', () => {
       expect(screen.queryByTestId(`today-tonnage-icon-${id}`)).toBeNull();
     }
     expect(new Set(y).size).toBe(3);
+    for (const id of ['humpback', 'fin-whale', 'ferry']) {
+      const ground = drawing(`today-tonnage-ground-${id}`);
+      expect(ground).toHaveProp('fill', uiRoles.surface);
+      const leader = screen.queryByTestId(`today-tonnage-leader-${id}`, { includeHiddenElements: true });
+      if (leader) expect(leader.props.x1).toBeLessThan(ground.props.x);
+    }
     fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
     expect(screen.queryByTestId('today-tonnage-icon-humpback', { includeHiddenElements: true })).toBeNull();
     expect(text('today-progress-chart').props.accessibilityLabel).not.toContain('whale');
