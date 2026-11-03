@@ -33,7 +33,7 @@ jest.mock('@/src/auth', () => ({ useAuth: () => ({ user: null }) }));
 const mockLogEvent = jest.fn();
 jest.mock('@/src/logging/logEvent', () => ({ logEvent: (...args: unknown[]) => mockLogEvent(...args) }));
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
 import { StyleSheet } from 'react-native';
 
@@ -282,8 +282,19 @@ describe('background and text', () => {
     fireEvent.press(screen.getByTestId('settings-appearance-text-navy'));
     fireEvent.press(screen.getByTestId('settings-appearance-option-warm'));
 
-    await Promise.resolve();
+    await act(async () => {});
     expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it('compares a quick second choice with the first one on its way, not the store', async () => {
+    render(<SettingsAppearanceRoute />);
+
+    fireEvent.press(screen.getByTestId('settings-appearance-background-rose'));
+    // Back to the theme's own before the first has been written: the last choice wins.
+    fireEvent.press(screen.getByTestId('settings-appearance-background-match'));
+
+    await waitFor(() => expect(storedRecord()?.background).toBe('match'));
+    expect(screen.getByRole('radio', { name: 'Match theme, default' }).props.accessibilityState).toEqual({ checked: true });
   });
 
   it('keeps two quick choices: the second does not overwrite the first’s field', async () => {

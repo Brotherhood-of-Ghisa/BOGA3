@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { readStoredAppearance, useStoredAppearance } from '@/components/appearance/chosen-theme';
+import { readIntendedAppearance, readStoredAppearance, useStoredAppearance } from '@/components/appearance/chosen-theme';
 import { launchTheme, saveAppearancePart } from '@/components/ui/theme-launch';
 import type { AppearanceChoice } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
@@ -29,13 +29,14 @@ export function useAppearanceCommit() {
 
   const commit = async (part: Partial<AppearanceChoice>, failure: CommitFailure): Promise<CommitOutcome> => {
     setSaveError(null);
-    // Read the store, not state: two commits can land before a re-render.
-    const stored = readStoredAppearance();
+    // Read the store and the saves on their way, not state: two commits can
+    // land before a re-render, or before the first has been written.
+    const intended = readIntendedAppearance();
     const unchanged = (Object.keys(part) as (keyof AppearanceChoice)[]).every(
-      (key) => JSON.stringify(stored[key]) === JSON.stringify(part[key]),
+      (key) => JSON.stringify(intended[key]) === JSON.stringify(part[key]),
     );
     if (unchanged && !launchTheme.problem) return 'unchanged';
-    setAppearance({ ...stored, ...part });
+    setAppearance({ ...intended, ...part });
     try {
       await saveAppearancePart(part);
     } catch (error) {

@@ -47,6 +47,7 @@ export function ThemeBackgroundScreen() {
       <View style={styles.body}>
         <View style={styles.ring}>
           <HueRing
+            accessibilityLabel="Background hue"
             hue={choice.hue}
             onChange={(hue) => setChoice((current) => ({ ...current, hue }))}
             onChangeEnd={(hue) => {

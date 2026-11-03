@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { generateRoles, type UiRoles } from '@/components/ui/theme';
 import { hueName, parseHueThemeId } from '@/components/ui/theme-hue';
 import { findBackgroundSwatch, findTextInk, type BackgroundChoice } from '@/components/ui/theme-neutrals';
-import { launchTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
+import { launchTheme, readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
 import { resolveAppearance, resolveThemePreset, type AppearanceChoice } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
@@ -20,6 +20,16 @@ export function readStoredAppearance(): AppearanceChoice {
       context: { error: error instanceof Error ? error.message : String(error) },
     });
     return launchTheme.appearance;
+  }
+}
+
+// The stored choice with the saves still on their way applied; the stored
+// choice itself when none is. Falls back as `readStoredAppearance` does.
+export function readIntendedAppearance(): AppearanceChoice {
+  try {
+    return readIntendedTheme();
+  } catch {
+    return readStoredAppearance();
   }
 }
 

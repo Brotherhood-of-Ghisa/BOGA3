@@ -64,6 +64,16 @@ export async function saveAppearance(appearance: AppearanceChoice): Promise<void
 }
 
 let lastSave: Promise<void> = Promise.resolve();
+// Parts accepted but not yet settled, so a second choice compares against what
+// the first will store rather than what it has stored so far.
+let queued: Partial<AppearanceChoice> = {};
+let queuedCount = 0;
+
+// The stored choice with the saves still queued applied. Throws when the store
+// cannot be read.
+export function readIntendedTheme(): AppearanceChoice {
+  return { ...readStoredTheme().appearance, ...queued };
+}
 
 // Saves part of the choice — the accent (a preset id or a custom hue's
 // `hue:<deg>`), the background, the text — keeping the rest of the stored
@@ -71,9 +81,16 @@ let lastSave: Promise<void> = Promise.resolve();
 // after another, so two quick choices cannot overwrite each other's field.
 // Rejects, saving nothing, when the store cannot be read or written.
 export function saveAppearancePart(part: Partial<AppearanceChoice>): Promise<void> {
+  queued = { ...queued, ...part };
+  queuedCount += 1;
   const run = lastSave.then(() => saveAppearance({ ...readStoredTheme().appearance, ...part }));
-  lastSave = run.catch(() => undefined);
+  lastSave = run.then(settle, settle);
   return run;
+}
+
+function settle(): void {
+  queuedCount -= 1;
+  if (queuedCount === 0) queued = {};
 }
 
 export function saveThemeAccent(accent: ThemePresetId | HueThemeId): Promise<void> {

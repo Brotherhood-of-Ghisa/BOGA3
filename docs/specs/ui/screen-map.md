@@ -161,7 +161,7 @@ the tab bar (`TabOwnedPage`), owned by More.
   database rebuild preserves them. Preference-storage failures surface in one
   place — Settings' Data & sync `Error` row, retried by its `Refresh` — so no
   preference control or exercise browser grows its own error box.
-- An Appearance preset reads `<Preset> from next launch` until the app reopens
+- A pending Appearance choice reads `<Preset>, … from next launch` until the app reopens
   (`design-language.md`, "Choosing one"); meanwhile its checked row reads
   `Next launch`.
 - The body weight log is reachable from Settings' Bodyweight card regardless

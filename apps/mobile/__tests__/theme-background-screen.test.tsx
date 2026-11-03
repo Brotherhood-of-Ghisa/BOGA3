@@ -36,7 +36,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-const ring = () => screen.getByRole('adjustable', { name: 'Hue' });
+const ring = () => screen.getByRole('adjustable', { name: 'Background hue' });
 const pan = () => ring().props.gesture.handlers as Record<'onBegin' | 'onUpdate' | 'onFinalize', (event?: unknown) => void>;
 // A touch at the top of the 240pt ring is 0°, at its right edge 90°.
 const touch = (x: number, y: number) => ({ x, y });
@@ -64,12 +64,17 @@ it('starts at the custom background chosen before', () => {
   expect(tint('Strong').props.accessibilityState).toEqual({ selected: true });
 });
 
-it('repaints the preview as the ring moves and a tint is picked, saving nothing until released', () => {
+it('repaints the preview as the ring moves and a tint is picked', async () => {
   render(<ThemeBackgroundRoute />);
 
   act(() => pan().onBegin(touch(240, 120)));
   expect(previewGround()).toBe(appearanceRoles({ ...DEFAULT_APPEARANCE, background: { hue: 90, tint: 2 } }).paper);
+  // Moving the ring saves nothing.
   expect(storedBackground()).toBeNull();
+
+  fireEvent.press(tint('Strong'));
+  expect(previewGround()).toBe(appearanceRoles({ ...DEFAULT_APPEARANCE, background: { hue: 90, tint: 3 } }).paper);
+  await waitFor(() => expect(storedBackground()).toEqual({ hue: 90, tint: 3 }));
 });
 
 it('keeps the text and accent already chosen in the preview', () => {
