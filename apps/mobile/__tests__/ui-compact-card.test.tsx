@@ -49,6 +49,13 @@ it('omits absent metadata without drawing a placeholder or a second card', () =>
   expect(screen.getByText('Current CoW')).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
 });
 
+it('can keep list context beside the label while retaining its metadata role and wrapping', () => {
+  render(<CompactHeader label="This week" metadata="26 Oct – 1 Nov 26" metadataPlacement="inline"
+    testID="heading" metadataTestID="date" />);
+  expect(screen.getByTestId('heading')).toHaveStyle({ justifyContent: 'flex-start', gap: uiSpace.sm, flexWrap: 'wrap', alignItems: 'baseline' });
+  expect(screen.getByTestId('date')).toHaveStyle({ ...uiText.meta, marginLeft: 0, textAlign: 'left' });
+});
+
 it.each([false, true])('keeps the corrected CoW heading/date roles for previous=%s; the old title-role arrangement fails', previous => {
   const result = cowResult();
   render(<CoWResultHeading result={result} previous={previous} today dateFormat="DD-MM-YYYY" />);

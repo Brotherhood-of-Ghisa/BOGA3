@@ -46,6 +46,11 @@ the board region. Keep fixed board-name ellipses and feature-sized figure
 columns. Extract Today's board presenter for native gallery reuse without
 changing its parent read or destinations. No product facts change intended.
 
+Native feedback selection (2026-11-03): the operator selected “Yes, beside
+‘THIS WEEK’ on the left”. List metadata uses the shared header's bounded inline
+placement, with its existing muted role and wrapping; numeric column headings
+remain on the right. Other CompactHeader consumers keep trailing metadata.
+
 Independent reviewer lane agreement: fast, ios-smoke, ios-groups-e2e,
 jest-coverage, complexity, dependencies. Narrow unrelated frontend-ui flows as
 covered-by-jest; retain native three-width before/after and edge/action evidence.

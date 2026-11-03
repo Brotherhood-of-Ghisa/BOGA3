@@ -17,6 +17,7 @@ export function CompactCard(props: CompactCardProps) {
 type CompactHeaderProps = {
   label: string;
   metadata?: string;
+  metadataPlacement?: 'trailing' | 'inline';
   metadataAccessibilityLabel?: string;
   tone?: 'ink' | 'record' | 'muted';
   icon?: IconName;
@@ -27,16 +28,16 @@ type CompactHeaderProps = {
 };
 
 /** The same wrapping label/date header also fits an existing embedded container. */
-export function CompactHeader({ label, metadata, metadataAccessibilityLabel, tone = 'ink', icon,
+export function CompactHeader({ label, metadata, metadataPlacement = 'trailing', metadataAccessibilityLabel, tone = 'ink', icon,
   accessibilityRole, testID, labelTestID, metadataTestID }: CompactHeaderProps) {
-  return <View style={styles.header} testID={testID}>
+  return <View style={[styles.header, metadataPlacement === 'inline' ? styles.inlineHeader : null]} testID={testID}>
     <View style={styles.label} testID={testID ? `${testID}-label-row` : undefined}>
       <Text accessibilityRole={accessibilityRole} allowFontScaling={false}
         style={[uiText.label, uiTextTone[tone], styles.labelText]} testID={labelTestID}>{label}</Text>
       {icon ? <Icon name={icon} size="xs" /> : null}
     </View>
     {metadata ? <Text accessibilityLabel={metadataAccessibilityLabel} allowFontScaling={false}
-      style={[uiText.meta, styles.metadata]} testID={metadataTestID}>
+      style={[uiText.meta, styles.metadata, metadataPlacement === 'inline' ? styles.inlineMetadata : null]} testID={metadataTestID}>
       <FigureText>{metadata}</FigureText>
     </Text> : null}
   </View>;
@@ -49,4 +50,6 @@ const styles = StyleSheet.create({
   label: { flexDirection: 'row-reverse', alignItems: 'center', gap: uiSpace.xs, flexShrink: 1, maxWidth: '100%' },
   labelText: { flexShrink: 1 },
   metadata: { flexShrink: 1, minWidth: 0, marginLeft: 'auto', textAlign: 'right' },
+  inlineHeader: { justifyContent: 'flex-start', gap: uiSpace.sm },
+  inlineMetadata: { marginLeft: 0, textAlign: 'left' },
 });

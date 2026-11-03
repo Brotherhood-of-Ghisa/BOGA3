@@ -60,12 +60,13 @@ it('puts an independent history target around its inset content, beside disclosu
 it('keeps the header outside the labelled board region and the footer inside it', () => {
   const board = jest.fn();
   const header = jest.fn();
-  render(<ListCard header={<ListCardHeader label="This week" metadata="26 Oct – 1 Nov 26"
+  render(<ListCard header={<ListCardHeader label="This week" metadata="26 Oct – 1 Nov 26" metadataTestID="date"
     trailing={<IconButton name="swap" accessibilityLabel="Switch" onPress={header} testID="switch" />} />}
     columnLabels={<Text>Sets</Text>} footer={<Text>You, 6th, 58</Text>}
     onPress={board} accessibilityLabel="Board, Alex 128 sets" regionTestID="board">
     <ListRow density="compact" label="Alex" />
   </ListCard>);
+  expect(screen.getByTestId('date')).toHaveStyle({ marginLeft: 0, textAlign: 'left' });
   fireEvent.press(screen.getByTestId('switch'));
   expect(header).toHaveBeenCalledTimes(1);
   expect(board).not.toHaveBeenCalled();
