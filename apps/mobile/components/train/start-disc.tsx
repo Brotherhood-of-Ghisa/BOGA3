@@ -58,7 +58,7 @@ export function StartDisc({
           pressed && !busy ? styles.discPressed : null,
         ]}
         testID={testID}>
-        <Icon color={uiRoles.surface} name="play" size="lg" />
+        <Icon color={uiRoles.onAccent} name="play" size="lg" />
         <Text allowFontScaling={false} style={styles.label}>
           {label}
         </Text>
@@ -93,6 +93,6 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xxl,
     letterSpacing: uiTypography.size.xxl * uiGeometry.microLabelTracking,
     textTransform: 'uppercase',
-    color: uiRoles.surface,
+    color: uiRoles.onAccent,
   },
 });

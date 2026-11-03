@@ -324,10 +324,10 @@ const styles = StyleSheet.create({
   chipPressed: {
     backgroundColor: uiRoles.paper,
   },
-  // The ink pill's label: no text tone draws on ink, so the selected chip keeps
-  // the surface colour here.
+  // The ink pill's label: no text tone draws on ink, so the selected chip takes
+  // the on-ink colour here.
   chipLabelOn: {
-    color: uiRoles.surface,
+    color: uiRoles.onInk,
   },
   sections: {
     gap: uiSpace.sm,

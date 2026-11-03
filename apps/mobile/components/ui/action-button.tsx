@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   // (`design-language.md` §3).
   labelLarge: { fontSize: uiTypography.size.xxl, lineHeight: uiTypography.lineHeight.xxl },
   labelPrimary: {
-    color: uiRoles.surface,
+    color: uiRoles.onAccent,
   },
   labelDanger: {
     color: uiRoles.danger,

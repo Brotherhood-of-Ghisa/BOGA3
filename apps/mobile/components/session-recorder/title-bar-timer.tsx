@@ -115,7 +115,7 @@ export function useTitleBarTimer(timer: TimerControls, setting: boolean) {
 const GLYPH_COLOR: Record<Tone, string> = {
   running: uiRoles.ink,
   paused: uiRoles.inkMuted,
-  done: uiRoles.surface,
+  done: uiRoles.onInk,
 };
 
 const styles = StyleSheet.create({

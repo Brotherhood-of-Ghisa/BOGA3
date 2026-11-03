@@ -99,10 +99,18 @@
 - `ui-theme.test.ts` gates every theme preset
   (`components/ui/theme-presets.ts`): the generator rules for its seeds, plus
   `record` ≥ 4.5:1 on `paper`, `surface` and `record-wash`, `record` ≥ 30° of
-  hue from `accent`, and `surface` ≥ 4.5:1 on `accent`. A new preset passes
-  these or does not ship. `ui-theme-launch.test.ts` covers the stored choice:
-  resolution, the default fallback for an unknown id or an unreadable store,
-  and that each fallback is logged.
+  hue from `accent`, and `onAccent` ≥ 4.5:1 on `accent`. A new preset passes
+  these or does not ship. It also sweeps every floor over the background ×
+  text × accent grid (`components/ui/theme-neutrals.ts`), and checks that an
+  untouched background and text draw every preset and custom hue as
+  `fixtures/theme-roles-light.json` records. `ui-theme-launch.test.ts` covers
+  the stored choice: the appearance record's parser, the older accent id read
+  while no record exists and left in place, the default fallback for an
+  unknown id, an invalid record or an unreadable store, and that each
+  fallback is logged.
+- `ui-on-colour-guard.test.ts` keeps `surface` a ground: any use in `app/` or
+  `components/` other than a `backgroundColor`, a shape's `fill` or a role set
+  handed on fails, with self-tests for what it rejects and allows.
 - The retired legacy vocabulary (the `uiColors` / `uiRadius` / `uiElevation`
   scales and the `UiText` / `UiSurface` / `UiButton` / `SegmentedChips`
   primitives, removed 2026-09-26) is blocked by the `legacyVocabulary` rule in

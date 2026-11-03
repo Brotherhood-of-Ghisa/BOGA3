@@ -12,7 +12,7 @@ import { SubPage } from '@/components/settings/sub-page';
 import { ChoiceRow, FormSection, Notice, RadioRow, uiBorder, uiGeometry, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { generateRoles } from '@/components/ui/theme';
 import { hueName, parseHueThemeId } from '@/components/ui/theme-hue';
-import { launchTheme, saveThemePresetId } from '@/components/ui/theme-launch';
+import { launchTheme, saveThemeAccent } from '@/components/ui/theme-launch';
 import {
   DEFAULT_THEME_PRESET_ID,
   themePresets,
@@ -61,7 +61,7 @@ export function AppearanceSettingsScreen() {
     setChosenId(id);
     setSaveError(null);
     try {
-      await saveThemePresetId(id);
+      await saveThemeAccent(id);
     } catch (error) {
       void logEvent({
         level: 'warn',

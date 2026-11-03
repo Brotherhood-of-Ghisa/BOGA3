@@ -20,8 +20,15 @@ import { StyleSheet } from 'react-native';
 import { pointToHue } from '@/components/appearance/hue-ring';
 import { generateRoles } from '@/components/ui/theme';
 import { seedsFromHue } from '@/components/ui/theme-hue';
-import { THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
+import { APPEARANCE_STORAGE_KEY, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import ThemeColourRoute from '../app/theme-colour';
+
+// The accent the saved appearance record holds, or null when nothing was saved:
+// a stored choice made before the record existed is read but never written.
+function storedAccent(): string | null {
+  const record = Storage.getItemSync(APPEARANCE_STORAGE_KEY);
+  return record === null ? null : (JSON.parse(record) as { accent: string }).accent;
+}
 
 beforeEach(() => {
   mockLogEvent.mockReset();
@@ -100,19 +107,19 @@ it('saves the hue when the ring is let go and says it applies next launch', asyn
   act(() => pan().onBegin(touch(120, 0)));
   act(() => pan().onUpdate(touch(240, 120)));
   // Dragging saves nothing.
-  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBeNull();
+  expect(storedAccent()).toBeNull();
   expect(savedStatus()).toBeNull();
 
   await act(async () => pan().onFinalize(touch(240, 120)));
 
   expect(await screen.findByText('Saved · next launch')).toBeTruthy();
-  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:90');
+  expect(storedAccent()).toBe('hue:90');
 
   // Moving the ring on hides the status until that hue is let go too.
   act(() => pan().onBegin(touch(120, 240)));
   expect(savedStatus()).toBeNull();
   await act(async () => pan().onFinalize(touch(120, 240)));
-  await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:180'));
+  await waitFor(() => expect(storedAccent()).toBe('hue:180'));
   expect(await screen.findByText('Saved · next launch')).toBeTruthy();
 });
 
@@ -124,7 +131,7 @@ it('saves the hue at the release point, not the last hue the ring rendered', asy
   // The finger moved on before the last move was rendered: the event is the truth.
   await act(async () => pan().onFinalize(touch(240, 120)));
 
-  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:90');
+  expect(storedAccent()).toBe('hue:90');
 });
 
 it('saves a VoiceOver step at once', async () => {
@@ -132,7 +139,7 @@ it('saves a VoiceOver step at once', async () => {
   await step('increment');
 
   expect(await screen.findByText('Saved · next launch')).toBeTruthy();
-  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:57');
+  expect(storedAccent()).toBe('hue:57');
 });
 
 it('writes nothing when the ring is let go at the hue already stored', async () => {
@@ -156,7 +163,7 @@ it('says nothing changed, and logs why, when the save fails, and saves on the ne
 
   expect(await screen.findByText('Couldn’t save the colour. Nothing changed.')).toBeTruthy();
   expect(screen.getByTestId('theme-colour-error').props.accessibilityRole).toBe('alert');
-  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBeNull();
+  expect(storedAccent()).toBeNull();
   expect(savedStatus()).toBeNull();
   expect(mockLogEvent).toHaveBeenCalledWith(
     expect.objectContaining({ level: 'warn', event: 'theme.save_failed', context: { hue: 90, error: 'disk full' } }),
@@ -167,7 +174,7 @@ it('says nothing changed, and logs why, when the save fails, and saves on the ne
   await act(async () => pan().onFinalize(touch(240, 120)));
   expect(await screen.findByText('Saved · next launch')).toBeTruthy();
   expect(screen.queryByText('Couldn’t save the colour. Nothing changed.')).toBeNull();
-  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('hue:90');
+  expect(storedAccent()).toBe('hue:90');
 });
 
 describe('pointToHue', () => {

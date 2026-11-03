@@ -441,9 +441,11 @@ function ReliefFibres({ d, layer, id = layer }: { d: string; layer: 'surface' | 
   const definitionId = useId();
   // Share native path parsing and stroked bounds between the ordered relief paints.
   // Transparent fill and stroke alpha avoid native outline clips and offscreen opacity layers.
+  // The highlight is a light edge on the figure's mid-tone shading, drawn in `onInk` (white in light
+  // mode). It is not on an `ink` fill, so a ground where `onInk` is dark must give it a role of its own.
   return <>
     <Defs><Path id={definitionId} d={d} /></Defs>
-    <Use href={`#${definitionId}`} fill="transparent" stroke={uiRoles.surface} strokeWidth={1.1} strokeOpacity={0.95}
+    <Use href={`#${definitionId}`} fill="transparent" stroke={uiRoles.onInk} strokeWidth={1.1} strokeOpacity={0.95}
       translateX={0.45} translateY={-0.45} strokeLinecap="round" strokeLinejoin="round"
       testID={`stats-muscle-body-fibres-${id}-highlight`} />
     <Use href={`#${definitionId}`} fill="transparent" stroke={uiRoles.inkMuted} strokeWidth={0.9}

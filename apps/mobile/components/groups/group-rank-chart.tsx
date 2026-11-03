@@ -101,7 +101,9 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
             {series.lines.map((line) =>
               line.ranks.map((rank, index) => (
                 <SvgText
-                  fill={index === selectedIndex ? uiRoles.surface : uiRoles.inkMuted}
+                  // The selected marker is filled `ink` (yours) or `viz4`; both carry the on-ink label.
+                  // `viz4` has no on-colour role of its own, so a ground where `onInk` is dark must revisit it.
+                  fill={index === selectedIndex ? uiRoles.onInk : uiRoles.inkMuted}
                   fontFamily={uiFonts.display.family}
                   fontSize={uiTypography.size.xxs}
                   fontWeight="700"
