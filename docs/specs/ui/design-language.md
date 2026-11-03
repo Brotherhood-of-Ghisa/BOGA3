@@ -112,10 +112,10 @@ legends and deltas included (`ink-muted` is about 3.2:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
 labels still say how much. An empty `viz0` cell takes a `rule` hairline,
 being only about 1.15:1 against `surface`. A filter showing all its values at once marks the one in
-force in fixed black `selection` with white `onSelection` text (inverted in dark)
+force in `selection` (black; white in dark) with `onSelection` text
 (`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`
 shows one value and has no unselected peer, so it carries `ink` on `surface`
-(Progress's filter row, the history metric). Heatmap tiles/bars have no black current/selected
+(Progress's filter row, the history metric). Heatmap tiles/bars have no `selection` current/selected
 outlines. Weekly selection uses a caret and accessible state.
 
 ## 3. Typography
