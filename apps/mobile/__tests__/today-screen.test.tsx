@@ -14,7 +14,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AppState, ScrollView, StyleSheet, type AppStateStatus } from 'react-native';
-import Svg, { TSpan } from 'react-native-svg';
+import Svg, { Line, Rect, TSpan } from 'react-native-svg';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -252,9 +252,9 @@ describe('Today: the Progress card over real data', () => {
     }
     expect(new Set(y).size).toBe(3);
     for (const id of ['humpback', 'fin-whale', 'ferry']) {
-      const ground = drawing(`today-tonnage-ground-${id}`);
-      expect(ground).toHaveProp('fill', uiRoles.surface);
-      const leader = screen.queryByTestId(`today-tonnage-leader-${id}`, { includeHiddenElements: true });
+      const ground = screen.UNSAFE_getAllByType(Rect).find(node => node.props.testID === `today-tonnage-ground-${id}`)!;
+      expect(ground.props.fill).toBe(uiRoles.surface);
+      const leader = screen.UNSAFE_getAllByType(Line).find(node => node.props.testID === `today-tonnage-leader-${id}`);
       if (leader) expect(leader.props.x1).toBeLessThan(ground.props.x);
     }
     fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
