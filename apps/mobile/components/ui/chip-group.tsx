@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     color: uiRoles.ink,
   },
   labelOn: {
-    color: uiRoles.surface,
+    color: uiRoles.onInk,
   },
   labelFaint: {
     color: uiRoles.inkFaint,

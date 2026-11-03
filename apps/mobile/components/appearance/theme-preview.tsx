@@ -88,7 +88,7 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
           </Text>
         </View>
         <View style={[styles.button, styles.buttonPrimary, { backgroundColor: roles.accent }]}>
-          <Text allowFontScaling={false} style={[uiText.button, text(roles.surface)]}>
+          <Text allowFontScaling={false} style={[uiText.button, text(roles.onAccent)]}>
             LOG SET
           </Text>
         </View>

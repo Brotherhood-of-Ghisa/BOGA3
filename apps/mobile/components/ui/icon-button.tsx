@@ -29,7 +29,7 @@ const GLYPH_COLOR: Record<IconButtonTone, string> = {
   default: uiRoles.ink,
   muted: uiRoles.inkMuted,
   danger: uiRoles.danger,
-  accent: uiRoles.surface,
+  accent: uiRoles.onAccent,
 };
 
 // A 44pt icon-only control (`design-language.md` §4): every top bar's back and

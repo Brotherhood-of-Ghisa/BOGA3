@@ -37,11 +37,18 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { Storage } from 'expo-sqlite/kv-store';
 
 import * as themeLaunch from '@/components/ui/theme-launch';
-import { THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
+import { APPEARANCE_STORAGE_KEY, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { ensureExerciseListPreferencesLoaded } from '@/src/exercise-catalog/list-preferences';
 import SettingsAppearanceRoute from '../app/settings-appearance';
 import SettingsRoute from '../app/settings';
+
+// The accent the saved appearance record holds, or null when nothing was saved:
+// a stored choice made before the record existed is read but never written.
+function storedAccent(): string | null {
+  const record = Storage.getItemSync(APPEARANCE_STORAGE_KEY);
+  return record === null ? null : (JSON.parse(record) as { accent: string }).accent;
+}
 
 // This suite launches in the default theme (nothing stored at import).
 
@@ -91,13 +98,13 @@ it('saves a choice at once and labels it as applying next launch', async () => {
 
   fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
 
-  await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('slate'));
+  await waitFor(() => expect(storedAccent()).toBe('slate'));
   expect(radio('Slate, next launch').props.accessibilityState).toEqual({ checked: true });
   expect(within(screen.getByTestId('settings-appearance-option-slate')).getByText('Next launch')).toBeTruthy();
 
   // Choosing the theme in use again leaves nothing pending.
   fireEvent.press(screen.getByTestId('settings-appearance-option-warm'));
-  await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('warm'));
+  await waitFor(() => expect(storedAccent()).toBe('warm'));
   expect(screen.queryByText('Next launch')).toBeNull();
   expect(within(screen.getByTestId('settings-appearance-option-warm')).getByText('Default')).toBeTruthy();
 });
@@ -111,7 +118,7 @@ it('keeps the previous choice and says nothing changed, in a danger notice, when
   expect(await screen.findByText('Couldn’t save the theme. Nothing changed.')).toBeTruthy();
   expect(screen.getByTestId('settings-appearance-error').props.accessibilityRole).toBe('alert');
   expect(radio('Warm, default').props.accessibilityState).toEqual({ checked: true });
-  expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBeNull();
+  expect(storedAccent()).toBeNull();
   expect(mockLogEvent).toHaveBeenCalledWith(
     expect.objectContaining({
       level: 'warn',
@@ -146,13 +153,29 @@ it('replaces an unusable stored choice when the default is chosen again', async 
 
   fireEvent.press(screen.getByTestId('settings-appearance-option-warm'));
 
-  await waitFor(() => expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('warm'));
+  await waitFor(() => expect(storedAccent()).toBe('warm'));
 });
 
 it('shows a choice made earlier this run, read from the store', () => {
   Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'plum');
   render(<SettingsRoute />);
   expect(screen.getByLabelText('Appearance, Plum from next launch')).toBeTruthy();
+});
+
+it('shows the accent of the appearance record, and keeps its background and text when a preset is chosen', async () => {
+  Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"plum","background":"rose","text":"navy","mode":"light"}');
+  render(<SettingsAppearanceRoute />);
+  expect(radio('Plum, next launch').props.accessibilityState).toEqual({ checked: true });
+
+  fireEvent.press(screen.getByTestId('settings-appearance-option-forest'));
+
+  await waitFor(() => expect(storedAccent()).toBe('forest'));
+  expect(JSON.parse(Storage.getItemSync(APPEARANCE_STORAGE_KEY)!)).toEqual({
+    accent: 'forest',
+    background: 'rose',
+    text: 'navy',
+    mode: 'light',
+  });
 });
 
 it('updates Settings home when the Appearance page saves a choice', async () => {

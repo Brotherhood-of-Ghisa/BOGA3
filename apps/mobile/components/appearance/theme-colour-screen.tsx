@@ -7,8 +7,8 @@ import { ThemePreview } from '@/components/appearance/theme-preview';
 import { Notice, Screen, uiRoles, uiSpace } from '@/components/ui';
 import { hexToLch } from '@/components/ui/lch';
 import { generateRoles } from '@/components/ui/theme';
-import { hueThemeId, normaliseHue, parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
-import { readStoredThemePresetId, saveThemePresetId } from '@/components/ui/theme-launch';
+import { hueThemeId, normaliseHue, seedsFromHue } from '@/components/ui/theme-hue';
+import { readStoredTheme, saveThemeAccent } from '@/components/ui/theme-launch';
 import { logEvent } from '@/src/logging';
 
 // Settings → Appearance → Custom colour: pick one hue on a ring and see the
@@ -29,7 +29,7 @@ export function ThemeColourScreen() {
     // Read the store, not state: two releases can land before a re-render.
     if (released === storedCustomHue()) return;
     try {
-      await saveThemePresetId(hueThemeId(released));
+      await saveThemeAccent(hueThemeId(released));
     } catch (error) {
       void logEvent({
         level: 'warn',
@@ -64,8 +64,8 @@ export function ThemeColourScreen() {
 // the ring then starts from the theme in use, and saving reports failures).
 function storedCustomHue(): number | null {
   try {
-    const stored = readStoredThemePresetId();
-    return stored === null ? null : parseHueThemeId(stored);
+    const { preset } = readStoredTheme();
+    return preset.id === 'custom' ? preset.hue : null;
   } catch {
     return null;
   }

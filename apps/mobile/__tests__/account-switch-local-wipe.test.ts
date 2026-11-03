@@ -233,6 +233,7 @@ describe('sign-out / account-switch local wipe', () => {
   it('local preference edits leave synced settings and nudges unchanged; the account wipe preserves their keys and the device theme', async () => {
     Storage.setItemSync(migrationCompleteKey('account:A'), 'true');
     Storage.setItemSync('boga3.themePreset.v1', 'forest');
+    Storage.setItemSync('boga3.appearance.v2', '{"accent":"plum","background":"sage","text":"navy","mode":"light"}');
     setAccountLocalPreferenceAccount('A', true);
     await ensureAccountLocalPreferencesLoaded();
     db().update(userSettings).set({ localDirty: false }).run();
@@ -245,6 +246,7 @@ describe('sign-out / account-switch local wipe', () => {
     await wipeLocalForAccountSwitch();
     expect(Storage.getItemSync(preferenceKey('account:A', 'sort'))).toBe('name');
     expect(Storage.getItemSync('boga3.themePreset.v1')).toBe('forest');
+    expect(Storage.getItemSync('boga3.appearance.v2')).toBe('{"accent":"plum","background":"sage","text":"navy","mode":"light"}');
     setAccountLocalPreferenceAccount(null, true);
     setAccountLocalPreferenceAccount('A', true);
     await ensureAccountLocalPreferencesLoaded();

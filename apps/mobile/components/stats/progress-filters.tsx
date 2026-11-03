@@ -72,7 +72,7 @@ export function ProgressFilters({ grouping, secondary, secondaryVolume, gym, tes
           }}
           size="compact"
           testID={testID}
-          trailing={<Icon color={changed.length > 0 ? uiRoles.surface : uiRoles.inkMuted} name="chevron-down" size="xs" />}
+          trailing={<Icon color={changed.length > 0 ? uiRoles.onInk : uiRoles.inkMuted} name="chevron-down" size="xs" />}
         />
       </View>
       <Sheet dismissLabel="Dismiss filters" onDismiss={() => setOpen(false)} onDismissed={restoreFocus}

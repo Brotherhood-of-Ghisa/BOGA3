@@ -1,5 +1,6 @@
 import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
-import { generateRoles } from '@/components/ui/theme';
+import { defaultThemeSeeds, generateRoles } from '@/components/ui/theme';
+import { withNeutrals } from '@/components/ui/theme-neutrals';
 import * as tokens from '@/components/ui/tokens';
 
 // The token rules that stay true for good (`docs/specs/ui/design-language.md`
@@ -33,6 +34,10 @@ describe('design-language tokens', () => {
         'inkGhost',
         'inkMuted',
         'loss',
+        'onAccent',
+        'onDanger',
+        'onInk',
+        'onSelection',
         'paper',
         'record',
         'recordRule',
@@ -87,27 +92,44 @@ describe('design-language tokens', () => {
   describe('one value per role (design-language.md §2, rationalised 2026-09-27)', () => {
     it('gives no two roles the same value', () => {
       // Two roles that cannot be told apart are one role (design-language.md "Colour roles").
+      // An on-colour role is named by the fill it sits on, so it may repeat
+      // another role's value.
       const byValue = new Map<string, string[]>();
-      for (const [role, value] of Object.entries(uiRoles)) {
+      for (const [role, value] of Object.entries(uiRoles).filter(([name]) => !/^on[A-Z]/.test(name))) {
         byValue.set(value, [...(byValue.get(value) ?? []), role]);
       }
       const shared = [...byValue.values()].filter((roles) => roles.length > 1);
       expect(shared).toEqual([]);
     });
 
-    it('keeps every neutral on one warm hue', () => {
-      // The neutrals are one ramp — the ground a later theme is derived from.
-      // `surface` is pure white and has no hue.
-      const neutrals = [
-        uiRoles.ink,
-        uiRoles.inkMuted,
-        uiRoles.inkFaint,
-        uiRoles.inkGhost,
-        uiRoles.paper,
-        uiRoles.rule,
-        uiRoles.ruleSoft,
-      ];
-      for (const neutral of neutrals) {
+    describe.each([
+      ['the shipped default', defaultThemeSeeds],
+      ['a cool page under a navy ink', withNeutrals(defaultThemeSeeds, 'cool', 'navy')],
+      ['a custom page under a plum ink', withNeutrals(defaultThemeSeeds, { hue: 200, tint: 3 }, 'plum')],
+    ])('for %s', (_name, seeds) => {
+      const roles = generateRoles(seeds);
+
+      it('keeps each neutral family on one hue: the inks on `text`\'s, the ground on `background`\'s', () => {
+        // Background and text are picked apart, so the neutrals are two ramps,
+        // each one hue. `surface` is pure white and has no hue.
+        const families = [
+          { seed: seeds.text, roles: [roles.ink, roles.inkMuted, roles.inkFaint, roles.inkGhost] },
+          { seed: seeds.background, roles: [roles.paper, roles.rule, roles.ruleSoft, roles.viz0] },
+        ];
+        for (const family of families) {
+          const seed = lch(family.seed);
+          for (const neutral of family.roles) {
+            const { chroma, hue } = lch(neutral);
+            expect(chroma).toBeLessThanOrEqual(Math.max(seed.chroma, 1));
+            // Hue is only meaningful where there is chroma to carry it.
+            if (chroma >= 2) expect(hueDistance(hue, seed.hue)).toBeLessThanOrEqual(10);
+          }
+        }
+      });
+    });
+
+    it('keeps the shipped neutrals warm and low in chroma', () => {
+      for (const neutral of [uiRoles.ink, uiRoles.inkMuted, uiRoles.inkFaint, uiRoles.inkGhost, uiRoles.paper, uiRoles.rule, uiRoles.ruleSoft]) {
         const { chroma, hue } = lch(neutral);
         expect(chroma).toBeLessThanOrEqual(10);
         expect(hue).toBeGreaterThanOrEqual(75);
@@ -171,7 +193,7 @@ describe('design-language tokens', () => {
     it('is fixed in every theme, whatever the seeds', () => {
       // `danger` and the two directions are not seeded: a decrease stays red
       // and an improvement green however the accent is picked.
-      const rose = generateRoles({ ground: '#6A5F62', accent: '#B4235A', record: '#7A6A12', viz: '#9A7480' });
+      const rose = generateRoles({ background: '#6A5F62', text: '#6A5F62', accent: '#B4235A', record: '#7A6A12', viz: '#9A7480' });
       expect(rose.gain).toBe(uiRoles.gain);
       expect(rose.loss).toBe(uiRoles.loss);
     });
