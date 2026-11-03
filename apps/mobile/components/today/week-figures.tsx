@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/icon';
 import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiIconSize, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
 import type { ProgressMetric } from '@/src/preferences/model';
 
@@ -84,7 +84,7 @@ export function WeekFigure({ label, current, previous, record = false, previousW
   );
   return onToggleMetric ? (
     <Pressable accessibilityLabel={`${spoken}. ${metric === 'totalVolume' ? 'Switch to sets' : 'Switch to tonnes'}`}
-      accessibilityRole="button" onPress={onToggleMetric} style={[styles.figure, metric === 'totalVolume' ? styles.tonnageFigure : null]} testID={`${testID}-metric-toggle`}>
+      accessibilityRole="button" onPress={onToggleMetric} style={[styles.figure, styles.metricFigure]} testID={`${testID}-metric-toggle`}>
       {content}
     </Pressable>
   ) : content;
@@ -160,8 +160,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: uiSpace.xs,
   },
-  tonnageFigure: { flex: 2 },
-  metricLabel: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
+  metricFigure: { flex: 2 },
+  metricLabel: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs, minHeight: uiIconSize.sm },
   // One child since the record mark went; `row` still sizes the figure to its
   // content rather than stretching it.
   valueRow: {
