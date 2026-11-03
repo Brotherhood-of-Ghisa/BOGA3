@@ -533,7 +533,7 @@ describe('tonnage weight references', () => {
     }
   });
 
-  it.each([[20000, 240], [136000, 126]])('keeps %s-volume annotations on the right when one column fits (%spt)', (reach, height) => {
+  it.each([[20000, 240], [80000, 120], [136000, 126], [1000000, 120]])('keeps %s-volume annotations on the right when one column fits (%spt)', (reach, height) => {
     const geometry = chart(input(reach), 326, height);
     for (const reference of geometry.references) {
       expect(reference.x + reference.width).toBeCloseTo(geometry.plot.width - uiSpace.xs);

@@ -33,6 +33,7 @@ import {
 } from './progress-format';
 import { StepAround } from './step-arrows';
 import { TonnageReferenceLayer } from './tonnage-reference-layer';
+import { REFERENCE_GAP, REFERENCE_HEIGHT } from './tonnage-references';
 import type { ProgressMetric } from '@/src/preferences/model';
 
 // Until the first layout pass reports the card's width (and in Jest, where
@@ -140,6 +141,8 @@ export function PeriodPace({
   const figures = periodDayFigures(period, selection?.periodKey === periodKey ? selection.dayIndex : null, metric);
   const { width, height } = size;
   const geometry = periodChartGeometry(period, width, height, figures);
+  // Leave a right-hand column for every annotation, even on a short phone.
+  const referenceMinimumHeight = (geometry.references.length + 1) * (REFERENCE_HEIGHT + REFERENCE_GAP);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const measuredWidth = Math.round(event.nativeEvent.layout.width);
@@ -247,7 +250,9 @@ export function PeriodPace({
         onLayout={onLayout}
         onResponderRelease={onTouch}
         onStartShouldSetResponder={() => true}
-        style={styles.fillChart}
+        style={[styles.fillChart, geometry.references.length > 0 && {
+          minHeight: Math.max(MIN_FILL_CHART_HEIGHT, referenceMinimumHeight),
+        }]}
         testID="today-progress-chart">
         {/* The drawing sits over the box rather than in it, so the last
             measured height never props the box up: the box takes only the

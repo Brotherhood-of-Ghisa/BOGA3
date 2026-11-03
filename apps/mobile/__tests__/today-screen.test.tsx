@@ -28,6 +28,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import { ShareBar } from '@/components/today';
+import { CHART_RIGHT_GUTTER } from '@/components/today/progress-format';
 import { Storage } from 'expo-sqlite/kv-store';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
@@ -238,6 +239,8 @@ describe('Today: the Progress card over real data', () => {
     await logSession('high-volume', local(2026, 10, 15, 9), 2300);
     await renderToday();
     fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
+    expect(text('today-progress-chart')).toHaveStyle({ minHeight: 120 });
+    fireEvent(text('today-progress-chart'), 'layout', { nativeEvent: { layout: { width: 311, height: 120 } } });
     const y = [];
     for (const [id, label, spoken] of [
       ['humpback', '≈40 t', 'humpback whale, approximately 40 tonnes.'],
@@ -251,9 +254,10 @@ describe('Today: the Progress card over real data', () => {
       expect(screen.queryByTestId(`today-tonnage-icon-${id}`)).toBeNull();
     }
     expect(new Set(y).size).toBe(3);
-    for (const id of ['humpback', 'fin-whale', 'ferry']) {
+    for (const id of ['elephant', 'wagon', 'humpback', 'fin-whale', 'ferry']) {
       const ground = screen.UNSAFE_getAllByType(Rect).find(node => node.props.testID === `today-tonnage-ground-${id}`)!;
       expect(ground.props.fill).toBe(uiRoles.surface);
+      expect(ground.props.x + ground.props.width).toBeCloseTo(311 - CHART_RIGHT_GUTTER - uiSpace.xs);
       const leader = screen.UNSAFE_getAllByType(Line).find(node => node.props.testID === `today-tonnage-leader-${id}`);
       if (leader) expect(leader.props.x1).toBeLessThan(ground.props.x);
     }
