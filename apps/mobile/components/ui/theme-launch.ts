@@ -64,10 +64,12 @@ export async function saveAppearance(appearance: AppearanceChoice): Promise<void
 }
 
 let lastSave: Promise<void> = Promise.resolve();
-// Parts accepted but not yet settled, so a second choice compares against what
-// the first will store rather than what it has stored so far.
+// The saves accepted but not yet settled, so a second choice compares against
+// what the first will store rather than what it has stored so far. Each field
+// holds the value of the newest save that names it, and that save's ticket.
 let queued: Partial<AppearanceChoice> = {};
-let queuedCount = 0;
+const queuedTickets = new Map<keyof AppearanceChoice, number>();
+let lastTicket = 0;
 
 // The stored choice with the saves still queued applied. Throws when the store
 // cannot be read.
@@ -81,16 +83,21 @@ export function readIntendedTheme(): AppearanceChoice {
 // after another, so two quick choices cannot overwrite each other's field.
 // Rejects, saving nothing, when the store cannot be read or written.
 export function saveAppearancePart(part: Partial<AppearanceChoice>): Promise<void> {
+  const ticket = (lastTicket += 1);
+  const fields = Object.keys(part) as (keyof AppearanceChoice)[];
   queued = { ...queued, ...part };
-  queuedCount += 1;
+  fields.forEach((field) => queuedTickets.set(field, ticket));
+  // A field leaves the queue when its newest save settles, saved or failed.
+  const settle = (): void => {
+    fields.forEach((field) => {
+      if (queuedTickets.get(field) !== ticket) return;
+      queuedTickets.delete(field);
+      delete queued[field];
+    });
+  };
   const run = lastSave.then(() => saveAppearance({ ...readStoredTheme().appearance, ...part }));
   lastSave = run.then(settle, settle);
   return run;
-}
-
-function settle(): void {
-  queuedCount -= 1;
-  if (queuedCount === 0) queued = {};
 }
 
 export function saveThemeAccent(accent: ThemePresetId | HueThemeId): Promise<void> {

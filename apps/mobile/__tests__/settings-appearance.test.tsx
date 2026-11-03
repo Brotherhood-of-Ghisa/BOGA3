@@ -168,6 +168,8 @@ it('shows a choice made earlier this run, read from the store', () => {
   Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'plum');
   render(<SettingsRoute />);
   expect(screen.getByLabelText('Appearance, Plum from next launch')).toBeTruthy();
+  // Untinted, the row shows the accent and that it waits.
+  expect(within(screen.getByTestId('settings-appearance-row')).getByText('Plum from next launch')).toBeTruthy();
 });
 
 it('shows the accent of the appearance record, and keeps its background and text when a preset is chosen', async () => {
