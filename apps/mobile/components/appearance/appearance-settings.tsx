@@ -27,7 +27,7 @@ import { SETTINGS_SUB_PAGES, THEME_COLOUR_ROUTE } from '@/src/navigation/routes'
 // Settings home's Appearance row (`docs/specs/ui/design-language.md` "Choosing
 // one"): names the chosen theme and opens the Appearance page. The row shows
 // the accent, `tinted` when the background or text is not the theme's own, and
-// `from next launch` on a pending accent (a choice applies on the next launch,
+// `from next launch` on a pending choice (a choice applies on the next launch,
 // as the app cannot restart itself); VoiceOver hears the whole choice.
 export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }) {
   const router = useRouter();
