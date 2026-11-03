@@ -278,7 +278,7 @@ export const CHART_AXIS_ROOM = 6;
 /**
  * Day of the period on x (the first day at 0, the last at the plot's edge)
  * and cumulative figures on y. Tonnage uses the data's scale, then fits the
- * eligible vehicle annotations ([[comparison.tonnage-references]]); every
+ * eligible weight annotations ([[comparison.tonnage-references]]); every
  * series and reference shares that scale.
  */
 export const periodChartGeometry = (

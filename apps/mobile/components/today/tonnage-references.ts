@@ -4,12 +4,10 @@ import { uiSpace } from '@/components/ui/tokens';
 // Original BoGa side profiles, drawn for this chart on a 32 × 16 grid.
 // Unbranded vector geometry; no third-party artwork or font dependency.
 export const TONNAGE_REFERENCES = [
-  { id: 'compact', value: 1000, label: '≈1 t', spoken: 'small car, approximately 1 tonne',
-    path: 'M4 12H2V9L5 7L9 3H19L23 7L28 9V12H25 M8 12H21 M8 7L11 4.5H17V7Z M19 4.5L21.5 7H19Z M8 12a2 2 0 1 1-4 0a2 2 0 1 1 4 0 M25 12a2 2 0 1 1-4 0a2 2 0 1 1 4 0' },
   { id: 'saloon', value: 2000, label: '≈2 t', spoken: 'saloon car, approximately 2 tonnes',
     path: 'M5 12H1V9L6 7Q12 0 21 5L25 7L31 9V12H28 M9 12H24 M8 7Q14 2 20 5L23 7Z M9 12a2 2 0 1 1-4 0a2 2 0 1 1 4 0 M28 12a2 2 0 1 1-4 0a2 2 0 1 1 4 0' },
-  { id: 'van', value: 2500, label: '≈2.5 t', spoken: 'panel van, approximately 2.5 tonnes',
-    path: 'M5 12H1L2 2H21L27 8L30 9V12H27 M9 12H23 M19 4H21L25 8H19Z M9 12a2 2 0 1 1-4 0a2 2 0 1 1 4 0 M27 12a2 2 0 1 1-4 0a2 2 0 1 1 4 0' },
+  { id: 'elephant', value: 6000, label: '≈6 t', spoken: 'African elephant, approximately 6 tonnes',
+    path: 'M5 10V6C5 2 9 1 14 2C18 1 21 2 23 4C26 2 29 4 29 7V11Q29 13 31 11V12Q31 15 28 14Q26 14 26 11V9L24 8L23 14H20L19 10H12L11 14H8V10Z M5 6Q2 6 2 10 M23 4C19 1 17 5 20 9Q24 11 24 5 M27 5.5h.1' },
   { id: 'wagon', value: 20000, label: '≈20 t', spoken: 'empty freight wagon, approximately 20 tonnes',
     path: 'M2 3H30V10H2Z M9 3V10 M16 3V10 M23 3V10 M1 11H31 M4 11V12 M28 11V12 M8 13a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0 M13 13a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0 M22 13a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0 M27 13a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0' },
 ] as const;

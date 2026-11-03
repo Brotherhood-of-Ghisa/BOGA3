@@ -187,16 +187,20 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 9.375 t');
     expect(text('today-progress-period-difference')).toHaveTextContent('new');
     expect(text('today-progress-chart')).toHaveProp('accessibilityLabel', expect.stringContaining('On course for 21.875 tonnes.'));
-    const annotations = () => ['compact', 'saloon', 'van', 'wagon'].map(id => drawing(`today-tonnage-line-${id}`).props.y1);
+    const annotations = () => ['saloon', 'elephant', 'wagon'].map(id => drawing(`today-tonnage-line-${id}`).props.y1);
     const positions = annotations();
     expect(drawing('today-tonnage-references')).toHaveProp('pointerEvents', 'none');
-    for (const [id, label] of [['compact', '≈1 t'], ['saloon', '≈2 t'], ['van', '≈2.5 t'], ['wagon', '≈20 t']]) {
+    for (const [id, label] of [['saloon', '≈2 t'], ['elephant', '≈6 t'], ['wagon', '≈20 t']]) {
       expect(within(drawing(`today-tonnage-label-${id}`)).UNSAFE_getByType(TSpan).props.children).toBe(label);
       expect(drawing(`today-tonnage-icon-${id}`)).toBeTruthy();
       expect(drawing(`today-tonnage-label-${id}`).props.accessibilityLabel).toBeUndefined();
       expect(screen.queryByTestId(`today-tonnage-label-${id}`)).toBeNull();
     }
     expect(text('today-progress-chart').props.accessibilityLabel).toContain('empty freight wagon, approximately 20 tonnes.');
+    expect(text('today-progress-chart').props.accessibilityLabel).toContain('African elephant, approximately 6 tonnes.');
+    expect(screen.queryByTestId('today-tonnage-label-van', { includeHiddenElements: true })).toBeNull();
+    expect(screen.queryByTestId('today-tonnage-line-compact', { includeHiddenElements: true })).toBeNull();
+    expect(text('today-progress-chart').props.accessibilityLabel).not.toContain('small car');
     expect(text('today-progress-week-sessions-value')).toHaveTextContent('1');
     expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
 
@@ -253,7 +257,7 @@ describe('Today: the Progress card over real data', () => {
     act(() => updatePreferences({ volumeEfforts: [] }));
     await waitFor(() => expect(text('today-progress-week-working-sets-value')).toHaveTextContent('0'));
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 0 t');
-    expect(screen.queryByTestId('today-tonnage-line-compact', { includeHiddenElements: true })).toBeNull();
+    expect(screen.queryByTestId('today-tonnage-line-saloon', { includeHiddenElements: true })).toBeNull();
     expect(text('today-progress-period-difference')).toHaveTextContent('—');
     expect(text('today-progress-week-sessions-value')).toHaveTextContent('1');
   });
