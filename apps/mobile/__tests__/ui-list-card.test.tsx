@@ -43,9 +43,10 @@ it('puts an independent history target around its inset content, beside disclosu
   const history = jest.fn();
   const disclosure = jest.fn();
   render(<ListRow density="compact" label="Lat pulldown" testID="row"
-    contentAction={{ onPress: history, accessibilityLabel: 'Open history', accessibilityRole: 'link', testID: 'history' }}
+    contentAction={{ onPress: history, accessibilityLabel: 'Open history', accessibilityValue: { text: 'Now 16, previous 10' }, accessibilityRole: 'link', testID: 'history' }}
     trailing={<IconButton name="chevron-down" accessibilityLabel="Show contributions" onPress={disclosure} testID="disclosure" />} />);
-  expect(screen.getByTestId('history')).toHaveStyle({ minHeight: uiGeometry.tapTarget, justifyContent: 'center' });
+  expect(screen.getByTestId('history')).toHaveStyle({ minWidth: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, justifyContent: 'center' });
+  expect(screen.getByTestId('history')).toHaveProp('accessibilityValue', { text: 'Now 16, previous 10' });
   expect(StyleSheet.flatten(screen.getByTestId('history').props.style).paddingVertical).toBeUndefined();
   expect(StyleSheet.flatten(screen.getByText('Lat pulldown').parent?.parent?.props.style)).toMatchObject({ paddingVertical: uiSpace.xs });
   fireEvent.press(screen.getByTestId('history'));

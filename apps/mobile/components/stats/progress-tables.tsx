@@ -1,14 +1,14 @@
 import { Fragment, useRef, type ComponentRef } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Icon, ListRow, StatePanel, uiBorder, uiGeometry, uiRoles, uiText } from '@/components/ui';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StatePanel, uiBorder, uiRoles } from '@/components/ui';
 import type { ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import {
   COLUMN_KEYS, COLUMN_NAMES, ComparisonHeaders, ComparisonValues, compareOptionalNumbers, comparisonSortValues,
-  hasComparisonMetric, metricUnit, resolveComparisonLayout, type ComparisonColumnKey,
+  hasComparisonMetric, metricUnit, comparisonValuesLabel, resolveComparisonLayout, type ComparisonColumnKey,
   type ComparisonLayout,
 } from './comparison-columns';
-import { StatsTable, StatsTableFamily, StatsTableHeaderLabel, StatsTableSortHeader, statsTableStyles } from './stats-table';
+import { StatsTable, StatsTableRow, StatsTableName, StatsTableDisclosure, StatsTableFamily, StatsTableHeaderLabel, StatsTableSortHeader, statsTableStyles } from './stats-table';
 
 import { EXERCISE_LIST_FAMILY_ORDER } from '@/src/exercise-catalog/list-model';
 import { exerciseSearchTextMatches, normalizeExerciseSearchWords } from '@/src/exercise-catalog/search';
@@ -98,7 +98,7 @@ export function ProgressTables(props: ProgressTablesProps) {
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
   const layout = resolveComparisonLayout(width, [...rows, ...exercises], metric, true, true);
   return <View testID="stats-muscle-table-container"><StatsTable testID="stats-muscle-table">
-    <ComparisonHeaders layout={layout} metric={metric} testID="stats-muscle-table-header"
+    <ComparisonHeaders compact layout={layout} metric={metric} testID="stats-muscle-table-header"
       name={<MuscleSortHeaderCell header="muscle" label="Muscle" metric={metric} mode={sortMode} onSort={onSort} />}
       column={(column, columnWidth) => <MuscleSortHeaderCell header={column.key} label={column.label}
         metric={metric} mode={sortMode} onSort={onSort} width={columnWidth} />} />
@@ -161,7 +161,7 @@ function MuscleSortHeaderCell({ header, label, metric, mode, onSort, width }: {
 function Headers({ name, layout, metric, testID, axis }: {
   name: string; layout: ComparisonLayout; metric: ProgressTableMetric; testID: string; axis: boolean;
 }) {
-  return <ComparisonHeaders axis={axis} layout={layout} metric={metric} testID={testID}
+  return <ComparisonHeaders compact axis={axis} layout={layout} metric={metric} testID={testID}
     name={<StatsTableHeaderLabel label={name} />} />;
 }
 
@@ -171,35 +171,36 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
   const prefix = `stats-muscle-row-${row.muscleGroupId}`;
-  const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} />;
-  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values} trailing={
-    <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
-      accessibilityState={{ expanded: selected }} onPress={() => onSelect(row.muscleGroupId)} style={styles.chevron}
-      testID={`stats-muscle-select-${row.muscleGroupId}`}>
-      <Icon name={selected ? 'chevron-down' : 'chevron-right'} size="sm" color={uiRoles.ink} />
-    </Pressable>}>
-    <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
-      onPress={() => onHistory(row, name.current)} style={styles.nameLink} testID={`stats-muscle-history-${row.muscleGroupId}`}>
-      <Text allowFontScaling={false} style={[uiText.bodyStrong, statsTableStyles.name]}>{row.displayName}</Text>
-    </Pressable>
+  const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} compact speak={!layout.stacked} />;
+  return <StatsTableRow testID={prefix} meta={layout.stacked ? undefined : values}
+    contentAction={{ ref: name, accessibilityRole: 'link',
+      accessibilityLabel: `Open ${row.displayName} history`,
+      accessibilityValue: layout.stacked ? { text: comparisonValuesLabel(row, metric) } : undefined,
+      onPress: () => onHistory(row, name.current), testID: `stats-muscle-history-${row.muscleGroupId}` }}
+    trailing={<StatsTableDisclosure expanded={selected}
+      accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
+      onPress={() => onSelect(row.muscleGroupId)} testID={`stats-muscle-select-${row.muscleGroupId}`} />}>
+    <StatsTableName name={row.displayName} />
     {layout.stacked ? values : null}
-  </ListRow>;
+  </StatsTableRow>;
 }
 
 function ExerciseRow({ row, metric, layout, onHistory, hideRole, axis }: {
   row: ProgressExerciseComparison; metric: ProgressTableMetric; layout: ComparisonLayout; onHistory: ProgressTablesProps['onExerciseHistory']; hideRole?: boolean; axis: boolean;
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
+  const role = hideRole ? undefined : row.role === 'primary' ? 'Primary' : 'Secondary';
+  const historyValue = [role, layout.stacked ? comparisonValuesLabel(row, metric) : undefined].filter(Boolean).join('. ');
   const prefix = `stats-contribution-${row.exerciseDefinitionId}`;
-  const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} />;
-  const history = <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
-      onPress={() => onHistory(row, name.current)} style={styles.nameLink}>
-      <Text allowFontScaling={false} style={[uiText.bodyStrong, statsTableStyles.name]}>{row.displayName}</Text>
-      {hideRole ? null : <Text allowFontScaling={false} style={uiText.meta}>{row.role === 'primary' ? 'Primary' : 'Secondary'}</Text>}
-    </Pressable>;
-  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values} trailing={axis ? null : undefined}>
-    {history}{layout.stacked ? values : null}
-  </ListRow>;
+  const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} compact speak={!layout.stacked} />;
+  return <StatsTableRow testID={prefix} meta={layout.stacked ? undefined : values} trailing={axis ? null : undefined}
+    contentAction={{ ref: name, accessibilityRole: 'link',
+      accessibilityLabel: `Open ${row.displayName} history`,
+      accessibilityValue: historyValue ? { text: historyValue } : undefined,
+      onPress: () => onHistory(row, name.current) }}>
+    <StatsTableName name={row.displayName} metadata={role} />
+    {layout.stacked ? values : null}
+  </StatsTableRow>;
 }
 
 const styles = StyleSheet.create({
@@ -207,6 +208,4 @@ const styles = StyleSheet.create({
     borderBottomWidth: uiBorder.width, borderColor: uiRoles.rule },
   // The selected muscle keeps its ink rule, and its contributions hang off it.
   selected: { position: 'absolute', left: 0, top: 0, bottom: 0, width: uiBorder.width * 3, backgroundColor: uiRoles.ink },
-  nameLink: { minWidth: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, justifyContent: 'center' },
-  chevron: { width: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, alignItems: 'center', justifyContent: 'center' },
 });

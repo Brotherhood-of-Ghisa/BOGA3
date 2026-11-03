@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Card, Icon, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
+import { Card, Icon, ListRow, type ListRowProps, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
 
 // Progress's one table style, which both breakdowns are drawn with: a `Card`
 // holding a micro-label header row over right-aligned figure columns, and
-// `ListRow` data rows under it. A figure column has a fixed width so digits
+// compact `StatsTableRow` data rows in adopted Muscle tables. A figure column has a fixed width so digits
 // align down the list and the name takes the rest; a figure that outgrows its
 // column wraps rather than shrinking (`design-language.md` §6). The table
 // carries no title: the breakdown control above it says which one this is.
@@ -36,9 +36,32 @@ export function StatsTable({ children, testID }: { children: ReactNode; testID?:
   return <Card testID={testID}>{children}</Card>;
 }
 
+type WithoutDensity<T> = T extends unknown ? Omit<T, 'density'> : never;
+
+/** The adopted table row is the list's compact recipe, including independent content actions. */
+export function StatsTableRow(props: WithoutDensity<ListRowProps>) {
+  return <ListRow {...props} density="compact" />;
+}
+
+/** Wrapping names and optional quiet role metadata; the row owns the content inset. */
+export function StatsTableName({ name, metadata }: { name: string; metadata?: string }) {
+  return <><Text allowFontScaling={false} style={uiText.bodyStrong}>{name}</Text>
+    {metadata ? <Text allowFontScaling={false} style={uiText.meta}>{metadata}</Text> : null}</>;
+}
+
+/** Disclosure stays separate from the history link, on the shared control axis. */
+export function StatsTableDisclosure({ expanded, accessibilityLabel, onPress, testID }: {
+  expanded: boolean; accessibilityLabel: string; onPress: () => void; testID: string;
+}) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel}
+    accessibilityState={{ expanded }} onPress={onPress} style={styles.disclosure} testID={testID}>
+    <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size="sm" color={uiRoles.ink} />
+  </Pressable>;
+}
+
 /** The header row: a name cell, then the figure columns in a `StatsTableFigures`. */
-export function StatsTableHeader({ children, testID }: { children: ReactNode; testID?: string }) {
-  return <View style={styles.header} testID={testID}>{children}</View>;
+export function StatsTableHeader({ children, testID, compact = false }: { children: ReactNode; testID?: string; compact?: boolean }) {
+  return <View style={[styles.header, compact && styles.compactHeader]} testID={testID}>{children}</View>;
 }
 
 /** The right-aligned figure columns of a header row or a data row. */
@@ -92,6 +115,8 @@ export const statsTableStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  compactHeader: { gap: uiSpace.sm },
+  disclosure: { width: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, alignItems: 'center', justifyContent: 'center' },
   numericSortHeader: { flexDirection: 'row-reverse', justifyContent: 'flex-start' },
   family: { paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
     paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderColor: uiRoles.rule },

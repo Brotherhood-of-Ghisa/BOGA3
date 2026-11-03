@@ -165,8 +165,8 @@ export type ComparisonColumnPosition = {
  * stays over its column. `column` draws one figure column's header — the plain
  * spoken micro-label by default, a sort control where the table has one.
  */
-export function ComparisonHeaders({ name, layout, metric, axis = true, testID, column }: {
-  name: ReactNode; layout: ComparisonLayout; metric: ComparisonMetric; axis?: boolean; testID: string;
+export function ComparisonHeaders({ name, layout, metric, axis = true, testID, column, compact = false }: {
+  name: ReactNode; layout: ComparisonLayout; metric: ComparisonMetric; axis?: boolean; testID: string; compact?: boolean;
   column?: (position: ComparisonColumnPosition, width: number) => ReactNode;
 }) {
   const columns = <StatsTableFigures style={layout.stacked && styles.stackedFigures}>
@@ -182,7 +182,7 @@ export function ComparisonHeaders({ name, layout, metric, axis = true, testID, c
       return <Fragment key={label}>{header}</Fragment>;
     })}
   </StatsTableFigures>;
-  return <StatsTableHeader testID={testID}>
+  return <StatsTableHeader testID={testID} compact={compact}>
     <View style={[statsTableStyles.headerCell, statsTableStyles.nameCell, layout.stacked && styles.stackedName]}>
       {name}
       {layout.stacked ? columns : null}
@@ -199,15 +199,20 @@ export function ComparisonHeaders({ name, layout, metric, axis = true, testID, c
  * itself (the Exercise table): a reader never reaches an element inside a
  * pressable row, so offering one there would only lose the phrase.
  */
-export function ComparisonValues({ row, metric, layout, prefix, speak = true }: {
-  row: ComparisonRow; metric: ComparisonMetric; layout: ComparisonLayout; prefix: string; speak?: boolean;
+export const comparisonValuesLabel = (row: ComparisonRow, metric: ComparisonMetric): string => {
+  const figures = comparisonFigures(row, metric);
+  return `Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.`;
+};
+
+export function ComparisonValues({ row, metric, layout, prefix, speak = true, compact = false }: {
+  row: ComparisonRow; metric: ComparisonMetric; layout: ComparisonLayout; prefix: string; speak?: boolean; compact?: boolean;
 }) {
   const figures = comparisonFigures(row, metric);
   const texts = [figures.now, figures.previous, figures.change.text];
   const changeColour = { color: changeToneColour(figures.change.tone) };
   return <View accessible={speak || undefined}
-    accessibilityLabel={speak ? `Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${metricUnit(metric)}.` : undefined}
-    style={layout.stacked && styles.stackedFigures} testID={`${prefix}-figures`}>
+    accessibilityLabel={speak ? comparisonValuesLabel(row, metric) : undefined}
+    style={[layout.stacked && styles.stackedFigures, compact && layout.stacked && styles.compactFigures]} testID={`${prefix}-figures`}>
     <StatsTableFigures style={layout.stacked && styles.stackedValues} testID={`${prefix}-values`}>
       {texts.map((value, index) => <ComparisonCell key={COLUMN_KEYS[index]} text={value} width={layout.columns[index]}
         colour={COLUMN_KEYS[index] === 'change' ? changeColour : undefined} testID={`${prefix}-${COLUMN_KEYS[index]}`} />)}
@@ -226,6 +231,7 @@ function ComparisonCell({ text, width, colour, testID }: {
 }
 
 const styles = StyleSheet.create({
+  compactFigures: { paddingBottom: 0 },
   axis: { width: uiGeometry.tapTarget },
   stackedName: { flexDirection: 'column', alignItems: 'stretch' },
   stackedValues: { justifyContent: 'flex-end' },
