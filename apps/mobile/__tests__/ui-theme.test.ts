@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 
 import { uiRoles } from '@/components/ui';
 import { hexToLch, lchToHex, withAlpha } from '@/components/ui/lch';
-import { defaultThemeSeeds, generateRoles, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
+import { defaultThemeSeeds, generateRoles, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
 import { hueName, hueThemeId, parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
 import {
   BACKGROUND_CHROMA_CAP,
@@ -24,11 +24,12 @@ import {
 import themeRolesLight from './fixtures/theme-roles-light.json';
 
 // The theme generator (`docs/specs/ui/design-language.md` §2, "Derivation"
-// and "Presets"): every colour role is generated from five seeds. These tests
-// pin that the default seeds reproduce the picked palette, that the rules the
-// palette is gated on hold for every shipped preset and for seeds no preset
-// ships, and that each preset's `accent` and `record` — used as given — meet
-// their own floors.
+// and "Presets"): every colour role is generated from five seeds, on a light
+// or a dark ladder. These tests pin that the default seeds reproduce the picked
+// palette, that the rules the palette is gated on hold in both modes for every
+// shipped preset and for seeds no preset ships, that each preset's `accent` and
+// `record` — used as given in light mode — meet their own floors, and that the
+// dark ladder left every light role as it was.
 
 // The palette as rationalised and picked on device, 2026-09-27. The generator
 // was calibrated to it; a role drifting further than ΔE*ab 3 from it is a
@@ -73,6 +74,9 @@ const OTHER_SEEDS: Record<string, ThemeSeeds> = {
 
 type OnColourRole = 'onAccent' | 'onSelection' | 'onDanger' | 'onInk';
 const ON_COLOUR_ROLES: readonly OnColourRole[] = ['onAccent', 'onSelection', 'onDanger', 'onInk'];
+const MODES: readonly ThemeMode[] = ['light', 'dark'];
+// The roles no seed moves that carry a meaning of their own.
+const FIXED_HUES = ['danger', 'gain', 'loss', 'regimeOlder', 'regimeNewer'] as const;
 // The fill each on-colour role is drawn on.
 const FILL_OF: Record<OnColourRole, keyof UiRoles> = {
   onAccent: 'accent',
@@ -146,7 +150,7 @@ describe('theme generator', () => {
     expect(drift).toEqual([]);
   });
 
-  it('uses the accent and record seeds as given, and never themes danger, surface, filter selection or the on-colour roles', () => {
+  it('in light mode, uses the accent and record seeds as given, and never themes danger, surface, filter selection or the on-colour roles', () => {
     for (const seeds of [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS)]) {
       const roles = generateRoles(seeds);
       expect(roles.accent).toBe(seeds.accent);
@@ -185,8 +189,12 @@ describe('theme generator', () => {
     expect(() => generateRoles({ ...defaultThemeSeeds, accent: 'orange' })).toThrow('expected #RRGGBB');
   });
 
-  describe.each(Object.entries({ ...PRESET_SEEDS, ...OTHER_SEEDS, ...HUE_SEEDS }))('for the %s seeds', (_name, seeds) => {
-    const roles = generateRoles(seeds);
+  describe.each(
+    MODES.flatMap((mode) =>
+      Object.entries({ ...PRESET_SEEDS, ...OTHER_SEEDS, ...HUE_SEEDS }).map(([name, seeds]) => [name, mode, seeds] as const),
+    ),
+  )('for the %s seeds in %s mode', (_name, mode, seeds) => {
+    const roles = generateRoles(seeds, mode);
 
     it('gives no two roles the same value', () => {
       const values = grounds(roles);
@@ -194,20 +202,7 @@ describe('theme generator', () => {
     });
 
     it('steps the neutrals in a fixed lightness order, each family on its own seed\'s hue', () => {
-      const ladder = [
-        roles.ink,
-        roles.inkMuted,
-        roles.inkFaint,
-        roles.inkGhost,
-        roles.rule,
-        roles.ruleSoft,
-        roles.viz0,
-        roles.paper,
-        roles.surface,
-      ].map((hex) => hexToLch(hex).lightness);
-      for (let index = 1; index < ladder.length; index += 1) {
-        expect(ladder[index]).toBeGreaterThan(ladder[index - 1]);
-      }
+      expect(isAscending(neutralLadder(roles, mode))).toBe(true);
       // Hue is only meaningful where there is chroma to carry it.
       for (const neutral of [roles.inkMuted, roles.inkFaint, roles.inkGhost]) {
         expect(hueDistance(hexToLch(neutral).hue, hexToLch(seeds.text).hue)).toBeLessThanOrEqual(10);
@@ -224,20 +219,71 @@ describe('theme generator', () => {
       expect(contrastRatio(roles.ink, roles.viz1)).toBeGreaterThanOrEqual(3);
     });
 
-    it('darkens the viz ramp in even steps of at least 6 L*', () => {
-      const ramp = [roles.viz0, roles.viz1, roles.viz2, roles.viz3, roles.viz4].map(
-        (hex) => hexToLch(hex).lightness,
-      );
-      for (let index = 1; index < ramp.length; index += 1) {
-        expect(ramp[index - 1] - ramp[index]).toBeGreaterThanOrEqual(6);
-      }
+    it('steps the viz ramp away from the page by at least 6 L* a step', () => {
+      for (const stepSize of vizSteps(roles, mode)) expect(stepSize).toBeGreaterThanOrEqual(6);
     });
 
-    it('tints each wash from its own role', () => {
+    it('tints each wash from its own role, close to the page', () => {
       expect(hueDistance(hexToLch(roles.accentWash).hue, hexToLch(roles.accent).hue)).toBeLessThanOrEqual(10);
       expect(hueDistance(hexToLch(roles.recordWash).hue, hexToLch(roles.record).hue)).toBeLessThanOrEqual(10);
-      expect(hexToLch(roles.accentWash).lightness).toBeGreaterThanOrEqual(95);
+      if (mode === 'light') expect(hexToLch(roles.accentWash).lightness).toBeGreaterThanOrEqual(95);
+      else expect(Math.abs(hexToLch(roles.accentWash).lightness - hexToLch(roles.paper).lightness)).toBeLessThanOrEqual(10);
     });
+  });
+});
+
+describe('the dark ladder', () => {
+  const SEEDS = [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS), ...Object.values(HUE_SEEDS)];
+
+  it('lays the page at L* 10, lifts a card to L* 15, and draws `ink` at L* 95', () => {
+    for (const seeds of SEEDS) {
+      const roles = generateRoles(seeds, 'dark');
+      expect(hexToLch(roles.paper).lightness).toBeCloseTo(10, 0);
+      expect(hexToLch(roles.surface).lightness).toBeCloseTo(15, 0);
+      expect(hexToLch(roles.ink).lightness).toBeCloseTo(95, 0);
+    }
+  });
+
+  it('fixes danger, filter selection, the change directions, the regimes, the on-colour roles and the scrim', () => {
+    for (const seeds of SEEDS) {
+      const roles = generateRoles(seeds, 'dark');
+      expect(roles).toMatchObject({
+        selection: '#FFFFFF',
+        danger: '#F7716B',
+        gain: '#58AC76',
+        loss: '#FF6881',
+        regimeOlder: '#54A8AC',
+        regimeNewer: '#D57DC1',
+        scrim: 'rgba(0, 0, 0, 0.6)',
+      });
+      for (const role of ON_COLOUR_ROLES) expect(roles[role]).toBe('#000000');
+    }
+  });
+
+  it('keeps each fixed role on its light hue, and `gain` and `loss` at one L*', () => {
+    const light = generateRoles(defaultThemeSeeds);
+    const dark = generateRoles(defaultThemeSeeds, 'dark');
+    for (const role of ['danger', 'gain', 'loss', 'regimeOlder', 'regimeNewer'] as const) {
+      expect(hueDistance(hexToLch(dark[role]).hue, hexToLch(light[role]).hue)).toBeLessThanOrEqual(3);
+    }
+    expect(Math.abs(hexToLch(dark.gain).lightness - hexToLch(dark.loss).lightness)).toBeLessThanOrEqual(2);
+  });
+
+  it('steps `accent` and `record` from their seeds rather than using them as given', () => {
+    for (const seeds of SEEDS) {
+      const roles = generateRoles(seeds, 'dark');
+      expect(hueDistance(hexToLch(roles.accent).hue, hexToLch(seeds.accent).hue)).toBeLessThanOrEqual(3);
+      expect(hueDistance(hexToLch(roles.record).hue, hexToLch(seeds.record).hue)).toBeLessThanOrEqual(3);
+      expect(hexToLch(roles.accent).lightness).toBeCloseTo(72, 0);
+      expect(hexToLch(roles.record).lightness).toBeCloseTo(66, 0);
+    }
+  });
+
+  it('lightens the viz ramp in even steps: "more" stays stronger', () => {
+    for (const seeds of SEEDS) {
+      const [, ...rampSteps] = vizSteps(generateRoles(seeds, 'dark'), 'dark');
+      expect(Math.max(...rampSteps) - Math.min(...rampSteps)).toBeLessThanOrEqual(0.7);
+    }
   });
 });
 
@@ -284,18 +330,12 @@ describe('theme presets', () => {
 describe('custom hue themes', () => {
   const everyHue = Array.from({ length: 360 }, (_, hue) => hue);
 
-  it('meet every preset floor at every hue', () => {
+  it.each(MODES)('meet every floor at every hue in %s mode', (mode) => {
     // The floors a preset is gated on, by construction: the user picks the
     // hue, lightness and chroma are fixed.
-    const failures = everyHue.filter((hue) => {
-      const roles = generateRoles(seedsFromHue(hue));
-      return !(
-        contrastRatio(roles.onAccent, roles.accent) >= 4.5 &&
-        [roles.paper, roles.surface, roles.recordWash].every((ground) => contrastRatio(roles.record, ground) >= 4.5) &&
-        hueDistance(hexToLch(roles.record).hue, hexToLch(roles.accent).hue) >= 30 &&
-        new Set(grounds(roles)).size === grounds(roles).length
-      );
-    });
+    const failures = everyHue
+      .map((hue) => ({ hue, broken: brokenFloors(generateRoles(seedsFromHue(hue), mode), mode) }))
+      .filter(({ broken }) => broken.length > 0);
     expect(failures).toEqual([]);
   });
 
@@ -389,10 +429,11 @@ describe('background and text choices', () => {
   ).flat();
   const backgrounds: BackgroundChoice[] = ['match', ...backgroundSwatches.map((swatch) => swatch.id), ...customBackgrounds];
   const texts: TextChoice[] = ['match', ...textInks.map((ink) => ink.id)];
-  // Every preset, and a custom accent every 15°.
+  // Every preset, and a custom accent every 5° ("custom hue themes" sweeps
+  // all 360 hues under the default background and text).
   const accents = [
     ...themePresets.map((preset) => preset.seeds),
-    ...Array.from({ length: 24 }, (_, index) => seedsFromHue(index * 15)),
+    ...Array.from({ length: 72 }, (_, index) => seedsFromHue(index * 5)),
   ];
 
   it('stay neutrals: chroma within the caps', () => {
@@ -430,13 +471,12 @@ describe('background and text choices', () => {
     expect({ ...sage, background: undefined, text: undefined }).toEqual({ ...slate, background: undefined, text: undefined });
   });
 
-  it('keep every floor over the background × text × accent grid', () => {
+  it.each(MODES)('keep every floor over the background × text × accent grid in %s mode', (mode) => {
     const failures: string[] = [];
     for (const accentSeeds of accents) {
       for (const background of backgrounds) {
         for (const text of texts) {
-          const roles = generateRoles(withNeutrals(accentSeeds, background, text));
-          const broken = brokenFloors(roles);
+          const broken = brokenFloors(generateRoles(withNeutrals(accentSeeds, background, text), mode), mode);
           if (broken.length > 0) {
             failures.push(`${accentSeeds.accent} / ${JSON.stringify(background)} / ${text}: ${broken.join(', ')}`);
           }
@@ -445,29 +485,71 @@ describe('background and text choices', () => {
     }
     expect(failures).toEqual([]);
   });
+
+  it('leave every light role exactly as it was before the dark ladder', () => {
+    // A digest of every light role over the whole grid, taken from the
+    // generator before it had a dark ladder. Any light change is a visible one.
+    const hash = createHash('sha256');
+    for (const accentSeeds of accents) {
+      for (const background of backgrounds) {
+        for (const text of texts) {
+          const seeds = withNeutrals(accentSeeds, background, text);
+          const roles = generateRoles(seeds, 'light');
+          expect(roles).toEqual(generateRoles(seeds));
+          hash.update(JSON.stringify(Object.keys(roles).sort().map((role) => [role, roles[role as keyof UiRoles]])));
+        }
+      }
+    }
+    expect(hash.digest('hex')).toBe('0e8e78dc361f150d1db05c9e3d05ee215875ceef4f01e30afcb58103089e92cf');
+  });
 });
 
-// The floors every theme is gated on (`design-language.md` §2): text on both
-// grounds and on the ramp, `record` on its grounds, every on-colour role on
-// its fill, the neutral ladder's order, and one value per role.
-function brokenFloors(roles: UiRoles): string[] {
+// The floors every theme is gated on, in either mode (`design-language.md`
+// §2): text on both grounds and on the ramp, `record` on its grounds, every
+// on-colour role on its fill, the roles drawn as text on both grounds, the
+// neutral ladder's order, the ramp's steps, and one value per role.
+function brokenFloors(roles: UiRoles, mode: ThemeMode): string[] {
+  const legible = (foreground: string, backgrounds: string[]) =>
+    backgrounds.every((ground) => contrastRatio(foreground, ground) >= 4.5);
+  const textRoles = ['accent', 'danger', 'gain', 'loss', 'regimeOlder', 'regimeNewer'] as const;
   const floors: [string, boolean][] = [
-    ['ink on paper/surface', [roles.paper, roles.surface].every((ground) => contrastRatio(roles.ink, ground) >= 4.5)],
-    ['inkMuted on paper/surface', [roles.paper, roles.surface].every((ground) => contrastRatio(roles.inkMuted, ground) >= 4.5)],
+    ['ink on paper/surface', legible(roles.ink, [roles.paper, roles.surface])],
+    ['inkMuted on paper/surface', legible(roles.inkMuted, [roles.paper, roles.surface])],
     ['ink on viz4', contrastRatio(roles.ink, roles.viz4) >= 4.5],
     ['ink on viz1', contrastRatio(roles.ink, roles.viz1) >= 3],
-    [
-      'record on paper/surface/recordWash',
-      [roles.paper, roles.surface, roles.recordWash].every((ground) => contrastRatio(roles.record, ground) >= 4.5),
-    ],
+    ['record on paper/surface/recordWash', legible(roles.record, [roles.paper, roles.surface, roles.recordWash])],
+    ['record hue away from accent', hueDistance(hexToLch(roles.record).hue, hexToLch(roles.accent).hue) >= 30],
+    // Two roles that cannot be told apart are one role: the seeded marks stay
+    // a visible step (ΔE*ab 5, about twice a just-noticeable difference) from
+    // every fixed one, so a commit never looks like a delete or a change.
+    ...(['accent', 'record'] as const).flatMap((seeded) =>
+      FIXED_HUES.map((fixed): [string, boolean] => [`${seeded} apart from ${fixed}`, deltaE(roles[seeded], roles[fixed]) >= 5]),
+    ),
     ...ON_COLOUR_ROLES.map((role): [string, boolean] => [
       `${role} on ${FILL_OF[role]}`,
       contrastRatio(roles[role], roles[FILL_OF[role]]) >= 4.5,
     ]),
-    ['neutral ladder order', isAscending([roles.ink, roles.inkMuted, roles.inkFaint, roles.inkGhost, roles.rule, roles.ruleSoft, roles.viz0, roles.paper, roles.surface])],
+    ...textRoles.map((role): [string, boolean] => [`${role} on paper/surface`, legible(roles[role], [roles.paper, roles.surface])]),
+    ['neutral ladder order', isAscending(neutralLadder(roles, mode))],
+    ['viz steps of 6 L*', vizSteps(roles, mode).every((stepSize) => stepSize >= 6)],
     ['one value per role', new Set(grounds(roles)).size === grounds(roles).length],
   ];
   return floors.filter(([, holds]) => !holds).map(([name]) => name);
+}
+
+// The neutrals from darkest to lightest. Light mode runs from `ink` up to the
+// white card; dark mode from the dark page up to `ink`, with a card lifted a
+// step above the page.
+function neutralLadder(roles: UiRoles, mode: ThemeMode): string[] {
+  const inkToGround = [roles.ink, roles.inkMuted, roles.inkFaint, roles.inkGhost, roles.rule, roles.ruleSoft, roles.viz0];
+  return mode === 'light' ? [...inkToGround, roles.paper, roles.surface] : [roles.paper, roles.surface, ...inkToGround.reverse()];
+}
+
+// How far each step of the ramp moves away from the page in L*, `viz0` →
+// `viz4`: darker on the light page, lighter on the dark one.
+function vizSteps(roles: UiRoles, mode: ThemeMode): number[] {
+  const ramp = [roles.viz0, roles.viz1, roles.viz2, roles.viz3, roles.viz4].map((hex) => hexToLch(hex).lightness);
+  return ramp.slice(1).map((lightness, index) => (mode === 'light' ? ramp[index] - lightness : lightness - ramp[index]));
 }
 
 function isAscending(colours: string[]): boolean {

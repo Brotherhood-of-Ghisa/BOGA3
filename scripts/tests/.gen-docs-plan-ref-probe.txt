@@ -1,1 +1,0 @@
-ok: <path d="M12 4LM2.18 3"/> M<n>-T<nn>; rule keys T1 D14 E0.3 P5 R10

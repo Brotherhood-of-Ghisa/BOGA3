@@ -32,21 +32,23 @@ values are generated per theme, so neither a doc nor a screen may hold one —
 `uiRoles` is the only source, and `UiRoles` in
 `apps/mobile/components/ui/theme.ts` documents what each role is for.
 
-Invariants, gated by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
+Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 
 - **One value per role.** Two roles that cannot be told apart are one role.
   The on-colour roles are exempt: each is named by the fill it sits on.
+  `accent` and `record` stay ΔE\*ab ≥ 5 from `danger`, `gain`, `loss` and the
+  regimes.
 - **`record` is never `accent`**, and clears 4.5:1 as text on `paper` and
   `surface` — it marks figures, not just a band, so "your best ever" and "the
   button that commits" must not read as the same mark.
 - **Each neutral family is one hue.** The inks (`ink` → `ink-muted` →
-  `ink-faint` → `ink-ghost`) take the `text` seed's; `scrim` follows `ink`, at
-  42%. The ground (`paper`, `rule`, `rule-soft`, `viz0`) takes the
+  `ink-faint` → `ink-ghost`) take the `text` seed's; in light mode `scrim`
+  follows `ink`, at 42%. The ground (`paper`, `rule`, `rule-soft`, `viz0`) takes the
   `background` seed's. The shipped default keeps both at 75–95, chroma ≤ 10.
 - **`surface` is a ground, never a foreground.** A label, glyph, ring or
   stroke on a filled role takes that fill's on-colour role: `onAccent`,
   `onSelection`, `onDanger`, or `onInk` on `ink` used as a fill. All four are
-  white in light mode. `apps/mobile/__tests__/ui-on-colour-guard.test.ts`
+  white in light mode and black in dark. `apps/mobile/__tests__/ui-on-colour-guard.test.ts`
   rejects `surface` anywhere but a ground.
 - **A wash is a tint of its role**, within 10° of its hue, so the edited row
   carries the accent's hue rather than the ground's.
@@ -61,10 +63,17 @@ the gain/loss meanings.
 `text`, `accent`, `record` and `viz` into every role, synchronously at module load so every
 module-scope `StyleSheet.create` keeps working. A seed sets hue and chroma; the
 role sets its own fixed L\* — contrast depends on lightness, so the text floors
-hold whatever the seed. `accent` and `record` are used as given, so their floors
-are the seed's to meet. **Light only:** `app.config.ts` pins
-`userInterfaceStyle: "light"` (`ux-rules.md` "Appearance"); a dark theme would
-be a second ladder, not different seeds.
+hold whatever the seed. In light mode `accent` and `record` are used as given, so
+their floors are the seed's to meet.
+
+**Two ladders, one set of seeds:** `generateRoles(seeds, mode)`. Dark puts
+`paper` at L\*10, lifts `surface` to L\*15 (never a shadow) and `ink` to L\*95.
+`accent` (L\*72, `onAccent` black) and `record` (L\*66) take their seed's hue;
+`danger`, `gain`, `loss` and the regimes keep their light hues at L\*64;
+`selection` turns white, `scrim` 60% black. The `viz` ramp lightens in even
+steps, ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
+Dark is not reachable: `app.config.ts` pins `userInterfaceStyle: "light"`
+(`ux-rules.md` "Appearance").
 
 **Choosing one.** An accent (four presets or a custom hue), a background and a
 text, per device, resolved when `tokens.ts` first evaluates
@@ -97,14 +106,14 @@ every launcher alias. Seasonal identity follows [[appearance.november]]; its
 alternates require a native build, while ordinary Warm remains primary.
 
 **Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
-empty / rest, `viz1`…`viz4` the lightest to the strongest intensity; the steps
+empty / rest, `viz1`…`viz4` the weakest to the strongest intensity; the steps
 are even in lightness, so each bucket reads as "more" without relying on hue,
 and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
-legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
+legends and deltas included (`ink-muted` is about 3.2:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
 labels still say how much. An empty `viz0` cell takes a `rule` hairline,
-being only 1.18:1 against `surface`. A filter showing all its values at once marks the one in
-force in fixed black `selection` with white `onSelection` text in every theme
+being only about 1.15:1 against `surface`. A filter showing all its values at once marks the one in
+force in fixed black `selection` with white `onSelection` text (inverted in dark)
 (`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`
 shows one value and has no unselected peer, so it carries `ink` on `surface`
 (Progress's filter row, the history metric). Heatmap tiles/bars have no black current/selected
