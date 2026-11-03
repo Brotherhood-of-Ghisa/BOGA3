@@ -39,6 +39,6 @@ it('rejects metric-group padding and a styled wrapper even when it uses tokens',
   expect(findSummaryPatternViolations({ rootDir }).map(item => item.rule)).toEqual(['local summary geometry', 'local summary geometry']);
 });
 it('accepts the unchanged shared WeekFigure group geometry', () => {
-  write('components/groups/group-week-totals.tsx', 'const Figures = () => <View style={weekFigureStyles.figures}><WeekFigure/></View>;');
+  write('components/groups/group-week-totals.tsx', "import { weekFigureStyles } from '@/components/today/week-figures'; const Figures = () => <View style={weekFigureStyles.figures}><WeekFigure/></View>;");
   expect(findSummaryPatternViolations({ rootDir })).toEqual([]);
 });

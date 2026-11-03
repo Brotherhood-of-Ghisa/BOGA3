@@ -3,7 +3,7 @@ import { Dimensions, StyleSheet, Text } from 'react-native';
 import { TableGallery } from '@/components/pattern-gallery/table-gallery';
 import { resolveComparisonLayout, ComparisonHeaders } from '@/components/stats/comparison-columns';
 import { tableGalleryMuscles } from '@/components/pattern-gallery/table-fixtures';
-import { StatsTableRow, StatsTableName, StatsTableFamily } from '@/components/stats/stats-table';
+import { StatsTableRow, StatsTableName, StatsTableFamily, statsTableStyles } from '@/components/stats/stats-table';
 import { ListRow, uiGeometry, uiSpace, uiText } from '@/components/ui';
 
 it('shares the compact list recipe and keeps wrapping content free of nested padding/minimums', () => {
@@ -117,4 +117,11 @@ it('retains a passive column header and compact role groups in the standalone co
   expect(screen.getByRole('header', { name: 'Change, working sets' })).toBeTruthy();
   for (const family of screen.UNSAFE_getAllByType(StatsTableFamily)) expect(family.props.compact).toBe(true);
   expect(screen.getByText('Lat Pulldown')).toHaveStyle(uiText.body);
+});
+
+
+it('keeps the standalone contributor heading geometry in the table foundation', () => {
+  expect(StyleSheet.flatten(statsTableStyles.sectionHeader)).toEqual({
+    flexDirection: 'row', alignItems: 'center', gap: uiSpace.md, padding: uiSpace.md,
+  });
 });

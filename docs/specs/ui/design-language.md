@@ -231,7 +231,7 @@ vocabulary; semantic roles give prominence. List/table rows share line heights,
 insets, alignment, separators and wrapping; nested contributors inherit them.
 A whole-board action does not make passive rows independent targets. Never
 shrink figures. Features own formatting, ranking and navigation; shared
-presentation owns styling. For pattern selection and human acceptance, load
+presentation owns styling. For adopted scope and expansion, load `components-catalog.md`. For pattern selection and human acceptance, load
 `docs/specs/08-ux-delivery-standard.md`.
 
 ### Compact list/table rows

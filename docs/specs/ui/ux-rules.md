@@ -235,9 +235,8 @@ spacing/radius literals and retired vocabulary are forbidden in app/components.
    is a labelled `IconButton`, and an icon never carries state alone: the
    words or the row's accessibility label say it.
 
-For adopted CompactCard rules and scope, load
-`apps/mobile/scripts/compact-pattern-guardrail.js`; for their safe/failing
-cases, load `apps/mobile/__tests__/compact-pattern-guardrail.test.ts`.
+For adopted scope, expansion and executable examples, load
+`components-catalog.md` ("Gallery and adoption scope").
 
 Guardrail commands (from `apps/mobile/`): `npm run lint:ui-guardrails`
 (`--verbose` per violation, `--include-allowlisted` for colour audit, `--update-budgets`

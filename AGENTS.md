@@ -116,6 +116,8 @@ place each under `docs/specs/**`, routed from here.
 
 ## Design work (all contributors and agents)
 
+For UI blocks, first load `docs/specs/ui/components-catalog.md`; pattern selection,
+derivation and coded-result acceptance follow `docs/specs/08-ux-delivery-standard.md`.
 For every significant UI/design task, load and follow
 `docs/specs/ui/ai-design-policy.md`. It is the single provider-neutral policy
 for design targets, external-artifact vs repository authority,

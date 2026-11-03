@@ -40,7 +40,8 @@ Document boundary:
 For a new UI block, consult `docs/specs/ui/components-catalog.md`, show the
 applicable families, recommend one, and ask the human to select its pattern and
 bounded variant before implementation. Record that choice in the UX Contract
-and PR. A planned family is not an existing production export.
+and PR, with the production export and reference surface. For adopted scope and
+how a touched consumer joins it, load the catalog’s "Gallery and adoption scope". A planned family is not an existing production export.
 
 When none fits, present the nearest parent and the proposed differences,
 including inherited typography, spacing and interaction boundaries. Obtain the
@@ -60,7 +61,9 @@ Before a pattern migration ships:
    reviewing their shared spacing.
 2. Ask the human to accept the coded result or request changes. Record the
    acceptor, full reviewed commit, device/viewport and accepted surfaces in the
-   PR. Plan, target or sketch approval, silence, tests and AI review do not
+   PR. Keep template selection, coded-result acceptance and merge as separate
+   records; when provenance is missing or stale, report the gap and obtain
+   explicit acceptance at the reviewed code. Plan, target or sketch approval, silence, tests and AI review do not
    constitute acceptance of the running result.
 3. A material UI change after acceptance requires fresh captures and renewed
    acceptance. Until accepted, label the PR as awaiting visual acceptance;

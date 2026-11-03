@@ -5,7 +5,7 @@ Link CI runs / artifacts / prior threads — do not paste them.
 
 ## Objective
 
-<!-- 1-2 sentences: what changes and why. No history/background. -->
+<!-- 1-2 sentences: what changes and why. UI blocks: selected family/variant + production export/reference; derivatives name parent/delta. Selection/acceptance workflow: docs/specs/08-ux-delivery-standard.md. -->
 
 ## Tests
 
@@ -25,7 +25,8 @@ Product facts: <!-- **highlight** each id added, changed or decided (`set.eligib
 
 ## Review hard
 
-<!-- 2-4 spots that need real scrutiny, each with file:line. "Nothing risky — mechanical" is a valid answer. -->
+<!-- 2-4 spots that need real scrutiny, each with file:line. "Nothing risky — mechanical" is a valid answer.
+     Pattern migrations: link native running component/reference evidence, including paired list/table rows when relevant; name acceptor, full reviewed commit, devices/viewports and surfaces, or state awaiting visual acceptance. Tests/AI review and merge are not acceptance. -->
 
 -
 

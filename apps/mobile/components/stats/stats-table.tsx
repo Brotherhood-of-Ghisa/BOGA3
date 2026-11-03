@@ -104,6 +104,7 @@ export function StatsTableFamily({ name, testID, compact = false }: { name: stri
 }
 
 export const statsTableStyles = StyleSheet.create({
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.md, padding: uiSpace.md },
   // The name takes whatever the figure columns leave, and wraps.
   nameCell: { flex: 1, minWidth: 0 },
   headerCell: { minHeight: uiGeometry.tapTarget, flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
