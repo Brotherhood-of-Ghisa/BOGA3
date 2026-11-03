@@ -18,7 +18,7 @@ export function ProgressMuscleView(props: Props) {
   if (muscleLayout === 'list') return <ProgressTables {...props} />;
   const selected = muscles.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
-  const layout = resolveComparisonLayout(width, exercises, metric, false);
+  const layout = resolveComparisonLayout(width, exercises, metric, false, { compact: true });
   return <View style={styles.body}>
     <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedId} onSelect={onSelect} report={report} setTargets={props.setTargets} />
     {selected ? <StatsTable testID="stats-contributions">

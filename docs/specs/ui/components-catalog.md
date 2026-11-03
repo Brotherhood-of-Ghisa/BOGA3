@@ -88,8 +88,9 @@ and existing sheet/list densities are outside this adoption scope.
 
 Muscle list and single-muscle contributors reuse StatsTableRow on compact
 ListRow, with StatsTableName and StatsTableDisclosure owning their presentation.
-Comparison headers/values align with that compact rhythm; stacked history
-targets speak their figures. The Exercise table retains its existing density.
+Now / Prev / Δ headers reserve only the active sort arrow; nested contributors
+inherit them, while standalone contributors keep a passive header. Stacked
+history targets speak their figures. The Exercise table retains its existing density.
 For adoption guardrails and safe/failing examples, load
 `apps/mobile/scripts/table-pattern-guardrail.js` and
 `apps/mobile/__tests__/table-pattern-guardrail.test.ts`.

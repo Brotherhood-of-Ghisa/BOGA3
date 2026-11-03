@@ -236,19 +236,18 @@ presentation owns styling. For pattern selection and human acceptance, load
 
 ### Compact list/table rows
 
-Use `ListRow density="compact"`. Words use `body`/`bodyStrong`
-and numbers `figure`, on 20pt lines. Leading, content and value
-slots have `uiSpace.xs` vertical insets: passive single-line content takes
-nominally 28pt, two lines 48pt, excluding its `uiBorder.width` / `ruleSoft`
-separator; native font metrics round to device pixels.
-An independently interactive row or trailing control keeps `tapTarget` without
-another vertical inset around that target. A separate content action wraps
-inset text beside disclosure. Wrapped content grows;
-feature-sized figure columns retain full values. StatsTableRow shares
-this rhythm in Muscle lists and nested contributors; its name and disclosure
-remain separate targets. Compact comparison headers align with row slots, and
-stacked values add no second bottom inset. Sheet/list option densities and the
-Exercise table keep their recipes.
+Use `ListRow density="compact"`: ordinary names in `body`, selected/own names
+in `bodyStrong`, numbers in `figure`. Content slots have `uiSpace.xs` vertical
+insets. Passive one/two-line rows take nominally 28/48pt plus their
+`uiBorder.width` / `ruleSoft` separator; native font metrics round to pixels.
+Independent actions keep `tapTarget` without another inset around them.
+Content actions and disclosures remain separate; wrapped content grows and
+figures never shrink. StatsTableRow shares this foundation. Muscle tables use
+Now / Prev / Δ columns, spoken as Now / Previous / Change; only the active sort
+reserves an arrow. Numeric sort columns retain full targets. Nested contributors
+inherit the parent header; standalone contributors keep a passive header.
+Family headings use compact insets. Existing sheet/list option densities and
+the Exercise table keep their recipes.
 
 ### Headline summary tiles
 

@@ -96,7 +96,8 @@ export function ProgressTables(props: ProgressTablesProps) {
   const { width } = useWindowDimensions();
   const selected = rows.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
-  const layout = resolveComparisonLayout(width, [...rows, ...exercises], metric, true, true);
+  const activeSort = sortMode.slice(0, sortMode.lastIndexOf('-')) as 'name' | ComparisonColumnKey;
+  const layout = resolveComparisonLayout(width, [...rows, ...exercises], metric, true, { compact: true, activeSort });
   return <View testID="stats-muscle-table-container"><StatsTable testID="stats-muscle-table">
     <ComparisonHeaders compact layout={layout} metric={metric} testID="stats-muscle-table-header"
       name={<MuscleSortHeaderCell header="muscle" label="Muscle" metric={metric} mode={sortMode} onSort={onSort} />}
@@ -105,13 +106,13 @@ export function ProgressTables(props: ProgressTablesProps) {
     {rows.length === 0 ? <StatePanel fill={false} body="No muscles match the search query." testID="stats-muscle-list-empty" /> : null}
     {rows.map((row, index) => <Fragment key={row.muscleGroupId}>
       {grouped && familyHasHeader(row.familyName, familyCounts) && (index === 0 || rows[index - 1].familyName !== row.familyName) ?
-        <StatsTableFamily name={row.familyName} testID={`stats-family-header-${row.familyName.toLowerCase().replace(/\s+/g, '-')}`} /> : null}
+        <StatsTableFamily compact name={row.familyName} testID={`stats-family-header-${row.familyName.toLowerCase().replace(/\s+/g, '-')}`} /> : null}
       <View testID={`stats-muscle-block-${row.muscleGroupId}`}>
         <MuscleRow row={row} metric={metric} layout={layout} selected={row.muscleGroupId === selectedId}
           onSelect={onSelect} onHistory={onMuscleHistory} />
         {row.muscleGroupId === selectedId && selected ? <View
           testID="stats-contributions" style={styles.contributions}>
-          <ProgressContributionRows muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
+          <ProgressContributionRows header={false} muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
         </View> : null}
         {row.muscleGroupId === selectedId ? <View pointerEvents="none" style={styles.selected} /> : null}
       </View>
@@ -120,18 +121,18 @@ export function ProgressTables(props: ProgressTablesProps) {
 }
 
 // Both presentations keep one contribution-row and empty-state implementation.
-export function ProgressContributionRows({ muscle, metric, layout, onHistory, splitByEffort = false, axis = true }: {
+export function ProgressContributionRows({ muscle, metric, layout, onHistory, splitByEffort = false, axis = true, header = true }: {
   muscle: ProgressMuscleComparison; metric: ProgressTableMetric; layout: ComparisonLayout;
-  onHistory: ProgressTablesProps['onExerciseHistory']; splitByEffort?: boolean; axis?: boolean;
+  onHistory: ProgressTablesProps['onExerciseHistory']; splitByEffort?: boolean; axis?: boolean; header?: boolean;
 }) {
   const exercises = muscle.exercises.filter(row => hasComparisonMetric(row, metric));
   return <>
-    <Headers axis={axis} name="Exercise" layout={layout} metric={metric} testID="stats-contributions-header" />
+    {header ? <Headers axis={axis} name="Exercise" layout={layout} metric={metric} testID="stats-contributions-header" /> : null}
     {exercises.length === 0 ? <StatePanel fill={false} testID="stats-contributions-empty"
       body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${muscle.displayName} in either period`} /> : (splitByEffort ? (['primary', 'secondary'] as const).map(role => {
         const rows = exercises.filter(row => row.role === role);
         return rows.length > 0 ? <Fragment key={role}>
-          <StatsTableFamily name={role === 'primary' ? 'Primary effort' : 'Secondary effort'} />
+          <StatsTableFamily compact name={role === 'primary' ? 'Primary effort' : 'Secondary effort'} />
           {rows.map(row => <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout} onHistory={onHistory} axis={axis} hideRole />)}
         </Fragment> : null;
       }) : exercises.map(row =>
@@ -151,7 +152,7 @@ function MuscleSortHeaderCell({ header, label, metric, mode, onSort, width }: {
 }) {
   const key = header === 'muscle' ? 'name' : header;
   const named = header === 'muscle' ? 'Muscle' : `${COLUMN_NAMES[COLUMN_KEYS.indexOf(header)]}, ${metricUnit(metric)}`;
-  return <StatsTableSortHeader label={label} active={mode.startsWith(`${key}-`)} descending={mode.endsWith('-desc')}
+  return <StatsTableSortHeader compact label={label} active={mode.startsWith(`${key}-`)} descending={mode.endsWith('-desc')}
     description={named} currentSort={describeMuscleSort(mode)} nextSort={describeMuscleSort(nextMuscleSortMode(mode, header))}
     onPress={() => onSort?.(header)} testID={`stats-muscle-sort-${header}`} numeric={header !== 'muscle'}
     style={width === undefined ? statsTableStyles.nameCell : { width }} />;
@@ -180,7 +181,7 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
     trailing={<StatsTableDisclosure expanded={selected}
       accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
       onPress={() => onSelect(row.muscleGroupId)} testID={`stats-muscle-select-${row.muscleGroupId}`} />}>
-    <StatsTableName name={row.displayName} />
+    <StatsTableName name={row.displayName} selected={selected} />
     {layout.stacked ? values : null}
   </StatsTableRow>;
 }

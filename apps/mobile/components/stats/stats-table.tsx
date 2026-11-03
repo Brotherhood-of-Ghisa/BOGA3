@@ -44,8 +44,8 @@ export function StatsTableRow(props: WithoutDensity<ListRowProps>) {
 }
 
 /** Wrapping names and optional quiet role metadata; the row owns the content inset. */
-export function StatsTableName({ name, metadata }: { name: string; metadata?: string }) {
-  return <><Text allowFontScaling={false} style={uiText.bodyStrong}>{name}</Text>
+export function StatsTableName({ name, metadata, selected = false }: { name: string; metadata?: string; selected?: boolean }) {
+  return <><Text allowFontScaling={false} style={selected ? uiText.bodyStrong : uiText.body}>{name}</Text>
     {metadata ? <Text allowFontScaling={false} style={uiText.meta}>{metadata}</Text> : null}</>;
 }
 
@@ -79,9 +79,9 @@ export function StatsTableHeaderLabel({ label, active = false }: { label: string
 
 /** Shared sortable header; the caller names its ordering and next action. */
 export function StatsTableSortHeader({ label, active, descending, description, currentSort, nextSort, onPress,
-  testID, style, numeric = false, recent = false }: {
+  testID, style, numeric = false, recent = false, compact = false }: {
   label: string; active: boolean; descending: boolean; description: string; currentSort: string; nextSort: string;
-  onPress: () => void; testID: string; style?: StyleProp<ViewStyle>; numeric?: boolean; recent?: boolean;
+  onPress: () => void; testID: string; style?: StyleProp<ViewStyle>; numeric?: boolean; recent?: boolean; compact?: boolean;
 }) {
   const direction = active && !descending ? 'up' : 'down';
   return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
@@ -90,17 +90,17 @@ export function StatsTableSortHeader({ label, active, descending, description, c
     style={({ pressed }) => [statsTableStyles.headerCell, style,
       numeric && styles.numericSortHeader, pressed && styles.pressed]}>
     <StatsTableHeaderLabel active={active} label={label} />
-    <View accessible={false} testID={`${testID}-indicator`}
+    {active || !compact ? <View accessible={false} testID={`${testID}-indicator`}
       style={[styles.indicator, recent && styles.recency, !active && styles.hidden]}>
       {recent ? <StatsTableHeaderLabel label="Recent" /> : null}
       <Icon color={uiRoles.ink} name={direction === 'up' ? 'arrow-up' : 'arrow-down'} size="xs"
         testID={`${testID}-indicator-${direction}`} />
-    </View>
+    </View> : null}
   </Pressable>;
 }
 
-export function StatsTableFamily({ name, testID }: { name: string; testID?: string }) {
-  return <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.family]} testID={testID}>{name}</Text>;
+export function StatsTableFamily({ name, testID, compact = false }: { name: string; testID?: string; compact?: boolean }) {
+  return <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.family, compact && styles.compactFamily]} testID={testID}>{name}</Text>;
 }
 
 export const statsTableStyles = StyleSheet.create({
@@ -116,6 +116,7 @@ export const statsTableStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   compactHeader: { gap: uiSpace.sm },
+  compactFamily: { paddingTop: uiSpace.sm, paddingBottom: uiSpace.xs },
   disclosure: { width: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, alignItems: 'center', justifyContent: 'center' },
   numericSortHeader: { flexDirection: 'row-reverse', justifyContent: 'flex-start' },
   family: { paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,

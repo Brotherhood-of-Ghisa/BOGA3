@@ -1,6 +1,6 @@
 /**
  * Progress's tables, muscle views, filters and week list on the shared text
- * roles (`design-language.md` §3, "Text roles"): row names are `bodyStrong`,
+ * roles (`design-language.md` §3, "Text roles"): ordinary row names are `body`, the selected muscle `bodyStrong`,
  * headings `title`, headers and controls `label`; figures take `figure`, and a
  * word never takes Plex Mono, only the digits inside it do (`FigureText`).
  */
@@ -42,10 +42,11 @@ const tableProps = { muscles: [lats, { ...muscle('back_upper', 'Upper back', 2, 
   selectedId: 'back_lats', grouped: true, onSelect: jest.fn(), onMuscleHistory: jest.fn(), onExerciseHistory: jest.fn() };
 
 describe('Progress tables', () => {
-  it('names muscle and exercise rows in bodyStrong, not Archivo, and their role in meta', () => {
+  it('keeps selected muscle emphasis, ordinary body names and quiet role metadata', () => {
     render(<ProgressTables {...tableProps} />);
     expect(style(within(screen.getByTestId('stats-muscle-history-back_lats')).getByText('Lats'))).toMatchObject(BODY_STRONG);
-    expect(style(screen.getByText('Lat Pulldown'))).toMatchObject(BODY_STRONG);
+    expect(style(screen.getByText('Lat Pulldown'))).toMatchObject(BODY);
+    expect(style(screen.getByText('Upper back'))).toMatchObject(BODY);
     expect(style(screen.getByText('Primary'))).toMatchObject(META);
   });
 

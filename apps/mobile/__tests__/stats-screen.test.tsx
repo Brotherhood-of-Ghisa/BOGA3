@@ -1116,9 +1116,11 @@ it.each([['3d', 320], ['3d', 390], ['list', 320], ['list', 390]] as const)(
     const axis = muscleLayout === 'list';
     const header = screen.UNSAFE_getAllByType(ComparisonHeaders)
       .find(node => node.props.testID === 'stats-contributions-header')!;
-    expect(header.props.axis).toBe(axis);
-    expect(header.props.layout).toEqual(resolveComparisonLayout(width,
-      axis ? [muscle, ...muscle.exercises] : muscle.exercises, 'totalVolume', axis, axis));
+    if (axis) expect(header).toBeUndefined();
+    else {
+      expect(header.props.axis).toBe(false);
+      expect(header.props.layout).toEqual(resolveComparisonLayout(width, muscle.exercises, 'totalVolume', false, { compact: true }));
+    }
     const row = screen.UNSAFE_getAllByType(ListRow).find(node => node.props.testID === 'stats-contribution-bench')!;
     expect(row.props.trailing).toBe(axis ? null : undefined);
     expect(screen.getByTestId('stats-contribution-bench-now')).toHaveTextContent('188271603422374');
@@ -1146,7 +1148,7 @@ it.each([320, 430])('keeps full muscle figures and contribution columns at %ipt'
   expect(StyleSheet.flatten(tile.props.style)).toEqual(bounds);
   expect(screen.getByTestId('stats-contribution-bench-now')).toHaveTextContent('188271603422374');
   expect(screen.getByTestId('stats-contribution-bench-previous')).toHaveTextContent('6172839456170');
-  expect(StyleSheet.flatten((screen.getByTestId('stats-contributions-header').children[0] as ReactTestInstance).props.style)).toMatchObject({ flexDirection: 'column', alignItems: 'stretch' });
+  expect(screen.queryByTestId('stats-contributions-header')).toBeNull();
   expect(screen.getByTestId('stats-contribution-bench-values')).toHaveStyle({ flexDirection: 'row', justifyContent: 'flex-end' });
   for (const column of ['now', 'previous', 'change']) {
     expect(screen.getByTestId(`stats-contribution-bench-${column}`)).toHaveStyle(
@@ -1154,7 +1156,7 @@ it.each([320, 430])('keeps full muscle figures and contribution columns at %ipt'
   }
   expect(screen.getByTestId('stats-muscle-row-chest-previous')).toHaveStyle({ color: uiRoles.ink });
   expect(screen.getByRole('link', { name: 'Open Long exercise name history' })).toBeTruthy();
-  expect(within(screen.getByTestId('stats-contributions-header')).getByText('Change')).toBeTruthy();
+  expect(within(screen.getByTestId('stats-muscle-table-header')).getByText('Δ')).toBeTruthy();
   act(() => ReactNative.Dimensions.set({ window: dimensions }));
 });
 

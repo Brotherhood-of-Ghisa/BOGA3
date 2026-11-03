@@ -42,6 +42,7 @@ export type ComparisonRow = {
 // and the name fit one line on a small phone; the unit belongs to the spoken
 // label, never the header.
 export const COLUMN_LABELS = ['Now', 'Prev', 'Change'] as const;
+const COMPACT_COLUMN_LABELS = ['Now', 'Prev', 'Δ'] as const;
 export const COLUMN_NAMES = ['Now', 'Previous', 'Change'] as const;
 export const COLUMN_KEYS = ['now', 'previous', 'change'] as const;
 
@@ -141,15 +142,22 @@ export type ComparisonLayout = { columns: number[]; stacked: boolean };
  * active column's arrow never crowds the next column.
  */
 export const resolveComparisonLayout = (
-  width: number, rows: ComparisonRow[], metric: ComparisonMetric, axis = true, sortable = false,
+  width: number, rows: ComparisonRow[], metric: ComparisonMetric, axis = true,
+  sortable: boolean | { compact: true; activeSort?: 'name' | ComparisonColumnKey } = false,
 ): ComparisonLayout => {
   const rowContent = width - uiSpace.lg * 2 - uiBorder.width * 2 - uiSpace.md * 2;
   const gaps = uiSpace.sm * (COLUMN_LABELS.length - 1);
   const axisWidth = axis ? uiGeometry.tapTarget : 0;
-  const indicator = sortable ? uiIconSize.xs + uiSpace.xs : 0;
+  const compact = typeof sortable === 'object';
+  const labels = compact ? COMPACT_COLUMN_LABELS : COLUMN_LABELS;
   const cap = (rowContent - axisWidth - uiSpace.md - gaps) / COLUMN_LABELS.length;
-  const columns = COLUMN_LABELS.map((label, index) => Math.min(cap,
-    statsTableColumnWidth(label, rows.map(row => comparisonColumnTexts(row, metric)[index]), indicator)));
+  const columns = labels.map((label, index) => {
+    const active = compact ? sortable.activeSort === COLUMN_KEYS[index] : sortable;
+    const indicator = active ? uiIconSize.xs + uiSpace.xs : 0;
+    const minimum = compact ? uiGeometry.tapTarget : 0;
+    return Math.min(cap, Math.max(minimum,
+      statsTableColumnWidth(label, rows.map(row => comparisonColumnTexts(row, metric)[index]), indicator)));
+  });
   const nameRoom = rowContent - axisWidth - uiSpace.md * 2
     - columns.reduce((sum, value) => sum + value, 0) - gaps;
   return { columns, stacked: nameRoom < uiGeometry.tapTarget + uiSpace.xl };
@@ -169,21 +177,23 @@ export function ComparisonHeaders({ name, layout, metric, axis = true, testID, c
   name: ReactNode; layout: ComparisonLayout; metric: ComparisonMetric; axis?: boolean; testID: string; compact?: boolean;
   column?: (position: ComparisonColumnPosition, width: number) => ReactNode;
 }) {
-  const columns = <StatsTableFigures style={layout.stacked && styles.stackedFigures}>
-    {COLUMN_LABELS.map((label, index) => {
+  const passive = compact && !column;
+  const labels = compact ? COMPACT_COLUMN_LABELS : COLUMN_LABELS;
+  const columns = <StatsTableFigures style={[layout.stacked && styles.stackedFigures, compact && styles.compactFigures]}>
+    {labels.map((label, index) => {
       const width = layout.columns[index];
       const header = column
         ? column({ key: COLUMN_KEYS[index], label, name: COLUMN_NAMES[index], index }, width)
         : <View accessible accessibilityRole="header"
           accessibilityLabel={`${COLUMN_NAMES[index]}, ${metricUnit(metric)}`}
-          style={[statsTableStyles.headerCell, statsTableStyles.headerCellNumeric, { width }]}>
+          style={[statsTableStyles.headerCell, passive && styles.passiveHeaderCell, statsTableStyles.headerCellNumeric, { width }]}>
           <StatsTableHeaderLabel label={label} />
         </View>;
       return <Fragment key={label}>{header}</Fragment>;
     })}
   </StatsTableFigures>;
   return <StatsTableHeader testID={testID} compact={compact}>
-    <View style={[statsTableStyles.headerCell, statsTableStyles.nameCell, layout.stacked && styles.stackedName]}>
+    <View style={[statsTableStyles.headerCell, passive && styles.passiveHeaderCell, statsTableStyles.nameCell, layout.stacked && styles.stackedName]}>
       {name}
       {layout.stacked ? columns : null}
     </View>
@@ -232,6 +242,7 @@ function ComparisonCell({ text, width, colour, testID }: {
 
 const styles = StyleSheet.create({
   compactFigures: { paddingBottom: 0 },
+  passiveHeaderCell: { minHeight: 0, paddingVertical: uiSpace.xs },
   axis: { width: uiGeometry.tapTarget },
   stackedName: { flexDirection: 'column', alignItems: 'stretch' },
   stackedValues: { justifyContent: 'flex-end' },

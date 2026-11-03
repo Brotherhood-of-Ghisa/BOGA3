@@ -101,3 +101,21 @@ parent/delta selection rather than silently changing the first migration.
 Production migrations still require their own coded-result review and acceptance
 at the reviewed commit. The approved template selection is carried forward; only
 a material deviation or new derivative needs a new template decision.
+
+
+## Selected table compression derivative (2026-11-03)
+
+After inspecting the first coded table migration, the operator requested three
+compression proposals and selected “Image 2”: the compact three-column table
+shown as Proposal 2. The selected image is retained with PR evidence under the
+gitignored table-migration artifacts; it is a new build input for the table
+only. Existing screen controls/navigation and repository tokens remain owners.
+
+- Keep Now, Prev and Δ in true columns, with Change retained in spoken labels.
+- Reserve an arrow only for the active sort, retaining direct header sorting
+  and 44pt numeric targets. Wide figures still wrap/stack without shrinking.
+- Ordinary names use body; selected muscle uses bodyStrong. Role metadata stays.
+- Remove the repeated nested contributor header. Standalone contributors retain
+  one compact passive column header. Family headings use compact insets.
+- New coded-result acceptance remains pending; the earlier green commit is the
+  before reference. No merge or downstream-task authorization is implied.
