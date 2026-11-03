@@ -14,7 +14,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AppState, ScrollView, StyleSheet, type AppStateStatus } from 'react-native';
-import Svg from 'react-native-svg';
+import Svg, { TSpan } from 'react-native-svg';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -100,6 +100,8 @@ const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
 };
 
 const text = (testID: string) => screen.getByTestId(testID);
+// Passive SVG drawings are hidden: the adjustable chart speaks for them.
+const drawing = (testID: string) => screen.getByTestId(testID, { includeHiddenElements: true });
 // The session table's rows: hidden from assistive tech, since the summary's button speaks for them.
 const rowText = (testID: string) => screen.getByTestId(testID, { includeHiddenElements: true });
 
@@ -185,22 +187,39 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 9.375 t');
     expect(text('today-progress-period-difference')).toHaveTextContent('new');
     expect(text('today-progress-chart')).toHaveProp('accessibilityLabel', expect.stringContaining('On course for 21.875 tonnes.'));
+    const annotations = () => ['compact', 'saloon', 'van', 'wagon'].map(id => drawing(`today-tonnage-line-${id}`).props.y1);
+    const positions = annotations();
+    expect(drawing('today-tonnage-references')).toHaveProp('pointerEvents', 'none');
+    for (const [id, label] of [['compact', '≈1 t'], ['saloon', '≈2 t'], ['van', '≈2.5 t'], ['wagon', '≈20 t']]) {
+      expect(within(drawing(`today-tonnage-label-${id}`)).UNSAFE_getByType(TSpan).props.children).toBe(label);
+      expect(drawing(`today-tonnage-icon-${id}`)).toBeTruthy();
+      expect(drawing(`today-tonnage-label-${id}`).props.accessibilityLabel).toBeUndefined();
+      expect(screen.queryByTestId(`today-tonnage-label-${id}`)).toBeNull();
+    }
+    expect(text('today-progress-chart').props.accessibilityLabel).toContain('empty freight wagon, approximately 20 tonnes.');
     expect(text('today-progress-week-sessions-value')).toHaveTextContent('1');
     expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
 
     fireEvent(text('today-progress-chart'), 'responderRelease', { nativeEvent: { locationX: 318 } });
     expect(text('today-progress-period-working-sets')).toHaveTextContent('1 Nov 26 21.875 t');
     expect(text('today-progress-period-difference')).toHaveTextContent('+611%');
+    expect(annotations()).toEqual(positions);
+    fireEvent(text('today-progress-chart'), 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+    expect(annotations()).toEqual(positions);
+    fireEvent(text('today-progress-chart'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     fireEvent.press(weeklyToggle());
     expect(weeklyToggle()).toHaveTextContent(/Sets/);
     expect(text('today-progress-week-working-sets-value')).toHaveTextContent('6');
     expect(text('today-progress-period-working-sets')).toHaveTextContent('1 Nov 26 42 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('+36');
+    expect(screen.queryByTestId('today-tonnage-label-wagon', { includeHiddenElements: true })).toBeNull();
+    expect(text('today-progress-chart').props.accessibilityLabel).not.toContain('freight wagon');
     fireEvent.press(text('today-progress-period-compare-older'));
     await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('10 Aug – 6 Sep 26'));
     fireEvent.press(weeklyToggle());
     expect(text('today-progress-period-day')).toHaveTextContent('1 Nov 26');
     expect(text('today-progress-period-previous-range')).toHaveTextContent('10 Aug – 6 Sep 26');
+    expect(within(drawing('today-tonnage-label-wagon')).UNSAFE_getByType(TSpan).props.children).toBe('≈20 t');
     expect(text('today-progress-week-working-sets-previous')).toHaveTextContent('vs 6.15');
     view.unmount();
     await renderToday();
@@ -234,6 +253,7 @@ describe('Today: the Progress card over real data', () => {
     act(() => updatePreferences({ volumeEfforts: [] }));
     await waitFor(() => expect(text('today-progress-week-working-sets-value')).toHaveTextContent('0'));
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 0 t');
+    expect(screen.queryByTestId('today-tonnage-line-compact', { includeHiddenElements: true })).toBeNull();
     expect(text('today-progress-period-difference')).toHaveTextContent('—');
     expect(text('today-progress-week-sessions-value')).toHaveTextContent('1');
   });
@@ -282,8 +302,8 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-working-sets')).toHaveTextContent('7 Oct 26 6 sets');
     expect(text('today-progress-period-previous-sets')).toHaveTextContent('0 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('+6');
-    expect(text('today-progress-chart-selection')).toBeTruthy();
-    expect(text('today-progress-chart-today')).toBeTruthy();
+    expect(drawing('today-progress-chart-selection')).toBeTruthy();
+    expect(drawing('today-progress-chart-today')).toBeTruthy();
 
     // Sunday, day 14: 18 sets over 12 days projects 21; the previous period had 20 Sep's 6.
     // A projected day shows as its date alone; only the spoken value says it is projected.
@@ -301,8 +321,8 @@ describe('Today: the Progress card over real data', () => {
     expect(chart).toHaveProp('accessibilityValue', { text: '19 Oct 26 (projected): 23 sets, last period 6' });
     touchDay(11);
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 18 sets');
-    expect(screen.queryByTestId('today-progress-chart-selection')).toBeNull();
-    expect(screen.queryByTestId('today-progress-chart-today')).toBeNull();
+    expect(screen.queryByTestId('today-progress-chart-selection', { includeHiddenElements: true })).toBeNull();
+    expect(screen.queryByTestId('today-progress-chart-today', { includeHiddenElements: true })).toBeNull();
   });
 
   it("takes the period from Settings' Progress period and reads again when it changes", async () => {

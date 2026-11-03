@@ -31,6 +31,11 @@ import {
 import type { LatestSessionSummary, ProgressCounts, SessionPersonalRecord, TodayProgressPeriod } from '@/src/progress-summary';
 import { localPeriodWindow, localWeekWindow } from '@/src/utils/local-calendar';
 import { formatDayMonth } from '@/src/utils/local-time';
+import {
+  TONNAGE_REFERENCES, REFERENCE_HEIGHT, REFERENCE_GAP, REFERENCE_STROKE,
+  eligibleTonnageReferences, fitTonnageMaximum,
+} from '@/components/today/tonnage-references';
+import { uiSpace } from '@/components/ui/tokens';
 
 const local = (year: number, month: number, day: number, hour = 0, minute = 0) =>
   new Date(year, month - 1, day, hour, minute);
@@ -408,4 +413,115 @@ describe('tonnage pace', () => {
       expect(periodPaceDelta(periodDayFigures(input, null, 'totalVolume')).text).toBe(expected);
     },
   );
+});
+
+describe('tonnage vehicle references', () => {
+  const now = local(2026, 10, 23);
+  const input = (actual: number | null, projected: number | null = actual, previous = 0) => {
+    const result = period({ now, cumulative: days(19, () => 20) });
+    result.toDate.volumeKgReps = actual;
+    result.cumulativeVolumeKgReps = [0, ...Array(18).fill(actual)];
+    result.projectedVolumeKgReps = projected;
+    result.previous.total.volumeKgReps = previous;
+    result.previous.cumulativeVolumeKgReps = days(28, () => previous);
+    return result;
+  };
+  const chart = (data: TodayProgressPeriod, width = 326, height = 126, day: number | null = null) =>
+    periodChartGeometry(data, width, height, periodDayFigures(data, day, 'totalVolume'));
+  const thresholds = (data: TodayProgressPeriod) => chart(data).references.map(reference => reference.value);
+
+  it.each(TONNAGE_REFERENCES.map(reference => [reference.value]))('compares raw values at the %s boundary', threshold => {
+    const lower = TONNAGE_REFERENCES.filter(reference => reference.value < threshold).map(reference => reference.value);
+    // Whole-kg display rounds to the threshold before the actual reaches it.
+    expect(formatTonnes(threshold - 0.1)).toBe(String(threshold / 1000));
+    expect(thresholds(input(threshold - 0.1))).toEqual(lower);
+    expect(thresholds(input(threshold))).toEqual([...lower, threshold]);
+    expect(thresholds(input(threshold + 0.1))).toEqual([...lower, threshold]);
+    expect(thresholds(input(0, threshold))).toEqual([...lower, threshold]);
+  });
+
+  it('uses every known current value, regardless of a lower/missing projection or larger comparison', () => {
+    expect(thresholds(input(1200, 4200))).toEqual([1000, 2000, 2500]);
+    expect(thresholds(input(2500, 100))).toEqual([1000, 2000, 2500]);
+    expect(thresholds(input(2500, null))).toEqual([1000, 2000, 2500]);
+    expect(thresholds(input(19999, null))).toEqual([1000, 2000, 2500]);
+    expect(thresholds(input(900, 900, 30000))).toEqual([]);
+    expect(thresholds(input(null, null, 30000))).toEqual([]);
+    expect(thresholds(input(0))).toEqual([]);
+    expect(thresholds(input(null, 2500))).toEqual([1000, 2000, 2500]);
+    const incomplete = input(null, Number.POSITIVE_INFINITY, 30000);
+    incomplete.cumulativeVolumeKgReps = [Number.NaN, 2000, null, Number.NEGATIVE_INFINITY];
+    incomplete.previous.cumulativeVolumeKgReps[0] = Number.NaN;
+    const geometry = chart(incomplete);
+    expect(geometry.references.map(reference => reference.value)).toEqual([1000, 2000]);
+    expect(geometry.current).toHaveLength(1);
+    expect(geometry.today.current).toBeNull();
+    expect(geometry.projection).toBeNull();
+    expect(geometry.previous.every(point => Number.isFinite(point.y))).toBe(true);
+    expect(eligibleTonnageReferences({ cumulative: [NaN, Infinity, null], toDate: null, projected: null })).toEqual([]);
+  });
+
+  it('adds exactly the missing top clearance, idempotently, without unlocking the next vehicle', () => {
+    const plot = { top: 6, bottom: 66 };
+    const references = TONNAGE_REFERENCES.slice(0, 2);
+    const fitted = fitTonnageMaximum(2000, references, plot);
+    const room = REFERENCE_HEIGHT + REFERENCE_GAP + REFERENCE_STROKE / 2 + uiSpace.xs;
+    expect(fitted).toBeCloseTo(2000 / (1 - room / 60));
+    expect(fitted).toBeGreaterThan(2500);
+    expect(fitTonnageMaximum(fitted, references, plot)).toBe(fitted);
+    const geometry = chart(input(2000), 326, 72);
+    expect(geometry.references.map(reference => reference.value)).toEqual([1000, 2000]);
+    expect(geometry.references[1].top).toBeCloseTo(plot.top + uiSpace.xs);
+    expect(geometry.current[18].y).toBeCloseTo(geometry.references[1].y);
+    expect(geometry.projection?.to.y).toBeCloseTo(geometry.references[1].y);
+    expect(geometry.current[0].y).toBe(plot.bottom);
+    const alreadyFits = chart(input(2000, 8000));
+    expect(alreadyFits.projection?.to.y).toBe(alreadyFits.plot.top);
+    expect(fitTonnageMaximum(8000, references, plot)).toBe(8000);
+    expect(fitTonnageMaximum(8000, [], plot)).toBe(8000);
+    expect(fitTonnageMaximum(2000, references, { top: 6, bottom: 6 })).toBe(2000);
+  });
+
+  it.each([72, 126, 240])('fits every annotation on short and tall charts (%spt) through 136 tonnes', height => {
+    for (const width of [240, 287, 326, 390]) {
+      for (const reach of [1000, 2000, 2500, 20000, 136000]) {
+        const geometry = chart(input(reach), width, height);
+        expect(geometry.references).toHaveLength(reach >= 20000 ? 4 : reach >= 2500 ? 3 : reach >= 2000 ? 2 : 1);
+        for (const [index, reference] of geometry.references.entries()) {
+          expect(reference.x).toBeGreaterThanOrEqual(0);
+          expect(reference.x + reference.width).toBeLessThanOrEqual(geometry.plot.width);
+          expect(reference.top).toBeGreaterThanOrEqual(0);
+          expect(reference.top + REFERENCE_HEIGHT).toBeLessThanOrEqual(height);
+          expect(Number.isFinite(reference.y)).toBe(true);
+          expect(reference.y).toBeGreaterThanOrEqual(geometry.plot.top);
+          expect(reference.y).toBeLessThanOrEqual(geometry.plot.bottom);
+          // Every reference is on the same linear mapping as the actual value.
+          const yAtReach = geometry.current[18].y;
+          expect(reference.y).toBeCloseTo(geometry.plot.bottom - reference.value / reach * (geometry.plot.bottom - yAtReach));
+          for (const other of geometry.references.slice(index + 1)) {
+            const separate = reference.x + reference.width <= other.x || other.x + other.width <= reference.x
+              || reference.top + REFERENCE_HEIGHT <= other.top || other.top + REFERENCE_HEIGHT <= reference.top;
+            expect({ width, height, reach, reference, other, separate }).toMatchObject({ separate: true });
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps scale and membership through scrubbing and changes only scale when stepping comparison', () => {
+    const data = input(1200, 4200);
+    const today = chart(data);
+    for (const day of [0, 18, 27]) {
+      const selected = chart(data, 326, 126, day);
+      expect(selected.references).toEqual(today.references);
+      expect(selected.current).toEqual(today.current);
+      expect(selected.previous).toEqual(today.previous);
+      expect(selected.projection).toEqual(today.projection);
+    }
+    const compared = chart(input(1200, 4200, 30000));
+    expect(compared.references.map(reference => reference.value)).toEqual([1000, 2000, 2500]);
+    expect(compared.references[0].y).toBeGreaterThan(today.references[0].y);
+    expect(periodChartGeometry(data, 326).references).toEqual([]);
+    expect(periodChartGeometry(data, 326).current[18].y).toBe(6);
+  });
 });

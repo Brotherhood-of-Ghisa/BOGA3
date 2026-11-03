@@ -28,6 +28,10 @@ import {
   formatDateRange,
   formatMonthDayTime,
 } from '@/src/utils/local-time';
+import {
+  eligibleTonnageReferences, finiteMaximum, fitTonnageMaximum, layoutTonnageReferences,
+  type TonnageAnnotation,
+} from './tonnage-references';
 
 /** A window of whole weeks (a week, a period) as its Monday–Sunday range, in the selected date format. */
 export const formatWeekRange = (window: LocalWindow, dateFormat: ExerciseDateFormat): string => {
@@ -184,6 +188,7 @@ export const periodChartAccessibilityLabel = (period: TodayProgressPeriod, metri
     `against the ${comparedPeriodName(period)} ${value(series.previous.toSameDay)} by day ${period.dayOfPeriod};`,
     `the ${comparedPeriodName(period)} finished at ${value(series.previous.total)}.`,
     `On course for ${value(series.projected)}.`,
+    ...(metric === 'totalVolume' ? eligibleTonnageReferences(series).map(reference => reference.spoken + '.') : []),
   ].join(' ');
 };
 
@@ -260,6 +265,7 @@ export type PeriodChartGeometry = {
   selected: { x: number; current: ChartPoint | null; previous: ChartPoint | null; projected: boolean };
   /** Where each week after the first starts. */
   weekStartsX: number[];
+  references: TonnageAnnotation[];
 };
 
 // Room on the right for the dots at the lines' ends.
@@ -271,8 +277,9 @@ export const CHART_AXIS_ROOM = 6;
 
 /**
  * Day of the period on x (the first day at 0, the last at the plot's edge)
- * and cumulative working sets on y, scaled to the highest of the projection,
- * the previous period's total and today's figure.
+ * and cumulative figures on y. Tonnage uses the data's scale, then fits the
+ * eligible vehicle annotations ([[comparison.tonnage-references]]); every
+ * series and reference shares that scale.
  */
 export const periodChartGeometry = (
   period: TodayProgressPeriod,
@@ -284,12 +291,16 @@ export const periodChartGeometry = (
   const plotBottom = Math.max(PLOT_TOP, height - CHART_AXIS_ROOM);
   const days = period.daysInPeriod;
   const series = periodMetricSeries(period, selected.metric);
-  const yMax = Math.max(1, series.projected ?? 0, series.previous.total ?? 0, series.toDate ?? 0,
-    ...series.cumulative.map(value => value ?? 0), ...series.previous.cumulative.map(value => value ?? 0));
+  const plot = { width: plotWidth, top: PLOT_TOP, bottom: plotBottom };
+  const baseMaximum = Math.max(1, finiteMaximum([
+    series.projected, series.previous.total, series.toDate, ...series.cumulative, ...series.previous.cumulative,
+  ]));
+  const references = selected.metric === 'totalVolume' ? eligibleTonnageReferences(series) : [];
+  const yMax = fitTonnageMaximum(baseMaximum, references, plot);
   const x = (dayIndex: number) => (days > 1 ? (dayIndex / (days - 1)) * plotWidth : 0);
   const y = (value: number) => PLOT_TOP + (1 - value / yMax) * (plotBottom - PLOT_TOP);
   const point = (day: number, value: number | null): ChartPoint | null =>
-    value === null ? null : { x: x(day), y: y(value) };
+    value === null || !Number.isFinite(value) ? null : { x: x(day), y: y(value) };
   const toPoints = (values: (number | null)[]) => values.flatMap((value, day) => {
     const known = point(day, value);
     return known ? [known] : [];
@@ -302,7 +313,8 @@ export const periodChartGeometry = (
   const projected = point(days - 1, series.projected);
 
   return {
-    plot: { width: plotWidth, top: PLOT_TOP, bottom: plotBottom },
+    plot,
+    references: layoutTonnageReferences(references, plot, yMax),
     current,
     previous,
     projection: todayCurrent && projected ? { from: todayCurrent, to: projected } : null,
