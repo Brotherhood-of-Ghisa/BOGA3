@@ -14,7 +14,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AppState, ScrollView, StyleSheet, type AppStateStatus } from 'react-native';
-import Svg, { TSpan } from 'react-native-svg';
+import Svg, { Line, Rect, TSpan } from 'react-native-svg';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -28,6 +28,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import { ShareBar } from '@/components/today';
+import { CHART_RIGHT_GUTTER } from '@/components/today/progress-format';
 import { Storage } from 'expo-sqlite/kv-store';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
@@ -187,10 +188,10 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 9.375 t');
     expect(text('today-progress-period-difference')).toHaveTextContent('new');
     expect(text('today-progress-chart')).toHaveProp('accessibilityLabel', expect.stringContaining('On course for 21.875 tonnes.'));
-    const annotations = () => ['saloon', 'elephant', 'wagon'].map(id => drawing(`today-tonnage-line-${id}`).props.y1);
+    const annotations = () => ['elephant', 'wagon'].map(id => drawing(`today-tonnage-line-${id}`).props.y1);
     const positions = annotations();
     expect(drawing('today-tonnage-references')).toHaveProp('pointerEvents', 'none');
-    for (const [id, label] of [['saloon', '≈2 t'], ['elephant', '≈6 t'], ['wagon', '≈20 t']]) {
+    for (const [id, label] of [['elephant', '≈6 t'], ['wagon', '≈20 t']]) {
       expect(within(drawing(`today-tonnage-label-${id}`)).UNSAFE_getByType(TSpan).props.children).toBe(label);
       expect(drawing(`today-tonnage-icon-${id}`)).toBeTruthy();
       expect(drawing(`today-tonnage-label-${id}`).props.accessibilityLabel).toBeUndefined();
@@ -200,7 +201,8 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-chart').props.accessibilityLabel).toContain('African elephant, approximately 6 tonnes.');
     expect(screen.queryByTestId('today-tonnage-label-van', { includeHiddenElements: true })).toBeNull();
     expect(screen.queryByTestId('today-tonnage-line-compact', { includeHiddenElements: true })).toBeNull();
-    expect(text('today-progress-chart').props.accessibilityLabel).not.toContain('small car');
+    expect(screen.queryByTestId('today-tonnage-icon-saloon', { includeHiddenElements: true })).toBeNull();
+    expect(text('today-progress-chart').props.accessibilityLabel).not.toContain('car');
     expect(text('today-progress-week-sessions-value')).toHaveTextContent('1');
     expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
 
@@ -230,6 +232,38 @@ describe('Today: the Progress card over real data', () => {
     expect(weeklyToggle()).toHaveTextContent(/Tons/);
     expect(chartUnits()).toHaveTextContent(/ t/);
     expect(screen.queryByTestId('today-progress-period-metric-toggle')).toBeNull();
+  });
+
+  it('renders and speaks separate whale and ferry lines from real logged volume', async () => {
+    await bootLocalApp();
+    await logSession('high-volume', local(2026, 10, 15, 9), 2300);
+    await renderToday();
+    fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
+    expect(text('today-progress-chart')).toHaveStyle({ minHeight: 120 });
+    fireEvent(text('today-progress-chart'), 'layout', { nativeEvent: { layout: { width: 311, height: 120 } } });
+    const y = [];
+    for (const [id, label, spoken] of [
+      ['humpback', '≈40 t', 'humpback whale, approximately 40 tonnes.'],
+      ['fin-whale', '≈60 t', 'fin whale, approximately 60 tonnes.'],
+      ['ferry', '≈80 t', 'small passenger ferry, approximately 80 tonnes.'],
+    ]) {
+      expect(within(drawing(`today-tonnage-label-${id}`)).UNSAFE_getByType(TSpan).props.children).toBe(label);
+      expect(drawing(`today-tonnage-icon-${id}`)).toBeTruthy();
+      y.push(drawing(`today-tonnage-line-${id}`).props.y1);
+      expect(text('today-progress-chart').props.accessibilityLabel).toContain(spoken);
+      expect(screen.queryByTestId(`today-tonnage-icon-${id}`)).toBeNull();
+    }
+    expect(new Set(y).size).toBe(3);
+    for (const id of ['elephant', 'wagon', 'humpback', 'fin-whale', 'ferry']) {
+      const ground = screen.UNSAFE_getAllByType(Rect).find(node => node.props.testID === `today-tonnage-ground-${id}`)!;
+      expect(ground.props.fill).toBe(uiRoles.surface);
+      expect(ground.props.x + ground.props.width).toBeCloseTo(311 - CHART_RIGHT_GUTTER - uiSpace.xs);
+      const leader = screen.UNSAFE_getAllByType(Line).find(node => node.props.testID === `today-tonnage-leader-${id}`);
+      if (leader) expect(leader.props.x1).toBeLessThan(ground.props.x);
+    }
+    fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
+    expect(screen.queryByTestId('today-tonnage-icon-humpback', { includeHiddenElements: true })).toBeNull();
+    expect(text('today-progress-chart').props.accessibilityLabel).not.toContain('whale');
   });
 
   it('keeps both sections on the durable metric after a failed save and retries together', async () => {

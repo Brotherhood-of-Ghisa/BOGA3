@@ -33,6 +33,7 @@ import {
 } from './progress-format';
 import { StepAround } from './step-arrows';
 import { TonnageReferenceLayer } from './tonnage-reference-layer';
+import { REFERENCE_GAP, REFERENCE_HEIGHT } from './tonnage-references';
 import type { ProgressMetric } from '@/src/preferences/model';
 
 // Until the first layout pass reports the card's width (and in Jest, where
@@ -55,7 +56,6 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
       ))}
       {today.current ? <Line stroke={uiRoles.ruleSoft} strokeWidth={1} x1={today.current.x} x2={today.current.x} y1={plot.top} y2={plot.bottom} /> : null}
       {area.length ? <Polygon fill={uiRoles.viz0} points={toPolyline(area)} /> : null}
-      <TonnageReferenceLayer annotations={geometry.references} width={plot.width} />
       <Polyline
         fill="none"
         points={toPolyline(previous)}
@@ -85,9 +85,6 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
         strokeWidth={2}
         testID="today-progress-chart-current"
       />
-      {!today.current || selected.x === today.current.x ? null : (
-        <Circle cx={today.current.x} cy={today.current.y} fill={uiRoles.ink} r={2.5} testID="today-progress-chart-today" />
-      )}
       {selected.x === today.current?.x ? null : (
         <Line
           stroke={uiRoles.inkFaint}
@@ -98,6 +95,10 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
           y1={plot.top}
           y2={plot.bottom}
         />
+      )}
+      <TonnageReferenceLayer annotations={geometry.references} width={plot.width} />
+      {!today.current || selected.x === today.current.x ? null : (
+        <Circle cx={today.current.x} cy={today.current.y} fill={uiRoles.ink} r={2.5} testID="today-progress-chart-today" />
       )}
       {selected.previous ? <Circle cx={selected.previous.x} cy={selected.previous.y} fill={uiRoles.surface} r={3.5} stroke={uiRoles.inkFaint} strokeWidth={2} /> : null}
       {/* A projected day is hollow: the projection's figure, not a count. */}
@@ -121,7 +122,7 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
 // period, never later than the previous one. The chart takes the height the
 // block is given.
 // Tons adds the references of [[comparison.tonnage-references]]; their quiet
-// passive layer sits behind the interactive series.
+// passive labels stay legible over the series; selection markers stay above.
 export function PeriodPace({
   period,
   onShowCompared,
@@ -140,6 +141,8 @@ export function PeriodPace({
   const figures = periodDayFigures(period, selection?.periodKey === periodKey ? selection.dayIndex : null, metric);
   const { width, height } = size;
   const geometry = periodChartGeometry(period, width, height, figures);
+  // Leave a right-hand column for every annotation, even on a short phone.
+  const referenceMinimumHeight = (geometry.references.length + 1) * (REFERENCE_HEIGHT + REFERENCE_GAP);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const measuredWidth = Math.round(event.nativeEvent.layout.width);
@@ -247,7 +250,9 @@ export function PeriodPace({
         onLayout={onLayout}
         onResponderRelease={onTouch}
         onStartShouldSetResponder={() => true}
-        style={styles.fillChart}
+        style={[styles.fillChart, geometry.references.length > 0 && {
+          minHeight: Math.max(MIN_FILL_CHART_HEIGHT, referenceMinimumHeight),
+        }]}
         testID="today-progress-chart">
         {/* The drawing sits over the box rather than in it, so the last
             measured height never props the box up: the box takes only the
