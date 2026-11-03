@@ -1,19 +1,21 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { ModeSection } from '@/components/appearance/appearance-mode';
 import { BackgroundSection, TextSection } from '@/components/appearance/appearance-neutrals';
 import {
   appearanceLabel,
   appearanceSummary,
   appearanceRoles,
   pendingAppearance,
+  previewMode,
   useStoredAppearance,
 } from '@/components/appearance/chosen-theme';
 import { ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
 import { SubPage } from '@/components/settings/sub-page';
 import { ChoiceRow, FormSection, Notice, RadioRow, uiBorder, uiGeometry, uiSpace, uiText, uiTextTone } from '@/components/ui';
-import { generateRoles } from '@/components/ui/theme';
+import { generateRoles, type ThemeMode } from '@/components/ui/theme';
 import { hueName, parseHueThemeId } from '@/components/ui/theme-hue';
 import {
   DEFAULT_THEME_PRESET_ID,
@@ -47,10 +49,10 @@ export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }
   );
 }
 
-// Settings → Appearance: a live preview of the choice, then Theme (the presets
-// as radio rows, then Custom colour, which opens the hue picker), Background
-// and Text. Each choice is saved at once and labelled `Next launch` until the
-// app reopens.
+// Settings → Appearance: a live preview of the choice, then Mode, Theme (the
+// presets as radio rows, then Custom colour, which opens the hue picker),
+// Background and Text. Each choice is saved at once and labelled `Next launch`
+// until the app reopens.
 export function AppearanceSettingsScreen() {
   const router = useRouter();
   const { appearance, saveError, commit } = useAppearanceCommit();
@@ -60,6 +62,7 @@ export function AppearanceSettingsScreen() {
   return (
     <SubPage testID="settings-appearance-screen">
       <PreviewBlock appearance={appearance} />
+      <ModeSection appearance={appearance} commit={commit} pending={pending} />
       <FormSection title="Theme">
         {themePresets.map((preset, index) => {
           const checked = preset.id === appearance.accent;
@@ -71,7 +74,7 @@ export function AppearanceSettingsScreen() {
               divider={index > 0}
               key={preset.id}
               label={preset.label}
-              meta={<PresetMeta details={detail} preset={preset} />}
+              meta={<PresetMeta details={detail} mode={previewMode(appearance.mode)} preset={preset} />}
               onPress={() => {
                 void commit(
                   { accent: preset.id },
@@ -122,17 +125,21 @@ function presetDetails(id: ThemePresetId, checked: boolean, pending: boolean): s
   ];
 }
 
-// A preset as its own colours: `ink`, `accent`, `record` and the ramp's third
-// step on its `paper`. These are another theme's values, so they cannot be
-// roles of this one.
+// A preset as its own colours in a mode: `ink`, `accent`, `record` and the
+// ramp's third step on its `paper`. These are another theme's values, so they
+// cannot be roles of this one.
+function presetSwatchColours(preset: ThemePreset, mode: ThemeMode) {
+  const roles = generateRoles(preset.seeds, mode);
+  return { ground: roles.paper, border: roles.rule, marks: [roles.ink, roles.accent, roles.record, roles.viz3] };
+}
+
 const swatchColours = new Map(
-  themePresets.map((preset) => {
-    const roles = generateRoles(preset.seeds);
-    return [preset.id, { ground: roles.paper, border: roles.rule, marks: [roles.ink, roles.accent, roles.record, roles.viz3] }];
-  }),
+  (['light', 'dark'] as const).flatMap((mode) =>
+    themePresets.map((preset) => [`${mode}:${preset.id}`, presetSwatchColours(preset, mode)] as const),
+  ),
 );
 
-function PresetMeta({ details, preset }: { details: string[]; preset: ThemePreset }) {
+function PresetMeta({ details, mode, preset }: { details: string[]; mode: ThemeMode; preset: ThemePreset }) {
   return (
     <View style={styles.meta}>
       {details.length > 0 ? (
@@ -140,13 +147,13 @@ function PresetMeta({ details, preset }: { details: string[]; preset: ThemePrese
           {details.join(' · ')}
         </Text>
       ) : null}
-      <PresetSwatch preset={preset} />
+      <PresetSwatch mode={mode} preset={preset} />
     </View>
   );
 }
 
-function PresetSwatch({ preset }: { preset: ThemePreset }) {
-  const colours = swatchColours.get(preset.id)!;
+function PresetSwatch({ mode, preset }: { mode: ThemeMode; preset: ThemePreset }) {
+  const colours = swatchColours.get(`${mode}:${preset.id}`)!;
   return (
     <View
       importantForAccessibility="no-hide-descendants"

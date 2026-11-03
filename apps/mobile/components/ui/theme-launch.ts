@@ -1,8 +1,11 @@
 import { Storage } from 'expo-sqlite/kv-store';
+import { Appearance, type ColorSchemeName } from 'react-native';
 
+import type { ThemeMode } from '@/components/ui/theme';
 import type { HueThemeId } from '@/components/ui/theme-hue';
 import {
   defaultTheme,
+  type AppearanceMode,
   resolveAppearance,
   resolveThemePreset,
   type AppearanceChoice,
@@ -44,6 +47,36 @@ export function readLaunchTheme(): ResolvedTheme {
 
 // The theme this launch is drawn in. Never changes while the app runs.
 export const launchTheme: ResolvedTheme = readLaunchTheme();
+
+// The ladder a stored mode draws on: `system` takes the OS's mode, and light
+// when the OS states none.
+export function resolveMode(mode: AppearanceMode, osScheme: ColorSchemeName | null | undefined): ThemeMode {
+  if (mode !== 'system') return mode;
+  return osScheme === 'dark' ? 'dark' : 'light';
+}
+
+// Reads the OS's mode, then pins the app's native UI (alerts, the date picker,
+// the keyboard, the status bar's default) to the resolved mode until the app
+// is next launched, so an OS change while the app runs never mixes modes. The
+// read must come first: once pinned, the OS reports the pin.
+// `userInterfaceStyle: "automatic"` (`app.config.ts`) is what lets the read
+// see a dark OS at all. A JS reload inside the same process (the dev
+// client's reload) reads the previous pin, so it keeps that launch's mode;
+// only a cold start reads the OS afresh.
+export function pinLaunchMode(mode: AppearanceMode): { osScheme: ColorSchemeName | null; mode: ThemeMode } {
+  const osScheme = Appearance.getColorScheme() ?? null;
+  const resolved = resolveMode(mode, osScheme);
+  // react-native-web's Appearance cannot pin; the web build has no native UI to pin.
+  Appearance.setColorScheme?.(resolved);
+  return { osScheme, mode: resolved };
+}
+
+// The OS's mode as this launch found it, and the mode this launch is drawn in.
+// Resolved here, in the module `tokens.ts` evaluates first, so no module reads
+// a role before the mode is fixed. Never changes while the app runs.
+const launchPin = pinLaunchMode(launchTheme.appearance.mode);
+export const launchOsScheme: ColorSchemeName | null = launchPin.osScheme;
+export const launchMode: ThemeMode = launchPin.mode;
 
 const savedListeners = new Set<() => void>();
 

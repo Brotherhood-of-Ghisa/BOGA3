@@ -96,6 +96,7 @@ export {
   uiFonts,
   uiGeometry,
   uiIconSize,
+  uiMode,
   uiRoles,
   uiSpace,
   uiTypography,

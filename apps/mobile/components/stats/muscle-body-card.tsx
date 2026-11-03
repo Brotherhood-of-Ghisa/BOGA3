@@ -15,6 +15,7 @@ import {
   uiSpace,
   uiText,
   uiTextTone,
+  uiMode,
   type SegmentedControlOption,
 } from '@/components/ui';
 import { useNovemberAppearance } from '@/components/appearance/use-november-appearance';
@@ -33,6 +34,7 @@ import {
   selectMuscleFibres,
   type BodyOrientation,
   type MuscleSetTargets,
+  type ThemeShadePalette,
 } from './muscle-body-projection';
 
 type Props = {
@@ -256,7 +258,7 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
 
   const orientation = bodyOrientationForAngle(angleDeg);
   const scores = useMemo(() => computeMuscleScores(muscles, metric, setTargets), [muscles, metric, setTargets]);
-  const palette = useMemo(() => buildThemeShadePalette(uiRoles), []);
+  const palette = useMemo(() => buildThemeShadePalette(uiRoles, uiMode), []);
   const selectedFibres = useMemo(() => selectMuscleFibres(selectedId, report), [selectedId, report]);
   const projected = useMemo(
     () =>
@@ -394,10 +396,10 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
                 />
               ))}
               {(['surface', 'deep'] as const).map(layer => projected.fibres[layer] ? (
-                <ReliefFibres key={layer} d={projected.fibres[layer]} layer={layer} />
+                <ReliefFibres key={layer} d={projected.fibres[layer]} layer={layer} relief={palette.relief} />
               ) : null)}
               {projected.fibres.anatomicalParts?.map(part => part.d ? (
-                <ReliefFibres key={part.id} d={part.d} layer="deep" id={`anatomy-${part.id}`} />
+                <ReliefFibres key={part.id} d={part.d} layer="deep" id={`anatomy-${part.id}`} relief={palette.relief} />
               ) : null)}
             </Svg>
           </View>
@@ -437,18 +439,25 @@ export function MuscleBodyCard({ muscles, metric, selectedId, onSelect, report, 
   );
 }
 
-function ReliefFibres({ d, layer, id = layer }: { d: string; layer: 'surface' | 'deep'; id?: string }) {
+type ReliefFibresProps = {
+  d: string;
+  layer: 'surface' | 'deep';
+  id?: string;
+  relief: ThemeShadePalette['relief'];
+};
+
+function ReliefFibres({ d, layer, id = layer, relief }: ReliefFibresProps) {
   const definitionId = useId();
   // Share native path parsing and stroked bounds between the ordered relief paints.
   // Transparent fill and stroke alpha avoid native outline clips and offscreen opacity layers.
-  // The highlight is a light edge on the figure's mid-tone shading, drawn in `onInk` (white in light
-  // mode). It is not on an `ink` fill, so a ground where `onInk` is dark must give it a role of its own.
+  // A light edge then a dark one on the figure's mid-tone shading, in the palette's mode
+  // (`buildThemeShadePalette`).
   return <>
     <Defs><Path id={definitionId} d={d} /></Defs>
-    <Use href={`#${definitionId}`} fill="transparent" stroke={uiRoles.onInk} strokeWidth={1.1} strokeOpacity={0.95}
+    <Use href={`#${definitionId}`} fill="transparent" stroke={relief.highlight} strokeWidth={1.1} strokeOpacity={0.95}
       translateX={0.45} translateY={-0.45} strokeLinecap="round" strokeLinejoin="round"
       testID={`stats-muscle-body-fibres-${id}-highlight`} />
-    <Use href={`#${definitionId}`} fill="transparent" stroke={uiRoles.inkMuted} strokeWidth={0.9}
+    <Use href={`#${definitionId}`} fill="transparent" stroke={relief.shade} strokeWidth={0.9}
       strokeOpacity={layer === 'surface' ? 0.72 : 0.70} strokeLinecap="round" strokeLinejoin="round"
       testID={`stats-muscle-body-fibres-${id}-shade`} />
   </>;

@@ -56,8 +56,7 @@ export type AppearanceRecordField = 'json' | 'accent' | 'background' | 'text' | 
 // A theme from one hue the user picked (`theme-hue.ts`), stored as `hue:<deg>`.
 export type CustomTheme = { id: 'custom'; label: string; hue: number; seeds: ThemeSeeds };
 
-// Light, dark, or the OS's mode at launch. Stored with the choice; every
-// theme is drawn light until a dark ladder ships.
+// Light, dark, or the OS's mode at launch (`theme-launch.ts` resolves it).
 export type AppearanceMode = 'light' | 'dark' | 'system';
 export const APPEARANCE_MODES: readonly AppearanceMode[] = ['light', 'dark', 'system'];
 

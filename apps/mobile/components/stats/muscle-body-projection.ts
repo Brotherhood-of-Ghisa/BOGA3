@@ -1,5 +1,6 @@
 import { hexToLch, lchToHex, type Lch } from '@/components/ui/lch';
-import { uiRoles } from '@/components/ui/tokens';
+import type { ThemeMode } from '@/components/ui/theme';
+import { uiMode, uiRoles } from '@/components/ui/tokens';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
@@ -11,7 +12,7 @@ import {
   type MuscleBodyMaterialId,
   type MuscleBodyMesh,
 } from './muscle-body-mesh';
-import { MOUSTACHE_FILL, NOVEMBER_MOUSTACHE_MESH } from './muscle-body-moustache';
+import { MOUSTACHE_LCH, NOVEMBER_MOUSTACHE_MESH } from './muscle-body-moustache';
 import { reduceFibreRun, type FibrePoint } from './projected-fibre-contour';
 
 export type BodyOrientation = 'front' | 'back';
@@ -24,12 +25,16 @@ export type MuscleSetTargets = {
 
 export type ThemeShadeRoles = Pick<
   typeof uiRoles,
-  'paper' | 'rule' | 'viz1' | 'viz2' | 'viz4'
+  'paper' | 'rule' | 'viz1' | 'viz2' | 'viz4' | 'ink' | 'inkMuted' | 'onInk'
 >;
 
 export type ThemeShadePalette = {
   readonly neutral: readonly string[];
   readonly anchors: readonly [Lch, Lch, Lch];
+  // The November moustache.
+  readonly moustache: string;
+  // A selected muscle's fibre relief: a light edge, then a dark one.
+  readonly relief: { readonly highlight: string; readonly shade: string };
 };
 
 export type ProjectedTriangle = {
@@ -193,7 +198,8 @@ const buildShadeRamp = (
  * Keeps anatomical lighting within the theme's shades ([[comparison.colour-scale]]).
  */
 export function buildThemeShadePalette(
-  roles: ThemeShadeRoles = uiRoles
+  roles: ThemeShadeRoles = uiRoles,
+  mode: ThemeMode = uiMode,
 ): ThemeShadePalette {
   const { lightness: paperL, chroma: paperC, hue: paperH } = hexToLch(roles.paper);
   const { lightness: ruleL, chroma: ruleC } = hexToLch(roles.rule);
@@ -207,6 +213,14 @@ export function buildThemeShadePalette(
   return {
     neutral,
     anchors: [hexToLch(roles.viz1), hexToLch(roles.viz2), hexToLch(roles.viz4)],
+    moustache: lchToHex(MOUSTACHE_LCH[mode]),
+    // The relief is lit from the palest ink-family colour and shaded with a
+    // dark one, whichever end of the ladder the page is at: in light mode white
+    // (`onInk`) and `inkMuted`; in dark the pale `ink` and the dark `paper`.
+    relief:
+      mode === 'light'
+        ? { highlight: roles.onInk, shade: roles.inkMuted }
+        : { highlight: roles.ink, shade: roles.paper },
   };
 }
 
@@ -230,7 +244,7 @@ const getDefaultPalette = (): ThemeShadePalette => {
   if (cachedDefaultPalette && cachedDefaultPalette.roles === uiRoles) {
     return cachedDefaultPalette.palette;
   }
-  const palette = buildThemeShadePalette(uiRoles);
+  const palette = buildThemeShadePalette(uiRoles, uiMode);
   cachedDefaultPalette = { roles: uiRoles, palette };
   return palette;
 };
@@ -536,7 +550,7 @@ const projectMoustache = (
     const y = (triangle.y0 + triangle.y1 + triangle.y2) / 3;
     const occluded = body.some(facet => pointInTriangle(x, y, facet)
       && depthAtPoint(facet, x, y, ctx.verts) > triangle.depth + .001);
-    return occluded ? [] : [{ ...triangle, fill: MOUSTACHE_FILL, selected: false }];
+    return occluded ? [] : [{ ...triangle, fill: ctx.palette.moustache, selected: false }];
   });
 };
 
