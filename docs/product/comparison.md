@@ -1,5 +1,16 @@
 # Comparison
 
+### comparison.tonnage-references · presentation · accepted
+
+Tonnage references are fixed, approximate familiar-weight comparisons. Current
+actual/projected reach alone makes them eligible; comparison, day selection
+and visual fitting cannot. Every eligible reference shares the data's linear
+scale, with only necessary top clearance. Sets has no references.
+
+Why: relatable weights must not change the figures or imply an achievement.
+Code: `apps/mobile/components/today/tonnage-references.ts`;
+`apps/mobile/components/today/period-pace.tsx`.
+
 ### comparison.change-display · presentation · accepted
 
 | Figure | Shown as | Examples |

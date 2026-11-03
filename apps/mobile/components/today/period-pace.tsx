@@ -32,6 +32,7 @@ import {
   type PeriodChartGeometry,
 } from './progress-format';
 import { StepAround } from './step-arrows';
+import { TonnageReferenceLayer } from './tonnage-reference-layer';
 import type { ProgressMetric } from '@/src/preferences/model';
 
 // Until the first layout pass reports the card's width (and in Jest, where
@@ -54,6 +55,7 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
       ))}
       {today.current ? <Line stroke={uiRoles.ruleSoft} strokeWidth={1} x1={today.current.x} x2={today.current.x} y1={plot.top} y2={plot.bottom} /> : null}
       {area.length ? <Polygon fill={uiRoles.viz0} points={toPolyline(area)} /> : null}
+      <TonnageReferenceLayer annotations={geometry.references} width={plot.width} />
       <Polyline
         fill="none"
         points={toPolyline(previous)}
@@ -118,6 +120,8 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
 // The arrows either side of the compared range step to an earlier or later
 // period, never later than the previous one. The chart takes the height the
 // block is given.
+// Tons adds the references of [[comparison.tonnage-references]]; their quiet
+// passive layer sits behind the interactive series.
 export function PeriodPace({
   period,
   onShowCompared,
@@ -248,7 +252,8 @@ export function PeriodPace({
         {/* The drawing sits over the box rather than in it, so the last
             measured height never props the box up: the box takes only the
             height the card leaves it. */}
-        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+          pointerEvents="none" style={StyleSheet.absoluteFill}>
           <Svg height={height} style={styles.chart} width={width}>
             <PeriodChart geometry={geometry} />
           </Svg>
