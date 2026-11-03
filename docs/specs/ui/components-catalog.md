@@ -12,7 +12,7 @@
 > `docs-check` lane fails until a new primitive or component folder is named
 > here, so the inventory cannot quietly go stale.
 
-Two standing rules:
+Rules:
 
 1. **Build screens from the primitives in `apps/mobile/components/ui/`**,
    imported from the barrel (`apps/mobile/components/ui/index.ts`). A
@@ -20,9 +20,7 @@ Two standing rules:
    defect, and the `ui-guardrails` lane rejects raw colour, size, spacing and
    radius literals in `app/` and `components/` either way (`ux-rules.md`
    "Styling guardrails").
-2. **Look here before adding a component.** Duplicating a shared row, card,
-   sheet, summary line or state panel is the failure this catalog exists to
-   prevent.
+2. **Look here before adding a component.** Reuse shared rows, cards, sheets, summaries and state panels.
 
 ## Coded compositions
 
@@ -73,16 +71,46 @@ For a new block or derivative, follow the human selection and acceptance workflo
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`); every other page takes the native header (`ux-rules.md` "Pages") |
 | Colour roles, fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
 
+### Gallery and adoption scope
+
+Open `app/ui-gallery.tsx` by explicit development-only deep link:
+`boga3://ui-gallery?family=<family>&review=1`. Families are `compact`, `list`,
+`table` and `summary`; the existing `sample=summary` link also works.
+Omit `review=1` for controls; `long=1` selects long content.
+Use list/table `sample=rows` to compare identical passive, wrapped, own/selected
+and independent-control rows. Compact samples cover Stream, CoW and embedded summaries. Route and navigator share `isUiGalleryAllowed`.
+
+Adoption lists in the four `apps/mobile/scripts/*-pattern-guardrail.js`
+modules protect Stream/CoW, both weekly boards, Muscle/contributor tables and
+Group stats. Every changed JSX/style source additionally declares template reuse or
+custom design in its PR UX Contract; spec 08 owns that process and acceptance.
+Missing declarations fail the existing guardrail lane. Template selections extend
+the checks to new consumers, including TS/TSX style companions and
+imported/re-exported style modules. Cases:
+`apps/mobile/__tests__/ui-pattern-selection.test.ts` and
+`apps/mobile/__tests__/pattern-adoption-guardrail.test.ts`.
+
+Foundation definitions own geometry and retain their component tests. Template consumers
+cannot override their selected family's type/casing or pattern style props;
+compact list/table consumers cannot add row insets/minimums. Page/chart layout,
+CoW podiums and record targets retain their existing contracts. Figure widths
+remain feature-owned. Untouched legacy screens keep their recipes; new or
+changed JSX cannot silently opt out. Other catalog primitives are useful parents
+for custom design, not automatic approval of a new composition. Gallery fixtures
+are parents only inside the existing guarded development route.
+
+Use `template` for approved families/variants, `custom` for everything beyond
+them. Reuse needs no fresh design acceptance; custom design needs the explicit
+human acceptance in spec 08. Humans decide semantic fit. No new
+suppression or increased budget substitutes for fixing drift.
+
 ### List pattern adoption
 
 `GroupHomeBoard` owns its standalone ListCard; callers do not add another Card.
 Today embeds the list inside its existing card, keeping the group header and
 CoW controls outside the board action. Readers retain ranking, ties, formatting
 and full accessible names. Long board names keep one-line ellipses. For row
-geometry, load `design-language.md` §4; for ListCard adoption guardrails and
-safe/failing examples, load `apps/mobile/scripts/list-pattern-guardrail.js`
-and `apps/mobile/__tests__/list-pattern-guardrail.test.ts`. Untouched tables
-and existing sheet/list densities are outside this adoption scope.
+geometry, load `design-language.md` §4. Enforcement scope is above.
 
 ### Table pattern adoption
 
@@ -91,9 +119,7 @@ ListRow, with StatsTableName and StatsTableDisclosure owning their presentation.
 Now / Prev / Δ headers reserve only the active sort arrow; nested contributors
 inherit them, while standalone contributors keep a passive header. Stacked
 history targets speak their figures. The Exercise table retains its existing density.
-For adoption guardrails and safe/failing examples, load
-`apps/mobile/scripts/table-pattern-guardrail.js` and
-`apps/mobile/__tests__/table-pattern-guardrail.test.ts`.
+Enforcement scope is above.
 
 Rules the code cannot state for itself:
 
@@ -147,7 +173,7 @@ folder rather than re-implementing its row, card or sheet.
 | `today/` | the Today cards: `TodayProgressCard` (the progress card with `WeekFigures`, `ShareBar` and `PeriodPace`, over `TodaySessionCard`); the group's board (headed by `TodayGroupHeader`: the group's name and `TodayGroupSwitch`) and sessions cards; `StepAround`; and `SessionSummaryRow` + `TrainingNowMark`, the session row Sessions' history uses. The pager: `TodayCards` on `SwipePages` (UX pattern 15), and `TodayPanel`. Reads: `apps/mobile/src/progress-summary/` |
 | `train/` | `StartDisc`, Train's one action |
 | `heatmaps/` | `DailyHeatmap` / `WeeklyHeatmap`, `HeatmapLegend` and their data and metric modules; semantics in `apps/mobile/components/heatmaps/README.md` |
-| `stats/` | `HistoryView`, the body of the history page (`app/progress-history.tsx`) for one exercise definition or muscle: its view and metric selectors and the chosen view; the Timeline's week list (`week-set-list.tsx`) draws its cards with `ExerciseSetsCard`. Progress pushes it and restores focus to the launching header link or row on return. `MuscleBodyCard` (`muscle-body-card.tsx`, `muscle-body-projection.ts`, `muscle-body-mesh.ts`) draws the rotatable 3D low-poly muscle body model with LCh lighting and [[comparison.colour-scale]]. `StatsTable` (`stats-table.tsx`) draws exercises and muscle contributors — a card, a micro-label header row over right-aligned figure columns, `ListRow` rows, no title — and `comparison-columns.tsx` the one Now / Prev / Change triple they both draw in it, with the layout that moves the figures to their own line when the name loses its floor; `comparison-format.ts` says a change, `ui/change-tone.ts` colours it. `ProgressMuscleView` follows Settings' Muscle view, choosing `ProgressTables` with inline contributors in List, or `MuscleBodyCard` with contributors and three compact history links below; both reuse `ProgressContributionRows`. `HistoryTitle` (`history-title.tsx`) is the history page's header title and a muscle's switcher sheet; `SecondarySetsChip` its secondary-set chip. `ProgressFilters` (`progress-filters.tsx`) is Progress's Filters button and sheet: grouping and secondary-set switches and `GymScopeChoices` rows, each only where the view uses it |
+| `stats/` | `HistoryView` and `HistoryTitle` own muscle/exercise history and focus return; Timeline uses `ExerciseSetsCard`. `MuscleBodyCard` draws the rotatable model with [[comparison.colour-scale]]. `ProgressMuscleView` selects list or body presentation; both reuse `ProgressContributionRows`. `StatsTable` owns the table frame/rows, `comparison-columns.tsx` responsive figures, `comparison-format.ts` formatting and `ui/change-tone.ts` colour. `ProgressFilters` owns grouping, secondary-set and gym choices. |
 | `gyms/` | `GymsScreen`, `GymEditor` and `GymPicker` (a view's gym filter, [[gym.view-filter]]: a button naming the scope, opening a sheet of radio rows, never a chip per gym; a header places `GymPickerButton` and `GymPickerSheet` apart; a sheet holding other choices draws `GymScopeChoices`, its rows); the gym directory and writes are `src/session-recorder/gym-options.ts`, location reads `src/location/gym-location-reads.ts` |
 | `groups/` | every group surface, behind the barrel `apps/mobile/components/groups/index.ts`: stream session and membership items, `GroupStreamList`, `CoWStreamCard` (lifecycle link to its exact challenge), boards (`GroupBoardRow`, `GroupMetricBoard`, `GroupMetricHistory` and its tap-to-cycle filter pill `GroupCycleButton`, `GroupPodiumCard`, `GroupLeaderboardsPage`), `GroupCoWsPage` (browser shared by the Groups tab and standalone route), the record and action sheets, member and exercise rows, the group / comparison / details forms, `StandardExercisePicker`, `UsernameGate`, `GroupCertificationStatus`, `GroupSetCertification` (a record set's one status and action), `GroupOfflineBanner`, `GroupWriteNotice`, the feature state panels (thin `StatePanel` wrappers), `usePullToRefresh` and the `groupScreenStyles` page shell. Data comes from `apps/mobile/src/groups` |
 | `bodyweight/` | `WeightEntrySheet`, `BodyWeightSettingsRow` (Settings' row), `BodyweightCalculationsRow`, `BodyWeightScreen` — the only bodyweight entry surfaces. No session, logger or analytics component shows or edits a reading (`docs/specs/tech/bodyweight-load-contract.md`) |

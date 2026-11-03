@@ -224,13 +224,16 @@ the thresholds; this is where they live.
 
 ## What CI runs
 
-CI (`.github/workflows/ci.yml`) runs the `CI? ✅` lanes above, installing each
+Code CI (`.github/workflows/ci.yml`) runs the `CI? ✅` lanes above, installing each
 workspace from its lockfile. Compatible runs reuse Jest's transform cache.
 Docs-only PRs run `docs-check` alone (`06`, "CI posture"). **Other lanes run
 locally** — backend/sync by choice, Maestro by host requirements — so CI cannot
 catch their regressions. Run your area's gates before the PR.
 
 Updates: [workflow](../../.github/workflows/daily-development-log.yml).
+
+For UI declarations/acceptance, load spec `08`.
+`.github/workflows/ui-pattern-review.yml` checks PR-body/design-acceptance comments independently.
 
 ## Maintenance
 

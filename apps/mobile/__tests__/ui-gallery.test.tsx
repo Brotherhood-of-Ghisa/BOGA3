@@ -144,3 +144,25 @@ it('selects production table fixtures through the same development-only route', 
   view.rerender(<UiGalleryRoute />);
   expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
 });
+
+
+it.each(['compact', 'list', 'table', 'summary'])('keeps the %s family behind release and StoreClient guards', family => {
+  mockParams = { family, review: '1' };
+  mockDev = false;
+  const view = render(<UiGalleryRoute />);
+  expect(view.toJSON()).toBeNull();
+  mockDev = true;
+  const previous = Constants.executionEnvironment;
+  Object.defineProperty(Constants, 'executionEnvironment', { configurable: true, value: ExecutionEnvironment.StoreClient });
+  try { view.rerender(<UiGalleryRoute />); expect(view.toJSON()).toBeNull(); }
+  finally { Object.defineProperty(Constants, 'executionEnvironment', { configurable: true, value: previous }); }
+});
+
+it('opens SummaryTile directly by family and retains error/retry presentation', () => {
+  mockParams = { family: 'summary', state: 'error', review: '1' };
+  render(<UiGalleryRoute />);
+  expect(screen.getByTestId('ui-gallery-summary-error-normal')).toBeTruthy();
+  fireEvent.press(screen.getByText('Retry'));
+  expect(screen.getByTestId('group-week-totals-card')).toBeTruthy();
+  expect(screen.getByTestId('ui-gallery-summary-action')).toHaveTextContent('Retry');
+});

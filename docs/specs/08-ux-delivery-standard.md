@@ -35,37 +35,63 @@ Document boundary:
 3. If a task introduces a new pattern, updating the `UX patterns` section is required in the same task.
 4. If a task intentionally deviates from an existing pattern, record rationale and impact in the PR body (Deviations).
 
-### Select a coded pattern before building
+### Select a design template before building
 
-For a new UI block, consult `docs/specs/ui/components-catalog.md`, show the
-applicable families, recommend one, and ask the human to select its pattern and
-bounded variant before implementation. Record that choice in the UX Contract
-and PR. A planned family is not an existing production export.
+For a new UI block, show the applicable approved families from
+`docs/specs/ui/components-catalog.md`, recommend one and record the selected
+production export/variant before coding. Reusing an approved design template
+within its bounded variants needs no fresh design acceptance. Carry existing
+selections forward within their agreed scope.
 
-When none fits, present the nearest parent and the proposed differences,
-including inherited typography, spacing and interaction boundaries. Obtain the
-human's selection of that derivation before coding. Feature content and
-behavior remain with their existing owners; a derivative does not justify
-local typography or density overrides.
+A composition outside those templates, or a derivative beyond their allowed
+variants, is **custom design**. Show its nearest parent, proposed appearance
+and differences, including inherited type, geometry and action boundaries.
+Stop for explicit human design acceptance before implementation. Record who
+accepted and the proposal/reference in the UX Contract. Template selection,
+silence, AI review and ordinary code approval cannot authorize a custom design.
 
-### Accept coded patterns and reference migrations
+### Record and verify the choice
 
-Before a pattern migration ships:
+The existing guardrail lane requires one visible `ui-pattern-selection` JSON
+code block in the draft/PR body. It maps every changed JSX/style source under
+app/components to `template` or `custom`, its production parents and its delta
+(or explicit unchanged-design claim). This covers new components, blocks and style-only changes; it does not infer visual materiality. Schema and failing/safe cases:
+`apps/mobile/scripts/ui-pattern-selection.js` and
+`apps/mobile/__tests__/ui-pattern-selection.test.ts`.
 
-1. Provide the running production component and its migrated reference screen
-   for human inspection. Use the native comparison evidence required by
-   `docs/specs/ui/ai-design-policy.md`: before/after at small and normal phone
-   widths, long names/figures, wrapping or stacking, relevant empty/loading/error
-   states, and the actions the pattern owns. Show list/table rows together when
-   reviewing their shared spacing.
-2. Ask the human to accept the coded result or request changes. Record the
-   acceptor, full reviewed commit, device/viewport and accepted surfaces in the
-   PR. Plan, target or sketch approval, silence, tests and AI review do not
-   constitute acceptance of the running result.
-3. A material UI change after acceptance requires fresh captures and renewed
-   acceptance. Until accepted, label the PR as awaiting visual acceptance;
-   do not merge, declare the migration complete, or expand it to more screens.
-   Dependent work starts from the accepted, merged implementation.
+Before a PR exists, save that body at `apps/mobile/artifacts/ui-review.md`
+(or set `BOGA_UI_REVIEW_BODY` to its path), then run normal gates. A template
+parent must exist at the base and be imported/rendered from its real export;
+template selections inherit existing family checks. Custom records carry
+`preBuildApproval` with the human's login and proposal approval reference.
+CI verifies declarations; humans verify truthful classification, scope and
+pre-build evidence. Approval records stay with the task/PR, never in code/specs.
+
+### Accept custom coded results
+
+Provide the running custom component/reference and native comparisons under
+`docs/specs/ui/ai-design-policy.md`: small/normal widths, long content, relevant
+states and owned actions; pair list/table rows when their rhythm changes.
+Any human with repository write/maintain/admin authority, including the PR
+author, can accept the coded design in a PR comment at that exact head:
+
+```text
+UI design accepted at <full-head-sha>:
+- apps/mobile/components/<area>/<component>.tsx
+```
+
+Use that block as the whole comment; list every accepted custom path.
+The required `UI pattern review` check verifies User identity, live authority,
+full head and exact paths. Bots, generic approvals and quoted examples do not
+count. Pushes invalidate old-head acceptance; comment edits/deletions and PR
+body changes rerun this check. Edit/delete the comment to withdraw acceptance.
+Agents must never post design acceptance or impersonate the human. GitHub
+identifies accounts; it cannot identify who operated shared credentials.
+
+Until custom design is accepted, report it as awaiting design acceptance and
+keep it unmerged. Record acceptor, full commit, devices/viewports and surfaces
+in the PR. A material later design change needs renewed acceptance. Untouched
+approved-template instances do not need another design review.
 
 ## UX quality principles
 
