@@ -30,8 +30,9 @@ const DEFAULT_COLORS: Partial<Record<IconName, string>> = {
   'set-planned': uiRoles.inkGhost,
 };
 
-// What a `knockout` mark is drawn in: the card ground it cuts back to.
-const KNOCKOUT_COLOR = uiRoles.surface;
+// What a `knockout` mark is drawn in: the mark cut into a glyph's own fill,
+// which is `ink` unless told otherwise (`set-done`'s tick).
+const KNOCKOUT_COLOR = uiRoles.onInk;
 
 const paintProps = (paint: IconPaint | undefined, color: string) => {
   switch (paint) {

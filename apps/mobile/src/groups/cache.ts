@@ -45,6 +45,35 @@ export type GroupCacheEntry<T> = {
   fetchedAtMs: number;
 };
 
+// In-memory mirror of the entries read or written in this app run, so a
+// remounted screen draws its cached payload on its first render instead of a
+// loading state while SQLite is read. CoW summaries are left out: their stored
+// key differs from the read alias and they expire. Every eviction below drops
+// the mirrored entries with the rows.
+const memory = new Map<string, GroupCacheEntry<unknown>>();
+const memoryKey = (userId: string, cacheKey: string) => `${userId}\u0000${cacheKey}`;
+const remember = (cacheKey: string, userId: string, entry: GroupCacheEntry<unknown> | null) => {
+  if (isCoWSummaryKey(cacheKey)) return;
+  if (entry) memory.set(memoryKey(userId, cacheKey), entry);
+  else memory.delete(memoryKey(userId, cacheKey));
+};
+const forgetAccountMemory = (userId: string) => {
+  const prefix = memoryKey(userId, '');
+  for (const key of [...memory.keys()]) if (key.startsWith(prefix)) memory.delete(key);
+};
+
+/**
+ * The entry `readGroupCache` or `writeGroupCache` last saw for (`cacheKey`,
+ * `userId`) in this app run, without touching SQLite; null when there is none.
+ */
+export const peekGroupCache = <T>(cacheKey: string, userId: string): GroupCacheEntry<T> | null =>
+  quarantinedAccounts.has(userId) ? null : (memory.get(memoryKey(userId, cacheKey)) as GroupCacheEntry<T> | undefined) ?? null;
+
+/** Drops the whole mirror: the local store was wiped under it. */
+export const forgetGroupCacheMemory = (): void => {
+  memory.clear();
+};
+
 /**
  * Returns the cached payload for `cacheKey` only when it was fetched by
  * `userId`; another account's row reads as absent. Malformed JSON, incompatible generations and unsafe payloads are evicted
@@ -64,6 +93,7 @@ export const readGroupCache = <T>(
     .orderBy(desc(groupCache.fetchedAtMs))
     .get();
   if (!row) {
+    remember(cacheKey, userId, null);
     return null;
   }
   let payload: unknown;
@@ -76,7 +106,9 @@ export const readGroupCache = <T>(
     deleteGroupCacheEntry(database,row.cacheKey);
     return null;
   }
-  return { payload: payload as T, fetchedAtMs: row.fetchedAtMs };
+  const entry = { payload: payload as T, fetchedAtMs: row.fetchedAtMs };
+  remember(cacheKey, userId, entry);
+  return entry;
 };
 
 /** Upserts the last successful payload for `cacheKey`, replacing any previous owner. */
@@ -113,11 +145,15 @@ export const writeGroupCache = <T>(
       set: { userId: values.userId, payloadJson: values.payloadJson, fetchedAtMs: values.fetchedAtMs },
     })
     .run();
+  // Another owner's row was just replaced.
+  for (const key of [...memory.keys()]) if (key.endsWith(`\u0000${entry.cacheKey}`)) memory.delete(key);
+  remember(entry.cacheKey, entry.userId, { payload: entry.payload, fetchedAtMs: entry.fetchedAtMs });
 };
 
 /** Deletes one cache entry (any owner). */
 export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: string): void => {
   database.delete(groupCache).where(eq(groupCache.cacheKey, cacheKey)).run();
+  for (const key of [...memory.keys()]) if (key.endsWith(`\u0000${cacheKey}`)) memory.delete(key);
 };
 
 /**
@@ -138,6 +174,7 @@ export const evictGroup = (database: GroupCacheDatabase, groupId: string): void 
 /** Clears the whole cache. `wipeLocalTables` deletes the table inside its own transaction. */
 export const wipeGroupCache = (database: GroupCacheDatabase): void => {
   database.delete(groupCache).run();
+  memory.clear();
   cacheGenerations.forEach((_generation,userId) => invalidateCompetitionMemory(userId));
 };
 
@@ -168,6 +205,7 @@ export const evictObsoleteGroupCache = (database: GroupCacheDatabase,userId: str
 };
 
 export function invalidateCompetitionMemory(userId: string): void {
+  forgetAccountMemory(userId);
   cacheGenerations.set(userId,getCompetitionCacheGeneration(userId) + 1);
   cacheListeners.forEach(listener => listener());
 }
@@ -247,6 +285,7 @@ export function quarantineCompetitionCache(userId: string): number {
 }
 export function deleteAccountCompetitionCache(database: GroupCacheDatabase,userId: string): void {
   database.delete(groupCache).where(eq(groupCache.userId,userId)).run();
+  forgetAccountMemory(userId);
   quarantinedAccounts.delete(userId);
 }
 

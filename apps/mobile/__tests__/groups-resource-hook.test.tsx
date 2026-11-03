@@ -64,7 +64,9 @@ jest.mock('expo-router', () => {
 });
 
 import { groupCache } from '@/src/data/schema';
+import { notifyRowsPushed } from '@/src/sync/push-signal';
 import {
+  GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS,
   GROUP_RESOURCE_POLL_INTERVAL_MS,
   GroupApiError,
   groupCacheKeys,
@@ -254,6 +256,95 @@ describe('useGroupResource', () => {
     expect(fetcher).toHaveBeenCalledTimes(4);
   });
 
+  it('draws a payload this app run already read on its first render, with no loading state', async () => {
+    seedCache(groupCacheKeys.mine, payload('cached'));
+    const fetcher = jest.fn(() => new Promise<Payload>(() => undefined));
+    const first = renderResource({ fetcher });
+    // Nothing read yet in this run: the first render waits for SQLite.
+    expect(first.result.current).toMatchObject({ data: null, hydrated: false });
+    await flush();
+    first.unmount();
+
+    const { result } = renderResource({ fetcher });
+
+    expect(result.current).toMatchObject({ data: payload('cached'), lastUpdatedAtMs: CACHED_AT_MS, hydrated: true });
+    await flush();
+    expect(result.current).toMatchObject({ data: payload('cached'), refreshing: true });
+  });
+
+  it('drops a mirrored payload once SQLite shows its row was wiped', async () => {
+    seedCache(groupCacheKeys.mine, payload('cached'));
+    const fetcher = jest.fn(() => new Promise<Payload>(() => undefined));
+    const first = renderResource({ fetcher });
+    await flush();
+    first.unmount();
+    // A wipe that bypasses the cache module (the dev reset deletes the table).
+    fixture.database.delete(groupCache).run();
+
+    const { result } = renderResource({ fetcher });
+    expect(result.current.data).toEqual(payload('cached'));
+    await flush();
+    expect(result.current).toMatchObject({ data: null, lastUpdatedAtMs: null, hydrated: true });
+  });
+
+  it('first-renders the payload its last refresh wrote, and never one another user cached', async () => {
+    const fetcher = jest.fn(() => Promise.resolve(payload('fresh')));
+    const first = renderResource({ fetcher });
+    await flush();
+    first.unmount();
+
+    expect(renderResource({ fetcher }).result.current).toMatchObject({ data: payload('fresh'), lastUpdatedAtMs: NOW_MS });
+    expect(renderResource({ fetcher, userId: 'user-2' }).result.current).toMatchObject({ data: null, hydrated: false });
+  });
+
+  it('refreshes 2 s and 6 s after a push while focused, and not while blurred', async () => {
+    expect(GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS).toEqual([2_000, 6_000]);
+    const fetcher = jest.fn(() => Promise.resolve(payload('x')));
+    renderResource({ fetcher });
+    await flush();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    act(() => notifyRowsPushed());
+    await advance(1_999);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    await advance(4_000);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+
+    // A second push re-arms both refreshes from its own time.
+    act(() => notifyRowsPushed());
+    await advance(1_000);
+    act(() => notifyRowsPushed());
+    await advance(2_000);
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    await advance(4_000);
+    expect(fetcher).toHaveBeenCalledTimes(5);
+
+    blurScreen();
+    act(() => notifyRowsPushed());
+    await advance(10_000);
+    expect(fetcher).toHaveBeenCalledTimes(5);
+  });
+
+  it('a push just before focus still refreshes at its remaining delays', async () => {
+    const fetcher = jest.fn(() => Promise.resolve(payload('x')));
+    blurScreen();
+    renderResource({ fetcher });
+    act(() => notifyRowsPushed());
+    await advance(3_000);
+    expect(fetcher).not.toHaveBeenCalled();
+
+    focusScreen();
+    await flush();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    // The 2 s refresh has passed; the 6 s one is 3 s away.
+    await advance(2_999);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await advance(1);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it('refresh() fetches on demand and collapses concurrent calls into one request', async () => {
     const fetcher = jest.fn(() => Promise.resolve(payload('x')));
     const { result } = renderResource({ fetcher });
@@ -416,13 +507,15 @@ describe('useGroupResource', () => {
     expect(readGroupCache(fixture.database, groupCacheKeys.stream('g1'), USER)).toBeNull();
   });
 
-  it('clears its poll timer and NetInfo listener on unmount', async () => {
+  it('clears its poll timer, push refreshes and NetInfo listener on unmount', async () => {
     const fetcher = jest.fn(() => Promise.resolve(payload('x')));
     const { unmount } = renderResource({ fetcher });
     await flush();
     expect(mockNetInfoListeners.size).toBe(1);
+    act(() => notifyRowsPushed());
 
     unmount();
+    act(() => notifyRowsPushed());
 
     expectEveryPollIntervalCleared();
     expect(mockNetInfoListeners.size).toBe(0);

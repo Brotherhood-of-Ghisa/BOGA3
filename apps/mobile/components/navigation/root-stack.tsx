@@ -18,6 +18,15 @@ const ROOT_STACK_SCREEN_OPTIONS = {
 } as const;
 
 /**
+ * The summary after Finish ends the workout rather than drilling into it, so
+ * it fades in over the tabs (and out to Progress) instead of sliding.
+ */
+export const completedSessionOptions = ({ route }: { route: { params?: object } }) =>
+  (route.params as { presentation?: unknown } | undefined)?.presentation === 'completion'
+    ? ({ animation: 'fade' } as const)
+    : {};
+
+/**
  * The root stack. Every root route is declared here under exactly one
  * `Stack.Protected` group, and `useRootRouteAccess` enables one access level at a
  * time: `sign-in`, the first-sync block (`sync-setup`), or the app. When the level
@@ -53,7 +62,7 @@ export function RootStack() {
         <Stack.Screen name="progress-history" options={{ title: 'History' }} />
         <Stack.Screen name="rm-curve" options={{ title: 'RM curve' }} />
         {/* Draws its own top bar (`Stack.Screen` options in the screen). */}
-        <Stack.Screen name="completed-session/[sessionId]" />
+        <Stack.Screen name="completed-session/[sessionId]" options={completedSessionOptions} />
         <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
         <Stack.Screen name="session-plan/new" options={{ title: 'New session plan' }} />
         <Stack.Screen name="session-plan/[planId]" options={{ title: 'Plan' }} />
@@ -84,6 +93,7 @@ export function RootStack() {
         <Stack.Screen name="settings-review-changes" options={{ title: 'Review changes' }} />
         <Stack.Screen name="gyms" options={{ title: 'Gyms' }} />
         <Stack.Screen name="theme-colour" options={{ title: 'Custom colour' }} />
+        <Stack.Screen name="theme-background" options={{ title: 'Custom background' }} />
         <Stack.Screen name="group/mine" options={{ title: 'My groups' }} />
         <Stack.Screen name="group/new" options={{ title: 'New group' }} />
         <Stack.Screen name="group/join" options={{ title: 'Join group' }} />

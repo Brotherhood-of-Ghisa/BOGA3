@@ -26,9 +26,9 @@ Two standing rules:
 
 ## Coded compositions
 
-CompactCard/CompactHeader serve Stream and embedded CoW headers.
-ListCard and compact ListRow serve the two weekly boards; their native
-acceptance is pending. Table migration and SummaryTile remain approved templates,
+CompactCard/CompactHeader serve Stream and embedded CoW headers; SummaryTile
+serves Group stats. ListCard and compact ListRow serve the two weekly boards;
+their native acceptance is pending. SortableTable remains an approved template,
 **not production exports**. For a new block or derivative, follow the human selection and acceptance workflow in
 `docs/specs/08-ux-delivery-standard.md` before building.
 
@@ -37,7 +37,7 @@ acceptance is pending. Table migration and SummaryTile remain approved templates
 | CompactCard / CompactHeader | `compact-card.tsx`: fixed compact Card and shared label/metadata header; Stream and CoW | Embedded summaries reuse only the header inside their existing container; Card accessibility actions retain nested record callbacks |
 | ListCard / ListCardHeader | `list-card.tsx` and compact `list-row.tsx`; GroupHomeBoard and Today's weekly board | Passive rows and a whole-board action differ from independent row controls |
 | SortableTable | Evolve StatsTable and comparison columns | Keep sorting with its current owner and history/disclosure actions separate |
-| SummaryTile | Card, Stat, WeekFigure; At a glance's Group stats | Keep both Sets/PRs and page-level controls' existing scope |
+| SummaryTile | `summary-tile.tsx`: shared header and existing metric content; At a glance's Group stats | Both Sets/PRs remain visible; period controls stay outside and metric controls govern the board/chart |
 
 ## Existing primitives (`apps/mobile/components/ui/`)
 
@@ -45,6 +45,7 @@ acceptance is pending. Table migration and SummaryTile remain approved templates
 | --- | --- |
 | The page ground; a scrolling page body with the gutter and card gap | `Screen` / `ScreenScroll` (`screen.tsx`) |
 | A compact summary or an embedded label/date header | `CompactCard` / `CompactHeader` (`compact-card.tsx`); feature content and actions retain their owners |
+| A headline metric tile | `SummaryTile` (`summary-tile.tsx`); fixed frame/header, feature-owned WeekFigure or Stat content |
 | A container for content | `Card` (`card.tsx`) — with `onPress` the whole card is one labelled link |
 | A legend plus a figure | `Stat` (`stat.tsx`) — `stacked` or `inline`; its only emphasis is `record` |
 | A compact board with a shared header, optional columns and footer | `ListCard` / `ListCardHeader` (`list-card.tsx`); standalone or embedded, action limited to its board region |
@@ -121,12 +122,12 @@ folder rather than re-implementing its row, card or sheet.
 | --- | --- |
 | `pattern-gallery/` | Development-only native gallery of production pattern presenters and fixed fixtures, including board references and compact row-only list/table inputs; reached by explicit deep link, with access owned by `src/utils/isUiGalleryAllowed.ts` |
 | `rm-curve/` | `RmCurveScreen` / `RmCurveContent`, the experimental reps–load scatter, fitted temporal curves, model/scope controls, dated set inspection and `RmCurveHelp` explainer; reads `src/rm-curve/`, hosted by `app/rm-curve.tsx` |
-| `navigation/` | `MainTabBar` / `MainTabs` — the one bottom bar, drawn identically by the tab layout, the session view, exercise history and `TabOwnedPage`; `TabOwnedPage` (a root-stack page that keeps the tab bar under its native header: Exercises, Groups, Settings); the root stack and the auth route guard. The tab order, labels, routes and testIDs live in the non-visual model `apps/mobile/src/navigation/main-tabs.ts`, and presses go through `apps/mobile/components/navigation/use-open-main-tab.ts` so Train opens a workout in progress |
+| `navigation/` | `MainTabBar` / `MainTabs` — the one bottom bar, drawn identically by the tab layout, a completed session's edit, exercise history and `TabOwnedPage`; `TabOwnedPage` (a root-stack page that keeps the tab bar under its native header: Exercises, Groups, Settings); the root stack and the auth route guard. The tab order, labels, routes and testIDs live in the non-visual model `apps/mobile/src/navigation/main-tabs.ts`, and a press on a page over the tabs goes through `apps/mobile/components/navigation/use-open-main-tab.ts`, which closes it with no animation |
 | `exercise-core/` | `ExerciseNameField` and `ExerciseWeightSection` (weight entry, `Uses bodyweight` and its share) with `validateExerciseCore`, composed by both the personal editor and the group exercise form, so the two never diverge |
 | `exercise-catalog/` | `ExerciseMerge` (catalogue-only browser/confirmation controller) and `ExerciseEditorScreen` (the `/exercise-edit` page, with `ExerciseLinksSection`), opened by `useOpenExerciseEditor` (`exercise-editor-request.ts`, which carries a caller's prefill and save callbacks) from the catalogue, the picker's `Add new`, group `Add as new`, the exercise page, the group exercises page and a shared exercise and `ExerciseListContent` / `ExerciseListPreferenceControls` — the shared list rows, family headers and filter row for every exercise list. The grouping, filtering, sorting, row stats and preference models are `apps/mobile/src/exercise-catalog/` |
 | `exercise-page/` | the in-workout exercise page: top bar, `RecordsPanel`, `SetRow`, `SetLogger`, `SetEntryFields` (also used by plan/programme targets), `SwipeSetRow`, the effort and options sheets, and `ExerciseSwapSheet` (a `PageSheet` reusing `ExerciseListContent`). Rules live in `apps/mobile/src/session-recorder/exercise-page-model.ts` and `ux-rules.md` "Swipes on the exercise page" |
 | `session-recorder/` | `RestTimerBar` with `RepeatingTimerFocus` (the session/exercise timer strip and its fullscreen repeating presentation; state in `apps/mobile/src/session-recorder/rest-timer.ts`), the exercise picker (body of the `app/session/[sessionId]/add-exercise.tsx` page-sheet route — it only **adds**; swapping is the exercise page's `ExerciseSwapSheet`), `SessionInsightPresentation` (shared by live, completion and historical Summary) and the session / exercise / set / location types in `types.ts`. The folder name predates the session view |
-| `session-view/` | the active session and completed-session edit: `SessionTopBar` (its `active` / `completed` / `complete` modes), `SessionSummaryCard`, `SessionTimesFields`, `SessionExerciseCard`, the gym and options sheets |
+| `session-view/` | the active session and completed-session edit: `SessionViewScreen` (on the Train tab, or as the edit page), `SessionTopBar` (its `active` / `completed` / `complete` modes), `SessionSummaryCard`, `SessionTimesFields`, `SessionExerciseCard`, the gym and options sheets |
 | `session-planner/` | the planning surfaces: `PlanFormScreen` (the shared create/edit/duplicate one-off plan editor), `PlanScheduleSheet` (native date/time picker sheet with clear action), `PlanBlockEditor` (one block's target sets), `PlanSetAddForm` (count-only copies of the last target, shared by both editors), `PlanExercisePickSheet` (the catalogue-in-a-sheet block picker), `PlanCardChoiceSheet` (the compatible-card choice when attaching a block finds several candidates), `ProgrammeFormScreen` / `ProgrammeSessionEditSheet` (the multi-session programme editor and focused child-session editor sheet), `ProgrammeDetailHeader` / `NextProgrammeBlockCard` / `ProgrammePlanList` (programme detail summary, next unresolved block card, child plans list with reordering), and `PlanSection` / `PlanSessionAction` / `NewProgrammeAction` / `usePlanSections` (the Sessions hub's planning sections and persistent authoring actions). The domain behind them is `apps/mobile/src/session-planner/` |
 | `session-detail/` | the read-only session cards — `SetSummaryRow`, `ExerciseSetsCard`, `SessionFactsCard` — shared by the session view, View Session, exercise history and the group session view. Row and card models: `src/session-recorder/session-view-model.ts`, `completed-session-detail-model.ts` |
 | `session-complete/` | the post-submit presentation: `SessionCompletionScreen`, `SessionBreakdownPager` (two pages, `By muscle` then `By exercise`), `SessionMuscleBreakdown` / `SessionSummaryContent` (shared with historical review), `PersonalRecordCard`, `ExerciseVolumeCard` (drawn only with a distribution) with `ComparisonUnavailableCard` pooling the rest by name, and `SessionShareSheet` / `SessionShareCard`. The share image is privacy-limited: all PRs and drawn comparisons, never gym or location data |
@@ -142,7 +143,7 @@ folder rather than re-implementing its row, card or sheet.
 | `sync-status/` | `SyncStatusPanel` (Settings → Data & sync), with `ExerciseMergeReviewScreen` (its Review changes page) for current/saved changes and uncertain operation recovery and the snapshot hook behind its Settings row's status |
 | `settings/` | The home rows' status strings, the sub page screens (`SubPage`), Everything else, Data & sync's `BackupPanel` |
 | `more/` | More's connected-agent read for `Connect an AI` |
-| `appearance/` | Settings' Appearance: the preset list, hue ring and theme preview; launcher reconciliation and the shared figure's calendar hook implement [[appearance.november]] |
+| `appearance/` | Settings' Appearance: the preview, preset, background and text rows, hue ring; launcher reconciliation and the shared figure's calendar hook implement [[appearance.november]] |
 | `notifications/` | Settings' Notifications page and the group mute row; server-confirmed state comes from `src/notifications` |
 | `preferences/` | Settings editors (rest timer, effort, Progress); full muscle setup/target pages and their numeric fields |
 | `profile/` | the Profile cards and their panel and form hooks |
@@ -163,3 +164,10 @@ folder rather than re-implementing its row, card or sheet.
   exported from their route files so the surface can be wired from another
   route; they are route composition and test seams, not reusable building
   blocks. Document them in `screen-map.md` and `navigation-contract.md`.
+
+### SummaryTile reference
+
+Group stats in GroupGlancePage uses the fixed headline tile frame with existing
+WeekFigure metrics. Native gallery sample `summary` renders the same page with
+period/metric controls and fixed ready, past, large, zero, no-baseline, held,
+loading, error/retry and offline fixtures. Read state stays outside the tile.

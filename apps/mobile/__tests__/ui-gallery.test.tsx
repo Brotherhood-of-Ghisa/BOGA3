@@ -118,3 +118,19 @@ it('normalizes Stream state links to its actual ready presentation', () => {
   render(<CompactGallery initialState="error" />);
   expect(screen.getByTestId('ui-gallery-stream-ready-normal')).toBeTruthy();
 });
+
+it('selects the Summary family and can return to the existing gallery samples', () => {
+  render(<CompactGallery />);
+  fireEvent.press(screen.getByTestId('ui-gallery-sample-summary'));
+  expect(screen.getByTestId('group-week-totals-card')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('ui-gallery-sample-stream'));
+  expect(screen.getByTestId('group-stream-session-card-reference')).toBeTruthy();
+});
+
+it.each([true, false])('keeps Summary deep links under the existing gallery guard (development=%s)', dev => {
+  mockDev = dev;
+  mockParams = { sample: 'summary', state: 'zero', review: '1' };
+  render(<UiGalleryRoute />);
+  if (dev) expect(screen.getByTestId('group-week-totals-sets-value')).toHaveTextContent('0');
+  else expect(screen.queryByTestId('group-week-totals-card')).toBeNull();
+});

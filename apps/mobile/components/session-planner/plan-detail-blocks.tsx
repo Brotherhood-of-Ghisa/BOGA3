@@ -10,7 +10,8 @@ export type PlanDetailBlocksProps = {
   onAdd: (block: PlanBlockView) => void;
   /** Confirms the skip for a pending block. */
   onSkip: (block: PlanBlockView) => void;
-  onOpenSession: (sessionId: string) => void;
+  // `attached`: the block's session is the workout in progress, else a completed one.
+  onOpenSession: (sessionId: string, attached: boolean) => void;
 };
 
 const blockStateWord = (block: PlanBlockView): string => {
@@ -81,7 +82,7 @@ export function PlanDetailBlocks({ detail, onAdd, onSkip, onOpenSession }: PlanD
               density="list"
               divider={false}
               label="Open session"
-              onPress={() => onOpenSession(block.attachedSessionId as string)}
+              onPress={() => onOpenSession(block.attachedSessionId as string, block.status === 'attached')}
               testID={`plan-detail-block-${index + 1}-session`}
             />
           ) : null}

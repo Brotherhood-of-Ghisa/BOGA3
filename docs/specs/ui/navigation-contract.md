@@ -17,6 +17,8 @@ For route owners, load `screen-map.md`.
 - **Two kinds of page.** Tabs use `PageHeader` (Groups: a tab header), without Back. Other pages use native headers; Back returns to origin.
   `/exercise-catalog` and `/settings` also keep the tab bar
   (`apps/mobile/components/navigation/tab-owned-page.tsx`).
+- **Motion** ([ux-rules](ux-rules.md) Pages 2): a tab press on a page over the
+  tabs closes it unanimated (`useOpenMainTabFromPage`); the summary fades.
 - The shell is `apps/mobile/src/navigation/main-tabs.ts` — Today / Train /
   Progress / Groups, then More as a ⋮ — drawn by `MainTabBar`
   (`apps/mobile/components/navigation/main-tab-bar.tsx`) on every screen that
@@ -27,10 +29,9 @@ For route owners, load `screen-map.md`.
   `apps/mobile/app/(tabs)/_layout.tsx` must appear in `main-tabs.ts` as a
   destination or as a preserved root with an owner, or it renders with no tab
   selected.
-- Train is the only tab whose destination is computed: with a workout in
-  progress it opens that session directly (`mainTabDestination`,
-  `useOpenMainTab`); a failed lookup opens `/train`. Train is also the only way into an active workout —
-  nothing on Today opens `/session/<id>`.
+- Train hosts the workout in progress: the session view replaces its disc, so
+  switching tabs mid-workout is a tab switch. Every other way in opens Train
+  (`useOpenActiveWorkout`, `dismissTo`); nothing on Today does.
 - Sync cadence is route-independent: the scheduler
   (`apps/mobile/src/sync/scheduler.ts`) never reads the active route, and a
   screen's writes reach it only through the shared post-commit nudge
@@ -136,43 +137,42 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/sync-setup` | `index` → `/today` | the first sync drains. Neither gate screen ever navigates itself: the stack drops it and the router lands |
 | `/sync-setup` | `/sign-in` | the latest cycle outcome is `AUTH_REQUIRED` (no Retry offered) |
 | `/today` ↔ `/train` ↔ `/progress` ↔ `/groups` ↔ `/more` | | `MainTabBar` |
-| any tab strip | `/session/<sessionId>` | the Train tab with a workout in progress: `push` from the tab bar and `exercise-history`, `dismissTo` from a completed session view, and nothing on that session's own view |
-| `/train`, `/sessions`, `/completed-session/<id>` | `/session/<sessionId>` | every active-session entry, through `sessionViewHref` (`push`): Train's launch and Sessions' review/complete. Train rechecks for a draft and `apps/mobile/src/session-entry/coordinator.ts` serialises requests: never two drafts |
-| `/session/<id>` | `/completed-session/<id>?presentation=completion` | Finish, after its cleanup prompts and the completion write (`replace`) |
-| `/session/<id>` | `/train` or another tab | Abandon after its confirmation, or the bottom bar (`dismissTo`, so the tab below is reused rather than stacked) |
+| `/sessions`, plan, programme, History, own group session | `/train` (the workout) | every way into an active workout (`dismissTo`). Train's own start swaps in place; `apps/mobile/src/session-entry/coordinator.ts` serialises requests: never two drafts |
+| the workout | `/completed-session/<id>?presentation=completion` | Finish, after its cleanup prompts and the completion write (`push` over the tabs, a fade); Train shows its disc beneath |
+| the workout | Train's disc | Abandon after its confirmation, in place |
 | `/session/<id>` (completed edit) | the previous screen | `Done`: `back()`, else `replace('/completed-session/<id>')`; completion is never replayed |
-| `/session/<id>` | `/session/<id>/exercise/<sessionExerciseId>` | an exercise card (`push`); Back, `Complete exercise`, `Remove from session` and the title switcher's `All exercises` return `back()`, or `replace('/train')` with no history; its other rows `replace`, so Back still returns here |
-| `/session/<id>` | `/session/<id>/add-exercise` | `+ Add exercise` (`push`, a modal page sheet); Close, swipe-down and a successful add return `back()`, a failed add stays |
+| the workout | `/session/<id>/exercise/<sessionExerciseId>` | an exercise card (`push`); Back, `Complete exercise`, `Remove from session` and the title switcher's `All exercises` return `back()`, or `replace('/train')` with no history; its other rows `replace`, so Back still returns here |
+| the workout | `/session/<id>/add-exercise` | `+ Add exercise` (`push`, a modal page sheet); Close, swipe-down and a successful add return `back()`, a failed add stays |
 | `/session/<id>/add-exercise` | `/exercise-catalog?source=session&intent=manage` | the picker's Manage (`push`, a second sheet over it); the catalogue's post-save `back()` returns the picker as left |
-| `/session/<id>` | `/session/<id>/compare`, `/gyms` | the ⋮ sheet's `Session vs history` and the gym sheet's `Manage gyms` (sheet closes, then `push`) |
+| the workout | `/session/<id>/compare`, `/gyms` | the ⋮ sheet's `Session vs history` and the gym sheet's `Manage gyms` (sheet closes, then `push`) |
 | `/session/<id>/exercise/<id>` | `/progress-history`, `/exercise-history` | the records panel's `Progress` (`progressHistoryHref`) and ⋮ `Exercise history` (`exerciseHistoryHref`, gym per [[gym.view-filter]]); `push` |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress-history?exerciseDefinitionId=<id>` | `/exercise-history?exerciseDefinitionId=<id>` | ⋮ `History` (`exerciseHistoryHref`, `push`), preserving gym selection |
 | `/exercise-catalog` | `/exercise-history?exerciseDefinitionId=<id>` | exercise actions `History` (`exerciseHistoryHref`, `push`), no pre-applied filters |
 | `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | list muscle → saved view; 3D muscle header → chosen view; contributor → Timeline; Exercise list row → saved view with its exercise metric and gym; all carry `metric`; muscle links carry both counting choices; tables carry gym (`progressHistoryHref`, `push`). Back preserves filters, layout, selection and scroll; focus returns once to the launching link or row |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
-| `/progress-history` | `/session/<id>`, `/completed-session/<id>`, `/sessions?day=`, `?week=` | Grid single: active → session, else completed (`historyDayHref`); several/lookup failure → day list. Weeks and ⋮ → week list; Timeline → completed session; muscle exercise links carry metric/gym (`push`) |
+| `/progress-history` | `/train`, `/completed-session/<id>`, `/sessions?day=`, `?week=` | Grid single: active → Train, else completed (`historyDayHref`); several/lookup failure → day list. Weeks and ⋮ → week list; Timeline → completed session; muscle exercise links carry metric/gym (`push`) |
 | `/progress-history` | `/rm-curve?exerciseDefinitionId=<id>` | live exercise Options → RM curve (`rmCurveHref`, `push`); chart scope stays local |
 | `/rm-curve` | originating History, else `/progress` | Back pops unchanged History metric/week/scroll; without history, replaces to Progress. Workout drafts stay untouched |
 | `/progress-history?exerciseDefinitionId=<id>` | `/progress-history?muscleGroupId=<id>` | header ⋮ muscle rows carry gym and supported metric (`progressHistoryHref`, `push`) |
-| `/sessions` | `/completed-session/<id>`, `/session/<id>` | a completed row (`push`), and the active row's resume (`sessionViewHref`). `/sessions` never completes an active session directly |
+| `/sessions` | `/completed-session/<id>` | a completed row (`push`). `/sessions` never completes an active session directly |
 | `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
 | `/sessions` | `/programme/new`, `/programme/<programmeId>` | the `New programme` action, and a programme row in Unscheduled (`push`). Create/duplicate save `replace`s to `/programme/<id>`; edit save returns `back()` |
-| `/session-plan/<id>` | `/session/<sessionId>` | **Start all** and **Add to session** route into the recorder through `sessionViewHref` (`push`) — conflict offers Resume, the ambiguous card choice is a sheet, not a route |
+| `/session-plan/<id>` | `/train`, `/session/<id>` | **Start all**, **Add to session** and an attached block's `Open session` open the workout; a consumed block's opens its edit page (`push`). Conflict offers Resume; the ambiguous card choice is a sheet |
 | `/session-plan/new` | `/session-plan/new?edit=`, `?from=` | the detail's `Edit` (pencil) and duplicate actions (`push`) |
-| `/programme/<id>` | `/session/<sessionId>` | **Add to session** on the next unresolved block, exactly as the plan row above |
+| `/programme/<id>` | `/train` | **Add to session** on the next unresolved block, as the plan row above |
 | `/programme/<id>` | `/session-plan/<planId>` | a child session plan row (`push`) |
 | `/programme/<id>` | `/programme/new?edit=`, `?from=` | the detail's `Edit` and duplicate actions (`push`) |
 | `/programme/<id>` | Back to `/sessions` | confirmed `Delete` (detaches child plans as standalone plans without deleting workouts), returns `back()` |
 | `/today` | `/sessions`, `/completed-session/<id>`, `/train` | the Progress section's and Plan's `Sessions`, the latest-session row (or the session its arrows stepped to), the empty panel's `Open Train` (`push`) |
 | `/exercise-history` | `/completed-session/<id>` | a session card or an all-time-best row |
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
-| `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`replace`) |
+| `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`dismissTo`) |
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
 | `/more` | `/exercise-catalog`, `/gyms`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
-| `/exercise-catalog`, `/settings` | a tab | `MainTabBar` (`dismissTo`, so the tabs below are reused rather than stacked) |
+| `/exercise-catalog`, `/settings`, `/exercise-history`, `/session/<id>` | a tab | `MainTabBar` (unanimated `dismissTo`: the tabs below are reused) |
 | `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
-| `/settings`, `/settings-muscles`, `/settings-appearance`, `/settings-data-sync` | `/profile`, `/body-weight`, `/theme-colour`, `/settings-*` | rows (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never from workouts |
+| `/settings`, `/settings-muscles`, `/settings-appearance`, `/settings-data-sync` | `/profile`, `/body-weight`, `/theme-colour`, `/theme-background`, `/settings-*` | rows (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never from workouts |
 | `/settings-everything-else` | `/dev-logs` | `View logs` (`push`), only under `isDevMode()` |
 | `/profile`, `/connected-agents` | themselves | sign-in/sign-out rerender, and grant load / retry / confirmed revocation, update the route in place |
 | `/connected-agents` | `/sign-in` | its auth guard on a signed-out direct entry |
@@ -197,8 +197,7 @@ Progress filters stay in-route; Sessions last. Muscle 3D discloses the selected 
 their links open history within [[comparison.history-window]] at the selected metric/gym. Exercise always uses List; breakdown and muscle-layout switches reset scroll.
 
 Modals, sheets and `Alert` stay in-route. A back *gesture* is disabled rather than handled where leaving
-would be wrong: the session view of a workout in progress and the completion
-summary both set `gestureEnabled: false`.
+would be wrong: the completion summary sets `gestureEnabled: false`.
 
 ## Header titles
 

@@ -23,8 +23,8 @@ describe('history hrefs', () => {
     expect(historyDayHref('2026-10-07', [])).toBeNull();
   });
 
-  it('opens the active workout on its session view and preserves other day destinations', () => {
-    expect(historyDayHref('2026-10-25', ['active a/b'], 'active a/b')).toBe('/session/active%20a%2Fb');
+  it('opens the active workout on Train, where it lives, and preserves other day destinations', () => {
+    expect(historyDayHref('2026-10-25', ['active a/b'], 'active a/b')).toBe('/train');
     expect(historyDayHref('2026-10-25', ['completed'], 'active')).toBe('/completed-session/completed');
     expect(historyDayHref('2026-10-25', ['active', 'completed'], 'active')).toBe('/sessions?day=2026-10-25');
     expect(historyDayHref('2026-10-25', [], 'active')).toBeNull();

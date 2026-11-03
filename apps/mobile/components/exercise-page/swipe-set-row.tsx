@@ -127,7 +127,7 @@ function SwipeUnderlay({ drag, side, testID }: { drag: SharedValue<number>; side
           <Icon color={isLeft ? uiRoles.danger : uiRoles.accent} name={name} />
         </Animated.View>
         <Animated.View style={[styles.symbol, symbolStyle, solidStyle]}>
-          <Icon color={uiRoles.surface} name={name} />
+          <Icon color={isLeft ? uiRoles.onDanger : uiRoles.onAccent} name={name} />
         </Animated.View>
       </View>
     </View>

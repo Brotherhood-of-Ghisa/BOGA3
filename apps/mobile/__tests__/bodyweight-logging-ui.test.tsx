@@ -33,7 +33,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
-import { SessionViewScreen } from '@/app/session/[sessionId]/index';
+import { SessionViewScreen } from '@/components/session-view/session-view-screen';
 import {
   __resetBodyweightCalculationPreferenceForTests,
   setBodyweightCalculationsEnabled,
@@ -135,7 +135,7 @@ describe('bodyweight logging over real data', () => {
 
   it('shows the session view row in the ordinary vocabulary and geometry, recalculating as readings change', async () => {
     await seed({ calculations: false });
-    render(<SessionViewScreen sessionId={SESSION} />);
+    render(<SessionViewScreen placement="tab" onEnded={jest.fn()} sessionId={SESSION} />);
     await waitFor(() => expect(rowFigure('vol')).toBe('Vol 0'));
     const ordinaryStyle = screen.getByTestId(ROW).props.style;
 

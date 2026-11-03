@@ -1,38 +1,49 @@
 import { Storage } from 'expo-sqlite/kv-store';
 
 import type { HueThemeId } from '@/components/ui/theme-hue';
-import { resolveThemePreset, type ResolvedTheme, type ThemePresetId } from '@/components/ui/theme-presets';
+import {
+  defaultTheme,
+  resolveAppearance,
+  resolveThemePreset,
+  type AppearanceChoice,
+  type ResolvedTheme,
+  type ThemePresetId,
+} from '@/components/ui/theme-presets';
+import { parseAppearanceRecord, serialiseAppearanceRecord } from '@/components/ui/theme-record';
 
-// The chosen theme, per device: it is not synced to the account. Read
+// The chosen appearance, per device: it is not synced to the account. Read
 // synchronously, once, when `tokens.ts` first evaluates — about a hundred
 // modules bake `uiRoles` into a module-scope `StyleSheet.create`, so a choice
 // takes effect on the next launch (`docs/specs/ui/design-language.md` §2,
-// "Presets").
+// "Choosing one").
+//
+// The record (`theme-record.ts`). Every save writes it.
+export const APPEARANCE_STORAGE_KEY = 'boga3.appearance.v2';
+// The accent id stored before background and text were choices. Read only
+// while no record exists, never written, and left in place.
 export const THEME_PRESET_STORAGE_KEY = 'boga3.themePreset.v1';
+
+// The stored choice, resolved: the record, else the older accent id, else the
+// default. An unusable value resolves to the default with its problem. Throws
+// when the store cannot be read.
+export function readStoredTheme(): ResolvedTheme {
+  const record = Storage.getItemSync(APPEARANCE_STORAGE_KEY);
+  if (record === null) return resolveThemePreset(Storage.getItemSync(THEME_PRESET_STORAGE_KEY));
+  const parsed = parseAppearanceRecord(record);
+  return parsed.appearance ? resolveAppearance(parsed.appearance) : defaultTheme(parsed.problem);
+}
 
 // What the stored choice resolves to, or the default and why.
 export function readLaunchTheme(): ResolvedTheme {
-  let storedId: string | null;
   try {
-    storedId = Storage.getItemSync(THEME_PRESET_STORAGE_KEY);
+    return readStoredTheme();
   } catch (error) {
-    const resolved = resolveThemePreset(null);
-    return {
-      ...resolved,
-      problem: { kind: 'read-failed', message: error instanceof Error ? error.message : String(error) },
-    };
+    return defaultTheme({ kind: 'read-failed', message: error instanceof Error ? error.message : String(error) });
   }
-  return resolveThemePreset(storedId);
 }
 
 // The theme this launch is drawn in. Never changes while the app runs.
 export const launchTheme: ResolvedTheme = readLaunchTheme();
-
-// The choice as stored now: differs from `launchTheme` once the user picks
-// another preset, until the next launch.
-export function readStoredThemePresetId(): string | null {
-  return Storage.getItemSync(THEME_PRESET_STORAGE_KEY);
-}
 
 const savedListeners = new Set<() => void>();
 
@@ -45,9 +56,50 @@ export function subscribeThemeSaved(listener: () => void): () => void {
   };
 }
 
-// Rejects when the write fails; the caller reports that nothing changed. `id`
-// is a preset id or a custom hue's `hue:<deg>`.
-export async function saveThemePresetId(id: ThemePresetId | HueThemeId): Promise<void> {
-  await Storage.setItem(THEME_PRESET_STORAGE_KEY, id);
+// Writes the whole choice as the record. Rejects when the write fails; the
+// caller reports that nothing changed.
+export async function saveAppearance(appearance: AppearanceChoice): Promise<void> {
+  await Storage.setItem(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord(appearance));
   savedListeners.forEach((listener) => listener());
+}
+
+let lastSave: Promise<void> = Promise.resolve();
+// The saves accepted but not yet settled, so a second choice compares against
+// what the first will store rather than what it has stored so far. Each field
+// holds the value of the newest save that names it, and that save's ticket.
+let queued: Partial<AppearanceChoice> = {};
+const queuedTickets = new Map<keyof AppearanceChoice, number>();
+let lastTicket = 0;
+
+// The stored choice with the saves still queued applied. Throws when the store
+// cannot be read.
+export function readIntendedTheme(): AppearanceChoice {
+  return { ...readStoredTheme().appearance, ...queued };
+}
+
+// Saves part of the choice — the accent (a preset id or a custom hue's
+// `hue:<deg>`), the background, the text — keeping the rest of the stored
+// choice; an unusable stored choice is replaced by the default's. Saves run one
+// after another, so two quick choices cannot overwrite each other's field.
+// Rejects, saving nothing, when the store cannot be read or written.
+export function saveAppearancePart(part: Partial<AppearanceChoice>): Promise<void> {
+  const ticket = (lastTicket += 1);
+  const fields = Object.keys(part) as (keyof AppearanceChoice)[];
+  queued = { ...queued, ...part };
+  fields.forEach((field) => queuedTickets.set(field, ticket));
+  // A field leaves the queue when its newest save settles, saved or failed.
+  const settle = (): void => {
+    fields.forEach((field) => {
+      if (queuedTickets.get(field) !== ticket) return;
+      queuedTickets.delete(field);
+      delete queued[field];
+    });
+  };
+  const run = lastSave.then(() => saveAppearance({ ...readStoredTheme().appearance, ...part }));
+  lastSave = run.then(settle, settle);
+  return run;
+}
+
+export function saveThemeAccent(accent: ThemePresetId | HueThemeId): Promise<void> {
+  return saveAppearancePart({ accent });
 }

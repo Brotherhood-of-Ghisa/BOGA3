@@ -34,6 +34,7 @@ import {
   getCycleErrorCode,
 } from '@/src/sync/cycle-error-signal';
 import { runSyncCycle, type WireEntity } from '@/src/sync/cycle';
+import { getLastRowsPushedAtMs, subscribeToRowsPushed } from '@/src/sync/push-signal';
 
 import {
   createInMemoryDatabase,
@@ -183,7 +184,14 @@ describe('cycle convergence', () => {
       return pushOk;
     });
 
+    const rowsPushed = jest.fn();
+    const unsubscribe = subscribeToRowsPushed(rowsPushed);
     await expect(runSyncCycle()).resolves.toBe('converged');
+    unsubscribe();
+
+    // A cycle that pushed nothing tells no server-derived reader to refresh.
+    expect(rowsPushed).not.toHaveBeenCalled();
+    expect(getLastRowsPushedAtMs()).toBeNull();
 
     // The single server row landed locally and clean.
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-server')).get();
@@ -212,9 +220,14 @@ describe('cycle convergence', () => {
       return pushOk;
     });
 
+    const rowsPushed = jest.fn();
+    const unsubscribe = subscribeToRowsPushed(rowsPushed);
     await runSyncCycle();
+    unsubscribe();
 
     expect(pushedBatches.length).toBeGreaterThanOrEqual(1);
+    // Once, at the end of the cycle, however many push legs sent rows.
+    expect(rowsPushed).toHaveBeenCalledTimes(1);
     const row = database.select().from(gyms).where(eq(gyms.id, 'gym-local')).get();
     expect(row?.localDirty).toBe(false);
   });

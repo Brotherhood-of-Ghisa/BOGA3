@@ -193,14 +193,15 @@ describe('maestro harness helpers', () => {
       resolveMaestroHarnessTeleportHref({ target: 'exercise-page', sessionId: 'session-123' })
     ).toBeNull();
     expect(resolveMaestroHarnessTeleportTarget('session-view')).toBe('session-view');
+    // The seeded workout in progress lives on Train; a completed session's edit
+    // is `completed-session` with `intent=edit`.
     expect(
       resolveMaestroHarnessTeleportHref({ target: 'session-view', sessionId: 'session-123' })
-    ).toBe('/session/session-123');
+    ).toBe('/train');
     expect(resolveMaestroHarnessTeleportHref({ target: 'session-view' })).toBeNull();
-    // A completed session opens the same route, to edit it.
     expect(
-      resolveMaestroHarnessTeleportHref({ target: 'session-view', sessionId: 'maestro_m24_completion_one_pr' })
-    ).toBe('/session/maestro_m24_completion_one_pr');
+      resolveMaestroHarnessTeleportHref({ target: 'completed-session', sessionId: 'done-1', intent: 'edit' })
+    ).toBe('/completed-session/done-1?intent=edit');
     expect(resolveMaestroHarnessTeleportTarget('session-plan-new')).toBe('session-plan-new');
     expect(
       resolveMaestroHarnessTeleportHref({ target: 'session-plan-new' })

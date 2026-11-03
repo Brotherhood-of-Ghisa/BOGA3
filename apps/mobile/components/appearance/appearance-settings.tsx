@@ -1,96 +1,82 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { BackgroundSection, TextSection } from '@/components/appearance/appearance-neutrals';
 import {
-  isThemePending,
-  readChosenId,
-  themeLabel,
-  useChosenThemeId,
+  appearanceLabel,
+  appearanceSummary,
+  appearanceRoles,
+  pendingAppearance,
+  useStoredAppearance,
 } from '@/components/appearance/chosen-theme';
+import { ThemePreview } from '@/components/appearance/theme-preview';
+import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
 import { SubPage } from '@/components/settings/sub-page';
 import { ChoiceRow, FormSection, Notice, RadioRow, uiBorder, uiGeometry, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { generateRoles } from '@/components/ui/theme';
 import { hueName, parseHueThemeId } from '@/components/ui/theme-hue';
-import { launchTheme, saveThemePresetId } from '@/components/ui/theme-launch';
 import {
   DEFAULT_THEME_PRESET_ID,
   themePresets,
   type ThemePreset,
+  type AppearanceChoice,
   type ThemePresetId,
 } from '@/components/ui/theme-presets';
-import { logEvent } from '@/src/logging';
 import { SETTINGS_SUB_PAGES, THEME_COLOUR_ROUTE } from '@/src/navigation/routes';
 
-// Settings home's Appearance row (`docs/specs/ui/design-language.md` "Presets"):
-// names the chosen theme and opens the Appearance page. A choice applies on the
-// next launch, as the app cannot restart itself, so a pending choice reads
-// `from next launch` here.
+// Settings home's Appearance row (`docs/specs/ui/design-language.md` "Choosing
+// one"): names the chosen theme and opens the Appearance page. The row shows
+// the accent, `tinted` when the background or text is not the theme's own, and
+// `from next launch` on a pending choice (a choice applies on the next launch,
+// as the app cannot restart itself); VoiceOver hears the whole choice.
 export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }) {
   const router = useRouter();
-  const [chosenId] = useChosenThemeId();
-  const label = themeLabel(chosenId);
-  const shown = isThemePending(chosenId) ? `${label} from next launch` : label;
+  const [appearance] = useStoredAppearance();
+  const label = appearanceLabel(appearance);
+  const spoken = pendingAppearance(appearance).any ? `${label} from next launch` : label;
   return (
     <ChoiceRow
-      accessibilityLabel={`Appearance, ${shown}`}
+      accessibilityLabel={`Appearance, ${spoken}`}
       divider={divider}
       icon="palette"
       label="Appearance"
       onPress={() => router.push(SETTINGS_SUB_PAGES.appearance)}
       testID="settings-appearance-row"
-      value={shown}
+      value={appearanceSummary(appearance)}
     />
   );
 }
 
-// Settings → Appearance: the presets as radio rows, a choice saved at once and
-// labelled `Next launch` until the app reopens, then Custom colour, which opens
-// the hue picker.
+// Settings → Appearance: a live preview of the choice, then Theme (the presets
+// as radio rows, then Custom colour, which opens the hue picker), Background
+// and Text. Each choice is saved at once and labelled `Next launch` until the
+// app reopens.
 export function AppearanceSettingsScreen() {
   const router = useRouter();
-  const [chosenId, setChosenId] = useChosenThemeId();
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const customHue = parseHueThemeId(chosenId);
-  const pending = isThemePending(chosenId);
-
-  const choose = async (id: ThemePresetId) => {
-    // Re-choosing the current preset saves nothing, unless this launch could
-    // not use the stored choice: saving then replaces the unusable value.
-    if (id === chosenId && !launchTheme.problem) return;
-    setChosenId(id);
-    setSaveError(null);
-    try {
-      await saveThemePresetId(id);
-    } catch (error) {
-      void logEvent({
-        level: 'warn',
-        event: 'theme.save_failed',
-        message: 'Could not save the chosen theme preset.',
-        context: { presetId: id, error: error instanceof Error ? error.message : String(error) },
-      });
-      // Show what is stored, not what was showing before the tap: another
-      // choice may have saved meanwhile.
-      setChosenId(readChosenId());
-      setSaveError('Couldn’t save the theme. Nothing changed.');
-    }
-  };
+  const { appearance, saveError, commit } = useAppearanceCommit();
+  const pending = pendingAppearance(appearance);
+  const customHue = parseHueThemeId(appearance.accent);
 
   return (
     <SubPage testID="settings-appearance-screen">
-      <FormSection footnote="Applies next launch" title="Theme">
+      <PreviewBlock appearance={appearance} />
+      <FormSection title="Theme">
         {themePresets.map((preset, index) => {
-          const details = presetDetails(preset.id, chosenId, pending);
+          const checked = preset.id === appearance.accent;
+          const detail = presetDetails(preset.id, checked, pending.accent);
           return (
             <RadioRow
-              accessibilityLabel={[preset.label, ...details.map((detail) => detail.toLowerCase())].join(', ')}
-              checked={preset.id === chosenId}
+              accessibilityLabel={[preset.label, ...detail.map((word) => word.toLowerCase())].join(', ')}
+              checked={checked}
               divider={index > 0}
               key={preset.id}
               label={preset.label}
-              meta={<PresetMeta details={details} preset={preset} />}
+              meta={<PresetMeta details={detail} preset={preset} />}
               onPress={() => {
-                void choose(preset.id);
+                void commit(
+                  { accent: preset.id },
+                  { message: 'Couldn’t save the theme. Nothing changed.', context: { presetId: preset.id } },
+                );
               }}
               testID={`settings-appearance-option-${preset.id}`}
             />
@@ -102,20 +88,37 @@ export function AppearanceSettingsScreen() {
           label="Custom colour"
           onPress={() => router.push(THEME_COLOUR_ROUTE)}
           testID="settings-appearance-option-custom"
-          value={customHue !== null ? `${hueName(customHue)}, ${customHue}°${pending ? ' · Next launch' : ''}` : undefined}
+          value={customHue !== null ? `${hueName(customHue)}, ${customHue}°${pending.accent ? ' · Next launch' : ''}` : undefined}
         />
       </FormSection>
+      <BackgroundSection appearance={appearance} commit={commit} pending={pending} />
+      <TextSection appearance={appearance} commit={commit} pending={pending} />
       {saveError ? <Notice icon="warning" live message={saveError} testID="settings-appearance-error" tone="danger" /> : null}
     </SubPage>
   );
 }
 
+// The choice drawn on a small mock of the app, and when it applies.
+function PreviewBlock({ appearance }: { appearance: AppearanceChoice }) {
+  return (
+    <View style={styles.preview}>
+      <Text accessibilityRole="header" allowFontScaling={false} style={uiText.label}>
+        Preview
+      </Text>
+      <ThemePreview roles={appearanceRoles(appearance)} testID="settings-appearance-preview" />
+      <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.muted]} testID="settings-appearance-footnote">
+        Applies next launch
+      </Text>
+    </View>
+  );
+}
+
 // The words beside a preset's name: `Default`, and `Next launch` on the chosen
 // preset while it waits for the next launch.
-function presetDetails(id: ThemePresetId, chosenId: string, pending: boolean): string[] {
+function presetDetails(id: ThemePresetId, checked: boolean, pending: boolean): string[] {
   return [
     ...(id === DEFAULT_THEME_PRESET_ID ? ['Default'] : []),
-    ...(id === chosenId && pending ? ['Next launch'] : []),
+    ...(checked && pending ? ['Next launch'] : []),
   ];
 }
 
@@ -157,6 +160,9 @@ function PresetSwatch({ preset }: { preset: ThemePreset }) {
 }
 
 const styles = StyleSheet.create({
+  preview: {
+    gap: uiSpace.sm,
+  },
   meta: {
     flexDirection: 'row',
     alignItems: 'center',

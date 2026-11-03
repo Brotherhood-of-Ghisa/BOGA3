@@ -6,7 +6,7 @@ import { launchTheme } from '@/components/ui/theme-launch';
 // (`components/ui/theme.ts`, §2 "Derivation") — the seeds of the preset chosen
 // on this device as of launch (§2 "Presets"); what each role is for is on
 // `UiRoles`.
-export const uiRoles = generateRoles(launchTheme.preset.seeds);
+export const uiRoles = generateRoles(launchTheme.seeds);
 
 // The geometry (`docs/specs/ui/design-language.md` §4): the radii, fixed
 // widths and label tracking every screen is drawn with. Decided

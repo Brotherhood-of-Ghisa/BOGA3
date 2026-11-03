@@ -39,6 +39,7 @@ export * from './set-facts';
 export * from './stream-view-model';
 export * from './last-viewed-group';
 export {
+  GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS,
   GROUP_RESOURCE_POLL_INTERVAL_MS,
   useGroupResource,
   type GroupResourceOptions,

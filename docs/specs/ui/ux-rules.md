@@ -7,9 +7,9 @@
 > **Load when:** a task creates or changes UI.
 
 This doc complements `docs/specs/08-ux-delivery-standard.md` (process, UX
-contract, reusable UX patterns). It states a rule once, here or in the source
-below that owns it, and never restates code: a component's header comment and
-the names of its Jest tests are the specification of that component.
+contract, reusable UX patterns). It states each rule once, here or in its owning
+source, and never restates code: a component's header comment and its Jest
+test names specify it.
 
 ## Where screen behaviour lives
 
@@ -31,14 +31,14 @@ the names of its Jest tests are the specification of that component.
 
 Every period selector and default follows [[comparison.allowed-periods]]. When
 adding an analytical read or filter, load `docs/product/comparison.md`; reuse
-the configured calendar bounds instead of introducing another duration.
+the configured calendar bounds.
 
 ## Actions and emphasis
 
 1. **One primary per screen**, the screen's one `accent` action
    (`design-language.md` "Emphasis"): `Finish`, `Done`, `Edit`, `Save`, a
-   start disc. Train's disc (an empty start) stays the primary
-   even with a ready plan, whose `Start` is an outline.
+   start disc. Train's disc (an empty start) stays primary even with a
+   ready plan, whose `Start` is an outline.
 2. **Everything else is an outline or a text button.** Dismissal is never a
    button inside a sheet (see Sheets).
 3. **Destructive actions are `danger`** and visually distinct from the
@@ -48,10 +48,8 @@ the configured calendar bounds instead of introducing another duration.
    the active tab in `ink` (the others muted) over an `ink` underline, and never uses `accent`.
    Four labelled tabs (Today, Train, Progress, Groups), then More as a ⋮;
    Settings is a More row; both work signed out.
-5. **A workout in progress is never offered as a Resume button.** Train opens
-   it directly, and every session start goes through the session-entry
-   coordinator (`src/session-entry/coordinator.ts`), so no action can create a
-   second concurrent session.
+5. **A workout in progress is never a Resume button.** Train is that workout;
+   every start goes through `src/session-entry/coordinator.ts`: never two.
 
 ## Sheets
 
@@ -61,7 +59,7 @@ the configured calendar bounds instead of introducing another duration.
    screen, sized to its content. A **sub-page** (a browser or a preview:
    Swap exercise, Share session) opens a `PageSheet`, the native iOS page
    sheet the exercise picker uses. An **editor** is a page ("Pages"). Do not
-   document opening either as a route transition. A sub-page whose subject
+   document either as a route transition. A sub-page whose subject
    belongs in a native title and whose chart wants the whole screen is a route
    instead (Progress history, `navigation-contract.md`).
 2. **Dragging down closes every sheet, and dismissal writes nothing.** A
@@ -93,11 +91,14 @@ the configured calendar bounds instead of introducing another duration.
 Decided 2026-10-27.
 
 1. **Two kinds of page.** Tabs have no back; Groups takes the header style
-   below for its group switch, the others an in-content `PageHeader`. Every other page has the one native stack header on the
+   below for its group switch, the others an in-content `PageHeader`. Every other page has one native stack header on the
    `paper` ground (no white band, no shadow): a minimal back chevron, an
    Archivo 700 title, and an optional `headerRight` action (⋮, `+`). No page
    draws a second back of its own; back returns to where you came from.
-2. **Edit in a page, choose in a tray.** An editor (the exercise editor,
+2. **Motion says where you went.** Tab presses never animate. A page slides
+   in from the right, Back reverses it, a modal rises, and the summary after
+   Finish fades.
+3. **Edit in a page, choose in a tray.** An editor (the exercise editor,
    `/exercise-edit`) is a pushed page; what it opens (Link) pushes over it, so
    unsaved edits wait beneath. A `Sheet` is for row ⋮ menus and choosing one
    or a few values (a muscle). A single setting — a switch, a choice of two or
@@ -153,8 +154,8 @@ Checked by `apps/mobile/__tests__/settings-conformance.test.ts`.
    inside it and an accessibility label that states its summary (spec 08,
    "Read-only link card pattern"). Editing and removal live on the destination.
 4. **A list's sort, filter and search are the list's state.** Changing them
-   never navigates and never rewrites the URL; which of them persist is a
-   device-local preference (spec 05), not a screen decision.
+   never navigates or rewrites the URL; which persist is a device-local
+   preference (spec 05).
 
 ## States and feedback
 
@@ -185,14 +186,13 @@ Checked by `apps/mobile/__tests__/settings-conformance.test.ts`.
 
 What a set *is* and which sets count are [[set.performed]] and
 [[set.eligibility]]; counted sessions and records are
-`docs/specs/tech/training-metrics-contract.md`; how the session recorder
-keeps, defaults and cleans up rows is `src/session-recorder/session-model.ts`
-and spec 05's session invariants. The UI adds:
+`docs/specs/tech/training-metrics-contract.md`; row lifecycle is
+`src/session-recorder/session-model.ts` and spec 05's session invariants. The UI adds:
 
 1. **Set counts** follow [[set.count-display]]; the session view card's row
    count is its plain-row exception.
-2. **Set inputs show validity by visual cues only** (field frame, a disabled
-   commit control); there is no inline validation text inside a set row.
+2. **Set inputs show validity by visual cues only** (field frame, disabled
+   commit control); a set row has no inline validation text.
 3. **A planned row is matched or modified by its prescribed Weight and Reps
    only**; changing effort does not make it modified.
 4. **Set rows** follow [[set.row-figures]]; fading is `design-language.md`
@@ -205,11 +205,10 @@ and spec 05's session invariants. The UI adds:
 
 ## Calendar dates
 
-[[copy.calendar-dates]] is enforced by the presentation-source restrictions in
+[[copy.calendar-dates]] is enforced by lint in
 `apps/mobile/eslint.config.js` and required formatter arguments in
 `apps/mobile/src/utils/local-time.ts`. Components subscribe through
-`useDateFormat`; pure view models take that preference explicitly. Lint rejects native locale APIs, direct calendar-field
-interpolation and fixed formatter preferences. Calendar keys and canonical form state remain internal values.
+`useDateFormat`; pure view models take that preference explicitly. Calendar keys and canonical form state remain internal values.
 
 ## Styling guardrails
 
@@ -240,27 +239,34 @@ For adopted CompactCard rules and scope, load
 `apps/mobile/scripts/compact-pattern-guardrail.js`; for their safe/failing
 cases, load `apps/mobile/__tests__/compact-pattern-guardrail.test.ts`.
 
-Guardrail commands (from `apps/mobile/`): `npm run lint:ui-guardrails`, with
-`--verbose` for each ratchet violation, `--include-allowlisted` for the colour
-audit, and `--update-budgets` after a cleanup.
+Guardrail commands (from `apps/mobile/`): `npm run lint:ui-guardrails`
+(`--verbose` per violation, `--include-allowlisted` for colour audit, `--update-budgets`
+after a cleanup).
 
 ## Appearance
 
-Every theme is light; the presets, their seeds and why the choice applies at
-next launch are `design-language.md` "Choosing one" and the decision register in
-`docs/specs/03-technical-architecture.md`. Outside the roles: `app/_layout.tsx`
-keeps `<StatusBar style="dark" />`; the splash is a fixed white
-(`app.config.ts`); neither reads a role. The stack header takes `paper`
-(no shadow line) and `ink`, read once at launch like every role, so header
-and page read as one surface ("Pages").
+Every theme is light; presets, seeds and the next-launch rule are
+`design-language.md` "Choosing one" and the decision register in
+`docs/specs/03-technical-architecture.md`. Outside the roles, `app/_layout.tsx`
+keeps `<StatusBar style="dark" />` and the splash is a fixed white
+(`app.config.ts`). The stack header takes `paper` (no shadow line) and `ink`,
+so header and page read as one surface ("Pages").
+
+Settings → Appearance is one page: a live `ThemePreview` of the choice, then
+Theme, Background (Match theme, five swatches, Custom background) and Text
+(Match background, four inks) as radio rows, each with a swatch. A tap or
+release saves at once and writes nothing when the value is already stored; the
+chosen row reads `Next launch` until the app reopens. A Custom row opens its
+picker (hue ring; the background adds a tint step) with the same preview. A
+failed save shows a danger `Notice` saying nothing changed and is logged.
+Settings home names the combined choice.
 
 ## Screen rules no other source states
 
 ### Exercise tags are read-only
 
-Tag editing was dropped 2026-09-23: there is no attach, create, rename, delete
-or manage UI. The synced tag tables and existing assignments stay, and
-exercise history filters by them.
+Tag editing was dropped 2026-09-23: no attach, create, rename, delete or manage
+UI exists. Synced tags and assignments stay; exercise history filters by them.
 
 ### Swipes on the exercise page
 
@@ -269,27 +275,26 @@ swipe-left; only the open row, the logger, answers swipe-right, which the
 other rows carry as their glyph. Right confirms the row exactly like the tick
 and moves on; confirming the last set adds one, opened with the copied values.
 Left drops the row: it is removed, planned or ad-hoc, confirmed or not. A side
-is offered only when its move would change the row: every row drops, so
-swipe-left is always offered, but no right swipe without a valid set; a side
-not offered neither drags nor shows its symbol. Both swipes dismiss the
+is offered only when its move would change the row: swipe-left is always
+offered, right only with a valid set; an unoffered side neither drags nor shows
+its symbol. Both swipes dismiss the
 keyboard, and neither navigates. The `Confirm set` / `Drop set` accessibility
 actions are the non-gesture path, under the same conditions.
 
-The gesture states its own threshold: the row follows the finger to the
-trigger, then resists to a hard stop, and the side goes from its wash to its
-solid colour exactly where a release starts firing. Code:
+The row follows the finger to the trigger, then resists; the side turns solid
+where a release starts firing. Code:
 `components/exercise-page/swipe-set-row.tsx`,
 `canDropSet` and `dropSet` in `src/session-recorder/exercise-page-model.ts`.
 
 ### Planned sessions on Sessions and the plan screens
 
-Decided with the one-off planner. `/sessions` owns queue management: planned
+`/sessions` owns queue management: planned
 rows never enter, nor are affected by, the completed history's count, filters,
 row actions or deleted toggle; a schedule is optional and Unscheduled is never
 disguised as "today". The picker's completed-history action is **Repeat last**
 (the newest session, [[gym.split]], appended as planned sets) and is separate from **From
-planner**, which offers authored one-off blocks and available programme blocks
-still available (pending, definition-bearing, target-bearing). A block attaches
+planner**, which offers authored one-off blocks and programme blocks that are
+pending, definition-bearing and target-bearing. A block attaches
 to the active session's unsourced card of the same exercise: one match attaches,
 several offer an accessible choice sheet that writes nothing until confirmed,
 none creates a card. **Start all** with another active session offers one Resume
@@ -302,30 +307,26 @@ alone never advances; skip uses non-performance wording. Code: `src/session-plan
 ### Training programmes and multi-session plans
 
 Decided with mobile training programmes.
-- **Sequence without dates.** A programme represents an ordered sequence of
-  two or more child sessions (e.g. a 6-week wave, an A/B split). Child sessions
-  can each have an optional schedule and gym, but programme order is strictly
-  sequenced and independent of calendar dates.
-- **Queue and authoring hub.** `/sessions` displays programmes alongside
-  standalone plans under Unscheduled, ordered by recency. Persistent
-  `Plan session` and `New programme` action rows provide direct authoring entry.
-- **Child session editing.** Editing child sessions in the programme form uses
-  a focused page-sheet editor (`ProgrammeSessionEditSheet`) rather than an
-  unbounded mega-form, preventing scroll fatigue and preserving field validation
-  focus.
+- **Sequence without dates.** A programme is an ordered sequence of two or
+  more child sessions (e.g. a 6-week wave, an A/B split). Children may each
+  have an optional schedule and gym; order is independent of calendar dates.
+- **Queue and authoring hub.** `/sessions` lists programmes beside standalone
+  plans under Unscheduled, by recency, with persistent `Plan session` and
+  `New programme` rows.
+- **Child session editing.** A focused page-sheet editor
+  (`ProgrammeSessionEditSheet`), not one long form.
 - **Next unresolved block.** Programme detail (`/programme/[programmeId]`)
-  determines progress and deterministically surfaces the next unresolved block
-  in programme order, then exercise order. **Add to session** attaches the block
-  to an active session (with candidate card choice when ambiguous) or creates a
+  surfaces the next unresolved block in programme order, then exercise order.
+  **Add to session** attaches the block to an active session (with candidate card choice when ambiguous) or creates a
   new session; explicit **Skip** advances to the next unresolved block without
   recording performed work.
 - **Playlist-style session reordering.** Child sessions reorder with accessible
-  Move controls in both the programme form and programme detail; order indexes
-  update deterministically.
-- **Detached deletion invariant.** Deleting a programme soft-deletes the
-  programme record and detaches all child plans (`programme_id = null`,
-  `programme_order_index = null`), preserving them as standalone plans. Performed
-  session rows, workouts, and recorded sets are never deleted.
+  Move controls in the programme form and detail; order indexes update
+  deterministically.
+- **Detached deletion invariant.** Deleting a programme soft-deletes it and
+  detaches its child plans (`programme_id` and `programme_order_index` set to
+  null), keeping them as standalone plans. Performed rows, workouts and recorded
+  sets are never deleted.
 
 ### Connected agent write permission
 
@@ -333,13 +334,13 @@ Decided with mobile training programmes.
   client and states every capability of **Allow this coach to make changes**
   next to the toggle: reading upcoming/unscheduled plans, creating plans and
   programmes, and adding, editing, deleting or restoring exercises, whose
-  changes recalculate past figures ([[agents.write-access]]). The base OAuth consent is never labelled
+  changes recalculate past figures ([[agents.write-access]]). Base OAuth consent is never labelled
   as write access.
 - **Default off, revert on failure.** Write access is off until explicitly
-  enabled, is never enabled by a loading fallback, and applies optimistically
-  only with a revert to the server value plus a retryable error on failure.
-- **Revocation stays primary.** Revoking a grant remains the security-critical
-  action with its destructive confirm; reconnecting the client starts disabled.
+  enabled, never by a loading fallback; it applies optimistically and reverts
+  to the server value with a retryable error on failure.
+- **Revocation stays primary.** Revoking a grant stays the security-critical
+  action, with its destructive confirm; reconnecting starts disabled.
 
 ## Maintenance
 

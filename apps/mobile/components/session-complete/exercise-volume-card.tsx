@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     marginLeft: -MARKER / 2,
     borderRadius: uiGeometry.radius.pill,
     borderWidth: uiBorder.width * 2,
-    borderColor: uiRoles.surface,
+    borderColor: uiRoles.onInk,
     backgroundColor: uiRoles.ink,
   },
 });

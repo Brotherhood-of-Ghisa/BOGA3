@@ -86,7 +86,7 @@ function CoWEditorFields({ model, groupId, editing, picker, setPicker, onSave, o
       {COW_METRICS.map((metric, index) => <Pressable key={metric} ref={index === 0 ? metricsLauncher : undefined} accessibilityRole="checkbox" accessibilityLabel={COW_FORM_LABELS[metric]}
         accessibilityState={{ checked: model.draft.metrics.includes(metric), disabled }} disabled={disabled}
         onPress={() => model.toggleMetric(metric)} style={[styles.checkRow, index > 0 ? styles.divider : null]} testID={`cow-form-metric-${metric}`}>
-        <View style={[styles.box, model.draft.metrics.includes(metric) ? styles.checked : null]}>{model.draft.metrics.includes(metric) ? <Icon name="check" color={uiRoles.surface} size="sm" /> : null}</View>
+        <View style={[styles.box, model.draft.metrics.includes(metric) ? styles.checked : null]}>{model.draft.metrics.includes(metric) ? <Icon name="check" color={uiRoles.onInk} size="sm" /> : null}</View>
         <Text allowFontScaling={false} style={[uiText.body, styles.name]}>{COW_FORM_LABELS[metric]}{metric === 'e1rm' && chosen?.rules.bodyweight_calculations_enabled && chosen.rules.bodyweight_contribution > 0 ? ' (%BW)' : ''}</Text>
       </Pressable>)}
     </FormSection>

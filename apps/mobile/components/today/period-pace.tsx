@@ -101,7 +101,7 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
         cy={selected.current.y}
         fill={selected.projected ? uiRoles.surface : uiRoles.ink}
         r={4.5}
-        stroke={selected.projected ? uiRoles.ink : uiRoles.surface}
+        stroke={selected.projected ? uiRoles.ink : uiRoles.onInk}
         strokeWidth={2}
       />
     </>

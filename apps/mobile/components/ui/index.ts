@@ -6,6 +6,7 @@ export {
   type ActionButtonVariant,
 } from '@/components/ui/action-button';
 export { Card } from '@/components/ui/card';
+export { SummaryTile } from '@/components/ui/summary-tile';
 export { CompactCard, CompactHeader } from '@/components/ui/compact-card';
 export { ListCard, ListCardHeader } from '@/components/ui/list-card';
 export { changeToneColour, type ChangeTone } from '@/components/ui/change-tone';

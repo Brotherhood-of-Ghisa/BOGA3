@@ -172,7 +172,7 @@ describe('RootLayout auth bootstrap wiring', () => {
   });
 
   it.each([...themePresets, customTheme(200)])('applies the $label icon policy once on mount', (preset) => {
-    jest.replaceProperty(themeLaunch, 'launchTheme', { preset, problem: null });
+    jest.replaceProperty(themeLaunch, 'launchTheme', { ...themeLaunch.launchTheme, preset, problem: null });
 
     render(<RootLayout />);
 

@@ -30,6 +30,7 @@ let mockScreenOptions: {
 } = {};
 let mockSearchParams: Record<string, string | string[]> = {};
 const mockPush = jest.fn();
+const mockDismissTo = jest.fn();
 const mockFocusCleanups = new Set<() => void>();
 
 jest.mock('expo-router', () => ({
@@ -43,7 +44,7 @@ jest.mock('expo-router', () => ({
     },
   },
   useLocalSearchParams: () => mockSearchParams,
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, dismissTo: mockDismissTo }),
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => {
       const cleanup = callback();
@@ -176,6 +177,7 @@ beforeEach(async () => {
   mockScreenOptions = {};
   mockSearchParams = {};
   mockPush.mockClear();
+  mockDismissTo.mockClear();
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
   jest.useFakeTimers({ doNotFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate', 'nextTick', 'performance', 'queueMicrotask', 'hrtime'] });
@@ -233,7 +235,8 @@ describe('The history page over real data', () => {
     expect(renderedDailySample(subject).filter(tile => tile.day?.hasTraining).map(tile => [tile.dateKey, tile.day?.value]))
       .toEqual([[localDateKey(new Date()), 1]]);
     fireEvent.press(screen.getByTestId(`stats-${subject}-history-heatmap-cell-${localDateKey(new Date())}`));
-    await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith('/session/history_pulldown_in_progress'));
+    // The workout in progress lives on Train.
+    await waitFor(() => expect(mockDismissTo).toHaveBeenLastCalledWith('/train'));
   });
 
   it.each([

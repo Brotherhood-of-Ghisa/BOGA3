@@ -111,7 +111,7 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
             onPress={onCommit}
             style={[styles.tick, canCommit ? null : styles.tickDisabled]}
             testID="exercise-set-logger-commit">
-            <Icon color={uiRoles.surface} name="check" />
+            <Icon color={uiRoles.onAccent} name="check" />
           </Pressable>
         </View>
       </SetEntryFields>

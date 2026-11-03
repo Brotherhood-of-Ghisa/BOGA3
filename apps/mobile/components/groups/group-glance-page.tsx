@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { ScrollView, StyleSheet, Text, View, type RefreshControlProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { SummaryTile } from '@/components/ui/summary-tile';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import type { GroupApiError } from '@/src/groups/api';
@@ -197,12 +198,8 @@ function GlanceCards({
       accessibilityState={{ busy: held !== null }}
       style={[styles.sections, faded ? styles.held : null]}
       testID="group-glance-figures">
-      <Card testID="group-week-totals-card">
-        <View style={styles.card}>
-          <CardTitle testID="group-week-totals-title" title="Group stats" />
-          <GroupWeekTotalsFigures current={totals.current} offset={figuresOffset} previous={totals.previous} />
-        </View>
-      </Card>
+      <SummaryTile testID="group-week-totals-card" title="Group stats" titleTestID="group-week-totals-title"
+        metrics={<GroupWeekTotalsFigures current={totals.current} offset={figuresOffset} previous={totals.previous} />} />
 
       <GroupHomeBoard board={board} metric={metric} title="Top brothers" />
 

@@ -32,14 +32,24 @@ values are generated per theme, so neither a doc nor a screen may hold one —
 `uiRoles` is the only source, and `UiRoles` in
 `apps/mobile/components/ui/theme.ts` documents what each role is for.
 
-Invariants, gated by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
+Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 
 - **One value per role.** Two roles that cannot be told apart are one role.
+  The on-colour roles are exempt: each is named by the fill it sits on.
+  `accent` and `record` stay ΔE\*ab ≥ 5 from `danger`, `gain`, `loss` and the
+  regimes.
 - **`record` is never `accent`**, and clears 4.5:1 as text on `paper` and
   `surface` — it marks figures, not just a band, so "your best ever" and "the
   button that commits" must not read as the same mark.
-- **The neutrals are one hue** (75–95 at chroma ≤ 10), in the series `ink` →
-  `ink-muted` → `ink-faint` → `ink-ghost`. `scrim` follows `ink`, at 42%.
+- **Each neutral family is one hue.** The inks (`ink` → `ink-muted` →
+  `ink-faint` → `ink-ghost`) take the `text` seed's; in light mode `scrim`
+  follows `ink`, at 42%. The ground (`paper`, `rule`, `rule-soft`, `viz0`) takes the
+  `background` seed's. The shipped default keeps both at 75–95, chroma ≤ 10.
+- **`surface` is a ground, never a foreground.** A label, glyph, ring or
+  stroke on a filled role takes that fill's on-colour role: `onAccent`,
+  `onSelection`, `onDanger`, or `onInk` on `ink` used as a fill. All four are
+  white in light mode and black in dark. `apps/mobile/__tests__/ui-on-colour-guard.test.ts`
+  rejects `surface` anywhere but a ground.
 - **A wash is a tint of its role**, within 10° of its hue, so the edited row
   carries the accent's hue rather than the ground's.
 - **`danger` and the two change directions are not seeded** (§6): a decrease
@@ -49,18 +59,34 @@ Invariants, gated by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 with readable text contrast; they do not reuse the sequential `viz` ramp or
 the gain/loss meanings.
 
-**Four seeds make a theme.** `generateRoles(seeds)` turns `ground`, `accent`,
-`record` and `viz` into every role, synchronously at module load so every
+**Five seeds make a theme.** `generateRoles(seeds)` turns `background`,
+`text`, `accent`, `record` and `viz` into every role, synchronously at module load so every
 module-scope `StyleSheet.create` keeps working. A seed sets hue and chroma; the
 role sets its own fixed L\* — contrast depends on lightness, so the text floors
-hold whatever the seed. `accent` and `record` are used as given, so their floors
-are the seed's to meet. **Light only:** `app.config.ts` pins
-`userInterfaceStyle: "light"` (`ux-rules.md` "Appearance"); a dark theme would
-be a second ladder, not different seeds.
+hold whatever the seed. In light mode `accent` and `record` are used as given, so
+their floors are the seed's to meet.
 
-**Choosing one.** Four presets or a custom hue, per device, resolved when
-`tokens.ts` first evaluates (`theme-presets.ts`, `theme-launch.ts`); an unknown
-id or unreadable store opens in the default and is logged. `record` stays a
+**Two ladders, one set of seeds:** `generateRoles(seeds, mode)`. Dark puts
+`paper` at L\*10, lifts `surface` to L\*15 (never a shadow) and `ink` to L\*95.
+`accent` (L\*72, `onAccent` black) and `record` (L\*66) take their seed's hue;
+`danger`, `gain`, `loss` and the regimes keep their light hues at L\*64;
+`selection` turns white, `scrim` 60% black. The `viz` ramp lightens in even
+steps, ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
+Dark is not reachable: `app.config.ts` pins `userInterfaceStyle: "light"`
+(`ux-rules.md` "Appearance").
+
+**Choosing one.** An accent (four presets or a custom hue), a background and a
+text, per device, resolved when `tokens.ts` first evaluates
+(`theme-presets.ts`, `theme-launch.ts`). They are stored as the JSON record
+`boga3.appearance.v2`, `{accent, background, text, mode}` (`theme-record.ts`).
+A device with no record reads the older accent id, `boga3.themePreset.v1`;
+the first save writes the record and leaves that id in place. Background is
+`match` (the accent theme's own neutral), one of five swatches, or a custom
+hue and tint step. Text is `match` (the background) or one of four inks
+(`theme-neutrals.ts`). Chroma is capped (background 12, text 14) so both
+read as neutrals. `match` for both draws the accent's theme unchanged. Settings → Appearance (`ux-rules.md` "Appearance") sets each part with a live preview. `mode`
+is stored, but every theme still draws light. An unknown id, an invalid record
+or an unreadable store opens in the default and is logged. `record` stays a
 brass across presets, so "your best ever" keeps one look. For a custom hue,
 `seedsFromHue` (`theme-hue.ts`) fixes every seed's L\* and chroma so the floors
 hold at all 360 hues by construction rather than by checking afterwards. Hue is
@@ -80,14 +106,14 @@ every launcher alias. Seasonal identity follows [[appearance.november]]; its
 alternates require a native build, while ordinary Warm remains primary.
 
 **Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
-empty / rest, `viz1`…`viz4` the lightest to the strongest intensity; the steps
+empty / rest, `viz1`…`viz4` the weakest to the strongest intensity; the steps
 are even in lightness, so each bucket reads as "more" without relying on hue,
 and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
-legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
+legends and deltas included (`ink-muted` is about 3.2:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
 labels still say how much. An empty `viz0` cell takes a `rule` hairline,
-being only 1.18:1 against `surface`. A filter showing all its values at once marks the one in
-force in fixed black `selection` with white `surface` text in every theme
+being only about 1.15:1 against `surface`. A filter showing all its values at once marks the one in
+force in fixed black `selection` with white `onSelection` text (inverted in dark)
 (`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`
 shows one value and has no unselected peer, so it carries `ink` on `surface`
 (Progress's filter row, the history metric). Heatmap tiles/bars have no black current/selected
@@ -214,16 +240,24 @@ and human acceptance, load `docs/specs/08-ux-delivery-standard.md`.
 
 ### Compact list/table rows
 
-The shared recipe is `ListRow density="compact"`. Words use `body`/`bodyStrong`
-and numbers `figure`, each on the base 20pt line. Leading, content and value
-slots receive `uiSpace.xs` above and below: passive single-line content takes
+Use `ListRow density="compact"`. Words use `body`/`bodyStrong`
+and numbers `figure`, on 20pt lines. Leading, content and value
+slots have `uiSpace.xs` vertical insets: passive single-line content takes
 nominally 28pt, two lines 48pt, excluding its `uiBorder.width` / `ruleSoft`
 separator; native font metrics round to device pixels.
 An independently interactive row or trailing control keeps `tapTarget` without
-another vertical inset around that target. A separate content action wraps the
-inset text, beside the disclosure control. Wrapped content grows naturally;
-feature-sized figure columns retain full values. Nested table content inherits
-this rhythm. Existing sheet/list option densities keep their own recipes.
+another vertical inset around that target. A separate content action wraps
+inset text beside disclosure. Wrapped content grows;
+feature-sized figure columns retain full values. Nested table content shares
+this rhythm. Sheet/list option densities keep their recipes.
+
+### Headline summary tiles
+
+SummaryTile preserves the Group stats composition: `md` inset, `sm` between
+CompactHeader and the metric content. WeekFigure and Stat keep their existing
+headline, label and comparison roles and geometry. Feature readers supply the
+values and comparisons; a tile adds no type, spacing or density override.
+Controls governing multiple cards stay outside the tile.
 
 ## 5. Emphasis
 

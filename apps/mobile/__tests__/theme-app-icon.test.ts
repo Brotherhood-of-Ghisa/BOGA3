@@ -17,7 +17,7 @@ import * as appIcons from 'expo-alternate-app-icons';
 import { Storage } from 'expo-sqlite/kv-store';
 
 import { startThemeAppIcon } from '@/components/appearance/theme-app-icon';
-import { readLaunchTheme, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
+import { APPEARANCE_STORAGE_KEY, readLaunchTheme, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { customTheme, getThemePreset, resolveThemePreset, type ThemePresetId } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
@@ -52,6 +52,7 @@ afterEach(async () => {
   expect(jest.getTimerCount()).toBe(0);
   jest.useRealTimers();
   Storage.removeItemSync(THEME_PRESET_STORAGE_KEY);
+  Storage.removeItemSync(APPEARANCE_STORAGE_KEY);
   jest.restoreAllMocks();
   jest.clearAllMocks();
 });
@@ -90,6 +91,17 @@ it.each([null, 'neon', 'hue:400'])('uses Warm when the saved theme is absent or 
   jest.mocked(appIcons.getAppIconName).mockReturnValue('Plum');
   await applyThemeAppIcon(resolveThemePreset(storedId).preset);
   expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith(null);
+});
+
+it.each<[string, string | null]>([
+  ['{"accent":"plum","background":"sage","text":"navy","mode":"light"}', 'Plum'],
+  ['{"accent":"hue:200","background":{"hue":30,"tint":2},"text":"match","mode":"light"}', 'Rainbow'],
+  ['{"accent":"plum","background":"neon","text":"match","mode":"light"}', null],
+])('follows the accent of the appearance record %s', async (record, expectedName) => {
+  Storage.setItemSync(APPEARANCE_STORAGE_KEY, record);
+  jest.mocked(appIcons.getAppIconName).mockReturnValue('Forest');
+  await applyThemeAppIcon(readLaunchTheme().preset);
+  expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith(expectedName);
 });
 
 it('uses Warm when the saved theme cannot be read', async () => {

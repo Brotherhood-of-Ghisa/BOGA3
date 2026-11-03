@@ -95,7 +95,7 @@ export function GymPickerButton({ value, options, onPress, size = 'pill', testID
       accessibilityRole="button"
       label={label}
       size={size}
-      trailing={size === 'compact' ? <Icon color={value !== undefined ? uiRoles.surface : uiRoles.inkMuted} name="chevron-down" size="xs" /> : undefined}
+      trailing={size === 'compact' ? <Icon color={value !== undefined ? uiRoles.onInk : uiRoles.inkMuted} name="chevron-down" size="xs" /> : undefined}
       on={value !== undefined}
       onPress={onPress}
       testID={testID}

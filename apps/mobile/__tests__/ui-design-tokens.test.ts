@@ -1,6 +1,9 @@
 import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
-import { generateRoles } from '@/components/ui/theme';
+import { defaultThemeSeeds, generateRoles, type ThemeMode } from '@/components/ui/theme';
+import { withNeutrals } from '@/components/ui/theme-neutrals';
 import * as tokens from '@/components/ui/tokens';
+
+const MODES: readonly ThemeMode[] = ['light', 'dark'];
 
 // The token rules that stay true for good (`docs/specs/ui/design-language.md`
 // §2–§4): the type scale, the colour roles, the geometry,
@@ -33,6 +36,10 @@ describe('design-language tokens', () => {
         'inkGhost',
         'inkMuted',
         'loss',
+        'onAccent',
+        'onDanger',
+        'onInk',
+        'onSelection',
         'paper',
         'record',
         'recordRule',
@@ -78,49 +85,6 @@ describe('design-language tokens', () => {
     );
   });
 
-  it('dims a sheet backdrop with ink, not a neutral black', () => {
-    expect(uiRoles.scrim).toBe('rgba(27, 23, 18, 0.42)');
-    // `ink` (#1B1712) is rgb(27, 23, 18).
-    expect(uiRoles.ink).toBe('#1B1712');
-  });
-
-  describe('one value per role (design-language.md §2, rationalised 2026-09-27)', () => {
-    it('gives no two roles the same value', () => {
-      // Two roles that cannot be told apart are one role (design-language.md "Colour roles").
-      const byValue = new Map<string, string[]>();
-      for (const [role, value] of Object.entries(uiRoles)) {
-        byValue.set(value, [...(byValue.get(value) ?? []), role]);
-      }
-      const shared = [...byValue.values()].filter((roles) => roles.length > 1);
-      expect(shared).toEqual([]);
-    });
-
-    it('keeps every neutral on one warm hue', () => {
-      // The neutrals are one ramp — the ground a later theme is derived from.
-      // `surface` is pure white and has no hue.
-      const neutrals = [
-        uiRoles.ink,
-        uiRoles.inkMuted,
-        uiRoles.inkFaint,
-        uiRoles.inkGhost,
-        uiRoles.paper,
-        uiRoles.rule,
-        uiRoles.ruleSoft,
-      ];
-      for (const neutral of neutrals) {
-        const { chroma, hue } = lch(neutral);
-        expect(chroma).toBeLessThanOrEqual(10);
-        expect(hue).toBeGreaterThanOrEqual(75);
-        expect(hue).toBeLessThanOrEqual(95);
-      }
-    });
-
-    it('tints `accent-wash` from `accent`, not from the ground', () => {
-      expect(hueDistance(lch(uiRoles.accentWash).hue, lch(uiRoles.accent).hue)).toBeLessThanOrEqual(10);
-      expect(lightness(uiRoles.accentWash)).toBeGreaterThanOrEqual(95);
-    });
-  });
-
   it('carries exactly the typefaces and weights named in design-language.md §3', () => {
     expect(uiFonts).toEqual({
       display: { family: 'Archivo', weights: ['600', '700', '800'] },
@@ -129,81 +93,170 @@ describe('design-language tokens', () => {
     });
   });
 
-  it('keeps `record` a different colour from `accent`', () => {
-    // The collision resolved 2026-09-22: "your best ever" and "the button that
-    // commits" must not read as the same mark. Regressing this is silent — both
-    // roles keep working, they just stop meaning different things.
-    expect(uiRoles.record).not.toBe(uiRoles.accent);
-    expect(uiRoles.recordWash).not.toBe(uiRoles.accentWash);
+  it('dims a sheet backdrop with ink in light mode, and with black in dark', () => {
+    expect(uiRoles.scrim).toBe('rgba(27, 23, 18, 0.42)');
+    // `ink` (#1B1712) is rgb(27, 23, 18).
+    expect(uiRoles.ink).toBe('#1B1712');
+    // Dark mode's `ink` is pale: a backdrop of it would lighten the page.
+    expect(generateRoles(defaultThemeSeeds, 'dark').scrim).toBe('rgba(0, 0, 0, 0.6)');
   });
 
-  it('keeps `record` legible as text on both grounds', () => {
-    // WCAG 2.1 normal-text minimum; `record` is applied to figures, not just
-    // to a band. Guards against a later "warm it up a bit" losing the floor.
-    expect(contrastRatio(uiRoles.record, uiRoles.paper)).toBeGreaterThanOrEqual(4.5);
-    expect(contrastRatio(uiRoles.record, uiRoles.surface)).toBeGreaterThanOrEqual(4.5);
-    // `record` figures sit inside the `record-wash` band, so that pairing is a
-    // real reading surface too — and the wash is the value most likely to be
-    // "warmed up" later.
-    expect(contrastRatio(uiRoles.record, uiRoles.recordWash)).toBeGreaterThanOrEqual(4.5);
+  it('ships the light roles: `uiRoles` is the default seeds on the light ladder', () => {
+    expect(uiRoles).toEqual(generateRoles(defaultThemeSeeds, 'light'));
   });
 
-  describe('a change\'s two directions (design-language.md §6)', () => {
-    // Every change figure takes one of these, and nothing else does, so an
-    // improvement and a decrease can never read as each other — or as the
-    // delete red, which `loss` must stay distinct from.
-    it('keeps both legible as figures on either ground', () => {
-      for (const direction of [uiRoles.gain, uiRoles.loss]) {
-        expect(contrastRatio(direction, uiRoles.paper)).toBeGreaterThanOrEqual(4.5);
-        expect(contrastRatio(direction, uiRoles.surface)).toBeGreaterThanOrEqual(4.5);
+  // Every invariant below holds on both ladders (design-language.md §2). Light
+  // mode is what ships; dark is the same seeds on the dark ladder.
+  describe.each(MODES)('in %s mode', (mode) => {
+    const roles = generateRoles(defaultThemeSeeds, mode);
+    // Lightness away from the page: up in light mode is darker.
+    const away = (hex: string) => (mode === 'light' ? -lightness(hex) : lightness(hex));
+
+    describe('one value per role (design-language.md §2, rationalised 2026-09-27)', () => {
+      it('gives no two roles the same value', () => {
+        // Two roles that cannot be told apart are one role (design-language.md "Colour roles").
+        // An on-colour role is named by the fill it sits on, so it may repeat
+        // another role's value.
+        const byValue = new Map<string, string[]>();
+        for (const [role, value] of Object.entries(roles).filter(([name]) => !/^on[A-Z]/.test(name))) {
+          byValue.set(value, [...(byValue.get(value) ?? []), role]);
+        }
+        const shared = [...byValue.values()].filter((names) => names.length > 1);
+        expect(shared).toEqual([]);
+      });
+
+      describe.each([
+        ['the shipped default', defaultThemeSeeds],
+        ['a cool page under a navy ink', withNeutrals(defaultThemeSeeds, 'cool', 'navy')],
+        ['a custom page under a plum ink', withNeutrals(defaultThemeSeeds, { hue: 200, tint: 3 }, 'plum')],
+      ])('for %s', (_name, seeds) => {
+        const seeded = generateRoles(seeds, mode);
+
+        it('keeps each neutral family on one hue: the inks on `text`\'s, the ground on `background`\'s', () => {
+          // Background and text are picked apart, so the neutrals are two ramps,
+          // each one hue. Light `surface` is pure white and has no hue; dark
+          // `surface` is a step of the ground.
+          const families = [
+            { seed: seeds.text, roles: [seeded.ink, seeded.inkMuted, seeded.inkFaint, seeded.inkGhost] },
+            {
+              seed: seeds.background,
+              roles: [seeded.paper, seeded.rule, seeded.ruleSoft, seeded.viz0, ...(mode === 'dark' ? [seeded.surface] : [])],
+            },
+          ];
+          for (const family of families) {
+            const seed = lch(family.seed);
+            for (const neutral of family.roles) {
+              const { chroma, hue } = lch(neutral);
+              expect(chroma).toBeLessThanOrEqual(Math.max(seed.chroma, 1));
+              // Hue is only meaningful where there is chroma to carry it.
+              if (chroma >= 2) expect(hueDistance(hue, seed.hue)).toBeLessThanOrEqual(10);
+            }
+          }
+        });
+      });
+
+      it('keeps the shipped neutrals warm and low in chroma', () => {
+        for (const neutral of [roles.ink, roles.inkMuted, roles.inkFaint, roles.inkGhost, roles.paper, roles.rule, roles.ruleSoft]) {
+          const { chroma, hue } = lch(neutral);
+          expect(chroma).toBeLessThanOrEqual(10);
+          expect(hue).toBeGreaterThanOrEqual(75);
+          expect(hue).toBeLessThanOrEqual(95);
+        }
+      });
+
+      it('tints `accent-wash` from `accent`, not from the ground, close to the page', () => {
+        expect(hueDistance(lch(roles.accentWash).hue, lch(roles.accent).hue)).toBeLessThanOrEqual(10);
+        if (mode === 'light') expect(lightness(roles.accentWash)).toBeGreaterThanOrEqual(95);
+        else expect(Math.abs(lightness(roles.accentWash) - lightness(roles.paper))).toBeLessThanOrEqual(10);
+      });
+    });
+
+    it('keeps `record` a different colour from `accent`', () => {
+      // The collision resolved 2026-09-22: "your best ever" and "the button that
+      // commits" must not read as the same mark. Regressing this is silent — both
+      // roles keep working, they just stop meaning different things.
+      expect(roles.record).not.toBe(roles.accent);
+      expect(roles.recordWash).not.toBe(roles.accentWash);
+    });
+
+    it('keeps `accent` and `record` a visible step from every fixed meaning', () => {
+      // A commit must not look like a delete, a change or a regime: ΔE*ab ≥ 5.
+      for (const seeded of [roles.accent, roles.record]) {
+        for (const fixed of [roles.danger, roles.gain, roles.loss, roles.regimeOlder, roles.regimeNewer]) {
+          expect(deltaE(seeded, fixed)).toBeGreaterThanOrEqual(5);
+        }
       }
     });
 
-    it('tells the two apart by hue at one weight, and neither from `danger`', () => {
-      // One L* for both: the pair reads as equals that differ only in
-      // direction, rather than one shouting.
-      expect(Math.abs(lightness(uiRoles.gain) - lightness(uiRoles.loss))).toBeLessThanOrEqual(2);
-      expect(hueDistance(lch(uiRoles.gain).hue, lch(uiRoles.loss).hue)).toBeGreaterThanOrEqual(90);
-      expect(uiRoles.loss).not.toBe(uiRoles.danger);
-      expect(hueDistance(lch(uiRoles.loss).hue, lch(uiRoles.danger).hue)).toBeGreaterThanOrEqual(10);
+    it('keeps `record` legible as text on both grounds', () => {
+      // WCAG 2.1 normal-text minimum; `record` is applied to figures, not just
+      // to a band. Guards against a later "warm it up a bit" losing the floor.
+      expect(contrastRatio(roles.record, roles.paper)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(roles.record, roles.surface)).toBeGreaterThanOrEqual(4.5);
+      // `record` figures sit inside the `record-wash` band, so that pairing is a
+      // real reading surface too — and the wash is the value most likely to be
+      // "warmed up" later.
+      expect(contrastRatio(roles.record, roles.recordWash)).toBeGreaterThanOrEqual(4.5);
     });
 
-    it('is fixed in every theme, whatever the seeds', () => {
-      // `danger` and the two directions are not seeded: a decrease stays red
-      // and an improvement green however the accent is picked.
-      const rose = generateRoles({ ground: '#6A5F62', accent: '#B4235A', record: '#7A6A12', viz: '#9A7480' });
-      expect(rose.gain).toBe(uiRoles.gain);
-      expect(rose.loss).toBe(uiRoles.loss);
+    describe('a change\'s two directions (design-language.md §6)', () => {
+      // Every change figure takes one of these, and nothing else does, so an
+      // improvement and a decrease can never read as each other — or as the
+      // delete red, which `loss` must stay distinct from.
+      it('keeps both legible as figures on either ground', () => {
+        for (const direction of [roles.gain, roles.loss]) {
+          expect(contrastRatio(direction, roles.paper)).toBeGreaterThanOrEqual(4.5);
+          expect(contrastRatio(direction, roles.surface)).toBeGreaterThanOrEqual(4.5);
+        }
+      });
+
+      it('tells the two apart by hue at one weight, and neither from `danger`', () => {
+        // One L* for both: the pair reads as equals that differ only in
+        // direction, rather than one shouting.
+        expect(Math.abs(lightness(roles.gain) - lightness(roles.loss))).toBeLessThanOrEqual(2);
+        expect(hueDistance(lch(roles.gain).hue, lch(roles.loss).hue)).toBeGreaterThanOrEqual(90);
+        expect(roles.loss).not.toBe(roles.danger);
+        expect(hueDistance(lch(roles.loss).hue, lch(roles.danger).hue)).toBeGreaterThanOrEqual(10);
+      });
+
+      it('is fixed in every theme, whatever the seeds', () => {
+        // `danger` and the two directions are not seeded: a decrease stays red
+        // and an improvement green however the accent is picked.
+        const rose = generateRoles({ background: '#6A5F62', text: '#6A5F62', accent: '#B4235A', record: '#7A6A12', viz: '#9A7480' }, mode);
+        expect(rose.danger).toBe(roles.danger);
+        expect(rose.gain).toBe(roles.gain);
+        expect(rose.loss).toBe(roles.loss);
+      });
     });
-  });
 
-  describe('data-visualisation ramp (design-language.md §2)', () => {
-    const ramp = [uiRoles.viz0, uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4];
+    describe('data-visualisation ramp (design-language.md §2)', () => {
+      const ramp = [roles.viz0, roles.viz1, roles.viz2, roles.viz3, roles.viz4];
 
-    it('darkens step by step, each step distinct from the next', () => {
-      // "More" must always read darker, and two neighbouring buckets must not
-      // collapse into one colour on a heatmap or a failure row.
-      for (let step = 1; step < ramp.length; step += 1) {
-        expect(lightness(ramp[step])).toBeLessThan(lightness(ramp[step - 1]));
-        expect(lightness(ramp[step - 1]) - lightness(ramp[step])).toBeGreaterThanOrEqual(6);
-      }
-    });
+      it('moves away from the page step by step, each step distinct from the next', () => {
+        // "More" must always read stronger — darker on the light page, lighter
+        // on the dark one — and two neighbouring buckets must not collapse into
+        // one colour on a heatmap or a failure row.
+        for (let step = 1; step < ramp.length; step += 1) {
+          expect(away(ramp[step]) - away(ramp[step - 1])).toBeGreaterThanOrEqual(6);
+        }
+      });
 
-    it('keeps `ink` legible on every step, and its marks visible on the lightest', () => {
-      // Text on a `viz` ground is `ink` (WCAG AA, normal text) — the darkest
-      // step is the binding case.
-      expect(contrastRatio(uiRoles.ink, uiRoles.viz4)).toBeGreaterThanOrEqual(4.5);
-      // The today ring and selected border are `ink` hairlines (non-text, 3:1).
-      expect(contrastRatio(uiRoles.ink, uiRoles.viz1)).toBeGreaterThanOrEqual(3);
-      // The first step must read as shaded against a card's `surface`.
-      expect(lightness(uiRoles.surface) - lightness(uiRoles.viz1)).toBeGreaterThanOrEqual(10);
-    });
+      it('keeps `ink` legible on every step, and its marks visible on the weakest', () => {
+        // Text on a `viz` ground is `ink` (WCAG AA, normal text) — the strongest
+        // step is the binding case.
+        expect(contrastRatio(roles.ink, roles.viz4)).toBeGreaterThanOrEqual(4.5);
+        // The today ring and selected border are `ink` hairlines (non-text, 3:1).
+        expect(contrastRatio(roles.ink, roles.viz1)).toBeGreaterThanOrEqual(3);
+        // The first step must read as shaded against a card's `surface`.
+        expect(away(roles.viz1) - away(roles.surface)).toBeGreaterThanOrEqual(10);
+      });
 
-    it('is never the primary action or a record', () => {
-      for (const step of ramp) {
-        expect(step).not.toBe(uiRoles.accent);
-        expect(step).not.toBe(uiRoles.record);
-      }
+      it('is never the primary action or a record', () => {
+        for (const step of ramp) {
+          expect(step).not.toBe(roles.accent);
+          expect(step).not.toBe(roles.record);
+        }
+      });
     });
   });
 });
@@ -224,6 +277,18 @@ function lch(hex: string): { lightness: number; chroma: number; hue: number } {
   const bStar = 200 * (f(y) - f(z));
   const hue = (Math.atan2(bStar, a) * 180) / Math.PI;
   return { lightness: 116 * f(y) - 16, chroma: Math.hypot(a, bStar), hue: hue < 0 ? hue + 360 : hue };
+}
+
+// CIE76 ΔE*ab: Euclidean distance in L*a*b*. ~2.3 is a just-noticeable
+// difference side by side.
+function deltaE(first: string, second: string): number {
+  const toLab = (hex: string) => {
+    const { lightness: l, chroma, hue } = lch(hex);
+    const radians = (hue * Math.PI) / 180;
+    return [l, chroma * Math.cos(radians), chroma * Math.sin(radians)];
+  };
+  const [a, b] = [toLab(first), toLab(second)];
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
 function hueDistance(a: number, b: number): number {

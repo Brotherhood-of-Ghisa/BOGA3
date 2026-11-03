@@ -6,7 +6,9 @@
  * migrated in-memory SQLite
  * database (helpers/local-data.ts), seeded with the `session-view` Maestro
  * fixture where a workout is in progress. Started sessions are read back from
- * the database. Only the native database open and the router are replaced.
+ * the database. Only the native database open, the focus hook and the session
+ * view (`session-view-screen.test.tsx` owns it) are replaced: the stand-in
+ * names the workout Train shows and ends it when pressed.
  *
  * Planning has no data source yet (the route offers none), so planned launches
  * are driven through the `planningState` prop with a materializer that writes
@@ -14,7 +16,7 @@
  * a failed draft write, a failed plan write and a failed active-session read.
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -22,14 +24,24 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule()
 );
 
-const mockPush = jest.fn();
-
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
   useIsFocused: () => true,
+  useRouter: () => ({ dismissTo: jest.fn() }),
 }));
 
+jest.mock('@/components/session-view/session-view-screen', () => {
+  const { createElement } = jest.requireActual<typeof import('react')>('react');
+  const { Pressable, View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    SessionViewScreen: ({ onEnded, placement, sessionId }: { onEnded: (moment: string) => void; placement: string; sessionId: string }) =>
+      createElement(View, { accessibilityLabel: `${placement} workout ${sessionId}`, testID: 'train-workout' },
+        createElement(Pressable, { onPress: () => onEnded('now'), testID: 'train-workout-abandon' }),
+        createElement(Pressable, { onPress: () => onEnded('on-return'), testID: 'train-workout-finish' })),
+  };
+});
+
 import TrainRoute, { TrainScreen, type TrainPlanningState } from '../app/(tabs)/train';
+import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import * as sessionDrafts from '@/src/data/session-drafts';
 import * as sessionList from '@/src/data/session-list';
@@ -59,6 +71,9 @@ const openTrain = async (fixture?: 'session-view') => {
   render(<TrainRoute />);
   await checked();
 };
+
+// The workout Train shows in place of its disc, as `<placement> workout <id>`.
+const shownWorkout = () => screen.queryByTestId('train-workout')?.props.accessibilityLabel ?? null;
 
 const activeSessionId = async () => (await listSessionListBuckets()).active?.id ?? null;
 const activeSessionCount = () =>
@@ -112,7 +127,6 @@ const renderWithPlan = async (planningState: TrainPlanningState, sessionEntry?: 
 
 beforeEach(() => {
   resetLocalData();
-  mockPush.mockReset();
 });
 
 afterEach(() => {
@@ -141,39 +155,92 @@ describe('Train over real data', () => {
     expect(history).not.toHaveBeenCalled();
   });
 
-  it('opens the workout in progress, offering no button for it', async () => {
+  it('is the workout in progress: the session view in place of the disc, offering no button for it', async () => {
     await seed('session-view');
     render(<TrainRoute />);
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith(`/session/${ACTIVE}`));
-    expect(mockPush).toHaveBeenCalledTimes(1);
-    expect(isBusy()).toBe(true);
+    await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
+    expect(screen.queryByTestId('train-start-empty-button')).toBeNull();
     expect(screen.queryByRole('button', { name: /resume/i })).toBeNull();
   });
 
-  it('waits for focus before opening the workout in progress', async () => {
+  it('waits for focus before reading for a workout in progress', async () => {
     await seed('session-view');
     render(<TrainScreen isFocused={false} />);
     await act(async () => undefined);
 
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(shownWorkout()).toBeNull();
+    expect(isBusy()).toBe(true);
   });
 
-  it('checks again on every focus, so an abandoned workout is never opened', async () => {
+  it('keeps the workout shown while a focus re-reads it, and shows the disc once it was abandoned', async () => {
     await seed('session-view');
     const view = render(<TrainScreen isFocused />);
-    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
 
     view.rerender(<TrainScreen isFocused={false} />);
     await setSessionDeletedState(ACTIVE, true);
     view.rerender(<TrainScreen isFocused />);
-    expect(isBusy()).toBe(true);
+    // Returning to Train never blanks the workout while the read is in flight.
+    expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`);
     await checked();
 
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(shownWorkout()).toBeNull();
   });
 
-  it('starts one empty draft on a double tap, the disc unchanged, and opens its session view', async () => {
+  it('keeps the workout shown when a focus re-read fails', async () => {
+    await seed('session-view');
+    const view = render(<TrainScreen isFocused />);
+    await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
+    jest.spyOn(sessionList, 'findActiveSessionId').mockRejectedValueOnce(new Error('Unable to read sessions'));
+
+    view.rerender(<TrainScreen isFocused={false} />);
+    view.rerender(<TrainScreen isFocused />);
+    await act(async () => undefined);
+
+    expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`);
+  });
+
+  it('shows a workout opened from a page over the tabs at once, before re-reading', async () => {
+    // The opener lives on another page; `screen` follows the Train render below.
+    const { result } = renderHook(() => useOpenActiveWorkout());
+    await openTrain();
+
+    act(() => result.current('opened-elsewhere'));
+
+    expect(shownWorkout()).toBe('tab workout opened-elsewhere');
+  });
+
+  it('returns to the disc at once, ready to start, when the workout is abandoned', async () => {
+    await seed('session-view');
+    render(<TrainRoute />);
+    await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
+
+    fireEvent.press(screen.getByTestId('train-workout-abandon'));
+
+    expect(shownWorkout()).toBeNull();
+    expect(isBusy()).toBe(false);
+  });
+
+  it("keeps a finished workout under Finish's summary, and shows the disc once Train is back", async () => {
+    await seed('session-view');
+    const view = render(<TrainScreen isFocused />);
+    await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
+
+    // The summary fades in over Train: nothing beneath may change.
+    fireEvent.press(screen.getByTestId('train-workout-finish'));
+    expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`);
+    view.rerender(<TrainScreen isFocused={false} />);
+    expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`);
+    await setSessionDeletedState(ACTIVE, true);
+
+    view.rerender(<TrainScreen isFocused />);
+    expect(shownWorkout()).toBeNull();
+    await checked();
+    expect(shownWorkout()).toBeNull();
+  });
+
+  it('starts one empty draft on a double tap, the disc unchanged, and shows its session view', async () => {
     await openTrain();
     const before = screen.getByTestId('train-start-empty-button').props.style;
 
@@ -183,10 +250,10 @@ describe('Train over real data', () => {
     expect(screen.getByTestId('train-start-empty-button')).toHaveTextContent('Start');
     expect(StyleSheet.flatten(screen.getByTestId('train-start-empty-button').props.style)).toEqual(StyleSheet.flatten(before));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(shownWorkout()).not.toBeNull());
     const started = await activeSessionId();
     expect(started).not.toBeNull();
-    expect(mockPush).toHaveBeenCalledWith(`/session/${started}`);
+    expect(shownWorkout()).toBe(`tab workout ${started}`);
     expect(activeSessionCount()).toBe(1);
     expect(await sessionDrafts.loadSessionSnapshotById(started!)).toMatchObject({ status: 'active', exercises: [] });
   });
@@ -199,22 +266,20 @@ describe('Train over real data', () => {
 
     fireEvent.press(screen.getByTestId('train-start-empty-button'));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(shownWorkout()).not.toBeNull());
     const started = await activeSessionId();
     expect(started).not.toBe(ACTIVE);
-    expect(mockPush).toHaveBeenCalledWith(`/session/${started}`);
+    expect(shownWorkout()).toBe(`tab workout ${started}`);
   });
 
-  it('opens the workout in progress rather than offering a plan', async () => {
+  it('shows the workout in progress rather than offering a plan', async () => {
     const plan = readyPlan({ title: 'Lower body', detail: '4 exercises' });
     await seed('session-view');
     render(<TrainScreen planningState={plan} />);
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith(`/session/${ACTIVE}`));
+    await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
     expect(screen.queryByTestId('train-start-planned-button')).toBeNull();
     expect(screen.queryByTestId('train-manage-planning-button')).toBeNull();
-    fireEvent.press(screen.getByTestId('train-start-empty-button'));
-    expect(mockPush).toHaveBeenCalledTimes(1);
     expect(await activeSessionId()).toBe(ACTIVE);
     expect(plan.status === 'ready' && plan.materialize).not.toHaveBeenCalled();
   });
@@ -232,7 +297,7 @@ describe('Train over real data', () => {
     expect(await activeSessionId()).toBeNull();
 
     fireEvent.press(screen.getByTestId('train-start-empty-button'));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(shownWorkout()).not.toBeNull());
     expect(await activeSessionId()).not.toBeNull();
   });
 
@@ -256,11 +321,11 @@ describe('Train over real data', () => {
     });
     fireEvent.press(screen.getByRole('button', { name: 'Start Upper body' }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/planned-session'));
-    expect(await activeSessionId()).toBe('planned-session');
-
     fireEvent.press(screen.getByTestId('train-manage-planning-button'));
     expect(plan.status === 'ready' && plan.openManager).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => expect(shownWorkout()).toBe('tab workout planned-session'));
+    expect(await activeSessionId()).toBe('planned-session');
   });
 
   it('keeps a failed planned launch inline, leaving empty training usable (a failed plan write)', async () => {

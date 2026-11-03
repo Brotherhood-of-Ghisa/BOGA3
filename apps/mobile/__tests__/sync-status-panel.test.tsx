@@ -30,11 +30,12 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 
 import { StyleSheet } from 'react-native';
 
+import { waitForGone } from './helpers/wait-for-gone';
+
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
 import { uiRoles, uiText } from '@/components/ui';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { SyncStatusSnapshot } from '@/src/sync/sync-status';
-import { waitForGone } from './helpers/wait-for-gone';
 
 const baseStatus: SyncStatusSnapshot = {
   lastSuccessAtMs: null,
@@ -254,10 +255,13 @@ describe('Settings sync-status panel', () => {
     expect(screen.getByText('Review changes')).toHaveStyle({ color: uiRoles.accent });
     fireEvent.press(screen.getByTestId('settings-merge-review'));
     expect(mockPush).toHaveBeenCalledWith('/settings-review-changes');
-    // The first absence poll must see the old row while the replacement read waits.
-    const readStatus = jest.fn(() => new Promise<SyncStatusSnapshot>(resolve =>
-      setTimeout(() => resolve({ ...baseStatus, mergeReviewCount: 0 }), 5)));
-    rerender(<SyncStatusPanel onRequestSync={jest.fn()} readStatus={readStatus} />);
+    const readEmptyStatus = jest.fn(() =>
+      new Promise<SyncStatusSnapshot>(resolve => {
+        setTimeout(() => resolve({ ...baseStatus, mergeReviewCount: 0 }), 5);
+      }),
+    );
+    rerender(<SyncStatusPanel onRequestSync={jest.fn()} readStatus={readEmptyStatus} />);
+    expect(screen.getByTestId('settings-merge-review')).toBeTruthy();
     await waitForGone(() => screen.queryByTestId('settings-merge-review'));
   });
 
