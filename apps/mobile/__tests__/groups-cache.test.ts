@@ -1,6 +1,7 @@
 import { groupCache } from '@/src/data/schema';
 import { competitionCacheKeys, evictCompetitionCache, evictGroup, groupCacheKeys, getCompetitionCacheGeneration,
-  readGroupCache, writeGroupCache, observeGroupCompetitionPolicy, deleteGroupCacheEntry, wipeGroupCache } from '@/src/groups/cache';
+  readGroupCache, writeGroupCache, observeGroupCompetitionPolicy, deleteGroupCacheEntry, wipeGroupCache,
+  forgetGroupCacheMemory, invalidateCompetitionMemory, peekGroupCache, quarantineCompetitionCache } from '@/src/groups/cache';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 import { competitionGroup, competitionGroupDetail, competitionExercise, competitionSession, competitionStream,
   competitionWeek, competitionBoard,competitionEvent } from './helpers/competition-fixtures';
@@ -228,4 +229,43 @@ it('round-trips safe normalized projections and rejects a private nested counter
   expect(() => put(key, poisoned)).toThrow('Unsafe group cache payload.');
   raw('session:v6:g1:other:old', payload);
   expect(readGroupCache(fixture.database, 'session:v6:g1:other:old', 'u1')).toBeNull();
+});
+
+describe('the in-memory mirror', () => {
+  const mine = { groups: [competitionGroup] };
+  it('holds what this run read or wrote, per account, and drops it with the rows', () => {
+    expect(peekGroupCache(groupCacheKeys.mine,'u1')).toBeNull();
+    put(groupCacheKeys.mine,mine);
+    expect(peekGroupCache(groupCacheKeys.mine,'u1')).toEqual({ payload: mine,fetchedAtMs: 1000 });
+    expect(peekGroupCache(groupCacheKeys.mine,'u2')).toBeNull();
+
+    deleteGroupCacheEntry(fixture.database,groupCacheKeys.mine);
+    expect(peekGroupCache(groupCacheKeys.mine,'u1')).toBeNull();
+
+    raw(groupCacheKeys.mine,mine);
+    readGroupCache(fixture.database,groupCacheKeys.mine,'u1');
+    expect(peekGroupCache(groupCacheKeys.mine,'u1')).toEqual({ payload: mine,fetchedAtMs: 1 });
+    fixture.database.delete(groupCache).run();
+    // A read that finds the row gone drops it too.
+    readGroupCache(fixture.database,groupCacheKeys.mine,'u1');
+    expect(peekGroupCache(groupCacheKeys.mine,'u1')).toBeNull();
+  });
+  it('a write by another account replaces the first owner', () => {
+    put(groupCacheKeys.mine,mine,'u1');
+    put(groupCacheKeys.mine,mine,'u2');
+    expect(peekGroupCache(groupCacheKeys.mine,'u1')).toBeNull();
+    expect(peekGroupCache(groupCacheKeys.mine,'u2')).not.toBeNull();
+  });
+  it.each([
+    ['a generation bump',() => invalidateCompetitionMemory('u1')],
+    ['a quarantine',() => quarantineCompetitionCache('u1')],
+    ['a competition eviction',() => evictCompetitionCache(fixture.database,'u1')],
+    ['a group eviction',() => evictGroup(fixture.database,'g1')],
+    ['a cache wipe',() => wipeGroupCache(fixture.database)],
+    ['a local-store wipe',() => forgetGroupCacheMemory()],
+  ])('forgets the account after %s', (_label,evict) => {
+    put(groupCacheKeys.group('g1'),competitionGroupDetail);
+    evict();
+    expect(peekGroupCache(groupCacheKeys.group('g1'),'u1')).toBeNull();
+  });
 });

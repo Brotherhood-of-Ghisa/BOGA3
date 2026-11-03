@@ -37,6 +37,7 @@ import {
   wipeLocalDatabaseRows,
 } from '@/src/data/local-wipe';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
+import { forgetGroupCacheMemory } from '@/src/groups/cache';
 import { logEvent } from '@/src/logging/logEvent';
 import {
   drainAccountLocalSyncedWrites,
@@ -113,6 +114,7 @@ const wipeStore = async (database: LocalDatabase, accountUserId: string | null):
   await drainAccountLocalSyncedWrites();
   wipeLocalDatabaseRows(database, { accountUserId });
   invalidateExerciseCatalogCache();
+  forgetGroupCacheMemory();
   notifyLocalDataReset();
   // The emptied row no longer overrides the kv fallback until sync restores it.
   forgetSyncedTargetsAdoption();

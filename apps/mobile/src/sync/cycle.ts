@@ -31,6 +31,7 @@ import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import { ensureLocalDataOwnedBy, withLocalDataLock } from '@/src/sync/account-wipe';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
 import { clearCycleError, markCycleError } from '@/src/sync/cycle-error-signal';
+import { notifyRowsPushed } from '@/src/sync/push-signal';
 import { runBootstrapper } from '@/src/sync/bootstrapper';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { runBundleMigrations } from '@/src/data/bundle-migrations';
@@ -2058,6 +2059,9 @@ export const runSyncCycle = (): Promise<SyncCycleOutcome> => withLocalDataLock(r
 
 const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
   const database = await bootstrapLocalDataLayer();
+  // Rows the push legs sent: once the cycle ends, server-derived readers
+  // (group reads) are told the server has them.
+  let pushedRows = 0;
 
   try {
     // The local store must belong to the account this cycle syncs as. A store
@@ -2104,6 +2108,7 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
       if (pushed === null) {
         continue;
       }
+      pushedRows += pushed;
       const pulledAfter = await runPullLeg(database);
 
       if (pulledBefore.changed === 0 && pushed === 0 && pulledAfter.changed === 0) {
@@ -2113,6 +2118,10 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
     }
   } catch (error) {
     return classifyThrow(error);
+  } finally {
+    if (pushedRows > 0) {
+      notifyRowsPushed();
+    }
   }
 };
 
