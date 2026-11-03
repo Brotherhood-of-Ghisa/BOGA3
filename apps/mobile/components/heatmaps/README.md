@@ -145,4 +145,4 @@ short windows have no implicit 52-week minimum.
   including coincident ticks. Sets retains only its median.
 - Daily and Weekly follow [[copy.no-subtitles]] and share title typography. Window/Metric captions, metric
   subtitles are omitted. Selected metric controls
-  use fixed black `selection` with white `surface` labels in every theme.
+  use `selection` with `onSelection` labels (black in light, white in dark).
