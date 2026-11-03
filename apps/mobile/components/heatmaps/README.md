@@ -90,7 +90,7 @@ and routes; rest cells in Daily stay text.
   the month/row framing without changing adapter values or colours. Months without
   training retain only their heading; occupancy includes adjacent-month days
   in their Monday-owned rows, including zero/unavailable training. Tiles have no
-  selection or black outlines. Figure visibility follows
+  `selection` or other outlines. Figure visibility follows
   [[copy.blank-history]]. Missing/future positions are empty spacers without
   accessible day values. A vertical `rule` centres in a wider Sun/Week gap;
   the eight tile columns shrink independently of the outside date gutter.
@@ -123,7 +123,7 @@ short windows have no implicit 52-week minimum.
 - **Design language only** (`docs/specs/ui/design-language.md` §2): cells and
   bars on `HEAT_RAMP` (`uiRoles.viz0`…`viz4`); an empty day is `viz0` with a
   `rule` hairline. No legacy palette and no hard-coded colours.
-- **No black outlines:** current tiles/bars have no black border.
+- **No outlines:** current tiles/bars have no `selection` or other border.
   Current-week wording is accessible only.
   `__tests__/heatmap-marks.test.tsx` holds this.
 - **Warm switching:** the history page mounts each view on first use and keeps visited views mounted. Its inactive
@@ -145,4 +145,4 @@ short windows have no implicit 52-week minimum.
   including coincident ticks. Sets retains only its median.
 - Daily and Weekly follow [[copy.no-subtitles]] and share title typography. Window/Metric captions, metric
   subtitles are omitted. Selected metric controls
-  use `selection` with `onSelection` labels (black in light, white in dark).
+  use a `selection` ground (black in light, white in dark) with `onSelection` labels.
