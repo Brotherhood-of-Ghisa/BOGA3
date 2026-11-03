@@ -2,31 +2,15 @@
 
 > **Owns:** the UX delivery process, iteration loop, and evidence standard. **Not here:** concrete UI rules and inventories → `docs/specs/ui/`. **Load when:** any UI work.
 
-## Purpose
+## Scope and ownership
 
-Define a repeatable, lightweight process for specifying and iterating on UX quality and visual appearance for MVP UI work.
-
-## Scope
-
-Applies to all user-facing mobile UI tasks across screens, components, and cross-screen flows.
-
-## Relationship to the UI docs bundle (`docs/specs/ui/**`)
-
-Use `docs/specs/ui/README.md` as the entrypoint for app-specific UI documentation (screen map, navigation contract, components catalog, app-specific UX rules).
-
-Document boundary:
-
-1. This document (`08`) owns cross-task UX process, task contract expectations, UX quality principles, and reusable UX patterns.
-2. `docs/specs/ui/**` owns current app-specific UI reality (routes, navigation behavior, reusable UI component inventory, app-specific semantics/guardrails).
-3. `docs/specs/ui/ai-design-policy.md` owns design-source selection, design
-   targets (build inputs, not specs), artifact boundaries, generated-code integration, and visual
-   comparison requirements for human- or AI-assisted design work.
-4. UI docs under `docs/specs/ui/**` should stay synthetic/overview-first and source-linked:
-   - summarize what exists and why it matters,
-   - avoid duplicating source-file prop/API details unless a compact contract summary is needed.
-5. If a UI task changes app-specific UI behavior/docs, update the relevant `docs/specs/ui/*.md` files in the same session.
-   - Use `docs/specs/ui/README.md` (`Maintenance rules`) as the canonical trigger map for which UI docs to update.
-6. Update this document in the same task only when the change affects shared UX process/pattern standards (not just one screen/component implementation).
+Applies to mobile UI screens, components and flows. This document owns shared
+UX delivery process and patterns. For current app rules/inventory and their
+maintenance triggers, load `docs/specs/ui/README.md`. For design targets,
+external artifacts, generated-code integration and screenshot comparison,
+load `docs/specs/ui/ai-design-policy.md`. Component code/tests own APIs and
+screen behavior; UI docs summarize current reality without duplicating them.
+Update this standard only for shared process or pattern changes.
 
 ## UX consistency and pattern management
 
@@ -93,43 +77,89 @@ keep it unmerged. Record acceptor, full commit, devices/viewports and surfaces
 in the PR. A material later design change needs renewed acceptance. Untouched
 approved-template instances do not need another design review.
 
-## UX quality principles
+### Promote a design into a reusable template
 
-1. Clarity first: primary action and primary data should be obvious within 3 seconds.
-2. Fast entry: common actions should require minimal taps and minimal context switching.
-3. Stable behavior: user actions should produce immediate, predictable feedback.
-4. Mobile ergonomics: controls must be thumb-friendly and readable on small screens.
-5. Progressive disclosure: advanced/secondary controls should not overwhelm the default path.
+A human **or agent** may propose promotion in the existing UX Contract and
+`ui-pattern-selection` block. Custom acceptance authorizes one use; it never
+promotes a design. Only a human with repository write/maintain/admin authority,
+including the PR author, may accept promotion.
+
+1. **Propose.** Add the proposed contract to the catalog's
+   `ui-template-catalog` array: stable `id`, production `source`/`export`,
+   intended `uses`, named `variants` with explicit bounds, `slots`,
+   `typography`, `geometry`, `interactions`, `accessibility`, owned implementation
+   `files`, representative `gallery` source/export and Jest `tests` paths.
+   Include production and gallery sources in `files`. The inventory is the
+   durable contract; acceptance evidence stays in the PR.
+   In `ui-pattern-selection.promotions`, name the `id`, `whyExistingInsufficient`,
+   `nearestParent` (existing family/source/export), `differences`,
+   `visualReference` and `preBuildApproval` (human login/reference).
+2. **Review before building.** Obtain explicit human acceptance of the proposed
+   design **and template scope** before implementing novel production design.
+   Carry valid earlier design evidence forward for an existing custom component,
+   but obtain a separate promotion decision. Agents may prepare proposals,
+   implementations and evidence; they must never fabricate or post acceptance.
+3. **Implement and verify.** Build the production export, representative gallery
+   examples using it, meaningful tests and native comparisons required by the
+   design policy. The promotion's `evidence.native` lists references with
+   `device`, `viewport` and `covers`: collectively `small`, `normal`,
+   `content-extremes`, `states`, `interactions`, `accessibility`. Include long/empty
+   content, each variant and relevant loading/error/disabled/selected states,
+   wrapping/stacking and owned actions; explain inapplicable cases. Show shared
+   row rhythm together. Record screenshots and behavior/accessibility results
+   at the reviewed full commit. Changed UI still declares custom design;
+   adding a catalog row cannot authorize its own reuse.
+4. **Accept the running template.** After inspecting the implementation,
+   contract and evidence, the authorized human posts this whole PR comment:
+
+   ```text
+   UI template accepted at <full-head-sha>:
+   - <TemplateId> sha256:<digest>
+   ```
+
+   The existing checker prints the required id/digest when acceptance is missing;
+   its `promotionDigest` hashes the catalog entry and complete promotion record
+   deterministically. List each accepted promotion. Generic PR approval,
+   proposal approval and `UI design accepted` comments do not promote anything.
+   Template acceptance also accepts the running custom design of the contract's
+   owned files; unrelated custom files need their own acceptance.
+   Every push invalidates acceptance; contract/proposal/evidence edits change
+   the digest even without a push. Comment deletion/edit withdraws it. Renew
+   evidence and human acceptance after implementation or scope changes.
+5. **Register and activate.** Merge only after the existing `UI pattern review`
+   check passes on the final head. The candidate catalog is parsed as data;
+   only unchanged registrations already in the trusted merged base are eligible
+   for reuse. Future template parents use `family: "catalog"` plus `template`
+   id, `source`, `export`, accepted `use` and named `variant`. Style/spread overrides and mismatched/dynamic `variant` props fail reuse. Within
+   those bounds reuse needs no renewed design acceptance. Outside them declare custom
+   design and obtain human acceptance; changing the reusable contract requires
+   promotion again. Preserve production exports, catalog bounds and checker
+   inheritance in the same change.
+
+The checker verifies registration structure, real exports, gallery use, file
+presence, declared bounds and authorized exact-head/digest comments. Humans
+verify semantic fit, evidence quality, truthful pre-build authority/timing and
+completeness of owned files. A reference is not independent proof of those facts.
+GitHub User identity cannot distinguish a human from an agent using shared
+credentials; agents must not use that limitation to post acceptance.
+
+Installation uses the existing base-owned workflow and required check, never
+candidate executables. If it is not yet installed/enforced on protected `main`,
+activation is pending: merge the policy first, verify the check on a subsequent
+PR, then require it in branch protection/rulesets. Stacked PRs must retarget the
+merged `main` and pass its trusted check before merge. No new approval service
+or generic approval-count requirement is introduced. For schema and fixture
+examples, load `apps/mobile/scripts/ui-template-promotion.js` and
+`apps/mobile/__tests__/ui-template-promotion.test.ts`.
 
 ## Required task-level UX contract
 
-For UI/UX work, write a `UX Contract` before building: in the plan or task
-card if the work has one (`docs/plans/`, optional), otherwise in the PR body.
-Non-UX work needs none.
-
-For a significant UI task, record its design target (a build input, not a
-spec: `docs/specs/ui/ai-design-policy.md`) beside the UX Contract.
-
-Each UX contract must include:
-
-1. Key user flows (minimal template):
-   - One small block per flow:
-     - `Flow name`
-     - `Trigger`
-     - `Steps`
-     - `Success outcome`
-     - `Failure/edge outcome`
-2. Interaction + appearance notes (lightweight):
-   - Keep this compact (prefer <= 5 bullets total).
-3. Evidence + completion notes:
-   - Record them in the PR body (Tests / Deviations), with screenshots linked.
-   - Follow the verification expectations in `docs/specs/02-quality-and-test-gates.md`.
-
-Notes:
-
-1. Keep `Key user flows` as the single source of truth for UX behavior in the task.
-2. Do not create separate `Key interactions` or `Required states` sections.
-3. If needed, include interaction details and state transitions directly in each flow's `Steps` and outcomes.
+Before UI work, record the UX Contract in the task/plan or PR body, beside the
+significant task's design target (`docs/specs/ui/ai-design-policy.md`). For each
+flow state trigger, steps, success and failure/edge outcomes. Add at most five
+interaction/appearance notes. Keep flow behavior here, not in duplicate
+interaction/state sections. Closeout links tests and screenshots to those flows
+and records deviations; update the owning UI documents when behavior changes.
 
 ## UX patterns
 
@@ -197,71 +227,19 @@ Use this section as the single source of truth for reusable UX patterns.
    - Usage: Today (`components/today/today-cards.tsx`), on `SwipePages`. The Groups screen swipes its four pages on the same pager, but its pages scroll and At a glance's stepper and metric head the page, outside its cards.
    - Rules: each page fills the height between its tabs and the tab bar, as its own cards (You: progress over session; a group: board over sessions) or, for a panel, one `Card`; each page's cards take the full width (no peek of the next) and paging snaps; tabs above name every page and move to it on tap, so a swipe is never the only way; each page has one elastic part that takes the height left (the chart, or the sessions list) above a fixed floor, and a list too long for its card scrolls inside it rather than clips; links are text buttons inside the cards (`Sessions`), never a chevron row; a page's own controls sit in its cards, never beside the tabs (the group's name and switch head its board card).
 
-## Default appearance baseline (MVP)
+## Quality and closeout
 
-1. Layout
-   - No horizontal scrolling on phone widths.
-   - Content remains usable on small phone viewport widths.
-   - Preserve spacing rhythm (prefer 8pt-based increments).
-2. Typography
-   - Body and input text should remain readable without zoom.
-   - Titles and section labels should be visually distinct from body text.
-   - Titles stand alone: [[copy.no-subtitles]].
-3. Touch targets
-   - Primary interactive elements must meet mobile tap-target expectations.
-   - Destructive actions must be visually distinguishable from primary actions.
-4. Feedback
-   - Validation errors are shown near relevant fields.
-   - Success and destructive outcomes provide explicit confirmation feedback.
-5. Accessibility baseline
-   - Meaningful accessibility labels for primary controls.
-   - Color is not the only channel for errors or destructive intent.
+Make the primary action/data obvious within three seconds, entry fast, feedback
+immediate and errors local. Progressively disclose secondary controls; prefer
+8pt-based spacing increments. Keep mobile controls readable and reachable, layouts usable on small
+phones without horizontal scrolling, and color supplemental to words/shapes.
+Use meaningful accessibility labels and explicit destructive confirmation.
 
-## UX iteration loop (required for UI tasks)
+Specify flows and pattern first, build the smallest slice, review appearance at
+small/normal widths and exercise interactions, then refine and run the agreed
+`./boga` gates. Every completed UI task links happy and failure-path assertions,
+visual captures and contract traceability. Update shared patterns when needed.
 
-1. Specify:
-   - Write the task-level `UX Contract` before implementation.
-   - Review existing `UX patterns` and decide whether task reuses or extends patterns.
-2. Build smallest slice:
-   - Implement only enough UI/state to run the first happy-path check.
-3. Visual review pass:
-   - Check hierarchy, spacing, and readability on small and large phone layouts.
-4. Interaction review pass:
-   - Verify add/edit/remove/submit flows and state transitions.
-5. Refine:
-   - Address top UX issues first (clarity, errors, destructive safety, density).
-6. Verify:
-   - Run targeted tests, then `npm run lint`, `npm run typecheck`, `npm run test`.
-7. Closeout:
-   - Record what changed and UX evidence in task completion note.
-   - If new patterns were introduced, update the `UX patterns` section in this document.
-
-## Evidence requirements for task closeout
-
-Every completed UI task must provide:
-
-1. Test evidence:
-   - At least one happy-path interaction assertion.
-   - At least one failure/error-path assertion.
-2. Visual evidence:
-   - Screenshots or equivalent captures for key happy-path and failure/edge flows covered by task scope.
-3. Contract traceability:
-   - Brief mapping from `UX Contract` items to implemented behavior/tests.
-4. Pattern maintenance evidence:
-   - If a new pattern was introduced, include the corresponding update to the `UX patterns` section.
-
-## Stop-ship UX conditions
-
-Do not mark a UI task complete if any are true:
-
-1. Primary user action is ambiguous or requires workaround steps.
-2. One or more key user flows in the UX contract are unimplemented.
-3. Validation/destructive flows are missing clear user feedback.
-4. Required UX evidence is missing from the completion note.
-5. Task introduced a new UX pattern without updating `UX patterns`.
-
-## Adoption notes
-
-1. This standard complements `docs/specs/06-testing-strategy.md` and the `AGENTS.md` workflow router.
-2. For app-specific UI inventory/navigation/component docs, use `docs/specs/ui/README.md` and the linked UI docs bundle.
-3. If UI work needs exceptions, record them explicitly in the PR body with reason and impact.
+Do not ship an ambiguous/incomplete primary flow, hidden validation feedback,
+missing evidence, or an unrecorded new pattern. Record justified exceptions in
+the PR's Deviations section.
