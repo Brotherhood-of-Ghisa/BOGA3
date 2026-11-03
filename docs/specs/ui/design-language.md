@@ -40,8 +40,8 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   `surface` — it marks figures, not just a band, so "your best ever" and "the
   button that commits" must not read as the same mark.
 - **Each neutral family is one hue.** The inks (`ink` → `ink-muted` →
-  `ink-faint` → `ink-ghost`) take the `text` seed's; `scrim` follows `ink`, at
-  42%. The ground (`paper`, `rule`, `rule-soft`, `viz0`) takes the
+  `ink-faint` → `ink-ghost`) take the `text` seed's; in light mode `scrim`
+  follows `ink`, at 42%. The ground (`paper`, `rule`, `rule-soft`, `viz0`) takes the
   `background` seed's. The shipped default keeps both at 75–95, chroma ≤ 10.
 - **`surface` is a ground, never a foreground.** A label, glyph, ring or
   stroke on a filled role takes that fill's on-colour role: `onAccent`,
@@ -66,7 +66,7 @@ their floors are the seed's to meet.
 
 **Two ladders, one set of seeds:** `generateRoles(seeds, mode)`. Dark puts
 `paper` at L\*10, lifts `surface` to L\*15 (never a shadow) and `ink` to L\*95.
-`accent` and `record` take their seed's hue at L\*66, with black labels;
+`accent` and `record` take their seed's hue at L\*66, and `onAccent` is black;
 `danger`, `gain`, `loss` and the regimes keep their light hues at L\*64;
 `selection` turns white, `scrim` 60% black. The `viz` ramp lightens in even
 steps, ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
@@ -104,7 +104,7 @@ every launcher alias. Seasonal identity follows [[appearance.november]]; its
 alternates require a native build, while ordinary Warm remains primary.
 
 **Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
-empty / rest, `viz1`…`viz4` the lightest to the strongest intensity; the steps
+empty / rest, `viz1`…`viz4` the weakest to the strongest intensity; the steps
 are even in lightness, so each bucket reads as "more" without relying on hue,
 and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes

@@ -166,7 +166,8 @@ describe('design-language tokens', () => {
 
       it('tints `accent-wash` from `accent`, not from the ground, close to the page', () => {
         expect(hueDistance(lch(roles.accentWash).hue, lch(roles.accent).hue)).toBeLessThanOrEqual(10);
-        expect(Math.abs(lightness(roles.accentWash) - lightness(roles.paper))).toBeLessThanOrEqual(10);
+        if (mode === 'light') expect(lightness(roles.accentWash)).toBeGreaterThanOrEqual(95);
+        else expect(Math.abs(lightness(roles.accentWash) - lightness(roles.paper))).toBeLessThanOrEqual(10);
       });
     });
 

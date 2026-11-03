@@ -224,7 +224,8 @@ describe('theme generator', () => {
     it('tints each wash from its own role, close to the page', () => {
       expect(hueDistance(hexToLch(roles.accentWash).hue, hexToLch(roles.accent).hue)).toBeLessThanOrEqual(10);
       expect(hueDistance(hexToLch(roles.recordWash).hue, hexToLch(roles.record).hue)).toBeLessThanOrEqual(10);
-      expect(Math.abs(hexToLch(roles.accentWash).lightness - hexToLch(roles.paper).lightness)).toBeLessThanOrEqual(10);
+      if (mode === 'light') expect(hexToLch(roles.accentWash).lightness).toBeGreaterThanOrEqual(95);
+      else expect(Math.abs(hexToLch(roles.accentWash).lightness - hexToLch(roles.paper).lightness)).toBeLessThanOrEqual(10);
     });
   });
 });
