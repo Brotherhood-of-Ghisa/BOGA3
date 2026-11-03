@@ -10,6 +10,8 @@ import {
   deriveTodayProgress,
   todayProgressLoadWindow,
   workingSetsBySession,
+  progressMetricsBySession,
+  projectVolume,
   type LatestSessionSummary,
   type ProgressSession,
   type TodayProgress,
@@ -31,7 +33,7 @@ const LATEST: LatestSessionSummary = {
   exercises: [],
 };
 
-const session = (id: string, completedAt: Date, workingSets: number): ProgressSession => ({ id, completedAt, workingSets });
+const session = (id: string, completedAt: Date, workingSets: number, volumeKgReps: number | null = 0): ProgressSession => ({ id, completedAt, workingSets, volumeKgReps });
 
 const ready = (progress: TodayProgress) => {
   if (progress.status !== 'ready') throw new Error('expected a ready summary');
@@ -65,8 +67,8 @@ describe('deriveTodayProgress', () => {
     }));
 
     expect(week.window).toEqual({ start: monday, end: local(2026, 3, 23) });
-    expect(week.current).toEqual({ sessions: 2, workingSets: 11, prs: 2 });
-    expect(week.previous).toEqual({ sessions: 2, workingSets: 18, prs: 2 });
+    expect(week.current).toMatchObject({ sessions: 2, workingSets: 11, prs: 2 });
+    expect(week.previous).toMatchObject({ sessions: 2, workingSets: 18, prs: 2 });
   });
 
   it('builds this period by day to today, the previous period by day in full, and compares at the same day', () => {
@@ -95,15 +97,15 @@ describe('deriveTodayProgress', () => {
     expect(period.window).toEqual({ start: local(2026, 10, 5), end: local(2026, 11, 2) });
     expect([period.weeks, period.dayOfPeriod, period.daysInPeriod]).toEqual([4, 19, 28]);
     expect(period.cumulativeWorkingSets).toEqual([8, 8, 8, ...Array(15).fill(20), 30]);
-    expect(period.toDate).toEqual({ sessions: 3, workingSets: 30, prs: 2 });
+    expect(period.toDate).toMatchObject({ sessions: 3, workingSets: 30, prs: 2 });
     expect(period.projectedWorkingSets).toBe(44); // 30 / 19 days × 28
 
     expect(period.previous.window).toEqual({ start: local(2026, 9, 7), end: local(2026, 10, 5) });
     expect(period.previous.cumulativeWorkingSets).toHaveLength(28);
     expect(period.previous.cumulativeWorkingSets.slice(0, 20)).toEqual([4, 4, ...Array(16).fill(10), 15, 22]);
     expect(period.previous.cumulativeWorkingSets[27]).toBe(25);
-    expect(period.previous.toSameDay).toEqual({ sessions: 3, workingSets: 15, prs: 1 });
-    expect(period.previous.total).toEqual({ sessions: 5, workingSets: 25, prs: 2 });
+    expect(period.previous.toSameDay).toMatchObject({ sessions: 3, workingSets: 15, prs: 1 });
+    expect(period.previous.total).toMatchObject({ sessions: 5, workingSets: 25, prs: 2 });
     expect(progress.latest).toBe(LATEST);
   });
 
@@ -142,7 +144,7 @@ describe('deriveTodayProgress', () => {
     expect(dayOne.period.projectedWorkingSets).toBe(560); // 20 × 28 days
 
     const quiet = ready(deriveTodayProgress({ now: local(2026, 11, 13), periodWeeks: 4, sessions: [], prAchievedAt: [], latest: LATEST }));
-    expect(quiet.period.toDate).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
+    expect(quiet.period.toDate).toMatchObject({ sessions: 0, workingSets: 0, prs: 0 });
     expect(quiet.period.projectedWorkingSets).toBe(0);
     expect(quiet.period.cumulativeWorkingSets).toEqual(new Array(12).fill(0));
   });
@@ -239,5 +241,63 @@ describe("a session's exercise lines", () => {
       ['Legacy lift', 0, null, false],
       ['Another legacy lift', 0, null, false],
     ]);
+  });
+});
+
+
+describe('independent tonnage totals', () => {
+  it('counts volume-only sessions in volume, while sessions and sets retain working-set eligibility', () => {
+    const progress = ready(deriveTodayProgress({
+      now: local(2026, 10, 16, 12), periodWeeks: 4, latest: LATEST, prAchievedAt: [],
+      sessions: [
+        session('previous', local(2026, 10, 6), 2, 1000),
+        session('working', local(2026, 10, 14), 3, 2000.5),
+        session('volume-only', local(2026, 10, 15), 0, 500.5),
+      ],
+    }));
+    expect(progress.week.current).toEqual({ sessions: 1, workingSets: 3, prs: 0, volumeKgReps: 2501 });
+    expect(progress.week.previous.volumeKgReps).toBe(1000);
+    expect(progress.period.toDate.volumeKgReps).toBe(3501);
+    expect(progress.period.cumulativeVolumeKgReps.slice(-3)).toEqual([3000.5, 3501, 3501]);
+    expect(progress.period.projectedVolumeKgReps).toBe(3501 / 12 * 28);
+  });
+
+  it('keeps an overflow unavailable through following days and does not emit an infinite projection', () => {
+    const progress = ready(deriveTodayProgress({
+      now: local(2026, 10, 16), periodWeeks: 4, latest: LATEST, prAchievedAt: [],
+      sessions: [session('before', local(2026, 10, 5), 1, 100), session('overflow', local(2026, 10, 6), 1, null)],
+    }));
+    expect(progress.period.cumulativeVolumeKgReps).toEqual([100, ...Array(11).fill(null)]);
+    expect(progress.period.toDate.volumeKgReps).toBeNull();
+    expect(progress.period.projectedVolumeKgReps).toBeNull();
+    expect(projectVolume(Number.MAX_VALUE, 1, 28)).toBeNull();
+    expect(projectVolume(0, 1, 28)).toBe(0);
+  });
+
+  it.each([local(2026, 3, 29, 12), local(2026, 10, 25, 12)])('places volume by local day across DST: %s', now => {
+    const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 18);
+    const { period } = ready(deriveTodayProgress({ now, periodWeeks: 4, latest: LATEST, prAchievedAt: [],
+      sessions: [session('yesterday', yesterday, 0, 125), session('today', now, 0, 250)],
+    }));
+    expect(period.cumulativeVolumeKgReps.slice(-2)).toEqual([125, 375]);
+  });
+
+  it('uses each physical set once, without mappings, with independent effort and per-side/bodyweight context', () => {
+    const input: StatsAggregationInput = {
+      sessions: [{ id: 's', completedAt: local(2026, 10, 15), bodyWeightKg: 80 }],
+      sessionExercises: [{ id: 'e', sessionId: 's', exerciseDefinitionId: 'd' }, { id: 'legacy', sessionId: 's', exerciseDefinitionId: null }],
+      exerciseDefinitions: [{ id: 'd', loadInputMode: 'per_side_load', bodyweightContribution: 0.5 }],
+      bodyweightCalculationsEnabled: true,
+      effortPolicy: { workingSetEfforts: [], volumeEfforts: ['warm_up'] },
+      exerciseSets: [
+        { sessionExerciseId: 'e', setType: 'warm_up', weightValue: '10', repsValue: '5' },
+        { sessionExerciseId: 'e', setType: 'rir_2', weightValue: '100', repsValue: '5' },
+        { sessionExerciseId: 'e', setType: 'warm_up', weightValue: '10', repsValue: '5', performanceStatus: 'planned' },
+        { sessionExerciseId: 'legacy', setType: 'warm_up', weightValue: '5', repsValue: '5' },
+      ], muscleMappings: [], muscleGroups: [],
+    };
+    // (80 × 0.5 + 10 × 2) × 5 + 5 × 5, even with zero working sets.
+    expect(progressMetricsBySession(input)[0]).toMatchObject({ workingSets: 0, volumeKgReps: 325 });
+    expect(workingSetsBySession(input)).toEqual([]);
   });
 });

@@ -26,6 +26,7 @@ jest.mock('@/src/data/bootstrap', () => ({
   }),
 }));
 
+import { eq } from 'drizzle-orm';
 import { __resetClockForTests } from '@/src/data/clock';
 import { exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions } from '@/src/data/schema';
 import { aggregateStats, createDrizzleStatsStore } from '@/src/data/stats';
@@ -140,13 +141,13 @@ describe('loadTodayProgress', () => {
 
     const { week, period } = ready(await loadTodayProgress(NOW, 4));
 
-    expect(week.current).toEqual({ sessions: 2, workingSets: 5, prs: 2 });
-    expect(week.previous).toEqual({ sessions: 1, workingSets: 3, prs: 3 });
+    expect(week.current).toMatchObject({ sessions: 2, workingSets: 5, prs: 2 });
+    expect(week.previous).toMatchObject({ sessions: 1, workingSets: 3, prs: 3 });
     // This period runs from Monday 5 October; the previous one from Monday 7 September.
-    expect(period.toDate).toEqual({ sessions: 3, workingSets: 8, prs: 5 });
+    expect(period.toDate).toMatchObject({ sessions: 3, workingSets: 8, prs: 5 });
     expect(period.cumulativeWorkingSets).toEqual([0, 3, 3, 3, 3, 3, 3, 6, 8, 8]);
-    expect(period.previous.toSameDay).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
-    expect(period.previous.total).toEqual({ sessions: 1, workingSets: 2, prs: 0 });
+    expect(period.previous.toSameDay).toMatchObject({ sessions: 0, workingSets: 0, prs: 0 });
+    expect(period.previous.total).toMatchObject({ sessions: 1, workingSets: 2, prs: 0 });
   });
 
   it('counts the workout in progress where finishing it now would: its confirmed sets, and no PR', async () => {
@@ -159,9 +160,9 @@ describe('loadTodayProgress', () => {
 
     const { week, period, latest } = ready(await loadTodayProgress(NOW, 4));
 
-    expect(week.current).toEqual({ sessions: 1, workingSets: 2, prs: 0 });
-    expect(week.previous).toEqual({ sessions: 1, workingSets: 3, prs: 0 });
-    expect(period.toDate).toEqual({ sessions: 2, workingSets: 5, prs: 0 });
+    expect(week.current).toMatchObject({ sessions: 1, workingSets: 2, prs: 0 });
+    expect(week.previous).toMatchObject({ sessions: 1, workingSets: 3, prs: 0 });
+    expect(period.toDate).toMatchObject({ sessions: 2, workingSets: 5, prs: 0 });
     // The latest-session card lists completed sessions only.
     expect(latest.id).toBe('oct-6');
   });
@@ -188,8 +189,8 @@ describe('loadTodayProgress', () => {
     const { week } = ready(await loadTodayProgress(NOW, 4));
 
     // 100 × 5 twice over 90 × 5 once: 1RM, Weight and Volume.
-    expect(week.current).toEqual({ sessions: 1, workingSets: 2, prs: 3 });
-    expect(week.previous).toEqual({ sessions: 1, workingSets: 1, prs: 0 });
+    expect(week.current).toMatchObject({ sessions: 1, workingSets: 2, prs: 3 });
+    expect(week.previous).toMatchObject({ sessions: 1, workingSets: 1, prs: 0 });
   });
 
   it('summarises the latest completed session by completed_at', async () => {
@@ -269,8 +270,8 @@ describe('loadTodayProgress', () => {
 
     expect(progress.latest).toMatchObject({ id: 'may-8', workingSets: 4, exerciseCount: 1, gymName: null, durationSec: null });
     expect(progress.latest.records.map((record) => record.kind)).toEqual(['oneRepMax', 'weight', 'volume']);
-    expect(progress.week.current).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
-    expect(progress.period.previous.total).toEqual({ sessions: 0, workingSets: 0, prs: 0 });
+    expect(progress.week.current).toMatchObject({ sessions: 0, workingSets: 0, prs: 0 });
+    expect(progress.period.previous.total).toMatchObject({ sessions: 0, workingSets: 0, prs: 0 });
   });
 
   it('shows an earlier session by its offset from the latest, saying whether an older one exists', async () => {
@@ -301,10 +302,10 @@ describe('loadTodayProgress', () => {
 
     expect(period.compareBack).toBe(2);
     expect(period.previous.window).toEqual({ start: local(2026, 8, 10), end: local(2026, 9, 7) });
-    expect(period.previous.toSameDay).toEqual({ sessions: 1, workingSets: 4, prs: 0 });
-    expect(period.previous.total).toEqual({ sessions: 1, workingSets: 4, prs: 0 });
+    expect(period.previous.toSameDay).toMatchObject({ sessions: 1, workingSets: 4, prs: 0 });
+    expect(period.previous.total).toMatchObject({ sessions: 1, workingSets: 4, prs: 0 });
     // This period is the same whichever it is compared with: 100 × 5 over 90 × 5 is a 1RM and a Weight PR.
-    expect(period.toDate).toEqual({ sessions: 1, workingSets: 1, prs: 2 });
+    expect(period.toDate).toMatchObject({ sessions: 1, workingSets: 1, prs: 2 });
   });
 
   it('reads the latest session alone only when it is older than the loaded range', async () => {
@@ -331,4 +332,30 @@ describe('loadTodayProgress', () => {
     expect(counted.loadAggregationInput).toHaveBeenCalledTimes(1);
     expect(counted.loadRecordFacts).toHaveBeenCalledTimes(1);
   });
+});
+
+
+it('reads weekly and cumulative volume from physical sets, including volume-only and active sessions', async () => {
+  db().update(exerciseDefinitions).set({ loadInputMode: 'per_side_load' }).where(eq(exerciseDefinitions.id, BENCH)).run();
+  insertSession('completed', { completedAt: local(2026, 10, 13) }, [bench('10'), { definitionId: null, sets: [['5', '4']] }]);
+  insertSession('volume-only', { completedAt: local(2026, 10, 14, 9) }, [
+    { definitionId: SQUAT, sets: [['60', '5', 'warm_up']] },
+  ]);
+  insertSession('active', { completedAt: local(2026, 10, 14, 10), status: 'active' }, [bench('2')]);
+  const source = createDrizzleStatsStore();
+  const store = createDrizzleProgressSummaryStore({
+    async loadAggregationInput(range) {
+      return { ...await source.loadAggregationInput(range), effortPolicy: {
+        workingSetEfforts: ['rir_2', 'unspecified'], volumeEfforts: ['warm_up', 'rir_2', 'unspecified'],
+      } };
+    },
+  });
+  const { week, period } = ready(await createTodayProgressRepository(store).loadTodayProgress(NOW, 4));
+  // Per-side bench, an unlinked set, warm-up Volume and an active set:
+  // 100 + 20 + 300 + 20 = 440 kg·reps.
+  expect(week.current).toMatchObject({ sessions: 2, workingSets: 3, volumeKgReps: 440 });
+  expect(week.previous.volumeKgReps).toBe(0);
+  expect(period.toDate.volumeKgReps).toBe(440);
+  expect(period.cumulativeVolumeKgReps.slice(-2)).toEqual([120, 440]);
+  expect(period.projectedVolumeKgReps).toBe(440 / period.dayOfPeriod * period.daysInPeriod);
 });

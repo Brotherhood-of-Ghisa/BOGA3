@@ -2,8 +2,9 @@
 // sets and its PRs by the session's `completed_at`, the stamp both the stats
 // aggregation and the exercise session facts use.
 
-import { countedMuscleAnalyticsSessionIds, countMuscleAnalyticsWorkingSets } from '@/src/data/muscle-analytics';
+import { countMuscleAnalyticsWorkingSets } from '@/src/data/muscle-analytics';
 import type { StatsAggregationInput } from '@/src/data/stats';
+import { addFiniteVolume, personalLoadContext, summarizeExerciseLoad } from '@/src/exercise-calculations/analytics';
 import type { RecordKind } from '@/src/exercise-calculations/records';
 import {
   isInWindow,
@@ -14,10 +15,10 @@ import {
   type LocalWindow,
 } from '@/src/utils/local-calendar';
 
-export type ProgressCounts = { sessions: number; workingSets: number; prs: number };
+export type ProgressCounts = { sessions: number; workingSets: number; prs: number; volumeKgReps: number | null };
 
 /** A completed session and its working sets. */
-export type ProgressSession = { id: string; completedAt: Date; workingSets: number };
+export type ProgressSession = { id: string; completedAt: Date; workingSets: number; volumeKgReps: number | null };
 
 export type TodayProgressWeek = {
   window: LocalWindow;
@@ -42,15 +43,18 @@ export type TodayProgressPeriod = {
   daysInPeriod: number;
   /** Working sets through each day so far: index 0 is the first day, the last is today. */
   cumulativeWorkingSets: number[];
+  cumulativeVolumeKgReps: (number | null)[];
   /** The first day through the end of today. */
   toDate: ProgressCounts;
   /** Linear: working sets so far per elapsed day (today included) over the whole period. */
   projectedWorkingSets: number;
+  projectedVolumeKgReps: number | null;
   /** The compared period: the previous one unless Today stepped further back. */
   previous: {
     window: LocalWindow;
     /** Working sets through each day of the whole compared period. */
     cumulativeWorkingSets: number[];
+    cumulativeVolumeKgReps: (number | null)[];
     /** Through the same day of the period. */
     toSameDay: ProgressCounts;
     total: ProgressCounts;
@@ -158,7 +162,7 @@ export type TodayProgressInput = {
   periodWeeks: number;
   /** The compared period, in periods back; 1 (the previous period) when absent. */
   compareBack?: number;
-  /** Counted sessions (`workingSetsBySession`) covering at least `todayProgressLoadWindow(now, periodWeeks, compareBack)`. */
+  /** Sessions with independent set/volume figures over `todayProgressLoadWindow(now, periodWeeks, compareBack)`. */
   sessions: ProgressSession[];
   /** `completed_at` of each PR over the same range: one per record kind (`sessionRecordKinds`). */
   prAchievedAt: Date[];
@@ -190,15 +194,16 @@ const groupBy = <T>(items: readonly T[], keyOf: (item: T) => string | undefined)
 };
 
 /**
- * Each counted session (`isCountedSession`: at least one working set) with its
- * working sets. A warm-up-only or empty session is not a session here.
+ * Each session's physical working sets and independent Volume. Volume never
+ * sums muscle contributions: mappings can overlap or be absent altogether.
  */
-export const workingSetsBySession = (input: StatsAggregationInput): ProgressSession[] => {
-  const counted = countedMuscleAnalyticsSessionIds(input);
+export const progressMetricsBySession = (input: StatsAggregationInput): ProgressSession[] => {
   const exercisesBySession = groupBy(input.sessionExercises, (exercise) => exercise.sessionId);
   const sessionIdByExercise = new Map(input.sessionExercises.map((exercise) => [exercise.id, exercise.sessionId]));
   const setsBySession = groupBy(input.exerciseSets, (set) => sessionIdByExercise.get(set.sessionExerciseId));
-  return input.sessions.filter((session) => counted.has(session.id)).map((session) => ({
+  const setsByExercise = groupBy(input.exerciseSets, (set) => set.sessionExerciseId);
+  const definitions = new Map(input.exerciseDefinitions?.map((definition) => [definition.id, definition]));
+  return input.sessions.map((session) => ({
     id: session.id,
     completedAt: session.completedAt,
     workingSets: countMuscleAnalyticsWorkingSets({
@@ -207,15 +212,26 @@ export const workingSetsBySession = (input: StatsAggregationInput): ProgressSess
       sessionExercises: exercisesBySession.get(session.id) ?? [],
       exerciseSets: setsBySession.get(session.id) ?? [],
     }),
+    volumeKgReps: (exercisesBySession.get(session.id) ?? []).reduce<number | null>((total, exercise) => {
+      const context = personalLoadContext(input.bodyweightCalculationsEnabled ?? false,
+        definitions.get(exercise.exerciseDefinitionId ?? ''), session, input.effortPolicy);
+      const { volumeKgReps } = summarizeExerciseLoad(setsByExercise.get(exercise.id) ?? [], context);
+      return addFiniteVolume(total, volumeKgReps);
+    }, 0),
   }));
 };
+
+/** The counted subset, retained for consumers that ask only for working sets. */
+export const workingSetsBySession = (input: StatsAggregationInput): ProgressSession[] =>
+  progressMetricsBySession(input).filter((session) => session.workingSets > 0);
 
 const countIn = (input: TodayProgressInput, window: LocalWindow): ProgressCounts => {
   const sessions = input.sessions.filter((session) => isInWindow(session.completedAt, window));
   return {
-    sessions: sessions.length,
+    sessions: sessions.filter((session) => session.workingSets > 0).length,
     workingSets: sessions.reduce((total, session) => total + session.workingSets, 0),
     prs: input.prAchievedAt.filter((achievedAt) => isInWindow(achievedAt, window)).length,
+    volumeKgReps: sessions.reduce<number | null>((total, session) => addFiniteVolume(total, session.volumeKgReps), 0),
   };
 };
 
@@ -226,6 +242,23 @@ const cumulativeByDay = (sessions: ProgressSession[], period: LocalWindow, days:
   }
   let running = 0;
   return perDay.map((count) => (running += count));
+};
+
+const cumulativeVolumeByDay = (sessions: ProgressSession[], period: LocalWindow, days: number): (number | null)[] => {
+  const perDay = new Array<number | null>(days).fill(0);
+  for (const session of sessions) {
+    if (!isInWindow(session.completedAt, period)) continue;
+    const day = localDaysBetween(period.start, session.completedAt);
+    perDay[day] = addFiniteVolume(perDay[day], session.volumeKgReps);
+  }
+  let running: number | null = 0;
+  return perDay.map((volume) => (running = addFiniteVolume(running, volume)));
+};
+
+/** Linear volume keeps full precision; a non-finite projection stays absent. */
+export const projectVolume = (total: number | null, elapsedDays: number, days: number): number | null => {
+  const value = total === null ? null : (total / elapsedDays) * days;
+  return value !== null && Number.isFinite(value) ? value : null;
 };
 
 const derivePeriod = (input: TodayProgressInput): TodayProgressPeriod => {
@@ -242,11 +275,14 @@ const derivePeriod = (input: TodayProgressInput): TodayProgressPeriod => {
     dayOfPeriod,
     daysInPeriod,
     cumulativeWorkingSets: cumulativeByDay(input.sessions, window, daysInPeriod).slice(0, dayOfPeriod),
+    cumulativeVolumeKgReps: cumulativeVolumeByDay(input.sessions, window, daysInPeriod).slice(0, dayOfPeriod),
     toDate,
     projectedWorkingSets: Math.round((toDate.workingSets / dayOfPeriod) * daysInPeriod),
+    projectedVolumeKgReps: projectVolume(toDate.volumeKgReps, dayOfPeriod, daysInPeriod),
     previous: {
       window: previousWindow,
       cumulativeWorkingSets: cumulativeByDay(input.sessions, previousWindow, daysInPeriod),
+      cumulativeVolumeKgReps: cumulativeVolumeByDay(input.sessions, previousWindow, daysInPeriod),
       toSameDay: countIn(input, { start: previousWindow.start, end: startOfLocalDay(previousWindow.start, dayOfPeriod) }),
       total: countIn(input, previousWindow),
     },

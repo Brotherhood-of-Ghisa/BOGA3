@@ -290,7 +290,7 @@ additionally render faded ([[set.row-figures]], §6).
   genuinely unavailable strict-group results. Long context wraps or gets a
   separate line instead of shrinking numeric figures.
 - **One format per figure** — Weight `60.0`, 1RM `104.7` ([[1rm.formula]]),
-  Volume `2560` — on every screen (`tech/training-metrics-contract.md` §4,
+  Volume `2560` — except Today’s tonnes ([[copy.no-weight-unit]]) (`tech/training-metrics-contract.md` §4,
   `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
 - **A numeric change carries its direction**, in colour as well as in its sign: an

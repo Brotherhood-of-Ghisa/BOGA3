@@ -1,8 +1,11 @@
 import { StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { Notice } from '@/components/ui/notice';
+import { ActionButton } from '@/components/ui/action-button';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgress } from '@/src/progress-summary';
+import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
 import { PeriodPace } from './period-pace';
 import { TodaySessionCard } from './session-card';
@@ -24,6 +27,8 @@ export type TodayProgressCardProps = {
 // period against the previous period, or an earlier one, day by day) over
 // the session card (the latest session, or an earlier one stepped back to).
 // The progress card takes the height the session card leaves, the chart filling it.
+// The weekly Sets/Tons control selects one account-local metric for both
+// sections, keeping the chart’s selected day and compared period.
 export function TodayProgressCard({
   progress,
   onOpenSession,
@@ -31,12 +36,20 @@ export function TodayProgressCard({
   onShowCompared,
   onShowSession,
 }: TodayProgressCardProps) {
+  const { values: { todayProgressMetric: metric }, error, retry } = useAccountLocalPreferenceState();
+  const onToggleMetric = () => updatePreferences({
+    todayProgressMetric: metric === 'totalVolume' ? 'workingSetCount' : 'totalVolume',
+  });
   return (
     <View style={[styles.stack, styles.fill]}>
       <Card style={[styles.card, styles.fillProgress]} testID="today-progress-card">
-        <WeekFigures week={progress.week} />
+        <WeekFigures metric={metric} onToggleMetric={onToggleMetric} week={progress.week} />
+        {error ? (
+          <Notice action={<ActionButton label="Retry" onPress={() => { void retry(); }} variant="text" testID="today-progress-preference-retry" />}
+            live message={error} testID="today-progress-preference-error" tone="danger" />
+        ) : null}
         <View style={styles.divider} />
-        <PeriodPace onShowCompared={onShowCompared} period={progress.period} />
+        <PeriodPace metric={metric} onShowCompared={onShowCompared} period={progress.period} />
       </Card>
       <TodaySessionCard
         hasOlderSession={progress.hasOlderSession}

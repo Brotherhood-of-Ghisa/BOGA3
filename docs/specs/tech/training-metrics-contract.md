@@ -327,8 +327,9 @@ of Display (§1); zero working sets alone cannot establish Volume emptiness.
 
 No derived figure is written back to a set or session.
 
-**Display** (`format.ts`). Every figure has one format on every screen, the
-groups' included. Figures have no thousands separators; unit labels follow
+**Display** (`format.ts`). Figures share the formats below, the groups'
+included; Today's tonnes exception follows [[copy.no-weight-unit]]. Figures
+have no thousands separators; unit labels follow
 [[copy.no-weight-unit]].
 
 | Figure | Format | Example |

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { loadTodayProgress, type TodayProgress, type TodayProgressOptions } from '@/src/progress-summary';
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 
 import { useDailyReread } from './use-daily-reread';
 
@@ -36,6 +37,8 @@ const systemNow = () => new Date();
  */
 export function useTodayProgress({ isFocused, load = loadTodayProgress, now = systemNow }: UseTodayProgressInput) {
   const { accountRevision: context, values: { targetWindowWeeks: periodWeeks } } = useAccountLocalPreferenceState();
+  const calculationRevision = useBodyWeightContextRevision();
+  const previousCalculationRevision = useRef(calculationRevision);
   const [result, setResult] = useState<{ context: number; state: TodayProgressState }>({ context, state: { status: 'loading' } });
   const [view, setView] = useState({ context, compareBack: 1, sessionOffset: 0 });
   const { compareBack, sessionOffset } = view.context === context ? view : { compareBack: 1, sessionOffset: 0 };
@@ -74,6 +77,11 @@ export function useTodayProgress({ isFocused, load = loadTodayProgress, now = sy
   }, [read, context]);
 
   useDailyReread(isFocused, readNow, nowRef, generationRef);
+  useEffect(() => {
+    if (previousCalculationRevision.current === calculationRevision) return;
+    previousCalculationRevision.current = calculationRevision;
+    if (isFocused) readNow();
+  }, [calculationRevision, isFocused, readNow]);
 
   const state: TodayProgressState = result.context === context ? result.state : { status: 'loading' };
   const showCompared = useCallback(

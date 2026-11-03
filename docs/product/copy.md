@@ -40,6 +40,9 @@ Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/componen
 While kg is the sole weight unit, visible/spoken labels omit kg/kilograms,
 including compound volume units. Retain `per side`, `%BW`, `%BW·reps`. Stored
 values, wire units and coaching/import payloads stay unchanged.
+Today's weekly box and pace chart may show Volume in metric tonnes: `Tons`
+in the weekly heading, `t` beside chart figures, spoken as tonnes. Display
+whole-kg precision in tonnes with trailing zeros removed.
 Shared group-session cards may use `(% BW)` once in the exercise heading
 instead of visible per-set units; spoken units remain complete.
 

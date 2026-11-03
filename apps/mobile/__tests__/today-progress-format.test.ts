@@ -6,6 +6,8 @@
 
 import {
   CHART_RIGHT_GUTTER,
+  formatTonnes,
+  periodPaceDelta,
   formatBestSet,
   formatRecordCount,
   formatSessionSummaryFigures,
@@ -32,7 +34,7 @@ import { formatDayMonth } from '@/src/utils/local-time';
 
 const local = (year: number, month: number, day: number, hour = 0, minute = 0) =>
   new Date(year, month - 1, day, hour, minute);
-const counts = (workingSets: number, sessions = 0, prs = 0): ProgressCounts => ({ sessions, workingSets, prs });
+const counts = (workingSets: number, sessions = 0, prs = 0): ProgressCounts => ({ sessions, workingSets, prs, volumeKgReps: 0 });
 
 // A period as the read shapes it; only the fields a test names matter. Today
 // is the last day of `cumulative`.
@@ -57,11 +59,14 @@ const period = (overrides: {
     dayOfPeriod: overrides.cumulative.length,
     daysInPeriod: weeks * 7,
     cumulativeWorkingSets: overrides.cumulative,
+    cumulativeVolumeKgReps: overrides.cumulative.map(() => 0),
+    projectedVolumeKgReps: 0,
     toDate: overrides.toDate ?? counts(last(overrides.cumulative)),
     projectedWorkingSets: overrides.projected ?? 0,
     previous: {
       window: localPeriodWindow(now, weeks, -compareBack),
       cumulativeWorkingSets: previousCumulative,
+      cumulativeVolumeKgReps: previousCumulative.map(() => 0),
       toSameDay: overrides.toSameDay ?? counts(0),
       total: overrides.total ?? counts(last(previousCumulative)),
     },
@@ -127,9 +132,9 @@ describe('the period against the previous period', () => {
       date: local(2026, 10, 23),
       previousDate: local(2026, 9, 25),
       when: 'today',
-      workingSets: 102,
-      previousWorkingSets: 98,
-      difference: 4,
+      metric: 'workingSetCount',
+      value: 102,
+      previousValue: 98,
     });
     expect(formatPeriodDayLabel(periodDayFigures(october, null))).toBe('Today');
   });
@@ -143,16 +148,16 @@ describe('the period against the previous period', () => {
     });
 
     const past = periodDayFigures(october, 4);
-    expect(past).toMatchObject({ when: 'past', workingSets: 10, previousWorkingSets: 12, difference: -2 });
+    expect(past).toMatchObject({ when: 'past', value: 10, previousValue: 12 });
     expect(formatPeriodDayLabel(past)).toBe('9 Oct 26');
 
     // 38 sets over 19 days: 2 a day, reaching the projection on the last day.
     const projected = periodDayFigures(october, 21);
-    expect(projected).toMatchObject({ when: 'projected', workingSets: 44, previousWorkingSets: 63, difference: -19 });
+    expect(projected).toMatchObject({ when: 'projected', value: 44, previousValue: 63 });
     // Shown as its date alone; spoken, it says it is projected.
     expect(formatPeriodDayLabel(projected)).toBe('26 Oct 26');
     expect(formatPeriodDayLabel(projected, { spoken: true })).toBe('26 Oct 26 (projected)');
-    expect(periodDayFigures(october, 27).workingSets).toBe(october.projectedWorkingSets);
+    expect(periodDayFigures(october, 27).value).toBe(october.projectedWorkingSets);
 
     // A selection outside the period stays on its edge.
     expect(periodDayFigures(october, -3).dayIndex).toBe(0);
@@ -220,8 +225,8 @@ describe('the period chart geometry', () => {
     expect(geometry.previous[27].x).toBeCloseTo(plotWidth);
     expect(geometry.weekStartsX.map((x) => x / plotWidth)).toEqual([7 / 27, 14 / 27, 21 / 27].map((share) => expect.closeTo(share, 6)));
     // The projection (147) is the highest figure: it reaches the plot's top at the period's end.
-    expect(geometry.projection.to).toEqual({ x: expect.closeTo(plotWidth, 6), y: geometry.plot.top });
-    expect(geometry.projection.from).toEqual(geometry.today.current);
+    expect(geometry.projection?.to).toEqual({ x: expect.closeTo(plotWidth, 6), y: geometry.plot.top });
+    expect(geometry.projection?.from).toEqual(geometry.today.current);
     expect(geometry.today.current).toEqual(geometry.current[18]);
     expect(geometry.today.previous).toEqual(geometry.previous[18]);
     // Zero sits on the baseline.
@@ -253,11 +258,11 @@ describe('the period chart geometry', () => {
   it('marks the selected day, on the projection after today', () => {
     const october = period({ now, cumulative: days(19, (index) => (index + 1) * 2), previousCumulative: days(28, () => 10), projected: 56, toSameDay: counts(10) });
     const atToday = periodChartGeometry(october, width);
-    expect(atToday.selected).toEqual({ current: atToday.today.current, previous: atToday.today.previous, projected: false });
+    expect(atToday.selected).toMatchObject({ current: atToday.today.current, previous: atToday.today.previous, projected: false });
 
     const later = periodChartGeometry(october, width, undefined, periodDayFigures(october, 27));
     expect(later.selected.projected).toBe(true);
-    expect(later.selected.current).toEqual(later.projection.to);
+    expect(later.selected.current).toEqual(later.projection?.to);
     expect(later.selected.previous).toEqual(later.previous[27]);
   });
 
@@ -275,7 +280,7 @@ describe('the period chart geometry', () => {
   it('draws nothing wider than the space it is given, and writes points to one decimal', () => {
     const narrow = periodChartGeometry(period({ now, cumulative: [1, 2] }), 6);
     expect(narrow.plot.width).toBe(0);
-    expect(narrow.today.previous.x).toBe(0);
+    expect(narrow.today.previous?.x).toBe(0);
     expect(toPolyline([{ x: 0, y: 80.25 }, { x: 9.731, y: 6 }])).toBe('0.0,80.3 9.7,6.0');
   });
 });
@@ -346,4 +351,61 @@ describe('the session card', () => {
       'Session on 15 Oct 26 07:12; 0 exercises; 12 sets; 0 PRs',
     );
   });
+});
+
+
+describe('tonnage pace', () => {
+  it.each([[12450, '12.45'], [125, '0.125'], [102.5, '0.103'], [0, '0'], [null, '—'], [Infinity, '—']])(
+    'formats %s kg·reps as %s tonnes at whole-kg precision', (value, expected) => {
+      expect(formatTonnes(value as number | null)).toBe(expected);
+    },
+  );
+
+  const volumePeriod = () => {
+    const input = period({ now: local(2026, 10, 23), cumulative: days(19, () => 20) });
+    input.toDate.volumeKgReps = 12450;
+    input.cumulativeVolumeKgReps = days(19, index => index < 3 ? 125 : 12450);
+    input.projectedVolumeKgReps = 12450 / 19 * 28;
+    input.previous.cumulativeVolumeKgReps = days(28, () => 11100);
+    input.previous.toSameDay.volumeKgReps = 11100;
+    input.previous.total.volumeKgReps = 11100;
+    return input;
+  };
+
+  it('selects past, today and projected volume with percentage deltas from unrounded values', () => {
+    const input = volumePeriod();
+    const today = periodDayFigures(input, null, 'totalVolume');
+    expect(today).toMatchObject({ value: 12450, previousValue: 11100, metric: 'totalVolume' });
+    expect(periodPaceDelta(today)).toEqual({ text: '+12%', tone: 'positive' });
+    expect(periodDayFigures(input, 0, 'totalVolume').value).toBe(125);
+    expect(periodDayFigures(input, 27, 'totalVolume').value).toBe(input.projectedVolumeKgReps);
+    expect(periodChartAccessibilityLabel(input, 'totalVolume')).toContain('Cumulative tonnage: this period 12.45 tonnes');
+    expect(periodChartAccessibilityValue(input, today)).toBe('Today: 12.45 tonnes, last period 11.1 tonnes');
+    expect(periodFiguresAccessibilityLabel(input, today)).toContain('+12%');
+  });
+
+  it('retains the kg scale for sub-tonne totals and omits unavailable cumulative segments and projection', () => {
+    const input = volumePeriod();
+    input.toDate.volumeKgReps = null;
+    input.cumulativeVolumeKgReps = [125, ...Array(18).fill(null)];
+    input.projectedVolumeKgReps = null;
+    const figures = periodDayFigures(input, null, 'totalVolume');
+    const geometry = periodChartGeometry(input, 326, undefined, figures);
+    expect(geometry.current).toHaveLength(1);
+    expect(geometry.today.current).toBeNull();
+    expect(geometry.selected.current).toBeNull();
+    expect(geometry.projection).toBeNull();
+    expect(periodPaceDelta(figures)).toEqual({ text: '—', tone: 'neutral' });
+    expect(periodChartAccessibilityValue(input, figures)).toContain('unavailable');
+  });
+
+  it.each([[0, 0, '—'], [1000, 0, 'new'], [0, 1000, '−100%'], [1000, 1000, '0%']])(
+    'compares %s against %s as %s', (current, previous, expected) => {
+      const input = volumePeriod();
+      input.toDate.volumeKgReps = current as number;
+      input.cumulativeVolumeKgReps[18] = current as number;
+      input.previous.toSameDay.volumeKgReps = previous as number;
+      expect(periodPaceDelta(periodDayFigures(input, null, 'totalVolume')).text).toBe(expected);
+    },
+  );
 });
