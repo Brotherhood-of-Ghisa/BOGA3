@@ -99,6 +99,8 @@ jobs:
       # literals outright, and holds raw fontSize / spacing / radius counts to
       # the budgets in scripts/ui-guardrails.config.js so they can only fall.
       - name: UI guardrails
+        env:
+          BOGA_UI_SELECTION_DELEGATED: "1"
         if: steps.changes.outputs.docs_only != 'true'
         run: npm run lint:ui-guardrails
 

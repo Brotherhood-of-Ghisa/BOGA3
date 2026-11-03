@@ -9,9 +9,9 @@ const TYPE_FIELDS = new Set(['fontFamily', 'fontWeight', 'fontSize', 'lineHeight
 const ROW_FIELDS = new Set(['padding', 'paddingVertical', 'paddingTop', 'paddingBottom', 'paddingBlock', 'paddingBlockStart', 'paddingBlockEnd', 'marginVertical', 'marginTop', 'marginBottom', 'minHeight']);
 const PATTERNS = new Set(['StatsTable', 'StatsTableRow', 'StatsTableName', 'StatsTableDisclosure']);
 
-function findTablePatternViolations({ rootDir = path.resolve(__dirname, '..') } = {}) {
+function findTablePatternViolations({ rootDir = path.resolve(__dirname, '..'), adoptedFiles = [] } = {}) {
   const violations = [];
-  const files = patternFiles(rootDir, TABLE_PATTERN_FILES);
+  const files = patternFiles(rootDir, [...TABLE_PATTERN_FILES, ...adoptedFiles]);
   for (const file of files) {
     const absolute = path.join(rootDir, file);
     if (!fs.existsSync(absolute)) continue;

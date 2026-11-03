@@ -124,8 +124,8 @@ for design targets, external-artifact vs repository authority,
 generated-code integration, screenshot comparison, conflict reporting, and
 commit boundaries. A design target is a build input, kept with the task or PR,
 never a spec of the result: what must outlive the build moves to its owner.
-For new UI blocks, select a pattern with the human before coding; follow
-`docs/specs/08-ux-delivery-standard.md` for derivations and migration acceptance.
+Custom/derived UI needs human design acceptance before coding (spec `08`).
+Agents never post acceptance. Template reuse needs no fresh acceptance.
 
 ## Always load (every session)
 

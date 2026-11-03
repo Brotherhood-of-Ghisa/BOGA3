@@ -70,9 +70,9 @@ it('permits legitimate foundation definitions and untouched consumers, while the
   write('components/stats/stats-table.tsx', 'const style = {lineHeight: height, minHeight: target};');
   write('components/groups/untouched.tsx', 'const style = {fontFamily: family};');
   const output: string[] = [];
-  expect(runUiGuardrailCheck({ rootDir, stdout: { write: (text: string) => output.push(text) } }).ok).toBe(true);
+  expect(runUiGuardrailCheck({ rootDir, selectionContext: { files: [] }, stdout: { write: (text: string) => output.push(text) } }).ok).toBe(true);
   write(COMPACT_PATTERN_FILES[2], '<CompactHeader style={custom} label="CoW"/>');
-  expect(runUiGuardrailCheck({ rootDir, stdout: { write: (text: string) => output.push(text) } }).ok).toBe(false);
+  expect(runUiGuardrailCheck({ rootDir, selectionContext: { files: [] }, stdout: { write: (text: string) => output.push(text) } }).ok).toBe(false);
   expect(output.join('')).toContain('compact style override');
 });
 

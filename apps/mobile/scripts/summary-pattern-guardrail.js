@@ -8,10 +8,10 @@ const GEOMETRY_FIELDS = /^(padding|margin|gap|rowGap|columnGap|height|minHeight|
 const TYPE_FIELDS = new Set(['fontFamily', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing', 'textTransform']);
 
 // Only adopted tile consumers and their style companions; shared metric primitives own type/geometry.
-function findSummaryPatternViolations({ rootDir = path.resolve(__dirname, '..') } = {}) {
+function findSummaryPatternViolations({ rootDir = path.resolve(__dirname, '..'), adoptedFiles = [] } = {}) {
   const violations = [];
   const metricFiles = new Set(patternFiles(rootDir, [SUMMARY_PATTERN_FILES[1]]));
-  for (const file of patternFiles(rootDir, SUMMARY_PATTERN_FILES)) {
+  for (const file of patternFiles(rootDir, [...SUMMARY_PATTERN_FILES, ...adoptedFiles])) {
     const absolute = path.join(rootDir, file);
     if (!fs.existsSync(absolute)) continue;
     const { source, name: referenceName, component, fromModule } = patternSource(file, fs.readFileSync(absolute, 'utf8'));
@@ -24,7 +24,7 @@ function findSummaryPatternViolations({ rootDir = path.resolve(__dirname, '..') 
           hasTile = true;
           const metrics = node.attributes.properties.find(attr => ts.isJsxAttribute(attr) && attr.name.getText(source) === 'metrics');
           const content = metrics?.initializer && ts.isJsxExpression(metrics.initializer) ? metrics.initializer.expression : null;
-          if (!content || !ts.isJsxSelfClosingElement(content) || component(content.tagName) !== 'GroupWeekTotalsFigures') report(node, 'summary metric composition');
+          if (file === SUMMARY_PATTERN_FILES[0] && (!content || !ts.isJsxSelfClosingElement(content) || component(content.tagName) !== 'GroupWeekTotalsFigures')) report(node, 'summary metric composition');
         }
         if (metricFiles.has(file)) {
           for (const attr of node.attributes.properties) {

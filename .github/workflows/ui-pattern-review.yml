@@ -1,0 +1,94 @@
+name: UI pattern review
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited]
+  issue_comment:
+    types: [created, edited, deleted]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: write
+
+concurrency:
+  group: ui-pattern-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate-ui-patterns:
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    name: Evaluate UI design policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        id: pr
+        with:
+          script: |
+            const number = context.payload.pull_request?.number ?? context.payload.issue.number;
+            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
+            if (pr.state !== 'open' || pr.base.ref !== 'main') {
+              core.setOutput('skip', 'true');
+              return;
+            }
+            require('fs').writeFileSync(`${process.env.RUNNER_TEMP}/ui-pattern-event.json`, JSON.stringify({ pull_request: pr }));
+            core.setOutput('base', pr.base.sha);
+            core.setOutput('head', pr.head.sha);
+            const { data: check } = await github.rest.checks.create({
+              ...context.repo, name: 'UI pattern review', head_sha: pr.head.sha, status: 'in_progress',
+            });
+            core.setOutput('check', check.id);
+      # Only protected base code/dependencies execute. Candidate code is parsed as data.
+      - uses: actions/checkout@v4
+        if: steps.pr.outputs.skip != 'true'
+        with:
+          ref: ${{ steps.pr.outputs.base }}
+          path: policy
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        if: steps.pr.outputs.skip != 'true'
+        with:
+          ref: ${{ steps.pr.outputs.head }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: steps.pr.outputs.skip != 'true'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: policy/apps/mobile/package-lock.json
+      - run: npm ci --ignore-scripts
+        if: steps.pr.outputs.skip != 'true'
+        working-directory: policy/apps/mobile
+      - name: Check template inheritance and custom design acceptance
+        if: steps.pr.outputs.skip != 'true'
+        id: design
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BOGA_UI_REVIEW_ROOT: ${{ github.workspace }}/candidate/apps/mobile
+          BOGA_UI_EVENT_PATH: ${{ runner.temp }}/ui-pattern-event.json
+        run: node scripts/check-ui-guardrails.js
+        working-directory: policy/apps/mobile
+      - name: Publish the result on the exact candidate head
+        if: always() && !cancelled() && steps.pr.outputs.check
+        uses: actions/github-script@v8
+        env:
+          DESIGN_OUTCOME: ${{ steps.design.outcome }}
+          CHECK_ID: ${{ steps.pr.outputs.check }}
+        with:
+          script: |
+            const passed = process.env.DESIGN_OUTCOME === 'success';
+            await github.rest.checks.update({
+              ...context.repo,
+              check_run_id: Number(process.env.CHECK_ID),
+              status: 'completed',
+              conclusion: passed ? 'success' : 'failure',
+              details_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              output: {
+                title: passed ? 'UI design policy passed' : 'UI design declaration or acceptance required',
+                summary: 'Template reuse and custom human-design acceptance are checked by protected base policy. See the workflow log.',
+              },
+            });

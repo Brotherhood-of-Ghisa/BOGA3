@@ -9,6 +9,7 @@ const { findListPatternViolations } = require('./list-pattern-guardrail');
 const { findTablePatternViolations } = require('./table-pattern-guardrail');
 
 const { findSummaryPatternViolations } = require('./summary-pattern-guardrail');
+const { findUiPatternSelections } = require('./ui-pattern-selection');
 
 const RAW_COLOR_LITERAL_REGEX =
   /#[0-9A-Fa-f]{3,8}\b|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)/g;
@@ -423,19 +424,25 @@ function runUiGuardrailCheck(options = {}) {
   write('');
   write(formatLegacyVocabularySummary(legacyResult));
 
-  const compactViolations = findCompactPatternViolations(options);
+  const selection = findUiPatternSelections(options);
+  write(`UI pattern selection: ${selection.violations.length === 0 ? 'PASS' : 'FAIL'}`);
+  if (selection.context?.delegated) write('  Selection and new consumers are checked by the required UI pattern review check.');
+  if (selection.custom?.length && !selection.context?.finalReview) write('  Custom designs still require authorized human design acceptance in the PR check before merge.');
+  for (const violation of selection.violations) write(`  ${violation.file}:${violation.line} — ${violation.rule}`);
+  const selected = family => ({ ...options, adoptedFiles: selection.filesByFamily[family] });
+  const compactViolations = findCompactPatternViolations(selected('CompactCard'));
   write('');
   write(`Compact patterns: ${compactViolations.length === 0 ? 'PASS' : 'FAIL'}`);
   for (const violation of compactViolations) write(`  ${violation.file}:${violation.line} — ${violation.rule}`);
-  const listViolations = findListPatternViolations(options);
+  const listViolations = findListPatternViolations(selected('ListCard'));
   write(`List patterns: ${listViolations.length === 0 ? 'PASS' : 'FAIL'}`);
   for (const violation of listViolations) write(`  ${violation.file}:${violation.line} — ${violation.rule}`);
 
-  const tableViolations = findTablePatternViolations(options);
+  const tableViolations = findTablePatternViolations(selected('SortableTable'));
   write(`Table patterns: ${tableViolations.length === 0 ? 'PASS' : 'FAIL'}`);
   for (const violation of tableViolations) write(`  ${violation.file}:${violation.line} — ${violation.rule}`);
 
-  const summaryViolations = findSummaryPatternViolations(options);
+  const summaryViolations = findSummaryPatternViolations(selected('SummaryTile'));
   write('');
   write(`Summary patterns: ${summaryViolations.length === 0 ? 'PASS' : 'FAIL'}`);
   for (const violation of summaryViolations) write(`  ${violation.file}:${violation.line} — ${violation.rule}`);
@@ -465,6 +472,7 @@ function runUiGuardrailCheck(options = {}) {
   }
 
   const ok =
+    selection.violations.length === 0 &&
     compactViolations.length === 0 &&
     listViolations.length === 0 &&
     tableViolations.length === 0 &&
@@ -486,7 +494,7 @@ function parseArgs(argv) {
 
 if (require.main === module) {
   const args = parseArgs(process.argv.slice(2));
-  const result = runUiGuardrailCheck(args);
+  const result = runUiGuardrailCheck({ ...args, rootDir: process.env.BOGA_UI_REVIEW_ROOT });
   process.exitCode = result.ok ? 0 : 1;
 }
 

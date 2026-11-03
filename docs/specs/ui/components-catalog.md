@@ -80,27 +80,29 @@ Omit `review=1` for controls; `long=1` selects long content.
 Use list/table `sample=rows` to compare identical passive, wrapped, own/selected
 and independent-control rows. Compact samples cover Stream, CoW and embedded summaries. Route and navigator share `isUiGalleryAllowed`.
 
-Initial automated adoption scope is the presenter lists exported by
-`apps/mobile/scripts/compact-pattern-guardrail.js`, `list-pattern-guardrail.js`,
-`table-pattern-guardrail.js` and `summary-pattern-guardrail.js`: Stream session/
-record cards, CoW preview and Today summaries, both weekly boards, Muscle/
-contributor tables, and Group stats in At a glance. The scans include conventional
-TS/TSX style companions and imported/re-exported style modules. For executable
-safe/failing boundaries, load `apps/mobile/__tests__/pattern-adoption-guardrail.test.ts`.
+Adoption lists in the four `apps/mobile/scripts/*-pattern-guardrail.js`
+modules protect Stream/CoW, both weekly boards, Muscle/contributor tables and
+Group stats. Every changed JSX/style source additionally declares template reuse or
+custom design in its PR UX Contract; spec 08 owns that process and acceptance.
+Missing declarations fail the existing guardrail lane. Template selections extend
+the checks to new consumers, including TS/TSX style companions and
+imported/re-exported style modules. Cases:
+`apps/mobile/__tests__/ui-pattern-selection.test.ts` and
+`apps/mobile/__tests__/pattern-adoption-guardrail.test.ts`.
 
-Shared definitions in `components/ui/`, StatsTable, comparison columns and
-WeekFigure own their roles and geometry, covered by component Jest tests.
-Feature consumers cannot assemble typography/casing or pass style/spread props
-to their adopted patterns; boards and table rows cannot add vertical row insets
-or minimum heights. Page/chart layout, CoW podium geometry and Stream record
-targets retain their existing contracts. Names/figure column widths remain
-feature-owned. Untouched screens, including the Exercise table and sheet/list
-recipes, are outside this adoption claim.
+Foundation definitions own geometry and retain their component tests. Template consumers
+cannot override their selected family's type/casing or pattern style props;
+compact list/table consumers cannot add row insets/minimums. Page/chart layout,
+CoW podiums and record targets retain their existing contracts. Figure widths
+remain feature-owned. Untouched legacy screens keep their recipes; new or
+changed JSX cannot silently opt out. Other catalog primitives are useful parents
+for custom design, not automatic approval of a new composition. Gallery fixtures
+are parents only inside the existing guarded development route.
 
-When touching a new consumer, select its family/derivative and obtain acceptance
-under spec 08, then add the presenter to its family's scan list and add rejection/
-safe tests in the same PR. Do not expand enforcement by adding a suppression or
-raising a budget. Static checks cannot select a semantic family or grant acceptance.
+Use `template` for approved families/variants, `custom` for everything beyond
+them. Reuse needs no fresh design acceptance; custom design needs the explicit
+human acceptance in spec 08. Humans decide semantic fit. No new
+suppression or increased budget substitutes for fixing drift.
 
 ### List pattern adoption
 

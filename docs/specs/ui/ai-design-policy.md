@@ -41,7 +41,7 @@
    it with the target. The PR records each material deviation and its reason;
    the target is not edited to match. Visual review supplements, and never
    replaces, the required `./boga` gates and accessibility/behavior checks.
-   For coded patterns and reference migrations, follow the explicit human
+   For designs outside approved templates, follow the explicit human
    acceptance checklist in `docs/specs/08-ux-delivery-standard.md`.
 8. If design artifacts, target screenshots, requirements, repository docs, or
    current code conflict during the build, report the sources and impact in
