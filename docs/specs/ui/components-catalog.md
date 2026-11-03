@@ -65,7 +65,7 @@ For a new block or derivative, follow the human selection and acceptance workflo
 | A Settings row: one of ≤3 options under its label, the one chosen of many (radio, optional `meta` swatch), several (checkbox), a read-only value (one accessible element unless it has a `valueTestID`; optional glyph, `danger` tone) | `SegmentRow`, `RadioRow`, `CheckRow`, `ValueRow` (`form-rows.tsx`; `ux-rules.md` "Settings pages") |
 | A search input | `SearchField` (`search-field.tsx`) |
 | Full-width pages swiped between under tabs that name them (UX pattern 15) | `SwipePages` (`swipe-pages.tsx`) — Today's cards, the Groups screen's pages |
-| One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral or fixed black/white filter selection |
+| One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral, or `selection` for filters (black; white in dark) |
 | One filter of a few values where a row of them cannot afford every label | `ToggleChip` (`toggle-chip.tsx`) — the value in force plus the `swap` glyph; a tap steps to the next |
 | Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
 | One option or setting on or off, in a sheet (`Show deleted sessions`) or a form card (`Track each gym separately`, `density="list"`, optional `description`) | `SwitchRow` (`switch-row.tsx`) |

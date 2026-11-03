@@ -115,7 +115,7 @@ being only about 1.15:1 against `surface`. A filter showing all its values at on
 force in fixed black `selection` with white `onSelection` text (inverted in dark)
 (`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`
 shows one value and has no unselected peer, so it carries `ink` on `surface`
-(Progress's filter row, the history metric). Heatmap tiles/bars have no black current/selected
+(Progress's filter row, the history metric). Heatmap tiles/bars have no `selection` current/selected
 outlines. Weekly selection uses a caret and accessible state.
 
 ## 3. Typography
