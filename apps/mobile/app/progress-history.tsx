@@ -1,4 +1,6 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
+import { ACTIVE_WORKOUT_HREF } from '@/src/navigation/active-session-entry';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -215,6 +217,7 @@ export type ProgressHistoryScreenProps = {
 export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, initialView, todayDateKey }: ProgressHistoryScreenProps) {
   const { values, pending, accountRevision, error: preferenceError, retry: retryPreferences } = useAccountLocalPreferenceState();
   const router = useRouter();
+  const openActiveWorkout = useOpenActiveWorkout();
   const catalog = useExerciseCatalog();
   const revision = useBodyWeightContextRevision();
   const [entryView, setEntryView] = useState<HeatmapView | null>(initialView ?? null);
@@ -288,8 +291,11 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         href = sessionsDayHref(day.dateKey);
       }
     }
-    if (request === dayNavigation.current && accountRevision === getAccountLocalPreferenceAccountRevision() && href) router.push(href);
-  }, [router, accountRevision]);
+    if (request === dayNavigation.current && accountRevision === getAccountLocalPreferenceAccountRevision() && href) {
+      if (href === ACTIVE_WORKOUT_HREF) openActiveWorkout(day.sessionIds[0]);
+      else router.push(href);
+    }
+  }, [openActiveWorkout, router, accountRevision]);
   const openWeek = useCallback((weekStartDateKey: string) => router.push(sessionsWeekHref(weekStartDateKey)), [router]);
   const openSession = useCallback((sessionId: string) => router.push(completedSessionHref(sessionId)), [router]);
   // A muscle's week list links each card's exercise to its own history, on

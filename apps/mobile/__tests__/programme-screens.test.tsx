@@ -16,6 +16,7 @@ jest.mock('@/src/data/bootstrap', () =>
 );
 
 const mockPush = jest.fn();
+const mockDismissTo = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 let mockParams: Record<string, string | string[]> = {};
@@ -32,6 +33,7 @@ jest.mock('expo-router', () => {
     useRouter: () => ({
       back: mockBack,
       canGoBack: () => true,
+      dismissTo: mockDismissTo,
       push: mockPush,
       replace: mockReplace,
     }),
@@ -86,6 +88,7 @@ describe('programme screens', () => {
     resetLocalData();
     await seedCatalog();
     mockPush.mockReset();
+    mockDismissTo.mockReset();
     mockReplace.mockReset();
     mockBack.mockReset();
     mockParams = {};
@@ -527,9 +530,9 @@ describe('programme screens', () => {
         fireEvent.press(screen.getByTestId('programme-next-block-add'));
       });
 
-      // Creates session and navigates into active session view
+      // Creates the session and opens Train, where the workout lives
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith(expect.stringMatching(/^\/session\//));
+        expect(mockDismissTo).toHaveBeenCalledWith('/train');
       });
     });
 

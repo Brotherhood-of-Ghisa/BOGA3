@@ -1,9 +1,8 @@
 import type { Href } from 'expo-router';
 
-import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
-import { loadActiveSessionId } from '@/src/session-entry';
+import { mainTabHref } from '@/src/navigation/main-tabs';
 
-/** The session view for one session. */
+/** The session view for one session as a page: a completed session's edit. */
 export const sessionViewHref = (sessionId: string): Href =>
   `/session/${encodeURIComponent(sessionId)}` as Href;
 
@@ -20,19 +19,7 @@ export const sessionCompareHref = (sessionId: string): Href =>
   `/session/${encodeURIComponent(sessionId)}/compare` as Href;
 
 /**
- * Where a main tab leads. Train is the way into training, so with a workout in
- * progress it opens that session directly. A failed lookup opens Train, which
- * shows its own retryable read error rather than assuming there is no workout.
+ * Where the workout in progress lives: the Train tab shows it in place of its
+ * Start disc, so every way into it opens Train.
  */
-export async function mainTabDestination(
-  tab: MainTabKey,
-  loadActive: () => Promise<string | null> = loadActiveSessionId,
-): Promise<Href> {
-  if (tab !== 'train') return mainTabHref(tab);
-  try {
-    const activeSessionId = await loadActive();
-    return activeSessionId ? sessionViewHref(activeSessionId) : mainTabHref(tab);
-  } catch {
-    return mainTabHref(tab);
-  }
-}
+export const ACTIVE_WORKOUT_HREF: Href = mainTabHref('train');

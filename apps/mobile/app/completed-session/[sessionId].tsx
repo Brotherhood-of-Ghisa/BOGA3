@@ -462,8 +462,10 @@ export function CompletedSessionDetailScreenShell({
     [completionExerciseComparisons, completionPersonalRecords, sessionInsightExercises]
   );
 
+  // Over the tabs the summary closes onto Progress (its fade); with nothing
+  // beneath, Progress replaces it.
   const handleCompletionExit = useCallback(() => {
-    router.replace('/progress');
+    router.dismissTo('/progress');
   }, [router]);
 
   useEffect(() => {
@@ -489,7 +491,7 @@ export function CompletedSessionDetailScreenShell({
     ) : null;
 
   // All presentations draw their own top bar, like the session view they sit
-  // beside; completion also blocks the back gesture (its exits replace to
+  // beside; completion also blocks the back gesture (its exits close to
   // Progress). The stack title is the back label of what the detail pushes.
   const stackOptions =
     presentation === 'completion'

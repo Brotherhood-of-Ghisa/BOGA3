@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 
 import type { PlanCardChoice } from '@/components/session-planner/plan-card-choice-sheet';
-import { sessionViewHref } from '@/src/navigation/active-session-entry';
+import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 import { findActiveSessionId } from '@/src/data/session-list';
 import { loadSessionSnapshotById } from '@/src/data/session-drafts';
 import {
@@ -41,6 +41,7 @@ export type PlanDetailController = {
  */
 export const usePlanDetail = (planId: string | null): PlanDetailController => {
   const router = useRouter();
+  const openActiveWorkout = useOpenActiveWorkout();
   const [detail, setDetail] = useState<PlanDetailView | null | 'loading'>('loading');
   const [notice, setNotice] = useState<string | null>(null);
   const [resumeSessionId, setResumeSessionId] = useState<string | null>(null);
@@ -109,7 +110,7 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
       clearNotice();
       const result = await startSessionPlan(planId);
       if (result.status === 'started' || result.status === 'already-active') {
-        router.push(sessionViewHref(result.sessionId));
+        openActiveWorkout(result.sessionId);
         return;
       }
       if (result.status === 'active-conflict') {
@@ -130,7 +131,7 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
       clearNotice();
       const result = await addPlanBlockToSession(block.id);
       if (result.status === 'attached') {
-        router.push(sessionViewHref(result.sessionId));
+        openActiveWorkout(result.sessionId);
         return;
       }
       if (result.status === 'ambiguous') {
@@ -169,7 +170,7 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
     void run(async () => {
       const result = await addPlanBlockToSession(pending.planExerciseId, cardId);
       if (result.status === 'attached') {
-        router.push(sessionViewHref(result.sessionId));
+        openActiveWorkout(result.sessionId);
         return;
       }
       setNotice("Couldn't add the block. Try again.");

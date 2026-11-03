@@ -22,7 +22,7 @@
       "count": 1
     }
   },
-  "app/session/[sessionId]/index.tsx": {
+  "components/session-view/session-view-screen.tsx": {
     "max-lines-per-function": {
       "count": 1
     }

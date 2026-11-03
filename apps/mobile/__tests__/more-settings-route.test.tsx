@@ -15,10 +15,6 @@ jest.mock('@/src/utils/isDevMode', () => ({ isDevMode: () => false }));
 jest.mock('@/src/utils/agent-connect', () => ({
   getAgentConnectUrl: () => 'https://example.test/connect',
 }));
-jest.mock('@/src/navigation/active-session-entry', () => ({
-  mainTabDestination: (tab: string) => Promise.resolve(`/${tab}`),
-}));
-
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { Stack, router as appRouter } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';

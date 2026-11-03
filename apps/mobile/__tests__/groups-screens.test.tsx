@@ -29,11 +29,12 @@ jest.mock('@react-native-community/netinfo', () => ({
 }));
 
 const mockPush = jest.fn();
+const mockDismissTo = jest.fn();
 const mockReplace = jest.fn();
 let mockParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, back: jest.fn(), replace: mockReplace }),
+  useRouter: () => ({ push: mockPush, back: jest.fn(), replace: mockReplace, dismissTo: mockDismissTo }),
   useLocalSearchParams: () => mockParams,
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
@@ -1025,14 +1026,15 @@ describe("Friend's session view", () => {
     expect(mockPush).toHaveBeenCalledWith('/completed-session/s-1');
   });
 
-  it('opens my live session while it runs, and shows no records until it is completed', async () => {
+  it('opens my live session on Train while it runs, and shows no records until it is completed', async () => {
     const me = { user_id: USER_ID, username: 'me' };
     mockParams = { groupId: 'group-a', memberId: USER_ID, sessionId: 's-1' };
     api.getCompetitionSession.mockResolvedValue(sessionDetail({ member: me, status: 'active', completed_at_ms: null, duration_sec: null }));
     api.getCompetitionSessionRecords.mockResolvedValue(sessionRecords({ member: me, provisional: true }));
     render(<GroupSessionRoute />);
     fireEvent.press(await screen.findByTestId('group-session-full-view'));
-    expect(mockPush).toHaveBeenCalledWith('/session/s-1');
+    expect(mockDismissTo).toHaveBeenCalledWith('/train');
+    expect(mockPush).not.toHaveBeenCalled();
     await waitFor(() => expect(api.getCompetitionSessionRecords).toHaveBeenCalled());
     expect(screen.queryByTestId('group-session-records')).toBeNull();
     expect(screen.queryByText(/#1 in group/)).toBeNull();

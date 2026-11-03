@@ -6,6 +6,7 @@ import { PlanCardChoiceSheet } from '@/components/session-planner/plan-card-choi
 import { PlanDetailBlocks } from '@/components/session-planner/plan-detail-blocks';
 import { PlanDetailSummary } from '@/components/session-planner/plan-detail-summary';
 import { usePlanDetail } from '@/components/session-planner/use-plan-detail';
+import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 import { sessionViewHref } from '@/src/navigation/active-session-entry';
 
 const coerceParam = (value: string | string[] | undefined): string | null =>
@@ -24,6 +25,7 @@ export type SessionPlanDetailScreenProps = {
  */
 export function SessionPlanDetailScreen({ planId }: SessionPlanDetailScreenProps) {
   const router = useRouter();
+  const openActiveWorkout = useOpenActiveWorkout();
   const controller = usePlanDetail(planId);
   const { detail, notice, resumeSessionId, choice } = controller;
 
@@ -59,7 +61,7 @@ export function SessionPlanDetailScreen({ planId }: SessionPlanDetailScreenProps
                 <ActionButton
                   accessibilityLabel="Resume the active session"
                   label="Resume"
-                  onPress={() => router.push(sessionViewHref(resumeSessionId))}
+                  onPress={() => openActiveWorkout(resumeSessionId)}
                   testID="plan-detail-resume"
                   variant="outline"
                 />
@@ -81,7 +83,7 @@ export function SessionPlanDetailScreen({ planId }: SessionPlanDetailScreenProps
         <PlanDetailBlocks
           detail={detail}
           onAdd={controller.addBlock}
-          onOpenSession={(sessionId) => router.push(sessionViewHref(sessionId))}
+          onOpenSession={(sessionId, attached) => (attached ? openActiveWorkout(sessionId) : router.push(sessionViewHref(sessionId)))}
           onSkip={controller.skipBlock}
         />
 

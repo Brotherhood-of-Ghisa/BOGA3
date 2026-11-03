@@ -29,6 +29,8 @@ let mockCanGoBack = true;
 let mockScreenOptions: { headerLeft?: () => mockReact.ReactElement; headerRight?: () => mockReact.ReactElement } = {};
 let mockSearchParams: Record<string, string> = {};
 
+const mockDismissTo = jest.fn();
+const mockSetOptions = jest.fn();
 jest.mock('expo-router', () => ({
   Stack: {
     // The header's right items are mounted in place, so the gym button is reachable.
@@ -37,7 +39,9 @@ jest.mock('expo-router', () => ({
       return mockReact.createElement(mockReact.Fragment, null, options.headerRight?.());
     },
   },
+  useNavigation: () => ({ setOptions: mockSetOptions }),
   useRouter: () => ({
+    dismissTo: mockDismissTo,
     push: mockPush,
     replace: mockReplace,
     back: mockBack,
@@ -167,6 +171,8 @@ beforeEach(() => {
   resetLocalData();
   __resetExerciseListPreferencesForTests();
   mockPush.mockClear();
+  mockDismissTo.mockClear();
+  mockSetOptions.mockClear();
   mockBack.mockClear();
   mockReplace.mockClear();
   mockCanGoBack = true;
@@ -460,15 +466,16 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(mockPush).toHaveBeenLastCalledWith(`/completed-session/${EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId}`);
   });
 
-  it('routes the detail navigation strip through the canonical four-tab model', async () => {
+  it('leaves for a tab with no animation, closing onto the tabs below rather than stacking them', async () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
 
     fireEvent.press(screen.getByTestId('top-level-tab-more'));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/more'));
+    expect(mockSetOptions).toHaveBeenCalledWith({ animation: 'none' });
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith('/more'));
 
-    // No workout in progress in this fixture: Train opens Train.
     fireEvent.press(screen.getByTestId('top-level-tab-train'));
-    await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith('/train'));
+    await waitFor(() => expect(mockDismissTo).toHaveBeenLastCalledWith('/train'));
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('draws its own back arrow that pops the stack', async () => {

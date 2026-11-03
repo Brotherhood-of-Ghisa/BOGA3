@@ -23,7 +23,7 @@ draws the same fixed bar on every screen that shows tabs.
 | Route | What it is for | File |
 | --- | --- | --- |
 | `/today` | Landing page: You (this week, N-week period, a session's exercises), Plan (muscles' last three days, today and week against targets; week's plans; `Sessions` opens Sessions), Groups (current CoW exercise/metrics, last week’s winners, unchanged week board and sessions). Swiped cards: Plan first, opens on You. Starts nothing | `(tabs)/today.tsx`, `components/today/`, `src/progress-summary/`, `src/today-plan/` |
-| `/train` | The single entry surface for starting a personal workout | `(tabs)/train.tsx` |
+| `/train` | The single entry surface for starting a personal workout, and the workout in progress | `(tabs)/train.tsx` |
 | `/progress` | Frozen breakdown / period / metric chips over table search and a Filters button, whose sheet holds the family-grouping switch, adjacent Sets/Volume primary-only switches ([[muscle.secondary-filter]]) and the gym's radio rows — each only where the view uses it; Muscle uses Settings' saved layout (`List`/`3D`, default `List`), Exercise always uses its full exercise list; both follow [[comparison.change-display]]. Exercise sorts Now / Prev / Change / recency; Muscle sorts name / Now / Prev / Change, within fixed family sections or globally with grouping off. Search matches Exercise names/primary muscles or Muscle names/families. Each breakdown retains its own search, grouping and sort for the visit. Exercise opens on its configured metric (Sets by default), with 1RM available explicitly. Muscle List uses the Exercise table’s separate columns and responsive rows; names open history and chevrons disclose contributors; 3D reveals effort-grouped contributors and Timeline / Grid / Weekly links. Table history and contributor links carry the chosen gym and metric; 3D muscle contributors open all-gym exercise Timeline. Visits open on Settings' defaults ([[comparison.window]]); choices last the visit, a changed default replaces one; `breakdown` / `period` links override on entry or change. Sessions remains last | `(tabs)/progress.tsx` |
 | `/groups` | One group, under a tab header titled (and switched) by name, a settings icon; swiped pages, opening mid: `Stream` of sessions, records, membership and CoW lifecycle events (a record card shows its set and certification status, then values; its sheet: the set, one Certify, each value, the previous #1 per board, `Session`, `Leaderboard`); `At a glance` (pinned stepper, metric; stats, top five, rank chart); `Leaderboards` (All podiums, search, order); `CoWs` (current, next and past challenges) | `(tabs)/groups.tsx`, `components/groups/` |
 | `/more` | Secondary hub, the bar's ⋮. Two untitled cards: Exercises, Gyms; then Connect an AI (names the connected agents and opens `/connected-agents`; with none, or signed out, opens the setup instructions in the browser) and Settings | `(tabs)/more.tsx` |
@@ -43,7 +43,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 
 | Route | What it is for | File |
 | --- | --- | --- |
-| `/session/[sessionId]` | The session view: the active session, read-only and navigational (summary card, one card per exercise, `Finish`). Also the completed-session editor, with editable Start/End | `session/[sessionId]/index.tsx`, `components/session-view/` |
+| `/session/[sessionId]` | The session view as a page: the completed-session editor, with editable Start/End. The active session's view (summary card, one card per exercise, `Finish`) is the Train tab | `session/[sessionId]/index.tsx`, `components/session-view/session-view-screen.tsx` |
 | `/session/[sessionId]/exercise/[sessionExerciseId]` | One exercise of that session: records panel, ordered set list with the in-place logger, `Complete exercise` | `session/[sessionId]/exercise/[sessionExerciseId].tsx`, `components/exercise-page/`, `apps/mobile/src/session-recorder/` |
 | `/session/[sessionId]/add-exercise` | Exercise picker (iOS page sheet): the catalogue browser in select mode, group exercises, inline create | `session/[sessionId]/add-exercise.tsx`, `components/session-recorder/exercise-picker.tsx` |
 | `/session/[sessionId]/compare` | Session vs history: the open session's exercise / muscle volume against earlier completed history, off the session view so logging stays uncluttered | `session/[sessionId]/compare.tsx` |
@@ -121,9 +121,8 @@ the tab bar (`TabOwnedPage`), owned by More.
 
 ## Screen rules a route file will not tell you
 
-- **Train never offers Resume.** A workout in progress is *opened*: the Train
-  tab goes to it (`mainTabDestination`), and `/train` reached another way
-  replaces itself with it.
+- **Train never offers Resume.** While a workout is in progress `/train` *is*
+  it: the session view replaces the disc in place.
 - Session-view and exercise-page edits **autosave losslessly** (every row
   kept); only `Finish` / `Done` drop unconfirmed rows (`../05-data-model.md`).
   Both run the shared cleanup prompts, and invalid set values block them.

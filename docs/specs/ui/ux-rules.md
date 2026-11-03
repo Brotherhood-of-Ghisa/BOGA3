@@ -48,10 +48,8 @@ the configured calendar bounds instead of introducing another duration.
    the active tab in `ink` (the others muted) over an `ink` underline, and never uses `accent`.
    Four labelled tabs (Today, Train, Progress, Groups), then More as a ⋮;
    Settings is a More row; both work signed out.
-5. **A workout in progress is never offered as a Resume button.** Train opens
-   it directly, and every session start goes through the session-entry
-   coordinator (`src/session-entry/coordinator.ts`), so no action can create a
-   second concurrent session.
+5. **A workout in progress is never a Resume button.** Train is that workout;
+   every start goes through `src/session-entry/coordinator.ts`: never two.
 
 ## Sheets
 
@@ -97,7 +95,10 @@ Decided 2026-10-27.
    `paper` ground (no white band, no shadow): a minimal back chevron, an
    Archivo 700 title, and an optional `headerRight` action (⋮, `+`). No page
    draws a second back of its own; back returns to where you came from.
-2. **Edit in a page, choose in a tray.** An editor (the exercise editor,
+2. **Motion says where you went.** Tab presses never animate. A page slides
+   in from the right, Back reverses it, a modal rises, and the summary after
+   Finish fades.
+3. **Edit in a page, choose in a tray.** An editor (the exercise editor,
    `/exercise-edit`) is a pushed page; what it opens (Link) pushes over it, so
    unsaved edits wait beneath. A `Sheet` is for row ⋮ menus and choosing one
    or a few values (a muscle). A single setting — a switch, a choice of two or

@@ -36,7 +36,11 @@ const mockCanGoBack = jest.fn(() => true);
 const mockNavigation = {
   addListener: jest.fn((_event: string, _listener: (event: unknown) => void) => () => undefined),
   dispatch: jest.fn(),
+  setOptions: jest.fn(),
 };
+// The workout in progress on the Train tab; Train swaps its disc back on `onEnded`.
+const mockOnEnded = jest.fn();
+const ON_TAB = { placement: 'tab', onEnded: mockOnEnded } as const;
 // Every mounted focus callback, so a test can play "the screen came back".
 const mockFocusCallbacks = new Set<() => void | (() => void)>();
 
@@ -79,7 +83,7 @@ jest.mock('@/src/groups/use-group-exercise-linking', () => ({
 
 import { AddExerciseScreen } from '../app/session/[sessionId]/add-exercise';
 import { SessionCompareScreen } from '../app/session/[sessionId]/compare';
-import { SessionViewScreen } from '../app/session/[sessionId]/index';
+import { SessionViewScreen } from '@/components/session-view/session-view-screen';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { upsertLocalGym, setLocalGymArchived } from '@/src/data/local-gyms';
@@ -192,10 +196,14 @@ const WithAddExerciseRoute = ({ children }: { children: mockReact.ReactNode }) =
     </>
   );
 };
-const renderSessionView = (sessionId: string) =>
+const renderSessionView = (sessionId: string, placement: 'tab' | 'page' = 'tab') =>
   render(
     <WithAddExerciseRoute>
-      <SessionViewScreen sessionId={sessionId} />
+      {placement === 'tab' ? (
+        <SessionViewScreen {...ON_TAB} sessionId={sessionId} />
+      ) : (
+        <SessionViewScreen placement="page" sessionId={sessionId} />
+      )}
     </WithAddExerciseRoute>,
   );
 
@@ -288,7 +296,7 @@ describe('Session view', () => {
       .spyOn(sessionFacts, 'loadEarlierBestsByDefinition')
       .mockRejectedValueOnce(new Error('Facts read failed'));
     await seed();
-    render(<SessionViewScreen sessionId={SESSION} />);
+    render(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
 
     await waitFor(() => expect(failedRead).toHaveBeenCalled());
     await act(async () => {
@@ -322,9 +330,12 @@ describe('Session view', () => {
       fireEvent.press(screen.getByTestId('session-view-finish-button'));
     });
 
+    // The summary covers the tabs while Train returns to its disc beneath.
     await waitFor(() =>
-      expect(mockReplace).toHaveBeenCalledWith(`/completed-session/${SESSION}?presentation=completion`)
+      expect(mockPush).toHaveBeenCalledWith(`/completed-session/${SESSION}?presentation=completion`)
     );
+    expect(mockOnEnded.mock.calls).toEqual([['on-return']]);
+    expect(mockReplace).not.toHaveBeenCalled();
     expect(titles).toEqual(['Remove exercises with no sets and submit?']);
     const after = await readSession(SESSION);
     expect(after).toMatchObject({ status: 'completed', gymId: FIXTURE_GYM, startedAt: before!.startedAt });
@@ -353,10 +364,11 @@ describe('Session view', () => {
     });
 
     expect(await readSession(SESSION)).toEqual(before);
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockOnEnded).not.toHaveBeenCalled();
   });
 
-  it('abandons only after the destructive confirmation, then returns to Train', async () => {
+  it('abandons only after the destructive confirmation, then returns Train to its disc', async () => {
     let answer = 'Keep session';
     const titles = answerAlerts(() => answer);
     await openSession();
@@ -375,7 +387,8 @@ describe('Session view', () => {
     });
     expect(sessionRow(SESSION)?.deletedAt).toBeInstanceOf(Date);
     expect(await sessionDrafts.loadLatestSessionDraftSnapshot()).toBeNull();
-    expect(mockDismissTo).toHaveBeenCalledWith('/train');
+    expect(mockOnEnded.mock.calls).toEqual([['now']]);
+    expect(mockDismissTo).not.toHaveBeenCalled();
   });
 
   it('states a failed abandon inline as a danger line, and stays on the session (a failed write)', async () => {
@@ -392,18 +405,46 @@ describe('Session view', () => {
     expect(StyleSheet.flatten(notice.props.style)).toMatchObject({
       fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: uiRoles.danger,
     });
-    expect(mockDismissTo).not.toHaveBeenCalled();
+    expect(mockOnEnded).not.toHaveBeenCalled();
   });
 
-  it('stays on this workout when Train is pressed, and leaves for any other tab', async () => {
+  it('draws no tab bar of its own on the Train tab: the tab layout draws it, so switching is a tab switch', async () => {
     await openSession();
 
-    fireEvent.press(screen.getByTestId('top-level-tab-train'));
-    await act(async () => undefined);
-    expect(mockDismissTo).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('top-level-tab-train')).toBeNull();
+  });
+
+  it('on the tab, hands a workout completed elsewhere back to Train rather than editing it there', async () => {
+    await seed(async () => {
+      await sessionDrafts.completeSessionDraft(SESSION, { completedAt: new Date(), now: new Date() });
+    });
+    renderSessionView(SESSION);
+
+    await waitFor(() => expect(mockOnEnded.mock.calls).toEqual([['now']]));
+  });
+
+  it('as a page, finishes by replacing itself with the summary and leaves for a tab with no animation', async () => {
+    answerAlerts(() => 'Remove empty exercises and submit');
+    const frames: FrameRequestCallback[] = [];
+    const frameSpy = jest
+      .spyOn(global, 'requestAnimationFrame')
+      .mockImplementation((callback) => frames.push(callback));
+    await seed();
+    renderSessionView(SESSION, 'page');
+    await screen.findByLabelText(BENCH_LABEL);
 
     fireEvent.press(screen.getByTestId('top-level-tab-today'));
-    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith('/today'));
+    expect(mockNavigation.setOptions).toHaveBeenCalledWith({ animation: 'none' });
+    frames.forEach((frame) => frame(0));
+    expect(mockDismissTo).toHaveBeenCalledWith('/today');
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('session-view-finish-button'));
+    });
+    await waitFor(() =>
+      expect(mockReplace).toHaveBeenCalledWith(`/completed-session/${SESSION}?presentation=completion`)
+    );
+    frameSpy.mockRestore();
   });
 
   it('adds an exercise from the picker with one empty set, leaving the rest as they were', async () => {
@@ -770,17 +811,17 @@ describe('Session view', () => {
 
   it('says so when its session is no longer the active draft', async () => {
     await seed(() => setSessionDeletedState(SESSION, true));
-    render(<SessionViewScreen sessionId={SESSION} />);
+    render(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
 
     expect(await screen.findByText('This session is no longer active.')).toBeTruthy();
     fireEvent.press(screen.getByTestId('session-view-back'));
-    expect(mockDismissTo).toHaveBeenCalledWith('/train');
+    expect(mockOnEnded.mock.calls).toEqual([['now']]);
   });
 
   it('shows a retryable error when the draft read fails (a failed read)', async () => {
     await seed();
     jest.spyOn(sessionDrafts, 'loadLatestSessionDraftSnapshot').mockRejectedValueOnce(new Error('disk'));
-    render(<SessionViewScreen sessionId={SESSION} />);
+    render(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
 
     fireEvent.press(await screen.findByTestId('session-view-retry'));
     expect(await screen.findByLabelText(BENCH_LABEL)).toBeTruthy();
@@ -834,7 +875,7 @@ describe('Session view', () => {
 
     // Returning to the session view and abandoning the session clears the timer.
     screen.unmount();
-    render(<SessionViewScreen sessionId={SESSION} />);
+    render(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
     expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
 
     answerAlerts(() => 'Abandon');
@@ -905,7 +946,7 @@ describe('Session view: editing a completed session', () => {
       await sessionDrafts.completeSessionDraft(DONE, { completedAt: COMPLETED_AT, now: COMPLETED_AT });
       await afterSeed?.();
     });
-    renderSessionView(DONE);
+    renderSessionView(DONE, 'page');
   };
 
   const renderCompleted = async (exercises?: StoredExercise[]) => {
@@ -1138,7 +1179,7 @@ describe('Session view: editing a completed session', () => {
     });
     render(
       <>
-        <SessionViewScreen sessionId={DONE} />
+        <SessionViewScreen placement="page" sessionId={DONE} />
         <ExercisePageScreen sessionExerciseId="done_bench" sessionId={DONE} />
       </>
     );

@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 
 import type { PlanCardChoice } from '@/components/session-planner/plan-card-choice-sheet';
-import { sessionViewHref } from '@/src/navigation/active-session-entry';
+import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 import { findActiveSessionId } from '@/src/data/session-list';
 import { loadSessionSnapshotById } from '@/src/data/session-drafts';
 import {
@@ -38,6 +38,7 @@ export type ProgrammeDetailController = {
  */
 export const useProgrammeDetail = (programmeId: string | null): ProgrammeDetailController => {
   const router = useRouter();
+  const openActiveWorkout = useOpenActiveWorkout();
   const [detail, setDetail] = useState<ProgrammeDetailView | null | 'loading'>('loading');
   const [notice, setNotice] = useState<string | null>(null);
   const [choice, setChoice] = useState<ProgrammeDetailController['choice']>(null);
@@ -98,7 +99,7 @@ export const useProgrammeDetail = (programmeId: string | null): ProgrammeDetailC
       clearNotice();
       const result = await addPlanBlockToSession(block.id);
       if (result.status === 'attached') {
-        router.push(sessionViewHref(result.sessionId));
+        openActiveWorkout(result.sessionId);
         return;
       }
       if (result.status === 'ambiguous') {
@@ -121,7 +122,7 @@ export const useProgrammeDetail = (programmeId: string | null): ProgrammeDetailC
       setChoice(null);
       const result = await addPlanBlockToSession(planExerciseId, cardId);
       if (result.status === 'attached') {
-        router.push(sessionViewHref(result.sessionId));
+        openActiveWorkout(result.sessionId);
         return;
       }
       setNotice("Couldn't add the block. Try again.");

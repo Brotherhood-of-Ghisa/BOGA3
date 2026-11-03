@@ -4,10 +4,27 @@ import { StyleSheet } from 'react-native';
 import { uiText } from '@/components/ui/text-roles';
 import { uiRoles } from '@/components/ui/tokens';
 
-jest.mock('expo-router', () => ({
-  Tabs: Object.assign(() => null, { Screen: () => null }),
-  useRouter: () => ({ push: jest.fn() }),
-}));
+const mockPush = jest.fn();
+const mockTabsProps: { screenOptions?: object; screens: Record<string, object> } = { screens: {} };
+
+jest.mock('expo-router', () => {
+  const { createElement, Fragment } = jest.requireActual<typeof import('react')>('react');
+  return {
+    Tabs: Object.assign(
+      ({ children, screenOptions }: { children: import('react').ReactNode; screenOptions: object }) => {
+        mockTabsProps.screenOptions = screenOptions;
+        return createElement(Fragment, null, children);
+      },
+      {
+        Screen: ({ name, options }: { name: string; options: object }) => {
+          mockTabsProps.screens[name] = options;
+          return null;
+        },
+      },
+    ),
+    useRouter: () => ({ push: mockPush }),
+  };
+});
 
 import TabsLayout, { TabsBar } from '../app/(tabs)/_layout';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
@@ -81,8 +98,16 @@ describe('MainTabBar', () => {
 describe('TabsLayout', () => {
   it('paints the status-bar inset on the paper ground, matching the tab pages', () => {
     render(<TabsLayout />);
-    expect(StyleSheet.flatten(screen.getByTestId('tabs-safe-area').props.style)).toMatchObject({
-      backgroundColor: uiRoles.paper,
+    expect(mockTabsProps.screenOptions).toMatchObject({
+      sceneStyle: { backgroundColor: uiRoles.paper, paddingTop: expect.any(Number) },
+    });
+  });
+
+  it("leaves Train to clear the status bar itself, so its workout's top bar runs under it", () => {
+    render(<TabsLayout />);
+    expect(mockTabsProps.screens.train).toEqual({
+      title: 'Train',
+      sceneStyle: { backgroundColor: uiRoles.paper },
     });
   });
 });
@@ -99,6 +124,13 @@ describe('TabsBar', () => {
 
     render(<TabsBar routeName="groups" />);
     expect(screen.getByLabelText('Open Groups').props.accessibilityState.selected).toBe(true);
+  });
+
+  it('switches tabs in place: Train is a tab like any other, with the workout on it', () => {
+    render(<TabsBar routeName="today" />);
+    fireEvent.press(screen.getByLabelText('Open Train'));
+    fireEvent.press(screen.getByLabelText('Open Progress'));
+    expect(mockPush.mock.calls).toEqual([['/train'], ['/progress']]);
   });
 
   it('draws nothing for a route no tab owns', () => {

@@ -144,13 +144,13 @@ describe('Sessions over real data', () => {
     );
   });
 
-  it('opens the session view when resuming the active session', async () => {
+  it('resumes the active session on Train, where the workout lives', async () => {
     await openSessions();
 
     fireEvent.press(screen.getByTestId('resume-active-session-button'));
 
-    expect(mockPush).toHaveBeenCalledWith(`/session/${ACTIVE}`);
-    expect(mockDismissTo).not.toHaveBeenCalled();
+    expect(mockDismissTo).toHaveBeenCalledWith('/train');
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('routes completion through the session cleanup flow instead of completing directly', async () => {
@@ -158,7 +158,7 @@ describe('Sessions over real data', () => {
 
     fireEvent.press(screen.getByLabelText('Review and complete active session'));
 
-    expect(mockPush).toHaveBeenCalledWith(`/session/${ACTIVE}`);
+    expect(mockDismissTo).toHaveBeenCalledWith('/train');
     expect(await loadSessionSnapshotById(ACTIVE)).toMatchObject({ status: 'active', completedAt: null });
   });
 

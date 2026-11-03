@@ -1,9 +1,8 @@
-import { useRouter, type Href } from 'expo-router';
-import { useCallback, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
-import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
+import { useOpenMainTabFromPage } from '@/components/navigation/use-open-main-tab';
 import { uiRoles } from '@/components/ui/tokens';
 import type { MainTabKey } from '@/src/navigation/main-tabs';
 
@@ -15,12 +14,11 @@ type TabOwnedPageProps = {
 
 /**
  * A root-stack page that keeps the bottom tab bar (Exercises, Settings): the native header on top, its owner tab selected below. A tab
- * press returns by `dismissTo`, so the tabs underneath are reused rather than
- * stacked, as from the session view.
+ * press closes the page with no animation and reuses the tabs underneath
+ * (`useOpenMainTabFromPage`).
  */
 export function TabOwnedPage({ children, activeTab = 'more' }: TabOwnedPageProps) {
-  const router = useRouter();
-  const openTab = useOpenMainTab(useCallback((href: Href) => router.dismissTo(href), [router]));
+  const openTab = useOpenMainTabFromPage();
   return (
     <View style={styles.page}>
       <View style={styles.body}>{children}</View>

@@ -1,29 +1,55 @@
-import type { Href } from 'expo-router';
-import { useCallback, useRef } from 'react';
+import { useNavigation, useRouter } from 'expo-router';
+import { useCallback } from 'react';
 
-import { mainTabDestination } from '@/src/navigation/active-session-entry';
-import type { MainTabKey } from '@/src/navigation/main-tabs';
+import { ACTIVE_WORKOUT_HREF } from '@/src/navigation/active-session-entry';
+import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 
 /**
- * A main-tab press handler: resolves where the tab leads (`mainTabDestination`)
- * and opens it with `open`. A press while the last one is still resolving is
- * ignored, so a double tap on Train cannot push the session view twice.
+ * A tab-bar press on a page pushed over the tabs (`TabOwnedPage`, exercise
+ * history, a completed session's edit). A tab press switches context and is
+ * never a step back, so the pages on top close with no animation and the tab
+ * is selected, as a press on the tab layout's own bar does. The top page is the
+ * one that animates when several close at once, so only its animation goes.
  */
-export function useOpenMainTab(
-  open: (href: Href) => void,
-  loadActive?: () => Promise<string | null>,
-): (tab: MainTabKey) => void {
-  const pendingRef = useRef(false);
+export function useOpenMainTabFromPage(): (tab: MainTabKey) => void {
+  const navigation = useNavigation();
+  const router = useRouter();
   return useCallback(
     (tab: MainTabKey) => {
-      if (pendingRef.current) return;
-      pendingRef.current = true;
-      void mainTabDestination(tab, loadActive)
-        .then(open)
-        .finally(() => {
-          pendingRef.current = false;
-        });
+      navigation.setOptions({ animation: 'none' });
+      // The option reaches the native screen with the next frame; the close must not beat it.
+      requestAnimationFrame(() => router.dismissTo(mainTabHref(tab)));
     },
-    [open, loadActive],
+    [navigation, router],
+  );
+}
+
+type OpenedWorkoutListener = (sessionId: string) => void;
+const openedWorkoutListeners = new Set<OpenedWorkoutListener>();
+
+/**
+ * Train's subscription to workouts opened from elsewhere, so it shows one
+ * before the pages on top slide away rather than its disc while it re-reads.
+ */
+export function subscribeOpenedWorkout(listener: OpenedWorkoutListener): () => void {
+  openedWorkoutListeners.add(listener);
+  return () => {
+    openedWorkoutListeners.delete(listener);
+  };
+}
+
+/**
+ * The way into the workout in progress from a page over the tabs (Sessions, a
+ * plan, a programme, History, a group session). The workout lives on Train, so
+ * Train is told which one and the pages on top close as Back would.
+ */
+export function useOpenActiveWorkout(): (sessionId: string) => void {
+  const router = useRouter();
+  return useCallback(
+    (sessionId: string) => {
+      openedWorkoutListeners.forEach((listener) => listener(sessionId));
+      router.dismissTo(ACTIVE_WORKOUT_HREF);
+    },
+    [router],
   );
 }
