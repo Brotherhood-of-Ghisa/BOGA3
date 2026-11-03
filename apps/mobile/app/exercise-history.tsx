@@ -4,13 +4,13 @@ import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/forma
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
-import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
+import { useOpenMainTabFromPage } from '@/components/navigation/use-open-main-tab';
 import {
   ActionButton,
   Card,
@@ -413,7 +413,7 @@ function SessionCard({
 
 export default function ExerciseHistoryRoute() {
   const router = useRouter();
-  const openMainTab = useOpenMainTab(useCallback((href: Href) => router.push(href), [router]));
+  const openMainTab = useOpenMainTabFromPage();
   const params = useLocalSearchParams<{
     exerciseDefinitionId?: string | string[];
     tagDefinitionId?: string | string[];

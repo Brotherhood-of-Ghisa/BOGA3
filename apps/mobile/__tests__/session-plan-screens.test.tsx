@@ -22,6 +22,7 @@ jest.mock('@/src/data/bootstrap', () =>
 );
 
 const mockPush = jest.fn();
+const mockDismissTo = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 let mockParams: Record<string, string | string[]> = {};
@@ -38,6 +39,7 @@ jest.mock('expo-router', () => {
     useRouter: () => ({
       back: mockBack,
       canGoBack: () => true,
+      dismissTo: mockDismissTo,
       push: mockPush,
       replace: mockReplace,
     }),
@@ -70,6 +72,7 @@ beforeEach(() => {
   resetLocalData();
   mockPush.mockReset();
   mockReplace.mockReset();
+  mockDismissTo.mockReset();
   mockBack.mockReset();
   mockParams = {};
   alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
@@ -457,20 +460,18 @@ describe('plan detail', () => {
     expect(screen.getByTestId('plan-detail-delete')).toBeTruthy();
   });
 
-  it("Start all creates the active session with the plan's provenance and routes to it", async () => {
+  it("Start all creates the active session with the plan's provenance and opens Train, where it lives", async () => {
     await seedCatalog();
     const planId = await createPlanThroughRepository();
     await openDetail(planId);
 
     fireEvent.press(screen.getByTestId('plan-detail-start-all'));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
-    // The href builder encodes the owner-composed id's colons.
-    const startedSessionId = decodeURIComponent(
-      String(mockPush.mock.calls[0][0]).replace('/session/', ''),
-    );
-    const sessionRow = localDatabase().select().from(sessions).all().find((row) => row.id === startedSessionId);
-    expect(sessionRow).toMatchObject({ status: 'active', sourcePlanId: planId });
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith('/train'));
+    expect(mockPush).not.toHaveBeenCalled();
+    const activeRows = localDatabase().select().from(sessions).all().filter((row) => row.status === 'active');
+    expect(activeRows).toHaveLength(1);
+    expect(activeRows[0]).toMatchObject({ sourcePlanId: planId });
   });
 
   it('Start all with another active session offers one Resume and creates nothing', async () => {
@@ -490,7 +491,7 @@ describe('plan detail', () => {
     expect(await screen.findByTestId('plan-detail-notice')).toBeTruthy();
     expect(screen.getByTestId('plan-detail-resume')).toBeTruthy();
     fireEvent.press(screen.getByTestId('plan-detail-resume'));
-    expect(mockPush).toHaveBeenCalledWith('/session/live-session-1');
+    expect(mockDismissTo).toHaveBeenCalledWith('/train');
     // No second session: only the pre-existing active one.
     const activeRows = localDatabase().select().from(sessions).all().filter((row) => row.status === 'active');
     expect(activeRows).toHaveLength(1);
@@ -534,7 +535,7 @@ describe('plan detail', () => {
     fireEvent.press(screen.getByTestId('plan-card-choice-confirm'));
 
     await waitForGone(() => screen.queryByTestId('plan-card-choice-sheet'));
-    expect(mockPush).toHaveBeenCalledWith('/session/live-session-1');
+    expect(mockDismissTo).toHaveBeenCalledWith('/train');
     // The chosen card carries the block; the other stays unsourced.
     const planDetail = await planQueries.loadPlanDetail(planId);
     expect(planDetail?.blocks[0]).toMatchObject({
@@ -581,7 +582,7 @@ describe('plan detail: edit, skip, and the recorder complete', () => {
     const planId = await createPlanThroughRepository();
     await openDetail(planId);
     fireEvent.press(screen.getByTestId('plan-detail-start-all'));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledTimes(1));
 
     mockParams = { edit: planId };
     render(<SessionPlanNewRoute />);
@@ -908,7 +909,7 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
 
     fireEvent.press(screen.getByTestId('plan-detail-block-1-add'));
     // The sheet never opens: one unsourced candidate attaches directly.
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/session/live-session-1'));
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith('/train'));
     expect(screen.queryByTestId('plan-card-choice-sheet')).toBeNull();
     const detail = await planQueries.loadPlanDetail(planId);
     expect(detail?.blocks[0]).toMatchObject({ status: 'attached', attachedSessionExerciseId: 'card-2' });
@@ -920,7 +921,7 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
     await openDetail(planId);
     // Start all, then confirm a planned set: skip is now impossible.
     fireEvent.press(screen.getByTestId('plan-detail-start-all'));
-    await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledTimes(1));
     const detail = await planQueries.loadPlanDetail(planId);
     const cardId = detail?.blocks[0].attachedSessionExerciseId as string;
     const sessionId = detail?.blocks[0].attachedSessionId as string;
@@ -954,6 +955,50 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
     );
     const after = await planQueries.loadPlanDetail(planId);
     expect(after?.blocks[0].status).toBe('attached');
+  });
+
+  it("a block's Open session opens the workout in progress on Train, and a completed one as its edit page", async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    await openDetail(planId);
+    fireEvent.press(screen.getByTestId('plan-detail-start-all'));
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledTimes(1));
+    mockDismissTo.mockReset();
+    screen.unmount();
+
+    await openDetail(planId);
+    fireEvent.press(await screen.findByTestId('plan-detail-block-1-session'));
+    expect(mockDismissTo).toHaveBeenCalledWith('/train');
+    expect(mockPush).not.toHaveBeenCalled();
+    mockDismissTo.mockReset();
+    screen.unmount();
+
+    // Confirm the block's first set and finish: the block is consumed by a completed session.
+    const detail = await planQueries.loadPlanDetail(planId);
+    const sessionId = detail?.blocks[0].attachedSessionId as string;
+    const cardId = detail?.blocks[0].attachedSessionExerciseId as string;
+    const snapshot = await loadSessionSnapshotById(sessionId);
+    await persistSessionDraftSnapshot({
+      sessionId,
+      gymId: null,
+      startedAt: new Date(),
+      exercises: (snapshot?.exercises ?? []).map((exercise) =>
+        exercise.id === cardId
+          ? {
+              ...exercise,
+              sets: (exercise.sets ?? []).map((set, index) =>
+                index === 0 ? { ...set, repsValue: '5', weightValue: '100', performanceStatus: null } : set,
+              ),
+            }
+          : exercise,
+      ),
+    });
+    await completeSessionDraft(sessionId, { completedAt: new Date(), now: new Date() });
+
+    await openDetail(planId);
+    fireEvent.press(await screen.findByTestId('plan-detail-block-1-session'));
+    expect(mockPush).toHaveBeenCalledWith(`/session/${encodeURIComponent(sessionId)}`);
+    expect(mockDismissTo).not.toHaveBeenCalled();
   });
 
   it('the completed-session picker hides the From planner entry', async () => {

@@ -29,7 +29,7 @@ import {
   uiText,
   uiTextTone,
 } from '@/components/ui';
-import { sessionViewHref } from '@/src/navigation/active-session-entry';
+import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 
 export type SessionsScreenProps = {
   dataClient?: SessionListDataClient;
@@ -99,9 +99,7 @@ export function SessionsScreen({
     };
   }, [activeSession]);
 
-  const openActiveSession = (sessionId: string) => {
-    router.push(sessionViewHref(sessionId));
-  };
+  const openActiveSession = useOpenActiveWorkout();
 
   const discardActiveSession = () => {
     if (dataClient && activeSession) {

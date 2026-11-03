@@ -30,7 +30,7 @@ import {
   useNetworkOnline,
   type GroupGetResult,
 } from '@/src/groups';
-import { sessionViewHref } from '@/src/navigation/active-session-entry';
+import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 
 const firstParam = (value: string | string[] | undefined): string | null =>
   (Array.isArray(value) ? value[0] : value) ?? null;
@@ -73,14 +73,17 @@ function UnavailableState() {
   );
 }
 
-/** My own session's full view: the live session while it runs, else View Session. */
-const fullSessionHref = (session: CompetitionSessionWire): Href =>
-  session.status === 'completed' ? `/completed-session/${encodeURIComponent(session.session_id)}` as Href : sessionViewHref(session.session_id);
 
 /** The native header: which group's view, whose session and when; on my own session, the full-session action. */
 function GroupSessionHeader({ session, groupName, userId }: { session: CompetitionSessionWire | null; groupName: string | null; userId: string }) {
   const dateFormat = useDateFormat();
   const router = useRouter();
+  const openActiveWorkout = useOpenActiveWorkout();
+  // My own session's full view: the workout in progress on Train while it runs, else View Session.
+  const openFullSession = (target: CompetitionSessionWire) =>
+    target.status === 'completed'
+      ? router.push(`/completed-session/${encodeURIComponent(target.session_id)}` as Href)
+      : openActiveWorkout(target.session_id);
   return (
     <Stack.Screen
       options={{
@@ -92,7 +95,7 @@ function GroupSessionHeader({ session, groupName, userId }: { session: Competiti
             <IconButton
               accessibilityLabel="View full session"
               name="arrow-up-right"
-              onPress={() => router.push(fullSessionHref(session))}
+              onPress={() => openFullSession(session)}
               testID="group-session-full-view"
             />
           )

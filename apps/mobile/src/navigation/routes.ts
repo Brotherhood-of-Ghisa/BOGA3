@@ -1,7 +1,7 @@
 import type { Href } from 'expo-router';
 
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
-import { sessionViewHref } from './active-session-entry';
+import { ACTIVE_WORKOUT_HREF } from './active-session-entry';
 import { encodeGymRouteParam } from '@/src/utils/gym-scope-route';
 
 export const SIGN_IN_ROUTE = '/sign-in';
@@ -96,11 +96,11 @@ export const sessionsWeekHref = (dateKey: string): Href =>
 export const sessionsDayHref = (dateKey: string): Href =>
   `/sessions?day=${encodeURIComponent(dateKey)}` as Href;
 
-/** Where a history day leads; null for a day without a session. */
+/** Where a history day leads (the workout in progress lives on Train); null for a day without a session. */
 export const historyDayHref = (dateKey: string, sessionIds: readonly string[], activeSessionId: string | null = null): Href | null => {
   if (sessionIds.length === 0) return null;
   if (sessionIds.length > 1) return sessionsDayHref(dateKey);
-  return sessionIds[0] === activeSessionId ? sessionViewHref(sessionIds[0]) : completedSessionHref(sessionIds[0]);
+  return sessionIds[0] === activeSessionId ? ACTIVE_WORKOUT_HREF : completedSessionHref(sessionIds[0]);
 };
 
 

@@ -3,7 +3,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 import { bootstrapLocalDataLayer, resetLocalAppData } from '@/src/data';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
-import { sessionViewHref } from '@/src/navigation/active-session-entry';
+import { ACTIVE_WORKOUT_HREF } from '@/src/navigation/active-session-entry';
 import { syncRuntimeState } from '@/src/data/schema';
 import { clearAuthRequired, markAuthRequired } from '@/src/sync/auth-required-signal';
 import type { SyncProgress } from '@/src/sync/progress';
@@ -187,7 +187,8 @@ export const resolveMaestroHarnessTeleportHref = ({
         ? (`/session/${sessionId}/exercise/${sessionExerciseId}` as Href)
         : null;
     case 'session-view':
-      return sessionId ? sessionViewHref(sessionId) : null;
+      // The seeded workout in progress, which lives on Train.
+      return sessionId ? ACTIVE_WORKOUT_HREF : null;
     case 'session-plan-new':
       return '/session-plan/new' as Href;
     case 'today':

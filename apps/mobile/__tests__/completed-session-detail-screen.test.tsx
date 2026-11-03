@@ -384,7 +384,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(screen.queryByTestId('session-share-preview')).toBeNull();
   });
 
-  it('replaces to Stats when Android hardware back is pressed during completion', async () => {
+  it('closes onto Progress when Android hardware back is pressed during completion', async () => {
     let hardwareBackHandler: Parameters<typeof BackHandler.addEventListener>[1] | null = null;
     const remove = jest.fn();
     const addEventListenerSpy = jest
@@ -416,7 +416,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     act(() => {
       expect(hardwareBackHandler?.({ type: 'hardwareBackPress', timeStamp: 0 })).toBe(true);
     });
-    expect(mockReplace).toHaveBeenCalledWith('/progress');
+    expect(mockDismissTo).toHaveBeenCalledWith('/progress');
 
     view.unmount();
     expect(remove).toHaveBeenCalled();
@@ -479,7 +479,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     await waitFor(() => expect(screen.getByTestId('completed-session-detail-error')).toBeTruthy());
     expect(screen.getByText('Storage unavailable')).toBeTruthy();
     fireEvent.press(screen.getByTestId('session-completion-safe-exit'));
-    expect(mockReplace).toHaveBeenCalledWith('/progress');
+    expect(mockDismissTo).toHaveBeenCalledWith('/progress');
   });
 
   const detailClient = (

@@ -48,7 +48,7 @@ import { renderRouter } from 'expo-router/testing-library';
 import { Text } from 'react-native';
 
 import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
-import { RootStack } from '@/components/navigation/root-stack';
+import { completedSessionOptions, RootStack } from '@/components/navigation/root-stack';
 import {
   __resetAuthRequiredSignalForTests,
   clearAuthRequired,
@@ -283,4 +283,18 @@ it('never declares the gallery as reachable when its runtime guard is false', as
   const blocked = await render('/ui-gallery');
   expect(await screen.findByTestId('today-stub')).toBeTruthy();
   expect(blocked.getPathname()).toBe('/today');
+});
+
+describe('completedSessionOptions', () => {
+  it('fades the summary after Finish in and out, since it ends the workout rather than drilling in', () => {
+    expect(completedSessionOptions({ route: { params: { sessionId: 's1', presentation: 'completion' } } })).toEqual({
+      animation: 'fade',
+    });
+  });
+
+  it('slides View Session in like any other page', () => {
+    expect(completedSessionOptions({ route: { params: { sessionId: 's1' } } })).toEqual({});
+    expect(completedSessionOptions({ route: { params: { sessionId: 's1', presentation: 'summary' } } })).toEqual({});
+    expect(completedSessionOptions({ route: {} })).toEqual({});
+  });
 });

@@ -27,17 +27,19 @@ let mockParams: Record<string, string | undefined> = {};
 let mockCanGoBack = true;
 const mockStackScreen = jest.fn();
 const mockPush = jest.fn();
+const mockDismissTo = jest.fn();
 const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockFocusEffects = new Map<() => void | (() => void), void | (() => void)>();
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockParams,
+  useNavigation: () => ({ setOptions: jest.fn() }),
   useRouter: () => ({
     push: mockPush,
     replace: mockReplace,
     back: mockBack,
-    dismissTo: jest.fn(),
+    dismissTo: mockDismissTo,
     canGoBack: () => mockCanGoBack,
   }),
   useFocusEffect: (callback: () => void | (() => void)) => {
@@ -312,6 +314,7 @@ beforeEach(() => {
   mockCanGoBack = true;
   mockStackScreen.mockReset();
   mockPush.mockReset();
+  mockDismissTo.mockReset();
   mockReplace.mockReset();
   mockBack.mockReset();
   mockFocusEffects.clear();
@@ -374,7 +377,7 @@ describe('completion presentation over real data', () => {
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
   });
 
-  it('keeps a no-PR session informational when the catalog read fails, and Done goes to Stats', async () => {
+  it('keeps a no-PR session informational when the catalog read fails, and Done closes onto Progress', async () => {
     await openSession({ sessionId: NO_PR, presentation: 'completion', maestroCatalog: 'fail-once' });
 
     expect(await screen.findByText('Muscle breakdown unavailable.')).toBeTruthy();
@@ -385,7 +388,7 @@ describe('completion presentation over real data', () => {
     expect(screen.queryByTestId('session-completion-view-muscle-load')).toBeNull();
 
     fireEvent.press(screen.getByTestId('session-completion-done'));
-    expect(mockReplace).toHaveBeenCalledWith('/progress');
+    expect(mockDismissTo).toHaveBeenCalledWith('/progress');
   });
 
   it('says so when no completed set maps to a muscle', async () => {
@@ -701,7 +704,7 @@ describe('a session written through the app', () => {
     expect(screen.queryByText('Append')).toBeNull();
 
     fireEvent.press(screen.getByTestId('session-completion-done'));
-    expect(mockReplace).toHaveBeenCalledWith('/progress');
+    expect(mockDismissTo).toHaveBeenCalledWith('/progress');
 
     // The share image shows one set count, the working sets.
     fireEvent.press(screen.getByTestId('session-completion-share-session'));
@@ -1032,12 +1035,12 @@ describe('records, sharing and deleted sessions over real data', () => {
     expect(await screen.findByTestId(`session-completion-exercise-${ONE_PR_SQUAT}`)).toBeTruthy();
   });
 
-  it('offers one safe exit to Stats when a completion target was deleted', async () => {
+  it('offers one safe exit to Progress when a completion target was deleted', async () => {
     await openSession({ sessionId: ONE_PR, presentation: 'completion' }, 'exercise-block-history', markOnePrDeleted);
 
     expect(screen.getByTestId('completed-session-detail-empty')).toBeTruthy();
     expect(screen.queryByTestId('session-completion-presentation')).toBeNull();
     fireEvent.press(screen.getByTestId('session-completion-safe-exit'));
-    expect(mockReplace).toHaveBeenCalledWith('/progress');
+    expect(mockDismissTo).toHaveBeenCalledWith('/progress');
   });
 });

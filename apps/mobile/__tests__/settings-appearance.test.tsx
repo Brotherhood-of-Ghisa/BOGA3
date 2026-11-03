@@ -24,6 +24,7 @@ jest.mock('expo-router', () => ({
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- resolve after mock hoisting.
   useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, [callback]),
   useLocalSearchParams: () => ({}),
+  useNavigation: () => ({ setOptions: jest.fn() }),
   useRouter: () => ({ push: mockPush, replace: jest.fn() }),
 }));
 

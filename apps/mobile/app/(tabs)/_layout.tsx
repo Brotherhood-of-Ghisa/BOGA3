@@ -1,13 +1,10 @@
-import { Tabs, useRouter, type Href } from 'expo-router';
-import { useCallback } from 'react';
-import { StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Tabs, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { HEADER_STYLE_OPTIONS } from '@/components/navigation/header-style';
-import { useOpenMainTab } from '@/components/navigation/use-open-main-tab';
 import { uiRoles } from '@/components/ui/tokens';
-import { resolveMainTab } from '@/src/navigation/main-tabs';
+import { mainTabHref, resolveMainTab } from '@/src/navigation/main-tabs';
 
 /**
  * The tab layout's bar, selected from the tab navigator's own focused route.
@@ -18,31 +15,33 @@ import { resolveMainTab } from '@/src/navigation/main-tabs';
 export function TabsBar({ routeName }: { routeName: string | undefined }) {
   const router = useRouter();
   const activeTab = routeName ? resolveMainTab([routeName]) : null;
-  const openTab = useOpenMainTab(useCallback((href: Href) => router.push(href), [router]));
 
   if (!activeTab) {
     return null;
   }
 
-  return <MainTabBar activeTab={activeTab} onSelect={openTab} />;
+  return <MainTabBar activeTab={activeTab} onSelect={(tab) => router.push(mainTabHref(tab))} />;
 }
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  // The status-bar inset sits on the pages' own `paper` ground, so the top
+  // bar and the page read as one surface (not the navigator's default grey).
+  // Train clears the status bar itself: its workout's top bar runs under it.
+  const sceneStyle = { backgroundColor: uiRoles.paper, paddingTop: insets.top };
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea} testID="tabs-safe-area">
-      <Tabs
-        screenOptions={{ headerShown: false }}
-        tabBar={({ state }) => <TabsBar routeName={state.routes[state.index]?.name} />}>
-        <Tabs.Screen name="today" options={{ title: 'Today' }} />
-        <Tabs.Screen name="train" options={{ title: 'Train' }} />
-        <Tabs.Screen name="progress" options={{ title: 'Progress' }} />
-        {/* The one tab with a header: the group's name, its switch and Manage (`GroupScreenHeader`). */}
-        <Tabs.Screen name="groups" options={GROUPS_TAB_OPTIONS} />
-        <Tabs.Screen name="more" options={{ title: 'More' }} />
-        {/* A preserved compatibility root: addressable, owned by Progress. */}
-        <Tabs.Screen name="stats-history" options={{ title: 'History' }} />
-      </Tabs>
-    </SafeAreaView>
+    <Tabs
+      screenOptions={{ headerShown: false, sceneStyle }}
+      tabBar={({ state }) => <TabsBar routeName={state.routes[state.index]?.name} />}>
+      <Tabs.Screen name="today" options={{ title: 'Today' }} />
+      <Tabs.Screen name="train" options={{ title: 'Train', sceneStyle: { backgroundColor: uiRoles.paper } }} />
+      <Tabs.Screen name="progress" options={{ title: 'Progress' }} />
+      {/* The one tab with a header: the group's name, its switch and Manage (`GroupScreenHeader`). */}
+      <Tabs.Screen name="groups" options={GROUPS_TAB_OPTIONS} />
+      <Tabs.Screen name="more" options={{ title: 'More' }} />
+      {/* A preserved compatibility root: addressable, owned by Progress. */}
+      <Tabs.Screen name="stats-history" options={{ title: 'History' }} />
+    </Tabs>
   );
 }
 
@@ -50,15 +49,6 @@ const GROUPS_TAB_OPTIONS = {
   title: 'Groups',
   headerShown: true,
   ...HEADER_STYLE_OPTIONS,
-  // The layout's safe area already clears the status bar.
+  // The scene's padding already clears the status bar.
   headerStatusBarHeight: 0,
 } as const;
-
-const styles = StyleSheet.create({
-  // The status-bar inset sits on the pages' own `paper` ground, so the top
-  // bar and the page read as one surface (not the navigator's default grey).
-  safeArea: {
-    flex: 1,
-    backgroundColor: uiRoles.paper,
-  },
-});
