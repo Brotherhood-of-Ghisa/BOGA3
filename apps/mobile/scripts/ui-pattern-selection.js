@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const ts = require('typescript');
-const { PATTERN_FOUNDATIONS } = require('./pattern-guardrail-source');
+const { meaningful, approvalReference, acceptedCommentEntries } = require('./ui-design-acceptance');
+const { reviewTemplatePromotions, registeredTemplateError } = require('./ui-template-promotion');
+const { PATTERN_FOUNDATIONS, attributeValue } = require('./pattern-guardrail-source');
 const { COMPACT_PATTERN_FILES } = require('./compact-pattern-guardrail');
 const { LIST_PATTERN_FILES } = require('./list-pattern-guardrail');
 const { TABLE_PATTERN_FILES } = require('./table-pattern-guardrail');
@@ -18,7 +20,6 @@ const FAMILIES = [...Object.keys(TEMPLATE_SOURCES), 'catalog'];
 const PREFIX = 'apps/mobile/';
 const mobilePath = file => file.slice(PREFIX.length);
 const isSource = file => /^apps\/mobile\/(app|components)\/.*\.(ts|tsx|js|jsx)$/s.test(file) && !/\/(?:__tests__|__snapshots__)\/|\.(?:test|spec|stories)\.[jt]sx?$/.test(file);
-const meaningful = value => typeof value === 'string' && value.trim() !== '' && !/^(todo|tbd|pending|n\/a|none|unknown)(\b|$)|<[^>]+>/i.test(value.trim());
 const gitOutput = (root, args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 const git = (root, args) => gitOutput(root, args).trim();
 const gitPaths = (root, args) => gitOutput(root, [...args, '-z']).split('\0').filter(Boolean);
@@ -161,7 +162,7 @@ function exportOwner(rootDir, file, name, seen = new Set()) {
   return exported(source, name) ? { file, name } : null;
 }
 
-function usesParent(rootDir, file, parent, componentNode) {
+function parentElements(rootDir, file, parent, componentNode) {
   const relative = mobilePath(file);
   const source = parse(file, fs.readFileSync(path.join(rootDir, relative), 'utf8'));
   const imports = new Map();
@@ -175,19 +176,32 @@ function usesParent(rootDir, file, parent, componentNode) {
     }
     if (ts.isNamespaceImport(bindings)) imports.set(bindings.name.text, { module, namespace: true });
   }
-  let found = false;
+  const elements = [];
   function visit(node) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const tag = node.tagName;
       const binding = imports.get(ts.isPropertyAccessExpression(tag) ? tag.expression.getText(source) : tag.getText(source));
       const name = binding?.namespace && ts.isPropertyAccessExpression(tag) ? tag.name.text : binding?.name;
       const owner = binding && name ? exportOwner(rootDir, binding.module, name) : null;
-      if (owner?.file === mobilePath(parent.source) && owner?.name === parent.export) found = true;
+      if (owner?.file === mobilePath(parent.source) && owner?.name === parent.export) elements.push(node);
     }
-    if (!found) ts.forEachChild(node, visit);
+    ts.forEachChild(node, visit);
   }
   visit(componentNode ?? source);
-  return found;
+  return elements;
+}
+
+function usesParent(rootDir, file, parent, componentNode) {
+  return parentElements(rootDir, file, parent, componentNode).length > 0;
+}
+
+function promotedPropsError(rootDir, file, parent, parents) {
+  const variants = parents.filter(item => item.source === parent.source && item.export === parent.export).map(item => item.variant);
+  for (const element of parentElements(rootDir, file, parent)) for (const attribute of element.attributes.properties) {
+    if (ts.isJsxSpreadAttribute(attribute) || /style$/i.test(attribute.name.getText())) return 'promoted template style/spread overrides need custom human acceptance';
+    if (attribute.name.getText() === 'variant' && !variants.includes(attributeValue(attribute))) return 'rendered template variant must match its accepted declaration; dynamic variants need custom human acceptance';
+  }
+  return null;
 }
 
 function parentError(rootDir, context, file, parent, requireUse) {
@@ -200,28 +214,8 @@ function parentError(rootDir, context, file, parent, requireUse) {
   return null;
 }
 
-function approvalReference(value) {
-  if (!value || !meaningful(value.by) || !meaningful(value.reference) || /\[bot\]$/i.test(value.by)) return false;
-  try {
-    const url = new URL(value.reference);
-    return ['https:', 'codex:'].includes(url.protocol) && Boolean(url.hostname) && !/^(example\.(com|org)|localhost)$/.test(url.hostname);
-  } catch { return false; }
-}
-
 function acceptedDesignPaths(context) {
-  const api = route => JSON.parse(execFileSync('gh', ['api', '--paginate', '--slurp', route], { encoding: 'utf8' })).flat();
-  const comments = context.comments ?? api(`repos/${context.repository}/issues/${context.number}/comments`);
-  const accepted = new Set();
-  for (const comment of comments) {
-    if (comment.user?.type !== 'User') continue;
-    const lines = (comment.body ?? '').trimEnd().split('\n');
-    // An acceptance is the whole visible comment, pinned to the exact candidate.
-    if (lines[0] !== `UI design accepted at ${context.head}:` || lines.slice(1).some(line => line !== '' && !/^- `?apps\/mobile\/(app|components)\/[^`\r\n]+\.[jt]sx?`?$/.test(line))) continue;
-    const permission = context.permissions?.[comment.user.login] ?? api(`repos/${context.repository}/collaborators/${encodeURIComponent(comment.user.login)}/permission`)[0].permission;
-    if (!['admin', 'maintain', 'write'].includes(permission)) continue;
-    for (const line of lines.slice(1)) accepted.add(line.replace(/^- /, '').replace(/^`|`$/g, ''));
-  }
-  return accepted;
+  return acceptedCommentEntries(context, `UI design accepted at ${context.head}:`, /^- `?(apps\/mobile\/(?:app|components)\/[^`\r\n]+\.[jt]sx?)`?$/);
 }
 
 /** @param {{rootDir?: string, selectionContext?: object | null}} options */
@@ -231,11 +225,16 @@ function findUiPatternSelections({ rootDir = path.resolve(__dirname, '..'), sele
   const report = (file, rule) => violations.push({ file, line: 1, rule });
   try {
     const context = selectionContext ?? reviewContext(rootDir);
-    if (context.files.length === 0 && !/^```ui-pattern-selection\b/m.test(context.body ?? '')) return { violations, filesByFamily, context };
-    const blocks = [...context.body.matchAll(/^```ui-pattern-selection\s*\n([\s\S]*?)^```[ \t]*$/gm)];
-    if (blocks.length !== 1) throw new Error('Provide one ui-pattern-selection JSON block in artifacts/ui-review.md (local) or the PR body.');
-    const data = JSON.parse(blocks[0][1]);
-    if (!Array.isArray(data.files)) throw new Error('ui-pattern-selection.files must be an array.');
+    let data = null;
+    if (context.files.length || /^```ui-pattern-selection\b/m.test(context.body ?? '')) {
+      const blocks = [...context.body.matchAll(/^```ui-pattern-selection\s*\n([\s\S]*?)^```[ \t]*$/gm)];
+      if (blocks.length !== 1) throw new Error('Provide one ui-pattern-selection JSON block in artifacts/ui-review.md (local) or the PR body.');
+      data = JSON.parse(blocks[0][1]);
+      if (!Array.isArray(data.files)) throw new Error('ui-pattern-selection.files must be an array.');
+    }
+    const promotion = reviewTemplatePromotions({ rootDir, context, data, exported: (source, name) => exported(parse('template.tsx', source), name), usesParent, parentError });
+    violations.push(...promotion.violations);
+    if (!data) return { violations, filesByFamily, context };
     const seen = new Set();
     const custom = [];
     const headRecipes = new Set(context.files.flatMap(file => [...presentationProperties(parse(file, fs.readFileSync(path.join(rootDir, mobilePath(file)), 'utf8'))).values()].map(property => property.recipe)));
@@ -261,9 +260,16 @@ function findUiPatternSelections({ rootDir = path.resolve(__dirname, '..'), sele
       for (const parent of record.parents) {
         const error = parentError(rootDir, context, file, parent, record.mode === 'template');
         if (error) { report(file, error); continue; }
+        const registeredError = registeredTemplateError(promotion.templates, parent);
+        if (record.mode === 'template' && registeredError) report(file, registeredError);
+        const registered = promotion.templates.some(template => template.source === parent.source && template.export === parent.export);
+        if (record.mode === 'template' && registered) {
+          const propError = promotedPropsError(rootDir, file, parent, record.parents);
+          if (propError) report(file, propError);
+        }
         const expectedFamily = Object.keys(TEMPLATE_SOURCES).find(family => TEMPLATE_SOURCES[family].includes(mobilePath(parent.source)));
         if (expectedFamily && parent.family !== expectedFamily) { report(file, 'known template parent must retain its inherited family'); continue; }
-        if (record.mode === 'template' && !isGalleryParent(file, parent) && !TEMPLATE_SOURCES[parent.family]?.includes(mobilePath(parent.source))) report(file, 'this parent is not an approved design template; declare custom and obtain human design acceptance');
+        if (record.mode === 'template' && !isGalleryParent(file, parent) && !TEMPLATE_SOURCES[parent.family]?.includes(mobilePath(parent.source)) && !registered) report(file, 'this parent is not an approved design template; declare custom and obtain human design acceptance');
         if (record.mode === 'template' && parent.family !== 'catalog' && !definition) filesByFamily[parent.family].push(mobilePath(file));
       }
       if (record.mode === 'template') for (const component of components) {
@@ -276,7 +282,7 @@ function findUiPatternSelections({ rootDir = path.resolve(__dirname, '..'), sele
     }
     for (const file of context.files) if (!seen.has(file)) report(file, 'missing UI pattern declaration for changed JSX/style source');
     if (custom.length && context.finalReview) {
-      const accepted = acceptedDesignPaths(context);
+      const accepted = new Set([...acceptedDesignPaths(context), ...promotion.acceptedPaths]);
       for (const file of custom) if (!accepted.has(file)) report(file, 'awaiting authorized human design acceptance comment at this head and exact custom paths');
     }
     return { violations, filesByFamily, context, custom };

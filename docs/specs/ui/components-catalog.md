@@ -12,15 +12,8 @@
 > `docs-check` lane fails until a new primitive or component folder is named
 > here, so the inventory cannot quietly go stale.
 
-Rules:
-
-1. **Build screens from the primitives in `apps/mobile/components/ui/`**,
-   imported from the barrel (`apps/mobile/components/ui/index.ts`). A
-   hand-styled `View` / `Text` / `Pressable` where a primitive fits is a
-   defect, and the `ui-guardrails` lane rejects raw colour, size, spacing and
-   radius literals in `app/` and `components/` either way (`ux-rules.md`
-   "Styling guardrails").
-2. **Look here before adding a component.** Reuse shared rows, cards, sheets, summaries and state panels.
+**Reuse before adding.** Build from `apps/mobile/components/ui/index.ts`.
+Token guardrails apply to every composition (`ux-rules.md`, "Styling guardrails").
 
 ## Coded compositions
 
@@ -36,6 +29,17 @@ For a new block or derivative, follow the human selection and acceptance workflo
 | ListCard / ListCardHeader | `list-card.tsx` and compact `list-row.tsx`; GroupHomeBoard and Today's weekly board | Passive rows and a whole-board action differ from independent row controls |
 | SortableTable family | `stats/stats-table.tsx`: StatsTable, compact StatsTableRow/Name/Disclosure and comparison columns; Muscle list/contributors | Keep sorting with its current owner, separate history/disclosure targets and responsive stacking |
 | SummaryTile | `summary-tile.tsx`: shared header and existing metric content; At a glance's Group stats | Both Sets/PRs remain visible; period controls stay outside and metric controls govern the board/chart |
+
+### Promoted templates
+
+New registrations live in this machine-readable inventory. The four families
+above retain their existing checker inventory. For promotion, contract schema
+and executable examples, load `docs/specs/08-ux-delivery-standard.md` and
+`apps/mobile/__tests__/ui-template-promotion.test.ts`. This change promotes none.
+
+```ui-template-catalog
+[]
+```
 
 ## Existing primitives (`apps/mobile/components/ui/`)
 
