@@ -1,13 +1,15 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/ui/icon';
 import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
+import type { ProgressMetric } from '@/src/preferences/model';
 
-import { formatPeriodRange, weekFigureAccessibilityLabel, weekShare } from './progress-format';
+import { formatPaceValue, formatPeriodRange, weekFigureAccessibilityLabel, weekShare } from './progress-format';
 
-type ShareBarProps = { current: number; previous: number; testID?: string };
+type ShareBarProps = { current: number | null; previous: number | null; testID?: string };
 
 // One `viz` step per lap of `previous` (`weekShare`): `viz2` up to it, `viz3`
 // up to twice it, `viz4` beyond. A lap fills over the one before, full; the
@@ -16,6 +18,7 @@ const LAP_FILLS = [uiRoles.viz2, uiRoles.viz3, uiRoles.viz4] as const;
 
 // A thin bar on the `viz` ramp: `current` as a share of `previous`, in laps.
 export function ShareBar({ current, previous, testID }: ShareBarProps) {
+  if (current === null || previous === null) return <View style={styles.track} testID={testID} />;
   const { lap, fraction } = weekShare({ current, previous });
   return (
     <View
@@ -38,44 +41,59 @@ const TODAY_LAST_WEEK: PreviousWeekName = { short: null, spoken: 'last week' };
 
 type FigureProps = {
   label: string;
-  current: number;
-  previous: number;
+  current: number | null;
+  previous: number | null;
+  metric?: ProgressMetric;
+  onToggleMetric?: () => void;
   record?: boolean;
   previousWeek?: PreviousWeekName;
   testID: string;
 };
 
-export function WeekFigure({ label, current, previous, record = false, previousWeek = LAST_WEEK, testID }: FigureProps) {
-  const showRecord = record && current > 0;
-  return (
+export function WeekFigure({ label, current, previous, record = false, previousWeek = LAST_WEEK, testID,
+  metric = 'workingSetCount', onToggleMetric }: FigureProps) {
+  const showRecord = record && current !== null && current > 0;
+  const currentText = formatPaceValue(current, metric);
+  const previousText = formatPaceValue(previous, metric);
+  const spoken = metric === 'totalVolume'
+    ? `Tonnes ${current === null ? 'unavailable' : currentText}, vs ${previous === null ? 'unavailable' : previousText} ${previousWeek.spoken}`
+    : weekFigureAccessibilityLabel(label, { current: current ?? 0, previous: previous ?? 0 }, previousWeek.spoken);
+  const content = (
     <View
-      accessible
-      accessibilityLabel={weekFigureAccessibilityLabel(label, { current, previous }, previousWeek.spoken)}
+      accessible={!onToggleMetric}
+      accessibilityLabel={spoken}
       style={styles.figure}
       testID={testID}>
-      <Text allowFontScaling={false} style={uiText.label}>
-        {label}
-      </Text>
+      <View style={styles.metricLabel}>
+        <Text allowFontScaling={false} style={uiText.label}>{label}</Text>
+        {onToggleMetric ? <Icon color={uiRoles.inkMuted} name="swap" size="sm" /> : null}
+      </View>
       <View style={styles.valueRow}>
         <Text
           allowFontScaling={false}
           style={[uiText.figureHero, showRecord ? uiTextTone.record : null]}
           testID={`${testID}-value`}>
-          {current}
+          {currentText}
         </Text>
       </View>
       <ShareBar current={current} previous={previous} testID={`${testID}-bar`} />
       <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-previous`}>
-        <FigureText>{previousWeek.short ? `vs ${previous} ${previousWeek.short}` : `vs ${previous}`}</FigureText>
+        <FigureText>{previousWeek.short ? `vs ${previousText} ${previousWeek.short}` : `vs ${previousText}`}</FigureText>
       </Text>
     </View>
   );
+  return onToggleMetric ? (
+    <Pressable accessibilityLabel={`${spoken}. ${metric === 'totalVolume' ? 'Switch to sets' : 'Switch to tonnes'}`}
+      accessibilityRole="button" onPress={onToggleMetric} style={[styles.figure, metric === 'totalVolume' ? styles.tonnageFigure : null]} testID={`${testID}-metric-toggle`}>
+      {content}
+    </Pressable>
+  ) : content;
 }
 
-// `This week` (Mon–Sun, local): sessions, working sets and PRs so far, each
+// `This week` (Mon–Sun, local): sessions, sets or tonnes and PRs so far, each
 // over last week's whole total. No signed deltas: a part week against a whole
 // one says little.
-export function WeekFigures({ week }: { week: TodayProgressWeek }) {
+export function WeekFigures({ week, metric, onToggleMetric }: { week: TodayProgressWeek; metric: ProgressMetric; onToggleMetric: () => void }) {
   return (
     <View style={styles.block} testID="today-progress-week">
       <View style={styles.heading}>
@@ -98,9 +116,11 @@ export function WeekFigures({ week }: { week: TodayProgressWeek }) {
           testID="today-progress-week-sessions"
         />
         <WeekFigure
-          current={week.current.workingSets}
-          label="Sets"
-          previous={week.previous.workingSets}
+          current={metric === 'totalVolume' ? week.current.volumeKgReps : week.current.workingSets}
+          label={metric === 'totalVolume' ? 'Tons' : 'Sets'}
+          metric={metric}
+          onToggleMetric={onToggleMetric}
+          previous={metric === 'totalVolume' ? week.previous.volumeKgReps : week.previous.workingSets}
           previousWeek={TODAY_LAST_WEEK}
           testID="today-progress-week-working-sets"
         />
@@ -140,6 +160,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: uiSpace.xs,
   },
+  tonnageFigure: { flex: 2 },
+  metricLabel: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
   // One child since the record mark went; `row` still sizes the figure to its
   // content rather than stretching it.
   valueRow: {

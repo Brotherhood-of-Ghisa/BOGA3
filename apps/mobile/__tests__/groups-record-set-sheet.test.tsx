@@ -103,9 +103,14 @@ it('keeps historical kg values distinct from the current normalized standard',as
   await waitFor(()=>expect(api.certifyCompetition).toHaveBeenCalledWith(expect.objectContaining({ revision: 2,token: competitionRow.write_token })));
 });
 it('certifies from the stream sheet and refreshes the selected group',async()=>{
+  api.certifyCompetition.mockImplementationOnce(async()=>{
+    await new Promise(resolve=>setTimeout(resolve,5));
+    return { contract_version: 4,certification: mine,created: true };
+  });
   await openRecord();const reads=api.getCompetitionStream.mock.calls.length;
   fireEvent.press(screen.getByTestId('group-metric-record-certify'));
-  expect(await screen.findByTestId('group-metric-record-status')).toHaveTextContent(/Certified by you/);
+  expect(screen.getByTestId('group-metric-record-status')).toHaveTextContent('Not certified');
+  await waitFor(()=>expect(screen.getByTestId('group-metric-record-status')).toHaveTextContent(/Certified by you/));
   await waitFor(()=>expect(api.getCompetitionStream.mock.calls.length).toBeGreaterThan(reads));
   expect(api.certifyCompetition).toHaveBeenCalledTimes(1);
 });

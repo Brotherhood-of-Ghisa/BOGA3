@@ -12,7 +12,9 @@ import { formatCompactDuration } from '@/src/data/session-list';
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
 import type { RecordKind } from '@/src/exercise-calculations/records';
 import type { ChangeTone } from '@/components/ui';
-import type { ExerciseDateFormat } from '@/src/preferences/model';
+import type { ExerciseDateFormat, ProgressMetric } from '@/src/preferences/model';
+import { projectVolume } from '@/src/progress-summary';
+import { formatCountDelta, formatVolumeDelta } from '@/components/stats/comparison-format';
 import {
   buildSessionRecordLine,
   PERSONAL_RECORD_NOUN,
@@ -61,40 +63,64 @@ export type PeriodDayFigures = {
   previousDate: Date;
   /** After today the figure is the projection's. */
   when: 'past' | 'today' | 'projected';
-  workingSets: number;
-  previousWorkingSets: number;
-  difference: number;
+  metric: ProgressMetric;
+  value: number | null;
+  previousValue: number | null;
 };
 
 /** The day the chart selects, clamped into the period; null is today. */
 export const clampPeriodDay = (period: TodayProgressPeriod, dayIndex: number | null): number =>
   dayIndex === null ? period.dayOfPeriod - 1 : Math.min(Math.max(dayIndex, 0), period.daysInPeriod - 1);
 
-/**
- * A day's cumulative working sets: counted through today, and after it the
- * projection's linear rate (the sets so far per elapsed day), which reaches
- * `projectedWorkingSets` on the last day.
- */
-export const periodDayFigures = (period: TodayProgressPeriod, dayIndex: number | null): PeriodDayFigures => {
+/** Today’s tonnes presentation follows [[copy.no-weight-unit]]. */
+export const formatTonnes = (volume: number | null): string =>
+  volume === null || !Number.isFinite(volume) ? '—' : String(Math.round(volume) / 1000);
+
+export const formatPaceValue = (value: number | null, metric: ProgressMetric): string =>
+  value === null ? '—' : metric === 'totalVolume' ? formatTonnes(value) : String(value);
+
+export const paceUnit = (metric: ProgressMetric): string => metric === 'totalVolume' ? 't' : 'sets';
+
+export const periodMetricSeries = (period: TodayProgressPeriod, metric: ProgressMetric) => {
+  const volume = metric === 'totalVolume';
+  return {
+    cumulative: volume ? period.cumulativeVolumeKgReps : period.cumulativeWorkingSets,
+    toDate: volume ? period.toDate.volumeKgReps : period.toDate.workingSets,
+    projected: volume ? period.projectedVolumeKgReps : period.projectedWorkingSets,
+    previous: {
+      cumulative: volume ? period.previous.cumulativeVolumeKgReps : period.previous.cumulativeWorkingSets,
+      toSameDay: volume ? period.previous.toSameDay.volumeKgReps : period.previous.toSameDay.workingSets,
+      total: volume ? period.previous.total.volumeKgReps : period.previous.total.workingSets,
+    },
+  };
+};
+
+/** A selected day's cumulative figure, or the existing linear pace after today. */
+export const periodDayFigures = (
+  period: TodayProgressPeriod, dayIndex: number | null, metric: ProgressMetric = 'workingSetCount',
+): PeriodDayFigures => {
   const day = clampPeriodDay(period, dayIndex);
   const todayIndex = period.dayOfPeriod - 1;
   const when = day < todayIndex ? 'past' : day === todayIndex ? 'today' : 'projected';
-  const workingSets =
-    when === 'projected'
-      ? Math.round((period.toDate.workingSets / period.dayOfPeriod) * (day + 1))
-      : (period.cumulativeWorkingSets[day] ?? period.toDate.workingSets);
-  const previousWorkingSets =
-    when === 'today' ? period.previous.toSameDay.workingSets : (period.previous.cumulativeWorkingSets[day] ?? 0);
+  const series = periodMetricSeries(period, metric);
+  const projection = projectVolume(series.toDate, period.dayOfPeriod, day + 1);
+  const value = when === 'projected'
+    ? metric === 'totalVolume' ? projection : Math.round(projection ?? 0)
+    : series.cumulative[day];
   return {
     dayIndex: day,
     date: dayOf(period.window, day),
     previousDate: dayOf(period.previous.window, day),
     when,
-    workingSets,
-    previousWorkingSets,
-    difference: workingSets - previousWorkingSets,
+    metric,
+    value,
+    previousValue: when === 'today' ? series.previous.toSameDay : (day in series.previous.cumulative ? series.previous.cumulative[day] : 0),
   };
 };
+
+export const periodPaceDelta = (figures: PeriodDayFigures) => figures.metric === 'totalVolume'
+  ? formatVolumeDelta(figures.value, figures.previousValue)
+  : formatCountDelta(figures.value ?? 0, figures.previousValue ?? 0);
 
 /**
  * `Today`, `9 Oct 26`. A projected day shows as its date alone (the hollow
@@ -134,31 +160,39 @@ const setCount = (count: number) => plural(count, 'set', 'sets');
 export const comparedPeriodName = (period: Pick<TodayProgressPeriod, 'compareBack'>): string =>
   period.compareBack === 1 ? 'last period' : `period ${period.compareBack} back`;
 
+const spokenPaceValue = (value: number | null, metric: ProgressMetric): string => {
+  if (value === null) return 'unavailable';
+  return metric === 'totalVolume' ? `${formatTonnes(value)} tonnes` : setCount(value);
+};
+
 /** Both periods and the selected day's figures, spoken as one heading. */
 export const periodFiguresAccessibilityLabel = (period: TodayProgressPeriod, figures: PeriodDayFigures): string =>
   [
     `${period.weeks}-week period, ${formatPeriodRange(period.window)}:`,
-    `${formatPeriodDayLabel(figures, { spoken: true })} ${setCount(figures.workingSets)},`,
+    `${formatPeriodDayLabel(figures, { spoken: true })} ${spokenPaceValue(figures.value, figures.metric)},`,
     `against the ${comparedPeriodName(period)}, ${formatPeriodRange(period.previous.window)}:`,
-    `${setCount(figures.previousWorkingSets)} by ${formatCompactDate(figures.previousDate)},`,
-    formatSignedCount(figures.difference),
+    `${spokenPaceValue(figures.previousValue, figures.metric)} by ${formatCompactDate(figures.previousDate)},`,
+    periodPaceDelta(figures).text,
   ].join(' ');
 
-/** The period chart's spoken summary; the chart itself is one adjustable image. */
-export const periodChartAccessibilityLabel = (period: TodayProgressPeriod): string =>
-  [
-    `Cumulative sets: this period ${period.toDate.workingSets} by day ${period.dayOfPeriod} of ${period.daysInPeriod}`,
-    `against the ${comparedPeriodName(period)} ${period.previous.toSameDay.workingSets} by day ${period.dayOfPeriod};`,
-    `the ${comparedPeriodName(period)} finished at ${period.previous.total.workingSets}.`,
-    `On course for ${period.projectedWorkingSets}.`,
+/** The chart summary and selection use the same metric as the weekly box. */
+export const periodChartAccessibilityLabel = (period: TodayProgressPeriod, metric: ProgressMetric = 'workingSetCount'): string => {
+  const series = periodMetricSeries(period, metric);
+  const value = (figure: number | null) => metric === 'totalVolume' ? spokenPaceValue(figure, metric) : String(figure);
+  return [
+    `Cumulative ${metric === 'totalVolume' ? 'tonnage' : 'sets'}: this period ${value(series.toDate)} by day ${period.dayOfPeriod} of ${period.daysInPeriod}`,
+    `against the ${comparedPeriodName(period)} ${value(series.previous.toSameDay)} by day ${period.dayOfPeriod};`,
+    `the ${comparedPeriodName(period)} finished at ${value(series.previous.total)}.`,
+    `On course for ${value(series.projected)}.`,
   ].join(' ');
+};
 
 /** The selected day, as the adjustable chart's value. */
 export const periodChartAccessibilityValue = (
   period: Pick<TodayProgressPeriod, 'compareBack'>,
   figures: PeriodDayFigures
 ): string =>
-  `${formatPeriodDayLabel(figures, { spoken: true })}: ${setCount(figures.workingSets)}, ${comparedPeriodName(period)} ${figures.previousWorkingSets}`;
+  `${formatPeriodDayLabel(figures, { spoken: true })}: ${spokenPaceValue(figures.value, figures.metric)}, ${comparedPeriodName(period)} ${figures.metric === 'totalVolume' ? spokenPaceValue(figures.previousValue, figures.metric) : figures.previousValue}`;
 
 const RECORD_KIND_LABELS: Record<RecordKind, string> = { oneRepMax: '1RM', weight: 'Weight', volume: 'Volume' };
 
@@ -220,10 +254,10 @@ export type PeriodChartGeometry = {
   plot: { width: number; top: number; bottom: number };
   current: ChartPoint[];
   previous: ChartPoint[];
-  projection: { from: ChartPoint; to: ChartPoint };
-  today: { current: ChartPoint; previous: ChartPoint };
+  projection: { from: ChartPoint; to: ChartPoint } | null;
+  today: { current: ChartPoint | null; previous: ChartPoint | null };
   /** The selected day: on the current line through today, on the projection after it. */
-  selected: { current: ChartPoint; previous: ChartPoint; projected: boolean };
+  selected: { x: number; current: ChartPoint | null; previous: ChartPoint | null; projected: boolean };
   /** Where each week after the first starts. */
   weekStartsX: number[];
 };
@@ -249,26 +283,34 @@ export const periodChartGeometry = (
   const plotWidth = Math.max(0, width - CHART_RIGHT_GUTTER);
   const plotBottom = Math.max(PLOT_TOP, height - CHART_AXIS_ROOM);
   const days = period.daysInPeriod;
-  const yMax = Math.max(1, period.projectedWorkingSets, period.previous.total.workingSets, period.toDate.workingSets);
+  const series = periodMetricSeries(period, selected.metric);
+  const yMax = Math.max(1, series.projected ?? 0, series.previous.total ?? 0, series.toDate ?? 0,
+    ...series.cumulative.map(value => value ?? 0), ...series.previous.cumulative.map(value => value ?? 0));
   const x = (dayIndex: number) => (days > 1 ? (dayIndex / (days - 1)) * plotWidth : 0);
   const y = (value: number) => PLOT_TOP + (1 - value / yMax) * (plotBottom - PLOT_TOP);
-  const toPoints = (values: number[]) => values.map((value, index) => ({ x: x(index), y: y(value) }));
-
-  const current = toPoints(period.cumulativeWorkingSets);
-  const previous = toPoints(period.previous.cumulativeWorkingSets);
+  const point = (day: number, value: number | null): ChartPoint | null =>
+    value === null ? null : { x: x(day), y: y(value) };
+  const toPoints = (values: (number | null)[]) => values.flatMap((value, day) => {
+    const known = point(day, value);
+    return known ? [known] : [];
+  });
+  const current = toPoints(series.cumulative);
+  const previous = toPoints(series.previous.cumulative);
   const todayIndex = period.dayOfPeriod - 1;
-  const todayCurrent = current[todayIndex] ?? { x: x(todayIndex), y: y(period.toDate.workingSets) };
-  const todayPrevious = previous[todayIndex] ?? { x: x(todayIndex), y: y(period.previous.toSameDay.workingSets) };
+  const todayCurrent = point(todayIndex, series.toDate);
+  const todayPrevious = point(todayIndex, series.previous.toSameDay);
+  const projected = point(days - 1, series.projected);
 
   return {
     plot: { width: plotWidth, top: PLOT_TOP, bottom: plotBottom },
     current,
     previous,
-    projection: { from: todayCurrent, to: { x: x(days - 1), y: y(period.projectedWorkingSets) } },
+    projection: todayCurrent && projected ? { from: todayCurrent, to: projected } : null,
     today: { current: todayCurrent, previous: todayPrevious },
     selected: {
-      current: { x: x(selected.dayIndex), y: y(selected.workingSets) },
-      previous: { x: x(selected.dayIndex), y: y(selected.previousWorkingSets) },
+      x: x(selected.dayIndex),
+      current: point(selected.dayIndex, selected.value),
+      previous: point(selected.dayIndex, selected.previousValue),
       projected: selected.when === 'projected',
     },
     weekStartsX: Array.from({ length: period.weeks - 1 }, (_, week) => x((week + 1) * 7)),

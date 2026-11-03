@@ -342,3 +342,29 @@ it.each(['list', 'cards'])('ignores a Today layout %s the retired setting saved'
   expect(values()).not.toHaveProperty('todayLayout');
   expect(getAccountLocalPreferenceState().error).toBeNull();
 });
+
+
+it('persists Today metric independently of Progress, restores it, and isolates accounts', async () => {
+  await account();
+  expect(values().todayProgressMetric).toBe('workingSetCount');
+  setAccountLocalPreferences({ todayProgressMetric: 'totalVolume' });
+  expect(values().progressMetric).toBe('workingSetCount');
+  __resetAccountLocalPreferencesForTests();
+  await account();
+  expect(values().todayProgressMetric).toBe('totalVolume');
+  await account('B');
+  expect(values().todayProgressMetric).toBe('workingSetCount');
+  await account('A');
+  expect(values().todayProgressMetric).toBe('totalVolume');
+  expect(isPreferenceValue('todayProgressMetric', 'estimatedOneRepMax')).toBe(false);
+  expect(isPreferenceValue('todayProgressMetric', 'totalVolume')).toBe(true);
+});
+
+it('defaults a corrupt Today metric and rejects invalid updates without overwriting it', async () => {
+  Storage.setItemSync(preferenceKey('account:A', 'todayProgressMetric'), 'sideways');
+  await account();
+  expect(values().todayProgressMetric).toBe('workingSetCount');
+  setAccountLocalPreferences({ todayProgressMetric: 'sideways' as never });
+  expect(getAccountLocalPreferenceState().error).toBe(preferenceValidationMessages.todayProgressMetric);
+  expect(values().todayProgressMetric).toBe('workingSetCount');
+});

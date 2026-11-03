@@ -1,4 +1,4 @@
-// Today's progress read: the stats aggregation for sessions and working sets,
+// Today’s progress read: the stats aggregation for sessions, sets and Volume,
 // the exercise session facts for PRs (every record kind), and one small query
 // for the completed session shown (the latest, or one stepped back to). Nothing here replays history.
 
@@ -20,7 +20,7 @@ import {
   buildSessionExerciseLines,
   deriveTodayProgress,
   todayProgressLoadWindow,
-  workingSetsBySession,
+  progressMetricsBySession,
   type SessionExerciseLine,
   type SessionPersonalRecord,
   type TodayProgress,
@@ -173,12 +173,12 @@ export const createTodayProgressRepository = (
       store.loadRecordFacts(range),
       store.loadSessionExercises(latest.id),
     ]);
-    const sessionsInRange = workingSetsBySession(aggregation);
+    const sessionsInRange = progressMetricsBySession(aggregation);
     // The shown session is nearly always inside the range; read it alone only when older.
     const [latestSessions, latestRecordFacts] = isInWindow(latest.completedAt, range)
       ? [sessionsInRange, recordFacts]
       : await Promise.all([
-          store.loadAggregationInput(instantWindow(latest.completedAt)).then(workingSetsBySession),
+          store.loadAggregationInput(instantWindow(latest.completedAt)).then(progressMetricsBySession),
           store.loadRecordFacts(instantWindow(latest.completedAt)),
         ]);
     return deriveTodayProgress({

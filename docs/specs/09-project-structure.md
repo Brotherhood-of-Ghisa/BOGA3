@@ -114,7 +114,7 @@ Define the canonical repository structure, path ownership, and placement convent
 - `apps/mobile/src/progress-summary/`
   - owns Today's progress read (`loadTodayProgress`): the week and month
     windows of [[comparison.window]], and a completed session's exercises.
-    Counted sessions and working sets come from the stats
+    Sessions, working sets and Volume come from the stats
     aggregation (`src/data/stats.ts`), PRs (one per record kind) from the
     exercise session facts;
     every figure places a session by its `completed_at`.

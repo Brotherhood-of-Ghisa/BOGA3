@@ -28,6 +28,7 @@ jest.mock('expo-router', () => ({
 }));
 
 import { ShareBar } from '@/components/today';
+import { Storage } from 'expo-sqlite/kv-store';
 import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
@@ -165,6 +166,76 @@ describe('Today: the Progress card over real data', () => {
     expect(prs.value).toHaveTextContent('3');
     expect(prs.previous).toHaveTextContent('vs 3');
     expect(prs.fill).toHaveStyle({ width: '100%' });
+  });
+
+  it('switches both sections only from the weekly box and retains the selected chart day and compared period', async () => {
+    await bootLocalApp();
+    await logHistory();
+    const view = await renderToday();
+    const weeklyToggle = () => text('today-progress-week-working-sets-metric-toggle');
+    const chartUnits = () => text('today-progress-period-working-sets');
+    expect(weeklyToggle()).toHaveProp('accessibilityRole', 'button');
+    fireEvent.press(weeklyToggle());
+    expect(weeklyToggle()).toHaveTextContent(/Tons/);
+    expect(chartUnits()).toHaveTextContent(/ t/);
+    expect(screen.queryByTestId('today-progress-period-metric-toggle')).toBeNull();
+    expect(text('today-progress-week-working-sets-value')).toHaveTextContent('3.225');
+    expect(text('today-progress-week-working-sets-previous')).toHaveTextContent('vs 6.15');
+    expect(text('today-progress-week-working-sets-bar-fill')).toHaveStyle({ width: '52%' });
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 9.375 t');
+    expect(text('today-progress-period-difference')).toHaveTextContent('new');
+    expect(text('today-progress-chart')).toHaveProp('accessibilityLabel', expect.stringContaining('On course for 21.875 tonnes.'));
+    expect(text('today-progress-week-sessions-value')).toHaveTextContent('1');
+    expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
+
+    fireEvent(text('today-progress-chart'), 'responderRelease', { nativeEvent: { locationX: 318 } });
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('1 Nov 26 21.875 t');
+    expect(text('today-progress-period-difference')).toHaveTextContent('+611%');
+    fireEvent.press(weeklyToggle());
+    expect(weeklyToggle()).toHaveTextContent(/Sets/);
+    expect(text('today-progress-week-working-sets-value')).toHaveTextContent('6');
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('1 Nov 26 42 sets');
+    expect(text('today-progress-period-difference')).toHaveTextContent('+36');
+    fireEvent.press(text('today-progress-period-compare-older'));
+    await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('10 Aug – 6 Sep 26'));
+    fireEvent.press(weeklyToggle());
+    expect(text('today-progress-period-day')).toHaveTextContent('1 Nov 26');
+    expect(text('today-progress-period-previous-range')).toHaveTextContent('10 Aug – 6 Sep 26');
+    expect(text('today-progress-week-working-sets-previous')).toHaveTextContent('vs 6.15');
+    view.unmount();
+    await renderToday();
+    expect(weeklyToggle()).toHaveTextContent(/Tons/);
+    expect(chartUnits()).toHaveTextContent(/ t/);
+    expect(screen.queryByTestId('today-progress-period-metric-toggle')).toBeNull();
+  });
+
+  it('keeps both sections on the durable metric after a failed save and retries together', async () => {
+    await bootLocalApp();
+    await logHistory();
+    await renderToday();
+    const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw new Error('disk full'); });
+    fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
+    expect(text('today-progress-week-working-sets-metric-toggle')).toHaveTextContent(/Sets/);
+    expect(text('today-progress-period-working-sets')).toHaveTextContent(/ sets/);
+    expect(text('today-progress-preference-error')).toHaveTextContent(/Preferences could not be saved/);
+    write.mockRestore();
+    fireEvent.press(text('today-progress-preference-retry'));
+    await waitFor(() => expect(text('today-progress-week-working-sets-metric-toggle')).toHaveTextContent(/Tons/));
+    expect(text('today-progress-period-working-sets')).toHaveTextContent(/ t/);
+    await waitForGone(() => screen.queryByTestId('today-progress-preference-error'));
+  });
+
+  it('recalculates displayed tonnage when Volume effort eligibility changes while focused', async () => {
+    await bootLocalApp();
+    await logHistory();
+    await renderToday();
+    fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
+    expect(text('today-progress-week-working-sets-value')).toHaveTextContent('3.225');
+    act(() => updatePreferences({ volumeEfforts: [] }));
+    await waitFor(() => expect(text('today-progress-week-working-sets-value')).toHaveTextContent('0'));
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 0 t');
+    expect(text('today-progress-period-difference')).toHaveTextContent('—');
+    expect(text('today-progress-week-sessions-value')).toHaveTextContent('1');
   });
 
   it('compares this fixed period so far with the previous period at the same day', async () => {

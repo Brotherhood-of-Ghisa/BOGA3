@@ -2,6 +2,8 @@ export {
   deriveTodayProgress,
   todayProgressLoadWindow,
   workingSetsBySession,
+  progressMetricsBySession,
+  projectVolume,
   buildSessionExerciseLines,
   type LatestSessionSummary,
   type SessionExerciseLine,

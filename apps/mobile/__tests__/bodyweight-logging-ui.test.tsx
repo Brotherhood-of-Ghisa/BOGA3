@@ -22,6 +22,11 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule()
 );
 
+// This suite exercises load calculations; GPS retries must not outlive it.
+jest.mock('@/src/location/foreground-location-lazy', () => ({
+  getCurrentForegroundPositionLazy: jest.fn(async () => ({ status: 'permission_denied', canAskAgain: false })),
+}));
+
 jest.mock('expo-router', () => ({
   Stack: { Screen: () => null },
   useRouter: () => ({ back: jest.fn(), canGoBack: () => true, push: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() }),

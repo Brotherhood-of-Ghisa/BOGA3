@@ -50,6 +50,7 @@ export type AccountLocalPreferences = {
   muscleVolumePrimaryOnly: boolean;
   progressMuscleLayout: ProgressMuscleLayout;
   progressMetric: ProgressMetric;
+  todayProgressMetric: ProgressMetric;
   progressExerciseMetric: ProgressExerciseMetric;
   restTimerAutoStart: boolean;
   restTimerDurationSec: number;
@@ -84,6 +85,7 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   muscleVolumePrimaryOnly: false,
   progressMuscleLayout: 'list',
   progressMetric: 'workingSetCount',
+  todayProgressMetric: 'workingSetCount',
   progressExerciseMetric: 'workingSetCount',
   restTimerAutoStart: true,
   restTimerDurationSec: DEFAULT_REST_TIMER_SECONDS,
@@ -97,7 +99,7 @@ export const browsingPreferenceFields = Object.keys(DEFAULT_EXERCISE_LIST_PREFER
 // as JSON and must be parsed back (`storage.ts`).
 export const textPreferenceFields: (keyof AccountLocalPreferences)[] = [
   ...browsingPreferenceFields, 'heatmapView', 'progressBreakdown', 'progressPeriod', 'progressMuscleLayout', 'progressMetric', 'progressExerciseMetric',
-  'muscleTargetMode',
+  'muscleTargetMode', 'todayProgressMetric',
 ];
 // Stored as `true` / `false`.
 export const booleanPreferenceFields: (keyof AccountLocalPreferences)[] = [
@@ -129,6 +131,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   muscleVolumePrimaryOnly: 'Choose whether muscle Volume counts primary work only.',
   progressMuscleLayout: 'Choose List or 3D for Progress muscles.',
   progressMetric: 'Choose Sets or Volume for Progress.',
+  todayProgressMetric: 'Choose Sets or Tons for Today.',
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
   restTimerAutoStart: 'Choose whether to start the rest timer automatically.',
   restTimerDurationSec: REST_TIMER_RANGE_MESSAGE,
@@ -163,6 +166,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'progressBreakdown': return value === 'exercise' || value === 'muscle';
     case 'progressPeriod': return value === 'window' || value === 'this-week';
     case 'progressMuscleLayout': return value === 'list' || value === '3d';
+    case 'todayProgressMetric':
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';
     case 'progressExerciseMetric':
       return value === 'workingSetCount' || value === 'totalVolume' || value === 'estimatedOneRepMax';
