@@ -27,9 +27,9 @@ Two standing rules:
 ## Coded compositions
 
 CompactCard/CompactHeader serve Stream and embedded CoW headers; SummaryTile
-serves Group stats. ListCard and compact ListRow serve the two weekly boards;
-their native acceptance is pending. SortableTable remains an approved template,
-**not production exports**. For a new block or derivative, follow the human selection and acceptance workflow in
+serves Group stats. ListCard and compact ListRow serve the two weekly boards.
+SortableTable remains an approved template, **not a production export**.
+For a new block or derivative, follow the human selection and acceptance workflow in
 `docs/specs/08-ux-delivery-standard.md` before building.
 
 | Family | Reuse / reference | Boundary to preserve |
