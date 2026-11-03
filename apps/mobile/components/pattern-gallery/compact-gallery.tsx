@@ -8,6 +8,7 @@ import { TodayCoWSummarySection } from '@/components/today/group-cow-summary';
 import { GroupApiError } from '@/src/groups/api';
 import type { GroupResourceState } from '@/src/groups/use-group-resource';
 import type { CoWResultWire, CoWSummaryWire } from '@/src/groups/cow-wire';
+import { SummaryGallery } from './summary-gallery';
 import { cowSummary, competitionEvent, galleryCow, gallerySession, GALLERY_SAMPLES, GALLERY_STATES, COW_GALLERY_STATES,
   type GallerySample, type GalleryState } from './fixtures';
 
@@ -32,6 +33,9 @@ export function CompactGallery({ initialSample, initialState, initialLong = fals
     values: competitionEvent.values.map(value => ({ ...value, value: 123456.7 })) } : competitionEvent;
   const resource = galleryResource(state, result);
   const retry = () => { setState('ready'); setAction('Retry'); };
+  if (sample === 'summary') return <SummaryGallery initialState={initialState} initialLong={initialLong} review={review}>
+    <SegmentedControl options={GALLERY_SAMPLES} value={sample} onChange={setSample} testIDPrefix="ui-gallery-sample" accessibilityLabel="Component example" />
+  </SummaryGallery>;
   return <ScreenScroll testID={`ui-gallery-${sample}-${state}-${long ? 'long' : 'normal'}`} contentInsetAdjustmentBehavior="automatic">
     {!review ? <>
       <SegmentedControl options={GALLERY_SAMPLES} value={sample} onChange={setSample} testIDPrefix="ui-gallery-sample" accessibilityLabel="Component example" />

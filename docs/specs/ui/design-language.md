@@ -238,6 +238,14 @@ Never shrink figures to fit. Feature readers retain formatting, ranking and
 navigation; shared presentation owns its bounded styling. For pattern selection
 and human acceptance, load `docs/specs/08-ux-delivery-standard.md`.
 
+### Headline summary tiles
+
+SummaryTile preserves the Group stats composition: `md` inset, `sm` between
+CompactHeader and the metric content. WeekFigure and Stat keep their existing
+headline, label and comparison roles and geometry. Feature readers supply the
+values and comparisons; a tile adds no type, spacing or density override.
+Controls governing multiple cards stay outside the tile.
+
 ## 5. Emphasis
 
 **One primary action per screen**, in `accent`. Everything else is an outline or
