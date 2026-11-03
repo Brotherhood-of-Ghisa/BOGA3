@@ -30,7 +30,7 @@ jest.mock('expo-router', () => ({
 import { ShareBar } from '@/components/today';
 import { CHART_RIGHT_GUTTER } from '@/components/today/progress-format';
 import { Storage } from 'expo-sqlite/kv-store';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiGeometry, uiIconSize, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
@@ -178,7 +178,12 @@ describe('Today: the Progress card over real data', () => {
     const weeklyToggle = () => text('today-progress-week-working-sets-metric-toggle');
     const chartUnits = () => text('today-progress-period-working-sets');
     expect(weeklyToggle()).toHaveProp('accessibilityRole', 'button');
+    expect(weeklyToggle()).toHaveStyle({ flex: 2 });
+    for (const [id, label] of [['sessions', 'Sessions'], ['working-sets', 'Sets'], ['prs', 'PRs']]) {
+      expect(within(text(`today-progress-week-${id}`)).getByText(label).parent?.parent).toHaveStyle({ minHeight: uiIconSize.sm });
+    }
     fireEvent.press(weeklyToggle());
+    expect(weeklyToggle()).toHaveStyle({ flex: 2 });
     expect(weeklyToggle()).toHaveTextContent(/Tons/);
     expect(chartUnits()).toHaveTextContent(/ t/);
     expect(screen.queryByTestId('today-progress-period-metric-toggle')).toBeNull();
@@ -215,6 +220,7 @@ describe('Today: the Progress card over real data', () => {
     fireEvent(text('today-progress-chart'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     fireEvent.press(weeklyToggle());
     expect(weeklyToggle()).toHaveTextContent(/Sets/);
+    expect(weeklyToggle()).toHaveStyle({ flex: 2 });
     expect(text('today-progress-week-working-sets-value')).toHaveTextContent('6');
     expect(text('today-progress-period-working-sets')).toHaveTextContent('1 Nov 26 42 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('+36');
