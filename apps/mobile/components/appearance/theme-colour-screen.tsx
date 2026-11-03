@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { isThemePending } from '@/components/appearance/chosen-theme';
+import { appearanceRoles, pendingAppearance, useStoredAppearance } from '@/components/appearance/chosen-theme';
 import { HueRing } from '@/components/appearance/hue-ring';
 import { ThemePreview } from '@/components/appearance/theme-preview';
 import { Notice, Screen, uiRoles, uiSpace } from '@/components/ui';
 import { hexToLch } from '@/components/ui/lch';
-import { generateRoles } from '@/components/ui/theme';
-import { hueThemeId, normaliseHue, seedsFromHue } from '@/components/ui/theme-hue';
+import { hueThemeId, normaliseHue } from '@/components/ui/theme-hue';
 import { readStoredTheme, saveThemeAccent } from '@/components/ui/theme-launch';
 import { logEvent } from '@/src/logging';
 
@@ -21,7 +20,9 @@ export function ThemeColourScreen() {
   const [storedHue, setStoredHue] = useState<number | null>(storedCustomHue);
   const [savedHere, setSavedHere] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const roles = generateRoles(seedsFromHue(hue));
+  // The picked hue with the background and text already chosen.
+  const [appearance] = useStoredAppearance();
+  const roles = appearanceRoles({ ...appearance, accent: hueThemeId(hue) });
 
   // `released` is the plain hue the ring was let go at.
   const commit = async (released: number) => {
@@ -52,7 +53,7 @@ export function ThemeColourScreen() {
         </View>
         <ThemePreview roles={roles} testID="theme-colour-preview" />
         {saveError ? <Notice icon="warning" live message={saveError} testID="theme-colour-error" tone="danger" /> : null}
-        {savedHere && storedHue === hue && !saveError && isThemePending(hueThemeId(hue)) ? (
+        {savedHere && storedHue === hue && !saveError && pendingAppearance({ ...appearance, accent: hueThemeId(hue) }).accent ? (
           <Notice icon="success" live message="Saved · next launch" testID="theme-colour-status" />
         ) : null}
       </View>

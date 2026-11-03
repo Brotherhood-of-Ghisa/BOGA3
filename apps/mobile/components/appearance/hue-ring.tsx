@@ -11,6 +11,8 @@ type HueRingProps = {
   // The hue the ring was let go at: the end of a drag or tap, or one VoiceOver step.
   onChangeEnd?: (hue: number) => void;
   size?: number;
+  // What VoiceOver calls the ring.
+  accessibilityLabel?: string;
   testID?: string;
 };
 
@@ -35,7 +37,7 @@ export function pointToHue(x: number, y: number, size: number): number {
 
 // A hue picker: drag (or tap) anywhere on the ring. Reports every move, so the
 // caller can repaint a preview live, and the hue it is let go at.
-export function HueRing({ hue, onChange, onChangeEnd, size = 240, testID }: HueRingProps) {
+export function HueRing({ hue, onChange, onChangeEnd, size = 240, accessibilityLabel = 'Hue', testID }: HueRingProps) {
   const centre = size / 2;
   const outer = centre - (THUMB_RADIUS - THICKNESS / 2) - 1;
   const inner = outer - THICKNESS;
@@ -63,7 +65,7 @@ export function HueRing({ hue, onChange, onChangeEnd, size = 240, testID }: HueR
       <View
         accessible
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-        accessibilityLabel="Hue"
+        accessibilityLabel={accessibilityLabel}
         accessibilityRole="adjustable"
         accessibilityValue={{ text: `${hueName(hue)}, ${hue} degrees` }}
         onAccessibilityAction={(event) => {

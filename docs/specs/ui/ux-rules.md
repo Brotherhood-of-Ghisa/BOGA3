@@ -252,6 +252,15 @@ keeps `<StatusBar style="dark" />` and the splash is a fixed white
 (`app.config.ts`). The stack header takes `paper` (no shadow line) and `ink`,
 so header and page read as one surface ("Pages").
 
+Settings → Appearance is one page: a live `ThemePreview` of the choice, then
+Theme, Background (Match theme, five swatches, Custom background) and Text
+(Match background, four inks) as radio rows, each with a swatch. A tap or
+release saves at once and writes nothing when the value is already stored; the
+chosen row reads `Next launch` until the app reopens. A Custom row opens its
+picker (hue ring; the background adds a tint step) with the same preview. A
+failed save shows a danger `Notice` saying nothing changed and is logged.
+Settings home names the combined choice.
+
 ## Screen rules no other source states
 
 ### Exercise tags are read-only

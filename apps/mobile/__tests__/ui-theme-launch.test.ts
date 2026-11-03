@@ -8,9 +8,11 @@ import { Storage } from 'expo-sqlite/kv-store';
 import { generateRoles } from '@/components/ui/theme';
 import {
   APPEARANCE_STORAGE_KEY,
+  readIntendedTheme,
   readLaunchTheme,
   readStoredTheme,
   saveAppearance,
+  saveAppearancePart,
   saveThemeAccent,
   THEME_PRESET_STORAGE_KEY,
 } from '@/components/ui/theme-launch';
@@ -285,6 +287,37 @@ describe('saving', () => {
     expect(readStoredTheme().preset.id).toBe('warm');
     await write;
     expect(readStoredTheme().preset.id).toBe('slate');
+  });
+
+  it('reads the saves still on their way as the intended choice, and only until they settle', async () => {
+    const first = saveAppearancePart({ background: 'rose' });
+    const second = saveAppearancePart({ text: 'navy' });
+    expect(readStoredTheme().appearance).toEqual(DEFAULT_APPEARANCE);
+    expect(readIntendedTheme()).toEqual({ ...DEFAULT_APPEARANCE, background: 'rose', text: 'navy' });
+    await Promise.all([first, second]);
+    expect(readIntendedTheme()).toEqual({ ...DEFAULT_APPEARANCE, background: 'rose', text: 'navy' });
+    expect(storedRecord()).toEqual({ ...DEFAULT_APPEARANCE, background: 'rose', text: 'navy' });
+  });
+
+  it('forgets a field whose save failed, even while a later save for another field waits', async () => {
+    jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
+    const failed = saveAppearancePart({ background: 'rose' });
+    const later = saveAppearancePart({ text: 'navy' });
+    await expect(failed).rejects.toThrow('disk full');
+    // The later save has not settled: its field still counts, the failed one does not.
+    expect(readIntendedTheme()).toEqual({ ...DEFAULT_APPEARANCE, text: 'navy' });
+    await later;
+    expect(storedRecord()).toEqual({ ...DEFAULT_APPEARANCE, text: 'navy' });
+  });
+
+  it('keeps a field queued by a newer save when an older save of it settles', async () => {
+    const older = saveAppearancePart({ background: 'rose' });
+    const newer = saveAppearancePart({ background: 'cool' });
+    await older;
+    expect(readIntendedTheme().background).toBe('cool');
+    await newer;
+    expect(readStoredTheme().appearance.background).toBe('cool');
+    expect(readIntendedTheme().background).toBe('cool');
   });
 
   it('orders an async read after a write still settling', async () => {

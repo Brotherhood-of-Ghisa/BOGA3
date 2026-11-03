@@ -63,9 +63,43 @@ export async function saveAppearance(appearance: AppearanceChoice): Promise<void
   savedListeners.forEach((listener) => listener());
 }
 
-// Saves a new accent — a preset id or a custom hue's `hue:<deg>` — keeping the
-// rest of the stored choice; an unusable stored choice is replaced by the
-// default's. Rejects, saving nothing, when the store cannot be read or written.
-export async function saveThemeAccent(accent: ThemePresetId | HueThemeId): Promise<void> {
-  await saveAppearance({ ...readStoredTheme().appearance, accent });
+let lastSave: Promise<void> = Promise.resolve();
+// The saves accepted but not yet settled, so a second choice compares against
+// what the first will store rather than what it has stored so far. Each field
+// holds the value of the newest save that names it, and that save's ticket.
+let queued: Partial<AppearanceChoice> = {};
+const queuedTickets = new Map<keyof AppearanceChoice, number>();
+let lastTicket = 0;
+
+// The stored choice with the saves still queued applied. Throws when the store
+// cannot be read.
+export function readIntendedTheme(): AppearanceChoice {
+  return { ...readStoredTheme().appearance, ...queued };
+}
+
+// Saves part of the choice — the accent (a preset id or a custom hue's
+// `hue:<deg>`), the background, the text — keeping the rest of the stored
+// choice; an unusable stored choice is replaced by the default's. Saves run one
+// after another, so two quick choices cannot overwrite each other's field.
+// Rejects, saving nothing, when the store cannot be read or written.
+export function saveAppearancePart(part: Partial<AppearanceChoice>): Promise<void> {
+  const ticket = (lastTicket += 1);
+  const fields = Object.keys(part) as (keyof AppearanceChoice)[];
+  queued = { ...queued, ...part };
+  fields.forEach((field) => queuedTickets.set(field, ticket));
+  // A field leaves the queue when its newest save settles, saved or failed.
+  const settle = (): void => {
+    fields.forEach((field) => {
+      if (queuedTickets.get(field) !== ticket) return;
+      queuedTickets.delete(field);
+      delete queued[field];
+    });
+  };
+  const run = lastSave.then(() => saveAppearance({ ...readStoredTheme().appearance, ...part }));
+  lastSave = run.then(settle, settle);
+  return run;
+}
+
+export function saveThemeAccent(accent: ThemePresetId | HueThemeId): Promise<void> {
+  return saveAppearancePart({ accent });
 }
