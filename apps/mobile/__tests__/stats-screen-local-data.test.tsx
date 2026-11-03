@@ -363,14 +363,14 @@ describe('Stats over real data', () => {
     expect(names()).toEqual([...names()].sort((left, right) => left.localeCompare(right)));
     fireEvent.press(screen.getByTestId('stats-muscle-sort-muscle'));
     expect(names()).toEqual([...names()].sort((left, right) => right.localeCompare(left)));
-    expect(screen.getByTestId('stats-muscle-sort-now-indicator')).toHaveStyle({ opacity: 0 });
+    expect(screen.queryByTestId('stats-muscle-sort-now-indicator')).toBeNull();
     fireEvent.press(screen.getByTestId('stats-muscle-sort-change'));
     expectSorted('change', true);
     fireEvent.press(screen.getByTestId('stats-muscle-sort-change'));
     expectSorted('change', false);
     expect(screen.getByTestId('stats-muscle-sort-change-indicator-up', { includeHiddenElements: true })).toBeTruthy();
     chooseFilter('metric', 'Volume');
-    for (const [column, label] of [['now', 'Now'], ['previous', 'Prev'], ['change', 'Change']]) {
+    for (const [column, label] of [['now', 'Now'], ['previous', 'Prev'], ['change', 'Δ']]) {
       expect(within(screen.getByTestId(`stats-muscle-sort-${column}`)).getByText(label)).toBeTruthy();
     }
     expect(screen.queryAllByTestId(/^stats-muscle-row-.*-periods$/)).toHaveLength(0);

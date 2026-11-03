@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from 'react';
-import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type AccessibilityValue, type ViewInstance } from 'react-native';
 
 import { uiText } from '@/components/ui/text-roles';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
@@ -11,6 +11,7 @@ export type ListRowContentAction = {
   onPress: () => void;
   accessibilityLabel: string;
   accessibilityRole?: 'button' | 'link';
+  accessibilityValue?: AccessibilityValue;
   testID?: string;
   ref?: Ref<ViewInstance>;
 };
@@ -189,7 +190,7 @@ const styles = StyleSheet.create({
   },
   compactInset: { paddingVertical: uiSpace.xs },
   compactTarget: { minHeight: uiGeometry.tapTarget },
-  contentControl: { justifyContent: 'center' },
+  contentControl: { minWidth: uiGeometry.tapTarget, justifyContent: 'center' },
   compactSelected: { color: uiRoles.accent },
   own: { backgroundColor: uiRoles.paper },
   selected: {

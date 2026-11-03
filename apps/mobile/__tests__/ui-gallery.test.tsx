@@ -134,3 +134,13 @@ it.each([true, false])('keeps Summary deep links under the existing gallery guar
   if (dev) expect(screen.getByTestId('group-week-totals-sets-value')).toHaveTextContent('0');
   else expect(screen.queryByTestId('group-week-totals-card')).toBeNull();
 });
+
+
+it('selects production table fixtures through the same development-only route', () => {
+  mockParams = { family: 'table', review: '1' };
+  const view = render(<UiGalleryRoute />);
+  expect(screen.getByTestId('stats-muscle-table')).toBeTruthy();
+  mockDev = false;
+  view.rerender(<UiGalleryRoute />);
+  expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
+});

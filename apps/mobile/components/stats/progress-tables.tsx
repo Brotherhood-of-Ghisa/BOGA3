@@ -1,14 +1,14 @@
 import { Fragment, useRef, type ComponentRef } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Icon, ListRow, StatePanel, uiBorder, uiGeometry, uiRoles, uiText } from '@/components/ui';
+import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StatePanel, uiBorder, uiRoles } from '@/components/ui';
 import type { ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import {
   COLUMN_KEYS, COLUMN_NAMES, ComparisonHeaders, ComparisonValues, compareOptionalNumbers, comparisonSortValues,
-  hasComparisonMetric, metricUnit, resolveComparisonLayout, type ComparisonColumnKey,
+  hasComparisonMetric, metricUnit, comparisonValuesLabel, resolveComparisonLayout, type ComparisonColumnKey,
   type ComparisonLayout,
 } from './comparison-columns';
-import { StatsTable, StatsTableFamily, StatsTableHeaderLabel, StatsTableSortHeader, statsTableStyles } from './stats-table';
+import { StatsTable, StatsTableRow, StatsTableName, StatsTableDisclosure, StatsTableFamily, StatsTableHeaderLabel, StatsTableSortHeader, statsTableStyles } from './stats-table';
 
 import { EXERCISE_LIST_FAMILY_ORDER } from '@/src/exercise-catalog/list-model';
 import { exerciseSearchTextMatches, normalizeExerciseSearchWords } from '@/src/exercise-catalog/search';
@@ -96,22 +96,23 @@ export function ProgressTables(props: ProgressTablesProps) {
   const { width } = useWindowDimensions();
   const selected = rows.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
-  const layout = resolveComparisonLayout(width, [...rows, ...exercises], metric, true, true);
+  const activeSort = sortMode.slice(0, sortMode.lastIndexOf('-')) as 'name' | ComparisonColumnKey;
+  const layout = resolveComparisonLayout(width, [...rows, ...exercises], metric, true, { compact: true, activeSort });
   return <View testID="stats-muscle-table-container"><StatsTable testID="stats-muscle-table">
-    <ComparisonHeaders layout={layout} metric={metric} testID="stats-muscle-table-header"
+    <ComparisonHeaders compact layout={layout} metric={metric} testID="stats-muscle-table-header"
       name={<MuscleSortHeaderCell header="muscle" label="Muscle" metric={metric} mode={sortMode} onSort={onSort} />}
       column={(column, columnWidth) => <MuscleSortHeaderCell header={column.key} label={column.label}
         metric={metric} mode={sortMode} onSort={onSort} width={columnWidth} />} />
     {rows.length === 0 ? <StatePanel fill={false} body="No muscles match the search query." testID="stats-muscle-list-empty" /> : null}
     {rows.map((row, index) => <Fragment key={row.muscleGroupId}>
       {grouped && familyHasHeader(row.familyName, familyCounts) && (index === 0 || rows[index - 1].familyName !== row.familyName) ?
-        <StatsTableFamily name={row.familyName} testID={`stats-family-header-${row.familyName.toLowerCase().replace(/\s+/g, '-')}`} /> : null}
+        <StatsTableFamily compact name={row.familyName} testID={`stats-family-header-${row.familyName.toLowerCase().replace(/\s+/g, '-')}`} /> : null}
       <View testID={`stats-muscle-block-${row.muscleGroupId}`}>
         <MuscleRow row={row} metric={metric} layout={layout} selected={row.muscleGroupId === selectedId}
           onSelect={onSelect} onHistory={onMuscleHistory} />
         {row.muscleGroupId === selectedId && selected ? <View
           testID="stats-contributions" style={styles.contributions}>
-          <ProgressContributionRows muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
+          <ProgressContributionRows header={false} muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
         </View> : null}
         {row.muscleGroupId === selectedId ? <View pointerEvents="none" style={styles.selected} /> : null}
       </View>
@@ -120,18 +121,18 @@ export function ProgressTables(props: ProgressTablesProps) {
 }
 
 // Both presentations keep one contribution-row and empty-state implementation.
-export function ProgressContributionRows({ muscle, metric, layout, onHistory, splitByEffort = false, axis = true }: {
+export function ProgressContributionRows({ muscle, metric, layout, onHistory, splitByEffort = false, axis = true, header = true }: {
   muscle: ProgressMuscleComparison; metric: ProgressTableMetric; layout: ComparisonLayout;
-  onHistory: ProgressTablesProps['onExerciseHistory']; splitByEffort?: boolean; axis?: boolean;
+  onHistory: ProgressTablesProps['onExerciseHistory']; splitByEffort?: boolean; axis?: boolean; header?: boolean;
 }) {
   const exercises = muscle.exercises.filter(row => hasComparisonMetric(row, metric));
   return <>
-    <Headers axis={axis} name="Exercise" layout={layout} metric={metric} testID="stats-contributions-header" />
+    {header ? <Headers axis={axis} name="Exercise" layout={layout} metric={metric} testID="stats-contributions-header" /> : null}
     {exercises.length === 0 ? <StatePanel fill={false} testID="stats-contributions-empty"
       body={`No ${metric === 'workingSetCount' ? 'working sets' : 'volume-included sets'} for ${muscle.displayName} in either period`} /> : (splitByEffort ? (['primary', 'secondary'] as const).map(role => {
         const rows = exercises.filter(row => row.role === role);
         return rows.length > 0 ? <Fragment key={role}>
-          <StatsTableFamily name={role === 'primary' ? 'Primary effort' : 'Secondary effort'} />
+          <StatsTableFamily compact name={role === 'primary' ? 'Primary effort' : 'Secondary effort'} />
           {rows.map(row => <ExerciseRow key={row.exerciseDefinitionId} row={row} metric={metric} layout={layout} onHistory={onHistory} axis={axis} hideRole />)}
         </Fragment> : null;
       }) : exercises.map(row =>
@@ -151,7 +152,7 @@ function MuscleSortHeaderCell({ header, label, metric, mode, onSort, width }: {
 }) {
   const key = header === 'muscle' ? 'name' : header;
   const named = header === 'muscle' ? 'Muscle' : `${COLUMN_NAMES[COLUMN_KEYS.indexOf(header)]}, ${metricUnit(metric)}`;
-  return <StatsTableSortHeader label={label} active={mode.startsWith(`${key}-`)} descending={mode.endsWith('-desc')}
+  return <StatsTableSortHeader compact label={label} active={mode.startsWith(`${key}-`)} descending={mode.endsWith('-desc')}
     description={named} currentSort={describeMuscleSort(mode)} nextSort={describeMuscleSort(nextMuscleSortMode(mode, header))}
     onPress={() => onSort?.(header)} testID={`stats-muscle-sort-${header}`} numeric={header !== 'muscle'}
     style={width === undefined ? statsTableStyles.nameCell : { width }} />;
@@ -161,7 +162,7 @@ function MuscleSortHeaderCell({ header, label, metric, mode, onSort, width }: {
 function Headers({ name, layout, metric, testID, axis }: {
   name: string; layout: ComparisonLayout; metric: ProgressTableMetric; testID: string; axis: boolean;
 }) {
-  return <ComparisonHeaders axis={axis} layout={layout} metric={metric} testID={testID}
+  return <ComparisonHeaders compact axis={axis} layout={layout} metric={metric} testID={testID}
     name={<StatsTableHeaderLabel label={name} />} />;
 }
 
@@ -171,35 +172,36 @@ function MuscleRow({ row, metric, layout, selected, onSelect, onHistory }: {
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
   const prefix = `stats-muscle-row-${row.muscleGroupId}`;
-  const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} />;
-  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values} trailing={
-    <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
-      accessibilityState={{ expanded: selected }} onPress={() => onSelect(row.muscleGroupId)} style={styles.chevron}
-      testID={`stats-muscle-select-${row.muscleGroupId}`}>
-      <Icon name={selected ? 'chevron-down' : 'chevron-right'} size="sm" color={uiRoles.ink} />
-    </Pressable>}>
-    <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
-      onPress={() => onHistory(row, name.current)} style={styles.nameLink} testID={`stats-muscle-history-${row.muscleGroupId}`}>
-      <Text allowFontScaling={false} style={[uiText.bodyStrong, statsTableStyles.name]}>{row.displayName}</Text>
-    </Pressable>
+  const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} compact speak={!layout.stacked} />;
+  return <StatsTableRow testID={prefix} meta={layout.stacked ? undefined : values}
+    contentAction={{ ref: name, accessibilityRole: 'link',
+      accessibilityLabel: `Open ${row.displayName} history`,
+      accessibilityValue: layout.stacked ? { text: comparisonValuesLabel(row, metric) } : undefined,
+      onPress: () => onHistory(row, name.current), testID: `stats-muscle-history-${row.muscleGroupId}` }}
+    trailing={<StatsTableDisclosure expanded={selected}
+      accessibilityLabel={`${selected ? 'Hide' : 'Show'} ${row.displayName} contributions`}
+      onPress={() => onSelect(row.muscleGroupId)} testID={`stats-muscle-select-${row.muscleGroupId}`} />}>
+    <StatsTableName name={row.displayName} selected={selected} />
     {layout.stacked ? values : null}
-  </ListRow>;
+  </StatsTableRow>;
 }
 
 function ExerciseRow({ row, metric, layout, onHistory, hideRole, axis }: {
   row: ProgressExerciseComparison; metric: ProgressTableMetric; layout: ComparisonLayout; onHistory: ProgressTablesProps['onExerciseHistory']; hideRole?: boolean; axis: boolean;
 }) {
   const name = useRef<ComponentRef<typeof View>>(null);
+  const role = hideRole ? undefined : row.role === 'primary' ? 'Primary' : 'Secondary';
+  const historyValue = [role, layout.stacked ? comparisonValuesLabel(row, metric) : undefined].filter(Boolean).join('. ');
   const prefix = `stats-contribution-${row.exerciseDefinitionId}`;
-  const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} />;
-  const history = <Pressable ref={name} accessibilityRole="link" accessibilityLabel={`Open ${row.displayName} history`}
-      onPress={() => onHistory(row, name.current)} style={styles.nameLink}>
-      <Text allowFontScaling={false} style={[uiText.bodyStrong, statsTableStyles.name]}>{row.displayName}</Text>
-      {hideRole ? null : <Text allowFontScaling={false} style={uiText.meta}>{row.role === 'primary' ? 'Primary' : 'Secondary'}</Text>}
-    </Pressable>;
-  return <ListRow density="list" testID={prefix} meta={layout.stacked ? undefined : values} trailing={axis ? null : undefined}>
-    {history}{layout.stacked ? values : null}
-  </ListRow>;
+  const values = <ComparisonValues row={row} metric={metric} layout={layout} prefix={prefix} compact speak={!layout.stacked} />;
+  return <StatsTableRow testID={prefix} meta={layout.stacked ? undefined : values} trailing={axis ? null : undefined}
+    contentAction={{ ref: name, accessibilityRole: 'link',
+      accessibilityLabel: `Open ${row.displayName} history`,
+      accessibilityValue: historyValue ? { text: historyValue } : undefined,
+      onPress: () => onHistory(row, name.current) }}>
+    <StatsTableName name={row.displayName} metadata={role} />
+    {layout.stacked ? values : null}
+  </StatsTableRow>;
 }
 
 const styles = StyleSheet.create({
@@ -207,6 +209,4 @@ const styles = StyleSheet.create({
     borderBottomWidth: uiBorder.width, borderColor: uiRoles.rule },
   // The selected muscle keeps its ink rule, and its contributions hang off it.
   selected: { position: 'absolute', left: 0, top: 0, bottom: 0, width: uiBorder.width * 3, backgroundColor: uiRoles.ink },
-  nameLink: { minWidth: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, justifyContent: 'center' },
-  chevron: { width: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, alignItems: 'center', justifyContent: 'center' },
 });

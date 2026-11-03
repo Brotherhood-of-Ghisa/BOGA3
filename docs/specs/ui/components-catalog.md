@@ -28,7 +28,7 @@ Two standing rules:
 
 CompactCard/CompactHeader serve Stream and embedded CoW headers; SummaryTile
 serves Group stats. ListCard and compact ListRow serve the two weekly boards.
-SortableTable remains an approved template, **not a production export**.
+StatsTable now composes the compact row foundation for Muscle/contributor tables.
 For a new block or derivative, follow the human selection and acceptance workflow in
 `docs/specs/08-ux-delivery-standard.md` before building.
 
@@ -36,7 +36,7 @@ For a new block or derivative, follow the human selection and acceptance workflo
 | --- | --- | --- |
 | CompactCard / CompactHeader | `compact-card.tsx`: fixed compact Card and shared label/metadata header; Stream and CoW | Embedded summaries reuse only the header inside their existing container; Card accessibility actions retain nested record callbacks |
 | ListCard / ListCardHeader | `list-card.tsx` and compact `list-row.tsx`; GroupHomeBoard and Today's weekly board | Passive rows and a whole-board action differ from independent row controls |
-| SortableTable | Evolve StatsTable and comparison columns | Keep sorting with its current owner and history/disclosure actions separate |
+| SortableTable family | `stats/stats-table.tsx`: StatsTable, compact StatsTableRow/Name/Disclosure and comparison columns; Muscle list/contributors | Keep sorting with its current owner, separate history/disclosure targets and responsive stacking |
 | SummaryTile | `summary-tile.tsx`: shared header and existing metric content; At a glance's Group stats | Both Sets/PRs remain visible; period controls stay outside and metric controls govern the board/chart |
 
 ## Existing primitives (`apps/mobile/components/ui/`)
@@ -84,6 +84,17 @@ safe/failing examples, load `apps/mobile/scripts/list-pattern-guardrail.js`
 and `apps/mobile/__tests__/list-pattern-guardrail.test.ts`. Untouched tables
 and existing sheet/list densities are outside this adoption scope.
 
+### Table pattern adoption
+
+Muscle list and single-muscle contributors reuse StatsTableRow on compact
+ListRow, with StatsTableName and StatsTableDisclosure owning their presentation.
+Now / Prev / Δ headers reserve only the active sort arrow; nested contributors
+inherit them, while standalone contributors keep a passive header. Stacked
+history targets speak their figures. The Exercise table retains its existing density.
+For adoption guardrails and safe/failing examples, load
+`apps/mobile/scripts/table-pattern-guardrail.js` and
+`apps/mobile/__tests__/table-pattern-guardrail.test.ts`.
+
 Rules the code cannot state for itself:
 
 - A primitive draws on `uiRoles` / `uiFonts` / `uiGeometry` only — never a
@@ -120,7 +131,7 @@ folder rather than re-implementing its row, card or sheet.
 
 | Folder | What it owns |
 | --- | --- |
-| `pattern-gallery/` | Development-only native gallery of production pattern presenters and fixed fixtures, including board references and compact row-only list/table inputs; reached by explicit deep link, with access owned by `src/utils/isUiGalleryAllowed.ts` |
+| `pattern-gallery/` | Development-only native gallery of production pattern presenters and fixed fixtures, including board/table references and paired compact list/table rows; reached by explicit deep link, with access owned by `src/utils/isUiGalleryAllowed.ts` |
 | `rm-curve/` | `RmCurveScreen` / `RmCurveContent`, the experimental reps–load scatter, fitted temporal curves, model/scope controls, dated set inspection and `RmCurveHelp` explainer; reads `src/rm-curve/`, hosted by `app/rm-curve.tsx` |
 | `navigation/` | `MainTabBar` / `MainTabs` — the one bottom bar, drawn identically by the tab layout, a completed session's edit, exercise history and `TabOwnedPage`; `TabOwnedPage` (a root-stack page that keeps the tab bar under its native header: Exercises, Groups, Settings); the root stack and the auth route guard. The tab order, labels, routes and testIDs live in the non-visual model `apps/mobile/src/navigation/main-tabs.ts`, and a press on a page over the tabs goes through `apps/mobile/components/navigation/use-open-main-tab.ts`, which closes it with no animation |
 | `exercise-core/` | `ExerciseNameField` and `ExerciseWeightSection` (weight entry, `Uses bodyweight` and its share) with `validateExerciseCore`, composed by both the personal editor and the group exercise form, so the two never diverge |

@@ -226,29 +226,28 @@ style object, read their role's fields.
 - The primitives implementing all of this live in
   `apps/mobile/components/ui/` (`components-catalog.md`).
 
-**Compact compositions.** Summary cards, list cards, sortable tables and
-headline tiles share the current vocabulary; prominence comes from their
-semantic roles, not a new spacing scale. List/table rows at the same density
-share line heights, vertical insets, alignment, separators and wrapping.
-Nested contributors inherit that rhythm, with indentation or semantic emphasis
-where needed. Distinguish passive content from independent row controls; a
-whole-board target does not turn every passive row into a separate target.
-Never shrink figures to fit. Feature readers retain formatting, ranking and
-navigation; shared presentation owns its bounded styling. For pattern selection
-and human acceptance, load `docs/specs/08-ux-delivery-standard.md`.
+**Compact compositions.** Cards, lists, tables and tiles share the current
+vocabulary; semantic roles give prominence. List/table rows share line heights,
+insets, alignment, separators and wrapping; nested contributors inherit them.
+A whole-board action does not make passive rows independent targets. Never
+shrink figures. Features own formatting, ranking and navigation; shared
+presentation owns styling. For pattern selection and human acceptance, load
+`docs/specs/08-ux-delivery-standard.md`.
 
 ### Compact list/table rows
 
-Use `ListRow density="compact"`. Words use `body`/`bodyStrong`
-and numbers `figure`, on 20pt lines. Leading, content and value
-slots have `uiSpace.xs` vertical insets: passive single-line content takes
-nominally 28pt, two lines 48pt, excluding its `uiBorder.width` / `ruleSoft`
-separator; native font metrics round to device pixels.
-An independently interactive row or trailing control keeps `tapTarget` without
-another vertical inset around that target. A separate content action wraps
-inset text beside disclosure. Wrapped content grows;
-feature-sized figure columns retain full values. Nested table content shares
-this rhythm. Sheet/list option densities keep their recipes.
+Use `ListRow density="compact"`: ordinary names in `body`, selected/own names
+in `bodyStrong`, numbers in `figure`. Content slots have `uiSpace.xs` vertical
+insets. Passive one/two-line rows take nominally 28/48pt plus their
+`uiBorder.width` / `ruleSoft` separator; native font metrics round to pixels.
+Independent actions keep `tapTarget` without another inset around them.
+Content actions and disclosures remain separate; wrapped content grows and
+figures never shrink. StatsTableRow shares this foundation. Muscle tables use
+Now / Prev / Δ columns, spoken as Now / Previous / Change; only the active sort
+reserves an arrow. Numeric sort columns retain full targets. Nested contributors
+inherit the parent header; standalone contributors keep a passive header.
+Family headings use compact insets. Existing sheet/list option densities and
+the Exercise table keep their recipes.
 
 ### Headline summary tiles
 
