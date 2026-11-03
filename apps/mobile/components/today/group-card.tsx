@@ -1,3 +1,4 @@
+import { TodayWeekBoardCard } from './today-week-board';
 import { TodayCoWSummaries } from './group-cow-summary';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -5,14 +6,12 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
 import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import {
   GROUP_SESSIONS_SHOWN,
   buildGroupSessions,
   buildWeekBoard,
   type GroupSessionRowViewModel,
-  type WeekBoardRowViewModel,
-  type WeekBoardViewModel,
 } from '@/src/groups';
 import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
 import { localWeekWindow } from '@/src/utils/local-calendar';
@@ -38,111 +37,6 @@ export type TodayGroupCardProps = {
   /** Reads the group's stream for its recent sessions; online by default. */
   loadStreamPage?: GroupStreamPageLoader;
 };
-
-// A board figure: Plex Mono 500, right-aligned in its column.
-function BoardFigure({ value, record = false, testID }: { value: number; record?: boolean; testID: string }) {
-  const showRecord = record && value > 0;
-  return (
-    <View style={styles.figureCell}>
-      <Text allowFontScaling={false} style={[uiText.figure, styles.boardFigure, showRecord ? uiTextTone.record : null]} testID={testID}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function BoardRow({ row }: { row: WeekBoardRowViewModel }) {
-  const testID = `today-group-board-row-${row.userId}`;
-  return (
-    <View style={[styles.boardRow, row.isMe ? styles.boardRowMine : null]} testID={testID}>
-      <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted, styles.rank]} testID={`${testID}-rank`}>
-        {row.rank}
-      </Text>
-      <Text
-        allowFontScaling={false}
-        ellipsizeMode="tail"
-        numberOfLines={1}
-        style={[uiText.body, styles.memberName, row.isMe ? uiTextEmphasis.strong : null]}
-        testID={`${testID}-name`}>
-        {row.name}
-      </Text>
-      <View style={styles.track}>
-        <View
-          style={[styles.bar, { width: `${Math.round(row.fraction * 100)}%` }, row.leader ? styles.barLeader : null]}
-          testID={`${testID}-fill`}
-        />
-      </View>
-      <BoardFigure testID={`${testID}-working-sets`} value={row.workingSets} />
-      <BoardFigure record testID={`${testID}-records`} value={row.groupRecords} />
-    </View>
-  );
-}
-
-const boardAccessibilityLabel = (range: string, board: WeekBoardViewModel): string =>
-  [
-    `This week, ${range}`,
-    ...board.rows.map((row) => `${row.rank}, ${row.name}, ${row.workingSets} sets, ${row.groupRecords} PRs`),
-    board.me ? `You, ${board.me.rankLabel}, ${board.me.workingSets} sets, ${board.me.groupRecords} PRs` : null,
-  ]
-    .filter(Boolean)
-    .join('; ');
-
-// The group's name and switch, then this week's leaders by working sets,
-// `PRs` being group records: the top five, then the caller's own line when
-// they are outside them.
-function WeekBoardCard({ board, range, onOpenGroup, header, challenges }: {
-  board: WeekBoardViewModel;
-  range: string;
-  onOpenGroup: () => void;
-  header: ReactNode;
-  challenges: ReactNode;
-}) {
-  return (
-    <Card style={styles.boardCard} testID="today-group-card">
-      {header}
-      {challenges}
-      <View style={styles.boardHeading}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.ink]}>
-          This week
-        </Text>
-        <Text allowFontScaling={false} style={[uiText.meta, styles.boardRange]} testID="today-group-board-range">
-          <FigureText>{range}</FigureText>
-        </Text>
-      </View>
-      <Pressable
-        accessibilityHint="Opens the group"
-        accessibilityLabel={boardAccessibilityLabel(range, board)}
-        accessibilityRole="button"
-        onPress={onOpenGroup}
-        style={({ pressed }) => [styles.board, pressed ? styles.pressed : null]}
-        testID="today-group-board">
-        <View style={styles.columnLabels}>
-          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint, styles.columnLabel]}>
-            Sets
-          </Text>
-          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint, styles.columnLabel]}>
-            PRs
-          </Text>
-        </View>
-        {board.rows.map((row) => (
-          <BoardRow key={row.userId} row={row} />
-        ))}
-        {board.me ? (
-          <View style={[styles.boardRow, styles.meLine]} testID="today-group-board-me">
-            <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted, styles.rank]} testID="today-group-board-me-rank">
-              {board.me.rankLabel}
-            </Text>
-            <Text allowFontScaling={false} style={[uiText.body, uiTextEmphasis.strong, styles.memberName, styles.meName]}>
-              You
-            </Text>
-            <BoardFigure testID="today-group-board-me-working-sets" value={board.me.workingSets} />
-            <BoardFigure record testID="today-group-board-me-records" value={board.me.groupRecords} />
-          </View>
-        ) : null}
-      </Pressable>
-    </Card>
-  );
-}
 
 function SessionRow({ row, onPress }: { row: GroupSessionRowViewModel; onPress: () => void }) {
   const testID = `today-group-session-${row.sessionId}`;
@@ -256,7 +150,7 @@ export function TodayGroupCard({
 
   return (
     <View style={[styles.stack, styles.fill]}>
-      <WeekBoardCard
+      <TodayWeekBoardCard
         board={board}
         challenges={<TodayCoWSummaries key={`${myUserId}:${selectedGroupId}`} groupId={selectedGroupId} userId={myUserId} />}
         header={
@@ -303,12 +197,6 @@ function SessionsCard({ fill, testID, children }: { fill: boolean; testID: strin
   );
 }
 
-const BAR_HEIGHT = 12;
-const RANK_WIDTH = 22;
-const NAME_WIDTH = 104;
-// Fits the widest column label, `SETS`.
-const FIGURE_WIDTH = 36;
-
 const styles = StyleSheet.create({
   stack: {
     gap: uiSpace.sm,
@@ -316,87 +204,6 @@ const styles = StyleSheet.create({
   fill: {
     flex: 1,
     minHeight: 0,
-  },
-  boardCard: {
-    paddingBottom: uiSpace.sm,
-  },
-  // `This week` and its range, under the header row.
-  boardHeading: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: uiSpace.xs,
-    paddingHorizontal: uiSpace.md,
-    paddingTop: uiSpace.sm,
-    paddingBottom: uiSpace.xs,
-  },
-  boardRange: {
-    marginLeft: 'auto',
-    textAlign: 'right',
-  },
-  board: {
-    gap: 0,
-  },
-  columnLabels: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: uiSpace.sm,
-    paddingHorizontal: uiSpace.md,
-  },
-  columnLabel: {
-    width: FIGURE_WIDTH,
-    textAlign: 'right',
-  },
-  boardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.xs + 2,
-  },
-  // `You` sits on `paper`, as the canvas draws it.
-  boardRowMine: {
-    backgroundColor: uiRoles.paper,
-  },
-  meLine: {
-    marginTop: uiSpace.xs,
-    borderTopWidth: 1,
-    borderTopColor: uiRoles.ruleSoft,
-  },
-  meName: {
-    flex: 1,
-    width: undefined,
-  },
-  rank: {
-    width: RANK_WIDTH,
-  },
-  memberName: {
-    width: NAME_WIDTH,
-  },
-  track: {
-    flex: 1,
-    height: BAR_HEIGHT,
-    borderRadius: uiGeometry.radius.control,
-    backgroundColor: uiRoles.viz0,
-    overflow: 'hidden',
-  },
-  bar: {
-    height: BAR_HEIGHT,
-    borderRadius: uiGeometry.radius.control,
-    backgroundColor: uiRoles.viz3,
-  },
-  barLeader: {
-    backgroundColor: uiRoles.viz4,
-  },
-  figureCell: {
-    width: FIGURE_WIDTH,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  boardFigure: {
-    textAlign: 'right',
   },
   // A pressed row takes the `paper` ground, as `ListRow` does.
   pressed: {

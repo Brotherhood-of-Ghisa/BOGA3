@@ -238,6 +238,19 @@ Never shrink figures to fit. Feature readers retain formatting, ranking and
 navigation; shared presentation owns its bounded styling. For pattern selection
 and human acceptance, load `docs/specs/08-ux-delivery-standard.md`.
 
+### Compact list/table rows
+
+Use `ListRow density="compact"`. Words use `body`/`bodyStrong`
+and numbers `figure`, on 20pt lines. Leading, content and value
+slots have `uiSpace.xs` vertical insets: passive single-line content takes
+nominally 28pt, two lines 48pt, excluding its `uiBorder.width` / `ruleSoft`
+separator; native font metrics round to device pixels.
+An independently interactive row or trailing control keeps `tapTarget` without
+another vertical inset around that target. A separate content action wraps
+inset text beside disclosure. Wrapped content grows;
+feature-sized figure columns retain full values. Nested table content shares
+this rhythm. Sheet/list option densities keep their recipes.
+
 ### Headline summary tiles
 
 SummaryTile preserves the Group stats composition: `md` inset, `sm` between

@@ -201,11 +201,7 @@ function GlanceCards({
       <SummaryTile testID="group-week-totals-card" title="Group stats" titleTestID="group-week-totals-title"
         metrics={<GroupWeekTotalsFigures current={totals.current} offset={figuresOffset} previous={totals.previous} />} />
 
-      <Card testID="group-home-board-card">
-        <View style={styles.card}>
-          <GroupHomeBoard board={board} metric={metric} title="Top brothers" />
-        </View>
-      </Card>
+      <GroupHomeBoard board={board} metric={metric} title="Top brothers" />
 
       <Card testID="group-position-card">
         <View style={styles.card}>

@@ -26,15 +26,16 @@ Two standing rules:
 
 ## Coded compositions
 
-CompactCard and CompactHeader serve Stream and embedded CoW headers; SummaryTile
-serves Group stats. ListCard and SortableTable remain approved templates,
-**not production exports**. For a new block or derivative, follow the human selection and acceptance workflow in
+CompactCard/CompactHeader serve Stream and embedded CoW headers; SummaryTile
+serves Group stats. ListCard and compact ListRow serve the two weekly boards.
+SortableTable remains an approved template, **not a production export**.
+For a new block or derivative, follow the human selection and acceptance workflow in
 `docs/specs/08-ux-delivery-standard.md` before building.
 
 | Family | Reuse / reference | Boundary to preserve |
 | --- | --- | --- |
 | CompactCard / CompactHeader | `compact-card.tsx`: fixed compact Card and shared label/metadata header; Stream and CoW | Embedded summaries reuse only the header inside their existing container; Card accessibility actions retain nested record callbacks |
-| ListCard | Card, ListRow; GroupHomeBoard and Today's weekly board | Passive rows and a whole-board action differ from independent row controls |
+| ListCard / ListCardHeader | `list-card.tsx` and compact `list-row.tsx`; GroupHomeBoard and Today's weekly board | Passive rows and a whole-board action differ from independent row controls |
 | SortableTable | Evolve StatsTable and comparison columns | Keep sorting with its current owner and history/disclosure actions separate |
 | SummaryTile | `summary-tile.tsx`: shared header and existing metric content; At a glance's Group stats | Both Sets/PRs remain visible; period controls stay outside and metric controls govern the board/chart |
 
@@ -47,7 +48,8 @@ serves Group stats. ListCard and SortableTable remain approved templates,
 | A headline metric tile | `SummaryTile` (`summary-tile.tsx`); fixed frame/header, feature-owned WeekFigure or Stat content |
 | A container for content | `Card` (`card.tsx`) — with `onPress` the whole card is one labelled link |
 | A legend plus a figure | `Stat` (`stat.tsx`) — `stacked` or `inline`; its only emphasis is `record` |
-| A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`) |
+| A compact board with a shared header, optional columns and footer | `ListCard` / `ListCardHeader` (`list-card.tsx`); standalone or embedded, action limited to its board region |
+| A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`); `compact` shares the list/table content rhythm and preserves full control targets |
 | A picker or menu: row actions, options, a choice of one value, a short form | `Sheet` (`sheet.tsx`) |
 | A sub-page over the current screen: a browser, an editor, a preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
 | The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action; `variant="link"` for a heading's link | `ActionButton` (`action-button.tsx`) |
@@ -70,6 +72,17 @@ serves Group stats. ListCard and SortableTable remain approved templates,
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`); every other page takes the native header (`ux-rules.md` "Pages") |
 | Colour roles, fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
+
+### List pattern adoption
+
+`GroupHomeBoard` owns its standalone ListCard; callers do not add another Card.
+Today embeds the list inside its existing card, keeping the group header and
+CoW controls outside the board action. Readers retain ranking, ties, formatting
+and full accessible names. Long board names keep one-line ellipses. For row
+geometry, load `design-language.md` §4; for ListCard adoption guardrails and
+safe/failing examples, load `apps/mobile/scripts/list-pattern-guardrail.js`
+and `apps/mobile/__tests__/list-pattern-guardrail.test.ts`. Untouched tables
+and existing sheet/list densities are outside this adoption scope.
 
 Rules the code cannot state for itself:
 
@@ -107,7 +120,7 @@ folder rather than re-implementing its row, card or sheet.
 
 | Folder | What it owns |
 | --- | --- |
-| `pattern-gallery/` | Development-only native gallery of production pattern presenters and fixed fixtures; reached by explicit deep link, with access owned by `src/utils/isUiGalleryAllowed.ts` |
+| `pattern-gallery/` | Development-only native gallery of production pattern presenters and fixed fixtures, including board references and compact row-only list/table inputs; reached by explicit deep link, with access owned by `src/utils/isUiGalleryAllowed.ts` |
 | `rm-curve/` | `RmCurveScreen` / `RmCurveContent`, the experimental reps–load scatter, fitted temporal curves, model/scope controls, dated set inspection and `RmCurveHelp` explainer; reads `src/rm-curve/`, hosted by `app/rm-curve.tsx` |
 | `navigation/` | `MainTabBar` / `MainTabs` — the one bottom bar, drawn identically by the tab layout, a completed session's edit, exercise history and `TabOwnedPage`; `TabOwnedPage` (a root-stack page that keeps the tab bar under its native header: Exercises, Groups, Settings); the root stack and the auth route guard. The tab order, labels, routes and testIDs live in the non-visual model `apps/mobile/src/navigation/main-tabs.ts`, and a press on a page over the tabs goes through `apps/mobile/components/navigation/use-open-main-tab.ts`, which closes it with no animation |
 | `exercise-core/` | `ExerciseNameField` and `ExerciseWeightSection` (weight entry, `Uses bodyweight` and its share) with `validateExerciseCore`, composed by both the personal editor and the group exercise form, so the two never diverge |

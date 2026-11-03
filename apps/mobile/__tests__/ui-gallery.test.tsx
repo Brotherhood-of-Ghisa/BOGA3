@@ -84,6 +84,15 @@ it('never mounts gallery fixtures in a release build', () => {
   expect(screen.queryByTestId('ui-gallery-stream-ready-normal')).toBeNull();
 });
 
+it('selects the ListCard family under the existing development guard', () => {
+  mockParams = { family: 'list', sample: 'boards', review: '1' };
+  const view = render(<UiGalleryRoute />);
+  expect(screen.getByTestId('ui-gallery-list-boards-ready-normal')).toBeTruthy();
+  mockDev = false;
+  view.rerender(<UiGalleryRoute />);
+  expect(screen.queryByTestId('ui-gallery-list-boards-ready-normal')).toBeNull();
+});
+
 it('rejects StoreClient even in development', () => {
   const old = Constants.executionEnvironment;
   Object.defineProperty(Constants, 'executionEnvironment', { configurable: true, value: ExecutionEnvironment.StoreClient });

@@ -54,8 +54,8 @@ one access level. Screens never redirect to gate themselves:
   only ways out are the two transitions below; a retryable cycle error offers one
   Retry firing exactly one cycle, and `UPDATE_REQUIRED` explains the required app
   update with no Retry.
-- When the level changes, the old level's routes leave the stack and the router
-  lands on the first route still declared: `/sign-in`, `/sync-setup`, or `index`
+- When the level changes, its old routes leave the stack; the router
+  lands on the first declared route: `/sign-in`, `/sync-setup`, or `index`
   (which redirects to `/today`). A deep link to another level's route lands the
   same way. Group order in the root stack therefore matters.
 - Never unmount the navigator to gate access: expo-router 57 reverts routes
@@ -119,6 +119,10 @@ one access level. Screens never redirect to gate themselves:
 | `/group/[groupId]/cows`, `…/cows/[cowId]` | `cowId`, `metric=e1rm\|improvement\|volume` | public identity and opening metric only; invalid/disabled metric uses the first enabled metric. A metric change replaces result pages without pushing a route |
 | `/group/[groupId]/cows/schedule` | `cowId` | absent creates next week; present edits that definition before start only. The static schedule segment wins over cowId |
 | `/group/[groupId]/edit` | `focusTimeZone=1` | focuses calendar; Back refreshes management ([[groups.cow-calendar]]) |
+
+### List gallery selection
+
+`family=list` selects board/row fixtures; the guard stays unchanged.
 
 ## Allowed transitions
 

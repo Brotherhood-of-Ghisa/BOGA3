@@ -4,10 +4,18 @@ import { Pressable, StyleSheet, Text, View, type ViewInstance } from 'react-nati
 import { uiText } from '@/components/ui/text-roles';
 import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
-export type ListRowDensity = 'sheet' | 'list';
+export type ListRowDensity = 'sheet' | 'list' | 'compact';
 export type ListRowTone = 'default' | 'danger';
 
-export type ListRowProps = {
+export type ListRowContentAction = {
+  onPress: () => void;
+  accessibilityLabel: string;
+  accessibilityRole?: 'button' | 'link';
+  testID?: string;
+  ref?: Ref<ViewInstance>;
+};
+
+type ListRowBaseProps = {
   // The row's text. Pass `children` instead for composed content (a set row's
   // weight × reps).
   label?: string;
@@ -22,11 +30,14 @@ export type ListRowProps = {
   // The control. Always rendered in a fixed tap-target-wide column so every
   // control in a list sits on one vertical axis (`design-language.md` §4).
   trailing?: ReactNode;
-  // `sheet`: a roomy option row in a sheet. `list`: a dense row in a card.
+  // `compact`: passive 28pt content or a 44pt independent target.
+  // `sheet` and `list` keep the existing option-row recipes.
   density?: ListRowDensity;
   tone?: ListRowTone;
   // The current choice in a picker: `accent-wash` ground, `accent` label.
   selected?: boolean;
+  // A board member's own row: paper ground and stronger body label.
+  own?: boolean;
   // A `rule-soft` hairline above the row.
   divider?: boolean;
   // A disclosure row's state (a collapsible section's header): announced as
@@ -55,17 +66,25 @@ export type ListRowProps = {
   testID?: string;
 };
 
+// A content action stays independent of the row and its disclosure control.
+export type ListRowProps = ListRowBaseProps & (
+  | { density: 'compact'; contentAction: ListRowContentAction; onPress?: never; accessible?: never }
+  | { contentAction?: never }
+);
+
 // A design-language row: `[leading][content, flex][meta][trailing control]`.
 export function ListRow({
   label,
   description,
   children,
+  contentAction,
   leading,
   meta,
   trailing,
   density = 'sheet',
   tone = 'default',
   selected = false,
+  own = false,
   divider = true,
   expanded,
   checked,
@@ -78,34 +97,12 @@ export function ListRow({
   ref,
   testID,
 }: ListRowProps) {
-  const body = (
-    <>
-      {leading}
-      <View style={[styles.content, description !== undefined ? styles.contentTwoLine : null]}>
-        {label !== undefined ? (
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            style={[
-              labelStyles[density],
-              tone === 'danger' ? styles.labelDanger : null,
-              selected ? styles.labelSelected : null,
-              disabled ? styles.labelDisabled : null,
-            ]}>
-            {label}
-          </Text>
-        ) : null}
-        {description !== undefined ? <Text allowFontScaling={false} style={styles.description}>{description}</Text> : null}
-        {children}
-      </View>
-      {meta}
-      {trailing !== undefined ? <View style={styles.control}>{trailing}</View> : null}
-    </>
-  );
 
   const rowStyle = [
     styles.row,
     densityStyles[density],
+    density === 'compact' && onPress ? styles.compactTarget : null,
+    own ? styles.own : null,
     divider ? styles.divider : null,
     selected ? styles.selected : null,
   ];
@@ -113,7 +110,8 @@ export function ListRow({
   if (!onPress) {
     return (
       <View accessibilityLabel={accessibilityLabel} accessible={accessible} ref={ref} style={rowStyle} testID={testID}>
-        {body}
+        <ListRowContent label={label} description={description} leading={leading} meta={meta} trailing={trailing} contentAction={contentAction}
+          density={density} tone={tone} selected={selected} own={own} disabled={disabled}>{children}</ListRowContent>
       </View>
     );
   }
@@ -138,9 +136,45 @@ export function ListRow({
       ref={ref}
       style={({ pressed }) => [rowStyle, pressed && !disabled ? styles.pressed : null]}
       testID={testID}>
-      {body}
+      <ListRowContent label={label} description={description} leading={leading} meta={meta} trailing={trailing} contentAction={contentAction}
+          density={density} tone={tone} selected={selected} own={own} disabled={disabled}>{children}</ListRowContent>
     </Pressable>
   );
+}
+
+function ListRowContent({ label, description, children, contentAction, leading, meta, trailing, density = 'sheet', tone = 'default',
+  selected = false, own = false, disabled = false }: ListRowBaseProps & { contentAction?: ListRowContentAction }) {
+  const labelRole = density === 'compact' && (own || selected) ? uiText.bodyStrong : labelStyles[density];
+  const selectedStyle = density === 'compact' ? styles.compactSelected : styles.labelSelected;
+  const content = <View style={[contentAction ? null : styles.content, density === 'compact' ? styles.compactInset : description !== undefined ? styles.contentTwoLine : null]}>
+        {label !== undefined ? (
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={[
+              labelRole,
+              tone === 'danger' ? styles.labelDanger : null,
+              selected ? selectedStyle : null,
+              disabled ? styles.labelDisabled : null,
+            ]}>
+            {label}
+          </Text>
+        ) : null}
+        {description !== undefined ? <Text allowFontScaling={false} style={styles.description}>{description}</Text> : null}
+        {children}
+      </View>;
+  return (
+    <>
+      {density === 'compact' && leading !== undefined ? <View style={styles.compactInset}>{leading}</View> : leading}
+      {contentAction ? <Pressable {...contentAction} accessibilityRole={contentAction.accessibilityRole ?? 'button'}
+        disabled={disabled || undefined} style={({ pressed }) => [styles.content, styles.compactTarget, styles.contentControl, pressed && !disabled ? styles.pressed : null]}>
+        {content}
+      </Pressable> : content}
+      {density === 'compact' && meta !== undefined ? <View style={styles.compactInset}>{meta}</View> : meta}
+      {trailing !== undefined ? <View style={[styles.control, density === 'compact' ? styles.compactTarget : null]}>{trailing}</View> : null}
+    </>
+  );
+
 }
 
 const styles = StyleSheet.create({
@@ -153,6 +187,11 @@ const styles = StyleSheet.create({
     borderTopWidth: uiBorder.width,
     borderTopColor: uiRoles.ruleSoft,
   },
+  compactInset: { paddingVertical: uiSpace.xs },
+  compactTarget: { minHeight: uiGeometry.tapTarget },
+  contentControl: { justifyContent: 'center' },
+  compactSelected: { color: uiRoles.accent },
+  own: { backgroundColor: uiRoles.paper },
   selected: {
     backgroundColor: uiRoles.accentWash,
   },
@@ -192,6 +231,10 @@ const styles = StyleSheet.create({
 });
 
 const densityStyles = StyleSheet.create({
+  compact: {
+    paddingHorizontal: uiSpace.md,
+    gap: uiSpace.sm,
+  },
   sheet: {
     minHeight: uiGeometry.tapTarget + uiSpace.sm * 2,
     paddingHorizontal: uiSpace.lg,
@@ -205,6 +248,7 @@ const densityStyles = StyleSheet.create({
 });
 
 const labelStyles = {
+  compact: uiText.body,
   sheet: uiText.optionLarge,
   list: uiText.option,
 };

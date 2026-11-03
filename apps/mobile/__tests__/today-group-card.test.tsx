@@ -227,7 +227,7 @@ describe('Today: the group card', () => {
     // `This week` and this local week (Mon 5 – Sun 11 Oct 2026), in Today's range format.
     expect(within(byId('today-group-card')).getByText(/This week/)).toBeTruthy();
     expect(byId('today-group-board-range')).toHaveTextContent('5 – 11 Oct 26');
-    expect(byId('today-group-board-range')).toHaveStyle({ textAlign: 'right', marginLeft: 'auto' });
+    expect(byId('today-group-board-range')).toHaveStyle({ textAlign: 'left', marginLeft: 0 });
 
     // Four members fit the top five: I am on the board, with no line of my own.
     expect(byId('today-group-board-row-dave-name')).toHaveTextContent('dave');
