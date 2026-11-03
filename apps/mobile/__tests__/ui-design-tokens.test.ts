@@ -179,6 +179,15 @@ describe('design-language tokens', () => {
       expect(roles.recordWash).not.toBe(roles.accentWash);
     });
 
+    it('keeps `accent` and `record` a visible step from every fixed meaning', () => {
+      // A commit must not look like a delete, a change or a regime: ΔE*ab ≥ 5.
+      for (const seeded of [roles.accent, roles.record]) {
+        for (const fixed of [roles.danger, roles.gain, roles.loss, roles.regimeOlder, roles.regimeNewer]) {
+          expect(deltaE(seeded, fixed)).toBeGreaterThanOrEqual(5);
+        }
+      }
+    });
+
     it('keeps `record` legible as text on both grounds', () => {
       // WCAG 2.1 normal-text minimum; `record` is applied to figures, not just
       // to a band. Guards against a later "warm it up a bit" losing the floor.
@@ -232,7 +241,7 @@ describe('design-language tokens', () => {
         }
       });
 
-      it('keeps `ink` legible on every step, and its marks visible on the lightest', () => {
+      it('keeps `ink` legible on every step, and its marks visible on the weakest', () => {
         // Text on a `viz` ground is `ink` (WCAG AA, normal text) — the strongest
         // step is the binding case.
         expect(contrastRatio(roles.ink, roles.viz4)).toBeGreaterThanOrEqual(4.5);
@@ -268,6 +277,18 @@ function lch(hex: string): { lightness: number; chroma: number; hue: number } {
   const bStar = 200 * (f(y) - f(z));
   const hue = (Math.atan2(bStar, a) * 180) / Math.PI;
   return { lightness: 116 * f(y) - 16, chroma: Math.hypot(a, bStar), hue: hue < 0 ? hue + 360 : hue };
+}
+
+// CIE76 ΔE*ab: Euclidean distance in L*a*b*. ~2.3 is a just-noticeable
+// difference side by side.
+function deltaE(first: string, second: string): number {
+  const toLab = (hex: string) => {
+    const { lightness: l, chroma, hue } = lch(hex);
+    const radians = (hue * Math.PI) / 180;
+    return [l, chroma * Math.cos(radians), chroma * Math.sin(radians)];
+  };
+  const [a, b] = [toLab(first), toLab(second)];
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
 function hueDistance(a: number, b: number): number {

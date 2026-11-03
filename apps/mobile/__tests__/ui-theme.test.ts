@@ -75,6 +75,8 @@ const OTHER_SEEDS: Record<string, ThemeSeeds> = {
 type OnColourRole = 'onAccent' | 'onSelection' | 'onDanger' | 'onInk';
 const ON_COLOUR_ROLES: readonly OnColourRole[] = ['onAccent', 'onSelection', 'onDanger', 'onInk'];
 const MODES: readonly ThemeMode[] = ['light', 'dark'];
+// The roles no seed moves that carry a meaning of their own.
+const FIXED_HUES = ['danger', 'gain', 'loss', 'regimeOlder', 'regimeNewer'] as const;
 // The fill each on-colour role is drawn on.
 const FILL_OF: Record<OnColourRole, keyof UiRoles> = {
   onAccent: 'accent',
@@ -272,7 +274,7 @@ describe('the dark ladder', () => {
       const roles = generateRoles(seeds, 'dark');
       expect(hueDistance(hexToLch(roles.accent).hue, hexToLch(seeds.accent).hue)).toBeLessThanOrEqual(3);
       expect(hueDistance(hexToLch(roles.record).hue, hexToLch(seeds.record).hue)).toBeLessThanOrEqual(3);
-      expect(hexToLch(roles.accent).lightness).toBeCloseTo(66, 0);
+      expect(hexToLch(roles.accent).lightness).toBeCloseTo(72, 0);
       expect(hexToLch(roles.record).lightness).toBeCloseTo(66, 0);
     }
   });
@@ -517,6 +519,12 @@ function brokenFloors(roles: UiRoles, mode: ThemeMode): string[] {
     ['ink on viz1', contrastRatio(roles.ink, roles.viz1) >= 3],
     ['record on paper/surface/recordWash', legible(roles.record, [roles.paper, roles.surface, roles.recordWash])],
     ['record hue away from accent', hueDistance(hexToLch(roles.record).hue, hexToLch(roles.accent).hue) >= 30],
+    // Two roles that cannot be told apart are one role: the seeded marks stay
+    // a visible step (ΔE*ab 5, about twice a just-noticeable difference) from
+    // every fixed one, so a commit never looks like a delete or a change.
+    ...(['accent', 'record'] as const).flatMap((seeded) =>
+      FIXED_HUES.map((fixed): [string, boolean] => [`${seeded} apart from ${fixed}`, deltaE(roles[seeded], roles[fixed]) >= 5]),
+    ),
     ...ON_COLOUR_ROLES.map((role): [string, boolean] => [
       `${role} on ${FILL_OF[role]}`,
       contrastRatio(roles[role], roles[FILL_OF[role]]) >= 4.5,

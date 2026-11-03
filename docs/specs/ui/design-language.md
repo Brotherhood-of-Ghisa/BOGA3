@@ -36,6 +36,8 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
 
 - **One value per role.** Two roles that cannot be told apart are one role.
   The on-colour roles are exempt: each is named by the fill it sits on.
+  `accent` and `record` stay ΔE\*ab ≥ 5 from `danger`, `gain`, `loss` and the
+  regimes.
 - **`record` is never `accent`**, and clears 4.5:1 as text on `paper` and
   `surface` — it marks figures, not just a band, so "your best ever" and "the
   button that commits" must not read as the same mark.
@@ -66,11 +68,11 @@ their floors are the seed's to meet.
 
 **Two ladders, one set of seeds:** `generateRoles(seeds, mode)`. Dark puts
 `paper` at L\*10, lifts `surface` to L\*15 (never a shadow) and `ink` to L\*95.
-`accent` and `record` take their seed's hue at L\*66, and `onAccent` is black;
+`accent` (L\*72, `onAccent` black) and `record` (L\*66) take their seed's hue;
 `danger`, `gain`, `loss` and the regimes keep their light hues at L\*64;
 `selection` turns white, `scrim` 60% black. The `viz` ramp lightens in even
 steps, ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
-Dark is not reachable yet: `app.config.ts` pins `userInterfaceStyle: "light"`
+Dark is not reachable: `app.config.ts` pins `userInterfaceStyle: "light"`
 (`ux-rules.md` "Appearance").
 
 **Choosing one.** An accent (four presets or a custom hue), a background and a
@@ -107,10 +109,10 @@ alternates require a native build, while ordinary Warm remains primary.
 empty / rest, `viz1`…`viz4` the weakest to the strongest intensity; the steps
 are even in lightness, so each bucket reads as "more" without relying on hue,
 and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
-legends and deltas included (`ink-muted` is 3.3:1 on `viz2`); `Stat` takes
+legends and deltas included (`ink-muted` is about 3.2:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
 labels still say how much. An empty `viz0` cell takes a `rule` hairline,
-being only 1.18:1 against `surface`. A filter showing all its values at once marks the one in
+being only about 1.15:1 against `surface`. A filter showing all its values at once marks the one in
 force in fixed black `selection` with white `onSelection` text (inverted in dark)
 (`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`
 shows one value and has no unselected peer, so it carries `ink` on `surface`

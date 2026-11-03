@@ -114,11 +114,12 @@ const DARK_STEPS: Record<SteppedRole, Step> = {
 };
 
 // Roles the dark ladder steps that light mode takes elsewhere: light cards are
-// white, and light `accent` and `record` are the seeds as given. In dark both
-// lighten to L* 66, so each clears 4.5:1 as text on `paper` and `surface` and
-// carries a dark label.
+// white, and light `accent` and `record` are the seeds as given. In dark each
+// clears 4.5:1 as text on `paper` and `surface`. `accent` sits at L* 72, apart
+// from the fixed roles' L* 64, so a red or teal accent never reads as `danger`
+// or a regime; it carries a black label.
 const DARK_SURFACE = step('background', 15, 0.35);
-const DARK_ACCENT = step('accent', 66, 1);
+const DARK_ACCENT = step('accent', 72, 1);
 const DARK_RECORD = step('record', 66, 1);
 
 type FixedRole =
