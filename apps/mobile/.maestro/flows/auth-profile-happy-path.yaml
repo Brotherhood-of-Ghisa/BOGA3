@@ -61,6 +61,13 @@ appId: com.dinoderek.mobile
 # is idempotent: the element stays present until the tap succeeds.
 - waitForAnimationToEnd:
     timeout: 4000
+# A wiped November launch changes the native icon, and UIKit's confirmation
+# covers the dev menu's Continue. Jest cannot dismiss it.
+- runFlow:
+    when:
+      visible: "You have changed the icon.*"
+    commands:
+      - tapOn: "OK"
 - retry:
     maxRetries: 3
     commands:

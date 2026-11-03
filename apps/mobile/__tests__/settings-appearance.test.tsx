@@ -38,7 +38,8 @@ import { Storage } from 'expo-sqlite/kv-store';
 import { StyleSheet } from 'react-native';
 
 import { appearanceRoles } from '@/components/appearance/chosen-theme';
-import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { generateRoles } from '@/components/ui/theme';
+import { DEFAULT_APPEARANCE, getThemePreset } from '@/components/ui/theme-presets';
 import * as themeLaunch from '@/components/ui/theme-launch';
 import { APPEARANCE_STORAGE_KEY, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
@@ -383,5 +384,94 @@ describe('background and text', () => {
     Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"slate","background":"match","text":"plum","mode":"light"}');
     render(<SettingsRoute />);
     expect(screen.getByLabelText('Appearance, Slate, Plum text from next launch')).toBeTruthy();
+  });
+});
+
+describe('mode', () => {
+  const previewGround = () => StyleSheet.flatten(screen.getByTestId('settings-appearance-preview', { includeHiddenElements: true }).props.style).backgroundColor;
+  const darkPaper = generateRoles(getThemePreset('warm').seeds, 'dark').paper;
+  const lightPaper = generateRoles(getThemePreset('warm').seeds, 'light').paper;
+
+  it('offers Light, Dark and System, Light the default and checked, and says when System applies', () => {
+    render(<SettingsAppearanceRoute />);
+    expect(screen.getByRole('radio', { name: 'Light, default' }).props.accessibilityState).toEqual({ checked: true });
+    expect(screen.getByRole('radio', { name: 'Dark' }).props.accessibilityState).toEqual({ checked: false });
+    expect(screen.getByRole('radio', { name: 'System' }).props.accessibilityState).toEqual({ checked: false });
+    expect(screen.getByText('System applies the phone’s mode at launch')).toBeTruthy();
+  });
+
+  it('saves a mode at once, keeping the rest, repaints the preview in it and labels it as applying next launch', async () => {
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"warm","background":"rose","text":"navy","mode":"light"}');
+    render(<SettingsAppearanceRoute />);
+    expect(previewGround()).toBe(appearanceRoles({ accent: 'warm', background: 'rose', text: 'navy', mode: 'light' }).paper);
+
+    fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
+
+    expect(previewGround()).toBe(appearanceRoles({ accent: 'warm', background: 'rose', text: 'navy', mode: 'dark' }).paper);
+    await waitFor(() => expect(storedRecord()).toEqual({ accent: 'warm', background: 'rose', text: 'navy', mode: 'dark' }));
+    expect(screen.getByRole('radio', { name: 'Dark, next launch' }).props.accessibilityState).toEqual({ checked: true });
+  });
+
+  it('labels only the mode as pending when only the mode changed', async () => {
+    render(<SettingsAppearanceRoute />);
+    fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
+    await waitFor(() => expect(storedRecord()?.mode).toBe('dark'));
+    expect(screen.getAllByText('Next launch')).toHaveLength(1);
+    expect(within(screen.getByTestId('settings-appearance-mode-dark')).getByText('Next launch')).toBeTruthy();
+  });
+
+  it('draws the preset swatches in the mode the choice would open in', async () => {
+    render(<SettingsAppearanceRoute />);
+    expect(appearanceRoles({ ...DEFAULT_APPEARANCE, mode: 'dark' }).paper).toBe(darkPaper);
+    expect(StyleSheet.flatten(screen.getByTestId('settings-appearance-swatch-warm', { includeHiddenElements: true }).props.style).backgroundColor).toBe(lightPaper);
+
+    fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
+    expect(StyleSheet.flatten(screen.getByTestId('settings-appearance-swatch-warm', { includeHiddenElements: true }).props.style).backgroundColor).toBe(darkPaper);
+    await waitFor(() => expect(storedRecord()?.mode).toBe('dark'));
+  });
+
+  it('previews System in the phone’s mode as this launch found it', async () => {
+    jest.replaceProperty(themeLaunch, 'launchOsScheme', 'dark');
+    render(<SettingsAppearanceRoute />);
+    fireEvent.press(screen.getByTestId('settings-appearance-mode-system'));
+    expect(previewGround()).toBe(darkPaper);
+    await waitFor(() => expect(storedRecord()?.mode).toBe('system'));
+  });
+
+  it('previews System light when the phone was light, or stated no mode, at launch', async () => {
+    jest.replaceProperty(themeLaunch, 'launchOsScheme', null);
+    render(<SettingsAppearanceRoute />);
+    fireEvent.press(screen.getByTestId('settings-appearance-mode-system'));
+    expect(previewGround()).toBe(lightPaper);
+    await waitFor(() => expect(storedRecord()?.mode).toBe('system'));
+  });
+
+  it('says nothing changed, and logs which mode failed, when a mode cannot be saved', async () => {
+    jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
+    render(<SettingsAppearanceRoute />);
+
+    fireEvent.press(screen.getByTestId('settings-appearance-mode-system'));
+
+    expect(await screen.findByText('Couldn’t save the theme. Nothing changed.')).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Light, default' }).props.accessibilityState).toEqual({ checked: true });
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'theme.save_failed', context: { mode: 'system', error: 'disk full' } }),
+    );
+  });
+
+  it('names a mode other than light on Settings home', async () => {
+    render(
+      <>
+        <SettingsRoute />
+        <SettingsAppearanceRoute />
+      </>,
+    );
+    fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
+    expect(await screen.findByLabelText('Appearance, Warm, Dark mode from next launch')).toBeTruthy();
+    expect(within(screen.getByTestId('settings-appearance-row')).getByText('Warm, dark')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('settings-appearance-background-rose'));
+    expect(await screen.findByLabelText('Appearance, Warm, Rose background, Dark mode from next launch')).toBeTruthy();
+    expect(within(screen.getByTestId('settings-appearance-row')).getByText('Warm, tinted, dark')).toBeTruthy();
   });
 });

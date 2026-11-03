@@ -72,8 +72,7 @@ their floors are the seed's to meet.
 `danger`, `gain`, `loss` and the regimes keep their light hues at L\*64;
 `selection` turns white, `scrim` 60% black. The `viz` ramp lightens in even
 steps, ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
-Dark is not reachable: `app.config.ts` pins `userInterfaceStyle: "light"`
-(`ux-rules.md` "Appearance").
+`uiRoles` take the launch mode's ladder; `tokens.ts` exports it as `uiMode`.
 
 **Choosing one.** An accent (four presets or a custom hue), a background and a
 text, per device, resolved when `tokens.ts` first evaluates
@@ -85,11 +84,11 @@ the first save writes the record and leaves that id in place. Background is
 hue and tint step. Text is `match` (the background) or one of four inks
 (`theme-neutrals.ts`). Chroma is capped (background 12, text 14) so both
 read as neutrals. `match` for both draws the accent's theme unchanged. Settings → Appearance (`ux-rules.md` "Appearance") sets each part with a live preview. `mode`
-is stored, but every theme still draws light. An unknown id, an invalid record
+is `light` (default), `dark` or `system` (the phone's at launch). An unknown id, an invalid record
 or an unreadable store opens in the default and is logged. `record` stays a
 brass across presets, so "your best ever" keeps one look. For a custom hue,
 `seedsFromHue` (`theme-hue.ts`) fixes every seed's L\* and chroma so the floors
-hold at all 360 hues by construction rather than by checking afterwards. Hue is
+hold at all 360 hues by construction. Hue is
 the one thing that moves: `record` keeps the brass unless the picked accent
 lands within 35° of it, then steps 35° away on the far side — that step is what
 makes the `record`-to-`accent` floor hold, so do not "simplify" it away.

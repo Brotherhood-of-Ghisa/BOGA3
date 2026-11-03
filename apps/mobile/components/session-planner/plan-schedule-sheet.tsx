@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
-import { ActionButton, Card, ListRow, Sheet, uiSpace } from '@/components/ui';
+import { ActionButton, Card, ListRow, Sheet, uiMode, uiSpace } from '@/components/ui';
 import { formatClockTime, formatShortDate } from '@/src/utils/local-time';
 
 export type PlanScheduleSheetProps = {
@@ -64,7 +64,7 @@ function PlanScheduleSheetBody({
               if (date) setSelectedDate(date);
             }}
             testID="plan-schedule-picker-native"
-            themeVariant="light"
+            themeVariant={uiMode}
             value={selectedDate}
           />
         </View>

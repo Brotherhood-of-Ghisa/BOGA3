@@ -1,22 +1,16 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
-
 // Why this file exists
 // --------------------
-// `app.config.ts` pins `userInterfaceStyle: "light"` because the app renders a
-// single light theme (components/ui/tokens.ts has no dark variants) and we want
-// the OS-owned chrome — Alert.alert, the keyboard, native pickers — to match.
+// `app.config.ts` sets `userInterfaceStyle: "automatic"` so the app can read
+// the phone's mode at launch; under a pinned "light" the OS reports light
+// whatever the phone is set to, and Light / Dark / System could never resolve
+// System to dark. The app then pins its own native UI to the chosen mode at
+// runtime (`components/ui/theme-launch.ts`, tested in `ui-theme-launch.test.ts`).
 //
-// That pin is NOT self-enforcing. expo-splash-screen's iOS Info.plist plugin
-// force-assigns `UIUserInterfaceStyle = 'Automatic'` whenever the splash config
-// declares ANY `dark` variant, overriding the app-level setting. Its own source
-// calls this "fragile because the order of operations matter now". The failure
-// is silent at runtime: prebuild emits one warning line, the build succeeds, and
-// the shipped binary is in Automatic — so on a dark-mode device the OS chrome
-// goes dark over a light app. It cost a build to catch once already.
+// The splash stays white in both modes: it is drawn before JS reads the chosen
+// mode, so a `dark` variant would follow the phone rather than the choice.
 //
-// These assertions run the real Expo plugin functions, so an upstream change to
-// the override rule fails here rather than in a plist nobody inspects.
+// These assertions run the real Expo plugin function, so an upstream change to
+// how the key is written fails here rather than in a plist nobody inspects.
 
 const appConfig = require('../app.config').default({
   config: {},
@@ -25,18 +19,6 @@ const appConfig = require('../app.config').default({
   ios?: { userInterfaceStyle?: string; infoPlist?: Record<string, unknown> };
   plugins: (string | [string, Record<string, unknown>])[];
 };
-
-// expo-splash-screen's `exports` map hides its plugin build, so both tests below
-// reach it by path.
-const SPLASH_INFO_PLIST_PLUGIN = join(
-  __dirname,
-  '..',
-  'node_modules',
-  'expo-splash-screen',
-  'plugin',
-  'build',
-  'withIosSplashInfoPlist.js',
-);
 
 function splashPluginOptions(): Record<string, unknown> {
   const entry = appConfig.plugins.find(
@@ -49,46 +31,26 @@ function splashPluginOptions(): Record<string, unknown> {
   return entry[1];
 }
 
-describe('iOS userInterfaceStyle is pinned to light', () => {
-  it('declares light at the app level', () => {
-    expect(appConfig.userInterfaceStyle).toBe('light');
+describe('the native interface style follows the phone until the app pins it', () => {
+  it('declares automatic at the app level, with no iOS override', () => {
+    expect(appConfig.userInterfaceStyle).toBe('automatic');
+    expect(appConfig.ios?.userInterfaceStyle).toBeUndefined();
   });
 
-  it("resolves to 'Light' through Expo's own userInterfaceStyle plugin", () => {
+  it("resolves to 'Automatic' through Expo's own userInterfaceStyle plugin", () => {
     const {
       getUserInterfaceStyle,
       setUserInterfaceStyle,
     } = require('@expo/prebuild-config/build/plugins/unversioned/expo-system-ui/withIosUserInterfaceStyle');
 
-    expect(getUserInterfaceStyle(appConfig)).toBe('light');
+    expect(getUserInterfaceStyle(appConfig)).toBe('automatic');
     expect(setUserInterfaceStyle(appConfig, {})).toMatchObject({
-      UIUserInterfaceStyle: 'Light',
+      UIUserInterfaceStyle: 'Automatic',
     });
   });
 
-  it('does not let the splash plugin override the pin to Automatic', () => {
-    // Order-independent: assert the splash plugin declines to write the key at
-    // all. If a `dark` variant is ever reintroduced, this returns
-    // { UIUserInterfaceStyle: 'Automatic' } and the test fails.
-    const {
-      setSplashInfoPlist,
-    } = require(SPLASH_INFO_PLIST_PLUGIN);
-
-    const infoPlist = setSplashInfoPlist(appConfig, {}, splashPluginOptions());
-
-    expect(infoPlist).not.toHaveProperty('UIUserInterfaceStyle');
-  });
-
-  it('configures no dark splash variant', () => {
+  it('keeps the splash white, with no dark variant', () => {
     expect(splashPluginOptions()).not.toHaveProperty('dark');
-  });
-
-  it("still guards the key Expo's override writes", () => {
-    // Mirrors background-sync-task.test.ts: read the plugin source so an
-    // upstream rename of the overriding assignment fails loudly here instead of
-    // quietly making the test above vacuous.
-    const pluginSource = readFileSync(SPLASH_INFO_PLIST_PLUGIN, 'utf8');
-
-    expect(pluginSource).toContain("infoPlist.UIUserInterfaceStyle = 'Automatic'");
+    expect(splashPluginOptions().backgroundColor).toBe('#ffffff');
   });
 });

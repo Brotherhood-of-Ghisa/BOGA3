@@ -81,7 +81,7 @@ describe('design-language tokens', () => {
       expect(exported).not.toContain(retired);
     }
     expect(exported.sort()).toEqual(
-      ['uiBorder', 'uiFonts', 'uiGeometry', 'uiIconSize', 'uiRoles', 'uiSpace', 'uiTypography'].sort(),
+      ['uiBorder', 'uiFonts', 'uiGeometry', 'uiIconSize', 'uiMode', 'uiRoles', 'uiSpace', 'uiTypography'].sort(),
     );
   });
 

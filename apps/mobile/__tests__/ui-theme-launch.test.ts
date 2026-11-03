@@ -4,13 +4,16 @@ const mockLogEvent = jest.fn();
 jest.mock('@/src/logging', () => ({ logEvent: (...args: unknown[]) => mockLogEvent(...args) }));
 
 import { Storage } from 'expo-sqlite/kv-store';
+import { Appearance } from 'react-native';
 
 import { generateRoles } from '@/components/ui/theme';
 import {
   APPEARANCE_STORAGE_KEY,
+  pinLaunchMode,
   readIntendedTheme,
   readLaunchTheme,
   readStoredTheme,
+  resolveMode,
   saveAppearance,
   saveAppearancePart,
   saveThemeAccent,
@@ -239,6 +242,117 @@ describe('the launch theme', () => {
     expect(launch.readStoredTheme().preset.id).toBe('slate');
     expect(launch.readLaunchTheme().preset.id).toBe('slate');
     expect(launch.launchTheme.preset.id).toBe('warm');
+  });
+});
+
+// What a launch resolves when the OS is in `osScheme`, loaded afresh as the app
+// would: the mode, the roles `tokens.ts` draws, and the pins made.
+function launchWith(osScheme: 'light' | 'dark' | null) {
+  let result!: {
+    launch: typeof import('@/components/ui/theme-launch');
+    tokens: typeof import('@/components/ui/tokens');
+    pins: unknown[];
+    read: jest.SpyInstance;
+    pin: jest.SpyInstance;
+  };
+  jest.isolateModules(() => {
+    const { Appearance: FreshAppearance } = require('react-native') as typeof import('react-native');
+    const read = jest.spyOn(FreshAppearance, 'getColorScheme').mockReturnValue(osScheme);
+    const pin = jest.spyOn(FreshAppearance, 'setColorScheme').mockImplementation(() => {});
+    const tokens = require('@/components/ui/tokens') as typeof import('@/components/ui/tokens');
+    const launch = require('@/components/ui/theme-launch') as typeof import('@/components/ui/theme-launch');
+    result = { launch, tokens, pins: pin.mock.calls.map(([scheme]) => scheme), read, pin };
+  });
+  return result;
+}
+
+const storeMode = (mode: AppearanceChoice['mode']) =>
+  Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord({ ...DEFAULT_APPEARANCE, accent: 'slate', mode }));
+
+describe('the launch mode', () => {
+  it.each([
+    ['light', 'light', 'light'],
+    ['light', 'dark', 'light'],
+    ['light', null, 'light'],
+    ['dark', 'light', 'dark'],
+    ['dark', 'dark', 'dark'],
+    ['dark', null, 'dark'],
+    ['system', 'light', 'light'],
+    ['system', 'dark', 'dark'],
+    ['system', null, 'light'],
+  ] as const)('resolves a stored %s on an OS in %s to %s', (mode, osScheme, expected) => {
+    expect(resolveMode(mode, osScheme)).toBe(expected);
+  });
+
+  it('reads the OS mode before it pins native UI to the resolved mode', () => {
+    const read = jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('dark');
+    const pin = jest.spyOn(Appearance, 'setColorScheme').mockImplementation(() => {});
+    expect(pinLaunchMode('system')).toEqual({ osScheme: 'dark', mode: 'dark' });
+    expect(pin).toHaveBeenCalledTimes(1);
+    expect(pin).toHaveBeenCalledWith('dark');
+    expect(read.mock.invocationCallOrder[0]).toBeLessThan(pin.mock.invocationCallOrder[0]);
+  });
+
+  it('resolves without pinning where Appearance cannot pin (react-native-web)', () => {
+    jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('dark');
+    const original = Appearance.setColorScheme;
+    (Appearance as { setColorScheme?: unknown }).setColorScheme = undefined;
+    try {
+      expect(pinLaunchMode('system')).toEqual({ osScheme: 'dark', mode: 'dark' });
+    } finally {
+      Appearance.setColorScheme = original;
+    }
+  });
+
+  it('pins light, whatever the OS, for a light choice', () => {
+    jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('dark');
+    const pin = jest.spyOn(Appearance, 'setColorScheme').mockImplementation(() => {});
+    expect(pinLaunchMode('light')).toEqual({ osScheme: 'dark', mode: 'light' });
+    expect(pin).toHaveBeenCalledWith('light');
+  });
+
+  it('opens a new device in light, pinned, on a dark OS', () => {
+    const { launch, tokens, pins } = launchWith('dark');
+    expect(launch.launchMode).toBe('light');
+    expect(launch.launchOsScheme).toBe('dark');
+    expect(tokens.uiMode).toBe('light');
+    expect(tokens.uiRoles).toEqual(generateRoles(WARM.seeds, 'light'));
+    expect(pins).toEqual(['light']);
+  });
+
+  it.each([
+    ['dark', 'light', 'dark'],
+    ['system', 'dark', 'dark'],
+    ['system', 'light', 'light'],
+    ['light', 'dark', 'light'],
+  ] as const)('draws `uiRoles` for a stored %s on an OS in %s on the %s ladder, and pins it', (mode, osScheme, expected) => {
+    storeMode(mode);
+    const { launch, tokens, pins } = launchWith(osScheme);
+    expect(launch.launchMode).toBe(expected);
+    expect(tokens.uiMode).toBe(expected);
+    expect(tokens.uiRoles).toEqual(generateRoles(getThemePreset('slate').seeds, expected));
+    expect(pins).toEqual([expected]);
+  });
+
+  it('opens an unreadable record in light, with its problem to log, even on a dark OS', () => {
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"slate","background":"match","text":"match","mode":"dusk"}');
+    const { launch, tokens, pins } = launchWith('dark');
+    expect(launch.launchTheme.problem).toMatchObject({ kind: 'invalid-record', field: 'mode' });
+    expect(launch.launchMode).toBe('light');
+    expect(tokens.uiRoles).toEqual(generateRoles(WARM.seeds, 'light'));
+    expect(pins).toEqual(['light']);
+  });
+
+  it('keeps the launch mode when the OS mode or the stored mode changes while the app runs', async () => {
+    storeMode('system');
+    const { launch, tokens, read, pin } = launchWith('dark');
+    // The phone switches to light, then the user picks Light.
+    read.mockReturnValue('light');
+    await launch.saveAppearancePart({ mode: 'light' });
+    expect(launch.readStoredTheme().appearance.mode).toBe('light');
+    expect(launch.launchMode).toBe('dark');
+    expect(tokens.uiMode).toBe('dark');
+    expect(pin.mock.calls).toEqual([['dark']]);
   });
 });
 

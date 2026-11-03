@@ -64,12 +64,13 @@ Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 ### comparison.colour-scale · presentation · accepted
 
 Progress 3D Sets use [[muscle.weekly-targets]] scaled to [[comparison.window]],
-capped at 100%: zero is whitish neutral, positive attainment light-to-dark.
-Volume uses rounded percentage changes, scaled middle-to-dark for gains and
-middle-to-light for losses against body-wide finite extrema. Displayed −100%
-uses the head's whitish neutral and still participates in loss scaling. Filters may
+capped at 100%: zero is the figure's neutral, positive attainment weak-to-strong.
+Volume uses rounded percentage changes, scaled middle-to-strong for gains and
+middle-to-weak for losses against body-wide finite extrema. Displayed −100%
+uses the head's neutral and still participates in loss scaling. Filters may
 rescale Volume; rotation/selection cannot. Unchanged activity is middle;
-empty in both periods/unavailable neutral; `new`/overflow darkest, outside finite extrema.
+empty in both periods/unavailable neutral; `new`/overflow strongest, outside finite extrema.
+Strong is darker in light mode and lighter in dark.
 No legend; selection shows Now/Prev/Change.
 
 History legends precede charts: muscle Sets uses `% of target`, capped at

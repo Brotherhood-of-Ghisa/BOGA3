@@ -107,7 +107,12 @@
   the stored choice: the appearance record's parser, the older accent id read
   while no record exists and left in place, the default fallback for an
   unknown id, an invalid record or an unreadable store, and that each
-  fallback is logged.
+  fallback is logged; and the launch mode: each stored mode × OS scheme, the
+  OS read before the pin, and `uiRoles` drawn on the resolved ladder.
+- `ui-mode-literal-guard.test.ts` keeps every surface on the launch mode: no
+  colour literal outside the theme files, no fixed `themeVariant`, status-bar
+  style, keyboard or alert style, and no OS-mode read but `theme-launch.ts`,
+  with self-tests for what it rejects and allows.
 - `ui-on-colour-guard.test.ts` keeps `surface` a ground: any use in `app/` or
   `components/` other than a `backgroundColor`, a shape's `fill` or a role set
   handed on fails, with self-tests for what it rejects and allows.

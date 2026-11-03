@@ -1,10 +1,22 @@
 import { useEffect, useState } from 'react';
 
-import { generateRoles, type UiRoles } from '@/components/ui/theme';
+import { generateRoles, type ThemeMode, type UiRoles } from '@/components/ui/theme';
 import { hueName, parseHueThemeId } from '@/components/ui/theme-hue';
 import { findBackgroundSwatch, findTextInk, type BackgroundChoice } from '@/components/ui/theme-neutrals';
-import { launchTheme, readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
-import { resolveAppearance, resolveThemePreset, type AppearanceChoice } from '@/components/ui/theme-presets';
+import {
+  launchOsScheme,
+  launchTheme,
+  readIntendedTheme,
+  readStoredTheme,
+  resolveMode,
+  subscribeThemeSaved,
+} from '@/components/ui/theme-launch';
+import {
+  resolveAppearance,
+  resolveThemePreset,
+  type AppearanceChoice,
+  type AppearanceMode,
+} from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
 // The stored choice. Falls back to the theme in use, logged, when the store
@@ -45,14 +57,23 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
 
 // Which parts of a choice wait for the next launch: each differs from the
 // theme in use.
-export type PendingAppearance = { accent: boolean; background: boolean; text: boolean; any: boolean };
+export type PendingAppearance = { accent: boolean; background: boolean; text: boolean; mode: boolean; any: boolean };
 
 export function pendingAppearance(appearance: AppearanceChoice): PendingAppearance {
   const launched = launchTheme.appearance;
   const accent = appearance.accent !== launched.accent;
   const background = !same(appearance.background, launched.background);
   const text = appearance.text !== launched.text;
-  return { accent, background, text, any: accent || background || text || appearance.mode !== launched.mode };
+  const mode = appearance.mode !== launched.mode;
+  return { accent, background, text, mode, any: accent || background || text || mode };
+}
+
+export const MODE_LABELS: Record<AppearanceMode, string> = { light: 'Light', dark: 'Dark', system: 'System' };
+
+// The ladder a mode would draw on if the app opened now: `system` takes the
+// OS's mode as this launch found it, since the pin hides any change since.
+export function previewMode(mode: AppearanceMode): ThemeMode {
+  return resolveMode(mode, launchOsScheme);
 }
 
 export function themeLabel(id: string): string {
@@ -70,27 +91,32 @@ export function backgroundLabel(background: BackgroundChoice): string {
 }
 
 // The whole choice for Settings home's row: the accent, then the background
-// and the text when they are not the theme's own.
-export function appearanceLabel({ accent, background, text }: AppearanceChoice): string {
+// and the text when they are not the theme's own, and the mode when it is not
+// the default light.
+export function appearanceLabel({ accent, background, text, mode }: AppearanceChoice): string {
   return [
     themeLabel(accent),
     ...(background === 'match' ? [] : [`${backgroundLabel(background)} background`]),
     ...(text === 'match' ? [] : [`${findTextInk(text)!.label} text`]),
+    ...(mode === 'light' ? [] : [`${MODE_LABELS[mode]} mode`]),
   ].join(', ');
 }
 
-// The roles a choice draws, for a preview or a swatch: the screens bake this
-// launch's `uiRoles` in, so another theme's colours cannot be roles of this one.
+// The roles a choice draws, in the mode it would open in, for a preview or a
+// swatch: the screens bake this launch's `uiRoles` in, so another theme's
+// colours cannot be roles of this one.
 export function appearanceRoles(appearance: AppearanceChoice): UiRoles {
-  return generateRoles(resolveAppearance(appearance).seeds);
+  return generateRoles(resolveAppearance(appearance).seeds, previewMode(appearance.mode));
 }
 
 // What fits at the end of Settings home's row without squeezing its label: the
-// accent, `from next launch` while it waits, or `tinted` when a background or
-// text was chosen. The row's accessibility label carries `appearanceLabel`.
+// accent, then `tinted` when a background or text was chosen and the mode when
+// it is not light; with neither, `from next launch` while the choice waits.
+// The row's accessibility label carries `appearanceLabel`.
 export function appearanceSummary(appearance: AppearanceChoice): string {
-  const tinted = appearance.background !== 'match' || appearance.text !== 'match';
   const label = themeLabel(appearance.accent);
-  if (tinted) return `${label}, tinted`;
+  const tinted = appearance.background !== 'match' || appearance.text !== 'match';
+  const parts = [label, ...(tinted ? ['tinted'] : []), ...(appearance.mode === 'light' ? [] : [MODE_LABELS[appearance.mode].toLowerCase()])];
+  if (parts.length > 1) return parts.join(', ');
   return pendingAppearance(appearance).any ? `${label} from next launch` : label;
 }

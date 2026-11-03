@@ -12,18 +12,18 @@ import { THEME_BACKGROUND_ROUTE } from '@/src/navigation/routes';
 
 export type CommitChoice = (part: Partial<AppearanceChoice>, failure: CommitFailure) => Promise<CommitOutcome>;
 
-type SectionProps = {
+export type SectionProps = {
   appearance: AppearanceChoice;
   pending: PendingAppearance;
   commit: CommitChoice;
   footnote?: string;
 };
 
-const SAVE_FAILED = 'Couldn’t save the theme. Nothing changed.';
+export const SAVE_FAILED = 'Couldn’t save the theme. Nothing changed.';
 
 // The words beside a choice's name: `Default` on the theme's own neutral, and
 // `Next launch` on the chosen row while it waits for the next launch.
-function details(isDefault: boolean, checked: boolean, pending: boolean): string[] {
+export function details(isDefault: boolean, checked: boolean, pending: boolean): string[] {
   return [...(isDefault ? ['Default'] : []), ...(checked && pending ? ['Next launch'] : [])];
 }
 
@@ -45,7 +45,7 @@ export function BackgroundSection({ appearance, pending, commit, footnote }: Sec
             divider={index > 0}
             key={choice.id}
             label={choice.label}
-            meta={<Meta details={detail} roles={appearanceRoles({ ...appearance, background: choice.id })} />}
+            meta={<ChoiceMeta details={detail} roles={appearanceRoles({ ...appearance, background: choice.id })} />}
             onPress={() => {
               void commit({ background: choice.id }, { message: SAVE_FAILED, context: { background: choice.id } });
             }}
@@ -85,7 +85,7 @@ export function TextSection({ appearance, pending, commit, footnote }: SectionPr
             divider={index > 0}
             key={choice.id}
             label={choice.label}
-            meta={<Meta details={detail} roles={appearanceRoles({ ...appearance, text: choice.id })} />}
+            meta={<ChoiceMeta details={detail} roles={appearanceRoles({ ...appearance, text: choice.id })} />}
             onPress={() => {
               void commit({ text: choice.id }, { message: SAVE_FAILED, context: { text: choice.id } });
             }}
@@ -97,7 +97,8 @@ export function TextSection({ appearance, pending, commit, footnote }: SectionPr
   );
 }
 
-function Meta({ details: words, roles }: { details: string[]; roles: UiRoles }) {
+// A choice's words, then its swatch.
+export function ChoiceMeta({ details: words, roles }: { details: string[]; roles: UiRoles }) {
   return (
     <View style={styles.meta}>
       {words.length > 0 ? (

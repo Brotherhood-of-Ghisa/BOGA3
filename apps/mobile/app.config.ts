@@ -74,13 +74,12 @@ export default ({ config }: { config: ExpoConfig }) => ({
     orientation: "portrait",
     icon: "./assets/images/app-icons/warm.png",
     scheme: APP_SCHEME,
-    // Light-only by decision (2026-09-19). Dark mode is explicitly not a
-    // product goal, and "automatic" is not free: it hands the OS-owned
-    // chrome — Alert.alert dialogs, the keyboard, native pickers — a dark
-    // appearance over an app whose themes are all light. Pinning "light"
-    // keeps that chrome consistent with the tokens in
-    // components/ui/tokens.ts, which have no dark variants.
-    userInterfaceStyle: "light",
+    // "automatic", so the app can read the phone's mode at launch: a pinned
+    // "light" makes the OS report light whatever the phone is set to. The
+    // app then pins its own native UI — alerts, the keyboard, pickers — to
+    // the mode the user chose (components/ui/theme-launch.ts), so this value
+    // never decides how a screen looks.
+    userInterfaceStyle: "automatic",
 
     ios: {
         supportsTablet: true,
@@ -135,12 +134,12 @@ export default ({ config }: { config: ExpoConfig }) => ({
                 image: "./assets/images/splash-icon.png",
                 imageWidth: 200,
                 resizeMode: "contain",
-                // No `dark` variant: a dark splash makes expo-splash-screen
-                // force UIUserInterfaceStyle=Automatic into Info.plist,
-                // silently overriding the `userInterfaceStyle: "light"` above
-                // (prebuild warns "preventing splash screen from working
-                // properly"). Light-only is the decision, so the dark
-                // background goes.
+                // White in both modes, with no `dark` variant. The splash is
+                // drawn before JS reads the chosen mode, so a dark variant
+                // would follow the phone rather than the choice; and a dark
+                // splash makes expo-splash-screen write its own
+                // UIUserInterfaceStyle into Info.plist (prebuild warns
+                // "preventing splash screen from working properly").
                 backgroundColor: "#ffffff"
             }
         ],

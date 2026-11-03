@@ -1,6 +1,14 @@
+import type { Lch } from '@/components/ui/lch';
+import type { ThemeMode } from '@/components/ui/theme';
+
 import type { MuscleBodyFace, MuscleBodyMesh, MuscleBodyVertex } from './muscle-body-mesh';
 
-export const MOUSTACHE_FILL = '#393938';
+// A near-neutral grey that stands off the figure's neutral shading: dark on
+// the pale light-mode figure, pale on the dark-mode one.
+export const MOUSTACHE_LCH: Record<ThemeMode, Lch> = {
+  light: { lightness: 24, chroma: 0.66, hue: 110 },
+  dark: { lightness: 74, chroma: 0.66, hue: 110 },
+};
 
 // Curled strips sampled on the existing upper lip, lifted slightly above its facets.
 const wing = [

@@ -10,7 +10,6 @@ import { uiRoles } from '@/components/ui/tokens';
 import { StatsScreenShell } from '../app/(tabs)/stats-history';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { MUSCLE_BODY_MESH } from '@/components/stats/muscle-body-mesh';
-import { MOUSTACHE_FILL } from '@/components/stats/muscle-body-moustache';
 import { MUSCLE_MAP_REFERENCE } from '@/components/stats/muscle-map-reference';
 import {
   SHADE_STEPS,
@@ -23,6 +22,9 @@ import {
   projectMuscleBody,
 } from '@/components/stats/muscle-body-projection';
 import type { ProgressComparisons, ProgressMuscleComparison } from '@/src/data';
+
+// This launch's moustache: the tests run in light mode.
+const MOUSTACHE_FILL = buildThemeShadePalette().moustache;
 
 beforeEach(() => { jest.useFakeTimers({ now: new Date(2026, 9, 20) }); });
 afterEach(() => { jest.useRealTimers(); });
@@ -206,6 +208,29 @@ describe('buildThemeShadePalette', () => {
       });
       for (let i = 1; i < lightness.length; i++) expect(lightness[i - 1]).toBeGreaterThan(lightness[i]);
     }
+  });
+
+  it.each(themes)('keeps "more = stronger" on the dark ladder in $id: a higher score is lighter', preset => {
+    const palette = buildThemeShadePalette(generateRoles(preset.seeds, 'dark'), 'dark');
+    for (let step = 0; step < SHADE_STEPS; step += 1) {
+      const lightness = [-1, -.5, 0, .5, 1].map(score => hexToLch(buildMuscleShadeRamp(score, palette)[step]).lightness);
+      for (let i = 1; i < lightness.length; i++) expect(lightness[i - 1]).toBeLessThan(lightness[i]);
+    }
+  });
+
+  it('keeps the light figure as shipped, and draws the dark one dark, with a pale moustache and relief edge', () => {
+    const light = buildThemeShadePalette(uiRoles, 'light');
+    expect(light.moustache).toBe('#393938');
+    expect(light.relief).toEqual({ highlight: uiRoles.onInk, shade: uiRoles.inkMuted });
+    const roles = generateRoles(themePresets[0].seeds, 'dark');
+    const dark = buildThemeShadePalette(roles, 'dark');
+    const middle = hexToLch(dark.neutral[Math.floor(SHADE_STEPS / 2)]).lightness;
+    expect(middle).toBeLessThan(40);
+    // The moustache and the relief's light edge stand off the dark figure; its shade sits below it.
+    expect(hexToLch(dark.moustache).lightness - middle).toBeGreaterThan(40);
+    expect(dark.relief).toEqual({ highlight: roles.ink, shade: roles.paper });
+    expect(hexToLch(dark.relief.highlight).lightness).toBeGreaterThan(middle);
+    expect(hexToLch(dark.relief.shade).lightness).toBeLessThan(middle);
   });
 });
 
@@ -518,7 +543,7 @@ describe('MuscleBodyCard', () => {
     expect(screen.getByTestId('stats-muscle-body-fibres-surface-shade').props.strokeWidth).toBe(0.9);
     expect(screen.getByTestId('stats-muscle-body-fibres-anatomy-FJ1456-shade').props.strokeOpacity).toBe(0.70);
     const highlight = screen.UNSAFE_getAllByType(Use).find(path => path.props.testID === 'stats-muscle-body-fibres-surface-highlight')!;
-    expect(highlight.props).toMatchObject({ stroke: uiRoles.surface, strokeWidth: 1.1,
+    expect(highlight.props).toMatchObject({ stroke: uiRoles.onInk, strokeWidth: 1.1,
       strokeOpacity: 0.95, translateX: 0.45, translateY: -0.45, strokeLinecap: 'round', strokeLinejoin: 'round' });
     expect(screen.UNSAFE_getAllByType(Use).find(path => path.props.testID === 'stats-muscle-body-fibres-surface-shade')!.props).toMatchObject({
       stroke: uiRoles.inkMuted, strokeOpacity: 0.72, fill: 'transparent', strokeLinecap: 'round', strokeLinejoin: 'round',

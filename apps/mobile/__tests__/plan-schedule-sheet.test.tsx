@@ -45,6 +45,7 @@ describe('PlanScheduleSheet', () => {
 
       const picker = screen.getByTestId('plan-schedule-picker-native');
       expect(picker).toBeTruthy();
+      // This launch's mode (light in tests); `plan-schedule-sheet-dark.test.tsx` draws a dark launch.
       expect(picker.props.themeVariant).toBe('light');
       expect(picker.props.mode).toBe('datetime');
 

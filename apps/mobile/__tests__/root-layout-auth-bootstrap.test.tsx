@@ -24,6 +24,8 @@ const mockRegisterBackgroundSyncTask = jest.fn<Promise<void>, unknown[]>(() => P
 const mockStackScreen = jest.fn();
 const mockStack = jest.fn();
 const mockReportLaunchThemeProblem = jest.fn();
+const mockStatusBar = jest.fn();
+const mockThemeProvider = jest.fn();
 const mockStopThemeAppIcon = jest.fn();
 const mockStartThemeAppIcon = jest.fn();
 
@@ -86,7 +88,10 @@ jest.mock('@/src/appearance/launch-theme-report', () => ({
 }));
 
 jest.mock('expo-status-bar', () => ({
-  StatusBar: () => null,
+  StatusBar: (props: unknown) => {
+    mockStatusBar(props);
+    return null;
+  },
 }));
 
 jest.mock('react-native-gesture-handler', () => {
@@ -120,8 +125,16 @@ jest.mock('expo-router', () => {
   Stack.Screen = StackScreen;
   Stack.Protected = StackProtected;
 
+  const ThemeProvider = ({ children, value }: { children: ReactNode; value: unknown }) => {
+    mockThemeProvider(value);
+    return <>{children}</>;
+  };
+
   return {
     Stack,
+    ThemeProvider,
+    DefaultTheme: { dark: false, colors: {}, fonts: {} },
+    DarkTheme: { dark: true, colors: {}, fonts: {} },
   };
 });
 
@@ -130,6 +143,7 @@ import { act, render, screen, waitFor } from '@testing-library/react-native';
 import RootLayout from '../app/_layout';
 import * as themeLaunch from '@/components/ui/theme-launch';
 import { customTheme, themePresets } from '@/components/ui/theme-presets';
+import * as tokens from '@/components/ui/tokens';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { getExerciseCatalogSnapshot } from '@/src/exercise-catalog/cache';
 import { closeLocalData, localDataClient, resetLocalData } from './helpers/local-data';
@@ -158,6 +172,30 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockStopThemeAppIcon.mockReset();
     mockRegisterBackgroundSyncTask.mockResolvedValue(undefined);
     mockBootstrapAuthState.mockResolvedValue(undefined);
+  });
+
+  it('draws the status bar and the navigators in this launch\'s mode and roles', () => {
+    render(<RootLayout />);
+
+    // Tests launch light: dark status-bar content on the light page.
+    expect(mockStatusBar).toHaveBeenLastCalledWith({ style: 'dark' });
+    expect(mockThemeProvider).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        dark: false,
+        colors: expect.objectContaining({ background: uiRoles.paper, card: uiRoles.paper, text: uiRoles.ink }),
+      }),
+    );
+  });
+
+  it('draws light status-bar content in a dark launch', () => {
+    jest.replaceProperty(tokens, 'uiMode', 'dark');
+    try {
+      render(<RootLayout />);
+
+      expect(mockStatusBar).toHaveBeenLastCalledWith({ style: 'light' });
+    } finally {
+      jest.restoreAllMocks();
+    }
   });
 
   it('reports why the launch theme is not the stored choice, once on mount', () => {

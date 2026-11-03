@@ -99,6 +99,28 @@ describe('Groups: names and titles', () => {
     expect(initials.length).toBeGreaterThan(0);
     initials.forEach((node) => expect(node.props).toMatchObject({ fontFamily: uiFonts.display.family, fontWeight: '700' }));
   });
+
+  it('labels a selected marker in the colour its fill carries: on-ink on yours, `ink` on a `viz4` one', () => {
+    const view = render(
+      <GroupRankChart
+        accessibilityLabel="Place"
+        columnLabels={['28 Sep', '5 Oct']}
+        onSelect={jest.fn()}
+        selectedIndex={1}
+        series={{
+          periods: [],
+          lines: [
+            { userId: 'me', name: 'Dino', initial: 'D', isMe: true, ranks: [2, 1] },
+            { userId: 'u', name: 'Marco', initial: 'M', isMe: false, ranks: [1, 2] },
+          ],
+          depth: 2,
+        }}
+      />,
+    );
+    const fills = view.UNSAFE_getAllByType(SvgText).map((node) => node.props.fill);
+    // Per line, per period: Dino's then Marco's; period 1 is selected.
+    expect(fills).toEqual([uiRoles.inkMuted, uiRoles.onInk, uiRoles.inkMuted, uiRoles.ink]);
+  });
 });
 
 describe('Sessions and week figures: words out of Plex Mono', () => {

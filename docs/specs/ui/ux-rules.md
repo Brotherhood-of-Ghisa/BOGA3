@@ -245,16 +245,20 @@ after a cleanup).
 
 ## Appearance
 
-Every theme is light; presets, seeds and the next-launch rule are
-`design-language.md` "Choosing one" and the decision register in
-`docs/specs/03-technical-architecture.md`. Outside the roles, `app/_layout.tsx`
-keeps `<StatusBar style="dark" />` and the splash is a fixed white
-(`app.config.ts`). The stack header takes `paper` (no shadow line) and `ink`,
-so header and page read as one surface ("Pages").
+A launch draws every screen in one mode: Light (the default), Dark, or System,
+the phone's mode at launch. Native UI (alerts, keyboard, date picker) is pinned
+to it, so a phone change mid-session shows at the next launch (decision
+register, `docs/specs/03-technical-architecture.md`). Presets, seeds and the
+next-launch rule are `design-language.md` "Choosing one". The status bar, the
+date picker and the navigators take `uiMode`, never a fixed mode or colour
+(`apps/mobile/__tests__/ui-mode-literal-guard.test.ts`). The splash stays white
+(`app.config.ts`). The stack header takes `paper` (no shadow line) and `ink`, so
+header and page read as one surface ("Pages").
 
-Settings → Appearance is one page: a live `ThemePreview` of the choice, then
-Theme, Background (Match theme, five swatches, Custom background) and Text
-(Match background, four inks) as radio rows, each with a swatch. A tap or
+Settings → Appearance is one page: a live `ThemePreview` of the choice in its
+mode, then Mode (Light, Dark, System), Theme, Background (Match theme, five
+swatches, Custom background) and Text (Match background, four inks) as radio
+rows, each with a swatch. A tap or
 release saves at once and writes nothing when the value is already stored; the
 chosen row reads `Next launch` until the app reopens. A Custom row opens its
 picker (hue ring; the background adds a tint step) with the same preview. A
