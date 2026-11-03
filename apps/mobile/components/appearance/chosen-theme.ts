@@ -84,3 +84,13 @@ export function appearanceLabel({ accent, background, text }: AppearanceChoice):
 export function appearanceRoles(appearance: AppearanceChoice): UiRoles {
   return generateRoles(resolveAppearance(appearance).seeds);
 }
+
+// What fits at the end of Settings home's row without squeezing its label: the
+// accent, `from next launch` while it waits, or `tinted` when a background or
+// text was chosen. The row's accessibility label carries `appearanceLabel`.
+export function appearanceSummary(appearance: AppearanceChoice): string {
+  const tinted = appearance.background !== 'match' || appearance.text !== 'match';
+  const label = themeLabel(appearance.accent);
+  if (tinted) return `${label}, tinted`;
+  return pendingAppearance(appearance).any ? `${label} from next launch` : label;
+}

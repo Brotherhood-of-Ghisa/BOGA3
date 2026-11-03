@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { BackgroundSection, TextSection } from '@/components/appearance/appearance-neutrals';
 import {
   appearanceLabel,
+  appearanceSummary,
   appearanceRoles,
   pendingAppearance,
   useStoredAppearance,
@@ -24,24 +25,24 @@ import {
 import { SETTINGS_SUB_PAGES, THEME_COLOUR_ROUTE } from '@/src/navigation/routes';
 
 // Settings home's Appearance row (`docs/specs/ui/design-language.md` "Choosing
-// one"): names the chosen theme — the accent, then the background and text when
-// they are not the theme's own — and opens the Appearance page. A choice
-// applies on the next launch, as the app cannot restart itself, so a pending
-// choice reads `from next launch` here.
+// one"): names the chosen theme and opens the Appearance page. The row shows
+// the accent, `tinted` when the background or text is not the theme's own, and
+// `from next launch` on a pending accent (a choice applies on the next launch,
+// as the app cannot restart itself); VoiceOver hears the whole choice.
 export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }) {
   const router = useRouter();
   const [appearance] = useStoredAppearance();
   const label = appearanceLabel(appearance);
-  const shown = pendingAppearance(appearance).any ? `${label} from next launch` : label;
+  const spoken = pendingAppearance(appearance).any ? `${label} from next launch` : label;
   return (
     <ChoiceRow
-      accessibilityLabel={`Appearance, ${shown}`}
+      accessibilityLabel={`Appearance, ${spoken}`}
       divider={divider}
       icon="palette"
       label="Appearance"
       onPress={() => router.push(SETTINGS_SUB_PAGES.appearance)}
       testID="settings-appearance-row"
-      value={shown}
+      value={appearanceSummary(appearance)}
     />
   );
 }

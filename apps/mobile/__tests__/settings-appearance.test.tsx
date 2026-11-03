@@ -364,6 +364,8 @@ describe('background and text', () => {
 
     fireEvent.press(screen.getByTestId('settings-appearance-background-rose'));
     expect(await screen.findByLabelText('Appearance, Warm, Rose background from next launch')).toBeTruthy();
+    // The row shows what fits; VoiceOver hears the whole choice.
+    expect(within(screen.getByTestId('settings-appearance-row')).getByText('Warm, tinted')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('settings-appearance-text-navy'));
     expect(await screen.findByLabelText('Appearance, Warm, Rose background, Navy text from next launch')).toBeTruthy();
