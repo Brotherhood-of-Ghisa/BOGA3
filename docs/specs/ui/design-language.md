@@ -75,7 +75,7 @@ the first save writes the record and leaves that id in place. Background is
 `match` (the accent theme's own neutral), one of five swatches, or a custom
 hue and tint step. Text is `match` (the background) or one of four inks
 (`theme-neutrals.ts`). Chroma is capped (background 12, text 14) so both
-read as neutrals. `match` for both draws the accent's theme unchanged. `mode`
+read as neutrals. `match` for both draws the accent's theme unchanged. Settings → Appearance (`ux-rules.md` "Appearance") sets each part with a live preview. `mode`
 is stored, but every theme still draws light. An unknown id, an invalid record
 or an unreadable store opens in the default and is logged. `record` stays a
 brass across presets, so "your best ever" keeps one look. For a custom hue,

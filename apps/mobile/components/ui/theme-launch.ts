@@ -63,9 +63,19 @@ export async function saveAppearance(appearance: AppearanceChoice): Promise<void
   savedListeners.forEach((listener) => listener());
 }
 
-// Saves a new accent — a preset id or a custom hue's `hue:<deg>` — keeping the
-// rest of the stored choice; an unusable stored choice is replaced by the
-// default's. Rejects, saving nothing, when the store cannot be read or written.
-export async function saveThemeAccent(accent: ThemePresetId | HueThemeId): Promise<void> {
-  await saveAppearance({ ...readStoredTheme().appearance, accent });
+let lastSave: Promise<void> = Promise.resolve();
+
+// Saves part of the choice — the accent (a preset id or a custom hue's
+// `hue:<deg>`), the background, the text — keeping the rest of the stored
+// choice; an unusable stored choice is replaced by the default's. Saves run one
+// after another, so two quick choices cannot overwrite each other's field.
+// Rejects, saving nothing, when the store cannot be read or written.
+export function saveAppearancePart(part: Partial<AppearanceChoice>): Promise<void> {
+  const run = lastSave.then(() => saveAppearance({ ...readStoredTheme().appearance, ...part }));
+  lastSave = run.catch(() => undefined);
+  return run;
+}
+
+export function saveThemeAccent(accent: ThemePresetId | HueThemeId): Promise<void> {
+  return saveAppearancePart({ accent });
 }

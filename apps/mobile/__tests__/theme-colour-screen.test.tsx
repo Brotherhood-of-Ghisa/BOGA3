@@ -18,7 +18,9 @@ import { Storage } from 'expo-sqlite/kv-store';
 import { StyleSheet } from 'react-native';
 
 import { pointToHue } from '@/components/appearance/hue-ring';
+import { appearanceRoles } from '@/components/appearance/chosen-theme';
 import { generateRoles } from '@/components/ui/theme';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 import { seedsFromHue } from '@/components/ui/theme-hue';
 import { APPEARANCE_STORAGE_KEY, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import ThemeColourRoute from '../app/theme-colour';
@@ -81,6 +83,15 @@ it('repaints the preview as the hue changes', async () => {
   // Wraps past 0°.
   expect(ring().props.accessibilityValue).toEqual({ text: 'Pink, 357 degrees' });
   expect(previewBackground('BEST EVER')).toBe(generateRoles(seedsFromHue(357)).recordWash);
+});
+
+it('draws the preview in the background and text already chosen', () => {
+  Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"warm","background":"rose","text":"navy","mode":"light"}');
+  render(<ThemeColourRoute />);
+  // The ring starts at Warm's hue, so the mock is the custom theme at hue 47.
+  const roles = appearanceRoles({ ...DEFAULT_APPEARANCE, accent: 'hue:47', background: 'rose', text: 'navy' });
+  expect(previewBackground('BEST EVER')).toBe(roles.recordWash);
+  expect(StyleSheet.flatten(screen.getByTestId('theme-colour-preview', { includeHiddenElements: true }).props.style).backgroundColor).toBe(roles.paper);
 });
 
 it('shows the preview sets with their 1RM to one decimal and counts the performed set', () => {

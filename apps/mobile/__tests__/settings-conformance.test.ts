@@ -26,6 +26,7 @@ const MOBILE_ROOT = join(__dirname, '..');
 const SETTINGS_ROOTS = [
   ...readdirSync(join(MOBILE_ROOT, 'app')).filter((name) => /^settings.*\.tsx$/.test(name)).map((name) => `app/${name}`),
   'app/theme-colour.tsx',
+  'app/theme-background.tsx',
 ];
 const NOT_SETTINGS_CONTENT = /^components\/(ui|navigation)\//;
 
@@ -162,10 +163,11 @@ describe('every Settings page speaks the Settings language', () => {
   it('walks every Settings route and the components of every page', () => {
     const files = settingsFiles();
     const expected = [
-      'app/settings.tsx', 'app/theme-colour.tsx',
+      'app/settings.tsx', 'app/theme-colour.tsx', 'app/theme-background.tsx',
       ...Object.values(SETTINGS_SUB_PAGES).map((route) => `app${route}.tsx`),
       ...readdirSync(join(MOBILE_ROOT, 'components/settings')).map((name) => `components/settings/${name}`),
-      'components/appearance/appearance-settings.tsx', 'components/appearance/theme-colour-screen.tsx',
+      'components/appearance/appearance-settings.tsx', 'components/appearance/appearance-neutrals.tsx',
+      'components/appearance/theme-colour-screen.tsx', 'components/appearance/theme-background-screen.tsx',
       'components/notifications/notification-settings-screen.tsx', 'components/notifications/settings-row.tsx',
       'components/preferences/effort-settings.tsx', 'components/preferences/muscle-settings.tsx',
       'components/preferences/progress-settings.tsx', 'components/preferences/rest-timer-settings.tsx',
@@ -187,10 +189,10 @@ describe('every Settings page speaks the Settings language', () => {
 
   it('pushes every Settings route as a page titled in the root stack, and each is a Settings sub page', () => {
     const stack = readFileSync(join(MOBILE_ROOT, 'components/navigation/root-stack.tsx'), 'utf8');
-    const routes = SETTINGS_ROOTS.filter((root) => root !== 'app/settings.tsx' && root !== 'app/theme-colour.tsx')
+    const routes = SETTINGS_ROOTS.filter((root) => !['app/settings.tsx', 'app/theme-colour.tsx', 'app/theme-background.tsx'].includes(root))
       .map((root) => root.replace(/^app/, '').replace(/\.tsx$/, ''));
     expect(routes.sort()).toEqual(Object.values(SETTINGS_SUB_PAGES).sort());
-    [...routes, '/theme-colour'].forEach((route) =>
+    [...routes, '/theme-colour', '/theme-background'].forEach((route) =>
       expect(stack).toMatch(new RegExp(`name="${route.slice(1)}" options=\\{\\{ title: '[^']+' \\}\\}`)));
   });
 });

@@ -39,6 +39,7 @@ export const exerciseEditHref = ({ exerciseDefinitionId, request }: { exerciseDe
   return `${EXERCISE_EDIT_ROUTE}${params.length > 0 ? `?${params.join('&')}` : ''}` as Href;
 };
 export const THEME_COLOUR_ROUTE = '/theme-colour';
+export const THEME_BACKGROUND_ROUTE = '/theme-background';
 
 /** One muscle's or one exercise's effort history, pushed from Progress. */
 export const PROGRESS_HISTORY_ROUTE = '/progress-history';
