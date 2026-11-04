@@ -5,6 +5,7 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notInArray } from '
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
 import { nowMonotonic, type Transaction } from './clock';
+import { selectInProgressSessionRow } from './in-progress-session';
 import { loadAsOfWeightResolver, resolveSessionWeights } from './bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessionPlanSets, sessions, userSettings } from './schema';
@@ -159,6 +160,20 @@ export type ReopenCompletedSessionResult = {
   sessionId: string;
 };
 
+export class SessionUnavailableError extends Error {
+  constructor() {
+    super('This session is no longer available.');
+    this.name = 'SessionUnavailableError';
+  }
+}
+
+export class ActiveSessionConflictError extends Error {
+  constructor(public readonly activeSessionId: string) {
+    super('Another session is already in progress. Finish or abandon it first.');
+    this.name = 'ActiveSessionConflictError';
+  }
+}
+
 export type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 export type SessionPersistenceRecord = ResolvedSessionWeight & {
@@ -215,6 +230,7 @@ type StoredDraftGraph = {
 };
 
 type SaveDraftGraphInput = {
+  requireNoActiveSession?: boolean;
   sessionId?: string;
   gymId: string | null;
   status: SessionDraftStatus;
@@ -1056,6 +1072,8 @@ export const reviveSessionRow = async (sessionId: string, now: Date = new Date()
   const database = await bootstrapLocalDataLayer();
   let revived = false;
   database.transaction((tx) => {
+    const row = tx.select().from(sessions).where(eq(sessions.id, sessionId)).get();
+    if (row?.status === 'active' && row.deletedAt !== null) requireNoOtherActiveSession(tx, sessionId);
     const localUpdatedAtMs = nowMonotonic(tx);
     const result = tx
       .update(sessions)
@@ -1068,6 +1086,11 @@ export const reviveSessionRow = async (sessionId: string, now: Date = new Date()
     notifyLocalWrite();
   }
   return revived;
+};
+
+const requireNoOtherActiveSession = (tx: Transaction, sessionId: string): void => {
+  const active = selectInProgressSessionRow(tx);
+  if (active && active.id !== sessionId) throw new ActiveSessionConflictError(active.id);
 };
 
 // Header edits are independent of exercise identity/weight revisions.
@@ -1128,6 +1151,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
     guardSessionGraphMerge(database, input);
     let startChanged = false;
     database.transaction((tx) => {
+      if (input.requireNoActiveSession) requireNoOtherActiveSession(tx, sessionId);
       // One monotonic last-write-wins timestamp for every row written in this
       // draft-save transaction — the `sessions` row plus the whole
       // `session_exercises` / `exercise_sets` / `session_exercise_tags` graph
@@ -1280,43 +1304,29 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
   async reopenCompletedSession(input) {
     const database = await bootstrapLocalDataLayer();
 
-    database.transaction((tx) => {
+    const changed = database.transaction((tx) => {
       const existingSession = tx.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
-      if (!existingSession) {
-        throw new Error(`Session ${input.sessionId} does not exist`);
-      }
-      if (existingSession.status !== 'completed') {
-        throw new Error(`Cannot reopen non-completed session ${input.sessionId}`);
-      }
-
-      const activeConflict = tx
-        .select({ id: sessions.id })
-        .from(sessions)
-        .where(and(eq(sessions.status, 'active'), isNull(sessions.deletedAt)))
-        .all()
-        .find((row) => row.id !== input.sessionId);
-
-      if (activeConflict) {
-        throw new Error(`Cannot reopen session ${input.sessionId} while another active or draft session exists`);
-      }
+      if (!existingSession || existingSession.deletedAt !== null) throw new SessionUnavailableError();
+      requireNoOtherActiveSession(tx, input.sessionId);
+      if (existingSession.status === 'active') return false;
 
       tx.update(sessions)
         .set({
           status: 'active',
           completedAt: null,
           durationSec: null,
-          deletedAt: null,
           localDirty: true,
           localUpdatedAtMs: nowMonotonic(tx),
           updatedAt: input.updatedAt,
         })
         .where(eq(sessions.id, input.sessionId))
         .run();
+      return true;
     });
 
     // Post-commit: the reopened session row was dirtied above; nudge to push the
     // reopen soon.
-    notifyLocalWrite();
+    if (changed) notifyLocalWrite();
   },
   async listCompletedSessions() {
     const database = await bootstrapLocalDataLayer();
@@ -1331,6 +1341,8 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
     input: PersistSessionDraftInput,
     options: {
       now?: Date;
+      /** A new-workout entry must not race another local Start or Resume. */
+      requireNoActiveSession?: boolean;
     } = {}
   ): Promise<PersistSessionDraftResult> {
     ensureDate(input.startedAt, 'startedAt');
@@ -1339,6 +1351,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
     ensureDate(now, 'now');
 
     return store.saveDraftGraph({
+      ...(options.requireNoActiveSession ? { requireNoActiveSession: true } : {}),
       sessionId: input.sessionId,
       gymId: input.gymId,
       startedAt: input.startedAt,

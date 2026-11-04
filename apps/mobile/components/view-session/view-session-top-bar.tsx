@@ -15,13 +15,14 @@ type ViewSessionTopBarProps = {
   // Omitted while the session is deleted: the session view edits only a live
   // session.
   onEdit?: () => void;
+  busy?: boolean;
 };
 
 // Back · title · ⋮ · Edit. The title is the session's (`Afternoon training ·
 // 19 Feb`); `View Session` while there is none. Edit is the screen's one `accent` action and
 // sits where the session view's Done sits, so the Edit → Done loop reads as one
 // place.
-export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit, title = 'View Session' }: ViewSessionTopBarProps) {
+export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit, title = 'View Session', busy = false }: ViewSessionTopBarProps) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.bar, { paddingTop: insets.top }]} testID="completed-session-detail-top-bar">
@@ -41,6 +42,7 @@ export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit, title = 'View
       ) : null}
       {onEdit ? (
         <ActionButton
+          disabled={busy}
           accessibilityLabel="Edit session"
           label="Edit"
           onPress={onEdit}

@@ -5,7 +5,7 @@ import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revis
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { EMPTY_SESSION_WEIGHT, type ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, StyleSheet, View } from 'react-native';
 
 import { SessionMuscleBreakdown, SessionSummaryContent, type MuscleCatalogState } from '@/components/session-complete/session-summary-content';
@@ -18,6 +18,9 @@ import { ActionButton } from '@/components/ui/action-button';
 import { StatePanel, type StatePanelKind } from '@/components/ui/state-panel';
 import { uiRoles } from '@/components/ui/tokens';
 import { ViewSessionScreen, ViewSessionTopBar } from '@/components/view-session';
+import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
+import { DEFAULT_SESSION_ENTRY_COORDINATOR } from '@/src/session-entry';
+import { ActiveSessionConflictError, SessionUnavailableError } from '@/src/data/session-drafts';
 import {
   formatSessionListCompactDuration,
   loadLocalGymById,
@@ -83,6 +86,7 @@ export type CompletedSessionDetailRecord = ResolvedSessionWeight & {
 };
 
 export type CompletedSessionDetailDataClient = {
+  resumeCompletedSession?(sessionId: string): Promise<{ sessionId: string }>;
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
   loadInsights?(sessionId: string, historyLookbackWeeks: number): Promise<CompletedSessionInsights | null>;
   // Each exercise's records in the sessions before this one, for the
@@ -176,6 +180,7 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
 };
 
 export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetailDataClient = {
+  resumeCompletedSession: (sessionId) => DEFAULT_SESSION_ENTRY_COORDINATOR.resumeCompletedSession(sessionId),
   async loadCompletedSession(sessionId) {
     const sessionGraph = await loadSessionSnapshotById(sessionId);
 
@@ -219,6 +224,7 @@ export function CompletedSessionDetailScreenShell({
 }: CompletedSessionDetailScreenShellProps) {
   const dateFormat = useDateFormat();
   const router = useRouter();
+  const openActiveWorkout = useOpenActiveWorkout();
   const exerciseCatalog = useExerciseCatalog();
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -242,6 +248,14 @@ export function CompletedSessionDetailScreenShell({
   );
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isTogglingDeletedState, setIsTogglingDeletedState] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
+  const [activeConflictId, setActiveConflictId] = useState<string | null>(null);
+  const actionInFlight = useRef(false);
+  const actionSessionId = useRef(sessionId);
+  useEffect(() => {
+    actionSessionId.current = sessionId;
+    return () => { actionSessionId.current = null; };
+  }, [sessionId]);
 
   const reloadSession = useCallback(() => {
     let cancelled = false;
@@ -508,7 +522,7 @@ export function CompletedSessionDetailScreenShell({
 
   // Completed sessions are edited in the session view.
   const handleEdit = () => {
-    if (!session) {
+    if (!session || actionInFlight.current) {
       return;
     }
 
@@ -516,12 +530,14 @@ export function CompletedSessionDetailScreenShell({
   };
 
   const handleToggleDeletedState = () => {
-    if (!session || isTogglingDeletedState) {
+    if (!session || actionInFlight.current) {
       return;
     }
 
     const sessionId = session.id;
     const nextIsDeleted = session.deletedAt === null;
+    actionInFlight.current = true;
+    setActiveConflictId(null);
     setActionFeedback(null);
     setIsTogglingDeletedState(true);
 
@@ -545,8 +561,34 @@ export function CompletedSessionDetailScreenShell({
         );
       })
       .finally(() => {
+        actionInFlight.current = false;
         setIsTogglingDeletedState(false);
       });
+  };
+
+  const handleResume = () => {
+    if (!session || session.deletedAt !== null || !dataClient.resumeCompletedSession || actionInFlight.current) return;
+    const targetId = session.id;
+    const accountAtStart = getAccountLocalPreferenceAccountRevision();
+    const isCurrent = () => actionSessionId.current === targetId && accountAtStart === getAccountLocalPreferenceAccountRevision();
+    actionInFlight.current = true;
+    setIsResuming(true);
+    setActionFeedback(null);
+    setActiveConflictId(null);
+    void dataClient.resumeCompletedSession(targetId).then(() => {
+      if (isCurrent()) openActiveWorkout(targetId);
+    }).catch((error: unknown) => {
+      if (!isCurrent()) return;
+      if (error instanceof SessionUnavailableError) {
+        setSession(null);
+      } else {
+        setActionFeedback(error instanceof Error ? error.message : 'Unable to resume session. Try again.');
+        if (error instanceof ActiveSessionConflictError) setActiveConflictId(error.activeSessionId);
+      }
+    }).finally(() => {
+      actionInFlight.current = false;
+      setIsResuming(false);
+    });
   };
 
   // Loading, error and not-found keep the route's frame: the detail's top bar
@@ -654,6 +696,10 @@ export function CompletedSessionDetailScreenShell({
         model={buildCompletedSessionDetailModel(session.exercises, historicalBests)}
         onBack={handleBack}
         onEdit={handleEdit}
+        onResume={dataClient.resumeCompletedSession ? handleResume : undefined}
+        isResuming={isResuming}
+        busy={isResuming || isTogglingDeletedState}
+        onOpenActive={activeConflictId ? () => openActiveWorkout(activeConflictId) : undefined}
         onToggleDeleted={handleToggleDeletedState}
         summary={{
           title: completedSessionTitle(new Date(session.startedAt), dateFormat),

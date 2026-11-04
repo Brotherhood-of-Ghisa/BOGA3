@@ -8,12 +8,14 @@ type ViewSessionOptionsSheetProps = {
   deleted: boolean;
   onDismiss: () => void;
   onToggleDeleted: () => void;
+  onResume?: () => void;
+  busy?: boolean;
+  isResuming?: boolean;
 };
 
-// The session ⋮: `Delete session` (a soft delete, hidden from history), or
-// `Undelete session` while it is deleted. Neither confirms — each undoes the
-// other, and the deleted band says which state the session is in.
-export function ViewSessionOptionsSheet({ visible, deleted, onDismiss, onToggleDeleted }: ViewSessionOptionsSheetProps) {
+// Resume opens the saved workout on Train. Delete/undelete remain reversible;
+// deleted sessions offer only Undelete, and a pending write disables all rows.
+export function ViewSessionOptionsSheet({ visible, deleted, onDismiss, onToggleDeleted, onResume, busy = false, isResuming = false }: ViewSessionOptionsSheetProps) {
   return (
     <Sheet
       dismissLabel="Dismiss session options"
@@ -21,10 +23,20 @@ export function ViewSessionOptionsSheet({ visible, deleted, onDismiss, onToggleD
       testID="completed-session-detail-options-sheet"
       title="Session"
       visible={visible}>
+      {!deleted && onResume ? (
+        <ListRow
+          disabled={busy}
+          label={isResuming ? 'Resuming session…' : 'Resume session'}
+          leading={<Icon color={uiRoles.inkMuted} name="play" size="md" />}
+          onPress={onResume}
+          testID="completed-session-detail-resume-button"
+        />
+      ) : null}
       {deleted ? (
-        <ListRow label="Undelete session" onPress={onToggleDeleted} testID="completed-session-detail-delete-button" />
+        <ListRow disabled={busy} label="Undelete session" onPress={onToggleDeleted} testID="completed-session-detail-delete-button" />
       ) : (
         <ListRow
+          disabled={busy}
           label="Delete session"
           leading={<Icon color={uiRoles.danger} name="trash" size="md" />}
           onPress={onToggleDeleted}

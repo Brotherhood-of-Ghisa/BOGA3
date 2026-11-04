@@ -211,6 +211,19 @@ describe('Train over real data', () => {
     expect(shownWorkout()).toBe('tab workout opened-elsewhere');
   });
 
+  it('keeps a resumed workout visible when focus returns after its earlier Finish', async () => {
+    const { result } = renderHook(() => useOpenActiveWorkout());
+    await seed('session-view');
+    const view = render(<TrainScreen isFocused />);
+    await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
+    fireEvent.press(screen.getByTestId('train-workout-finish'));
+    view.rerender(<TrainScreen isFocused={false} />);
+    act(() => result.current(ACTIVE));
+    view.rerender(<TrainScreen isFocused loadActiveSessionId={() => new Promise(() => undefined)} />);
+    expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`);
+    expect(screen.queryByTestId('train-start-empty-button')).toBeNull();
+  });
+
   it('returns to the disc at once, ready to start, when the workout is abandoned', async () => {
     await seed('session-view');
     render(<TrainRoute />);
@@ -398,7 +411,7 @@ describe('Train launch states', () => {
     render(
       <TrainScreen
         loadActiveSessionId={() => new Promise(() => undefined)}
-        sessionEntry={{ startEmptyOrResume: start, startPlannedOrResume: jest.fn() }}
+        sessionEntry={{ startEmptyOrResume: start, startPlannedOrResume: jest.fn(), resumeCompletedSession: jest.fn() }}
       />,
     );
 
@@ -411,6 +424,7 @@ describe('Train launch states', () => {
 
   it('ignores a planned start while an empty start is pending, relabelling nothing (a pending launch)', async () => {
     const pending: SessionEntryCoordinator = {
+      resumeCompletedSession: jest.fn(),
       startEmptyOrResume: jest.fn(() => new Promise<never>(() => undefined)),
       startPlannedOrResume: jest.fn(() => new Promise<never>(() => undefined)),
     };

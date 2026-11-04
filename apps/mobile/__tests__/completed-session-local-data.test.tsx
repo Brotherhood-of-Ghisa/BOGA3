@@ -324,6 +324,35 @@ afterEach(() => {
   closeLocalData();
 });
 
+describe('resuming completed sessions over real data', () => {
+  it.each(['summary', 'sets'])('resumes from %s through the production data client and opens Train', async (section) => {
+    await openDesignSession();
+    const before = localDatabase().select().from(sessions).where(eq(sessions.id, DESIGN.sessionId)).get()!;
+    if (section === 'sets') await openSets();
+    fireEvent.press(screen.getByTestId('completed-session-detail-options-button'));
+    expect(screen.getByTestId('completed-session-detail-resume-button')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('completed-session-detail-resume-button'));
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith('/train'));
+    expect(localDatabase().select().from(sessions).where(eq(sessions.id, DESIGN.sessionId)).get()).toMatchObject({
+      id: before.id, startedAt: before.startedAt, gymId: before.gymId, status: 'active', completedAt: null, durationSec: null,
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('hides Resume on deleted sessions and leaves Edit as a completed-history action', async () => {
+    await openDesignSession();
+    fireEvent.press(screen.getByTestId('completed-session-detail-edit-button'));
+    expect(mockPush).toHaveBeenCalledWith(`/session/${DESIGN.sessionId}`);
+    expect(localDatabase().select().from(sessions).where(eq(sessions.id, DESIGN.sessionId)).get()?.status).toBe('completed');
+    fireEvent.press(screen.getByTestId('completed-session-detail-options-button'));
+    fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
+    await screen.findByTestId('completed-session-detail-deleted-band');
+    fireEvent.press(screen.getByTestId('completed-session-detail-options-button'));
+    expect(screen.queryByTestId('completed-session-detail-resume-button')).toBeNull();
+    expect(screen.getByText('Undelete session')).toBeTruthy();
+  });
+});
+
 describe('completion presentation over real data', () => {
   it.each(['completion', 'summary'])('refreshes the %s and share comparison when the saved window changes', async presentation => {
     await openSession({ sessionId: ONE_PR, presentation });

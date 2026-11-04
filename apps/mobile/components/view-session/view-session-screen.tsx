@@ -2,6 +2,7 @@ import { type ReactNode, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
+import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
@@ -35,6 +36,10 @@ type ViewSessionScreenProps = {
   onBack: () => void;
   onEdit: () => void;
   onToggleDeleted: () => void;
+  onResume?: () => void;
+  onOpenActive?: () => void;
+  busy?: boolean;
+  isResuming?: boolean;
 };
 
 const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set' : 'sets'}`;
@@ -42,7 +47,7 @@ const formatSetCount = (count: number): string => `${count} ${count === 1 ? 'set
 /**
  * View Session: a finished session, read-only (redesign, View Session restyle).
  * Facts, then local Summary / Sets sections. Editing happens on the session
- * view (`Edit`); the ⋮ holds what is rare: delete or undelete the session.
+ * view (`Edit`); the ⋮ can resume a live completed session on Train, or delete/undelete it.
  */
 export function ViewSessionScreen({
   summary,
@@ -54,12 +59,17 @@ export function ViewSessionScreen({
   onBack,
   onEdit,
   onToggleDeleted,
+  onResume,
+  onOpenActive,
+  busy = false,
+  isResuming = false,
 }: ViewSessionScreenProps) {
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
 
   return (
     <Screen>
       <ViewSessionTopBar
+        busy={busy}
         onBack={onBack}
         onEdit={summary.deleted ? undefined : onEdit}
         onOpenOptions={() => setIsOptionsVisible(true)}
@@ -76,6 +86,9 @@ export function ViewSessionScreen({
           <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.bodyStrong, uiTextTone.danger]} testID="completed-session-detail-error-notice">
             {error}
           </Text>
+        ) : null}
+        {error && onOpenActive ? (
+          <ActionButton label="Open current session" onPress={onOpenActive} testID="completed-session-detail-open-active" variant="link" />
         ) : null}
         <SessionFactsCard
           facts={[
@@ -125,6 +138,12 @@ export function ViewSessionScreen({
       </ScreenScroll>
 
       <ViewSessionOptionsSheet
+        busy={busy}
+        isResuming={isResuming}
+        onResume={onResume ? () => {
+          setIsOptionsVisible(false);
+          onResume();
+        } : undefined}
         deleted={summary.deleted}
         onDismiss={() => setIsOptionsVisible(false)}
         onToggleDeleted={() => {

@@ -109,7 +109,7 @@ export const startSessionPlan = async (planId: string, now: Date = new Date()): 
         })),
       })),
     },
-    { now },
+    { now, requireNoActiveSession: true },
   );
 
   return { status: 'started', sessionId: result.sessionId };
@@ -298,7 +298,7 @@ export const addPlanBlockToSession = async (
         },
       ],
     },
-    { now },
+    { now, requireNoActiveSession: true },
   );
   const createdCard = await planStore.findLiveSourcedCardForBlock(planExerciseId);
   return { status: 'attached', sessionId: result.sessionId, sessionExerciseId: createdCard?.id ?? cardId };
