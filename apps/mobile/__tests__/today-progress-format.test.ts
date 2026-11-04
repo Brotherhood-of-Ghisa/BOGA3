@@ -360,8 +360,9 @@ describe('the session card', () => {
 
 
 describe('tonnage pace', () => {
-  it.each([[12450, '12.45'], [125, '0.125'], [102.5, '0.103'], [0, '0'], [null, '—'], [Infinity, '—']])(
-    'formats %s kg·reps as %s tonnes at whole-kg precision', (value, expected) => {
+  it.each([[12450, '12.5'], [4536, '4.5'], [30782, '30.8'], [125, '0.1'], [102.5, '0.1'], [49, '0'], [50, '0.1'],
+    [1000, '1'], [0, '0'], [null, '—'], [Infinity, '—'], [NaN, '—']])(
+    'formats %s kg·reps as %s tonnes rounded to one decimal without trailing zeros', (value, expected) => {
       expect(formatTonnes(value as number | null)).toBe(expected);
     },
   );
@@ -384,8 +385,9 @@ describe('tonnage pace', () => {
     expect(periodPaceDelta(today)).toEqual({ text: '+12%', tone: 'positive' });
     expect(periodDayFigures(input, 0, 'totalVolume').value).toBe(125);
     expect(periodDayFigures(input, 27, 'totalVolume').value).toBe(input.projectedVolumeKgReps);
-    expect(periodChartAccessibilityLabel(input, 'totalVolume')).toContain('Cumulative tonnage: this period 12.45 tonnes');
-    expect(periodChartAccessibilityValue(input, today)).toBe('Today: 12.45 tonnes, last period 11.1 tonnes');
+    expect(periodChartAccessibilityLabel(input, 'totalVolume')).toContain('Cumulative tonnage: this period 12.5 tonnes');
+    expect(periodChartAccessibilityValue(input, today)).toBe('Today: 12.5 tonnes, last period 11.1 tonnes');
+    expect(periodFiguresAccessibilityLabel(input, today)).toContain('12.5 tonnes');
     expect(periodFiguresAccessibilityLabel(input, today)).toContain('+12%');
   });
 
@@ -452,7 +454,7 @@ describe('tonnage weight references', () => {
 
   it.each(TONNAGE_REFERENCES.map(reference => [reference.value]))('compares raw values at the %s boundary', threshold => {
     const lower = TONNAGE_REFERENCES.filter(reference => reference.value < threshold).map(reference => reference.value);
-    // Whole-kg display rounds to the threshold before the actual reaches it.
+    // Display rounding reaches the threshold before the actual value does.
     expect(formatTonnes(threshold - 0.1)).toBe(String(threshold / 1000));
     expect(thresholds(input(threshold - 0.1))).toEqual(lower);
     expect(thresholds(input(threshold))).toEqual([...lower, threshold]);
