@@ -188,7 +188,6 @@ export const periodChartAccessibilityLabel = (period: TodayProgressPeriod, metri
     `against the ${comparedPeriodName(period)} ${value(series.previous.toSameDay)} by day ${period.dayOfPeriod};`,
     `the ${comparedPeriodName(period)} finished at ${value(series.previous.total)}.`,
     `On course for ${value(series.projected)}.`,
-    ...(metric === 'totalVolume' ? eligibleTonnageReferences(series).map(reference => reference.spoken + '.') : []),
   ].join(' ');
 };
 
@@ -197,7 +196,11 @@ export const periodChartAccessibilityValue = (
   period: Pick<TodayProgressPeriod, 'compareBack'>,
   figures: PeriodDayFigures
 ): string =>
-  `${formatPeriodDayLabel(figures, { spoken: true })}: ${spokenPaceValue(figures.value, figures.metric)}, ${comparedPeriodName(period)} ${figures.metric === 'totalVolume' ? spokenPaceValue(figures.previousValue, figures.metric) : figures.previousValue}`;
+  [
+    `${formatPeriodDayLabel(figures, { spoken: true })}: ${spokenPaceValue(figures.value, figures.metric)}, ${comparedPeriodName(period)} ${figures.metric === 'totalVolume' ? spokenPaceValue(figures.previousValue, figures.metric) : figures.previousValue}`,
+    ...(figures.metric === 'totalVolume'
+      ? eligibleTonnageReferences([figures.value, figures.previousValue]).map(reference => reference.spoken + '.') : []),
+  ].join(' ');
 
 const RECORD_KIND_LABELS: Record<RecordKind, string> = { oneRepMax: '1RM', weight: 'Weight', volume: 'Volume' };
 
@@ -295,7 +298,7 @@ export const periodChartGeometry = (
   const baseMaximum = Math.max(1, finiteMaximum([
     series.projected, series.previous.total, series.toDate, ...series.cumulative, ...series.previous.cumulative,
   ]));
-  const references = selected.metric === 'totalVolume' ? eligibleTonnageReferences(series) : [];
+  const references = selected.metric === 'totalVolume' ? eligibleTonnageReferences([selected.value, selected.previousValue]) : [];
   const yMax = fitTonnageMaximum(baseMaximum, references, plot);
   const x = (dayIndex: number) => (days > 1 ? (dayIndex / (days - 1)) * plotWidth : 0);
   const y = (value: number) => PLOT_TOP + (1 - value / yMax) * (plotBottom - PLOT_TOP);

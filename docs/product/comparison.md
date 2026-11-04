@@ -2,10 +2,11 @@
 
 ### comparison.tonnage-references · presentation · accepted
 
-Tonnage references are fixed, approximate familiar-weight comparisons. Current
-actual/projected reach alone makes them eligible; comparison, day selection
-and visual fitting cannot. Every eligible reference shares the data's linear
-scale, with only necessary top clearance. Sets has no references.
+Tonnage references are fixed, approximate familiar-weight comparisons. Either
+period's cumulative figure at the selected day makes them eligible: today by
+default, with current-period projection for future days. Visual fitting cannot
+add references. Every eligible reference shares the data's linear scale, with
+only necessary top clearance. Sets has no references.
 
 Why: relatable weights must not change the figures or imply an achievement.
 Code: `apps/mobile/components/today/tonnage-references.ts`;
