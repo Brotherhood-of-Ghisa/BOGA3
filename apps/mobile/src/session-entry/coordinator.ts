@@ -1,4 +1,4 @@
-import { findActiveSessionId, persistSessionDraftSnapshot } from '@/src/data';
+import { findActiveSessionId, persistSessionDraftSnapshot, reopenCompletedSessionDraft } from '@/src/data';
 
 export type SessionEntryResult = {
   kind: 'resumed' | 'started';
@@ -8,6 +8,7 @@ export type SessionEntryResult = {
 export type PlannedSessionMaterializer = () => Promise<{ sessionId: string }>;
 
 export type SessionEntryCoordinator = {
+  resumeCompletedSession: (sessionId: string) => Promise<SessionEntryResult>;
   startEmptyOrResume: () => Promise<SessionEntryResult>;
   startPlannedOrResume: (
     materialize: PlannedSessionMaterializer,
@@ -15,19 +16,29 @@ export type SessionEntryCoordinator = {
 };
 
 export type SessionEntryDependencies = {
+  reopenCompletedSession: (sessionId: string) => Promise<{ sessionId: string }>;
   loadActiveSessionId: () => Promise<string | null>;
   createEmptySession: () => Promise<{ sessionId: string }>;
 };
 
 /**
- * Serializes every new-session request through one active-draft recheck. The
- * default instance is shared by Today and Train, so rapid taps or a route
+ * Coordinates Start and Resume through one active-draft recheck. The
+ * default instance is shared by Today, Train and completed detail, so rapid taps or a route
  * transition cannot create two drafts in one JavaScript runtime.
  */
 export function createSessionEntryCoordinator(
   dependencies: SessionEntryDependencies,
 ): SessionEntryCoordinator {
   let inFlight: Promise<SessionEntryResult> | null = null;
+
+  const track = (pending: Promise<SessionEntryResult>) => {
+    inFlight = pending;
+    const clear = () => {
+      if (inFlight === pending) inFlight = null;
+    };
+    void pending.then(clear, clear);
+    return pending;
+  };
 
   const runExclusive = (
     createSession: () => Promise<{ sessionId: string }>,
@@ -46,17 +57,19 @@ export function createSessionEntryCoordinator(
       return { kind: 'started', sessionId: created.sessionId };
     })();
 
-    inFlight = pending;
-    const clear = () => {
-      if (inFlight === pending) {
-        inFlight = null;
-      }
-    };
-    void pending.then(clear, clear);
-    return pending;
+    return track(pending);
   };
 
   return {
+    resumeCompletedSession: (sessionId) => {
+      const previous = inFlight;
+      return track((async () => {
+        // Resume must recheck its own target after a pending Start, never inherit that workout's success.
+        if (previous) await previous.catch(() => undefined);
+        await dependencies.reopenCompletedSession(sessionId);
+        return { kind: 'resumed', sessionId };
+      })());
+    },
     startEmptyOrResume: () => runExclusive(dependencies.createEmptySession),
     startPlannedOrResume: (materialize) => runExclusive(materialize),
   };
@@ -66,6 +79,7 @@ export function createSessionEntryCoordinator(
 export const loadActiveSessionId = (): Promise<string | null> => findActiveSessionId();
 
 export const DEFAULT_SESSION_ENTRY_COORDINATOR = createSessionEntryCoordinator({
+  reopenCompletedSession: reopenCompletedSessionDraft,
   loadActiveSessionId,
   async createEmptySession() {
     return persistSessionDraftSnapshot({
@@ -73,6 +87,6 @@ export const DEFAULT_SESSION_ENTRY_COORDINATOR = createSessionEntryCoordinator({
       startedAt: new Date(),
       status: 'active',
       exercises: [],
-    });
+    }, { requireNoActiveSession: true });
   },
 });

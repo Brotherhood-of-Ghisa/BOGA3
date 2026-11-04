@@ -106,6 +106,7 @@ function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: () => Pr
   };
   // A workout opened or ended here: known without another read.
   const show = useCallback((activeSessionId: string | null) => {
+    setEndsOnReturn(false);
     setCheck({ status: 'done', activeSessionId });
     setWorkoutId(activeSessionId);
   }, []);

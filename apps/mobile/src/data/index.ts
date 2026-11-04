@@ -37,6 +37,8 @@ export {
   type UpsertLocalGymInput,
 } from './local-gyms';
 export {
+  ActiveSessionConflictError,
+  SessionUnavailableError,
   calculateSessionDurationSec,
   completeSessionDraft,
   createDrizzleSessionDraftStore,

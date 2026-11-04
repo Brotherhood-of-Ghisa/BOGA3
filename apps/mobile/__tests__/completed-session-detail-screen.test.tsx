@@ -11,6 +11,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { BackHandler, StyleSheet } from 'react-native';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { setAccountLocalPreferenceAccount, setAccountLocalPreferences } from '@/src/preferences/account-local';
+import { ActiveSessionConflictError, SessionUnavailableError } from '@/src/data/session-drafts';
+import { subscribeOpenedWorkout } from '@/components/navigation/use-open-main-tab';
 
 import CompletedSessionDetailRoute, {
   CompletedSessionDetailScreenShell,
@@ -500,6 +502,67 @@ describe('CompletedSessionDetailScreenShell', () => {
     fireEvent.press(screen.getByTestId('completed-session-detail-options-button'));
     return screen.getByTestId('completed-session-detail-options-sheet');
   };
+
+  it('suppresses Resume, Delete and Edit while a resume write is pending and navigates only after success', async () => {
+    let resolve!: (result: { sessionId: string }) => void;
+    const resumeCompletedSession = jest.fn().mockReturnValue(new Promise((done) => { resolve = done; }));
+    const client = detailClient({ resumeCompletedSession });
+    await renderDetail(client);
+    openSessionOptions();
+    fireEvent.press(screen.getByTestId('completed-session-detail-resume-button'));
+    expect(mockDismissTo).not.toHaveBeenCalled();
+    expect(screen.getByTestId('completed-session-detail-edit-button')).toBeDisabled();
+    openSessionOptions();
+    expect(screen.getByTestId('completed-session-detail-resume-button')).toBeDisabled();
+    expect(screen.getByTestId('completed-session-detail-resume-button')).toHaveTextContent('Resuming session…');
+    fireEvent.press(screen.getByTestId('completed-session-detail-resume-button'));
+    fireEvent.press(screen.getByTestId('completed-session-detail-delete-button'));
+    expect(resumeCompletedSession).toHaveBeenCalledTimes(1);
+    expect(client.setCompletedSessionDeletedState).not.toHaveBeenCalled();
+    await act(async () => resolve({ sessionId: 'completed-under-test' }));
+    expect(mockDismissTo).toHaveBeenCalledWith('/train');
+  });
+
+  it('keeps a failed resume completed and retryable', async () => {
+    const resumeCompletedSession = jest.fn().mockRejectedValueOnce(new Error('Unable to save. Try again.'))
+      .mockResolvedValue({ sessionId: 'completed-under-test' });
+    await renderDetail(detailClient({ resumeCompletedSession }));
+    openSessionOptions();
+    fireEvent.press(screen.getByTestId('completed-session-detail-resume-button'));
+    expect(await screen.findByText('Unable to save. Try again.')).toBeTruthy();
+    expect(mockDismissTo).not.toHaveBeenCalled();
+    expect(screen.getByTestId('completed-session-detail-edit-button')).toBeEnabled();
+    openSessionOptions();
+    fireEvent.press(screen.getByTestId('completed-session-detail-resume-button'));
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith('/train'));
+    expect(resumeCompletedSession).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers the conflicting current workout without navigating or changing the requested session', async () => {
+    const opened = jest.fn();
+    const unsubscribe = subscribeOpenedWorkout(opened);
+    try {
+      const resumeCompletedSession = jest.fn().mockRejectedValue(new ActiveSessionConflictError('current-workout'));
+      await renderDetail(detailClient({ resumeCompletedSession }));
+      openSessionOptions();
+      fireEvent.press(screen.getByTestId('completed-session-detail-resume-button'));
+      expect(await screen.findByText('Another session is already in progress. Finish or abandon it first.')).toBeTruthy();
+      expect(mockDismissTo).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId('completed-session-detail-open-active'));
+      expect(opened).toHaveBeenCalledWith('current-workout');
+      expect(mockDismissTo).toHaveBeenCalledWith('/train');
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('replaces stale detail with the unavailable state when the target was removed before Resume', async () => {
+    await renderDetail(detailClient({ resumeCompletedSession: jest.fn().mockRejectedValue(new SessionUnavailableError()) }));
+    openSessionOptions();
+    fireEvent.press(screen.getByTestId('completed-session-detail-resume-button'));
+    expect(await screen.findByTestId('completed-session-detail-empty')).toBeTruthy();
+    expect(mockDismissTo).not.toHaveBeenCalled();
+  });
 
   it('asks for the bests before this session and bands the set that beats them', async () => {
     const loadHistoricalBests = jest.fn().mockResolvedValue(

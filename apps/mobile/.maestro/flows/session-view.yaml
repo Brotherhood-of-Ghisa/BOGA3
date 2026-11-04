@@ -17,6 +17,8 @@ appId: com.dinoderek.mobile
 #      and its Done to Progress;
 #   6. ⋮ → Abandon asks for confirmation, then lands on Train with Start and
 #      no Resume.
+#   7. completed detail's native options modal → Resume returns the just-finished
+#      workout to Train with its saved cards, then Finish works again.
 # Why device:
 #   1., 2. and 6. root-stack and tab navigation (Jest mocks the tab
 #      navigator, so only the device shows the workout kept on Train);
@@ -24,6 +26,8 @@ appId: com.dinoderek.mobile
 #      re-presented on focus;
 #   4. a native page-sheet route over the session view, and the keyboard;
 #   5. the summary pushed over the tabs after Finish, and a native alert.
+#   7. the modal-to-tab handoff and deferred Train focus after Finish need the
+#      native navigator; Jest replaces it and proves the persistence/timer rules.
 # Jest counterpart: __tests__/session-view-screen.test.tsx (summary and
 #   cards, record band, live comparison, ⋮ sheet, gym picking and
 #   suggestions, the Gyms round trip, the picker add, cleanup prompts, abandon
@@ -42,6 +46,25 @@ appId: com.dinoderek.mobile
           visible:
             id: "stats-history-screen"
           timeout: 30000
+
+# A conflicting Resume must leave the completed workout intact, and its link
+# must cross from completed detail back into the actual current Train tab.
+- openLink: "boga3://maestro-harness?teleport=completed-session&sessionId=maestro_m24_completion_one_pr"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-options-button"
+    timeout: 20000
+- tapOn:
+    id: "completed-session-detail-options-button"
+- tapOn:
+    id: "completed-session-detail-resume-button"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-open-active"
+    timeout: 10000
+- takeScreenshot: "00-resume-conflict"
+- tapOn:
+    id: "completed-session-detail-open-active"
 
 # --- 1. The Train tab lands on the workout in progress ---
 - waitForAnimationToEnd:
@@ -180,6 +203,41 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - tapOn:
     text: "Remove and submit"
+- extendedWaitUntil:
+    visible:
+      id: "session-completion-presentation"
+    timeout: 20000
+- tapOn:
+    id: "session-completion-done"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 20000
+
+# --- 7. Resume the workout just finished: no reset or replacement graph ---
+- openLink: "boga3://maestro-harness?teleport=completed-session&sessionId=maestro_session_view_active"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-options-button"
+    timeout: 20000
+- tapOn:
+    id: "completed-session-detail-options-button"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-resume-button"
+    timeout: 10000
+- takeScreenshot: "04-completed-session-resume-options"
+- tapOn:
+    id: "completed-session-detail-resume-button"
+- extendedWaitUntil:
+    visible:
+      text: "Incline Dumbbell Press, 3 of 3 sets done"
+    timeout: 20000
+- assertNotVisible:
+    id: "train-start-empty-button"
+- takeScreenshot: "05-resumed-session-on-train"
+- tapOn:
+    id: "session-view-finish-button"
 - extendedWaitUntil:
     visible:
       id: "session-completion-presentation"

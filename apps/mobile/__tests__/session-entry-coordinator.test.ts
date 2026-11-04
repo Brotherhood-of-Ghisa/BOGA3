@@ -14,11 +14,48 @@ const deferred = <T,>() => {
 };
 
 const dependencies = (): jest.Mocked<SessionEntryDependencies> => ({
+  reopenCompletedSession: jest.fn().mockImplementation(async (sessionId) => ({ sessionId })),
   loadActiveSessionId: jest.fn().mockResolvedValue(null),
   createEmptySession: jest.fn().mockResolvedValue({ sessionId: 'new-session' }),
 });
 
 describe('session-entry coordinator', () => {
+  it('waits for Start before checking a Resume target and surfaces its own conflict', async () => {
+    const deps = dependencies();
+    const create = deferred<{ sessionId: string }>();
+    deps.createEmptySession.mockReturnValue(create.promise);
+    deps.reopenCompletedSession.mockRejectedValue(new Error('another workout is active'));
+    const coordinator = createSessionEntryCoordinator(deps);
+    const started = coordinator.startEmptyOrResume();
+    const resumed = coordinator.resumeCompletedSession('finished');
+    expect(deps.reopenCompletedSession).not.toHaveBeenCalled();
+    create.resolve({ sessionId: 'new-session' });
+    await expect(started).resolves.toMatchObject({ sessionId: 'new-session' });
+    await expect(resumed).rejects.toThrow('another workout is active');
+    expect(deps.reopenCompletedSession).toHaveBeenCalledWith('finished');
+  });
+
+  it('opens the resumed workout when Start arrives during Resume instead of creating a new one', async () => {
+    const deps = dependencies();
+    const reopen = deferred<{ sessionId: string }>();
+    deps.reopenCompletedSession.mockReturnValue(reopen.promise);
+    const coordinator = createSessionEntryCoordinator(deps);
+    const resumed = coordinator.resumeCompletedSession('finished');
+    const started = coordinator.startEmptyOrResume();
+    reopen.resolve({ sessionId: 'finished' });
+    await expect(Promise.all([resumed, started])).resolves.toEqual([
+      { kind: 'resumed', sessionId: 'finished' }, { kind: 'resumed', sessionId: 'finished' },
+    ]);
+    expect(deps.createEmptySession).not.toHaveBeenCalled();
+  });
+
+  it('releases a failed Resume so a later Start can succeed', async () => {
+    const deps = dependencies();
+    deps.reopenCompletedSession.mockRejectedValue(new Error('write failed'));
+    const coordinator = createSessionEntryCoordinator(deps);
+    await expect(coordinator.resumeCompletedSession('finished')).rejects.toThrow('write failed');
+    await expect(coordinator.startEmptyOrResume()).resolves.toMatchObject({ kind: 'started' });
+  });
   it('resumes the current draft instead of creating another one', async () => {
     const deps = dependencies();
     deps.loadActiveSessionId.mockResolvedValue('active-session');

@@ -60,6 +60,7 @@ import {
   loadSessionSnapshotById,
   persistCompletedSessionSnapshot,
   persistSessionDraftSnapshot,
+  reopenCompletedSessionDraft,
 } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
 import { writeBodyweightCalculationsEnabled } from '@/src/data/user-settings';
@@ -333,6 +334,17 @@ describe('exercise session facts — incremental maintenance equals a full rebui
 
     expectIncrementalEqualsFullRebuild([BENCH]);
     expect(factFor(sessionId, BENCH)).toMatchObject({ prE1rm: true, prWeight: true, topWeightKg: 110 });
+  });
+
+  it('reopening removes completed facts and re-completion rebuilds them at the final end without duplicating records', async () => {
+    await reopenCompletedSessionDraft('s3', { now: day(8) });
+    expectIncrementalEqualsFullRebuild([BENCH, DIP]);
+    expect(factFor('s3', BENCH)).toBeUndefined();
+    expect(factFor('s3', DIP)).toBeUndefined();
+    await completeSessionDraft('s3', { now: day(9) });
+    expectIncrementalEqualsFullRebuild([BENCH, DIP]);
+    expect(factFor('s3', BENCH)).toMatchObject({ achievedAt: day(9), prWeight: true });
+    expect(factFor('s3', DIP)).toMatchObject({ achievedAt: day(9), prWeight: false });
   });
 
   it('completed-edit: changing an older set recomputes later flags', async () => {

@@ -167,6 +167,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/today` | `/sessions`, `/completed-session/<id>`, `/train` | the Progress section's and Plan's `Sessions`, the latest-session row (or the session its arrows stepped to), the empty panel's `Open Train` (`push`) |
 | `/exercise-history` | `/completed-session/<id>` | a session card or an all-time-best row |
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
+| `/completed-session/<id>` | `/train` | ⋮ `Resume session` in either section, after reopening the same workout; another active workout blocks it and offers `Open current session`. Deleted/missing targets cannot resume |
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`dismissTo`) |
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
 | `/more` | `/exercise-catalog`, `/gyms`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
