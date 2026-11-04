@@ -178,21 +178,23 @@ describe('Today: the Progress card over real data', () => {
     const weeklyToggle = () => text('today-progress-week-working-sets-metric-toggle');
     const chartUnits = () => text('today-progress-period-working-sets');
     expect(weeklyToggle()).toHaveProp('accessibilityRole', 'button');
-    expect(weeklyToggle()).toHaveStyle({ flex: 2 });
+    expect(weeklyToggle()).toHaveStyle({ flex: 1 });
     for (const [id, label] of [['sessions', 'Sessions'], ['working-sets', 'Sets'], ['prs', 'PRs']]) {
+      expect(text(`today-progress-week-${id}`)).toHaveStyle({ flex: 1 });
       expect(within(text(`today-progress-week-${id}`)).getByText(label).parent?.parent).toHaveStyle({ minHeight: uiIconSize.sm });
     }
     fireEvent.press(weeklyToggle());
-    expect(weeklyToggle()).toHaveStyle({ flex: 2 });
+    expect(weeklyToggle()).toHaveStyle({ flex: 1 });
     expect(weeklyToggle()).toHaveTextContent(/Tons/);
     expect(chartUnits()).toHaveTextContent(/ t/);
     expect(screen.queryByTestId('today-progress-period-metric-toggle')).toBeNull();
-    expect(text('today-progress-week-working-sets-value')).toHaveTextContent('3.225');
-    expect(text('today-progress-week-working-sets-previous')).toHaveTextContent('vs 6.15');
+    expect(text('today-progress-week-working-sets-value')).toHaveTextContent('3.2');
+    expect(text('today-progress-week-working-sets-previous')).toHaveTextContent('vs 6.2');
+    expect(weeklyToggle()).toHaveProp('accessibilityLabel', 'Tonnes 3.2, vs 6.2 last week. Switch to sets');
     expect(text('today-progress-week-working-sets-bar-fill')).toHaveStyle({ width: '52%' });
-    expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 9.375 t');
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 9.4 t');
     expect(text('today-progress-period-difference')).toHaveTextContent('new');
-    expect(text('today-progress-chart')).toHaveProp('accessibilityLabel', expect.stringContaining('On course for 21.875 tonnes.'));
+    expect(text('today-progress-chart')).toHaveProp('accessibilityLabel', expect.stringContaining('On course for 21.9 tonnes.'));
     const annotations = () => ['elephant', 'wagon'].map(id => drawing(`today-tonnage-line-${id}`).props.y1);
     const positions = annotations();
     expect(drawing('today-tonnage-references')).toHaveProp('pointerEvents', 'none');
@@ -212,7 +214,8 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
 
     fireEvent(text('today-progress-chart'), 'responderRelease', { nativeEvent: { locationX: 318 } });
-    expect(text('today-progress-period-working-sets')).toHaveTextContent('1 Nov 26 21.875 t');
+    expect(text('today-progress-period-working-sets')).toHaveTextContent('1 Nov 26 21.9 t');
+    expect(text('today-progress-period-previous-sets')).toHaveTextContent('3.1 t');
     expect(text('today-progress-period-difference')).toHaveTextContent('+611%');
     expect(annotations()).toEqual(positions);
     fireEvent(text('today-progress-chart'), 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
@@ -220,7 +223,7 @@ describe('Today: the Progress card over real data', () => {
     fireEvent(text('today-progress-chart'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     fireEvent.press(weeklyToggle());
     expect(weeklyToggle()).toHaveTextContent(/Sets/);
-    expect(weeklyToggle()).toHaveStyle({ flex: 2 });
+    expect(weeklyToggle()).toHaveStyle({ flex: 1 });
     expect(text('today-progress-week-working-sets-value')).toHaveTextContent('6');
     expect(text('today-progress-period-working-sets')).toHaveTextContent('1 Nov 26 42 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('+36');
@@ -232,7 +235,7 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-day')).toHaveTextContent('1 Nov 26');
     expect(text('today-progress-period-previous-range')).toHaveTextContent('10 Aug – 6 Sep 26');
     expect(within(drawing('today-tonnage-label-wagon')).UNSAFE_getByType(TSpan).props.children).toBe('≈20 t');
-    expect(text('today-progress-week-working-sets-previous')).toHaveTextContent('vs 6.15');
+    expect(text('today-progress-week-working-sets-previous')).toHaveTextContent('vs 6.2');
     view.unmount();
     await renderToday();
     expect(weeklyToggle()).toHaveTextContent(/Tons/);
@@ -293,7 +296,7 @@ describe('Today: the Progress card over real data', () => {
     await logHistory();
     await renderToday();
     fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
-    expect(text('today-progress-week-working-sets-value')).toHaveTextContent('3.225');
+    expect(text('today-progress-week-working-sets-value')).toHaveTextContent('3.2');
     act(() => updatePreferences({ volumeEfforts: [] }));
     await waitFor(() => expect(text('today-progress-week-working-sets-value')).toHaveTextContent('0'));
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 0 t');

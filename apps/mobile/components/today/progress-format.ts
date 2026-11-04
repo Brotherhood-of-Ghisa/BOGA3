@@ -78,7 +78,7 @@ export const clampPeriodDay = (period: TodayProgressPeriod, dayIndex: number | n
 
 /** Today’s tonnes presentation follows [[copy.no-weight-unit]]. */
 export const formatTonnes = (volume: number | null): string =>
-  volume === null || !Number.isFinite(volume) ? '—' : String(Math.round(volume) / 1000);
+  volume === null || !Number.isFinite(volume) ? '—' : String(Math.round(volume / 100) / 10);
 
 export const formatPaceValue = (value: number | null, metric: ProgressMetric): string =>
   value === null ? '—' : metric === 'totalVolume' ? formatTonnes(value) : String(value);
