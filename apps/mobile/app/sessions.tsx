@@ -39,6 +39,10 @@ export type SessionsScreenProps = {
   jumpTo?: HistoryJump | null;
 };
 
+/**
+ * The planning queues hide completed summaries until Show completed plans is on.
+ * Both view options last for this screen mount; workout history is independent.
+ */
 export function SessionsScreen({
   dataClient,
   initialSessions = DEFAULT_SESSION_LIST_ITEMS,
@@ -46,6 +50,7 @@ export function SessionsScreen({
   jumpTo = null,
 }: SessionsScreenProps) {
   const router = useRouter();
+  const [showCompletedPlans, setShowCompletedPlans] = useState(false);
   const [showDeletedSessions, setShowDeletedSessions] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [activeDurationNowMs, setActiveDurationNowMs] = useState(() => Date.now());
@@ -58,6 +63,9 @@ export function SessionsScreen({
       isFocused,
     });
   const planSections = usePlanSections();
+  const upcoming = planSections.upcoming.filter((plan) => showCompletedPlans || plan.progress !== 'completed');
+  const unscheduled = planSections.unscheduled.filter((plan) => showCompletedPlans || plan.progress !== 'completed');
+  const programmes = planSections.programmes.filter((programme) => showCompletedPlans || programme.progress !== 'completed');
 
   const activeSession = sessions.find(
     (session) => session.status === 'active' && session.deletedAt === null
@@ -74,9 +82,9 @@ export function SessionsScreen({
   const planningEmpty =
     !planSections.isLoading &&
     !planSections.loadErrorMessage &&
-    planSections.upcoming.length === 0 &&
-    planSections.unscheduled.length === 0 &&
-    planSections.programmes.length === 0;
+    upcoming.length === 0 &&
+    unscheduled.length === 0 &&
+    programmes.length === 0;
 
   const showGlobalEmptyState =
     !isLoadingSessions &&
@@ -169,15 +177,15 @@ export function SessionsScreen({
       <PlanSection
         label="Upcoming"
         onOpenPlan={openPlan}
-        plans={planSections.upcoming}
+        plans={upcoming}
         testID="sessions-plan-section-upcoming"
       />
       <PlanSection
         label="Unscheduled"
         onOpenPlan={openPlan}
         onOpenProgramme={openProgramme}
-        plans={planSections.unscheduled}
-        programmes={planSections.programmes}
+        plans={unscheduled}
+        programmes={programmes}
         testID="sessions-plan-section-unscheduled"
       />
     </>
@@ -218,8 +226,13 @@ export function SessionsScreen({
         onDismiss={() => setOptionsVisible(false)}
         testID="sessions-options-sheet"
         visible={optionsVisible}>
-        {/* A view option: deleted sessions join their weeks, faded and tagged. */}
         <View style={styles.options}>
+          <SwitchRow
+            label="Show completed plans"
+            onValueChange={setShowCompletedPlans}
+            testID="toggle-completed-plans"
+            value={showCompletedPlans}
+          />
           <SwitchRow
             label="Show deleted sessions"
             onValueChange={setShowDeletedSessions}
