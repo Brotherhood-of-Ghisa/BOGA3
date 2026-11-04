@@ -196,20 +196,20 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-difference')).toHaveTextContent('new');
     expect(text('today-progress-chart')).toHaveProp('accessibilityLabel', expect.stringContaining('On course for 21.9 tonnes.'));
     const annotations = () => ['elephant', 'wagon'].map(id => drawing(`today-tonnage-line-${id}`).props.y1);
-    const positions = annotations();
     expect(drawing('today-tonnage-references')).toHaveProp('pointerEvents', 'none');
-    for (const [id, label] of [['elephant', '≈6 t'], ['wagon', '≈20 t']]) {
+    for (const [id, label] of [['elephant', '≈6 t']]) {
       expect(within(drawing(`today-tonnage-label-${id}`)).UNSAFE_getByType(TSpan).props.children).toBe(label);
       expect(drawing(`today-tonnage-icon-${id}`)).toBeTruthy();
       expect(drawing(`today-tonnage-label-${id}`).props.accessibilityLabel).toBeUndefined();
       expect(screen.queryByTestId(`today-tonnage-label-${id}`)).toBeNull();
     }
-    expect(text('today-progress-chart').props.accessibilityLabel).toContain('empty freight wagon, approximately 20 tonnes.');
-    expect(text('today-progress-chart').props.accessibilityLabel).toContain('African elephant, approximately 6 tonnes.');
+    expect(screen.queryByTestId('today-tonnage-line-wagon', { includeHiddenElements: true })).toBeNull();
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain('empty freight wagon');
+    expect(text('today-progress-chart').props.accessibilityValue.text).toContain('African elephant, approximately 6 tonnes.');
     expect(screen.queryByTestId('today-tonnage-label-van', { includeHiddenElements: true })).toBeNull();
     expect(screen.queryByTestId('today-tonnage-line-compact', { includeHiddenElements: true })).toBeNull();
     expect(screen.queryByTestId('today-tonnage-icon-saloon', { includeHiddenElements: true })).toBeNull();
-    expect(text('today-progress-chart').props.accessibilityLabel).not.toContain('car');
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain('car');
     expect(text('today-progress-week-sessions-value')).toHaveTextContent('1');
     expect(text('today-progress-week-prs-value')).toHaveTextContent('3');
 
@@ -217,7 +217,9 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-working-sets')).toHaveTextContent('1 Nov 26 21.9 t');
     expect(text('today-progress-period-previous-sets')).toHaveTextContent('3.1 t');
     expect(text('today-progress-period-difference')).toHaveTextContent('+611%');
-    expect(annotations()).toEqual(positions);
+    expect(within(drawing('today-tonnage-label-wagon')).UNSAFE_getByType(TSpan).props.children).toBe('≈20 t');
+    expect(text('today-progress-chart').props.accessibilityValue.text).toContain('empty freight wagon, approximately 20 tonnes.');
+    const positions = annotations();
     fireEvent(text('today-progress-chart'), 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
     expect(annotations()).toEqual(positions);
     fireEvent(text('today-progress-chart'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
@@ -228,7 +230,7 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-working-sets')).toHaveTextContent('1 Nov 26 42 sets');
     expect(text('today-progress-period-difference')).toHaveTextContent('+36');
     expect(screen.queryByTestId('today-tonnage-label-wagon', { includeHiddenElements: true })).toBeNull();
-    expect(text('today-progress-chart').props.accessibilityLabel).not.toContain('freight wagon');
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain('freight wagon');
     fireEvent.press(text('today-progress-period-compare-older'));
     await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('10 Aug – 6 Sep 26'));
     fireEvent.press(weeklyToggle());
@@ -243,13 +245,44 @@ describe('Today: the Progress card over real data', () => {
     expect(screen.queryByTestId('today-progress-period-metric-toggle')).toBeNull();
   });
 
+  it('updates drawn and spoken references when stepping to a heavier comparison period', async () => {
+    await bootLocalApp();
+    await logSession('september-heavy', local(2026, 9, 15, 9), 6000);
+    await logSession('october-light', local(2026, 10, 15, 9), 100);
+    await renderToday();
+    fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
+    expect(text('today-progress-chart').props.accessibilityValue.text).toContain('small passenger ferry, approximately 80 tonnes.');
+    expect(drawing('today-tonnage-line-ferry')).toBeTruthy();
+    fireEvent(text('today-progress-chart'), 'responderRelease', { nativeEvent: { locationX: 0 } });
+    expect(screen.queryByTestId('today-tonnage-line-elephant', { includeHiddenElements: true })).toBeNull();
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain('small passenger ferry');
+    for (let day = 0; day < 8; day += 1) {
+      fireEvent(text('today-progress-chart'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    }
+    expect(drawing('today-tonnage-line-ferry')).toBeTruthy();
+    expect(text('today-progress-chart').props.accessibilityValue.text).toContain('small passenger ferry, approximately 80 tonnes.');
+
+    fireEvent.press(text('today-progress-period-compare-older'));
+    await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('10 Aug – 6 Sep 26'));
+    expect(screen.queryByTestId('today-tonnage-line-wagon', { includeHiddenElements: true })).toBeNull();
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain('small passenger ferry');
+
+    fireEvent.press(text('today-progress-period-compare-newer'));
+    await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('7 Sep – 4 Oct 26'));
+    expect(drawing('today-tonnage-line-ferry')).toBeTruthy();
+    expect(text('today-progress-chart').props.accessibilityValue.text).toContain('small passenger ferry, approximately 80 tonnes.');
+  });
+
   it('renders and speaks separate whale and ferry lines from real logged volume', async () => {
     await bootLocalApp();
     await logSession('high-volume', local(2026, 10, 15, 9), 2300);
     await renderToday();
     fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
-    expect(text('today-progress-chart')).toHaveStyle({ minHeight: 120 });
+    expect(screen.queryByTestId('today-tonnage-line-humpback', { includeHiddenElements: true })).toBeNull();
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain('whale');
     fireEvent(text('today-progress-chart'), 'layout', { nativeEvent: { layout: { width: 311, height: 120 } } });
+    fireEvent(text('today-progress-chart'), 'responderRelease', { nativeEvent: { locationX: 303 } });
+    expect(text('today-progress-chart')).toHaveStyle({ minHeight: 120 });
     const y = [];
     for (const [id, label, spoken] of [
       ['humpback', '≈40 t', 'humpback whale, approximately 40 tonnes.'],
@@ -259,7 +292,7 @@ describe('Today: the Progress card over real data', () => {
       expect(within(drawing(`today-tonnage-label-${id}`)).UNSAFE_getByType(TSpan).props.children).toBe(label);
       expect(drawing(`today-tonnage-icon-${id}`)).toBeTruthy();
       y.push(drawing(`today-tonnage-line-${id}`).props.y1);
-      expect(text('today-progress-chart').props.accessibilityLabel).toContain(spoken);
+      expect(text('today-progress-chart').props.accessibilityValue.text).toContain(spoken);
       expect(screen.queryByTestId(`today-tonnage-icon-${id}`)).toBeNull();
     }
     expect(new Set(y).size).toBe(3);
@@ -272,7 +305,7 @@ describe('Today: the Progress card over real data', () => {
     }
     fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
     expect(screen.queryByTestId('today-tonnage-icon-humpback', { includeHiddenElements: true })).toBeNull();
-    expect(text('today-progress-chart').props.accessibilityLabel).not.toContain('whale');
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain('whale');
   });
 
   it('keeps both sections on the durable metric after a failed save and retries together', async () => {

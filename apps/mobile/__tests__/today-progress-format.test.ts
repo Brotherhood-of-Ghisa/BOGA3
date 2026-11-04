@@ -386,7 +386,7 @@ describe('tonnage pace', () => {
     expect(periodDayFigures(input, 0, 'totalVolume').value).toBe(125);
     expect(periodDayFigures(input, 27, 'totalVolume').value).toBe(input.projectedVolumeKgReps);
     expect(periodChartAccessibilityLabel(input, 'totalVolume')).toContain('Cumulative tonnage: this period 12.5 tonnes');
-    expect(periodChartAccessibilityValue(input, today)).toBe('Today: 12.5 tonnes, last period 11.1 tonnes');
+    expect(periodChartAccessibilityValue(input, today)).toBe('Today: 12.5 tonnes, last period 11.1 tonnes African elephant, approximately 6 tonnes.');
     expect(periodFiguresAccessibilityLabel(input, today)).toContain('12.5 tonnes');
     expect(periodFiguresAccessibilityLabel(input, today)).toContain('+12%');
   });
@@ -424,6 +424,7 @@ describe('tonnage weight references', () => {
     result.toDate.volumeKgReps = actual;
     result.cumulativeVolumeKgReps = [0, ...Array(18).fill(actual)];
     result.projectedVolumeKgReps = projected;
+    result.previous.toSameDay.volumeKgReps = previous;
     result.previous.total.volumeKgReps = previous;
     result.previous.cumulativeVolumeKgReps = days(28, () => previous);
     return result;
@@ -459,30 +460,33 @@ describe('tonnage weight references', () => {
     expect(thresholds(input(threshold - 0.1))).toEqual(lower);
     expect(thresholds(input(threshold))).toEqual([...lower, threshold]);
     expect(thresholds(input(threshold + 0.1))).toEqual([...lower, threshold]);
-    expect(thresholds(input(0, threshold))).toEqual([...lower, threshold]);
+    expect(eligibleTonnageReferences([0, threshold]).map(reference => reference.value)).toEqual([...lower, threshold]);
+    expect(thresholds(input(0, 0, threshold - 0.1))).toEqual(lower);
+    expect(thresholds(input(0, 0, threshold))).toEqual([...lower, threshold]);
   });
 
-  it('uses every known current value, regardless of a lower/missing projection or larger comparison', () => {
+  it('uses finite selected values from either period and ignores the unselected projection', () => {
     expect(thresholds(input(1200, 4200))).toEqual([]);
-    expect(thresholds(input(1200, 8400))).toEqual([6000]);
+    expect(thresholds(input(1200, 8400))).toEqual([]);
     expect(thresholds(input(6000, 100))).toEqual([6000]);
     expect(thresholds(input(6000, null))).toEqual([6000]);
     expect(thresholds(input(2500, null))).toEqual([]);
     expect(thresholds(input(19999, null))).toEqual([6000]);
-    expect(thresholds(input(900, 900, 30000))).toEqual([]);
-    expect(thresholds(input(null, null, 30000))).toEqual([]);
+    expect(thresholds(input(900, 900, 30000))).toEqual([6000, 20000]);
+    expect(thresholds(input(null, null, 30000))).toEqual([6000, 20000]);
     expect(thresholds(input(0))).toEqual([]);
-    expect(thresholds(input(null, 6000))).toEqual([6000]);
-    const incomplete = input(null, Number.POSITIVE_INFINITY, 30000);
+    expect(thresholds(input(null, 6000))).toEqual([]);
+    const incomplete = input(null, Number.POSITIVE_INFINITY, Number.NaN);
     incomplete.cumulativeVolumeKgReps = [Number.NaN, 6000, null, Number.NEGATIVE_INFINITY];
-    incomplete.previous.cumulativeVolumeKgReps[0] = Number.NaN;
+    incomplete.previous.cumulativeVolumeKgReps = [Number.NaN, 20000, null, Number.POSITIVE_INFINITY];
     const geometry = chart(incomplete);
-    expect(geometry.references.map(reference => reference.value)).toEqual([6000]);
+    expect(geometry.references).toEqual([]);
     expect(geometry.current).toHaveLength(1);
     expect(geometry.today.current).toBeNull();
     expect(geometry.projection).toBeNull();
     expect(geometry.previous.every(point => Number.isFinite(point.y))).toBe(true);
-    expect(eligibleTonnageReferences({ cumulative: [NaN, Infinity, null], toDate: null, projected: null })).toEqual([]);
+    expect(eligibleTonnageReferences([NaN, Infinity, -Infinity, null])).toEqual([]);
+    expect(eligibleTonnageReferences([NaN, 20000, Infinity, null]).map(reference => reference.value)).toEqual([6000, 20000]);
   });
 
   it('adds exactly the missing top clearance, idempotently, without unlocking the next reference', () => {
@@ -542,20 +546,30 @@ describe('tonnage weight references', () => {
     }
   });
 
-  it('keeps scale and membership through scrubbing and changes only scale when stepping comparison', () => {
-    const data = input(1200, 8400);
+  it('follows selected-day totals from either period while retaining the full curves', () => {
+    const data = input(15000, 15000 / 19 * 28, 20000);
+    data.cumulativeVolumeKgReps = days(19, day => day < 3 ? 0 : 15000);
+    data.previous.total.volumeKgReps = 100000;
+    data.previous.cumulativeVolumeKgReps = days(28, day => day < 3 ? 0 : day < 19 ? 20000 : 100000);
     const today = chart(data);
-    for (const day of [0, 18, 27]) {
+    expect(today.references.map(reference => reference.value)).toEqual([6000, 20000]);
+    for (const [day, expected] of [[0, []], [18, [6000, 20000]], [27, [6000, 20000, 40000, 60000, 80000]]] as const) {
       const selected = chart(data, 326, 126, day);
-      expect(selected.references).toEqual(today.references);
-      expect(selected.current).toEqual(today.current);
-      expect(selected.previous).toEqual(today.previous);
-      expect(selected.projection).toEqual(today.projection);
+      expect(selected.references.map(reference => reference.value)).toEqual(expected);
+      expect(selected.current.map(point => point.x)).toEqual(today.current.map(point => point.x));
+      expect(selected.previous.map(point => point.x)).toEqual(today.previous.map(point => point.x));
+      expect(selected.projection?.from.x).toBe(today.projection?.from.x);
+      expect(selected.projection?.to.x).toBe(today.projection?.to.x);
+      const spoken = periodChartAccessibilityValue(data, periodDayFigures(data, day, 'totalVolume'));
+      for (const reference of TONNAGE_REFERENCES) {
+        expect(spoken.includes(reference.spoken)).toBe(selected.references.some(item => item.id === reference.id));
+      }
     }
-    const compared = chart(input(1200, 8400, 30000));
-    expect(compared.references.map(reference => reference.value)).toEqual([6000]);
-    expect(compared.references[0].y).toBeGreaterThan(today.references[0].y);
+    const currentOnly = input(15000, 15000 / 19 * 28);
+    expect(chart(currentOnly).references.map(reference => reference.value)).toEqual([6000]);
+    expect(chart(currentOnly, 326, 126, 27).references.map(reference => reference.value)).toEqual([6000, 20000]);
+    expect(periodChartAccessibilityLabel(data, 'totalVolume')).not.toContain('African elephant');
     expect(periodChartGeometry(data, 326).references).toEqual([]);
-    expect(periodChartGeometry(data, 326).current[18].y).toBe(6);
+    expect(periodChartAccessibilityValue(data, periodDayFigures(data, 27))).not.toContain('whale');
   });
 });

@@ -17,18 +17,17 @@ export const TONNAGE_REFERENCES = [
 ] as const;
 
 type Reference = typeof TONNAGE_REFERENCES[number];
-type CurrentSeries = { cumulative: (number | null)[]; toDate: number | null; projected: number | null };
 export const REFERENCE_STROKE = 0.75;
 export const REFERENCE_ICON_WIDTH = uiSpace.xxl;
 export const REFERENCE_HEIGHT = uiText.figureSmall.lineHeight;
 export const REFERENCE_GAP = uiSpace.xs;
 
-export const finiteMaximum = (values: (number | null)[]): number =>
+export const finiteMaximum = (values: readonly (number | null)[]): number =>
   values.reduce<number>((maximum, value) => value !== null && Number.isFinite(value) ? Math.max(maximum, value) : maximum, 0);
 
 /** Eligibility before fitting: [[comparison.tonnage-references]]. */
-export const eligibleTonnageReferences = (series: CurrentSeries): readonly Reference[] => {
-  const reach = finiteMaximum([...series.cumulative, series.toDate, series.projected]);
+export const eligibleTonnageReferences = (values: readonly (number | null)[]): readonly Reference[] => {
+  const reach = finiteMaximum(values);
   return TONNAGE_REFERENCES.filter(reference => reference.value <= reach);
 };
 
