@@ -138,7 +138,7 @@ describe('Programme detail', () => {
     expect(within(heading).queryAllByText('1')).toHaveLength(0);
     expect(style(screen.getByText('Heavy day'))).toMatchObject({ ...BODY_STRONG, flex: 1 });
     expect(style(screen.getByText('Planned'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
-    expectFigureInWords(screen.getByText(/· 3 blocks$/), '28-10-2026');
+    expectFigureInWords(screen.getByText(/· 3 blocks · 1 completed · 0 skipped$/), '28-10-2026');
   });
 
   it('asks which card in body, names each card in bodyStrong and counts its sets in meta', () => {

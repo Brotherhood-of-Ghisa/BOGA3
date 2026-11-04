@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Card, FigureText, IconButton, uiSpace, uiText } from '@/components/ui';
 import type { PlanDetailView } from '@/src/session-planner';
+import { blockCountsLabel } from './progress-labels';
 
 export type PlanDetailSummaryProps = {
   detail: PlanDetailView;
@@ -18,14 +19,6 @@ export type PlanDetailSummaryProps = {
 const PROVENANCE_LABEL: Record<PlanDetailView['provenance'], string | null> = {
   human: null,
   agent: 'Coached plan',
-};
-
-const progressLine = (detail: PlanDetailView): string => {
-  const counts = detail.blockCounts;
-  const done = counts.completed + counts.skipped;
-  const total = done + counts.pending + counts.attached;
-  if (total === 0) return 'No blocks yet';
-  return `${done} of ${total} blocks done`;
 };
 
 /**
@@ -48,7 +41,7 @@ export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDup
             </FigureText>
           </Text>
           <Text allowFontScaling={false} style={uiText.meta} testID="plan-detail-progress">
-            <FigureText>{progressLine(detail)}</FigureText>
+            <FigureText>{blockCountsLabel(detail.blockCounts)}</FigureText>
           </Text>
           {detail.programmeId !== null ? (
             <Text allowFontScaling={false} style={uiText.meta} testID="plan-detail-programme-badge">

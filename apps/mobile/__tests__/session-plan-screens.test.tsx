@@ -609,18 +609,24 @@ describe('plan detail: edit, skip, and the recorder complete', () => {
     expect(detail?.blocks[0].targets[0]).toMatchObject({ targetWeightValue: '100' });
   });
 
-  it('Skip without doing it resolves the pending block with no performed rows', async () => {
+  it('Skip resolves the pending block with no performed rows', async () => {
     await seedCatalog();
     const planId = await createPlanThroughRepository();
     await openDetail(planId);
 
-    fireEvent.press(screen.getByTestId('plan-detail-block-1-skip'));
+    const before = await planQueries.loadPlanDetail(planId);
+    const skip = screen.getByTestId('plan-detail-block-1-skip');
+    expect(skip).toHaveTextContent('Skip');
+    expect(skip).toHaveProp('accessibilityLabel', 'Skip Barbell Squat');
+    fireEvent.press(skip);
+    expect(alertSpy).toHaveBeenLastCalledWith('Skip Barbell Squat?', 'Mark this block as skipped in the plan?', expect.any(Array));
+    pressAlertButton('Cancel');
+    expect(await planQueries.loadPlanDetail(planId)).toEqual(before);
+    fireEvent.press(skip);
     pressAlertButton('Skip');
-
-    await waitFor(async () => {
-      const detail = await planQueries.loadPlanDetail(planId);
-      expect(detail?.blocks[0].status).toBe('skipped');
-    });
+    await waitFor(() => expect(screen.getByTestId('plan-detail-block-1-state')).toHaveTextContent('Skipped · Block 1 of 1'));
+    expect((await planQueries.loadPlanDetail(planId))?.blocks[0].status).toBe('skipped');
+    expect(screen.getByTestId('plan-detail-progress')).toHaveTextContent('1 block · 0 completed · 1 skipped');
     expect(localDatabase().select().from(sessions).all()).toHaveLength(0);
     expect(await screen.findByTestId('plan-detail-block-1-state')).toHaveTextContent('Skipped · Block 1 of 1');
   });
@@ -945,6 +951,7 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
       ),
     });
     expect(card).toBeTruthy();
+    const performedBefore = await loadSessionSnapshotById(sessionId);
 
     mockParams = { planId };
     fireEvent.press(screen.getByTestId('plan-detail-block-1-skip'));
@@ -955,6 +962,7 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
     );
     const after = await planQueries.loadPlanDetail(planId);
     expect(after?.blocks[0].status).toBe('attached');
+    expect(await loadSessionSnapshotById(sessionId)).toEqual(performedBefore);
   });
 
   it("a block's Open session opens the workout in progress on Train, and a completed one as its edit page", async () => {

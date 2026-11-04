@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Card, FigureText, IconButton, ListRow, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { PlanDetailView } from '@/src/session-planner';
+import { blockCountsLabel, planOutcomeLabel } from './progress-labels';
 
 export type ProgrammePlanListProps = {
   plans: PlanDetailView[];
@@ -15,18 +16,6 @@ export type ProgrammePlanListProps = {
 const formatSchedule = (date: Date | null, dateFormat: ExerciseDateFormat): string => {
   if (date === null) return 'Unscheduled';
   return formatLocalDateTime(date.getTime(), dateFormat);
-};
-
-const planProgressWord = (progress: PlanDetailView['progress']): string => {
-  switch (progress) {
-    case 'in_progress':
-      return 'In progress';
-    case 'completed':
-      return 'Completed';
-    case 'planned':
-    default:
-      return 'Planned';
-  }
 };
 
 export function ProgrammePlanList({
@@ -52,59 +41,51 @@ export function ProgrammePlanList({
       </Text>
 
       <Card>
-        {plans.map((plan, index) => {
-          const totalBlocks =
-            plan.blockCounts.pending +
-            plan.blockCounts.attached +
-            plan.blockCounts.completed +
-            plan.blockCounts.skipped;
-
-          return (
-            <ListRow
-              accessibilityLabel={`${plan.title}, ${formatSchedule(plan.scheduledFor, dateFormat)}, ${planProgressWord(plan.progress)}`}
-              density="list"
-              divider={index > 0}
-              key={plan.id}
-              onPress={() => onOpenPlan(plan.id)}
-              testID={`programme-plan-row-${plan.id}`}
-              trailing={
-                onReorderPlans ? (
-                  <View style={styles.reorderActions}>
-                    <IconButton
-                      accessibilityLabel={`Move session ${plan.title} earlier`}
-                      disabled={index === 0}
-                      name="arrow-up"
-                      onPress={() => movePlan(index, -1)}
-                      size="sm"
-                      testID={`programme-plan-row-${plan.id}-up`}
-                    />
-                    <IconButton
-                      accessibilityLabel={`Move session ${plan.title} later`}
-                      disabled={index === plans.length - 1}
-                      name="arrow-down"
-                      onPress={() => movePlan(index, 1)}
-                      size="sm"
-                      testID={`programme-plan-row-${plan.id}-down`}
-                    />
-                  </View>
-                ) : undefined
-              }>
-              <View style={styles.rowText}>
-                <View style={styles.rowTitleLine}>
-                  <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
-                    {plan.title}
-                  </Text>
-                  <Text allowFontScaling={false} style={uiText.label}>
-                    {planProgressWord(plan.progress)}
-                  </Text>
+        {plans.map((plan, index) => (
+          <ListRow
+            accessibilityLabel={`${plan.title}, ${formatSchedule(plan.scheduledFor, dateFormat)}, ${planOutcomeLabel(plan)}, ${blockCountsLabel(plan.blockCounts).replace(/ · /g, ', ')}`}
+            density="list"
+            divider={index > 0}
+            key={plan.id}
+            onPress={() => onOpenPlan(plan.id)}
+            testID={`programme-plan-row-${plan.id}`}
+            trailing={
+              onReorderPlans ? (
+                <View style={styles.reorderActions}>
+                  <IconButton
+                    accessibilityLabel={`Move session ${plan.title} earlier`}
+                    disabled={index === 0}
+                    name="arrow-up"
+                    onPress={() => movePlan(index, -1)}
+                    size="sm"
+                    testID={`programme-plan-row-${plan.id}-up`}
+                  />
+                  <IconButton
+                    accessibilityLabel={`Move session ${plan.title} later`}
+                    disabled={index === plans.length - 1}
+                    name="arrow-down"
+                    onPress={() => movePlan(index, 1)}
+                    size="sm"
+                    testID={`programme-plan-row-${plan.id}-down`}
+                  />
                 </View>
-                <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
-                  <FigureText>{`${formatSchedule(plan.scheduledFor, dateFormat)} · ${totalBlocks} ${totalBlocks === 1 ? 'block' : 'blocks'}`}</FigureText>
+              ) : undefined
+            }>
+            <View style={styles.rowText}>
+              <View style={styles.rowTitleLine}>
+                <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
+                  {plan.title}
+                </Text>
+                <Text allowFontScaling={false} style={uiText.label}>
+                  {planOutcomeLabel(plan)}
                 </Text>
               </View>
-            </ListRow>
-          );
-        })}
+              <Text allowFontScaling={false} style={uiText.meta}>
+                <FigureText>{`${formatSchedule(plan.scheduledFor, dateFormat)} · ${blockCountsLabel(plan.blockCounts)}`}</FigureText>
+              </Text>
+            </View>
+          </ListRow>
+        ))}
       </Card>
     </View>
   );

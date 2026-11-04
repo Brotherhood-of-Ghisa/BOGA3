@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ActionButton, Card, FigureText, Tag, uiSpace, uiText } from '@/components/ui';
 import type { ProgrammeDetailView } from '@/src/session-planner';
+import { planOutcomeLabel, progressLabel } from './progress-labels';
 
 export type ProgrammeDetailHeaderProps = {
   detail: ProgrammeDetailView;
@@ -10,26 +11,14 @@ export type ProgrammeDetailHeaderProps = {
   onDelete: () => void;
 };
 
-const progressWord = (progress: ProgrammeDetailView['progress']): string => {
-  switch (progress) {
-    case 'in_progress':
-      return 'In progress';
-    case 'completed':
-      return 'Completed';
-    case 'planned':
-    default:
-      return 'Planned';
-  }
-};
-
 export function ProgrammeDetailHeader({
   detail,
   onEdit,
   onDuplicate,
   onDelete,
 }: ProgrammeDetailHeaderProps) {
-  const counts = detail.blockCounts;
-  const totalBlocks = counts.pending + counts.attached + counts.completed + counts.skipped;
+  const completed = detail.plans.filter((plan) => planOutcomeLabel(plan) === 'Completed').length;
+  const skipped = detail.plans.filter((plan) => planOutcomeLabel(plan) === 'Skipped').length;
 
   return (
     <Card style={styles.card} testID="programme-detail-header">
@@ -46,7 +35,7 @@ export function ProgrammeDetailHeader({
         </View>
 
         <Tag
-          label={progressWord(detail.progress)}
+          label={progressLabel(detail.progress)}
           testID="programme-detail-progress-badge"
           tone={detail.progress === 'completed' ? 'neutral' : 'faint'}
         />
@@ -54,7 +43,7 @@ export function ProgrammeDetailHeader({
 
       <Text allowFontScaling={false} style={uiText.meta} testID="programme-detail-stats">
         <FigureText>
-          {`${detail.planCount} ${detail.planCount === 1 ? 'session' : 'sessions'} · ${counts.completed} of ${totalBlocks} ${totalBlocks === 1 ? 'block' : 'blocks'} completed`}
+          {`${detail.planCount} ${detail.planCount === 1 ? 'session' : 'sessions'} · ${completed} completed · ${skipped} skipped`}
         </FigureText>
       </Text>
 

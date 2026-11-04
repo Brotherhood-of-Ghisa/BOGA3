@@ -41,12 +41,15 @@ jest.mock('expo-router', () => {
 });
 
 import { updatePreferences } from '@/src/preferences/hooks';
+import { eq } from 'drizzle-orm';
+import { sessionPlans } from '@/src/data/schema';
 import { uiSpace } from '@/components/ui';
 import { ProgrammeNewScreen } from '@/app/programme/new';
 import { ProgrammeDetailScreen } from '@/app/programme/[programmeId]';
-import { planQueries, planRepository, addPlanBlockToSession } from '@/src/session-planner';
+import { planQueries, planRepository, addPlanBlockToSession, skipPlanBlock } from '@/src/session-planner';
+import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
-import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
+import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 
 describe('programme screens', () => {
   let alertSpy: jest.SpyInstance;
@@ -510,6 +513,9 @@ describe('programme screens', () => {
         expect(screen.getByText('Block 1')).toBeTruthy();
       });
 
+      expect(screen.getByTestId('programme-detail-progress-badge')).toHaveTextContent('Planned');
+      expect(screen.getByTestId('programme-detail-stats')).toHaveTextContent('2 sessions · 0 completed · 0 skipped');
+
       // Next block card highlights the Barbell Squat block
       expect(screen.getByTestId('programme-next-block-name')).toHaveTextContent('Barbell Squat');
       expect(screen.getByTestId('programme-next-block-targets')).toHaveTextContent('5 reps @ 140 (RIR 2)');
@@ -517,6 +523,109 @@ describe('programme screens', () => {
       // Sessions list renders both sessions
       expect(screen.getByText('Lower A')).toBeTruthy();
       expect(screen.getByText('Upper A')).toBeTruthy();
+    });
+
+    const finishBlock = async (blockId: string) => {
+      const result = await addPlanBlockToSession(blockId);
+      if (result.status !== 'attached') throw new Error(result.status);
+      const snapshot = (await loadSessionSnapshotById(result.sessionId))!;
+      await persistSessionDraftSnapshot({
+        sessionId: result.sessionId, gymId: null, startedAt: snapshot.startedAt,
+        exercises: snapshot.exercises.map((card) => ({
+          ...card,
+          sets: card.sets.map((set) => ({ ...set, repsValue: '7', weightValue: '125', performanceStatus: null })),
+        })),
+      });
+      await completeSessionDraft(result.sessionId, { completedAt: new Date(), now: new Date() });
+      return (await loadSessionSnapshotById(result.sessionId))!;
+    };
+
+    it('counts completed and skipped sessions separately using derived completion without rewriting workout provenance', async () => {
+      const before = (await planQueries.loadProgrammeDetail(seededProgrammeId))!;
+      const workout = await finishBlock(before.plans[0].blocks[0].id);
+      await skipPlanBlock(before.plans[1].blocks[0].id);
+      const derived = (await planQueries.loadProgrammeDetail(seededProgrammeId))!;
+      expect(derived.plans[0].blocks[0]).toMatchObject({
+        progressStatus: 'pending', status: 'completed', attachedSessionId: workout.sessionId,
+        attachedSessionExerciseId: workout.exercises[0].id,
+      });
+      expect(workout.exercises[0]).toMatchObject({
+        sourcePlanExerciseId: before.plans[0].blocks[0].id,
+        sets: [expect.objectContaining({ sourcePlanSetId: before.plans[0].blocks[0].targets[0].id, weightValue: '125', repsValue: '7' })],
+      });
+      expect(derived.plans[1].blocks[0].attachedSessionId).toBeNull();
+
+      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      expect(await screen.findByTestId('programme-detail-stats')).toHaveTextContent('2 sessions · 1 completed · 1 skipped');
+      expect(screen.getByTestId('programme-detail-progress-badge')).toHaveTextContent('Completed');
+      const completed = screen.getByTestId(`programme-plan-row-${before.plans[0].id}`);
+      const skipped = screen.getByTestId(`programme-plan-row-${before.plans[1].id}`);
+      expect(completed).toHaveProp('accessibilityLabel', 'Lower A, Unscheduled, Completed, 1 block, 1 completed, 0 skipped');
+      expect(skipped).toHaveProp('accessibilityLabel', 'Upper A, Unscheduled, Skipped, 1 block, 0 completed, 1 skipped');
+      expect(within(completed).getByText('Completed')).toBeTruthy();
+      expect(within(skipped).getByText('Skipped')).toBeTruthy();
+      fireEvent.press(completed);
+      expect(mockPush).toHaveBeenCalledWith(`/session-plan/${encodeURIComponent(before.plans[0].id)}`);
+      expect(await loadSessionSnapshotById(workout.sessionId)).toEqual(workout);
+    });
+
+    it.each([false, true])('keeps both block outcomes visible and spoken in a mixed session (resolved=%s)', async (resolved) => {
+      const result = await planRepository.createProgramme({
+        name: 'Mixed blocks', description: '',
+        plans: [resolved ? 2 : 3, 1].map((count, index) => ({
+          title: `Day ${index + 1}`, gymId: null, scheduledFor: null,
+          exercises: Array.from({ length: count }, () => ({
+            exerciseDefinitionId: 'ex-squat', name: 'Barbell Squat',
+            sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+          })),
+        })),
+      });
+      if (result.status !== 'saved') throw new Error(result.status);
+      const detail = (await planQueries.loadProgrammeDetail(result.id))!;
+      await finishBlock(detail.plans[0].blocks[0].id);
+      await skipPlanBlock(detail.plans[0].blocks[1].id);
+      await skipPlanBlock(detail.plans[1].blocks[0].id);
+      render(<ProgrammeDetailScreen programmeId={result.id} />);
+      expect(await screen.findByTestId('programme-detail-stats')).toHaveTextContent(`2 sessions · ${resolved ? 1 : 0} completed · 1 skipped`);
+      const row = screen.getByTestId(`programme-plan-row-${detail.plans[0].id}`);
+      const outcome = resolved ? 'Completed' : 'In progress';
+      const total = resolved ? 2 : 3;
+      expect(within(row).getByText(outcome)).toBeTruthy();
+      expect(within(row).getByText(new RegExp(`${total} blocks · 1 completed · 1 skipped$`))).toBeTruthy();
+      expect(row).toHaveProp('accessibilityLabel', `Day 1, Unscheduled, ${outcome}, ${total} blocks, 1 completed, 1 skipped`);
+    });
+
+    it.each([0, 1])('keeps empty and singular legacy programme totals explicit (%i sessions)', async (remaining) => {
+      const detail = (await planQueries.loadProgrammeDetail(seededProgrammeId))!;
+      // A synced/legacy programme can have fewer children than the authoring minimum.
+      for (const plan of detail.plans.slice(remaining)) {
+        localDatabase().delete(sessionPlans).where(eq(sessionPlans.id, plan.id)).run();
+      }
+      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      expect(await screen.findByTestId('programme-detail-stats')).toHaveTextContent(
+        `${remaining} ${remaining === 1 ? 'session' : 'sessions'} · 0 completed · 0 skipped`,
+      );
+      expect(screen.getByTestId('programme-detail-progress-badge')).toHaveTextContent('Planned');
+    });
+
+    it('shows all completed sessions without inventing skipped work', async () => {
+      const detail = (await planQueries.loadProgrammeDetail(seededProgrammeId))!;
+      for (const plan of detail.plans) await finishBlock(plan.blocks[0].id);
+      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      expect(await screen.findByTestId('programme-detail-stats')).toHaveTextContent('2 sessions · 2 completed · 0 skipped');
+      expect(screen.getByTestId('programme-detail-progress-badge')).toHaveTextContent('Completed');
+    });
+
+    it('keeps partial and attached work in progress and does not count it as a finished session', async () => {
+      const detail = (await planQueries.loadProgrammeDetail(seededProgrammeId))!;
+      await skipPlanBlock(detail.plans[0].blocks[0].id);
+      await addPlanBlockToSession(detail.plans[1].blocks[0].id);
+      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      expect(await screen.findByTestId('programme-detail-stats')).toHaveTextContent('2 sessions · 0 completed · 1 skipped');
+      expect(screen.getByTestId('programme-detail-progress-badge')).toHaveTextContent('In progress');
+      expect(screen.getByTestId(`programme-plan-row-${detail.plans[1].id}`)).toHaveProp(
+        'accessibilityLabel', 'Upper A, Unscheduled, In progress, 1 block, 0 completed, 0 skipped',
+      );
     });
 
     it('adds the next block to session on press', async () => {
@@ -573,11 +682,11 @@ describe('programme screens', () => {
     it('claims completion only once every block is resolved', async () => {
       render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
 
-      await waitFor(() => expect(screen.getByTestId('programme-next-block-skip')).toBeTruthy());
+      await screen.findByTestId('programme-next-block-skip');
       await act(async () => {
         fireEvent.press(screen.getByTestId('programme-next-block-skip'));
       });
-      await waitFor(() => expect(screen.getByTestId('programme-next-block-skip')).toBeTruthy());
+      await waitFor(() => expect(screen.getByTestId('programme-next-block-name')).toHaveTextContent('Bench Press'));
       await act(async () => {
         fireEvent.press(screen.getByTestId('programme-next-block-skip'));
       });
@@ -587,6 +696,9 @@ describe('programme screens', () => {
           'All blocks in this programme have been completed or skipped.'
         );
       });
+      expect(screen.getByTestId('programme-detail-progress-badge')).toHaveTextContent('Completed');
+      expect(screen.getByTestId('programme-detail-stats')).toHaveTextContent('2 sessions · 0 completed · 2 skipped');
+      expect(screen.getAllByText('Skipped')).toHaveLength(2);
     });
 
     it('reorders sessions in the programme via Move controls', async () => {

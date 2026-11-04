@@ -188,7 +188,7 @@ stateDiagram-v2
     [*] --> pending: Authored by Human or Agent
     pending --> attached: Materialized onto active exercise card
     attached --> completed: Explicit Complete block (≥1 confirmed planned set)
-    pending --> skipped: Explicit Skip block (no actual work)
+    pending --> skipped: Explicit Skip block (no confirmed source-derived work)
     attached --> pending: Sourced card deleted / active workout discarded
     completed --> [*]
     skipped --> [*]
@@ -202,7 +202,7 @@ stateDiagram-v2
   cannot complete a block; target deviations do not prevent completion. On read,
   a pending block claimed by a completed session derives `completed` when it has
   confirmed source-derived work.
-- **Skipped:** explicitly skipped from programme detail (no performed rows).
+- **Skipped:** explicitly skipped from programme detail (creates no performed rows).
 - **Derived progress:** parent progress (`planned | in_progress | completed`)
   is computed on the fly from child block states, never stored.
 
@@ -301,11 +301,13 @@ path is defined so the permitted operation can never block sync.
 | `/session-plan/new` | Author a one-off plan (also edit and duplicate prefill); target entry follows the recorder through shared fields. |
 | `/session-plan/[planId]` | View/edit: Start all, Duplicate, Delete (unused/eligible only), Add block. Consumed blocks are read-only and link to their performed session. |
 | `/programme/new` | Author an ordered programme; minimum 2 child plans; target entry uses the recorder's shared fields. |
-| `/programme/[programmeId]` | Overall progress, next unresolved block in sequence, child plan summaries. |
+| `/programme/[programmeId]` | Resolution badge and session outcomes per [[planner.progress-outcomes]], next unresolved block in sequence, child plan summaries. |
 
 - **Today tab:** surfaces the next scheduled workout or programme block as a primary Start card.
 - **Exercise picker:** the historical **Append plan** action is renamed **Repeat
   last**, and a new **Planner** chip selects available authored blocks.
+
+Displayed block counts use derived read-model statuses under [[planner.block-completion]], including stored-pending blocks with confirmed source-derived work in completed workouts. Outcome copy follows [[planner.progress-outcomes]]; Skip confirms only the planned outcome and changes no logged values.
 
 Planner **Add set(s)** opens a count-only form, default 1. It appends that
 many exact copies of the last target, preserving weight, reps and effort,

@@ -63,12 +63,12 @@ export function PlanDetailBlocks({ detail, onAdd, onSkip, onOpenSession }: PlanD
                 testID={`plan-detail-block-${index + 1}-add`}
               />
               <ListRow
-                accessibilityLabel={`Skip ${block.name} without doing it`}
+                accessibilityLabel={`Skip ${block.name}`}
                 density="list"
                 divider
-                label="Skip without doing it"
+                label="Skip"
                 onPress={() => {
-                  Alert.alert(`Skip ${block.name}?`, 'The block moves on without recording any work.', [
+                  Alert.alert(`Skip ${block.name}?`, 'Mark this block as skipped in the plan?', [
                     { text: 'Cancel', style: 'cancel' },
                     { text: 'Skip', style: 'default', onPress: () => onSkip(block) },
                   ]);
