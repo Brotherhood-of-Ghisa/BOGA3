@@ -28,60 +28,45 @@ within its bounded variants needs no fresh design acceptance. Carry existing
 selections forward within their agreed scope.
 
 A composition outside those templates, or a derivative beyond their allowed
-variants, is **custom design**. Show its nearest parent, proposed appearance
-and differences, including inherited type, geometry and action boundaries.
-Stop for explicit human design acceptance before implementation. Record who
-accepted and the proposal/reference in the UX Contract. Template selection,
-silence, AI review and ordinary code approval cannot authorize a custom design.
+variants, is **custom design**. Record its nearest parent and differences,
+including inherited type, geometry and action boundaries. Custom UI follows
+ordinary PR review with the required tests and visual evidence. It needs no
+separate pre-build approval reference or specially formatted acceptance comment.
 
 ### Record and verify the choice
 
 The existing guardrail lane requires one visible `ui-pattern-selection` JSON
-code block in the draft/PR body. It maps every changed JSX/style source under
-app/components to `template` or `custom`, its production parents and its delta
-(or explicit unchanged-design claim). This covers new components, blocks and style-only changes; it does not infer visual materiality. Schema and failing/safe cases:
+code block in the draft/PR body for new or changed JSX/presentation under
+app/components. It maps each affected source to `template` or `custom`, its
+production parents and its delta. Existing compositions are established design:
+comments, formatting and logic edits that preserve JSX and presentation values
+need no declaration. The checker compares parsed JSX and presentation values;
+reviewers judge visual materiality. Schema and failing/safe cases:
 `apps/mobile/scripts/ui-pattern-selection.js` and
 `apps/mobile/__tests__/ui-pattern-selection.test.ts`.
 
 Before a PR exists, save that body at `apps/mobile/artifacts/ui-review.md`
 (or set `BOGA_UI_REVIEW_BODY` to its path), then run normal gates. A template
 parent must exist at the base and be imported/rendered from its real export;
-template selections inherit existing family checks. Custom records carry
-`preBuildApproval` with the human's login and proposal approval reference.
-CI verifies declarations; humans verify truthful classification, scope and
-pre-build evidence. Approval records stay with the task/PR, never in code/specs.
+template selections inherit existing family checks. CI verifies declarations;
+reviewers verify truthful classification, scope and evidence. Custom declarations
+do not require approval metadata. Template promotion has its own process below.
 
-### Accept custom coded results
+### Review custom coded results
 
 Provide the running custom component/reference and native comparisons under
 `docs/specs/ui/ai-design-policy.md`: small/normal widths, long content, relevant
 states and owned actions; pair list/table rows when their rhythm changes.
-Any human with repository write/maintain/admin authority, including the PR
-author, can accept the coded design in a PR comment at that exact head:
-
-```text
-UI design accepted at <full-head-sha>:
-- apps/mobile/components/<area>/<component>.tsx
-```
-
-Use that block as the whole comment; list every accepted custom path.
-The required `UI pattern review` check verifies User identity, live authority,
-full head and exact paths. Bots, generic approvals and quoted examples do not
-count. Pushes invalidate old-head acceptance; comment edits/deletions and PR
-body changes rerun this check. Edit/delete the comment to withdraw acceptance.
-Agents must never post design acceptance or impersonate the human. GitHub
-identifies accounts; it cannot identify who operated shared credentials.
-
-Until custom design is accepted, report it as awaiting design acceptance and
-keep it unmerged. Record acceptor, full commit, devices/viewports and surfaces
-in the PR. A material later design change needs renewed acceptance. Untouched
-approved-template instances do not need another design review.
+Review this evidence in the normal PR process. An unrelated push does not
+create a new design-acceptance step; refresh evidence when the design changes.
+The `UI pattern review` check enforces declarations, template inheritance and
+template promotion, never separate approval of custom-component use.
 
 ### Promote a design into a reusable template
 
 A human **or agent** may propose promotion in the existing UX Contract and
-`ui-pattern-selection` block. Custom acceptance authorizes one use; it never
-promotes a design. Only a human with repository write/maintain/admin authority,
+`ui-pattern-selection` block. Shipping custom UI never promotes it to a reusable
+template. Only a human with repository write/maintain/admin authority,
 including the PR author, may accept promotion.
 
 1. **Propose.** Add the proposed contract to the catalog's
@@ -120,9 +105,8 @@ including the PR author, may accept promotion.
    The existing checker prints the required id/digest when acceptance is missing;
    its `promotionDigest` hashes the catalog entry and complete promotion record
    deterministically. List each accepted promotion. Generic PR approval,
-   proposal approval and `UI design accepted` comments do not promote anything.
-   Template acceptance also accepts the running custom design of the contract's
-   owned files; unrelated custom files need their own acceptance.
+   proposal approval do not promote anything. This acceptance is specific to
+   reusable-template registration; custom-component use has no separate gate.
    Every push invalidates acceptance; contract/proposal/evidence edits change
    the digest even without a push. Comment deletion/edit withdraws it. Renew
    evidence and human acceptance after implementation or scope changes.
@@ -132,7 +116,7 @@ including the PR author, may accept promotion.
    for reuse. Future template parents use `family: "catalog"` plus `template`
    id, `source`, `export`, accepted `use` and named `variant`. Style/spread overrides and mismatched/dynamic `variant` props fail reuse. Within
    those bounds reuse needs no renewed design acceptance. Outside them declare custom
-   design and obtain human acceptance; changing the reusable contract requires
+   design for ordinary PR review; changing the reusable contract requires
    promotion again. Preserve production exports, catalog bounds and checker
    inheritance in the same change.
 

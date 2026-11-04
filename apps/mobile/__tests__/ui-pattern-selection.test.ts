@@ -36,13 +36,13 @@ it('requires a declaration for a new component or new JSX in an existing source'
   expect(check(context([])).violations).toEqual([expect.objectContaining({ file, rule: 'missing UI pattern declaration for changed JSX/style source' })]);
 });
 it('accepts an imported production template through aliases and a barrel without per-instance approval', () => {
-  expect(check()).toMatchObject({ violations: [], custom: [], filesByFamily: { ListCard: ['components/groups/new-summary.tsx'] } });
+  expect(check()).toMatchObject({ violations: [], filesByFamily: { ListCard: ['components/groups/new-summary.tsx'] } });
 });
 it('rejects the demonstrated token-only Card bypass as template reuse', () => {
   write(file, "import { Card } from '@/components/ui/card'; const Example = () => <Card/>;");
   const customParent = { family: 'catalog', source: 'apps/mobile/components/ui/card.tsx', export: 'Card' };
   const result = check(context([{ ...record(), parents: [customParent] }]));
-  expect(result.violations.map(item => item.rule)).toContain('this parent is not an approved design template; declare custom and obtain human design acceptance');
+  expect(result.violations.map(item => item.rule)).toContain('this parent is not an approved design template; declare custom design');
 });
 it('checks inherited density and spacing for newly declared consumers in the existing lane', () => {
   write(file, "import { ListCard } from '@/components/ui/list-card'; const Example = () => <ListCard><View style={{paddingVertical: uiSpace.xl}}/></ListCard>;");
@@ -68,43 +68,25 @@ it('fails malformed JSON and multiple declaration blocks', () => {
   expect(check({ ...context(), body: body([record()]) + body([record()]) }).violations).toHaveLength(1);
 });
 
-const customRecord = () => ({ ...record(), mode: 'custom', delta: 'Derived layout outside the approved template.',
-  preBuildApproval: { by: 'operator', reference: 'https://github.com/org/repo/pull/12#issuecomment-34' } });
-const approval = (extra: Record<string, unknown> = {}) => ({
-  user: { login: 'reviewer', type: 'User' }, body: `UI design accepted at abc123:\n- ${file}`, ...extra });
-function finalContext(comments: unknown[], permissions: Record<string, string> = { reviewer: 'write' }) {
-  return { ...context([customRecord()]), finalReview: true, comments, permissions };
-}
-it('requires pre-build approval evidence only for custom or derived designs', () => {
-  expect(check(context([{ ...customRecord(), preBuildApproval: undefined }])).violations.map(item => item.rule)).toContain('custom design needs its explicit pre-build human approval reference');
-  expect(check(context([customRecord()])).violations).toEqual([]);
+const customRecord = () => ({ ...record(), mode: 'custom', delta: 'Derived layout outside the approved template.' });
+const finalContext = () => ({ ...context([customRecord()]), finalReview: true });
+it('allows custom design locally and on a PR without pre-build evidence or acceptance comments', () => {
+  const customParent = { family: 'catalog', source: 'apps/mobile/components/ui/card.tsx', export: 'Card' };
+  write(file, "import { Card } from '@/components/ui/card'; export function Example(){return <Card/>;}");
+  const selection = { ...customRecord(), parents: [customParent] };
+  expect(check(context([selection])).violations).toEqual([]);
+  expect(check({ ...finalContext(), body: body([selection]) }).violations).toEqual([]);
 });
-it('accepts explicit design acceptance by any authorized human at the exact current head', () => {
-  for (const permission of ['write', 'maintain', 'admin']) expect(check(finalContext([approval()], { reviewer: permission })).violations).toEqual([]);
+it('keeps custom design valid across unrelated pushes without renewed acceptance', () => {
+  for (const head of ['first-head', 'next-head']) {
+    expect(check({ ...finalContext(), head }).violations).toEqual([]);
+  }
 });
-it.each([
-  { body: 'Looks good, approved.' },
-  { body: `UI design accepted at old-head:\n- ${file}` },
-  { user: { login: 'reviewer', type: 'Bot' } },
-  { body: 'UI design accepted at abc123:\n- apps/mobile/components/groups/other.tsx' },
-  { body: `> UI design accepted at abc123:\n> - ${file}` },
-  { body: `\`\`\`\nUI design accepted at abc123:\n- ${file}\n\`\`\`` },
-])('does not treat invalid or generic review as design acceptance: %j', extra => {
-  expect(check(finalContext([approval(extra)])).violations.map(item => item.rule)).toContainEqual(expect.stringContaining('awaiting authorized human design acceptance comment'));
-});
-it('rejects insufficient authority and removed or edited acceptance comments', () => {
-  expect(check(finalContext([approval()], { reviewer: 'read' })).violations).toHaveLength(1);
-  expect(check(finalContext([])).violations).toHaveLength(1);
-  expect(check(finalContext([approval({ body: 'Acceptance withdrawn.' })])).violations).toHaveLength(1);
-});
-it('allows the human PR author with repository authority to accept the design', () => {
-  expect(check(finalContext([approval({ user: { login: 'author', type: 'User' } })], { author: 'write' })).violations).toEqual([]);
-});
-it('permits an explicitly accepted custom delta while keeping global token rules', () => {
+it('permits a custom delta without approval while keeping global token rules', () => {
   write(file, "import { ListCard } from '@/components/ui/list-card'; const Example = () => <ListCard><View style={{paddingVertical:uiSpace.xl}}/></ListCard>;");
-  expect(runUiGuardrailCheck({ rootDir, selectionContext: finalContext([approval()]), stdout: { write() {} } }).ok).toBe(true);
+  expect(runUiGuardrailCheck({ rootDir, selectionContext: finalContext(), stdout: { write() {} } }).ok).toBe(true);
   write(file, "import { ListCard } from '@/components/ui/list-card'; const Example = () => <ListCard><Text style={{color:'#123456'}}>Hello</Text></ListCard>;");
-  expect(runUiGuardrailCheck({ rootDir, selectionContext: finalContext([approval()]), stdout: { write() {} } }).ok).toBe(false);
+  expect(runUiGuardrailCheck({ rootDir, selectionContext: finalContext(), stdout: { write() {} } }).ok).toBe(false);
 });
 
 it('detects untracked files, renames and newly introduced JSX in an existing file from the Git diff', () => {
@@ -130,6 +112,41 @@ it('detects untracked files, renames and newly introduced JSX in an existing fil
 });
 
 
+const existingDesign = "import { Card } from '@/components/ui/card'; export function Existing(){const save = () => submit(); return <Card onPress={save}/>;}";
+it.each([
+  ['comment', existingDesign, `${existingDesign}\n// Keep the current design.`, false],
+  ['save handler', existingDesign, existingDesign.replace('submit()', 'submit({ retry: true })'), false],
+  ['inline handler', existingDesign.replace('{save}', '{() => submit()}'), existingDesign.replace('{save}', '{() => submit({ retry: true })}'), false],
+  ['formatting', existingDesign, existingDesign.replace('const save', '\n  const save'), false],
+  ['new content', existingDesign, existingDesign.replace('<Card onPress={save}/>', '<Card onPress={save}><Text>New summary</Text></Card>'), true],
+  ['changed style', 'export const styles = { padding: uiSpace.md };', 'export const styles = { padding: uiSpace.lg };', true],
+  ['style spread', 'export const styles = { title: { ...uiText.body } };', 'export const styles = { title: { ...uiText.pageTitle } };', true],
+  ['component binding', "import { Card as Panel } from '@/components/ui'; export const Existing = () => <Panel/>;", "import { SummaryTile as Panel } from '@/components/ui'; export const Existing = () => <Panel/>;", true],
+  ['non-render logic', 'export const styles = { padding: uiSpace.md }; export const retry = false;', 'export const styles = { padding: uiSpace.md }; export const retry = true;', false],
+])('requires declarations only when %s edits change JSX or presentation', (_name, before, after, needsDeclaration) => {
+  const repo = path.join(rootDir, 'maintenance');
+  const mobile = path.join(repo, 'apps/mobile');
+  const target = path.join(mobile, 'components/existing.tsx');
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const git = (args: string[]) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8', stdio: 'pipe' }).trim();
+  git(['init', '-q']); git(['config', 'user.name', 'Test']); git(['config', 'user.email', 'test@example.invalid']);
+  fs.writeFileSync(target, before);
+  git(['add', '.']); git(['commit', '-qm', 'base']); git(['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+  fs.writeFileSync(target, after);
+  const saved = { ...process.env };
+  try {
+    delete process.env.GITHUB_ACTIONS; delete process.env.GITHUB_EVENT_PATH; delete process.env.GITHUB_WORKFLOW;
+    delete process.env.BOGA_UI_EVENT_PATH; delete process.env.BOGA_UI_REVIEW_BODY;
+    const selectionContext = reviewContext(mobile);
+    expect(selectionContext.files).toEqual(needsDeclaration ? ['apps/mobile/components/existing.tsx'] : []);
+    const result = findUiPatternSelections({ rootDir: mobile, selectionContext });
+    expect(result.violations).toEqual(needsDeclaration
+      ? [expect.objectContaining({ rule: expect.stringContaining('one ui-pattern-selection') })] : []);
+  } finally {
+    Object.assign(process.env, saved);
+  }
+});
+
 it('keeps preview exports outside production template reuse', () => {
   const preview = 'apps/mobile/components/pattern-gallery/list-gallery.tsx';
   const source = 'export function ListGallery() { return <View/>; }';
@@ -142,16 +159,11 @@ it('keeps preview exports outside production template reuse', () => {
 it('does not silently accept stale declarations when the change has no JSX', () => {
   expect(check({ ...context(), files: [] }).violations.map(item => item.rule)).toContain('duplicate or out-of-diff UI declaration');
 });
-it('requires fresh pre-build evidence on custom declarations and rejects bot attributions', () => {
-  for (const preBuildApproval of [{ by: 'operator', reference: 'TBD' }, { by: 'robot[bot]', reference: 'https://github.com/org/repo/pull/12' }]) {
-    expect(check(context([{ ...customRecord(), preBuildApproval }])).violations).toHaveLength(1);
-  }
-});
-it('requires acceptance coverage of every custom component', () => {
+it('allows several declared custom components without per-file acceptance', () => {
   const second = 'apps/mobile/components/groups/second.tsx';
   write(second, "import { ListCard } from '@/components/ui/list-card'; const Example = () => <ListCard/>;");
-  const result = check({ ...finalContext([approval()]), files: [file, second], body: body([customRecord(), { ...customRecord(), path: second }]) });
-  expect(result.violations).toEqual([expect.objectContaining({ file: second, rule: expect.stringContaining('awaiting authorized human design acceptance comment') })]);
+  const result = check({ ...finalContext(), files: [file, second], body: body([customRecord(), { ...customRecord(), path: second }]) });
+  expect(result.violations).toEqual([]);
 });
 it('pins PR source to the event head and keeps the code-CI delegation explicit', () => {
   const saved = { ...process.env };
@@ -200,14 +212,6 @@ it('resolves renamed re-exports to their original production owner and export', 
   write(file, "import { SharedList } from '@/components/ui'; const Example = () => <SharedList/>;");
   expect(check().violations).toEqual([]);
 });
-it.each([
-  `    UI design accepted at abc123:\n    - ${file}`,
-  `<!--\nUI design accepted at abc123:\n- ${file}\n-->`,
-  `\`\`\`\`markdown\n\`\`\`\nUI design accepted at abc123:\n- ${file}\n\`\`\`\``,
-])('does not count hidden or example Markdown as acceptance: %s', text => {
-  expect(check(finalContext([approval({ body: text })])).violations.map(item => item.rule)).toContainEqual(expect.stringContaining('awaiting authorized human design acceptance comment'));
-});
-
 it('executes protected base policy and publishes candidate-head checks on body and review edits', () => {
   const workflow = fs.readFileSync(path.resolve(__dirname, '../../../.github/workflows/ui-pattern-review.yml'), 'utf8');
   expect(workflow).toContain('pull_request_target:');
@@ -223,12 +227,12 @@ it('executes protected base policy and publishes candidate-head checks on body a
   expect(workflow).not.toMatch(/working-directory: candidate/);
 });
 
-it('requires custom acceptance when an existing template adds a new geometry property', () => {
+it('requires a custom declaration when an existing template adds a new geometry property', () => {
   const before = baseSources[parent.source] + ' export const styles = { card: { padding: uiSpace.md } };';
   write(parent.source, before.replace('padding: uiSpace.md', 'padding: uiSpace.md, paddingVertical: uiSpace.xl'));
   const selectionContext = { ...context([{ ...record(), path: parent.source }]), files: [parent.source],
     readBase: (name: string) => name === parent.source ? before : baseSources[name] ?? null };
-  expect(check(selectionContext).violations.map(item => item.rule)).toContain('new or changed template typography/geometry needs custom design acceptance');
+  expect(check(selectionContext).violations.map(item => item.rule)).toContain('new or changed template typography/geometry needs a custom design declaration');
 });
 it('rejects anonymous default UI changes hidden beside an unchanged template user', () => {
   const before = "import { ListCard } from '@/components/ui/list-card'; function Retained(){return <ListCard/>;} export default function(){return <View/>;}";
@@ -247,12 +251,12 @@ it('permits an unchanged style recipe moved to its existing template foundation'
   expect(check(selectionContext).violations).toEqual([]);
 });
 
-it('requires custom acceptance when a template removes its last geometry property', () => {
+it('requires a custom declaration when a template removes its last geometry property', () => {
   const before = baseSources[parent.source] + ' export const styles = { card: { padding: uiSpace.md } };';
   write(parent.source, before.replace('padding: uiSpace.md', ''));
   const selectionContext = { ...context([{ ...record(), path: parent.source }]), files: [parent.source],
     readBase: (name: string) => name === parent.source ? before : baseSources[name] ?? null };
-  expect(check(selectionContext).violations.map(item => item.rule)).toContain('new or changed template typography/geometry needs custom design acceptance');
+  expect(check(selectionContext).violations.map(item => item.rule)).toContain('new or changed template typography/geometry needs a custom design declaration');
 });
 
 it.each([
@@ -276,17 +280,17 @@ it.each(['add', 'remove'])('does not borrow an unrelated existing recipe to waiv
   write(second, other + ' export const changedLogic = true;');
   const selectionContext = { ...context([{ ...record(), path: parent.source }, { ...record(), path: second, parents: [{ family: 'SummaryTile', source: second, export: 'SummaryTile' }] }]), files: [parent.source, second],
     readBase: (name: string) => name === parent.source ? before : name === second ? other : null };
-  expect(check(selectionContext).violations).toContainEqual(expect.objectContaining({ file: parent.source, rule: 'new or changed template typography/geometry needs custom design acceptance' }));
+  expect(check(selectionContext).violations).toContainEqual(expect.objectContaining({ file: parent.source, rule: 'new or changed template typography/geometry needs a custom design declaration' }));
 });
 
 it('allows local ReactNode content inside the existing template slots', () => {
   write(file, "import { ListCard } from '@/components/ui/list-card'; export function Example(){const body=<View><Text>Content</Text></View>;return <ListCard>{body}</ListCard>;}");
   expect(check().violations).toEqual([]);
 });
-it('requires acceptance when a template adds a style spread to an existing recipe', () => {
+it('requires a custom declaration when a template adds a style spread to an existing recipe', () => {
   const before = baseSources[parent.source] + ' export const styles = { card: { padding: uiSpace.md } };';
   write(parent.source, before.replace('padding: uiSpace.md', 'padding: uiSpace.md, ...uiText.title'));
   const selectionContext = { ...context([{ ...record(), path: parent.source }]), files: [parent.source],
     readBase: (name: string) => name === parent.source ? before : baseSources[name] ?? null };
-  expect(check(selectionContext).violations.map(item => item.rule)).toContain('new or changed template typography/geometry needs custom design acceptance');
+  expect(check(selectionContext).violations.map(item => item.rule)).toContain('new or changed template typography/geometry needs a custom design declaration');
 });
