@@ -14,6 +14,10 @@ export const TONNAGE_REFERENCES = [
     path: 'M7 8L2 3L3 8L1 12L7 10Q18 13 31 8Q24 5 18 6L16 2Q13 3 13 6Z M21 9L18 13L24 10 M27 8h.1' },
   { id: 'ferry', value: 80000, label: '≈80 t', spoken: 'small passenger ferry, approximately 80 tonnes',
     path: 'M1 10H31L27 14H5Z M5 10V6H27V10 M8 6V3H23L26 6 M10 4.5H13 M15 4.5H18 M20 4.5H23 M8 8H11 M13 8H16 M18 8H21 M23 8H25 M16 3V1 M2 15Q5 13 8 15Q11 13 14 15Q17 13 20 15Q23 13 26 15Q29 13 31 15' },
+  // Boeing lists a 757-200 takeoff configuration at 99,790 kg (page 2-6):
+  // https://www.boeing.com/content/dam/boeing/v2/airports/acaps/757_Rev_H.pdf
+  { id: 'airplane', value: 100000, label: '≈100 t', spoken: 'Boeing 757-200 at takeoff, approximately 100 tonnes',
+    path: 'M1 3H4L8 8H26Q29 8 31 10L28 11H5L1 3Z M10 8L7 2H10L19 8 M19 10L10 15H7L12 10 M21 11V13H25V11 M25 9H28' },
 ] as const;
 
 type Reference = typeof TONNAGE_REFERENCES[number];
@@ -66,7 +70,7 @@ export const layoutTonnageReferences = (
     );
     const position = candidates.find(candidate => candidate.x >= uiSpace.xs
       && placed.every(other => !overlaps(candidate, other)));
-    // Native chart bounds (minimum 72pt high) leave at least two label rows.
+    // The native chart grows with the number of eligible references.
     placed.push(position ?? candidates[0]);
   }
   return placed;

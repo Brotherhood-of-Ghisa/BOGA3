@@ -453,6 +453,19 @@ describe('tonnage weight references', () => {
     expect(new Set(references.map(reference => reference.path)).size).toBe(5);
   });
 
+  it('adds a distinct Boeing 757-200 at 100 t, including a selected future projection', () => {
+    const references = chart(input(100000)).references;
+    expect(references.map(reference => reference.value)).toEqual([6000, 20000, 40000, 60000, 80000, 100000]);
+    expect(references[5]).toMatchObject({
+      id: 'airplane', value: 100000, label: '≈100 t',
+      spoken: 'Boeing 757-200 at takeoff, approximately 100 tonnes',
+    });
+    expect(new Set(references.map(reference => reference.path)).size).toBe(6);
+    const future = input(80000, 100000);
+    expect(chart(future).references.some(reference => reference.id === 'airplane')).toBe(false);
+    expect(chart(future, 326, 126, 27).references.map(reference => reference.id)).toContain('airplane');
+  });
+
   it.each(TONNAGE_REFERENCES.map(reference => [reference.value]))('compares raw values at the %s boundary', threshold => {
     const lower = TONNAGE_REFERENCES.filter(reference => reference.value < threshold).map(reference => reference.value);
     // Display rounding reaches the threshold before the actual value does.
@@ -513,9 +526,12 @@ describe('tonnage weight references', () => {
     expect(fitTonnageMaximum(6000, references, { top: 6, bottom: 6 })).toBe(6000);
   });
 
-  it.each([72, 126, 240])('fits every annotation on short and tall charts (%spt) through 1,000 tonnes', height => {
+  const reaches = [1000, 2000, 6000, 20000, 40000, 60000, 80000, 100000, 136000, 1000000];
+  // Six references raise the native floor to 140pt; retain the shorter five-reference stress case.
+  const chartSizes = [[72, reaches.filter(reach => reach < 100000)], [126, reaches], [140, reaches], [240, reaches]] as const;
+  it.each(chartSizes)('fits every annotation on supported short and tall charts (%spt)', (height, values) => {
     for (const width of [240, 287, 326, 390]) {
-      for (const reach of [1000, 2000, 6000, 20000, 40000, 60000, 80000, 136000, 1000000]) {
+      for (const reach of values) {
         const geometry = chart(input(reach), width, height);
         expect(geometry.references).toHaveLength(TONNAGE_REFERENCES.filter(reference => reference.value <= reach).length);
         for (const [index, reference] of geometry.references.entries()) {
@@ -539,7 +555,7 @@ describe('tonnage weight references', () => {
     }
   });
 
-  it.each([[20000, 240], [80000, 120], [136000, 126], [1000000, 120]])('keeps %s-volume annotations on the right when one column fits (%spt)', (reach, height) => {
+  it.each([[20000, 240], [80000, 120], [136000, 144], [1000000, 144]])('keeps %s-volume annotations on the right when one column fits (%spt)', (reach, height) => {
     const geometry = chart(input(reach), 326, height);
     for (const reference of geometry.references) {
       expect(reference.x + reference.width).toBeCloseTo(geometry.plot.width - uiSpace.xs);
@@ -553,7 +569,7 @@ describe('tonnage weight references', () => {
     data.previous.cumulativeVolumeKgReps = days(28, day => day < 3 ? 0 : day < 19 ? 20000 : 100000);
     const today = chart(data);
     expect(today.references.map(reference => reference.value)).toEqual([6000, 20000]);
-    for (const [day, expected] of [[0, []], [18, [6000, 20000]], [27, [6000, 20000, 40000, 60000, 80000]]] as const) {
+    for (const [day, expected] of [[0, []], [18, [6000, 20000]], [27, [6000, 20000, 40000, 60000, 80000, 100000]]] as const) {
       const selected = chart(data, 326, 126, day);
       expect(selected.references.map(reference => reference.value)).toEqual(expected);
       expect(selected.current.map(point => point.x)).toEqual(today.current.map(point => point.x));

@@ -245,32 +245,42 @@ describe('Today: the Progress card over real data', () => {
     expect(screen.queryByTestId('today-progress-period-metric-toggle')).toBeNull();
   });
 
-  it('updates drawn and spoken references when stepping to a heavier comparison period', async () => {
+  it('draws and speaks the 100 t airplane only for eligible tonnage selections', async () => {
     await bootLocalApp();
-    await logSession('september-heavy', local(2026, 9, 15, 9), 6000);
+    await logSession('september-heavy', local(2026, 9, 15, 9), 7000);
     await logSession('october-light', local(2026, 10, 15, 9), 100);
     await renderToday();
     fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
-    expect(text('today-progress-chart').props.accessibilityValue.text).toContain('small passenger ferry, approximately 80 tonnes.');
-    expect(drawing('today-tonnage-line-ferry')).toBeTruthy();
+    const spoken = 'Boeing 757-200 at takeoff, approximately 100 tonnes.';
+    expect(text('today-progress-chart')).toHaveStyle({ minHeight: 140 });
+    fireEvent(text('today-progress-chart'), 'layout', { nativeEvent: { layout: { width: 311, height: 140 } } });
+    expect(text('today-progress-chart').props.accessibilityValue.text).toContain(spoken);
+    expect(drawing('today-tonnage-line-airplane')).toBeTruthy();
+    expect(within(drawing('today-tonnage-label-airplane')).UNSAFE_getByType(TSpan).props.children).toBe('≈100 t');
+    expect(drawing('today-tonnage-icon-airplane')).toBeTruthy();
+    expect(screen.queryByTestId('today-tonnage-icon-airplane')).toBeNull();
     fireEvent(text('today-progress-chart'), 'responderRelease', { nativeEvent: { locationX: 0 } });
     expect(screen.queryByTestId('today-tonnage-line-elephant', { includeHiddenElements: true })).toBeNull();
-    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain('small passenger ferry');
+    expect(screen.queryByTestId('today-tonnage-line-airplane', { includeHiddenElements: true })).toBeNull();
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain(spoken);
     for (let day = 0; day < 8; day += 1) {
       fireEvent(text('today-progress-chart'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     }
-    expect(drawing('today-tonnage-line-ferry')).toBeTruthy();
-    expect(text('today-progress-chart').props.accessibilityValue.text).toContain('small passenger ferry, approximately 80 tonnes.');
+    expect(drawing('today-tonnage-line-airplane')).toBeTruthy();
+    expect(text('today-progress-chart').props.accessibilityValue.text).toContain(spoken);
 
     fireEvent.press(text('today-progress-period-compare-older'));
     await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('10 Aug – 6 Sep 26'));
     expect(screen.queryByTestId('today-tonnage-line-wagon', { includeHiddenElements: true })).toBeNull();
-    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain('small passenger ferry');
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain(spoken);
 
     fireEvent.press(text('today-progress-period-compare-newer'));
     await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('7 Sep – 4 Oct 26'));
-    expect(drawing('today-tonnage-line-ferry')).toBeTruthy();
-    expect(text('today-progress-chart').props.accessibilityValue.text).toContain('small passenger ferry, approximately 80 tonnes.');
+    expect(drawing('today-tonnage-line-airplane')).toBeTruthy();
+    expect(text('today-progress-chart').props.accessibilityValue.text).toContain(spoken);
+    fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
+    expect(screen.queryByTestId('today-tonnage-line-airplane', { includeHiddenElements: true })).toBeNull();
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain(spoken);
   });
 
   it('renders and speaks separate whale and ferry lines from real logged volume', async () => {
