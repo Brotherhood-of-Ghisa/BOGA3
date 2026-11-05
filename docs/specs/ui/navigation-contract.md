@@ -20,7 +20,7 @@ For route owners, load `screen-map.md`.
 - **Motion** ([ux-rules](ux-rules.md) Pages 2): a tab press on a page over the
   tabs closes it unanimated (`useOpenMainTabFromPage`); the summary fades.
 - The shell is `apps/mobile/src/navigation/main-tabs.ts` — Today / Train /
-  Progress / Groups, then More as a ⋮ — drawn by `MainTabBar`
+  Progress / Groups, then More as an in-card ⋮ — drawn by `MainTabBar`
   (`apps/mobile/components/navigation/main-tab-bar.tsx`) on every screen that
   shows tabs. `/stats-history`,
   `/exercise-catalog` and `/settings` each map to a canonical owner

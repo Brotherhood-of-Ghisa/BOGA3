@@ -46,7 +46,7 @@ the configured calendar bounds.
    style of a native `Alert`.
 4. **Tabs are navigation, not actions.** `MainTabs` uses tab semantics, marks
    the active tab in `ink` (the others muted) over an `ink` underline, and never uses `accent`.
-   Four labelled tabs (Today, Train, Progress, Groups), then More as a ⋮;
+   Four labelled tabs (Today, Train, Progress, Groups), then in-card ⋮ for More;
    Settings is a More row; both work signed out.
 5. **A workout in progress is never a Resume button.** Train is that workout;
    every start goes through `src/session-entry/coordinator.ts`: never two.
