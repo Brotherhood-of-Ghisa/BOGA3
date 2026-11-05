@@ -64,6 +64,7 @@ import { setSessionDeletedState } from '@/src/data/session-list';
 import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
+import { Tag } from '@/components/ui/tag';
 import { planQueries, planRepository, skipPlanBlock, startSessionPlan } from '@/src/session-planner';
 import { createDrizzleSessionPlanStore } from '@/src/data/session-plan-store';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';
@@ -773,7 +774,7 @@ describe('Sessions planning sections', () => {
     expect(mockPush).toHaveBeenCalledWith('/programme/new');
   });
 
-  it('marks resolved rows with their outcome and local day without moving or filtering them', async () => {
+  it('keeps outcome labels, local days and routes in the completed section', async () => {
     const finished = new Date(2026, 9, 25, 0, 30);
     let programmeId = '';
     let completePlanId = '';
@@ -801,17 +802,17 @@ describe('Sessions planning sections', () => {
       }
     });
     showCompletedPlans();
-    const done = screen.getByTestId(`sessions-plan-section-upcoming-row-${completePlanId}`);
+    const done = screen.getByTestId(`sessions-plan-section-completed-row-${completePlanId}`);
     expect(within(done).getByText('Completed')).toBeTruthy();
     expect(within(done).getByText('25-10-2026 · 1 block · 1 completed · 0 skipped')).toBeTruthy();
     expect(done.props.accessibilityLabel).toContain('Completed, 25-10-2026');
     expect(within(done).queryByText('06-10-2026 07:00')).toBeNull();
-    expect(planRowLabels('sessions-plan-section-upcoming')[0]).toContain('Tomorrow');
-    const skipped = screen.getByTestId(`sessions-plan-section-unscheduled-row-${skippedPlanId}`);
+    expect(planRowLabels('sessions-plan-section-upcoming')[0]).toContain('Later Week');
+    const skipped = screen.getByTestId(`sessions-plan-section-completed-row-${skippedPlanId}`);
     expect(within(skipped).getByText('Skipped')).toBeTruthy();
     expect(within(skipped).getByText('1 block · 0 completed · 1 skipped')).toBeTruthy();
     expect(within(skipped).queryByText(/Unscheduled/)).toBeNull();
-    const programme = screen.getByTestId(`sessions-plan-section-unscheduled-programme-${programmeId}`);
+    const programme = screen.getByTestId(`sessions-plan-section-completed-programme-${programmeId}`);
     expect(within(programme).getByText('Completed')).toBeTruthy();
     expect(within(programme).getByText('Programme · 2 sessions · 25-10-2026')).toBeTruthy();
     expect(programme.props.accessibilityLabel).toContain('Completed 25-10-2026');
@@ -822,7 +823,7 @@ describe('Sessions planning sections', () => {
     expect(mockPush).toHaveBeenLastCalledWith(`/programme/${programmeId}`);
 
     await act(async () => setExerciseListPreferences({ dateFormat: 'YYYY-MM-DD' }));
-    expect(within(screen.getByTestId(`sessions-plan-section-upcoming-row-${completePlanId}`)).getByText(/^2026-10-25 ·/)).toBeTruthy();
+    expect(within(screen.getByTestId(`sessions-plan-section-completed-row-${completePlanId}`)).getByText(/^2026-10-25 ·/)).toBeTruthy();
   });
 
   it('refreshes completion on focus and retains the last rows after a failed plan read', async () => {
@@ -835,7 +836,7 @@ describe('Sessions planning sections', () => {
     await skipPlanBlock(block.id, new Date(2026, 9, 25, 12));
     mockIsFocused = true;
     view.rerender(<SessionsRoute />);
-    const row = () => within(screen.getByTestId(`sessions-plan-section-upcoming-row-${id}`));
+    const row = () => within(screen.getByTestId(`sessions-plan-section-completed-row-${id}`));
     await waitFor(() => expect(row().getByText('Skipped')).toBeTruthy());
     jest.spyOn(planQueries, 'listUpcomingPlans').mockRejectedValueOnce(new Error('failed read'));
     mockIsFocused = false;
@@ -864,12 +865,93 @@ describe('Sessions completed-plan visibility over real data', () => {
     }
   };
   const planRow = (id: string, queue = 'unscheduled') => `sessions-plan-section-${queue}-row-${id}`;
-  const programmeRow = (id: string) => `sessions-plan-section-unscheduled-programme-${id}`;
+  const programmeRow = (id: string, queue = 'unscheduled') => `sessions-plan-section-${queue}-programme-${id}`;
   const openOptions = () => fireEvent.press(screen.getByTestId('sessions-options-button'));
   const toggleCompleted = () => fireEvent.press(screen.getByTestId('toggle-completed-plans'));
   const dismissOptions = () => fireEvent(screen.getByTestId('sessions-options-sheet'), 'accessibilityEscape');
   const rowIds = (queue: string) => screen.getAllByTestId(new RegExp(`^sessions-plan-section-${queue}-(row|programme)-`))
     .map((node) => node.props.testID);
+
+  it('keeps partial programmes and unfinished children in their queues while resolved children appear once in programme order', async () => {
+    let partial!: Awaited<ReturnType<typeof store.saveProgrammeGraph>>;
+    let full!: Awaited<ReturnType<typeof store.saveProgrammeGraph>>;
+    let future!: string;
+    await openSessions(async () => {
+      future = await store.savePlanGraph(planInput('Completed in advance', new Date(2030, 0, 1)));
+      partial = await store.saveProgrammeGraph({ name: 'Partial wave', description: null, plans: [
+        planInput('Unscheduled completed child'), planInput('Later unfinished child', new Date(2026, 10, 8)),
+        planInput('Scheduled skipped child', now), planInput('Sooner unfinished child', new Date(2026, 10, 7)),
+      ] }, now);
+      full = await store.saveProgrammeGraph({ name: 'Resolved wave', description: null, plans: [planInput('Resolved unscheduled child')] }, new Date(2026, 10, 3));
+      await resolvePlan(future);
+      await resolvePlan(partial.planIds[0]);
+      await resolvePlan(partial.planIds[2], 'skipped');
+      await resolvePlan(full.planIds[0]);
+    });
+    const parent = screen.getByTestId(programmeRow(partial.programmeId));
+    expect(within(parent).getByText('1/4 completed')).toBeTruthy();
+    expect(within(parent).getByText('Programme · 4 sessions · 1 skipped')).toBeTruthy();
+    expect(parent.props.accessibilityLabel).toBe('Programme Partial wave, 4 sessions, 1 of 4 sessions completed, 1 skipped');
+    const fractionTag = parent.findByType(Tag);
+    expect(fractionTag.props).toEqual({ label: '1/4 completed' });
+    expect(within(parent).getAllByText('1/4 completed')).toHaveLength(1);
+    const upcomingIds = [planRow(partial.planIds[3], 'upcoming'), planRow(partial.planIds[1], 'upcoming')];
+    expect(rowIds('upcoming')).toEqual(upcomingIds);
+    expect(screen.queryByTestId('sessions-plan-section-completed')).toBeNull();
+
+    openOptions(); toggleCompleted(); dismissOptions();
+    expect(rowIds('upcoming')).toEqual(upcomingIds);
+    expect(rowIds('unscheduled')).toEqual([programmeRow(partial.programmeId)]);
+    expect(rowIds('completed')).toEqual([
+      programmeRow(full.programmeId, 'completed'), planRow(partial.planIds[2], 'completed'),
+      planRow(future, 'completed'), planRow(partial.planIds[0], 'completed'), planRow(full.planIds[0], 'completed'),
+    ]);
+    expect(screen.getAllByText('1/4 completed')).toHaveLength(1);
+    expect(screen.getByTestId(programmeRow(full.programmeId, 'completed')).findByType(Tag).props).toEqual({ label: 'Completed' });
+    expect(screen.queryByTestId(planRow(future, 'upcoming'))).toBeNull();
+    expect(screen.queryByTestId(planRow(partial.planIds[0]))).toBeNull();
+    fireEvent.press(screen.getByTestId(planRow(partial.planIds[0], 'completed')));
+    expect(mockPush).toHaveBeenLastCalledWith(`/session-plan/${partial.planIds[0]}`);
+    const headings = screen.getAllByRole('header').map((heading) => heading.props.children);
+    expect(headings.indexOf('Unscheduled')).toBeLessThan(headings.indexOf('Completed plans'));
+    expect(screen.getAllByTestId(/^completed-session-row-/)).toHaveLength(11);
+  });
+
+  it.each([false, true])('refreshes whole-session fractions and child placement on focus with completed visibility %s', async (showCompleted) => {
+    let programme!: Awaited<ReturnType<typeof store.saveProgrammeGraph>>;
+    const view = await openSessions(async () => {
+      programme = await store.saveProgrammeGraph({ name: 'Refreshed wave', description: null, plans: [planInput('First'), planInput('Second')] });
+    });
+    await screen.findByText('0/2 completed');
+    if (showCompleted) { openOptions(); toggleCompleted(); dismissOptions(); }
+    mockIsFocused = false;
+    view.rerender(<SessionsRoute />);
+    await resolvePlan(programme.planIds[0]);
+    mockIsFocused = true;
+    view.rerender(<SessionsRoute />);
+    await screen.findByText('1/2 completed');
+    expect(screen.getByTestId(programmeRow(programme.programmeId)).props.accessibilityLabel).toContain('1 of 2 sessions completed');
+    if (showCompleted) {
+      expect(screen.getByTestId(planRow(programme.planIds[0], 'completed'))).toBeTruthy();
+    } else {
+      expect(screen.queryByTestId('sessions-plan-section-completed')).toBeNull();
+    }
+    expect(screen.queryByTestId(planRow(programme.planIds[1]))).toBeNull();
+  });
+
+  it('deduplicates completed entities when read sources overlap (synthetic duplicate summaries)', async () => {
+    await bootLocalApp();
+    const programme = await store.saveProgrammeGraph({ name: 'Resolved', description: null, plans: [planInput('Resolved child', now)] });
+    await resolvePlan(programme.planIds[0]);
+    const [upcoming, programmes] = await Promise.all([planQueries.listUpcomingPlans(), planQueries.listProgrammeSummaries()]);
+    jest.spyOn(planQueries, 'listUpcomingPlans').mockResolvedValue([...upcoming, ...upcoming]);
+    jest.spyOn(planQueries, 'listUnscheduledPlans').mockResolvedValue(upcoming);
+    jest.spyOn(planQueries, 'listProgrammeSummaries').mockResolvedValue([...programmes, ...programmes]);
+    render(<SessionsRoute />);
+    await screen.findByTestId('session-list-empty-state');
+    openOptions(); toggleCompleted(); dismissOptions();
+    expect(rowIds('completed')).toEqual([programmeRow(programme.programmeId, 'completed'), planRow(programme.planIds[0], 'completed')]);
+  });
 
   it('hides completed plans in both queues and scheduled programme children, and only fully resolved programmes', async () => {
     let scheduled!: string, unscheduled!: string;
@@ -900,7 +982,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     expect((await planQueries.listProgrammeSummaries()).map((programme) => programme.id)).toContain(full.programmeId);
   });
 
-  it('reveals rows in their original order and routes, immediately without a database read or write or history reload', async () => {
+  it('partitions resolved rows in source order and keeps routes, with no SQL or history reload on toggle', async () => {
     let completed!: string, pending!: string, older!: string, newer!: string;
     let programme!: Awaited<ReturnType<typeof store.saveProgrammeGraph>>;
     const historyLoad = loadSpy();
@@ -931,13 +1013,14 @@ describe('Sessions completed-plan visibility over real data', () => {
     expect(screen.getByTestId('toggle-completed-plans-switch', { includeHiddenElements: true })).toHaveProp('value', true);
     dismissOptions();
 
-    expect(rowIds('upcoming')).toEqual([planRow(completed, 'upcoming'), planRow(pending, 'upcoming')]);
-    expect(rowIds('unscheduled')).toEqual([programmeRow(programme.programmeId), planRow(newer), planRow(older)]);
-    fireEvent.press(screen.getByTestId(planRow(completed, 'upcoming')));
+    expect(rowIds('upcoming')).toEqual([planRow(pending, 'upcoming')]);
+    expect(rowIds('unscheduled')).toEqual([planRow(older)]);
+    expect(rowIds('completed')).toEqual([programmeRow(programme.programmeId, 'completed'), planRow(completed, 'completed'), planRow(newer, 'completed'), planRow(programme.planIds[0], 'completed')]);
+    fireEvent.press(screen.getByTestId(planRow(completed, 'completed')));
     expect(mockPush).toHaveBeenLastCalledWith(`/session-plan/${completed}`);
-    fireEvent.press(screen.getByTestId(planRow(newer)));
+    fireEvent.press(screen.getByTestId(planRow(newer, 'completed')));
     expect(mockPush).toHaveBeenLastCalledWith(`/session-plan/${newer}`);
-    fireEvent.press(screen.getByTestId(programmeRow(programme.programmeId)));
+    fireEvent.press(screen.getByTestId(programmeRow(programme.programmeId, 'completed')));
     expect(mockPush).toHaveBeenLastCalledWith(`/programme/${programme.programmeId}`);
 
     openOptions();
@@ -969,7 +1052,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     expect(screen.queryByTestId(planRow(completed, 'upcoming'))).toBeNull();
     const historyRows = screen.getAllByTestId(/^completed-session-row-/).map((row) => row.props.testID);
     openOptions(); toggleCompleted(); dismissOptions();
-    expect(screen.getByTestId(planRow(completed, 'upcoming'))).toBeTruthy();
+    expect(screen.getByTestId(planRow(completed, 'completed'))).toBeTruthy();
     expect(screen.getAllByTestId(/^completed-session-row-/).map((row) => row.props.testID)).toEqual(historyRows);
     expect(jump).toHaveBeenCalledTimes(1);
   });
@@ -989,7 +1072,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     await screen.findByTestId(planRow(partial));
 
     expect(screen.getByTestId(planRow(emptyPlan))).toBeTruthy();
-    expect(screen.getByTestId(programmeRow(emptyProgramme.programmeId))).toBeTruthy();
+    expect(within(screen.getByTestId(programmeRow(emptyProgramme.programmeId))).getByText('0/0 completed')).toBeTruthy();
     expect(screen.getByTestId(programmeRow(unmapped.programmeId))).toBeTruthy();
     expect(screen.getByTestId(planRow(attached, 'upcoming'))).toBeTruthy();
     expect(await planQueries.findNextProgrammeBlock(unmapped.programmeId)).toBeNull();
@@ -1023,7 +1106,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     view.rerender(<SessionsRoute />);
     await screen.findByTestId(`completed-session-row-${started.sessionId}`);
     if (showCompleted) {
-      expect(screen.getByTestId(planRow(id, 'upcoming'))).toBeTruthy();
+      await screen.findByTestId(planRow(id, 'completed'));
       openOptions(); toggleCompleted(); dismissOptions();
     }
     await waitForGone(() => screen.queryByTestId(planRow(id, 'upcoming')));
@@ -1040,21 +1123,21 @@ describe('Sessions completed-plan visibility over real data', () => {
       await setSessionDeletedState(OLDER_COMPLETED, true);
     });
     openOptions(); toggleCompleted(); dismissOptions();
-    expect(screen.getByTestId(planRow(id))).toBeTruthy();
+    expect(screen.getByTestId(planRow(id, 'completed'))).toBeTruthy();
     expect(screen.queryByTestId(`completed-session-row-${OLDER_COMPLETED}`)).toBeNull();
     showDeletedSessions();
     await screen.findByTestId(`completed-session-deleted-tag-${OLDER_COMPLETED}`);
     toggleCompleted(); dismissOptions();
-    expect(screen.queryByTestId(planRow(id))).toBeNull();
+    expect(screen.queryByTestId(planRow(id, 'completed'))).toBeNull();
     expect(screen.getByTestId(`completed-session-row-${OLDER_COMPLETED}`)).toBeTruthy();
     openOptions(); toggleCompleted(); dismissOptions();
-    expect(screen.getByTestId(planRow(id))).toBeTruthy();
+    expect(screen.getByTestId(planRow(id, 'completed'))).toBeTruthy();
     expect(screen.queryByTestId(planRow(deletedPlan))).toBeNull();
     view.unmount();
 
     render(<SessionsRoute />);
     await screen.findByTestId(`completed-session-row-${NEWEST_COMPLETED}`);
-    expect(screen.queryByTestId(planRow(id))).toBeNull();
+    expect(screen.queryByTestId(planRow(id, 'completed'))).toBeNull();
     expect(screen.queryByTestId(`completed-session-row-${OLDER_COMPLETED}`)).toBeNull();
     openOptions();
     expect(screen.getByTestId('toggle-completed-plans')).toHaveProp('accessibilityState', { checked: false });
@@ -1075,10 +1158,14 @@ describe('Sessions completed-plan visibility over real data', () => {
     expect(screen.getByTestId('sessions-new-programme-action')).toBeTruthy();
     openOptions(); toggleCompleted(); dismissOptions();
     expect(screen.queryByTestId('session-list-empty-state')).toBeNull();
-    expect(screen.getByTestId(planRow(scheduled, 'upcoming'))).toBeTruthy();
-    expect(screen.getByTestId(planRow(unscheduled))).toBeTruthy();
-    expect(screen.getByTestId(programmeRow(programme.programmeId))).toBeTruthy();
+    expect(screen.getByTestId(planRow(scheduled, 'completed'))).toBeTruthy();
+    expect(screen.getByTestId(planRow(unscheduled, 'completed'))).toBeTruthy();
+    expect(within(screen.getByTestId(programmeRow(programme.programmeId, 'completed'))).getByText('Completed')).toBeTruthy();
+    expect(within(screen.getByTestId(planRow(programme.planIds[0], 'completed'))).getByText('Skipped')).toBeTruthy();
+    expect(screen.queryByTestId('sessions-plan-section-upcoming')).toBeNull();
+    expect(screen.queryByTestId('sessions-plan-section-unscheduled')).toBeNull();
     openOptions(); toggleCompleted(); dismissOptions();
+    expect(screen.queryByTestId('sessions-plan-section-completed')).toBeNull();
     expect(screen.getByTestId('session-list-empty-state')).toBeTruthy();
   });
 

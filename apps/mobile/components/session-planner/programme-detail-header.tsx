@@ -4,7 +4,7 @@ import { formatShortDate } from '@/src/utils/local-time';
 
 import { ActionButton, Card, FigureText, Tag, uiSpace, uiText } from '@/components/ui';
 import type { ProgrammeDetailView } from '@/src/session-planner';
-import { planOutcomeLabel, progressLabel } from './progress-labels';
+import { progressLabel } from './progress-labels';
 
 export type ProgrammeDetailHeaderProps = {
   detail: ProgrammeDetailView;
@@ -20,8 +20,8 @@ export function ProgrammeDetailHeader({
   onDelete,
 }: ProgrammeDetailHeaderProps) {
   const dateFormat = useDateFormat();
-  const completed = detail.plans.filter((plan) => planOutcomeLabel(plan) === 'Completed').length;
-  const skipped = detail.plans.filter((plan) => planOutcomeLabel(plan) === 'Skipped').length;
+  const completed = detail.completedSessionCount;
+  const skipped = detail.skippedSessionCount;
 
   return (
     <Card style={styles.card} testID="programme-detail-header">

@@ -403,6 +403,57 @@ describe('completion dates across list and detail reads', () => {
 });
 
 describe('programme progress and next block', () => {
+  it('counts live child session outcomes rather than resolved blocks, preserving programme order and exhaustive children', async () => {
+    const result = await planRepository.createProgramme({
+      name: 'Mixed outcomes', description: '', plans: [
+        planDraft('Mixed resolved', { scheduledFor: WEDNESDAY, exercises: [exercise('A'), exercise('B')] }),
+        planDraft('Partial', { exercises: [exercise('A'), exercise('B')] }),
+        planDraft('Entirely skipped'), planDraft('Deleted completed'),
+      ],
+    }, T0);
+    if (result.status !== 'saved') throw new Error('seed failed');
+    const graphs = await store.listPlanGraphsByProgramme(result.id);
+    const [mixed, partial, skipped, deleted] = graphs.map((graph) => graph.plan.id);
+    const [mixedA, mixedB] = await blockIdsByPlan(mixed);
+    resolveBlock(mixedA, 'completed'); resolveBlock(mixedB, 'skipped');
+    resolveBlock((await blockIdsByPlan(partial))[0], 'completed');
+    resolveBlock((await blockIdsByPlan(skipped))[0], 'skipped');
+    resolveBlock((await blockIdsByPlan(deleted))[0], 'completed');
+    db().update(sessionPlans).set({ deletedAt: T1 }).where(eq(sessionPlans.id, deleted)).run();
+    for (const summary of [
+      (await planQueries.listProgrammeSummaries())[0],
+      (await planQueries.loadProgrammeDetail(result.id))!,
+    ]) {
+      expect(summary).toMatchObject({ planCount: 3, completedSessionCount: 1, skippedSessionCount: 1, progress: 'in_progress' });
+      expect(summary.plans.map((plan) => plan.id)).toEqual([mixed, partial, skipped]);
+      expect(summary.blockCounts).toEqual({ pending: 1, attached: 0, completed: 2, skipped: 2 });
+    }
+    resolveBlock((await blockIdsByPlan(partial))[1], 'skipped');
+    expect((await planQueries.listProgrammeSummaries())[0]).toMatchObject({
+      planCount: 3, completedSessionCount: 2, skippedSessionCount: 1, progress: 'completed',
+    });
+  });
+
+  it('keeps all-skipped, empty and zero-block children distinct in outcome counts', async () => {
+    const result = await planRepository.createProgramme({
+      name: 'Skipped wave', description: '', plans: [planDraft('First'), planDraft('Second')],
+    }, T0);
+    if (result.status !== 'saved') throw new Error('seed failed');
+    const graphs = await store.listPlanGraphsByProgramme(result.id);
+    for (const graph of graphs) resolveBlock(graph.exercises[0].id, 'skipped');
+    expect((await planQueries.listProgrammeSummaries())[0]).toMatchObject({
+      progress: 'completed', planCount: 2, completedSessionCount: 0, skippedSessionCount: 2,
+    });
+    const empty = await store.saveProgrammeGraph({ name: 'Empty wave', description: null, plans: [] }, T1);
+    expect(await planQueries.loadProgrammeDetail(empty.programmeId)).toMatchObject({
+      progress: 'planned', planCount: 0, completedSessionCount: 0, skippedSessionCount: 0, plans: [],
+    });
+    db().update(sessionPlanExercises).set({ deletedAt: T1 }).where(eq(sessionPlanExercises.id, graphs[0].exercises[0].id)).run();
+    const summary = (await planQueries.listProgrammeSummaries()).find((programme) => programme.id === result.id)!;
+    expect(summary).toMatchObject({ planCount: 2, completedSessionCount: 0, skippedSessionCount: 1 });
+    expect(summary.plans[0]).toMatchObject({ progress: 'planned', blockCounts: { completed: 0, skipped: 0 } });
+  });
+
   const createTwoPlanProgramme = async () => {
     const created = await planRepository.createProgramme(
       {

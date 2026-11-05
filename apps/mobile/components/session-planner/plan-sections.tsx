@@ -16,18 +16,19 @@ import { planQueries, type PlanSummaryView, type ProgrammeSummaryView } from '@/
 import { blockCountsLabel, planDateLabel, planOutcomeLabel } from './progress-labels';
 
 /**
- * The Sessions screen's planning sections: **Upcoming** (scheduled one-off
- * and programme-child plans, soonest first) and **Unscheduled** (standalone plans
- * and training programmes, most recently updated first), over the plan queries.
+ * The Sessions screen partitions exhaustive reads into unfinished **Upcoming**
+ * and **Unscheduled** queues, followed by optional **Completed plans**. Programme
+ * children resolve independently; unfinished programmes show session outcomes.
  * Queue management stays here; the Today landing page owns surfacing the next
  * scheduled workout or programme block, and programmes join these sections
  * with their own screens. Derived only — nothing here writes plan tables.
  */
 
 const programmeCompletionLabel = (programme: ProgrammeSummaryView, dateFormat: ExerciseDateFormat): string =>
-  programme.progress === 'completed'
+  (programme.progress === 'completed'
     ? `, Completed${programme.completedAt === null ? '' : ` ${formatShortDate(programme.completedAt, dateFormat)}`}`
-    : '';
+    : `, ${programme.completedSessionCount} of ${programme.planCount} sessions completed`) +
+  (programme.skippedSessionCount > 0 ? `, ${programme.skippedSessionCount} skipped` : '');
 
 export type PlanSectionProps = {
   label: string;
@@ -70,10 +71,10 @@ export function PlanSection({
                 <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
                   {programme.name}
                 </Text>
-                {programme.progress === 'completed' ? <Tag label="Completed" /> : null}
+                <Tag label={programme.progress === 'completed' ? 'Completed' : `${programme.completedSessionCount}/${programme.planCount} completed`} />
               </View>
               <Text allowFontScaling={false} style={uiText.meta}>
-                <FigureText>{`Programme · ${programme.planCount} ${programme.planCount === 1 ? 'session' : 'sessions'}${programme.progress === 'completed' && programme.completedAt !== null ? ` · ${formatShortDate(programme.completedAt, dateFormat)}` : ''}`}</FigureText>
+                <FigureText>{`Programme · ${programme.planCount} ${programme.planCount === 1 ? 'session' : 'sessions'}${programme.skippedSessionCount > 0 ? ` · ${programme.skippedSessionCount} skipped` : ''}${programme.progress === 'completed' && programme.completedAt !== null ? ` · ${formatShortDate(programme.completedAt, dateFormat)}` : ''}`}</FigureText>
               </Text>
             </View>
           </ListRow>

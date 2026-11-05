@@ -70,6 +70,10 @@ export type ProgrammeSummaryView = {
   progress: PlanProgress;
   completedAt: Date | null;
   planCount: number;
+  completedSessionCount: number;
+  skippedSessionCount: number;
+  /** Live child summaries in programme order, from the same bulk block read. */
+  plans: PlanSummaryView[];
   blockCounts: { pending: number; attached: number; completed: number; skipped: number };
 };
 
@@ -211,6 +215,11 @@ const summaryFromPlanAndBlocks = (plan: PlanRow, blocks: PlanBlockView[]): PlanS
   };
 };
 
+const sessionCountsFromPlans = (plans: PlanSummaryView[]) => ({
+  completedSessionCount: plans.filter((plan) => plan.progress === 'completed' && plan.blockCounts.completed > 0).length,
+  skippedSessionCount: plans.filter((plan) => plan.progress === 'completed' && plan.blockCounts.completed === 0).length,
+});
+
 export const createPlanQueries = (store: SessionPlanStore = createDrizzleSessionPlanStore()) => {
   /** Loads block views (and their attachment state) for the given plans in one pass. */
   const loadBlockViewsForPlans = async (planIds: string[]): Promise<Map<string, PlanBlockView[]>> => {
@@ -274,6 +283,7 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
       description: programme.description,
       ...progressFromBlocks(blocks),
       planCount: details.length,
+      ...sessionCountsFromPlans(details),
       plans: details,
       nextBlock,
     };
@@ -304,14 +314,19 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
       return programmes
         .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
         .map((programme) => {
-          const programmePlans = plans.filter((plan) => plan.programmeId === programme.id);
+          const programmePlans = plans
+            .filter((plan) => plan.programmeId === programme.id)
+            .sort((a, b) => (a.programmeOrderIndex ?? 0) - (b.programmeOrderIndex ?? 0) || a.createdAt.getTime() - b.createdAt.getTime());
           const blocks = programmePlans.flatMap((plan) => blocksByPlanId.get(plan.id) ?? []);
+          const summaries = programmePlans.map((plan) => summaryFromPlanAndBlocks(plan, blocksByPlanId.get(plan.id) ?? []));
           return {
             id: programme.id,
             name: programme.name,
             description: programme.description,
             ...progressFromBlocks(blocks),
             planCount: programmePlans.length,
+            ...sessionCountsFromPlans(summaries),
+            plans: summaries,
           };
         });
     },

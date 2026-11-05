@@ -297,7 +297,7 @@ path is defined so the permitted operation can never block sync.
 
 | Route | Contract |
 | :--- | :--- |
-| `/sessions` (Planning Hub) | Four sections — **Active**, **Upcoming** (scheduled plans by date), **Unscheduled** (plans and programmes by updated time), **Completed** (performed history). Queue management and authoring live here; screen rules in `docs/specs/ui/screen-map.md`. |
+| `/sessions` (Planning Hub) | **Active**, unfinished **Upcoming** (scheduled plans by date) and **Unscheduled** (standalone plans/programmes by updated time), optional **Completed plans**, then weekly performed history. Queue management and authoring live here; screen rules in `docs/specs/ui/screen-map.md`. |
 | `/session-plan/new` | Author a one-off plan (also edit and duplicate prefill); target entry follows the recorder through shared fields. |
 | `/session-plan/[planId]` | View/edit: Start all, Duplicate, Delete (unused/eligible only), Add block. Consumed blocks are read-only and link to their performed session. |
 | `/programme/new` | Author an ordered programme; minimum 2 child plans; target entry uses the recorder's shared fields. |

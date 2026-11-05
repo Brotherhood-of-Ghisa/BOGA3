@@ -105,6 +105,7 @@ describe('Programme detail', () => {
     description: 'Four weeks of triples.',
     progress: 'planned', completedAt: null,
     planCount: 3,
+      completedSessionCount: 0, skippedSessionCount: 0,
     blockCounts: counts,
     plans: [plan()],
     nextBlock: block(),
@@ -163,7 +164,7 @@ describe('Sessions planning sections', () => {
         label="Unscheduled"
         onOpenPlan={jest.fn()}
         plans={[plan({ scheduledFor: null })]}
-        programmes={[{ id: 'prog1', name: 'Strength block', description: null, progress: 'planned', completedAt: null, planCount: 3, blockCounts: counts }]}
+        programmes={[{ id: 'prog1', name: 'Strength block', description: null, progress: 'planned', completedAt: null, planCount: 3, completedSessionCount: 0, skippedSessionCount: 0, plans: [], blockCounts: counts }]}
         testID="section"
       />,
     );
