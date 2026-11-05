@@ -1,7 +1,7 @@
 import { uiText } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 
-// Original BoGa side profiles, drawn for this chart on a 32 × 16 grid.
+// Original BoGa outlines, drawn for this chart on a 32 × 16 grid.
 // Unbranded vector geometry; no third-party artwork or font dependency.
 export const TONNAGE_REFERENCES = [
   { id: 'elephant', value: 6000, label: '≈6 t', spoken: 'African elephant, approximately 6 tonnes',
@@ -14,10 +14,18 @@ export const TONNAGE_REFERENCES = [
     path: 'M7 8L2 3L3 8L1 12L7 10Q18 13 31 8Q24 5 18 6L16 2Q13 3 13 6Z M21 9L18 13L24 10 M27 8h.1' },
   { id: 'ferry', value: 80000, label: '≈80 t', spoken: 'small passenger ferry, approximately 80 tonnes',
     path: 'M1 10H31L27 14H5Z M5 10V6H27V10 M8 6V3H23L26 6 M10 4.5H13 M15 4.5H18 M20 4.5H23 M8 8H11 M13 8H16 M18 8H21 M23 8H25 M16 3V1 M2 15Q5 13 8 15Q11 13 14 15Q17 13 20 15Q23 13 26 15Q29 13 31 15' },
-  // Boeing lists a 757-200 takeoff configuration at 99,790 kg (page 2-6):
-  // https://www.boeing.com/content/dam/boeing/v2/airports/acaps/757_Rev_H.pdf
-  { id: 'airplane', value: 100000, label: '≈100 t', spoken: 'Boeing 757-200 at takeoff, approximately 100 tonnes',
-    path: 'M1 3H4L8 8H26Q29 8 31 10L28 11H5L1 3Z M10 8L7 2H10L19 8 M19 10L10 15H7L12 10 M21 11V13H25V11 M25 9H28' },
+  // Endeavour's maximum landing weight is 100,000 kg (orbiter only):
+  // https://www.esa.int/articles/shuttle-technical-facts
+  { id: 'shuttle', value: 100000, label: '≈100 t', spoken: 'Space Shuttle orbiter at maximum landing weight, approximately 100 tonnes',
+    path: 'M30.5 8Q28.5 5.8 24 5.8H19L6 1H3L6 5.8H2V10.2H6L3 15H6L19 10.2H24Q28.5 10.2 30.5 8Z M6 8H19 M25 6.2L24 8L25 9.8 M2 6.8H.8 M2 9.2H.8' },
+  // The R 9150 backhoe configuration weighs 128 t, rounded to this reference:
+  // https://www.liebherr.com/shared/media/mining/brochures/job-reports/r-9150-alrosa/eb_r9150-alrosa_enus.pdf
+  { id: 'excavator', value: 125000, label: '≈125 t', spoken: 'large mining excavator, approximately 125 tonnes',
+    path: 'M2 11V8H9V5H14L16 8V11Z M10.5 6.5H13L14.5 8.5H10.5Z M4 11.5H16C18.5 11.5 18.5 15 16 15H4C1.5 15 1.5 11.5 4 11.5Z M5 13.25H15 M15.5 8L20 1.5H22L28.5 8L27 9.5L21.5 4.5L18 10 M27 9.5L30.5 10V13.5H27L25 11.5Z' },
+  // Modelled sphere: 5 m diameter × 2.3 t/m³ bulk density gives about 150.5 t.
+  // Density assumption: https://ntrs.nasa.gov/api/citations/20110016582/downloads/20110016582.pdf
+  { id: 'asteroid', value: 150000, label: '≈150 t', spoken: 'small stony asteroid about 5 metres across, approximately 150 tonnes',
+    path: 'M11 1.5L17 1L23 3.5L26 7L24 11.5L18.5 15L12 14L6.5 10L7.5 5Z M11 5.4C11 3.3 15.5 3.3 15.5 5.4C15.5 7.5 11 7.5 11 5.4Z M19 10.3C19 8.7 22 8.7 22 10.3C22 11.9 19 11.9 19 10.3Z M11 10L12.5 11.4 M20 4.5L21 5.5' },
 ] as const;
 
 type Reference = typeof TONNAGE_REFERENCES[number];
@@ -32,7 +40,7 @@ export const finiteMaximum = (values: readonly (number | null)[]): number =>
 /** Eligibility before fitting: [[comparison.tonnage-references]]. */
 export const eligibleTonnageReferences = (values: readonly (number | null)[]): readonly Reference[] => {
   const reach = finiteMaximum(values);
-  return TONNAGE_REFERENCES.filter(reference => reference.value <= reach);
+  return TONNAGE_REFERENCES.filter(reference => reference.value <= reach).slice(-6);
 };
 
 /** Fit just the missing points above the annotation: [[comparison.tonnage-references]]. */
