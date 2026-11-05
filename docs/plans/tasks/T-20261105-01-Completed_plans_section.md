@@ -32,8 +32,8 @@ This card plans the work; this PR changes no application code.
   while its unfinished programme stays in Unscheduled. Each entity appears
   once; do not introduce unfinished unscheduled-child rows in the hub.
 - Unfinished programme rows show the completed sessions fraction in a boxed
-  `Tag` labelled `{completedSessions}/{totalSessions} completed`, derived from the
-  programme's current live children; `1/10 completed` is only an example.
+  `Tag` labelled `{completedSessions} over {totalSessions}`, derived from the
+  programme's current live children; `1 over 10` is only an example.
   Reuse the same neutral `Tag` component, border, background, padding, shape
   and typography as the existing boxed Completed label, in its title-row
   position. Keep the existing Completed tag for resolved programmes; do not
@@ -74,14 +74,16 @@ Card/ListRow composition, status/date presentation, tokens and accessibility.
 The issue selects this component; the operator selects the existing neutral
 `Tag` in `apps/mobile/components/ui/tag.tsx` for the fraction, matching the
 Completed label from the prerequisite work. No new component family or visual
-variant is proposed. Retain existing completion tags/dates.
+variant is proposed. Retain existing completion tags. On Sessions planning
+rows, show dates only in Upcoming; omit completion dates. Workout history and
+plan/programme detail dates retain their existing presentation.
 Capture the baseline before editing; keep comparison evidence under the
 gitignored `apps/mobile/artifacts/` tree and link it in the implementation PR.
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
 | Browse unfinished work | Open Sessions with the switch off | Unfinished programmes stay in Unscheduled with their completed sessions fraction in the existing Completed-style boxed Tag; unfinished scheduled children stay in Upcoming | Empty plans and pending/attached work retain existing visibility; skip counts stay separate; loading/errors keep their established behavior |
-| Reveal resolved work | Open options, enable Show completed plans, dismiss; disable again | Completed plans appears after Unscheduled and disappears immediately on reversal; rows open their existing plan/programme details | No section when empty; unknown completion dates stay absent; labels follow [[planner.progress-outcomes]]; no SQL or history-count change on toggle |
+| Reveal resolved work | Open options, enable Show completed plans, dismiss; disable again | Completed plans appears after Unscheduled and disappears immediately on reversal; rows open their existing plan/programme details | No section when empty; planning dates appear only in Upcoming; labels follow [[planner.progress-outcomes]]; no SQL or history-count change on toggle |
 | Return after completion | Resolve a plan elsewhere, then refocus Sessions with either switch value | Newly resolved rows leave unfinished queues; appear only in the enabled completed section | Failed reload retains the last successful rows and existing error; week/day navigation stays a one-time scroll without filtering |
 
 ## Implementation tasks and acceptance
@@ -122,7 +124,8 @@ gitignored `apps/mobile/artifacts/` tree and link it in the implementation PR.
      all-skipped outcomes with separate skip counts, zero/empty programmes,
      tombstoned children excluded, accessible counts and focus refresh;
    - empty, pending, attached, partially resolved and entirely skipped work;
-   - existing outcome/date labels, missing dates, local Date format and routes;
+   - existing outcome labels and routes; no planning dates outside Upcoming,
+     whose schedule follows local Date format; unchanged workout-history dates;
    - default hidden state, immediate toggle reversal, mount reset and focus
      retention, with no SQL on toggle and no state/schedule writes;
    - visible-only global emptiness, initial loading, failed reads and refocus

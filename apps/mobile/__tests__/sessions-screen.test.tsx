@@ -774,7 +774,7 @@ describe('Sessions planning sections', () => {
     expect(mockPush).toHaveBeenCalledWith('/programme/new');
   });
 
-  it('keeps outcome labels, local days and routes in the completed section', async () => {
+  it('keeps dates only in Upcoming planning rows, retaining completed outcomes and routes', async () => {
     const finished = new Date(2026, 9, 25, 0, 30);
     let programmeId = '';
     let completePlanId = '';
@@ -804,18 +804,20 @@ describe('Sessions planning sections', () => {
     showCompletedPlans();
     const done = screen.getByTestId(`sessions-plan-section-completed-row-${completePlanId}`);
     expect(within(done).getByText('Completed')).toBeTruthy();
-    expect(within(done).getByText('25-10-2026 · 1 block · 1 completed · 0 skipped')).toBeTruthy();
-    expect(done.props.accessibilityLabel).toContain('Completed, 25-10-2026');
+    expect(within(done).getByText('1 block · 1 completed · 0 skipped')).toBeTruthy();
+    expect(done.props.accessibilityLabel).toBe('Tomorrow, Completed, 1 block · 1 completed · 0 skipped');
+    expect(within(done).queryByText(/25-10-2026/)).toBeNull();
     expect(within(done).queryByText('06-10-2026 07:00')).toBeNull();
-    expect(planRowLabels('sessions-plan-section-upcoming')[0]).toContain('Later Week');
+    expect(planRowLabels('sessions-plan-section-upcoming')[0]).toBe('Later Week, 12-10-2026 07:00');
     const skipped = screen.getByTestId(`sessions-plan-section-completed-row-${skippedPlanId}`);
     expect(within(skipped).getByText('Skipped')).toBeTruthy();
     expect(within(skipped).getByText('1 block · 0 completed · 1 skipped')).toBeTruthy();
     expect(within(skipped).queryByText(/Unscheduled/)).toBeNull();
     const programme = screen.getByTestId(`sessions-plan-section-completed-programme-${programmeId}`);
     expect(within(programme).getByText('Completed')).toBeTruthy();
-    expect(within(programme).getByText('Programme · 2 sessions · 25-10-2026')).toBeTruthy();
-    expect(programme.props.accessibilityLabel).toContain('Completed 25-10-2026');
+    expect(within(programme).getByText('Programme · 2 sessions')).toBeTruthy();
+    expect(programme.props.accessibilityLabel).toBe('Programme Finished wave, 2 sessions, Completed');
+    expect(within(programme).queryByText(/25-10-2026/)).toBeNull();
     expect(screen.getAllByTestId(/^completed-session-row-/)).toHaveLength(11);
     fireEvent.press(done);
     expect(mockPush).toHaveBeenLastCalledWith(`/session-plan/${completePlanId}`);
@@ -823,7 +825,8 @@ describe('Sessions planning sections', () => {
     expect(mockPush).toHaveBeenLastCalledWith(`/programme/${programmeId}`);
 
     await act(async () => setExerciseListPreferences({ dateFormat: 'YYYY-MM-DD' }));
-    expect(within(screen.getByTestId(`sessions-plan-section-completed-row-${completePlanId}`)).getByText(/^2026-10-25 ·/)).toBeTruthy();
+    expect(planRowLabels('sessions-plan-section-upcoming')[0]).toBe('Later Week, 2026-10-12 07:00');
+    expect(within(screen.getByTestId(`sessions-plan-section-completed-row-${completePlanId}`)).queryByText(/2026-10-25/)).toBeNull();
   });
 
   it('refreshes completion on focus and retains the last rows after a failed plan read', async () => {
@@ -889,12 +892,12 @@ describe('Sessions completed-plan visibility over real data', () => {
       await resolvePlan(full.planIds[0]);
     });
     const parent = screen.getByTestId(programmeRow(partial.programmeId));
-    expect(within(parent).getByText('1/4 completed')).toBeTruthy();
+    expect(within(parent).getByText('1 over 4')).toBeTruthy();
     expect(within(parent).getByText('Programme · 4 sessions · 1 skipped')).toBeTruthy();
     expect(parent.props.accessibilityLabel).toBe('Programme Partial wave, 4 sessions, 1 of 4 sessions completed, 1 skipped');
     const fractionTag = parent.findByType(Tag);
-    expect(fractionTag.props).toEqual({ label: '1/4 completed' });
-    expect(within(parent).getAllByText('1/4 completed')).toHaveLength(1);
+    expect(fractionTag.props).toEqual({ label: '1 over 4' });
+    expect(within(parent).getAllByText('1 over 4')).toHaveLength(1);
     const upcomingIds = [planRow(partial.planIds[3], 'upcoming'), planRow(partial.planIds[1], 'upcoming')];
     expect(rowIds('upcoming')).toEqual(upcomingIds);
     expect(screen.queryByTestId('sessions-plan-section-completed')).toBeNull();
@@ -906,7 +909,7 @@ describe('Sessions completed-plan visibility over real data', () => {
       programmeRow(full.programmeId, 'completed'), planRow(partial.planIds[2], 'completed'),
       planRow(future, 'completed'), planRow(partial.planIds[0], 'completed'), planRow(full.planIds[0], 'completed'),
     ]);
-    expect(screen.getAllByText('1/4 completed')).toHaveLength(1);
+    expect(screen.getAllByText('1 over 4')).toHaveLength(1);
     expect(screen.getByTestId(programmeRow(full.programmeId, 'completed')).findByType(Tag).props).toEqual({ label: 'Completed' });
     expect(screen.queryByTestId(planRow(future, 'upcoming'))).toBeNull();
     expect(screen.queryByTestId(planRow(partial.planIds[0]))).toBeNull();
@@ -922,14 +925,14 @@ describe('Sessions completed-plan visibility over real data', () => {
     const view = await openSessions(async () => {
       programme = await store.saveProgrammeGraph({ name: 'Refreshed wave', description: null, plans: [planInput('First'), planInput('Second')] });
     });
-    await screen.findByText('0/2 completed');
+    await screen.findByText('0 over 2');
     if (showCompleted) { openOptions(); toggleCompleted(); dismissOptions(); }
     mockIsFocused = false;
     view.rerender(<SessionsRoute />);
     await resolvePlan(programme.planIds[0]);
     mockIsFocused = true;
     view.rerender(<SessionsRoute />);
-    await screen.findByText('1/2 completed');
+    await screen.findByText('1 over 2');
     expect(screen.getByTestId(programmeRow(programme.programmeId)).props.accessibilityLabel).toContain('1 of 2 sessions completed');
     if (showCompleted) {
       expect(screen.getByTestId(planRow(programme.planIds[0], 'completed'))).toBeTruthy();
@@ -1072,7 +1075,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     await screen.findByTestId(planRow(partial));
 
     expect(screen.getByTestId(planRow(emptyPlan))).toBeTruthy();
-    expect(within(screen.getByTestId(programmeRow(emptyProgramme.programmeId))).getByText('0/0 completed')).toBeTruthy();
+    expect(within(screen.getByTestId(programmeRow(emptyProgramme.programmeId))).getByText('0 over 0')).toBeTruthy();
     expect(screen.getByTestId(programmeRow(unmapped.programmeId))).toBeTruthy();
     expect(screen.getByTestId(planRow(attached, 'upcoming'))).toBeTruthy();
     expect(await planQueries.findNextProgrammeBlock(unmapped.programmeId)).toBeNull();
@@ -1081,7 +1084,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     openOptions(); toggleCompleted(); dismissOptions();
     expect(screen.queryByTestId('sessions-plan-section-completed')).toBeNull();
     expect(screen.getByTestId(planRow(partial))).toBeTruthy();
-    expect(within(screen.getByTestId(programmeRow(emptyProgramme.programmeId))).getByText('0/0 completed')).toBeTruthy();
+    expect(within(screen.getByTestId(programmeRow(emptyProgramme.programmeId))).getByText('0 over 0')).toBeTruthy();
   });
 
   it.each([false, true])('applies show-completed=%s when focus reloads a plan completed elsewhere', async (showCompleted) => {
