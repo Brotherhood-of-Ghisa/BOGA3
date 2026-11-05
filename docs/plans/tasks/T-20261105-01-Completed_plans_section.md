@@ -12,8 +12,8 @@
 Keep resolved planning work out of Upcoming and Unscheduled, even when
 **Show completed plans** is enabled. Reveal those rows in a separate
 **Completed plans** section between Unscheduled and weekly workout history.
-Keep unfinished programmes visible with session-level progress such as
-`Programme · 1/10 completed`.
+Keep unfinished programmes visible with a completed sessions fraction:
+the number of completed child sessions divided by the total live child sessions.
 This card plans the work; this PR changes no application code.
 
 ## Scope and decisions
@@ -31,14 +31,17 @@ This card plans the work; this PR changes no application code.
   each child independently of its programme: a completed child appears there
   while its unfinished programme stays in Unscheduled. Each entity appears
   once; do not introduce unfinished unscheduled-child rows in the hub.
-- Programme rows show `Programme · 1/10 completed` when one of ten live child
-  sessions has the Completed outcome. Count session outcomes using
+- Programme rows show the completed sessions fraction as
+  `Programme · {completedSessions}/{totalSessions} completed`, derived from the
+  programme's current live children; `1/10 completed` is only an example.
+  Count session outcomes using
   [[planner.progress-outcomes]], never completed blocks or workout count.
-  Append a separate skipped count when nonzero, e.g. `· 2 skipped`; skipped
+  Append `· {skippedSessions} skipped` when the skipped count is nonzero; skipped
   sessions do not inflate the numerator. An entirely resolved programme moves
   to Completed plans under the existing resolution rule, even when skipped
   sessions mean its completed fraction is below the total. Speak the fraction
-  as `1 of 10 sessions completed` and the skipped count separately.
+  as `{completedSessions} of {totalSessions} sessions completed` and the skipped
+  count separately.
 - Keep unfinished ordering. For the new section, retain programme order, then
   resolved scheduled-plan order, then resolved unscheduled-plan order; dedupe
   plans by plan ID and programmes by programme ID if sources overlap. Append
@@ -53,7 +56,7 @@ This card plans the work; this PR changes no application code.
 
 **Product decisions planned:** resolved summaries belong in a separate optional
 section, including unscheduled programme children; unfinished programmes show
-a session-completion fraction with skips separate. Outcome facts and training
+a completed sessions fraction with skips separate. Outcome facts and training
 calculations remain unchanged. Record the grouping in the owning screen documentation and
 highlight it on the implementation PR's `Product facts:` line; the product
 review determines any required fact authoring under `docs/product/`.
@@ -70,7 +73,7 @@ gitignored `apps/mobile/artifacts/` tree and link it in the implementation PR.
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
-| Browse unfinished work | Open Sessions with the switch off | Unfinished programmes stay in Unscheduled with a session-level fraction; unfinished scheduled children stay in Upcoming | Empty plans and pending/attached work retain existing visibility; skip counts stay separate; loading/errors keep their established behavior |
+| Browse unfinished work | Open Sessions with the switch off | Unfinished programmes stay in Unscheduled with their completed sessions fraction; unfinished scheduled children stay in Upcoming | Empty plans and pending/attached work retain existing visibility; skip counts stay separate; loading/errors keep their established behavior |
 | Reveal resolved work | Open options, enable Show completed plans, dismiss; disable again | Completed plans appears after Unscheduled and disappears immediately on reversal; rows open their existing plan/programme details | No section when empty; unknown completion dates stay absent; labels follow [[planner.progress-outcomes]]; no SQL or history-count change on toggle |
 | Return after completion | Resolve a plan elsewhere, then refocus Sessions with either switch value | Newly resolved rows leave unfinished queues; appear only in the enabled completed section | Failed reload retains the last successful rows and existing error; week/day navigation stays a one-time scroll without filtering |
 
@@ -101,9 +104,9 @@ gitignored `apps/mobile/artifacts/` tree and link it in the implementation PR.
    - resolved programmes and scheduled children, partial programmes with both
      resolved and unfinished children, including unscheduled completed children
      of an unfinished programme, and one row per entity;
-   - ten-session programmes showing `1/10 completed`, with the parent retained
-     when the completed toggle is off or on; unchanged placement and ordering
-     of unfinished scheduled children;
+   - completed sessions fractions derived from different completed/total
+     counts, with the parent retained when the completed toggle is off or on;
+     unchanged placement and ordering of unfinished scheduled children;
    - fractions counting whole child outcomes rather than blocks, mixed and
      all-skipped outcomes with separate skip counts, zero/empty programmes,
      tombstoned children excluded, accessible counts and focus refresh;
@@ -122,7 +125,7 @@ gitignored `apps/mobile/artifacts/` tree and link it in the implementation PR.
 4. **Share screenshots before running further tests.** Build the smallest
    runnable slice and capture before/after on small and normal phones: hidden
    and revealed sections, a completed future-scheduled plan, resolved/partial
-   programmes (including `1/10 completed` and skips), skipped/missing-date rows,
+   programmes (including completed sessions fractions and skips), skipped/missing-date rows,
    long names, empty/loading/error states
    and the boundary with workout history. Share the updated captures and wait
    for the operator's visual review before any test/gate run. Address requested
