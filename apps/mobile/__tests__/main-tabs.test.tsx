@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { uiText } from '@/components/ui/text-roles';
@@ -163,6 +163,19 @@ describe('MainTabs', () => {
     expect(screen.queryByText('More')).toBeNull();
     expect(screen.getByLabelText('Open More').props.accessibilityState.selected).toBe(true);
     expect(screen.queryByLabelText('Open Settings')).toBeNull();
+  });
+
+  it('keeps the ⋮ inside the bordered tab card, not beside it', () => {
+    render(<MainTabs activeTab="today" onSelect={jest.fn()} />);
+
+    const card = screen.getByTestId('main-bottom-tabs');
+    expect(StyleSheet.flatten(card.props.style)).toMatchObject({ borderWidth: expect.any(Number) });
+    for (const tab of MAIN_TAB_DEFINITIONS) {
+      expect(within(card).getByTestId(tab.testID)).toBeTruthy();
+    }
+    // More is the last child: the card's right edge.
+    const children = card.children.map((child) => (typeof child === 'string' ? child : child.props.testID));
+    expect(children.at(-1)).toBe('top-level-tab-more');
   });
 });
 
