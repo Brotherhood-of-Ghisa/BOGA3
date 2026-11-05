@@ -245,28 +245,28 @@ describe('Today: the Progress card over real data', () => {
     expect(screen.queryByTestId('today-progress-period-metric-toggle')).toBeNull();
   });
 
-  it('draws and speaks the 100 t airplane only for eligible tonnage selections', async () => {
+  it('draws and speaks the 100 t shuttle only for eligible tonnage selections', async () => {
     await bootLocalApp();
     await logSession('september-heavy', local(2026, 9, 15, 9), 7000);
     await logSession('october-light', local(2026, 10, 15, 9), 100);
     await renderToday();
     fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
-    const spoken = 'Boeing 757-200 at takeoff, approximately 100 tonnes.';
+    const spoken = 'Space Shuttle orbiter at maximum landing weight, approximately 100 tonnes.';
     expect(text('today-progress-chart')).toHaveStyle({ minHeight: 140 });
     fireEvent(text('today-progress-chart'), 'layout', { nativeEvent: { layout: { width: 311, height: 140 } } });
     expect(text('today-progress-chart').props.accessibilityValue.text).toContain(spoken);
-    expect(drawing('today-tonnage-line-airplane')).toBeTruthy();
-    expect(within(drawing('today-tonnage-label-airplane')).UNSAFE_getByType(TSpan).props.children).toBe('≈100 t');
-    expect(drawing('today-tonnage-icon-airplane')).toBeTruthy();
-    expect(screen.queryByTestId('today-tonnage-icon-airplane')).toBeNull();
+    expect(drawing('today-tonnage-line-shuttle')).toBeTruthy();
+    expect(within(drawing('today-tonnage-label-shuttle')).UNSAFE_getByType(TSpan).props.children).toBe('≈100 t');
+    expect(drawing('today-tonnage-icon-shuttle')).toBeTruthy();
+    expect(screen.queryByTestId('today-tonnage-icon-shuttle')).toBeNull();
     fireEvent(text('today-progress-chart'), 'responderRelease', { nativeEvent: { locationX: 0 } });
     expect(screen.queryByTestId('today-tonnage-line-elephant', { includeHiddenElements: true })).toBeNull();
-    expect(screen.queryByTestId('today-tonnage-line-airplane', { includeHiddenElements: true })).toBeNull();
+    expect(screen.queryByTestId('today-tonnage-line-shuttle', { includeHiddenElements: true })).toBeNull();
     expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain(spoken);
     for (let day = 0; day < 8; day += 1) {
       fireEvent(text('today-progress-chart'), 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     }
-    expect(drawing('today-tonnage-line-airplane')).toBeTruthy();
+    expect(drawing('today-tonnage-line-shuttle')).toBeTruthy();
     expect(text('today-progress-chart').props.accessibilityValue.text).toContain(spoken);
 
     fireEvent.press(text('today-progress-period-compare-older'));
@@ -276,11 +276,40 @@ describe('Today: the Progress card over real data', () => {
 
     fireEvent.press(text('today-progress-period-compare-newer'));
     await waitFor(() => expect(text('today-progress-period-previous-range')).toHaveTextContent('7 Sep – 4 Oct 26'));
-    expect(drawing('today-tonnage-line-airplane')).toBeTruthy();
+    expect(drawing('today-tonnage-line-shuttle')).toBeTruthy();
     expect(text('today-progress-chart').props.accessibilityValue.text).toContain(spoken);
     fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
-    expect(screen.queryByTestId('today-tonnage-line-airplane', { includeHiddenElements: true })).toBeNull();
+    expect(screen.queryByTestId('today-tonnage-line-shuttle', { includeHiddenElements: true })).toBeNull();
     expect(text('today-progress-chart').props.accessibilityValue.text).not.toContain(spoken);
+  });
+
+  it('keeps the existing height and omits the lightest references above 150 t over real volume', async () => {
+    await bootLocalApp();
+    await logSession('october-heavy', local(2026, 10, 15, 9), 10000);
+    await renderToday();
+    fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
+    expect(text('today-progress-chart')).toHaveStyle({ minHeight: 140 });
+    fireEvent(text('today-progress-chart'), 'layout', { nativeEvent: { layout: { width: 311, height: 140 } } });
+    for (const [id, label, spoken] of [
+      ['shuttle', '≈100 t', 'Space Shuttle orbiter at maximum landing weight, approximately 100 tonnes.'],
+      ['excavator', '≈125 t', 'large mining excavator, approximately 125 tonnes.'],
+      ['asteroid', '≈150 t', 'small stony asteroid about 5 metres across, approximately 150 tonnes.'],
+    ]) {
+      expect(within(drawing(`today-tonnage-label-${id}`)).UNSAFE_getByType(TSpan).props.children).toBe(label);
+      expect(drawing(`today-tonnage-icon-${id}`)).toBeTruthy();
+      expect(text('today-progress-chart').props.accessibilityValue.text).toContain(spoken);
+      expect(screen.queryByTestId(`today-tonnage-icon-${id}`)).toBeNull();
+    }
+    for (const id of ['elephant', 'wagon']) {
+      expect(screen.queryByTestId(`today-tonnage-line-${id}`, { includeHiddenElements: true })).toBeNull();
+    }
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toMatch(/African elephant|freight wagon|Boeing/);
+    expect(screen.queryByTestId('today-tonnage-icon-airplane', { includeHiddenElements: true })).toBeNull();
+    fireEvent.press(text('today-progress-week-working-sets-metric-toggle'));
+    for (const id of ['shuttle', 'excavator', 'asteroid']) {
+      expect(screen.queryByTestId(`today-tonnage-line-${id}`, { includeHiddenElements: true })).toBeNull();
+    }
+    expect(text('today-progress-chart').props.accessibilityValue.text).not.toMatch(/Shuttle|excavator|asteroid/);
   });
 
   it('renders and speaks separate whale and ferry lines from real logged volume', async () => {

@@ -453,29 +453,45 @@ describe('tonnage weight references', () => {
     expect(new Set(references.map(reference => reference.path)).size).toBe(5);
   });
 
-  it('adds a distinct Boeing 757-200 at 100 t, including a selected future projection', () => {
-    const references = chart(input(100000)).references;
-    expect(references.map(reference => reference.value)).toEqual([6000, 20000, 40000, 60000, 80000, 100000]);
-    expect(references[5]).toMatchObject({
-      id: 'airplane', value: 100000, label: '≈100 t',
-      spoken: 'Boeing 757-200 at takeoff, approximately 100 tonnes',
-    });
-    expect(new Set(references.map(reference => reference.path)).size).toBe(6);
-    const future = input(80000, 100000);
-    expect(chart(future).references.some(reference => reference.id === 'airplane')).toBe(false);
-    expect(chart(future, 326, 126, 27).references.map(reference => reference.id)).toContain('airplane');
+  it.each([
+    ['shuttle', 100000, '≈100 t', 'Space Shuttle orbiter at maximum landing weight, approximately 100 tonnes'],
+    ['excavator', 125000, '≈125 t', 'large mining excavator, approximately 125 tonnes'],
+    ['asteroid', 150000, '≈150 t', 'small stony asteroid about 5 metres across, approximately 150 tonnes'],
+  ] as const)('draws %s at %s, including a selected future projection', (id, value, label, spoken) => {
+    const references = chart(input(value), 326, 140).references;
+    expect(references[references.length - 1]).toMatchObject({ id, value, label, spoken });
+    expect(new Set(references.map(reference => reference.path)).size).toBe(references.length);
+    expect(TONNAGE_REFERENCES.map(reference => reference.id)).not.toContain('airplane');
+    expect(periodChartAccessibilityValue(input(value), periodDayFigures(input(value), null, 'totalVolume'))).toContain(spoken);
+    const future = input(value * 0.8, value);
+    expect(chart(future).references.some(reference => reference.id === id)).toBe(false);
+    expect(chart(future, 326, 140, 27).references.map(reference => reference.id)).toContain(id);
+    expect(periodChartAccessibilityValue(future, periodDayFigures(future, 27, 'totalVolume'))).toContain(spoken);
   });
 
   it.each(TONNAGE_REFERENCES.map(reference => [reference.value]))('compares raw values at the %s boundary', threshold => {
     const lower = TONNAGE_REFERENCES.filter(reference => reference.value < threshold).map(reference => reference.value);
+    const shown = [...lower, threshold].slice(-6);
     // Display rounding reaches the threshold before the actual value does.
     expect(formatTonnes(threshold - 0.1)).toBe(String(threshold / 1000));
-    expect(thresholds(input(threshold - 0.1))).toEqual(lower);
-    expect(thresholds(input(threshold))).toEqual([...lower, threshold]);
-    expect(thresholds(input(threshold + 0.1))).toEqual([...lower, threshold]);
-    expect(eligibleTonnageReferences([0, threshold]).map(reference => reference.value)).toEqual([...lower, threshold]);
-    expect(thresholds(input(0, 0, threshold - 0.1))).toEqual(lower);
-    expect(thresholds(input(0, 0, threshold))).toEqual([...lower, threshold]);
+    expect(thresholds(input(threshold - 0.1))).toEqual(lower.slice(-6));
+    expect(thresholds(input(threshold))).toEqual(shown);
+    expect(thresholds(input(threshold + 0.1))).toEqual(shown);
+    expect(eligibleTonnageReferences([0, threshold]).map(reference => reference.value)).toEqual(shown);
+    expect(thresholds(input(0, 0, threshold - 0.1))).toEqual(lower.slice(-6));
+    expect(thresholds(input(0, 0, threshold))).toEqual(shown);
+  });
+
+  it.each([
+    [125000, ['wagon', 'humpback', 'fin-whale', 'ferry', 'shuttle', 'excavator']],
+    [150000, ['humpback', 'fin-whale', 'ferry', 'shuttle', 'excavator', 'asteroid']],
+  ] as const)('keeps the highest six comparisons at %s without growing the chart', (reach, ids) => {
+    const data = input(reach);
+    expect(chart(data, 326, 140).references.map(reference => reference.id)).toEqual(ids);
+    const spoken = periodChartAccessibilityValue(data, periodDayFigures(data, null, 'totalVolume'));
+    for (const reference of TONNAGE_REFERENCES) {
+      expect(spoken.includes(reference.spoken)).toBe(ids.some(id => id === reference.id));
+    }
   });
 
   it('uses finite selected values from either period and ignores the unselected projection', () => {
@@ -526,14 +542,14 @@ describe('tonnage weight references', () => {
     expect(fitTonnageMaximum(6000, references, { top: 6, bottom: 6 })).toBe(6000);
   });
 
-  const reaches = [1000, 2000, 6000, 20000, 40000, 60000, 80000, 100000, 136000, 1000000];
-  // Six references raise the native floor to 140pt; retain the shorter five-reference stress case.
+  const reaches = [1000, 2000, 6000, 20000, 40000, 60000, 80000, 100000, 125000, 136000, 150000, 175000, 1000000];
+  // At most six references retain the native 140pt floor and shorter stress cases.
   const chartSizes = [[72, reaches.filter(reach => reach < 100000)], [126, reaches], [140, reaches], [240, reaches]] as const;
   it.each(chartSizes)('fits every annotation on supported short and tall charts (%spt)', (height, values) => {
     for (const width of [240, 287, 326, 390]) {
       for (const reach of values) {
         const geometry = chart(input(reach), width, height);
-        expect(geometry.references).toHaveLength(TONNAGE_REFERENCES.filter(reference => reference.value <= reach).length);
+        expect(geometry.references).toHaveLength(Math.min(6, TONNAGE_REFERENCES.filter(reference => reference.value <= reach).length));
         for (const [index, reference] of geometry.references.entries()) {
           expect(reference.x).toBeGreaterThanOrEqual(0);
           expect(reference.x + reference.width).toBeLessThanOrEqual(geometry.plot.width - uiSpace.xs);
@@ -555,11 +571,17 @@ describe('tonnage weight references', () => {
     }
   });
 
-  it.each([[20000, 240], [80000, 120], [136000, 144], [1000000, 144]])('keeps %s-volume annotations on the right when one column fits (%spt)', (reach, height) => {
+  it.each([[20000, 240], [80000, 120], [100000, 144], [136000, 240], [150000, 240], [1000000, 144]])('keeps %s-volume annotations on the right when one column fits (%spt)', (reach, height) => {
     const geometry = chart(input(reach), 326, height);
     for (const reference of geometry.references) {
       expect(reference.x + reference.width).toBeCloseTo(geometry.plot.width - uiSpace.xs);
     }
+  });
+
+  it.each([125000, 136000, 150000])('staggers crowded %s-volume labels within the existing chart height', reach => {
+    const geometry = chart(input(reach), 326, 144);
+    expect(geometry.references).toHaveLength(6);
+    expect(geometry.references.some(reference => reference.x + reference.width < geometry.plot.width - uiSpace.xs)).toBe(true);
   });
 
   it('follows selected-day totals from either period while retaining the full curves', () => {
