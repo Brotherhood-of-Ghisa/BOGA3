@@ -1169,7 +1169,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     expect(screen.getByTestId(planRow(scheduled, 'completed'))).toBeTruthy();
     expect(screen.getByTestId(planRow(unscheduled, 'completed'))).toBeTruthy();
     expect(within(screen.getByTestId(programmeRow(programme.programmeId, 'completed'))).getByText('Completed')).toBeTruthy();
-    expect(within(screen.getByTestId(planRow(programme.planIds[0], 'completed'))).getByText('Skipped')).toBeTruthy();
+    expect(screen.getByTestId(planRow(programme.planIds[0], 'completed')).findByType(Tag).props.label).toBe('Skipped');
     expect(screen.queryByTestId('sessions-plan-section-upcoming')).toBeNull();
     expect(screen.queryByTestId('sessions-plan-section-unscheduled')).toBeNull();
     openOptions(); toggleCompleted(); dismissOptions();
