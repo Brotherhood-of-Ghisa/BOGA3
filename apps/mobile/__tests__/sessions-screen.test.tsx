@@ -1078,6 +1078,10 @@ describe('Sessions completed-plan visibility over real data', () => {
     expect(await planQueries.findNextProgrammeBlock(unmapped.programmeId)).toBeNull();
     expect((await planQueries.loadPlanDetail(attached))?.blockCounts.attached).toBe(1);
     expect(screen.queryByTestId('session-list-empty-state')).toBeNull();
+    openOptions(); toggleCompleted(); dismissOptions();
+    expect(screen.queryByTestId('sessions-plan-section-completed')).toBeNull();
+    expect(screen.getByTestId(planRow(partial))).toBeTruthy();
+    expect(within(screen.getByTestId(programmeRow(emptyProgramme.programmeId))).getByText('0/0 completed')).toBeTruthy();
   });
 
   it.each([false, true])('applies show-completed=%s when focus reloads a plan completed elsewhere', async (showCompleted) => {

@@ -316,7 +316,7 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
         .map((programme) => {
           const programmePlans = plans
             .filter((plan) => plan.programmeId === programme.id)
-            .sort((a, b) => (a.programmeOrderIndex ?? 0) - (b.programmeOrderIndex ?? 0) || a.createdAt.getTime() - b.createdAt.getTime());
+            .sort((a, b) => (a.programmeOrderIndex ?? -1) - (b.programmeOrderIndex ?? -1) || a.createdAt.getTime() - b.createdAt.getTime());
           const blocks = programmePlans.flatMap((plan) => blocksByPlanId.get(plan.id) ?? []);
           const summaries = programmePlans.map((plan) => summaryFromPlanAndBlocks(plan, blocksByPlanId.get(plan.id) ?? []));
           return {

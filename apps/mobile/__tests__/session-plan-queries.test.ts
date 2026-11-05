@@ -403,6 +403,20 @@ describe('completion dates across list and detail reads', () => {
 });
 
 describe('programme progress and next block', () => {
+  it('keeps null-order children ahead of index zero, matching programme detail after an interrupted reorder', async () => {
+    const result = await planRepository.createProgramme({
+      name: 'Unfinished reorder', description: '', plans: [planDraft('Index zero'), planDraft('Null order')],
+    }, T0);
+    if (result.status !== 'saved') throw new Error('seed failed');
+    const graphs = await store.listPlanGraphsByProgramme(result.id);
+    const [zero, unordered] = graphs.map((graph) => graph.plan.id);
+    db().update(sessionPlans).set({ programmeOrderIndex: null, createdAt: T1 }).where(eq(sessionPlans.id, unordered)).run();
+    const summary = (await planQueries.listProgrammeSummaries())[0];
+    const detail = (await planQueries.loadProgrammeDetail(result.id))!;
+    expect(summary.plans.map((plan) => plan.id)).toEqual([unordered, zero]);
+    expect(summary.plans.map((plan) => plan.id)).toEqual(detail.plans.map((plan) => plan.id));
+  });
+
   it('counts live child session outcomes rather than resolved blocks, preserving programme order and exhaustive children', async () => {
     const result = await planRepository.createProgramme({
       name: 'Mixed outcomes', description: '', plans: [

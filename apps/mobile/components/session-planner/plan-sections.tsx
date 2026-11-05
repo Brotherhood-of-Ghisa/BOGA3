@@ -18,7 +18,8 @@ import { blockCountsLabel, planDateLabel, planOutcomeLabel } from './progress-la
 /**
  * The Sessions screen partitions exhaustive reads into unfinished **Upcoming**
  * and **Unscheduled** queues, followed by optional **Completed plans**. Programme
- * children resolve independently; unfinished programmes show session outcomes.
+ * children resolve independently; unfinished programmes show session outcomes
+ * under [[planner.progress-outcomes]].
  * Queue management stays here; the Today landing page owns surfacing the next
  * scheduled workout or programme block, and programmes join these sections
  * with their own screens. Derived only — nothing here writes plan tables.
