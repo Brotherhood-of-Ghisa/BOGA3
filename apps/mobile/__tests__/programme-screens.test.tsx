@@ -42,7 +42,8 @@ jest.mock('expo-router', () => {
 
 import { updatePreferences } from '@/src/preferences/hooks';
 import { eq } from 'drizzle-orm';
-import { sessionPlans } from '@/src/data/schema';
+import { sessionPlans, sessionPlanExercises } from '@/src/data/schema';
+import { formatShortDate } from '@/src/utils/local-time';
 import { uiSpace } from '@/components/ui';
 import { ProgrammeNewScreen } from '@/app/programme/new';
 import { ProgrammeDetailScreen } from '@/app/programme/[programmeId]';
@@ -560,13 +561,31 @@ describe('programme screens', () => {
       expect(screen.getByTestId('programme-detail-progress-badge')).toHaveTextContent('Completed');
       const completed = screen.getByTestId(`programme-plan-row-${before.plans[0].id}`);
       const skipped = screen.getByTestId(`programme-plan-row-${before.plans[1].id}`);
-      expect(completed).toHaveProp('accessibilityLabel', 'Lower A, Unscheduled, Completed, 1 block, 1 completed, 0 skipped');
-      expect(skipped).toHaveProp('accessibilityLabel', 'Upper A, Unscheduled, Skipped, 1 block, 0 completed, 1 skipped');
+      const completedDay = formatShortDate(derived.plans[0].completedAt!, 'DD-MM-YYYY');
+      const skippedDay = formatShortDate(derived.plans[1].completedAt!, 'DD-MM-YYYY');
+      expect(completed).toHaveProp('accessibilityLabel', `Lower A, ${completedDay}, Completed, 1 block, 1 completed, 0 skipped`);
+      expect(skipped).toHaveProp('accessibilityLabel', `Upper A, ${skippedDay}, Skipped, 1 block, 0 completed, 1 skipped`);
+      expect(screen.getByTestId('programme-detail-completed-date')).toHaveTextContent(formatShortDate(derived.completedAt!, 'DD-MM-YYYY'));
       expect(within(completed).getByText('Completed')).toBeTruthy();
       expect(within(skipped).getByText('Skipped')).toBeTruthy();
       fireEvent.press(completed);
       expect(mockPush).toHaveBeenCalledWith(`/session-plan/${encodeURIComponent(before.plans[0].id)}`);
       expect(await loadSessionSnapshotById(workout.sessionId)).toEqual(workout);
+    });
+
+    it('keeps completion status but omits dates when a resolved block has no timestamp', async () => {
+      const detail = (await planQueries.loadProgrammeDetail(seededProgrammeId))!;
+      for (const plan of detail.plans) {
+        localDatabase().update(sessionPlanExercises)
+          .set({ progressStatus: 'skipped', resolvedAt: null })
+          .where(eq(sessionPlanExercises.id, plan.blocks[0].id)).run();
+      }
+      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      expect(await screen.findByTestId('programme-detail-progress-badge')).toHaveTextContent('Completed');
+      expect(screen.queryByTestId('programme-detail-completed-date')).toBeNull();
+      const child = screen.getByTestId(`programme-plan-row-${detail.plans[0].id}`);
+      expect(child.props.accessibilityLabel).toBe('Lower A, Skipped, 1 block, 0 completed, 1 skipped');
+      expect(within(child).queryByText(/Unscheduled/)).toBeNull();
     });
 
     it.each([false, true])('keeps both block outcomes visible and spoken in a mixed session (resolved=%s)', async (resolved) => {
@@ -592,7 +611,9 @@ describe('programme screens', () => {
       const total = resolved ? 2 : 3;
       expect(within(row).getByText(outcome)).toBeTruthy();
       expect(within(row).getByText(new RegExp(`${total} blocks · 1 completed · 1 skipped$`))).toBeTruthy();
-      expect(row).toHaveProp('accessibilityLabel', `Day 1, Unscheduled, ${outcome}, ${total} blocks, 1 completed, 1 skipped`);
+      const completedAt = (await planQueries.loadPlanDetail(detail.plans[0].id))!.completedAt;
+      const date = completedAt === null ? 'Unscheduled' : formatShortDate(completedAt, 'DD-MM-YYYY');
+      expect(row).toHaveProp('accessibilityLabel', `Day 1, ${date}, ${outcome}, ${total} blocks, 1 completed, 1 skipped`);
     });
 
     it.each([0, 1])('keeps empty and singular legacy programme totals explicit (%i sessions)', async (remaining) => {

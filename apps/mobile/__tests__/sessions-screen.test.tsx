@@ -13,7 +13,7 @@
  * after unmount), driven through an injected client.
  */
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, SectionList, type AlertButton } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -85,6 +85,12 @@ const openSessions = async (prepare?: () => Promise<unknown>) => {
 const showDeletedSessions = () => {
   fireEvent.press(screen.getByTestId('sessions-options-button'));
   fireEvent.press(screen.getByTestId('toggle-deleted-sessions'));
+};
+
+const showCompletedPlans = () => {
+  fireEvent.press(screen.getByTestId('sessions-options-button'));
+  fireEvent.press(screen.getByTestId('toggle-completed-plans'));
+  fireEvent(screen.getByTestId('sessions-options-sheet'), 'accessibilityEscape');
 };
 
 const loadSpy = () => jest.spyOn(DEFAULT_SESSION_LIST_DATA_CLIENT, 'loadSessions');
@@ -315,10 +321,14 @@ describe('Sessions over real data', () => {
     });
 
     expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('24-07-2026 23:45');
+    expect(screen.getByTestId(`completed-session-tag-${lateId}`)).toHaveTextContent('Completed');
+    expect(screen.getByTestId(`completed-session-date-${lateId}`)).toHaveTextContent('25-07-2026');
+    expect(screen.getByTestId(`completed-session-open-button-${lateId}`).props.accessibilityLabel).toContain('Completed 25-07-2026');
 
     await act(async () => {
       setExerciseListPreferences({ dateFormat: 'MM-DD-YYYY' });
     });
+    expect(screen.getByTestId(`completed-session-date-${lateId}`)).toHaveTextContent('07-25-2026');
     expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('07-24-2026 23:45');
 
     await act(async () => {
@@ -761,6 +771,79 @@ describe('Sessions planning sections', () => {
 
     fireEvent.press(screen.getByTestId('sessions-new-programme-action'));
     expect(mockPush).toHaveBeenCalledWith('/programme/new');
+  });
+
+  it('marks resolved rows with their outcome and local day without moving or filtering them', async () => {
+    const finished = new Date(2026, 9, 25, 0, 30);
+    let programmeId = '';
+    let completePlanId = '';
+    let skippedPlanId = '';
+    const resolvePlan = async (id: string, outcome: 'completed' | 'skipped', date: Date | null) => {
+      const plan = (await planQueries.loadPlanDetail(id))!;
+      for (const block of plan.blocks) {
+        localDataClient().prepare('UPDATE session_plan_exercises SET progress_status = ?, resolved_at = ? WHERE id = ?')
+          .run(outcome, date?.getTime() ?? null, block.id);
+      }
+    };
+    await openSessions(async () => {
+      await seedPlans();
+      completePlanId = (await planQueries.listUpcomingPlans())[0].id;
+      skippedPlanId = (await planQueries.listUnscheduledPlans())[0].id;
+      await resolvePlan(completePlanId, 'completed', finished);
+      await resolvePlan(skippedPlanId, 'skipped', null);
+      const programme = await planRepository.createProgramme({
+        name: 'Finished wave', description: '', plans: [planDraft(), planDraft()],
+      });
+      if (programme.status !== 'saved') throw new Error('seed failed');
+      programmeId = programme.id;
+      for (const plan of (await planQueries.loadProgrammeDetail(programmeId))!.plans) {
+        await resolvePlan(plan.id, 'completed', finished);
+      }
+    });
+    showCompletedPlans();
+    const done = screen.getByTestId(`sessions-plan-section-upcoming-row-${completePlanId}`);
+    expect(within(done).getByText('Completed')).toBeTruthy();
+    expect(within(done).getByText('25-10-2026 · 1 block · 1 completed · 0 skipped')).toBeTruthy();
+    expect(done.props.accessibilityLabel).toContain('Completed, 25-10-2026');
+    expect(within(done).queryByText('06-10-2026 07:00')).toBeNull();
+    expect(planRowLabels('sessions-plan-section-upcoming')[0]).toContain('Tomorrow');
+    const skipped = screen.getByTestId(`sessions-plan-section-unscheduled-row-${skippedPlanId}`);
+    expect(within(skipped).getByText('Skipped')).toBeTruthy();
+    expect(within(skipped).getByText('1 block · 0 completed · 1 skipped')).toBeTruthy();
+    expect(within(skipped).queryByText(/Unscheduled/)).toBeNull();
+    const programme = screen.getByTestId(`sessions-plan-section-unscheduled-programme-${programmeId}`);
+    expect(within(programme).getByText('Completed')).toBeTruthy();
+    expect(within(programme).getByText('Programme · 2 sessions · 25-10-2026')).toBeTruthy();
+    expect(programme.props.accessibilityLabel).toContain('Completed 25-10-2026');
+    expect(screen.getAllByTestId(/^completed-session-row-/)).toHaveLength(11);
+    fireEvent.press(done);
+    expect(mockPush).toHaveBeenLastCalledWith(`/session-plan/${completePlanId}`);
+    fireEvent.press(programme);
+    expect(mockPush).toHaveBeenLastCalledWith(`/programme/${programmeId}`);
+
+    await act(async () => setExerciseListPreferences({ dateFormat: 'YYYY-MM-DD' }));
+    expect(within(screen.getByTestId(`sessions-plan-section-upcoming-row-${completePlanId}`)).getByText(/^2026-10-25 ·/)).toBeTruthy();
+  });
+
+  it('refreshes completion on focus and retains the last rows after a failed plan read', async () => {
+    const view = await openSessions(seedPlans);
+    showCompletedPlans();
+    const id = (await planQueries.listUpcomingPlans())[0].id;
+    const block = (await planQueries.loadPlanDetail(id))!.blocks[0];
+    mockIsFocused = false;
+    view.rerender(<SessionsRoute />);
+    await skipPlanBlock(block.id, new Date(2026, 9, 25, 12));
+    mockIsFocused = true;
+    view.rerender(<SessionsRoute />);
+    const row = () => within(screen.getByTestId(`sessions-plan-section-upcoming-row-${id}`));
+    await waitFor(() => expect(row().getByText('Skipped')).toBeTruthy());
+    jest.spyOn(planQueries, 'listUpcomingPlans').mockRejectedValueOnce(new Error('failed read'));
+    mockIsFocused = false;
+    view.rerender(<SessionsRoute />);
+    mockIsFocused = true;
+    view.rerender(<SessionsRoute />);
+    await screen.findByTestId('sessions-plans-error');
+    expect(row().getByText('Skipped')).toBeTruthy();
   });
 });
 

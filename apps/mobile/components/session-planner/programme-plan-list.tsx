@@ -1,21 +1,14 @@
 import { useDateFormat } from '@/src/preferences/hooks';
-import { formatLocalDateTime } from '@/src/utils/local-time';
-import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Card, FigureText, IconButton, ListRow, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { Card, FigureText, IconButton, ListRow, Tag, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import type { PlanDetailView } from '@/src/session-planner';
-import { blockCountsLabel, planOutcomeLabel } from './progress-labels';
+import { blockCountsLabel, planDateLabel, planOutcomeLabel } from './progress-labels';
 
 export type ProgrammePlanListProps = {
   plans: PlanDetailView[];
   onOpenPlan: (planId: string) => void;
   onReorderPlans?: (orderedPlanIds: string[]) => void;
-};
-
-const formatSchedule = (date: Date | null, dateFormat: ExerciseDateFormat): string => {
-  if (date === null) return 'Unscheduled';
-  return formatLocalDateTime(date.getTime(), dateFormat);
 };
 
 export function ProgrammePlanList({
@@ -43,7 +36,7 @@ export function ProgrammePlanList({
       <Card>
         {plans.map((plan, index) => (
           <ListRow
-            accessibilityLabel={`${plan.title}, ${formatSchedule(plan.scheduledFor, dateFormat)}, ${planOutcomeLabel(plan)}, ${blockCountsLabel(plan.blockCounts).replace(/ · /g, ', ')}`}
+            accessibilityLabel={[plan.title, planDateLabel(plan, dateFormat), planOutcomeLabel(plan), blockCountsLabel(plan.blockCounts).replace(/ · /g, ', ')].filter(Boolean).join(', ')}
             density="list"
             divider={index > 0}
             key={plan.id}
@@ -76,12 +69,14 @@ export function ProgrammePlanList({
                 <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
                   {plan.title}
                 </Text>
-                <Text allowFontScaling={false} style={uiText.label}>
-                  {planOutcomeLabel(plan)}
-                </Text>
+                {plan.progress === 'completed' ? <Tag label={planOutcomeLabel(plan)} /> : (
+                  <Text allowFontScaling={false} style={uiText.label}>
+                    {planOutcomeLabel(plan)}
+                  </Text>
+                )}
               </View>
               <Text allowFontScaling={false} style={uiText.meta}>
-                <FigureText>{`${formatSchedule(plan.scheduledFor, dateFormat)} · ${blockCountsLabel(plan.blockCounts)}`}</FigureText>
+                <FigureText>{[planDateLabel(plan, dateFormat), blockCountsLabel(plan.blockCounts)].filter(Boolean).join(' · ')}</FigureText>
               </Text>
             </View>
           </ListRow>
@@ -97,6 +92,7 @@ const styles = StyleSheet.create({
   },
   rowText: {
     flex: 1,
+    minWidth: 0,
     paddingVertical: uiSpace.xs,
     gap: uiSpace.xs,
   },

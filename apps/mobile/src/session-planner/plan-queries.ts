@@ -57,6 +57,7 @@ export type PlanSummaryView = {
   programmeOrderIndex: number | null;
   provenance: 'human' | 'agent';
   progress: PlanProgress;
+  completedAt: Date | null;
   blockCounts: { pending: number; attached: number; completed: number; skipped: number };
 };
 
@@ -67,6 +68,7 @@ export type ProgrammeSummaryView = {
   name: string;
   description: string | null;
   progress: PlanProgress;
+  completedAt: Date | null;
   planCount: number;
   blockCounts: { pending: number; attached: number; completed: number; skipped: number };
 };
@@ -87,6 +89,27 @@ const progressFromCounts = (counts: BlockCounts): PlanProgress => {
     return 'completed';
   }
   return counts.attached + counts.completed + counts.skipped > 0 ? 'in_progress' : 'planned';
+};
+
+/** A missing block timestamp makes the final day uncertain. */
+const progressFromBlocks = (blocks: PlanBlockView[]) => {
+  const counts = emptyBlockCounts();
+  let latest: Date | null = null;
+  let allDated = true;
+  for (const block of blocks) {
+    counts[block.status] += 1;
+    if (block.resolvedAt === null || !Number.isFinite(block.resolvedAt.getTime())) {
+      allDated = false;
+    } else if (latest === null || block.resolvedAt > latest) {
+      latest = block.resolvedAt;
+    }
+  }
+  const progress = progressFromCounts(counts);
+  return {
+    progress,
+    completedAt: progress === 'completed' && allDated ? latest : null,
+    blockCounts: counts,
+  };
 };
 
 type ClaimingCard = {
@@ -176,10 +199,6 @@ const toBlockViews = (
 };
 
 const summaryFromPlanAndBlocks = (plan: PlanRow, blocks: PlanBlockView[]): PlanSummaryView => {
-  const counts = emptyBlockCounts();
-  for (const block of blocks) {
-    counts[block.status] += 1;
-  }
   return {
     id: plan.id,
     title: plan.title,
@@ -188,8 +207,7 @@ const summaryFromPlanAndBlocks = (plan: PlanRow, blocks: PlanBlockView[]): PlanS
     programmeId: plan.programmeId,
     programmeOrderIndex: plan.programmeOrderIndex,
     provenance: plan.provenance,
-    progress: progressFromCounts(counts),
-    blockCounts: counts,
+    ...progressFromBlocks(blocks),
   };
 };
 
@@ -243,27 +261,19 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
       ...summaryFromPlanAndBlocks(graph.plan, blocksByPlanId.get(graph.plan.id) ?? []),
       blocks: blocksByPlanId.get(graph.plan.id) ?? [],
     }));
-    const counts = emptyBlockCounts();
-    for (const detail of details) {
-      for (const block of detail.blocks) {
-        counts[block.status] += 1;
-      }
-    }
+    const blocks = details.flatMap((detail) => detail.blocks);
     // Programme-order then exercise-order: plans come ordered by
     // programme_order_index and blocks by order_index, so the first pending
     // materializable block in that sequence (with a non-null exercise definition)
     // is the next one to offer.
     const nextBlock =
-      details
-        .flatMap((detail) => detail.blocks)
-        .find((block) => block.status === 'pending' && block.exerciseDefinitionId !== null) ?? null;
+      blocks.find((block) => block.status === 'pending' && block.exerciseDefinitionId !== null) ?? null;
     return {
       id: programme.id,
       name: programme.name,
       description: programme.description,
-      progress: progressFromCounts(counts),
+      ...progressFromBlocks(blocks),
       planCount: details.length,
-      blockCounts: counts,
       plans: details,
       nextBlock,
     };
@@ -295,19 +305,13 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
         .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
         .map((programme) => {
           const programmePlans = plans.filter((plan) => plan.programmeId === programme.id);
-          const counts = emptyBlockCounts();
-          for (const plan of programmePlans) {
-            for (const block of blocksByPlanId.get(plan.id) ?? []) {
-              counts[block.status] += 1;
-            }
-          }
+          const blocks = programmePlans.flatMap((plan) => blocksByPlanId.get(plan.id) ?? []);
           return {
             id: programme.id,
             name: programme.name,
             description: programme.description,
-            progress: progressFromCounts(counts),
+            ...progressFromBlocks(blocks),
             planCount: programmePlans.length,
-            blockCounts: counts,
           };
         });
     },
