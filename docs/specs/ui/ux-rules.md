@@ -291,10 +291,12 @@ where a release starts firing. Code:
 
 ### Planned sessions on Sessions and the plan screens
 
-`/sessions` owns queue management: planned
-rows never enter, nor are affected by, the completed history's count, filters,
-row actions or deleted toggle; a schedule is optional and Unscheduled is never
-disguised as "today". The picker's completed-history action is **Repeat last**
+Resolved rows use neutral `Tag`s with [[planner.progress-outcomes]] labels
+and [[copy.calendar-dates]] dates; rows keep their sections.
+
+`/sessions` owns queue management. Plans stay independent of completed history,
+its filters, counts and deleted toggle. An optional schedule never defaults to
+today. The picker's completed-history action is **Repeat last**
 (the newest session, [[gym.split]], appended as planned sets) and is separate from **From
 planner**, which offers authored one-off blocks and programme blocks that are
 pending, definition-bearing and target-bearing. A block attaches

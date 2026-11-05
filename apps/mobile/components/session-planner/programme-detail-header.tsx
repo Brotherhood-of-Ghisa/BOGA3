@@ -1,4 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useDateFormat } from '@/src/preferences/hooks';
+import { formatShortDate } from '@/src/utils/local-time';
 
 import { ActionButton, Card, FigureText, Tag, uiSpace, uiText } from '@/components/ui';
 import type { ProgrammeDetailView } from '@/src/session-planner';
@@ -17,6 +19,7 @@ export function ProgrammeDetailHeader({
   onDuplicate,
   onDelete,
 }: ProgrammeDetailHeaderProps) {
+  const dateFormat = useDateFormat();
   const completed = detail.plans.filter((plan) => planOutcomeLabel(plan) === 'Completed').length;
   const skipped = detail.plans.filter((plan) => planOutcomeLabel(plan) === 'Skipped').length;
 
@@ -40,6 +43,12 @@ export function ProgrammeDetailHeader({
           tone={detail.progress === 'completed' ? 'neutral' : 'faint'}
         />
       </View>
+
+      {detail.progress === 'completed' && detail.completedAt !== null ? (
+        <Text allowFontScaling={false} accessibilityLabel={`Completed ${formatShortDate(detail.completedAt, dateFormat)}`} style={uiText.meta} testID="programme-detail-completed-date">
+          <FigureText>{formatShortDate(detail.completedAt, dateFormat)}</FigureText>
+        </Text>
+      ) : null}
 
       <Text allowFontScaling={false} style={uiText.meta} testID="programme-detail-stats">
         <FigureText>

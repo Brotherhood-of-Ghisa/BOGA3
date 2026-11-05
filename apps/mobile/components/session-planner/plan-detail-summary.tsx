@@ -1,10 +1,10 @@
 import { useDateFormat } from '@/src/preferences/hooks';
-import { formatLocalDateTime } from '@/src/utils/local-time';
+import { formatLocalDateTime, formatShortDate } from '@/src/utils/local-time';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Card, FigureText, IconButton, uiSpace, uiText } from '@/components/ui';
+import { ActionButton, Card, FigureText, IconButton, Tag, uiSpace, uiText } from '@/components/ui';
 import type { PlanDetailView } from '@/src/session-planner';
-import { blockCountsLabel } from './progress-labels';
+import { blockCountsLabel, planOutcomeLabel } from './progress-labels';
 
 export type PlanDetailSummaryProps = {
   detail: PlanDetailView;
@@ -35,6 +35,16 @@ export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDup
           <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title} testID="plan-detail-title">
             {detail.title}
           </Text>
+          {detail.progress === 'completed' ? (
+            <View style={styles.completion}>
+              <Tag label={planOutcomeLabel(detail)} testID="plan-detail-completed-tag" />
+              {detail.completedAt !== null ? (
+                <Text allowFontScaling={false} accessibilityLabel={`${planOutcomeLabel(detail)} ${formatShortDate(detail.completedAt, dateFormat)}`} style={uiText.meta} testID="plan-detail-completed-date">
+                  <FigureText>{formatShortDate(detail.completedAt, dateFormat)}</FigureText>
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
           <Text allowFontScaling={false} style={uiText.meta} testID="plan-detail-schedule">
             <FigureText>
               {detail.scheduledFor !== null ? `Scheduled ${formatLocalDateTime(detail.scheduledFor.getTime(), dateFormat)}` : 'Unscheduled'}
@@ -99,6 +109,12 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     flex: 1,
+    gap: uiSpace.xs,
+  },
+  completion: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
     gap: uiSpace.xs,
   },
 });

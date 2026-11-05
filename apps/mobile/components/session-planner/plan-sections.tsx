@@ -1,5 +1,5 @@
 import { useDateFormat } from '@/src/preferences/hooks';
-import { formatLocalDateTime } from '@/src/utils/local-time';
+import { formatShortDate } from '@/src/utils/local-time';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -9,9 +9,11 @@ import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
+import { Tag } from '@/components/ui/tag';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import { planQueries, type PlanSummaryView, type ProgrammeSummaryView } from '@/src/session-planner';
+import { blockCountsLabel, planDateLabel, planOutcomeLabel } from './progress-labels';
 
 /**
  * The Sessions screen's planning sections: **Upcoming** (scheduled one-off
@@ -22,14 +24,10 @@ import { planQueries, type PlanSummaryView, type ProgrammeSummaryView } from '@/
  * with their own screens. Derived only — nothing here writes plan tables.
  */
 
-/** Formats the quiet schedule line under a plan's title. */
-const scheduleLine = (plan: PlanSummaryView, dateFormat: ExerciseDateFormat): string => {
-  if (plan.scheduledFor !== null) {
-    const at = plan.scheduledFor;
-    return formatLocalDateTime(at.getTime(), dateFormat);
-  }
-  return 'Unscheduled';
-};
+const programmeCompletionLabel = (programme: ProgrammeSummaryView, dateFormat: ExerciseDateFormat): string =>
+  programme.progress === 'completed'
+    ? `, Completed${programme.completedAt === null ? '' : ` ${formatShortDate(programme.completedAt, dateFormat)}`}`
+    : '';
 
 export type PlanSectionProps = {
   label: string;
@@ -61,35 +59,43 @@ export function PlanSection({
       <Card>
         {programmes.map((programme, index) => (
           <ListRow
-            accessibilityLabel={`Programme ${programme.name}, ${programme.planCount} sessions`}
+            accessibilityLabel={`Programme ${programme.name}, ${programme.planCount} sessions${programmeCompletionLabel(programme, dateFormat)}`}
             density="list"
             divider={index > 0}
             key={programme.id}
             onPress={() => onOpenProgramme?.(programme.id)}
             testID={`${testID}-programme-${programme.id}`}>
             <View style={styles.rowText}>
-              <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
-                {programme.name}
-              </Text>
-              <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
-                <FigureText>{`Programme · ${programme.planCount} ${programme.planCount === 1 ? 'session' : 'sessions'}`}</FigureText>
+              <View style={styles.titleRow}>
+                <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
+                  {programme.name}
+                </Text>
+                {programme.progress === 'completed' ? <Tag label="Completed" /> : null}
+              </View>
+              <Text allowFontScaling={false} style={uiText.meta}>
+                <FigureText>{`Programme · ${programme.planCount} ${programme.planCount === 1 ? 'session' : 'sessions'}${programme.progress === 'completed' && programme.completedAt !== null ? ` · ${formatShortDate(programme.completedAt, dateFormat)}` : ''}`}</FigureText>
               </Text>
             </View>
           </ListRow>
         ))}
         {plans.map((plan, index) => (
           <ListRow
-            accessibilityLabel={`${plan.title}, ${scheduleLine(plan, dateFormat)}`}
+            accessibilityLabel={plan.progress === 'completed'
+              ? [plan.title, planOutcomeLabel(plan), planDetailLine(plan, dateFormat)].join(', ')
+              : `${plan.title}, ${planDateLabel(plan, dateFormat)}`}
             density="list"
             divider={programmes.length > 0 || index > 0}
             key={plan.id}
             onPress={() => onOpenPlan(plan.id)}
             testID={`${testID}-row-${plan.id}`}>
             <View style={styles.rowText}>
-              <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
-                {plan.title}
-              </Text>
-              <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+              <View style={styles.titleRow}>
+                <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
+                  {plan.title}
+                </Text>
+                {plan.progress === 'completed' ? <Tag label={planOutcomeLabel(plan)} /> : null}
+              </View>
+              <Text allowFontScaling={false} style={uiText.meta}>
                 <FigureText>{planDetailLine(plan, dateFormat)}</FigureText>
               </Text>
             </View>
@@ -103,7 +109,8 @@ export function PlanSection({
 const planDetailLine = (plan: PlanSummaryView, dateFormat: ExerciseDateFormat): string => {
   const counts = plan.blockCounts;
   const blocks = counts.pending + counts.attached + counts.completed + counts.skipped;
-  return `${scheduleLine(plan, dateFormat)} · ${blocks} ${blocks === 1 ? 'block' : 'blocks'}`;
+  const blockLine = plan.progress === 'completed' ? blockCountsLabel(counts) : `${blocks} ${blocks === 1 ? 'block' : 'blocks'}`;
+  return [planDateLabel(plan, dateFormat), blockLine].filter(Boolean).join(' · ');
 };
 
 /** The quiet Plan session action: the hub's persistent entry and the empty states' one. */
@@ -189,6 +196,16 @@ const styles = StyleSheet.create({
     paddingBottom: uiSpace.md,
   },
   rowText: {
+    flex: 1,
+    minWidth: 0,
     paddingVertical: uiSpace.sm,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.sm,
+  },
+  title: {
+    flex: 1,
   },
 });

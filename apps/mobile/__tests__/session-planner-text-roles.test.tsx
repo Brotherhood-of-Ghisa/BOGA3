@@ -70,7 +70,7 @@ const plan = (overrides: Partial<PlanDetailView> = {}): PlanDetailView => ({
   programmeId: 'prog1',
   programmeOrderIndex: 1,
   provenance: 'agent',
-  progress: 'planned',
+  progress: 'planned', completedAt: null,
   blockCounts: counts,
   blocks: [block()],
   ...overrides,
@@ -103,7 +103,7 @@ describe('Programme detail', () => {
     id: 'prog1',
     name: 'Strength block',
     description: 'Four weeks of triples.',
-    progress: 'planned',
+    progress: 'planned', completedAt: null,
     planCount: 3,
     blockCounts: counts,
     plans: [plan()],
@@ -163,7 +163,7 @@ describe('Sessions planning sections', () => {
         label="Unscheduled"
         onOpenPlan={jest.fn()}
         plans={[plan({ scheduledFor: null })]}
-        programmes={[{ id: 'prog1', name: 'Strength block', description: null, progress: 'planned', planCount: 3, blockCounts: counts }]}
+        programmes={[{ id: 'prog1', name: 'Strength block', description: null, progress: 'planned', completedAt: null, planCount: 3, blockCounts: counts }]}
         testID="section"
       />,
     );

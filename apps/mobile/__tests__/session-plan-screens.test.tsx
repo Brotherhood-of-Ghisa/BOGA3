@@ -51,7 +51,8 @@ import SessionPlanNewRoute, { SessionPlanNewScreen } from '@/app/session-plan/ne
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
-import { sessions } from '@/src/data/schema';
+import { sessions, sessionPlanExercises } from '@/src/data/schema';
+import { eq } from 'drizzle-orm';
 import { PlanCardChoiceSheet } from '@/components/session-planner/plan-card-choice-sheet';
 import { PlanFormScreen } from '@/components/session-planner/plan-form-screen';
 import { planRepository, savePlanEdits, startSessionPlan } from '@/src/session-planner';
@@ -458,6 +459,28 @@ describe('plan detail', () => {
     expect(screen.getByTestId('plan-detail-block-1-targets')).toHaveTextContent('100 × 5 · — × 8');
     // Deletable while nothing is consumed.
     expect(screen.getByTestId('plan-detail-delete')).toBeTruthy();
+  });
+
+  it('shows the completion day and retains the original schedule, omitting an unknown completion day', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository({ scheduledFor: new Date(2026, 9, 24, 10) });
+    const detail = (await planQueries.loadPlanDetail(planId))!;
+    localDatabase().update(sessionPlanExercises)
+      .set({ progressStatus: 'completed', resolvedAt: new Date(2026, 9, 25, 0, 30) })
+      .where(eq(sessionPlanExercises.id, detail.blocks[0].id)).run();
+    await openDetail(planId);
+    expect(screen.getByTestId('plan-detail-completed-tag')).toHaveTextContent('Completed');
+    expect(screen.getByTestId('plan-detail-completed-date')).toHaveTextContent('25-10-2026');
+    expect(screen.getByTestId('plan-detail-schedule')).toHaveTextContent('Scheduled 24-10-2026 10:00');
+    await act(async () => updatePreferences({ dateFormat: 'MM-DD-YYYY' }));
+    expect(screen.getByTestId('plan-detail-completed-date')).toHaveTextContent('10-25-2026');
+
+    localDatabase().update(sessionPlanExercises).set({ resolvedAt: null })
+      .where(eq(sessionPlanExercises.id, detail.blocks[0].id)).run();
+    screen.unmount();
+    await openDetail(planId);
+    expect(screen.getByTestId('plan-detail-completed-tag')).toHaveTextContent('Completed');
+    expect(screen.queryByTestId('plan-detail-completed-date')).toBeNull();
   });
 
   it("Start all creates the active session with the plan's provenance and opens Train, where it lives", async () => {

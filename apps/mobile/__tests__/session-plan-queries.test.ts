@@ -94,10 +94,10 @@ const attachBlock = (planExerciseId: string, cardId: string, sessionId = 'sess-1
     .run();
 };
 
-const resolveBlock = (planExerciseId: string, status: 'completed' | 'skipped'): void => {
+const resolveBlock = (planExerciseId: string, status: 'completed' | 'skipped', resolvedAt: Date | null = T0): void => {
   db()
     .update(sessionPlanExercises)
-    .set({ progressStatus: status, resolvedAt: T0 })
+    .set({ progressStatus: status, resolvedAt })
     .where(eq(sessionPlanExercises.id, planExerciseId))
     .run();
 };
@@ -269,6 +269,7 @@ describe('plan detail with block consumption state', () => {
     expect(detail?.blockCounts).toEqual({ pending: 0, attached: 0, completed: 2, skipped: 0 });
     expect(detail?.blocks.map((b) => b.status)).toEqual(['completed', 'completed']);
     expect(detail?.blocks[0].resolvedAt).toEqual(T1);
+    expect(detail?.completedAt).toEqual(T1);
   });
 
   it('leaves block pending on read when claiming session is completed but has no performed sets (legacy zero-work claim)', async () => {
@@ -350,6 +351,54 @@ describe('plan detail with block consumption state', () => {
     expect(detail?.blocks[0].status).toBe('pending');
     expect(detail?.blocks[0].resolvedAt).toBeNull();
     expect(detail?.blocks[0].attachedSessionId).toBeNull();
+  });
+});
+
+describe('completion dates across list and detail reads', () => {
+  it('uses the last live block resolution across a programme, and keeps unfinished dates absent', async () => {
+    const result = await planRepository.createProgramme({
+      name: 'Dated wave', description: '',
+      plans: [planDraft('Scheduled', { scheduledFor: WEDNESDAY }), planDraft('Undated')],
+    }, T0);
+    if (result.status !== 'saved') throw new Error('seed failed');
+    const initial = (await planQueries.loadProgrammeDetail(result.id))!;
+    const [early, late] = initial.plans;
+    expect(initial.completedAt).toBeNull();
+    expect(early.completedAt).toBeNull();
+    attachBlock(early.blocks[0].id, 'dated-card');
+    resolveBlock(late.blocks[0].id, 'skipped', T1);
+    expect((await planQueries.loadProgrammeDetail(result.id))?.completedAt).toBeNull();
+
+    resolveBlock(early.blocks[0].id, 'completed', T0);
+    const complete = (await planQueries.loadProgrammeDetail(result.id))!;
+    expect(complete.completedAt).toEqual(T1);
+    expect(complete.plans.map((plan) => plan.completedAt)).toEqual([T0, T1]);
+    expect((await planQueries.listProgrammeSummaries())[0].completedAt).toEqual(T1);
+    expect((await planQueries.listUpcomingPlans())[0]).toMatchObject({ completedAt: T0, scheduledFor: WEDNESDAY });
+
+    resolveBlock(early.blocks[0].id, 'completed', null);
+    expect((await planQueries.loadPlanDetail(early.id))?.completedAt).toBeNull();
+    expect((await planQueries.listUpcomingPlans())[0].completedAt).toBeNull();
+    expect((await planQueries.loadProgrammeDetail(result.id))?.completedAt).toBeNull();
+    expect((await planQueries.listProgrammeSummaries())[0]).toMatchObject({ progress: 'completed', completedAt: null });
+  });
+
+  it('dates all-skipped standalone plans, excludes tombstoned blocks and leaves empty plans undated', async () => {
+    const result = await planRepository.createPlan(planDraft('Skipped', {
+      exercises: [exercise('First'), exercise('Deleted later')],
+    }), T0);
+    if (result.status !== 'saved') throw new Error('seed failed');
+    const [first, deleted] = await blockIdsByPlan(result.id);
+    resolveBlock(first, 'skipped', T0);
+    resolveBlock(deleted, 'completed', T1);
+    db().update(sessionPlanExercises).set({ deletedAt: T1 }).where(eq(sessionPlanExercises.id, deleted)).run();
+    expect((await planQueries.listUnscheduledPlans())[0]).toMatchObject({
+      progress: 'completed', completedAt: T0, blockCounts: { completed: 0, skipped: 1 },
+    });
+    resolveBlock(first, 'skipped', null);
+    expect((await planQueries.listUnscheduledPlans())[0].completedAt).toBeNull();
+    db().update(sessionPlanExercises).set({ deletedAt: T1 }).where(eq(sessionPlanExercises.id, first)).run();
+    expect((await planQueries.loadPlanDetail(result.id))).toMatchObject({ progress: 'planned', completedAt: null });
   });
 });
 

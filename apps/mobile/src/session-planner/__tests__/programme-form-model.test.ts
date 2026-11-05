@@ -112,7 +112,7 @@ describe('programme-form-model', () => {
       id: 'prog-1',
       name: '5/3/1 Wave',
       description: 'Wave 1',
-      progress: 'planned',
+      progress: 'planned', completedAt: null,
       planCount: 2,
       blockCounts: { pending: 2, attached: 0, completed: 0, skipped: 0 },
       nextBlock: null,
@@ -125,7 +125,7 @@ describe('programme-form-model', () => {
           programmeId: 'prog-1',
           programmeOrderIndex: 0,
           provenance: 'human',
-          progress: 'planned',
+          progress: 'planned', completedAt: null,
           blockCounts: { pending: 1, attached: 0, completed: 0, skipped: 0 },
           blocks: [
             {
@@ -159,7 +159,7 @@ describe('programme-form-model', () => {
           programmeId: 'prog-1',
           programmeOrderIndex: 1,
           provenance: 'human',
-          progress: 'planned',
+          progress: 'planned', completedAt: null,
           blockCounts: { pending: 1, attached: 0, completed: 0, skipped: 0 },
           blocks: [],
         },
