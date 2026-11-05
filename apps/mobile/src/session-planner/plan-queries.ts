@@ -77,7 +77,7 @@ export type ProgrammeSummaryView = {
   blockCounts: { pending: number; attached: number; completed: number; skipped: number };
 };
 
-export type ProgrammeDetailView = ProgrammeSummaryView & {
+export type ProgrammeDetailView = Omit<ProgrammeSummaryView, 'plans'> & {
   plans: PlanDetailView[];
   /** The earliest available block in programme-order then exercise-order; null when none. */
   nextBlock: PlanBlockView | null;

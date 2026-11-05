@@ -9,11 +9,11 @@ import {
   type SessionSummaryFigures,
 } from '@/components/today/progress-format';
 import { SessionSummaryRow } from '@/components/today/session-summary-row';
-import { Card, FigureText, StatePanel, Tag, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { Card, StatePanel, Tag, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { logEvent } from '@/src/logging';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
-import { formatMonthDayTime, formatShortDate } from '@/src/utils/local-time';
+import { formatMonthDayTime } from '@/src/utils/local-time';
 
 import { historyJumpListIndex, historyJumpLocation, type HistoryJump, type HistoryJumpLocation } from './history-jump';
 
@@ -217,18 +217,13 @@ function HistoryRow({
   const deleted = session.deletedAt !== null;
   const figures = toSummaryFigures(session);
   const label = sessionSummaryAccessibilityLabel(figures, dateFormat);
-  const completedAt = session.completedAt === null ? null : new Date(session.completedAt);
-  const completionDay = completedAt !== null && Number.isFinite(completedAt.getTime())
-    ? formatShortDate(completedAt, dateFormat)
-    : null;
-  const completionLabel = completionDay === null ? 'Completed' : `Completed ${completionDay}`;
   return (
     <View
       style={[styles.cell, first ? styles.cellFirst : styles.cellDivider, last ? styles.cellLast : null]}
       testID={`completed-session-row-${session.id}`}>
       <SessionSummaryRow
         accessibilityHint="Opens the completed session"
-        accessibilityLabel={`${deleted ? 'Deleted. ' : ''}${label}. ${completionLabel}`}
+        accessibilityLabel={deleted ? `Deleted. ${label}` : label}
         duration={formatSessionSummaryDuration(figures)}
         figures={formatSessionSummaryFigures(figures)}
         gym={session.gymName}
@@ -237,14 +232,6 @@ function HistoryRow({
         stamp={formatMonthDayTime(figures.startedAt.getTime(), dateFormat)}
         style={[styles.row, deleted ? styles.deletedRow : null]}
         testID={`completed-session-open-button-${session.id}`}>
-        <View style={styles.completion}>
-          <Tag label="Completed" testID={`completed-session-tag-${session.id}`} />
-          {completionDay !== null ? (
-            <Text allowFontScaling={false} style={uiText.meta} testID={`completed-session-date-${session.id}`}>
-              <FigureText>{completionDay}</FigureText>
-            </Text>
-          ) : null}
-        </View>
         {/* Deleted is said in words, not only by the fade (`08` baseline 5). */}
         {deleted ? <Tag label="Deleted" testID={`completed-session-deleted-tag-${session.id}`} tone="faint" /> : null}
       </SessionSummaryRow>
@@ -299,12 +286,6 @@ function GlobalEmptyState() {
 }
 
 const styles = StyleSheet.create({
-  completion: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: uiSpace.sm,
-  },
   list: {
     flex: 1,
     backgroundColor: uiRoles.paper,

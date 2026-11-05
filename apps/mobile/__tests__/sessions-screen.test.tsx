@@ -322,14 +322,15 @@ describe('Sessions over real data', () => {
     });
 
     expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('24-07-2026 23:45');
-    expect(screen.getByTestId(`completed-session-tag-${lateId}`)).toHaveTextContent('Completed');
-    expect(screen.getByTestId(`completed-session-date-${lateId}`)).toHaveTextContent('25-07-2026');
-    expect(screen.getByTestId(`completed-session-open-button-${lateId}`).props.accessibilityLabel).toContain('Completed 25-07-2026');
+    const historyRow = screen.getByTestId(`completed-session-open-button-${lateId}`);
+    expect(within(historyRow).queryByText('Completed')).toBeNull();
+    expect(within(historyRow).queryByText('25-07-2026')).toBeNull();
+    expect(historyRow.props.accessibilityLabel).not.toContain('25-07-2026');
 
     await act(async () => {
       setExerciseListPreferences({ dateFormat: 'MM-DD-YYYY' });
     });
-    expect(screen.getByTestId(`completed-session-date-${lateId}`)).toHaveTextContent('07-25-2026');
+    expect(within(screen.getByTestId(`completed-session-open-button-${lateId}`)).queryByText('07-25-2026')).toBeNull();
     expect(screen.getByTestId(`completed-session-open-button-${lateId}-start`)).toHaveTextContent('07-24-2026 23:45');
 
     await act(async () => {
