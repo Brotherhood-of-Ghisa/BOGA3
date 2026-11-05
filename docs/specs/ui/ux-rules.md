@@ -291,14 +291,14 @@ where a release starts firing. Code:
 
 ### Planned sessions on Sessions and the plan screens
 
-Resolved rows use neutral `Tag`s with [[planner.progress-outcomes]] labels
-and [[copy.calendar-dates]] dates; rows keep their sections.
-
-`/sessions` owns queue management. Plans stay independent of completed history,
-its filters, counts and deleted toggle. An optional schedule never defaults to
-today. The picker's completed-history action is **Repeat last**
-(the newest session, [[gym.split]], appended as planned sets) and is separate from **From
-planner**, which offers authored one-off blocks and programme blocks that are
+Resolved rows use neutral `Tag`s and [[planner.progress-outcomes]] labels.
+On Sessions, only Upcoming shows dates ([[copy.calendar-dates]]).
+Unfinished queues precede optional Completed plans, including unscheduled
+children. Unfinished programmes show `{completed} over {total}` in matching Tags,
+with separate skips.
+Plans never affect workout history; schedules never default to today. **Repeat
+last** in the picker appends the newest workout as planned sets ([[gym.split]]),
+separately from **From planner**, which offers authored one-off and programme blocks that are
 pending, definition-bearing and target-bearing. A block attaches
 to the active session's unsourced card of the same exercise: one match attaches,
 several offer an accessible choice sheet that writes nothing until confirmed,

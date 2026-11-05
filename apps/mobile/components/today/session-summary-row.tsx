@@ -20,7 +20,7 @@ export type SessionSummaryRowProps = {
   accessibilityHint: string;
   onPress: () => void;
   testID: string;
-  /** Under the record line: Sessions' completion date and status tags. */
+  /** Under the record line: Sessions' `Deleted` tag. */
   children?: ReactNode;
   /** The row's insets where its container gives none (a Sessions history row). */
   style?: StyleProp<ViewStyle>;

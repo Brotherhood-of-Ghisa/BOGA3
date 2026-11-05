@@ -114,6 +114,7 @@ describe('programme-form-model', () => {
       description: 'Wave 1',
       progress: 'planned', completedAt: null,
       planCount: 2,
+      completedSessionCount: 0, skippedSessionCount: 0,
       blockCounts: { pending: 2, attached: 0, completed: 0, skipped: 0 },
       nextBlock: null,
       plans: [

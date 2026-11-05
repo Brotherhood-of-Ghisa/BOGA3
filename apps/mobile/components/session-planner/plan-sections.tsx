@@ -1,5 +1,4 @@
 import { useDateFormat } from '@/src/preferences/hooks';
-import { formatShortDate } from '@/src/utils/local-time';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -16,18 +15,20 @@ import { planQueries, type PlanSummaryView, type ProgrammeSummaryView } from '@/
 import { blockCountsLabel, planDateLabel, planOutcomeLabel } from './progress-labels';
 
 /**
- * The Sessions screen's planning sections: **Upcoming** (scheduled one-off
- * and programme-child plans, soonest first) and **Unscheduled** (standalone plans
- * and training programmes, most recently updated first), over the plan queries.
+ * The Sessions screen partitions exhaustive reads into unfinished **Upcoming**
+ * and **Unscheduled** queues, followed by optional **Completed plans**. Programme
+ * children resolve independently; unfinished programmes show session outcomes
+ * under [[planner.progress-outcomes]].
  * Queue management stays here; the Today landing page owns surfacing the next
  * scheduled workout or programme block, and programmes join these sections
  * with their own screens. Derived only — nothing here writes plan tables.
  */
 
-const programmeCompletionLabel = (programme: ProgrammeSummaryView, dateFormat: ExerciseDateFormat): string =>
-  programme.progress === 'completed'
-    ? `, Completed${programme.completedAt === null ? '' : ` ${formatShortDate(programme.completedAt, dateFormat)}`}`
-    : '';
+const programmeCompletionLabel = (programme: ProgrammeSummaryView): string =>
+  (programme.progress === 'completed'
+    ? ', Completed'
+    : `, ${programme.completedSessionCount} of ${programme.planCount} sessions completed`) +
+  (programme.skippedSessionCount > 0 ? `, ${programme.skippedSessionCount} skipped` : '');
 
 export type PlanSectionProps = {
   label: string;
@@ -59,7 +60,7 @@ export function PlanSection({
       <Card>
         {programmes.map((programme, index) => (
           <ListRow
-            accessibilityLabel={`Programme ${programme.name}, ${programme.planCount} sessions${programmeCompletionLabel(programme, dateFormat)}`}
+            accessibilityLabel={`Programme ${programme.name}, ${programme.planCount} sessions${programmeCompletionLabel(programme)}`}
             density="list"
             divider={index > 0}
             key={programme.id}
@@ -70,10 +71,10 @@ export function PlanSection({
                 <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
                   {programme.name}
                 </Text>
-                {programme.progress === 'completed' ? <Tag label="Completed" /> : null}
+                <Tag label={programme.progress === 'completed' ? 'Completed' : `${programme.completedSessionCount} over ${programme.planCount}`} />
               </View>
               <Text allowFontScaling={false} style={uiText.meta}>
-                <FigureText>{`Programme · ${programme.planCount} ${programme.planCount === 1 ? 'session' : 'sessions'}${programme.progress === 'completed' && programme.completedAt !== null ? ` · ${formatShortDate(programme.completedAt, dateFormat)}` : ''}`}</FigureText>
+                <FigureText>{`Programme · ${programme.planCount} ${programme.planCount === 1 ? 'session' : 'sessions'}${programme.skippedSessionCount > 0 ? ` · ${programme.skippedSessionCount} skipped` : ''}`}</FigureText>
               </Text>
             </View>
           </ListRow>
@@ -110,7 +111,7 @@ const planDetailLine = (plan: PlanSummaryView, dateFormat: ExerciseDateFormat): 
   const counts = plan.blockCounts;
   const blocks = counts.pending + counts.attached + counts.completed + counts.skipped;
   const blockLine = plan.progress === 'completed' ? blockCountsLabel(counts) : `${blocks} ${blocks === 1 ? 'block' : 'blocks'}`;
-  return [planDateLabel(plan, dateFormat), blockLine].filter(Boolean).join(' · ');
+  return [plan.progress === 'completed' ? '' : planDateLabel(plan, dateFormat), blockLine].filter(Boolean).join(' · ');
 };
 
 /** The quiet Plan session action: the hub's persistent entry and the empty states' one. */

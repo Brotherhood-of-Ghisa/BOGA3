@@ -40,7 +40,8 @@ export type SessionsScreenProps = {
 };
 
 /**
- * The planning queues hide completed summaries until Show completed plans is on.
+ * The planning queues hold unfinished work; Show completed plans reveals a
+ * separate section before workout history, including resolved programme children.
  * Both view options last for this screen mount; workout history is independent.
  */
 export function SessionsScreen({
@@ -63,9 +64,17 @@ export function SessionsScreen({
       isFocused,
     });
   const planSections = usePlanSections();
-  const upcoming = planSections.upcoming.filter((plan) => showCompletedPlans || plan.progress !== 'completed');
-  const unscheduled = planSections.unscheduled.filter((plan) => showCompletedPlans || plan.progress !== 'completed');
-  const programmes = planSections.programmes.filter((programme) => showCompletedPlans || programme.progress !== 'completed');
+  const upcoming = planSections.upcoming.filter((plan) => plan.progress !== 'completed');
+  const unscheduled = planSections.unscheduled.filter((plan) => plan.progress !== 'completed');
+  const programmes = planSections.programmes.filter((programme) => programme.progress !== 'completed');
+  const completedPlans = showCompletedPlans ? [...new Map([
+    ...planSections.upcoming,
+    ...planSections.unscheduled,
+    ...planSections.programmes.flatMap((programme) => programme.plans.filter((plan) => plan.scheduledFor === null)),
+  ].filter((plan) => plan.progress === 'completed').map((plan) => [plan.id, plan])).values()] : [];
+  const completedProgrammes = showCompletedPlans ? [...new Map(planSections.programmes
+    .filter((programme) => programme.progress === 'completed')
+    .map((programme) => [programme.id, programme])).values()] : [];
 
   const activeSession = sessions.find(
     (session) => session.status === 'active' && session.deletedAt === null
@@ -84,7 +93,9 @@ export function SessionsScreen({
     !planSections.loadErrorMessage &&
     upcoming.length === 0 &&
     unscheduled.length === 0 &&
-    programmes.length === 0;
+    programmes.length === 0 &&
+    completedPlans.length === 0 &&
+    completedProgrammes.length === 0;
 
   const showGlobalEmptyState =
     !isLoadingSessions &&
@@ -187,6 +198,14 @@ export function SessionsScreen({
         plans={unscheduled}
         programmes={programmes}
         testID="sessions-plan-section-unscheduled"
+      />
+      <PlanSection
+        label="Completed plans"
+        onOpenPlan={openPlan}
+        onOpenProgramme={openProgramme}
+        plans={completedPlans}
+        programmes={completedProgrammes}
+        testID="sessions-plan-section-completed"
       />
     </>
   );
