@@ -9,7 +9,7 @@ import { themePresets } from '@/components/ui/theme-presets';
 import { uiRoles } from '@/components/ui/tokens';
 import { StatsScreenShell } from '../app/(tabs)/stats-history';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
-import { MUSCLE_BODY_MESH } from '@/components/stats/muscle-body-mesh';
+import { MUSCLE_BODY_MESH, type MuscleBodyMesh } from '@/components/stats/muscle-body-mesh';
 import { MUSCLE_MAP_REFERENCE } from '@/components/stats/muscle-map-reference';
 import {
   SHADE_STEPS,
@@ -734,6 +734,148 @@ describe('MuscleBodyCard', () => {
     });
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Chest');
     expect(screen.getByTestId('stats-contributions')).toBeTruthy();
+  });
+
+  it('projects contour for front-facing selected muscle and culls it at 180 degrees', () => {
+    const scores = computeMuscleScores([makeMuscle('chest', 'Chest', 8), makeMuscle('back_lats', 'Lats', 6)], 'workingSetCount');
+    const front = projectMuscleBody({ angleDeg: 0, width: 280, height: 280, scores, selectedId: 'chest', overlay: 'contour' });
+    expect(front.contour).not.toBeNull();
+    expect(front.contour!.d).toMatch(/^M/);
+
+    const back = projectMuscleBody({ angleDeg: 180, width: 280, height: 280, scores, selectedId: 'chest', overlay: 'contour' });
+    expect(back.contour).toBeFalsy();
+
+    const glutesFront = projectMuscleBody({ angleDeg: 0, width: 280, height: 280, scores, selectedId: 'glutes_max', overlay: 'contour' });
+    expect(glutesFront.contour).toBeFalsy();
+
+    const glutesBack = projectMuscleBody({ angleDeg: 180, width: 280, height: 280, scores, selectedId: 'glutes_max', overlay: 'contour' });
+    expect(glutesBack.contour).not.toBeNull();
+    expect(glutesBack.contour!.d).toMatch(/^M/);
+
+    const unselected = projectMuscleBody({ angleDeg: 0, width: 280, height: 280, scores, selectedId: null, overlay: 'contour' });
+    expect(unselected.contour).toBeFalsy();
+  });
+
+  it('supports controlled overlay and onOverlayChange callback', () => {
+    const rows = [makeMuscle('chest', 'Chest', 8)];
+    const onOverlayChange = jest.fn();
+    const { rerender } = render(
+      <MuscleBodyCard
+        metric="workingSetCount"
+        muscles={rows}
+        onOverlayChange={onOverlayChange}
+        onSelect={jest.fn()}
+        overlay="contour"
+        selectedId="chest"
+      />
+    );
+
+    const toggle = screen.getByTestId('stats-muscle-body-overlay-toggle');
+    expect(toggle).toHaveTextContent('Contour');
+    expect(screen.getByTestId('stats-muscle-body-contour')).toBeTruthy();
+
+    fireEvent.press(toggle);
+    expect(onOverlayChange).toHaveBeenCalledWith('fibres');
+
+    rerender(
+      <MuscleBodyCard
+        metric="workingSetCount"
+        muscles={rows}
+        onOverlayChange={onOverlayChange}
+        onSelect={jest.fn()}
+        overlay="fibres"
+        selectedId="chest"
+      />
+    );
+    expect(toggle).toHaveTextContent('Fibres');
+    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+  });
+
+  it('correctly occludes sloping faces and excludes hidden forearm edge at 48 degrees', () => {
+    const scores = computeMuscleScores([makeMuscle('forearms_grip', 'Forearms', 8)], 'workingSetCount');
+    const projected = projectMuscleBody({
+      angleDeg: 48,
+      width: 280,
+      height: 280,
+      scores,
+      selectedId: 'forearms_grip',
+      overlay: 'contour',
+    });
+    expect(projected.contour).not.toBeNull();
+
+    // Projected vertices for edge 1592-1604 at 48 degrees
+    const rad = (48 * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const scale = 280 / 2.02;
+    const projectPt = ([x, y, z]: readonly number[]) => {
+      const rx = x * cos + z * sin;
+      const sx = Math.round((140 + rx * scale) * 10) / 10;
+      const sy = Math.round((140 - y * scale) * 10) / 10;
+      return `${sx} ${sy}`;
+    };
+    const p1592 = projectPt(MUSCLE_BODY_MESH.vertices[1592]);
+    const p1604 = projectPt(MUSCLE_BODY_MESH.vertices[1604]);
+    const edgePattern = new RegExp(`M${p1592}L${p1604}|M${p1604}L${p1592}`);
+    expect(projected.contour!.d).not.toMatch(edgePattern);
+  });
+
+  it('occludes an edge when covering face has farther centroid but nearer surface depth at intersection', () => {
+    // Face 0: Selected muscle face with boundary edge (0, 1) whose midpoint is at (0, 0, 0.1)
+    const customMesh: MuscleBodyMesh = {
+      materials: ['neutral', 'chest'],
+      vertices: [
+        [-0.2, 0, 0.1], // v0
+        [0.2, 0, 0.1],  // v1
+        [0, 0.3, 0.1],  // v2
+        // Face 1: Sloping covering face in front of edge 0-1 midpoint (0, 0)
+        // Centroid depth: (-0.2 + -0.2 + 0.5) / 3 = 0.033 (farther than edge 0-1 at 0.1)
+        // But depthAtPoint on face 1 at (0, 0) is 0.267 (nearer than 0.1)
+        [-0.3, -0.4, -0.2], // v3
+        [0.3, -0.4, -0.2],  // v4
+        [0, 0.2, 0.5],      // v5
+      ],
+      faces: [
+        [0, 1, 2, 1],
+        [3, 4, 5, 0],
+      ],
+    };
+    const scores = new Map([['chest', 8]]);
+    const projected = projectMuscleBody({
+      angleDeg: 0,
+      width: 280,
+      height: 280,
+      scores,
+      selectedId: 'chest',
+      overlay: 'contour',
+      mesh: customMesh,
+    });
+    // Face 1 centroid is farther (0.033) than edge 0-1 (0.1), but surface depth at (0, 0) is nearer (0.267 > 0.1).
+    // Edge 0-1 (from 112.3 140 to 167.7 140) must be occluded and not present in the contour.
+    expect(projected.contour).not.toBeNull();
+    expect(projected.contour!.d).not.toContain('M112.3 140L167.7 140');
+    expect(projected.contour!.d).not.toContain('M167.7 140L112.3 140');
+  });
+
+  it('toggles between fibres and contour overlay and hides contour when muscle is on the far side', () => {
+    const rows = [makeMuscle('chest', 'Chest', 8), makeMuscle('back_lats', 'Lats', 6)];
+    render(<MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} defaultOverlay="fibres" />);
+
+    const toggle = screen.getByTestId('stats-muscle-body-overlay-toggle');
+    expect(toggle).toHaveTextContent('Fibres');
+    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-body-fibres-surface-highlight')).toBeTruthy();
+
+    fireEvent.press(toggle);
+    expect(toggle).toHaveTextContent('Contour');
+    expect(screen.getByTestId('stats-muscle-body-contour')).toBeTruthy();
+    expect(screen.queryByTestId('stats-muscle-body-fibres-surface-highlight')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
+    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+
+    fireEvent.press(toggle);
+    expect(toggle).toHaveTextContent('Fibres');
   });
 
 });
