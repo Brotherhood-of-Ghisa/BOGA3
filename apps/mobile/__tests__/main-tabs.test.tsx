@@ -173,6 +173,9 @@ describe('MainTabs', () => {
     for (const tab of MAIN_TAB_DEFINITIONS) {
       expect(within(card).getByTestId(tab.testID)).toBeTruthy();
     }
+    // More is the last child: the card's right edge.
+    const children = card.children.map((child) => (typeof child === 'string' ? child : child.props.testID));
+    expect(children.at(-1)).toBe('top-level-tab-more');
   });
 });
 
