@@ -31,12 +31,16 @@ This card plans the work; this PR changes no application code.
   each child independently of its programme: a completed child appears there
   while its unfinished programme stays in Unscheduled. Each entity appears
   once; do not introduce unfinished unscheduled-child rows in the hub.
-- Programme rows show the completed sessions fraction as
-  `Programme · {completedSessions}/{totalSessions} completed`, derived from the
+- Unfinished programme rows show the completed sessions fraction in a boxed
+  `Tag` labelled `{completedSessions}/{totalSessions} completed`, derived from the
   programme's current live children; `1/10 completed` is only an example.
+  Reuse the same neutral `Tag` component, border, background, padding, shape
+  and typography as the existing boxed Completed label, in its title-row
+  position. Keep the existing Completed tag for resolved programmes; do not
+  create a new badge variant or repeat the fraction as plain metadata.
   Count session outcomes using
   [[planner.progress-outcomes]], never completed blocks or workout count.
-  Append `· {skippedSessions} skipped` when the skipped count is nonzero; skipped
+  Append `· {skippedSessions} skipped` to the programme metadata when nonzero; skipped
   sessions do not inflate the numerator. An entirely resolved programme moves
   to Completed plans under the existing resolution rule, even when skipped
   sessions mean its completed fraction is below the total. Speak the fraction
@@ -56,7 +60,8 @@ This card plans the work; this PR changes no application code.
 
 **Product decisions planned:** resolved summaries belong in a separate optional
 section, including unscheduled programme children; unfinished programmes show
-a completed sessions fraction with skips separate. Outcome facts and training
+a completed sessions fraction boxed like the existing Completed tag, with skips
+separate. Outcome facts and training
 calculations remain unchanged. Record the grouping in the owning screen documentation and
 highlight it on the implementation PR's `Product facts:` line; the product
 review determines any required fact authoring under `docs/product/`.
@@ -66,14 +71,16 @@ review determines any required fact authoring under `docs/product/`.
 Design target: issue #1104's section order, using the running Sessions screen
 as the repo-native reference. Reuse production `PlanSection` and its existing
 Card/ListRow composition, status/date presentation, tokens and accessibility.
-The issue explicitly selects this component; no new component family or visual
-variant is proposed. Retain completion tags/dates from the prerequisite work.
+The issue selects this component; the operator selects the existing neutral
+`Tag` in `apps/mobile/components/ui/tag.tsx` for the fraction, matching the
+Completed label from the prerequisite work. No new component family or visual
+variant is proposed. Retain existing completion tags/dates.
 Capture the baseline before editing; keep comparison evidence under the
 gitignored `apps/mobile/artifacts/` tree and link it in the implementation PR.
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
-| Browse unfinished work | Open Sessions with the switch off | Unfinished programmes stay in Unscheduled with their completed sessions fraction; unfinished scheduled children stay in Upcoming | Empty plans and pending/attached work retain existing visibility; skip counts stay separate; loading/errors keep their established behavior |
+| Browse unfinished work | Open Sessions with the switch off | Unfinished programmes stay in Unscheduled with their completed sessions fraction in the existing Completed-style boxed Tag; unfinished scheduled children stay in Upcoming | Empty plans and pending/attached work retain existing visibility; skip counts stay separate; loading/errors keep their established behavior |
 | Reveal resolved work | Open options, enable Show completed plans, dismiss; disable again | Completed plans appears after Unscheduled and disappears immediately on reversal; rows open their existing plan/programme details | No section when empty; unknown completion dates stay absent; labels follow [[planner.progress-outcomes]]; no SQL or history-count change on toggle |
 | Return after completion | Resolve a plan elsewhere, then refocus Sessions with either switch value | Newly resolved rows leave unfinished queues; appear only in the enabled completed section | Failed reload retains the last successful rows and existing error; week/day navigation stays a one-time scroll without filtering |
 
@@ -95,8 +102,10 @@ gitignored `apps/mobile/artifacts/` tree and link it in the implementation PR.
    `apps/mobile/src/session-planner/plan-queries.ts` with derived child-session
    outcome counts for the fraction; reuse the existing bulk child/block reads
    and outcome rules, keeping query results exhaustive. Render the fraction
-   and separate skipped count in the existing programme metadata line, without
-   new badges, styles, persistence or per-row detail requests.
+   with the existing neutral `Tag` in the programme title row, matching the
+   Completed tag's style and placement. Keep skipped counts in the metadata
+   line and existing resolved outcome tags. No new badge component/variant,
+   custom styling, persistence or per-row detail requests.
 3. **Prepare real-data coverage.** Extend the existing
    `apps/mobile/__tests__/sessions-screen.test.tsx` fixtures/assertions; read its
    directory README and `docs/specs/writing-tests.md` first. Cover:
@@ -107,6 +116,8 @@ gitignored `apps/mobile/artifacts/` tree and link it in the implementation PR.
    - completed sessions fractions derived from different completed/total
      counts, with the parent retained when the completed toggle is off or on;
      unchanged placement and ordering of unfinished scheduled children;
+   - the fraction rendered in the same neutral Tag as Completed, with no
+     duplicate plain-text fraction and unchanged accessible count wording;
    - fractions counting whole child outcomes rather than blocks, mixed and
      all-skipped outcomes with separate skip counts, zero/empty programmes,
      tombstoned children excluded, accessible counts and focus refresh;
@@ -125,8 +136,9 @@ gitignored `apps/mobile/artifacts/` tree and link it in the implementation PR.
 4. **Share screenshots before running further tests.** Build the smallest
    runnable slice and capture before/after on small and normal phones: hidden
    and revealed sections, a completed future-scheduled plan, resolved/partial
-   programmes (including completed sessions fractions and skips), skipped/missing-date rows,
-   long names, empty/loading/error states
+   programmes (including boxed completed sessions fractions and skips),
+   skipped/missing-date rows, long names and large fraction counts at narrow
+   widths, empty/loading/error states
    and the boundary with workout history. Share the updated captures and wait
    for the operator's visual review before any test/gate run. Address requested
    visual changes first; record the reviewed commit and devices in the PR.
