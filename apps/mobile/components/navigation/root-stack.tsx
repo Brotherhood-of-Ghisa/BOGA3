@@ -92,8 +92,8 @@ export function RootStack() {
         <Stack.Screen name="settings-data-sync" options={{ title: 'Data & sync' }} />
         <Stack.Screen name="settings-review-changes" options={{ title: 'Review changes' }} />
         <Stack.Screen name="gyms" options={{ title: 'Gyms' }} />
-        <Stack.Screen name="theme-colour" options={{ title: 'Custom colour' }} />
-        <Stack.Screen name="theme-background" options={{ title: 'Custom background' }} />
+        {/* The picker replaces this title with the part it edits. */}
+        <Stack.Screen name="theme-custom" options={{ title: 'Custom colour' }} />
         <Stack.Screen name="group/mine" options={{ title: 'My groups' }} />
         <Stack.Screen name="group/new" options={{ title: 'New group' }} />
         <Stack.Screen name="group/join" options={{ title: 'Join group' }} />

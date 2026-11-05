@@ -2,17 +2,21 @@ import { Storage } from 'expo-sqlite/kv-store';
 import { Appearance, type ColorSchemeName } from 'react-native';
 
 import type { ThemeMode } from '@/components/ui/theme';
-import type { HueThemeId } from '@/components/ui/theme-hue';
 import {
+  appearanceMode,
   defaultTheme,
-  type AppearanceMode,
   resolveAppearance,
   resolveThemePreset,
   type AppearanceChoice,
   type ResolvedTheme,
-  type ThemePresetId,
 } from '@/components/ui/theme-presets';
-import { parseAppearanceRecord, serialiseAppearanceRecord } from '@/components/ui/theme-record';
+import {
+  parseAppearanceRecord,
+  parseLegacyAppearanceRecord,
+  serialiseAppearanceRecord,
+  type AppearanceRecordResult,
+} from '@/components/ui/theme-record';
+
 
 // The chosen appearance, per device: it is not synced to the account. Read
 // synchronously, once, when `tokens.ts` first evaluates — about a hundred
@@ -21,20 +25,26 @@ import { parseAppearanceRecord, serialiseAppearanceRecord } from '@/components/u
 // "Choosing one").
 //
 // The record (`theme-record.ts`). Every save writes it.
-export const APPEARANCE_STORAGE_KEY = 'boga3.appearance.v2';
-// The accent id stored before background and text were choices. Read only
-// while no record exists, never written, and left in place.
+export const APPEARANCE_STORAGE_KEY = 'boga3.appearance.v3';
+// The two older values, read only while no newer one exists, never written,
+// and left in place: the record before custom themes, and before it the accent
+// id alone.
+export const LEGACY_APPEARANCE_STORAGE_KEY = 'boga3.appearance.v2';
 export const THEME_PRESET_STORAGE_KEY = 'boga3.themePreset.v1';
 
-// The stored choice, resolved: the record, else the older accent id, else the
-// default. An unusable value resolves to the default with its problem. Throws
-// when the store cannot be read.
+// The stored choice, resolved: the record, else the older record converted,
+// else the accent id, else the default. An unusable value resolves to the
+// default with its problem. Throws when the store cannot be read.
 export function readStoredTheme(): ResolvedTheme {
   const record = Storage.getItemSync(APPEARANCE_STORAGE_KEY);
-  if (record === null) return resolveThemePreset(Storage.getItemSync(THEME_PRESET_STORAGE_KEY));
-  const parsed = parseAppearanceRecord(record);
-  return parsed.appearance ? resolveAppearance(parsed.appearance) : defaultTheme(parsed.problem);
+  if (record !== null) return resolveRecord(parseAppearanceRecord(record));
+  const legacy = Storage.getItemSync(LEGACY_APPEARANCE_STORAGE_KEY);
+  if (legacy !== null) return resolveRecord(parseLegacyAppearanceRecord(legacy, Appearance.getColorScheme()));
+  return resolveThemePreset(Storage.getItemSync(THEME_PRESET_STORAGE_KEY));
 }
+
+const resolveRecord = (parsed: AppearanceRecordResult): ResolvedTheme =>
+  parsed.appearance ? resolveAppearance(parsed.appearance) : defaultTheme(parsed.problem);
 
 // What the stored choice resolves to, or the default and why.
 export function readLaunchTheme(): ResolvedTheme {
@@ -48,24 +58,18 @@ export function readLaunchTheme(): ResolvedTheme {
 // The theme this launch is drawn in. Never changes while the app runs.
 export const launchTheme: ResolvedTheme = readLaunchTheme();
 
-// The ladder a stored mode draws on: `system` takes the OS's mode, and light
-// when the OS states none.
-export function resolveMode(mode: AppearanceMode, osScheme: ColorSchemeName | null | undefined): ThemeMode {
-  if (mode !== 'system') return mode;
-  return osScheme === 'dark' ? 'dark' : 'light';
-}
-
 // Reads the OS's mode, then pins the app's native UI (alerts, the date picker,
-// the keyboard, the status bar's default) to the resolved mode until the app
+// the keyboard, the status bar's default) to the resolved mode (a custom
+// theme's from its page) until the app
 // is next launched, so an OS change while the app runs never mixes modes. The
 // read must come first: once pinned, the OS reports the pin.
 // `userInterfaceStyle: "automatic"` (`app.config.ts`) is what lets the read
 // see a dark OS at all. A JS reload inside the same process (the dev
 // client's reload) reads the previous pin, so it keeps that launch's mode;
 // only a cold start reads the OS afresh.
-export function pinLaunchMode(mode: AppearanceMode): { osScheme: ColorSchemeName | null; mode: ThemeMode } {
+export function pinLaunchMode(appearance: AppearanceChoice): { osScheme: ColorSchemeName | null; mode: ThemeMode } {
   const osScheme = Appearance.getColorScheme() ?? null;
-  const resolved = resolveMode(mode, osScheme);
+  const resolved = appearanceMode(appearance, osScheme);
   // react-native-web's Appearance cannot pin; the web build has no native UI to pin.
   Appearance.setColorScheme?.(resolved);
   return { osScheme, mode: resolved };
@@ -74,7 +78,7 @@ export function pinLaunchMode(mode: AppearanceMode): { osScheme: ColorSchemeName
 // The OS's mode as this launch found it, and the mode this launch is drawn in.
 // Resolved here, in the module `tokens.ts` evaluates first, so no module reads
 // a role before the mode is fixed. Never changes while the app runs.
-const launchPin = pinLaunchMode(launchTheme.appearance.mode);
+const launchPin = pinLaunchMode(launchTheme.appearance);
 export const launchOsScheme: ColorSchemeName | null = launchPin.osScheme;
 export const launchMode: ThemeMode = launchPin.mode;
 
@@ -110,9 +114,8 @@ export function readIntendedTheme(): AppearanceChoice {
   return { ...readStoredTheme().appearance, ...queued };
 }
 
-// Saves part of the choice — the accent (a preset id or a custom hue's
-// `hue:<deg>`), the background, the text — keeping the rest of the stored
-// choice; an unusable stored choice is replaced by the default's. Saves run one
+// Saves part of the choice — the theme, the mode, the custom colours —
+// keeping the rest of the stored choice; an unusable stored choice is replaced by the default's. Saves run one
 // after another, so two quick choices cannot overwrite each other's field.
 // Rejects, saving nothing, when the store cannot be read or written.
 export function saveAppearancePart(part: Partial<AppearanceChoice>): Promise<void> {
@@ -133,6 +136,3 @@ export function saveAppearancePart(part: Partial<AppearanceChoice>): Promise<voi
   return run;
 }
 
-export function saveThemeAccent(accent: ThemePresetId | HueThemeId): Promise<void> {
-  return saveAppearancePart({ accent });
-}

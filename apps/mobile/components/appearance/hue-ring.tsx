@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -10,6 +11,9 @@ type HueRingProps = {
   onChange: (hue: number) => void;
   // The hue the ring was let go at: the end of a drag or tap, or one VoiceOver step.
   onChangeEnd?: (hue: number) => void;
+  // The colour a hue is drawn in, on the ring and the thumb: by default the
+  // accent that hue gives a preset-like theme.
+  colourAt?: (hue: number) => string;
   size?: number;
   // What VoiceOver calls the ring.
   accessibilityLabel?: string;
@@ -22,11 +26,11 @@ const THUMB_RADIUS = THICKNESS / 2 + 4;
 // A step for VoiceOver's swipe up / down.
 const ACCESSIBILITY_STEP = 10;
 
-// Each segment is drawn in the accent that hue gives, so the ring shows the
-// buttons the user can actually get (some hues lose chroma at L* 46).
-const SEGMENT_COLOURS = Array.from({ length: SEGMENTS }, (_, index) =>
-  seedsFromHue(((index + 0.5) * 360) / SEGMENTS).accent,
-);
+const defaultColourAt = (hue: number): string => seedsFromHue(hue).accent;
+const SEGMENT_HUES = Array.from({ length: SEGMENTS }, (_, index) => ((index + 0.5) * 360) / SEGMENTS);
+// Each segment is drawn in the colour its hue gives, so the ring shows the
+// colours the user can actually get (some hues lose chroma).
+const DEFAULT_SEGMENT_COLOURS = SEGMENT_HUES.map(defaultColourAt);
 
 // The hue under a point in the ring's box: 0° at the top, clockwise.
 export function pointToHue(x: number, y: number, size: number): number {
@@ -37,7 +41,19 @@ export function pointToHue(x: number, y: number, size: number): number {
 
 // A hue picker: drag (or tap) anywhere on the ring. Reports every move, so the
 // caller can repaint a preview live, and the hue it is let go at.
-export function HueRing({ hue, onChange, onChangeEnd, size = 240, accessibilityLabel = 'Hue', testID }: HueRingProps) {
+export function HueRing({
+  hue,
+  onChange,
+  onChangeEnd,
+  colourAt = defaultColourAt,
+  size = 240,
+  accessibilityLabel = 'Hue',
+  testID,
+}: HueRingProps) {
+  const segmentColours = useMemo(
+    () => (colourAt === defaultColourAt ? DEFAULT_SEGMENT_COLOURS : SEGMENT_HUES.map(colourAt)),
+    [colourAt],
+  );
   const centre = size / 2;
   const outer = centre - (THUMB_RADIUS - THICKNESS / 2) - 1;
   const inner = outer - THICKNESS;
@@ -77,7 +93,7 @@ export function HueRing({ hue, onChange, onChangeEnd, size = 240, accessibilityL
         style={{ width: size, height: size }}
         testID={testID}>
         <Svg height={size} width={size}>
-          {SEGMENT_COLOURS.map((colour, index) => {
+          {segmentColours.map((colour, index) => {
             // Half a degree of overlap hides the seams between segments.
             const from = (index * 360) / SEGMENTS - 0.25;
             const to = ((index + 1) * 360) / SEGMENTS + 0.25;
@@ -90,7 +106,7 @@ export function HueRing({ hue, onChange, onChangeEnd, size = 240, accessibilityL
             );
           })}
           <Circle cx={thumb[0]} cy={thumb[1]} fill={uiRoles.surface} r={THUMB_RADIUS} stroke={uiRoles.ink} strokeWidth={1} />
-          <Circle cx={thumb[0]} cy={thumb[1]} fill={seedsFromHue(hue).accent} r={THUMB_RADIUS - 4} />
+          <Circle cx={thumb[0]} cy={thumb[1]} fill={colourAt(hue)} r={THUMB_RADIUS - 4} />
         </Svg>
         <View pointerEvents="none" style={styles.centre}>
           <Text allowFontScaling={false} style={uiText.title} testID={testID ? `${testID}-name` : undefined}>

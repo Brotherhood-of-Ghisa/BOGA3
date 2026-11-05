@@ -7,44 +7,57 @@ import { Storage } from 'expo-sqlite/kv-store';
 import { Appearance } from 'react-native';
 
 import { generateRoles } from '@/components/ui/theme';
+import { customFromSeeds, generateCustomRoles, type CustomColours } from '@/components/ui/theme-custom';
 import {
   APPEARANCE_STORAGE_KEY,
+  LEGACY_APPEARANCE_STORAGE_KEY,
   pinLaunchMode,
   readIntendedTheme,
   readLaunchTheme,
   readStoredTheme,
-  resolveMode,
   saveAppearance,
   saveAppearancePart,
-  saveThemeAccent,
   THEME_PRESET_STORAGE_KEY,
 } from '@/components/ui/theme-launch';
 import { seedsFromHue } from '@/components/ui/theme-hue';
 import { withNeutrals } from '@/components/ui/theme-neutrals';
 import {
-  customTheme,
+  CUSTOM_THEME,
   DEFAULT_APPEARANCE,
   defaultTheme,
   getThemePreset,
   resolveAppearance,
+  resolveMode,
   resolveThemePreset,
-  storedThemeId,
   type AppearanceChoice,
 } from '@/components/ui/theme-presets';
-import { parseAppearanceRecord, serialiseAppearanceRecord } from '@/components/ui/theme-record';
+import {
+  parseAppearanceRecord,
+  parseLegacyAppearanceRecord,
+  serialiseAppearanceRecord,
+} from '@/components/ui/theme-record';
 import { reportLaunchThemeProblem } from '@/src/appearance/launch-theme-report';
 
 // The chosen appearance (`docs/specs/ui/design-language.md` §2, "Choosing
-// one"): a record stored per device, resolved to seeds when `tokens.ts` first
-// evaluates. Before the record existed the choice was an accent id alone; that
-// value is read while no record exists. An unusable value or an unreadable
-// store falls back to the default, and the root layout logs why.
+// one"): a record stored per device, resolved when `tokens.ts` first
+// evaluates. Two older values are read while no record exists: the record
+// before custom themes, converted, and before it an accent id alone. An
+// unusable value or an unreadable store falls back to the default, and the
+// root layout logs why.
 
 const WARM = getThemePreset('warm');
 
-// The theme an accent alone draws: background and text left to match.
-const accentOnly = (accent: AppearanceChoice['accent']) => resolveAppearance({ ...DEFAULT_APPEARANCE, accent });
+// Custom colours far from any preset: a dark teal page, a high-strength accent.
+const CUSTOM: CustomColours = {
+  background: { hue: 200, strength: 30, lightness: 20, depth: 150 },
+  text: { hue: 60, strength: 10 },
+  accent: { hue: 330, strength: 80 },
+  record: { hue: 90, strength: 60 },
+  viz: { hue: 150, strength: 50 },
+};
+const CHOSEN: AppearanceChoice = { theme: 'custom', mode: 'light', custom: CUSTOM };
 
+const preset = (theme: AppearanceChoice['theme']): AppearanceChoice => ({ ...DEFAULT_APPEARANCE, theme });
 const storedRecord = (): unknown => JSON.parse(Storage.getItemSync(APPEARANCE_STORAGE_KEY) ?? 'null');
 
 beforeEach(() => {
@@ -55,34 +68,21 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('resolveThemePreset: the accent id stored before the record', () => {
+describe('resolveThemePreset: the accent id stored before any record', () => {
   it('is the default, with no problem, when nothing is stored', () => {
-    expect(resolveThemePreset(null)).toEqual({
-      preset: WARM,
-      appearance: DEFAULT_APPEARANCE,
-      seeds: WARM.seeds,
-      problem: null,
-    });
+    expect(resolveThemePreset(null)).toEqual({ preset: WARM, appearance: DEFAULT_APPEARANCE, problem: null });
   });
 
-  it('is the stored preset, with background and text matching it', () => {
-    expect(resolveThemePreset('slate')).toEqual({
-      preset: getThemePreset('slate'),
-      appearance: { ...DEFAULT_APPEARANCE, accent: 'slate' },
-      seeds: getThemePreset('slate').seeds,
-      problem: null,
-    });
+  it('is the stored preset', () => {
+    expect(resolveThemePreset('slate')).toEqual({ preset: getThemePreset('slate'), appearance: preset('slate'), problem: null });
   });
 
-  it('is a custom theme for a stored hue', () => {
+  it('is a custom theme of a stored hue’s colours, on a light page', () => {
     expect(resolveThemePreset('hue:200')).toEqual({
-      preset: { id: 'custom', label: 'Custom', hue: 200, seeds: seedsFromHue(200) },
-      appearance: { ...DEFAULT_APPEARANCE, accent: 'hue:200' },
-      seeds: seedsFromHue(200),
+      preset: CUSTOM_THEME,
+      appearance: { theme: 'custom', mode: 'light', custom: customFromSeeds(seedsFromHue(200), 'light') },
       problem: null,
     });
-    expect(storedThemeId(customTheme(200))).toBe('hue:200');
-    expect(storedThemeId(getThemePreset('plum'))).toBe('plum');
   });
 
   it('falls back to the default and reports a hue out of range', () => {
@@ -95,38 +95,30 @@ describe('resolveThemePreset: the accent id stored before the record', () => {
 });
 
 describe('the appearance record', () => {
-  const chosen: AppearanceChoice = { accent: 'hue:47', background: { hue: 200, tint: 2 }, text: 'navy', mode: 'light' };
-
-  it('is JSON with the four fields in a fixed order, and reads back', () => {
-    const stored = serialiseAppearanceRecord(chosen);
-    expect(stored).toBe('{"accent":"hue:47","background":{"hue":200,"tint":2},"text":"navy","mode":"light"}');
-    expect(parseAppearanceRecord(stored)).toEqual({ appearance: chosen, problem: null });
-    expect(serialiseAppearanceRecord(DEFAULT_APPEARANCE)).toBe(
-      '{"accent":"warm","background":"match","text":"match","mode":"light"}',
-    );
+  it('is JSON with the three fields in a fixed order, and reads back', () => {
+    const stored = serialiseAppearanceRecord(CHOSEN);
+    expect(stored.startsWith('{"theme":"custom","mode":"light","custom":{"background":{"hue":200,')).toBe(true);
+    expect(parseAppearanceRecord(stored)).toEqual({ appearance: CHOSEN, problem: null });
+    expect(serialiseAppearanceRecord(DEFAULT_APPEARANCE)).toBe('{"theme":"warm","mode":"light","custom":null}');
   });
 
-  it('reads every background and text a build offers, and every mode', () => {
-    for (const background of ['match', 'white', 'warm', 'cool', 'sage', 'rose', { hue: 0, tint: 1 }, { hue: 359, tint: 3 }]) {
-      const record = JSON.stringify({ ...DEFAULT_APPEARANCE, background });
-      expect(parseAppearanceRecord(record).appearance?.background).toEqual(background);
+  it('reads every preset and mode, and keeps custom colours while a preset is chosen', () => {
+    for (const theme of ['warm', 'slate', 'forest', 'plum']) {
+      for (const mode of ['light', 'dark', 'system']) {
+        expect(parseAppearanceRecord(JSON.stringify({ theme, mode, custom: null })).appearance).toEqual({ theme, mode, custom: null });
+      }
     }
-    for (const text of ['match', 'navy', 'espresso', 'forest', 'plum']) {
-      expect(parseAppearanceRecord(JSON.stringify({ ...DEFAULT_APPEARANCE, text })).appearance?.text).toBe(text);
-    }
-    for (const mode of ['light', 'dark', 'system']) {
-      expect(parseAppearanceRecord(JSON.stringify({ ...DEFAULT_APPEARANCE, mode })).appearance?.mode).toBe(mode);
-    }
+    const kept = { theme: 'slate', mode: 'dark', custom: CUSTOM } as const;
+    expect(parseAppearanceRecord(JSON.stringify(kept)).appearance).toEqual(kept);
   });
 
-  it('ignores fields it does not know, and normalises a custom accent', () => {
-    const record = JSON.stringify({ ...DEFAULT_APPEARANCE, accent: 'hue:007', contrast: 'high' });
-    expect(parseAppearanceRecord(record)).toEqual({ appearance: { ...DEFAULT_APPEARANCE, accent: 'hue:7' }, problem: null });
+  it('ignores fields it does not know', () => {
+    const record = JSON.stringify({ ...DEFAULT_APPEARANCE, contrast: 'high' });
+    expect(parseAppearanceRecord(record)).toEqual({ appearance: DEFAULT_APPEARANCE, problem: null });
   });
 
-  it('reports an accent no preset has as an unknown preset', () => {
-    const record = JSON.stringify({ ...DEFAULT_APPEARANCE, accent: 'neon' });
-    expect(parseAppearanceRecord(record)).toEqual({
+  it('reports a theme no preset has as an unknown preset', () => {
+    expect(parseAppearanceRecord(JSON.stringify({ ...DEFAULT_APPEARANCE, theme: 'neon' }))).toEqual({
       appearance: null,
       problem: { kind: 'unknown-preset', storedId: 'neon' },
     });
@@ -137,20 +129,60 @@ describe('the appearance record', () => {
     ['json', '"warm"'],
     ['json', '[]'],
     ['json', 'null'],
-    ['accent', '{"background":"match","text":"match","mode":"light"}'],
-    ['accent', '{"accent":7,"background":"match","text":"match","mode":"light"}'],
-    ['background', '{"accent":"warm","text":"match","mode":"light"}'],
-    ['background', '{"accent":"warm","background":"neon","text":"match","mode":"light"}'],
-    ['background', '{"accent":"warm","background":{"hue":360,"tint":1},"text":"match","mode":"light"}'],
-    ['background', '{"accent":"warm","background":{"hue":20.5,"tint":1},"text":"match","mode":"light"}'],
-    ['background', '{"accent":"warm","background":{"hue":20,"tint":4},"text":"match","mode":"light"}'],
-    ['background', '{"accent":"warm","background":null,"text":"match","mode":"light"}'],
-    ['text', '{"accent":"warm","background":"match","text":"teal","mode":"light"}'],
-    ['text', '{"accent":"warm","background":"match","text":{},"mode":"light"}'],
-    ['mode', '{"accent":"warm","background":"match","text":"match","mode":"dusk"}'],
-    ['mode', '{"accent":"warm","background":"match","text":"match"}'],
+    ['theme', '{"mode":"light","custom":null}'],
+    ['theme', '{"theme":7,"mode":"light","custom":null}'],
+    ['mode', '{"theme":"warm","mode":"dusk","custom":null}'],
+    ['mode', '{"theme":"warm","custom":null}'],
+    ['custom', '{"theme":"custom","mode":"light","custom":null}'],
+    ['custom', '{"theme":"warm","mode":"light"}'],
+    ['custom', '{"theme":"warm","mode":"light","custom":{"text":{"hue":1,"strength":1}}}'],
   ])('reports a record with a bad %s field: %s', (field, stored) => {
     expect(parseAppearanceRecord(stored)).toEqual({ appearance: null, problem: { kind: 'invalid-record', field, stored } });
+  });
+});
+
+describe('the record before custom themes', () => {
+  const legacy = (fields: Record<string, unknown>) =>
+    JSON.stringify({ accent: 'warm', background: 'match', text: 'match', mode: 'light', ...fields });
+
+  it('reads a preset left to match as that preset, keeping its mode', () => {
+    expect(parseLegacyAppearanceRecord(legacy({ accent: 'plum', mode: 'system' }))).toEqual({
+      appearance: { theme: 'plum', mode: 'system', custom: null },
+      problem: null,
+    });
+  });
+
+  it.each([
+    ['a swatch and an ink', { accent: 'plum', background: 'sage', text: 'espresso' }, withNeutrals(getThemePreset('plum').seeds, 'sage', 'espresso'), 'light'],
+    ['a custom hue and background', { accent: 'hue:120', background: { hue: 30, tint: 1 }, text: 'navy' }, withNeutrals(seedsFromHue(120), { hue: 30, tint: 1 }, 'navy'), 'light'],
+    ['a custom hue left to match', { accent: 'hue:47' }, seedsFromHue(47), 'light'],
+    ['a tinted dark theme', { background: 'cool', mode: 'dark' }, withNeutrals(WARM.seeds, 'cool', 'match'), 'dark'],
+    ['a tinted system theme on a light OS', { background: 'cool', mode: 'system' }, withNeutrals(WARM.seeds, 'cool', 'match'), 'light'],
+  ] as const)('converts %s into the custom theme it drew', (_name, fields, seeds, ladder) => {
+    const { appearance } = parseLegacyAppearanceRecord(legacy(fields), 'light');
+    expect(appearance).toEqual({ theme: 'custom', mode: (fields as { mode?: string }).mode ?? 'light', custom: customFromSeeds(seeds, ladder) });
+  });
+
+  it('draws a tinted system theme on the page of the OS’s mode as read', () => {
+    const { appearance } = parseLegacyAppearanceRecord(legacy({ background: 'cool', mode: 'system' }), 'dark');
+    expect(appearance).toEqual({ theme: 'custom', mode: 'system', custom: customFromSeeds(withNeutrals(WARM.seeds, 'cool', 'match'), 'dark') });
+    expect(parseLegacyAppearanceRecord(legacy({ background: 'cool', mode: 'system' })).appearance?.custom?.background.lightness).toBe(96);
+  });
+
+  it('reports an accent no preset has as an unknown preset', () => {
+    expect(parseLegacyAppearanceRecord(legacy({ accent: 'neon' })).problem).toEqual({ kind: 'unknown-preset', storedId: 'neon' });
+  });
+
+  it.each([
+    ['json', 'not json'],
+    ['accent', '{"background":"match","text":"match","mode":"light"}'],
+    ['background', legacy({ background: 'neon' })],
+    ['background', legacy({ background: { hue: 360, tint: 1 } })],
+    ['background', legacy({ background: { hue: 20, tint: 4 } })],
+    ['text', legacy({ text: 'teal' })],
+    ['mode', legacy({ mode: 'dusk' })],
+  ])('reports a bad %s field: %s', (field, stored) => {
+    expect(parseLegacyAppearanceRecord(stored)).toEqual({ appearance: null, problem: { kind: 'invalid-record', field, stored } });
   });
 });
 
@@ -160,41 +192,40 @@ describe('the launch theme', () => {
   });
 
   it.each([
-    ['a preset', 'forest', accentOnly('forest')],
-    ['a custom hue', 'hue:265', accentOnly('hue:265')],
+    ['a preset', 'forest', resolveAppearance(preset('forest'))],
     ['an unknown id, reported', 'neon', defaultTheme({ kind: 'unknown-preset', storedId: 'neon' })],
-  ])('reads %s stored before the record existed', (_name, storedId, expected) => {
+  ])('reads %s stored before any record existed', (_name, storedId, expected) => {
     Storage.setItemSync(THEME_PRESET_STORAGE_KEY, storedId);
     expect(readLaunchTheme()).toEqual(expected);
   });
 
-  it('reads a valid record, drawing its background and text', () => {
-    const appearance: AppearanceChoice = { accent: 'plum', background: 'sage', text: 'espresso', mode: 'light' };
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord(appearance));
-    expect(readLaunchTheme()).toEqual({
-      preset: getThemePreset('plum'),
-      appearance,
-      seeds: withNeutrals(getThemePreset('plum').seeds, 'sage', 'espresso'),
-      problem: null,
-    });
+  it('reads a valid record', () => {
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord(CHOSEN));
+    expect(readLaunchTheme()).toEqual({ preset: CUSTOM_THEME, appearance: CHOSEN, problem: null });
   });
 
-  it('prefers the record to the older accent id', () => {
+  it('prefers the record to the older record, and the older record to the accent id', () => {
     Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'forest');
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord({ ...DEFAULT_APPEARANCE, accent: 'slate' }));
+    Storage.setItemSync(LEGACY_APPEARANCE_STORAGE_KEY, '{"accent":"plum","background":"match","text":"match","mode":"light"}');
+    expect(readLaunchTheme().preset.id).toBe('plum');
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord(preset('slate')));
     expect(readLaunchTheme().preset.id).toBe('slate');
   });
 
-  it('opens in the default, reported, for an invalid record — even with an older accent id stored', () => {
+  it('opens in the default, reported, for an invalid record — even with an older value stored', () => {
     Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'forest');
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"plum"');
-    expect(readLaunchTheme()).toEqual(
-      defaultTheme({ kind: 'invalid-record', field: 'json', stored: '{"accent":"plum"' }),
-    );
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"theme":"plum"');
+    expect(readLaunchTheme()).toEqual(defaultTheme({ kind: 'invalid-record', field: 'json', stored: '{"theme":"plum"' }));
   });
 
-  it('opens in the default, reported, for a record naming an unknown accent', () => {
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord({ ...DEFAULT_APPEARANCE, accent: 'neon' as 'warm', background: 'rose' }));
+  it('converts an older system record on the OS’s mode at launch', () => {
+    Storage.setItemSync(LEGACY_APPEARANCE_STORAGE_KEY, '{"accent":"hue:200","background":"match","text":"match","mode":"system"}');
+    jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('dark');
+    expect(readLaunchTheme().appearance.custom?.background.lightness).toBe(10);
+  });
+
+  it('opens in the default, reported, for an invalid older record', () => {
+    Storage.setItemSync(LEGACY_APPEARANCE_STORAGE_KEY, '{"accent":"neon"}');
     expect(readLaunchTheme()).toEqual(defaultTheme({ kind: 'unknown-preset', storedId: 'neon' }));
   });
 
@@ -205,15 +236,7 @@ describe('the launch theme', () => {
     expect(readLaunchTheme()).toEqual(defaultTheme({ kind: 'read-failed', message: 'database is locked' }));
   });
 
-  it('draws `uiRoles` in the custom hue stored before the record existed', () => {
-    Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'hue:265');
-    jest.isolateModules(() => {
-      const { uiRoles } = require('@/components/ui/tokens') as typeof import('@/components/ui/tokens');
-      expect(uiRoles).toEqual(generateRoles(seedsFromHue(265)));
-    });
-  });
-
-  it('draws `uiRoles` in the preset stored before the record existed', () => {
+  it('draws `uiRoles` in the preset stored before any record existed', () => {
     Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'plum');
     jest.isolateModules(() => {
       const { uiRoles } = require('@/components/ui/tokens') as typeof import('@/components/ui/tokens');
@@ -221,14 +244,12 @@ describe('the launch theme', () => {
     });
   });
 
-  it('draws `uiRoles` in the background and text of the record', () => {
-    Storage.setItemSync(
-      APPEARANCE_STORAGE_KEY,
-      serialiseAppearanceRecord({ accent: 'hue:120', background: { hue: 30, tint: 1 }, text: 'navy', mode: 'light' }),
-    );
+  it('draws `uiRoles` in the custom colours of the record, in the mode its page sets', () => {
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord(CHOSEN));
     jest.isolateModules(() => {
-      const { uiRoles } = require('@/components/ui/tokens') as typeof import('@/components/ui/tokens');
-      expect(uiRoles).toEqual(generateRoles(withNeutrals(seedsFromHue(120), { hue: 30, tint: 1 }, 'navy')));
+      const { uiRoles, uiMode } = require('@/components/ui/tokens') as typeof import('@/components/ui/tokens');
+      expect(uiRoles).toEqual(generateCustomRoles(CUSTOM));
+      expect(uiMode).toBe('dark');
     });
   });
 
@@ -238,7 +259,7 @@ describe('the launch theme', () => {
       launch = require('@/components/ui/theme-launch');
     });
     expect(launch.launchTheme.preset.id).toBe('warm');
-    await launch.saveThemeAccent('slate');
+    await launch.saveAppearancePart({ theme: 'slate' });
     expect(launch.readStoredTheme().preset.id).toBe('slate');
     expect(launch.readLaunchTheme().preset.id).toBe('slate');
     expect(launch.launchTheme.preset.id).toBe('warm');
@@ -267,7 +288,7 @@ function launchWith(osScheme: 'light' | 'dark' | null) {
 }
 
 const storeMode = (mode: AppearanceChoice['mode']) =>
-  Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord({ ...DEFAULT_APPEARANCE, accent: 'slate', mode }));
+  Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord({ ...DEFAULT_APPEARANCE, theme: 'slate', mode }));
 
 describe('the launch mode', () => {
   it.each([
@@ -287,7 +308,7 @@ describe('the launch mode', () => {
   it('reads the OS mode before it pins native UI to the resolved mode', () => {
     const read = jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('dark');
     const pin = jest.spyOn(Appearance, 'setColorScheme').mockImplementation(() => {});
-    expect(pinLaunchMode('system')).toEqual({ osScheme: 'dark', mode: 'dark' });
+    expect(pinLaunchMode({ ...DEFAULT_APPEARANCE, mode: 'system' })).toEqual({ osScheme: 'dark', mode: 'dark' });
     expect(pin).toHaveBeenCalledTimes(1);
     expect(pin).toHaveBeenCalledWith('dark');
     expect(read.mock.invocationCallOrder[0]).toBeLessThan(pin.mock.invocationCallOrder[0]);
@@ -298,7 +319,7 @@ describe('the launch mode', () => {
     const original = Appearance.setColorScheme;
     (Appearance as { setColorScheme?: unknown }).setColorScheme = undefined;
     try {
-      expect(pinLaunchMode('system')).toEqual({ osScheme: 'dark', mode: 'dark' });
+      expect(pinLaunchMode({ ...DEFAULT_APPEARANCE, mode: 'system' })).toEqual({ osScheme: 'dark', mode: 'dark' });
     } finally {
       Appearance.setColorScheme = original;
     }
@@ -307,7 +328,7 @@ describe('the launch mode', () => {
   it('pins light, whatever the OS, for a light choice', () => {
     jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('dark');
     const pin = jest.spyOn(Appearance, 'setColorScheme').mockImplementation(() => {});
-    expect(pinLaunchMode('light')).toEqual({ osScheme: 'dark', mode: 'light' });
+    expect(pinLaunchMode(DEFAULT_APPEARANCE)).toEqual({ osScheme: 'dark', mode: 'light' });
     expect(pin).toHaveBeenCalledWith('light');
   });
 
@@ -335,12 +356,25 @@ describe('the launch mode', () => {
   });
 
   it('opens an unreadable record in light, with its problem to log, even on a dark OS', () => {
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"slate","background":"match","text":"match","mode":"dusk"}');
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"theme":"slate","mode":"dusk","custom":null}');
     const { launch, tokens, pins } = launchWith('dark');
     expect(launch.launchTheme.problem).toMatchObject({ kind: 'invalid-record', field: 'mode' });
     expect(launch.launchMode).toBe('light');
     expect(tokens.uiRoles).toEqual(generateRoles(WARM.seeds, 'light'));
     expect(pins).toEqual(['light']);
+  });
+
+  it.each([
+    [20, 'dark'],
+    [49, 'dark'],
+    [50, 'light'],
+    [96, 'light'],
+  ] as const)('pins a custom page of %s to %s, whatever the stored mode and the OS', (lightness, expected) => {
+    const custom = { ...CUSTOM, background: { ...CUSTOM.background, lightness } };
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord({ theme: 'custom', mode: 'system', custom }));
+    const { launch, pins } = launchWith(expected === 'dark' ? 'light' : 'dark');
+    expect(launch.launchMode).toBe(expected);
+    expect(pins).toEqual([expected]);
   });
 
   it('keeps the launch mode when the OS mode or the stored mode changes while the app runs', async () => {
@@ -358,38 +392,44 @@ describe('the launch mode', () => {
 
 describe('saving', () => {
   it('writes the whole choice as the record', async () => {
-    const appearance: AppearanceChoice = { accent: 'forest', background: 'white', text: 'plum', mode: 'light' };
-    await saveAppearance(appearance);
-    expect(storedRecord()).toEqual(appearance);
-    expect(readStoredTheme().appearance).toEqual(appearance);
+    await saveAppearance(CHOSEN);
+    expect(storedRecord()).toEqual(CHOSEN);
+    expect(readStoredTheme().appearance).toEqual(CHOSEN);
   });
 
-  it('writes a new accent into the record, keeping the rest of the choice', async () => {
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord({ ...DEFAULT_APPEARANCE, background: 'rose', text: 'navy' }));
-    await saveThemeAccent('hue:90');
-    expect(storedRecord()).toEqual({ accent: 'hue:90', background: 'rose', text: 'navy', mode: 'light' });
+  it('writes a new theme into the record, keeping the rest of the choice', async () => {
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord({ ...CHOSEN, mode: 'dark' }));
+    await saveAppearancePart({ theme: 'forest' });
+    expect(storedRecord()).toEqual({ theme: 'forest', mode: 'dark', custom: CUSTOM });
   });
 
-  it('migrates on the first save: the older accent id becomes a record, and is left in place', async () => {
+  it('migrates on the first save: an older value becomes a record, and is left in place', async () => {
     Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'plum');
     expect(readStoredTheme().preset.id).toBe('plum');
-    await saveThemeAccent('forest');
-    expect(storedRecord()).toEqual({ ...DEFAULT_APPEARANCE, accent: 'forest' });
+    await saveAppearancePart({ mode: 'dark' });
+    expect(storedRecord()).toEqual({ ...preset('plum'), mode: 'dark' });
     expect(Storage.getItemSync(THEME_PRESET_STORAGE_KEY)).toBe('plum');
-    expect(readLaunchTheme().preset.id).toBe('forest');
+  });
+
+  it('migrates a converted older record on the first save, leaving it in place', async () => {
+    const legacy = '{"accent":"hue:47","background":"match","text":"match","mode":"light"}';
+    Storage.setItemSync(LEGACY_APPEARANCE_STORAGE_KEY, legacy);
+    await saveAppearancePart({ mode: 'dark' });
+    expect(storedRecord()).toEqual({ theme: 'custom', mode: 'dark', custom: customFromSeeds(seedsFromHue(47), 'light') });
+    expect(Storage.getItemSync(LEGACY_APPEARANCE_STORAGE_KEY)).toBe(legacy);
   });
 
   it('replaces an unusable record with the default\'s rest', async () => {
     Storage.setItemSync(APPEARANCE_STORAGE_KEY, 'not json');
-    await saveThemeAccent('slate');
-    expect(storedRecord()).toEqual({ ...DEFAULT_APPEARANCE, accent: 'slate' });
+    await saveAppearancePart({ theme: 'slate' });
+    expect(storedRecord()).toEqual(preset('slate'));
   });
 
   it('saves nothing when the store cannot be read', async () => {
     jest.spyOn(Storage, 'getItemSync').mockImplementationOnce(() => {
       throw new Error('database is locked');
     });
-    await expect(saveThemeAccent('slate')).rejects.toThrow('database is locked');
+    await expect(saveAppearancePart({ theme: 'slate' })).rejects.toThrow('database is locked');
     expect(Storage.getItemSync(APPEARANCE_STORAGE_KEY)).toBeNull();
   });
 
@@ -397,41 +437,41 @@ describe('saving', () => {
   // settles, as the real one does, so a test cannot read a saved value before
   // the code awaiting the write has resumed.
   it('holds a saved choice only once the write settles', async () => {
-    const write = saveThemeAccent('slate');
+    const write = saveAppearancePart({ theme: 'slate' });
     expect(readStoredTheme().preset.id).toBe('warm');
     await write;
     expect(readStoredTheme().preset.id).toBe('slate');
   });
 
   it('reads the saves still on their way as the intended choice, and only until they settle', async () => {
-    const first = saveAppearancePart({ background: 'rose' });
-    const second = saveAppearancePart({ text: 'navy' });
+    const first = saveAppearancePart({ custom: CUSTOM });
+    const second = saveAppearancePart({ mode: 'dark' });
     expect(readStoredTheme().appearance).toEqual(DEFAULT_APPEARANCE);
-    expect(readIntendedTheme()).toEqual({ ...DEFAULT_APPEARANCE, background: 'rose', text: 'navy' });
+    expect(readIntendedTheme()).toEqual({ ...DEFAULT_APPEARANCE, custom: CUSTOM, mode: 'dark' });
     await Promise.all([first, second]);
-    expect(readIntendedTheme()).toEqual({ ...DEFAULT_APPEARANCE, background: 'rose', text: 'navy' });
-    expect(storedRecord()).toEqual({ ...DEFAULT_APPEARANCE, background: 'rose', text: 'navy' });
+    expect(readIntendedTheme()).toEqual({ ...DEFAULT_APPEARANCE, custom: CUSTOM, mode: 'dark' });
+    expect(storedRecord()).toEqual({ ...DEFAULT_APPEARANCE, custom: CUSTOM, mode: 'dark' });
   });
 
   it('forgets a field whose save failed, even while a later save for another field waits', async () => {
     jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
-    const failed = saveAppearancePart({ background: 'rose' });
-    const later = saveAppearancePart({ text: 'navy' });
+    const failed = saveAppearancePart({ custom: CUSTOM });
+    const later = saveAppearancePart({ mode: 'dark' });
     await expect(failed).rejects.toThrow('disk full');
     // The later save has not settled: its field still counts, the failed one does not.
-    expect(readIntendedTheme()).toEqual({ ...DEFAULT_APPEARANCE, text: 'navy' });
+    expect(readIntendedTheme()).toEqual({ ...DEFAULT_APPEARANCE, mode: 'dark' });
     await later;
-    expect(storedRecord()).toEqual({ ...DEFAULT_APPEARANCE, text: 'navy' });
+    expect(storedRecord()).toEqual({ ...DEFAULT_APPEARANCE, mode: 'dark' });
   });
 
   it('keeps a field queued by a newer save when an older save of it settles', async () => {
-    const older = saveAppearancePart({ background: 'rose' });
-    const newer = saveAppearancePart({ background: 'cool' });
+    const older = saveAppearancePart({ theme: 'plum' });
+    const newer = saveAppearancePart({ theme: 'forest' });
     await older;
-    expect(readIntendedTheme().background).toBe('cool');
+    expect(readIntendedTheme().theme).toBe('forest');
     await newer;
-    expect(readStoredTheme().appearance.background).toBe('cool');
-    expect(readIntendedTheme().background).toBe('cool');
+    expect(readStoredTheme().appearance.theme).toBe('forest');
+    expect(readIntendedTheme().theme).toBe('forest');
   });
 
   it('orders an async read after a write still settling', async () => {

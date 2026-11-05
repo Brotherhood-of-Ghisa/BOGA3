@@ -142,7 +142,7 @@ import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 import RootLayout from '../app/_layout';
 import * as themeLaunch from '@/components/ui/theme-launch';
-import { customTheme, themePresets } from '@/components/ui/theme-presets';
+import { CUSTOM_THEME, themePresets } from '@/components/ui/theme-presets';
 import * as tokens from '@/components/ui/tokens';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { getExerciseCatalogSnapshot } from '@/src/exercise-catalog/cache';
@@ -209,7 +209,7 @@ describe('RootLayout auth bootstrap wiring', () => {
     jest.restoreAllMocks();
   });
 
-  it.each([...themePresets, customTheme(200)])('applies the $label icon policy once on mount', (preset) => {
+  it.each([...themePresets, CUSTOM_THEME])('applies the $label icon policy once on mount', (preset) => {
     jest.replaceProperty(themeLaunch, 'launchTheme', { ...themeLaunch.launchTheme, preset, problem: null });
 
     render(<RootLayout />);

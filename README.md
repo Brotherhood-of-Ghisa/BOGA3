@@ -72,9 +72,9 @@ Captured from the iOS app with sample training data.
 | :---: | :---: |
 | <img src="docs/screenshots/progress.png" alt="Muscle progress table comparing current and previous training periods" width="300"> | <img src="docs/screenshots/exercise-history.png" alt="Bench press volume history shown as a calendar heatmap" width="300"> |
 
-| Custom colour | Workout summary |
+| Custom theme | Workout summary |
 | :---: | :---: |
-| <img src="docs/screenshots/custom-colour.png" alt="Custom colour ring with a live preview of workout controls" width="300"> | <img src="docs/screenshots/session-summary.png" alt="Completed workout summary showing muscle set distribution and an exercise volume comparison" width="300"> |
+| <img src="docs/screenshots/custom-theme.png" alt="Custom background picker: hue ring, strength, lightness and depth sliders over a live preview on a dark tinted page" width="300"> | <img src="docs/screenshots/session-summary.png" alt="Completed workout summary showing muscle set distribution and an exercise volume comparison" width="300"> |
 
 ## Working on BoGa
 

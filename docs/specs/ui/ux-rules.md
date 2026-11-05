@@ -132,7 +132,7 @@ Decided 2026-10-27. The primitives are `components/ui/form-section.tsx` and `for
 Decided 2026-10-30. A `footnote` states only when a change applies or its
 status ([[copy.no-inline-explanation]]). Every destination is a pushed page of `FormSection`s
 (optional muted `footnote`), built only from `SwitchRow`, `SegmentRow` (≤3
-options), `RadioRow` (one of many), `CheckRow` (several), `InputRow` (blank =
+options), `SliderRow` (0–max), `RadioRow` (one of many), `CheckRow` (several), `InputRow` (blank =
 default), `FormField`, `ValueRow` (read-only), `ChoiceRow` and `ActionRow`.
 Four buttons: **rows** (chevron = a page; `accent` words = acts now; `danger`
 words = destroys, confirmed by an `Alert`), **primary** (≤1 per page, only to
@@ -254,15 +254,14 @@ date picker and the navigators take `uiMode`, never a fixed mode or colour
 (`app.config.ts`). The stack header takes `paper` (no shadow line) and `ink`, so
 header and page read as one surface ("Pages").
 
-Settings → Appearance is one page: a live `ThemePreview` of the choice in its
-mode, then Mode (Light, Dark, System), Theme, Background (Match theme, five
-swatches, Custom background) and Text (Match background, four inks) as radio
-rows, each with a swatch. A tap or
-release saves at once and writes nothing when the value is already stored; the
-chosen row reads `Next launch` until the app reopens. A Custom row opens its
-picker (hue ring; the background adds a tint step) with the same preview. A
-failed save shows a danger `Notice` saying nothing changed and is logged.
-Settings home names the combined choice.
+Settings → Appearance: a live `ThemePreview`, then Theme (four presets and
+Custom as radio rows with swatches), then Mode (Light, Dark, System) for a
+preset or one row per Custom part (Background, Text, Accent, Best ever,
+Charts), each opening a picker: hue ring, strength `SliderRow`, and for the
+background lightness and depth. A tap or release saves at once, writing nothing
+when already stored; the chosen row reads `Next launch` until the app reopens.
+A failed save shows a danger `Notice` saying nothing changed and is logged.
+Settings home names the choice.
 
 ## Screen rules no other source states
 

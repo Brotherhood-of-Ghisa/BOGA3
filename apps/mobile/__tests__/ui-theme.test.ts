@@ -4,22 +4,7 @@ import { uiRoles } from '@/components/ui';
 import { hexToLch, lchToHex, withAlpha } from '@/components/ui/lch';
 import { defaultThemeSeeds, generateRoles, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
 import { hueName, hueThemeId, parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
-import {
-  BACKGROUND_CHROMA_CAP,
-  BACKGROUND_TINTS,
-  backgroundSwatches,
-  TEXT_CHROMA_CAP,
-  textInks,
-  withNeutrals,
-  type BackgroundChoice,
-  type TextChoice,
-} from '@/components/ui/theme-neutrals';
-import {
-  DEFAULT_APPEARANCE,
-  DEFAULT_THEME_PRESET_ID,
-  resolveAppearance,
-  themePresets,
-} from '@/components/ui/theme-presets';
+import { DEFAULT_THEME_PRESET_ID, getThemePreset, themePresets } from '@/components/ui/theme-presets';
 
 import themeRolesLight from './fixtures/theme-roles-light.json';
 
@@ -27,9 +12,9 @@ import themeRolesLight from './fixtures/theme-roles-light.json';
 // and "Presets"): every colour role is generated from five seeds, on a light
 // or a dark ladder. These tests pin that the default seeds reproduce the picked
 // palette, that the rules the palette is gated on hold in both modes for every
-// shipped preset and for seeds no preset ships, that each preset's `accent` and
-// `record` — used as given in light mode — meet their own floors, and that the
-// dark ladder left every light role as it was.
+// shipped preset and for seeds no preset ships, and that each preset's `accent`
+// and `record` — used as given in light mode — meet their own floors. Custom
+// themes are not gated (`ui-theme-custom.test.ts`).
 
 // The palette as rationalised and picked on device, 2026-09-27. The generator
 // was calibrated to it; a role drifting further than ΔE*ab 3 from it is a
@@ -327,7 +312,9 @@ describe('theme presets', () => {
   );
 });
 
-describe('custom hue themes', () => {
+// The hue seeds an older stored custom hue (`hue:<deg>`) named. A record that
+// still holds one is converted to custom colours on read (`theme-record.ts`).
+describe('hue seeds', () => {
   const everyHue = Array.from({ length: 360 }, (_, hue) => hue);
 
   it.each(MODES)('meet every floor at every hue in %s mode', (mode) => {
@@ -401,106 +388,24 @@ function drift(roles: UiRoles, before: Record<string, string>): string[] {
   );
 }
 
-describe('an appearance with background and text left to match', () => {
+describe('the presets and hue seeds', () => {
   it.each(themePresets.map((preset) => [preset.id] as const))('draws the %s preset as before (ΔE*ab ≤ 1)', (id) => {
-    const roles = generateRoles(resolveAppearance({ ...DEFAULT_APPEARANCE, accent: id }).seeds);
+    const roles = generateRoles(getThemePreset(id).seeds);
     expect(drift(roles, themeRolesLight.presets[id])).toEqual([]);
     expect(roles.scrim).toBe(themeRolesLight.presets[id].scrim);
   });
 
   it.each(Object.keys(themeRolesLight.hues))('draws %s as before (ΔE*ab ≤ 1)', (id) => {
-    const roles = generateRoles(resolveAppearance({ ...DEFAULT_APPEARANCE, accent: id as `hue:${number}` }).seeds);
+    const roles = generateRoles(seedsFromHue(parseHueThemeId(id)!));
     expect(drift(roles, themeRolesLight.hues[id as keyof typeof themeRolesLight.hues])).toEqual([]);
   });
 
   it('draws every one of the 360 custom hues exactly as before', () => {
     const hash = createHash('sha256');
     for (let hue = 0; hue < 360; hue += 1) {
-      const { seeds } = resolveAppearance({ ...DEFAULT_APPEARANCE, accent: hueThemeId(hue) });
-      hash.update(JSON.stringify(legacyRoles(generateRoles(seeds))));
+      hash.update(JSON.stringify(legacyRoles(generateRoles(seedsFromHue(hue)))));
     }
     expect(hash.digest('hex')).toBe(themeRolesLight.digest);
-  });
-});
-
-describe('background and text choices', () => {
-  const customBackgrounds: BackgroundChoice[] = Array.from({ length: 12 }, (_, index) =>
-    BACKGROUND_TINTS.map((tint) => ({ hue: index * 30 + 15, tint })),
-  ).flat();
-  const backgrounds: BackgroundChoice[] = ['match', ...backgroundSwatches.map((swatch) => swatch.id), ...customBackgrounds];
-  const texts: TextChoice[] = ['match', ...textInks.map((ink) => ink.id)];
-  // Every preset, and a custom accent every 5° ("custom hue themes" sweeps
-  // all 360 hues under the default background and text).
-  const accents = [
-    ...themePresets.map((preset) => preset.seeds),
-    ...Array.from({ length: 72 }, (_, index) => seedsFromHue(index * 5)),
-  ];
-
-  it('stay neutrals: chroma within the caps', () => {
-    for (const swatch of backgroundSwatches) expect(swatch.chroma).toBeLessThanOrEqual(BACKGROUND_CHROMA_CAP);
-    for (const ink of textInks) expect(ink.chroma).toBeLessThanOrEqual(TEXT_CHROMA_CAP);
-    for (const background of backgrounds) {
-      const { background: seed } = withNeutrals(defaultThemeSeeds, background, 'match');
-      expect(hexToLch(seed).chroma).toBeLessThanOrEqual(BACKGROUND_CHROMA_CAP + 0.5);
-    }
-    for (const text of texts) {
-      expect(hexToLch(withNeutrals(defaultThemeSeeds, 'match', text).text).chroma).toBeLessThanOrEqual(TEXT_CHROMA_CAP + 0.5);
-    }
-  });
-
-  it('are told apart by id, label and colour', () => {
-    for (const choices of [backgroundSwatches, textInks]) {
-      for (const key of ['id', 'label'] as const) {
-        expect(new Set(choices.map((choice) => choice[key])).size).toBe(choices.length);
-      }
-      const seeds = choices.map((choice) => lchToHex({ lightness: 42.4, chroma: choice.chroma, hue: choice.hue }));
-      expect(new Set(seeds).size).toBe(choices.length);
-    }
-  });
-
-  it('match: text takes the background, and the background the accent theme\'s own neutral', () => {
-    const slate = themePresets[1].seeds;
-    expect(withNeutrals(slate, 'match', 'match')).toEqual(slate);
-    const sage = withNeutrals(slate, 'sage', 'match');
-    expect(sage.text).toBe(sage.background);
-    expect(sage.background).not.toBe(slate.background);
-    const navy = withNeutrals(slate, 'match', 'navy');
-    expect(navy.background).toBe(slate.background);
-    expect(hueDistance(hexToLch(navy.text).hue, 265)).toBeLessThanOrEqual(3);
-    // Accent, record and ramp never follow the neutrals.
-    expect({ ...sage, background: undefined, text: undefined }).toEqual({ ...slate, background: undefined, text: undefined });
-  });
-
-  it.each(MODES)('keep every floor over the background × text × accent grid in %s mode', (mode) => {
-    const failures: string[] = [];
-    for (const accentSeeds of accents) {
-      for (const background of backgrounds) {
-        for (const text of texts) {
-          const broken = brokenFloors(generateRoles(withNeutrals(accentSeeds, background, text), mode), mode);
-          if (broken.length > 0) {
-            failures.push(`${accentSeeds.accent} / ${JSON.stringify(background)} / ${text}: ${broken.join(', ')}`);
-          }
-        }
-      }
-    }
-    expect(failures).toEqual([]);
-  });
-
-  it('leave every light role exactly as it was before the dark ladder', () => {
-    // A digest of every light role over the whole grid, taken from the
-    // generator before it had a dark ladder. Any light change is a visible one.
-    const hash = createHash('sha256');
-    for (const accentSeeds of accents) {
-      for (const background of backgrounds) {
-        for (const text of texts) {
-          const seeds = withNeutrals(accentSeeds, background, text);
-          const roles = generateRoles(seeds, 'light');
-          expect(roles).toEqual(generateRoles(seeds));
-          hash.update(JSON.stringify(Object.keys(roles).sort().map((role) => [role, roles[role as keyof UiRoles]])));
-        }
-      }
-    }
-    expect(hash.digest('hex')).toBe('0e8e78dc361f150d1db05c9e3d05ee215875ceef4f01e30afcb58103089e92cf');
   });
 });
 

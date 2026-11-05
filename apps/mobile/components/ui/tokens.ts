@@ -1,5 +1,6 @@
-import { generateRoles, type ThemeMode } from '@/components/ui/theme';
+import type { ThemeMode } from '@/components/ui/theme';
 import { launchMode, launchTheme } from '@/components/ui/theme-launch';
+import { appearanceRoles } from '@/components/ui/theme-presets';
 
 // The mode this launch is drawn in: light or dark, the stored choice resolved
 // at launch (`theme-launch.ts`). What a native surface takes when it is told a
@@ -10,9 +11,9 @@ export const uiMode: ThemeMode = launchMode;
 // The colour roles (`docs/specs/ui/design-language.md` §2). A screen names the
 // role, never the hex. They are generated from five seed colours
 // (`components/ui/theme.ts`) — the appearance chosen on this device as of
-// launch (§2 "Choosing one"), on the ladder of `uiMode`; what each role is for
-// is on `UiRoles`.
-export const uiRoles = generateRoles(launchTheme.seeds, uiMode);
+// launch (§2 "Choosing one"): a preset on the ladder of `uiMode`, or a custom
+// theme (`theme-custom.ts`). What each role is for is on `UiRoles`.
+export const uiRoles = appearanceRoles(launchTheme.appearance, uiMode);
 
 // The geometry (`docs/specs/ui/design-language.md` §4): the radii, fixed
 // widths and label tracking every screen is drawn with. Decided
