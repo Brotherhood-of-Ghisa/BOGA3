@@ -62,9 +62,8 @@ describe('the Appearance and Notifications routes', () => {
   it('leave no Sheet or outline/primary button in their components', () => {
     const files = [
       'components/appearance/appearance-settings.tsx',
-      'components/appearance/appearance-neutrals.tsx',
-      'components/appearance/theme-colour-screen.tsx',
-      'components/appearance/theme-background-screen.tsx',
+      'components/appearance/appearance-custom.tsx',
+      'components/appearance/theme-custom-screen.tsx',
       'components/notifications/notification-settings-screen.tsx',
     ].map((file) => readFileSync(join(MOBILE_ROOT, file), 'utf8'));
     files.forEach((source) => expect(source).not.toMatch(/<Sheet\b|variant="(primary|outline)"/));

@@ -74,28 +74,30 @@ their floors are the seed's to meet.
 steps, ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
 `uiRoles` take the launch mode's ladder; `tokens.ts` exports it as `uiMode`.
 
-**Choosing one.** An accent (four presets or a custom hue), a background and a
-text, per device, resolved when `tokens.ts` first evaluates
-(`theme-presets.ts`, `theme-launch.ts`). They are stored as the JSON record
-`boga3.appearance.v2`, `{accent, background, text, mode}` (`theme-record.ts`).
-A device with no record reads the older accent id, `boga3.themePreset.v1`;
-the first save writes the record and leaves that id in place. Background is
-`match` (the accent theme's own neutral), one of five swatches, or a custom
-hue and tint step. Text is `match` (the background) or one of four inks
-(`theme-neutrals.ts`). Chroma is capped (background 12, text 14) so both
-read as neutrals. `match` for both draws the accent's theme unchanged. Settings → Appearance (`ux-rules.md` "Appearance") sets each part with a live preview. `mode`
-is `light` (default), `dark` or `system` (the phone's at launch). An unknown id, an invalid record
-or an unreadable store opens in the default and is logged. `record` stays a
-brass across presets, so "your best ever" keeps one look. For a custom hue,
-`seedsFromHue` (`theme-hue.ts`) fixes every seed's L\* and chroma so the floors
-hold at all 360 hues by construction. Hue is
-the one thing that moves: `record` keeps the brass unless the picked accent
-lands within 35° of it, then steps 35° away on the far side — that step is what
-makes the `record`-to-`accent` floor hold, so do not "simplify" it away.
-`ui-theme.test.ts` gates the generator and every preset.
+**Choosing one.** A theme — four presets or Custom — per device, resolved when
+`tokens.ts` first evaluates (`theme-presets.ts`, `theme-launch.ts`), stored as
+the JSON record `boga3.appearance.v3`, `{theme, mode, custom}`
+(`theme-record.ts`). With no record, the older `boga3.appearance.v2`
+(`{accent, background, text, mode}`) is converted — a preset left to match
+stays that preset, anything else becomes the custom theme it drew — and before
+it the accent id `boga3.themePreset.v1`; the first save writes the record and
+leaves both in place. A preset takes `mode`: `light` (default), `dark` or
+`system` (the phone's at launch). An unknown id, an invalid record or an
+unreadable store opens in the default and is logged. `record` stays a brass
+across presets, so "your best ever" keeps one look. Settings → Appearance
+(`ux-rules.md` "Appearance") sets each part with a live preview.
+
+**Custom** (`theme-custom.ts`): a hue and a strength (0–100% of the part's
+chroma cap) per seed, and the page's lightness (L\* 0–100) and depth (0–300%).
+The seeds feed the ladder of the page's mode — light at L\* 50 and above, dark
+below — and each role keeps its hue, chroma and share of the `paper` → `ink`
+distance, moved onto the chosen page. Depth scales that share for `surface`,
+`rule`, `rule-soft` and `viz0`; `surface` takes the page's tint. Picking Custom
+starts from the preset in use. Custom themes are not gated against the floors
+above: only presets are hand-checked (`ui-theme-custom.test.ts`).
 
 The launcher icon follows the theme applied at launch: one per preset, one
-rainbow icon for every custom colour, Warm as default and fallback. The native boundary,
+rainbow icon for every custom theme, Warm as default and fallback. The native boundary,
 `apps/mobile/components/appearance/theme-app-icon.ts`, serializes requests while
 active and retries interruptions after foregrounding. Other native failures
 attempt the primary icon and are logged without blocking boot. Matching icons

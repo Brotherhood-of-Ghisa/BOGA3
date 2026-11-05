@@ -1,17 +1,12 @@
-import {
-  ChoiceMeta,
-  details,
-  SAVE_FAILED,
-  type SectionProps,
-} from '@/components/appearance/appearance-neutrals';
+import { ChoiceMeta, details, SAVE_FAILED, type SectionProps } from '@/components/appearance/appearance-custom';
 import { appearanceRoles, MODE_LABELS } from '@/components/appearance/chosen-theme';
 import { FormSection, RadioRow } from '@/components/ui';
 import { APPEARANCE_MODES } from '@/components/ui/theme-presets';
 
-// Settings → Appearance → Mode: Light (the default), Dark, or System, which
-// takes the phone's mode each time the app opens. Each row's swatch is the
-// choice drawn in that mode.
-export function ModeSection({ appearance, pending, commit }: Omit<SectionProps, 'footnote'>) {
+// Settings → Appearance → Mode, shown while a preset is the theme: Light (the
+// default), Dark, or System, which takes the phone's mode each time the app
+// opens. Each row's swatch is the preset drawn in that mode.
+export function ModeSection({ appearance, pending, commit }: SectionProps) {
   return (
     <FormSection footnote="System applies the phone’s mode at launch" testID="settings-appearance-mode" title="Mode">
       {APPEARANCE_MODES.map((mode, index) => {

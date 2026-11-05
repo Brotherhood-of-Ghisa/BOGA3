@@ -1,12 +1,14 @@
-import { defaultThemeSeeds, type ThemeSeeds } from '@/components/ui/theme';
-import { hueThemeId, parseHueThemeId, seedsFromHue, type HueThemeId } from '@/components/ui/theme-hue';
-import { withNeutrals, type BackgroundChoice, type TextChoice } from '@/components/ui/theme-neutrals';
+import type { ColorSchemeName } from 'react-native';
+
+import { defaultThemeSeeds, generateRoles, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
+import { customFromSeeds, customMode, generateCustomRoles, type CustomColours } from '@/components/ui/theme-custom';
+import { parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
 
 // The themes a user can choose (`docs/specs/ui/design-language.md` §2,
 // "Presets"). A preset is its seeds, fixed here and gated in
-// `__tests__/ui-theme.test.ts`, so no seed ever needs correcting at runtime;
-// the custom colour (`theme-hue.ts`) fixes everything but the hue for the same
-// reason. Picked 2026-10-01 from a mock of six: one per hue family.
+// `__tests__/ui-theme.test.ts`, so no seed ever needs correcting at runtime.
+// Picked 2026-10-01 from a mock of six: one per hue family. Anything else is a
+// custom theme (`theme-custom.ts`), which is not gated.
 export type ThemePreset = {
   id: ThemePresetId;
   label: string;
@@ -18,9 +20,8 @@ export type ThemePresetId = 'warm' | 'slate' | 'forest' | 'plum';
 export const DEFAULT_THEME_PRESET_ID: ThemePresetId = 'warm';
 
 // In the order the Appearance page lists them. `record` stays a brass in every
-// preset: "your best ever" keeps one look whatever the accent.
-// A preset names one mid neutral; its background and text both take it until
-// the user picks either apart (`theme-neutrals.ts`).
+// preset: "your best ever" keeps one look whatever the accent. A preset names
+// one mid neutral, which its background and text both take.
 export const themePresets: readonly ThemePreset[] = [
   { id: 'warm', label: 'Warm', seeds: defaultThemeSeeds },
   { id: 'slate', label: 'Slate', seeds: oneNeutral('#5B6470', { accent: '#1F6FB2', record: '#8A6516', viz: '#5F7F96' }) },
@@ -51,66 +52,43 @@ export type ThemeLaunchProblem =
   | { kind: 'invalid-record'; field: AppearanceRecordField; stored: string }
   | { kind: 'read-failed'; message: string };
 
-export type AppearanceRecordField = 'json' | 'accent' | 'background' | 'text' | 'mode';
+// The record's fields, and the older record's (`accent`, `background`, `text`).
+export type AppearanceRecordField = 'json' | 'theme' | 'mode' | 'custom' | 'accent' | 'background' | 'text';
 
-// A theme from one hue the user picked (`theme-hue.ts`), stored as `hue:<deg>`.
-export type CustomTheme = { id: 'custom'; label: string; hue: number; seeds: ThemeSeeds };
+// What the launcher icon is chosen by: every custom theme shares one icon.
+export type CustomTheme = { id: 'custom'; label: string };
+export const CUSTOM_THEME: CustomTheme = { id: 'custom', label: 'Custom' };
 
-// Light, dark, or the OS's mode at launch (`theme-launch.ts` resolves it).
+// Light, dark, or the OS's mode at launch, for a preset. A custom theme's page
+// lightness sets its mode.
 export type AppearanceMode = 'light' | 'dark' | 'system';
 export const APPEARANCE_MODES: readonly AppearanceMode[] = ['light', 'dark', 'system'];
 
-// Everything the user chose about how the app looks, per device.
+// Everything the user chose about how the app looks, per device. `custom` is
+// kept while a preset is chosen, so going back to Custom finds it as left; it
+// is never null while `theme` is `custom`.
 export type AppearanceChoice = {
-  // A preset id or a custom hue's `hue:<deg>`.
-  accent: ThemePresetId | HueThemeId;
-  background: BackgroundChoice;
-  text: TextChoice;
+  theme: ThemePresetId | 'custom';
   mode: AppearanceMode;
+  custom: CustomColours | null;
 };
 
 export const DEFAULT_APPEARANCE: AppearanceChoice = {
-  accent: DEFAULT_THEME_PRESET_ID,
-  background: 'match',
-  text: 'match',
+  theme: DEFAULT_THEME_PRESET_ID,
   mode: 'light',
+  custom: null,
 };
 
-// The theme a launch is drawn in. `preset` is the accent theme (it names the
-// launcher icon); `seeds` are its seeds with the chosen background and text.
+// The theme a launch is drawn in. `preset` names the launcher icon.
 export type ResolvedTheme = {
   preset: ThemePreset | CustomTheme;
   appearance: AppearanceChoice;
-  seeds: ThemeSeeds;
   problem: ThemeLaunchProblem | null;
 };
 
-export function customTheme(hue: number): CustomTheme {
-  return { id: 'custom', label: 'Custom', hue, seeds: seedsFromHue(hue) };
-}
-
-// The value a theme is stored under: a preset id, or `hue:<deg>`.
-export function storedThemeId(theme: ThemePreset | CustomTheme): ThemePresetId | HueThemeId {
-  return theme.id === 'custom' ? hueThemeId(theme.hue) : theme.id;
-}
-
-// The accent a stored id names, normalised, or null when it names none.
-export function parseAccentId(storedId: string): ThemePresetId | HueThemeId | null {
-  const hue = parseHueThemeId(storedId);
-  if (hue !== null) return hueThemeId(hue);
-  return findThemePreset(storedId)?.id ?? null;
-}
-
-// The theme a choice draws.
 export function resolveAppearance(appearance: AppearanceChoice): ResolvedTheme {
-  const hue = parseHueThemeId(appearance.accent);
-  const preset = hue === null ? getThemePreset(appearance.accent as ThemePresetId) : customTheme(hue);
-  return {
-    preset,
-    appearance,
-    seeds: withNeutrals(preset.seeds, appearance.background, appearance.text),
-    problem: null,
-  };
+  const preset = appearance.theme === 'custom' ? CUSTOM_THEME : getThemePreset(appearance.theme);
+  return { preset, appearance, problem: null };
 }
 
 // The default theme, and why it is drawn instead of the stored choice.
@@ -118,14 +96,51 @@ export function defaultTheme(problem: ThemeLaunchProblem | null): ResolvedTheme 
   return { ...resolveAppearance(DEFAULT_APPEARANCE), problem };
 }
 
-// The theme a stored accent id names (the whole choice before background and
-// text were choices): a preset, or a custom hue. No stored id is the default
-// with no problem: the user has never chosen. An id no preset has (a preset
-// since removed, or a corrupted value) is the default, reported.
+// The ladder a stored mode draws on: `system` takes the OS's mode, and light
+// when the OS states none.
+export function resolveMode(mode: AppearanceMode, osScheme: ColorSchemeName | null | undefined): ThemeMode {
+  if (mode !== 'system') return mode;
+  return osScheme === 'dark' ? 'dark' : 'light';
+}
+
+// The mode a choice draws in: a custom theme's from its page, a preset's from
+// the stored mode.
+export function appearanceMode(appearance: AppearanceChoice, osScheme: ColorSchemeName | null | undefined): ThemeMode {
+  return appearance.theme === 'custom' && appearance.custom
+    ? customMode(appearance.custom)
+    : resolveMode(appearance.mode, osScheme);
+}
+
+// Every role a choice draws, in a mode (a custom theme ignores it: its page
+// sets it).
+export function appearanceRoles(appearance: AppearanceChoice, mode: ThemeMode): UiRoles {
+  if (appearance.theme === 'custom' && appearance.custom) return generateCustomRoles(appearance.custom);
+  return generateRoles(getThemePreset(appearance.theme as ThemePresetId).seeds, mode);
+}
+
+// Custom colours to start from: the ones already chosen, else the preset in
+// use, drawn in its mode.
+export function startingCustom(appearance: AppearanceChoice, mode: ThemeMode): CustomColours {
+  if (appearance.custom) return appearance.custom;
+  const preset = getThemePreset(appearance.theme as ThemePresetId);
+  return customFromSeeds(preset.seeds, mode);
+}
+
+// The choice an older stored accent id names: a preset id, or a custom hue as
+// `hue:<deg>` (0–359), which becomes a custom theme on a light page. Null when
+// it names neither.
+export function appearanceFromAccentId(storedId: string): AppearanceChoice | null {
+  const hue = parseHueThemeId(storedId);
+  if (hue !== null) return { theme: 'custom', mode: 'light', custom: customFromSeeds(seedsFromHue(hue), 'light') };
+  const preset = findThemePreset(storedId);
+  return preset ? { ...DEFAULT_APPEARANCE, theme: preset.id } : null;
+}
+
+// The theme the first stored value, an accent id alone, names. No stored id is
+// the default with no problem: the user has never chosen. An id no preset has
+// (a preset since removed, or a corrupted value) is the default, reported.
 export function resolveThemePreset(storedId: string | null): ResolvedTheme {
   if (storedId === null) return defaultTheme(null);
-  const accent = parseAccentId(storedId);
-  return accent === null
-    ? defaultTheme({ kind: 'unknown-preset', storedId })
-    : resolveAppearance({ ...DEFAULT_APPEARANCE, accent });
+  const appearance = appearanceFromAccentId(storedId);
+  return appearance === null ? defaultTheme({ kind: 'unknown-preset', storedId }) : resolveAppearance(appearance);
 }

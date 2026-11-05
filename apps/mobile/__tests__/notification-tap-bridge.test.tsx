@@ -48,6 +48,7 @@ jest.mock('expo-router', () => ({
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { NotificationTapBridge } from '@/components/navigation/notification-tap-bridge';
 import { generateRoles } from '@/components/ui/theme';
+import { customFromSeeds, generateCustomRoles } from '@/components/ui/theme-custom';
 import { seedsFromHue } from '@/components/ui/theme-hue';
 import { getThemePreset } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
@@ -68,7 +69,7 @@ beforeEach(() => {
 });
 
 it("shares the recipient's applied app theme, custom colours included, for expanded notifications", () => {
-  const roles = generateRoles(seedsFromHue(200));
+  const roles = generateCustomRoles(customFromSeeds(seedsFromHue(200), 'light'));
   const view = render(<NotificationTapBridge />);
   expect(mockStart).toHaveBeenCalledTimes(1);
   expect(mockSetTheme).toHaveBeenCalledWith({

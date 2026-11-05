@@ -38,8 +38,9 @@ export const exerciseEditHref = ({ exerciseDefinitionId, request }: { exerciseDe
   ].filter(Boolean);
   return `${EXERCISE_EDIT_ROUTE}${params.length > 0 ? `?${params.join('&')}` : ''}` as Href;
 };
-export const THEME_COLOUR_ROUTE = '/theme-colour';
-export const THEME_BACKGROUND_ROUTE = '/theme-background';
+/** Settings → Appearance → Custom: one part's picker (`background`, `text`, `accent`, `record`, `viz`). */
+export const THEME_CUSTOM_ROUTE = '/theme-custom';
+export const themeCustomHref = (part: string): Href => `${THEME_CUSTOM_ROUTE}?part=${encodeURIComponent(part)}` as Href;
 
 /** One muscle's or one exercise's effort history, pushed from Progress. */
 export const PROGRESS_HISTORY_ROUTE = '/progress-history';

@@ -1,21 +1,16 @@
 import { useEffect, useState } from 'react';
 
-import { generateRoles, type ThemeMode, type UiRoles } from '@/components/ui/theme';
-import { hueName, parseHueThemeId } from '@/components/ui/theme-hue';
-import { findBackgroundSwatch, findTextInk, type BackgroundChoice } from '@/components/ui/theme-neutrals';
+import type { ThemeMode, UiRoles } from '@/components/ui/theme';
+import type { CustomPart } from '@/components/ui/theme-custom';
+import { hueName } from '@/components/ui/theme-hue';
+import { launchOsScheme, launchTheme, readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
 import {
-  launchOsScheme,
-  launchTheme,
-  readIntendedTheme,
-  readStoredTheme,
-  resolveMode,
-  subscribeThemeSaved,
-} from '@/components/ui/theme-launch';
-import {
-  resolveAppearance,
-  resolveThemePreset,
+  appearanceMode,
+  appearanceRoles as rolesInMode,
+  getThemePreset,
   type AppearanceChoice,
   type AppearanceMode,
+  type ThemePresetId,
 } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
@@ -56,67 +51,84 @@ export function useStoredAppearance(): [AppearanceChoice, (appearance: Appearanc
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
 
 // Which parts of a choice wait for the next launch: each differs from the
-// theme in use.
-export type PendingAppearance = { accent: boolean; background: boolean; text: boolean; mode: boolean; any: boolean };
+// theme in use. `custom` is per part, and counts only while Custom is chosen.
+export type PendingAppearance = {
+  theme: boolean;
+  mode: boolean;
+  custom: Record<CustomPart, boolean>;
+  any: boolean;
+};
 
 export function pendingAppearance(appearance: AppearanceChoice): PendingAppearance {
   const launched = launchTheme.appearance;
-  const accent = appearance.accent !== launched.accent;
-  const background = !same(appearance.background, launched.background);
-  const text = appearance.text !== launched.text;
+  const theme = appearance.theme !== launched.theme;
   const mode = appearance.mode !== launched.mode;
-  return { accent, background, text, mode, any: accent || background || text || mode };
+  const customPart = (part: CustomPart) =>
+    appearance.theme === 'custom' && !same(appearance.custom?.[part], launched.custom?.[part]);
+  const custom = {
+    background: customPart('background'),
+    text: customPart('text'),
+    accent: customPart('accent'),
+    record: customPart('record'),
+    viz: customPart('viz'),
+  };
+  const drawnMode = appearance.theme !== 'custom' && mode;
+  return { theme, mode, custom, any: theme || drawnMode || Object.values(custom).some(Boolean) };
 }
 
 export const MODE_LABELS: Record<AppearanceMode, string> = { light: 'Light', dark: 'Dark', system: 'System' };
 
-// The ladder a mode would draw on if the app opened now: `system` takes the
+// The custom parts as the Appearance page names them, in its order.
+export const CUSTOM_PART_LABELS: Record<CustomPart, string> = {
+  background: 'Background',
+  text: 'Text',
+  accent: 'Accent',
+  record: 'Best ever',
+  viz: 'Charts',
+};
+
+// The ladder a choice would draw on if the app opened now: `system` takes the
 // OS's mode as this launch found it, since the pin hides any change since.
-export function previewMode(mode: AppearanceMode): ThemeMode {
-  return resolveMode(mode, launchOsScheme);
+export function previewMode(appearance: AppearanceChoice): ThemeMode {
+  return appearanceMode(appearance, launchOsScheme);
 }
 
-export function themeLabel(id: string): string {
-  const hue = parseHueThemeId(id);
-  return hue === null ? resolveThemePreset(id).preset.label : `Custom (${hueName(hue)})`;
+export function themeLabel(appearance: AppearanceChoice): string {
+  return appearance.theme === 'custom' ? 'Custom' : getThemePreset(appearance.theme as ThemePresetId).label;
 }
 
-// The tint steps of a custom background, as a picker names them.
-export const BACKGROUND_TINT_LABELS = { 1: 'Soft', 2: 'Medium', 3: 'Strong' } as const;
-
-export function backgroundLabel(background: BackgroundChoice): string {
-  if (background === 'match') return 'Match theme';
-  if (typeof background === 'string') return findBackgroundSwatch(background)!.label;
-  return `Custom (${hueName(background.hue)})`;
+// A custom part's value as a row shows it: its hue's name and strength, and
+// for the background its lightness.
+export function customPartLabel(appearance: AppearanceChoice, part: CustomPart): string {
+  const colours = appearance.custom;
+  if (!colours) return '';
+  const { hue, strength } = colours[part];
+  const words = [hueName(hue), `${strength}%`];
+  return part === 'background' ? [...words, `light ${colours.background.lightness}`].join(', ') : words.join(', ');
 }
 
-// The whole choice for Settings home's row: the accent, then the background
-// and the text when they are not the theme's own, and the mode when it is not
-// the default light.
-export function appearanceLabel({ accent, background, text, mode }: AppearanceChoice): string {
-  return [
-    themeLabel(accent),
-    ...(background === 'match' ? [] : [`${backgroundLabel(background)} background`]),
-    ...(text === 'match' ? [] : [`${findTextInk(text)!.label} text`]),
-    ...(mode === 'light' ? [] : [`${MODE_LABELS[mode]} mode`]),
-  ].join(', ');
+// The whole choice for Settings home's row: the theme, and a preset's mode
+// when it is not the default light.
+export function appearanceLabel(appearance: AppearanceChoice): string {
+  const label = themeLabel(appearance);
+  if (appearance.theme === 'custom' || appearance.mode === 'light') return label;
+  return `${label}, ${MODE_LABELS[appearance.mode]} mode`;
 }
 
 // The roles a choice draws, in the mode it would open in, for a preview or a
 // swatch: the screens bake this launch's `uiRoles` in, so another theme's
 // colours cannot be roles of this one.
 export function appearanceRoles(appearance: AppearanceChoice): UiRoles {
-  return generateRoles(resolveAppearance(appearance).seeds, previewMode(appearance.mode));
+  return rolesInMode(appearance, previewMode(appearance));
 }
 
-// What fits at the end of Settings home's row without squeezing its label: the
-// accent, then `tinted` when a background or text was chosen and the mode when
-// it is not light; with neither, `from next launch` while the choice waits.
-// The row's accessibility label carries `appearanceLabel`.
+// What fits at the end of Settings home's row: the theme, then a preset's mode
+// when it is not light; with neither, `from next launch` while the choice
+// waits. The row's accessibility label carries `appearanceLabel`.
 export function appearanceSummary(appearance: AppearanceChoice): string {
-  const label = themeLabel(appearance.accent);
-  const tinted = appearance.background !== 'match' || appearance.text !== 'match';
-  const parts = [label, ...(tinted ? ['tinted'] : []), ...(appearance.mode === 'light' ? [] : [MODE_LABELS[appearance.mode].toLowerCase()])];
-  if (parts.length > 1) return parts.join(', ');
+  const label = themeLabel(appearance);
+  if (appearance.theme !== 'custom' && appearance.mode !== 'light') {
+    return `${label}, ${MODE_LABELS[appearance.mode].toLowerCase()}`;
+  }
   return pendingAppearance(appearance).any ? `${label} from next launch` : label;
 }

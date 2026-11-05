@@ -18,7 +18,9 @@ import { Storage } from 'expo-sqlite/kv-store';
 
 import { startThemeAppIcon } from '@/components/appearance/theme-app-icon';
 import { APPEARANCE_STORAGE_KEY, readLaunchTheme, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
-import { customTheme, getThemePreset, resolveThemePreset, type ThemePresetId } from '@/components/ui/theme-presets';
+import { customFromSeeds } from '@/components/ui/theme-custom';
+import { seedsFromHue } from '@/components/ui/theme-hue';
+import { CUSTOM_THEME, getThemePreset, resolveThemePreset, type ThemePresetId } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
 const listeners = new Set<(state: AppStateStatus) => void>();
@@ -65,9 +67,9 @@ it.each<[ThemePresetId, string | null]>([
   expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith(expectedName);
 });
 
-it.each([0, 200, 359])('uses the Rainbow icon for custom hue %s', async (hue) => {
+it('uses the Rainbow icon for a custom theme', async () => {
   jest.mocked(appIcons.getAppIconName).mockReturnValue('Forest');
-  await applyThemeAppIcon(customTheme(hue));
+  await applyThemeAppIcon(CUSTOM_THEME);
   expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith('Rainbow');
 });
 
@@ -79,9 +81,8 @@ it('keeps Rainbow between custom colours and restores Warm when chosen', async (
     return name;
   });
 
-  await applyThemeAppIcon(customTheme(0));
-  await applyThemeAppIcon(customTheme(200));
-  await applyThemeAppIcon(customTheme(359));
+  await applyThemeAppIcon(CUSTOM_THEME);
+  await applyThemeAppIcon(CUSTOM_THEME);
   await applyThemeAppIcon(getThemePreset('warm'));
 
   expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Rainbow'], [null]]);
@@ -94,10 +95,10 @@ it.each([null, 'neon', 'hue:400'])('uses Warm when the saved theme is absent or 
 });
 
 it.each<[string, string | null]>([
-  ['{"accent":"plum","background":"sage","text":"navy","mode":"light"}', 'Plum'],
-  ['{"accent":"hue:200","background":{"hue":30,"tint":2},"text":"match","mode":"light"}', 'Rainbow'],
-  ['{"accent":"plum","background":"neon","text":"match","mode":"light"}', null],
-])('follows the accent of the appearance record %s', async (record, expectedName) => {
+  ['{"theme":"plum","mode":"dark","custom":null}', 'Plum'],
+  [`{"theme":"custom","mode":"light","custom":${JSON.stringify(customFromSeeds(seedsFromHue(200), 'light'))}}`, 'Rainbow'],
+  ['{"theme":"plum","mode":"dusk","custom":null}', null],
+])('follows the theme of the appearance record %s', async (record, expectedName) => {
   Storage.setItemSync(APPEARANCE_STORAGE_KEY, record);
   jest.mocked(appIcons.getAppIconName).mockReturnValue('Forest');
   await applyThemeAppIcon(readLaunchTheme().preset);
@@ -202,7 +203,7 @@ it('rechecks the icon after cancellation rather than prompting for an already ap
     jest.mocked(appIcons.getAppIconName).mockReturnValue('Rainbow');
     throw new Error('interrupted after applying');
   });
-  await applyThemeAppIcon(customTheme(200));
+  await applyThemeAppIcon(CUSTOM_THEME);
   changeState('active');
   await settle();
   expect(jest.mocked(appIcons.setAlternateAppIcon).mock.calls).toEqual([['Rainbow']]);
@@ -265,7 +266,7 @@ it.each([
   ['plum', 'PlumNovember'], ['custom', 'RainbowNovember'],
 ] as const)('applies the November variant for %s without changing the chosen theme', async (id, name) => {
   jest.setSystemTime(new Date(2026, 10, 1));
-  await applyThemeAppIcon(id === 'custom' ? customTheme(200) : getThemePreset(id));
+  await applyThemeAppIcon(id === 'custom' ? CUSTOM_THEME : getThemePreset(id));
   expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith(name);
 });
 

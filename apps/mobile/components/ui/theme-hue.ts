@@ -1,9 +1,10 @@
 import { hexToLch, lchToHex } from '@/components/ui/lch';
 import type { ThemeSeeds } from '@/components/ui/theme';
 
-// A theme from one hue: Settings → Appearance → Custom colour. The user picks a hue;
-// lightness and chroma are ours, so the floors the presets are gated on hold
-// for every hue by construction rather than being checked after the fact.
+// The hue names a picker shows, and the seeds of the older custom theme that
+// was one hue (stored as `hue:<deg>`), read only to convert such a choice into
+// custom colours (`theme-presets.ts`, `theme-record.ts`). The hue ring draws
+// its default colours from those seeds.
 
 // `accent` at the default's L* 46: a `surface` (white) label clears 5.1:1 on
 // it at every hue. Chroma 60 is a little under the default's 73 so the

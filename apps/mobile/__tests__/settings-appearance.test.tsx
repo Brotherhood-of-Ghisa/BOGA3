@@ -2,10 +2,10 @@
 
 /**
  * Settings → Appearance (`docs/specs/ui/design-language.md` "Presets"): the
- * theme presets as radio rows on a page, a choice saved per device at once and
- * applied on the next launch, the Custom colour row that opens the picker, and
- * the failures that must be logged rather than silent. Settings home's row
- * names the choice and pushes the page.
+ * theme presets and Custom as radio rows on a page, a choice saved per device
+ * at once and applied on the next launch, Mode for a preset, the custom
+ * colours' rows that open their pickers, and the failures that must be logged
+ * rather than silent. Settings home's row names the choice and pushes the page.
  *
  * The choice lives in expo-sqlite's key-value store, faked in memory for every
  * suite by jest.setup.ts and read back here. Replaced: the router, the auth
@@ -39,6 +39,7 @@ import { StyleSheet } from 'react-native';
 
 import { appearanceRoles } from '@/components/appearance/chosen-theme';
 import { generateRoles } from '@/components/ui/theme';
+import { customFromSeeds, generateCustomRoles, type CustomColours } from '@/components/ui/theme-custom';
 import { DEFAULT_APPEARANCE, getThemePreset } from '@/components/ui/theme-presets';
 import * as themeLaunch from '@/components/ui/theme-launch';
 import { APPEARANCE_STORAGE_KEY, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
@@ -47,14 +48,14 @@ import { ensureExerciseListPreferencesLoaded } from '@/src/exercise-catalog/list
 import SettingsAppearanceRoute from '../app/settings-appearance';
 import SettingsRoute from '../app/settings';
 
-// The accent the saved appearance record holds, or null when nothing was saved:
+// The theme the saved appearance record holds, or null when nothing was saved:
 // a stored choice made before the record existed is read but never written.
 function storedAccent(): string | null {
-  return storedRecord()?.accent ?? null;
+  return storedRecord()?.theme ?? null;
 }
 
 // The whole saved record, or null when nothing was saved.
-function storedRecord(): { accent: string; background: unknown; text: unknown; mode: string } | null {
+function storedRecord(): { theme: string; mode: string; custom: CustomColours | null } | null {
   const record = Storage.getItemSync(APPEARANCE_STORAGE_KEY);
   return record === null ? null : JSON.parse(record);
 }
@@ -173,20 +174,16 @@ it('shows a choice made earlier this run, read from the store', () => {
   expect(within(screen.getByTestId('settings-appearance-row')).getByText('Plum from next launch')).toBeTruthy();
 });
 
-it('shows the accent of the appearance record, and keeps its background and text when a preset is chosen', async () => {
-  Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"plum","background":"rose","text":"navy","mode":"light"}');
+it('keeps the custom colours and mode in the record when a preset is chosen', async () => {
+  const custom = customFromSeeds(getThemePreset('slate').seeds, 'light');
+  Storage.setItemSync(APPEARANCE_STORAGE_KEY, JSON.stringify({ theme: 'plum', mode: 'dark', custom }));
   render(<SettingsAppearanceRoute />);
   expect(radio('Plum, next launch').props.accessibilityState).toEqual({ checked: true });
 
   fireEvent.press(screen.getByTestId('settings-appearance-option-forest'));
 
   await waitFor(() => expect(storedAccent()).toBe('forest'));
-  expect(JSON.parse(Storage.getItemSync(APPEARANCE_STORAGE_KEY)!)).toEqual({
-    accent: 'forest',
-    background: 'rose',
-    text: 'navy',
-    mode: 'light',
-  });
+  expect(storedRecord()).toEqual({ theme: 'forest', mode: 'dark', custom });
 });
 
 it('updates Settings home when the Appearance page saves a choice', async () => {
@@ -203,187 +200,100 @@ it('updates Settings home when the Appearance page saves a choice', async () => 
   expect(await screen.findByLabelText('Appearance, Slate from next launch')).toBeTruthy();
 });
 
-it('offers a custom colour last, a navigate row that pushes the picker route', () => {
-  render(<SettingsAppearanceRoute />);
-  const custom = screen.getByTestId('settings-appearance-option-custom');
-  // The label and chevron say it opens a picker; no value while no custom colour is chosen.
-  expect(within(custom).getAllByText(/./).map(node => node.props.children)).toEqual(['Custom colour']);
-
-  fireEvent.press(custom);
-
-  expect(mockPush).toHaveBeenCalledWith('/theme-colour');
-});
-
-it('names a custom colour chosen earlier this run on its row, no preset checked', () => {
-  Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'hue:200');
-  render(<SettingsAppearanceRoute />);
-
-  expect(within(screen.getByTestId('settings-appearance-option-custom')).getByText('Teal, 200° · Next launch')).toBeTruthy();
-  expect(radio('Warm, default').props.accessibilityState).toEqual({ checked: false });
-});
-
-describe('background and text', () => {
-  // The mock page's ground, read off the preview.
+describe('custom', () => {
+  const WARM_CUSTOM = customFromSeeds(getThemePreset('warm').seeds, 'light');
+  const CUSTOM: CustomColours = {
+    background: { hue: 200, strength: 30, lightness: 20, depth: 150 },
+    text: { hue: 60, strength: 10 },
+    accent: { hue: 330, strength: 80 },
+    record: { hue: 90, strength: 60 },
+    viz: { hue: 150, strength: 50 },
+  };
+  const storeCustom = (theme = 'custom') =>
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, JSON.stringify({ theme, mode: 'light', custom: CUSTOM }));
   const previewGround = () => StyleSheet.flatten(screen.getByTestId('settings-appearance-preview', { includeHiddenElements: true }).props.style).backgroundColor;
 
-  it('lists the background and text choices, the theme’s own ones first and checked', () => {
+  it('offers Custom last among the themes, unchecked, with Mode shown and no custom rows', () => {
     render(<SettingsAppearanceRoute />);
-    expect(screen.getByRole('radio', { name: 'Match theme, default' }).props.accessibilityState).toEqual({ checked: true });
-    for (const id of ['white', 'warm', 'cool', 'sage', 'rose']) {
-      expect(screen.getByTestId(`settings-appearance-background-${id}`).props.accessibilityState).toEqual({ checked: false });
+    expect(radio('Custom').props.accessibilityState).toEqual({ checked: false });
+    expect(screen.getByTestId('settings-appearance-mode')).toBeTruthy();
+    expect(screen.queryByTestId('settings-appearance-custom')).toBeNull();
+  });
+
+  it('starts Custom from the preset in use, saves it at once and swaps Mode for the custom rows', async () => {
+    render(<SettingsAppearanceRoute />);
+
+    fireEvent.press(radio('Custom'));
+
+    await waitFor(() => expect(storedRecord()).toEqual({ theme: 'custom', mode: 'light', custom: WARM_CUSTOM }));
+    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+    expect(previewGround()).toBe(generateCustomRoles(WARM_CUSTOM).paper);
+    expect(screen.queryByTestId('settings-appearance-mode')).toBeNull();
+    for (const label of ['Background', 'Text', 'Accent', 'Best ever', 'Charts']) {
+      expect(within(screen.getByTestId('settings-appearance-custom')).getByText(label)).toBeTruthy();
     }
-    expect(screen.getByRole('radio', { name: 'Match background, default' }).props.accessibilityState).toEqual({ checked: true });
-    for (const id of ['navy', 'espresso', 'forest', 'plum']) {
-      expect(screen.getByTestId(`settings-appearance-text-${id}`).props.accessibilityState).toEqual({ checked: false });
-    }
-    // The page says once when a choice applies.
-    expect(screen.getAllByText('Applies next launch')).toHaveLength(1);
   });
 
-  it('repaints the preview at once as a background and a text are picked', () => {
+  it('goes back to the custom colours left behind', async () => {
+    storeCustom('slate');
     render(<SettingsAppearanceRoute />);
-    const before = previewGround();
-
-    fireEvent.press(screen.getByTestId('settings-appearance-background-rose'));
-    const rose = previewGround();
-    expect(rose).not.toBe(before);
-    expect(rose).toBe(appearanceRoles({ ...DEFAULT_APPEARANCE, background: 'rose' }).paper);
-
-    fireEvent.press(screen.getByTestId('settings-appearance-text-navy'));
-    const ink = StyleSheet.flatten(screen.getByText('Bench Press', { includeHiddenElements: true }).props.style).color;
-    expect(ink).toBe(appearanceRoles({ ...DEFAULT_APPEARANCE, background: 'rose', text: 'navy' }).ink);
+    fireEvent.press(radio('Custom'));
+    await waitFor(() => expect(storedRecord()).toEqual({ theme: 'custom', mode: 'light', custom: CUSTOM }));
   });
 
-  it('saves a background at once, keeping the rest, and labels it as applying next launch', async () => {
+  it('names each part’s hue and strength, and the page’s lightness, and pushes its picker', () => {
+    storeCustom();
+    render(<SettingsAppearanceRoute />);
+    const rows = screen.getByTestId('settings-appearance-custom');
+    expect(within(rows).getByText('Teal, 30%, light 20')).toBeTruthy();
+    expect(within(rows).getByText('Purple, 80%')).toBeTruthy();
+    expect(screen.getByLabelText('Best ever, Olive, 60%, next launch')).toBeTruthy();
+    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+
+    fireEvent.press(screen.getByTestId('settings-appearance-custom-record'));
+
+    expect(mockPush).toHaveBeenCalledWith('/theme-custom?part=record');
+  });
+
+  it('previews a custom theme in the mode its page sets', () => {
+    storeCustom();
+    render(<SettingsAppearanceRoute />);
+    expect(previewGround()).toBe(generateCustomRoles(CUSTOM).paper);
+  });
+
+  it('names Custom on Settings home', () => {
+    storeCustom();
+    render(<SettingsRoute />);
+    expect(screen.getByLabelText('Appearance, Custom from next launch')).toBeTruthy();
+    expect(within(screen.getByTestId('settings-appearance-row')).getByText('Custom from next launch')).toBeTruthy();
+  });
+
+  it('reads a record from before custom themes as the custom theme it drew', () => {
+    Storage.setItemSync('boga3.appearance.v2', '{"accent":"hue:200","background":"rose","text":"navy","mode":"light"}');
+    render(<SettingsAppearanceRoute />);
+    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+  });
+
+  it('says nothing changed, and logs it, when Custom cannot be saved', async () => {
+    jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
     render(<SettingsAppearanceRoute />);
 
-    fireEvent.press(screen.getByTestId('settings-appearance-background-sage'));
+    fireEvent.press(radio('Custom'));
 
-    await waitFor(() => expect(storedRecord()).toEqual({ accent: 'warm', background: 'sage', text: 'match', mode: 'light' }));
-    expect(screen.getByTestId('settings-appearance-background-sage').props.accessibilityState).toEqual({ checked: true });
-    expect(within(screen.getByTestId('settings-appearance-background-sage')).getByText('Next launch')).toBeTruthy();
-    // The preset and text rows are not pending.
-    expect(within(screen.getByTestId('settings-appearance-text-match')).queryByText('Next launch')).toBeNull();
+    expect(await screen.findByText('Couldn’t save the theme. Nothing changed.')).toBeTruthy();
+    expect(radio('Warm, default').props.accessibilityState).toEqual({ checked: true });
+    expect(mockLogEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ event: 'theme.save_failed', context: { presetId: 'custom', error: 'disk full' } }),
+    );
   });
 
-  it('saves a text colour at once, keeping the rest', async () => {
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"plum","background":"cool","text":"match","mode":"light"}');
-    render(<SettingsAppearanceRoute />);
-
-    fireEvent.press(screen.getByTestId('settings-appearance-text-espresso'));
-
-    await waitFor(() => expect(storedRecord()).toEqual({ accent: 'plum', background: 'cool', text: 'espresso', mode: 'light' }));
-    expect(within(screen.getByTestId('settings-appearance-text-espresso')).getByText('Next launch')).toBeTruthy();
-  });
-
-  it('writes nothing when the choice already stored is chosen again', async () => {
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"warm","background":"rose","text":"navy","mode":"light"}');
+  it('writes nothing when Custom is chosen again, even with a part’s save still on its way', async () => {
+    storeCustom();
     const setItem = jest.spyOn(Storage, 'setItem');
     render(<SettingsAppearanceRoute />);
-
-    fireEvent.press(screen.getByTestId('settings-appearance-background-rose'));
-    fireEvent.press(screen.getByTestId('settings-appearance-text-navy'));
-    fireEvent.press(screen.getByTestId('settings-appearance-option-warm'));
-
+    fireEvent.press(radio('Custom, next launch'));
     await act(async () => {});
     expect(setItem).not.toHaveBeenCalled();
-  });
-
-  it('compares a quick second choice with the first one on its way, not the store', async () => {
-    render(<SettingsAppearanceRoute />);
-
-    fireEvent.press(screen.getByTestId('settings-appearance-background-rose'));
-    // Back to the theme's own before the first has been written: the last choice wins.
-    fireEvent.press(screen.getByTestId('settings-appearance-background-match'));
-
-    await waitFor(() => expect(storedRecord()?.background).toBe('match'));
-    expect(screen.getByRole('radio', { name: 'Match theme, default' }).props.accessibilityState).toEqual({ checked: true });
-  });
-
-  it('keeps two quick choices: the second does not overwrite the first’s field', async () => {
-    render(<SettingsAppearanceRoute />);
-
-    fireEvent.press(screen.getByTestId('settings-appearance-background-warm'));
-    fireEvent.press(screen.getByTestId('settings-appearance-text-forest'));
-
-    await waitFor(() => expect(storedRecord()).toEqual({ accent: 'warm', background: 'warm', text: 'forest', mode: 'light' }));
-  });
-
-  it('says nothing changed, in a danger notice, and logs which choice failed, when a background cannot be saved', async () => {
-    jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
-    render(<SettingsAppearanceRoute />);
-
-    fireEvent.press(screen.getByTestId('settings-appearance-background-cool'));
-
-    expect(await screen.findByText('Couldn’t save the theme. Nothing changed.')).toBeTruthy();
-    expect(screen.getByTestId('settings-appearance-error').props.accessibilityRole).toBe('alert');
-    expect(screen.getByRole('radio', { name: 'Match theme, default' }).props.accessibilityState).toEqual({ checked: true });
-    expect(storedRecord()).toBeNull();
-    expect(mockLogEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ level: 'warn', event: 'theme.save_failed', context: { background: 'cool', error: 'disk full' } }),
-    );
-  });
-
-  it('says nothing changed, and logs which choice failed, when a text colour cannot be saved', async () => {
-    jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
-    render(<SettingsAppearanceRoute />);
-
-    fireEvent.press(screen.getByTestId('settings-appearance-text-plum'));
-
-    expect(await screen.findByText('Couldn’t save the theme. Nothing changed.')).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Match background, default' }).props.accessibilityState).toEqual({ checked: true });
-    expect(mockLogEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ event: 'theme.save_failed', context: { text: 'plum', error: 'disk full' } }),
-    );
-  });
-
-  it('offers a custom background last, a navigate row that pushes its picker and names a custom one', () => {
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"warm","background":{"hue":200,"tint":3},"text":"match","mode":"light"}');
-    render(<SettingsAppearanceRoute />);
-    const custom = screen.getByTestId('settings-appearance-background-custom');
-    expect(within(custom).getByText('Teal, Strong · Next launch')).toBeTruthy();
-    // No swatch is checked while a custom background is.
-    expect(screen.getByRole('radio', { name: 'Match theme, default' }).props.accessibilityState).toEqual({ checked: false });
-
-    fireEvent.press(custom);
-
-    expect(mockPush).toHaveBeenCalledWith('/theme-background');
-  });
-
-  it('shows no value on the custom background row while none is chosen', () => {
-    render(<SettingsAppearanceRoute />);
-    const custom = screen.getByTestId('settings-appearance-background-custom');
-    expect(within(custom).getAllByText(/./).map((node) => node.props.children)).toEqual(['Custom background']);
-  });
-
-  it('labels the combined choice on Settings home, and updates it when the page saves', async () => {
-    render(
-      <>
-        <SettingsRoute />
-        <SettingsAppearanceRoute />
-      </>,
-    );
-    expect(screen.getByLabelText('Appearance, Warm')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('settings-appearance-background-rose'));
-    expect(await screen.findByLabelText('Appearance, Warm, Rose background from next launch')).toBeTruthy();
-    // The row shows what fits; VoiceOver hears the whole choice.
-    expect(within(screen.getByTestId('settings-appearance-row')).getByText('Warm, tinted')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('settings-appearance-text-navy'));
-    expect(await screen.findByLabelText('Appearance, Warm, Rose background, Navy text from next launch')).toBeTruthy();
-  });
-
-  it('labels a custom accent and background on Settings home', () => {
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"hue:200","background":{"hue":20,"tint":1},"text":"forest","mode":"light"}');
-    render(<SettingsRoute />);
-    expect(screen.getByLabelText('Appearance, Custom (Teal), Custom (Red) background, Forest text from next launch')).toBeTruthy();
-  });
-
-  it('reads a text colour with the background left to the theme', () => {
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"slate","background":"match","text":"plum","mode":"light"}');
-    render(<SettingsRoute />);
-    expect(screen.getByLabelText('Appearance, Slate, Plum text from next launch')).toBeTruthy();
   });
 });
 
@@ -401,14 +311,14 @@ describe('mode', () => {
   });
 
   it('saves a mode at once, keeping the rest, repaints the preview in it and labels it as applying next launch', async () => {
-    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"accent":"warm","background":"rose","text":"navy","mode":"light"}');
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"theme":"slate","mode":"light","custom":null}');
     render(<SettingsAppearanceRoute />);
-    expect(previewGround()).toBe(appearanceRoles({ accent: 'warm', background: 'rose', text: 'navy', mode: 'light' }).paper);
+    expect(previewGround()).toBe(appearanceRoles({ theme: 'slate', mode: 'light', custom: null }).paper);
 
     fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
 
-    expect(previewGround()).toBe(appearanceRoles({ accent: 'warm', background: 'rose', text: 'navy', mode: 'dark' }).paper);
-    await waitFor(() => expect(storedRecord()).toEqual({ accent: 'warm', background: 'rose', text: 'navy', mode: 'dark' }));
+    expect(previewGround()).toBe(generateRoles(getThemePreset('slate').seeds, 'dark').paper);
+    await waitFor(() => expect(storedRecord()).toEqual({ theme: 'slate', mode: 'dark', custom: null }));
     expect(screen.getByRole('radio', { name: 'Dark, next launch' }).props.accessibilityState).toEqual({ checked: true });
   });
 
@@ -469,9 +379,5 @@ describe('mode', () => {
     fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
     expect(await screen.findByLabelText('Appearance, Warm, Dark mode from next launch')).toBeTruthy();
     expect(within(screen.getByTestId('settings-appearance-row')).getByText('Warm, dark')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('settings-appearance-background-rose'));
-    expect(await screen.findByLabelText('Appearance, Warm, Rose background, Dark mode from next launch')).toBeTruthy();
-    expect(within(screen.getByTestId('settings-appearance-row')).getByText('Warm, tinted, dark')).toBeTruthy();
   });
 });
