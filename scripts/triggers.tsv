@@ -111,6 +111,7 @@ scripts/lane-timing.sh	meta-tests	lane-timing recorder (lane-timing meta-test)
 scripts/test-timings.sh	meta-tests	timings reader / import (lane-timing meta-test)
 scripts/worktree-*	meta-tests	worktree lifecycle scripts (lifecycle meta-test)
 scripts/worktree-lib.sh	fast,backend,frontend	slot-lease / placement guard sourced by every runtime entrypoint
+scripts/runtime-guard.sh	fast,backend,ios-auth-profile,ios-sync-e2e,ios-groups-e2e	whole-lane runtime ownership
 scripts/pr-wait.sh	meta-tests	PR merge waiter (lifecycle meta-test)
 scripts/ci-docs-only.sh	meta-tests	CI docs-only fast-path classifier (ci-docs-only meta-test)
 scripts/boga-config-init.sh	meta-tests	machine config seeding (run by worktree start)

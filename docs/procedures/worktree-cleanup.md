@@ -66,3 +66,7 @@ is unavailable, `release` fails and keeps the lease; fix Docker (see
 [`12`](../specs/12-worktree-config-and-isolation.md) failure hypothesis 8) and
 retry. Do not delete lease files by hand. Finish with `./boga worktree ls` and
 report the before/after counts of leases, stacks, and containers.
+
+If release reports a busy runtime, stop and load spec `12`, "Runtime ownership".
+Do not remove its lock to force cleanup; inspect the holder and get human
+confirmation before clearing another session's abandoned ownership.

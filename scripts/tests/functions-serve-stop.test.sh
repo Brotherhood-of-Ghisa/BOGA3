@@ -78,11 +78,11 @@ chmod +x "$STUB_BIN"/* "$SHIM" "$CLI"
 
 # ---------- scaffold: a leased worktree holding the real runtime scripts ----------
 mkdir -p "$ROOT/scripts" "$ROOT/supabase/scripts" "$ROOT/supabase/functions" "$ROOT/apps/mobile" "$OTHER"
-cp "$SRC_ROOT/scripts/worktree-lib.sh" "$ROOT/scripts/"
+cp "$SRC_ROOT/scripts/"{worktree-lib.sh,runtime-guard.sh} "$ROOT/scripts/"
 for f in _common.sh _containers.sh local-runtime-up.sh local-runtime-down.sh; do
   cp "$SRC_ROOT/supabase/scripts/$f" "$ROOT/supabase/scripts/"
 done
-: >"$ROOT/supabase/config.toml"
+printf 'project_id = "BOGA-wt-wt7"\n' >"$ROOT/supabase/config.toml"
 : >"$ROOT/supabase/functions/.env.local"
 echo 7 >"$ROOT/.worktree-slot"
 export BOGA_CONFIG_ROOT="$WORK/config"

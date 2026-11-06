@@ -6,43 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUPABASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/_common.sh"
-
-LOCK_DIR="${SUPABASE_DIR}/.temp/runtime-baseline.lock"
-LOCK_TIMEOUT_SECONDS="${SUPABASE_BASELINE_LOCK_TIMEOUT_SECONDS:-120}"
-LOCK_POLL_SECONDS="${SUPABASE_BASELINE_LOCK_POLL_SECONDS:-1}"
-
-release_lock() {
-  if [[ -d "${LOCK_DIR}" ]]; then
-    rm -f "${LOCK_DIR}/owner.pid" "${LOCK_DIR}/created_at"
-    rmdir "${LOCK_DIR}" 2>/dev/null || true
-  fi
-}
-
-acquire_lock() {
-  ensure_tmp_dir
-
-  local started_at now holder
-  started_at="$(date +%s)"
-
-  while ! mkdir "${LOCK_DIR}" 2>/dev/null; do
-    now="$(date +%s)"
-
-    if (( now - started_at >= LOCK_TIMEOUT_SECONDS )); then
-      holder="unknown"
-      if [[ -f "${LOCK_DIR}/owner.pid" ]]; then
-        holder="$(cat "${LOCK_DIR}/owner.pid" 2>/dev/null || echo "unknown")"
-      fi
-      echo "[supabase] timed out waiting for baseline lock (${LOCK_TIMEOUT_SECONDS}s). Holder: ${holder}" >&2
-      exit 1
-    fi
-
-    sleep "${LOCK_POLL_SECONDS}"
-  done
-
-  printf '%s\n' "$$" >"${LOCK_DIR}/owner.pid"
-  printf '%s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >"${LOCK_DIR}/created_at"
-  trap release_lock EXIT
-}
+source "${REPO_ROOT}/scripts/runtime-guard.sh"
+boga_runtime_guard_script "$REPO_ROOT" "$0" "$@"
 
 load_supabase_status_env_if_available() {
   local output line key value
@@ -263,5 +228,4 @@ ensure_runtime_and_baseline() {
   echo "[supabase] local runtime baseline ready"
 }
 
-acquire_lock
 ensure_runtime_and_baseline

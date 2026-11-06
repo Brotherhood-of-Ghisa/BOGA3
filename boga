@@ -106,7 +106,17 @@ run_lane_row() {
   [[ "${cwd}" == "apps/mobile" ]] && ensure_mobile_deps
 
   echo "[boga] lane: ${name}  (cd ${cwd} && ${cmd})"
-  lane_body() { (cd "${REPO_ROOT}/${cwd}" && eval "${cmd}"); }
+  lane_body() {
+    if [[ "$infra" == supabase || "$infra" == ios+supabase ]]; then
+      source "$REPO_ROOT/scripts/runtime-guard.sh"
+      local project
+      project="$(boga_runtime_project "$REPO_ROOT")" || return 1
+      boga_runtime_guard_run "$project" "lane $name" bash -euo pipefail -c \
+        'cd "$1"; eval "$2"' -- "$REPO_ROOT/$cwd" "$cmd"
+    else
+      (cd "${REPO_ROOT}/${cwd}" && eval "${cmd}")
+    fi
+  }
   boga_time_lane "${name}" lane_body
 }
 

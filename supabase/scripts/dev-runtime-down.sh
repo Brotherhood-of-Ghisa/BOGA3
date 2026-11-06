@@ -13,6 +13,8 @@ source "${SCRIPT_DIR}/dev-stack-lib.sh"
 
 engage_dev_stack
 dev_stack_assert_engaged
+source "${REPO_ROOT}/scripts/runtime-guard.sh"
+boga_runtime_guard_script "$REPO_ROOT" "$0" "$@"
 
 echo "[dev-stack] stopping dev Supabase (${BOGA_DEV_PROJECT_ID})"
 run_supabase stop

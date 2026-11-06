@@ -19,6 +19,8 @@ SUPABASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${SUPABASE_DIR}/.." && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/_common.sh"
+source "${REPO_ROOT}/scripts/runtime-guard.sh"
+boga_runtime_guard_script "$REPO_ROOT" "$0" "$@"
 
 echo "[test-sync-infra] ensuring local Supabase baseline (idempotent)"
 "${SCRIPT_DIR}/ensure-local-runtime-baseline.sh"
