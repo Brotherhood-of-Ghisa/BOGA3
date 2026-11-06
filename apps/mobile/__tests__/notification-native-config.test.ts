@@ -20,15 +20,22 @@ it('registers the real application, notification APIs and local bridge through t
       'generate-modules-provider', '--platform', 'apple', '--project-root', root, '--app-root', root,
       '--target', target, '--packages', 'expo-application', 'expo-notifications', 'boga-notifications',
     ], { cwd: root, encoding: 'utf8', timeout: 30000 });
-    expect({ status: generated.status, error: generated.error?.message, stderr: generated.stderr }).toEqual({
-      status: 0, error: undefined, stderr: '',
-    });
+    // expo-modules-core's own CoreModule is internal (AppContext creates it), so autolinking warns about it.
+    const stderr = generated.stderr.replace(
+      /^warning: The @ExpoModule class 'CoreModule' \([^)]*\/expo-modules-core\/ios\/Core\/Modules\/CoreModule\.swift\) is internal,.*\n/m, '');
+    // expo-application declares its module only through @ExpoModule, and the autolinker scans for
+    // those on macOS alone; elsewhere it must name exactly that package as missing.
+    const scansApple = process.platform === 'darwin';
+    expect({ status: generated.status, error: generated.error?.message, stderr }).toEqual(scansApple
+      ? { status: 0, error: undefined, stderr: '' }
+      : { status: 1, error: undefined, stderr: expect.stringMatching(
+        /^error: Scanning for @ExpoModule classes didn't complete .* missing from the modules provider: expo-application\. [^\n]*\n$/) });
     const provider = fs.readFileSync(target, 'utf8');
-    for (const name of ['BogaNotifications', 'ExpoApplication', 'ExpoNotifications']) {
+    for (const name of ['BogaNotifications', ...(scansApple ? ['ExpoApplication'] : []), 'ExpoNotifications']) {
       expect(provider).toContain(`internal import ${name}`);
     }
-    for (const name of ['BogaNotificationsModule', 'ApplicationModule', 'BackgroundModule', 'BadgeModule',
-      'CategoriesModule', 'EmitterModule', 'HandlerModule', 'PermissionsModule', 'PresentationModule',
+    for (const name of ['BogaNotificationsModule', ...(scansApple ? ['ApplicationModule'] : []), 'BackgroundModule',
+      'BadgeModule', 'CategoriesModule', 'EmitterModule', 'HandlerModule', 'PermissionsModule', 'PresentationModule',
       'PushTokenModule', 'SchedulerModule', 'ServerRegistrationModule']) {
       expect(provider).toContain(`(module: ${name}.self, name: nil)`);
     }
