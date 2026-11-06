@@ -101,6 +101,7 @@
     "eslint-plugin-sonarjs": "^4.2.2",
     "globals": "^14.0.0",
     "jest": "~30.5.2",
+    "jest-environment-node": "~30.5.2",
     "jest-expo": "~58.0.14",
     "pg": "^8.21.0",
     "react-test-renderer": "19.3.0",
