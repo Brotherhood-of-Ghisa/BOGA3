@@ -168,10 +168,22 @@ the scripts' names:
    `EXDevMenuIsOnboardingFinished=true` via the
    `apps/mobile/plugins/with-android-dev-menu-preferences.js` config plugin.
    Best-effort on both — a failed grant is logged, not fatal.
-5. **iOS password AutoFill bootstrap.** Before auth lanes on a new leased
-   simulator, turn off Settings → General → AutoFill & Passwords → AutoFill
-   Passwords and Passkeys using the normal UI. Maestro 2.11 omits native
-   SafariViewService save dialogs from its hierarchy.
+5. **iOS password AutoFill preflight.** Auth/profile, sync and groups lanes
+   require AutoFill off. After resolving and persisting the actual simulator
+   UDID, provision invokes `maestro-ios-autofill.js` before app install/launch.
+   It navigates Settings → General → AutoFill & Passwords, reads the live
+   `AutoFillToggle` value and checked state, toggles its switch child only
+   when on, then reads back off. Each run rechecks that UDID; display names
+   and old artifacts never prove readiness. An unreadable/missing control,
+   failed toggle or timeout fails provisioning, preserving teardown and
+   reporting the UDID, manual recovery path and `autofill/` artifacts
+   (log, before/after hierarchies, screenshot; failure capture is bounded).
+   Setup has a three-minute deadline, each command at most one minute;
+   failure screenshot/hierarchy attempts each get fifteen seconds. Doctor
+   reports the requirement without changing or certifying simulator state.
+   This is shared native setup, not a product lane: Jest covers its state
+   handling and runtime meta-tests cover ordering, lane wiring and cleanup.
+   Maestro 2.11 omits native SafariViewService save dialogs from its hierarchy.
 
 ## 5. Runtime state and logs
 

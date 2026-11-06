@@ -45,6 +45,10 @@ This directory contains two kinds of files:
 
 ### Internal Maestro helpers
 
+- `maestro-ios-autofill.js`
+  - purpose: provision-only native Settings preflight for auth/profile, sync and groups; reads the resolved UDID's live AutoFill switch, disables it when on and verifies off, with bounded failure diagnostics under the run's `autofill/` directory.
+  - used by: `maestro_prepare_ios_autofill` in `maestro-ios-runtime.sh`, called by `maestro-ios-provision.sh` before app install/launch.
+  - status: used and needed; Jest and `scripts/tests/maestro-autofill.test.sh` cover state handling and runner ordering.
 - `ios-sim-boot.sh`
   - purpose: resolves a simulator by `IOS_SIM_UDID` or `IOS_SIM_DEVICE`; when `IOS_SIM_AUTO_CREATE=1` (the default) and the named device is missing, it creates a slot-named simulator on the pinned iOS runtime + a preferred iPhone device type, boots it, and waits for boot readiness. Existing/booted simulators are reused, never duplicated — except a slot-named lane sim on another runtime, which it shuts down, deletes and recreates on the pin (one log line; the pin and the override are in `docs/specs/11-maestro-runtime-and-testing-conventions.md`). An explicit `IOS_SIM_UDID` is used as found, and a missing pinned runtime fails with the install command rather than falling back. The boot + wait run under a hard deadline (`IOS_SIM_BOOT_TIMEOUT_SECONDS`, default 120); on timeout it kills the blocked `simctl` and fails with the device state, whether Simulator.app is running, SpringBoard's status and crash reports for that device, and the remediation. Regression test: `scripts/tests/ios-sim-boot.test.sh` (`meta-tests`).
   - used by: `maestro-ios-provision.sh`, `ios-dev-client-start.sh`.
