@@ -206,6 +206,9 @@ if [[ -f "$MAESTRO_ENV" ]]; then
     warn "Maestro env exists but may not use expected Expo port $(boga_port_for_slot expo "$slot")"
   fi
   check_ios_sim_runtime "$MAESTRO_ENV"
+  if command -v xcrun >/dev/null 2>&1; then
+    warn "iOS auth/profile, sync and groups require AutoFill off; provisioning verifies the actual target UDID through Settings before app launch (not checked by this read-only doctor)"
+  fi
 else
   fail "missing $MAESTRO_ENV; run ./boga worktree start"
 fi

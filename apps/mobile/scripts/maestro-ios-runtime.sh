@@ -34,6 +34,7 @@ LAUNCH_LOG_FILE
 TEARDOWN_LOG_FILE
 EXPO_LOG_FILE
 MAESTRO_RESET_STRATEGY
+MAESTRO_IOS_REQUIRE_AUTOFILL_OFF
 IOS_SIM_DEVICE
 IOS_SIM_UDID
 IOS_SIM_AUTO_CREATE
@@ -47,6 +48,18 @@ SIMULATOR_SYSTEM_LOG_FILE
 MAESTRO_ENV_LOCAL_PATH
 MAESTRO_ENV_LOCAL_BACKUP
 EOF
+}
+
+maestro_prepare_ios_autofill() {
+  [[ "${MAESTRO_IOS_REQUIRE_AUTOFILL_OFF:-0}" == "1" ]] || return 0
+  node - "$SCRIPT_DIR/maestro-ios-autofill.js" "$IOS_SIM_UDID" "$MAESTRO_ARTIFACT_ROOT/autofill" <<'NODE'
+try {
+  require(process.argv[2]).prepareAutofill(process.argv[3], process.argv[4]);
+} catch (error) {
+  console.error(`[maestro-autofill] ${error.message}`);
+  process.exitCode = 1;
+}
+NODE
 }
 
 # Pre-authorize the dev-client URL schemes so the SpringBoard `Open in "<App>"?`

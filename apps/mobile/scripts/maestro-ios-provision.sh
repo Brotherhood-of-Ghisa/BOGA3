@@ -37,10 +37,12 @@ fi
 
 IOS_SIM_DEVICE="$(maestro_simulator_name_for_udid "$IOS_SIM_UDID")"
 echo "[maestro-ios-provision] Simulator ready: $IOS_SIM_DEVICE ($IOS_SIM_UDID)"
+maestro_write_runtime_env "$RUNTIME_ENV_FILE"
 
 # ios-sim-boot.sh has already waited (bounded) for boot-complete; a second bare
 # `bootstatus -b` here would block forever on a device that stops booting.
 open -a Simulator --args -CurrentDeviceUDID "$IOS_SIM_UDID" >/dev/null 2>&1 || true
+maestro_prepare_ios_autofill
 
 if [[ "${MAESTRO_RESET_STRATEGY:-data}" == "full" ]]; then
   echo "[maestro-ios-provision] Performing full reset by uninstalling the dev client before reinstall"

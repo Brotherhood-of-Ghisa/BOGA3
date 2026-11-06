@@ -39,6 +39,7 @@ TESTS=(
   "maestro-android-runtime.test.sh"
   "ios-sim-boot.test.sh"
   "maestro-crash-reports.test.sh"
+  "maestro-autofill.test.sh"
   "functions-serve-stop.test.sh"
   "baseline-stamp.test.sh"
   "dev-stack-config.test.sh"

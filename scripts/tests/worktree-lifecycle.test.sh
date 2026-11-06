@@ -268,6 +268,9 @@ if (( ${#WL_ID} <= SUPABASE_CLI_PROJECT_ID_LIMIT )); then pass "config.toml proj
 assert_contains "$(cat "$REG/$WL_SLOT")" "project_id=$WL_ID" "lease records the same capped id"
 run out "$WL/scripts/worktree-doctor.sh"
 assert_contains "$out" "[ok] supabase project_id matches slot" "doctor accepts the capped id"
+if command -v xcrun >/dev/null 2>&1; then
+  assert_contains "$out" "provisioning verifies the actual target UDID through Settings" "doctor explains AutoFill readiness without claiming to have checked it"
+fi
 
 echo "== migration: a config.toml written before the cap"
 OLD_ID="BOGA-$LONG_NAME-wt$WL_SLOT"

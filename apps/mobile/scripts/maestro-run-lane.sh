@@ -34,6 +34,7 @@ LANES="smoke|data-smoke|exercise-page|rm-curve|session-view|auth-profile|sync-e2
 
 RUN_FLOW="$SCRIPT_DIR/maestro-ios-run-flow.sh"
 RUN_FLOWS="$SCRIPT_DIR/maestro-ios-run-flows.sh"
+export MAESTRO_IOS_REQUIRE_AUTOFILL_OFF=0
 
 # Switch the runner pair to Android. Called from the android-* arms; the flow
 # list for each lane stays beside its iOS twin below.
@@ -159,6 +160,7 @@ case "$lane" in
   # its own dedicated fixture, per the one-user-per-flow rule (see docs/specs/11,
   # enforced by scripts/tests/maestro-fixture-users.test.sh).
   auth-profile)
+    export MAESTRO_IOS_REQUIRE_AUTOFILL_OFF=1
     export_local_supabase_env
     export MAESTRO_AUTH_PROFILE_EMAIL="${MAESTRO_AUTH_PROFILE_EMAIL:-$USER_A_EMAIL}"
     export MAESTRO_AUTH_PROFILE_PASSWORD="${MAESTRO_AUTH_PROFILE_PASSWORD:-$USER_A_PASSWORD}"
@@ -178,6 +180,7 @@ case "$lane" in
   # first sign-in takes the bootstrapper's SEED branch and the wipe restores only
   # this run's data.
   sync-e2e)
+    export MAESTRO_IOS_REQUIRE_AUTOFILL_OFF=1
     export_local_supabase_env
     "$REPO_ROOT/supabase/scripts/sync-e2e-fixture-reset.sh"
     MAESTRO_ROUNDTRIP_SUPABASE_URL="$EXPO_PUBLIC_SUPABASE_URL" \
@@ -197,6 +200,7 @@ case "$lane" in
   # groups-fixture-reset.sh first hard-deletes both users' groups and sync rows
   # (service role), so repeated runs in one slot need no Supabase reset.
   groups-e2e)
+    export MAESTRO_IOS_REQUIRE_AUTOFILL_OFF=1
     export_local_supabase_env
     "$REPO_ROOT/supabase/scripts/groups-fixture-reset.sh"
     MAESTRO_GROUPS_DEVICE_EMAIL="$USER_C_EMAIL" \

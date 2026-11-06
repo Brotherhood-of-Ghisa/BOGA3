@@ -57,6 +57,17 @@ IOS_SIM_UDID=<dedicated-simulator-udid>
 
 ## Per-worktree config
 
+Auth/profile, sync and groups automatically prepare password AutoFill through
+native Settings before launching the app (contract: spec 11 above). Every run
+checks the resolved simulator UDID, including after recreation or app reinstall.
+Setup evidence lives under the run's `autofill/` directory.
+
+If preparation fails, open **the UDID printed in the error**, turn off
+Settings → General → AutoFill & Passwords → AutoFill Passwords and Passkeys,
+and rerun the same lane. Inspect `autofill/setup.log`, `failure.png` and
+`failure-hierarchy.json`; failed captures are recorded in the log. Doctor
+reports this prerequisite but does not inspect or change Settings.
+
 The local config file is `.maestro/maestro.env.local`.
 
 Common overrides:
