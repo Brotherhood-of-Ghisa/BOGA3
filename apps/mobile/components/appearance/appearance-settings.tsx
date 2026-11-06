@@ -54,7 +54,8 @@ export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }
 // Settings → Appearance: a live preview of the choice, then Theme (the presets
 // and Custom as radio rows), then Mode for a preset or the custom colours for
 // Custom. While Custom is chosen, Theme collapses to its Custom row and a
-// `Show presets` row that lists the presets again (`Hide presets` folds them). Each choice is saved at
+// `Show presets` row that lists the presets again; Hide presets or a tap on
+// Custom folds them. Each choice is saved at
 // once and labelled `Next launch` until the app reopens.
 export function AppearanceSettingsScreen() {
   const { appearance, saveError, commit } = useAppearanceCommit();
@@ -86,7 +87,6 @@ export function AppearanceSettingsScreen() {
               label={preset.label}
               meta={<PresetMeta details={detail} mode={previewMode({ ...appearance, theme: preset.id })} preset={preset} />}
               onPress={() => {
-                setPresetsShown(false);
                 void commit(
                   { theme: preset.id },
                   { message: 'Couldn’t save the theme. Nothing changed.', context: { presetId: preset.id } },
@@ -105,6 +105,7 @@ export function AppearanceSettingsScreen() {
           onPress={() => {
             // From the store and the saves on their way, not this render: a
             // part saved on its picker may not have reached this page yet.
+            setPresetsShown(false);
             const intended = readIntendedAppearance();
             if (intended.theme === 'custom') return;
             void commit(

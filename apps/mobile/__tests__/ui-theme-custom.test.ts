@@ -143,6 +143,12 @@ describe('primary text', () => {
     (['inkMuted', 'inkFaint', 'inkGhost', 'paper', 'accent'] as const).forEach((role) => expect(navy[role]).toBe(base[role]));
   });
 
+  it.each([30, 140, 200, 280])('strengthens hue %i over the whole slider, to the most its L* holds', (hue) => {
+    const at = (strength: number) => hexToLch(generateCustomRoles({ ...WARM_LIGHT, ink: { hue, strength } }).ink).chroma;
+    expect(at(50)).toBeGreaterThan(at(25));
+    expect(at(100)).toBeGreaterThan(at(75));
+  });
+
   it('is a grey at a strength of 0, on a light or a dark page', () => {
     for (const lightness of [96, 10]) {
       const roles = generateCustomRoles({ ...withBackground(WARM_LIGHT, { lightness }), ink: { hue: 280, strength: 0 } });
@@ -163,7 +169,7 @@ describe('parseCustomColours', () => {
   it('takes the primary text from the text for a value saved before it was a part, drawing the same `ink`', () => {
     const { ink: _ink, ...saved } = WARM_LIGHT;
     const read = parseCustomColours(JSON.parse(JSON.stringify(saved)))!;
-    expect(read.ink).toEqual({ hue: WARM_LIGHT.text.hue, strength: Math.round(WARM_LIGHT.text.strength / 2) });
+    expect(read.ink.hue).toBe(WARM_LIGHT.text.hue);
     const before = generateRoles(customSeeds(read), 'light').ink;
     expect(deltaE(generateCustomRoles(read).ink, before)).toBeLessThan(1);
   });

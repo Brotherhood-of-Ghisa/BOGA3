@@ -271,6 +271,31 @@ describe('custom', () => {
     expect(screen.queryByTestId('settings-appearance-option-warm')).toBeNull();
   });
 
+  it('folds the presets again on a tap on Custom, writing nothing', () => {
+    storeCustom();
+    const setItem = jest.spyOn(Storage, 'setItem');
+    render(<SettingsAppearanceRoute />);
+    fireEvent.press(screen.getByRole('button', { name: 'Show presets' }));
+
+    fireEvent.press(radio('Custom, next launch'));
+
+    expect(screen.queryByTestId('settings-appearance-option-warm')).toBeNull();
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the presets listed when a preset cannot be saved', async () => {
+    storeCustom();
+    jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
+    render(<SettingsAppearanceRoute />);
+    fireEvent.press(screen.getByRole('button', { name: 'Show presets' }));
+
+    fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
+
+    expect(await screen.findByText('Couldn’t save the theme. Nothing changed.')).toBeTruthy();
+    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+    expect(screen.getByTestId('settings-appearance-option-slate')).toBeTruthy();
+  });
+
   it('leaves Custom for a preset picked from the expanded list, and drops Show presets', async () => {
     storeCustom();
     render(<SettingsAppearanceRoute />);

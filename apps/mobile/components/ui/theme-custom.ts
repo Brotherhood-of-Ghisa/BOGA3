@@ -1,5 +1,5 @@
 import { hexToLch, lchToHex, withAlpha } from '@/components/ui/lch';
-import { generateRoles, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
+import { generateRoles, inkStep, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
 import { normaliseHue } from '@/components/ui/theme-hue';
 
 // A custom theme (`docs/specs/ui/design-language.md` §2, "Custom"): the user
@@ -35,12 +35,11 @@ export const DEFAULT_DEPTH = 100;
 
 // Each seed's L* and the chroma a strength of 100 gives it. The L* are the
 // shipped seeds' (the neutral `inkMuted`, the custom accent's 46, the brass's
-// 45, the ramp's strongest step), so a converted preset keeps its look. `ink`
-// is a text seed with twice the chroma cap, so primary text can carry more
-// colour than the ladder's 0.53 (light) or 0.3 (dark) of a text seed allows.
+// 45, the ramp's strongest step), so a converted preset keeps its look. `ink`'s
+// seed only draws its hue ring: primary text is drawn by `customInk`.
 const SEED: Record<CustomPart, { lightness: number; chroma: number }> = {
   background: { lightness: 42.4, chroma: 40 },
-  ink: { lightness: 42.4, chroma: 80 },
+  ink: { lightness: 42.4, chroma: 40 },
   text: { lightness: 42.4, chroma: 40 },
   accent: { lightness: 46, chroma: 100 },
   record: { lightness: 45, chroma: 100 },
@@ -64,9 +63,26 @@ export function customSeeds(colours: CustomColours): ThemeSeeds {
   };
 }
 
+// Primary text sits at its ladder's `ink` L* (8 light, 95 dark), where sRGB
+// holds little chroma and how much depends on the hue. Its strength is a share
+// of the most that hue holds there, so the whole slider changes the colour.
+const inkGamut = (mode: ThemeMode, hue: number): number =>
+  hexToLch(lchToHex({ lightness: inkStep(mode).lightness, chroma: 150, hue })).chroma;
+
+export function customInk(mode: ThemeMode, { hue, strength }: HueStrength): string {
+  return lchToHex({ lightness: inkStep(mode).lightness, chroma: (inkGamut(mode, hue) * strength) / STRENGTH_MAX, hue });
+}
+
+// The primary text a text seed draws on a mode's ladder, as a hue and strength.
+function inkFromTextSeed(mode: ThemeMode, seed: string): HueStrength {
+  const { hue, chroma } = hexToLch(seed);
+  const share = (chroma * inkStep(mode).chroma) / inkGamut(mode, hue);
+  return { hue: normaliseHue(hue), strength: Math.min(STRENGTH_MAX, Math.round(share * STRENGTH_MAX)) };
+}
+
 // A page at L* 50 or above takes dark text, on the light ladder; below, light
 // text on the dark ladder.
-export function customMode({ background }: CustomColours): ThemeMode {
+export function customMode({ background }: Pick<CustomColours, 'background'>): ThemeMode {
   return background.lightness >= 50 ? 'light' : 'dark';
 }
 
@@ -82,10 +98,7 @@ const KEPT_ROLES = new Set<keyof UiRoles>(['selection', 'onAccent', 'onSelection
 // hue and chroma, so a tinted page has tinted cards.
 export function generateCustomRoles(colours: CustomColours): UiRoles {
   const mode = customMode(colours);
-  const seeds = customSeeds(colours);
-  // `ink` is the text ladder's step drawn from the primary text's own seed.
-  const ink = generateRoles({ ...seeds, text: customSeed('ink', colours.ink) }, mode).ink;
-  const reference = { ...generateRoles(seeds, mode), ink };
+  const reference = { ...generateRoles(customSeeds(colours), mode), ink: customInk(mode, colours.ink) };
   const paperRef = hexToLch(reference.paper).lightness;
   const end = hexToLch(reference.ink).lightness;
   const { lightness: page, depth } = colours.background;
@@ -111,18 +124,18 @@ const clamp = (lightness: number): number => Math.min(LIGHTNESS_MAX, Math.max(0,
 // and strength, the page at that ladder's `paper` and the shipped depth. Used
 // when the user first picks Custom, starting from the theme they were on.
 export function customFromSeeds(seeds: ThemeSeeds, mode: ThemeMode): CustomColours {
-  const pick = (part: CustomPart, seed: string = seeds[part as keyof ThemeSeeds]): HueStrength => {
+  const pick = (part: CustomPart, seed: string): HueStrength => {
     const { hue, chroma } = hexToLch(seed);
     return { hue: normaliseHue(hue), strength: Math.min(STRENGTH_MAX, Math.round((chroma / SEED[part].chroma) * STRENGTH_MAX)) };
   };
   const paper = hexToLch(generateRoles(seeds, mode).paper).lightness;
   return {
-    background: { ...pick('background'), lightness: Math.round(paper), depth: DEFAULT_DEPTH },
-    ink: pick('ink', seeds.text),
-    text: pick('text'),
-    accent: pick('accent'),
-    record: pick('record'),
-    viz: pick('viz'),
+    background: { ...pick('background', seeds.background), lightness: Math.round(paper), depth: DEFAULT_DEPTH },
+    ink: inkFromTextSeed(mode, seeds.text),
+    text: pick('text', seeds.text),
+    accent: pick('accent', seeds.accent),
+    record: pick('record', seeds.record),
+    viz: pick('viz', seeds.viz),
   };
 }
 
@@ -135,25 +148,20 @@ function parseHueStrength(value: unknown): HueStrength | null {
   return isInteger(hue, 359) && isInteger(strength, STRENGTH_MAX) ? { hue, strength } : null;
 }
 
-// The primary text a value stored before `ink` was its own part drew: the
-// text's hue at the strength that gives the same chroma under `ink`'s cap.
-const inkFromText = ({ hue, strength }: HueStrength): HueStrength => ({
-  hue,
-  strength: Math.round((strength * SEED.text.chroma) / SEED.ink.chroma),
-});
-
 // Custom colours as stored, or null when any part is missing or out of range.
-// A value without `ink` (stored before it was a part) takes it from `text`.
+// A value without `ink` (stored before it was a part) takes the primary text
+// its `text` drew, to the nearest whole strength.
 export function parseCustomColours(value: unknown): CustomColours | null {
   if (typeof value !== 'object' || value === null) return null;
   const stored = value as Record<string, unknown>;
-  const [background, text, accent, record, viz] = (['background', 'text', 'accent', 'record', 'viz'] as const).map((part) =>
-    parseHueStrength(stored[part]),
-  );
-  if (!background || !text || !accent || !record || !viz) return null;
-  const ink = stored.ink === undefined ? inkFromText(text) : parseHueStrength(stored.ink);
-  if (!ink) return null;
+  const read = (part: CustomPart) =>
+    part === 'ink' && stored.ink === undefined ? 'missing' : parseHueStrength(stored[part]);
+  const parts = Object.fromEntries(CUSTOM_PARTS.map((part) => [part, read(part)]));
+  if (Object.values(parts).some((part) => part === null)) return null;
+  const { background, text, accent, record, viz } = parts as Record<CustomPart, HueStrength>;
   const { lightness, depth } = stored.background as Record<string, unknown>;
   if (!isInteger(lightness, LIGHTNESS_MAX) || !isInteger(depth, DEPTH_MAX)) return null;
+  const mode = customMode({ background: { ...background, lightness, depth } });
+  const ink = parts.ink === 'missing' ? inkFromTextSeed(mode, customSeed('text', text)) : (parts.ink as HueStrength);
   return { background: { ...background, lightness, depth }, ink, text, accent, record, viz };
 }

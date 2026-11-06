@@ -245,6 +245,13 @@ export type UiRoles = {
   onInk: string;
 };
 
+// The `ink` step of a mode's ladder: its L* and the share of the text seed's
+// chroma it takes. A custom theme draws its primary text there.
+export function inkStep(mode: ThemeMode): { lightness: number; chroma: number } {
+  const { lightness, chroma } = (mode === 'light' ? LIGHT_STEPS : DARK_STEPS).ink;
+  return { lightness, chroma };
+}
+
 // Every colour role from the seeds, on the light or the dark ladder. Pure and
 // synchronous: `tokens.ts` calls it once at module load. Throws on a seed that
 // is not `#RRGGBB`.
