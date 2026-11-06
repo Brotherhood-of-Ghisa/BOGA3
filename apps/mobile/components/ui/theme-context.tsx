@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { StyleSheet, type ImageStyle, type TextStyle, type ViewStyle } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
 import { launchOsScheme, launchTheme, readLaunchTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
@@ -91,14 +91,15 @@ export function useUiMode(): ThemeMode {
 //
 // Each sheet is built once per set of roles, so a theme switch builds it once
 // however many components use it, and it is the same object between switches.
-type NamedStyles = Record<string, ViewStyle | TextStyle | ImageStyle>;
+// What `StyleSheet.create` takes: named view, text and image styles.
+type NamedStyles = Parameters<typeof StyleSheet.create>[0];
 
-export function makeStyles<S extends NamedStyles>(build: (roles: UiRoles) => S): () => Readonly<S> {
+export function makeStyles<S extends NamedStyles>(build: (roles: UiRoles) => S & NamedStyles): () => Readonly<S> {
   const sheets = new WeakMap<UiRoles, Readonly<S>>();
   const sheetFor = (roles: UiRoles): Readonly<S> => {
     const cached = sheets.get(roles);
     if (cached) return cached;
-    const sheet = StyleSheet.create(build(roles));
+    const sheet = StyleSheet.create<S>(build(roles));
     sheets.set(roles, sheet);
     return sheet;
   };
