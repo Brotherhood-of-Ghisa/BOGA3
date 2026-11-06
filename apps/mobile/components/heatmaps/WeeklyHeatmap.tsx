@@ -13,12 +13,12 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
+import { FigureText, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography, useUiRoles } from '@/components/ui';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 import { calculateLinearPercentile } from '@/src/session-insights/calculations';
 
-import { HEAT_RAMP, type CalendarHeatmapMetric } from './heatmap-metric';
+import { heatRamp, type CalendarHeatmapMetric } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
 import { HeatmapLegend } from './HeatmapLegend';
 import type { HeatmapData, WeekCell } from './heatmapData';
@@ -118,6 +118,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
   targetAveraged?: boolean; position: (value: number) => number; references: Reference[]; valueWidth: number; testID: string;
 }) {
   const dateFormat = useDateFormat();
+  const ramp = heatRamp(useUiRoles());
   const [beforeYear, year, afterYear] = formatCalendarWeekHeading(week.weekStartDateKey, dateFormat).split(/(\d{4})/);
   const value = weekValue(week, formatValue);
   const prCount = week.prCount ?? 0;
@@ -130,7 +131,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
   const track = <View style={styles.track} testID={`${testID}-track-${week.weekStartDateKey}`}>
     <View testID={`${testID}-bar-${week.weekStartDateKey}`} style={[styles.bar,
       { width: `${isKnownTraining(week) && week.value > 0 ? position(week.value) : 0}%`,
-        backgroundColor: isKnownTraining(week) && week.value > 0 ? HEAT_RAMP[week.level] : 'transparent' }]} />
+        backgroundColor: isKnownTraining(week) && week.value > 0 ? ramp[week.level] : 'transparent' }]} />
   </View>;
   const content = <View style={styles.row} testID={`${testID}-plot-row-${week.weekStartDateKey}`}>
     <View style={styles.date} testID={`${testID}-date-gutter-${week.weekStartDateKey}`}>

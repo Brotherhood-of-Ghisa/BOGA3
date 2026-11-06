@@ -2,7 +2,7 @@
 // No React / react-native imports, so they unit-test in isolation and are safe to
 // reuse from the aggregation adapter (heatmapData.ts) and the components.
 
-import { uiRoles } from '@/components/ui/tokens';
+import type { UiRoles } from '@/components/ui/theme';
 import type { CalendarHeatmapMetric } from '@/src/data';
 
 export type { CalendarHeatmapMetric };
@@ -11,15 +11,11 @@ export type CalendarHeatmapBucket = 0 | 1 | 2 | 3 | 4;
 
 /**
  * The data-viz ramp indexed by bucket level (0 = rest … 4 = max): the `viz`
- * roles of `design-language.md` §2.
+ * roles of `design-language.md` §2, in the roles the app is drawn in — a
+ * component passes `useUiRoles()`.
  */
-export const HEAT_RAMP = [
-  uiRoles.viz0,
-  uiRoles.viz1,
-  uiRoles.viz2,
-  uiRoles.viz3,
-  uiRoles.viz4,
-] as const;
+export const heatRamp = (roles: UiRoles) =>
+  [roles.viz0, roles.viz1, roles.viz2, roles.viz3, roles.viz4] as const;
 
 /** Structural subset of an effort row carrying the four selectable metrics. */
 export type HeatmapMetricSource = {
