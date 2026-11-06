@@ -52,7 +52,7 @@ appId: com.dinoderek.mobile
 - openLink: "${MAESTRO_DEV_CLIENT_URL}"
 - extendedWaitUntil:
     visible:
-      text: "Continue"
+      text: "Continue|You have changed the icon.*"
     timeout: 30000
 # Let the sheet finish animating before tapping so the tap doesn't fetch a
 # hierarchy mid-transition; then retry each tap so the transient iOS-26

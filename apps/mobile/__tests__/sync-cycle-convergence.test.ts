@@ -414,8 +414,8 @@ describe('FK_VIOLATION handling', () => {
     let servedOrphan = false;
     mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
       if (name === 'sync_pull') {
-        // sessions live in Layer 2 under the session planning topology.
-        if (args.layer === 2 && !servedOrphan) {
+        // sessions live in Layer 3 under the session planning topology.
+        if (args.layer === 3 && !servedOrphan) {
           servedOrphan = true;
           return {
             data: {
@@ -435,14 +435,14 @@ describe('FK_VIOLATION handling', () => {
 
     expect(getCycleErrorCode()).toBe('LOCAL_FK_VIOLATION');
     expect(database.select().from(sessions).where(eq(sessions.id, 'sess-orphan')).get()).toBeUndefined();
-    expect(readPullCursorJson()).not.toHaveProperty('2');
+    expect(readPullCursorJson()).not.toHaveProperty('3');
     expect(mockLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'error',
         source: 'database',
         event: 'sync.pull_local_fk_violation',
         context: expect.objectContaining({
-          layer: 2,
+          layer: 3,
           entity_types: ['sessions'],
           row_count: 1,
           operation: 'pull_page_apply',
@@ -463,7 +463,7 @@ describe('FK_VIOLATION handling', () => {
 
     mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
       if (name === 'sync_pull') {
-        if (args.layer === 2) {
+        if (args.layer === 3) {
           return {
             data: {
               entities: [orphanSessionEntity('sess-orphan', 100)],
@@ -687,7 +687,7 @@ it('refreshes dated projections after a committed pull even if the following pus
   let served = false;
   mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
     if (name !== 'sync_pull') return { data: null, error: { message: 'Network unavailable' } };
-    if (args.layer === 4 && !served) {
+    if (args.layer === 5 && !served) {
       served = true;
       return { data: { ...emptyPage, entities: [{ type: 'body_weight_measurements', id: 'r', client_updated_at_ms: 100,
         fields: { weight_kg: 80, measured_at: 1000,

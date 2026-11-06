@@ -102,6 +102,7 @@ export const loadPlanBlockProgressStatus = async (
   if (!block) {
     return 'not-found';
   }
+  if (block.plan.isRoutine) return 'not-found';
   return block.exercise.progressStatus;
 };
 
@@ -115,16 +116,13 @@ export const autoCompletePlanBlocksForSession = async (
   options?: { sourcedBlockIds?: string[]; now?: Date } | Date,
 ): Promise<string[]> => {
   const now = options instanceof Date ? options : options?.now ?? new Date();
-  let blockIds = options instanceof Date ? undefined : options?.sourcedBlockIds;
-  if (!blockIds) {
-    const snapshot = await loadSessionSnapshotById(sessionId);
-    if (!snapshot) {
-      return [];
-    }
-    blockIds = snapshot.exercises
-      .map((exercise) => exercise.sourcePlanExerciseId)
-      .filter((id): id is string => id != null);
-  }
+  const snapshot = await loadSessionSnapshotById(sessionId);
+  if (!snapshot) return [];
+  const reusable = new Set(snapshot.exercises.filter(exercise => exercise.sourcePlanUseId)
+    .map(exercise => exercise.sourcePlanExerciseId));
+  const requested = options instanceof Date ? undefined : options?.sourcedBlockIds;
+  const blockIds = (requested ?? snapshot.exercises.map(exercise => exercise.sourcePlanExerciseId))
+    .filter((id): id is string => id != null && !reusable.has(id));
   if (blockIds.length === 0) {
     return [];
   }

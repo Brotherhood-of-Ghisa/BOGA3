@@ -507,3 +507,43 @@ it('denies direct access to tag reconciliation', async () => {
   await expect(rpc('exercise_merge_coalesce_tag', { p_block: 'untrusted', p_tag: 'untrusted' }))
     .rejects.toThrow(/permission denied|Could not find/i);
 });
+
+
+it('restores a merged Routine workout with its use ancestor and unchanged authored targets', async () => {
+  const c = await chain();
+  const stamp = Date.now() + 1;
+  const plan = c.id + '-routine', planned = c.id + '-planned', target = c.id + '-target', use = c.id + '-use';
+  const entity = (type: string, id: string, fields: Record<string, unknown>): Entity => ({
+    type, id, client_updated_at_ms: stamp, fields: { ...times(stamp), ...fields },
+  });
+  await push([
+    entity('session_plans', plan, { title: 'Routine', is_routine: true, provenance: 'human', last_modified_by: 'human' }),
+    entity('session_plan_exercises', planned, { session_plan_id: plan, exercise_definition_id: c.source,
+      order_index: 0, name: 'Source', progress_status: 'pending', last_modified_by: 'human' }),
+    entity('session_plan_uses', use, { session_plan_id: plan, slot_index: 1, kind: 'workout', skipped_at: null }),
+    entity('session_plan_sets', target, { session_plan_exercise_id: planned, order_index: 0,
+      target_weight_value: '20.25', target_reps: 8, last_modified_by: 'human' }),
+    { ...c.entities[2], client_updated_at_ms: stamp, fields: { ...c.entities[2].fields, source_plan_id: plan, source_plan_use_id: use } },
+    { ...c.entities[3], client_updated_at_ms: stamp, fields: { ...c.entities[3].fields,
+      source_plan_exercise_id: planned, source_plan_use_id: use } },
+    { ...c.sets[0], client_updated_at_ms: stamp, fields: { ...c.sets[0].fields,
+      source_plan_set_id: target, source_plan_use_id: use } },
+  ]);
+  const authored = await row('session_plan_sets', target);
+  const { receipt } = await merge(c);
+  const snapshot = await rpc<{ rows: Entity[]; hasMore: boolean }>('exercise_merge_snapshot', { p_after: receipt.sequence - 1 });
+  expect(snapshot.hasMore).toBe(false);
+  const local = createInMemoryDatabase({ foreignKeys: true });
+  try {
+    local.database.transaction(tx => {
+      for (const incoming of snapshot.rows) applyPullPage(tx as unknown as Transaction,
+        [incoming as WireEntity], incoming.type as EntityTableName, true);
+    });
+    expect(local.client.pragma('foreign_key_check')).toEqual([]);
+    expect(local.client.prepare('select source_plan_use_id, weight_value from exercise_sets where id=?').get(c.sets[0].id))
+      .toEqual({ source_plan_use_id: use, weight_value: '5.0625' });
+    expect(local.client.prepare('select session_plan_id, slot_index from session_plan_uses where id=?').get(use))
+      .toEqual({ session_plan_id: plan, slot_index: 1 });
+  } finally { local.close(); }
+  expect(await row('session_plan_sets', target)).toEqual(authored);
+});

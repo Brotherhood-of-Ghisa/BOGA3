@@ -2,7 +2,7 @@
 
 # Integration test — sync_pull drain + push→pull round-trip.
 #
-# Part A — drain semantics. Push rows across all five topological layers
+# Part A — drain semantics. Push rows across all six topological layers
 # for user A using sync_push, then drain each layer with `limit: 2`:
 #
 #   - Pages within a layer are non-overlapping in the
@@ -58,7 +58,7 @@ http_request() {
   fi
   [[ -n "${prefer}" ]] && curl_args+=(-H "Prefer: ${prefer}")
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -105,7 +105,7 @@ sign_in() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -170,9 +170,10 @@ sync_pull() {
 # Layer 0: 2 gyms + 2 exercise_definitions + 2 muscle_groups = 6 rows
 # Layer 1: 2 exercise_muscle_mappings + 2 exercise_tag_definitions
 #          + 2 exercise_group_links = 6 rows
-# Layer 2: 2 sessions = 2 rows
-# Layer 3: 2 session_exercises = 2 rows
-# Layer 4: 2 exercise_sets + 2 session_exercise_tags = 4 rows
+# Layer 2: no authored blocks or uses in this ordinary-workout seed
+# Layer 3: 2 sessions = 2 rows
+# Layer 4: 2 session_exercises = 2 rows
+# Layer 5: 2 exercise_sets + 2 session_exercise_tags = 4 rows
 # + 1 tombstone row (deleted_at non-null) in gyms.
 # ---------------------------------------------------------------------------
 echo "[sync-v2-pull-drain] step 1 — seed via sync_push"
@@ -219,13 +220,13 @@ SEED_PAYLOAD="$(jq -nc \
               sort_order: 1, is_editable: 0, report_group: "legs", tracked: 0,
               created_at: ($b + 54), updated_at: ($b + 54), deleted_at: null}},
 
-    # Layer 2 — sessions (parent for the Layer 3 session_exercises below).
+    # Layer 3 — sessions (parent for Layer 4 cards).
     {type: "sessions", id: ("pd-" + $tag + "-sess-1"), client_updated_at_ms: ($b + 60),
-     fields: {gym_id: ("pd-" + $tag + "-gym-1"), source_plan_id: null, status: "active",
+     fields: {gym_id: ("pd-" + $tag + "-gym-1"), source_plan_id: null, source_plan_use_id: null, status: "active",
               started_at: ($b + 60), completed_at: null, duration_sec: null,
               created_at: ($b + 60), updated_at: ($b + 60), deleted_at: null}},
     {type: "sessions", id: ("pd-" + $tag + "-sess-2"), client_updated_at_ms: ($b + 70),
-     fields: {gym_id: ("pd-" + $tag + "-gym-2"), source_plan_id: null, status: "active",
+     fields: {gym_id: ("pd-" + $tag + "-gym-2"), source_plan_id: null, source_plan_use_id: null, status: "active",
               started_at: ($b + 70), completed_at: null, duration_sec: null,
               created_at: ($b + 70), updated_at: ($b + 70), deleted_at: null}},
     # Layer 1 — mappings/tags/links (parents live at Layer 0).
@@ -262,29 +263,29 @@ SEED_PAYLOAD="$(jq -nc \
               group_id: ("pd-" + $tag + "-grp-1"), group_exercise_id: "gex-2",
               created_at: ($b + 114), updated_at: ($b + 114), deleted_at: null}},
 
-    # Layer 3 — session_exercises (parent for the Layer 4 sets/tags below).
+    # Layer 4 — session_exercises (parent for Layer 5 sets/tags).
     {type: "session_exercises", id: ("pd-" + $tag + "-sx-1"), client_updated_at_ms: ($b + 120),
      fields: {merge_revision: 0, session_id: ("pd-" + $tag + "-sess-1"),
               exercise_definition_id: ("pd-" + $tag + "-ed-1"),
-              source_plan_exercise_id: null,
+              source_plan_exercise_id: null, source_plan_use_id: null,
               order_index: 0, name: "SX1", machine_name: null,
               created_at: ($b + 120), updated_at: ($b + 120), deleted_at: null}},
     {type: "session_exercises", id: ("pd-" + $tag + "-sx-2"), client_updated_at_ms: ($b + 130),
      fields: {merge_revision: 0, session_id: ("pd-" + $tag + "-sess-2"),
               exercise_definition_id: ("pd-" + $tag + "-ed-2"),
-              source_plan_exercise_id: null,
+              source_plan_exercise_id: null, source_plan_use_id: null,
               order_index: 0, name: "SX2", machine_name: "Smith",
               created_at: ($b + 130), updated_at: ($b + 130), deleted_at: null}},
 
-    # Layer 4
+    # Layer 5
     {type: "exercise_sets", id: ("pd-" + $tag + "-set-1"), client_updated_at_ms: ($b + 140),
-     fields: {merge_revision: 0, session_exercise_id: ("pd-" + $tag + "-sx-1"), source_plan_set_id: null, order_index: 0,
+     fields: {merge_revision: 0, session_exercise_id: ("pd-" + $tag + "-sx-1"), source_plan_set_id: null, source_plan_use_id: null, order_index: 0,
               weight_value: "100", reps_value: "8", set_type: "rir_4",
               planned_weight_value: null, planned_reps_value: null,
               planned_set_type: null, performance_status: null,
               created_at: ($b + 140), updated_at: ($b + 140), deleted_at: null}},
     {type: "exercise_sets", id: ("pd-" + $tag + "-set-2"), client_updated_at_ms: ($b + 150),
-     fields: {merge_revision: 0, session_exercise_id: ("pd-" + $tag + "-sx-2"), source_plan_set_id: null, order_index: 0,
+     fields: {merge_revision: 0, session_exercise_id: ("pd-" + $tag + "-sx-2"), source_plan_set_id: null, source_plan_use_id: null, order_index: 0,
               weight_value: "120", reps_value: "5", set_type: "rir_0",
               planned_weight_value: null, planned_reps_value: null,
               planned_set_type: null, performance_status: null,
@@ -309,7 +310,7 @@ assert_jq '.ok == true' "step 1 push ack"
 SEED_ENTITIES_JSON="$(printf '%s' "${SEED_PAYLOAD}" | jq -c '.entities')"
 
 # ---------------------------------------------------------------------------
-# Step 2 — drain each of the five layers with limit=2 paged pulls.
+# Step 2 — drain each of the six layers with limit=2 paged pulls.
 #
 # For each layer we accumulate pages into a single accumulator. The
 # accumulator is checked against:
@@ -319,7 +320,7 @@ SEED_ENTITIES_JSON="$(printf '%s' "${SEED_PAYLOAD}" | jq -c '.entities')"
 #     strictly after the earlier page's last row by (server_received_at,
 #     owner_user_id, type, id))
 # ---------------------------------------------------------------------------
-echo "[sync-v2-pull-drain] step 2 — drain layers 0..4 with limit=2"
+echo "[sync-v2-pull-drain] step 2 — drain layers 0..5 with limit=2"
 
 # Per-layer expected IDs computed from the seed payload itself (filter by
 # layer-type).
@@ -332,9 +333,10 @@ all_seed_ids_for() {
 
 LAYER0_FILTER='(.type == "gyms" or .type == "exercise_definitions" or .type == "muscle_groups")'
 LAYER1_FILTER='(.type == "exercise_muscle_mappings" or .type == "exercise_tag_definitions" or .type == "exercise_group_links")'
-LAYER2_FILTER='(.type == "sessions")'
-LAYER3_FILTER='(.type == "session_exercises")'
-LAYER4_FILTER='(.type == "exercise_sets" or .type == "session_exercise_tags")'
+LAYER2_FILTER='(.type == "session_plan_exercises" or .type == "session_plan_uses")'
+LAYER3_FILTER='(.type == "sessions")'
+LAYER4_FILTER='(.type == "session_exercises")'
+LAYER5_FILTER='(.type == "exercise_sets" or .type == "session_exercise_tags")'
 
 drain_layer() {
   local layer="$1" filter="$2"
@@ -386,6 +388,7 @@ drain_layer() {
     2) LAYER2_DRAIN="${acc}" ;;
     3) LAYER3_DRAIN="${acc}" ;;
     4) LAYER4_DRAIN="${acc}" ;;
+    5) LAYER5_DRAIN="${acc}" ;;
   esac
   echo "[sync-v2-pull-drain] layer ${layer}: drained $(printf '%s' "${acc}" | jq 'length') of-our rows across pages, has_more=false on final page"
 }
@@ -395,6 +398,7 @@ drain_layer 1 "${LAYER1_FILTER}"
 drain_layer 2 "${LAYER2_FILTER}"
 drain_layer 3 "${LAYER3_FILTER}"
 drain_layer 4 "${LAYER4_FILTER}"
+drain_layer 5 "${LAYER5_FILTER}"
 
 pass "drain — every layer drained with limit=2; union of pages equals seeded set; final page has_more=false"
 
@@ -414,9 +418,9 @@ echo "[sync-v2-pull-drain] step 3 — push→pull round-trip on every row"
 
 ALL_DRAINED="$(jq -nc \
   --argjson l0 "${LAYER0_DRAIN}" --argjson l1 "${LAYER1_DRAIN}" \
-  --argjson l2 "${LAYER2_DRAIN}" --argjson l3 "${LAYER3_DRAIN}" \
-  --argjson l4 "${LAYER4_DRAIN}" \
-  '$l0 + $l1 + $l2 + $l3 + $l4')"
+  --argjson l2 "${LAYER2_DRAIN}" --argjson l3 "${LAYER3_DRAIN}" --argjson l4 "${LAYER4_DRAIN}" \
+  --argjson l5 "${LAYER5_DRAIN}" \
+  '$l0 + $l1 + $l2 + $l3 + $l4 + $l5')"
 
 # Build a lookup `{(type,id) -> fields}` from the drained set and compare
 # each seed row's `fields` against it.
@@ -444,11 +448,11 @@ fi
 pass "round-trip — every pushed row reappeared in a pull response with identical fields"
 
 # ---------------------------------------------------------------------------
-# Step 4 — RLS for the round-trip. User B drains all five layers; ZERO of
+# Step 4 — RLS for the round-trip. User B drains all six layers; ZERO of
 # A's run-tagged ids should appear.
 # ---------------------------------------------------------------------------
 echo "[sync-v2-pull-drain] step 4 — user B cannot pull user A's rows"
-for layer in 0 1 2 3 4; do
+for layer in 0 1 2 3 4 5; do
   body="$(jq -nc --argjson layer "${layer}" '{layer: $layer, cursor: null, limit: 200}')"
   sync_pull "${USER_B_TOKEN}" "${body}"
   assert_status "200" "user B pull layer=${layer}"
@@ -458,7 +462,7 @@ for layer in 0 1 2 3 4; do
     fail "round-trip: user B saw ${LEAK_COUNT} of A's run-tagged rows in layer ${layer}"
   fi
 done
-pass "round-trip — user B's pulls return zero of A's rows on all five layers"
+pass "round-trip — user B's pulls return zero of A's rows on all six layers"
 
 COMPLETED=1
 echo "[sync-v2-pull-drain] all assertions passed"

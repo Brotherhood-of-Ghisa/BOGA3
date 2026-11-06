@@ -65,7 +65,7 @@ import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import { Tag } from '@/components/ui/tag';
-import { planQueries, planRepository, skipPlanBlock, startSessionPlan } from '@/src/session-planner';
+import { planQueries, planRepository, skipPlanBlock, skipSessionPlanUse, startSessionPlan } from '@/src/session-planner';
 import { createDrizzleSessionPlanStore } from '@/src/data/session-plan-store';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -847,7 +847,7 @@ describe('Sessions planning sections', () => {
     view.rerender(<SessionsRoute />);
     mockIsFocused = true;
     view.rerender(<SessionsRoute />);
-    await screen.findByTestId('sessions-plans-error');
+    await screen.findByTestId('sessions-plan-section-routines-error');
     expect(row().getByText('Skipped')).toBeTruthy();
   });
 });
@@ -1196,10 +1196,48 @@ describe('Sessions completed-plan visibility over real data', () => {
     await bootLocalApp();
     jest.spyOn(planQueries, 'listUpcomingPlans').mockRejectedValueOnce(new Error('Database unavailable'));
     render(<SessionsRoute />);
-    await screen.findByTestId('sessions-plans-error');
+    await screen.findByTestId('sessions-plan-section-routines-error');
     expect(screen.queryByTestId('session-list-empty-state')).toBeNull();
     openOptions(); toggleCompleted(); dismissOptions();
-    expect(screen.getByTestId('sessions-plans-error')).toHaveTextContent("Couldn't load your plans.");
+    expect(screen.getByTestId('sessions-plan-section-routines-error')).toHaveTextContent(/Couldn't load your plans\./);
     expect(screen.queryByTestId('session-list-empty-state')).toBeNull();
+  });
+});
+
+
+describe('Routine section over real data', () => {
+  const create = async (title = 'Anytime squat') => {
+    const result = await planRepository.createPlan({ title, isRoutine: true, scheduledFor: new Date(2026, 10, 1), gymId: null,
+      exercises: [{ exerciseDefinitionId: EXERCISE_BLOCK_HISTORY_FIXTURE.primaryExerciseId, name: 'Squat',
+        sets: [{ targetWeightText: '60', targetRepsText: '5', targetSetType: null }] }] });
+    if (result.status !== 'saved') throw new Error('Routine fixture failed');
+    return result.id;
+  };
+  it('keeps a skipped Routine separate from due and completed-plan queues, with its latest outcome spoken', async () => {
+    let id = '';
+    await openSessions(async () => {
+      id = await create();
+      await skipSessionPlanUse(id, 'skip-once', new Date(2026, 10, 6));
+    });
+    const row = await screen.findByTestId(`sessions-plan-section-routines-row-${id}`);
+    expect(row.props.accessibilityLabel).toBe('Anytime squat, Routine, Last skipped · 06-11-2026');
+    showCompletedPlans();
+    expect(screen.queryByTestId(`sessions-plan-section-upcoming-row-${id}`)).toBeNull();
+    expect(screen.queryByTestId(`sessions-plan-section-completed-row-${id}`)).toBeNull();
+    fireEvent.press(row);
+    expect(mockPush).toHaveBeenLastCalledWith(`/session-plan/${id}`);
+  });
+  it('retains cached Routine rows across a failed focus read and restores them with Retry', async () => {
+    let id = '';
+    const view = await openSessions(async () => { id = await create('Long reusable session title'); });
+    await screen.findByTestId(`sessions-plan-section-routines-row-${id}`);
+    jest.spyOn(planQueries, 'listRoutines').mockRejectedValueOnce(new Error('Failed read fixture'));
+    mockIsFocused = false; view.rerender(<SessionsRoute />);
+    mockIsFocused = true; view.rerender(<SessionsRoute />);
+    await screen.findByTestId('sessions-plan-section-routines-error');
+    expect(screen.getByTestId(`sessions-plan-section-routines-row-${id}`)).toBeTruthy();
+    fireEvent.press(screen.getByTestId('sessions-plan-section-routines-retry'));
+    await waitForGone(() => screen.queryByTestId('sessions-plan-section-routines-error'));
+    expect(screen.getByTestId(`sessions-plan-section-routines-row-${id}`)).toBeTruthy();
   });
 });

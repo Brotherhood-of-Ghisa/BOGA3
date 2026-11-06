@@ -46,12 +46,13 @@ export function SessionPlanNewScreen({ fromPlanId, editPlanId }: SessionPlanNewS
     ]).then(([detail, loadedExercises]) => {
       if (cancelled) return;
       const exercises = loadedExercises.length > 0 ? loadedExercises : catalog.exercises;
-      setInitialForm(detail !== null ? planFormFromDetail(detail, exercises) : 'unavailable');
+      setInitialForm(detail !== null ? { ...planFormFromDetail(detail, exercises),
+        programmeId: isEdit ? detail.programmeId : null } : 'unavailable');
     });
     return () => {
       cancelled = true;
     };
-  }, [prefillPlanId, catalog.exercises]);
+  }, [prefillPlanId, catalog.exercises, isEdit]);
 
   const onSave = async (form: PlanFormState): Promise<SaveOutcome> => {
     if (isEdit && editPlanId !== null) {
@@ -65,6 +66,8 @@ export function SessionPlanNewScreen({ fromPlanId, editPlanId }: SessionPlanNewS
         message:
           result.status === 'immutable-block'
             ? 'A block that is in progress or already done is read-only; it cannot be changed here.'
+            : result.status === 'stale-edit'
+              ? 'This plan changed. Your edits are still here; reopen the plan before saving.'
             : result.status === 'validation-failed'
               ? result.errors[0]?.message ?? "Couldn't save the plan. Try again."
               : "Couldn't save the plan. Try again.",

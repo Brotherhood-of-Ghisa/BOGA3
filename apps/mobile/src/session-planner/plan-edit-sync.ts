@@ -1,13 +1,14 @@
 import { planQueries, type PlanDetailView } from './plan-queries';
 import type { PlanFormState } from './plan-form-model';
 import { planFormToDraft } from './plan-form-model';
-import { validatePlanExerciseDraft } from './plan-validation';
+import { validatePlanDraft, validatePlanExerciseDraft } from './plan-validation';
+import { saveRoutinePlanEdit, type SaveSessionPlanGraphInput } from '@/src/data/session-plan-store';
 import { planRepository, type PlanMutationResult } from './plan-repository';
-import type { PlanExerciseDraft, PlanFieldError } from './types';
+import type { NormalizedPlan, PlanDraft, PlanExerciseDraft, PlanFieldError } from './types';
 
 /**
  * An edit of one plan, composed from the repository's guarded operations —
- * never a whole-graph rewrite. Consumed blocks (attached or resolved) are
+ * with an atomic future-intent graph edit for Routines. Ordinary consumed blocks are
  * read-only snapshots: the whole diff — changes, deletions and the order the
  * form shows — is checked against the loaded detail FIRST, so touching one
  * refuses the edit with `immutable-block` and writes nothing. Meta (title,
@@ -40,14 +41,22 @@ export const savePlanEdits = async (
   if (plan.kind === 'validation-failed') {
     return { status: 'validation-failed', errors: plan.errors };
   }
-  if (plan.touchesConsumed) {
+  if (plan.touchesConsumed && !prepared.draft.isRoutine) {
     return { status: 'immutable-block' };
+  }
+
+  if (prepared.draft.isRoutine || detail.isRoutine) {
+    return saveRoutineEdit(planId, form, detail, {
+      draft: prepared.draft,
+      rewriteGraph: plan.operations.length > 0 || plan.orderChanged,
+    });
   }
 
   const meta = await planRepository.updatePlanMeta(planId, {
     title: prepared.draft.title,
     gymId: prepared.draft.gymId,
     scheduledFor: prepared.draft.scheduledFor,
+    isRoutine: prepared.draft.isRoutine,
   });
   if (meta.status !== 'updated' && meta.status !== 'saved') {
     return meta;
@@ -85,6 +94,31 @@ export const savePlanEdits = async (
     }
   }
   return { status: 'updated' };
+};
+
+const routineEditInput = (planId: string, form: PlanFormState, detail: PlanDetailView, plan: NormalizedPlan): SaveSessionPlanGraphInput => ({
+  planId, ...plan,
+  exercises: plan.exercises.map((block, index) => {
+    const original = detail.blocks.find(existing => existing.id === form.blocks[index].sourceBlockId);
+    return { ...block, id: original?.id,
+      sets: block.sets.map((set, setIndex) => ({ ...set,
+        id: original?.targets.find(target => target.id === form.blocks[index].sets[setIndex].sourceSetId)?.id,
+      })),
+    };
+  }),
+});
+
+const saveRoutineEdit = async (planId: string, form: PlanFormState, detail: PlanDetailView,
+  change: { draft: PlanDraft; rewriteGraph: boolean }): Promise<PlanMutationResult> => {
+  const validated = validatePlanDraft(change.draft);
+  if (!validated.ok) return { status: 'validation-failed', errors: validated.errors };
+  if (!form.editVersion) return { status: 'stale-edit' };
+  const result = await saveRoutinePlanEdit(routineEditInput(planId, form, detail, validated.value.plan), {
+    expectedVersion: form.editVersion, rewriteGraph: change.rewriteGraph,
+  });
+  return result === 'programme'
+    ? { status: 'validation-failed', errors: [{ path: 'isRoutine', code: 'invalid_routine', message: 'A Routine must be standalone.' }] }
+    : { status: result };
 };
 
 export type BlockOp =

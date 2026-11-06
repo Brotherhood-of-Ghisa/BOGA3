@@ -4,6 +4,7 @@ import {
   reviveSessionRow,
   type SessionDraftExerciseInput,
   type SessionDraftExerciseSnapshot,
+  type SessionGraphSnapshot,
 } from '@/src/data/session-drafts';
 import { normalizeSessionSetType } from '@/src/data/set-types';
 import {
@@ -13,6 +14,7 @@ import {
 } from '@/src/data/session-plan-store';
 import { planAttachedSetId, planStartCardId, planStartSessionId, planStartSetId, readPlanMaterializationOwnerId } from './deterministic-ids';
 import type { AddPlanBlockResult, StartSessionPlanResult } from './types';
+import { startRoutineWorkout } from './routine-materialization';
 
 /**
  * Whole-plan materialization (`startSessionPlan`): one local transaction turns
@@ -64,6 +66,8 @@ export const startSessionPlan = async (planId: string, now: Date = new Date()): 
   if (activeSession) {
     return { status: 'active-conflict', activeSessionId: activeSession };
   }
+
+  if (graph.plan.isRoutine) return startRoutineWorkout(graph, now);
 
   const blocks = await availableBlocks(graph);
   if (blocks.length === 0) {
@@ -122,6 +126,7 @@ const toDraftExerciseInput = (exercise: SessionDraftExerciseSnapshot): SessionDr
   name: exercise.name,
   machineName: exercise.machineName,
   sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
+  sourcePlanUseId: exercise.sourcePlanUseId ?? null,
   sets: exercise.sets.map((set) => ({
     id: set.id,
     repsValue: set.repsValue,
@@ -132,6 +137,7 @@ const toDraftExerciseInput = (exercise: SessionDraftExerciseSnapshot): SessionDr
     plannedSetType: set.plannedSetType ?? null,
     performanceStatus: set.performanceStatus ?? null,
     sourcePlanSetId: set.sourcePlanSetId ?? null,
+    sourcePlanUseId: set.sourcePlanUseId ?? null,
   })),
 });
 
@@ -159,6 +165,15 @@ const isCompatibleUnsourcedCard = (
 ): boolean =>
   card.exerciseDefinitionId === exerciseDefinitionId &&
   (card.sourcePlanExerciseId ?? null) === null;
+
+/** The active use remains scoped even after its template becomes ordinary again. */
+const activeRoutineBlock = (graph: SessionGraphSnapshot, planId: string, blockId: string): AddPlanBlockResult | null => {
+  if (!graph.sourcePlanUseId || graph.sourcePlanId !== planId) return null;
+  const card = graph.exercises.find(candidate => candidate.sourcePlanExerciseId === blockId && candidate.sourcePlanUseId === graph.sourcePlanUseId);
+  return card
+    ? { status: 'attached', sessionId: graph.sessionId, sessionExerciseId: card.id }
+    : { status: 'block-not-available' };
+};
 
 /**
  * Appends one planned block to the active session, or starts one from the
@@ -191,7 +206,7 @@ export const addPlanBlockToSession = async (
   if (!block) {
     return { status: 'block-not-found' };
   }
-  if (block.exercise.progressStatus !== 'pending' || block.exercise.exerciseDefinitionId === null) {
+  if (block.plan.isRoutine || block.exercise.progressStatus !== 'pending' || block.exercise.exerciseDefinitionId === null) {
     return { status: 'block-not-available' };
   }
   const exerciseDefinitionId = block.exercise.exerciseDefinitionId;
@@ -213,6 +228,9 @@ export const addPlanBlockToSession = async (
     if (!graph || graph.status !== 'active') {
       return { status: 'session-not-found' };
     }
+
+    const existingUse = activeRoutineBlock(graph, block.plan.id, planExerciseId);
+    if (existingUse) return existingUse;
 
     let targetCard: SessionDraftExerciseSnapshot;
     if (targetSessionExerciseId !== undefined) {
@@ -273,6 +291,7 @@ export const addPlanBlockToSession = async (
         gymId: graph.gymId,
         startedAt: graph.startedAt,
         sourcePlanId: graph.sourcePlanId ?? null,
+        sourcePlanUseId: graph.sourcePlanUseId ?? null,
         exercises,
       },
       { now },

@@ -98,7 +98,7 @@ sync_rows=0
 # The performed rows that carry a source-plan link (exercise_sets,
 # session_exercises, sessions) precede the plan rows they reference.
 for table in session_exercise_tags exercise_sets session_exercises sessions \
-  session_plan_sets session_plan_exercises session_plans training_programmes \
+  session_plan_uses session_plan_sets session_plan_exercises session_plans training_programmes \
   exercise_muscle_mappings exercise_tag_definitions exercise_group_links exercise_definitions \
   muscle_groups gyms body_weight_measurements user_settings; do
   http DELETE "${REST}/${table}?owner_user_id=eq.${B_UID}" "${SERVICE_ROLE_KEY}" "" \
@@ -113,10 +113,10 @@ done
 sync_pull() {
   http POST "${REST}/rpc/sync_pull" "${B_TOKEN}" \
     "$(jq -nc --argjson layer "$1" '{layer: $layer, cursor: null, limit: 1}')" \
-    "x-boga-sync-protocol: 5" "Prefer: params=single-object"
+    "x-boga-sync-protocol: 6" "Prefer: params=single-object"
   expect_2xx "sync_pull layer $1 as user_b"
 }
-LAST_LAYER=4
+LAST_LAYER=5
 for ((layer = 0; layer <= LAST_LAYER; layer++)); do
   sync_pull "${layer}"
   jq -e '(.entities | type) == "array"' <<<"${BODY}" >/dev/null ||

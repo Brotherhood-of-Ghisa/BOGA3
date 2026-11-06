@@ -1,7 +1,7 @@
 # Session Planning and Programmes Technical Contract
 
 Load when you are building or changing authored plans and programmes: their
-schema, the Sync v2 16-entity expansion, materialization onto performed rows,
+schema, the Sync v2 17-entity topology, materialization onto performed rows,
 block lifecycle, or the agent plan-write API and MCP tools.
 
 ## 1. Architectural Decisions and Principles
@@ -14,13 +14,13 @@ block lifecycle, or the agent plan-write API and MCP tools.
 2. **Materialization uses standard entities.** Starting a plan or consuming a
    block creates ordinary `session_exercises` and `exercise_sets` rows. There is
    no recorder "planning mode", so draft and autosave mechanics are unchanged.
-3. **The exercise block is the unit of consumption and progress.** A
+3. **Ordinary plans consume exercise blocks.** A
    `session_plan_exercises` row plus its ordered `session_plan_sets` is
    independently consumable: a user can attach one block (e.g. the squat block of
    a 6-week wave) to an active session, perform unrelated freeform exercises, and
    explicitly resolve only that block.
 4. **Deterministic provenance and partial uniqueness.** Performed rows link back
-   to source plan rows via nullable FKs (§2.2), and partial unique indexes allow
+   to source plan rows via nullable FKs (§2.2), and ordinary null-use partial unique indexes allow
    at most one live performed session per whole-plan start, one live card per plan
    block, and one live set per plan target set — so retries, multi-device sync and
    concurrent attachments converge deterministically (§4.5).
@@ -39,7 +39,7 @@ block lifecycle, or the agent plan-write API and MCP tools.
 
 ### 2.1 Synced Entity Tables (Sync v2)
 
-Four entities, all user-owned, composite-keyed `(owner_user_id, id)` with ULID
+Five entities, all user-owned, composite-keyed `(owner_user_id, id)` with text
 `id`, carrying standard Sync v2 server fields plus client
 `createdAt` / `updatedAt` / `deletedAt` epoch-ms columns; foreign keys are
 `DEFERRABLE INITIALLY DEFERRED`.
@@ -56,7 +56,8 @@ wave, a split): `name` required 1..100 chars, `description` nullable max 500,
 - `programme_order_index` — nullable, 0-based order within the programme
 - `gym_id` — nullable FK → `gyms`, `ON DELETE SET NULL`
 - `title` — required, 1..100 chars
-- `scheduled_for` — nullable epoch ms; null means the unscheduled queue
+- `scheduled_for` — nullable epoch ms; retained while Routine is on
+- `is_routine` — boolean default false; CHECK excludes non-null programme membership
 - `provenance` — `'human' | 'agent'`, default `'human'`
 - `last_modified_by` — `'human' | 'agent'`, default `'human'`
 
@@ -85,18 +86,28 @@ wave, a split): `name` required 1..100 chars, `description` nullable max 500,
   `'rir_1'`, …)
 - `last_modified_by` — `'human' | 'agent'`, default `'human'`
 
+**`session_plan_uses`** — immutable action identity: `session_plan_id`, positive
+`slot_index`, `kind` (`workout | skip`), nullable `skipped_at`, standard clocks
+and tombstone. Live `(owner_user_id, session_plan_id, slot_index)` is unique.
+
 ### 2.2 Performed-Domain Provenance Fields
 
 Three nullable `text` columns added to the existing performed tables. Each is a
 composite FK `ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED`, guarded by a
 partial unique index on `(owner_user_id, <col>) WHERE deleted_at IS NULL AND
-<col> IS NOT NULL`.
+<col> IS NOT NULL AND source_plan_use_id IS NULL`.
 
 | Column | Parent | Partial unique index | Null when |
 | :--- | :--- | :--- | :--- |
 | `sessions.source_plan_id` | `session_plans` | `sessions_owner_source_plan_unique` | set only on whole-plan starts (`startSessionPlan`); null for manual sessions and single-block attachment |
 | `session_exercises.source_plan_exercise_id` | `session_plan_exercises` | `session_exercises_owner_source_block_unique` | unsourced/manual cards |
 | `exercise_sets.source_plan_set_id` | `session_plan_sets` | `exercise_sets_owner_source_set_unique` | manual sets, e.g. warm-ups |
+
+Each performed table also has nullable `source_plan_use_id` →
+`session_plan_uses`. Scoped uniqueness is one session per use, one card per
+(use, block), one set per (use, target). Deferred guards enforce workout-kind
+use, matching plan, and consistent session/card/set use links, including
+parent-only updates. Null-use ordinary uniqueness remains intact.
 
 #### Cross-Level Provenance Invariant
 
@@ -138,56 +149,35 @@ PK `(owner_user_id, client_id, operation, idempotency_key)`, with
 
 ## 3. Sync v2 Topology and Layer Migration
 
-Sync v2 expands from **twelve to sixteen** user-owned entity types.
+Sync v2 mirrors seventeen entities. `apps/mobile/src/sync/topo-order.ts`
+and the server pull mapping define six FK-safe layers; strict drift checks
+reject missing entities or forward references.
 
-### 3.1 Five-Layer Topological Order (`TOPO_LAYERS`)
+| Layer | Planning/performed chain |
+| :--- | :--- |
+| 0 | `training_programmes` and private roots |
+| 1 | `session_plans`, mappings and tag definitions |
+| 2 | `session_plan_exercises`, `session_plan_uses` |
+| 3 | `session_plan_sets`, `sessions` |
+| 4 | `session_exercises` |
+| 5 | `exercise_sets`, assignments, private bodyweight readings |
 
-The live layering, the invariants it must satisfy, and the rule for adding an
-entity (add it to its correct layer **and** add the matching
-`app_public.<entity>` migration) live in `apps/mobile/src/sync/topo-order.ts`;
-the drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`) fails the
-slow gate when the two diverge. The layering exists because the push batch
-builder walks layers in order and relies on it for FK-safe send order without
-per-row sorting.
-
-The four new entities land as:
-
-| Layer | Added entity | FKs to earlier layers |
-| :--- | :--- | :--- |
-| 0 | `training_programmes` | none |
-| 1 | `session_plans` | `gyms`, `training_programmes` |
-| 2 | `session_plan_exercises` | `exercise_definitions`, `session_plans` |
-| 3 | `session_plan_sets` | `session_plan_exercises` |
-
-That pushes the performed chain down one layer each — `sessions` 1→2,
-`session_exercises` 2→3, `exercise_sets` 3→4 — while
-`body_weight_measurements` stays alone in Layer 4 as an independently cursorable
-private root.
-
-### 3.2 Pull Cursor Reset and Protocol-4 Gate
-
-Client cursors live in `sync_runtime_state.pull_cursor` keyed by layer integer;
-the reshuffle invalidates stored cursors. Cursor remapping is rejected: shifting
-can orphan children or skip blocks.
-
-- **Client.** Local SQLite migration to the 16-entity schema resets `pull_cursor`
-  to `{}` so sync re-drains each layer from the start; replayed rows upsert as
-  idempotent LWW merges.
-- **Server.** The projection shift is gated on header `x-boga-sync-protocol: 4`.
-  Older clients halt with `UPDATE_REQUIRED`, preventing cursor corruption.
-
-**As-built.** Migrations `0016_nice_blink` (schema) and `0017_session_plan_cursor_reset`
-(reset); `require_sync_protocol()` enforces protocol 4.
+Migration `0028_true_outlaw_kid` resets `pull_cursor` to `{}`; replay is LWW
+idempotent. Header `x-boga-sync-protocol: 6` gates the changed projections;
+older builds halt with `UPDATE_REQUIRED`. Deploy only in the operator-agreed
+coordinated backend/app release once the new build is available.
 
 ## 4. Lifecycle and Materialization
 
-### 4.1 Plan Block Lifecycle
+Sections 4.1–4.6 describe ordinary plans.
+
+### 4.1 Ordinary Plan Block Lifecycle
 
 ```mermaid
 stateDiagram-v2
     [*] --> pending: Authored by Human or Agent
     pending --> attached: Materialized onto active exercise card
-    attached --> completed: Explicit Complete block (≥1 confirmed planned set)
+    attached --> completed: Explicit Complete block or qualifying Finish
     pending --> skipped: Explicit Skip block (no confirmed source-derived work)
     attached --> pending: Sourced card deleted / active workout discarded
     completed --> [*]
@@ -291,15 +281,37 @@ path is defined so the permitted operation can never block sync.
   and skips blocks. Reordering updates `programme_order_index`. Delete soft-deletes the programme
   and detaches child plans (`programme_id = null`) as standalone plans.
 
+### 4.7 Routine uses
+
+Product rules: [[planner.routine-reuse]], [[planner.progress-outcomes]].
+Start allocates a random action ID plus max known slot (including tombstones)
++ 1, atomically with the normal recorder graph. Performed IDs compose the
+action ID, never the slot. Accepted reservations survive abandonment and
+history deletion; completion derives from regular sessions and confirmed
+source-derived sets, including tombstoned authored ancestors. Entirely skipped
+legacy plans capture one skip action on conversion, retaining unknown
+dates as null.
+
+The first server commit owns a slot. Pull collision repair tombstones the
+losing action and clears only its performed source links, preserving IDs,
+actuals and later independent slots. Stale recorder saves cannot restore lost
+claims. Explicit Skip holds one caller action ID through uncertain retries.
+
+Routine edits check a whole authored-graph version and write future intent in
+one transaction; stale saves refuse without changing entered form values.
+Property-only conversion leaves blocks and targets untouched. Routine uses
+never resolve template blocks. Today, planner block pickers and coaching due
+queues exclude flagged plans; programme storage rejects the flag.
+
 ## 5. UI and UX Contracts
 
 ### 5.1 Route and Screen Map
 
 | Route | Contract |
 | :--- | :--- |
-| `/sessions` (Planning Hub) | **Active**, unfinished **Upcoming** (scheduled plans by date) and **Unscheduled** (standalone plans/programmes by updated time), optional **Completed plans**, then weekly performed history. Queue management and authoring live here; screen rules in `docs/specs/ui/screen-map.md`. |
-| `/session-plan/new` | Author a one-off plan (also edit and duplicate prefill); target entry follows the recorder through shared fields. |
-| `/session-plan/[planId]` | View/edit: Start all, Duplicate, Delete (unused/eligible only), Add block. Consumed blocks are read-only and link to their performed session. |
+| `/sessions` (Planning Hub) | **Active**, **Routines**, unfinished **Upcoming** (scheduled plans by date) and **Unscheduled** (standalone plans/programmes by updated time), optional **Completed plans**, then weekly performed history. Queue management and authoring live here; screen rules in `docs/specs/ui/screen-map.md`. |
+| `/session-plan/new` | Author a plan with standalone Routine property (edit/duplicate prefill); target entry follows the recorder through shared fields. |
+| `/session-plan/[planId]` | View/edit: Start all, Duplicate, Delete (unused/eligible only), Add block. Ordinary consumed blocks link to history; Routine detail offers Start/Resume, confirmed Skip and independent dates. |
 | `/programme/new` | Author an ordered programme; minimum 2 child plans; target entry uses the recorder's shared fields. |
 | `/programme/[programmeId]` | Resolution badge and session outcomes per [[planner.progress-outcomes]], next unresolved block in sequence, child plan summaries. |
 

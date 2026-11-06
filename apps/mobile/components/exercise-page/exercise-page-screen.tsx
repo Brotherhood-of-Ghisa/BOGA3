@@ -128,6 +128,9 @@ const FALLBACK_BACK_ROUTE = '/train' as Href;
  * The same page edits an exercise of a completed session (opened from the
  * session view's completed edit); its records then leave that session out.
  */
+const consumablePlanSourceId = (exercise: { sourcePlanUseId?: string | null; sourcePlanExerciseId?: string | null } | null | undefined) =>
+  exercise?.sourcePlanUseId ? null : exercise?.sourcePlanExerciseId ?? null;
+
 export function ExercisePageScreen({
   sessionId,
   sessionExerciseId,
@@ -208,7 +211,7 @@ export function ExercisePageScreen({
 
   // The sourced card's block state decides whether Complete block is
   // offered at all: a block that is already resolved never offers it again.
-  const sourcePlanExerciseId = exercise?.sourcePlanExerciseId ?? null;
+  const sourcePlanExerciseId = consumablePlanSourceId(exercise);
   useEffect(() => {
     if (sourcePlanExerciseId === null) {
       return;
@@ -577,7 +580,7 @@ export function ExercisePageScreen({
       <ExerciseOptionsSheet
         exerciseName={exercise.name}
         onCompleteBlock={
-          exercise.sourcePlanExerciseId != null && blockStatus !== 'resolved' ? onCompleteBlock : undefined
+          sourcePlanExerciseId !== null && blockStatus !== 'resolved' ? onCompleteBlock : undefined
         }
         onDismiss={() => setOpenSheet('none')}
         onEdit={() => { void draft.flush().then(saved => { if (saved) openEditor(); }); }}

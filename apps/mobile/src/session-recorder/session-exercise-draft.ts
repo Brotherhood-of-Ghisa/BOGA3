@@ -84,6 +84,7 @@ export const toSessionExerciseInput = (exercise: SessionDraftExerciseSnapshot): 
   name: exercise.name,
   machineName: exercise.machineName,
   sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
+      ...(exercise.sourcePlanUseId ? { sourcePlanUseId: exercise.sourcePlanUseId } : {}),
   sets: exercise.sets.map((set) => ({
     id: set.id,
     weightValue: set.weightValue,
@@ -94,6 +95,7 @@ export const toSessionExerciseInput = (exercise: SessionDraftExerciseSnapshot): 
     plannedSetType: set.plannedSetType,
     performanceStatus: set.performanceStatus,
     sourcePlanSetId: set.sourcePlanSetId ?? null,
+        ...(set.sourcePlanUseId ? { sourcePlanUseId: set.sourcePlanUseId } : {}),
   })),
 });
 
@@ -134,6 +136,7 @@ export const saveSessionExerciseDraft = async (
     gymId: session.gymId,
     startedAt: session.startedAt,
     sourcePlanId: session.sourcePlanId ?? null,
+    sourcePlanUseId: session.sourcePlanUseId ?? null,
     mergeRevisions: {
       ...Object.fromEntries(session.exercises.map(exercise => [exercise.id, exercise.mergeRevision ?? 0])),
       [change.sessionExerciseId]: change.mergeRevision ?? change.exercise?.mergeRevision ?? 0,

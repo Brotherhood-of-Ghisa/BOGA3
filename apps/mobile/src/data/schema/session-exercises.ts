@@ -3,6 +3,7 @@ import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-o
 
 import { exerciseDefinitions } from './exercise-definitions';
 import { sessionPlanExercises } from './session-plan-exercises';
+import { sessionPlanUses } from './session-plan-uses';
 import { sessions } from './sessions';
 
 export const sessionExercises = sqliteTable(
@@ -22,6 +23,7 @@ export const sessionExercises = sqliteTable(
       onDelete: 'set null',
     }),
     mergeRevision: integer('merge_revision').notNull().default(0),
+    sourcePlanUseId: text('source_plan_use_id').references(() => sessionPlanUses.id, { onDelete: 'set null' }),
     orderIndex: integer('order_index').notNull(),
     name: text('name').notNull(),
     machineName: text('machine_name'),
@@ -48,7 +50,10 @@ export const sessionExercises = sqliteTable(
     ),
     sourcePlanExerciseUnique: uniqueIndex('session_exercises_owner_source_block_unique')
       .on(table.sourcePlanExerciseId)
-      .where(sql`${table.deletedAt} is null and ${table.sourcePlanExerciseId} is not null`),
+      .where(sql`${table.deletedAt} is null and ${table.sourcePlanExerciseId} is not null and ${table.sourcePlanUseId} is null`),
+    sourceUseBlockUnique: uniqueIndex('session_exercises_owner_use_block_unique')
+      .on(table.sourcePlanUseId, table.sourcePlanExerciseId)
+      .where(sql`${table.deletedAt} is null and ${table.sourcePlanUseId} is not null and ${table.sourcePlanExerciseId} is not null`),
     orderGuard: check('session_exercises_order_index_non_negative', sql`${table.orderIndex} >= 0`),
   })
 );

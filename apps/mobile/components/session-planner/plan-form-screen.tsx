@@ -4,7 +4,7 @@ import { useDateFormat, useAccountLocalPreferenceState } from '@/src/preferences
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, ActionRow, Card, ChoiceRow, FormError, FormField, FormSection, ListRow, Notice, Sheet, StatePanel, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, ActionRow, Card, ChoiceRow, FormError, FormField, FormSection, ListRow, Notice, Sheet, StatePanel, SwitchRow, ValueRow, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import { PlanScheduleSheet } from '@/components/session-planner/plan-schedule-sheet';
@@ -77,6 +77,26 @@ export function PlanGymSheet({
   );
 }
 
+function PlanScheduleRow({ form, onOpen }: { form: PlanFormState; onOpen: () => void }) {
+  const dateFormat = useDateFormat();
+  if (form.isRoutine) return <ValueRow
+    accessibilityLabel="Schedule, Anytime, locked while Routine is on"
+    label="Schedule"
+    testID="plan-form-schedule"
+    value="Anytime"
+    valueIcon="lock"
+    valueIconTestID="plan-form-schedule-lock"
+  />;
+  return <ChoiceRow
+    accessibilityLabel={`Plan schedule, ${planScheduleLabel(form.scheduleText, dateFormat)}`}
+    label="Schedule"
+    onPress={onOpen}
+    placeholder="Unscheduled"
+    testID="plan-form-schedule"
+    value={form.scheduleText.trim() ? planScheduleLabel(form.scheduleText, dateFormat) : null}
+  />;
+}
+
 /**
  * The plan authoring editor shared by create, edit and duplicate: title,
  * optional schedule and gym, ordered exercise blocks with their ordered
@@ -84,7 +104,6 @@ export function PlanGymSheet({
  * write — this screen never touches the repository.
  */
 export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScreenProps) {
-  const dateFormat = useDateFormat();
   const [form, setForm] = useState<PlanFormState>(initialForm);
   const [submitted, setSubmitted] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
@@ -202,14 +221,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
           value={form.title}
         />
         <FormSection title="When and where">
-          <ChoiceRow
-            accessibilityLabel={`Plan schedule, ${planScheduleLabel(form.scheduleText, dateFormat)}`}
-            label="Schedule"
-            onPress={() => setScheduleSheetOpen(true)}
-            placeholder="Unscheduled"
-            testID="plan-form-schedule"
-            value={form.scheduleText.trim() ? planScheduleLabel(form.scheduleText, dateFormat) : null}
-          />
+          <PlanScheduleRow form={form} onOpen={() => setScheduleSheetOpen(true)} />
           <ChoiceRow
             accessibilityLabel={`Plan gym, ${form.gymId === null ? 'none' : 'selected'}`}
             divider
@@ -219,6 +231,15 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
             testID="plan-form-gym"
             value={form.gymId === null ? null : gyms?.find((gym) => gym.id === form.gymId)?.name ?? 'Selected'}
           />
+          {form.programmeId == null ? <SwitchRow
+            density="list"
+            disabled={saving}
+            divider
+            label="Routine"
+            onValueChange={isRoutine => patchForm({ isRoutine })}
+            testID="plan-form-routine"
+            value={form.isRoutine ?? false}
+          /> : null}
         </FormSection>
         {form.blocks.map((block, index) => (
           <PlanBlockEditor

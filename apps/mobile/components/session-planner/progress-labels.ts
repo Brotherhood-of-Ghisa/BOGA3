@@ -1,6 +1,17 @@
 import type { PlanSummaryView } from '@/src/session-planner';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { formatLocalDateTime, formatShortDate } from '@/src/utils/local-time';
+import { latestRoutineOutcome, type RoutineUseSummary } from '@/src/session-planner/routine-outcomes';
+
+export const routineDateLabel = (at: Date | null, dateFormat: ExerciseDateFormat): string =>
+  at === null ? 'Date unavailable' : formatShortDate(at, dateFormat);
+
+export const routineOutcomeLine = (summary: RoutineUseSummary, dateFormat: ExerciseDateFormat): string => {
+  const outcome = latestRoutineOutcome(summary);
+  if (outcome) return `Last ${outcome.kind} · ${routineDateLabel(outcome.at, dateFormat)}`;
+  if (summary.activeSessionId) return 'In progress';
+  return summary.hasKnownUse ? 'No completed uses' : 'Never used';
+};
 
 export const progressLabel = (progress: PlanSummaryView['progress']): string => ({
   planned: 'Planned',

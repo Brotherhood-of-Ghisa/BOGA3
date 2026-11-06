@@ -38,6 +38,7 @@ import { runBundleMigrations } from '@/src/data/bundle-migrations';
 import { bootstrapLocalDataLayer, type LocalDatabase } from '@/src/data/bootstrap';
 import { nowMonotonic, observeRemoteTimestamp, PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import { repairProvenanceForWirePage } from '@/src/data/session-drafts';
+import { repairRoutineUseClaimsForWirePage } from '@/src/data/session-plan-use-store';
 import * as schema from '@/src/data/schema';
 import { logEvent } from '@/src/logging/logEvent';
 import {
@@ -611,6 +612,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     SC('gym_id', 'gymId'),
     SC('title', 'title'),
     TS('scheduled_for', 'scheduledFor'),
+    KEEP('is_routine', 'isRoutine'),
     SC('provenance', 'provenance'),
     SC('last_modified_by', 'lastModifiedBy'),
     TS('created_at', 'createdAt'),
@@ -679,7 +681,13 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
   ],
+  session_plan_uses: [
+    SC('session_plan_id', 'sessionPlanId'), SC('slot_index', 'slotIndex'), SC('kind', 'kind'),
+    TS('skipped_at', 'skippedAt'), TS('created_at', 'createdAt'),
+    TS('updated_at', 'updatedAt'), TS('deleted_at', 'deletedAt'),
+  ],
   sessions: [
+    SC('source_plan_use_id', 'sourcePlanUseId'),
     SC('gym_id', 'gymId'),
     SC('source_plan_id', 'sourcePlanId'),
     SC('status', 'status'),
@@ -708,6 +716,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('deleted_at', 'deletedAt'),
   ],
   session_exercises: [
+    SC('source_plan_use_id', 'sourcePlanUseId'),
     KEEP('merge_revision', 'mergeRevision'),
     SC('session_id', 'sessionId'),
     SC('exercise_definition_id', 'exerciseDefinitionId'),
@@ -720,6 +729,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('deleted_at', 'deletedAt'),
   ],
   exercise_sets: [
+    SC('source_plan_use_id', 'sourcePlanUseId'),
     KEEP('merge_revision', 'mergeRevision'),
     SC('session_exercise_id', 'sessionExerciseId'),
     SC('source_plan_set_id', 'sourcePlanSetId'),
@@ -750,6 +760,7 @@ const ENTITY_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema
   body_weight_measurements: schema.bodyWeightMeasurements,
   training_programmes: schema.trainingProgrammes,
   session_plans: schema.sessionPlans,
+  session_plan_uses: schema.sessionPlanUses,
   session_plan_exercises: schema.sessionPlanExercises,
   session_plan_sets: schema.sessionPlanSets,
   gyms: schema.gyms,
@@ -1727,6 +1738,10 @@ const applyPageWithArbitrationRepair = async (
   try {
     return applyPage();
   } catch (error) {
+    if (String(error).includes('UNIQUE constraint failed: session_plan_uses.session_plan_id, session_plan_uses.slot_index')) {
+      await repairRoutineUseClaimsForWirePage(page.entities);
+      return applyPage();
+    }
     if (isLocalProvenanceUniqueViolation(error)) {
       // A pulled provenance row claims a plan block or source target a local
       // row already holds: the server committed first, so the local claimant

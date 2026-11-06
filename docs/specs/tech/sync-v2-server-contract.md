@@ -13,7 +13,7 @@ disagree):
 migrations, `apps/mobile/src/sync/` and
 `apps/mobile/scripts/check-sync-schema-drift.ts`.
 
-Authenticated app push and pull require the header `x-boga-sync-protocol: 5`
+Authenticated app push and pull require the header `x-boga-sync-protocol: 6`
 (see `sync_push`, "Update-required cutoff").
 
 ---
@@ -38,11 +38,11 @@ sequence discovery and atomic merge/recovery RPCs, load
     `exercise_definitions_load_input_mode_valid` (`total_load |
     per_side_load`; analytics read it, so both stores reject invalid values)
     and `user_settings_muscle_target_overrides_valid` (the shape the app
-    checks before writing).
+    checks before writing). The Routine standalone CHECK protects provenance.
   - Domain columns are nullable wherever the client may write NULL; only the
     PK, `owner_user_id` and `client_updated_at_ms` are NOT NULL.
   - Provenance guards and merge revision fences add to structural triggers; group triggers: "Out of scope".
-  - No uniqueness beyond the PK, except the three planning provenance guards
+  - No uniqueness beyond the PK, except planning provenance and Routine slot guards
     (`sessions_owner_source_plan_unique`,
     `session_exercises_owner_source_block_unique`,
     `exercise_sets_owner_source_set_unique`; see "Per-entity rules"). Slot and
@@ -76,12 +76,10 @@ Deletion is `deleted_at` going non-null; undelete is the same id with
 
 ### Migration-in-flight contract
 
-Migrations on `app_public.<entity>` tables are additive-only
-(`ADD COLUMN`) during normal operation. A destructive change needs a quiesced,
-coordinated window: ship a compatibility client first, stop normal sync with
-`UPDATE_REQUIRED`, convert the server, then let only new-protocol clients
-resume. The protocol-3 kg-only cutover
-(`docs/specs/tech/bodyweight-load-contract.md`, section 5) was such a window.
+Normal migrations are additive. Destructive changes and projection shifts need
+a coordinated `UPDATE_REQUIRED` cutover with the operator. Protocol 6's
+Routine reuse and layer shift are prepared for a later backend/app release;
+implementation does not authorize deployment.
 
 ## Universal columns, index and triggers
 
@@ -97,8 +95,7 @@ declares:
 Every table also has the index `<table>_owner_received_idx` on
 `(owner_user_id, server_received_at)` and two structural triggers:
 `<table>_touch_server_received_at` (BEFORE UPDATE when the row changed) and
-`<table>_owner_user_id_immutable` (see "RLS and owner immutability"). The drift
-checker asserts all of them per table.
+`<table>_owner_user_id_immutable` (see "RLS and owner immutability"). Drift checks assert these objects.
 
 ## Per-entity rules
 
@@ -123,28 +120,29 @@ listed here:
   page apply with `INTERNAL` and pull cannot advance past it. Its sync scope and
   FK-free group columns are owned by `docs/specs/05-data-model.md`.
 - **Session planning** adds `training_programmes`, `session_plans`,
-  `session_plan_exercises` and `session_plan_sets`, and three performed-domain
+  `session_plan_exercises`, `session_plan_sets`, `session_plan_uses`, and performed-domain
   provenance columns (`sessions.source_plan_id`,
   `session_exercises.source_plan_exercise_id`,
   `exercise_sets.source_plan_set_id`). The columns, wire shapes and lifecycle
   are owned by `docs/specs/tech/session-planning-contract.md`; this doc adds:
-  the three partial-unique guards and DEFERRABLE triggers
+  ordinary and use-scoped partial uniqueness, immutable action identity, and deferred triggers
   rejecting a source-derived set whose `source_plan_set_id` is not under its
   card's source block, or a parent block change that would strand one.
+  `source_plan_use_id` must match its parent chain and workout use;
+  `is_routine` and source-use links preserve omitted keys. Live use slots
+  arbitrate with `BLOCK_ALREADY_ATTACHED`; clients pull, preserve losing
+  actuals as ordinary work, then re-push.
 
 ## Deferrable foreign keys
 
-All eighteen cross-entity FKs (ten pre-planning plus the eight session planning edges)
+All twenty-two cross-entity FKs
 are `DEFERRABLE INITIALLY DEFERRED`, so the checks run at COMMIT. A push may
 write a child before its parent in one transaction, and any unsatisfied FK at
-COMMIT rolls back the whole batch. Names, targets and on-delete actions are in
-the migrations and are asserted by
+COMMIT rolls back the whole batch. The migrations define names, targets and delete actions, checked by
 `supabase/tests/sync-v2-deferrable-fk.sh` and
 `supabase/tests/sync-v2-schema-smoke.sh`.
 
-A child whose parent is neither in the batch nor on the server is a client
-batching bug, not a normal event (see "Client-enforced constraints"). The
-COMMIT-time failure is a backstop with no retry path.
+A missing parent is a client batching bug; COMMIT fails the batch.
 
 ## RLS and owner immutability
 
@@ -165,8 +163,7 @@ refuses a NULL `auth.uid()`. It uses `IS DISTINCT FROM`, so NULL cannot slip
 through. It is an authorization boundary, not validation, and the only Sync v2 trigger
 that inspects row content.
 
-The drift checker hashes each policy body and the trigger function body
-against `apps/mobile/scripts/check-sync-schema-drift.fixtures.json`. A
+The drift checker hashes each policy body and immutable-owner trigger against `apps/mobile/scripts/check-sync-schema-drift.fixtures.json`. A
 regression such as `owner_user_id = auth.uid()` turning into `true` fails the
 backend gate.
 
@@ -179,16 +176,17 @@ Push batching and pull draining both use the layering in
 | --- | --- |
 | 0 | `gyms`, `exercise_definitions`, `muscle_groups`, `user_settings`, `training_programmes` |
 | 1 | `session_plans`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `exercise_group_links` |
-| 2 | `sessions`, `session_plan_exercises` |
-| 3 | `session_exercises`, `session_plan_sets` |
-| 4 | `exercise_sets`, `session_exercise_tags`, `body_weight_measurements` (an independent root) |
+| 2 | `session_plan_exercises`, `session_plan_uses` |
+| 3 | `sessions`, `session_plan_sets` |
+| 4 | `session_exercises` |
+| 5 | `exercise_sets`, `session_exercise_tags`, `body_weight_measurements` (an independent root) |
 
 Any order within a layer is safe because no FK joins two tables in one layer
 and every FK points to a strictly earlier layer (or is a self-edge). The drift
 checker asserts both against the live FK graph, and that every entity sits in
 exactly one layer. Adding an entity or FK means updating
-`topo-order.ts` and the `sync_pull` layer mapping together. Protocol 4
-moved the session chain down a layer; an upgraded client resets `pull_cursor`
+`topo-order.ts` and the `sync_pull` layer mapping together. Protocol 6
+moves the performed chain below Routine uses; an upgraded client resets `pull_cursor`
 (`docs/specs/tech/session-planning-contract.md`).
 
 ## Drift checker
@@ -235,7 +233,7 @@ Push requests and pull responses carry rows in one shape:
 }
 ```
 
-- `type` is one of the sixteen entity table names.
+- `type` is one of the seventeen entity table names.
 - `id` is client-assigned (a ULID, or a slug for seeds) and stable forever.
 - `client_updated_at_ms` comes from the clock-monotonicity guard.
 - `fields` holds every typed column of the entity, keyed by its snake_case
@@ -270,7 +268,7 @@ in one transaction with deferred constraints, forces the FK check before it
 returns (so it can raise `FK_VIOLATION`), and commits or rolls back the whole
 batch.
 
-**`fields`.** Protocol-4 writers send every typed column. A key the server does
+**`fields`.** Protocol-6 writers send every typed column. A key the server does
 not know is ignored, not stored. Local-only columns are never sent.
 LWW stays per row; there are no per-field clocks.
 
@@ -279,7 +277,7 @@ LWW stays per row; there are no per-field clocks.
 `UPDATE_REQUIRED: …` before it touches any row. The cutoff is compatibility
 enforcement, not authorization; auth and OAuth denial are unchanged. The app
 client (`apps/mobile/src/auth/supabase.ts`) and the import CLI send
-protocol 4.
+protocol 6.
 
 **Batch building.** The client takes dirty rows layer by layer up to the cap,
 so no child ships without its parent: each FK target of a batched row is in an
@@ -308,7 +306,7 @@ concurrent pushes can commit out of stamp order and a pull between them can
 skip the earlier row. It self-heals: the row's next edit moves it past the
 cursor.
 
-**Drain and apply.** The cycle drains layers 0 to 4 in order, so when a layer-K
+**Drain and apply.** The cycle drains layers 0 to 5 in order, so when a layer-K
 page applies, layers 0 to K-1 are already local and every FK resolves without
 deferral. Each page applies in one SQLite transaction with this per-row rule:
 
@@ -333,7 +331,7 @@ cursors add nothing, since no FK joins two tables in a layer.
 
 The first cycle is an ordinary one: null cursors pull everything, dirty rows
 push, LWW reconciles; no modal.
-`bootstrap_completed_at` is set the first time all five layers drain to
+`bootstrap_completed_at` is set the first time all six layers drain to
 `has_more = false` in one cycle. It gates cold-start UX only; the protocol
 never branches on it. The local store must hold only the signed-in account's
 rows; the wipe that ensures this is owned by `docs/specs/05-data-model.md`

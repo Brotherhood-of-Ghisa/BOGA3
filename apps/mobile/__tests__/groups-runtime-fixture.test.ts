@@ -19,7 +19,7 @@ it('the scripted counterparty links and polls protocol-4 single-set Volume',()=>
   vm.runInNewContext(fs.readFileSync(path.resolve(__dirname,'../.maestro/scripts/groups-counterparty.js'),'utf8'),context);
   expect(calls.map(call=>call.name)).toEqual(['group_competition_exercise_list','sync_push','group_competition_board']);
   expect(calls.at(-1)?.args).toEqual({ p_group_id: 'group',p_group_exercise_id: 'comparison',p_metric: 'volume',p_certified: false,p_cursor: null,p_limit: 10 });
-  expect(calls.every(call=>call.headers['x-boga-group-contract']==='4' && call.headers['x-boga-sync-protocol']==='5')).toBe(true);
+  expect(calls.every(call=>call.headers['x-boga-group-contract']==='4' && call.headers['x-boga-sync-protocol']==='6')).toBe(true);
 });
 
 it('the merge device fixture refuses remote writes and uses revision-aware app requests for every phase', () => {
@@ -49,5 +49,5 @@ it('the merge device fixture refuses remote writes and uses revision-aware app r
   }
   const rpc = calls.filter(call => !call.url.includes('/auth/'));
   expect(rpc).toHaveLength(5);
-  expect(rpc.every(call => call.headers.Authorization === 'Bearer fixture-token' && call.headers['x-boga-sync-protocol'] === '5')).toBe(true);
+  expect(rpc.every(call => call.headers.Authorization === 'Bearer fixture-token' && call.headers['x-boga-sync-protocol'] === '6')).toBe(true);
 });

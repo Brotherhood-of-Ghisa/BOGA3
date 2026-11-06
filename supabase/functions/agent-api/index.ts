@@ -2594,6 +2594,7 @@ const getUpcomingSessionPlans = async (
     .from('session_plans')
     .select('id,title,scheduled_for,gym_id,provenance,programme_id,programme_order_index')
     .eq('owner_user_id', agent.userId)
+    .eq('is_routine', false)
     .is('deleted_at', null)
     .order('scheduled_for', { ascending: true, nullsFirst: false })
     .order('id', { ascending: true })
@@ -2682,6 +2683,7 @@ const getUpcomingSessionPlans = async (
       .select('source_plan_exercise_id,session_id')
       .eq('owner_user_id', agent.userId)
       .is('deleted_at', null)
+      .is('source_plan_use_id', null)
       .in('source_plan_exercise_id', ids)
       .limit(1000)
       .returns<Array<{ source_plan_exercise_id: string | null; session_id: string }>>();

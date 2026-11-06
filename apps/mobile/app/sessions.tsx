@@ -16,6 +16,7 @@ import {
 import {
   NewProgrammeAction,
   PlanSection,
+  RoutinePlanSection,
   PlanSessionAction,
   usePlanSections,
 } from '@/components/session-planner/plan-sections';
@@ -91,6 +92,7 @@ export function SessionsScreen({
   const planningEmpty =
     !planSections.isLoading &&
     !planSections.loadErrorMessage &&
+    planSections.routines.length === 0 &&
     upcoming.length === 0 &&
     unscheduled.length === 0 &&
     programmes.length === 0 &&
@@ -177,14 +179,7 @@ export function SessionsScreen({
           open the plan detail. */}
       <PlanSessionAction onPress={openPlanNew} testID="sessions-plan-session-action" />
       <NewProgrammeAction onPress={openProgrammeNew} testID="sessions-new-programme-action" />
-      {planSections.loadErrorMessage ? (
-        <StatePanel
-          body={planSections.loadErrorMessage}
-          fill={false}
-          kind="error"
-          testID="sessions-plans-error"
-        />
-      ) : null}
+      <RoutinePlanSection state={planSections} onOpenPlan={openPlan} />
       <PlanSection
         label="Upcoming"
         onOpenPlan={openPlan}

@@ -71,7 +71,7 @@ app_public_request() {
     -w "%{http_code}"
   )
   if [[ -n "${body}" ]]; then
-    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" --data "${body}")
+    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" --data "${body}")
   fi
   RESPONSE_STATUS="$(curl "${request_args[@]}" "${API_URL}/rest/v1/${route}")"
   RESPONSE_BODY="$(cat "${response_file}")"
@@ -347,6 +347,17 @@ cleanup() {
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from public.agent_plan_permissions
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
+      delete from app_public.exercise_sets
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
+          and id like 'agent-api-${RUN_TAG}-%';
+      delete from app_public.session_exercises
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
+          and id like 'agent-api-${RUN_TAG}-%';
+      delete from app_public.sessions
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
+          and id like 'agent-api-${RUN_TAG}-%';
+      delete from app_public.session_plan_uses
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from app_public.session_plan_sets
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from app_public.session_plan_exercises
@@ -355,12 +366,6 @@ cleanup() {
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from app_public.training_programmes
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
-      delete from app_public.exercise_sets
-        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
-          and id like 'agent-api-${RUN_TAG}-%';
-      delete from app_public.session_exercises
-        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
-          and id like 'agent-api-${RUN_TAG}-%';
       delete from app_public.exercise_muscle_mappings
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and (id like 'agent-api-${RUN_TAG}-%' or id like 'map_agent-api-${RUN_TAG}-%'
@@ -368,9 +373,6 @@ cleanup() {
               where owner_user_id = '${USER_A_UUID}'::uuid and name like 'agent-api-${RUN_TAG} %'));
       delete from app_public.exercise_definitions
         where owner_user_id = '${USER_A_UUID}'::uuid and name like 'agent-api-${RUN_TAG} %';
-      delete from app_public.sessions
-        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
-          and id like 'agent-api-${RUN_TAG}-%';
       delete from app_public.body_weight_measurements
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and id like 'agent-api-${RUN_TAG}-%';
@@ -1237,6 +1239,43 @@ assert_status "200" "unscheduled plan read"
 printf '%s' "${RESPONSE_BODY}" | jq -e \
   --arg unscheduled "${UNSCHEDULED_ID}" '(.data.plans | map(.id) | index($unscheduled)) != null' \
   >/dev/null || fail "include_unscheduled did not return the unscheduled plan"
+
+echo "[agent-api-test] verifying Routine availability preserves coaching compatibility"
+update_training_fixture "update app_public.session_plans set is_routine=true where owner_user_id='${USER_A_UUID}'::uuid and id='${UNSCHEDULED_ID}';" >/dev/null
+agent_get "session-plans?include_unscheduled=true"
+assert_status "200" "Routine excluded from coaching due queue"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg routine "${UNSCHEDULED_ID}" --arg ordinary "${PLAN_ID}" '
+  (.data.plans | map(.id) | index($routine)) == null and (.data.plans | map(.id) | index($ordinary)) != null
+' >/dev/null || fail "Routine leaked into coaching due queue or removed an ordinary plan"
+agent_post "session-plans" "${UNSCHEDULED_BODY}" "agent-api-${RUN_TAG}-plan-key-2"
+assert_status "200" "existing agent create replay on a converted Routine"
+[[ "$(run_psql "select is_routine from app_public.session_plans where owner_user_id='${USER_A_UUID}'::uuid and id='${UNSCHEDULED_ID}';")" == "t" ]] || fail "agent create replay cleared Routine availability"
+ROUTINE_BLOCK="$(run_psql "select id from app_public.session_plan_exercises where owner_user_id='${USER_A_UUID}'::uuid and session_plan_id='${UNSCHEDULED_ID}' limit 1;")"
+update_training_fixture "
+  insert into app_public.session_plan_uses(owner_user_id,id,session_plan_id,slot_index,kind,created_at,updated_at,client_updated_at_ms)
+    values('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-use','${UNSCHEDULED_ID}',1,'workout',${NOW_MS},${NOW_MS},${NOW_MS});
+  insert into app_public.sessions(owner_user_id,id,status,source_plan_id,source_plan_use_id,started_at,created_at,updated_at,client_updated_at_ms)
+    values('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-routine-session','active','${UNSCHEDULED_ID}','agent-api-${RUN_TAG}-use',${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
+  insert into app_public.session_exercises(owner_user_id,id,session_id,exercise_definition_id,name,order_index,source_plan_exercise_id,source_plan_use_id,created_at,updated_at,client_updated_at_ms)
+    values('${USER_A_UUID}'::uuid,'agent-api-${RUN_TAG}-routine-card','agent-api-${RUN_TAG}-routine-session','${EXERCISE_A}','Bench press',0,'${ROUTINE_BLOCK}','agent-api-${RUN_TAG}-use',${NOW_MS},${NOW_MS},${NOW_MS});
+  update app_public.session_plans set is_routine=false where owner_user_id='${USER_A_UUID}'::uuid and id='${UNSCHEDULED_ID}';
+" >/dev/null
+agent_get "session-plans?include_unscheduled=true"
+assert_status "200" "switched-off Routine ordinary queue"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg plan "${UNSCHEDULED_ID}" --arg block "${ROUTINE_BLOCK}" '
+  .data.plans[] | select(.id==$plan) | .progress=="planned" and .next_block_id==$block
+' >/dev/null || fail "historical Routine-use card consumed ordinary plan availability"
+# Past use snapshots do not freeze future authored intent, including after off.
+run_psql "select app_public.agent_update_plan_block(
+  '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', 'agent-api-${RUN_TAG}-routine-edit',
+  'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+  '${UNSCHEDULED_ID}', '${ROUTINE_BLOCK}',
+  to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${UNSCHEDULED_ID}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'),
+  '{\"name\":\"Future Routine block\"}'::jsonb
+);" >/dev/null
+[[ "$(run_psql "select name from app_public.session_exercises where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-routine-card';")" == "Bench press" ]] || fail "future Routine edit changed its performed snapshot"
+update_training_fixture "delete from app_public.sessions where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-routine-session';
+  delete from app_public.session_plan_uses where owner_user_id='${USER_A_UUID}'::uuid and id='agent-api-${RUN_TAG}-use';" >/dev/null
 
 echo "[agent-api-test] verifying live session card attached to block derives in_progress and excludes next_block_id"
 BLOCK_ID="$(run_psql "

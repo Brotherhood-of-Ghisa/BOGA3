@@ -70,7 +70,11 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
   session_plan_sets: [
     { parentIdField: 'session_plan_exercise_id', parentType: 'session_plan_exercises', required: true },
   ],
+  session_plan_uses: [
+    { parentIdField: 'session_plan_id', parentType: 'session_plans', required: true },
+  ],
   sessions: [
+    { parentIdField: 'source_plan_use_id', parentType: 'session_plan_uses', required: false },
     { parentIdField: 'gym_id', parentType: 'gyms', required: false },
     { parentIdField: 'source_plan_id', parentType: 'session_plans', required: false },
   ],
@@ -87,6 +91,7 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
     { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: true },
   ],
   session_exercises: [
+    { parentIdField: 'source_plan_use_id', parentType: 'session_plan_uses', required: false },
     { parentIdField: 'session_id', parentType: 'sessions', required: true },
     { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: false },
     {
@@ -96,6 +101,7 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
     },
   ],
   exercise_sets: [
+    { parentIdField: 'source_plan_use_id', parentType: 'session_plan_uses', required: false },
     { parentIdField: 'session_exercise_id', parentType: 'session_exercises', required: true },
     { parentIdField: 'source_plan_set_id', parentType: 'session_plan_sets', required: false },
   ],
@@ -115,6 +121,7 @@ const PARENT_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema
   body_weight_measurements: schema.bodyWeightMeasurements,
   training_programmes: schema.trainingProgrammes,
   session_plans: schema.sessionPlans,
+  session_plan_uses: schema.sessionPlanUses,
   session_plan_exercises: schema.sessionPlanExercises,
   session_plan_sets: schema.sessionPlanSets,
   gyms: schema.gyms,

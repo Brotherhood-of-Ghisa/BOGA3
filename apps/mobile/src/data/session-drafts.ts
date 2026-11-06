@@ -8,7 +8,7 @@ import { nowMonotonic, type Transaction } from './clock';
 import { selectInProgressSessionRow } from './in-progress-session';
 import { loadAsOfWeightResolver, resolveSessionWeights } from './bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
-import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessionPlanSets, sessions, userSettings } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessionPlanSets, sessionPlanUses, sessions, userSettings } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 import {
   hydrateSessionSetPerformanceStatus,
@@ -16,6 +16,7 @@ import {
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
 import { guardSessionMergeEdit } from './exercise-merge-store';
+import { insertPlanUseInTransaction } from './session-plan-use-store';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 export type SessionDraftStatus = 'active';
@@ -31,6 +32,7 @@ export type SessionDraftSetInput = {
   performanceStatus?: SessionSetPerformanceStatus;
   /** Block provenance. Undefined preserves the stored value; null clears it. */
   sourcePlanSetId?: string | null;
+  sourcePlanUseId?: string | null;
 };
 
 export type SessionDraftExerciseInput = {
@@ -42,6 +44,7 @@ export type SessionDraftExerciseInput = {
   sets: SessionDraftSetInput[];
   /** Block provenance. Undefined preserves the stored value; null clears it. */
   sourcePlanExerciseId?: string | null;
+  sourcePlanUseId?: string | null;
 };
 
 export type PersistSessionDraftInput = {
@@ -51,6 +54,7 @@ export type PersistSessionDraftInput = {
   status?: SessionDraftStatus;
   /** Whole-plan-start provenance. Undefined preserves the stored value. */
   sourcePlanId?: string | null;
+  sourcePlanUseId?: string | null;
   mergeRevisions?: Record<string, number>;
   exercises: SessionDraftExerciseInput[];
 };
@@ -84,6 +88,7 @@ export type SessionDraftSetSnapshot = {
   plannedSetType?: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;
   sourcePlanSetId?: string | null;
+  sourcePlanUseId?: string | null;
 };
 
 export type SessionDraftExerciseSnapshot = {
@@ -94,6 +99,7 @@ export type SessionDraftExerciseSnapshot = {
   name: string;
   machineName: string | null;
   sourcePlanExerciseId?: string | null;
+  sourcePlanUseId?: string | null;
   sets: SessionDraftSetSnapshot[];
 };
 
@@ -105,6 +111,7 @@ export type SessionDraftSnapshot = ResolvedSessionWeight & {
   createdAt: Date;
   updatedAt: Date;
   sourcePlanId?: string | null;
+  sourcePlanUseId?: string | null;
   exercises: SessionDraftExerciseSnapshot[];
 };
 
@@ -119,6 +126,7 @@ export type SessionGraphSnapshot = ResolvedSessionWeight & {
   createdAt: Date;
   updatedAt: Date;
   sourcePlanId?: string | null;
+  sourcePlanUseId?: string | null;
   exercises: SessionDraftExerciseSnapshot[];
 };
 
@@ -187,6 +195,7 @@ export type SessionPersistenceRecord = ResolvedSessionWeight & {
   createdAt: Date;
   updatedAt: Date;
   sourcePlanId?: string | null;
+  sourcePlanUseId?: string | null;
 };
 
 type StoredDraftSetRecord = {
@@ -201,6 +210,7 @@ type StoredDraftSetRecord = {
   plannedSetType?: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;
   sourcePlanSetId?: string | null;
+  sourcePlanUseId?: string | null;
 };
 
 type StoredDraftExerciseRecord = {
@@ -213,6 +223,7 @@ type StoredDraftExerciseRecord = {
   name: string;
   machineName: string | null;
   sourcePlanExerciseId?: string | null;
+  sourcePlanUseId?: string | null;
 };
 
 type StoredSessionExerciseTagRecord = {
@@ -231,11 +242,13 @@ type StoredDraftGraph = {
 
 type SaveDraftGraphInput = {
   requireNoActiveSession?: boolean;
+  newPlanUse?: { id: string; planId: string };
   sessionId?: string;
   gymId: string | null;
   status: SessionDraftStatus;
   startedAt: Date;
   sourcePlanId?: string | null;
+  sourcePlanUseId?: string | null;
   mergeRevisions?: Record<string, number>;
   exercises: SessionDraftExerciseInput[];
   now: Date;
@@ -344,6 +357,7 @@ const mapSessionRow = (row: typeof sessions.$inferSelect & ResolvedSessionWeight
     createdAt,
     updatedAt,
     sourcePlanId: row.sourcePlanId ?? null,
+    sourcePlanUseId: row.sourcePlanUseId ?? null,
   };
 };
 
@@ -360,6 +374,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
   createdAt: graph.session.createdAt,
   updatedAt: graph.session.updatedAt,
   sourcePlanId: graph.session.sourcePlanId ?? null,
+  sourcePlanUseId: graph.session.sourcePlanUseId ?? null,
   exercises: graph.exercises.map((exercise) => ({
     id: exercise.id,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
@@ -368,6 +383,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
     machineName: exercise.machineName,
     loadContext: exercise.loadContext,
     sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
+    sourcePlanUseId: exercise.sourcePlanUseId ?? null,
     sets: exercise.sets.map((set) => ({
       id: set.id,
       repsValue: set.repsValue,
@@ -381,6 +397,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
         weight: set.weightValue,
       }),
       sourcePlanSetId: set.sourcePlanSetId ?? null,
+      sourcePlanUseId: set.sourcePlanUseId ?? null,
     })),
   })),
 });
@@ -401,6 +418,7 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
   createdAt: graph.session.createdAt,
   updatedAt: graph.session.updatedAt,
   sourcePlanId: graph.session.sourcePlanId ?? null,
+  sourcePlanUseId: graph.session.sourcePlanUseId ?? null,
   exercises: graph.exercises.map((exercise) => ({
     id: exercise.id,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
@@ -409,6 +427,7 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
     machineName: exercise.machineName,
     loadContext: exercise.loadContext,
     sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
+    sourcePlanUseId: exercise.sourcePlanUseId ?? null,
     sets: exercise.sets.map((set) => ({
       id: set.id,
       repsValue: set.repsValue,
@@ -422,6 +441,7 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
         weight: set.weightValue,
       }),
       sourcePlanSetId: set.sourcePlanSetId ?? null,
+      sourcePlanUseId: set.sourcePlanUseId ?? null,
     })),
   })),
 });
@@ -489,6 +509,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         weight: row.weightValue,
       }),
       sourcePlanSetId: row.sourcePlanSetId,
+      sourcePlanUseId: row.sourcePlanUseId,
     });
     acc.set(row.sessionExerciseId, current);
     return acc;
@@ -510,6 +531,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         name: exercise.name,
         machineName: exercise.machineName,
         sourcePlanExerciseId: exercise.sourcePlanExerciseId,
+        sourcePlanUseId: exercise.sourcePlanUseId,
         loadContext: personalCalculationContext(
           bodyweightCalculationsEnabled,
           definitionById.get(exercise.exerciseDefinitionId),
@@ -539,6 +561,23 @@ type SessionGraphWriteTx = Pick<LocalDatabase, 'select' | 'insert' | 'update'>;
 const ORDER_INDEX_SCRATCH_OFFSET = 1_000_000;
 const ORDER_INDEX_TOMBSTONE_BASE = 2 * ORDER_INDEX_SCRATCH_OFFSET;
 
+/** An open recorder may still hold a claim that lost during its latest sync. */
+const discardLostRoutineClaims = (tx: SessionGraphWriteTx, exercises: SessionDraftExerciseInput[]): SessionDraftExerciseInput[] => {
+  const useIds = exercises.flatMap(exercise => [exercise.sourcePlanUseId, ...exercise.sets.map(set => set.sourcePlanUseId)])
+    .filter((id): id is string => !!id);
+  if (!useIds.length) return exercises;
+  const lost = new Set(tx.select({ id: sessionPlanUses.id }).from(sessionPlanUses)
+    .where(and(inArray(sessionPlanUses.id, useIds), isNotNull(sessionPlanUses.deletedAt))).all().map(row => row.id));
+  if (!lost.size) return exercises;
+  return exercises.map(exercise => ({
+    ...exercise,
+    ...(exercise.sourcePlanUseId && lost.has(exercise.sourcePlanUseId) ? { sourcePlanExerciseId: null, sourcePlanUseId: null } : {}),
+    sets: exercise.sets.map(set => ({ ...set,
+      ...(set.sourcePlanUseId && lost.has(set.sourcePlanUseId) ? { sourcePlanSetId: null, sourcePlanUseId: null } : {}),
+    })),
+  }));
+};
+
 const replaceSessionExerciseGraph = (
   tx: SessionGraphWriteTx,
   input: {
@@ -555,6 +594,7 @@ const replaceSessionExerciseGraph = (
     localUpdatedAtMs: number;
   }
 ) => {
+  const exercises = discardLostRoutineClaims(tx, input.exercises);
   const existingExerciseRows = tx
     .select({
       id: sessionExercises.id,
@@ -562,6 +602,7 @@ const replaceSessionExerciseGraph = (
       exerciseDefinitionId: sessionExercises.exerciseDefinitionId,
       orderIndex: sessionExercises.orderIndex,
       sourcePlanExerciseId: sessionExercises.sourcePlanExerciseId,
+      sourcePlanUseId: sessionExercises.sourcePlanUseId,
     })
     .from(sessionExercises)
     .where(eq(sessionExercises.sessionId, input.sessionId))
@@ -583,6 +624,7 @@ const replaceSessionExerciseGraph = (
             plannedSetType: exerciseSets.plannedSetType,
             performanceStatus: exerciseSets.performanceStatus,
             sourcePlanSetId: exerciseSets.sourcePlanSetId,
+            sourcePlanUseId: exerciseSets.sourcePlanUseId,
           })
           .from(exerciseSets)
           .where(inArray(exerciseSets.sessionExerciseId, existingExerciseIds))
@@ -645,7 +687,7 @@ const replaceSessionExerciseGraph = (
   // lands on a sibling tombstone that has not been re-parked yet.
   let tombstoneCursor = ORDER_INDEX_TOMBSTONE_BASE;
 
-  input.exercises.forEach((exercise, exerciseIndex) => {
+  exercises.forEach((exercise, exerciseIndex) => {
     const requestedId = exercise.id?.trim();
     const exerciseDefinitionId = exercise.exerciseDefinitionId.trim();
 
@@ -675,6 +717,8 @@ const replaceSessionExerciseGraph = (
           orderIndex: exerciseIndex,
           name: exercise.name,
           machineName: exercise.machineName ?? null,
+          sourcePlanUseId: exercise.sourcePlanUseId === undefined
+            ? existingExercise.sourcePlanUseId ?? null : exercise.sourcePlanUseId,
           sourcePlanExerciseId:
             exercise.sourcePlanExerciseId === undefined
               ? existingExercise.sourcePlanExerciseId ?? null
@@ -697,6 +741,7 @@ const replaceSessionExerciseGraph = (
           name: exercise.name,
           machineName: exercise.machineName ?? null,
           sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
+    sourcePlanUseId: exercise.sourcePlanUseId ?? null,
           deletedAt: null,
           localDirty: true,
           localUpdatedAtMs: input.localUpdatedAtMs,
@@ -785,6 +830,8 @@ const replaceSessionExerciseGraph = (
               set.plannedWeightValue === undefined ? existingSet?.plannedWeightValue ?? null : set.plannedWeightValue,
             plannedSetType: nextPlannedSetType,
             performanceStatus: nextPerformanceStatus,
+            sourcePlanUseId: set.sourcePlanUseId === undefined
+              ? existingSet?.sourcePlanUseId ?? null : set.sourcePlanUseId,
             sourcePlanSetId:
               set.sourcePlanSetId === undefined
                 ? existingSet?.sourcePlanSetId ?? null
@@ -811,6 +858,7 @@ const replaceSessionExerciseGraph = (
             plannedSetType: nextPlannedSetType,
             performanceStatus: nextPerformanceStatus,
             sourcePlanSetId: set.sourcePlanSetId ?? null,
+      sourcePlanUseId: set.sourcePlanUseId ?? null,
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs: input.localUpdatedAtMs,
@@ -926,6 +974,7 @@ export const clearProvenanceClaimsInTransaction = (
       .where(
         and(
           eq(sessionExercises.sourcePlanExerciseId, blockId),
+          isNull(sessionExercises.sourcePlanUseId),
           isNull(sessionExercises.deletedAt),
         ),
       )
@@ -967,7 +1016,7 @@ export const clearProvenanceClaimsInTransaction = (
       .select({ id: exerciseSets.id })
       .from(exerciseSets)
       .where(
-        and(eq(exerciseSets.sourcePlanSetId, targetId), isNull(exerciseSets.deletedAt)),
+        and(eq(exerciseSets.sourcePlanSetId, targetId), isNull(exerciseSets.sourcePlanUseId), isNull(exerciseSets.deletedAt)),
       )
       .all();
     for (const set of claimantSets) {
@@ -1002,6 +1051,7 @@ const collectWillWriteClaimsInTransaction = (
     if (entity.type !== 'session_exercises' && entity.type !== 'exercise_sets') {
       continue;
     }
+    if (entity.fields.source_plan_use_id != null) continue;
     const claim = entity.fields.source_plan_exercise_id ?? entity.fields.source_plan_set_id;
     if (typeof claim !== 'string' || claim.length === 0) {
       continue;
@@ -1020,7 +1070,7 @@ const collectWillWriteClaimsInTransaction = (
     const hasConflictingClaimant = tx
       .select({ id: table.id })
       .from(table)
-      .where(and(eq(claimColumn, claim), ne(table.id, entity.id), isNull(table.deletedAt)))
+      .where(and(eq(claimColumn, claim), isNull(table.sourcePlanUseId), ne(table.id, entity.id), isNull(table.deletedAt)))
       .get();
     if (!hasConflictingClaimant) {
       continue;
@@ -1159,6 +1209,17 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
       // push batch. The counter persist into sync_runtime_state.last_emitted_ms
       // is synchronous within this transaction.
       const localUpdatedAtMs = nowMonotonic(tx);
+      if (input.newPlanUse) {
+        const use = insertPlanUseInTransaction(tx, {
+          ...input.newPlanUse, kind: 'workout', now: input.now, localUpdatedAtMs,
+        });
+        if (use.deletedAt) throw new Error('This Routine use lost a concurrent action.');
+        if (input.sourcePlanUseId !== use.id || input.sourcePlanId !== use.sessionPlanId) {
+          throw new Error('Routine provenance does not match this workout.');
+        }
+      }
+      const lostUse = input.sourcePlanUseId && tx.select({ deletedAt: sessionPlanUses.deletedAt })
+        .from(sessionPlanUses).where(eq(sessionPlanUses.id, input.sourcePlanUseId)).get()?.deletedAt;
 
       startChanged = !!existingSession && existingSession.startedAt.getTime() !== input.startedAt.getTime();
 
@@ -1171,7 +1232,8 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
             startedAt: input.startedAt,
             completedAt: null,
             durationSec: null,
-            sourcePlanId: input.sourcePlanId ?? null,
+            sourcePlanId: lostUse ? null : input.sourcePlanId ?? null,
+            sourcePlanUseId: lostUse ? null : input.sourcePlanUseId ?? null,
             localDirty: true,
             localUpdatedAtMs,
             createdAt: input.now,
@@ -1186,8 +1248,10 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
             startedAt: input.startedAt,
             completedAt: null,
             durationSec: null,
+            sourcePlanUseId: lostUse ? null : input.sourcePlanUseId === undefined
+              ? existingSession.sourcePlanUseId ?? null : input.sourcePlanUseId,
             sourcePlanId:
-              input.sourcePlanId === undefined ? existingSession.sourcePlanId ?? null : input.sourcePlanId,
+              lostUse ? null : input.sourcePlanId === undefined ? existingSession.sourcePlanId ?? null : input.sourcePlanId,
             localDirty: true,
             localUpdatedAtMs,
             updatedAt: input.now,
@@ -1225,7 +1289,6 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
       // row and the whole exercise/set/tag graph rebuilt below, stamped inside
       // this transaction so the persist is atomic with the row writes.
       const localUpdatedAtMs = nowMonotonic(tx);
-
       startChanged = !!existingSession && existingSession.startedAt.getTime() !== input.startedAt.getTime();
 
       tx.update(sessions)
@@ -1343,6 +1406,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       now?: Date;
       /** A new-workout entry must not race another local Start or Resume. */
       requireNoActiveSession?: boolean;
+      newPlanUse?: { id: string; planId: string };
     } = {}
   ): Promise<PersistSessionDraftResult> {
     ensureDate(input.startedAt, 'startedAt');
@@ -1352,6 +1416,8 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
 
     return store.saveDraftGraph({
       ...(options.requireNoActiveSession ? { requireNoActiveSession: true } : {}),
+      newPlanUse: options.newPlanUse,
+      sourcePlanUseId: input.sourcePlanUseId,
       sessionId: input.sessionId,
       gymId: input.gymId,
       startedAt: input.startedAt,

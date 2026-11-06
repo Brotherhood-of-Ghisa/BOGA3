@@ -46,13 +46,13 @@ export function PlanDetailBlocks({ detail, onAdd, onSkip, onOpenSession }: PlanD
               {block.name}
             </Text>
             <Text allowFontScaling={false} style={uiText.meta} testID={`plan-detail-block-${index + 1}-state`}>
-              <FigureText>{`${blockStateWord(block)} · Block ${index + 1} of ${detail.blocks.length}`}</FigureText>
+              <FigureText>{`${detail.isRoutine ? '' : `${blockStateWord(block)} · `}Block ${index + 1} of ${detail.blocks.length}`}</FigureText>
             </Text>
             <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`plan-detail-block-${index + 1}-targets`}>
               <FigureText>{blockTargetsLine(block)}</FigureText>
             </Text>
           </View>
-          {block.status === 'pending' ? (
+          {detail.isRoutine ? null : block.status === 'pending' ? (
             <>
               <ListRow
                 accessibilityLabel={`Add ${block.name} to the active session`}

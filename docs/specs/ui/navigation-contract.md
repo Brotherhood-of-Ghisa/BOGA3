@@ -108,7 +108,7 @@ one access level. Screens never redirect to gate themselves:
 | | `section=stream\|glance\|leaderboards\|cows` | selects a group's page; absent opens Stream |
 | `/group/join` | `code` | prefills the code field and runs the preview once the username gate is satisfied |
 | `/group-session/[memberId]/[sessionId]` | `groupId` | required authorised scope, read through the group-scoped safe reader/cache; missing renders generic session unavailable |
-| `/session-plan/new` | `edit` | edits that plan: prefill, then the guarded per-operation sync; back returns to the plan detail |
+| `/session-plan/new` | `edit` | edits that plan: prefill, guarded ordinary edits or atomic version-checked Routine intent; back returns to the plan detail |
 | | `from` | prefills a duplicate; Save creates a new plan, never an in-place copy |
 | `/session-plan/[planId]` | `planId` | required; missing, unknown or deleted renders the in-route unavailable state |
 | `/programme/new` | `edit` | edits that programme: prefill, atomic update on save; back returns to programme detail |

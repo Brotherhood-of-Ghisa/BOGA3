@@ -4,7 +4,7 @@
 #
 # Sets up rows for two fixture users (A and B), then with user A's JWT
 # exercises SELECT / INSERT / UPDATE / DELETE against user B's rows on every
-# one of the sixteen v2 entity tables. All four operations must either:
+# one of the seventeen v2 entity tables. All four operations must either:
 #
 #   - return zero rows (SELECT, UPDATE, DELETE under PostgREST + RLS),
 #   - or fail with an RLS-deny status / response shape (INSERT with a
@@ -87,6 +87,7 @@ ENTITIES=(
   session_plans
   session_plan_exercises
   session_plan_sets
+  session_plan_uses
 )
 
 # -----------------------------------------------------------------------------
@@ -120,7 +121,7 @@ sign_in() {
   status="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -181,9 +182,11 @@ TP_ID="rls-${RUN_TAG}-btp"
 SP_ID="rls-${RUN_TAG}-bsp"
 SPE_ID="rls-${RUN_TAG}-bspe"
 SPS_ID="rls-${RUN_TAG}-bsps"
+SPU_ID="rls-${RUN_TAG}-bspu"
 
 cleanup_rows() {
   run_psql_sql "
+    delete from app_public.session_plan_uses        where id = '${SPU_ID}';
     delete from app_public.session_plan_sets        where id = '${SPS_ID}';
     delete from app_public.session_plan_exercises   where id = '${SPE_ID}';
     delete from app_public.session_plans            where id = '${SP_ID}';
@@ -320,6 +323,10 @@ run_psql_sql "
        created_at, updated_at, client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid, '${SPS_ID}', '${SPE_ID}', 0, 8,
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
+    insert into app_public.session_plan_uses
+      (owner_user_id,id,session_plan_id,slot_index,kind,skipped_at,created_at,updated_at,client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid,'${SPU_ID}','${SP_ID}',1,'skip',${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
   commit;
 " >/dev/null
 
@@ -344,7 +351,7 @@ http_request() {
   )
   [[ -n "${prefer}" ]] && curl_args+=(-H "Prefer: ${prefer}")
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -460,6 +467,12 @@ insert_payload_for() {
           exercise_definition_id: $edef, order_index: 0, name: "Injected",
           client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
       ;;
+    session_plan_uses)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --arg sp "${SP_ID}" --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, session_plan_id: $sp, slot_index: 2, kind: "skip", skipped_at: $ts,
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
     session_plan_sets)
       jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
         --arg spe "${SPE_ID}" --argjson ts "${NOW_MS}" \
@@ -488,6 +501,7 @@ target_row_id_for() {
     session_plans)            echo "${SP_ID}" ;;
     session_plan_exercises)   echo "${SPE_ID}" ;;
     session_plan_sets)        echo "${SPS_ID}" ;;
+    session_plan_uses)        echo "${SPU_ID}" ;;
   esac
 }
 

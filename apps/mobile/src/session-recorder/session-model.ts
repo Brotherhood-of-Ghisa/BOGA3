@@ -34,6 +34,7 @@ export function mapDraftSnapshotToSession(
       machineName: exercise.machineName ?? '',
       loadContext: exercise.loadContext,
       sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
+      ...(exercise.sourcePlanUseId ? { sourcePlanUseId: exercise.sourcePlanUseId } : {}),
       sets: exercise.sets.map((set) => ({
         id: set.id,
         reps: set.repsValue,
@@ -44,6 +45,7 @@ export function mapDraftSnapshotToSession(
         plannedSetType: normalizeSessionSetType(set.plannedSetType),
         performanceStatus: set.performanceStatus ?? null,
         sourcePlanSetId: set.sourcePlanSetId ?? null,
+        ...(set.sourcePlanUseId ? { sourcePlanUseId: set.sourcePlanUseId } : {}),
       })),
     })),
   };
@@ -57,6 +59,7 @@ export const toPersistDraftExercises = (session: Session) =>
     name: exercise.name,
     machineName: exercise.machineName || null,
     sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
+      ...(exercise.sourcePlanUseId ? { sourcePlanUseId: exercise.sourcePlanUseId } : {}),
     sets: exercise.sets.map((set) => {
       const committedSet = canonicalizeSetValues(set);
       return {
@@ -69,6 +72,7 @@ export const toPersistDraftExercises = (session: Session) =>
         plannedSetType: committedSet.plannedSetType,
         performanceStatus: committedSet.performanceStatus,
         sourcePlanSetId: set.sourcePlanSetId ?? null,
+        ...(set.sourcePlanUseId ? { sourcePlanUseId: set.sourcePlanUseId } : {}),
       };
     }),
   }));

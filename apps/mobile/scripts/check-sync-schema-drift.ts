@@ -649,6 +649,7 @@ interface EntityContext {
 // rules") names; every other entity has none.
 const ALLOWED_CHECK_NAMES: Readonly<Record<string, readonly string[]>> = {
   exercise_definitions: ['exercise_definitions_load_input_mode_valid'],
+  session_plans: ['session_plans_routine_standalone'],
   user_settings: ['user_settings_muscle_target_overrides_valid'],
 };
 

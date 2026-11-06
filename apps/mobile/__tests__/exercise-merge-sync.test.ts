@@ -1,10 +1,11 @@
+import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
 import { eq } from 'drizzle-orm';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 import { applyPullPage, entityToWire, runSyncCycle, type WireEntity } from '@/src/sync/cycle';
 import { syncExerciseMerges, validateMergeOutcomes } from '@/src/sync/exercise-merge';
 import { guardSessionMergeEdit, listMergeLocal, readMergeLocal, writeMergeLocal } from '@/src/data/exercise-merge-store';
-import { exerciseDefinitions, exerciseSessionFacts, exerciseSessionFactsStale, exerciseSets, gyms, sessionExercises, sessionPlans, sessionPlanExercises, sessionPlanSets, syncRuntimeState } from '@/src/data/schema';
+import { exerciseDefinitions, exerciseSessionFacts, exerciseSessionFactsStale, exerciseSets, gyms, sessionExercises, sessionPlans, sessionPlanExercises, sessionPlanSets, sessionPlanUses, syncRuntimeState } from '@/src/data/schema';
 import { wipeLocalDatabaseRows } from '@/src/data/local-wipe';
 import * as dataBootstrap from '@/src/data/bootstrap';
 import { createDrizzleSessionDraftStore, loadSessionSnapshotById, updateSessionMetadata } from '@/src/data/session-drafts';
@@ -49,7 +50,7 @@ const adapter = {
   toWire: (row: Record<string, unknown>, type: string) => wire(row, type),
   apply: (tx: Transaction, rows: MergeWireEntity[], force = false) => {
     let changed = 0;
-    for (const type of ['exercise_definitions', 'session_exercises', 'exercise_sets'] as const) {
+    for (const type of TOPO_LAYERS.flat() as EntityTableName[]) {
       changed += applyPullPage(tx, rows.filter(row => row.type === type) as WireEntity[], type, force);
     }
     return changed;
@@ -64,8 +65,8 @@ function canonical(): MergeWireEntity[] {
   ];
 }
 function rpcPages(rows = canonical()) {
-  mockRpc.mockImplementation(async (name: string) => {
-    if (name === 'exercise_merge_snapshot') return { data: { sequence: 1, token: 'token', rows, nextOffset: rows.length, hasMore: false }, error: null };
+  mockRpc.mockImplementation(async (name: string, args: { p_offset?: number } = {}) => {
+    if (name === 'exercise_merge_snapshot') return { data: { sequence: 1, token: 'token', rows: rows.slice(args.p_offset ?? 0), nextOffset: rows.length, hasMore: false }, error: null };
     if (name === 'exercise_merge_save_conflict') return { data: 'preserved', error: null };
     if (name === 'exercise_merge_review') return { data: { items: [], hasMore: false }, error: null };
     throw new Error('Unexpected RPC ' + name);
@@ -309,4 +310,77 @@ it('refuses an old active finish before mutating metadata or appending blocks to
     expect(database.select().from(sessionExercises).all()).toHaveLength(1);
     expect((await loadSessionSnapshotById('session'))?.startedAt.getTime()).toBe(1);
   } finally { boot.mockRestore(); }
+});
+
+
+it('keeps ordinary history provenance beside a merged repeated use of the same targets', async () => {
+  database.insert(sessionPlans).values({ id: 'plan', title: 'Plan', isRoutine: true }).run();
+  database.insert(sessionPlanExercises).values({ id: 'plan-block', sessionPlanId: 'plan', exerciseDefinitionId: 'a', name: 'A', orderIndex: 0 }).run();
+  database.insert(sessionPlanSets).values({ id: 'plan-target', sessionPlanExerciseId: 'plan-block', orderIndex: 0, targetReps: 5 }).run();
+  database.insert(sessionPlanUses).values({ id: 'use', sessionPlanId: 'plan', slotIndex: 1, kind: 'workout' }).run();
+  fixture.client.prepare("insert into sessions(id,status,started_at,completed_at) values('ordinary-session','completed',1,2)").run();
+  fixture.client.prepare("update sessions set source_plan_id='plan',source_plan_use_id='use' where id='session'").run();
+  database.insert(sessionExercises).values({ id: 'ordinary', sessionId: 'ordinary-session', exerciseDefinitionId: 'a', name: 'A',
+    orderIndex: 1, sourcePlanExerciseId: 'plan-block', localDirty: false }).run();
+  database.insert(exerciseSets).values({ id: 'ordinary-work', sessionExerciseId: 'ordinary', orderIndex: 0,
+    sourcePlanSetId: 'plan-target', weightValue: '55', repsValue: '7', localDirty: false }).run();
+  const rows = canonical().map(row => ({ ...row, fields: { ...row.fields, source_plan_use_id: 'use',
+    ...(row.type === 'session_exercises' ? { source_plan_exercise_id: 'plan-block' } : { source_plan_set_id: 'plan-target' }),
+  } }));
+  rpcPages(rows);
+  await sync();
+  expect(database.select().from(sessionExercises).where(eq(sessionExercises.id, 'ordinary')).get())
+    .toMatchObject({ sourcePlanExerciseId: 'plan-block', sourcePlanUseId: null, localDirty: false });
+  expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'ordinary-work')).get())
+    .toMatchObject({ sourcePlanSetId: 'plan-target', sourcePlanUseId: null, weightValue: '55', localDirty: false });
+  expect(database.select().from(sessionExercises).where(eq(sessionExercises.id, 'block')).get())
+    .toMatchObject({ sourcePlanExerciseId: 'plan-block', sourcePlanUseId: 'use' });
+});
+
+
+it('atomically repairs a missed slot winner while installing merge ancestors, preserving the losing work', async () => {
+  database.insert(sessionPlans).values({ id: 'plan', title: 'Routine', isRoutine: true }).run();
+  database.insert(sessionPlanExercises).values({ id: 'planned', sessionPlanId: 'plan', exerciseDefinitionId: 'a', name: 'A', orderIndex: 0 }).run();
+  database.insert(sessionPlanSets).values({ id: 'target', sessionPlanExerciseId: 'planned', orderIndex: 0, targetReps: 5 }).run();
+  database.insert(sessionPlanUses).values({ id: 'losing-use', sessionPlanId: 'plan', slotIndex: 1, kind: 'workout', localDirty: true }).run();
+  fixture.client.prepare("update sessions set source_plan_id='plan',source_plan_use_id='losing-use' where id='session'").run();
+  database.update(sessionExercises).set({ sourcePlanExerciseId: 'planned', sourcePlanUseId: 'losing-use', localDirty: true }).run();
+  database.update(exerciseSets).set({ sourcePlanSetId: 'target', sourcePlanUseId: 'losing-use', localDirty: true }).run();
+  const base = { createdAt: at, updatedAt: at, deletedAt: null, localUpdatedAtMs: 200, localDirty: false };
+  const rows = [
+    wire({ ...base, id: 'winning-use', sessionPlanId: 'plan', slotIndex: 1, kind: 'workout', skippedAt: null }, 'session_plan_uses'),
+    wire({ ...base, id: 'remote-session', status: 'completed', gymId: null, startedAt: at, completedAt: at,
+      durationSec: 1, sourcePlanId: 'plan', sourcePlanUseId: 'winning-use' }, 'sessions'),
+    ...canonical().map(row => ({ ...row, id: 'remote-' + row.id, fields: { ...row.fields, source_plan_use_id: 'winning-use',
+      ...(row.type === 'session_exercises'
+        ? { session_id: 'remote-session', source_plan_exercise_id: 'planned' }
+        : { session_exercise_id: 'remote-block', source_plan_set_id: 'target' }),
+    } })),
+  ];
+  rpcPages(rows);
+  const failAfterAncestors = { ...adapter, apply: (tx: Transaction, incoming: MergeWireEntity[], force = false) => {
+    const changed = adapter.apply(tx, incoming, force);
+    if (incoming.some(row => row.type === 'session_plan_uses')) throw new Error('Simulated install failure after repair');
+    return changed;
+  } };
+  await expect(syncExerciseMerges({ database, owner, remoteSequence: 1, conflictCount: 0, adapter: failAfterAncestors }))
+    .rejects.toThrow('Simulated install failure after repair');
+  expect(database.select().from(sessionPlanUses).where(eq(sessionPlanUses.id, 'losing-use')).get()!.deletedAt).toBeNull();
+  expect(database.select().from(sessionPlanUses).where(eq(sessionPlanUses.id, 'winning-use')).get()).toBeUndefined();
+  expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'set')).get())
+    .toMatchObject({ sourcePlanSetId: 'target', sourcePlanUseId: 'losing-use', weightValue: '40' });
+  expect(readMergeLocal(database, owner, 'sequence')).toBeNull();
+  expect(readMergeLocal(database, owner, 'stage')).not.toBeNull();
+  await sync();
+  expect(database.select().from(sessionPlanUses).where(eq(sessionPlanUses.id, 'losing-use')).get()!.deletedAt).not.toBeNull();
+  expect(database.select().from(sessionExercises).where(eq(sessionExercises.id, 'block')).get())
+    .toMatchObject({ sourcePlanExerciseId: null, sourcePlanUseId: null, localDirty: true });
+  expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'set')).get())
+    .toMatchObject({ sourcePlanSetId: null, sourcePlanUseId: null, weightValue: '40', repsValue: '5', localDirty: true });
+  expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'remote-set')).get())
+    .toMatchObject({ sourcePlanSetId: 'target', sourcePlanUseId: 'winning-use', weightValue: '20' });
+  expect(readMergeLocal(database, owner, 'sequence')).toBe(1);
+  expect(readMergeLocal(database, owner, 'stage')).toBeNull();
+  await sync();
+  expect(database.select().from(sessionPlanUses).all()).toHaveLength(2);
 });

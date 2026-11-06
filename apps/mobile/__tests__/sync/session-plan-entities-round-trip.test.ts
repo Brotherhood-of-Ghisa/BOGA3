@@ -24,6 +24,7 @@ import {
   sessionPlanExercises,
   sessionPlanSets,
   sessionPlans,
+  sessionPlanUses,
   sessions,
   syncRuntimeState,
   trainingProgrammes,
@@ -227,6 +228,57 @@ const seedDirtyPlanGraph = (db: InMemoryTestDatabase): void => {
 };
 
 describe('session planning graph round-trips through the sync cycle and survives reinstall', () => {
+  it('restores repeated workout identities and Skip reservations before their performed children', async () => {
+    const server = createStubServer();
+    mockRpc.mockImplementation(server.rpc);
+    markBootstrapDone();
+    seedDirtyPlanGraph(database);
+    const now = new Date();
+    const stamp = Date.now() + 100;
+    database.update(sessionPlans).set({ programmeId: null, programmeOrderIndex: null, isRoutine: true,
+      localDirty: true, localUpdatedAtMs: stamp }).where(eq(sessionPlans.id, 'sp-1')).run();
+    database.insert(sessionPlanUses).values([
+      { id: 'use-first', slotIndex: 1, kind: 'workout' as const },
+      { id: 'use-skip', slotIndex: 2, kind: 'skip' as const, skippedAt: now },
+      { id: 'use-again', slotIndex: 3, kind: 'workout' as const },
+    ].map(use => ({ ...use, sessionPlanId: 'sp-1', createdAt: now, updatedAt: now,
+      localDirty: true, localUpdatedAtMs: stamp }))).run();
+    database.update(sessions).set({ sourcePlanUseId: 'use-first', status: 'completed', completedAt: now,
+      localDirty: true, localUpdatedAtMs: stamp }).where(eq(sessions.id, 'sess-plan')).run();
+    database.update(sessionExercises).set({ sourcePlanUseId: 'use-first', localDirty: true, localUpdatedAtMs: stamp })
+      .where(eq(sessionExercises.id, 'sx-plan')).run();
+    database.update(exerciseSets).set({ sourcePlanUseId: 'use-first', weightValue: '90', repsValue: '8',
+      performanceStatus: null, localDirty: true, localUpdatedAtMs: stamp }).where(eq(exerciseSets.id, 'es-plan')).run();
+    database.insert(sessions).values({ id: 'sess-again', sourcePlanId: 'sp-1', sourcePlanUseId: 'use-again',
+      gymId: 'gym-plan', startedAt: now, localDirty: true, localUpdatedAtMs: stamp }).run();
+    database.insert(sessionExercises).values({ id: 'card-again', sessionId: 'sess-again',
+      exerciseDefinitionId: 'def-squat', sourcePlanExerciseId: 'spe-1', sourcePlanUseId: 'use-again',
+      name: 'Squat', orderIndex: 0, localDirty: true, localUpdatedAtMs: stamp }).run();
+    database.insert(exerciseSets).values({ id: 'set-again', sessionExerciseId: 'card-again',
+      sourcePlanSetId: 'sps-1', sourcePlanUseId: 'use-again', orderIndex: 0,
+      plannedWeightValue: '100', plannedRepsValue: '5', performanceStatus: 'planned',
+      localDirty: true, localUpdatedAtMs: stamp }).run();
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+    expect(server.count('session_plan_uses')).toBe(3);
+    reinstallLocalStore();
+    await expect(runSyncCycle()).resolves.toBe('converged');
+    expect(database.select().from(sessionPlans).where(eq(sessionPlans.id, 'sp-1')).get())
+      .toMatchObject({ isRoutine: true, programmeId: null });
+    expect(database.select().from(sessionPlanUses).all()).toHaveLength(3);
+    expect(database.select().from(sessions).all()).toHaveLength(2);
+    expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'es-plan')).get())
+      .toMatchObject({ sourcePlanUseId: 'use-first', sourcePlanSetId: 'sps-1', weightValue: '90', repsValue: '8' });
+    expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'set-again')).get())
+      .toMatchObject({ sourcePlanUseId: 'use-again', sourcePlanSetId: 'sps-1', weightValue: '', performanceStatus: 'planned' });
+    expect(database.select().from(sessionPlanUses).where(eq(sessionPlanUses.id, 'use-skip')).get()?.skippedAt).toEqual(now);
+    const order = server.pullObservationOrder;
+    expect(order.indexOf('session_plan_uses')).toBeLessThan(order.indexOf('sessions'));
+    expect(order.indexOf('sessions')).toBeLessThan(order.indexOf('session_exercises'));
+    expect(order.indexOf('session_exercises')).toBeLessThan(order.indexOf('exercise_sets'));
+    expect(fixture.client.pragma('foreign_key_check')).toEqual([]);
+  });
+
   it('pushes, wipes, and re-pulls the whole chain in FK-safe layer order with provenance intact', async () => {
     const server = createStubServer();
     mockRpc.mockImplementation(server.rpc);

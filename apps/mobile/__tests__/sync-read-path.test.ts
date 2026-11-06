@@ -149,12 +149,12 @@ afterEach(() => {
 
 describe('read path reflects server-pulled rows', () => {
   it('surfaces a pulled completed session through listSessionListBuckets', async () => {
-    // Layer-2 pull #1 hands back one completed session (sessions moved to
-    // Layer 2 with the session planning topology); every other pull empty.
+    // Layer-3 pull #1 hands back one completed session (sessions moved to
+    // Layer 3 with the session planning topology); every other pull empty.
     let layer1Pulls = 0;
     mockRpc.mockImplementation(async (name: string, args: { layer?: number }) => {
       if (name === 'sync_pull') {
-        if (args.layer === 2) {
+        if (args.layer === 3) {
           layer1Pulls += 1;
           if (layer1Pulls === 1) {
             return {

@@ -72,7 +72,7 @@ appId: com.dinoderek.mobile
 # SDK 58 can open the developer overlay directly, without the intro.
 - extendedWaitUntil:
     visible:
-      text: "Continue|Close"
+      text: "Continue|Close|You have changed the icon.*"
     timeout: 30000
 - waitForAnimationToEnd:
     timeout: 4000

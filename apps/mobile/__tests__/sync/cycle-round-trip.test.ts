@@ -325,9 +325,9 @@ describe('sync cycle round-trip against a live endpoint', () => {
     // of each layer by following the cursor until the server reports no more.
     const scoped = authed.client.schema(SYNC_RPC_SCHEMA);
     const seen = new Set<string>();
-    // Five layers under the session planning topology (0..4); exercise_sets moved
-    // to layer 4.
-    for (let layer = 0; layer < 5; layer += 1) {
+    // Six layers under the Routine topology (0..5); exercise_sets moved
+    // to layer 5.
+    for (let layer = 0; layer < 6; layer += 1) {
       let cursor: unknown = null;
       // Bounded loop: the server always advances the cursor and eventually
       // reports `has_more = false`; the cap is a safety stop against a runaway.
@@ -398,7 +398,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
 
     // Each layer's cursor advanced (every layer drained at least one row).
     const cursorMap = readCursorMap();
-    for (const layer of ['0', '1', '2', '3', '4']) {
+    for (const layer of ['0', '1', '3', '4', '5']) {
       expect(cursorMap[layer]).not.toBeNull();
       expect(cursorMap[layer]).toBeDefined();
     }
@@ -416,11 +416,11 @@ describe('sync cycle round-trip against a live endpoint', () => {
     expect(storedReading?.localDirty).toBe(false);
 
     // Model an upgraded device whose legacy cursors are already advanced.
-    // The reading (layer 4) and the sessions chain (sessions now layer 2) must
+    // The reading (layer 5) and the sessions chain (sessions in layer 3) must
     // re-pull, so drop those layer cursors; layers 0 and 1 are untouched and
     // must not move.
     const existingCursors = readCursorMap();
-    delete existingCursors['4'];
+    delete existingCursors['5'];
     delete existingCursors['2'];
     delete existingCursors['3'];
     database.update(sessions).set({
@@ -430,7 +430,7 @@ describe('sync cycle round-trip against a live endpoint', () => {
     database.update(syncRuntimeState).set({ pullCursor: existingCursors }).run();
     expect(await runSyncCycle()).toBe('converged');
     expect(database.select().from(bodyWeightMeasurements).where(eq(bodyWeightMeasurements.id, readingId)).get()).toEqual(storedReading);
-    expect(readCursorMap()['4']).toBeDefined();
+    expect(readCursorMap()['5']).toBeDefined();
     for (const layer of ['0', '1']) expect(readCursorMap()[layer]).toEqual(existingCursors[layer]);
     expect(database.select().from(sessions).where(eq(sessions.id, ids.session)).get()).toMatchObject({
       durationSec: 123, localDirty: false,

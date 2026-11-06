@@ -57,16 +57,20 @@ jest.mock('@/src/auth/supabase', () =>
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import {
+  exerciseDefinitions,
   exerciseSets,
   muscleGroups,
   sessionExercises,
   sessionPlanExercises,
   sessionPlanSets,
   sessionPlans,
+  sessionPlanUses,
   sessions,
   syncRuntimeState,
 } from '@/src/data/schema';
 import { runSyncCycle, type SyncCycleOutcome } from '@/src/sync/cycle';
+import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
+import { addPlanBlockToSession, planQueries, planRepository, skipSessionPlanUse, startSessionPlan } from '@/src/session-planner';
 
 const config = readSyncTestEndpoint();
 
@@ -94,12 +98,26 @@ interface DeviceFixture {
   database: InMemoryTestDatabase;
 }
 
+// Fresh owner keeps recent completed Routine uses out of the coaching fixture account.
+async function fixtureUser(method: string, path: string, body?: unknown): Promise<{ id: string }> {
+  if (!['127.0.0.1', 'localhost'].includes(new URL(config.url).hostname)) throw new Error('Local fixture required');
+  const key = process.env.SYNC_TEST_SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error('Run through boga test sync-infra');
+  const response = await fetch(config.url + '/auth/v1/admin/users' + path, {
+    method, headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok) throw new Error('Fixture user request failed: ' + response.status);
+  return response.json() as Promise<{ id: string }>;
+}
+
 describe('block-attachment arbitration across devices against a live endpoint', () => {
   let authed: AuthedTestClient;
+  let isolatedUserId: string;
   const openFixtures: InMemoryDatabaseFixture[] = [];
 
   const makeDevice = (): DeviceFixture => {
-    const fixture = createInMemoryDatabase();
+    const fixture = createInMemoryDatabase({ foreignKeys: true });
     openFixtures.push(fixture);
     const { database } = fixture;
     const now = new Date();
@@ -126,13 +144,16 @@ describe('block-attachment arbitration across devices against a live endpoint', 
   const planStampMs = Date.now();
 
   /** Seeds the plan graph; dirty seeds push, clean seeds behave as pulled rows. */
-  const seedPlanGraph = (database: InMemoryTestDatabase, ids: ArbitrationIds, dirty: boolean): void => {
+  const seedPlanGraph = (database: InMemoryTestDatabase, ids: ArbitrationIds, dirty: boolean, routine = false): void => {
     const stamp = planStampMs;
+    if (routine) database.insert(exerciseDefinitions).values({ id: `${ids.plan}-definition`, name: 'Back Squat',
+      localDirty: dirty, localUpdatedAtMs: stamp }).run();
     database
       .insert(sessionPlans)
       .values({
         id: ids.plan,
         title: 'Arbitration Plan',
+        isRoutine: routine,
         localDirty: dirty,
         localUpdatedAtMs: stamp,
       })
@@ -144,6 +165,7 @@ describe('block-attachment arbitration across devices against a live endpoint', 
         sessionPlanId: ids.plan,
         orderIndex: 0,
         name: 'Back Squat',
+        exerciseDefinitionId: routine ? `${ids.plan}-definition` : null,
         progressStatus: 'pending',
         localDirty: dirty,
         localUpdatedAtMs: stamp,
@@ -240,11 +262,14 @@ describe('block-attachment arbitration across devices against a live endpoint', 
   };
 
   beforeAll(async () => {
-    authed = await createAuthedTestClient(config);
+    const credentials = { email: makeIds().plan + '@example.test', password: 'ArbitrationFixture!234' };
+    isolatedUserId = (await fixtureUser('POST', '', { ...credentials, email_confirm: true })).id;
+    authed = await createAuthedTestClient(config, credentials);
   }, 60_000);
 
   afterAll(async () => {
     await authed?.teardown();
+    if (isolatedUserId) await fixtureUser('DELETE', '/' + isolatedUserId);
   });
 
   beforeEach(() => {
@@ -318,15 +343,121 @@ describe('block-attachment arbitration across devices against a live endpoint', 
 
     // The server holds exactly one live card claiming the block (B's), and
     // exactly one live set claiming the target.
-    const layer3 = await pullLayerEntities(3);
+    const layer3 = await pullLayerEntities(4);
     const claimingCards = layer3.filter(
       (entity) => entity.type === 'session_exercises' && entity.fields.source_plan_exercise_id === ids.block,
     );
     expect(claimingCards.map((entity) => entity.id)).toEqual(['card-winner']);
-    const layer4 = await pullLayerEntities(4);
+    const layer4 = await pullLayerEntities(5);
     const claimingSets = layer4.filter(
       (entity) => entity.type === 'exercise_sets' && entity.fields.source_plan_set_id === ids.targetA,
     );
     expect(claimingSets.map((entity) => entity.id)).toEqual(['set-winner']);
   }, 120_000);
+
+  const startOn = async (device: DeviceFixture, planId: string) => {
+    mockBootstrapState.database = device.database;
+    const result = await startSessionPlan(planId);
+    if (result.status !== 'started') throw new Error('Fixture start failed: ' + result.status);
+    return (await loadSessionSnapshotById(result.sessionId))!;
+  };
+  const enterWorkOn = async (device: DeviceFixture, snapshot: NonNullable<Awaited<ReturnType<typeof loadSessionSnapshotById>>>) => {
+    mockBootstrapState.database = device.database;
+    const card = snapshot.exercises[0];
+    await persistSessionDraftSnapshot({ sessionId: snapshot.sessionId, sourcePlanId: snapshot.sourcePlanId,
+      sourcePlanUseId: snapshot.sourcePlanUseId, gymId: null, startedAt: snapshot.startedAt,
+      exercises: [{ ...card, sets: [{ ...card.sets[0], weightValue: '93', repsValue: '4', performanceStatus: null }] }],
+    });
+  };
+
+  it.each(['workout', 'skip'] as const)('arbitrates offline Start against %s, retaining actuals and refusing stale recorder provenance', async winnerKind => {
+    const ids = makeIds();
+    const winner = makeDevice(), loser = makeDevice();
+    seedPlanGraph(winner.database, ids, true, true);
+    seedPlanGraph(loser.database, ids, false, true);
+    mockBootstrapState.database = winner.database;
+    if (winnerKind === 'workout') await startOn(winner, ids.plan);
+    else expect((await skipSessionPlanUse(ids.plan, `${ids.plan}-skip`)).status).toBe('skipped');
+    const opened = await startOn(loser, ids.plan);
+    await enterWorkOn(loser, opened);
+    expect(await runCycleOn(winner)).toBe('converged');
+    expect(await runCycleOn(loser)).toBe('converged');
+    const repaired = loser.database.select().from(sessionPlanUses).where(eq(sessionPlanUses.id, opened.sourcePlanUseId!)).get()!;
+    expect(repaired.deletedAt).not.toBeNull();
+    expect(loser.database.select().from(exerciseSets).where(eq(exerciseSets.id, opened.exercises[0].sets[0].id)).get())
+      .toMatchObject({ sourcePlanSetId: null, sourcePlanUseId: null, weightValue: '93', repsValue: '4', localDirty: false });
+    // An editor opened offline may still hold the old use links after repair.
+    await enterWorkOn(loser, opened);
+    expect(await runCycleOn(loser)).toBe('converged');
+    const retained = (await loadSessionSnapshotById(opened.sessionId))!;
+    expect(retained.sourcePlanUseId).toBeNull();
+    expect(retained.sourcePlanId).toBeNull();
+    expect(retained.exercises[0].sets[0]).toMatchObject({ sourcePlanSetId: null, sourcePlanUseId: null, weightValue: '93', repsValue: '4' });
+    const claims = (await pullLayerEntities(2)).filter(entity => entity.type === 'session_plan_uses' &&
+      entity.fields.session_plan_id === ids.plan && entity.fields.deleted_at === null);
+    expect(claims).toHaveLength(1);
+    expect(claims[0].fields.kind).toBe(winnerKind);
+  }, 120_000);
+
+  it('converges offline conversion of the same entirely skipped one-off with different recovered dates', async () => {
+    const ids = makeIds(), first = makeDevice(), second = makeDevice();
+    seedPlanGraph(first.database, ids, true);
+    seedPlanGraph(second.database, ids, false);
+    const firstDate = new Date(Date.now() - 2000), secondDate = new Date(Date.now() - 1000);
+    const convert = async (device: DeviceFixture, resolvedAt: Date) => {
+      device.database.update(sessionPlanExercises).set({ progressStatus: 'skipped', resolvedAt,
+        localDirty: true, localUpdatedAtMs: resolvedAt.getTime() }).where(eq(sessionPlanExercises.id, ids.block)).run();
+      mockBootstrapState.database = device.database;
+      expect((await planRepository.updatePlanMeta(ids.plan, { isRoutine: true })).status).toBe('updated');
+      return device.database.select().from(sessionPlanUses).get()!;
+    };
+    const accepted = await convert(first, firstDate), competing = await convert(second, secondDate);
+    expect(accepted.id).not.toBe(competing.id);
+    expect(await runCycleOn(first)).toBe('converged');
+    expect(await runCycleOn(second)).toBe('converged');
+    expect(second.database.select().from(sessionPlanUses).where(eq(sessionPlanUses.id, competing.id)).get()!.deletedAt).not.toBeNull();
+    const use = second.database.select().from(sessionPlanUses).where(eq(sessionPlanUses.id, accepted.id)).get()!;
+    expect(use).toMatchObject({ skippedAt: firstDate, deletedAt: null, localDirty: false });
+    expect(await runCycleOn(second)).toBe('converged');
+  }, 120_000);
+
+  it('resumes the existing scoped card after turning Routine off and syncs without an ordinary duplicate', async () => {
+    const ids = makeIds(), device = makeDevice();
+    seedPlanGraph(device.database, ids, true, true);
+    const opened = await startOn(device, ids.plan);
+    expect((await planRepository.updatePlanMeta(ids.plan, { isRoutine: false })).status).toBe('updated');
+    expect(await addPlanBlockToSession(ids.block)).toMatchObject({ status: 'attached',
+      sessionId: opened.sessionId, sessionExerciseId: opened.exercises[0].id });
+    expect(device.database.select().from(sessionExercises).all()).toHaveLength(1);
+    expect(await runCycleOn(device)).toBe('converged');
+  }, 120_000);
+
+  it('restores repeated workouts and more than one page of Skip uses into a wiped device with foreign keys enabled', async () => {
+    const ids = makeIds(), original = makeDevice();
+    seedPlanGraph(original.database, ids, true, true);
+    const first = await startOn(original, ids.plan);
+    await enterWorkOn(original, first);
+    await completeSessionDraft(first.sessionId, { completedAt: new Date() });
+    const second = await startOn(original, ids.plan);
+    expect(second.sourcePlanUseId).not.toBe(first.sourcePlanUseId);
+    expect(second.exercises[0].sets[0].performanceStatus).toBe('planned');
+    await enterWorkOn(original, second);
+    await completeSessionDraft(second.sessionId, { completedAt: new Date() });
+    for (let index = 0; index < 201; index += 1) {
+      expect((await skipSessionPlanUse(ids.plan, `${ids.plan}-skip-${index}`)).status).toBe('skipped');
+    }
+    expect(await runCycleOn(original)).toBe('converged');
+    const priorHistory = [await loadSessionSnapshotById(first.sessionId), await loadSessionSnapshotById(second.sessionId)];
+    const wiped = makeDevice();
+    expect(await runCycleOn(wiped)).toBe('converged');
+    expect(wiped.database.select().from(sessionPlanUses).all().filter(use => use.sessionPlanId === ids.plan)).toHaveLength(203);
+    expect(await loadSessionSnapshotById(first.sessionId)).toEqual(priorHistory[0]);
+    expect(await loadSessionSnapshotById(second.sessionId)).toEqual(priorHistory[1]);
+    expect(wiped.fixture.client.pragma('foreign_key_check')).toEqual([]);
+    const detail = (await planQueries.loadPlanDetail(ids.plan))!;
+    expect(detail.routine).toMatchObject({ activeSessionId: null, hasKnownUse: true,
+      lastCompletedAt: priorHistory[1]!.completedAt, lastSkippedAt: expect.any(Date) });
+    expect(await runCycleOn(wiped)).toBe('converged');
+  }, 120_000);
+
 });

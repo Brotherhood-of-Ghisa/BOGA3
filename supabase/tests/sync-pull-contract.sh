@@ -8,7 +8,7 @@
 # Scenarios covered:
 #   1. Snapshot pull (cursor=null)
 #   2. Paginated drain (limit=2 over 5 rows)
-#   3. Layer→type mapping integrity (all five layers, all ten entities;
+#   3. Layer→type mapping integrity (all six layers, all ten entities;
 #      asserts the topological-layer partition: pairwise disjoint, union = all 10)
 #   4. RLS isolation (user_a vs user_b)
 #   5. Tombstones included (rows with deleted_at != null appear in the pull)
@@ -116,7 +116,7 @@ sync_pull() {
     -X POST \
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${bearer}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" \
     -H "Accept: application/json" \
     -H "Accept-Profile: app_public" \
     -H "Content-Profile: app_public" \
@@ -136,7 +136,7 @@ sync_pull_anon() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" \
     -H "Accept: application/json" \
     -H "Accept-Profile: app_public" \
     -H "Content-Profile: app_public" \
@@ -183,7 +183,7 @@ sign_in() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-5}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -372,7 +372,7 @@ cleanup_run_rows
 # Scenario 3: Layer→type mapping integrity — THE plan-level outcome.
 #
 # Seed at least one row of EVERY entity type for user A, with a fully-
-# connected FK chain. Drain each FK-bearing layer (0..4) in pages so rows
+# connected FK chain. Drain each FK-bearing layer (0..5) in pages so rows
 # left by other local suites cannot push our fixture beyond the first page.
 # Assert each layer's response `type` set equals exactly the topological-layer mapping;
 # union = all ten; pairwise disjoint.
@@ -476,28 +476,28 @@ L1_TYPES="${LAYER_TYPES}"
 [[ "${L1_TYPES}" == '["exercise_group_links","exercise_muscle_mappings","exercise_tag_definitions"]' ]] \
   || fail "scenario 3 layer 1: expected {exercise_muscle_mappings, exercise_tag_definitions, exercise_group_links}, got ${L1_TYPES}"
 
-collect_fixture_types_for_layer 2
-L2_TYPES="${LAYER_TYPES}"
-[[ "${L2_TYPES}" == '["sessions"]' ]] \
-  || fail "scenario 3 layer 2: expected {sessions}, got ${L2_TYPES}"
-
 collect_fixture_types_for_layer 3
 L3_TYPES="${LAYER_TYPES}"
-[[ "${L3_TYPES}" == '["session_exercises"]' ]] \
-  || fail "scenario 3 layer 3: expected {session_exercises}, got ${L3_TYPES}"
+[[ "${L3_TYPES}" == '["sessions"]' ]] \
+  || fail "scenario 3 layer 3: expected {sessions}, got ${L3_TYPES}"
 
 collect_fixture_types_for_layer 4
 L4_TYPES="${LAYER_TYPES}"
-[[ "${L4_TYPES}" == '["exercise_sets","session_exercise_tags"]' ]] \
-  || fail "scenario 3 layer 4: expected {exercise_sets, session_exercise_tags}, got ${L4_TYPES}"
+[[ "${L4_TYPES}" == '["session_exercises"]' ]] \
+  || fail "scenario 3 layer 4: expected {session_exercises}, got ${L4_TYPES}"
+
+collect_fixture_types_for_layer 5
+L5_TYPES="${LAYER_TYPES}"
+[[ "${L5_TYPES}" == '["exercise_sets","session_exercise_tags"]' ]] \
+  || fail "scenario 3 layer 5: expected {exercise_sets, session_exercise_tags}, got ${L5_TYPES}"
 
 # Union equals all ten; pairwise disjoint (jq computes both at once).
 UNION_AND_DISJOINT="$(jq -nc \
   --argjson l0 "${L0_TYPES}" \
   --argjson l1 "${L1_TYPES}" \
-  --argjson l2 "${L2_TYPES}" \
-  --argjson l3 "${L3_TYPES}" \
-  --argjson l4 "${L4_TYPES}" '
+  --argjson l2 "${L3_TYPES}" \
+  --argjson l3 "${L4_TYPES}" \
+  --argjson l4 "${L5_TYPES}" '
   ($l0 + $l1 + $l2 + $l3 + $l4) as $all
   | {
       union_sorted: ($all | unique | sort),
@@ -673,21 +673,21 @@ pass "scenario 8: limit bounds (0 rejected, 201 rejected, 200 accepted)"
 # -----------------------------------------------------------------------------
 # Scenario 9: Layer bounds.
 #
-# layer=-1 rejected; layer=5 rejected; layer=0..4 each accepted (snapshot,
+# layer=-1 rejected; layer=6 rejected; layer=0..5 each accepted (snapshot,
 # may return empty entities).
 # -----------------------------------------------------------------------------
 
 echo "[sync-pull-contract] scenario 9: layer bounds"
 sync_pull '{"layer":-1,"cursor":null,"limit":10}'
 assert_jq '.error.code == "INTERNAL"' "scenario 9 layer=-1 INTERNAL error"
-sync_pull '{"layer":5,"cursor":null,"limit":10}'
-assert_jq '.error.code == "INTERNAL"' "scenario 9 layer=5 INTERNAL error"
-for layer in 0 1 2 3 4; do
+sync_pull '{"layer":6,"cursor":null,"limit":10}'
+assert_jq '.error.code == "INTERNAL"' "scenario 9 layer=6 INTERNAL error"
+for layer in 0 1 2 3 4 5; do
   sync_pull '{"layer":'"${layer}"',"cursor":null,"limit":10}'
   assert_status "200" "scenario 9 layer=${layer} status"
   assert_jq '.error == null or (has("entities") and has("next_cursor") and has("has_more"))' "scenario 9 layer=${layer} accepted"
 done
-pass "scenario 9: layer bounds (-1 and 5 rejected, 0..4 accepted)"
+pass "scenario 9: layer bounds (-1 and 6 rejected, 0..5 accepted)"
 
 # -----------------------------------------------------------------------------
 # Scenario 10: AUTH_REQUIRED.

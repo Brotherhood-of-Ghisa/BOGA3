@@ -360,6 +360,7 @@ describe('describeServerFkViolation', () => {
           session_id: 'sess-1',
           exercise_definition_id: 'def-missing',
           source_plan_exercise_id: null,
+          source_plan_use_id: null,
         },
       },
     ]);
@@ -377,6 +378,7 @@ describe('describeServerFkViolation', () => {
       'exercise_definition_id',
       'session_id',
       'source_plan_exercise_id',
+      'source_plan_use_id',
     ]);
   });
 
