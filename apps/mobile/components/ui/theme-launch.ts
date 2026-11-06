@@ -19,10 +19,10 @@ import {
 
 
 // The chosen appearance, per device: it is not synced to the account. Read
-// synchronously, once, when `tokens.ts` first evaluates — about a hundred
-// modules bake `uiRoles` into a module-scope `StyleSheet.create`, so a choice
-// takes effect on the next launch (`docs/specs/ui/design-language.md` §2,
-// "Choosing one").
+// synchronously when `tokens.ts` first evaluates, for the launch-time
+// `uiRoles` / `uiMode`. Modules that still read those take a choice on the
+// next launch (`docs/specs/ui/design-language.md` §2, "Choosing one");
+// modules that read the theme hooks (`theme-context.tsx`) follow each save.
 //
 // The record (`theme-record.ts`). Every save writes it.
 export const APPEARANCE_STORAGE_KEY = 'boga3.appearance.v3';

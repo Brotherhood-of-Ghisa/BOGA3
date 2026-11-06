@@ -6,7 +6,7 @@ Progress pushes (`components/stats/history-view.tsx`, route
 
 | File | What it is |
 |------|-----------|
-| `heatmap-metric.ts` | Pure, RN-free helpers: `getMetricValue`, `getCalendarHeatmapBucket`, `getCurrentLocalDateKey`, `HEAT_RAMP` (the `viz0`…`viz4` roles). |
+| `heatmap-metric.ts` | Pure, RN-free helpers: `getMetricValue`, `getCalendarHeatmapBucket`, `getCurrentLocalDateKey`, `heatRamp(roles)` (the `viz0`…`viz4` roles). |
 | `heatmapData.ts`    | `buildHeatmapData(dailyMetrics, metric, opts)` → `HeatmapData` (`{ daily, weekly, todayDateKey }`). Pure adapter; no RN imports. |
 | `heatmap-style.ts`  | Shared micro-label and Week-column spacing styles. |
 | `HeatmapLegend.tsx` | The percentage reference and 0%…100% ramp above each chart. |
@@ -122,7 +122,7 @@ short windows have no implicit 52-week minimum.
 ## Look
 
 - **Design language only** (`docs/specs/ui/design-language.md` §2): cells and
-  bars on `HEAT_RAMP` (`uiRoles.viz0`…`viz4`); an empty day is `viz0` with a
+  bars on `heatRamp` (the `viz0`…`viz4` roles); an empty day is `viz0` with a
   `rule` hairline. No legacy palette and no hard-coded colours.
 - **No highlight outlines:** tiles keep only their `rule` border and bars
   have no border; nothing outlines the current or a selected tile/bar.
