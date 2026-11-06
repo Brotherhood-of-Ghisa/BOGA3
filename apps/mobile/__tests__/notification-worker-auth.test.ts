@@ -1,4 +1,4 @@
-/** @jest-environment node */
+/** @jest-environment ./jest.node-environment.js */
 import { handleNotificationRequest, notificationServiceKeys, type Rpc } from '../../../supabase/functions/notification-worker/handler';
 
 const secretKeys = JSON.stringify({ default: 'sb_secret_worker', other: 'sb_secret_other' });

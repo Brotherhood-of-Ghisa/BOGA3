@@ -1,4 +1,4 @@
-/** @jest-environment node */
+/** @jest-environment ./jest.node-environment.js */
 // The groups performance harness's helpers: cron rates, the fixture's SQL
 // and its guards, the RPC statement builder, the scenario completeness rule
 // and the load run's pure pieces. The live lanes are groups-perf and

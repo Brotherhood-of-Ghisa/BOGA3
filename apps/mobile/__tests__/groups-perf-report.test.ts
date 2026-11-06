@@ -1,4 +1,4 @@
-/** @jest-environment node */
+/** @jest-environment ./jest.node-environment.js */
 // The groups performance harness's counters and report: EXPLAIN parsing,
 // table deltas, slopes per doubling, the report-only assertions and the
 // summary tables. Pure; the live lanes are groups-perf and groups-perf-load.
