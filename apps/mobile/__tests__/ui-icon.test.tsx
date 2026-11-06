@@ -6,6 +6,9 @@ import { Circle, Path } from 'react-native-svg';
 import { ICON_GLYPHS } from '@/components/ui/icon-glyphs';
 import { Icon, type IconName, uiIconSize, uiRoles } from '@/components/ui';
 
+import { requireWithReactCompiler } from './helpers/react-compiler';
+import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
+
 const ICON_NAMES = Object.keys(ICON_GLYPHS) as IconName[];
 
 describe('Icon', () => {
@@ -36,6 +39,36 @@ describe('Icon', () => {
 
     rerender(<Icon color={uiRoles.danger} name="x" />);
     expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([uiRoles.danger, uiRoles.danger]);
+  });
+
+  it('paints in a role named by `role`, which wins over the glyph\'s own', () => {
+    const { UNSAFE_getAllByType, rerender } = render(<Icon name="x" role="inkMuted" />);
+    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([uiRoles.inkMuted, uiRoles.inkMuted]);
+
+    rerender(<Icon name="set-current" role="danger" />);
+    expect(UNSAFE_getAllByType(Circle)[0].props.stroke).toBe(uiRoles.danger);
+  });
+
+  // The Icon colour pattern: a call site names the role, and the icon reads
+  // the roles itself, so it repaints with the theme. Compiled as the device
+  // runs it, so a cached read would show here.
+  it('repaints its role, its glyph default and its knockout when the theme is saved', async () => {
+    const { Icon: CompiledIcon } = requireWithReactCompiler<typeof import('@/components/ui/icon')>('components/ui/icon.tsx');
+    const slateDark = { theme: 'slate', mode: 'dark', custom: null } as const;
+    const slate = rolesFor(slateDark);
+    const { UNSAFE_getAllByType } = renderWithTheme(
+      <>
+        <CompiledIcon name="x" role="accent" />
+        <CompiledIcon name="set-done" />
+      </>,
+    );
+    expect(UNSAFE_getAllByType(Path)[0].props.stroke).toBe(uiRoles.accent);
+
+    await switchTheme(slateDark);
+    const [cross, , tick] = UNSAFE_getAllByType(Path);
+    expect(cross.props.stroke).toBe(slate.accent);
+    expect(UNSAFE_getAllByType(Circle)[0].props).toMatchObject({ fill: slate.ink, stroke: slate.ink });
+    expect(tick.props.stroke).toBe(slate.onInk);
   });
 
   // design-language §5: filled check = done, accent ring = current, dashed

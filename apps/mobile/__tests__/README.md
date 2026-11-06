@@ -113,6 +113,18 @@
   colour literal outside the theme files, no fixed `themeVariant`, status-bar
   style, keyboard or alert style, and no OS-mode read but `theme-launch.ts`,
   with self-tests for what it rejects and allows.
+- `ui-theme-context.test.tsx` covers the live theme (`components/ui/theme-context.tsx`):
+  the provider starting from the stored choice and re-resolving roles and
+  mode on each save, an unchanged save keeping the same roles, an unreadable
+  store keeping the theme and logging, and `makeStyles` building one sheet per
+  set of roles; a fixture component loaded through the React Compiler
+  repaints on a switch. Render a themed component with
+  `helpers/theme.tsx` (`renderWithTheme`, `switchTheme`), and take expected
+  colours from `rolesFor(...)`, not from `uiRoles`.
+- `ui-live-theme-guard.test.ts` fails on any code read of `uiRoles` / `uiMode`
+  in `app/`, `components/` or `src/` outside
+  `ui-live-theme-guard.allowlist.json`, the files still to migrate. A
+  migrated file leaves the list in the same change; the list only shrinks.
 - `ui-on-colour-guard.test.ts` keeps `surface` a ground: any use in `app/` or
   `components/` other than a `backgroundColor`, a shape's `fill` or a role set
   handed on fails, with self-tests for what it rejects and allows.
