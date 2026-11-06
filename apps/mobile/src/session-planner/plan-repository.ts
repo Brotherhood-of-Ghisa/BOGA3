@@ -48,6 +48,7 @@ export type PlanMutationResult =
   | { status: 'immutable-block' }
   | { status: 'limit-exceeded' }
   | { status: 'invalid-order' }
+  | { status: 'stale-edit' }
   | { status: 'validation-failed'; errors: PlanFieldError[] };
 
 export type PlanRepository = {
@@ -57,7 +58,7 @@ export type PlanRepository = {
   createProgramme(draft: ProgrammeDraft, now?: Date): Promise<PlanMutationResult>;
   updatePlanMeta(
     planId: string,
-    patch: { title?: string; gymId?: string | null; scheduledFor?: Date | null },
+    patch: { title?: string; gymId?: string | null; scheduledFor?: Date | null; isRoutine?: boolean },
     now?: Date,
   ): Promise<PlanMutationResult>;
   updatePlanBlock(planExerciseId: string, draft: PlanExerciseDraft, now?: Date): Promise<PlanMutationResult>;
@@ -97,6 +98,7 @@ const toStorePlanInput = (plan: NormalizedPlan, options: { planId?: string } = {
   gymId: plan.gymId,
   title: plan.title,
   scheduledFor: plan.scheduledFor,
+  isRoutine: plan.isRoutine,
   exercises: plan.exercises.map((exercise) => toStoreExercise(exercise)),
 });
 
@@ -155,6 +157,7 @@ const toDuplicatePlanInput = (
       : `${graph.plan.title}${copySuffix}`;
   return {
     gymId: graph.plan.gymId,
+    isRoutine: graph.plan.isRoutine,
     title: patch?.title ?? defaultTitle,
     scheduledFor: patch?.scheduledFor === undefined ? null : patch.scheduledFor,
     exercises: graph.exercises.map((exercise) => ({
@@ -169,6 +172,11 @@ const toDuplicatePlanInput = (
   };
 };
 
+const routineProgrammeRefusal = (): PlanMutationResult => ({
+  status: 'validation-failed',
+  errors: [{ path: 'isRoutine', code: 'invalid_routine', message: 'A Routine must be standalone.' }],
+});
+
 export const createPlanRepository = (): PlanRepository => ({
   async createPlan(draft, now = new Date()) {
     const validation = validatePlanDraft(draft);
@@ -180,6 +188,7 @@ export const createPlanRepository = (): PlanRepository => ({
   },
 
   async createPlanInProgramme(programmeId, draft, now = new Date()) {
+    if (draft.isRoutine) return routineProgrammeRefusal();
     const validation = validatePlanDraft(draft);
     if (!validation.ok) {
       return { status: 'validation-failed', errors: validation.errors };
@@ -217,6 +226,7 @@ export const createPlanRepository = (): PlanRepository => ({
     const title = patch.title ?? graph.plan.title;
     const gymId = patch.gymId === undefined ? graph.plan.gymId : patch.gymId;
     const scheduledFor = patch.scheduledFor === undefined ? graph.plan.scheduledFor : patch.scheduledFor;
+    if (patch.isRoutine && graph.plan.programmeId !== null) return routineProgrammeRefusal();
     const validation = validatePlanMetaFields(title, scheduledFor);
     if (!validation.ok) {
       return { status: 'validation-failed', errors: validation.errors };
@@ -226,6 +236,7 @@ export const createPlanRepository = (): PlanRepository => ({
       title: validation.value.title,
       gymId,
       scheduledFor,
+      isRoutine: patch.isRoutine,
       now,
     });
     return wrote ? { status: 'updated' } : { status: 'not-found' };

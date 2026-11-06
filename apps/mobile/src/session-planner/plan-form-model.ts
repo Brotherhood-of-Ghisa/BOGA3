@@ -16,6 +16,7 @@ import type { PlanDraft, PlanFieldError } from './types';
 export type PlanFormSet = {
   /** Client-side key only; the store assigns real ids on save. */
   id: string;
+  sourceSetId?: string;
   targetWeightText: string;
   targetRepsText: string;
   targetSetType: SessionSetTypeValue;
@@ -34,6 +35,11 @@ export type PlanFormBlock = {
 
 export type PlanFormState = {
   title: string;
+  isRoutine?: boolean;
+  programmeId?: string | null;
+  editVersion?: string;
+  /** Preserve seconds/milliseconds when the minute-level schedule field is unchanged. */
+  initialScheduledFor?: Date | null;
   /** `YYYY-MM-DD HH:mm`, '' when unscheduled — the session times' format. */
   scheduleText: string;
   gymId: string | null;
@@ -71,7 +77,7 @@ export const planSetCountError = (setCount: number, countText: string): string |
 export const addPlanFormSets = (sets: PlanFormSet[], countText: string): PlanFormSet[] => {
   const source = sets.at(-1);
   if (!source || planSetCountError(sets.length, countText)) return sets;
-  const copies = Array.from({ length: Number(countText) }, () => ({ ...source, id: nextKey('set') }));
+  const copies = Array.from({ length: Number(countText) }, () => ({ ...source, sourceSetId: undefined, id: nextKey('set') }));
   return [...sets, ...copies];
 };
 
@@ -141,6 +147,10 @@ export const planFormFromDetail = (
   catalogExercises?: LoadInputModeLookup | null,
 ): PlanFormState => ({
   title: detail.title,
+  isRoutine: detail.isRoutine ?? false,
+  programmeId: detail.programmeId,
+  editVersion: detail.editVersion,
+  initialScheduledFor: detail.scheduledFor,
   scheduleText:
     detail.scheduledFor !== null ? formatScheduleText(detail.scheduledFor) : '',
   gymId: detail.gymId,
@@ -152,6 +162,7 @@ export const planFormFromDetail = (
     loadInputMode: resolveBlockLoadInputMode(block.exerciseDefinitionId, catalogExercises),
     sets: block.targets.map((target) => ({
       id: nextKey('set'),
+      sourceSetId: target.id,
       targetWeightText: target.targetWeightValue ?? '',
       targetRepsText: String(target.targetReps),
       targetSetType: target.targetSetType,
@@ -187,13 +198,15 @@ export const planFormToDraft = (
     if (!parsed) {
       return { draft: null, scheduleError: 'Enter a valid date and time in YYYY-MM-DD HH:mm format.' };
     }
-    scheduledFor = parsed;
+    scheduledFor = state.initialScheduledFor && text === formatScheduleText(state.initialScheduledFor)
+      ? state.initialScheduledFor : parsed;
   }
   return {
     draft: {
       title: state.title,
       gymId: state.gymId,
       scheduledFor,
+      ...(state.isRoutine !== undefined ? { isRoutine: state.isRoutine } : {}),
       exercises: state.blocks.map((block) => ({
         exerciseDefinitionId: block.exerciseDefinitionId,
         name: block.name,

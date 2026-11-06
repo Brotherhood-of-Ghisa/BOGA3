@@ -51,11 +51,12 @@ import SessionPlanNewRoute, { SessionPlanNewScreen } from '@/app/session-plan/ne
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
-import { sessions, sessionPlanExercises } from '@/src/data/schema';
+import { sessions, sessionPlanExercises, sessionPlans, sessionPlanUses } from '@/src/data/schema';
+import * as routineUseStore from '@/src/data/session-plan-use-store';
 import { eq } from 'drizzle-orm';
 import { PlanCardChoiceSheet } from '@/components/session-planner/plan-card-choice-sheet';
 import { PlanFormScreen } from '@/components/session-planner/plan-form-screen';
-import { planRepository, savePlanEdits, startSessionPlan } from '@/src/session-planner';
+import { planRepository, savePlanEdits, skipSessionPlanUse, startSessionPlan } from '@/src/session-planner';
 import { planFormFromDetail, type PlanFormState } from '@/src/session-planner/plan-form-model';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { completeActiveSession, loadActiveSessionGraph } from '@/src/session-recorder/session-lifecycle';
@@ -1253,5 +1254,173 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
     // In the exercise-browser fixture, Barbell Squat has past sessions.
     // It should render its last completed date / session count rather than "Never done".
     expect(await screen.findByText(/Last:.*·.*session/)).toBeTruthy();
+  });
+});
+
+describe('Routine screens over real data', () => {
+  const createRoutine = async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    await planRepository.updatePlanMeta(planId, { isRoutine: true });
+    return planId;
+  };
+  const openRoutine = async (planId: string) => {
+    mockParams = { planId };
+    const view = render(<SessionPlanDetailRoute />);
+    await screen.findByTestId('plan-detail');
+    return view;
+  };
+
+  it('locks Schedule with a passive Anytime row, restores the picker and retains the exact saved instant', async () => {
+    await seedCatalog();
+    const scheduledFor = new Date(2026, 10, 6, 8, 12, 34, 567);
+    const planId = await createPlanThroughRepository({ scheduledFor });
+    render(<SessionPlanNewScreen editPlanId={planId} fromPlanId={null} />);
+    await screen.findByTestId('plan-form-title');
+    fireEvent.press(screen.getByTestId('plan-form-routine'));
+    expect(screen.getByTestId('plan-form-routine')).toHaveProp('accessibilityState', expect.objectContaining({ checked: true }));
+    expect(screen.getByLabelText('Schedule, Anytime, locked while Routine is on')).toBeTruthy();
+    expect(screen.getByTestId('plan-form-schedule').props.onPress).toBeUndefined();
+    expect(screen.queryByRole('button', { name: /^Plan schedule/ })).toBeNull();
+    fireEvent.press(screen.getByTestId('plan-form-routine'));
+    fireEvent.press(screen.getByTestId('plan-form-schedule'));
+    expect(screen.getByTestId('plan-schedule-picker-native')).toHaveProp('value', new Date(2026, 10, 6, 8, 12));
+    fireEvent.press(screen.getByTestId('plan-schedule-confirm-button'));
+    fireEvent.press(screen.getByTestId('plan-form-routine'));
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    await waitFor(() => expect(mockBack).toHaveBeenCalledTimes(1));
+    expect(localDatabase().select().from(sessionPlans).where(eq(sessionPlans.id, planId)).get())
+      .toMatchObject({ isRoutine: true, scheduledFor });
+  });
+
+  it('retains the switch, schedule and typed title after a failed create and saves them on Retry', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository({ scheduledFor: new Date(2026, 10, 8, 11, 30) });
+    jest.spyOn(planRepository, 'createPlan').mockRejectedValueOnce(new Error('SQLITE_FULL: simulated write failure'));
+    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={planId} />);
+    await screen.findByTestId('plan-form-title');
+    fillTitle('Travel Routine');
+    fireEvent.press(screen.getByTestId('plan-form-routine'));
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    await screen.findByTestId('plan-form-notice');
+    expect(screen.getByTestId('plan-form-title')).toHaveProp('value', 'Travel Routine');
+    expect(screen.getByTestId('plan-form-routine')).toHaveProp('accessibilityState', expect.objectContaining({ checked: true }));
+    expect(screen.getByLabelText('Schedule, Anytime, locked while Routine is on')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
+    expect((await planQueries.listRoutines())[0]).toMatchObject({ title: 'Travel Routine', scheduledFor: new Date(2026, 10, 8, 11, 30) });
+  });
+
+  it('omits Routine when editing a programme child', async () => {
+    await seedCatalog();
+    const child = { title: 'Child', gymId: null, scheduledFor: null, exercises: [{ exerciseDefinitionId: 'ex-squat',
+      name: 'Squat', sets: [{ targetWeightText: '50', targetRepsText: '5', targetSetType: null }] }] };
+    const result = await planRepository.createProgramme({ name: 'Programme', description: '', plans: [child, { ...child, title: 'Second' }] });
+    if (result.status !== 'saved') throw new Error('Programme fixture failed');
+    const detail = (await planQueries.loadProgrammeDetail(result.id))!;
+    render(<SessionPlanNewScreen editPlanId={detail.plans[0].id} fromPlanId={null} />);
+    await screen.findByTestId('plan-form-title');
+    expect(screen.queryByTestId('plan-form-routine')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Plan schedule/ })).toBeTruthy();
+  });
+
+  it('starts a never-used Routine, then offers Resume and guards its active use from Skip', async () => {
+    const planId = await createRoutine();
+    const first = await openRoutine(planId);
+    expect(screen.getByTestId('plan-detail-routine-unused')).toHaveTextContent('Never used');
+    expect(screen.queryByTestId('plan-detail-block-1-add')).toBeNull();
+    expect(screen.queryByTestId('plan-detail-block-1-skip')).toBeNull();
+    fireEvent.press(screen.getByTestId('plan-detail-start-all'));
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith('/train'));
+    first.unmount();
+    await openRoutine(planId);
+    expect(screen.getByTestId('plan-detail-start-all')).toHaveTextContent('Resume');
+    expect(screen.queryByTestId('plan-detail-skip-routine')).toBeNull();
+    expect(localDatabase().select().from(sessionPlanUses).all()).toHaveLength(1);
+  });
+
+  it('keeps one Skip token through a failed write and Retry, without creating a workout', async () => {
+    const planId = await createRoutine();
+    const skip = jest.spyOn(routineUseStore, 'skipRoutineUse').mockRejectedValueOnce(new Error('SQLITE_FULL: simulated failure'));
+    await openRoutine(planId);
+    fireEvent.press(screen.getByTestId('plan-detail-skip-routine'));
+    await screen.findByTestId('plan-detail-skip-sheet');
+    expect(within(screen.getByTestId('plan-detail-skip-sheet')).getByText('Never used')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('plan-detail-skip-confirm'));
+    expect(await screen.findByTestId('plan-detail-skip-error')).toHaveTextContent("Couldn't skip this use. Try again.");
+    expect(localDatabase().select().from(sessionPlanUses).all()).toHaveLength(0);
+    fireEvent.press(screen.getByTestId('plan-detail-skip-confirm'));
+    await waitForGone(() => screen.queryByTestId('plan-detail-skip-sheet'));
+    expect(screen.getByTestId('plan-detail-last-skipped')).toHaveTextContent(/Last skipped/);
+    expect(screen.getByTestId('plan-detail-start-all')).toHaveTextContent('Start all');
+    expect(skip).toHaveBeenCalledTimes(2);
+    expect(skip.mock.calls[0][1]).toBe(skip.mock.calls[1][1]);
+    expect(localDatabase().select().from(sessionPlanUses).all()).toHaveLength(1);
+    expect(localDatabase().select().from(sessions).all()).toHaveLength(0);
+  });
+
+  it('keeps typed edits and Routine selected when a newer authored graph makes Save stale', async () => {
+    const planId = await createRoutine();
+    render(<SessionPlanNewScreen editPlanId={planId} fromPlanId={null} />);
+    await screen.findByTestId('plan-form-title');
+    fillTitle('My unsaved intent');
+    await act(async () => { await planRepository.updatePlanMeta(planId, { title: 'Synced newer title' }); });
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    expect(await screen.findByTestId('plan-form-notice')).toHaveTextContent(/This plan changed/);
+    expect(screen.getByTestId('plan-form-title')).toHaveProp('value', 'My unsaved intent');
+    expect(screen.getByTestId('plan-form-routine')).toHaveProp('accessibilityState', expect.objectContaining({ checked: true }));
+    expect((await planQueries.loadPlanDetail(planId))!.title).toBe('Synced newer title');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('formats use dates with the preference and names a known missing timestamp without inventing one', async () => {
+    const planId = await createRoutine();
+    await skipSessionPlanUse(planId, 'dated-skip', new Date(2026, 10, 6));
+    const view = await openRoutine(planId);
+    expect(screen.getByTestId('plan-detail-last-skipped')).toHaveTextContent(/06-11-2026/);
+    await act(async () => updatePreferences({ dateFormat: 'MM-DD-YYYY' }));
+    expect(screen.getByTestId('plan-detail-last-skipped')).toHaveTextContent(/11-06-2026/);
+    view.unmount();
+    localDatabase().update(sessionPlanUses).set({ skippedAt: null }).run();
+    await openRoutine(planId);
+    expect(screen.getByTestId('plan-detail-last-skipped')).toHaveTextContent(/Last skipped.*Date unavailable/);
+    expect(screen.queryByText('Never used')).toBeNull();
+  });
+
+  it('uses the ordinary recorder Finish after partial work, shows its date, and starts every block fresh', async () => {
+    const planId = await createRoutine();
+    await planRepository.addPlanBlock(planId, { exerciseDefinitionId: 'ex-bench', name: 'Bench Press',
+      sets: [{ targetWeightText: '40', targetRepsText: '8', targetSetType: null }] });
+    const started = await startSessionPlan(planId);
+    if (started.status !== 'started') throw new Error('Routine start failed');
+    const snapshot = (await loadSessionSnapshotById(started.sessionId))!;
+    const exercise = snapshot.exercises[0];
+    const page = render(<ExercisePageScreen sessionExerciseId={exercise.id} sessionId={started.sessionId} />);
+    await screen.findByTestId('exercise-page');
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    await screen.findByTestId('exercise-options-sheet');
+    expect(screen.queryByTestId('exercise-options-complete-block')).toBeNull();
+    fireEvent.press(screen.getByTestId('exercise-options-sheet-backdrop', { includeHiddenElements: true }));
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '101');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '5');
+    fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+    await waitFor(async () => expect((await loadActiveSessionGraph(started.sessionId))!.session.exercises[0].sets[0].weight).toBe('101'));
+    const graph = (await loadActiveSessionGraph(started.sessionId))!;
+    await act(async () => completeActiveSession({ sessionId: started.sessionId, gymId: graph.gymId,
+      startedAt: graph.startedAt, completedHistorySession: graph.session }));
+    page.unmount();
+    await openRoutine(planId);
+    expect(screen.getByTestId('plan-detail-last-completed')).toHaveTextContent(/Last completed/);
+    expect(screen.queryByText('Never used')).toBeNull();
+    const history = (await loadSessionSnapshotById(started.sessionId))!;
+    expect(history.exercises).toHaveLength(2);
+    expect(history.exercises[1].sets).toEqual([]);
+    expect(history.exercises[0].sets[0]).toMatchObject({ weightValue: '101', repsValue: '5', performanceStatus: null });
+    fireEvent.press(screen.getByTestId('plan-detail-start-all'));
+    await waitFor(() => expect(mockDismissTo).toHaveBeenCalledWith('/train'));
+    const active = (await loadSessionSnapshotById((await loadActiveSessionId())!))!;
+    expect(active.exercises).toHaveLength(2);
+    expect(active.exercises.every(block => block.sets.every(set => set.weightValue === '' && set.performanceStatus === 'planned'))).toBe(true);
+    expect(await loadSessionSnapshotById(started.sessionId)).toEqual(history);
   });
 });

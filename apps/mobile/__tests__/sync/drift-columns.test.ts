@@ -32,6 +32,10 @@ const clientSets = [
 ];
 
 describe('sync drift column rules', () => {
+  it('accepts the standalone Routine boolean only on its owned wire column', () => {
+    expect(isTypeCompatible('integer', 'bool', 'session_plans', 'is_routine')).toBe(true);
+    expect(isTypeCompatible('integer', 'bool', 'sessions', 'is_routine')).toBe(false);
+  });
   it('finds nothing when every client column has a typed counterpart and the server adds only the envelope', () => {
     expect(diffEntityColumns('exercise_sets', clientSets, serverSets, noExemptions)).toEqual([]);
   });

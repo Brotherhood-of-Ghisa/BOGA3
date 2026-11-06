@@ -18,6 +18,7 @@ export const sessionPlans = sqliteTable(
     gymId: text('gym_id').references(() => gyms.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     scheduledFor: integer('scheduled_for', { mode: 'timestamp_ms' }),
+    isRoutine: integer('is_routine', { mode: 'boolean' }).notNull().default(false),
     provenance: text('provenance', { enum: ['human', 'agent'] })
       .notNull()
       .default('human'),
@@ -40,6 +41,7 @@ export const sessionPlans = sqliteTable(
     scheduledForIdx: index('session_plans_scheduled_for_idx').on(table.scheduledFor),
     deletedAtIdx: index('session_plans_deleted_at_idx').on(table.deletedAt),
     titleGuard: check('session_plans_title_non_empty', sql`length(${table.title}) > 0`),
+    routineGuard: check('session_plans_routine_standalone', sql`${table.isRoutine} = 0 or ${table.programmeId} is null`),
     provenanceGuard: check('session_plans_provenance_valid', sql`${table.provenance} in ('human', 'agent')`),
     lastModifiedByGuard: check(
       'session_plans_last_modified_by_valid',

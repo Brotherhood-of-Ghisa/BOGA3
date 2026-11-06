@@ -51,6 +51,7 @@ const SQLITE_BOOLEAN_COLUMNS: ReadonlySet<string> = new Set([
   'user_settings.count_secondary_muscles',
   'user_settings.volume_primary_only',
   'exercise_definitions.split_by_gym',
+  'session_plans.is_routine',
 ]);
 
 /**

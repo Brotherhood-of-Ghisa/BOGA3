@@ -104,10 +104,10 @@ const sessionExerciseEntity = (id: string, sessionId: string, ms: number): WireE
   },
 });
 
-/** Each account's server rows, by pull layer (five-layer topology). */
+/** Each account's server rows, by pull layer (six-layer topology). */
 const SERVER_ROWS: Record<string, Record<number, WireEntity[]>> = {
-  [USER_A]: { 2: [sessionEntity('a-session', 100)], 3: [sessionExerciseEntity('a-sx', 'a-session', 100)] },
-  [USER_B]: { 2: [sessionEntity('b-session', 200)], 3: [sessionExerciseEntity('b-sx', 'b-session', 200)] },
+  [USER_A]: { 3: [sessionEntity('a-session', 100)], 4: [sessionExerciseEntity('a-sx', 'a-session', 100)] },
+  [USER_B]: { 3: [sessionEntity('b-session', 200)], 4: [sessionExerciseEntity('b-sx', 'b-session', 200)] },
 };
 
 /** The cursor the stub server hands back after a layer's snapshot. */
@@ -262,7 +262,7 @@ describe('sync cycle account-ownership guard', () => {
     expect(ids(sessions)).toEqual(['a-session']);
     expect(readLocalDataOwner(local())).toBe(USER_A);
     const firstPullOfLayer = (layer: number) => pulls.find((pull) => pull.layer === layer)?.cursor;
-    expect([0, 1, 2, 3, 4].map(firstPullOfLayer)).toEqual([null, null, null, null, null]);
+    expect([0, 1, 2, 3, 4, 5].map(firstPullOfLayer)).toEqual([null, null, null, null, null, null]);
     expect(loggedEvents('sync.local_store_unowned_repull')).toEqual([
       expect.objectContaining({ context: { dirty_rows: 1 } }),
     ]);
@@ -286,7 +286,7 @@ describe('sync cycle account-ownership guard', () => {
     });
     const serve = mockRpc.getMockImplementation()!;
     mockRpc.mockImplementation(async (fn: string, args: { layer?: number }) => {
-      if (fn === 'sync_pull' && args.layer === 2) {
+      if (fn === 'sync_pull' && args.layer === 3) {
         await pullGate;
       }
       return serve(fn, args);

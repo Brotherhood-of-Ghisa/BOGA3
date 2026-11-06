@@ -4,6 +4,7 @@ import { getSignedInUserId } from '@/src/auth/session-user';
 import { getRequiredSupabaseMobileClient } from '@/src/auth/supabase';
 import type { LocalDatabase } from '@/src/data/bootstrap';
 import { nowMonotonic, type Transaction } from '@/src/data/clock';
+import { repairRoutineUseClaimsInTransaction } from '@/src/data/session-plan-use-store';
 import { clearProvenanceClaimsInTransaction } from '@/src/data/session-drafts';
 import {
   deleteMergeLocal, listMergeLocal, preserveMergeEntity, readMergeLocal, writeMergeLocal,
@@ -146,12 +147,13 @@ function installSnapshot(database: LocalDatabase, owner: string, stage: Stage, a
       .flatMap(row => JSON.parse(row.payload) as MergeWireEntity[]);
     const blocks = rows.filter(row => row.type === 'session_exercises');
     const sessionIds = [...new Set(blocks.map(row => String(row.fields.session_id)))];
+    repairRoutineUseClaimsInTransaction(tx, rows);
     applied += adapter.apply(tx, rows.filter(row => !(MERGE_ENTITY_TYPES as readonly string[]).includes(row.type)));
     const live = rows.filter(row => !row.fields.deleted_at);
     clearProvenanceClaimsInTransaction(tx, {
-      blocks: new Set(live.filter(row => row.type === 'session_exercises' && row.fields.source_plan_exercise_id)
+      blocks: new Set(live.filter(row => row.type === 'session_exercises' && row.fields.source_plan_exercise_id && !row.fields.source_plan_use_id)
         .map(row => String(row.fields.source_plan_exercise_id))),
-      targets: new Set(live.filter(row => row.type === 'exercise_sets' && row.fields.source_plan_set_id)
+      targets: new Set(live.filter(row => row.type === 'exercise_sets' && row.fields.source_plan_set_id && !row.fields.source_plan_use_id)
         .map(row => String(row.fields.source_plan_set_id))),
     }, new Date(), nowMonotonic(tx), new Set(rows.map(row => row.id)));
 

@@ -12,6 +12,7 @@ import {
   trainingProgrammes,
 } from './schema';
 import type { SessionSetTypeValue } from './set-types';
+import { captureLegacyRoutineSkip, findActivePlanSession } from './session-plan-use-store';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
 /**
@@ -60,6 +61,7 @@ export type SaveSessionPlanGraphInput = {
   gymId: string | null;
   title: string;
   scheduledFor: Date | null;
+  isRoutine?: boolean;
   exercises: SavePlanExerciseGraphInput[];
 };
 
@@ -138,7 +140,7 @@ const savePlanGraphInTransaction = (
   const planId = input.planId?.trim() || mintPlanEntityId('plan');
 
   const existingPlan = tx
-    .select({ id: sessionPlans.id })
+    .select({ id: sessionPlans.id, isRoutine: sessionPlans.isRoutine })
     .from(sessionPlans)
     .where(eq(sessionPlans.id, planId))
     .get();
@@ -152,6 +154,7 @@ const savePlanGraphInTransaction = (
         gymId: input.gymId,
         title: input.title,
         scheduledFor: input.scheduledFor,
+        isRoutine: input.isRoutine ?? false,
         lastModifiedBy: 'human',
         deletedAt: null,
         localDirty: true,
@@ -165,6 +168,7 @@ const savePlanGraphInTransaction = (
       gymId: input.gymId,
       title: input.title,
       scheduledFor: input.scheduledFor,
+      ...(input.isRoutine !== undefined ? { isRoutine: input.isRoutine } : {}),
       lastModifiedBy: 'human',
       deletedAt: null,
       localDirty: true,
@@ -182,6 +186,8 @@ const savePlanGraphInTransaction = (
       .where(eq(sessionPlans.id, planId))
       .run();
   }
+
+  if (input.isRoutine && !existingPlan?.isRoutine) captureLegacyRoutineSkip(tx, planId, now, localUpdatedAtMs);
 
   const existingExerciseRows = tx
     .select({ id: sessionPlanExercises.id, orderIndex: sessionPlanExercises.orderIndex })
@@ -239,6 +245,7 @@ const savePlanGraphInTransaction = (
       tx.update(sessionPlanExercises)
         .set({
           orderIndex: exerciseIndex,
+          exerciseDefinitionId: exerciseInput.exerciseDefinitionId,
           name: exerciseInput.name,
           lastModifiedBy: 'human',
           deletedAt: null,
@@ -346,6 +353,7 @@ const findLiveSourcedCardForBlockInTransaction = (tx: Transaction, planExerciseI
     .where(
       and(
         eq(sessionExercises.sourcePlanExerciseId, planExerciseId),
+        isNull(sessionExercises.sourcePlanUseId),
         isNull(sessionExercises.deletedAt),
         isNull(sessions.deletedAt),
       ),
@@ -389,6 +397,7 @@ const listSourcedCardsForBlocksInTransaction = (
     .where(
       and(
         inArray(sessionExercises.sourcePlanExerciseId, planExerciseIds),
+        isNull(sessionExercises.sourcePlanUseId),
         isNull(sessionExercises.deletedAt),
         // A card whose session was discarded no longer claims the block:
         // the block returns to pending (available) again.
@@ -471,6 +480,7 @@ export type SessionPlanStore = {
     title: string;
     gymId: string | null;
     scheduledFor: Date | null;
+    isRoutine?: boolean;
     now: Date;
   }): Promise<boolean>;
   /** Rewrites one block row and its target sets (a pending, unattached block only). */
@@ -639,17 +649,20 @@ const updateProgrammeMeta = async (input: { programmeId: string; name: string; d
 
 
 /** See {@link SessionPlanStore}. */
-const updatePlanMeta = async (input: { planId: string; title: string; gymId: string | null; scheduledFor: Date | null; now: Date }): Promise<boolean> => {
+const updatePlanMeta = async (input: { planId: string; title: string; gymId: string | null; scheduledFor: Date | null; isRoutine?: boolean; now: Date }): Promise<boolean> => {
     const database = await bootstrapLocalDataLayer();
     let wrote = false;
     database.transaction((tx) => {
       const localUpdatedAtMs = nowMonotonic(tx);
+      const previous = tx.select({ isRoutine: sessionPlans.isRoutine }).from(sessionPlans)
+        .where(eq(sessionPlans.id, input.planId)).get();
       const result = tx
         .update(sessionPlans)
         .set({
           title: input.title,
           gymId: input.gymId,
           scheduledFor: input.scheduledFor,
+          ...(input.isRoutine !== undefined ? { isRoutine: input.isRoutine } : {}),
           lastModifiedBy: 'human',
           localDirty: true,
           localUpdatedAtMs,
@@ -658,6 +671,7 @@ const updatePlanMeta = async (input: { planId: string; title: string; gymId: str
         .where(and(eq(sessionPlans.id, input.planId), isNull(sessionPlans.deletedAt)))
         .run();
       wrote = result.changes > 0;
+      if (wrote && input.isRoutine && !previous?.isRoutine) captureLegacyRoutineSkip(tx, input.planId, input.now, localUpdatedAtMs);
     });
     if (wrote) {
       notifyLocalWrite();
@@ -842,6 +856,7 @@ const releaseDiscardedBlockClaims = async (planExerciseIds: string[], now: Date 
       .where(
         and(
           inArray(sessionExercises.sourcePlanExerciseId, planExerciseIds),
+          isNull(sessionExercises.sourcePlanUseId),
           isNull(sessionExercises.deletedAt),
           isNotNull(sessions.deletedAt),
         ),
@@ -869,15 +884,7 @@ const releaseDiscardedBlockClaims = async (planExerciseIds: string[], now: Date 
 /** See {@link SessionPlanStore}. */
 const findActiveSessionIdBySourcePlan = async (planId: string): Promise<string | null> => {
     const database = await bootstrapLocalDataLayer();
-    const row = database
-      .select({ id: sessions.id })
-      .from(sessions)
-      .where(
-        and(eq(sessions.sourcePlanId, planId), eq(sessions.status, 'active'), isNull(sessions.deletedAt)),
-      )
-      .orderBy(desc(sessions.updatedAt))
-      .get();
-    return row?.id ?? null;
+    return database.transaction(tx => findActivePlanSession(tx, planId));
   };
 
 
@@ -1269,11 +1276,10 @@ const tombstonePlanExercise = async (input: { planExerciseId: string; now: Date 
 /** See {@link SessionPlanStore}. */
 const loadPlanGraph = async (planId: string): Promise<PlanGraph | null> => {
     const database = await bootstrapLocalDataLayer();
-    const plan = database.select().from(sessionPlans).where(eq(sessionPlans.id, planId)).get();
-    if (!plan || plan.deletedAt !== null) {
-      return null;
-    }
-    return loadGraphForPlan(database, plan);
+    return database.transaction(tx => {
+      const plan = tx.select().from(sessionPlans).where(eq(sessionPlans.id, planId)).get();
+      return !plan || plan.deletedAt !== null ? null : loadGraphForPlan(tx, plan);
+    });
   };
 
 
@@ -1396,7 +1402,7 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
   listLivePlans,
 });
 
-const loadGraphForPlan = (database: LocalDatabase, plan: PlanRow): PlanGraph => {
+const loadGraphForPlan = (database: Pick<LocalDatabase, 'select'>, plan: PlanRow): PlanGraph => {
   const exercises = database
     .select()
     .from(sessionPlanExercises)
@@ -1422,6 +1428,38 @@ const loadGraphForPlan = (database: LocalDatabase, plan: PlanRow): PlanGraph => 
     plan,
     exercises: exercises.map((exercise) => ({ ...exercise, sets: setsByExerciseId.get(exercise.id) ?? [] })),
   };
+};
+
+export const planGraphVersion = (graph: PlanGraph): string => JSON.stringify([
+  graph.plan.id, graph.plan.localUpdatedAtMs,
+  graph.exercises.map(block => [block.id, block.localUpdatedAtMs, block.sets.map(set => [set.id, set.localUpdatedAtMs])]),
+]);
+
+/** Routine edits change future intent atomically; performed snapshots are never rewritten. */
+export const saveRoutinePlanEdit = async (input: SaveSessionPlanGraphInput, options: {
+  expectedVersion: string; rewriteGraph: boolean; now?: Date;
+}): Promise<'updated' | 'not-found' | 'stale-edit' | 'programme'> => {
+  const database = await bootstrapLocalDataLayer();
+  const now = options.now ?? new Date();
+  const result = database.transaction(tx => {
+    const plan = tx.select().from(sessionPlans).where(eq(sessionPlans.id, input.planId!)).get();
+    if (!plan || plan.deletedAt) return 'not-found' as const;
+    if (input.isRoutine && plan.programmeId !== null) return 'programme' as const;
+    if (planGraphVersion(loadGraphForPlan(tx, plan)) !== options.expectedVersion) return 'stale-edit' as const;
+    const localUpdatedAtMs = nowMonotonic(tx);
+    if (options.rewriteGraph) {
+      savePlanGraphInTransaction(tx, input, now, localUpdatedAtMs);
+    } else {
+      tx.update(sessionPlans).set({ title: input.title, gymId: input.gymId,
+        scheduledFor: input.scheduledFor, isRoutine: input.isRoutine,
+        lastModifiedBy: 'human', localDirty: true, localUpdatedAtMs, updatedAt: now })
+        .where(eq(sessionPlans.id, plan.id)).run();
+      if (input.isRoutine && !plan.isRoutine) captureLegacyRoutineSkip(tx, plan.id, now, localUpdatedAtMs);
+    }
+    return 'updated' as const;
+  });
+  if (result === 'updated') notifyLocalWrite();
+  return result;
 };
 
 export {

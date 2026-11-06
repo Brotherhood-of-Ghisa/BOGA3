@@ -9,10 +9,11 @@ import { ListRow } from '@/components/ui/list-row';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
 import { Tag } from '@/components/ui/tag';
+import { StatePanel } from '@/components/ui/state-panel';
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { uiRoles, uiSpace } from '@/components/ui/tokens';
 import { planQueries, type PlanSummaryView, type ProgrammeSummaryView } from '@/src/session-planner';
-import { blockCountsLabel, planDateLabel, planOutcomeLabel } from './progress-labels';
+import { blockCountsLabel, planDateLabel, planOutcomeLabel, routineOutcomeLine } from './progress-labels';
 
 /**
  * The Sessions screen partitions exhaustive reads into unfinished **Upcoming**
@@ -37,6 +38,10 @@ export type PlanSectionProps = {
   testID: string;
   onOpenPlan: (planId: string) => void;
   onOpenProgramme?: (programmeId: string) => void;
+  emptyMessage?: string;
+  isLoading?: boolean;
+  errorMessage?: string | null;
+  onRetry?: () => void;
 };
 
 /** One planning section: its micro-label, the rows in one card, or nothing. */
@@ -47,9 +52,14 @@ export function PlanSection({
   testID,
   onOpenPlan,
   onOpenProgramme,
+  emptyMessage,
+  isLoading = false,
+  errorMessage,
+  onRetry,
 }: PlanSectionProps) {
   const dateFormat = useDateFormat();
-  if (plans.length === 0 && programmes.length === 0) {
+  const empty = plans.length === 0 && programmes.length === 0;
+  if (empty && !emptyMessage && !isLoading && !errorMessage) {
     return null;
   }
   return (
@@ -57,7 +67,11 @@ export function PlanSection({
       <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
         {label}
       </Text>
-      <Card>
+      {errorMessage ? <StatePanel action={onRetry ? { label: 'Retry', onPress: onRetry, testID: `${testID}-retry` } : undefined}
+        body={errorMessage} fill={false} kind="error" testID={`${testID}-error`} /> : null}
+      {empty && isLoading ? <Card><StatePanel body="Loading routines..." fill={false} kind="loading" testID={`${testID}-loading`} /></Card> : null}
+      {empty && !isLoading && !errorMessage ? <Card><StatePanel body={emptyMessage} fill={false} testID={`${testID}-empty`} /></Card> : null}
+      {!empty ? <Card>
         {programmes.map((programme, index) => (
           <ListRow
             accessibilityLabel={`Programme ${programme.name}, ${programme.planCount} sessions${programmeCompletionLabel(programme)}`}
@@ -81,7 +95,8 @@ export function PlanSection({
         ))}
         {plans.map((plan, index) => (
           <ListRow
-            accessibilityLabel={plan.progress === 'completed'
+            accessibilityLabel={plan.routine ? [plan.title, 'Routine', routineOutcomeLine(plan.routine, dateFormat),
+              plan.routine.activeSessionId ? 'In progress' : ''].filter(Boolean).join(', ') : plan.progress === 'completed'
               ? [plan.title, planOutcomeLabel(plan), planDetailLine(plan, dateFormat)].join(', ')
               : `${plan.title}, ${planDateLabel(plan, dateFormat)}`}
             density="list"
@@ -94,7 +109,7 @@ export function PlanSection({
                 <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
                   {plan.title}
                 </Text>
-                {plan.progress === 'completed' ? <Tag label={planOutcomeLabel(plan)} /> : null}
+                {plan.routine?.activeSessionId ? <Tag label="In progress" /> : !plan.isRoutine && plan.progress === 'completed' ? <Tag label={planOutcomeLabel(plan)} /> : null}
               </View>
               <Text allowFontScaling={false} style={uiText.meta}>
                 <FigureText>{planDetailLine(plan, dateFormat)}</FigureText>
@@ -102,12 +117,13 @@ export function PlanSection({
             </View>
           </ListRow>
         ))}
-      </Card>
+      </Card> : null}
     </View>
   );
 }
 
 const planDetailLine = (plan: PlanSummaryView, dateFormat: ExerciseDateFormat): string => {
+  if (plan.routine) return routineOutcomeLine(plan.routine, dateFormat);
   const counts = plan.blockCounts;
   const blocks = counts.pending + counts.attached + counts.completed + counts.skipped;
   const blockLine = plan.progress === 'completed' ? blockCountsLabel(counts) : `${blocks} ${blocks === 1 ? 'block' : 'blocks'}`;
@@ -145,6 +161,7 @@ export function NewProgrammeAction({ onPress, testID = 'sessions-new-programme-a
 }
 
 export type PlanSectionsState = {
+  routines: PlanSummaryView[];
   upcoming: PlanSummaryView[];
   unscheduled: PlanSummaryView[];
   programmes: ProgrammeSummaryView[];
@@ -153,26 +170,42 @@ export type PlanSectionsState = {
   reload: () => Promise<void>;
 };
 
+/** The reusable-intent section stays visible across empty, loading and failed reads. */
+export function RoutinePlanSection({ state, onOpenPlan }: { state: PlanSectionsState; onOpenPlan: (id: string) => void }) {
+  return <PlanSection
+    emptyMessage="No routines yet."
+    errorMessage={state.loadErrorMessage}
+    isLoading={state.isLoading}
+    label="Routines"
+    onOpenPlan={onOpenPlan}
+    onRetry={() => void state.reload()}
+    plans={state.routines}
+    testID="sessions-plan-section-routines"
+  />;
+}
+
 /** Loads the planning sections on mount and whenever the host refocuses. */
 export const usePlanSections = (): PlanSectionsState => {
   const [state, setState] = useState<{
+    routines: PlanSummaryView[];
     upcoming: PlanSummaryView[];
     unscheduled: PlanSummaryView[];
     programmes: ProgrammeSummaryView[];
     isLoading: boolean;
     loadErrorMessage: string | null;
-  }>({ upcoming: [], unscheduled: [], programmes: [], isLoading: true, loadErrorMessage: null });
+  }>({ routines: [], upcoming: [], unscheduled: [], programmes: [], isLoading: true, loadErrorMessage: null });
 
   const load = useCallback(async () => {
     // The previous load's rows stay visible across a refocus reload; the
     // first load starts with the hook's own loading state.
     try {
-      const [upcoming, unscheduled, programmes] = await Promise.all([
+      const [upcoming, unscheduled, programmes, routines] = await Promise.all([
         planQueries.listUpcomingPlans(),
         planQueries.listUnscheduledPlans(),
         planQueries.listProgrammeSummaries(),
+        planQueries.listRoutines(),
       ]);
-      setState({ upcoming, unscheduled, programmes, isLoading: false, loadErrorMessage: null });
+      setState({ routines, upcoming, unscheduled, programmes, isLoading: false, loadErrorMessage: null });
     } catch {
       setState((current) => ({
         ...current,

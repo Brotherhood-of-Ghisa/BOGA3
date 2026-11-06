@@ -4,7 +4,7 @@
 function post(path, body, auth) {
   var response = http.post(output.mergeUrl + path, { headers: {
     apikey: output.mergeKey, Authorization: 'Bearer ' + (auth || output.mergeToken || output.mergeKey),
-    'Content-Type': 'application/json', 'Content-Profile': 'app_public', 'x-boga-sync-protocol': '5'
+    'Content-Type': 'application/json', 'Content-Profile': 'app_public', 'x-boga-sync-protocol': '6'
   }, body: JSON.stringify(body) });
   var value = json(response.body);
   if (response.status !== 200) throw new Error('Merge fixture HTTP ' + response.status + ': ' + response.body);

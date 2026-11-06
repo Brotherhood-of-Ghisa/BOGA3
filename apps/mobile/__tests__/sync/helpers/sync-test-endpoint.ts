@@ -175,7 +175,7 @@ export const createAuthedTestClient = async (
 
   const client = createClient(config.url, config.anonKey, {
     auth: NO_TIMER_AUTH,
-    global: { headers: { 'x-boga-sync-protocol': '5', Authorization: `Bearer ${jwt}` } },
+    global: { headers: { 'x-boga-sync-protocol': '6', Authorization: `Bearer ${jwt}` } },
   });
 
   client.auth.getSession = () => authClient.auth.getSession();

@@ -3,6 +3,7 @@ import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-o
 
 import { gyms } from './gyms';
 import { sessionPlans } from './session-plans';
+import { sessionPlanUses } from './session-plan-uses';
 
 export const sessions = sqliteTable(
   'sessions',
@@ -13,6 +14,7 @@ export const sessions = sqliteTable(
       .default(sql`(lower(hex(randomblob(16))))`),
     gymId: text('gym_id').references(() => gyms.id, { onDelete: 'set null' }),
     sourcePlanId: text('source_plan_id').references(() => sessionPlans.id, { onDelete: 'set null' }),
+    sourcePlanUseId: text('source_plan_use_id').references(() => sessionPlanUses.id, { onDelete: 'set null' }),
     status: text('status', { enum: ['active', 'completed'] })
       .notNull()
       .default('active'),
@@ -36,7 +38,9 @@ export const sessions = sqliteTable(
     deletedAtIdx: index('sessions_deleted_at_idx').on(table.deletedAt),
     sourcePlanUnique: uniqueIndex('sessions_owner_source_plan_unique')
       .on(table.sourcePlanId)
-      .where(sql`${table.deletedAt} is null and ${table.sourcePlanId} is not null`),
+      .where(sql`${table.deletedAt} is null and ${table.sourcePlanId} is not null and ${table.sourcePlanUseId} is null`),
+    sourcePlanUseUnique: uniqueIndex('sessions_owner_source_use_unique').on(table.sourcePlanUseId)
+      .where(sql`${table.deletedAt} is null and ${table.sourcePlanUseId} is not null`),
     statusGuard: check(
       'sessions_status_guard',
       sql`${table.status} in ('active', 'completed')`

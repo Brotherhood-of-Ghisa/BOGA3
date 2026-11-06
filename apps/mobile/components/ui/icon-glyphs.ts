@@ -40,6 +40,8 @@ const DASHED_RING = [
 ];
 
 export const ICON_GLYPHS = {
+  // Lucide `lock`: a retained schedule is read-only while Routine is on.
+  lock: [path('M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z'), path('M7 11V7a5 5 0 0 1 10 0v4')],
   // --- Direction and disclosure ---
   'chevron-left': [path('m15 18-6-6 6-6')],
   'chevron-right': [path('m9 18 6-6-6-6')],

@@ -291,7 +291,8 @@ where a release starts firing. Code:
 ### Planned sessions on Sessions and the plan screens
 
 Resolved rows use neutral `Tag`s and [[planner.progress-outcomes]] labels.
-On Sessions, only Upcoming shows dates ([[copy.calendar-dates]]).
+On Sessions, only Upcoming shows schedule dates ([[copy.calendar-dates]]);
+Routine outcome dates follow [[planner.progress-outcomes]].
 Unfinished queues precede optional Completed plans, including unscheduled
 children. Unfinished programmes show `{completed} over {total}` in matching Tags,
 with separate skips.
@@ -302,9 +303,8 @@ pending, definition-bearing and target-bearing. A block attaches
 to the active session's unsourced card of the same exercise: one match attaches,
 several offer an accessible choice sheet that writes nothing until confirmed,
 none creates a card. **Start all** with another active session offers one Resume
-and creates nothing. Complete is explicit — the sourced card's `Complete block`,
-refused inline until one of the block's planned sets is confirmed; attachment
-alone never advances; skip uses non-performance wording. Code: `src/session-planner/`
+and creates nothing. Ordinary completion follows [[planner.block-completion]];
+Routine reuse follows [[planner.routine-reuse]]. Skip uses non-performance wording. Code: `src/session-planner/`
 (`plan-form-model`, `programme-form-model`, `plan-edit-sync`,
 `available-blocks`), the plan and programme routes' screen files.
 

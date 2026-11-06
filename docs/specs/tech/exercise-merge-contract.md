@@ -12,7 +12,7 @@ Writers must echo the revision their editor loaded, including graph rewrites, re
 An importer starts at zero; it must never attach today's revision to an older package.
 
 `public.exercise_merge_operations`, `public.exercise_merge_contexts` and
-`public.exercise_merge_conflicts` are **out of the sixteen-table mirror**.
+`public.exercise_merge_conflicts` are **out of the seventeen-table mirror**.
 They are owner-private server control/recovery storage, reached only through authenticated app RPCs.
 No direct table grants; RLS enabled; OAuth `client_id` requests denied.
 Receipts keep input hashes and counts, contexts keep immutable conversion factors, and unresolved
@@ -50,9 +50,9 @@ an old full-session reorder cannot bypass review through an unchanged sibling.
 A future client clock never bypasses revision comparison. Parent or protected-row hard deletes and
 protected reparenting are refused; ordinary current-context soft deletes remain supported.
 
-## Sync protocol 5
+## Protected history sync
 
-Authenticated sync now requires `x-boga-sync-protocol: 5`. Group representation remains protocol 4.
+Authenticated sync now requires `x-boga-sync-protocol: 6`. Group representation remains protocol 4.
 Old sync clients receive UPDATE_REQUIRED before revised behavior.
 Coordinate activation with app distribution: the server accepts one sync version.
 This code change does not deploy the migration or authorize activation.
@@ -68,7 +68,7 @@ Sequence discovery avoids the ordinary timestamp cursor's commit-order race.
 A known uncertain-operation receipt also triggers discovery before convergence.
 
 The client stages an exhaustive, token-fenced snapshot of affected sessions and required ancestors
-in durable pages. A changed token restarts staging; interruption resumes from its last page.
+in durable pages, including Routine use ancestors before performed rows. Same-slot use repair commits with snapshot installation; losing work survives. Repeated uses never clear ordinary provenance. A changed token restarts staging; interruption resumes from its last page.
 Ordinary pulls retain the complete old context until the snapshot is ready.
 One SQLite transaction preserves stale dirty rows, replaces the complete canonical context,
 and restores valid unsent additions with collision-safe slots.

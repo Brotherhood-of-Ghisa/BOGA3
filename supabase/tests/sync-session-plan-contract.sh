@@ -112,11 +112,11 @@ plan_pull_has_id() {
   fi
 }
 plan_pull_has_id 1 "${SP_ID}" "session_plans"
-plan_pull_has_id 2 "${PLAN_SESSION_ID}" "sessions"
+plan_pull_has_id 3 "${PLAN_SESSION_ID}" "sessions"
 plan_pull_has_id 2 "${SPE_ID}" "session_plan_exercises"
-plan_pull_has_id 3 "${PLAN_SX_ID}" "session_exercises"
+plan_pull_has_id 4 "${PLAN_SX_ID}" "session_exercises"
 plan_pull_has_id 3 "${SPS_ID}" "session_plan_sets"
-plan_pull_has_id 4 "${PLAN_SET_ID}" "exercise_sets"
+plan_pull_has_id 5 "${PLAN_SET_ID}" "exercise_sets"
 plan_pull_has_id 0 "${TP_ID}" "training_programmes"
 
 # Partial-unique retry guard: a second live session for the same whole-plan

@@ -24,6 +24,7 @@ export type SessionSet = {
   performanceStatus: SessionSetPerformanceStatus;
   /** Block provenance; manual sets are null. */
   sourcePlanSetId?: string | null;
+  sourcePlanUseId?: string | null;
 };
 
 export type SessionExercise = {
@@ -35,6 +36,7 @@ export type SessionExercise = {
   machineName: string;
   /** Block provenance; unsourced cards are null. */
   sourcePlanExerciseId?: string | null;
+  sourcePlanUseId?: string | null;
   sets: SessionSet[];
 };
 

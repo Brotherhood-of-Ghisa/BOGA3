@@ -2,12 +2,14 @@ import { isConfirmedPerformedSet } from '@/src/exercise-calculations/set-semanti
 import { normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import {
   createDrizzleSessionPlanStore,
+  planGraphVersion,
   type PlanExerciseRow,
   type PlanRow,
   type PlanSetRow,
   type SessionPlanStore,
 } from '@/src/data/session-plan-store';
 import type { PlanBlockStatus } from './types';
+import { loadRoutineUseSummaries, type RoutineUseSummary } from './routine-outcomes';
 
 /**
  * Read models for the planner screens: upcoming and unscheduled queues,
@@ -56,12 +58,14 @@ export type PlanSummaryView = {
   programmeId: string | null;
   programmeOrderIndex: number | null;
   provenance: 'human' | 'agent';
+  isRoutine?: boolean;
+  routine?: RoutineUseSummary;
   progress: PlanProgress;
   completedAt: Date | null;
   blockCounts: { pending: number; attached: number; completed: number; skipped: number };
 };
 
-export type PlanDetailView = PlanSummaryView & { blocks: PlanBlockView[] };
+export type PlanDetailView = PlanSummaryView & { blocks: PlanBlockView[]; editVersion?: string };
 
 export type ProgrammeSummaryView = {
   id: string;
@@ -211,6 +215,7 @@ const summaryFromPlanAndBlocks = (plan: PlanRow, blocks: PlanBlockView[]): PlanS
     programmeId: plan.programmeId,
     programmeOrderIndex: plan.programmeOrderIndex,
     provenance: plan.provenance,
+    ...(plan.isRoutine ? { isRoutine: true } : {}),
     ...progressFromBlocks(blocks),
   };
 };
@@ -292,7 +297,7 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
   return {
     /** Scheduled standalone and programme-child plans, soonest first. */
     async listUpcomingPlans(): Promise<PlanSummaryView[]> {
-      const plans = (await store.listLivePlans()).filter((plan) => plan.scheduledFor !== null);
+      const plans = (await store.listLivePlans()).filter((plan) => !plan.isRoutine && plan.scheduledFor !== null);
       plans.sort((a, b) => (a.scheduledFor?.getTime() ?? 0) - (b.scheduledFor?.getTime() ?? 0));
       const { summaries } = await loadPlanSummaries(plans);
       return summaries;
@@ -301,10 +306,19 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
     /** Unscheduled standalone plans, most recently updated first. */
     async listUnscheduledPlans(): Promise<PlanSummaryView[]> {
       const plans = (await store.listLivePlans())
-        .filter((plan) => plan.scheduledFor === null && plan.programmeId === null)
+        .filter((plan) => !plan.isRoutine && plan.scheduledFor === null && plan.programmeId === null)
         .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
       const { summaries } = await loadPlanSummaries(plans);
       return summaries;
+    },
+
+    async listRoutines(): Promise<PlanSummaryView[]> {
+      const plans = (await store.listLivePlans()).filter(plan => plan.isRoutine)
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+      const [{ summaries }, uses] = await Promise.all([
+        loadPlanSummaries(plans), loadRoutineUseSummaries(plans.map(plan => plan.id)),
+      ]);
+      return summaries.map(plan => ({ ...plan, routine: uses.get(plan.id) }));
     },
 
     /** Programme summaries with derived progress, most recently updated first. */
@@ -333,14 +347,20 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
 
     /** One plan with its ordered blocks and their consumption state. */
     async loadPlanDetail(planId: string): Promise<PlanDetailView | null> {
-      const plan = await store.loadPlan(planId);
-      if (!plan) {
+      const graph = await store.loadPlanGraph(planId);
+      if (!graph) {
         return null;
       }
-      const { blocksByPlanId } = await loadPlanSummaries([plan]);
+      const cards = await store.listSourcedCardsForBlocks(graph.exercises.map(block => block.id));
+      const blocks = toBlockViews(graph.exercises, graph.exercises.flatMap(block => block.sets), new Map(cards.map(card => [
+        card.sourcePlanExerciseId, { ...card, sessionExerciseId: card.id },
+      ])));
+      const uses = graph.plan.isRoutine ? await loadRoutineUseSummaries([planId]) : null;
       return {
-        ...summaryFromPlanAndBlocks(plan, blocksByPlanId.get(plan.id) ?? []),
-        blocks: blocksByPlanId.get(plan.id) ?? [],
+        ...summaryFromPlanAndBlocks(graph.plan, blocks),
+        ...(uses ? { routine: uses.get(planId) } : {}),
+        blocks,
+        editVersion: planGraphVersion(graph),
       };
     },
 

@@ -1,4 +1,5 @@
 export { exerciseMergeLocal } from './exercise-merge-local';
+export { sessionPlanUses, type SessionPlanUse, type NewSessionPlanUse } from './session-plan-uses';
 export { bodyWeightMeasurements, type BodyWeightMeasurement, type NewBodyWeightMeasurement } from './body-weight-measurements';
 export {
   exerciseDefinitions,

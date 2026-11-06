@@ -33,6 +33,8 @@ export type PlanDraft = {
   gymId: string | null;
   /** null = unscheduled (the plan lands in the Unscheduled queue). */
   scheduledFor: Date | null;
+  /** Reusable standalone intent; schedule metadata is retained while on. */
+  isRoutine?: boolean;
   exercises: PlanExerciseDraft[];
 };
 
@@ -60,6 +62,7 @@ export type NormalizedPlan = {
   title: string;
   gymId: string | null;
   scheduledFor: Date | null;
+  isRoutine?: boolean;
   exercises: NormalizedPlanExercise[];
 };
 
@@ -80,7 +83,8 @@ export type PlanFieldErrorCode =
   | 'invalid_reps'
   | 'invalid_weight'
   | 'unknown_set_type'
-  | 'invalid_schedule';
+  | 'invalid_schedule'
+  | 'invalid_routine';
 
 export type PlanFieldError = {
   path: PlanValidationPath;
@@ -105,6 +109,7 @@ export type StartSessionPlanResult =
   | { status: 'already-active'; sessionId: string }
   | { status: 'active-conflict'; activeSessionId: string }
   | { status: 'no-pending-blocks' }
+  | { status: 'unmapped-blocks' }
   | { status: 'plan-not-found' };
 
 export type AddPlanBlockResult =

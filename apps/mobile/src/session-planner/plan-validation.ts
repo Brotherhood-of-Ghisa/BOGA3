@@ -191,6 +191,9 @@ export const validatePlanDraft = (draft: PlanDraft, pathPrefix = ''): PlanValida
   if (draft.scheduledFor !== null && !isValidDate(draft.scheduledFor)) {
     errors.push(error(base('scheduledFor'), 'invalid_schedule', 'Pick a valid date and time.'));
   }
+  if (draft.isRoutine !== undefined && typeof draft.isRoutine !== 'boolean') {
+    errors.push(error(base('isRoutine'), 'invalid_routine', 'Choose whether this plan is a Routine.'));
+  }
 
   if (draft.exercises.length < PLAN_LIMITS.planExercises.min) {
     errors.push(error(base('exercises'), 'too_few', 'Add at least one exercise.'));
@@ -218,6 +221,7 @@ export const validatePlanDraft = (draft: PlanDraft, pathPrefix = ''): PlanValida
         title,
         gymId: draft.gymId,
         scheduledFor: draft.scheduledFor,
+        ...(draft.isRoutine !== undefined ? { isRoutine: draft.isRoutine } : {}),
         exercises,
       },
     },
@@ -245,6 +249,9 @@ export const validateProgrammeDraft = (draft: ProgrammeDraft): PlanValidationRes
 
   const plans: NormalizedPlan[] = [];
   draft.plans.forEach((plan, index) => {
+    if (plan.isRoutine) {
+      errors.push(error(`plans.${index}.isRoutine`, 'invalid_routine', 'A Routine must be standalone.'));
+    }
     const result = validatePlanDraft(plan, `plans.${index}`);
     if (result.ok) {
       plans.push(result.value.plan);

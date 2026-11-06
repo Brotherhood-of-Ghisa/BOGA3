@@ -342,7 +342,7 @@ const signIn = async (apiUrl: string, anonKey: string, email: string, password: 
   const response = await fetch(`${apiUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: {
-      'x-boga-sync-protocol': '5',
+      'x-boga-sync-protocol': '6',
       apikey: anonKey,
       'content-type': 'application/json',
     },
@@ -359,7 +359,7 @@ const verifyTokenEmail = async (apiUrl: string, anonKey: string, token: string, 
   const response = await fetch(`${apiUrl}/auth/v1/user`, {
     method: 'GET',
     headers: {
-      'x-boga-sync-protocol': '5',
+      'x-boga-sync-protocol': '6',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       accept: 'application/json',
@@ -379,7 +379,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
   const response = await fetch(`${apiUrl}/rest/v1/rpc/sync_push`, {
     method: 'POST',
     headers: {
-      'x-boga-sync-protocol': '5',
+      'x-boga-sync-protocol': '6',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       'content-type': 'application/json',

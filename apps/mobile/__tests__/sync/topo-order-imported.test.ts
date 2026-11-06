@@ -14,7 +14,7 @@
  *   2. No inline layer-array literal (e.g. a hardcoded `['gyms', ...]` block)
  *      duplicates the partition.
  *
- * It also checks the real exported partition has the expected five-layer shape
+ * It also checks the real exported partition has the expected six-layer shape
  * so a structural regression in the single source is caught here too.
  */
 
@@ -62,10 +62,10 @@ describe('the cycle and scheduler import the layer partition, never redefine it'
 });
 
 describe('the single source of truth has the expected shape', () => {
-  it('declares five layers spanning sixteen entity types', () => {
-    expect(TOPO_LAYERS).toHaveLength(5);
+  it('declares six layers spanning seventeen entity types', () => {
+    expect(TOPO_LAYERS).toHaveLength(6);
     const flat = TOPO_LAYERS.flat();
-    expect(new Set(flat).size).toBe(16);
+    expect(new Set(flat).size).toBe(17);
     // Layer 0 anchors the FK graph (no outbound entity FKs);  adds the
     // programme container.
     expect([...TOPO_LAYERS[0]].sort()).toEqual([
@@ -79,13 +79,14 @@ describe('the single source of truth has the expected shape', () => {
     //  adds session_plans (FKs gyms + training_programmes, both Layer 0).
     expect(TOPO_LAYERS[1]).toContain('exercise_group_links');
     expect(TOPO_LAYERS[1]).toContain('session_plans');
-    // sessions moved L1->L2 to sit below session_plans; the block joins it.
-    expect(TOPO_LAYERS[2]).toEqual(['sessions', 'session_plan_exercises']);
-    // session_exercises moved L2->L3 to sit below session_plan_exercises.
-    expect(TOPO_LAYERS[3]).toEqual(['session_exercises', 'session_plan_sets']);
-    // exercise_sets moved L3->L4 to sit below session_plan_sets, alongside the
+    // Uses follow plans, before the performed graph.
+    expect(TOPO_LAYERS[2]).toEqual(['session_plan_exercises', 'session_plan_uses']);
+    // Sessions follow use identities; authored targets follow blocks.
+    expect(TOPO_LAYERS[3]).toEqual(['sessions', 'session_plan_sets']);
+    // Performed cards follow sessions, and sets follow cards, alongside the
     // tags join and the independently cursorable bodyweight root.
-    expect(TOPO_LAYERS[4]).toEqual([
+    expect(TOPO_LAYERS[4]).toEqual(['session_exercises']);
+    expect(TOPO_LAYERS[5]).toEqual([
       'exercise_sets',
       'session_exercise_tags',
       'body_weight_measurements',

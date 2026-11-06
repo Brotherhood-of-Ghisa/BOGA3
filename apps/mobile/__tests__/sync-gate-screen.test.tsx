@@ -147,8 +147,8 @@ describe('SyncSetupScreen', () => {
     publish({ progress: { phase: 'pull', layersCompleted: 2, rowsApplied: 17, offline: false } });
     const advanced = screen.getByTestId(SYNC_GATE_TEST_IDS.activityDetail).props.children;
 
-    expect(initial).toBe('Layer 1 of 5');
-    expect(advanced).toBe('Layer 3 of 5 · 17 items');
+    expect(initial).toBe('Layer 1 of 6');
+    expect(advanced).toBe('Layer 3 of 6 · 17 items');
     expect(advanced).not.toBe(initial);
   });
 
@@ -238,11 +238,11 @@ describe('SyncSetupScreen', () => {
     publish({
       lastCycleErrorCode: 'LOCAL_FK_VIOLATION',
       lastCycleErrorDetail:
-        'local pull apply failed for session_exercises (layer 3 of 5): FOREIGN KEY constraint failed',
+        'local pull apply failed for session_exercises (layer 3 of 6): FOREIGN KEY constraint failed',
     });
 
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.errorDetail).props.children).toBe(
-      'LOCAL_FK_VIOLATION: local pull apply failed for session_exercises (layer 3 of 5): FOREIGN KEY constraint failed',
+      'LOCAL_FK_VIOLATION: local pull apply failed for session_exercises (layer 3 of 6): FOREIGN KEY constraint failed',
     );
   });
 
@@ -256,7 +256,7 @@ describe('SyncSetupScreen', () => {
     });
 
     expect(screen.getByTestId(SYNC_GATE_TEST_IDS.phaseLabel)).toBeTruthy();
-    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.activityDetail).props.children).toBe('Layer 3 of 5 · 400 items');
+    expect(screen.getByTestId(SYNC_GATE_TEST_IDS.activityDetail).props.children).toBe('Layer 3 of 6 · 400 items');
   });
 
   it('fires exactly one cycle when Retry is pressed', () => {

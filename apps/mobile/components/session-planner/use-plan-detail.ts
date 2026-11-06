@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 
 import type { PlanCardChoice } from '@/components/session-planner/plan-card-choice-sheet';
 import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
+import { useRoutineSkip } from './use-routine-skip';
 import { findActiveSessionId } from '@/src/data/session-list';
 import { loadSessionSnapshotById } from '@/src/data/session-drafts';
 import {
@@ -16,7 +17,7 @@ import {
   type PlanDetailView,
 } from '@/src/session-planner';
 
-export type PlanDetailController = {
+export type PlanDetailController = ReturnType<typeof useRoutineSkip> & {
   detail: PlanDetailView | null | 'loading';
   notice: string | null;
   resumeSessionId: string | null;
@@ -29,6 +30,9 @@ export type PlanDetailController = {
   duplicate: () => void;
   attachToChosenCard: (cardId: string) => void;
   setChoice: (choice: PlanDetailController['choice']) => void;
+  busy: boolean;
+  loadError: string | null;
+  reload: () => Promise<void>;
 };
 
 /**
@@ -47,15 +51,21 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
   const [resumeSessionId, setResumeSessionId] = useState<string | null>(null);
   const [choice, setChoice] = useState<PlanDetailController['choice']>(null);
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    if (planId === null) return;
+    if (planId === null) { setDetail(null); return; }
     try {
       setDetail(await planQueries.loadPlanDetail(planId));
+      setLoadError(null);
     } catch {
-      setDetail(null);
+      setLoadError("Couldn't load the plan. Try again.");
     }
   }, [planId]);
+  const routineSkip = useRoutineSkip(planId, reload, sessionId => {
+    setResumeSessionId(sessionId);
+    setNotice('This Routine has an active use. Resume it to keep working.');
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -68,6 +78,8 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
     setBusy(true);
     try {
       await action();
+    } catch {
+      setNotice("Couldn't update the plan. Try again.");
     } finally {
       setBusy(false);
     }
@@ -117,6 +129,10 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
         // One Resume action; nothing is created and nothing is replaced.
         setResumeSessionId(result.activeSessionId);
         setNotice('Another session is active. Resume it to keep working.');
+        return;
+      }
+      if (result.status === 'unmapped-blocks') {
+        setNotice('Choose an exercise for every block before starting.');
         return;
       }
       if (result.status === 'no-pending-blocks') {
@@ -213,6 +229,10 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
   };
 
   return {
+    ...routineSkip,
+    busy,
+    loadError,
+    reload,
     detail,
     notice,
     resumeSessionId,

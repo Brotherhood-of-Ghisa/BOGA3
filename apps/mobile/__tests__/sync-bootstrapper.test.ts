@@ -587,9 +587,9 @@ describe('runBootstrapper progress emission', () => {
     await bootstrap(database);
 
     const finalSnapshot = getSyncProgress();
-    // Final state: done, all four layers reported drained, the gym rows counted.
+    // Final state: done, all six layers reported drained, the gym rows counted.
     expect(finalSnapshot.phase).toBe('done');
-    expect(finalSnapshot.layersCompleted).toBe(5);
+    expect(finalSnapshot.layersCompleted).toBe(6);
 
     // The 'pull' phase was observed and its row counter advanced monotonically
     // across the two pages on layer 0.
@@ -619,7 +619,7 @@ describe('runBootstrapper progress emission', () => {
     const finalSnapshot = getSyncProgress();
     expect(finalSnapshot.phase).toBe('done');
     expect(finalSnapshot.rowsApplied).toBe(0);
-    expect(finalSnapshot.layersCompleted).toBe(5);
+    expect(finalSnapshot.layersCompleted).toBe(6);
     expect(seededDefinitionCount()).toBe(SYSTEM_EXERCISE_DEFINITION_SEEDS.length);
   });
 });
