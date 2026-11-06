@@ -29,6 +29,7 @@ cat >"$WORK/bin/npx" <<'EOF'
 echo "$*" >>"$GUARD_EVENTS/mutations"
 EOF
 chmod +x "$WORK/bin/npx"
+cp "$WORK/bin/npx" "$WORK/bin/docker"
 scaffold() {
   local root="$1" slot="$2"
   mkdir -p "$root/scripts" "$root/supabase/scripts" "$root/supabase/tests" "$root/apps/mobile"
