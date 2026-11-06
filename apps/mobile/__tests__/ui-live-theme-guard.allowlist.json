@@ -88,7 +88,6 @@
   "components/heatmaps/TimelineHeatmap.tsx",
   "components/heatmaps/WeeklyHeatmap.tsx",
   "components/heatmaps/calendar-tile.tsx",
-  "components/heatmaps/heatmap-metric.ts",
   "components/heatmaps/heatmap-style.ts",
   "components/navigation/header-style.ts",
   "components/navigation/main-tab-bar.tsx",

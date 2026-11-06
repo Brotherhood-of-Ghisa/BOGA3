@@ -81,8 +81,9 @@ export default function RootLayout() {
     };
   }, []);
 
-  // The theme sits outside everything else, so every screen, sheet and native
-  // surface below reads the theme the app is drawn in now.
+  // The theme sits outside everything else, so every screen and sheet below
+  // that reads it through the theme hooks follows a saved appearance. The
+  // navigation theme and the status bar below still take the launch theme.
   return (
     <AppThemeProvider>
       <GestureHandlerRootView style={styles.gestureRoot}>
