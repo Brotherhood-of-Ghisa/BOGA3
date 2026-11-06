@@ -38,7 +38,7 @@ export const exerciseEditHref = ({ exerciseDefinitionId, request }: { exerciseDe
   ].filter(Boolean);
   return `${EXERCISE_EDIT_ROUTE}${params.length > 0 ? `?${params.join('&')}` : ''}` as Href;
 };
-/** Settings → Appearance → Custom: one part's picker (`background`, `text`, `accent`, `record`, `viz`). */
+/** Settings → Appearance → Custom: one part's picker (`background`, `ink`, `text`, `accent`, `record`, `viz`). */
 export const THEME_CUSTOM_ROUTE = '/theme-custom';
 export const themeCustomHref = (part: string): Href => `${THEME_CUSTOM_ROUTE}?part=${encodeURIComponent(part)}` as Href;
 

@@ -50,6 +50,7 @@ const WARM = getThemePreset('warm');
 // Custom colours far from any preset: a dark teal page, a high-strength accent.
 const CUSTOM: CustomColours = {
   background: { hue: 200, strength: 30, lightness: 20, depth: 150 },
+  ink: { hue: 265, strength: 30 },
   text: { hue: 60, strength: 10 },
   accent: { hue: 330, strength: 80 },
   record: { hue: 90, strength: 60 },

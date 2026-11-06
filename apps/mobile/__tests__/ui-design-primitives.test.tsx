@@ -500,7 +500,7 @@ describe('ActionButton', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('draws a secondary action as an ink outline, and a danger one in danger', () => {
+  it('draws a secondary action as a rule outline with an ink label, and a danger one in danger', () => {
     render(
       <>
         <ActionButton label="+ Add exercise" onPress={jest.fn()} testID="outline" variant="outline" />
@@ -508,7 +508,7 @@ describe('ActionButton', () => {
       </>,
     );
 
-    expect(flatStyle(screen.getByTestId('outline'))).toMatchObject({ borderColor: uiRoles.ink, borderWidth: 1 });
+    expect(flatStyle(screen.getByTestId('outline'))).toMatchObject({ borderColor: uiRoles.rule, borderWidth: 1 });
     expect(flatStyle(screen.getByTestId('danger')).borderColor).toBe(uiRoles.danger);
     expect(flatStyle(screen.getByText('Archive')).color).toBe(uiRoles.danger);
   });
@@ -615,7 +615,7 @@ describe('StatePanel', () => {
     expect(flatStyle(screen.getByText("Couldn't load this"))).toMatchObject({ fontFamily: 'Archivo', color: uiRoles.ink });
     expect(flatStyle(screen.getByText('Check your connection.')).color).toBe(uiRoles.inkMuted);
     // An outline, never the screen's primary.
-    expect(flatStyle(screen.getByTestId('retry')).borderColor).toBe(uiRoles.ink);
+    expect(flatStyle(screen.getByTestId('retry')).borderColor).toBe(uiRoles.rule);
     fireEvent.press(screen.getByTestId('retry'));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });

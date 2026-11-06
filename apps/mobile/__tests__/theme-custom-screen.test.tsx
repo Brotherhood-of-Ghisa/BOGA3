@@ -34,6 +34,7 @@ import ThemeCustomRoute from '../app/theme-custom';
 
 const CUSTOM: CustomColours = {
   background: { hue: 80, strength: 20, lightness: 90, depth: 100 },
+  ink: { hue: 265, strength: 30 },
   text: { hue: 60, strength: 10 },
   accent: { hue: 30, strength: 70 },
   record: { hue: 90, strength: 50 },
@@ -164,6 +165,19 @@ it('saves a hue when the ring is let go, keeping the other parts', async () => {
   });
 
   await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, viz: { hue: 90, strength: 40 } }));
+});
+
+it('opens Primary text with a hue and strength only, and saves it as `ink`', async () => {
+  store(CUSTOM);
+  mockPart = 'ink';
+  render(<ThemeCustomRoute />);
+  expect(mockTitles).toContain('Primary text');
+  expect(ring().props.accessibilityValue).toEqual({ text: 'Blue, 265 degrees' });
+  expect(screen.queryByRole('adjustable', { name: 'Lightness' })).toBeNull();
+
+  await step(slider('Strength'), 'increment');
+
+  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, ink: { hue: 265, strength: 35 } }));
 });
 
 it('saves a VoiceOver step on depth at once', async () => {

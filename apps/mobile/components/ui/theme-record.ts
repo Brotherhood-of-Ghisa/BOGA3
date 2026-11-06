@@ -31,9 +31,10 @@ import {
 //
 // - `theme`: a preset id, or `custom`.
 // - `mode`: `light`, `dark` or `system`; a custom theme ignores it.
-// - `custom`: null, or `{background, text, accent, record, viz}`, each a
+// - `custom`: null, or `{background, ink, text, accent, record, viz}`, each a
 //   `{hue, strength}` and the background also `{lightness, depth}`
-//   (`theme-custom.ts`). Never null while `theme` is `custom`.
+//   (`theme-custom.ts`). Never null while `theme` is `custom`. A `custom`
+//   without `ink` (saved before it was a part) takes it from `text`.
 //
 // Fields this build does not know are ignored, so a later build may add one
 // without an older build falling back on read. A save writes only the three

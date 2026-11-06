@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ChoiceMeta, CustomSection } from '@/components/appearance/appearance-custom';
@@ -15,7 +16,7 @@ import {
 import { ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
 import { SubPage } from '@/components/settings/sub-page';
-import { ChoiceRow, FormSection, Notice, RadioRow, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ActionRow, ChoiceRow, FormSection, Notice, RadioRow, uiSpace, uiText, uiTextTone } from '@/components/ui';
 import { generateRoles, type ThemeMode } from '@/components/ui/theme';
 import {
   DEFAULT_THEME_PRESET_ID,
@@ -52,12 +53,15 @@ export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }
 
 // Settings → Appearance: a live preview of the choice, then Theme (the presets
 // and Custom as radio rows), then Mode for a preset or the custom colours for
-// Custom. Each choice is saved at once and labelled `Next launch` until the
-// app reopens.
+// Custom. While Custom is chosen, Theme collapses to its Custom row and a
+// `Show presets` row that lists the presets again (`Hide presets` folds them). Each choice is saved at
+// once and labelled `Next launch` until the app reopens.
 export function AppearanceSettingsScreen() {
   const { appearance, saveError, commit } = useAppearanceCommit();
+  const [presetsShown, setPresetsShown] = useState(false);
   const pending = pendingAppearance(appearance);
   const custom = appearance.theme === 'custom';
+  const presetsListed = !custom || presetsShown;
   const customChoice: AppearanceChoice = {
     ...appearance,
     theme: 'custom',
@@ -70,7 +74,7 @@ export function AppearanceSettingsScreen() {
     <SubPage testID="settings-appearance-screen">
       <PreviewBlock appearance={appearance} />
       <FormSection title="Theme">
-        {themePresets.map((preset, index) => {
+        {(presetsListed ? themePresets : []).map((preset, index) => {
           const checked = preset.id === appearance.theme;
           const detail = presetDetails(preset.id, checked, pending.theme);
           return (
@@ -82,6 +86,7 @@ export function AppearanceSettingsScreen() {
               label={preset.label}
               meta={<PresetMeta details={detail} mode={previewMode({ ...appearance, theme: preset.id })} preset={preset} />}
               onPress={() => {
+                setPresetsShown(false);
                 void commit(
                   { theme: preset.id },
                   { message: 'Couldn’t save the theme. Nothing changed.', context: { presetId: preset.id } },
@@ -94,7 +99,7 @@ export function AppearanceSettingsScreen() {
         <RadioRow
           accessibilityLabel={['Custom', ...customDetail.map((word) => word.toLowerCase())].join(', ')}
           checked={custom}
-          divider
+          divider={presetsListed}
           label="Custom"
           meta={<ChoiceMeta details={customDetail} roles={appearanceRoles(customChoice)} />}
           onPress={() => {
@@ -109,6 +114,15 @@ export function AppearanceSettingsScreen() {
           }}
           testID="settings-appearance-option-custom"
         />
+        {custom ? (
+          <ActionRow
+            divider
+            kind="act"
+            label={presetsShown ? 'Hide presets' : 'Show presets'}
+            onPress={() => setPresetsShown((shown) => !shown)}
+            testID="settings-appearance-show-presets"
+          />
+        ) : null}
       </FormSection>
       {custom ? (
         <CustomSection appearance={appearance} pending={pending} />

@@ -1136,7 +1136,7 @@ describe('Design language', () => {
     const section = screen.getByTestId('group-screen-exercises');
     expect(accentGrounds(section)).toEqual([]);
     expect(StyleSheet.flatten(screen.getByTestId('group-exercises-add-button').props.style)).toMatchObject({
-      borderColor: uiRoles.ink,
+      borderColor: uiRoles.rule,
       backgroundColor: uiRoles.surface,
     });
     expect(screen.getByTestId('group-exercise-archived-ge-old')).toHaveTextContent('Archived');

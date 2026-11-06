@@ -4,6 +4,7 @@ import {
   customFromSeeds,
   customMode,
   customSeed,
+  customSeeds,
   generateCustomRoles,
   parseCustomColours,
   type CustomColours,
@@ -132,13 +133,44 @@ describe('hue and strength', () => {
   });
 });
 
+describe('primary text', () => {
+  it('tints `ink` alone, at its own hue, and leaves the secondary inks to the text', () => {
+    const base = generateCustomRoles(WARM_LIGHT);
+    const navy = generateCustomRoles({ ...WARM_LIGHT, ink: { hue: 280, strength: 100 } });
+    expect(hexToLch(navy.ink).hue).toBeCloseTo(280, -1);
+    expect(hexToLch(navy.ink).chroma).toBeGreaterThan(hexToLch(base.ink).chroma + 10);
+    expect(hexToLch(navy.ink).lightness).toBeCloseTo(hexToLch(base.ink).lightness, 0);
+    (['inkMuted', 'inkFaint', 'inkGhost', 'paper', 'accent'] as const).forEach((role) => expect(navy[role]).toBe(base[role]));
+  });
+
+  it('is a grey at a strength of 0, on a light or a dark page', () => {
+    for (const lightness of [96, 10]) {
+      const roles = generateCustomRoles({ ...withBackground(WARM_LIGHT, { lightness }), ink: { hue: 280, strength: 0 } });
+      expect(hexToLch(roles.ink).chroma).toBeLessThan(1);
+    }
+  });
+
+  it('starts from the text’s hue when a preset is converted', () => {
+    expect(WARM_LIGHT.ink.hue).toBe(WARM_LIGHT.text.hue);
+  });
+});
+
 describe('parseCustomColours', () => {
   it('reads back what it was given', () => {
     expect(parseCustomColours(JSON.parse(JSON.stringify(WARM_LIGHT)))).toEqual(WARM_LIGHT);
   });
 
+  it('takes the primary text from the text for a value saved before it was a part, drawing the same `ink`', () => {
+    const { ink: _ink, ...saved } = WARM_LIGHT;
+    const read = parseCustomColours(JSON.parse(JSON.stringify(saved)))!;
+    expect(read.ink).toEqual({ hue: WARM_LIGHT.text.hue, strength: Math.round(WARM_LIGHT.text.strength / 2) });
+    const before = generateRoles(customSeeds(read), 'light').ink;
+    expect(deltaE(generateCustomRoles(read).ink, before)).toBeLessThan(1);
+  });
+
   it.each([
     ['nothing', null],
+    ['a primary text strength over 100', { ...WARM_LIGHT, ink: { hue: 10, strength: 101 } }],
     ['a missing part', { ...WARM_LIGHT, viz: undefined }],
     ['a hue of 360', { ...WARM_LIGHT, text: { hue: 360, strength: 10 } }],
     ['a strength over 100', { ...WARM_LIGHT, accent: { hue: 10, strength: 101 } }],

@@ -255,11 +255,12 @@ date picker and the navigators take `uiMode`, never a fixed mode or colour
 header and page read as one surface ("Pages").
 
 Settings → Appearance: a live `ThemePreview`, then Theme (four presets and
-Custom as radio rows with swatches), then Mode (Light, Dark, System) for a
-preset or one row per Custom part (Background, Text, Accent, Best ever,
-Charts), each opening a picker: hue ring, strength `SliderRow`, and for the
+Custom as radio rows with swatches; Custom folds the presets behind `Show
+presets`), then Mode (Light, Dark, System) for a preset or one
+row per Custom part (Background, Primary text, Secondary text, Accent, Best
+ever, Charts), each opening a picker: hue ring, strength `SliderRow`, and for the
 background lightness and depth. A tap or release saves at once, writing nothing
-when already stored; the chosen row reads `Next launch` until the app reopens.
+already stored; the chosen row reads `Next launch` until the app reopens.
 A failed save shows a danger `Notice` saying nothing changed and is logged.
 Settings home names the choice.
 

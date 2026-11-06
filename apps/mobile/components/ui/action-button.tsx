@@ -116,17 +116,19 @@ const styles = StyleSheet.create({
   primaryPressed: {
     opacity: 0.85,
   },
-  // The accepted session view draws `+ Add exercise` in an ink outline.
+  // A hairline in `rule`, as a card's edge: the ink label carries the action,
+  // so the outline never outweighs the text it frames.
   outline: {
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ink,
+    borderColor: uiRoles.rule,
     backgroundColor: uiRoles.surface,
   },
   outlineDanger: {
     borderColor: uiRoles.danger,
   },
+  // Fainter than an enabled outline, so a disabled one never reads stronger.
   outlineDisabled: {
-    borderColor: uiRoles.inkGhost,
+    borderColor: uiRoles.ruleSoft,
   },
   // Depth is a ground change, never an elevation.
   pressed: {
