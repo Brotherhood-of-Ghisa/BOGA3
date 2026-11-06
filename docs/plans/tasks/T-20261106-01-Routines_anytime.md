@@ -1,28 +1,90 @@
-# T-20261106-01 — Routines: reuse any planned session anytime
+# T-20261106-01 — Routines: reuse standalone plans anytime
 
-- Status: `planned`
+- Status: `ready` — mock v3 accepted; standalone-only scope and reuse of
+  existing outcome rules agreed. Technical design and implementation remain.
 - Depends on: none; refresh assumptions against current `origin/main` before execution.
 - Milestone: none; one cross-stack implementation PR using the task protocol.
 - Areas: frontend, backend, sync; UI impact: yes.
 
+## Agent handoff
+
+- Implement the decisions in this card. Mock v3 acceptance and the two product
+  questions below are settled; do not request those decisions again.
+- Accepted visual input: `docs/plans/designs/routines-anytime-v3.html`, with
+  acceptance and subsequent standalone-only clarification recorded in
+  `docs/plans/designs/routines-anytime-v3.md`. V1/v2 and the control comparison
+  are historical; their programme-conversion examples do not apply.
+- Use `docs/plans/designs/routines-anytime-v2.md` only for the source inspection
+  and verification map, subject to this card's final scope. Select the smallest
+  correct internal per-use model; no production implementation exists yet.
+- The worktree and local preview URLs below describe this planning session,
+  not a required execution environment. Refresh the base and acquire an
+  isolated worktree/lease through the normal task protocol. If starting from a
+  branch containing this handoff before it reaches main, preserve this commit.
+- Screenshots and copied preview fonts are gitignored evidence, not committed
+  runtime assets. The frozen HTML refers to its artifact directory; if absent,
+  copy its named fonts from the mobile package's existing `@expo-google-fonts`
+  dependencies into that directory without changing the frozen target. Do not
+  depend on a live preview server. Running-native review/acceptance and all
+  implementation gates remain required.
+
+## Execution checkpoint
+
+- Refreshed against merged `origin/main` at `a941bf6e`; current completed-plan
+  support is present. Existing provenance uniqueness and consumed-block guards
+  still require per-use identity; no production changes have been made.
+- Worktree: `/private/tmp/boga-worktrees/codex-routines-anytime`, branch
+  `codex/routines-anytime`, slot 41. `./boga doctor` passed on 2026-11-06.
+- Current reviewable mock and revised plan:
+  `docs/plans/designs/routines-anytime-v3.md` and
+  `docs/plans/designs/routines-anytime-v3.html`; technical planning remains in
+  `docs/plans/designs/routines-anytime-v2.md`.
+- Current focused mock evidence: `apps/mobile/artifacts/routines-anytime/v3/`;
+  locked/editable/save-error states captured at 390 × 844 and 320 × 700 pt.
+  The switch restored an editable date picker when off and a passive lock-marked
+  Anytime row when on, with no horizontal overflow. These are prototype checks,
+  not app gates or native acceptance.
+- Operator rejected v1's conceptual framing: Routine is a quality of the same
+  plan, activated with a tick in the current plan creation card. Revised plan
+  and mock: `docs/plans/designs/routines-anytime-v2.md` and
+  `docs/plans/designs/routines-anytime-v2.html`. No separate Routine object,
+  authoring flow, detail route or destructive conversion is intended.
+- Human mock acceptance is now **recorded**: the operator answered **Accept
+  mock v3** to the switch/locked-Anytime review question. Artifact hash and
+  reviewed surfaces are in `docs/plans/designs/routines-anytime-v3.md`.
+  Production work and the final gate/PR/review sequence remain outstanding.
+- Operator scope clarification after mock acceptance: **No Routine inside a
+  programme.** A Routine must be standalone. Programme authoring/editing does
+  not offer the property; saving and synced storage reject Routine plus
+  programme membership. Do not detach a programme child automatically.
+- Operator outcome guidance: **keep existing logic (for non routine plans)
+  wherever possible without creating new logics.** Reuse recorder Finish,
+  confirmed performed-set eligibility, history dates, correction/deletion/Undo
+  and active-workout guards. Add only the repeat-use and explicit-Skip behavior
+  this task requires; no parallel routine completion or date-editing engine.
+- These answers settle the two presented product questions. The exact internal
+  per-use schema, transaction and sync design still need source verification.
+  No production implementation, gates, reviews or PR are claimed complete.
+
 ## Objective
 
-Let a lifter keep any planned session as a Routine and start it whenever they
-want. Finishing or skipping one use leaves the Routine visible and available;
+Let a lifter keep any standalone planned session as a Routine and start it
+whenever they want. Finishing or skipping one use leaves the Routine visible and available;
 each later use starts with fresh progress. Show the date of the latest
 completion or skip, and obtain explicit human acceptance of a mock design
 before implementing the UI.
 
 ## Scope
 
-- In: an Edit action to make any existing plan a Routine; an authoring choice
-  for new plans; the Sessions **Routines** section; routine detail, Start/Resume,
+- In: an Edit action to make an existing standalone plan a Routine; an authoring
+  choice for new plans; the Sessions **Routines** section; routine detail, Start/Resume,
   explicit Skip, outcome dates, safe future edits, persistence and sync.
-- In: conversion of scheduled/unscheduled, human/agent-authored, standalone and
-  programme-child plans, including unused, active/attached, partially consumed,
+- In: conversion of scheduled/unscheduled, human/agent-authored
+  standalone plans, including unused, active/attached, partially consumed,
   completed and entirely skipped plans. Existing consumption locks must not
   prevent changing routine availability.
-- Out: weekly/calendar recurrence, interval scheduling, reminders, automatic
+- Out: Routines inside programmes; automatic detachment on conversion;
+  weekly/calendar recurrence, interval scheduling, reminders, automatic
   missed/skip events, backlog generation, programme looping, automatic target
   progression, and new coaching-agent write capabilities.
 - This card prepares the implementation; it does not author the mock or ship
@@ -32,8 +94,9 @@ before implementing the UI.
 
 1. The section is called **Routines**. The first version is **Anytime**, with
    no due date or repeat calendar. Ordinary plans retain their existing use.
-2. Any live plan can be made a Routine through **Edit**, without requiring the
-   lifter to Duplicate it, recreate its blocks or discard prior progress.
+2. Any live standalone plan can be made a Routine through **Edit**, without
+   requiring the lifter to Duplicate it, recreate its blocks or discard prior
+   progress.
    Conversion enables future reuse and preserves earlier workouts and links.
 3. The Routine remains listed after completion or skip. Each Start uses the
    entire current routine definition, including blocks skipped or unperformed
@@ -60,6 +123,21 @@ before implementing the UI.
 9. Human acceptance of the **mock design before UI implementation** is a
    task-specific requirement from the operator, including when existing
    components could otherwise be reused without a separate acceptance step.
+10. **Routine is a property of the existing plan** (operator clarification,
+    2026-11-06): activate it in the current creation/edit card. The operator
+    subsequently selected SwitchRow for this on/off property.
+    Preserve the plan identity and reuse the current editor/detail/row. The
+    Routines section groups these flagged plans; it is not a separate entity
+    workflow. Keep schedule metadata; repeat availability is Anytime in this
+    version. A programme child cannot be a Routine and is never detached by
+    toggling this property.
+11. **No Routine inside a programme** (operator clarification, 2026-11-06).
+    Programme forms omit Routine; the data boundary enforces this restriction.
+    Existing programme progression is unchanged.
+12. **Reuse ordinary-plan logic wherever possible** (operator guidance,
+    2026-11-06). Recorder Finish, confirmed-work eligibility and history
+    operations remain authoritative. Routine uses need fresh identity and
+    explicit Skip outcomes; they do not need separate workout-completion rules.
 
 ## Product decisions to graduate when implemented
 
@@ -76,30 +154,26 @@ change facts only where the authoring criteria require them:
   differ, without globally redefining a skipped block as performed work.
 - Apply [[copy.no-subtitles]] and [[copy.no-inline-explanation]] to the design.
 
-## Open — settle at session start, before production coding
+## Technical design — before production coding
 
 - Choose the smallest execution/provenance model that allows repeated starts
   while keeping historical rows immutable. Decide whether separate use records
   or isolated plan snapshots best fit the existing sync contract; do not reset
   shared consumed blocks or weaken uniqueness globally.
-- Define conversion of an already scheduled plan and a programme child. Every
-  case above must support Edit conversion; decide presentation and membership
-  explicitly. Future routine starts must not rewind or repeatedly advance the
-  original programme, or appear as calendar commitments in Today. Avoid duplicate
-  routine rows in Sessions.
-- Define whether historical source uses seed Last completed/Last skipped on
-  conversion, using recoverable timestamps only. No invented outcome dates.
-- Define the zero-confirmed-work Finish result using existing recorder rules;
-  it must not award a completion for merely starting, or turn an abandoned
-  workout into a skip. The agreed partial-work example has performed work.
-- Agree removing routine availability through Edit, with history preserved;
-  prefer existing controls over adding an archive subsystem. Specify what
-  happens to an active use and ordinary-plan visibility.
-- Agree date correction/deletion/Undo semantics and offline conflict handling,
-  including Start racing Skip and retrying the same action on two devices.
-- Select the UI composition and have the human accept the mock below. These
-  choices may refine presentation but must not remove conversion or restore
-  carry-over requirements for partial use.
+- Scheduled standalone conversion retains the scheduled instant but excludes
+  the plan from due queues while Routine is on. Turning it off restores normal
+  schedule behavior. Reject programme-child conversion without mutation.
+- Use recoverable existing outcomes on conversion, never invented dates. Keep
+  the existing confirmed-work predicate and recorder empty-Finish behavior.
+  Partial confirmed source work still satisfies the agreed recurring-use
+  requirement; manual-only or abandoned work must not create a completion.
+- Turning Routine off through Edit stops future repeat availability and restores
+  ordinary-plan visibility with the retained schedule. Preserve active/completed
+  uses and their history; add no archive subsystem.
+- Reuse existing history correction/deletion/Undo semantics. Prove offline
+  conflict handling, including Start racing Skip and retries on two devices.
+- The UI composition and mock v3 are accepted. Preserve that standalone-plan
+  composition and the fresh-start requirement after partial use.
 
 ## UX contract and design target
 
@@ -132,7 +206,7 @@ Record real exports/variants and any custom delta in the implementation PR's
 
 | Flow | Trigger and steps | Success | Failure/edge |
 | --- | --- | --- | --- |
-| Make a Routine | Open any plan, Edit, enable routine availability, Save. | Same authored plan becomes available in Routines; prior progress/history survives. | Cancel writes nothing; save failure retains input and offers retry. Attached/completed/skipped blocks do not disable conversion. |
+| Make a Routine | Open a standalone plan, Edit, enable Routine, Save. | Same authored plan becomes available in Routines; prior progress/history survives. | Programme child conversion is refused without detaching it; Cancel writes nothing; save failure retains input and offers retry. Attached/completed/skipped blocks do not disable conversion. |
 | Use and reuse | Start a Routine, perform some or all prescribed work, Finish; Start again. | Completed workout enters History; Last completed updates; next use has every current block with fresh progress. | Repeated tap/retry creates one use; unrelated active workout offers Resume. No performed work follows the separately agreed empty-workout rule. |
 | Resume or abandon | Leave an active routine workout; return and Resume, or explicitly abandon. | Resume keeps that use's actuals; abandon preserves the Routine and previous outcome dates. | App restart/offline sync neither duplicates the use nor loses recorded work. |
 | Skip one use | From an idle Routine choose Skip. | Last skipped updates, Last completed remains, Start stays available; no workout/figures created. | Guard an active use; failed/retried Skip records at most one event and never discards performed work. |
@@ -181,8 +255,8 @@ Refresh these at execution start; the planning baseline is `35cf8b8d`:
   screenshots against that mock at small/normal phone widths. Obtain human
   acceptance of the result before merge; document deviations. This is the
   operator's task-specific review, not a new template-promotion mechanism.
-- Jest covers the conversion matrix, full and partial uses, a second fresh use,
-  explicit Skip, date ordering, resume/abandon, future edits, guarded failures,
+- Jest covers standalone conversions, programme exclusion, full and partial
+  uses, a second fresh use, explicit Skip, date ordering, resume/abandon, future edits, guarded failures,
   retries and preserved history. Add migration/sync contract cases proving
   offline persistence and repeated/concurrent starts with per-use provenance.
 - Read each test directory's README before editing its tests. Use real data
