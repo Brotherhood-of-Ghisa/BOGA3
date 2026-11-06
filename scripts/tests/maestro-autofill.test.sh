@@ -91,6 +91,8 @@ done
 
 # Exercise the real lane arms without provisioning Supabase or a device.
 cp "$SRC_ROOT/apps/mobile/scripts/maestro-run-lane.sh" "$SCRIPTS/"
+mkdir -p "$WORK/scripts"
+printf 'boga_runtime_guard_script() { :; }\n' > "$WORK/scripts/runtime-guard.sh"
 printf '#!/usr/bin/env bash\necho "required=$MAESTRO_IOS_REQUIRE_AUTOFILL_OFF"\n' > "$SCRIPTS/maestro-ios-run-flow.sh"
 for script in ensure-local-runtime-baseline sync-e2e-fixture-reset groups-fixture-reset; do
   printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK/supabase/scripts/$script.sh"
