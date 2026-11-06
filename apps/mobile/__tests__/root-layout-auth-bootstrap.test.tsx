@@ -26,6 +26,7 @@ const mockStack = jest.fn();
 const mockReportLaunchThemeProblem = jest.fn();
 const mockStatusBar = jest.fn();
 const mockThemeProvider = jest.fn();
+const mockThemeUnderLayout = jest.fn();
 const mockStopThemeAppIcon = jest.fn();
 const mockStartThemeAppIcon = jest.fn();
 
@@ -127,6 +128,8 @@ jest.mock('expo-router', () => {
 
   const ThemeProvider = ({ children, value }: { children: ReactNode; value: unknown }) => {
     mockThemeProvider(value);
+    // What a screen under the layout reads as the app's theme.
+    mockThemeUnderLayout(jest.requireActual('@/components/ui/theme-context').useUiRoles());
     return <>{children}</>;
   };
 
@@ -147,6 +150,7 @@ import * as tokens from '@/components/ui/tokens';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { getExerciseCatalogSnapshot } from '@/src/exercise-catalog/cache';
 import { closeLocalData, localDataClient, resetLocalData } from './helpers/local-data';
+import { rolesFor, switchTheme } from './helpers/theme';
 
 describe('RootLayout auth bootstrap wiring', () => {
   afterEach(async () => {
@@ -185,6 +189,15 @@ describe('RootLayout auth bootstrap wiring', () => {
         colors: expect.objectContaining({ background: uiRoles.paper, card: uiRoles.paper, text: uiRoles.ink }),
       }),
     );
+  });
+
+  it('draws every screen in the theme saved while the app runs', async () => {
+    render(<RootLayout />);
+    expect(mockThemeUnderLayout).toHaveBeenLastCalledWith(uiRoles);
+
+    const slateDark = { theme: 'slate', mode: 'dark', custom: null } as const;
+    await switchTheme(slateDark);
+    expect(mockThemeUnderLayout).toHaveBeenLastCalledWith(rolesFor(slateDark));
   });
 
   it('draws light status-bar content in a dark launch', () => {

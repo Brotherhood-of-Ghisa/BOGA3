@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
-import { HEAT_RAMP } from './heatmap-metric';
+import { heatRamp } from './heatmap-metric';
 import { heatmapStyles } from './heatmap-style';
 import type { DayCell, WeekCell } from './heatmapData';
 
@@ -47,7 +47,7 @@ export function CalendarTile(props: Props) {
   const shared = {
     accessibilityLabel: `${dateLabel}, ${description(props)}${prCount > 0 ? `, ${prCount} PR${prCount === 1 ? '' : 's'}` : ''}${current ? weekly ? ', Current week' : ', Today' : ''}${target === undefined ? '' : `, ${Math.round(target * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
     testID,
-    style: [styles.tile, weekly && heatmapStyles.weekColumn, { backgroundColor: HEAT_RAMP[cell?.level ?? 0] },
+    style: [styles.tile, weekly && heatmapStyles.weekColumn, { backgroundColor: heatRamp(uiRoles)[cell?.level ?? 0] },
       cell?.unavailable ? styles.unavailable : null],
   };
   return onPress

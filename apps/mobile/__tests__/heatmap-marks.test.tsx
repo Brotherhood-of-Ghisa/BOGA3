@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react-native';
 import { FlatList, StyleSheet } from 'react-native';
 import { HeatmapLegend } from '@/components/heatmaps/HeatmapLegend';
 
-import { DailyHeatmap, HEAT_RAMP, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
+import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData, heatRamp } from '@/components/heatmaps';
 import { uiRoles } from '@/components/ui';
 import type { DailyEffortMetrics } from '@/src/data';
 
@@ -84,7 +84,7 @@ describe('DailyHeatmap marks', () => {
   });
 
   it('colours cells from the viz ramp', () => {
-    expect(HEAT_RAMP).toEqual([uiRoles.viz0, uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4]);
+    expect(heatRamp(uiRoles)).toEqual([uiRoles.viz0, uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4]);
     renderDaily();
 
     // The heaviest day in the window is the top step.

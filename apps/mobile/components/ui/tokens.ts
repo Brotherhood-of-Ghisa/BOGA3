@@ -1,4 +1,4 @@
-import type { ThemeMode } from '@/components/ui/theme';
+import type { ThemeMode, UiRoles } from '@/components/ui/theme';
 import { launchMode, launchTheme } from '@/components/ui/theme-launch';
 import { appearanceRoles } from '@/components/ui/theme-presets';
 
@@ -135,7 +135,7 @@ export const uiBorder = {
   width: 1,
 } as const;
 
-export type UiRoleToken = keyof typeof uiRoles;
+export type UiRoleToken = keyof UiRoles;
 export type UiFontToken = keyof typeof uiFonts;
 export type UiSpaceToken = keyof typeof uiSpace;
 export type UiIconSizeToken = keyof typeof uiIconSize;
