@@ -12,7 +12,7 @@ export {
   getCalendarHeatmapBucket,
   getCurrentLocalDateKey,
   getMetricValue,
-  heatRamp,
+  HEAT_RAMP,
   type CalendarHeatmapBucket,
   type CalendarHeatmapMetric,
   type HeatmapMetricSource,

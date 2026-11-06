@@ -8,9 +8,9 @@ import { uiIconSize, type UiIconSizeToken, type UiRoleToken } from '@/components
 export type { IconName } from '@/components/ui/icon-glyphs';
 
 // What the glyph is drawn in: a colour role by name, which follows the theme
-// (`role="inkMuted"`), or a colour already read from `useUiRoles()`. Neither:
+// (`colorRole="inkMuted"`), or a colour already read from `useUiRoles()`. Neither:
 // the glyph's own role (below), else `ink`.
-type IconColour = { role?: UiRoleToken; color?: never } | { color?: string; role?: never };
+type IconColour = { colorRole?: UiRoleToken; color?: never } | { color?: string; colorRole?: never };
 
 export type IconProps = IconColour & {
   name: IconName;
@@ -64,10 +64,10 @@ const renderShape = (shape: IconShape, index: number, colours: Paint) => {
 // The app's icon set: vendored Lucide geometry plus BoGa's state glyphs
 // (`icon-glyphs.ts`). Replaces the Unicode characters screens used to set in
 // `Text` as improvised icons. Never takes touches — wrap it in the control.
-export function Icon({ name, size = 'md', role, color, label, testID, style }: IconProps) {
+export function Icon({ name, size = 'md', colorRole, color, label, testID, style }: IconProps) {
   const roles = useUiRoles();
   const edge = uiIconSize[size];
-  const colours = { color: color ?? roles[role ?? DEFAULT_ROLES[name] ?? 'ink'], knockout: roles.onInk };
+  const colours = { color: color ?? roles[colorRole ?? DEFAULT_ROLES[name] ?? 'ink'], knockout: roles.onInk };
   const accessibility = label
     ? { accessible: true, accessibilityRole: 'image' as const, accessibilityLabel: label }
     : {

@@ -4,13 +4,11 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { useUiRoles } from '@/components/ui/theme-context';
 import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
 
-import { heatRamp } from './heatmap-metric';
+import { HEAT_RAMP } from './heatmap-metric';
 
 export function HeatmapLegend({ target = false }: { target?: boolean }) {
-  const ramp = heatRamp(useUiRoles());
   return (
     <View style={styles.legend}>
       <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
@@ -20,7 +18,7 @@ export function HeatmapLegend({ target = false }: { target?: boolean }) {
         <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
           0%
         </Text>
-        {ramp.map((color, i) => (
+        {HEAT_RAMP.map((color, i) => (
           <View
             key={color}
             style={[styles.swatch, { backgroundColor: color }, i === 0 ? styles.restSwatch : null]}

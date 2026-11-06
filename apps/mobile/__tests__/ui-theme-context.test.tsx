@@ -68,6 +68,31 @@ describe('AppThemeProvider', () => {
     expect(latest().roles).toBe(before);
   });
 
+  it('keeps the same roles when a save resolves to the same colours', async () => {
+    // System on a light launch draws exactly what Light draws.
+    const systemOnLight: AppearanceChoice = { ...DEFAULT_APPEARANCE, mode: 'system' };
+    expect(rolesFor(systemOnLight)).toEqual(rolesFor(DEFAULT_APPEARANCE));
+    renderWithTheme(<Probe />);
+    const before = latest().roles;
+
+    await switchTheme(systemOnLight);
+    expect(latest().roles).toBe(before);
+  });
+
+  it('starts in the launch theme, and logs, when the store cannot be read as it mounts', () => {
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord(SLATE_DARK));
+    const read = jest.spyOn(Storage, 'getItemSync').mockImplementation(() => {
+      throw new Error('disk gone');
+    });
+    try {
+      renderWithTheme(<Probe />);
+    } finally {
+      read.mockRestore();
+    }
+    expect(latest()).toEqual({ roles: rolesFor(launchTheme.appearance), mode: 'light' });
+    expect(mockLogEvent).toHaveBeenCalledWith(expect.objectContaining({ event: 'theme.read_failed' }));
+  });
+
   it('stays in the theme it is drawn in, and logs, when the saved choice cannot be read', async () => {
     renderWithTheme(<Probe />);
     const before = latest().roles;
