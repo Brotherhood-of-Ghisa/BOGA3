@@ -88,7 +88,7 @@ across presets, so "your best ever" keeps one look. Settings → Appearance
 (`ux-rules.md` "Appearance") sets each part with a live preview.
 
 **Custom** (`theme-custom.ts`): a hue and a strength (0–100% of the part's
-chroma cap) per seed, and the page's lightness (L\* 0–100) and depth (0–300%).
+chroma cap) per seed and for primary text (`ink` alone), and the page's lightness (L\* 0–100) and depth (0–300%).
 The seeds feed the ladder of the page's mode — light at L\* 50 and above, dark
 below — and each role keeps its hue, chroma and share of the `paper` → `ink`
 distance, moved onto the chosen page. Depth scales that share for `surface`,
@@ -261,8 +261,8 @@ Controls governing multiple cards stay outside the tile.
 
 ## 5. Emphasis
 
-**One primary action per screen**, in `accent`. Everything else is an outline or
-a plain text button. Two saturated buttons on one screen is a bug.
+**One primary action per screen**, in `accent`. Everything else is a `rule`
+outline or a plain text button. Two saturated buttons on one screen is a bug.
 A row-level action inside a list row (a group record's Certify / Withdraw) is a
 compact outline (`compactControlHeight` 28), its tap target kept at 44 by hit
 slop.

@@ -38,8 +38,8 @@ function customOf(appearance: AppearanceChoice): CustomColours {
   return startingCustom(appearance, previewMode(appearance));
 }
 
-// Settings → Appearance → Custom → one part (background, text, accent, best
-// ever, charts): a hue on a ring and a strength, and for the background its
+// Settings → Appearance → Custom → one part (background, primary text,
+// secondary text, accent, best ever, charts): a hue on a ring and a strength, and for the background its
 // lightness and depth, with the theme they make, live, on a small mock. A part
 // saves when the ring or a slider is let go (or a VoiceOver step is made) and
 // applies on the next launch (`theme-launch.ts`), which the page says once it

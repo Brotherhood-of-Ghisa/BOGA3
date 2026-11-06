@@ -204,6 +204,7 @@ describe('custom', () => {
   const WARM_CUSTOM = customFromSeeds(getThemePreset('warm').seeds, 'light');
   const CUSTOM: CustomColours = {
     background: { hue: 200, strength: 30, lightness: 20, depth: 150 },
+    ink: { hue: 265, strength: 40 },
     text: { hue: 60, strength: 10 },
     accent: { hue: 330, strength: 80 },
     record: { hue: 90, strength: 60 },
@@ -229,7 +230,7 @@ describe('custom', () => {
     expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
     expect(previewGround()).toBe(generateCustomRoles(WARM_CUSTOM).paper);
     expect(screen.queryByTestId('settings-appearance-mode')).toBeNull();
-    for (const label of ['Background', 'Text', 'Accent', 'Best ever', 'Charts']) {
+    for (const label of ['Background', 'Primary text', 'Secondary text', 'Accent', 'Best ever', 'Charts']) {
       expect(within(screen.getByTestId('settings-appearance-custom')).getByText(label)).toBeTruthy();
     }
   });
@@ -247,12 +248,64 @@ describe('custom', () => {
     const rows = screen.getByTestId('settings-appearance-custom');
     expect(within(rows).getByText('Teal, 30%, light 20')).toBeTruthy();
     expect(within(rows).getByText('Purple, 80%')).toBeTruthy();
+    expect(screen.getByLabelText('Primary text, Blue, 40%, next launch')).toBeTruthy();
     expect(screen.getByLabelText('Best ever, Olive, 60%, next launch')).toBeTruthy();
     expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
 
     fireEvent.press(screen.getByTestId('settings-appearance-custom-record'));
 
     expect(mockPush).toHaveBeenCalledWith('/theme-custom?part=record');
+  });
+
+  it('collapses Theme to Custom while it is chosen, and shows or hides the presets on request', () => {
+    storeCustom();
+    render(<SettingsAppearanceRoute />);
+    expect(screen.queryByTestId('settings-appearance-option-warm')).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Show presets' }));
+
+    expect(screen.getByTestId('settings-appearance-option-warm')).toBeTruthy();
+    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+
+    fireEvent.press(screen.getByRole('button', { name: 'Hide presets' }));
+
+    expect(screen.queryByTestId('settings-appearance-option-warm')).toBeNull();
+  });
+
+  it('folds the presets again on a tap on Custom, writing nothing', () => {
+    storeCustom();
+    const setItem = jest.spyOn(Storage, 'setItem');
+    render(<SettingsAppearanceRoute />);
+    fireEvent.press(screen.getByRole('button', { name: 'Show presets' }));
+
+    fireEvent.press(radio('Custom, next launch'));
+
+    expect(screen.queryByTestId('settings-appearance-option-warm')).toBeNull();
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the presets listed when a preset cannot be saved', async () => {
+    storeCustom();
+    jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
+    render(<SettingsAppearanceRoute />);
+    fireEvent.press(screen.getByRole('button', { name: 'Show presets' }));
+
+    fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
+
+    expect(await screen.findByText('Couldn’t save the theme. Nothing changed.')).toBeTruthy();
+    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+    expect(screen.getByTestId('settings-appearance-option-slate')).toBeTruthy();
+  });
+
+  it('leaves Custom for a preset picked from the expanded list, and drops Show presets', async () => {
+    storeCustom();
+    render(<SettingsAppearanceRoute />);
+    fireEvent.press(screen.getByTestId('settings-appearance-show-presets'));
+
+    fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
+
+    await waitFor(() => expect(storedAccent()).toBe('slate'));
+    expect(screen.queryByTestId('settings-appearance-show-presets')).toBeNull();
+    expect(screen.getByTestId('settings-appearance-option-warm')).toBeTruthy();
   });
 
   it('previews a custom theme in the mode its page sets', () => {

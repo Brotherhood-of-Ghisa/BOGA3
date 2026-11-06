@@ -67,6 +67,7 @@ export function pendingAppearance(appearance: AppearanceChoice): PendingAppearan
     appearance.theme === 'custom' && !same(appearance.custom?.[part], launched.custom?.[part]);
   const custom = {
     background: customPart('background'),
+    ink: customPart('ink'),
     text: customPart('text'),
     accent: customPart('accent'),
     record: customPart('record'),
@@ -81,7 +82,8 @@ export const MODE_LABELS: Record<AppearanceMode, string> = { light: 'Light', dar
 // The custom parts as the Appearance page names them, in its order.
 export const CUSTOM_PART_LABELS: Record<CustomPart, string> = {
   background: 'Background',
-  text: 'Text',
+  ink: 'Primary text',
+  text: 'Secondary text',
   accent: 'Accent',
   record: 'Best ever',
   viz: 'Charts',
