@@ -66,12 +66,34 @@ jest.mock('@/src/session-recorder/repeating-timer-native', () => ({
   setRepeatingTimerAwake: jest.fn(),
 }));
 
+jest.mock('@/src/session-recorder/rest-timer-notification-native', () => ({
+  REST_TIMER_NOTIFICATION_ID: 'boga-rest-timer',
+  REST_TIMER_NOTIFICATION_CHANNEL_ID: 'boga-rest-timer',
+  scheduleRestTimerNotification: jest.fn(),
+  cancelRestTimerNotification: jest.fn(),
+  flushRestTimerNotificationQueueForTests: jest.fn(async () => {}),
+  __resetRestTimerNotificationForTests: jest.fn(),
+}));
+
 // Notifications cross the native boundary here; service/controller suites inject its outcomes.
 jest.mock('expo-notifications', () => ({
+  AndroidImportance: { UNKNOWN: 0, UNSPECIFIED: 1, NONE: 2, MIN: 3, LOW: 4, DEFAULT: 5, HIGH: 6, MAX: 7 },
+  SchedulableTriggerInputTypes: {
+    CALENDAR: 'calendar',
+    DAILY: 'daily',
+    WEEKLY: 'weekly',
+    MONTHLY: 'monthly',
+    YEARLY: 'yearly',
+    DATE: 'date',
+    TIME_INTERVAL: 'timeInterval',
+  },
   IosAuthorizationStatus: { NOT_DETERMINED: 0, DENIED: 1, AUTHORIZED: 2, PROVISIONAL: 3, EPHEMERAL: 4 },
   DEFAULT_ACTION_IDENTIFIER: 'expo.modules.notifications.actions.DEFAULT',
   getPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: true, status: 'undetermined', ios: { status: 0 } })),
   requestPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: false, status: 'denied', ios: { status: 1 } })),
+  scheduleNotificationAsync: jest.fn(async () => 'mock-notification-id'),
+  cancelScheduledNotificationAsync: jest.fn(async () => undefined),
+  setNotificationChannelAsync: jest.fn(async () => null),
   getExpoPushTokenAsync: jest.fn(async () => { throw new Error('No native push provider in Jest'); }),
   addPushTokenListener: jest.fn(() => ({ remove: jest.fn() })),
   addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),

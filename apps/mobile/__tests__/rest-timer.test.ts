@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react-native';
 import { AppState, Vibration, type AppStateStatus } from 'react-native';
 
 import { playRepeatingTimerCue, setRepeatingTimerAwake, stopRepeatingTimerAudio } from '@/src/session-recorder/repeating-timer-native';
+import { cancelRestTimerNotification, scheduleRestTimerNotification } from '@/src/session-recorder/rest-timer-notification-native';
 
 import {
   __resetRestTimerForTests,
@@ -615,6 +616,39 @@ describe('rest-timer store and pure rules', () => {
     // At 30s (when original rest timer would have completed), no second cue fires
     jest.advanceTimersByTime(15_000);
     expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('manages background notification lifecycle on start, adjust, dismiss, switch, and natural completion', () => {
+    jest.mocked(scheduleRestTimerNotification).mockClear();
+    jest.mocked(cancelRestTimerNotification).mockClear();
+
+    // 1. Starting rest timer schedules notification
+    startRestTimer('session-1', 90, 0);
+    expect(scheduleRestTimerNotification).toHaveBeenCalledTimes(1);
+    expect(scheduleRestTimerNotification).toHaveBeenCalledWith(90_000);
+
+    // 2. Adjusting rest timer reschedules notification
+    adjustRestTimer('session-1', 15, 30_000);
+    expect(scheduleRestTimerNotification).toHaveBeenCalledTimes(2);
+    expect(scheduleRestTimerNotification).toHaveBeenLastCalledWith(105_000);
+
+    // 3. Dismissing rest timer cancels notification
+    dismissRestTimer('session-1');
+    expect(cancelRestTimerNotification).toHaveBeenCalled();
+
+    // 4. Starting new timer and switching to repeating mode cancels notification
+    jest.mocked(scheduleRestTimerNotification).mockClear();
+    jest.mocked(cancelRestTimerNotification).mockClear();
+    startRestTimer('session-1', 60, 0);
+    expect(scheduleRestTimerNotification).toHaveBeenCalledWith(60_000);
+    switchTimerMode('session-1', 'repeating');
+    expect(cancelRestTimerNotification).toHaveBeenCalled();
+
+    // 5. Natural countdown completion in foreground cancels scheduled notification
+    jest.mocked(cancelRestTimerNotification).mockClear();
+    startRestTimer('session-1', 30, 0);
+    jest.advanceTimersByTime(30_000);
+    expect(cancelRestTimerNotification).toHaveBeenCalled();
   });
 
   it('triggers rest completion cue even after screen hook unmounts', () => {
