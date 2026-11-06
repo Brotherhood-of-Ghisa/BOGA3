@@ -1,4 +1,4 @@
-/** @jest-environment node */
+/** @jest-environment ./jest.node-environment.js */
 import fs from 'fs';
 import path from 'path';
 import { spawnSync } from 'node:child_process';

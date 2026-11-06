@@ -1,4 +1,4 @@
-/** @jest-environment node */
+/** @jest-environment ./jest.node-environment.js */
 import { handleNotificationRequest, type Rpc } from '../../../supabase/functions/notification-worker/handler';
 import { encryptProjection, sendPush } from '../../../supabase/functions/notification-worker/provider';
 

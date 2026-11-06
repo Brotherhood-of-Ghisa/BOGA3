@@ -1,4 +1,4 @@
-/** @jest-environment node */
+/** @jest-environment ./jest.node-environment.js */
 // The harness runs the group-eval drain through its own mirror
 // (scripts/perf/groups/group-eval-mirror.ts) because the Edge module serves on
 // import. These tests fail when the two drift apart, and pin the mirror's
