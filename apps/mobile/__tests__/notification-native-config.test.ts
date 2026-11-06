@@ -20,7 +20,10 @@ it('registers the real application, notification APIs and local bridge through t
       'generate-modules-provider', '--platform', 'apple', '--project-root', root, '--app-root', root,
       '--target', target, '--packages', 'expo-application', 'expo-notifications', 'boga-notifications',
     ], { cwd: root, encoding: 'utf8', timeout: 30000 });
-    expect({ status: generated.status, error: generated.error?.message, stderr: generated.stderr }).toEqual({
+    // expo-modules-core's own CoreModule is internal (AppContext creates it), so autolinking warns about it.
+    const stderr = generated.stderr.replace(
+      /^warning: The @ExpoModule class 'CoreModule' \([^)]*\/expo-modules-core\/ios\/Core\/Modules\/CoreModule\.swift\) is internal,.*\n/m, '');
+    expect({ status: generated.status, error: generated.error?.message, stderr }).toEqual({
       status: 0, error: undefined, stderr: '',
     });
     const provider = fs.readFileSync(target, 'utf8');
