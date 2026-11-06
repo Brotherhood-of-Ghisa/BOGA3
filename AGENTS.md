@@ -96,14 +96,14 @@ place each under `docs/specs/**`, routed from here.
    no remote-only test lane in this repo.
 
 5. **You own your worktree from open to merge.** Nothing cleans up after you
-   (spec `01`; contract `12`). Work always happens in a local worktree unless
-   the user says otherwise (cloud containers have no iOS simulator).
+   (spec `01`; contract `12`). Use a local worktree unless instructed otherwise;
+   cloud containers lack iOS simulators.
    - **Open:** `./boga worktree create <branch>` (new worktree from the latest
      `origin/main`), or `./boga worktree start` inside a worktree your harness
      made. It fails unless the worktree contains the latest `origin/main`; pass
      `--base`/`--from <ref>` only when told to. Every `./boga test|db|ios|env`
      command, Supabase script, and Maestro run fails hard without this slot lease.
-   - **PR opened:** `./boga db down`. Optional: `./boga pr wait` in the
+   - **PR opened:** `./boga db down` (busy-runtime guidance: spec `12`). Optional: `./boga pr wait` in the
      background to notice the merge.
    - **PR merged:** you clean up in the same session — `./boga worktree release`
      removes the slot's Supabase containers/volumes, the lease, and the

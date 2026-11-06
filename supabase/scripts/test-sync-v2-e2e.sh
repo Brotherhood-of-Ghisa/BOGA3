@@ -23,6 +23,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUPABASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TESTS_DIR="${SUPABASE_DIR}/tests"
+REPO_ROOT="$(cd "$SUPABASE_DIR/.." && pwd)"
+source "${REPO_ROOT}/scripts/runtime-guard.sh"
+boga_runtime_guard_script "$REPO_ROOT" "$0" "$@"
 
 echo "[test] ensuring shared local runtime baseline"
 "${SUPABASE_DIR}/scripts/ensure-local-runtime-baseline.sh"

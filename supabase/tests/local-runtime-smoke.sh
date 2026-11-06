@@ -4,6 +4,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SUPABASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "$SUPABASE_DIR/.." && pwd)"
+source "${REPO_ROOT}/scripts/runtime-guard.sh"
+boga_runtime_guard_script "$REPO_ROOT" "$0" "$@"
 
 echo "[test] ensuring local runtime is up"
 "${SUPABASE_DIR}/scripts/local-runtime-up.sh"

@@ -101,7 +101,7 @@ EOF
 printf '.worktree-slot\nsupabase/config.toml\nsupabase/.env.local\nsupabase/.env.hosted\nsupabase/functions/.env.local\napps/mobile/.maestro/maestro.env.local\n' >"$MAIN/.gitignore"
 cp "$SRC_ROOT/boga" "$MAIN/"
 for f in worktree-lib.sh worktree-start.sh worktree-create.sh worktree-release.sh worktree-ls.sh \
-  worktree-doctor.sh pr-wait.sh boga-config-init.sh lanes.tsv lane-timing.sh java-env.sh; do
+  worktree-doctor.sh pr-wait.sh boga-config-init.sh lanes.tsv lane-timing.sh java-env.sh runtime-guard.sh; do
   cp "$SRC_ROOT/scripts/$f" "$MAIN/scripts/"
 done
 git -C "$MAIN" add -A

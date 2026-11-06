@@ -70,7 +70,7 @@ chmod +x "$STUB_BIN"/*
 
 # ---------- scaffold: a leased worktree holding the real preflight ----------
 mkdir -p "$ROOT/scripts" "$ROOT/supabase/scripts" "$ROOT/supabase/migrations" "$ROOT/apps/mobile"
-cp "$SRC_ROOT/scripts/worktree-lib.sh" "$ROOT/scripts/"
+cp "$SRC_ROOT/scripts/"{worktree-lib.sh,runtime-guard.sh} "$ROOT/scripts/"
 for f in _common.sh _containers.sh ensure-local-runtime-baseline.sh auth-fixture-constants.sh; do
   cp "$SRC_ROOT/supabase/scripts/$f" "$ROOT/supabase/scripts/"
 done

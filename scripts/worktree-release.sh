@@ -11,6 +11,8 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/worktree-lib.sh"
 
+RELEASE_ARGS=("$@")
+
 FORCE=0
 KEEP_WORKTREE=0
 SLOT_ARG=""
@@ -107,6 +109,13 @@ if [[ "$FORCE" != "1" ]]; then
     fail "PR $open_pr for branch $branch is still OPEN; release after it merges (./boga pr wait)"
   fi
   echo "[worktree-release] PR check ok for $branch: $(tr '\n' ' ' <<<"$states")"
+fi
+
+# Own the target runtime before touching its containers, lease or checkout.
+source "$SCRIPT_DIR/runtime-guard.sh"
+if ! boga_runtime_owned "$TARGET_PROJECT_ID"; then
+  exec "$SCRIPT_DIR/runtime-guard.sh" "$TARGET_PROJECT_ID" "worktree release $TARGET_PATH" \
+    "$0" ${RELEASE_ARGS[@]+"${RELEASE_ARGS[@]}"}
 fi
 
 # ---------- 2. Docker stack (fail hard, keep the lease) ----------

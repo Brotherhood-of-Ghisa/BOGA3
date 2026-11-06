@@ -54,6 +54,9 @@ else
   RESET_COMMAND="boga db reset"
 fi
 
+source "${REPO_ROOT}/scripts/runtime-guard.sh"
+boga_runtime_guard_script "$REPO_ROOT" "$0" "$@"
+
 # Best-effort load of `supabase status` env without failing when the stack is
 # down (status exits non-zero then). Mirrors ensure-local-runtime-baseline.sh.
 load_supabase_status_env_if_available() {

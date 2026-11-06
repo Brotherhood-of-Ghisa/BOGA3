@@ -2,7 +2,7 @@
 
 > **Owns:** the gate ladder, the (generated) lane matrix, path→gate triggers, CI posture. **Not here:** per-test purpose and policies → `06`; durations → `./boga timings`. **Load when:** always (always-load).
 
-Lanes to run for a change and before its PR.
+For runtime-ownership failures, load `12-worktree-config-and-isolation.md`.
 
 ## Run the gates (`./boga`, from anywhere in the repo)
 

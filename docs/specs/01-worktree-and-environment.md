@@ -33,6 +33,8 @@ nested.**
   and regenerates config.
 - Review feedback after step 3: work again (any gate restarts the stack), push,
   `./boga db down` (and restart `./boga pr wait` if you use it).
+- A busy runtime refuses teardown; load `12-worktree-config-and-isolation.md`,
+  "Runtime ownership", before retrying or handling abandoned ownership.
 - Step 4 is the owning agent's job once the human confirms the merge (or
   `pr wait` exits 0); `pr wait` only saves asking. Closed without merge: ask
   the human, then `release --force`.

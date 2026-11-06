@@ -42,6 +42,7 @@ TESTS=(
   "maestro-autofill.test.sh"
   "functions-serve-stop.test.sh"
   "baseline-stamp.test.sh"
+  "runtime-guard.test.sh"
   "dev-stack-config.test.sh"
   "dev-stack-main-checkout.test.sh"
   "ci-docs-only.test.sh"

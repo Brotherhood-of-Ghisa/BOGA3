@@ -244,13 +244,14 @@ Applies to every lane that hits a running stack rather than a mocked client.
 - **Data-shape contract:** baseline rows must exist, but **extra rows are
   allowed**. A suite must not assume empty tables beyond the baseline and must
   use per-run unique entity IDs, so repeated runs in one slot cannot collide.
-- **Parallel runs:** bootstrap is serialised per worktree by a lock in the
-  baseline script, and each worktree owns its own stack, one Metro port and one
-  simulator target (`12`). Avoid manual destructive operations (`db reset`, stack
-  restart) in a slot another suite is using; a suite that looks like it hit the
-  wrong instance is a `./boga worktree doctor` question. Every local gate
-  requires this worktree's slot lease (`AGENTS.md`), and no gate cleans up after
-  another worktree.
+- **Parallel runs:** runtime ownership covers setup, test bodies and teardown;
+  competing commands refuse before mutation. For ownership or interruption
+  failures, load `12-worktree-config-and-isolation.md`, "Runtime ownership".
+  `scripts/tests/runtime-guard.test.sh` (also exercised by Jest) proves
+  contention, direct reset paths, nesting, independent runtimes and signal
+  cleanup. The real `backend-fast` smoke still proves reset against Supabase.
+  Each worktree owns its stack, Metro port and simulator; every local gate
+  requires its slot lease, and none cleans up another worktree.
 
 ## CI posture
 

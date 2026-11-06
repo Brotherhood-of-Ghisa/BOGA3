@@ -32,6 +32,13 @@ lane="${1:-}"
 LANES="smoke|data-smoke|exercise-page|rm-curve|session-view|auth-profile|sync-e2e|groups-e2e|android-smoke|android-data-smoke"
 [[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
 
+case "$lane" in
+  auth-profile|sync-e2e|groups-e2e)
+    source "$REPO_ROOT/scripts/runtime-guard.sh"
+    boga_runtime_guard_script "$REPO_ROOT" "$0" "$@"
+    ;;
+esac
+
 RUN_FLOW="$SCRIPT_DIR/maestro-ios-run-flow.sh"
 RUN_FLOWS="$SCRIPT_DIR/maestro-ios-run-flows.sh"
 export MAESTRO_IOS_REQUIRE_AUTOFILL_OFF=0

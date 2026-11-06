@@ -52,6 +52,7 @@ Jest, Metro, or TypeScript excludes — the layout is the bug.
   edge-functions/env.shared        # shared local Edge Function identity defaults
   worktrees/slots/<slot>           # the lease: slot, project_id, path, common_git_dir, updated_at
   worktrees/slot-allocation.lock/  # held only while `start` picks a slot
+  worktrees/runtime-locks/         # active lane/lifecycle ownership by project_id
   timings/records/                 # one JSON per ./boga test lane run (scripts/lane-timing.sh)
   sweep/<utc>/                     # ./boga sweep per-lane logs + summary.txt
 ```
@@ -137,6 +138,30 @@ CLI-truncated form of such an id only when it publishes this slot's port.
 | Mobile dependencies | worktree-local `apps/mobile/node_modules`; a symlinked one is refused by runtime guards |
 | iOS dev-client build cache | intentionally **shared**: one host-local cache at `~/.cache/boga/maestro/ios-dev-client`; rebuild with `--force` after a native change |
 | Android dev-client build cache | intentionally **shared**: one host-local APK at `~/.cache/boga/maestro/android-dev-client`; rebuild with `--force` after a native change |
+
+### Runtime ownership
+
+`scripts/runtime-guard.sh` reserves the effective Supabase `project_id` with
+atomic `mkdir` under the machine's runtime-locks directory. `boga` holds it for
+each `supabase` or `ios+supabase` lane: baseline, fixtures, body and teardown.
+Direct suite runners, baseline, lifecycle/fixture resets and worktree release
+use the same guard. Database-free lanes, different projects and the dedicated
+dev stack remain independent. Gate stamps still validate baseline state;
+they do not grant ownership.
+
+A competing command fails before mutation, reporting the holder PID, command,
+start time and lock path. Retry after the holder exits. Nested scripts reuse
+ownership only when the token, project and live ancestor match. Only the holder
+removes its lock; existing script cleanup traps run inside the supervised child.
+On failure or HUP/INT/TERM, the supervisor stops its child's process group,
+waits for cleanup, escalates to KILL if necessary, and unlocks only after that
+work stops. An unkillable child keeps ownership.
+
+After SIGKILL or a machine crash, an abandoned or incomplete lock refuses
+further work rather than being stolen. Inspect the reported holder and its
+remaining child work; remove only that lock directory after verifying all its
+guarded work has stopped. Never infer safety from a dead PID alone. When
+cleaning up another session, follow `docs/procedures/worktree-cleanup.md` first.
 
 ### Generated Supabase config
 
