@@ -3,8 +3,9 @@
 const mockLogEvent = jest.fn();
 jest.mock('@/src/logging', () => ({ logEvent: (...args: unknown[]) => mockLogEvent(...args) }));
 
-import { render, screen } from '@testing-library/react-native';
+import { act, render, screen } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
+import { Suspense } from 'react';
 import { Text } from 'react-native';
 
 import type { UiRoles } from '@/components/ui/theme';
@@ -82,6 +83,41 @@ describe('AppThemeProvider', () => {
     expect(mockLogEvent).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'error', event: 'theme.read_failed', context: { error: 'disk gone' } }),
     );
+  });
+
+  it('repaints as a transition: a screen not ready for the new theme keeps the old one, never a fallback', async () => {
+    // A suspended render in an urgent update would swap the screen for its
+    // fallback; in a transition React keeps the committed screen until all of
+    // it can change theme in one commit.
+    let ready: () => void = () => {};
+    const notReady = new Promise<void>((resolve) => {
+      ready = resolve;
+    });
+    let waiting = true;
+    void notReady.then(() => {
+      waiting = false;
+    });
+    function SlowScreen() {
+      const roles = useUiRoles();
+      if (roles.paper === rolesFor(SLATE_DARK).paper && waiting) throw notReady;
+      return <Probe />;
+    }
+    renderWithTheme(
+      <Suspense fallback={<Text testID="fallback">loading</Text>}>
+        <SlowScreen />
+      </Suspense>,
+    );
+    const launchText = `light ${rolesFor(DEFAULT_APPEARANCE).paper}`;
+
+    await switchTheme(SLATE_DARK);
+    expect(screen.queryByTestId('fallback')).toBeNull();
+    expect(screen.getByTestId('probe')).toHaveTextContent(launchText);
+
+    await act(async () => {
+      ready();
+      await notReady;
+    });
+    expect(screen.getByTestId('probe')).toHaveTextContent(`dark ${rolesFor(SLATE_DARK).paper}`);
   });
 
   it('stops following saves once unmounted', async () => {
