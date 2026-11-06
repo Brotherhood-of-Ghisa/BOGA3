@@ -96,6 +96,8 @@ for script in ensure-local-runtime-baseline sync-e2e-fixture-reset groups-fixtur
   printf '#!/usr/bin/env bash\nexit 0\n' > "$WORK/supabase/scripts/$script.sh"
 done
 printf 'load_supabase_status_env() { API_URL=http://fixture; ANON_KEY=fixture; }\n' > "$WORK/supabase/scripts/_common.sh"
+mkdir -p "$WORK/scripts"
+printf 'boga_runtime_guard_script() { :; }\n' > "$WORK/scripts/runtime-guard.sh"
 printf 'USER_A_EMAIL=a\nUSER_A_PASSWORD=a\nUSER_B_EMAIL=b\nUSER_B_PASSWORD=b\nUSER_C_EMAIL=c\nUSER_C_PASSWORD=c\nUSER_C_USERNAME=c\nUSER_D_EMAIL=d\nUSER_D_PASSWORD=d\nUSER_D_USERNAME=d\n' > "$WORK/supabase/scripts/auth-fixture-constants.sh"
 chmod +x "$WORK/supabase/scripts/"*.sh
 for lane in auth-profile sync-e2e groups-e2e; do
