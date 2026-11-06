@@ -180,26 +180,31 @@ export const deriveRepeatingTimerView = (
 
 // The store owns native resources across both hosts, including after a view unmounts.
 function updateRepeatingTimerResources(): void {
-  if (activeEntry?.mode !== 'repeating' && !appStateSubscription) return;
+  if (!activeEntry && !appStateSubscription) return;
   stopRepeatingTimerAudio();
-  if (activeEntry?.mode === 'repeating') {
+  if (activeEntry) {
     if (!appStateSubscription) {
       // Unknown initial state waits for an active event rather than retaining foreground resources.
       isForeground = AppState.currentState === 'active';
       appStateSubscription = AppState.addEventListener('change', (state) => {
         isForeground = state === 'active';
+        if (state === 'active' && activeEntry?.mode === 'rest') {
+          scheduleRestCompletionCue();
+        }
         stopRepeatingTimerAudio();
         setRepeatingTimerAwake(isForeground && activeEntry?.mode === 'repeating' && activeEntry.pausedAtMs === null);
         scheduleRoundBoundaryCue();
         for (const listener of listeners) listener();
       });
     }
-    prepareRepeatingTimerAudio();
+    if (activeEntry.mode === 'repeating') {
+      prepareRepeatingTimerAudio();
+    }
   } else {
     appStateSubscription?.remove();
     appStateSubscription = null;
   }
-  setRepeatingTimerAwake(isForeground && activeEntry?.mode === 'repeating' && activeEntry.pausedAtMs === null);
+  setRepeatingTimerAwake(isForeground && activeEntry?.mode === 'repeating' && activeEntry?.pausedAtMs === null);
 }
 
 function scheduleRoundBoundaryCue(): void {

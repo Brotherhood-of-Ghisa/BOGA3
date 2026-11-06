@@ -15,6 +15,7 @@ export const REST_TIMER_NOTIFICATION_CHANNEL_ID = 'boga-rest-timer';
 
 let operations = Promise.resolve();
 let permissionRequested = false;
+let soundUpgradeRequested = false;
 
 async function ensureNotificationPermissionsAsync(): Promise<boolean> {
   try {
@@ -24,7 +25,31 @@ async function ensureNotificationPermissionsAsync(): Promise<boolean> {
       current.ios?.status === IosAuthorizationStatus.AUTHORIZED ||
       current.ios?.status === IosAuthorizationStatus.PROVISIONAL;
 
-    if (isGranted) return true;
+    if (Platform.OS === 'ios') {
+      if (isGranted && current.ios?.allowsSound !== false) {
+        return true;
+      }
+      if (isGranted && current.ios?.allowsSound === false && !soundUpgradeRequested) {
+        soundUpgradeRequested = true;
+        const requested = await requestPermissionsAsync({
+          ios: {
+            allowAlert: true,
+            allowBadge: false,
+            allowSound: true,
+          },
+        });
+        return (
+          requested.granted ||
+          requested.ios?.status === IosAuthorizationStatus.AUTHORIZED ||
+          requested.ios?.status === IosAuthorizationStatus.PROVISIONAL
+        );
+      }
+      if (isGranted) {
+        return true;
+      }
+    } else if (isGranted) {
+      return true;
+    }
 
     if (current.status === 'undetermined' && !permissionRequested) {
       permissionRequested = true;
@@ -78,12 +103,12 @@ export function scheduleRestTimerNotification(endsAtMs: number): void {
           title: 'Rest finished',
           body: 'Time for the next set.',
           sound: 'default',
-          ...(Platform.OS === 'android' ? { channelId: REST_TIMER_NOTIFICATION_CHANNEL_ID } : {}),
           data: { kind: 'rest-timer' },
         },
         trigger: {
           type: SchedulableTriggerInputTypes.DATE,
           date: new Date(endsAtMs),
+          ...(Platform.OS === 'android' ? { channelId: REST_TIMER_NOTIFICATION_CHANNEL_ID } : {}),
         },
       });
     })
@@ -109,4 +134,5 @@ export function flushRestTimerNotificationQueueForTests(): Promise<void> {
 export function __resetRestTimerNotificationForTests(): void {
   operations = Promise.resolve();
   permissionRequested = false;
+  soundUpgradeRequested = false;
 }

@@ -21,7 +21,7 @@ describe('rest-timer-notification-native adapter', () => {
       canAskAgain: true,
       status: 'granted',
       expires: 'never',
-      ios: { status: Notifications.IosAuthorizationStatus.AUTHORIZED },
+      ios: { status: Notifications.IosAuthorizationStatus.AUTHORIZED, allowsSound: true },
     } as unknown as Notifications.NotificationPermissionsStatus);
     jest.mocked(Notifications.requestPermissionsAsync).mockResolvedValue({
       granted: true,
@@ -67,6 +67,74 @@ describe('rest-timer-notification-native adapter', () => {
 
     expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
     expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests sound permission when already authorized but allowsSound is false', async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true });
+    try {
+      jest.mocked(Notifications.getPermissionsAsync).mockResolvedValueOnce({
+        granted: true,
+        canAskAgain: true,
+        status: 'granted',
+        expires: 'never',
+        ios: {
+          status: Notifications.IosAuthorizationStatus.AUTHORIZED,
+          allowsSound: false,
+        },
+      } as unknown as Notifications.NotificationPermissionsStatus);
+
+      scheduleRestTimerNotification(Date.now() + 60_000);
+      await flushRestTimerNotificationQueueForTests();
+
+      expect(Notifications.requestPermissionsAsync).toHaveBeenCalledWith({
+        ios: {
+          allowAlert: true,
+          allowBadge: false,
+          allowSound: true,
+        },
+      });
+      expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: originalOs, configurable: true });
+    }
+  });
+
+  it('respects denial after sound upgrade request without repeated attempts', async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true });
+    try {
+      jest.mocked(Notifications.getPermissionsAsync).mockResolvedValue({
+        granted: true,
+        canAskAgain: true,
+        status: 'granted',
+        expires: 'never',
+        ios: {
+          status: Notifications.IosAuthorizationStatus.AUTHORIZED,
+          allowsSound: false,
+        },
+      } as unknown as Notifications.NotificationPermissionsStatus);
+      jest.mocked(Notifications.requestPermissionsAsync).mockResolvedValueOnce({
+        granted: true,
+        canAskAgain: false,
+        status: 'granted',
+        expires: 'never',
+        ios: {
+          status: Notifications.IosAuthorizationStatus.AUTHORIZED,
+          allowsSound: false,
+        },
+      } as unknown as Notifications.NotificationPermissionsStatus);
+
+      scheduleRestTimerNotification(Date.now() + 60_000);
+      await flushRestTimerNotificationQueueForTests();
+      expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+
+      scheduleRestTimerNotification(Date.now() + 90_000);
+      await flushRestTimerNotificationQueueForTests();
+      expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: originalOs, configurable: true });
+    }
   });
 
   it('schedules notification with correct content, identifier, and trigger date', async () => {
@@ -123,7 +191,7 @@ describe('rest-timer-notification-native adapter', () => {
       );
       expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          content: expect.objectContaining({
+          trigger: expect.objectContaining({
             channelId: REST_TIMER_NOTIFICATION_CHANNEL_ID,
           }),
         }),

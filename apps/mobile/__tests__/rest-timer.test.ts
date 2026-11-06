@@ -651,6 +651,46 @@ describe('rest-timer store and pure rules', () => {
     expect(cancelRestTimerNotification).toHaveBeenCalled();
   });
 
+  it('re-affirms rest timer alert on foreground transition and handles expiration', () => {
+    let appStateCallback!: (state: AppStateStatus) => void;
+    const addListenerSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, cb) => {
+      appStateCallback = cb;
+      return { remove: jest.fn() };
+    });
+
+    try {
+      jest.mocked(scheduleRestTimerNotification).mockClear();
+      jest.mocked(cancelRestTimerNotification).mockClear();
+
+      startRestTimer('session-1', 90, 0);
+      expect(scheduleRestTimerNotification).toHaveBeenCalledWith(90_000);
+
+      appStateCallback('background');
+
+      jest.advanceTimersByTime(30_000);
+      appStateCallback('active');
+
+      expect(scheduleRestTimerNotification).toHaveBeenCalledTimes(2);
+      expect(scheduleRestTimerNotification).toHaveBeenLastCalledWith(90_000);
+
+      appStateCallback('background');
+      jest.advanceTimersByTime(70_000);
+      jest.mocked(Vibration.vibrate).mockClear();
+      jest.mocked(cancelRestTimerNotification).mockClear();
+
+      appStateCallback('active');
+
+      expect(cancelRestTimerNotification).toHaveBeenCalled();
+      expect(Vibration.vibrate).not.toHaveBeenCalled();
+      expect(deriveRestTimerView(getRestTimerEntry(), 'session-1')).toMatchObject({
+        status: 'completed',
+        remainingSec: 0,
+      });
+    } finally {
+      addListenerSpy.mockRestore();
+    }
+  });
+
   it('triggers rest completion cue even after screen hook unmounts', () => {
     const hook = renderHook(() => useSessionRestTimer('session-1'));
     act(() => {

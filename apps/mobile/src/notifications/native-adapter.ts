@@ -3,7 +3,8 @@ import * as Application from 'expo-application';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import {
   IosAuthorizationStatus, DEFAULT_ACTION_IDENTIFIER, getPermissionsAsync, requestPermissionsAsync, getExpoPushTokenAsync,
-  dismissAllNotificationsAsync, cancelAllScheduledNotificationsAsync, setNotificationHandler, setNotificationCategoryAsync,
+  dismissAllNotificationsAsync, getAllScheduledNotificationsAsync, cancelScheduledNotificationAsync,
+  setNotificationHandler, setNotificationCategoryAsync,
   addNotificationResponseReceivedListener, addPushTokenListener, getLastNotificationResponseAsync, clearLastNotificationResponseAsync,
   type NotificationPermissionsStatus, type NotificationResponse,
 } from 'expo-notifications';
@@ -57,7 +58,15 @@ const adapter: NotificationNativeAdapter = {
   activateBinding: value => requiredBridge().activateBinding(value),
   invalidateBinding: () => { bridge?.invalidateBinding(); },
   decrypt: value => bridge?.decrypt(value) ?? null,
-  clearNotifications: async () => { await dismissAllNotificationsAsync(); await cancelAllScheduledNotificationsAsync(); },
+  clearNotifications: async () => {
+    await dismissAllNotificationsAsync();
+    const scheduled = await getAllScheduledNotificationsAsync();
+    await Promise.all(
+      scheduled
+        .filter(item => item.identifier !== 'boga-rest-timer')
+        .map(item => cancelScheduledNotificationAsync(item.identifier)),
+    );
+  },
   openSettings: () => Linking.openSettings(),
   listen: (receiveTap, tokenChanged) => {
     void setNotificationCategoryAsync('boga-workout', []).catch(() => undefined);

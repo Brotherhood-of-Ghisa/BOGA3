@@ -93,6 +93,7 @@ jest.mock('expo-notifications', () => ({
   requestPermissionsAsync: jest.fn(async () => ({ granted: false, canAskAgain: false, status: 'denied', ios: { status: 1 } })),
   scheduleNotificationAsync: jest.fn(async () => 'mock-notification-id'),
   cancelScheduledNotificationAsync: jest.fn(async () => undefined),
+  getAllScheduledNotificationsAsync: jest.fn(async () => []),
   setNotificationChannelAsync: jest.fn(async () => null),
   getExpoPushTokenAsync: jest.fn(async () => { throw new Error('No native push provider in Jest'); }),
   addPushTokenListener: jest.fn(() => ({ remove: jest.fn() })),
