@@ -12,6 +12,7 @@ import { playRepeatingTimerCue, prepareRepeatingTimerAudio, setRepeatingTimerAwa
 export const REST_TIMER_STEP_SEC = 15;
 export const REPEATING_TIMER_STEP_SEC = 15;
 export const REPEATING_TIMER_PREPARATION_SEC = 15;
+export const REST_TIMER_MAX_COMPLETION_DELAY_MS = 1_500;
 
 export type TimerMode = 'rest' | 'repeating';
 
@@ -127,7 +128,9 @@ export const checkAndTriggerRestCompletion = (
   if (nowMs >= entry.endsAtMs) {
     if (lastSignaledRestEndsAtMs !== entry.endsAtMs) {
       lastSignaledRestEndsAtMs = entry.endsAtMs;
-      triggerRestCompletionCue();
+      if (nowMs - entry.endsAtMs <= REST_TIMER_MAX_COMPLETION_DELAY_MS) {
+        triggerRestCompletionCue();
+      }
     }
   }
 };
@@ -245,7 +248,7 @@ function scheduleRestCompletionCue(): void {
 
   restCompletionTimeout = setTimeout(() => {
     if (activeEntry?.mode === 'rest' && activeEntry.endsAtMs === targetEndsAtMs) {
-      checkAndTriggerRestCompletion(activeEntry, targetEndsAtMs);
+      checkAndTriggerRestCompletion(activeEntry, Date.now());
       for (const listener of listeners) {
         listener();
       }

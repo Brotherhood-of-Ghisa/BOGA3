@@ -18,6 +18,7 @@ import {
   getRestTimerEntry,
   isRestTimerAutoStartSuppressed,
   REPEATING_TIMER_STEP_SEC,
+  REST_TIMER_MAX_COMPLETION_DELAY_MS,
   REST_TIMER_STEP_SEC,
   resetRepeatingTimer,
   restartRestTimer,
@@ -543,6 +544,36 @@ describe('rest-timer store and pure rules', () => {
     // Remaining in completed status does not re-trigger vibration
     jest.advanceTimersByTime(10_000);
     expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses vibration cue when rest timer completion is stale (app resumed late from background)', () => {
+    startRestTimer('session-1', 60, 0);
+    const entry = getRestTimerEntry();
+    expect(entry).not.toBeNull();
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+
+    // Clock jumped 10s past expiry (e.g. user was in background and returned late)
+    jest.setSystemTime(70_000);
+    jest.advanceTimersByTime(60_000);
+
+    // Stale completion must NOT vibrate
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+
+    // Subsequent checks for the same completed timer do not vibrate
+    checkAndTriggerRestCompletion(entry, 75_000);
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+  });
+
+  it('triggers vibration cue when rest timer completion is within grace period', () => {
+    startRestTimer('session-1', 60, 0);
+    const entry = getRestTimerEntry();
+    expect(entry).not.toBeNull();
+    expect(Vibration.vibrate).not.toHaveBeenCalled();
+
+    // Delayed by exactly the maximum allowed threshold (1500ms)
+    checkAndTriggerRestCompletion(entry, 60_000 + REST_TIMER_MAX_COMPLETION_DELAY_MS);
+    expect(Vibration.vibrate).toHaveBeenCalledTimes(1);
+    expect(Vibration.vibrate).toHaveBeenCalledWith(400);
   });
 
   it('reschedules rest timer completion cue when adjusted', () => {
