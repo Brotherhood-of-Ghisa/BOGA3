@@ -6,17 +6,18 @@ import ALLOWLIST from './ui-live-theme-guard.allowlist.json';
 
 // A saved appearance repaints every mounted screen (`components/ui/theme-context.tsx`),
 // so nothing may read the colour roles or the mode from the launch-time
-// constants `uiRoles` / `uiMode` (`components/ui/tokens.ts`): a module that
-// does stays in the launch theme. Read them through `useUiRoles()`,
-// `useUiMode()` or a `makeStyles` sheet; a helper that builds colours takes
-// `roles` as an argument.
+// constants `uiRoles` / `uiMode` (`components/ui/tokens.ts`), nor the colours
+// built from them once at launch: the text roles and tones (`uiText`,
+// `uiTextTone`) and `changeToneColour`. A module that does stays in the launch
+// theme. Read them through `useUiRoles()`, `useUiMode()` or a `makeStyles`
+// sheet; a helper that builds colours takes `roles` as an argument.
 //
-// The allowlist holds the files that still read the constants. It only
-// shrinks: a migrated file leaves it, and the guard fails until it does.
+// The allowlist holds the files that still read them. It only shrinks: a
+// migrated file leaves it, and the guard fails until it does.
 
 const MOBILE_ROOT = join(__dirname, '..');
 const SCANNED = ['app', 'components', 'src'];
-const CONSTANTS = new Set(['uiRoles', 'uiMode']);
+const CONSTANTS = new Set(['uiRoles', 'uiMode', 'uiText', 'uiTextTone', 'changeToneColour']);
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {
@@ -69,17 +70,21 @@ describe('no read of the launch-time theme constants', () => {
     ['a renamed import', "import { uiRoles as roles } from '@/components/ui/tokens';"],
     ['a namespace read', 'const ink = tokens.uiRoles.ink;'],
     ['a re-export', "export { uiMode } from '@/components/ui/tokens';"],
+    ['a text role, which carries its colour', '<Text style={uiText.label}>Sets</Text>'],
+    ['a text tone', '<Text style={[uiText.label, uiTextTone.faint]}>Sets</Text>'],
+    ['a change colour', "<Icon color={changeToneColour('positive')} name=\"arrow-up\" />"],
   ])('rejects %s', (_name, source) => {
     expect(constantReads('components/example.tsx', source)).not.toEqual([]);
   });
 
   it.each([
     ['a makeStyles sheet', 'const useStyles = makeStyles((roles) => ({ card: { backgroundColor: roles.surface } }));'],
-    ['a hook read', 'function Row() { const roles = useUiRoles(); return <Icon role="inkMuted" name="x" />; }'],
+    ['a hook read', 'function Row() { const roles = useUiRoles(); return <Icon colorRole="inkMuted" name="x" />; }'],
     ['a function of the roles', 'export const heatRamp = (roles: UiRoles) => [roles.viz0, roles.viz1] as const;'],
     ['the name in a comment', '// Was `uiRoles.ink` before the theme went live.'],
     ['the name in a string', "const note = 'uiMode';"],
     ['a role token type', "import { type UiRoleToken } from '@/components/ui/tokens';"],
+    ['the colourless emphasis', '<Text style={uiTextEmphasis.strong}>Mine</Text>'],
   ])('allows %s', (_name, source) => {
     expect(constantReads('components/example.tsx', source)).toEqual([]);
   });

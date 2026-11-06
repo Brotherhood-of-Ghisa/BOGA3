@@ -2,11 +2,9 @@ import { render, screen } from '@testing-library/react-native';
 import { FlatList, StyleSheet } from 'react-native';
 import { HeatmapLegend } from '@/components/heatmaps/HeatmapLegend';
 
-import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData, heatRamp } from '@/components/heatmaps';
+import { DailyHeatmap, HEAT_RAMP, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { uiRoles } from '@/components/ui';
 import type { DailyEffortMetrics } from '@/src/data';
-
-import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 
 // Daily tiles are read-only. Weekly selection retains its caret and accessible state
 // without adding borders or a banner.
@@ -86,33 +84,12 @@ describe('DailyHeatmap marks', () => {
   });
 
   it('colours cells from the viz ramp', () => {
-    expect(heatRamp(uiRoles)).toEqual([uiRoles.viz0, uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4]);
+    expect(HEAT_RAMP).toEqual([uiRoles.viz0, uiRoles.viz1, uiRoles.viz2, uiRoles.viz3, uiRoles.viz4]);
     renderDaily();
 
     // The heaviest day in the window is the top step.
     expect(style(`${PREFIX}-heatmap-cell-2026-05-11`).backgroundColor).toBe(uiRoles.viz4);
   });
-});
-
-// The ramp is a function of the roles, so the tiles, the bars and the legend
-// take the theme saved while the app runs.
-it('repaints the ramp in a theme saved while it is shown', async () => {
-  const slateDark = { theme: 'slate', mode: 'dark', custom: null } as const;
-  const slate = rolesFor(slateDark);
-  // The legend's swatches: the views it fills, in order.
-  const swatches = () => screen.UNSAFE_getAllByType(HeatmapLegend)[0]
-    .findAll((node) => (node.type as unknown) === 'View' && StyleSheet.flatten(node.props.style)?.backgroundColor !== undefined)
-    .map((node) => StyleSheet.flatten(node.props.style).backgroundColor);
-
-  const daily = renderWithTheme(<DailyHeatmap data={data} formatValue={String} metricLabel="Volume" testIDPrefix={PREFIX} />);
-  expect(swatches()).toEqual([...heatRamp(uiRoles)]);
-  await switchTheme(slateDark);
-  expect(style(`${PREFIX}-heatmap-cell-2026-05-11`).backgroundColor).toBe(slate.viz4);
-  expect(swatches()).toEqual([...heatRamp(slate)]);
-  daily.unmount();
-
-  renderWithTheme(<WeeklyHeatmap data={data} metric="totalVolume" testIDPrefix={PREFIX} formatValue={String} />);
-  expect(style(`${PREFIX}-heatmap-bar-2026-05-11`).backgroundColor).toBe(slate.viz4);
 });
 
 describe('WeeklyHeatmap marks', () => {

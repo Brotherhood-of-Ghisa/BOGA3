@@ -41,11 +41,11 @@ describe('Icon', () => {
     expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([uiRoles.danger, uiRoles.danger]);
   });
 
-  it('paints in a role named by `role`, which wins over the glyph\'s own', () => {
-    const { UNSAFE_getAllByType, rerender } = render(<Icon name="x" role="inkMuted" />);
+  it('paints in a role named by `colorRole`, which wins over the glyph\'s own', () => {
+    const { UNSAFE_getAllByType, rerender } = render(<Icon name="x" colorRole="inkMuted" />);
     expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([uiRoles.inkMuted, uiRoles.inkMuted]);
 
-    rerender(<Icon name="set-current" role="danger" />);
+    rerender(<Icon name="set-current" colorRole="danger" />);
     expect(UNSAFE_getAllByType(Circle)[0].props.stroke).toBe(uiRoles.danger);
   });
 
@@ -58,7 +58,7 @@ describe('Icon', () => {
     const slate = rolesFor(slateDark);
     const { UNSAFE_getAllByType } = renderWithTheme(
       <>
-        <CompiledIcon name="x" role="accent" />
+        <CompiledIcon name="x" colorRole="accent" />
         <CompiledIcon name="set-done" />
       </>,
     );

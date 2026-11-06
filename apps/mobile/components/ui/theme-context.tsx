@@ -2,7 +2,7 @@ import { createContext, startTransition, useContext, useEffect, useState, type R
 import { StyleSheet } from 'react-native';
 
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
-import { launchOsScheme, launchTheme, readLaunchTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
+import { launchOsScheme, launchTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
 import { appearanceMode, appearanceRoles, type AppearanceChoice } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
@@ -24,12 +24,14 @@ function resolveAppTheme(appearance: AppearanceChoice): AppTheme {
   return { appearance, mode, roles: appearanceRoles(appearance, mode) };
 }
 
-// The current theme when the choice resolves to the same thing, so an
-// unchanged save keeps every cached sheet and re-renders nothing.
+// The theme a saved choice draws. Roles that resolve to the same colours keep
+// the current roles object, so every cached sheet stays; a choice that changes
+// nothing keeps the current theme and re-renders nothing.
 function withAppearance(current: AppTheme, appearance: AppearanceChoice): AppTheme {
   const next = resolveAppTheme(appearance);
-  const same = next.mode === current.mode && JSON.stringify(next.appearance) === JSON.stringify(current.appearance);
-  return same ? current : next;
+  if (next.mode !== current.mode || JSON.stringify(next.roles) !== JSON.stringify(current.roles)) return next;
+  if (JSON.stringify(next.appearance) === JSON.stringify(current.appearance)) return current;
+  return { ...current, appearance };
 }
 
 // The theme this launch is drawn in. What a component reads outside an
@@ -38,8 +40,8 @@ const launchAppTheme: AppTheme = resolveAppTheme(launchTheme.appearance);
 
 const AppThemeContext = createContext<AppTheme>(launchAppTheme);
 
-// The stored choice after a save, or null, logged, when the store cannot be
-// read; the app then stays in the theme it is drawn in.
+// The stored choice, or null, logged, when the store cannot be read; the app
+// then stays in the theme it is drawn in.
 function readSavedAppearance(): AppearanceChoice | null {
   try {
     return readStoredTheme().appearance;
@@ -54,16 +56,16 @@ function readSavedAppearance(): AppearanceChoice | null {
   }
 }
 
-// Holds the theme for everything below it: the stored choice when it mounts,
-// then each choice saved while the app runs (`subscribeThemeSaved`). Mounted
-// once, by the root layout.
+// Holds the theme for everything below it: the stored choice when it mounts
+// (the launch theme if the store cannot be read then), then each choice saved
+// while the app runs (`subscribeThemeSaved`). Mounted once, by the root layout.
 //
-// A save repaints every mounted screen, the stack behind the current one
-// included, which costs far more than the tap that saved it. So the repaint is
-// a transition: the control that saved it answers at once, and every screen
-// then changes theme in one commit, never part in the old one.
+// A save repaints every mounted screen that reads the theme, the stack behind
+// the current one included, which costs far more than the tap that saved it.
+// So the repaint is a transition: the control that saved it answers at once,
+// and those screens then change theme together in one commit.
 export function AppThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState(() => withAppearance(launchAppTheme, readLaunchTheme().appearance));
+  const [theme, setTheme] = useState(() => withAppearance(launchAppTheme, readSavedAppearance() ?? launchAppTheme.appearance));
   useEffect(
     () =>
       subscribeThemeSaved(() => {
