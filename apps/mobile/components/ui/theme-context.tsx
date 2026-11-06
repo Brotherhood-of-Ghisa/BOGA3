@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, startTransition, useContext, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
@@ -57,13 +57,18 @@ function readSavedAppearance(): AppearanceChoice | null {
 // Holds the theme for everything below it: the stored choice when it mounts,
 // then each choice saved while the app runs (`subscribeThemeSaved`). Mounted
 // once, by the root layout.
+//
+// A save repaints every mounted screen, the stack behind the current one
+// included, which costs far more than the tap that saved it. So the repaint is
+// a transition: the control that saved it answers at once, and every screen
+// then changes theme in one commit, never part in the old one.
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState(() => withAppearance(launchAppTheme, readLaunchTheme().appearance));
   useEffect(
     () =>
       subscribeThemeSaved(() => {
         const appearance = readSavedAppearance();
-        if (appearance) setTheme((current) => withAppearance(current, appearance));
+        if (appearance) startTransition(() => setTheme((current) => withAppearance(current, appearance)));
       }),
     [],
   );
