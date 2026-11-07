@@ -30,7 +30,7 @@ jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- shared native database boundary.
   require('./helpers/local-data').localDataBootstrapModule());
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { GroupNotificationMuteRow } from '@/components/notifications/group-mute-row';
 import { NotificationSettingsScreen } from '@/components/notifications/notification-settings-screen';
@@ -45,6 +45,7 @@ import { ensurePreferencesLoaded } from '@/src/preferences/hooks';
 import SettingsNotificationsRoute from '../app/settings-notifications';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
 import { fakeNotificationNative } from './helpers/notification-native';
+import { renderWithTheme } from './helpers/theme';
 import { waitForGone } from './helpers/wait-for-gone';
 
 const USER = '11111111-1111-4111-8111-111111111111';
@@ -101,7 +102,7 @@ const retryButton = () => screen.getByRole('button', { name: 'Retry' });
 
 // The page, once the status refresh on open has settled.
 const openPage = async (userId: string | null = USER) => {
-  render(<NotificationSettingsScreen userId={userId} />);
+  renderWithTheme(<NotificationSettingsScreen userId={userId} />);
   if (userId) await waitFor(() => expect(status('Not enabled')).toBeTruthy());
 };
 
@@ -112,7 +113,7 @@ const switchOn = async () => {
 };
 
 it('names the state on Settings home and pushes the Notifications page', () => {
-  render(<NotificationSettingsRow userId={USER} />);
+  renderWithTheme(<NotificationSettingsRow userId={USER} />);
   fireEvent.press(screen.getByLabelText('Notifications, Not enabled'));
   expect(mockPush).toHaveBeenCalledWith('/settings-notifications');
 });
@@ -157,7 +158,7 @@ it('never shows the switch on before permission resolves', async () => {
 it('turns the switch into Open iOS Settings when permission is refused, and reports an unsuccessful handoff', async () => {
   (native.getPermission as jest.Mock).mockResolvedValue('denied');
   await refreshNotificationStatus();
-  render(<NotificationSettingsScreen userId={USER} />);
+  renderWithTheme(<NotificationSettingsScreen userId={USER} />);
   // The status refresh on open must not land after the failure below.
   await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
   const open = screen.getByTestId('settings-notifications-open-settings');
@@ -244,7 +245,7 @@ it('distinguishes provisional quiet delivery from fully granted notifications', 
 it('keeps unsupported builds usable without offering registration or showing active defaults', async () => {
   native.supported = false;
   await refreshNotificationStatus();
-  render(<NotificationSettingsScreen userId={USER} />);
+  renderWithTheme(<NotificationSettingsScreen userId={USER} />);
   expect(screen.getByLabelText('Notifications: Unavailable')).toBeTruthy();
   expect(screen.queryByTestId('settings-notifications-enabled')).toBeNull();
   expect(screen.queryByText('Categories')).toBeNull();
@@ -255,7 +256,7 @@ it('does not invent category defaults before a successful server read', async ()
   __resetNotificationsForTests();
   setNotificationAccount({ userId: USER, authSessionId: 'auth-session' }, 'test-bearer-a');
   failRpc = { name: 'notification_preferences_get', message: 'offline', status: 0 };
-  render(<NotificationSettingsScreen userId={USER} />);
+  renderWithTheme(<NotificationSettingsScreen userId={USER} />);
   expect(await screen.findByTestId('settings-notifications-error')).toBeTruthy();
   expect(screen.queryByText('Categories')).toBeNull();
 
@@ -267,7 +268,7 @@ it('does not invent category defaults before a successful server read', async ()
 
 it('offers Sign in as a navigate row and never requests permission while signed out', () => {
   setNotificationAccount(null);
-  render(<NotificationSettingsScreen userId={null} />);
+  renderWithTheme(<NotificationSettingsScreen userId={null} />);
   expect(screen.queryByTestId('settings-notifications-enabled')).toBeNull();
   fireEvent.press(screen.getByTestId('settings-notifications-sign-in'));
   expect(mockPush).toHaveBeenCalledWith(SIGN_IN_ROUTE);
@@ -278,7 +279,7 @@ it('drops account A’s failed-save retry when the persistent route switches to 
   resetLocalData();
   await ensurePreferencesLoaded();
   startNotificationLifecycle();
-  const { rerender } = render(<SettingsNotificationsRoute />);
+  const { rerender } = renderWithTheme(<SettingsNotificationsRoute />);
   await waitFor(() => expect(status('Not enabled')).toBeTruthy());
   await switchOn();
   failRpc = { name: 'notification_preferences_set', message: 'offline', status: 0 };
@@ -302,7 +303,7 @@ it('drops account A’s failed-save retry when the persistent route switches to 
 });
 
 it('keeps a confirmed group mute after failure, retries it and disables changes offline', async () => {
-  const { rerender } = render(<GroupNotificationMuteRow groupId={GROUP} offline={false} />);
+  const { rerender } = renderWithTheme(<GroupNotificationMuteRow groupId={GROUP} offline={false} />);
   const toggle = await screen.findByRole('switch', { name: 'Mute notifications' });
   expect(toggle.props.accessibilityState.checked).toBe(false);
   failRpc = { name: 'notification_group_mute', message: 'offline', status: 0 };
@@ -318,7 +319,7 @@ it('keeps a confirmed group mute after failure, retries it and disables changes 
 });
 
 it('removes the stale group control when the server reports lost membership', async () => {
-  render(<GroupNotificationMuteRow groupId={GROUP} offline={false} />);
+  renderWithTheme(<GroupNotificationMuteRow groupId={GROUP} offline={false} />);
   const toggle = await screen.findByRole('switch', { name: 'Mute notifications' });
   failRpc = { name: 'notification_group_mute', message: 'NOT_FOUND: removed', status: 400 };
   fireEvent.press(toggle);
@@ -328,7 +329,7 @@ it('removes the stale group control when the server reports lost membership', as
 });
 
 it.each(['success', 'failure'] as const)('preserves a pending mute %s across offline and reconnect', async outcome => {
-  const { rerender } = render(<GroupNotificationMuteRow groupId={GROUP} offline={false} />);
+  const { rerender } = renderWithTheme(<GroupNotificationMuteRow groupId={GROUP} offline={false} />);
   const toggle = await screen.findByRole('switch', { name: 'Mute notifications' });
   let resolve!: (value: NotificationPreferences) => void;
   let reject!: (reason: Error) => void;

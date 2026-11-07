@@ -13,12 +13,11 @@ import { uiRoles } from '@/components/ui/tokens';
 export type ChangeTone = 'positive' | 'negative' | 'neutral' | 'new';
 
 /**
- * A change's ink in `roles`: what a component passes the roles it reads from
- * `useUiRoles()`, so the colour follows the theme. Colour is never the only
- * channel: the figure carries its sign (`+3`, `−12%`, or a plain `0`) whatever
- * this returns, so the direction still reads without hue.
+ * A change's ink in `roles`. Colour is never the only channel: the figure
+ * carries its sign (`+3`, `−12%`, or a plain `0`) whatever this returns, so the
+ * direction still reads without hue. A live component passes `useUiRoles()`.
  */
-export const changeToneColourIn = (tone: ChangeTone, roles: UiRoles): string => {
+export const changeToneColourIn = (roles: UiRoles, tone: ChangeTone): string => {
   switch (tone) {
     case 'positive':
     case 'new':
@@ -30,8 +29,5 @@ export const changeToneColourIn = (tone: ChangeTone, roles: UiRoles): string => 
   }
 };
 
-/**
- * A change's ink in the colours this launch found, for the screens not yet
- * moved to `changeToneColourIn`; it leaves with the last of them.
- */
-export const changeToneColour = (tone: ChangeTone): string => changeToneColourIn(tone, uiRoles);
+/** A change's ink in the launch roles; only a file still to migrate reads this. */
+export const changeToneColour = (tone: ChangeTone): string => changeToneColourIn(uiRoles, tone);

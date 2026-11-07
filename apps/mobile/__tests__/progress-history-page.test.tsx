@@ -14,7 +14,7 @@ import path from 'node:path';
 
 import * as mockReact from 'react';
 import { View } from 'react-native';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -97,7 +97,6 @@ import {
   type HistoryViewProps,
 } from '@/components/stats/history-view';
 import * as heatmapData from '@/components/heatmaps/heatmapData';
-import { uiRoles } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics, SelectedMuscleWeeklyEffort } from '@/src/data';
 import * as stats from '@/src/data/stats';
 import { getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
@@ -105,6 +104,10 @@ import { updatePreferences } from '@/src/preferences/hooks';
 import { progressHistoryHref } from '@/src/navigation/routes';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
 import { buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+import { launchTheme } from '@/components/ui/theme-launch';
+
+const roles = rolesFor(launchTheme.appearance);
 
 const buildWeeklyEffort = (): SelectedMuscleWeeklyEffort => ({
   weekStartDateKey: '2026-05-11',
@@ -150,7 +153,7 @@ const buildViewProps = (
 });
 
 const renderHistoryView = (overrides: Partial<HistoryViewProps<CalendarHeatmapMetric>> = {}) =>
-  render(<HistoryView {...buildViewProps(overrides)} />);
+  renderWithTheme(<HistoryView {...buildViewProps(overrides)} />);
 
 type HistoryKind = HistoryViewProps<CalendarHeatmapMetric>['kind'];
 const metricChip = (kind: HistoryKind) => screen.getByTestId(`stats-${kind}-history-metric-chip`);
@@ -233,7 +236,7 @@ describe('HistoryView', () => {
   it('renders the carried-over states: loading, error with retry, empty, then the chart', () => {
     const onRetry = jest.fn();
     const onOpenWeek = jest.fn();
-    const { rerender, toJSON } = render(<HistoryView {...buildViewProps({ isLoading: true, onRetry, onOpenWeek })} />);
+    const { rerender, toJSON } = renderWithTheme(<HistoryView {...buildViewProps({ isLoading: true, onRetry, onOpenWeek })} />);
     expect(screen.getByTestId('stats-muscle-history-loading')).toHaveTextContent('Loading Side delts history...');
     expect(screen.queryByTestId('stats-muscle-history-empty')).toBeNull();
     captureUiEvidence('stats-muscle-history-loading', toJSON());
@@ -317,14 +320,14 @@ describe('HistoryView', () => {
         view,
         onSelectMetric,
       });
-      const { rerender } = render(<HistoryView {...props} />);
+      const { rerender } = renderWithTheme(<HistoryView {...props} />);
       const prefix = `stats-${kind}-history-metric-chip`;
       // The view selector still marks its active segment on the fixed black ground.
-      expect(screen.getByTestId(`stats-${kind}-history-view-chip-${view}`)).toHaveStyle({ backgroundColor: uiRoles.selection });
+      expect(screen.getByTestId(`stats-${kind}-history-view-chip-${view}`)).toHaveStyle({ backgroundColor: roles.selection });
       // One chip shows only the metric in force, as ink on surface, and names the next.
-      expect(metricChip(kind)).toHaveStyle({ backgroundColor: uiRoles.surface });
+      expect(metricChip(kind)).toHaveStyle({ backgroundColor: roles.surface });
       expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveTextContent('Volume');
-      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ color: uiRoles.ink });
+      expect(screen.getByTestId(`${prefix}-totalVolume`)).toHaveStyle({ color: roles.ink });
       expect(screen.queryByTestId(`${prefix}-workingSetCount`)).toBeNull();
       expect(metricChip(kind)).toHaveProp('accessibilityLabel', 'Effort metric: Volume. Activate to show Sets.');
       fireEvent.press(metricChip(kind));
@@ -334,9 +337,9 @@ describe('HistoryView', () => {
       const after = kind === 'exercise' ? { value: 'estimatedRM1', label: '1RM' } : { value: 'totalVolume', label: 'Volume' };
       rerender(<HistoryView {...props} metric="workingSetCount" />);
       expect(shownMetric(kind)).toBe('workingSetCount');
-      expect(metricChip(kind)).toHaveStyle({ backgroundColor: uiRoles.surface });
+      expect(metricChip(kind)).toHaveStyle({ backgroundColor: roles.surface });
       expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveTextContent('Sets');
-      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ color: uiRoles.ink });
+      expect(screen.getByTestId(`${prefix}-workingSetCount`)).toHaveStyle({ color: roles.ink });
       expect(screen.queryByTestId(`${prefix}-totalVolume`)).toBeNull();
       expect(metricChip(kind)).toHaveProp('accessibilityLabel', `Effort metric: Sets. Activate to show ${after.label}.`);
       fireEvent.press(metricChip(kind));
@@ -355,7 +358,7 @@ describe('HistoryView', () => {
       metricOptions: kind === 'exercise' ? EXERCISE_HISTORY_METRIC_OPTIONS : MUSCLE_HISTORY_METRIC_OPTIONS,
       isLoading: true,
     });
-    const { rerender } = render(<HistoryView {...props} />);
+    const { rerender } = renderWithTheme(<HistoryView {...props} />);
     expect(screen.getByTestId(`stats-${kind}-history-loading`)).toBeTruthy();
     expect(build).not.toHaveBeenCalled();
     rerender(<HistoryView {...props} isLoading={false} errorMessage="Failed read" />);
@@ -366,7 +369,7 @@ describe('HistoryView', () => {
 
   it('keeps both heatmap views warm through loading, retry and view changes', () => {
     const shared = { weeklyEffort: [buildWeeklyEffort()], dailyMetrics: DAILY_METRICS };
-    const { rerender } = render(<HistoryView {...buildViewProps({ ...shared, view: 'daily' })} />);
+    const { rerender } = renderWithTheme(<HistoryView {...buildViewProps({ ...shared, view: 'daily' })} />);
 
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '03-06-2026, Volume 1200');
 
@@ -400,7 +403,7 @@ describe('HistoryView', () => {
       weeklyEffort: [buildWeeklyEffort()], dailyMetrics: DAILY_METRICS, view: 'daily' as const,
       muscleTargets: { muscleIds: ['front_delts'], weeklyTarget: 8 },
     };
-    const { rerender } = render(<HistoryView {...buildViewProps({ ...props, metric: 'totalVolume' })} />);
+    const { rerender } = renderWithTheme(<HistoryView {...buildViewProps({ ...props, metric: 'totalVolume' })} />);
 
     // Values are visible and announced directly, without a selection action.
     expect(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-06-03')).toHaveProp('accessibilityLabel', '03-06-2026, Volume 1200');
@@ -434,7 +437,7 @@ describe('ProgressHistoryScreen', () => {
     ['muscle', { muscleGroupId: 'front_delts' }, 'Side delts'],
   ] as const)('titles the %s page with its subject', async (kind, params, title) => {
     mockSearchParams = params;
-    render(<ProgressHistoryRoute />);
+    renderWithTheme(<ProgressHistoryRoute />);
     await waitFor(() => expect(mockScreenOptions.title).toBe(title));
     expect(screen.getByTestId(`stats-${kind}-history-overlay`)).toBeTruthy();
     expect(screen.queryByTestId('progress-history-unavailable')).toBeNull();
@@ -442,18 +445,18 @@ describe('ProgressHistoryScreen', () => {
 
   it('opens on the metric Progress carried over, and on Volume without one', async () => {
     mockSearchParams = { muscleGroupId: 'front_delts', metric: 'sets' };
-    render(<ProgressHistoryRoute />);
+    renderWithTheme(<ProgressHistoryRoute />);
     await waitFor(() => expect(shownMetric('muscle')).toBe('workingSetCount'));
 
     screen.unmount();
     mockSearchParams = { exerciseDefinitionId: 'ex1' };
-    render(<ProgressHistoryRoute />);
+    renderWithTheme(<ProgressHistoryRoute />);
     await waitFor(() => expect(shownMetric('exercise')).toBe('totalVolume'));
   });
 
   it('opens a link that lands on the mounted route as a new page, on its own metric', async () => {
     mockSearchParams = { muscleGroupId: 'front_delts', metric: 'sets' };
-    const { rerender } = render(<ProgressHistoryRoute />);
+    const { rerender } = renderWithTheme(<ProgressHistoryRoute />);
     await waitFor(() => expect(shownMetric('muscle')).toBe('workingSetCount'));
 
     mockSearchParams = { exerciseDefinitionId: 'ex1', metric: 'volume' };
@@ -465,7 +468,7 @@ describe('ProgressHistoryScreen', () => {
   it.each([['sets', 'secondary'], ['volume', 'secondaryVolume']] as const)(
     'replaces a local %s choice when a same-subject link explicitly includes secondary work', async (metric, parameter) => {
       mockSearchParams = { muscleGroupId: 'front_delts', metric };
-      const page = render(<ProgressHistoryRoute />);
+      const page = renderWithTheme(<ProgressHistoryRoute />);
       const chip = () => screen.getByTestId('stats-muscle-history-secondary');
       await screen.findByTestId('stats-muscle-history-overlay');
       if (chip().props.accessibilityState.checked) fireEvent.press(chip());
@@ -479,7 +482,7 @@ describe('ProgressHistoryScreen', () => {
 
   it('titles the page with the subject alone, and puts the focused week\'s sessions behind the header ⋮', async () => {
     await act(async () => { updatePreferences({ heatmapView: 'timeline' }); });
-    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     // The newest week in the window is focused, and it is the week trained.
     await waitFor(() => expect(screen.getByTestId('progress-history-options-button')).toBeTruthy());
     expect(mockScreenOptions.title).toBe('Side delts');
@@ -507,7 +510,7 @@ describe('ProgressHistoryScreen', () => {
     Object.assign(mockCatalog, { muscleSetup: setup });
     mockPush.mockClear();
     try {
-      render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+      renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
       await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull());
       const title = screen.getByLabelText('Side delts, switch muscle');
       fireEvent.press(title);
@@ -532,7 +535,7 @@ describe('ProgressHistoryScreen', () => {
   it('draws an exercise page\'s title in the same role, with no muscle switch', async () => {
     Object.assign(mockCatalog, { muscleSetup: buildMuscleSetup(mockCatalog.muscleGroups) });
     try {
-      render(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex1' }} todayDateKey="2026-06-05" />);
+      renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex1' }} todayDateKey="2026-06-05" />);
       await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
       expect(screen.getByTestId('progress-history-title-text')).toHaveTextContent('Bench Press');
       expect(screen.getByTestId('progress-history-title')).toHaveProp('accessibilityRole', 'header');
@@ -543,7 +546,7 @@ describe('ProgressHistoryScreen', () => {
 
   it('offers no ⋮ on a muscle\'s rest week, which has nothing to open', async () => {
     await act(async () => { updatePreferences({ heatmapView: 'timeline' }); });
-    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('progress-history-options-button')).toBeTruthy());
 
     await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-timeline-previous-week')); });
@@ -555,7 +558,7 @@ describe('ProgressHistoryScreen', () => {
 
   it('offers no ⋮ on a muscle page while a view that selects no week shows', async () => {
     await act(async () => { updatePreferences({ heatmapView: 'weekly' }); });
-    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-weekly'))
       .toHaveProp('accessibilityState', { selected: true }));
     expect(screen.queryByTestId('progress-history-options-button')).toBeNull();
@@ -568,7 +571,7 @@ describe('ProgressHistoryScreen', () => {
 
   it('drops the ⋮ when the Timeline is left for another view on a muscle page', async () => {
     await act(async () => { updatePreferences({ heatmapView: 'timeline' }); });
-    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('progress-history-options-button')).toBeTruthy());
 
     await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-weekly')); });
@@ -579,7 +582,7 @@ describe('ProgressHistoryScreen', () => {
   });
 
   it('links an exercise to each muscle it counts towards, primary first, from the ⋮ in any view', async () => {
-    render(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex2', gymId: 'gym-a' }} initialMetric="workingSetCount"
+    renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex2', gymId: 'gym-a' }} initialMetric="workingSetCount"
       todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('progress-history-options-button')).toBeTruthy());
 
@@ -599,7 +602,7 @@ describe('ProgressHistoryScreen', () => {
   });
 
   it('opens a muscle on Volume from an exercise-only metric', async () => {
-    render(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex2' }} initialMetric={null}
+    renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex2' }} initialMetric={null}
       todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('progress-history-options-button')).toBeTruthy());
     await chooseMetric('exercise', 'estimatedRM1');
@@ -610,7 +613,7 @@ describe('ProgressHistoryScreen', () => {
   });
 
   it('offers the RM curve even without counted muscles or a focused training week', async () => {
-    render(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex1' }} todayDateKey="2026-06-05" />);
+    renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex1' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(mockScreenOptions.title).toBe('Bench Press'));
     fireEvent.press(screen.getByTestId('progress-history-options-button'));
     fireEvent.press(screen.getByTestId('progress-history-rm-curve'));
@@ -621,7 +624,7 @@ describe('ProgressHistoryScreen', () => {
   it('keeps its declared title until the catalogue resolves the name', async () => {
     mockCatalog.status = 'loading';
     mockSearchParams = { exerciseDefinitionId: 'unknown-yet' };
-    render(<ProgressHistoryRoute />);
+    renderWithTheme(<ProgressHistoryRoute />);
     await waitFor(() => expect(mockScreenOptions.title).toBe(PROGRESS_HISTORY_TITLE));
     expect(screen.queryByTestId('progress-history-unavailable')).toBeNull();
   });
@@ -633,7 +636,7 @@ describe('ProgressHistoryScreen', () => {
     ['an exercise the catalogue does not hold', { exerciseDefinitionId: 'gone' }],
   ])('renders the unavailable state in route for %s', async (_case, params) => {
     mockSearchParams = params;
-    render(<ProgressHistoryRoute />);
+    renderWithTheme(<ProgressHistoryRoute />);
     await waitFor(() => expect(screen.getByTestId('progress-history-unavailable')).toBeTruthy());
     expect(mockScreenOptions.title).toBe(PROGRESS_HISTORY_TITLE);
     // The chrome of the subject that vanished goes with it, rather than being
@@ -646,7 +649,7 @@ describe('ProgressHistoryScreen', () => {
   it.each(['daily', 'weekly'] as const)('opens the Timeline override without changing saved %s, then lets the selector work', async saved => {
     await act(async () => { updatePreferences({ heatmapView: saved }); });
     mockSearchParams = { muscleGroupId: 'front_delts', metric: 'sets', view: ['timeline'] };
-    render(<ProgressHistoryRoute />);
+    renderWithTheme(<ProgressHistoryRoute />);
     await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-timeline'))
       .toHaveProp('accessibilityState', { selected: true }));
     expect(shownMetric('muscle')).toBe('workingSetCount');
@@ -661,7 +664,7 @@ describe('ProgressHistoryScreen', () => {
     const saved = view === 'daily' ? 'weekly' : 'daily';
     await act(async () => { updatePreferences({ heatmapView: saved }); });
     mockSearchParams = { muscleGroupId: 'front_delts', metric: 'volume', view };
-    render(<ProgressHistoryRoute />);
+    renderWithTheme(<ProgressHistoryRoute />);
     await waitFor(() => expect(screen.getByTestId(`stats-muscle-history-view-chip-${view}`))
       .toHaveProp('accessibilityState', { selected: true }));
     expect(shownMetric('muscle')).toBe('totalVolume');
@@ -670,7 +673,7 @@ describe('ProgressHistoryScreen', () => {
 
   it('applies the exercise Timeline override and resolves a mounted link without an override back to the saved view', async () => {
     mockSearchParams = { exerciseDefinitionId: 'ex1', metric: 'volume', view: 'timeline' };
-    const page = render(<ProgressHistoryRoute />);
+    const page = renderWithTheme(<ProgressHistoryRoute />);
     await waitFor(() => expect(screen.getByTestId('stats-exercise-history-view-chip-timeline'))
       .toHaveProp('accessibilityState', { selected: true }));
     expect(getAccountLocalPreferenceState().values.heatmapView).toBe('daily');
@@ -683,7 +686,7 @@ describe('ProgressHistoryScreen', () => {
   it('combines gym and entry-view params, remounting either change without saving the view', async () => {
     await act(async () => { updatePreferences({ heatmapView: 'weekly' }); });
     mockSearchParams = { exerciseDefinitionId: 'ex1', gymId: 'gym-a', metric: 'volume', view: 'timeline' };
-    const page = render(<ProgressHistoryRoute />);
+    const page = renderWithTheme(<ProgressHistoryRoute />);
     await waitFor(() => expect(screen.getByTestId('stats-exercise-history-view-chip-timeline'))
       .toHaveProp('accessibilityState', { selected: true }));
     expect(screen.UNSAFE_getByType(HistoryView).props.timeline.weekSetsTarget)
@@ -706,7 +709,7 @@ describe('ProgressHistoryScreen', () => {
   });
 
   it('switching the view saves it, so the next history page opens in it', async () => {
-    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-daily'))
       .toHaveProp('accessibilityState', { selected: true }));
     await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-weekly')); });
@@ -715,7 +718,7 @@ describe('ProgressHistoryScreen', () => {
   });
 
   it('keeps a view whose save failed as a draft, and says so with a Retry', async () => {
-    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByTestId('stats-muscle-history-view-chip-daily'))
       .toHaveProp('accessibilityState', { selected: true }));
     expect(screen.queryByTestId('progress-history-preferences-error')).toBeNull();
@@ -738,7 +741,7 @@ describe('ProgressHistoryScreen', () => {
   it('grades a muscle page’s Sets against the saved weekly target for that one muscle', async () => {
     await act(async () => { updatePreferences({ weeklyWorkingSetTarget: 8, muscleTargetMode: 'per-muscle',
       muscleTargetOverrides: { detailed: { front_delts: 4 }, broad: { front_delts: 16 } } }); });
-    render(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
+    renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByText('% of max')).toBeTruthy());
     expect(stats.computeSelectedMuscleHistoryEffort).toHaveBeenCalledWith(
       expect.objectContaining({ muscleGroupIds: ['front_delts'] })

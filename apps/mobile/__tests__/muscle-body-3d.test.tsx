@@ -6,7 +6,6 @@ import { generateRoles } from '@/components/ui/theme';
 import { seedsFromHue } from '@/components/ui/theme-hue';
 import { compareProgressVolume } from '@/src/data/progress-comparisons';
 import { themePresets } from '@/components/ui/theme-presets';
-import { uiRoles } from '@/components/ui/tokens';
 import { StatsScreenShell } from '../app/(tabs)/stats-history';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { MUSCLE_BODY_MESH, type MuscleBodyMesh } from '@/components/stats/muscle-body-mesh';
@@ -19,12 +18,12 @@ import {
   computeMuscleScores,
   hitTestProjectedMuscle,
   normaliseBodyAngle,
-  projectMuscleBody,
 } from '@/components/stats/muscle-body-projection';
+import { projectMuscleBody, testPalette, testRoles } from './helpers/muscle-body-palette';
 import type { ProgressComparisons, ProgressMuscleComparison } from '@/src/data';
 
 // This launch's moustache: the tests run in light mode.
-const MOUSTACHE_FILL = buildThemeShadePalette().moustache;
+const MOUSTACHE_FILL = testPalette.moustache;
 
 beforeEach(() => { jest.useFakeTimers({ now: new Date(2026, 9, 20) }); });
 afterEach(() => { jest.useRealTimers(); });
@@ -190,7 +189,7 @@ describe('buildThemeShadePalette', () => {
   const themes = [...themePresets, { id: 'custom', seeds: seedsFromHue(225) }];
   it.each(themes)('interpolates ordered theme shades independently of facet lighting in $id', preset => {
     const roles = generateRoles(preset.seeds);
-    const palette = buildThemeShadePalette(roles);
+    const palette = buildThemeShadePalette(roles, 'light');
     expect(palette.neutral).toHaveLength(SHADE_STEPS);
     expect(buildMuscleShadeRamp(null, palette)).toEqual(palette.neutral);
     expect(buildMuscleShadeRamp(NaN, palette)).toEqual(palette.neutral);
@@ -219,9 +218,9 @@ describe('buildThemeShadePalette', () => {
   });
 
   it('keeps the light figure as shipped, and draws the dark one dark, with a pale moustache and relief edge', () => {
-    const light = buildThemeShadePalette(uiRoles, 'light');
+    const light = buildThemeShadePalette(testRoles, 'light');
     expect(light.moustache).toBe('#393938');
-    expect(light.relief).toEqual({ highlight: uiRoles.onInk, shade: uiRoles.inkMuted });
+    expect(light.relief).toEqual({ highlight: testRoles.onInk, shade: testRoles.inkMuted });
     const roles = generateRoles(themePresets[0].seeds, 'dark');
     const dark = buildThemeShadePalette(roles, 'dark');
     const middle = hexToLch(dark.neutral[Math.floor(SHADE_STEPS / 2)]).lightness;
@@ -236,7 +235,7 @@ describe('buildThemeShadePalette', () => {
 
 describe('projectMuscleBody & hitTestProjectedMuscle', () => {
   it('draws intermediate scores as intermediate fills at identical facet lighting, independent of selection', () => {
-    const palette = buildThemeShadePalette();
+    const palette = testPalette;
     const snapshots = [.02, .5, 1].map(score => projectMuscleBody({ angleDeg: 0, width: 280, height: 280,
       scores: new Map([['chest', score]]), palette }).triangles.filter(triangle => triangle.muscleGroupId === 'chest'));
     for (let i = 0; i < snapshots[0].length; i++) {
@@ -261,7 +260,7 @@ describe('projectMuscleBody & hitTestProjectedMuscle', () => {
     muscles[2] = comparedMuscle('delts_front', 6, 6, 'workingSetCount');
     muscles[3] = comparedMuscle('biceps', 0, 8, 'workingSetCount');
     const scores = computeMuscleScores(muscles, 'workingSetCount', SET_TARGETS);
-    const palette = buildThemeShadePalette(generateRoles(preset.seeds));
+    const palette = buildThemeShadePalette(generateRoles(preset.seeds), 'light');
     for (const selectedId of [null, 'quads']) {
       const projected = projectMuscleBody({ angleDeg: 0, width: 280, height: 280, scores, selectedId, palette });
       for (const [id, score] of [['chest', 1], ['quads', 0], ['delts_front', .5], ['biceps', null]] as const) {
@@ -543,10 +542,10 @@ describe('MuscleBodyCard', () => {
     expect(screen.getByTestId('stats-muscle-body-fibres-surface-shade').props.strokeWidth).toBe(0.9);
     expect(screen.getByTestId('stats-muscle-body-fibres-anatomy-FJ1456-shade').props.strokeOpacity).toBe(0.70);
     const highlight = screen.UNSAFE_getAllByType(Use).find(path => path.props.testID === 'stats-muscle-body-fibres-surface-highlight')!;
-    expect(highlight.props).toMatchObject({ stroke: uiRoles.onInk, strokeWidth: 1.1,
+    expect(highlight.props).toMatchObject({ stroke: testRoles.onInk, strokeWidth: 1.1,
       strokeOpacity: 0.95, translateX: 0.45, translateY: -0.45, strokeLinecap: 'round', strokeLinejoin: 'round' });
     expect(screen.UNSAFE_getAllByType(Use).find(path => path.props.testID === 'stats-muscle-body-fibres-surface-shade')!.props).toMatchObject({
-      stroke: uiRoles.inkMuted, strokeOpacity: 0.72, fill: 'transparent', strokeLinecap: 'round', strokeLinejoin: 'round',
+      stroke: testRoles.inkMuted, strokeOpacity: 0.72, fill: 'transparent', strokeLinecap: 'round', strokeLinejoin: 'round',
     });
     expect(screen.getByTestId('stats-muscle-body-svg').props.pointerEvents).toBe('none');
     expect(

@@ -10,7 +10,7 @@
  * by reading the session back from the database.
  */
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 import { Alert, Keyboard, StyleSheet, type AlertButton } from 'react-native';
 
@@ -52,7 +52,7 @@ jest.mock('@/src/groups/use-group-exercise-linking', () => ({
 import ExercisePageRoute from '@/app/session/[sessionId]/exercise/[sessionExerciseId]';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { Icon } from '@/components/ui/icon';
-import { uiIconSize, uiRoles } from '@/components/ui/tokens';
+import { uiIconSize } from '@/components/ui/tokens';
 import { defaultSessionExerciseDraftClient, type SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { exerciseDefinitions, sessions } from '@/src/data/schema';
@@ -76,6 +76,10 @@ import {
 } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
 import { exerciseEditorPage, WithExerciseEditorPage } from './helpers/exercise-editor-page';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
 
 const SESSION = EXERCISE_PAGE_FIXTURE.activeSessionId;
 const BENCH = EXERCISE_PAGE_FIXTURE.benchSessionExerciseId;
@@ -107,7 +111,7 @@ const renderPage = async ({
   sessionExerciseId = BENCH,
   record = '1RM102.1',
 }: { sessionId?: string; sessionExerciseId?: string; record?: string } = {}) => {
-  render(<ExercisePageScreen sessionExerciseId={sessionExerciseId} sessionId={sessionId} />);
+  renderWithTheme(<ExercisePageScreen sessionExerciseId={sessionExerciseId} sessionId={sessionId} />);
   await screen.findByTestId('exercise-page');
   await waitFor(() => expect(screen.getByTestId('exercise-records-1rm')).toHaveTextContent(record));
 };
@@ -208,7 +212,7 @@ describe('ExercisePageScreen', () => {
     await saveExerciseCatalogExercise({ id: BENCH_DEF, name: EXERCISE_PAGE_FIXTURE.benchExerciseName,
       loadInputMode: 'per_side_load', bodyweightContribution: 0,
       mappings: [{ muscleGroupId: 'chest', role: 'primary', weight: 1 }] });
-    render(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
     expect(await screen.findByLabelText('Set 3 weight')).toHaveProp('value', '82.5');
     expect(screen.getAllByText('Weight')).toHaveLength(1);
     expect(screen.queryByText('Weight per side · kg')).toBeNull();
@@ -257,9 +261,9 @@ describe('ExercisePageScreen', () => {
 
     // 80 × 8 is today's top weight, 1RM and volume, and ties the 1RM record: no emphasis.
     expect(styleOf(screen.getByTestId('exercise-set-2-values'))).toMatchObject({ fontWeight: '500' });
-    expect(styleOf(screen.getByTestId('exercise-set-2-values')).color).not.toBe(uiRoles.record);
-    expect(figure(2, '1rm', '102.1')).toMatchObject({ fontWeight: '500', color: uiRoles.ink });
-    expect(figure(2, 'vol', '640')).toMatchObject({ fontWeight: '500', color: uiRoles.inkMuted });
+    expect(styleOf(screen.getByTestId('exercise-set-2-values')).color).not.toBe(themeRoles.record);
+    expect(figure(2, '1rm', '102.1')).toMatchObject({ fontWeight: '500', color: themeRoles.ink });
+    expect(figure(2, 'vol', '640')).toMatchObject({ fontWeight: '500', color: themeRoles.inkMuted });
 
     // 90 × 6 beats the 82.5 weight and 102.1 1RM records; its volume is never a record.
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
@@ -268,10 +272,10 @@ describe('ExercisePageScreen', () => {
 
     expect(styleOf(screen.getByTestId('exercise-set-3-values'))).toMatchObject({
       fontWeight: '700',
-      color: uiRoles.record,
+      color: themeRoles.record,
     });
-    expect(figure(3, '1rm', '108.3')).toMatchObject({ fontWeight: '700', color: uiRoles.record });
-    expect(figure(3, 'vol', '540')).toMatchObject({ fontWeight: '500', color: uiRoles.inkMuted });
+    expect(figure(3, '1rm', '108.3')).toMatchObject({ fontWeight: '700', color: themeRoles.record });
+    expect(figure(3, 'vol', '540')).toMatchObject({ fontWeight: '500', color: themeRoles.inkMuted });
 
     // The set list's band reads the session card's words: one set, both records.
     expect(screen.getByTestId('exercise-record-band-1')).toHaveTextContent('New 1RM · 108.3 + top weight90.0 × 6');
@@ -456,7 +460,7 @@ describe('ExercisePageScreen', () => {
     await seedPage();
     // The older history session is edited; the newer one came after it, so
     // nothing counts yet, as on the session view's record band.
-    render(<ExercisePageScreen sessionExerciseId={`${OLDER_HISTORY}_bench`} sessionId={OLDER_HISTORY} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={`${OLDER_HISTORY}_bench`} sessionId={OLDER_HISTORY} />);
     await screen.findByTestId('exercise-page');
 
     fireEvent.press(screen.getByTestId('exercise-records-toggle'));
@@ -797,7 +801,7 @@ describe('ExercisePageScreen', () => {
     await seedPage();
     mockRouter.push.mockImplementation((href: unknown) => exerciseEditorPage.push(href));
     mockRouter.back.mockImplementation(() => exerciseEditorPage.back());
-    render(
+    renderWithTheme(
       <WithExerciseEditorPage>
         <ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />
       </WithExerciseEditorPage>
@@ -901,7 +905,7 @@ describe('ExercisePageScreen', () => {
         persistSessionDraftSnapshot: jest.fn().mockRejectedValue(new Error('disk full')),
       };
       await seedPage();
-      render(<ExercisePageScreen draftClient={failingClient} sessionExerciseId={BENCH} sessionId={SESSION} />);
+      renderWithTheme(<ExercisePageScreen draftClient={failingClient} sessionExerciseId={BENCH} sessionId={SESSION} />);
       await screen.findByTestId('exercise-page');
       fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
       fireEvent.press(screen.getByTestId('exercise-page-options'));
@@ -975,13 +979,13 @@ describe('ExercisePageScreen', () => {
   it('says so when the exercise or the session is gone, or the session was deleted', async () => {
     await seedPage(() => setSessionDeletedState(NEWER_HISTORY, true));
 
-    render(<ExercisePageScreen sessionExerciseId="gone" sessionId={SESSION} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId="gone" sessionId={SESSION} />);
     expect(await screen.findByText('This exercise is no longer in the session.')).toBeTruthy();
     screen.unmount();
-    render(<ExercisePageScreen sessionExerciseId={BENCH} sessionId="gone" />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={BENCH} sessionId="gone" />);
     expect(await screen.findByText('This session no longer exists.')).toBeTruthy();
     screen.unmount();
-    render(<ExercisePageScreen sessionExerciseId={`${NEWER_HISTORY}_bench`} sessionId={NEWER_HISTORY} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={`${NEWER_HISTORY}_bench`} sessionId={NEWER_HISTORY} />);
     expect(
       await screen.findByText('This session was deleted, so its sets cannot be edited here.')
     ).toBeTruthy();
@@ -1014,7 +1018,7 @@ describe('ExercisePageScreen', () => {
       await atGym('gym-golds', "Gold's Gym", [OLDER_HISTORY, NEWER_HISTORY]);
       await atGym('gym-new', 'New Gym', [SESSION]);
     });
-    render(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
     await screen.findByTestId('exercise-page');
 
     fireEvent.press(screen.getByTestId('exercise-records-toggle'));
@@ -1072,7 +1076,7 @@ describe('ExercisePageScreen', () => {
     // Completed-session edit hides both the top-bar timer button and the timer bar.
     act(() => updatePreferences({ restTimerDurationSec: 90, restTimerAutoStart: true }));
     screen.unmount();
-    render(<ExercisePageScreen sessionExerciseId={`${NEWER_HISTORY}_bench`} sessionId={NEWER_HISTORY} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={`${NEWER_HISTORY}_bench`} sessionId={NEWER_HISTORY} />);
     await screen.findByTestId('exercise-page');
     expect(screen.queryByTestId('exercise-page-rest-timer-button')).toBeNull();
     expect(screen.queryByTestId('rest-timer-bar')).toBeNull();
@@ -1140,7 +1144,7 @@ describe('ExercisePageScreen', () => {
 
     // A completed session's page has no timer, as with the setting off.
     screen.unmount();
-    render(<ExercisePageScreen sessionExerciseId={`${NEWER_HISTORY}_bench`} sessionId={NEWER_HISTORY} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={`${NEWER_HISTORY}_bench`} sessionId={NEWER_HISTORY} />);
     await screen.findByTestId('exercise-page');
     expect(screen.queryByTestId('exercise-page-rest-timer-button')).toBeNull();
     act(() => updatePreferences({ timerInTitleBar: false }));
@@ -1231,7 +1235,7 @@ describe('exercise page title switcher', () => {
       persistSessionDraftSnapshot: jest.fn(defaultSessionExerciseDraftClient.persistSessionDraftSnapshot),
       persistCompletedSessionSnapshot: jest.fn(defaultSessionExerciseDraftClient.persistCompletedSessionSnapshot),
     };
-    render(<ExercisePageScreen draftClient={client} sessionExerciseId={BENCH} sessionId={SESSION} />);
+    renderWithTheme(<ExercisePageScreen draftClient={client} sessionExerciseId={BENCH} sessionId={SESSION} />);
     await screen.findByTestId('exercise-page');
     // Dirty but inside the autosave debounce: only leaving the page saves it.
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '85');
@@ -1286,7 +1290,7 @@ describe('exercise page title switcher', () => {
   it('offers the switcher when editing a completed session too', async () => {
     await seedPage();
     const completedId = NEWER_HISTORY;
-    render(<ExercisePageScreen sessionExerciseId={`${completedId}_bench`} sessionId={completedId} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={`${completedId}_bench`} sessionId={completedId} />);
     await screen.findByTestId('exercise-page');
 
     await openSwitcher();
@@ -1302,7 +1306,7 @@ describe('exercise page route', () => {
   it('opens the page for the route params', async () => {
     await seedPage();
     mockRouteParams = { sessionId: SESSION, sessionExerciseId: BENCH };
-    render(<ExercisePageRoute />);
+    renderWithTheme(<ExercisePageRoute />);
     // Loading draws a plain title; the loaded one is the switcher button.
     await waitFor(() => expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press'));
   });

@@ -1,6 +1,6 @@
 import { Fragment, useRef, type ComponentRef } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
-import { StatePanel, uiBorder, uiRoles } from '@/components/ui';
+import { View, useWindowDimensions } from 'react-native';
+import { StatePanel, makeStyles, uiBorder } from '@/components/ui';
 import type { ProgressExerciseComparison, ProgressMuscleComparison } from '@/src/data';
 import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
 import {
@@ -88,6 +88,7 @@ export const sortProgressMuscles = (muscles: ProgressMuscleComparison[], mode: M
 export function ProgressTables(props: ProgressTablesProps) {
   const { muscles, metric, selectedId, onSelect, onMuscleHistory, onExerciseHistory,
     grouped = true, searchQuery = '', sortMode = 'now-desc', onSort } = props;
+  const styles = useStyles();
   const words = normalizeExerciseSearchWords(searchQuery);
   // Counted over all the user's muscles, so a search does not take a header away.
   const familyCounts = countFamilyMuscles(muscles.map(row => row.familyName));
@@ -204,9 +205,9 @@ function ExerciseRow({ row, metric, layout, onHistory, hideRole, axis }: {
   </StatsTableRow>;
 }
 
-const styles = StyleSheet.create({
-  contributions: { backgroundColor: uiRoles.ruleSoft, borderTopWidth: uiBorder.width,
-    borderBottomWidth: uiBorder.width, borderColor: uiRoles.rule },
+const useStyles = makeStyles((roles) => ({
+  contributions: { backgroundColor: roles.ruleSoft, borderTopWidth: uiBorder.width,
+    borderBottomWidth: uiBorder.width, borderColor: roles.rule },
   // The selected muscle keeps its ink rule, and its contributions hang off it.
-  selected: { position: 'absolute', left: 0, top: 0, bottom: 0, width: uiBorder.width * 3, backgroundColor: uiRoles.ink },
-});
+  selected: { position: 'absolute', left: 0, top: 0, bottom: 0, width: uiBorder.width * 3, backgroundColor: roles.ink },
+}));

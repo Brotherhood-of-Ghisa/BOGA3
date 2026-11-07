@@ -1,7 +1,8 @@
 import { isModelFibre, MUSCLE_BODY_FASCICLES, type MuscleBodyFibreSelection, type TriangleFibreSegment } from '@/components/stats/muscle-body-fibres';
 import { MUSCLE_BODY_MESH, type MuscleBodyMesh } from '@/components/stats/muscle-body-mesh';
 import { MUSCLE_MAP_REFERENCE } from '@/components/stats/muscle-map-reference';
-import { hitTestProjectedMuscle, projectMuscleBody, selectMuscleFibres } from '@/components/stats/muscle-body-projection';
+import { hitTestProjectedMuscle, selectMuscleFibres } from '@/components/stats/muscle-body-projection';
+import { projectMuscleBody } from './helpers/muscle-body-palette';
 import { buildMuscleReportAssignment } from '@/src/data/muscle-report-presets';
 import { broadMuscleRows } from './helpers/broad-muscle-report';
 

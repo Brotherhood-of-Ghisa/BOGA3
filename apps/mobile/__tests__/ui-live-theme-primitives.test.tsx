@@ -4,7 +4,6 @@ import { StyleSheet, Switch, Text, type StyleProp } from 'react-native';
 import {
   ActionButton,
   Card,
-  changeToneColourIn,
   FormField,
   ListRow,
   Notice,
@@ -137,7 +136,7 @@ describe('components/ui repaints when the theme changes', () => {
   });
 });
 
-describe('text roles and change tones take the roles they are drawn in', () => {
+describe('text roles take the roles they are drawn in', () => {
   it('builds each sheet once per set of roles, in the colours of those roles', () => {
     const light = rolesFor(LIGHT);
     const dark = rolesFor(SLATE_DARK);
@@ -153,13 +152,5 @@ describe('text roles and change tones take the roles they are drawn in', () => {
     }
     renderWithTheme(<Probe />);
     await repaints(() => style('probe').color, (roles) => roles.ink);
-  });
-
-  it('colours a change from the roles it is given', () => {
-    const dark = rolesFor(SLATE_DARK);
-    expect(changeToneColourIn('positive', dark)).toBe(dark.gain);
-    expect(changeToneColourIn('new', dark)).toBe(dark.gain);
-    expect(changeToneColourIn('negative', dark)).toBe(dark.loss);
-    expect(changeToneColourIn('neutral', dark)).toBe(dark.ink);
   });
 });

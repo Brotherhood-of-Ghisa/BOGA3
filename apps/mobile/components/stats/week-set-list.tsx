@@ -7,7 +7,8 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
 import { useDelayedFlag } from '@/components/stats/use-delayed-flag';
-import { Icon, IconButton, StatePanel, uiGeometry, uiRoles, uiSpace, uiText, uiTypography } from '@/components/ui';
+import { Icon, IconButton, StatePanel, uiGeometry, uiSpace, uiTypography } from '@/components/ui';
+import { useUiText } from '@/components/ui/text-roles';
 
 import type { WeekBlockRole, WeekSetGroup, WeekSetsState } from './week-sets';
 
@@ -32,6 +33,7 @@ export const WEEK_SETS_LOADING_DELAY_MS = 250;
 const ROLE_LABELS: Record<WeekBlockRole, string> = { primary: 'Primary', secondary: 'Secondary' };
 
 export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLink, onRetry, testID }: Props) {
+  const text = useUiText();
   const showLoading = useDelayedFlag(loading, WEEK_SETS_LOADING_DELAY_MS);
   if (error) {
     return <StatePanel action={onRetry ? { label: 'Retry', onPress: onRetry, testID: `${testID}-retry` } : undefined}
@@ -42,7 +44,7 @@ export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLin
     return showLoading ? <StatePanel body="Loading sets..." fill={false} kind="loading" testID={`${testID}-loading`} /> : null;
   }
   if (groups.length === 0) {
-    return <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-empty`}>No sets this week</Text>;
+    return <Text allowFontScaling={false} style={text.meta} testID={`${testID}-empty`}>No sets this week</Text>;
   }
   return <View style={styles.list} testID={testID}>
     {groups.map((group) => <WeekSetCard key={group.key} exerciseLink={exerciseLink} group={group}
@@ -63,7 +65,7 @@ function WeekSetCard({ group, onOpenSession, exerciseLink, testID }: {
   const exerciseLabel = `Open ${group.title} progress`;
   const described = [group.title, group.detail === group.title ? null : group.detail, group.role ? ROLE_LABELS[group.role] : null]
     .filter(Boolean).join(', ');
-  const roleMark = group.role ? <Icon color={uiRoles.inkMuted}
+  const roleMark = group.role ? <Icon colorRole="inkMuted"
     name={`role-${group.role}`} size="xs" testID={`${testID}-role-${group.role}`} /> : null;
   return <ExerciseSetsCard
     accessibilityLabel={`Open session from ${described}`}

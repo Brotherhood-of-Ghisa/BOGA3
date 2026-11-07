@@ -7,10 +7,10 @@ import {
   Notice,
   Stat,
   uiBorder,
-  uiRoles,
   uiSpace,
-  uiText,
 } from '@/components/ui';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
 
 import type { InlineFeedback } from './use-profile-panel';
 
@@ -37,9 +37,11 @@ export function SignedOutCard({ email, password, onChangeEmail, onChangePassword
   isSubmitting: boolean;
   onSignIn: () => void;
 }) {
+  const styles = useStyles();
+  const text = useUiText();
   return (
     <Card style={styles.formCard} testID="profile-signed-out-card">
-      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={text.title}>
         Sign in
       </Text>
 
@@ -98,6 +100,7 @@ export function ProfileEditForm({ username, newEmail, newPassword, onChangeUsern
   isUpdating: boolean;
   updateDisabled: boolean;
 }) {
+  const styles = useStyles();
   return (
     <Card style={styles.formCard}>
       <FormField
@@ -174,6 +177,7 @@ export function ProfileSummary({ username, email, pendingEmail, editDisabled, si
   onEdit: () => void;
   onSignOut: () => void;
 }) {
+  const styles = useStyles();
   return (
     <>
       <Card>
@@ -225,7 +229,7 @@ export const profileStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   formCard: {
     padding: uiSpace.lg,
     gap: uiSpace.md,
@@ -236,7 +240,7 @@ const styles = StyleSheet.create({
   },
   valueRowDivider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   actionRow: {
     flexDirection: 'row',
@@ -246,4 +250,4 @@ const styles = StyleSheet.create({
   actionFill: {
     flex: 1,
   },
-});
+}));

@@ -7,8 +7,9 @@ import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { ScreenScroll } from '@/components/ui/screen';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { useUiRoles } from '@/components/ui/theme-context';
+import { uiSpace } from '@/components/ui/tokens';
 import type { ReadForegroundPosition } from '@/src/location/gym-location-reads';
 import { gymHasSavedLocation, listGymDirectory, type GymDirectoryEntry } from '@/src/session-recorder/gym-options';
 
@@ -34,6 +35,9 @@ export type GymsScreenProps = {
  * and from More; the native header's back returns to either.
  */
 export function GymsScreen({ readPosition }: GymsScreenProps) {
+  const roles = useUiRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [directory, setDirectory] = useState<DirectoryState>({ status: 'loading' });
   const [editing, setEditing] = useState<EditorTarget>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -80,14 +84,14 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
         density="list"
         divider={index > 0}
         key={gym.id}
-        leading={<Icon color={located ? uiRoles.ink : uiRoles.inkGhost} name="location" size="sm" />}
+        leading={<Icon colorRole={located ? 'ink' : 'inkGhost'} name="location" size="sm" />}
         onPress={() => setEditing(gym.id)}
         testID={`gyms-row-${gym.id}`}
-        trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}>
-        <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
+        trailing={<Icon colorRole="inkMuted" name="chevron-right" />}>
+        <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong}>
           {gym.name}
         </Text>
-        <Text allowFontScaling={false} style={uiText.meta} testID={`gyms-row-${gym.id}-status`}>
+        <Text allowFontScaling={false} style={text.meta} testID={`gyms-row-${gym.id}-status`}>
           {gym.archived ? 'Archived' : located ? 'Location saved' : 'No location saved'}
         </Text>
       </ListRow>
@@ -98,13 +102,13 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
   if (directory.status === 'loading') {
     body = (
       <View style={styles.state} testID="gyms-loading">
-        <ActivityIndicator color={uiRoles.inkMuted} />
+        <ActivityIndicator color={roles.inkMuted} />
       </View>
     );
   } else if (directory.status === 'error') {
     body = (
       <View style={styles.state} testID="gyms-error">
-        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{"Couldn't load your gyms."}</Text>
+        <Text allowFontScaling={false} style={[text.body, tone.muted]}>{"Couldn't load your gyms."}</Text>
         <ActionButton label="Retry" onPress={() => void reload()} testID="gyms-retry" variant="outline" />
       </View>
     );
@@ -115,7 +119,7 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
       <>
         <Card testID="gyms-list">
           {active.length === 0 && editing !== 'new' ? (
-            <Text allowFontScaling={false} style={[uiText.meta, styles.empty]}>No gyms yet.</Text>
+            <Text allowFontScaling={false} style={[text.meta, styles.empty]}>No gyms yet.</Text>
           ) : null}
           {active.map(gymRow)}
           {editing === 'new' ? (
@@ -141,7 +145,7 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
         ) : null}
         {showArchived && archived.length > 0 ? (
           <View style={styles.section}>
-            <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Archived</Text>
+            <Text allowFontScaling={false} style={[text.label, tone.faint]}>Archived</Text>
             <Card testID="gyms-archived-list">{archived.map(gymRow)}</Card>
           </View>
         ) : null}

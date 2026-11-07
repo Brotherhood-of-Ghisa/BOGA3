@@ -11,13 +11,12 @@ import {
   ListRow,
   SegmentedControl,
   Sheet,
-  uiRoles,
   uiSpace,
-  uiText,
-  uiTextTone,
-  uiMode,
+  useUiMode,
+  useUiRoles,
   type SegmentedControlOption,
 } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { useNovemberAppearance } from '@/components/appearance/use-november-appearance';
 import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import type { ProgressMuscleComparison } from '@/src/data';
@@ -106,6 +105,8 @@ function MuscleBodyHeader({
   onNext,
   onOpenPicker,
 }: HeaderProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.headerRow}>
       <View style={styles.controlsLeft}>
@@ -151,7 +152,7 @@ function MuscleBodyHeader({
           <Text
             allowFontScaling={false}
             numberOfLines={1}
-            style={[uiText.label, uiTextTone.ink]}
+            style={[text.label, tone.ink]}
             testID="stats-muscle-body-selected">
             {selectedMuscle?.displayName ?? 'Select'}
           </Text>
@@ -188,6 +189,8 @@ function MusclePickerSheet({
   selectedId,
   onSelectMuscle,
 }: PickerSheetProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const unit = metricUnit(metric);
   return (
     <Sheet
@@ -213,10 +216,10 @@ function MusclePickerSheet({
               <View style={styles.sheetRowContent}>
                 <Text
                   allowFontScaling={false}
-                  style={[uiText.bodyStrong, isSelected && uiTextTone.accent]}>
+                  style={[text.bodyStrong, isSelected && tone.accent]}>
                   {row.displayName}
                 </Text>
-                <Text allowFontScaling={false} style={uiText.meta}>
+                <Text allowFontScaling={false} style={text.meta}>
                   <FigureText>{`${figures.now} ${unit}`}</FigureText>
                 </Text>
               </View>
@@ -314,6 +317,8 @@ type ComparisonSectionProps = {
 };
 
 function MuscleBodyComparison({ selectedMuscle, metric, viewportWidth }: ComparisonSectionProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const colWidth = (viewportWidth - uiSpace.sm * 2) / 3;
   return (
     <View testID="stats-muscle-body-comparison">
@@ -322,7 +327,7 @@ function MuscleBodyComparison({ selectedMuscle, metric, viewportWidth }: Compari
           <Text
             key={label}
             allowFontScaling={false}
-            style={[uiText.label, uiTextTone.muted, { width: colWidth, textAlign: 'right' }]}>
+            style={[text.label, tone.muted, { width: colWidth, textAlign: 'right' }]}>
             {label}
           </Text>
         ))}
@@ -359,6 +364,8 @@ export function MuscleBodyCard({
 }: Props) {
   const { width: windowWidth } = useWindowDimensions();
   const november = useNovemberAppearance();
+  const roles = useUiRoles();
+  const mode = useUiMode();
   const [measuredWidth, setMeasuredWidth] = useState(0);
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
   const [dragOffsetDeg, setDragOffsetDeg] = useState(0);
@@ -380,7 +387,7 @@ export function MuscleBodyCard({
 
   const orientation = bodyOrientationForAngle(angleDeg);
   const scores = useMemo(() => computeMuscleScores(muscles, metric, setTargets), [muscles, metric, setTargets]);
-  const palette = useMemo(() => buildThemeShadePalette(uiRoles, uiMode), []);
+  const palette = useMemo(() => buildThemeShadePalette(roles, mode), [roles, mode]);
   const selectedFibres = useMemo(() => selectMuscleFibres(selectedId, report), [selectedId, report]);
   const projected = useMemo(
     () =>

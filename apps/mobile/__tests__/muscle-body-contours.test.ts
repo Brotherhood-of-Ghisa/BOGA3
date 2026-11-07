@@ -1,5 +1,5 @@
 import type { ModelFibreSegment } from '@/components/stats/muscle-body-fibres';
-import { projectMuscleBody } from '@/components/stats/muscle-body-projection';
+import { projectMuscleBody } from './helpers/muscle-body-palette';
 
 const { contourChains } = require('../scripts/anatomy/contour-chains.cjs');
 const line = (a: number, b: number, nz = 1): ModelFibreSegment => [a, 0, .1, b, 0, .1, 0, 0, nz];

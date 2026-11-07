@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { Card, Icon, ListRow, type ListRowProps, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
+import { Card, Icon, ListRow, makeStyles, type ListRowProps, uiBorder, uiGeometry, uiSpace, uiTypography } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 
 // Progress's one table style, which both breakdowns are drawn with: a `Card`
 // holding a micro-label header row over right-aligned figure columns, and
@@ -45,22 +46,25 @@ export function StatsTableRow(props: WithoutDensity<ListRowProps>) {
 
 /** Wrapping names and optional quiet role metadata; the row owns the content inset. */
 export function StatsTableName({ name, metadata, selected = false }: { name: string; metadata?: string; selected?: boolean }) {
-  return <><Text allowFontScaling={false} style={selected ? uiText.bodyStrong : uiText.body}>{name}</Text>
-    {metadata ? <Text allowFontScaling={false} style={uiText.meta}>{metadata}</Text> : null}</>;
+  const text = useUiText();
+  return <><Text allowFontScaling={false} style={selected ? text.bodyStrong : text.body}>{name}</Text>
+    {metadata ? <Text allowFontScaling={false} style={text.meta}>{metadata}</Text> : null}</>;
 }
 
 /** Disclosure stays separate from the history link, on the shared control axis. */
 export function StatsTableDisclosure({ expanded, accessibilityLabel, onPress, testID }: {
   expanded: boolean; accessibilityLabel: string; onPress: () => void; testID: string;
 }) {
+  const styles = useStyles();
   return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel}
     accessibilityState={{ expanded }} onPress={onPress} style={styles.disclosure} testID={testID}>
-    <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size="sm" color={uiRoles.ink} />
+    <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size="sm" />
   </Pressable>;
 }
 
 /** The header row: a name cell, then the figure columns in a `StatsTableFigures`. */
 export function StatsTableHeader({ children, testID, compact = false }: { children: ReactNode; testID?: string; compact?: boolean }) {
+  const styles = useStyles();
   return <View style={[styles.header, compact && styles.compactHeader]} testID={testID}>{children}</View>;
 }
 
@@ -68,13 +72,16 @@ export function StatsTableHeader({ children, testID, compact = false }: { childr
 export function StatsTableFigures({ children, style, testID }: {
   children: ReactNode; style?: StyleProp<ViewStyle>; testID?: string;
 }) {
+  const styles = useStyles();
   return <View style={[styles.figures, style]} testID={testID}>{children}</View>;
 }
 
 /** One header column: the micro-label, plus any sort indicator as children. */
 export function StatsTableHeaderLabel({ label, active = false }: { label: string; active?: boolean }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   return <Text allowFontScaling={false} numberOfLines={1}
-    style={[uiText.label, active && uiTextTone.ink]}>{label}</Text>;
+    style={[text.label, active && tone.ink]}>{label}</Text>;
 }
 
 /** Shared sortable header; the caller names its ordering and next action. */
@@ -83,6 +90,7 @@ export function StatsTableSortHeader({ label, active, descending, description, c
   label: string; active: boolean; descending: boolean; description: string; currentSort: string; nextSort: string;
   onPress: () => void; testID: string; style?: StyleProp<ViewStyle>; numeric?: boolean; recent?: boolean; compact?: boolean;
 }) {
+  const styles = useStyles();
   const direction = active && !descending ? 'up' : 'down';
   return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
     accessibilityLabel={`${description}.${active ? ` Current sort: ${currentSort}.` : ''} Activate to sort ${nextSort}.`}
@@ -93,14 +101,16 @@ export function StatsTableSortHeader({ label, active, descending, description, c
     {active || !compact ? <View accessible={false} testID={`${testID}-indicator`}
       style={[styles.indicator, recent && styles.recency, !active && styles.hidden]}>
       {recent ? <StatsTableHeaderLabel label="Recent" /> : null}
-      <Icon color={uiRoles.ink} name={direction === 'up' ? 'arrow-up' : 'arrow-down'} size="xs"
+      <Icon name={direction === 'up' ? 'arrow-up' : 'arrow-down'} size="xs"
         testID={`${testID}-indicator-${direction}`} />
     </View> : null}
   </Pressable>;
 }
 
 export function StatsTableFamily({ name, testID, compact = false }: { name: string; testID?: string; compact?: boolean }) {
-  return <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.family, compact && styles.compactFamily]} testID={testID}>{name}</Text>;
+  const text = useUiText();
+  const styles = useStyles();
+  return <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, styles.family, compact && styles.compactFamily]} testID={testID}>{name}</Text>;
 }
 
 export const statsTableStyles = StyleSheet.create({
@@ -109,23 +119,23 @@ export const statsTableStyles = StyleSheet.create({
   nameCell: { flex: 1, minWidth: 0 },
   headerCell: { minHeight: uiGeometry.tapTarget, flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
   headerCellNumeric: { justifyContent: 'flex-end' },
-  // A row's name and a figure cell: layout only, after `uiText.bodyStrong` and
-  // `uiText.figure`.
+  // A row's name and a figure cell: layout only, after the `bodyStrong` and
+  // `figure` text roles.
   name: { paddingVertical: uiSpace.xs },
   figure: { textAlign: 'right' },
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   compactHeader: { gap: uiSpace.sm },
   compactFamily: { paddingTop: uiSpace.sm, paddingBottom: uiSpace.xs },
   disclosure: { width: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, alignItems: 'center', justifyContent: 'center' },
   numericSortHeader: { flexDirection: 'row-reverse', justifyContent: 'flex-start' },
   family: { paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
-    paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderColor: uiRoles.rule },
-  pressed: { backgroundColor: uiRoles.paper },
+    paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderColor: roles.rule },
+  pressed: { backgroundColor: roles.paper },
   indicator: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
   recency: { width: 64 },
   hidden: { opacity: 0 },
   header: { flexDirection: 'row', alignItems: 'stretch', gap: uiSpace.md, paddingHorizontal: uiSpace.md },
   figures: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
-});
+}));

@@ -1,7 +1,8 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { useRef, useState } from 'react';
 import { Alert, Keyboard, ScrollView, Text } from 'react-native';
-import { ActionButton, FormField, Notice, Sheet, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, FormField, Notice, Sheet } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { resolveMeasurementDate, validateBodyWeight, type WeightEntry } from '@/src/bodyweight/weight-entry';
 import { formatLocalDateTime, reformatDateTime } from '@/src/utils/local-time';
 import { weightStyles as styles } from './styles';
@@ -20,6 +21,8 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
   onDelete?: () => Promise<void>;
   onDismiss: () => void;
 }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const dateFormat = useDateFormat();
   const [value, setValue] = useState(initial.weightValue);
   const [dateText, setDateText] = useState(formatLocalDateTime(measuredAt.getTime(), dateFormat));
@@ -71,7 +74,7 @@ export function WeightEntrySheet({ visible = true, autoFocus = true, title, init
     <Sheet visible={visible} title={title} keyboardAvoiding dismissLabel="Dismiss weight editor"
       onDismiss={() => { if (!saving.current) onDismiss(); }} testID="weight-entry-sheet">
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.form}>
-        {explanation ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{explanation}</Text> : null}
+        {explanation ? <Text allowFontScaling={false} style={[text.body, tone.muted]}>{explanation}</Text> : null}
         <FormField label="Body weight" accessibilityLabel="Body weight"
           value={value} onChangeText={setValue} keyboardType="decimal-pad" autoFocus={autoFocus}
           editable={!busy} error={valueError} testID="weight-entry-value" />
