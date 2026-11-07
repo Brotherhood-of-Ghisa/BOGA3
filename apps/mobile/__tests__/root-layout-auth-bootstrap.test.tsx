@@ -145,11 +145,14 @@ import { act, render, screen, waitFor } from '@testing-library/react-native';
 
 import RootLayout from '../app/_layout';
 import * as themeLaunch from '@/components/ui/theme-launch';
-import { CUSTOM_THEME, themePresets } from '@/components/ui/theme-presets';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { CUSTOM_THEME, DEFAULT_APPEARANCE, themePresets } from '@/components/ui/theme-presets';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { getExerciseCatalogSnapshot } from '@/src/exercise-catalog/cache';
 import { closeLocalData, localDataClient, resetLocalData } from './helpers/local-data';
 import { rolesFor, switchTheme } from './helpers/theme';
+
+// Tests launch in the default appearance.
+const launchRoles = rolesFor(DEFAULT_APPEARANCE);
 
 describe('RootLayout auth bootstrap wiring', () => {
   afterEach(async () => {
@@ -185,14 +188,14 @@ describe('RootLayout auth bootstrap wiring', () => {
     expect(mockThemeProvider).toHaveBeenLastCalledWith(
       expect.objectContaining({
         dark: false,
-        colors: expect.objectContaining({ background: uiRoles.paper, card: uiRoles.paper, text: uiRoles.ink }),
+        colors: expect.objectContaining({ background: launchRoles.paper, card: launchRoles.paper, text: launchRoles.ink }),
       }),
     );
   });
 
   it('draws every screen in the theme saved while the app runs', async () => {
     render(<RootLayout />);
-    expect(mockThemeUnderLayout).toHaveBeenLastCalledWith(uiRoles);
+    expect(mockThemeUnderLayout).toHaveBeenLastCalledWith(launchRoles);
 
     const slateDark = { theme: 'slate', mode: 'dark', custom: null } as const;
     await switchTheme(slateDark);
@@ -270,15 +273,15 @@ describe('RootLayout auth bootstrap wiring', () => {
         headerBackButtonDisplayMode: 'minimal',
         // One design-language header style on every stack route: the page's
         // own `paper` ground with no shadow line, and the title role.
-        headerStyle: { backgroundColor: uiRoles.paper },
+        headerStyle: { backgroundColor: launchRoles.paper },
         headerShadowVisible: false,
         headerTitleStyle: {
           fontFamily: uiFonts.display.family,
           fontWeight: '700',
           fontSize: uiTypography.size.lg,
-          color: uiRoles.ink,
+          color: launchRoles.ink,
         },
-        headerTintColor: uiRoles.ink,
+        headerTintColor: launchRoles.ink,
       },
     });
     // The back item's hidden label (read by VoiceOver) is the previous title: never "(tabs)".
