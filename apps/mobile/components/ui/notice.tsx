@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/icon';
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 // `neutral`: information — offline, saved, unavailable. `danger`: something
 // failed. There is no success or warning hue: the glyph and the words carry the
@@ -28,9 +29,11 @@ export type NoticeProps = {
 // A band that states something about the screen: `paper` on a `rule`
 // hairline at the card radius, an optional leading glyph and the words.
 export function Notice({ message, title, tone = 'neutral', icon, live = false, action, testID }: NoticeProps) {
+  const styles = useStyles();
+  const textRoles = useUiText();
   const danger = tone === 'danger';
   const words = (
-    <Text allowFontScaling={false} style={[uiText.body, title ? null : styles.fill, danger ? styles.messageDanger : null]}>{message}</Text>
+    <Text allowFontScaling={false} style={[textRoles.body, title ? null : styles.fill, danger ? styles.messageDanger : null]}>{message}</Text>
   );
   return (
     <View
@@ -38,10 +41,10 @@ export function Notice({ message, title, tone = 'neutral', icon, live = false, a
       accessibilityRole={danger ? 'alert' : undefined}
       style={[styles.band, title ? styles.bandTitled : null, danger ? styles.bandDanger : null]}
       testID={testID}>
-      {icon ? <Icon color={danger ? uiRoles.danger : uiRoles.inkMuted} name={icon} size="sm" /> : null}
+      {icon ? <Icon colorRole={danger ? 'danger' : 'inkMuted'} name={icon} size="sm" /> : null}
       {title ? (
         <View style={styles.words}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.title, danger ? styles.messageDanger : null]}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[textRoles.title, danger ? styles.messageDanger : null]}>
             {title}
           </Text>
           {words}
@@ -54,16 +57,16 @@ export function Notice({ message, title, tone = 'neutral', icon, live = false, a
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   band: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.card,
   },
   // A titled notice reads top-down: the glyph sits level with the title.
@@ -71,7 +74,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bandDanger: {
-    borderColor: uiRoles.danger,
+    borderColor: roles.danger,
   },
   words: {
     flex: 1,
@@ -82,6 +85,6 @@ const styles = StyleSheet.create({
   },
   messageDanger: {
     fontWeight: '600',
-    color: uiRoles.danger,
+    color: roles.danger,
   },
-});
+}));

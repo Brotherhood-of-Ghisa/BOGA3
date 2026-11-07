@@ -1,8 +1,9 @@
 import type { ReactNode, Ref } from 'react';
 import { Pressable, StyleSheet, Text, View, type AccessibilityValue, type ViewInstance } from 'react-native';
 
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextFor, useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type ListRowDensity = 'sheet' | 'list' | 'compact';
 export type ListRowTone = 'default' | 'danger';
@@ -98,6 +99,7 @@ export function ListRow({
   ref,
   testID,
 }: ListRowProps) {
+  const styles = useStyles();
 
   const rowStyle = [
     styles.row,
@@ -145,7 +147,10 @@ export function ListRow({
 
 function ListRowContent({ label, description, children, contentAction, leading, meta, trailing, density = 'sheet', tone = 'default',
   selected = false, own = false, disabled = false }: ListRowBaseProps & { contentAction?: ListRowContentAction }) {
-  const labelRole = density === 'compact' && (own || selected) ? uiText.bodyStrong : labelStyles[density];
+  const styles = useStyles();
+  const textRoles = useUiText();
+  const labelStyles = { compact: textRoles.body, sheet: textRoles.optionLarge, list: textRoles.option };
+  const labelRole = density === 'compact' && (own || selected) ? textRoles.bodyStrong : labelStyles[density];
   const selectedStyle = density === 'compact' ? styles.compactSelected : styles.labelSelected;
   const content = <View style={[contentAction ? null : styles.content, density === 'compact' ? styles.compactInset : description !== undefined ? styles.contentTwoLine : null]}>
         {label !== undefined ? (
@@ -178,7 +183,7 @@ function ListRowContent({ label, description, children, contentAction, leading, 
 
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -186,18 +191,18 @@ const styles = StyleSheet.create({
   },
   divider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   compactInset: { paddingVertical: uiSpace.xs },
   compactTarget: { minHeight: uiGeometry.tapTarget },
   contentControl: { minWidth: uiGeometry.tapTarget, justifyContent: 'center' },
-  compactSelected: { color: uiRoles.accent },
-  own: { backgroundColor: uiRoles.paper },
+  compactSelected: { color: roles.accent },
+  own: { backgroundColor: roles.paper },
   selected: {
-    backgroundColor: uiRoles.accentWash,
+    backgroundColor: roles.accentWash,
   },
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   content: {
     flex: 1,
@@ -208,8 +213,8 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.sm,
   },
   description: {
-    ...uiText.body,
-    color: uiRoles.inkMuted,
+    ...uiTextFor(roles).body,
+    color: roles.inkMuted,
   },
   // Width only: the row's own minimum height already makes the column a full
   // tap target, and a second minimum here would stack on the row's padding.
@@ -220,16 +225,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   labelDanger: {
-    color: uiRoles.danger,
+    color: roles.danger,
   },
   labelSelected: {
     fontWeight: '700',
-    color: uiRoles.accent,
+    color: roles.accent,
   },
   labelDisabled: {
-    color: uiRoles.inkGhost,
+    color: roles.inkGhost,
   },
-});
+}));
 
 const densityStyles = StyleSheet.create({
   compact: {
@@ -248,8 +253,3 @@ const densityStyles = StyleSheet.create({
   },
 });
 
-const labelStyles = {
-  compact: uiText.body,
-  sheet: uiText.optionLarge,
-  list: uiText.option,
-};

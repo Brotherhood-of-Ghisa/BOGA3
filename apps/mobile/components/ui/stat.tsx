@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View, type TextStyle } from 'react-native';
+import { Text, View, type TextStyle } from 'react-native';
 
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type StatLayout = 'stacked' | 'inline';
 export type StatRank = 'primary' | 'secondary';
@@ -63,10 +64,36 @@ export function Stat({
   valueWidth = 'fixed',
   testID,
 }: StatProps) {
+  const styles = useStyles();
+  const textRoles = useUiText();
+  const textTones = useUiTextTone();
+  // A headline figure; in a list row, the row's `figure`; a profile's text value,
+  // the name that heads a block; a heading beside headline figures.
+  const stackedValueStyles = {
+    figure: textRoles.figureStat,
+    rowFigure: textRoles.figure,
+    text: textRoles.bodyStrong,
+    // `title`, on `figureStat`'s line height, set to the line's bottom so the
+    // word sits on the figures' bottom line (iOS puts the extra leading above;
+    // Android needs `textAlignVertical`).
+    heading: [textRoles.title, { lineHeight: textRoles.figureStat.lineHeight, textAlignVertical: 'bottom' as const }],
+  };
+  
+  // The set row's 1RM line in ink, its quieter VOL line muted. Plex Mono 500 is
+  // its lightest embedded face, so a `record` (700) stands out from it.
+  const inlineValueStyles = {
+    primary: [textRoles.figureSmall, textTones.ink],
+    secondary: textRoles.figureSmall,
+  };
+  
+  const emphasisStyles: Record<StatEmphasis, TextStyle | null> = {
+    none: null,
+    record: textTones.record,
+  };
   const planned = state === 'planned';
   const legendStyle = [
-    uiText.label,
-    uiTextTone.faint,
+    textRoles.label,
+    textTones.faint,
     planned ? styles.legendPlanned : null,
     ground === 'viz' ? styles.legendOnViz : null,
   ];
@@ -104,15 +131,15 @@ export function Stat({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   legendPlanned: {
-    color: uiRoles.inkGhost,
+    color: roles.inkGhost,
   },
   legendOnViz: {
-    color: uiRoles.ink,
+    color: roles.ink,
   },
   valuePlanned: {
-    color: uiRoles.inkFaint,
+    color: roles.inkFaint,
   },
   inline: {
     flexDirection: 'row',
@@ -135,28 +162,4 @@ const styles = StyleSheet.create({
   stackedEnd: {
     alignItems: 'flex-end',
   },
-});
-
-// A headline figure; in a list row, the row's `figure`; a profile's text value,
-// the name that heads a block; a heading beside headline figures.
-const stackedValueStyles = {
-  figure: uiText.figureStat,
-  rowFigure: uiText.figure,
-  text: uiText.bodyStrong,
-  // `title`, on `figureStat`'s line height, set to the line's bottom so the
-  // word sits on the figures' bottom line (iOS puts the extra leading above;
-  // Android needs `textAlignVertical`).
-  heading: [uiText.title, { lineHeight: uiText.figureStat.lineHeight, textAlignVertical: 'bottom' as const }],
-};
-
-// The set row's 1RM line in ink, its quieter VOL line muted. Plex Mono 500 is
-// its lightest embedded face, so a `record` (700) stands out from it.
-const inlineValueStyles = {
-  primary: [uiText.figureSmall, uiTextTone.ink],
-  secondary: uiText.figureSmall,
-};
-
-const emphasisStyles: Record<StatEmphasis, TextStyle | null> = {
-  none: null,
-  record: uiTextTone.record,
-};
+}));

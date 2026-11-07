@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Card } from '@/components/ui/card';
 import { CompactHeader } from '@/components/ui/compact-card';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 type ListCardProps = {
   header: ReactNode;
@@ -21,6 +22,7 @@ type ListCardProps = {
 /** Fixed list composition. Only the board region owns the optional action. */
 export function ListCard({ header, columnLabels, children, footer, variant = 'standalone', testID,
   regionTestID, onPress, accessibilityLabel, accessibilityHint }: ListCardProps) {
+  const styles = useStyles();
   const body = <>{columnLabels ? <View style={styles.columns}>{columnLabels}</View> : null}{children}{footer}</>;
   const content = onPress ? <>{header}<Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel}
     accessibilityHint={accessibilityHint} onPress={onPress} testID={regionTestID}
@@ -34,13 +36,14 @@ export function ListCard({ header, columnLabels, children, footer, variant = 'st
 export function ListCardHeader({ label, metadata, metadataTestID, trailing }: {
   label: string; metadata?: string; metadataTestID?: string; trailing?: ReactNode;
 }) {
+  const styles = useStyles();
   return <View style={styles.header}>
     <View style={styles.heading}><CompactHeader label={label} metadata={metadata} metadataPlacement="inline" metadataTestID={metadataTestID} /></View>
     {trailing}
   </View>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   list: { paddingBottom: uiSpace.sm },
   standalone: { paddingTop: uiSpace.xs, paddingBottom: uiSpace.md },
   target: { minHeight: uiGeometry.tapTarget },
@@ -48,5 +51,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md, paddingTop: uiSpace.sm, paddingBottom: uiSpace.xs },
   heading: { flex: 1, minWidth: 0 },
   columns: { flexDirection: 'row', justifyContent: 'flex-end', gap: uiSpace.sm, paddingHorizontal: uiSpace.md },
-  pressed: { backgroundColor: uiRoles.paper },
-});
+  pressed: { backgroundColor: roles.paper },
+}));

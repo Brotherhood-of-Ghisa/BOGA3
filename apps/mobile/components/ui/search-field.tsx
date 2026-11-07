@@ -1,9 +1,10 @@
-import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import { TextInput, View, type TextInputProps } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type SearchFieldProps = Omit<TextInputProps, 'style' | 'placeholderTextColor' | 'value' | 'onChangeText'> & {
   value: string;
@@ -27,9 +28,12 @@ export function SearchField({
   testID,
   ...inputProps
 }: SearchFieldProps) {
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const textRoles = useUiText();
   return (
     <View style={styles.field}>
-      <Icon color={uiRoles.inkFaint} name="search" size="sm" />
+      <Icon colorRole="inkFaint" name="search" size="sm" />
       <TextInput
         autoCorrect={false}
         returnKeyType="search"
@@ -37,8 +41,8 @@ export function SearchField({
         allowFontScaling={false}
         accessibilityLabel={accessibilityLabel}
         onChangeText={onChangeText}
-        placeholderTextColor={uiRoles.inkFaint}
-        style={[uiText.inputLarge, styles.input]}
+        placeholderTextColor={roles.inkFaint}
+        style={[textRoles.inputLarge, styles.input]}
         testID={testID}
         value={value}
       />
@@ -56,16 +60,16 @@ export function SearchField({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   field: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
     minHeight: uiGeometry.tapTarget,
     paddingLeft: uiSpace.md,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.control,
   },
   input: {
@@ -73,4 +77,4 @@ const styles = StyleSheet.create({
     minHeight: uiGeometry.tapTarget,
     paddingRight: uiSpace.md,
   },
-});
+}));

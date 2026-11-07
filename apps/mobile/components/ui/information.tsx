@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
 import { Sheet } from '@/components/ui/sheet';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone, uiTextFor } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
 
 export type InformationProps = {
@@ -19,6 +20,9 @@ export type InformationProps = {
 /** On-demand prose in a content-height Sheet; long explanations scroll. */
 export function Information({ title, body, sections = [], label, testIDPrefix }: InformationProps) {
   const [visible, setVisible] = useState(false);
+  const styles = useStyles();
+  const textRoles = useUiText();
+  const textTones = useUiTextTone();
   return <>
     <View style={styles.row}>
       {label ? <Text allowFontScaling={false} accessibilityRole="header" style={styles.label}>{label}</Text> : null}
@@ -30,22 +34,22 @@ export function Information({ title, body, sections = [], label, testIDPrefix }:
     <Sheet visible={visible} title={title} dismissLabel={`Dismiss ${title}`}
       testID={testIDPrefix ? `${testIDPrefix}-help` : undefined} onDismiss={() => setVisible(false)}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        {body ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{body}</Text> : null}
+        {body ? <Text allowFontScaling={false} style={[textRoles.body, textTones.muted]}>{body}</Text> : null}
         {sections.map(([heading, text]) => <View key={heading} style={styles.section}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={uiText.bodyStrong}>{heading}</Text>
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{text}</Text>
+          <Text allowFontScaling={false} accessibilityRole="header" style={textRoles.bodyStrong}>{heading}</Text>
+          <Text allowFontScaling={false} style={[textRoles.body, textTones.muted]}>{text}</Text>
         </View>)}
       </ScrollView>
     </Sheet>
   </>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   row: { flexDirection: 'row', alignItems: 'center' },
   // Discount the centred glyph's inset; the full 44pt target remains intact.
   besideLabel: { marginLeft: uiSpace.xs - (uiGeometry.tapTarget - uiIconSize.sm) / 2 },
-  label: { ...uiText.title, flexShrink: 1 },
+  label: { ...uiTextFor(roles).title, flexShrink: 1 },
   scroll: { flexShrink: 1 },
   content: { paddingHorizontal: uiSpace.lg, paddingBottom: uiSpace.sm, gap: uiSpace.lg },
   section: { gap: uiSpace.xs },
-});
+}));

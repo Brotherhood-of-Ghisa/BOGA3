@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { GestureDetector, GestureHandlerRootView, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation, ReduceMotion, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming,
@@ -7,8 +7,9 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SHEET_DRAG_SLOP, SHEET_HORIZONTAL_SLOP, shouldDismissSheet } from '@/components/ui/sheet-gesture';
-import { uiText } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextFor } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type SheetProps = {
   visible: boolean;
@@ -141,6 +142,7 @@ export function Sheet({
   children,
   testID,
 }: SheetProps) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { pan, translation, reset } = useSheetDrag(visible, onDismiss);
   const handleDismissed = useCallback(() => {
@@ -225,14 +227,14 @@ export function Sheet({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   gestureRoot: {
     flex: 1,
   },
   root: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: uiRoles.scrim,
+    backgroundColor: roles.scrim,
   },
   backdrop: {
     flex: 1,
@@ -243,7 +245,7 @@ const styles = StyleSheet.create({
     paddingTop: uiSpace.sm,
     borderTopLeftRadius: uiGeometry.radius.sheet,
     borderTopRightRadius: uiGeometry.radius.sheet,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
   },
   handleArea: {
     alignItems: 'center',
@@ -253,7 +255,7 @@ const styles = StyleSheet.create({
     width: uiGeometry.sheetHandle.width,
     height: uiGeometry.sheetHandle.height,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.rule,
+    backgroundColor: roles.rule,
   },
   header: {
     flexDirection: 'row',
@@ -276,7 +278,7 @@ const styles = StyleSheet.create({
     marginLeft: 'auto',
   },
   title: {
-    ...uiText.sheetTitle,
+    ...uiTextFor(roles).sheetTitle,
     flex: 1,
   },
-});
+}));
