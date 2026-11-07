@@ -336,11 +336,9 @@ Decided with mobile training programmes.
 ### Connected agent write permission
 
 - **Named disclosure of every capability.** The Connected Agents card names the
-  client and states every capability of **Allow this coach to make changes**
-  next to the toggle: reading upcoming/unscheduled plans, creating plans and
-  programmes, and adding, editing, deleting or restoring exercises, whose
-  changes recalculate past figures ([[agents.write-access]]). Base OAuth consent is never labelled
-  as write access.
+  client and states every capability in [[agents.write-access]] next to its
+  toggle. It explains that exercise changes recalculate past figures. Base OAuth
+  consent is never labelled as write access.
 - **Default off, revert on failure.** Write access is off until explicitly
   enabled, never by a loading fallback; it applies optimistically and reverts
   to the server value with a retryable error on failure.

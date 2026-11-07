@@ -1,9 +1,9 @@
 import { Stack } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ActionButton, Card, FormField, Notice, PageHeader, uiRoles, uiSpace } from '@/components/ui';
+import { ActionButton, Card, FormField, Notice, makeStyles, PageHeader, uiSpace } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { clearAuthRequired } from '@/src/sync/auth-required-signal';
 
@@ -28,6 +28,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * missing credential path when opened directly.
  */
 export default function SignInScreen() {
+  const styles = useStyles();
   const { clearAuthError, disabledReason, isConfigured, lastError, signInWithPassword, status } = useAuth();
 
   const [email, setEmail] = useState('');
@@ -157,10 +158,10 @@ export default function SignInScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   safeArea: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   flex: {
     flex: 1,
@@ -176,4 +177,4 @@ const styles = StyleSheet.create({
     padding: uiSpace.lg,
     gap: uiSpace.md,
   },
-});
+}));

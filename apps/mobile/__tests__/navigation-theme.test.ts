@@ -1,10 +1,9 @@
 import { DarkTheme, DefaultTheme } from 'expo-router';
 
-import { NAVIGATION_THEME, navigationTheme, statusBarStyleFor } from '@/components/navigation/navigation-theme';
+import { navigationTheme, statusBarStyleFor } from '@/components/navigation/navigation-theme';
 import { defaultThemeSeeds, generateRoles } from '@/components/ui/theme';
-import { uiRoles } from '@/components/ui/tokens';
 
-// The navigators and the status bar take this launch's roles and mode, so what
+// The navigators and the status bar take the roles and mode the app is drawn in, so what
 // no screen paints — the ground behind a push, a default header, the clock —
 // never falls back to React Navigation's or the OS's own light look.
 
@@ -22,10 +21,6 @@ describe('navigationTheme', () => {
       notification: roles.danger,
     });
     expect(theme.fonts).toEqual((mode === 'dark' ? DarkTheme : DefaultTheme).fonts);
-  });
-
-  it('is built once, from this launch (light in tests)', () => {
-    expect(NAVIGATION_THEME).toEqual(navigationTheme(uiRoles, 'light'));
   });
 });
 

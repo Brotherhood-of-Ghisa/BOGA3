@@ -2,7 +2,7 @@
 import * as mockReact from 'react';
 import { AccessibilityInfo, Alert, Modal } from 'react-native';
 import * as Native from 'react-native';
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, renderHook, screen, waitFor, within } from '@testing-library/react-native';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 import { cowResult, cowSummary, previousCowSummary } from './helpers/cow-fixtures';
 import { competitionExercise, competitionGroupDetail } from './helpers/competition-fixtures';
@@ -31,6 +31,8 @@ import { GroupApiError } from '@/src/groups/api';
 import type { CoWDefinitionWire, CoWResultWire } from '@/src/groups/cow-wire';
 import { createCoWId } from '@/src/groups/cow-draft';
 import { ChoiceRow } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { AppThemeProvider } from '@/components/ui/theme-context';
 import { CoWPreview } from '@/components/groups/cow-preview';
 import { CoWGroupPreview } from '@/components/groups/cow-group-preview';
 import { TodayCoWSummaries } from '@/components/today/group-cow-summary';
@@ -40,13 +42,16 @@ import CoWScheduleRoute from '@/app/group/[groupId]/cows/schedule';
 import GroupRoute from '@/app/group/[groupId]';
 import EditGroupRoute from '@/app/group/[groupId]/edit';
 import { waitForGone } from './helpers/wait-for-gone';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
-import { renderWithTheme, rolesFor } from './helpers/theme';
-
-const themeRoles = rolesFor(DEFAULT_APPEARANCE);
+import { renderWithTheme } from './helpers/theme';
 
 const api = groupApi as jest.Mocked<typeof groupApi>;
+// The live text roles, read once before any render under test: `renderHook`
+// would otherwise take over `screen`.
+let uiText!: ReturnType<typeof useUiText>;
+let uiTextTone!: ReturnType<typeof useUiTextTone>;
+beforeAll(() => {
+  ({ text: uiText, tone: uiTextTone } = renderHook(() => ({ text: useUiText(), tone: useUiTextTone() }), { wrapper: AppThemeProvider }).result.current);
+});
 const NOW = new Date(2026, 9, 30, 12);
 const current = (): CoWResultWire => {
   const result = cowResult();

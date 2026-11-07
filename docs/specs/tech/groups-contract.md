@@ -81,7 +81,7 @@ position (live `started_at`) and visibility are read live. Membership items
 commit with the period change (not isolated) at a fixed position: a writer that
 edits `joined_at` or reopens a period must move the item.
 `group_events_backfill()` inserts missing session/membership items.
-CoW lifecycle uses a dedicated Stream family ([[groups.cow-stream]]); load
+CoW lifecycle uses a dedicated Stream family; load
 [group-cow-contract.md](group-cow-contract.md) when changing its capture/readers.
 
 **Group exercises & shared library.** A comparison identity that members link

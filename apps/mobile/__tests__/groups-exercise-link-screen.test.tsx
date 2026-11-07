@@ -72,9 +72,10 @@ import * as groupsApi from '@/src/groups/api';
 import ExerciseLinkRoute from '../app/exercise-link';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
-const themeRoles = rolesFor(DEFAULT_APPEARANCE);
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
@@ -403,7 +404,7 @@ describe('Link screen', () => {
       fontFamily: uiFonts.display.family,
       fontSize: uiTypography.size.xxs,
       textTransform: 'uppercase',
-      color: themeRoles.inkMuted,
+      color: roles.inkMuted,
     });
     expect(styleOf(screen.getByText('Iron Brotherhood'))).toMatchObject({
       fontFamily: uiFonts.display.family,
@@ -414,7 +415,7 @@ describe('Link screen', () => {
     const name = suggested.getAllByText(/^Bench Press/)[0];
     expect(styleOf(name)).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
     const group = suggested.getAllByText(/Iron Brotherhood/).at(-1)!;
-    expect(styleOf(group)).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', color: themeRoles.inkMuted });
+    expect(styleOf(group)).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', color: roles.inkMuted });
 
     await act(async () => {
       fireEvent.press(screen.getByTestId('exercise-link-link-gx-bench'));
@@ -423,7 +424,7 @@ describe('Link screen', () => {
       fontFamily: uiFonts.body.family,
       fontWeight: '400',
       fontSize: uiTypography.size.base,
-      color: themeRoles.inkMuted,
+      color: roles.inkMuted,
     });
   });
 });

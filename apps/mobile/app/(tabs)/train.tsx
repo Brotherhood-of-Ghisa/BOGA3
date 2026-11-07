@@ -13,8 +13,7 @@ import {
   ScreenScroll,
   StatePanel,
   uiSpace,
-  uiText,
-  uiTextTone,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import {
   DEFAULT_SESSION_ENTRY_COORDINATOR,
@@ -129,6 +128,8 @@ export function TrainScreen({
   sessionEntry = DEFAULT_SESSION_ENTRY_COORDINATOR,
   renderWorkout = renderSessionView,
 }: TrainScreenProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const insets = useSafeAreaInsets();
   const launchInFlightRef = useRef(false);
   const [launchError, setLaunchError] = useState<{
@@ -206,7 +207,7 @@ export function TrainScreen({
             testID="train-start-empty-button"
           />
           {launchError?.kind === 'empty' ? (
-            <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.bodyStrong, uiTextTone.danger, styles.errorText]} testID="train-empty-launch-error">
+            <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger, styles.errorText]} testID="train-empty-launch-error">
               {launchError.message}
             </Text>
           ) : null}
@@ -252,6 +253,8 @@ function TrainPlanning({
   onStart: (materialize: PlannedSessionMaterializer) => void;
   planningState: TrainPlanningState;
 }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   if (planningState.status === 'unavailable' || planningState.status === 'loading') {
     return null;
   }
@@ -288,13 +291,13 @@ function TrainPlanning({
 
   return (
     <View style={styles.planning} testID="train-planning-section">
-      <Text allowFontScaling={false} style={uiText.label}>Planned</Text>
+      <Text allowFontScaling={false} style={text.label}>Planned</Text>
       <Card style={styles.planRow} testID="train-planned-session-card">
         <View style={styles.planCopy}>
-          <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
+          <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong}>
             <FigureText strong>{planningState.title}</FigureText>
           </Text>
-          <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+          <Text allowFontScaling={false} numberOfLines={1} style={text.meta}>
             <FigureText>{planningState.detail}</FigureText>
           </Text>
         </View>
@@ -307,7 +310,7 @@ function TrainPlanning({
         />
       </Card>
       {launchError ? (
-        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.bodyStrong, uiTextTone.danger, styles.errorText]} testID="train-planned-launch-error">
+        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger, styles.errorText]} testID="train-planned-launch-error">
           {launchError}
         </Text>
       ) : null}

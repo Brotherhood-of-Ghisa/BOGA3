@@ -108,9 +108,10 @@ import EditGroupExerciseRoute from '../app/group/[groupId]/exercises/[exerciseId
 import NewGroupExerciseRoute from '../app/group/[groupId]/exercises/new';
 import GroupScreenRoute from '../app/group/[groupId]/index';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
-const themeRoles = rolesFor(DEFAULT_APPEARANCE);
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
@@ -198,7 +199,7 @@ const primaryGrounds = (): string[] =>
     .findAll((node: TestNode) => typeof node.type === 'string')
     .filter((node: TestNode) => {
       const ground = (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor;
-      return ground === themeRoles.accent;
+      return ground === roles.accent;
     })
     .map((node: TestNode) => String(node.props.testID));
 
@@ -1132,7 +1133,7 @@ describe('Design language', () => {
   const accentGrounds = (root: TestNode): string[] =>
     root
       .findAll((node: TestNode) => typeof node.type === 'string')
-      .filter((node: TestNode) => (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === themeRoles.accent)
+      .filter((node: TestNode) => (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === roles.accent)
       .map((node: TestNode) => String(node.props.testID));
 
   it('the Exercises section draws no accent: Add exercise is an outline, Archived a Tag', async () => {
@@ -1140,8 +1141,8 @@ describe('Design language', () => {
     const section = screen.getByTestId('group-screen-exercises');
     expect(accentGrounds(section)).toEqual([]);
     expect(StyleSheet.flatten(screen.getByTestId('group-exercises-add-button').props.style)).toMatchObject({
-      borderColor: themeRoles.rule,
-      backgroundColor: themeRoles.surface,
+      borderColor: roles.rule,
+      backgroundColor: roles.surface,
     });
     expect(screen.getByTestId('group-exercise-archived-ge-old')).toHaveTextContent('Archived');
   });

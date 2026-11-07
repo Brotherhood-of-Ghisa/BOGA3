@@ -18,10 +18,19 @@ jest.mock('@/src/auth/connected-agents', () => ({
   setAgentPlanEditEnabled: (...args: unknown[]) => mockSetAgentPlanEditEnabled(...args),
 }));
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, renderHook, screen, waitFor } from '@testing-library/react-native';
 import { Alert, StyleSheet } from 'react-native';
 
-import { uiFonts, uiRoles, uiText } from '@/components/ui';
+import { uiFonts } from '@/components/ui';
+import { useUiText } from '@/components/ui/text-roles';
+import { AppThemeProvider } from '@/components/ui/theme-context';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
+// The live text roles. Read before the render under test: `renderHook` would
+// otherwise take over `screen`.
+const liveText = () => renderHook(() => useUiText(), { wrapper: AppThemeProvider }).result.current;
 
 import ConnectedAgentsScreen from '../app/connected-agents';
 
@@ -47,7 +56,7 @@ describe('Connected agents screen', () => {
   });
 
   it('shows agent name, read-only access, grant time, and last access', async () => {
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
 
     expect(await screen.findByTestId('connected-agent-client-a')).toBeTruthy();
     expect(screen.getByText('Coach Agent')).toBeTruthy();
@@ -59,7 +68,8 @@ describe('Connected agents screen', () => {
 
   it('takes every text from the shared roles, with the dates in words and figures', async () => {
     mockListConnectedAgents.mockResolvedValue([{ ...agent, lastAccessAt: null, planAccessEnabled: 'unavailable' }]);
-    render(<ConnectedAgentsScreen />);
+    const uiText = liveText();
+    renderWithTheme(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
     const role = (name: keyof typeof uiText) => StyleSheet.flatten(uiText[name]);
@@ -70,20 +80,20 @@ describe('Connected agents screen', () => {
 
     // A date's words stay in the line's face; only its digits take Plex Mono.
     const granted = screen.getByTestId('connected-agent-granted-client-a');
-    expect(granted).toHaveStyle({ ...role('meta'), color: uiRoles.ink });
+    expect(granted).toHaveStyle({ ...role('meta'), color: roles.ink });
     const digits = granted.findAll((node) => String(node.type) === 'Text' && node !== granted && /^\d/.test(String(node.props.children)));
     expect(digits.length).toBeGreaterThan(0);
     for (const digit of digits) expect(digit).toHaveStyle({ fontFamily: uiFonts.figure.family });
     const never = screen.getByTestId('connected-agent-last-access-client-a');
     expect(never).toHaveTextContent('Never');
-    expect(never).toHaveStyle({ ...role('meta'), color: uiRoles.ink });
+    expect(never).toHaveStyle({ ...role('meta'), color: roles.ink });
 
-    expect(screen.getByTestId('connected-agent-plan-unavailable-client-a')).toHaveStyle({ ...role('meta'), color: uiRoles.danger });
+    expect(screen.getByTestId('connected-agent-plan-unavailable-client-a')).toHaveStyle({ ...role('meta'), color: roles.danger });
     expect(screen.getByTestId('connected-agent-plan-disclosure-client-a')).toHaveStyle(role('meta'));
   });
 
   it('leaves the title to the native header, with no intro under it', async () => {
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
 
     await screen.findByTestId('connected-agent-client-a');
     expect(screen.queryByText('Connected agents')).toBeNull();
@@ -91,7 +101,7 @@ describe('Connected agents screen', () => {
   });
 
   it('confirms and revokes a grant, then removes it from the list', async () => {
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
     fireEvent.press(screen.getByTestId('connected-agent-revoke-client-a'));
@@ -114,7 +124,7 @@ describe('Connected agents screen', () => {
 
   it('shows a retryable inline failure without exposing account data', async () => {
     mockListConnectedAgents.mockRejectedValue(new Error('Connection list unavailable.'));
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
 
     expect(await screen.findByTestId('connected-agents-error')).toBeTruthy();
     expect(screen.getByText('Connection list unavailable.')).toBeTruthy();
@@ -122,7 +132,7 @@ describe('Connected agents screen', () => {
   });
 
   it('shows change access and edit access off by default with the client named in disclosures', async () => {
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
     expect(
@@ -147,7 +157,7 @@ describe('Connected agents screen', () => {
   });
 
   it('enables plan access optimistically and persists it for the live grant', async () => {
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
     await act(async () => {
@@ -167,7 +177,7 @@ describe('Connected agents screen', () => {
   });
 
   it('enables plan edit optimistically and persists it for the live grant', async () => {
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
     await act(async () => {
@@ -190,7 +200,7 @@ describe('Connected agents screen', () => {
     mockSetAgentPlanEditEnabled.mockRejectedValue(
       new Error('Unable to update access for this coach right now.'),
     );
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
     await act(async () => {
@@ -208,7 +218,7 @@ describe('Connected agents screen', () => {
     mockSetAgentPlanPermission.mockRejectedValue(
       new Error('Unable to update access for this coach right now.'),
     );
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
     await act(async () => {
@@ -226,7 +236,7 @@ describe('Connected agents screen', () => {
     mockListConnectedAgents.mockResolvedValue([
       { ...agent, planAccessEnabled: 'unavailable', planEditEnabled: 'unavailable' },
     ]);
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
 
     const switchComponent = screen.getByTestId('connected-agent-plan-access-client-a');
@@ -274,7 +284,7 @@ describe('Connected agents screen', () => {
       return Promise.resolve();
     });
 
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
     await screen.findByTestId('connected-agent-client-b');
 
@@ -352,7 +362,7 @@ describe('Connected agents screen', () => {
       return Promise.resolve();
     });
 
-    render(<ConnectedAgentsScreen />);
+    renderWithTheme(<ConnectedAgentsScreen />);
     await screen.findByTestId('connected-agent-client-a');
     await screen.findByTestId('connected-agent-client-b');
 

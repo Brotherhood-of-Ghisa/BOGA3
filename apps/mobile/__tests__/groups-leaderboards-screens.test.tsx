@@ -93,9 +93,10 @@ import { sortPodiumCards } from '@/components/groups/group-leaderboards-page';
 import GroupBoardRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/index';
 import GroupBoardHistoryRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/history';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
-const themeRoles = rolesFor(DEFAULT_APPEARANCE);
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
@@ -361,8 +362,8 @@ describe('Full board (E1.2)', () => {
     expect(screen.getByTestId('group-board-row-1-mark-uncertified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-2-member')).toHaveTextContent('You');
     // My row sits on paper, the others on the card's surface.
-    expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(themeRoles.paper);
-    expect(groundOf(screen.getByTestId('group-board-row-1'))).toBe(themeRoles.surface);
+    expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(roles.paper);
+    expect(groundOf(screen.getByTestId('group-board-row-1'))).toBe(roles.surface);
     expect(screen.getByTestId('group-board-row-2-mark')).toHaveTextContent('');
     expect(screen.getByTestId('group-board-row-2-mark-certified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-3-member')).toHaveTextContent('Alex (former)');

@@ -8,8 +8,7 @@ appId: com.dinoderek.mobile
 #      and Tibialis off) from full stack pages, and Progress, already mounted, shows the user's
 #      muscles on return: Chest and Back; no Serratus, Lats, Upper back or
 #      Calves row; Chest, now one muscle, loses its family header
-#      ([[muscle.no-breakdown]], [[muscle.untracked]],
-#      [[muscle.family-sections]]);
+#      ([[muscle.no-breakdown]], [[muscle.untracked]]);
 #   2. the completed session's muscle breakdown reports the same muscles;
 #   3. the catalogue's keyboard search matches muscle names only ("lats" finds
 #      nothing, "back pulldown" finds Lat Pulldown), and its editor shows Back
@@ -52,6 +51,7 @@ appId: com.dinoderek.mobile
 
 # --- Setup: the List view; the catalogue's rows are Detailed after the reset ---
 - openLink: "boga3://settings-progress"
+- runFlow: ../scripts/dismiss-notification-permission.yaml
 - scrollUntilVisible:
     element:
       id: "settings-muscle-view-list"

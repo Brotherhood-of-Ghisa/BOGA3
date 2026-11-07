@@ -168,6 +168,11 @@ the scripts' names:
    `EXDevMenuIsOnboardingFinished=true` via the
    `apps/mobile/plugins/with-android-dev-menu-preferences.js` config plugin.
    Best-effort on both — a failed grant is logged, not fatal.
+   iOS cannot pre-grant notifications (`simctl privacy` has no such service), so
+   the rest timer's first-use notification dialog is answered by the flows: a
+   flow calls `.maestro/scripts/dismiss-notification-permission.yaml` after its
+   first link, and `await-notification-permission.yaml` right after a step that
+   starts the rest timer.
 5. **iOS password AutoFill preflight.** Auth/profile, sync and groups lanes
    require AutoFill off. After resolving and persisting the actual simulator
    UDID, provision invokes `maestro-ios-autofill.js` before app install/launch.

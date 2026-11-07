@@ -20,9 +20,10 @@ import { WeekFigure } from '@/components/today/week-figures';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { PickerGroupRow } from '@/src/groups';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
-const themeRoles = rolesFor(DEFAULT_APPEARANCE);
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const style = (node: { props: { style?: unknown } }): TextStyle => StyleSheet.flatten(node.props.style as never) as TextStyle;
 
@@ -64,7 +65,7 @@ describe('Groups: names and titles', () => {
     const name = screen.getByText(/^Bench Press/);
     expect(style(name)).toMatchObject(BODY_STRONG);
     // The nested group name resets the weight its parent would hand down.
-    expect(style(within(name).getByText(/Garage Gym/))).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', color: themeRoles.inkMuted });
+    expect(style(within(name).getByText(/Garage Gym/))).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', color: roles.inkMuted });
     expect(style(screen.getByText('not linked'))).toMatchObject(META);
   });
 
@@ -86,7 +87,7 @@ describe('Groups: names and titles', () => {
         value="a"
       />,
     );
-    expect(style(screen.getByText('Stream'))).toMatchObject({ ...LABEL, color: themeRoles.ink });
+    expect(style(screen.getByText('Stream'))).toMatchObject({ ...LABEL, color: roles.ink });
   });
 
   it('draws the rank chart\'s initials in Archivo, not Plex Mono: they are letters', () => {
@@ -123,7 +124,7 @@ describe('Groups: names and titles', () => {
     );
     const fills = view.UNSAFE_getAllByType(SvgText).map((node) => node.props.fill);
     // Per line, per period: Dino's then Marco's; period 1 is selected.
-    expect(fills).toEqual([themeRoles.inkMuted, themeRoles.onInk, themeRoles.inkMuted, themeRoles.ink]);
+    expect(fills).toEqual([roles.inkMuted, roles.onInk, roles.inkMuted, roles.ink]);
   });
 });
 
@@ -152,8 +153,8 @@ describe('Sessions and week figures: words out of Plex Mono', () => {
     const sets = screen.getByTestId('row-sets');
     expect(style(sets)).toMatchObject(META);
     expect(style(within(sets).getByText('12'))).toMatchObject({ fontFamily: uiFonts.figure.family });
-    expect(style(screen.getByTestId('row-start'))).toMatchObject({ fontFamily: uiFonts.figure.family, fontSize: uiTypography.size.sm, color: themeRoles.ink });
-    expect(style(screen.getByTestId('row-gym'))).toMatchObject({ ...META, fontWeight: '600', color: themeRoles.ink });
+    expect(style(screen.getByTestId('row-start'))).toMatchObject({ fontFamily: uiFonts.figure.family, fontSize: uiTypography.size.sm, color: roles.ink });
+    expect(style(screen.getByTestId('row-gym'))).toMatchObject({ ...META, fontWeight: '600', color: roles.ink });
   });
 
   it('reads a history row\'s `sets · exercises` line as words, its figures in Plex Mono', () => {

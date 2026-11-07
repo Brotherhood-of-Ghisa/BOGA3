@@ -1,5 +1,4 @@
-import { uiText } from '@/components/ui/text-roles';
-import { uiSpace } from '@/components/ui/tokens';
+import { uiSpace, uiTypography } from '@/components/ui/tokens';
 
 // Original BoGa outlines, drawn for this chart on a 32 × 16 grid.
 // Unbranded vector geometry; no third-party artwork or font dependency.
@@ -31,19 +30,19 @@ export const TONNAGE_REFERENCES = [
 type Reference = typeof TONNAGE_REFERENCES[number];
 export const REFERENCE_STROKE = 0.75;
 export const REFERENCE_ICON_WIDTH = uiSpace.xxl;
-export const REFERENCE_HEIGHT = uiText.figureSmall.lineHeight;
+export const REFERENCE_HEIGHT = uiTypography.lineHeight.sm; // `figureSmall`'s line
 export const REFERENCE_GAP = uiSpace.xs;
 
 export const finiteMaximum = (values: readonly (number | null)[]): number =>
   values.reduce<number>((maximum, value) => value !== null && Number.isFinite(value) ? Math.max(maximum, value) : maximum, 0);
 
-/** Eligibility before fitting: [[comparison.tonnage-references]]. */
+/** Only the selected values determine eligibility, before any layout fitting. */
 export const eligibleTonnageReferences = (values: readonly (number | null)[]): readonly Reference[] => {
   const reach = finiteMaximum(values);
   return TONNAGE_REFERENCES.filter(reference => reference.value <= reach).slice(-6);
 };
 
-/** Fit just the missing points above the annotation: [[comparison.tonnage-references]]. */
+/** Add only the clearance needed above the highest annotation. */
 export const fitTonnageMaximum = (
   baseMaximum: number, references: readonly Reference[], plot: { top: number; bottom: number },
 ): number => {
@@ -69,7 +68,7 @@ export const layoutTonnageReferences = (
   for (const reference of references) {
     const y = plot.top + (1 - reference.value / maximum) * (plot.bottom - plot.top);
     // Plex Mono's glyph advance is 600/1000 em, including ≈ and spaces.
-    const width = REFERENCE_ICON_WIDTH + REFERENCE_GAP + reference.label.length * uiText.figureSmall.fontSize * 0.6;
+    const width = REFERENCE_ICON_WIDTH + REFERENCE_GAP + reference.label.length * uiTypography.size.sm * 0.6;
     const naturalTop = Math.max(uiSpace.xs, y - REFERENCE_GAP - REFERENCE_STROKE / 2 - REFERENCE_HEIGHT);
     const tops = [naturalTop, ...placed.map(other => other.top - REFERENCE_HEIGHT - uiSpace.xs)]
       .filter(top => top >= uiSpace.xs && top <= naturalTop);

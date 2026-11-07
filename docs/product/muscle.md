@@ -98,11 +98,3 @@ figures (sets, Volume, records, 1RM) do not change. No line reports the dropped 
 
 Why: the user chose not to follow that muscle.
 Code: `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`.
-
-### muscle.family-sections · presentation · accepted
-
-In any list of muscles a family header shows only above two or more of the user's
-muscles; catalogue and picker cards stay one per family.
-
-Why: a header over one muscle repeats it.
-Code: `apps/mobile/components/stats/progress-tables.tsx`.

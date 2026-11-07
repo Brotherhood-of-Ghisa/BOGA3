@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
+import { useMemo } from 'react';
 
-import { HEADER_STYLE_OPTIONS } from '@/components/navigation/header-style';
+import { useHeaderStyleOptions } from '@/components/navigation/header-style';
 import { useAuth } from '@/src/auth';
 import { useRootRouteAccess } from '@/src/navigation/root-route-access';
 import { isUiGalleryAllowed } from '@/src/utils/isUiGalleryAllowed';
@@ -14,7 +15,6 @@ import { isUiGalleryAllowed } from '@/src/utils/isUiGalleryAllowed';
  */
 const ROOT_STACK_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: 'minimal',
-  ...HEADER_STYLE_OPTIONS,
 } as const;
 
 /**
@@ -41,9 +41,11 @@ export const completedSessionOptions = ({ route }: { route: { params?: object } 
 export function RootStack() {
   const access = useRootRouteAccess();
   const { isConfigured } = useAuth();
+  const headerStyle = useHeaderStyleOptions();
+  const screenOptions = useMemo(() => ({ ...ROOT_STACK_SCREEN_OPTIONS, ...headerStyle }), [headerStyle]);
 
   return (
-    <Stack screenOptions={ROOT_STACK_SCREEN_OPTIONS}>
+    <Stack screenOptions={screenOptions}>
       {/* An unconfigured build still opens sign-in directly to show why it is disabled. */}
       <Stack.Protected guard={access === 'sign-in' || !isConfigured}>
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />

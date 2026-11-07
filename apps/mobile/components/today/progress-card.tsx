@@ -1,9 +1,10 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { Notice } from '@/components/ui/notice';
 import { ActionButton } from '@/components/ui/action-button';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiSpace } from '@/components/ui/tokens';
 import type { TodayProgress } from '@/src/progress-summary';
 import { updatePreferences, useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 
@@ -36,6 +37,7 @@ export function TodayProgressCard({
   onShowCompared,
   onShowSession,
 }: TodayProgressCardProps) {
+  const styles = useStyles();
   const { values: { todayProgressMetric: metric }, error, retry } = useAccountLocalPreferenceState();
   const onToggleMetric = () => updatePreferences({
     todayProgressMetric: metric === 'totalVolume' ? 'workingSetCount' : 'totalVolume',
@@ -63,7 +65,7 @@ export function TodayProgressCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   stack: {
     gap: uiSpace.sm,
   },
@@ -84,6 +86,6 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     marginHorizontal: -uiSpace.md,
-    backgroundColor: uiRoles.ruleSoft,
+    backgroundColor: roles.ruleSoft,
   },
-});
+}));

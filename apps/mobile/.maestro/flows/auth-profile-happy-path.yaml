@@ -50,6 +50,7 @@ appId: com.dinoderek.mobile
 # not tapped. If this dismissal ever stops matching, the sign-in assertion below
 # fails loudly.
 - openLink: "${MAESTRO_DEV_CLIENT_URL}"
+- runFlow: ../scripts/dismiss-notification-permission.yaml
 - extendedWaitUntil:
     visible:
       text: "Continue|You have changed the icon.*"
