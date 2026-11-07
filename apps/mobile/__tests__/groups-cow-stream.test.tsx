@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import { CoWStreamCard } from '@/components/groups/cow-stream-card';
-import { uiText } from '@/components/ui';
+
 import { isCompetitionStreamWire } from '@/src/groups/competition-reader-guards';
 import { isCoWStreamItemWire } from '@/src/groups/cow-stream-wire';
 import { buildCoWStreamCard } from '@/src/groups/cow-stream-view-model';
@@ -11,6 +11,12 @@ import { groupCacheKeys, readGroupCache, writeGroupCache, observeGroupCompetitio
 import { cowStreamItem } from './helpers/cow-fixtures';
 import { competitionSession } from './helpers/competition-fixtures';
 import { createInMemoryDatabase } from './helpers/in-memory-db';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { textRoles } from '@/components/ui/text-roles';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
+const { text: themeText } = textRoles(themeRoles);
 
 const mockPush=jest.fn();
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
@@ -22,14 +28,14 @@ it.each(events)('accepts the closed %s projection and renders one default-visibl
   expect(isCoWStreamItemWire(item)).toBe(true);
   expect(isCompetitionStreamWire(stream(event))).toBe(true);
   expect(buildCompetitionStreamModels([item],undefined,'DD-MM-YYYY')).toEqual([item]);
-  render(<CoWStreamCard item={item} userId="u1" />);
+  renderWithTheme(<CoWStreamCard item={item} userId="u1" />);
   const card=screen.getByTestId(`cow-stream-${item.key}`);
   expect(card).toHaveTextContent('Bench press',{ exact: false });
   expect(card).toHaveTextContent('Europe/London',{ exact: false });
   const model = buildCoWStreamCard(item, 'u1', 'DD-MM-YYYY');
-  expect(screen.getByText(model.label)).toHaveStyle(uiText.label);
-  expect(screen.getByText(model.date)).toHaveStyle({ ...uiText.meta, textAlign: 'right' });
-  expect(screen.getByText(model.week)).toHaveStyle({ ...uiText.meta, textAlign: 'right' });
+  expect(screen.getByText(model.label)).toHaveStyle(themeText.label);
+  expect(screen.getByText(model.date)).toHaveStyle({ ...themeText.meta, textAlign: 'right' });
+  expect(screen.getByText(model.week)).toHaveStyle({ ...themeText.meta, textAlign: 'right' });
   fireEvent.press(card);
   expect(mockPush).toHaveBeenLastCalledWith('/group/g1/cows/cow1');
 });

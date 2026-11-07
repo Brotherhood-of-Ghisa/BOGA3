@@ -2,7 +2,7 @@ import { getCompetitionPodiums } from '@/src/groups/api';
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, View, type RefreshControlProps } from 'react-native';
+import { RefreshControl, ScrollView, View, type RefreshControlProps } from 'react-native';
 
 import {
   GroupGlancePage,
@@ -19,13 +19,13 @@ import {
   GroupsSignInRequired,
   GROUP_SECTIONS,
   GROUP_SECTION_LABELS,
-  groupScreenStyles,
   pickInlineError,
+  useGroupScreenStyles,
   usePullToRefresh,
   type GroupsSection,
 } from '@/components/groups';
 import { GroupCoWsPage } from '@/components/groups/group-cows-page';
-import { Icon, IconButton, ScreenScroll, SwipePages, uiRoles, uiSpace, type SwipePageFrame } from '@/components/ui';
+import { Icon, IconButton, ScreenScroll, SwipePages, makeStyles, uiSpace, type SwipePageFrame } from '@/components/ui';
 import { DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
 import { groupRankSeriesEnd, type GroupHomeMetric } from '@/src/groups/home-periods';
 import { useGroupGlance } from '@/src/groups/use-group-glance';
@@ -56,6 +56,7 @@ const toSection = (value: string | null): GroupsSection | null =>
  * `Manage`. `?groupId=` preselects a group and `?section=` its page.
  */
 export default function GroupsRoute() {
+  const styles = useStyles();
   const { isConfigured, user } = useAuth();
   // The Groups tab: the tab layout's header (the group's name) above, the tab bar below.
   return (
@@ -70,6 +71,8 @@ export default function GroupsRoute() {
 }
 
 function GroupsTabContent({ userId }: { userId: string }) {
+  const styles = useStyles();
+  const groupScreenStyles = useGroupScreenStyles();
   const router = useRouter();
   const params = useLocalSearchParams<{ groupId?: string | string[]; section?: string | string[] }>();
   const requestedGroupId = firstParam(params.groupId);
@@ -303,6 +306,7 @@ function GroupsScrollPage({ frame, refreshControl, testID, children }: {
   testID: string;
   children: ReactNode;
 }) {
+  const styles = useStyles();
   return (
     <ScrollView
       contentContainerStyle={styles.pageContent}
@@ -344,6 +348,7 @@ type GroupsStreamPageProps = {
 
 /** The Stream page: the group's newest-first stream, or why it is empty. */
 function GroupsStreamPage({ stream, inlineError, offline, onRefresh, onOpenSession, ...list }: GroupsStreamPageProps) {
+  const styles = useStyles();
   let emptyState = (
     <GroupStateView
       body="Sessions and records your group members log, and people joining or leaving, show up here."
@@ -374,10 +379,10 @@ function GroupsStreamPage({ stream, inlineError, offline, onRefresh, onOpenSessi
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   page: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   // A page sits between the pager's gutters: no side padding of its own.
   pageContent: {
@@ -391,4 +396,4 @@ const styles = StyleSheet.create({
     paddingTop: uiSpace.sm,
     gap: uiSpace.sm,
   },
-});
+}));

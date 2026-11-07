@@ -1,11 +1,11 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { FigureText, ListRow, uiRoles, uiSpace, uiText, uiTextEmphasis } from '@/components/ui';
+import { FigureText, ListRow, makeStyles, uiSpace, uiTextEmphasis, useTextRoles } from '@/components/ui';
 import { UNCERTIFIED_MARK_LABEL, type BoardRowViewModel } from '@/src/groups';
 
 import { GroupCertificationStatus } from './certification-status';
-import { scoreStyle } from './score-style';
-import { cardListItemStyles } from './screen-styles';
+import { useScoreStyle } from './score-style';
+import { useCardListItemStyles } from './screen-styles';
 
 type GroupBoardRowProps = {
   row: BoardRowViewModel;
@@ -23,6 +23,10 @@ type GroupBoardRowProps = {
  * The whole row opens the row detail sheet (E2).
  */
 export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps) {
+  const styles = useStyles();
+  const { text } = useTextRoles();
+  const scoreStyle = useScoreStyle();
+  const cardListItemStyles = useCardListItemStyles();
   const testID = `group-board-row-${row.rank}`;
   return (
     <View style={[cardListItemStyles(index, count), row.isMe ? styles.mine : null]}>
@@ -32,7 +36,7 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
         density="list"
         divider={index > 0}
         leading={
-          <Text allowFontScaling={false} style={[uiText.figureLarge, styles.rank]}>
+          <Text allowFontScaling={false} style={[text.figureLarge, styles.rank]}>
             {row.rankLabel}
           </Text>
         }
@@ -42,7 +46,7 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
               {row.valueLabel}
             </Text>
             <View style={styles.dateLine}>
-              <Text allowFontScaling={false} style={uiText.figureSmall} testID={`${testID}-date`}>
+              <Text allowFontScaling={false} style={text.figureSmall} testID={`${testID}-date`}>
                 {row.dateLabel}
               </Text>
               {row.certification ? (
@@ -64,12 +68,12 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
           <Text
             allowFontScaling={false}
             numberOfLines={1}
-            style={[uiText.body, row.isMe ? uiTextEmphasis.strong : null]}
+            style={[text.body, row.isMe ? uiTextEmphasis.strong : null]}
             testID={`${testID}-member`}>
             {row.memberLabel}
           </Text>
           {row.detailLabel ? (
-            <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-detail`}>
+            <Text allowFontScaling={false} style={text.meta} testID={`${testID}-detail`}>
               <FigureText>{row.detailLabel}</FigureText>
             </Text>
           ) : null}
@@ -79,9 +83,9 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   mine: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   rank: {
     minWidth: 24,
@@ -98,4 +102,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiSpace.sm,
   },
-});
+}));

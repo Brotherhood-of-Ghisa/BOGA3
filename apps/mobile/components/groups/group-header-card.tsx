@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Card, FigureText, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { Card, FigureText, uiSpace, useTextRoles } from '@/components/ui';
 
 type GroupHeaderCardProps = {
   name: string;
@@ -21,19 +21,20 @@ type GroupHeaderCardProps = {
  * any rows.
  */
 export function GroupHeaderCard({ name, description, meta, nameTestID, metaTestID, testID, children }: GroupHeaderCardProps) {
+  const { text, tone } = useTextRoles();
   return (
     <Card testID={testID}>
       <View style={styles.words}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title} testID={nameTestID}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={text.title} testID={nameTestID}>
           {name}
         </Text>
         {description ? (
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
+          <Text allowFontScaling={false} style={[text.body, tone.muted]}>
             {description}
           </Text>
         ) : null}
         {meta ? (
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID={metaTestID}>
+          <Text allowFontScaling={false} style={[text.body, tone.muted]} testID={metaTestID}>
             <FigureText>{meta}</FigureText>
           </Text>
         ) : null}

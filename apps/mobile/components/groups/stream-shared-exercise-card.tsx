@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import {
   useOpenExerciseEditor,
@@ -10,8 +10,8 @@ import {
   Card,
   Notice,
   Tag,
+  makeStyles,
   uiFonts,
-  uiRoles,
   uiSpace,
   uiTypography,
 } from '@/components/ui';
@@ -135,6 +135,7 @@ function StreamSharedExerciseCardActions({
 }
 
 export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded }: Props) {
+  const styles = useStyles();
   const dateFormat = useDateFormat();
   const catalog = useExerciseCatalog();
   const links = useMyGroupExerciseLinks(item.group_id);
@@ -343,12 +344,12 @@ export function StreamSharedExerciseCard({ item, userId, showGroupName, onAdded 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   card: { padding: uiSpace.md, gap: uiSpace.xs },
-  label: { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.sm, color: uiRoles.record },
-  exerciseName: { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.lg, color: uiRoles.ink },
+  label: { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.sm, color: roles.record },
+  exerciseName: { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.lg, color: roles.ink },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: uiSpace.xs, marginTop: uiSpace.xs },
   musclePillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: uiSpace.xs, marginTop: uiSpace.xs },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: uiSpace.sm, marginTop: uiSpace.xs },
-  muted: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: uiRoles.inkMuted },
-});
+  muted: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: roles.inkMuted },
+}));

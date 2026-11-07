@@ -2,7 +2,7 @@
 import * as mockReact from 'react';
 import { AccessibilityInfo, Alert, Modal } from 'react-native';
 import * as Native from 'react-native';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
 import { cowResult, cowSummary, previousCowSummary } from './helpers/cow-fixtures';
 import { competitionExercise, competitionGroupDetail } from './helpers/competition-fixtures';
@@ -30,7 +30,7 @@ import * as groupApi from '@/src/groups/api';
 import { GroupApiError } from '@/src/groups/api';
 import type { CoWDefinitionWire, CoWResultWire } from '@/src/groups/cow-wire';
 import { createCoWId } from '@/src/groups/cow-draft';
-import { ChoiceRow, uiText, uiTextTone } from '@/components/ui';
+import { ChoiceRow } from '@/components/ui';
 import { CoWPreview } from '@/components/groups/cow-preview';
 import { CoWGroupPreview } from '@/components/groups/cow-group-preview';
 import { TodayCoWSummaries } from '@/components/today/group-cow-summary';
@@ -40,6 +40,12 @@ import CoWScheduleRoute from '@/app/group/[groupId]/cows/schedule';
 import GroupRoute from '@/app/group/[groupId]';
 import EditGroupRoute from '@/app/group/[groupId]/edit';
 import { waitForGone } from './helpers/wait-for-gone';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { textRoles } from '@/components/ui/text-roles';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
+const { text: themeText, tone: themeTone } = textRoles(themeRoles);
 
 const api = groupApi as jest.Mocked<typeof groupApi>;
 const NOW = new Date(2026, 9, 30, 12);
@@ -94,7 +100,7 @@ async function chooseBench() {
   fireEvent.press(await screen.findByTestId('cow-picker-ge2'));
 }
 async function prepareCreate() {
-  render(<CoWScheduleRoute />); await chooseBench();
+  renderWithTheme(<CoWScheduleRoute />); await chooseBench();
   fireEvent.press(screen.getByTestId('cow-form-metric-e1rm'));
   fireEvent.press(screen.getByTestId('cow-form-metric-volume'));
   await waitFor(() => expect(screen.getByTestId('cow-form-submit')).toBeEnabled());
@@ -102,7 +108,7 @@ async function prepareCreate() {
 
 it('uses existing units, independent top-three metrics and exact identity on navigation', () => {
   const onOpen = jest.fn(); const onBrowse = jest.fn();
-  render(<CoWPreview result={current()} userId="u1" dateFormat="DD-MM-YYYY" onOpen={onOpen} onBrowse={onBrowse} testID="preview" />);
+  renderWithTheme(<CoWPreview result={current()} userId="u1" dateFormat="DD-MM-YYYY" onOpen={onOpen} onBrowse={onBrowse} testID="preview" />);
   expect(screen.getByTestId('preview-open').props.accessibilityLabel).toContain('26-10-2026');
   expect(screen.getByTestId('preview-open').props.accessibilityLabel).toContain('Live');
   expect(screen.getByText('1RM %BW')).toBeTruthy(); expect(screen.getByText('You')).toBeTruthy(); expect(screen.getByText('Jules (former)')).toBeTruthy();
@@ -114,31 +120,31 @@ it('uses existing units, independent top-three metrics and exact identity on nav
 });
 it('shows only enabled metrics and never substitutes the viewer into a short podium', () => {
   const result = current(); result.cow.metrics = ['volume']; result.rankings = [result.rankings[1]];
-  render(<CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" onOpen={jest.fn()} testID="preview" />);
+  renderWithTheme(<CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" onOpen={jest.fn()} testID="preview" />);
   expect(screen.queryByTestId('preview-metric-e1rm')).toBeNull(); expect(screen.queryByText('You')).toBeNull(); expect(screen.getByText('Jules')).toBeTruthy();
 });
 it.each([false, true])('uses the same compact card typography and right-aligned dates for a preview (past: %s)', previous => {
   const result = previous ? previousCowSummary().result! : current();
-  render(<CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" previous={previous} onOpen={jest.fn()} testID="preview" />);
+  renderWithTheme(<CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" previous={previous} onOpen={jest.fn()} testID="preview" />);
   const title = screen.getByText('CoW');
   const date = screen.getByLabelText(previous ? '19-10-2026 – 25-10-2026' : '26-10-2026 – 01-11-2026');
-  expect(title).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
-  expect(date).toHaveStyle({ ...uiText.meta, textAlign: 'right', marginLeft: 'auto' });
-  expect(screen.getByText('Pull-up')).toHaveStyle(uiText.bodyStrong);
-  expect(screen.getByText(previous ? 'Last week · Final' : 'Live')).toHaveStyle(uiText.meta);
+  expect(title).toHaveStyle({ ...themeText.label, ...themeTone.ink });
+  expect(date).toHaveStyle({ ...themeText.meta, textAlign: 'right', marginLeft: 'auto' });
+  expect(screen.getByText('Pull-up')).toHaveStyle(themeText.bodyStrong);
+  expect(screen.getByText(previous ? 'Last week · Final' : 'Live')).toHaveStyle(themeText.meta);
 });
 it.each(['pending','unavailable','empty'] as const)('keeps current %s distinct from absence', async state => {
   const value = summary();
   value.result.rankings.forEach(row => { row.entries = []; });
   if (state !== 'empty') { value.result.state = state; if (state === 'pending') value.result.publication_id = null; }
   api.getCoWSummary.mockResolvedValue(value);
-  render(<CoWGroupPreview groupId="g1" userId="u1" today />);
+  renderWithTheme(<CoWGroupPreview groupId="g1" userId="u1" today />);
   expect(await screen.findByTestId('today-cow')).toBeTruthy(); expect(screen.getByText('Pull-up')).toBeTruthy();
   expect(screen.getAllByText(state === 'pending' ? 'Updating' : state === 'unavailable' ? 'Group comparisons unavailable' : 'No qualifying results').length).toBeGreaterThan(0);
 });
 it.each([true, false])('hides confirmed absence without a gap (today: %s)', async today => {
   api.getCoWSummary.mockResolvedValue({ ...summary(), selection: 'none', result: null });
-  const view = render(<CoWGroupPreview groupId="g1" userId="u1" today={today} />);
+  const view = renderWithTheme(<CoWGroupPreview groupId="g1" userId="u1" today={today} />);
   await waitForGone(() => screen.queryByTestId(`${today ? 'today' : 'group'}-cow-section`));
   expect(view.toJSON()).toBeNull();
 });
@@ -146,20 +152,20 @@ it('labels a stored fallback with its own date and preserves selected metric/gro
   const value = summary(); value.selection = 'previous_final' as typeof value.selection;
   value.result.cow = past(); value.result.publication_id = 'stored';
   api.getCoWSummary.mockResolvedValue(value);
-  render(<CoWGroupPreview groupId="g1" userId="u1" today />);
+  renderWithTheme(<CoWGroupPreview groupId="g1" userId="u1" today />);
   expect(await screen.findByText('Last week · Final')).toBeTruthy(); expect(screen.getByText('19 – 25 Oct 26')).toBeTruthy();
   fireEvent.press(screen.getByTestId('today-cow-metric-volume')); fireEvent.press(screen.getByTestId('today-cow-open'));
   expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows?cowId=past&metric=volume');
 });
 it('shows retry on failed reads and offline state without declaring absence', async () => {
   api.getCoWSummary.mockRejectedValue(new GroupApiError('INTERNAL', 'failed'));
-  render(<CoWGroupPreview groupId="g1" userId="u1" today />);
+  renderWithTheme(<CoWGroupPreview groupId="g1" userId="u1" today />);
   expect(await screen.findByTestId('today-cow-error-state')).toBeTruthy();
   expect(screen.getByText('Please try again.')).toBeTruthy(); expect(screen.queryByText('failed')).toBeNull();
   expect(screen.queryByText('No CoW this week')).toBeNull();
 });
 it('opens the group preview without a View CoWs row or scheduling controls', async () => {
-  render(<GroupRoute />);
+  renderWithTheme(<GroupRoute />);
   expect(await screen.findByTestId('group-cow-open')).toBeTruthy(); expect(screen.queryByTestId('cows-schedule')).toBeNull();
   expect(screen.queryByText('View CoWs')).toBeNull();
   fireEvent.press(await screen.findByTestId('group-cow-metric-improvement')); fireEvent.press(screen.getByTestId('group-cow-open'));
@@ -167,7 +173,7 @@ it('opens the group preview without a View CoWs row or scheduling controls', asy
 });
 it('keeps group summary failures retryable without a View CoWs row', async () => {
   api.getCoWSummary.mockRejectedValue(new GroupApiError('INTERNAL', 'failed'));
-  render(<GroupRoute />);
+  renderWithTheme(<GroupRoute />);
   expect(await screen.findByTestId('group-cow-error-state')).toBeTruthy();
   expect(screen.queryByText('View CoWs')).toBeNull();
   api.getCoWSummary.mockResolvedValue(summary());
@@ -176,12 +182,12 @@ it('keeps group summary failures retryable without a View CoWs row', async () =>
 });
 it('browses current, next and past with archived names retained, and management only for admins', async () => {
   api.listCoWs.mockResolvedValue({ cows: [scheduled(), current().cow, { ...past(), group_exercise_id: 'old' }], next_cursor: null });
-  render(<CoWsRoute />);
+  renderWithTheme(<CoWsRoute />);
   expect(await screen.findByTestId('cows-preview')).toBeTruthy(); expect(await screen.findByTestId('cows-next')).toBeTruthy();
   expect(screen.getByText('Archived squat')).toBeTruthy();
-  expect(screen.getByText('Archived squat')).toHaveStyle(uiText.bodyStrong);
-  expect(within(screen.getByTestId('cows-past-past')).getByText('Final')).toHaveStyle(uiText.meta);
-  expect(within(screen.getByTestId('cows-next')).getByText('Pull-up')).toHaveStyle(uiText.bodyStrong);
+  expect(screen.getByText('Archived squat')).toHaveStyle(themeText.bodyStrong);
+  expect(within(screen.getByTestId('cows-past-past')).getByText('Final')).toHaveStyle(themeText.meta);
+  expect(within(screen.getByTestId('cows-next')).getByText('Pull-up')).toHaveStyle(themeText.bodyStrong);
   fireEvent.press(screen.getByTestId('cows-past-past'));
   expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows/past?metric=e1rm');
   fireEvent.press(screen.getByTestId('cows-schedule')); expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows/schedule?cowId=next');
@@ -189,32 +195,32 @@ it('browses current, next and past with archived names retained, and management 
 });
 it('members browse without management controls', async () => {
   api.getGroup.mockResolvedValue({ ...competitionGroupDetail, group: { ...competitionGroupDetail.group, my_role: 'member' } });
-  render(<CoWsRoute />); await screen.findByTestId('cows-preview');
+  renderWithTheme(<CoWsRoute />); await screen.findByTestId('cows-preview');
   expect(screen.queryByTestId('cows-schedule')).toBeNull();
 });
 it('does not turn a failed list into an empty next/history section', async () => {
   api.listCoWs.mockRejectedValue(new GroupApiError('INTERNAL', 'failed list'));
-  render(<CoWsRoute />); await screen.findByTestId('cows-preview');
+  renderWithTheme(<CoWsRoute />); await screen.findByTestId('cows-preview');
   expect(await screen.findByTestId('cows-list-error-state')).toBeTruthy(); expect(screen.queryByText('Nothing scheduled')).toBeNull(); expect(screen.queryByText('No past CoWs')).toBeNull();
 });
 it('uses online full pages and generic unranked rows without inventing a baseline reason', async () => {
   mockParams = { groupId: 'g1', cowId: 'cow1', metric: 'improvement' };
   api.getCoWResults.mockImplementation(async (_g, _c, metric) => ({ ...current(), rankings: [{ ...current().rankings.find(row => row.metric === metric)!,
     entries: [{ rank: null, member: { user_id: 'u1', username: 'Me' }, former: false, state: 'unranked', value: null }] }] }));
-  render(<CoWStandingsRoute />);
+  renderWithTheme(<CoWStandingsRoute />);
   expect(await screen.findByText('Not ranked')).toBeTruthy(); expect(screen.queryByText(/No pre-week baseline/)).toBeNull();
   fireEvent.press(screen.getByTestId('cow-standings-metric-volume'));
   await waitFor(() => expect(api.getCoWResults).toHaveBeenLastCalledWith('g1', 'cow1', 'volume', null));
 });
 it('a missing CoW is unavailable rather than a false loss of group membership', async () => {
-  mockParams = { groupId: 'g1', cowId: 'missing' }; render(<CoWStandingsRoute />);
+  mockParams = { groupId: 'g1', cowId: 'missing' }; renderWithTheme(<CoWStandingsRoute />);
   expect(await screen.findByTestId('cow-missing')).toBeTruthy(); expect(screen.queryByTestId('cow-lost-access')).toBeNull();
 });
 it('keeps Upcoming in the heading without an empty status panel or Refresh button', async () => {
   mockParams = { groupId: 'g1', cowId: 'next' };
   api.getCoWResults.mockResolvedValue({ ...current(), cow: scheduled(), state: 'pending', publication_id: null,
     rankings: [{ ...current().rankings[0], entries: [] }] });
-  render(<CoWStandingsRoute />);
+  renderWithTheme(<CoWStandingsRoute />);
   expect(await screen.findByText('Upcoming')).toBeTruthy();
   expect(screen.getAllByText('Upcoming')).toHaveLength(1);
   expect(screen.queryByTestId('cow-standings-state')).toBeNull();
@@ -227,7 +233,7 @@ it.each(['pending', 'unavailable'] as const)('keeps the %s message without a Ref
   mockParams = { groupId: 'g1', cowId: 'cow1' };
   api.getCoWResults.mockResolvedValue({ ...current(), state, publication_id: null,
     rankings: [{ ...current().rankings[0], entries: [] }] });
-  render(<CoWStandingsRoute />);
+  renderWithTheme(<CoWStandingsRoute />);
   expect(await screen.findByTestId('cow-standings-state')).toBeTruthy();
   expect(screen.getAllByText(state === 'pending' ? 'Updating' : 'Group comparisons unavailable').length).toBeGreaterThan(0);
   expect(screen.queryByText('Refresh')).toBeNull();
@@ -238,7 +244,7 @@ it('retains stale standings feedback without a Refresh button', async () => {
     if (before) throw new GroupApiError('CONFLICT', 'publication changed');
     return { ...current(), rankings: [{ ...current().rankings[0], next_cursor: 'next-page' }] };
   });
-  render(<CoWStandingsRoute />);
+  renderWithTheme(<CoWStandingsRoute />);
   fireEvent.press(await screen.findByTestId('cow-standings-more'));
   expect(await screen.findByTestId('cow-standings-stale')).toBeTruthy();
   expect(screen.queryByText('Refresh')).toBeNull();
@@ -250,11 +256,11 @@ it('renders server Finalizing without calling it Final and suppresses unsafe fig
   mockParams = { groupId: 'g1', cowId: 'cow1' };
   api.getCoWResults.mockResolvedValue({ ...current(), cow: { ...current().cow, state: 'finalizing' }, state: 'pending', publication_id: null,
     rankings: [{ ...current().rankings[0], entries: [] }] });
-  render(<CoWStandingsRoute />);
+  renderWithTheme(<CoWStandingsRoute />);
   expect(await screen.findByTestId('cow-standings-state')).toBeTruthy(); expect(screen.queryByText('Final')).toBeNull(); expect(screen.queryByText('150.0')).toBeNull();
 });
 it('validates empty choices near their fields before sending a write', async () => {
-  render(<CoWScheduleRoute />); await screen.findByTestId('cow-form-exercise');
+  renderWithTheme(<CoWScheduleRoute />); await screen.findByTestId('cow-form-exercise');
   await waitFor(() => expect(screen.getByTestId('cow-form-submit')).toBeEnabled());
   fireEvent.press(screen.getByTestId('cow-form-submit'));
   expect(await screen.findByText('Choose an exercise.')).toBeTruthy(); expect(screen.getByText('Choose at least one leaderboard.')).toBeTruthy(); expect(api.createCoW).not.toHaveBeenCalled();
@@ -275,7 +281,7 @@ it('searches only active comparisons and dismissal leaves metric and exercise se
 });
 it('picker distinguishes failed reads, no active choices and empty search', async () => {
   api.listCompetitionExercises.mockResolvedValue({ contract_version: 4, exercises: [archived] });
-  render(<CoWScheduleRoute />); fireEvent.press(await screen.findByTestId('cow-form-exercise'));
+  renderWithTheme(<CoWScheduleRoute />); fireEvent.press(await screen.findByTestId('cow-form-exercise'));
   expect(await screen.findByText('No active group exercises')).toBeTruthy(); expect(screen.queryByText('No matching exercises')).toBeNull();
 });
 it('refuses an offline write visibly without queuing it', async () => {
@@ -307,7 +313,7 @@ it('resolves a competing scheduled slot before permitting another create', async
 });
 it('retains edits through a revision conflict and uses the checked revision only after status review', async () => {
   mockParams.cowId = 'next'; api.updateCoW.mockRejectedValueOnce(new GroupApiError('CONFLICT', 'changed'));
-  render(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-submit'));
+  renderWithTheme(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-submit'));
   await screen.findByTestId('cow-form-check-status'); api.getCoW.mockResolvedValue({ cow: { ...scheduled(), revision: 2 } });
   fireEvent.press(screen.getByTestId('cow-form-check-status')); await screen.findByText('Review your selections before saving again.');
   fireEvent.press(screen.getByTestId('cow-form-submit')); await waitFor(() => expect(mockRouter.back).toHaveBeenCalledTimes(1));
@@ -315,13 +321,13 @@ it('retains edits through a revision conflict and uses the checked revision only
 });
 it('cancels before start through a native destructive confirmation', async () => {
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined); mockParams.cowId = 'next';
-  render(<CoWScheduleRoute />); fireEvent.press(await screen.findByTestId('cow-form-cancel'));
+  renderWithTheme(<CoWScheduleRoute />); fireEvent.press(await screen.findByTestId('cow-form-cancel'));
   expect(api.cancelCoW).not.toHaveBeenCalled();
   await act(async () => alert.mock.calls[0][2]!.find(button => button.style === 'destructive')!.onPress!());
   await waitFor(() => expect(mockRouter.back).toHaveBeenCalledTimes(1)); expect(api.cancelCoW).toHaveBeenCalledWith('g1', 'next', 1); alert.mockRestore();
 });
 it('never shows edit controls after start or after a role loss', async () => {
-  mockParams.cowId = 'cow1'; render(<CoWScheduleRoute />);
+  mockParams.cowId = 'cow1'; renderWithTheme(<CoWScheduleRoute />);
   expect(await screen.findByTestId('cow-form-read-only')).toBeTruthy(); expect(screen.queryByTestId('cow-form-cancel')).toBeNull(); expect(api.updateCoW).not.toHaveBeenCalled();
 });
 it('handles live role loss without discarding the user draft or navigating', async () => {
@@ -331,7 +337,7 @@ it('handles live role loss without discarding the user draft or navigating', asy
 });
 it('blocks unset scheduling without zone setup controls and revalidates on focus', async () => {
   api.getCoWCalendar.mockResolvedValue({ time_zone: null, revision: 1, next_week_start: null });
-  const view = render(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-metric-volume'));
+  const view = renderWithTheme(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-metric-volume'));
   expect(await screen.findByTestId('cow-form-zone-unset')).toBeTruthy();
   expect(screen.getByTestId('cow-form-submit')).toBeDisabled();
   expect(screen.queryByText('Set group time zone')).toBeNull(); expect(mockRouter.push).not.toHaveBeenCalled();
@@ -343,7 +349,7 @@ it('opens compiled time-zone setup while its calendar loads, then saves only aft
   let resolveCalendar!: (value: ReturnType<typeof calendar>) => void;
   api.getCoWCalendar.mockImplementationOnce(() => new Promise(resolve => { resolveCalendar = resolve; }));
   mockParams.focusTimeZone = '1';
-  render(<EditGroupRoute />);
+  renderWithTheme(<EditGroupRoute />);
   expect(await screen.findByTestId('cow-zone-loading')).toBeTruthy();
   expect(api.setCoWCalendar).not.toHaveBeenCalled();
   await act(async () => resolveCalendar({ ...calendar(), revision: 7 }));
@@ -357,7 +363,7 @@ it('opens compiled time-zone setup while its calendar loads, then saves only aft
 });
 it('saves a validated group calendar explicitly from group Edit while retaining invalid text', async () => {
   api.setCoWCalendar.mockRejectedValueOnce(new GroupApiError('VALIDATION', 'invalid zone'));
-  render(<EditGroupRoute />); const input = await screen.findByTestId('cow-zone-input');
+  renderWithTheme(<EditGroupRoute />); const input = await screen.findByTestId('cow-zone-input');
   fireEvent.changeText(input, 'Not/AZone'); fireEvent.press(screen.getByTestId('cow-zone-save'));
   expect(await screen.findByText('Check the time zone and try again.')).toBeTruthy(); expect(screen.getByTestId('cow-zone-input').props.value).toBe('Not/AZone');
   fireEvent.changeText(input, ' Europe/London '); fireEvent.press(screen.getByTestId('cow-zone-save'));
@@ -367,7 +373,7 @@ it('saves a validated group calendar explicitly from group Edit while retaining 
 it('drops a delayed summary from the previous group/account and resets in-card metric selection', async () => {
   let release!: (value: ReturnType<typeof summary>) => void;
   api.getCoWSummary.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
-  const view = render(<CoWGroupPreview groupId="g1" userId="u1" today />);
+  const view = renderWithTheme(<CoWGroupPreview groupId="g1" userId="u1" today />);
   await waitFor(() => expect(api.getCoWSummary).toHaveBeenCalledWith('g1'));
   const next = summary(); next.group_id = 'g2'; next.result.cow = { ...next.result.cow, cow_id: 'cow2', group_id: 'g2' };
   next.result.exercise = { ...next.result.exercise!, name: 'New group exercise' };
@@ -379,7 +385,7 @@ it('drops a delayed summary from the previous group/account and resets in-card m
 });
 it('returns focus to the Exercise field after the native sheet dismissal event', async () => {
   const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
-  render(<CoWScheduleRoute />); fireEvent.press(await screen.findByTestId('cow-form-exercise'));
+  renderWithTheme(<CoWScheduleRoute />); fireEvent.press(await screen.findByTestId('cow-form-exercise'));
   screen.UNSAFE_getByType(ChoiceRow).props.ref.current = { canonical: { nativeTag: 77 } };
   const modal = screen.UNSAFE_getAllByType(Modal).find(node => node.props.testID === 'cow-exercise-picker-modal')!;
   act(() => { modal.props.onRequestClose(); });
@@ -390,14 +396,14 @@ it('returns focus to the Exercise field after the native sheet dismissal event',
 });
 it('keeps a failed exercise read distinct from an empty picker and offers Retry', async () => {
   api.listCompetitionExercises.mockRejectedValue(new GroupApiError('INTERNAL', 'exercise read failed'));
-  render(<CoWScheduleRoute />); fireEvent.press(await screen.findByTestId('cow-form-exercise'));
+  renderWithTheme(<CoWScheduleRoute />); fireEvent.press(await screen.findByTestId('cow-form-exercise'));
   expect(await screen.findByTestId('cow-picker-error-state')).toBeTruthy();
   expect(screen.queryByText('No active group exercises')).toBeNull();
   api.listCompetitionExercises.mockResolvedValue({ contract_version: 4, exercises: [bench] });
   fireEvent.press(screen.getByTestId('cow-picker-error-state-retry')); expect(await screen.findByTestId('cow-picker-ge2')).toBeTruthy();
 });
 it('blocks a previously selected exercise that was archived while the form was away', async () => {
-  const view = render(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-metric-e1rm'));
+  const view = renderWithTheme(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-metric-e1rm'));
   mockFocused = false; view.rerender(<CoWScheduleRoute />);
   api.listCompetitionExercises.mockResolvedValue({ contract_version: 4, exercises: [{ ...bench, archived_at_ms: 1 }] });
   mockFocused = true; view.rerender(<CoWScheduleRoute />);
@@ -408,14 +414,14 @@ it('blocks a previously selected exercise that was archived while the form was a
 it('does not navigate twice if the user leaves while a write is in flight', async () => {
   let finish!: (value: Awaited<ReturnType<typeof groupApi.createCoW>>) => void;
   api.createCoW.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
-  const view = render(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-metric-volume'));
+  const view = renderWithTheme(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-metric-volume'));
   fireEvent.press(screen.getByTestId('cow-form-submit')); await waitFor(() => expect(api.createCoW).toHaveBeenCalled()); view.unmount();
   await act(async () => finish({ cow: scheduled() })); expect(mockRouter.back).not.toHaveBeenCalled();
 });
 it('refreshes list and calendar at group-week rollover so an upcoming row cannot remain in Next week', async () => {
   jest.useFakeTimers().setSystemTime(current().cow.ends_at_us / 1000 - 1000);
   api.getCoWSummary.mockResolvedValue(summary()); api.listCoWs.mockResolvedValue({ cows: [scheduled(), current().cow], next_cursor: null });
-  render(<CoWsRoute />); expect(await screen.findByTestId('cows-next')).toBeTruthy();
+  renderWithTheme(<CoWsRoute />); expect(await screen.findByTestId('cows-next')).toBeTruthy();
   const next = summary(); next.result.cow = { ...scheduled(), state: 'active' }; next.result.exercise = bench;
   next.result.cow.group_exercise_id = bench.group_exercise_id; next.valid_until_us = next.result.cow.ends_at_us;
   api.getCoWSummary.mockResolvedValue(next); api.listCoWs.mockResolvedValue({ cows: [next.result.cow, { ...current().cow, state: 'final' }], next_cursor: null });
@@ -446,13 +452,13 @@ it('refreshes next-week bounds after a stale-calendar rejection while retaining 
 it('keeps the published upcoming zone after the group calendar changes', async () => {
   api.listCoWs.mockResolvedValue({ cows: [{ ...scheduled(), time_zone: 'America/New_York' }], next_cursor: null });
   api.getCoWCalendar.mockResolvedValue({ time_zone: 'Pacific/Auckland', revision: 2, next_week_start: '2026-11-09' });
-  render(<CoWsRoute />); await screen.findByTestId('cows-next');
+  renderWithTheme(<CoWsRoute />); await screen.findByTestId('cows-next');
   expect(screen.getByText('2–8 Nov 2026 · America/New_York')).toBeTruthy();
   expect(screen.queryByText(/Pacific\/Auckland/)).toBeNull();
 });
 
 it('requires date review after returning across a calendar rollover', async () => {
-  const view = render(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-metric-e1rm'));
+  const view = renderWithTheme(<CoWScheduleRoute />); await chooseBench(); fireEvent.press(screen.getByTestId('cow-form-metric-e1rm'));
   mockFocused = false; view.rerender(<CoWScheduleRoute />);
   api.getCoWCalendar.mockResolvedValue({ ...calendar(), next_week_start: '2026-11-09' });
   mockFocused = true; view.rerender(<CoWScheduleRoute />);
@@ -465,7 +471,7 @@ it('requires date review after returning across a calendar rollover', async () =
 });
 it('omits Full standings when the selected preview metric has no rows', () => {
   const result = current(); result.rankings[0].entries = [];
-  render(<CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" onOpen={jest.fn()} onBrowse={jest.fn()} browseLabel="Full standings" testID="preview" />);
+  renderWithTheme(<CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" onOpen={jest.fn()} onBrowse={jest.fn()} browseLabel="Full standings" testID="preview" />);
   expect(screen.queryByText('Full standings')).toBeNull();
   fireEvent.press(screen.getByTestId('preview-metric-volume')); expect(screen.getByText('Full standings')).toBeTruthy();
 });
@@ -473,7 +479,7 @@ it('omits Full standings when the selected preview metric has no rows', () => {
 it('moves accessibility focus to the first invalid field after submit', async () => {
   const handle = jest.spyOn(Native, 'findNodeHandle').mockReturnValue(101);
   const focus = jest.spyOn(AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
-  render(<CoWScheduleRoute />);
+  renderWithTheme(<CoWScheduleRoute />);
   await screen.findByTestId('cow-form-submit');
   screen.UNSAFE_getByType(ChoiceRow).props.ref.current = { canonical: { nativeTag: 101 } };
   fireEvent.press(screen.getByTestId('cow-form-submit'));
@@ -494,7 +500,7 @@ it('checks the original identity after a committed create has a malformed reply'
 });
 
 it('keeps the tallest measured podium when switching to a shorter metric', () => {
-  render(<CoWPreview result={current()} userId="u1" dateFormat="DD-MM-YYYY" onOpen={jest.fn()} testID="preview" />);
+  renderWithTheme(<CoWPreview result={current()} userId="u1" dateFormat="DD-MM-YYYY" onOpen={jest.fn()} testID="preview" />);
   fireEvent(screen.getByTestId('preview-podium-e1rm'), 'layout', { nativeEvent: { layout: { height: 180 } } });
   fireEvent(screen.getByTestId('preview-podium-volume', { includeHiddenElements: true }), 'layout', { nativeEvent: { layout: { height: 70 } } });
   fireEvent.press(screen.getByTestId('preview-metric-volume'));
@@ -505,7 +511,7 @@ it('keeps the tallest measured podium when switching to a shorter metric', () =>
 
 it.each(['owner', 'admin', 'member'] as const)('shows the current calendar to %s with setup only for managers above CoW', async role => {
   api.getGroup.mockResolvedValue({ ...competitionGroupDetail, group: { ...competitionGroupDetail.group, my_role: role } });
-  const view = render(<GroupRoute />);
+  const view = renderWithTheme(<GroupRoute />);
   const zone = await screen.findByTestId('group-screen-time-zone-value');
   expect(zone).toHaveTextContent('UTC'); // The published preview remains Europe/London.
   expect(screen.getByText('Group time zone')).toBeTruthy();
@@ -524,7 +530,7 @@ it.each(['owner', 'admin', 'member'] as const)('shows the current calendar to %s
 it('only declares Not set after a successful calendar read confirms it', async () => {
   let finish!: (value: Awaited<ReturnType<typeof groupApi.getCoWCalendar>>) => void;
   api.getCoWCalendar.mockImplementation(() => new Promise(resolve => { finish = resolve; }));
-  render(<GroupRoute />);
+  renderWithTheme(<GroupRoute />);
   await screen.findByTestId('group-screen-time-zone-loading');
   expect(screen.queryByText('Not set')).toBeNull();
   const unset = { time_zone: null, revision: 1, next_week_start: null };
@@ -534,7 +540,7 @@ it('only declares Not set after a successful calendar read confirms it', async (
 });
 it('offers calendar retry without implying an unset zone after a read failure', async () => {
   api.getCoWCalendar.mockRejectedValue(new GroupApiError('INTERNAL', 'failed'));
-  render(<GroupRoute />);
+  renderWithTheme(<GroupRoute />);
   await screen.findByTestId('group-screen-time-zone-error-state');
   api.getCoWCalendar.mockResolvedValue(calendar());
   fireEvent.press(screen.getByTestId('group-screen-time-zone-error-state-retry'));
@@ -543,12 +549,12 @@ it('offers calendar retry without implying an unset zone after a read failure', 
 });
 it('keeps an unavailable offline calendar distinct from Not set', async () => {
   api.getCoWCalendar.mockRejectedValue(new GroupApiError('NETWORK', 'offline'));
-  render(<GroupRoute />);
+  renderWithTheme(<GroupRoute />);
   expect(await screen.findByTestId('group-screen-time-zone-offline-empty-state')).toBeTruthy();
   expect(screen.queryByText('Not set')).toBeNull();
 });
 it('retains the saved zone beside refresh failure and retry, and during offline use', async () => {
-  const view = render(<GroupRoute />);
+  const view = renderWithTheme(<GroupRoute />);
   await screen.findByTestId('group-screen-time-zone-value');
   mockFocused = false; view.rerender(<GroupRoute />);
   api.getCoWCalendar.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'failed'));
@@ -561,7 +567,7 @@ it('retains the saved zone beside refresh failure and retry, and during offline 
 });
 it('refreshes the current group zone on first and subsequent editor returns', async () => {
   api.getCoWCalendar.mockResolvedValue({ time_zone: null, revision: 1, next_week_start: null });
-  const view = render(<GroupRoute />);
+  const view = renderWithTheme(<GroupRoute />);
   expect(await screen.findByTestId('group-screen-time-zone-value')).toHaveTextContent('Not set');
   for (const [index, time_zone] of ['Europe/London', 'Pacific/Auckland'].entries()) {
     fireEvent.press(screen.getByTestId('group-screen-set-time-zone'));
@@ -574,7 +580,7 @@ it('refreshes the current group zone on first and subsequent editor returns', as
 });
 it('focuses the existing editor and can save consecutive zone changes', async () => {
   mockParams = { groupId: 'g1', focusTimeZone: '1' };
-  render(<EditGroupRoute />);
+  renderWithTheme(<EditGroupRoute />);
   const input = await screen.findByTestId('cow-zone-input');
   expect(input.props.autoFocus).toBe(true);
   for (const [index, time_zone] of ['Europe/London', 'Pacific/Auckland'].entries()) {
@@ -592,13 +598,13 @@ it('focuses the existing editor and can save consecutive zone changes', async ()
 });
 it('hides management and cached content after a calendar read loses membership', async () => {
   api.getCoWCalendar.mockRejectedValue(new GroupApiError('NOT_FOUND', 'Group not found'));
-  render(<GroupRoute />);
+  renderWithTheme(<GroupRoute />);
   expect(await screen.findByTestId('group-screen-lost-access')).toBeTruthy();
   expect(screen.queryByTestId('group-screen-set-time-zone')).toBeNull();
 });
 it('keeps calendar input on conflict, refreshes its revision and saves only online', async () => {
   api.setCoWCalendar.mockRejectedValueOnce(new GroupApiError('CONFLICT', 'changed'));
-  render(<EditGroupRoute />);
+  renderWithTheme(<EditGroupRoute />);
   fireEvent.changeText(await screen.findByTestId('cow-zone-input'), 'Pacific/Auckland');
   api.getCoWCalendar.mockResolvedValue({ ...calendar(), revision: 2 });
   fireEvent.press(screen.getByTestId('cow-zone-save'));
@@ -613,7 +619,7 @@ it('keeps calendar input on conflict, refreshes its revision and saves only onli
   expect(api.setCoWCalendar).toHaveBeenLastCalledWith('g1', 2, 'Pacific/Auckland');
 });
 it.each(['FORBIDDEN', 'NOT_FOUND'] as const)('refreshes editor access after %s without another write', async code => {
-  render(<EditGroupRoute />);
+  renderWithTheme(<EditGroupRoute />);
   fireEvent.changeText(await screen.findByTestId('cow-zone-input'), 'Pacific/Auckland');
   api.setCoWCalendar.mockRejectedValueOnce(new GroupApiError(code, 'access changed'));
   if (code === 'NOT_FOUND') api.getGroup.mockRejectedValue(new GroupApiError(code, 'Group not found'));
@@ -625,7 +631,7 @@ it.each(['FORBIDDEN', 'NOT_FOUND'] as const)('refreshes editor access after %s w
 });
 it('has no calendar setup controls in the CoW browser', async () => {
   api.getCoWCalendar.mockResolvedValue({ time_zone: null, revision: 1, next_week_start: null });
-  render(<CoWsRoute />); await screen.findByTestId('cows-schedule');
+  renderWithTheme(<CoWsRoute />); await screen.findByTestId('cows-schedule');
   expect(screen.queryByText('Set time zone')).toBeNull(); expect(screen.queryByText('Set group time zone')).toBeNull();
 });
 
@@ -636,7 +642,7 @@ it('Today shows the current exercise and every enabled metric, then last week’
   previous.result!.rankings[0].entries[0].member.username = 'Contessa Serbelloni Mazzanti Vien dal Mare';
   previous.result!.rankings[1].entries = [{ ...previous.result!.rankings[0].entries[0], value: 1800 }];
   api.getPreviousCoWSummary.mockResolvedValue(previous);
-  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   await screen.findByText('1RM · Volume · Improvement');
   const currentSection = screen.getByTestId('today-cow-current');
   expect(within(currentSection).getByText('Current CoW')).toBeTruthy();
@@ -655,7 +661,7 @@ it('Today shows the current exercise and every enabled metric, then last week’
 });
 
 it('Today shares uppercase headings, right-aligned date rows and compact text between current and past blocks', async () => {
-  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   await screen.findByText('1RM · Volume · Improvement');
   await screen.findByTestId('today-cow-winner-e1rm');
   for (const [prefix, title, date] of [
@@ -665,11 +671,11 @@ it('Today shares uppercase headings, right-aligned date rows and compact text be
     const section = within(screen.getByTestId(prefix));
     const heading = section.getByText(title);
     const range = section.getByText(date);
-    expect(heading).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
-    expect(range).toHaveStyle({ ...uiText.meta, textAlign: 'right', marginLeft: 'auto' });
-    expect(section.getByTestId(`${prefix}-exercise`)).toHaveStyle(uiText.bodyStrong);
+    expect(heading).toHaveStyle({ ...themeText.label, ...themeTone.ink });
+    expect(range).toHaveStyle({ ...themeText.meta, textAlign: 'right', marginLeft: 'auto' });
+    expect(section.getByTestId(`${prefix}-exercise`)).toHaveStyle(themeText.bodyStrong);
   }
-  expect(screen.getByTestId('today-cow-winner-e1rm-name')).toHaveStyle({ ...uiText.meta, ...uiTextTone.ink });
+  expect(screen.getByTestId('today-cow-winner-e1rm-name')).toHaveStyle({ ...themeText.meta, ...themeTone.ink });
 });
 
 it('Today retains the public winner identity when its figure is redacted and never promotes a runner-up', async () => {
@@ -681,7 +687,7 @@ it('Today retains the public winner identity when its figure is redacted and nev
   ];
   ranking.entry_count = 2;
   api.getPreviousCoWSummary.mockResolvedValue(previous);
-  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   expect((await screen.findByTestId('today-cow-winner-e1rm')).props.accessibilityLabel).toBe('Contessa Serbelloni Mazzanti Vien dal Mare [1RM]');
   expect(screen.queryByText('Runner up')).toBeNull();
 });
@@ -695,7 +701,7 @@ it.each(['finalizing', 'unavailable', 'empty'] as const)('Today keeps last week 
     if (state === 'finalizing') previous.result!.publication_id = null;
   }
   api.getPreviousCoWSummary.mockResolvedValue(previous);
-  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   const lastWeek = await screen.findByText('Last Week CoW');
   expect(lastWeek).toBeTruthy();
   if (state === 'empty') expect((await screen.findByTestId('today-cow-winner-e1rm')).props.accessibilityLabel).toBe('No qualifying results [1RM]');
@@ -705,14 +711,14 @@ it.each(['finalizing', 'unavailable', 'empty'] as const)('Today keeps last week 
 it('Today does not relabel a legacy fallback as current', async () => {
   const previous = previousCowSummary();
   api.getCoWSummary.mockResolvedValue({ ...previous, selection: 'previous_final' });
-  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   expect(await screen.findByText('Last Week CoW')).toBeTruthy();
   expect(screen.queryByText('Current CoW')).toBeNull();
 });
 
 it('Today exposes a retry for read failure and refreshes both week resources', async () => {
   api.getCoWSummary.mockRejectedValue(new GroupApiError('INTERNAL', 'failed'));
-  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   const retry = await screen.findByTestId('today-cow-current-error-state-retry');
   api.getCoWSummary.mockResolvedValue(summary());
   fireEvent.press(retry);
@@ -723,7 +729,7 @@ it('Today exposes a retry for read failure and refreshes both week resources', a
 it('Today suppresses a previous result from a different calendar revision until both reads agree', async () => {
   const previous = previousCowSummary();
   api.getPreviousCoWSummary.mockResolvedValueOnce({ ...previous, calendar_revision: 2 }).mockResolvedValue(previous);
-  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   expect(await screen.findByTestId('today-cow-winner-e1rm')).toBeTruthy();
   expect(api.getPreviousCoWSummary.mock.calls.length).toBeGreaterThan(1);
 });
@@ -731,7 +737,7 @@ it('Today suppresses a previous result from a different calendar revision until 
 
 it('Today keeps readable previous winners when the independent current read fails', async () => {
   api.getCoWSummary.mockRejectedValue(new GroupApiError('INTERNAL', 'failed'));
-  render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   expect(await screen.findByTestId('today-cow-current-error-state')).toBeTruthy();
   expect(await screen.findByTestId('today-cow-winner-e1rm')).toBeTruthy();
 });
@@ -740,7 +746,7 @@ it('Today uses no summary space when both weeks are confirmed absent', async () 
   const absent = { ...cowSummary(), selection: 'none' as const, result: null };
   api.getCoWSummary.mockResolvedValue(absent);
   api.getPreviousCoWSummary.mockResolvedValue(absent);
-  const view = render(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  const view = renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   await waitForGone(() => screen.queryByTestId('today-cow-summaries'));
   expect(view.toJSON()).toBeNull();
 });

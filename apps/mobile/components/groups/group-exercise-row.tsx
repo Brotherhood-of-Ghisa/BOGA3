@@ -1,7 +1,7 @@
 import type { Ref } from 'react';
-import { StyleSheet, Text, View, type ViewInstance } from 'react-native';
+import { Text, View, type ViewInstance } from 'react-native';
 
-import { ActionButton, Icon, ListRow, Tag, uiBorder, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, Icon, ListRow, Tag, makeStyles, uiBorder, uiSpace, useTextRoles } from '@/components/ui';
 import type { GroupExerciseRowViewModel } from '@/src/groups';
 
 type GroupExerciseRowProps = {
@@ -28,6 +28,8 @@ type GroupExerciseRowProps = {
  * (outline) under it.
  */
 export function GroupExerciseRow({ row, onPress, onLink, onUnlink, unlinkPending, focusRef, divider = false }: GroupExerciseRowProps) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   const id = row.groupExerciseId;
   const label = [row.name, row.loadInputModeLabel, row.archived ? 'archived' : null, row.linkStatus]
     .filter(Boolean)
@@ -51,16 +53,16 @@ export function GroupExerciseRow({ row, onPress, onLink, onUnlink, unlinkPending
         onPress={onPress}
         ref={focusRef}
         testID={`group-exercise-row-${id}`}
-        trailing={onPress ? <Icon color={uiRoles.inkMuted} name="chevron-right" /> : undefined}>
+        trailing={onPress ? <Icon colorRole="inkMuted" name="chevron-right" /> : undefined}>
         <View style={styles.text}>
-          <Text allowFontScaling={false} style={uiText.bodyStrong} testID={`group-exercise-name-${id}`}>
+          <Text allowFontScaling={false} style={text.bodyStrong} testID={`group-exercise-name-${id}`}>
             {row.name}
           </Text>
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID={`group-exercise-load-mode-${id}`}>
+          <Text allowFontScaling={false} style={[text.body, tone.muted]} testID={`group-exercise-load-mode-${id}`}>
             {row.loadInputModeLabel}
           </Text>
           {row.linkStatus ? (
-            <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID={`group-exercise-link-status-${id}`}>
+            <Text allowFontScaling={false} style={[text.body, tone.muted]} testID={`group-exercise-link-status-${id}`}>
               {row.linkStatus}
             </Text>
           ) : null}
@@ -96,10 +98,10 @@ export function GroupExerciseRow({ row, onPress, onLink, onUnlink, unlinkPending
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   divider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   text: {
     paddingVertical: uiSpace.sm,
@@ -113,4 +115,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingBottom: uiSpace.md,
   },
-});
+}));

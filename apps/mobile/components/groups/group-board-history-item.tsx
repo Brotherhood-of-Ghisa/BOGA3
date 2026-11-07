@@ -1,9 +1,9 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { FigureText, uiBorder, uiRoles, uiSpace, uiText } from '@/components/ui';
+import { FigureText, makeStyles, uiBorder, uiSpace, useTextRoles } from '@/components/ui';
 import type { BoardHistoryItemViewModel } from '@/src/groups';
 
-import { cardListItemStyles } from './screen-styles';
+import { useCardListItemStyles } from './screen-styles';
 
 type GroupBoardHistoryItemProps = {
   item: BoardHistoryItemViewModel;
@@ -15,6 +15,9 @@ type GroupBoardHistoryItemProps = {
 
 /** One lead change (E1.3), a row of the history's card: the date in small Plex Mono, then the sentence. */
 export function GroupBoardHistoryItem({ item, testID, index, count }: GroupBoardHistoryItemProps) {
+  const styles = useStyles();
+  const cardListItemStyles = useCardListItemStyles();
+  const { text } = useTextRoles();
   return (
     <View style={cardListItemStyles(index, count)}>
       <View
@@ -22,10 +25,10 @@ export function GroupBoardHistoryItem({ item, testID, index, count }: GroupBoard
         accessible
         style={[styles.item, index > 0 ? styles.divider : null]}
         testID={testID}>
-        <Text allowFontScaling={false} style={uiText.figureSmall} testID={`${testID}-date`}>
+        <Text allowFontScaling={false} style={text.figureSmall} testID={`${testID}-date`}>
           {item.dateLabel}
         </Text>
-        <Text allowFontScaling={false} style={uiText.body} testID={`${testID}-sentence`}>
+        <Text allowFontScaling={false} style={text.body} testID={`${testID}-sentence`}>
           <FigureText>{item.sentence}</FigureText>
         </Text>
       </View>
@@ -33,7 +36,7 @@ export function GroupBoardHistoryItem({ item, testID, index, count }: GroupBoard
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   item: {
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
@@ -41,6 +44,6 @@ const styles = StyleSheet.create({
   },
   divider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
-});
+}));

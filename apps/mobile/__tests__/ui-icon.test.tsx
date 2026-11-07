@@ -139,7 +139,7 @@ describe('no record figure draws a mark beside the number', () => {
   // `name="arrow-up"` and `name={'arrow-up'}` both; `color` as the role or
   // through the `record` text style.
   const ARROW_NAME = /name=\{?['"]arrow-/;
-  const RECORD_COLOUR = /uiRoles\.record\b|record\.color\b/;
+  const RECORD_COLOUR = /roles\.record|uiRoles\.record|colorRole="record"|record\.color/;
 
   it('pairs a record colour with no arrow glyph in app, components or src', () => {
     const offenders = uiSources().flatMap((file) =>

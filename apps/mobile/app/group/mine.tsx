@@ -9,9 +9,9 @@ import {
   GroupsEmptyActions,
   GroupsEmptyState,
   GroupsSignInRequired,
-  cardListItemStyles,
-  groupScreenStyles,
   pickInlineError,
+  useCardListItemStyles,
+  useGroupScreenStyles,
   usePullToRefresh,
 } from '@/components/groups';
 import { ActionButton } from '@/components/ui';
@@ -32,6 +32,8 @@ export default function MyGroupsRoute() {
 }
 
 function MyGroupsContent({ userId }: { userId: string }) {
+  const groupScreenStyles = useGroupScreenStyles();
+  const cardListItemStyles = useCardListItemStyles();
   const router = useRouter();
   const mine = useGroupResource<GroupListMineResult>({ userId, cacheKey: groupCacheKeys.mine, fetcher: listMyGroups });
   const { pulling, onRefresh } = usePullToRefresh(mine.refresh);

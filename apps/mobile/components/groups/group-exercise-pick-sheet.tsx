@@ -8,10 +8,8 @@ import {
   Notice,
   SearchField,
   Sheet,
-  uiRoles,
   uiSpace,
-  uiText,
-  uiTextTone,
+  useTextRoles,
 } from '@/components/ui';
 import {
   buildPickSheetModel,
@@ -68,6 +66,7 @@ type GroupExercisePickSheetProps = {
  * to a session. The target is always `mode: 'link'` there.
  */
 export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
+  const { text, tone } = useTextRoles();
   const { target, exercises, links, onRequestClose, onLinkAndAdd, onAddAsNew } = props;
   const purpose = props.purpose ?? 'add-to-session';
   // The muscle-group index the shared exercise search matches on.
@@ -141,7 +140,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
       visible>
       {target.mode === 'choose-linked' ? (
         <>
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.prompt]}>Which of your linked exercises?</Text>
+          <Text allowFontScaling={false} style={[text.body, tone.muted, styles.prompt]}>Which of your linked exercises?</Text>
           <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
             {target.linkedExercises.map((exercise, index) => (
               <ListRow
@@ -158,7 +157,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
         </>
       ) : (
         <>
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.prompt]}>Which of your exercises is this?</Text>
+          <Text allowFontScaling={false} style={[text.body, tone.muted, styles.prompt]}>Which of your exercises is this?</Text>
           <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
             {model?.suggestion ? (
               <RadioRow
@@ -202,11 +201,11 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
                     onPress={() => setOption({ kind: 'other', exerciseId: exercise.id })}
                     testID={`group-pick-sheet-choice-${exercise.id}`}>
                     <View style={styles.choiceText}>
-                      <Text allowFontScaling={false} style={[uiText.body, unavailableReason ? uiTextTone.faint : null]}>
+                      <Text allowFontScaling={false} style={[text.body, unavailableReason ? tone.faint : null]}>
                         {exercise.name}
                       </Text>
                       {unavailableReason ? (
-                        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.faint]}>
+                        <Text allowFontScaling={false} style={[text.body, tone.faint]}>
                           {unavailableReason}
                         </Text>
                       ) : null}
@@ -225,7 +224,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
           </ScrollView>
           <View style={styles.footer}>
             {chosen ? (
-              <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="group-pick-sheet-retroactivity">
+              <Text allowFontScaling={false} style={[text.body, tone.muted]} testID="group-pick-sheet-retroactivity">
                 {describeLinkRetroactivity(chosen.name, target.groupName)}
               </Text>
             ) : null}
@@ -246,7 +245,7 @@ export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
 }
 
 function RadioGlyph({ checked, faint = false }: { checked: boolean; faint?: boolean }) {
-  return <Icon color={faint ? uiRoles.inkFaint : uiRoles.ink} name={checked ? 'radio-on' : 'radio-off'} />;
+  return <Icon colorRole={faint ? 'inkFaint' : 'ink'} name={checked ? 'radio-on' : 'radio-off'} />;
 }
 
 function RadioRow({
@@ -264,6 +263,7 @@ function RadioRow({
   onPress: () => void;
   testID: string;
 }) {
+  const { text, tone } = useTextRoles();
   return (
     <ListRow
       accessibilityLabel={detail ? `${label}, ${detail}` : label}
@@ -273,11 +273,11 @@ function RadioRow({
       onPress={onPress}
       testID={testID}>
       <View style={styles.choiceText}>
-        <Text allowFontScaling={false} style={uiText.bodyStrong}>
+        <Text allowFontScaling={false} style={text.bodyStrong}>
           {label}
         </Text>
         {detail ? (
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
+          <Text allowFontScaling={false} style={[text.body, tone.muted]}>
             {detail}
           </Text>
         ) : null}

@@ -4,13 +4,19 @@
  * it, and `Manage` on the right. The screen's own behaviour is
  * groups-screens.test.tsx.
  */
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import * as mockReact from 'react';
 import { StyleSheet, Text, type TextStyle } from 'react-native';
 
-import { uiText } from '@/components/ui/text-roles';
+
 
 import { GroupScreenHeader } from '@/components/groups/group-screen-header';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { textRoles } from '@/components/ui/text-roles';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
+const { text: themeText } = textRoles(themeRoles);
 
 jest.mock('expo-router', () => ({
   // The header's custom title and right action render inline, so a test can read them.
@@ -26,7 +32,7 @@ const GROUPS = [
 ];
 
 const renderHeader = (overrides: Partial<Parameters<typeof GroupScreenHeader>[0]> = {}) =>
-  render(
+  renderWithTheme(
     <GroupScreenHeader
       groupName="Garage Gym"
       groups={GROUPS}
@@ -46,7 +52,7 @@ describe('the Groups header', () => {
     expect(name).toHaveTextContent('The Brotherhood of the Iron Ghisa');
     expect(name.props.numberOfLines).toBe(1);
     expect(name.props.adjustsFontSizeToFit).toBe(true);
-    expect(titleStyle()).toMatchObject(StyleSheet.flatten(uiText.sheetTitle) ?? {});
+    expect(titleStyle()).toMatchObject(StyleSheet.flatten(themeText.sheetTitle) ?? {});
     // A title says where you are on its own: no line under it.
     expect(screen.queryByTestId('groups-subtitle')).toBeNull();
   });

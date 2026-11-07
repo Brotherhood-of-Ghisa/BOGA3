@@ -7,7 +7,7 @@ import { buildCompetitionStreamModels, DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type C
   type CompetitionStreamModel, type StreamEventKind } from '@/src/groups/competition-stream-view-model';
 import { GroupMetricStreamRecordSheet } from './group-metric-stream-record-sheet';
 import { GroupMetricStreamCard } from './group-metric-stream-card';
-import { groupScreenStyles } from './screen-styles';
+import { useGroupScreenStyles } from './screen-styles';
 import { GroupStreamMembershipItem } from './stream-membership-item';
 import { GroupStreamSessionCard } from './stream-session-card';
 import { StreamSharedExerciseCard } from './stream-shared-exercise-card';
@@ -27,6 +27,7 @@ type Props = {
 export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChanged,showGroupNames,
   onPressSession,onPressMembership,pulling,onRefresh,header,emptyState,contentContainerStyle,testID,
   hiddenEventKinds = DEFAULT_HIDDEN_STREAM_EVENT_KINDS }: Props) {
+  const groupScreenStyles = useGroupScreenStyles();
   const dateFormat = useDateFormat();
   const [selectedKey,setSelectedKey] = useState<string | null>(null);
   // No snapshot fallback: access, mode or account changes immediately remove an open detail.

@@ -5,12 +5,13 @@ import { groupCacheKeys, listCompetitionExercises, useGroupResource } from '@/sr
 
 import type { CompetitionExerciseWire, CompetitionExerciseListWire } from '@/src/groups/competition-wire';
 import { GroupLostAccessState, GroupMissingDataState, GroupStateView } from './group-state-view';
-import { groupScreenStyles } from './screen-styles';
+import { useGroupScreenStyles } from './screen-styles';
 
 /** Resolve direct links from the same versioned catalogue as the group page. */
 export function GroupComparisonBoundary({ userId, groupId, exerciseId, children, history = false }: {
   userId: string; groupId: string; exerciseId: string; children: (exercise: CompetitionExerciseWire) => ReactNode; history?: boolean;
 }) {
+  const groupScreenStyles = useGroupScreenStyles();
   const fetcher = useCallback(() => listCompetitionExercises(groupId), [groupId]);
   const resource = useGroupResource<CompetitionExerciseListWire>({ userId, cacheKey: groupCacheKeys.groupExercises(groupId),
     fetcher, evictGroupIdOnNotFound: groupId });

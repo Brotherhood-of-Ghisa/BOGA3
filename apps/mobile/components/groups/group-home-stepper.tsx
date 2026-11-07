@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { useTextRoles } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import type { GroupHomePeriod } from '@/src/groups/home-periods';
 
@@ -22,6 +22,7 @@ export type GroupHomeStepperProps = {
  * forwards through the weeks.
  */
 export function GroupHomeStepper({ label, onEarlier, onLater, canGoLater }: GroupHomeStepperProps) {
+  const { text, tone } = useTextRoles();
   const noun = 'week';
   return (
     <View style={styles.stepper} testID="group-home-period-stepper">
@@ -37,7 +38,7 @@ export function GroupHomeStepper({ label, onEarlier, onLater, canGoLater }: Grou
         allowFontScaling={false}
         minimumFontScale={0.8}
         numberOfLines={1}
-        style={[uiText.label, uiTextTone.ink, styles.stepperLabel]}
+        style={[text.label, tone.ink, styles.stepperLabel]}
         testID="group-home-period-title">
         {label}
       </Text>

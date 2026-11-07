@@ -6,12 +6,12 @@
  * offset are the screen's (groups-screens.test.tsx), so they arrive as props;
  * here a fixed six-week series pins every figure.
  */
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { Circle, Svg } from 'react-native-svg';
 
 import { GROUP_GLANCE_HOLD_FADE_DELAY_MS, GroupGlancePage } from '@/components/groups/group-glance-page';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { GroupApiError } from '@/src/groups/api';
 import {
   GROUP_HOME_BOARD_SIZE,
@@ -24,6 +24,10 @@ import {
   type GroupHomeWindow,
 } from '@/src/groups/home-periods';
 import type { GroupGlanceHeld } from '@/src/groups/use-group-glance';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
 
 // Wed 14 Oct 2026, 18:30 local: the week is Mon 12 – Sun 18 Oct.
 const NOW = new Date(2026, 9, 14, 18, 30);
@@ -77,7 +81,7 @@ const renderPage = ({
   error?: GroupApiError | null;
   offline?: boolean;
 } = {}) =>
-  render(
+  renderWithTheme(
     <GroupGlancePage
       error={error}
       held={held}
@@ -334,7 +338,7 @@ describe('At a glance: text roles', () => {
   it('heads the cards with micro-labels, and names the week in the stepper', () => {
     renderPage();
 
-    const label = { textTransform: 'uppercase' as const, color: uiRoles.ink };
+    const label = { textTransform: 'uppercase' as const, color: themeRoles.ink };
     expect(byId('group-week-totals-title')).toHaveStyle(label);
     expect(byId('group-position-title')).toHaveStyle(label);
     expect(within(byId('group-home-board-card')).getByText('Top brothers')).toHaveStyle(label);
@@ -345,10 +349,10 @@ describe('At a glance: text roles', () => {
 
     expect(byId('group-home-board-row-marco-name')).toHaveStyle({ ...body, fontWeight: '400' });
     expect(byId(`group-home-board-row-${ME}-name`)).toHaveStyle({ ...body, fontWeight: '600' });
-    expect(byId('group-home-board-row-marco-rank')).toHaveStyle({ ...figure, color: uiRoles.inkMuted });
-    expect(byId('group-home-board-row-luca-value')).toHaveStyle({ ...figure, color: uiRoles.ink });
+    expect(byId('group-home-board-row-marco-rank')).toHaveStyle({ ...figure, color: themeRoles.inkMuted });
+    expect(byId('group-home-board-row-luca-value')).toHaveStyle({ ...figure, color: themeRoles.ink });
     // A PR count above zero is a record: the record colour, drawn heavy.
-    expect(byId(`group-home-board-row-${ME}-value`)).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '700', color: uiRoles.record });
+    expect(byId(`group-home-board-row-${ME}-value`)).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '700', color: themeRoles.record });
   });
 
   it('keeps my closing line in words, with only my place in the figure face', () => {

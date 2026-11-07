@@ -2,7 +2,7 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import { useRouter } from 'expo-router';
 import { Text, Alert, ScrollView } from 'react-native';
 
-import { ActionButton, FigureText, ListRow, SegmentedControl, Sheet, Stat, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, FigureText, ListRow, SegmentedControl, Sheet, Stat, uiSpace, useTextRoles } from '@/components/ui';
 import { formatBoardDate, formatBoardMemberLabel, useNetworkOnline, type GroupRole } from '@/src/groups';
 import { formatCompetitionValue as formatGroupMetricValue,formatSetFigure,COMPETITION_LABELS as GROUP_METRIC_LABELS,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS } from '@/src/groups/competition-view-model';
 import type { CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
@@ -23,6 +23,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
   myRole: GroupRole | null; onClose: () => void; onChanged: () => Promise<void>;
 }) {
   const dateFormat = useDateFormat();
+  const { text } = useTextRoles();
   const router = useRouter();
   const online = useNetworkOnline();
   const { certification, pending, needsReview, notice, perform, refresh } = useMetricCertification({
@@ -45,9 +46,9 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
         options={metricOptions.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
         onChange={onSelectMetric} testIDPrefix="group-metric-record-metric" /> : null}
       <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} />
-      <Text allowFontScaling={false} style={uiText.body} testID="group-metric-record-who">{formatBoardMemberLabel(row.member, row.former, userId)} · <FigureText>{formatBoardDate(row.performance.achieved_at_ms, dateFormat)}</FigureText></Text>
-      <Text allowFontScaling={false} style={uiText.body} testID="group-metric-record-raw"><FigureText>{formatSetFigure(row.performance)}</FigureText></Text>
-      <Text allowFontScaling={false} style={uiText.body} testID="group-metric-record-status"><FigureText>{model.statusText}</FigureText></Text>
+      <Text allowFontScaling={false} style={text.body} testID="group-metric-record-who">{formatBoardMemberLabel(row.member, row.former, userId)} · <FigureText>{formatBoardDate(row.performance.achieved_at_ms, dateFormat)}</FigureText></Text>
+      <Text allowFontScaling={false} style={text.body} testID="group-metric-record-raw"><FigureText>{formatSetFigure(row.performance)}</FigureText></Text>
+      <Text allowFontScaling={false} style={text.body} testID="group-metric-record-status"><FigureText>{model.statusText}</FigureText></Text>
       <MutedLine text={model.readOnlyNote} />
       <MutedLine text={model.offlineNote} />
       <MutedLine text={model.ownPerformanceNote} />
@@ -67,6 +68,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
   </Sheet>;
 }
 
-function MutedLine({ text }: { text: string | null }) {
-  return text ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>{text}</Text> : null;
+function MutedLine({ text: line }: { text: string | null }) {
+  const { text, tone } = useTextRoles();
+  return line ? <Text allowFontScaling={false} style={[text.body, tone.muted]}>{line}</Text> : null;
 }

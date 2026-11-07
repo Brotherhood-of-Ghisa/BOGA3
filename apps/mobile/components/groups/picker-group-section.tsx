@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import { Card } from '@/components/ui/card';
 import { ListRow } from '@/components/ui/list-row';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { useTextRoles } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import type { PickerGroupRow, PickerGroupSection } from '@/src/groups';
 
@@ -18,12 +18,13 @@ export function PickerGroupSectionList({
   sections: PickerGroupSection[];
   onPressRow: (row: PickerGroupRow) => void;
 }) {
+  const { text, tone } = useTextRoles();
   if (sections.length === 0) {
     return null;
   }
   return (
     <View style={styles.section} testID="exercise-picker-group-section">
-      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={text.label}>
         From your groups
       </Text>
       {sections.map((section) => (
@@ -37,11 +38,11 @@ export function PickerGroupSectionList({
               onPress={() => onPressRow(row)}
               testID={`exercise-picker-group-row-${row.groupExercise.group_exercise_id}`}>
               <View style={styles.rowText}>
-                <Text allowFontScaling={false} numberOfLines={2} style={uiText.bodyStrong}>
+                <Text allowFontScaling={false} numberOfLines={2} style={text.bodyStrong}>
                   {row.groupExercise.name}
-                  <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}> · {row.groupName}</Text>
+                  <Text allowFontScaling={false} style={[text.body, tone.muted]}> · {row.groupName}</Text>
                 </Text>
-                <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+                <Text allowFontScaling={false} numberOfLines={1} style={text.meta}>
                   {row.statusLabel}
                 </Text>
               </View>

@@ -86,7 +86,7 @@ export {
   type StatePanelProps,
 } from '@/components/ui/state-panel';
 export { Tag, type TagProps, type TagTone } from '@/components/ui/tag';
-export { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
+export { textRoles, uiText, uiTextEmphasis, uiTextTone, useTextRoles, type TextRoles } from '@/components/ui/text-roles';
 export { AppThemeProvider, makeStyles, useUiMode, useUiRoles, type AppTheme } from '@/components/ui/theme-context';
 export {
   ToggleChip,

@@ -15,7 +15,7 @@ import { GroupCycleButton } from './group-cycle-button';
 import { GroupOfflineBanner } from './offline-banner';
 import { GroupPagesFooter } from './group-pages-footer';
 import { GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from './group-state-view';
-import { groupScreenStyles } from './screen-styles';
+import { useGroupScreenStyles } from './screen-styles';
 import { usePullToRefresh } from './use-pull-to-refresh';
 
 type HistoryView = 'events' | 'scores';
@@ -36,6 +36,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
   userId: string; groupId: string; exercise: CompetitionExerciseWire;
   initialMetric: string | null; initialScope: GroupBoardScope;
 }) {
+  const groupScreenStyles = useGroupScreenStyles();
   const dateFormat = useDateFormat();
   const router = useRouter();
   const exerciseId = exercise.group_exercise_id;

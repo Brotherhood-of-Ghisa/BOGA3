@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { AccessibilityInfo, Alert, findNodeHandle, StyleSheet, Text, View, type ViewInstance } from 'react-native';
+import { AccessibilityInfo, Alert, StyleSheet, Text, View, findNodeHandle, type ViewInstance } from 'react-native';
 
 import { useOpenExerciseEditor, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-request';
 import {
@@ -11,7 +11,7 @@ import {
   type SegmentedControlOption,
   uiGeometry,
   uiSpace,
-  uiText,
+  useTextRoles,
 } from '@/components/ui';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
@@ -97,6 +97,7 @@ export function GroupExercisesPage({
   refreshGroup,
   userId,
 }: GroupExercisesPageProps) {
+  const { text } = useTextRoles();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'leaderboards' | 'shared'>('leaderboards');
   const links = useMyGroupExerciseLinks(groupId);
@@ -211,7 +212,7 @@ export function GroupExercisesPage({
   const header = (
     <View style={styles.headerBlock}>
       <View style={styles.header}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.microLabel]} testID="group-screen-exercises-title">
+        <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, styles.microLabel]} testID="group-screen-exercises-title">
           Exercises
         </Text>
         {activeTab === 'leaderboards' && canManage ? (

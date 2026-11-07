@@ -1,7 +1,7 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, FigureText, Icon, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, FigureText, Icon, uiSpace, useTextRoles } from '@/components/ui';
 import type { GroupRole } from '@/src/groups';
 import { sessionRecordCertificationStatus, type SessionRecordCertification } from '@/src/groups/competition-session-records-view-model';
 import { buildMetricRecordSheetModel, metricCertificationEndConfirmation } from '@/src/groups/metric-record-sheet-view-model';
@@ -21,6 +21,7 @@ export function GroupSetCertification({ certification, groupId, userId, myRole, 
   /** `between`: status left, action right (a row's own line). `end`: both at the end (beside the set). */
   align?: 'between' | 'end'; testID: string;
 }) {
+  const { text, tone } = useTextRoles();
   const dateFormat = useDateFormat();
   const state = useMetricCertification({ groupId, userId, row: certification.target, exercise: certification.exercise,
     online, readOnlyReason, onChanged });
@@ -40,8 +41,8 @@ export function GroupSetCertification({ certification, groupId, userId, myRole, 
     <View style={styles.block}>
       <View style={[styles.statusLine, align === 'end' ? styles.end : null]}>
         <View style={styles.status} accessible accessibilityLabel={status} testID={`${testID}-status`}>
-          <Icon color={model.active ? uiRoles.ink : uiRoles.inkMuted} name={model.active ? 'check' : 'circle'} size="xs" />
-          <Text allowFontScaling={false} style={[uiText.meta, model.active ? uiTextTone.ink : null, styles.statusText]}><FigureText>{status}</FigureText></Text>
+          <Icon colorRole={model.active ? 'ink' : 'inkMuted'} name={model.active ? 'check' : 'circle'} size="xs" />
+          <Text allowFontScaling={false} style={[text.meta, model.active ? tone.ink : null, styles.statusText]}><FigureText>{status}</FigureText></Text>
         </View>
         {action ? (
           <ActionButton

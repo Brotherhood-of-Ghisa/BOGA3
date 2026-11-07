@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 
-import { Icon, ListRow, Tag, uiRoles } from '@/components/ui';
+import { Icon, ListRow, Tag } from '@/components/ui';
 import { GROUP_ROLE_LABELS, formatMemberName, type GroupMember } from '@/src/groups';
 
 type GroupMemberRowProps = {
@@ -35,7 +35,7 @@ export function GroupMemberRow({ member, isMe, onPress, divider }: GroupMemberRo
       }
       onPress={onPress ? () => onPress(member) : undefined}
       testID={`group-member-row-${member.user_id}`}
-      trailing={onPress ? <Icon color={uiRoles.inkMuted} name="chevron-right" /> : null}
+      trailing={onPress ? <Icon colorRole="inkMuted" name="chevron-right" /> : null}
     />
   );
 }

@@ -1,16 +1,14 @@
-import { StyleSheet } from 'react-native';
-
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui';
+import { makeStyles, uiBorder, uiGeometry, uiSpace } from '@/components/ui';
 
 /**
  * Shared page shell for the group routes: the `Screen` / `ScreenScroll` ground
  * and gutter (`paper`, `lg` gutter, `md` between blocks), for the lists that
  * cannot be a `ScreenScroll` (a `FlatList`) and the routes not yet moved onto it.
  */
-export const groupScreenStyles = StyleSheet.create({
+export const useGroupScreenStyles = makeStyles((roles) => ({
   screen: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   content: {
     padding: uiSpace.lg,
@@ -45,8 +43,8 @@ export const groupScreenStyles = StyleSheet.create({
     overflow: 'hidden',
     borderLeftWidth: uiBorder.width,
     borderRightWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
-    backgroundColor: uiRoles.surface,
+    borderColor: roles.rule,
+    backgroundColor: roles.surface,
   },
   cardListItemFirst: {
     borderTopWidth: uiBorder.width,
@@ -58,11 +56,17 @@ export const groupScreenStyles = StyleSheet.create({
     borderBottomLeftRadius: uiGeometry.radius.card,
     borderBottomRightRadius: uiGeometry.radius.card,
   },
-});
+}));
 
-/** The styles for one cell of a `cardList` (`index` of `count`). */
-export const cardListItemStyles = (index: number, count: number) => [
-  groupScreenStyles.cardListItem,
-  index === 0 ? groupScreenStyles.cardListItemFirst : null,
-  index === count - 1 ? groupScreenStyles.cardListItemLast : null,
-];
+/**
+ * The styles for one cell of a `cardList`: `(index, count)` gives the cell's
+ * styles, `index` of `count`.
+ */
+export function useCardListItemStyles() {
+  const styles = useGroupScreenStyles();
+  return (index: number, count: number) => [
+    styles.cardListItem,
+    index === 0 ? styles.cardListItemFirst : null,
+    index === count - 1 ? styles.cardListItemLast : null,
+  ];
+}

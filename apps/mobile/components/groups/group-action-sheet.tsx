@@ -1,6 +1,6 @@
 import { StyleSheet, Text } from 'react-native';
 
-import { ListRow, Sheet, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ListRow, Sheet, uiSpace, useTextRoles } from '@/components/ui';
 
 export type GroupActionSheetItem<TKey extends string> = {
   key: TKey;
@@ -40,10 +40,11 @@ export function GroupActionSheet<TKey extends string>({
   testIDPrefix,
   actionTestIDPrefix,
 }: GroupActionSheetProps<TKey>) {
+  const { text, tone } = useTextRoles();
   return (
     <Sheet dismissLabel={dismissLabel} onDismiss={onClose} testID={`${testIDPrefix}-sheet`} title={title} visible={visible}>
       {subtitle ? (
-        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.subtitle]}>
+        <Text allowFontScaling={false} style={[text.body, tone.muted, styles.subtitle]}>
           {subtitle}
         </Text>
       ) : null}
