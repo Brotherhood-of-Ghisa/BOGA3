@@ -330,10 +330,10 @@ requests refuse atomically. Programme children share this form.
 
 ### 6.1 Agent API Routes (`supabase/functions/agent-api/`)
 
-All agent routes enforce strict token validation, current-grant checks against
-`public.agent_plan_permissions`, and service-role isolation. Read routes need only
-the base grant; creation routes require `plan_access_enabled = true`; mutation routes
-require `plan_edit_enabled = true`.
+Agent routes require valid tokens and service-role isolation. Reading the plan
+queue and creating plans or programmes require `plan_access_enabled`. The
+planned edit routes require `plan_edit_enabled`; see [[agents.write-access]]
+for their implementation status.
 
 | Route | Method | Purpose |
 | :--- | :--- | :--- |

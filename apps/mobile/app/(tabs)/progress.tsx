@@ -408,7 +408,7 @@ export function StatsScreenShell({
   const activeError = viewMode === 'exercise' ? exerciseDataError : errorMessage;
   const pending = !activeError && (viewMode === 'exercise' ? !exerciseDataReady : isLoading && !summary);
   const showLoading = useDelayedFlag(pending, LOADING_PANEL_DELAY_MS);
-  // Family headers follow the user's muscles ([[muscle.family-sections]]); unknown until they load.
+  // Family headers follow the user's muscles; counts are unknown until they load.
   const familyMuscleCounts = useMemo(
     () => muscleFamilyCounts ?? (summary ? countFamilyMuscles(summary.muscles.map(muscle => muscle.familyName)) : undefined),
     [muscleFamilyCounts, summary]);

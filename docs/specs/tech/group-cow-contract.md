@@ -269,9 +269,11 @@ through this reducer under later rules.
 
 ## Stream lifecycle
 
-Implements [[groups.cow-stream]]. The CoW after-write trigger appends to
-`group_events` in the management/barrier/publication transaction. Source-only
-generation updates emit nothing. Payloads hold published definition snapshots,
+The CoW after-write trigger appends to `group_events` on scheduling, meaningful
+edits, cancellation, start, cutoff and final publication in the same transaction
+as the transition. Cutoff emits a Finalizing card, and publication emits a
+separate outcome ([[groups.cow-finality]]). Source-only generation updates emit
+nothing. Payloads hold published definition snapshots,
 edit before-values and a final publication reference; no scores, receipts or
 private context. A partial unique index pins challenge/event/revision.
 Emitting workers lock the group FK row before the intake fence, matching

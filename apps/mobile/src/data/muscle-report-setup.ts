@@ -7,7 +7,7 @@ export type MuscleReportPreset = 'detailed' | 'broad';
 /** One muscle the settings screen lists: the entries it covers and whether any still counts. */
 export type SettingsMuscle = { id: string; label: string; family: string; entryIds: string[]; tracked: boolean };
 
-/** Muscles of one family; the header shows only above two or more ([[muscle.family-sections]]). */
+/** Muscles of one family; the header shows only above two or more. */
 export type SettingsMuscleSection = { family: string; showHeader: boolean; muscles: SettingsMuscle[] };
 
 /** The columns a write sets on a row; an omitted column keeps what the user chose. */
