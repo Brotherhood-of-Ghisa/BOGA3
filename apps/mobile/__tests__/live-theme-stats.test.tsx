@@ -66,7 +66,7 @@ describe('live theme: Progress', () => {
     expect(style(screen.getByTestId('row-change')).color).toBe(after.loss);
   });
 
-  it('repaints the filter chip trailing icon and the sheet label', async () => {
+  it('repaints the micro-label in the filter sheet', async () => {
     renderWithTheme(<ProgressFilters testID="filters" secondary={{ value: true, onChange: jest.fn() }}
       gym={{ value: undefined, onChange: jest.fn(), options: [{ gymId: 'club', name: 'Club' }, { gymId: null, name: null }] }} />);
     fireEvent.press(screen.getByTestId('filters'));

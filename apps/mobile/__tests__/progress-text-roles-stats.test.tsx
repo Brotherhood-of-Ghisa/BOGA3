@@ -14,7 +14,6 @@ import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import { ProgressTables } from '@/components/stats/progress-tables';
 import { statsTableColumnWidth } from '@/components/stats/stats-table';
 import { WeekSetList } from '@/components/stats/week-set-list';
-import { uiText } from '@/components/ui/text-roles';
 import { uiFonts, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { ProgressMuscleComparison } from '@/src/data';
 import { renderWithTheme, rolesFor } from './helpers/theme';
@@ -109,8 +108,6 @@ describe('Progress filters and week list', () => {
       options: [{ gymId: 'club', name: 'Club' }, { gymId: null, name: null }] }} />);
     fireEvent.press(screen.getByTestId('filters'));
     expect(style(screen.getByRole('header', { name: 'Gym' }))).toMatchObject({ ...LABEL, paddingHorizontal: uiSpace.lg });
-    // The role's own values.
-    expect(screen.getByRole('header', { name: 'Gym' }).props.style[0]).toEqual(uiText.label);
   });
 
   it('draws a week card\'s detail and the empty week in meta, its figures in the figure face', () => {

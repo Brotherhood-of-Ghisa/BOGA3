@@ -7,7 +7,6 @@ import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { SwitchRow } from '@/components/ui/switch-row';
 import { useUiText } from '@/components/ui/text-roles';
-import { useUiRoles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
 import { gymScopeLabel, type GymScopeOption } from '@/src/utils/gym-scope-route';
 
@@ -49,7 +48,6 @@ export const changedFilters = ({ grouping, secondary, secondaryVolume, gym }: Om
  */
 export function ProgressFilters({ grouping, secondary, secondaryVolume, gym, testID }: ProgressFiltersProps) {
   const text = useUiText();
-  const roles = useUiRoles();
   const [open, setOpen] = useState(false);
   const origin = useRef<ComponentRef<typeof View> | null>(null);
   const offeredGym = gym && offersGymChoice(gym.value, gym.options) ? gym : undefined;
@@ -75,7 +73,7 @@ export function ProgressFilters({ grouping, secondary, secondaryVolume, gym, tes
           }}
           size="compact"
           testID={testID}
-          trailing={<Icon color={changed.length > 0 ? roles.onInk : roles.inkMuted} name="chevron-down" size="xs" />}
+          trailing={<Icon colorRole={changed.length > 0 ? 'onInk' : 'inkMuted'} name="chevron-down" size="xs" />}
         />
       </View>
       <Sheet dismissLabel="Dismiss filters" onDismiss={() => setOpen(false)} onDismissed={restoreFocus}
