@@ -6,11 +6,14 @@ import {
   GroupMissingDataState,
   GroupStateView,
   GroupsSignInRequired,
+  PersonalExercisePicker,
   StandardExercisePicker,
   pickInlineError,
 } from '@/components/groups';
-import { ScreenScroll, SegmentedControl } from '@/components/ui';
+import { Notice, ScreenScroll, SegmentedControl } from '@/components/ui';
 import { useAuth } from '@/src/auth';
+import { linkExercise } from '@/src/data/exercise-group-links';
+import type { IndexedExerciseCatalogExercise } from '@/src/exercise-catalog/search';
 import { GroupComparisonForm } from '@/components/groups/group-comparison-form';
 import type { CompetitionRules as GroupExerciseRules } from '@/src/groups/competition-contract';
 import { createCompetitionExercise } from '@/src/groups/api';
@@ -26,9 +29,10 @@ import {
   type StandardExerciseOption,
 } from '@/src/groups';
 
-type ExerciseSource = 'catalogue' | 'custom';
+type ExerciseSource = 'mine' | 'catalogue' | 'custom';
 
 const SOURCE_OPTIONS = [
+  { value: 'mine', label: 'My exercises' },
   { value: 'catalogue', label: 'From catalogue' },
   { value: 'custom', label: 'Custom' },
 ] as const;
@@ -62,17 +66,30 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
     fetcher,
     evictGroupIdOnNotFound: groupId,
   });
-  const [source, setSource] = useState<ExerciseSource>('catalogue');
+  const [source, setSource] = useState<ExerciseSource>('mine');
   const [picked, setPicked] = useState<StandardExerciseOption | null>(null);
+  const [pickedPersonal, setPickedPersonal] = useState<IndexedExerciseCatalogExercise | null>(null);
   const create = useGroupAction((input: GroupExerciseRules & { sourceExerciseId: string | null }) => createCompetitionExercise({ groupId,name: input.name,mode: input.loadInputMode,contribution: input.bodyweightContribution,metric: input.defaultMetric,sourceId: input.sourceExerciseId }));
   const mounted = useMountedRef();
 
   const onSubmit = async (core: GroupExerciseRules) => {
-    const sourceExerciseId = source === 'catalogue' ? (picked?.sourceExerciseId ?? null) : null;
+    let sourceExerciseId: string | null = null;
+    if (source === 'catalogue') {
+      sourceExerciseId = picked?.sourceExerciseId ?? null;
+    } else if (source === 'mine') {
+      sourceExerciseId = pickedPersonal?.id.startsWith('seed_') ? pickedPersonal.id : null;
+    }
     const result = await create.run({ ...core, sourceExerciseId });
     // Back during a slow save already left this screen: going back again would pop the group screen.
     if (!mounted.current) return;
     if (result.ok) {
+      if (source === 'mine' && pickedPersonal) {
+        try {
+          await linkExercise(pickedPersonal.id, groupId, result.value.exercise.group_exercise_id);
+        } catch {
+          // Linking error does not rollback server creation
+        }
+      }
       // The group screen's Exercises segment refreshes on focus.
       router.back();
       return;
@@ -127,6 +144,36 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
         />
         {source === 'custom' ? (
           <GroupComparisonForm key="custom" {...formProps} />
+        ) : source === 'mine' ? (
+          <>
+            <PersonalExercisePicker
+              onPick={(option) => {
+                setPickedPersonal(option);
+                create.reset();
+              }}
+              selectedId={pickedPersonal?.id ?? null}
+            />
+            {pickedPersonal ? (
+              <>
+                <Notice
+                  message="This exercise will automatically be linked to your personal exercise once added."
+                  testID="group-personal-exercise-link-notice"
+                  tone="neutral"
+                />
+                <GroupComparisonForm
+                  initialRules={{
+                    name: pickedPersonal.name,
+                    loadInputMode: pickedPersonal.loadInputMode ?? 'total_load',
+                    bodyweightCalculationsEnabled: group.data.group.bodyweight_calculations_enabled,
+                    bodyweightContribution: pickedPersonal.bodyweightContribution ?? 0,
+                    defaultMetric: 'e1rm',
+                  }}
+                  key={pickedPersonal.id}
+                  {...formProps}
+                />
+              </>
+            ) : null}
+          </>
         ) : (
           <>
             <StandardExercisePicker
