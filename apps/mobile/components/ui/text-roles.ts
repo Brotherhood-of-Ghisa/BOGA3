@@ -7,7 +7,7 @@ import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui/toke
 // The text roles (`docs/specs/ui/design-language.md` §3, "Text roles"). A
 // screen names what its text does — a title, a row's name, a quiet figure —
 // and takes the face, weight, size and line-height from here; it never picks
-// them itself. Colour is a separate choice (`uiTextTone`), and so is the one
+// them itself. Colour is a separate choice (`useUiTextTone()`), and so is the one
 // step of emphasis (`uiTextEmphasis`). Layout (width, alignment, flex) stays
 // in the screen's own styles, listed after the role.
 const buildText = (roles: UiRoles) =>
