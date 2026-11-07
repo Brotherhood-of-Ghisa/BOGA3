@@ -1,3 +1,4 @@
+import type { UiRoles } from '@/components/ui/theme';
 import { uiRoles } from '@/components/ui/tokens';
 
 // The one rule for a change against an earlier period (`design-language.md`
@@ -12,18 +13,21 @@ import { uiRoles } from '@/components/ui/tokens';
 export type ChangeTone = 'positive' | 'negative' | 'neutral' | 'new';
 
 /**
- * A change's ink. Colour is never the only channel: the figure carries its
- * sign (`+3`, `−12%`, or a plain `0`) whatever this returns, so the direction still
- * reads without hue.
+ * A change's ink in `roles`. Colour is never the only channel: the figure
+ * carries its sign (`+3`, `−12%`, or a plain `0`) whatever this returns, so the
+ * direction still reads without hue. A live component passes `useUiRoles()`.
  */
-export const changeToneColour = (tone: ChangeTone): string => {
+export const changeToneColourIn = (roles: UiRoles, tone: ChangeTone): string => {
   switch (tone) {
     case 'positive':
     case 'new':
-      return uiRoles.gain;
+      return roles.gain;
     case 'negative':
-      return uiRoles.loss;
+      return roles.loss;
     case 'neutral':
-      return uiRoles.ink;
+      return roles.ink;
   }
 };
+
+/** A change's ink in the launch roles; only a file still to migrate reads this. */
+export const changeToneColour = (tone: ChangeTone): string => changeToneColourIn(uiRoles, tone);

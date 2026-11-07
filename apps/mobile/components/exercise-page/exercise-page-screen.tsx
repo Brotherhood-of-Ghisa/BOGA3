@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  StyleSheet,
   Text,
   type TextInputInstance,
   View,
@@ -24,8 +23,9 @@ import { Notice } from '@/components/ui/notice';
 import { ScreenScroll } from '@/components/ui/screen';
 import { completePlanBlock, loadPlanBlockProgressStatus } from '@/src/session-planner';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { nextSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
@@ -137,6 +137,9 @@ export function ExercisePageScreen({
   draftClient,
   loadRecords,
 }: ExercisePageScreenProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const router = useRouter();
   const bodyweightCalculationsEnabled = useBodyweightCalculationsEnabled();
   const [, setPreferenceFocusRevision] = useState(0);
@@ -544,15 +547,15 @@ export function ExercisePageScreen({
                 pressed ? styles.pressed : null,
               ]}
               testID="exercise-add-set">
-              <Icon color={uiRoles.ink} name="plus" size="xs" />
-              <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>Add set</Text>
+              <Icon name="plus" size="xs" />
+              <Text allowFontScaling={false} style={[text.label, tone.ink]}>Add set</Text>
             </Pressable>
           </Card>
           {draft.saveError ? (
             <Text
               allowFontScaling={false}
               accessibilityLiveRegion="polite"
-              style={[uiText.body, uiTextTone.danger]}
+              style={[text.body, tone.danger]}
               testID="exercise-save-error">
               {`Not saved: ${draft.saveError}`}
             </Text>
@@ -566,7 +569,7 @@ export function ExercisePageScreen({
             onPress={onComplete}
             style={({ pressed }) => [styles.complete, pressed ? styles.pressed : null]}
             testID="exercise-complete">
-            <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>Complete exercise</Text>
+            <Text allowFontScaling={false} style={[text.label, tone.ink]}>Complete exercise</Text>
           </Pressable>
         </ScreenScroll>
       </KeyboardAvoidingView>
@@ -632,10 +635,10 @@ export function ExercisePageScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   screen: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   body: {
     flex: 1,
@@ -646,14 +649,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: uiSpace.xs,
     minHeight: uiGeometry.tapTarget,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   addSetDivider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   // An outline, not a second `accent`: the logger's tick is the screen's one
   // primary (`design-language.md` §5).
@@ -662,7 +665,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.ink,
+    borderColor: roles.ink,
     borderRadius: uiGeometry.radius.control,
   },
-});
+}));

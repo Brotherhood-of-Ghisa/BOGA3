@@ -8,7 +8,7 @@
  * real data (`exercise-catalog-screen.test.tsx`, `exercise-picker.test.tsx`).
  */
 
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 
 import type { ExerciseEditorRequest, ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-request';
 import { ExerciseEditorScreen } from '@/components/exercise-catalog/exercise-editor-screen';
@@ -17,6 +17,10 @@ import type { ExerciseCatalogCacheSnapshot } from '@/src/exercise-catalog/cache'
 import { buildMuscleSetup, EMPTY_MUSCLE_SETUP } from '@/src/exercise-catalog/muscle-setup';
 
 import { broadMuscleRows, detailedMuscleRows } from './helpers/muscle-setup';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
@@ -110,7 +114,7 @@ const renderEditor = ({ editing, ...request }: Partial<ExerciseEditorRequest> & 
     mockCatalog = current;
     return <ExerciseEditorScreen request={{ onSave, onSaved, exerciseDefinitionId: editing?.id ?? null, ...request }} />;
   };
-  const view = render(page(mockCatalog));
+  const view = renderWithTheme(page(mockCatalog));
   return { ...view, rerenderWith: (next: ExerciseCatalogCacheSnapshot) => view.rerender(page(next)) };
 };
 
@@ -223,7 +227,7 @@ describe('editing an existing exercise', () => {
     ['still loading', { status: 'loading', exercises: [] }, 'Loading exercise…'],
   ])('says so instead of a form when the exercise is %s', (_case, over, message) => {
     mockCatalog = catalog(over);
-    render(<ExerciseEditorScreen request={{ exerciseDefinitionId: 'bench' }} />);
+    renderWithTheme(<ExerciseEditorScreen request={{ exerciseDefinitionId: 'bench' }} />);
     expect(screen.getByText(message)).toBeOnTheScreen();
     expect(screen.queryByTestId('exercise-editor-name-input')).toBeNull();
   });
@@ -238,7 +242,7 @@ describe('the header', () => {
   it('closes by an X, writing nothing, when it opens over the exercise picker', () => {
     mockPreviousRoute = 'session/[sessionId]/add-exercise';
     renderEditor();
-    render(<>{mockHeaderLeft?.() as React.ReactElement}</>);
+    renderWithTheme(<>{mockHeaderLeft?.() as React.ReactElement}</>);
     fireEvent.press(screen.getByLabelText('Close exercise editor'));
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(onSave).not.toHaveBeenCalled();
@@ -286,7 +290,7 @@ describe('robustness', () => {
   });
 
   it('refuses to edit a request no longer in memory rather than save without its caller', () => {
-    render(<ExerciseEditorScreen request={{ lost: true }} />);
+    renderWithTheme(<ExerciseEditorScreen request={{ lost: true }} />);
     expect(screen.getByText('This edit is no longer open. Go back and start it again.')).toBeOnTheScreen();
     expect(screen.queryByTestId('exercise-editor-name-input')).toBeNull();
   });
@@ -731,24 +735,24 @@ describe('opening the editor page', () => {
 // The editor on the shared text roles (`design-language.md` §3, "Text roles").
 describe('text roles', () => {
   const { StyleSheet } = jest.requireActual('react-native') as typeof import('react-native');
-  const { uiFonts, uiRoles, uiTypography } = jest.requireActual('@/components/ui/tokens') as typeof import('@/components/ui/tokens');
+  const { uiFonts, uiTypography } = jest.requireActual('@/components/ui/tokens') as typeof import('@/components/ui/tokens');
   const styleOf = (node: { props: { style?: unknown } }) => StyleSheet.flatten(node.props.style as never) as Record<string, unknown>;
 
   it('heads each section with a muted micro-label, the shared Weight section included', () => {
     renderEditor({ editing: exercise() });
     for (const heading of ['Muscles', 'Weight', 'Options']) {
       expect(styleOf(screen.getByText(heading))).toMatchObject({
-        fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase', color: uiRoles.inkMuted,
+        fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase', color: themeRoles.inkMuted,
       });
     }
   });
 
   it('draws an empty choice faint and a section error as meta in danger', async () => {
     renderEditor({ editing: exercise({ mappings: [] }) });
-    expect(styleOf(screen.getByText('Choose'))).toMatchObject({ fontFamily: uiFonts.body.family, color: uiRoles.inkFaint });
+    expect(styleOf(screen.getByText('Choose'))).toMatchObject({ fontFamily: uiFonts.body.family, color: themeRoles.inkFaint });
     await save();
     expect(styleOf(screen.getByTestId('exercise-editor-muscles-error'))).toMatchObject({
-      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: uiRoles.danger,
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: themeRoles.danger,
     });
   });
 });

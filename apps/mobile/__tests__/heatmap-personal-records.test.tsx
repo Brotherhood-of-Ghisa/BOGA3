@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react-native';
+import { screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
+import { renderWithTheme } from './helpers/theme';
 
 const TODAY = '2026-10-09';
 const PREFIX = 'records';
@@ -22,7 +23,7 @@ it.each([
   const data = buildHeatmapData(days, metric, { todayDateKey: TODAY, weeks: 1 });
   expect(data.daily.find(day => day.dateKey === '2026-10-05')?.prCount).toBe(dailyCount);
   expect(data.weekly.at(-1)?.prCount).toBe(weeklyCount);
-  const { unmount } = render(<DailyHeatmap data={data} testIDPrefix={PREFIX} metricLabel={label} formatValue={String} />);
+  const { unmount } = renderWithTheme(<DailyHeatmap data={data} testIDPrefix={PREFIX} metricLabel={label} formatValue={String} />);
   const markers = screen.queryAllByTestId('records-heatmap-cell-2026-10-05-pr', { includeHiddenElements: true });
   expect(markers).toHaveLength(dailyCount > 0 ? 1 : 0);
   if (dailyCount > 0) expect(screen.getByTestId('records-heatmap-cell-2026-10-05').props.accessibilityLabel)
@@ -31,7 +32,7 @@ it.each([
   expect(screen.queryByTestId('records-heatmap-day-detail')).toBeNull();
   expect(StyleSheet.flatten(screen.getByTestId('records-heatmap-cell-2026-10-05').props.style).borderWidth).toBe(StyleSheet.hairlineWidth);
   unmount();
-  render(<WeeklyHeatmap data={data} metric={metric} testIDPrefix={PREFIX} metricLabel={label} formatValue={String} />);
+  renderWithTheme(<WeeklyHeatmap data={data} metric={metric} testIDPrefix={PREFIX} metricLabel={label} formatValue={String} />);
   if (weeklyCount > 0) {
     expect(screen.getByTestId('records-heatmap-prs-2026-10-05')).toHaveTextContent(`${weeklyCount} PRs`);
     expect(screen.getByTestId('records-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain(`${weeklyCount} PRs`);
@@ -44,7 +45,7 @@ it('keeps rest, known zero and unavailable states while omitting absent PRs and 
     { ...days[0], totalVolume: 0, personalRecordCounts: undefined },
     { ...days[1], totalVolume: null, personalRecordCounts: { totalVolume: 1, estimatedRM1: 0, highestWeight: 0 } },
   ], 'totalVolume', { todayDateKey: '2026-10-11', weeks: 1 });
-  render(<DailyHeatmap data={data} testIDPrefix={PREFIX} metricLabel="Volume" formatValue={String} />);
+  renderWithTheme(<DailyHeatmap data={data} testIDPrefix={PREFIX} metricLabel="Volume" formatValue={String} />);
   expect(screen.getByTestId('records-heatmap-cell-2026-10-05')).toHaveProp('accessibilityLabel', '05-10-2026, Volume 0');
   expect(screen.getByTestId('records-heatmap-cell-2026-10-06')).toHaveProp('accessibilityLabel', '06-10-2026, Rest');
   expect(screen.getByTestId('records-heatmap-cell-2026-10-07')).toHaveProp('accessibilityLabel', '07-10-2026, Volume unavailable, 1 PR');

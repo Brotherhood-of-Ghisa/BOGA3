@@ -13,7 +13,8 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
+import { FigureText, makeStyles, uiGeometry, uiSpace, uiTypography, useUiRoles } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 import { calculateLinearPercentile } from '@/src/session-insights/calculations';
@@ -67,6 +68,9 @@ function weeklyScale(values: number[], metric: CalendarHeatmapMetric) {
 function WeeklyAnnotations({ references, testID, children }: {
   references: Reference[]; testID: string; children?: ReactNode;
 }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [plotWidth, setPlotWidth] = useState(0);
   const [labelWidths, setLabelWidths] = useState<Record<string, number>>({});
   // Prefer the median, then lower, then upper, without moving any tick.
@@ -103,11 +107,11 @@ function WeeklyAnnotations({ references, testID, children }: {
           testID={`${testID}-${annotation.id}`}
           style={[children ? styles.reference : styles.axisReference, { left: `${annotation.position}%` }]} />
         {children ? <View {...annotationProps}>
-          <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.muted]}>{annotation.label}</Text>
+          <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.muted]}>{annotation.label}</Text>
           <View style={styles.annotationGap} />
-          <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.muted]}><FigureText>{annotation.text}</FigureText></Text>
+          <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.muted]}><FigureText>{annotation.text}</FigureText></Text>
         </View> : <Text {...annotationProps} allowFontScaling={false} numberOfLines={1}
-          style={[uiText.label, uiTextTone.faint, ...annotationProps.style]}><FigureText>{annotation.text}</FigureText></Text>}
+          style={[text.label, tone.faint, ...annotationProps.style]}><FigureText>{annotation.text}</FigureText></Text>}
       </React.Fragment>;
     })}
   </View>;
@@ -118,6 +122,10 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
   targetAveraged?: boolean; position: (value: number) => number; references: Reference[]; valueWidth: number; testID: string;
 }) {
   const dateFormat = useDateFormat();
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [beforeYear, year, afterYear] = formatCalendarWeekHeading(week.weekStartDateKey, dateFormat).split(/(\d{4})/);
   const value = weekValue(week, formatValue);
   const prCount = week.prCount ?? 0;
@@ -130,21 +138,21 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
   const track = <View style={styles.track} testID={`${testID}-track-${week.weekStartDateKey}`}>
     <View testID={`${testID}-bar-${week.weekStartDateKey}`} style={[styles.bar,
       { width: `${isKnownTraining(week) && week.value > 0 ? position(week.value) : 0}%`,
-        backgroundColor: isKnownTraining(week) && week.value > 0 ? heatRamp(uiRoles)[week.level] : 'transparent' }]} />
+        backgroundColor: isKnownTraining(week) && week.value > 0 ? heatRamp(roles)[week.level] : 'transparent' }]} />
   </View>;
   const content = <View style={styles.row} testID={`${testID}-plot-row-${week.weekStartDateKey}`}>
     <View style={styles.date} testID={`${testID}-date-gutter-${week.weekStartDateKey}`}>
-      <Text allowFontScaling={false} numberOfLines={1} style={uiText.body} testID={`${testID}-date-${week.weekStartDateKey}`}>
+      <Text allowFontScaling={false} numberOfLines={1} style={text.body} testID={`${testID}-date-${week.weekStartDateKey}`}>
         <FigureText>{`${beforeYear}${afterYear}`.trim()}</FigureText>
       </Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={uiText.figureSmall} testID={`${testID}-date-year-${week.weekStartDateKey}`}>{year}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={text.figureSmall} testID={`${testID}-date-year-${week.weekStartDateKey}`}>{year}</Text>
     </View>
     <View style={styles.plot} testID={`${testID}-plot-${week.weekStartDateKey}`}>
       {references.length ? <WeeklyAnnotations key={references.map(reference => `${reference.id}:${reference.text}`).join()} references={references} testID={testID}>{track}</WeeklyAnnotations> : track}
     </View>
     <View style={[styles.valueColumn, { width: valueWidth }]} testID={`${testID}-value-column-${week.weekStartDateKey}`}>
-      <Text allowFontScaling={false} style={[uiText.figure, styles.value]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
-      {prCount > 0 ? <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.record, styles.prs]} testID={`${testID}-prs-${week.weekStartDateKey}`}><FigureText figureStyle={uiTextTone.record}>{`${prCount} PR${prCount === 1 ? '' : 's'}`}</FigureText></Text> : null}
+      <Text allowFontScaling={false} style={[text.figure, styles.value]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
+      {prCount > 0 ? <Text allowFontScaling={false} style={[text.meta, tone.record, styles.prs]} testID={`${testID}-prs-${week.weekStartDateKey}`}><FigureText figureStyle={tone.record}>{`${prCount} PR${prCount === 1 ? '' : 's'}`}</FigureText></Text> : null}
     </View>
   </View>;
   return onPress
@@ -155,6 +163,8 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
 
 export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatValue,
   formatReferenceValue = formatValue, metricLabel = 'Value', header }: Props) {
+  const styles = useStyles();
+  const text = useUiText();
   const windowWeeks = useMemo(() => data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey), [data.weekly, data.todayDateKey]);
   const rows = useMemo(() => {
     const months = new Map<string, WeekCell[]>();
@@ -206,8 +216,8 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
         return <View accessible accessibilityRole="text" accessibilityLabel={`${title}, No training`}
           style={styles.row} testID={`${testID}-empty-month-${item.monthKey}`}>
           <View style={styles.date}>
-            <Text allowFontScaling={false} numberOfLines={1} style={uiText.body}>{month}</Text>
-            <Text allowFontScaling={false} numberOfLines={1} style={uiText.figureSmall}>{year}</Text>
+            <Text allowFontScaling={false} numberOfLines={1} style={text.body}>{month}</Text>
+            <Text allowFontScaling={false} numberOfLines={1} style={text.figureSmall}>{year}</Text>
           </View>
           <View style={styles.monthRule} />
         </View>;
@@ -220,15 +230,15 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
   />;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   list: { flex: 1 },
   content: { padding: uiSpace.lg },
   week: { minHeight: uiGeometry.tapTarget },
   row: { flexDirection: 'row', alignItems: 'center', minHeight: ROW_HEIGHT, gap: uiSpace.sm },
   date: { width: DATE_WIDTH },
-  monthRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: uiRoles.rule },
+  monthRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: roles.rule },
   plot: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
-  track: { height: uiSpace.lg, backgroundColor: uiRoles.ruleSoft, borderRadius: uiGeometry.radius.control },
+  track: { height: uiSpace.lg, backgroundColor: roles.ruleSoft, borderRadius: uiGeometry.radius.control },
   bar: { height: '100%', borderRadius: uiGeometry.radius.control },
   value: { textAlign: 'right' },
   valueColumn: { position: 'relative' },
@@ -237,13 +247,13 @@ const styles = StyleSheet.create({
     textAlign: 'right' },
   referencePlot: { height: ROW_HEIGHT },
   annotatedTrack: { position: 'absolute', top: uiTypography.lineHeight.xxs + uiSpace.xs, left: 0, right: 0 },
-  reference: { position: 'absolute', top: uiTypography.lineHeight.xxs, height: uiSpace.lg + uiSpace.sm, width: 1, backgroundColor: uiRoles.inkMuted },
+  reference: { position: 'absolute', top: uiTypography.lineHeight.xxs, height: uiSpace.lg + uiSpace.sm, width: 1, backgroundColor: roles.inkMuted },
   annotationGap: { height: uiSpace.lg + uiSpace.xs * 2 },
-  axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1, backgroundColor: uiRoles.inkMuted },
+  axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1, backgroundColor: roles.inkMuted },
   axisRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.xs },
   axisPlot: { flex: 1 },
   axis: { height: uiTypography.lineHeight.xxs + uiSpace.sm },
   annotation: { position: 'absolute', left: 0, alignItems: 'center' },
-});
+}));
 
 export default WeeklyHeatmap;

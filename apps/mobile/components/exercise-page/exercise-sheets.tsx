@@ -3,8 +3,7 @@ import { ScrollView, StyleSheet, Text, useWindowDimensions } from 'react-native'
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiRoles } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { getSessionSetTypeCycle, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatEffort } from '@/src/session-recorder/exercise-page-model';
@@ -47,7 +46,7 @@ export function EffortChoices({ selected, onSelect }: Pick<EffortSheetProps, 'se
             onPress={() => onSelect(option)}
             selected={isSelected}
             testID={`exercise-effort-option-${option ?? 'none'}`}
-            trailing={isSelected ? <Icon color={uiRoles.accent} name="check" /> : undefined}
+            trailing={isSelected ? <Icon colorRole="accent" name="check" /> : undefined}
           />
         );
       })}
@@ -95,40 +94,40 @@ export function ExerciseOptionsSheet({
       {onCompleteBlock ? (
         <ListRow
           label="Complete block"
-          leading={<Icon color={uiRoles.ink} name="check" />}
+          leading={<Icon name="check" />}
           onPress={onCompleteBlock}
           testID="exercise-options-complete-block"
         />
       ) : null}
       <ListRow
         label="Edit exercise"
-        leading={<Icon color={uiRoles.ink} name="pencil" />}
+        leading={<Icon name="pencil" />}
         onPress={onEdit}
         testID="exercise-options-edit"
       />
       {onLink ? (
         <ListRow
           label="Link to group exercise"
-          leading={<Icon color={uiRoles.ink} name="link" />}
+          leading={<Icon name="link" />}
           onPress={onLink}
           testID="exercise-options-link-group"
         />
       ) : null}
       <ListRow
         label="Swap exercise"
-        leading={<Icon color={uiRoles.ink} name="swap" />}
+        leading={<Icon name="swap" />}
         onPress={onSwap}
         testID="exercise-options-swap"
       />
       <ListRow
         label="Exercise history"
-        leading={<Icon color={uiRoles.ink} name="list" />}
+        leading={<Icon name="list" />}
         onPress={onOpenHistory}
         testID="exercise-options-history"
       />
       <ListRow
         label="Remove from session"
-        leading={<Icon color={uiRoles.danger} name="trash" />}
+        leading={<Icon colorRole="danger" name="trash" />}
         onPress={onRemove}
         testID="exercise-options-remove"
         tone="danger"
@@ -152,6 +151,8 @@ type ExerciseSwitcherSheetProps = {
 // sets — the open one highlighted, a finished one ticked — then the way back
 // to the whole session.
 export function ExerciseSwitcherSheet({ visible, rows, onSelect, onOpenSession, onDismiss }: ExerciseSwitcherSheetProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const { height } = useWindowDimensions();
   return (
     <Sheet
@@ -167,26 +168,26 @@ export function ExerciseSwitcherSheet({ visible, rows, onSelect, onOpenSession, 
             key={row.id}
             label={row.name}
             leading={
-              <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted, styles.position]}>
+              <Text allowFontScaling={false} style={[text.figure, tone.muted, styles.position]}>
                 {row.position}
               </Text>
             }
             meta={
-              <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted]} testID={`exercise-switcher-progress-${row.id}`}>
+              <Text allowFontScaling={false} style={[text.figure, tone.muted]} testID={`exercise-switcher-progress-${row.id}`}>
                 {`${row.doneCount}/${row.totalCount}`}
               </Text>
             }
             onPress={() => onSelect(row.id)}
             selected={row.current}
             testID={`exercise-switcher-row-${row.id}`}
-            trailing={isFinished(row) ? <Icon color={uiRoles.inkMuted} name="check" testID={`exercise-switcher-finished-${row.id}`} /> : undefined}
+            trailing={isFinished(row) ? <Icon colorRole="inkMuted" name="check" testID={`exercise-switcher-finished-${row.id}`} /> : undefined}
           />
         ))}
       </ScrollView>
       <ListRow
         divider
         label="All exercises (session)"
-        leading={<Icon color={uiRoles.ink} name="chevron-left" />}
+        leading={<Icon name="chevron-left" />}
         onPress={onOpenSession}
         testID="exercise-switcher-session"
       />

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen } from '@testing-library/react-native';
 import { periodColour } from '@/components/rm-curve/chart';
 import { RmCurveScreen } from '@/components/rm-curve/screen';
 import { loadRmCurve } from '@/src/rm-curve/repository';
@@ -6,6 +6,8 @@ import { rmCurveWindow } from '@/src/rm-curve/model';
 import { EXERCISE_PAGE_FIXTURE } from '@/src/maestro/exercise-page-fixture';
 import { seedStrengthRegimesFixture } from '@/src/maestro/strength-regimes-fixture';
 import { resetLocalData, closeLocalData, localDataClient } from './helpers/local-data';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
 
 jest.mock('@/src/data/bootstrap', () => require('./helpers/local-data').localDataBootstrapModule());
 beforeEach(async () => { await resetLocalData(); });
@@ -16,7 +18,7 @@ it('fits both temporal regimes over migrated SQLite, pools gyms, preserves selec
   await seedStrengthRegimesFixture(now);
   const before = localDataClient().prepare('SELECT * FROM exercise_sets ORDER BY id').all();
   jest.useFakeTimers();
-  render(<RmCurveScreen exerciseDefinitionId={EXERCISE_PAGE_FIXTURE.benchExerciseId} now={now} />);
+  renderWithTheme(<RmCurveScreen exerciseDefinitionId={EXERCISE_PAGE_FIXTURE.benchExerciseId} now={now} />);
   await screen.findByTestId('rm-curve-plot');
   await screen.findByText('103 sets · 34 sessions');
   expect(screen.getByLabelText('gym: All gyms')).toBeTruthy();
@@ -32,7 +34,7 @@ it('fits both temporal regimes over migrated SQLite, pools gyms, preserves selec
   fireEvent(screen.getByTestId('rm-curve-plot'), 'accessibilityTap');
   for (let i = 0; i < model.observations.indexOf(newer); i++) fireEvent.press(screen.getByLabelText('Previous set'));
   expect(screen.getByTestId('rm-selected-period')).toHaveTextContent(/^From /);
-  expect(screen.getByTestId('rm-selected-period').props.style).toContainEqual({ color: periodColour('newer') });
+  expect(screen.getByTestId('rm-selected-period').props.style).toContainEqual({ color: periodColour(rolesFor(DEFAULT_APPEARANCE), 'newer') });
   fireEvent.press(screen.getByTestId('rm-method-joint'));
   // Identity is cleared immediately while the other method is fitting.
   expect(screen.queryByTestId('rm-selected-period')).toBeNull();

@@ -1,10 +1,10 @@
 import { type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 
 import { Icon } from '@/components/ui/icon';
-import { uiRoles } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
 
 // A drag claims the gesture only past this horizontal distance, and only
 // before the row has moved this far vertically — scrolling always wins.
@@ -104,6 +104,7 @@ const activeOffsetFor = ({ left, right }: SwipeDirections): number | [number, nu
  * `swipeOutcome` starts firing.
  */
 function SwipeUnderlay({ drag, side, testID }: { drag: SharedValue<number>; side: SwipeSide; testID?: string }) {
+  const styles = useStyles();
   const washStyle = useAnimatedStyle(() => ({ opacity: swipeSideVisual(drag.value, side).wash }));
   const solidStyle = useAnimatedStyle(() => ({ opacity: swipeSideVisual(drag.value, side).solid }));
   const symbolStyle = useAnimatedStyle(() => ({
@@ -124,10 +125,10 @@ function SwipeUnderlay({ drag, side, testID }: { drag: SharedValue<number>; side
         style={[styles.symbolSlot, isLeft ? styles.symbolSlotLeft : styles.symbolSlotRight]}
         testID={testID ? `${testID}-symbols` : undefined}>
         <Animated.View style={[styles.symbol, symbolStyle, washStyle]}>
-          <Icon color={isLeft ? uiRoles.danger : uiRoles.accent} name={name} />
+          <Icon colorRole={isLeft ? 'danger' : 'accent'} name={name} />
         </Animated.View>
         <Animated.View style={[styles.symbol, symbolStyle, solidStyle]}>
-          <Icon color={isLeft ? uiRoles.onDanger : uiRoles.onAccent} name={name} />
+          <Icon colorRole={isLeft ? 'onDanger' : 'onAccent'} name={name} />
         </Animated.View>
       </View>
     </View>
@@ -154,6 +155,7 @@ type SwipeSetRowProps = {
  * tick) keep working, and the accessibility actions are the non-gesture path.
  */
 export function SwipeSetRow({ children, onSwipeRight, onSwipeLeft, testID }: SwipeSetRowProps) {
+  const styles = useStyles();
   const drag = useSharedValue(0);
   const directions: SwipeDirections = { left: onSwipeLeft !== undefined, right: onSwipeRight !== undefined };
 
@@ -194,9 +196,9 @@ export function SwipeSetRow({ children, onSwipeRight, onSwipeLeft, testID }: Swi
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   content: {
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
   },
   underlay: {
     position: 'absolute',
@@ -237,15 +239,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   washRight: {
-    backgroundColor: uiRoles.accentWash,
+    backgroundColor: roles.accentWash,
   },
   washLeft: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   solidRight: {
-    backgroundColor: uiRoles.accent,
+    backgroundColor: roles.accent,
   },
   solidLeft: {
-    backgroundColor: uiRoles.danger,
+    backgroundColor: roles.danger,
   },
-});
+}));

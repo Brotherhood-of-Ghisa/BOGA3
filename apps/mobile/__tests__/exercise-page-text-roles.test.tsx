@@ -4,17 +4,21 @@
  * weight × reps `figure`, a headline record `figureLarge`; words never take
  * Plex Mono, only the figures inside them do (`FigureText`).
  */
-import { render, screen, within } from '@testing-library/react-native';
+import { screen, within } from '@testing-library/react-native';
 import { StyleSheet, type TextStyle } from 'react-native';
 
 import { ExerciseTopBar } from '@/components/exercise-page/exercise-top-bar';
 import { RecordsPanel, type RecordsView } from '@/components/exercise-page/records-panel';
 import { SetLogger } from '@/components/exercise-page/set-logger';
 import { SetRow } from '@/components/exercise-page/set-row';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { SetRowView } from '@/src/session-recorder/exercise-page-model';
 import type { ExerciseRecords, LastSession } from '@/src/session-recorder/exercise-records';
 import type { ExerciseRecordsState } from '@/src/session-recorder/use-exercise-records';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
 
 const style = (node: { props: { style?: unknown } }): TextStyle => StyleSheet.flatten(node.props.style as never) as TextStyle;
 
@@ -35,14 +39,14 @@ describe('Exercise page: title bar', () => {
     ['plain', undefined],
     ['switcher', jest.fn()],
   ])('draws the %s title in the title role', (_, onOpenSwitcher) => {
-    render(<ExerciseTopBar onBack={jest.fn()} onOpenSwitcher={onOpenSwitcher} title="Barbell Bench Press" />);
-    expect(style(screen.getByText('Barbell Bench Press'))).toMatchObject({ ...TITLE, color: uiRoles.ink });
+    renderWithTheme(<ExerciseTopBar onBack={jest.fn()} onOpenSwitcher={onOpenSwitcher} title="Barbell Bench Press" />);
+    expect(style(screen.getByText('Barbell Bench Press'))).toMatchObject({ ...TITLE, color: themeRoles.ink });
   });
 });
 
 describe('Exercise page: the logger', () => {
   const renderLogger = () =>
-    render(
+    renderWithTheme(
       <SetLogger
         loadContext={{ policy: 'personal', bodyweightContribution: 0, loadInputMode: 'total_load' }}
         number={3}
@@ -59,9 +63,9 @@ describe('Exercise page: the logger', () => {
 
   it('labels the set in accent and its fields faint', () => {
     renderLogger();
-    expect(style(screen.getByText('Set 3'))).toMatchObject({ ...LABEL, color: uiRoles.accent });
+    expect(style(screen.getByText('Set 3'))).toMatchObject({ ...LABEL, color: themeRoles.accent });
     for (const label of ['Effort', 'Weight', 'Reps']) {
-      expect(style(screen.getByText(label))).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
+      expect(style(screen.getByText(label))).toMatchObject({ ...LABEL, color: themeRoles.inkFaint });
     }
   });
 
@@ -98,18 +102,18 @@ describe('Exercise page: a set row', () => {
     ...over,
   });
   const renderRow = (over: Partial<SetRowView>) =>
-    render(<SetRow divider={false} onOpen={jest.fn()} onToggle={jest.fn()} row={row(over)} />);
+    renderWithTheme(<SetRow divider={false} onOpen={jest.fn()} onToggle={jest.fn()} row={row(over)} />);
 
   it('draws a performed set in ink: its type a label, its values the row figure', () => {
     renderRow({});
-    expect(style(screen.getByText('RIR 2'))).toMatchObject({ ...LABEL, color: uiRoles.ink });
-    expect(style(screen.getByTestId('exercise-set-1-values'))).toMatchObject({ ...FIGURE, color: uiRoles.ink });
+    expect(style(screen.getByText('RIR 2'))).toMatchObject({ ...LABEL, color: themeRoles.ink });
+    expect(style(screen.getByTestId('exercise-set-1-values'))).toMatchObject({ ...FIGURE, color: themeRoles.ink });
   });
 
   it('fades a planned set', () => {
     renderRow({ kind: 'pending' });
-    expect(style(screen.getByText('RIR 2'))).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
-    expect(style(screen.getByTestId('exercise-set-1-values'))).toMatchObject({ ...FIGURE, color: uiRoles.inkFaint });
+    expect(style(screen.getByText('RIR 2'))).toMatchObject({ ...LABEL, color: themeRoles.inkFaint });
+    expect(style(screen.getByTestId('exercise-set-1-values'))).toMatchObject({ ...FIGURE, color: themeRoles.inkFaint });
   });
 
   it('draws a record weight heavy in the record colour', () => {
@@ -118,7 +122,7 @@ describe('Exercise page: a set row', () => {
       fontFamily: uiFonts.figure.family,
       fontSize: uiTypography.size.base,
       fontWeight: '700',
-      color: uiRoles.record,
+      color: themeRoles.record,
     });
   });
 });
@@ -139,7 +143,7 @@ describe('Exercise page: the records panel', () => {
     sets: [{ setType: 'warm_up', weight: 60, reps: 8, oneRepMax: 75, volume: 480 }],
   };
   const renderPanel = (state: ExerciseRecordsState, view: RecordsView = 'records', expanded = true) =>
-    render(
+    renderWithTheme(
       <RecordsPanel
         dateFormat="YYYY-MM-DD"
         expanded={expanded}
@@ -157,14 +161,14 @@ describe('Exercise page: the records panel', () => {
     renderPanel(ready(RECORDS, LAST));
     expect(style(within(screen.getByTestId('exercise-records-progress')).getByText('Progress'))).toMatchObject({
       ...LABEL,
-      color: uiRoles.inkMuted,
+      color: themeRoles.inkMuted,
     });
   });
 
   it('draws a record line as a faint label, a large figure and a line of words', () => {
     renderPanel(ready(RECORDS, LAST));
     const line = screen.getByTestId('exercise-record-1rm');
-    expect(style(within(line).getByText('1RM'))).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
+    expect(style(within(line).getByText('1RM'))).toMatchObject({ ...LABEL, color: themeRoles.inkFaint });
     expect(style(within(line).getByText('142.5'))).toMatchObject({
       fontFamily: uiFonts.figure.family,
       fontWeight: '600',
@@ -182,7 +186,7 @@ describe('Exercise page: the records panel', () => {
     expectWordsWithFigures(summary, '140.0');
     expect(style(within(last).getByText(/Iron Den/))).toMatchObject(META);
     const set = screen.getByTestId('exercise-records-last-set-0');
-    expect(style(within(set).getByText('W-Up'))).toMatchObject({ ...LABEL, color: uiRoles.ink });
+    expect(style(within(set).getByText('W-Up'))).toMatchObject({ ...LABEL, color: themeRoles.ink });
     expect(style(within(set).getByText('60.0 × 8'))).toMatchObject(FIGURE);
   });
 
@@ -191,6 +195,6 @@ describe('Exercise page: the records panel', () => {
     ['empty', ready({ oneRepMax: null, maxWeight: null, volume: null }, null)],
   ])('writes the %s line as muted body', (kind, state) => {
     renderPanel(state);
-    expect(style(screen.getByTestId(`exercise-records-${kind}`))).toMatchObject({ ...BODY, color: uiRoles.inkMuted });
+    expect(style(screen.getByTestId(`exercise-records-${kind}`))).toMatchObject({ ...BODY, color: themeRoles.inkMuted });
   });
 });

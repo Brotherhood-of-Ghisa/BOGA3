@@ -11,7 +11,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, StyleSheet, type AlertButton } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -34,10 +34,14 @@ import { __resetBodyweightCalculationPreferenceForTests } from '@/src/bodyweight
 import * as bodyweightRepository from '@/src/data/bodyweight';
 import { bodyWeightMeasurements, userSettings } from '@/src/data/schema';
 import * as userSettingsRepository from '@/src/data/user-settings';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { formatLocalDateTime } from '@/src/utils/local-time';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
+import { renderWithTheme, rolesFor } from './helpers/theme';
 import { waitForGone } from './helpers/wait-for-gone';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 // A reading or preference write invalidates the exercise catalog, whose reload
 // runs on Jest's synchronous SQLite driver: it can hold the event loop past
@@ -62,7 +66,7 @@ const seedReading = async (weightValue: string) => {
 
 const openScreen = async () => {
   await bootLocalApp();
-  render(<BodyWeightScreen />);
+  renderWithTheme(<BodyWeightScreen />);
   await screen.findByTestId('body-weight-current');
 };
 
@@ -91,21 +95,21 @@ describe('body weight log', () => {
   it('draws its prose in muted body, its heading as a label and the Measured line\'s figures in Plex Mono', async () => {
     await bootLocalApp();
     await seedReading('82.5');
-    render(<BodyWeightScreen />);
+    renderWithTheme(<BodyWeightScreen />);
     const flat = (node: { props: { style?: unknown } }) => StyleSheet.flatten(node.props.style as never);
     const measured = await screen.findByText(/^Measured /);
-    expect(flat(measured)).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: uiRoles.inkMuted });
+    expect(flat(measured)).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: roles.inkMuted });
     expect(flat(within(measured).getAllByText(/^\d[\d:.,-]*$/)[0])).toMatchObject({ fontFamily: uiFonts.figure.family });
-    expect(flat(screen.getByText(/latest reading on or before/))).toMatchObject({ fontFamily: uiFonts.body.family, color: uiRoles.inkMuted });
+    expect(flat(screen.getByText(/latest reading on or before/))).toMatchObject({ fontFamily: uiFonts.body.family, color: roles.inkMuted });
     expect(flat(screen.getByRole('header', { name: 'Weight history' })))
       .toMatchObject({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
   });
 
   it('explains an entry in muted body', () => {
-    render(<WeightEntrySheet title="Add reading" initial={{ weightValue: '' }} measuredAt={new Date()} explanation="Used from this session on."
+    renderWithTheme(<WeightEntrySheet title="Add reading" initial={{ weightValue: '' }} measuredAt={new Date()} explanation="Used from this session on."
       onSave={jest.fn()} onDismiss={jest.fn()} autoFocus={false} />);
     expect(StyleSheet.flatten(screen.getByText('Used from this session on.').props.style))
-      .toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: uiRoles.inkMuted });
+      .toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: roles.inkMuted });
   });
 
   it('starts empty and saves a kg reading offline into the history', async () => {
@@ -211,7 +215,7 @@ describe('bodyweight calculations and the Settings card', () => {
 
   it('summarises the switch and the current reading on the card, which opens the body weight page', async () => {
     await bootLocalApp();
-    render(<BodyWeightSettingsRow />);
+    renderWithTheme(<BodyWeightSettingsRow />);
     await waitFor(() => expect(cardStatus()).toBe('Bodyweight, Off'));
     // The switch lives on the page, not the card.
     expect(screen.queryByTestId('settings-bodyweight-calculations-toggle')).toBeNull();
@@ -221,7 +225,7 @@ describe('bodyweight calculations and the Settings card', () => {
     screen.unmount();
 
     await seedReading('82.5');
-    render(<BodyWeightSettingsRow />);
+    renderWithTheme(<BodyWeightSettingsRow />);
     await waitFor(() => expect(cardStatus()).toBe('Bodyweight, Off · 82.5'));
   });
 
@@ -230,14 +234,14 @@ describe('bodyweight calculations and the Settings card', () => {
     // The shared resolver (src/data/bodyweight.ts) owns which reading counts.
     const read = jest.spyOn(bodyweightRepository, 'readCurrentBodyWeight')
       .mockResolvedValue({ weightKg: 77 } as Awaited<ReturnType<typeof bodyweightRepository.readCurrentBodyWeight>>);
-    render(<BodyWeightSettingsRow />);
+    renderWithTheme(<BodyWeightSettingsRow />);
     await waitFor(() => expect(cardStatus()).toBe('Bodyweight, Off · 77'));
     expect(read).toHaveBeenCalled();
   });
 
   it('keeps the body weight log available while the private preference turns off and on', async () => {
     await bootLocalApp();
-    render(<><BodyWeightSettingsRow /><BodyWeightScreen /></>);
+    renderWithTheme(<><BodyWeightSettingsRow /><BodyWeightScreen /></>);
     await waitFor(() => expect(toggle().props.accessibilityState).toEqual({ checked: false }));
     // The switch sits at the top of the log, above the current reading.
     const tree = JSON.stringify(screen.toJSON());
@@ -257,7 +261,7 @@ describe('bodyweight calculations and the Settings card', () => {
 
   it('reverts an optimistic toggle and shows a retryable error when the write fails', async () => {
     await bootLocalApp();
-    render(<BodyWeightScreen />);
+    renderWithTheme(<BodyWeightScreen />);
     await waitFor(() => expect(toggle().props.accessibilityState).toEqual({ checked: false }));
 
     // A failed preference write.
@@ -270,7 +274,7 @@ describe('bodyweight calculations and the Settings card', () => {
     expect(screen.getByTestId('settings-bodyweight-calculations-error'))
       .toHaveTextContent('Bodyweight calculations could not be updated. Try again.');
     expect(StyleSheet.flatten(screen.getByTestId('settings-bodyweight-calculations-error').props.style))
-      .toMatchObject({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: uiRoles.danger });
+      .toMatchObject({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: roles.danger });
     expect(storedPreference()).toBe(false);
   });
 });
