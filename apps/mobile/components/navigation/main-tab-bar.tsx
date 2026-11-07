@@ -1,8 +1,9 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabs } from '@/components/navigation/main-tabs';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiSpace } from '@/components/ui/tokens';
 import type { MainTabKey } from '@/src/navigation/main-tabs';
 
 type MainTabBarProps = {
@@ -17,6 +18,7 @@ type MainTabBarProps = {
  * them never changes the bar.
  */
 export function MainTabBar({ activeTab, onSelect }: MainTabBarProps) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(uiSpace.sm, insets.bottom) }]} testID="main-tab-bar">
@@ -25,10 +27,10 @@ export function MainTabBar({ activeTab, onSelect }: MainTabBarProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   bar: {
     paddingHorizontal: uiSpace.lg,
     paddingTop: uiSpace.sm,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
-});
+}));

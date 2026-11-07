@@ -20,10 +20,8 @@ import {
   Icon,
   FigureText,
   ListRow,
-  uiRoles,
   uiSpace,
-  uiText,
-  uiTextTone,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { useCoWCalendar } from '@/src/groups/use-cow-calendar';
@@ -73,6 +71,8 @@ function LostAccessState() {
 
 function GroupScreenContent({ userId, groupId }: { userId: string; groupId: string }) {
   const router = useRouter();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({
     userId,
@@ -132,13 +132,13 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
           density="list"
           label="Members"
           meta={
-            <Text allowFontScaling={false} numberOfLines={1} style={[uiText.body, uiTextTone.muted, styles.memberLine]} testID="group-screen-meta">
+            <Text allowFontScaling={false} numberOfLines={1} style={[text.body, tone.muted, styles.memberLine]} testID="group-screen-meta">
               <FigureText>{memberLine}</FigureText>
             </Text>
           }
           onPress={() => router.push(`/group/${groupId}/members`)}
           testID="group-screen-members-link"
-          trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}
+          trailing={<Icon colorRole="inkMuted" name="chevron-right" />}
         />
         <GroupNotificationMuteRow key={`${userId}:${groupId}`} groupId={groupId} offline={offline} />
       </GroupHeaderCard>
@@ -176,9 +176,9 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
       testID="group-screen">
       {header}
       <View style={styles.calendar} testID="group-screen-time-zone">
-        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>Group time zone</Text>
+        <Text allowFontScaling={false} accessibilityRole="header" style={text.label}>Group time zone</Text>
         {calendar.firstPage ? <>
-          <Text allowFontScaling={false} style={uiText.body} testID="group-screen-time-zone-value">{calendar.firstPage.time_zone ?? 'Not set'}</Text>
+          <Text allowFontScaling={false} style={text.body} testID="group-screen-time-zone-value">{calendar.firstPage.time_zone ?? 'Not set'}</Text>
           {calendarError ? <GroupInlineError error={calendarError} onRetry={() => void refreshCalendar()} testID="group-screen-time-zone-error" /> : null}
         </> : <GroupMissingDataState error={calendarError} offline={calendar.offline} onRetry={() => void refreshCalendar()} testIDPrefix="group-screen-time-zone" />}
         {canManageGroup(summary.my_role) ? <ActionButton label="Set time zone" variant="outline"

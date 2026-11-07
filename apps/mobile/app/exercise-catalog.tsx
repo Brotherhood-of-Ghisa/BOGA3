@@ -21,7 +21,7 @@ import { Screen } from '@/components/ui/screen';
 import { SearchField } from '@/components/ui/search-field';
 import { Sheet } from '@/components/ui/sheet';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 import {
   deleteExerciseCatalogExercise,
   undeleteExerciseCatalogExercise,
@@ -405,7 +405,7 @@ function ExerciseCatalogScreen() {
           accessibilityLabel="Edit exercise from actions"
           disabled={isActionTargetDeleted}
           label="Edit"
-          leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="pencil" size="md" />}
+          leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'ink'} name="pencil" size="md" />}
           onPress={() => {
             setExerciseActionMenuTarget(null);
             if (actionTarget && !actionTarget.deletedAt) {
@@ -420,7 +420,7 @@ function ExerciseCatalogScreen() {
             // A soft-deleted exercise is never linked from the UI.
             disabled={isActionTargetDeleted}
             label="Link to group exercise"
-            leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="link" size="md" />}
+            leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'ink'} name="link" size="md" />}
             onPress={() => {
               setExerciseActionMenuTarget(null);
               if (actionTarget && !actionTarget.deletedAt) {
@@ -433,7 +433,7 @@ function ExerciseCatalogScreen() {
         <ListRow
           accessibilityLabel="View exercise history from actions"
           label="History"
-          leading={<Icon color={uiRoles.ink} name="list" size="md" />}
+          leading={<Icon colorRole="ink" name="list" size="md" />}
           onPress={() => {
             setExerciseActionMenuTarget(null);
             if (actionTarget) router.push(exerciseHistoryHref(actionTarget.id));
@@ -444,7 +444,7 @@ function ExerciseCatalogScreen() {
           accessibilityLabel="Duplicate exercise from actions"
           disabled={isActionTargetDeleted}
           label="Duplicate"
-          leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="copy" size="md" />}
+          leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'ink'} name="copy" size="md" />}
           onPress={() => {
             setExerciseActionMenuTarget(null);
             if (actionTarget && !actionTarget.deletedAt) {
@@ -458,7 +458,7 @@ function ExerciseCatalogScreen() {
             accessibilityLabel="Share exercise with group from actions"
             disabled={isActionTargetDeleted}
             label="Share with group…"
-            leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.ink} name="share" size="md" />}
+            leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'ink'} name="share" size="md" />}
             onPress={() => {
               if (actionTarget && !actionTarget.deletedAt) {
                 void handleShareExercise(actionTarget);
@@ -468,7 +468,7 @@ function ExerciseCatalogScreen() {
           />
         ) : null}
         <ListRow accessibilityLabel="Merge exercise from actions" label="Merge into…"
-          leading={<Icon color={isActionTargetDeleted ? uiRoles.inkGhost : uiRoles.danger} name="swap" size="md" />}
+          leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'danger'} name="swap" size="md" />}
           disabled={isActionTargetDeleted} tone="danger" testID="exercise-action-merge"
           onPress={() => {
             if (actionTarget && !actionTarget.deletedAt) {
@@ -480,7 +480,7 @@ function ExerciseCatalogScreen() {
           <ListRow
             accessibilityLabel="Undelete exercise from actions"
             label="Undelete"
-            leading={<Icon color={uiRoles.ink} name="swap" size="md" />}
+            leading={<Icon colorRole="ink" name="swap" size="md" />}
             onPress={() => {
               if (actionTarget) {
                 void undeleteExercise(actionTarget);
@@ -492,7 +492,7 @@ function ExerciseCatalogScreen() {
           <ListRow
             accessibilityLabel="Delete exercise from actions"
             label="Delete"
-            leading={<Icon color={uiRoles.danger} name="trash" size="md" />}
+            leading={<Icon colorRole="danger" name="trash" size="md" />}
             onPress={() => {
               setExerciseActionMenuTarget(null);
               if (actionTarget) {

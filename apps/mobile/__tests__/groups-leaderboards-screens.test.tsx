@@ -10,7 +10,7 @@ import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { StyleSheet, type ViewStyle } from 'react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
@@ -86,12 +86,17 @@ import {
 import type { CompetitionExerciseWire,CompetitionBoardRowWire,CompetitionBoardWire,CompetitionHistoryWire } from '@/src/groups/competition-wire';
 import { competitionExercise,competitionRow,competitionBoard,competitionCertification,competitionEvent } from './helpers/competition-fixtures';
 import * as groupsApi from '@/src/groups/api';
-import { uiRoles } from '@/components/ui';
+
 
 import GroupsTabRoute from '../app/(tabs)/groups';
 import { sortPodiumCards } from '@/components/groups/group-leaderboards-page';
 import GroupBoardRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/index';
 import GroupBoardHistoryRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/history';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
@@ -198,7 +203,7 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
   };
   const openLeaderboards = async () => {
     mockParams = { groupId: GROUP_ID };
-    render(<GroupsTabRoute />);
+    renderWithTheme(<GroupsTabRoute />);
     await screen.findByTestId('groups-tab-glance');
     goToSection('Leaderboards');
   };
@@ -216,7 +221,7 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
 
   it('reads podiums only once the segment opens, caches them under boards:<groupId>, and renders the cards', async () => {
     mockParams = { groupId: GROUP_ID };
-    render(<GroupsTabRoute />);
+    renderWithTheme(<GroupsTabRoute />);
     await screen.findByTestId('groups-tab-glance');
     expect(api.getCompetitionPodiums).not.toHaveBeenCalled();
 
@@ -321,7 +326,7 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
 describe('Full board (E1.2)', () => {
   const openBoard = (params: Record<string, string> = {}) => {
     mockParams = { groupId: GROUP_ID, exerciseId: EXERCISE_ID, ...params };
-    render(<GroupBoardRoute />);
+    renderWithTheme(<GroupBoardRoute />);
   };
 
   it('opens on 1RM · All by default', async () => {
@@ -357,8 +362,8 @@ describe('Full board (E1.2)', () => {
     expect(screen.getByTestId('group-board-row-1-mark-uncertified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-2-member')).toHaveTextContent('You');
     // My row sits on paper, the others on the card's surface.
-    expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(uiRoles.paper);
-    expect(groundOf(screen.getByTestId('group-board-row-1'))).toBe(uiRoles.surface);
+    expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(roles.paper);
+    expect(groundOf(screen.getByTestId('group-board-row-1'))).toBe(roles.surface);
     expect(screen.getByTestId('group-board-row-2-mark')).toHaveTextContent('');
     expect(screen.getByTestId('group-board-row-2-mark-certified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-3-member')).toHaveTextContent('Alex (former)');
@@ -423,7 +428,7 @@ describe('Full board (E1.2)', () => {
   it('shows "Archived · read-only" on an archived exercise', async () => {
     api.getCompetitionBoard.mockResolvedValue(boardPage([], { group_exercise_id: 'ge-old',state: 'archived' }));
     mockParams = { groupId: GROUP_ID, exerciseId: 'ge-old' };
-    render(<GroupBoardRoute />);
+    renderWithTheme(<GroupBoardRoute />);
     expect(await screen.findByTestId('group-board-archived')).toHaveTextContent('Archived · read-only');
   });
 
@@ -481,7 +486,7 @@ describe('Full board (E1.2)', () => {
 });
 
 describe('Competition history',()=>{
-  const openHistory=()=>{mockParams={ groupId: GROUP_ID,exerciseId: EXERCISE_ID,scope: 'all' };render(<GroupBoardHistoryRoute />);};
+  const openHistory=()=>{mockParams={ groupId: GROUP_ID,exerciseId: EXERCISE_ID,scope: 'all' };renderWithTheme(<GroupBoardHistoryRoute />);};
   it('keeps original units and pages with the opaque history cursor',async()=>{
     const event={ ...competitionEvent,kind: 'lead_change' as const,event_id: 'lc2',sequence: 12,sort_at_ms: SEP_10,
       group: { group_id: GROUP_ID,name: 'Garage Gym' },group_exercise: { group_exercise_id: EXERCISE_ID,name: 'Bench Press' },

@@ -1,0 +1,21 @@
+appId: com.dinoderek.mobile
+---
+# Allow the iOS "Would Like to Send You Notifications" dialog when it is on
+# screen, and do nothing when it is not.
+#
+# Why: the rest timer asks for notification permission the first time it starts
+# (`src/session-recorder/rest-timer-notification-native.ts`), and iOS keeps the
+# dialog in front of the app, across the next flow's reset, until it is
+# answered. `simctl privacy` has no notification service, so the runtime cannot
+# pre-grant it as it does location; every assertion behind the dialog then
+# fails. Android grants POST_NOTIFICATIONS at provision time, so there the
+# dialog never appears and this is a no-op.
+#
+# Called right after a flow opens its first link, to clear a dialog an earlier
+# flow in the lane left behind. A flow that starts a rest timer itself calls
+# `await-notification-permission.yaml`, which waits for the dialog first.
+- runFlow:
+    when:
+      visible: ".*Would Like to Send You Notifications.*"
+    commands:
+      - tapOn: "Allow"

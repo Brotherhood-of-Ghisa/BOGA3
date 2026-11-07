@@ -9,10 +9,11 @@ import {
 } from 'react-native';
 import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
-import { changeToneColour } from '@/components/ui/change-tone';
+import { changeToneColourIn } from '@/components/ui/change-tone';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressPeriod } from '@/src/progress-summary';
 
 import {
@@ -44,29 +45,30 @@ export const MIN_FILL_CHART_HEIGHT = 72;
 const WEEK_TICK = 4;
 
 function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
+  const roles = useUiRoles();
   const { plot, current, previous, projection, today, selected, weekStartsX } = geometry;
   const lastCurrent = current[current.length - 1];
   const area = lastCurrent ? [{ x: 0, y: plot.bottom }, ...current, { x: lastCurrent.x, y: plot.bottom }] : [];
 
   return (
     <>
-      <Line stroke={uiRoles.rule} strokeWidth={1} x1={0} x2={plot.width} y1={plot.bottom} y2={plot.bottom} />
+      <Line stroke={roles.rule} strokeWidth={1} x1={0} x2={plot.width} y1={plot.bottom} y2={plot.bottom} />
       {weekStartsX.map((x) => (
-        <Line key={x} stroke={uiRoles.rule} strokeWidth={1} x1={x} x2={x} y1={plot.bottom} y2={plot.bottom + WEEK_TICK} />
+        <Line key={x} stroke={roles.rule} strokeWidth={1} x1={x} x2={x} y1={plot.bottom} y2={plot.bottom + WEEK_TICK} />
       ))}
-      {today.current ? <Line stroke={uiRoles.ruleSoft} strokeWidth={1} x1={today.current.x} x2={today.current.x} y1={plot.top} y2={plot.bottom} /> : null}
-      {area.length ? <Polygon fill={uiRoles.viz0} points={toPolyline(area)} /> : null}
+      {today.current ? <Line stroke={roles.ruleSoft} strokeWidth={1} x1={today.current.x} x2={today.current.x} y1={plot.top} y2={plot.bottom} /> : null}
+      {area.length ? <Polygon fill={roles.viz0} points={toPolyline(area)} /> : null}
       <Polyline
         fill="none"
         points={toPolyline(previous)}
-        stroke={uiRoles.inkFaint}
+        stroke={roles.inkFaint}
         strokeDasharray="5 4"
         strokeLinejoin="round"
         strokeWidth={2}
         testID="today-progress-chart-previous"
       />
       {projection ? <Line
-        stroke={uiRoles.inkGhost}
+        stroke={roles.inkGhost}
         strokeDasharray="2 4"
         strokeLinecap="round"
         strokeWidth={2}
@@ -79,7 +81,7 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
       <Polyline
         fill="none"
         points={toPolyline(current)}
-        stroke={uiRoles.ink}
+        stroke={roles.ink}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
@@ -87,7 +89,7 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
       />
       {selected.x === today.current?.x ? null : (
         <Line
-          stroke={uiRoles.inkFaint}
+          stroke={roles.inkFaint}
           strokeWidth={1}
           testID="today-progress-chart-selection"
           x1={selected.x}
@@ -98,16 +100,16 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
       )}
       <TonnageReferenceLayer annotations={geometry.references} width={plot.width} />
       {!today.current || selected.x === today.current.x ? null : (
-        <Circle cx={today.current.x} cy={today.current.y} fill={uiRoles.ink} r={2.5} testID="today-progress-chart-today" />
+        <Circle cx={today.current.x} cy={today.current.y} fill={roles.ink} r={2.5} testID="today-progress-chart-today" />
       )}
-      {selected.previous ? <Circle cx={selected.previous.x} cy={selected.previous.y} fill={uiRoles.surface} r={3.5} stroke={uiRoles.inkFaint} strokeWidth={2} /> : null}
+      {selected.previous ? <Circle cx={selected.previous.x} cy={selected.previous.y} fill={roles.surface} r={3.5} stroke={roles.inkFaint} strokeWidth={2} /> : null}
       {/* A projected day is hollow: the projection's figure, not a count. */}
       {selected.current ? <Circle
         cx={selected.current.x}
         cy={selected.current.y}
-        fill={selected.projected ? uiRoles.surface : uiRoles.ink}
+        fill={selected.projected ? roles.surface : roles.ink}
         r={4.5}
-        stroke={selected.projected ? uiRoles.ink : uiRoles.onInk}
+        stroke={selected.projected ? roles.ink : roles.onInk}
         strokeWidth={2}
       /> : null}
     </>
@@ -132,6 +134,10 @@ export function PeriodPace({
   /** Compares against the period this many periods back. */
   onShowCompared?: (periodsBack: number) => void;
 }) {
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [size, setSize] = useState({ width: FALLBACK_CHART_WIDTH, height: CHART_HEIGHT });
   // The selected day belongs to the period it was picked in; another period
   // (a new day, a changed Progress period) starts again at today.
@@ -173,7 +179,7 @@ export function PeriodPace({
     <Text
       allowFontScaling={false}
       numberOfLines={1}
-      style={[uiText.label, uiTextTone.faint]}
+      style={[text.label, tone.faint]}
       testID="today-progress-period-previous-range">
       {formatPeriodRange(period.previous.window)}
     </Text>
@@ -190,25 +196,25 @@ export function PeriodPace({
         style={styles.figures}
         testID="today-progress-period-figures">
         <View style={[styles.column, styles.currentColumn]}>
-          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]} testID="today-progress-period-range">
+          <Text allowFontScaling={false} style={[text.label, tone.ink]} testID="today-progress-period-range">
             {formatPeriodRange(period.window)}
           </Text>
           {/* One line whatever the day's label: the figure shrinks rather
               than wraps, so the card keeps its height as the selection moves. */}
           <View style={[styles.currentRow, metric === 'totalVolume' ? styles.tonnageRow : null]} testID="today-progress-period-working-sets">
-            <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta} testID="today-progress-period-day"><FigureText>{`${label} `}</FigureText></Text>
+            <Text allowFontScaling={false} numberOfLines={1} style={text.meta} testID="today-progress-period-day"><FigureText>{`${label} `}</FigureText></Text>
             <Text accessibilityLabel={periodFiguresAccessibilityLabel(period, figures)}
               accessibilityActions={compareActions} onAccessibilityAction={onCompareAction}
-              adjustsFontSizeToFit={metric === 'workingSetCount'} allowFontScaling={false} numberOfLines={1} style={[uiText.figureHero, styles.currentFigure]}>
+              adjustsFontSizeToFit={metric === 'workingSetCount'} allowFontScaling={false} numberOfLines={1} style={[text.figureHero, styles.currentFigure]}>
               {formatPaceValue(figures.value, metric)}
-              <Text allowFontScaling={false} style={uiText.meta}> {paceUnit(metric)}</Text>
+              <Text allowFontScaling={false} style={text.meta}> {paceUnit(metric)}</Text>
             </Text>
           </View>
         </View>
         {/* `vs` between the two periods, a rule above and below it. */}
         <View style={styles.versus}>
           <View style={styles.versusRule} />
-          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>vs</Text>
+          <Text allowFontScaling={false} style={[text.label, tone.faint]}>vs</Text>
           <View style={styles.versusRule} />
         </View>
         <View style={[styles.column, styles.comparedColumn]}>
@@ -224,14 +230,14 @@ export function PeriodPace({
             comparedRange
           )}
           <View style={styles.previousRow}>
-            <Text allowFontScaling={false} style={uiText.figureLarge} testID="today-progress-period-previous-sets">
+            <Text allowFontScaling={false} style={text.figureLarge} testID="today-progress-period-previous-sets">
               {formatPaceValue(figures.previousValue, metric)}
-              <Text allowFontScaling={false} style={uiText.meta}> {paceUnit(metric)}</Text>
+              <Text allowFontScaling={false} style={text.meta}> {paceUnit(metric)}</Text>
             </Text>
             {/* The difference takes its direction's colour, like every other
                 change figure (`design-language.md` §6). */}
             <Text allowFontScaling={false} testID="today-progress-period-difference"
-              style={[uiText.figureLarge, { color: changeToneColour(delta.tone) }]}>
+              style={[text.figureLarge, { color: changeToneColourIn(roles, delta.tone) }]}>
               {delta.text}
             </Text>
           </View>
@@ -268,7 +274,7 @@ export function PeriodPace({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   block: {
     gap: uiSpace.md,
   },
@@ -301,7 +307,7 @@ const styles = StyleSheet.create({
   versusRule: {
     flex: 1,
     width: 1,
-    backgroundColor: uiRoles.rule,
+    backgroundColor: roles.rule,
   },
   // Clear of `vs` on the left; on the right the arrow reaches past the edge, so its glyph sits on the figures' line.
   comparedColumn: {
@@ -330,4 +336,4 @@ const styles = StyleSheet.create({
     flexBasis: 0,
     minHeight: MIN_FILL_CHART_HEIGHT,
   },
-});
+}));

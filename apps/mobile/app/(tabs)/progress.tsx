@@ -23,7 +23,7 @@ import {
   StatePanel,
   ToggleChip,
   uiSpace,
-  uiText,
+  useUiText,
 } from '@/components/ui';
 import { type ProgressComparisons, type ProgressMuscleComparison } from '@/src/data';
 import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
@@ -321,6 +321,7 @@ export function StatsScreenShell({
   defaultCountSecondaryVolume = true,
   defaultGrouped = true,
 }: StatsScreenShellProps) {
+  const text = useUiText();
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
   );
@@ -458,7 +459,7 @@ export function StatsScreenShell({
           onExerciseHistory={(row, target) => openHistory(onOpenExerciseHistory, { exerciseDefinitionId: row.exerciseDefinitionId }, target)}
           /> : null}
         <ListRow onPress={onPressSessionsCard} accessibilityLabel="Open sessions list" testID="stats-sessions-link"
-          meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={[uiText.bodyStrong, statsTableStyles.name]}>Sessions</Text></ListRow>
+          meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={[text.bodyStrong, statsTableStyles.name]}>Sessions</Text></ListRow>
       </ScreenScroll>
 
     </Screen>
@@ -502,6 +503,7 @@ function ExerciseListView({
   sortMode: ExerciseSortMode;
   onPressSortHeader: (header: ExerciseSortHeader) => void;
 }) {
+  const text = useUiText();
   const links = useRef(new Map<string, ComponentRef<typeof View>>());
   const { width } = useWindowDimensions();
   if (items.length === 0) {
@@ -567,7 +569,7 @@ function ExerciseListView({
             meta={layout.stacked ? undefined : values}
             onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
             testID={`stats-exercise-row-${item.id}`}>
-            <Text allowFontScaling={false} style={[uiText.bodyStrong, statsTableStyles.name]} testID={`stats-exercise-name-${item.id}`}>
+            <Text allowFontScaling={false} style={[text.bodyStrong, statsTableStyles.name]} testID={`stats-exercise-name-${item.id}`}>
               {item.name}
             </Text>
             {layout.stacked ? values : null}

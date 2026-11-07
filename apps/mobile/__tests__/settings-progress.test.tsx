@@ -11,7 +11,7 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => require('react').useEffect(callback, [callback]),
 }));
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, renderHook, screen, waitFor, within } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
 import {
   DataSyncSettingsScreen,
@@ -22,11 +22,17 @@ import {
 import { EverythingElseSettingsScreen } from '@/components/settings/everything-else';
 import ProgressRoute from '../app/(tabs)/progress';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
-import { uiText } from '@/components/ui';
+import { useUiText } from '@/components/ui/text-roles';
+import { AppThemeProvider } from '@/components/ui/theme-context';
+import { renderWithTheme } from './helpers/theme';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, getAccountLocalPreferenceState, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
+
+// The live text roles. Read before the render under test: `renderHook` would
+// otherwise take over `screen`.
+const liveText = () => renderHook(() => useUiText(), { wrapper: AppThemeProvider }).result.current;
 
 const values = () => getAccountLocalPreferenceState().values;
 // Settings' sub pages that edit preferences, beside Data & sync, which reports
@@ -49,7 +55,7 @@ const ProgressSettingsAndPage = () => (
 const openSettings = async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  render(<SettingsPages />);
+  renderWithTheme(<SettingsPages />);
   await waitFor(() => expect(screen.getByTestId('settings-target-window')).toHaveProp('value', '4'));
 };
 const editNumber = (id: string, value: string) => {
@@ -109,6 +115,7 @@ it.each([[false, false], [false, true], [true, false], [true, true]])(
 );
 
 it('draws Progress and Effort as sections of rows: micro-label headings, option-role row names', async () => {
+  const uiText = liveText();
   await openSettings();
   const progress = within(screen.getByTestId('settings-section-progress'));
   for (const heading of ['Opens on', 'Display', 'Periods', 'Counting']) {
@@ -131,7 +138,7 @@ const openSettingsAndProgress = async () => {
   await loadMaestroFixture('exercise-block-history');
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  const page = render(<ProgressSettingsAndPage />);
+  const page = renderWithTheme(<ProgressSettingsAndPage />);
   await screen.findByTestId('stats-muscle-table');
   return page;
 };
@@ -162,7 +169,7 @@ it('saves List or 3D for Muscle while Exercise always lists full figures and ope
   __resetAccountLocalPreferencesForTests();
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  render(<ProgressSettingsAndPage />);
+  renderWithTheme(<ProgressSettingsAndPage />);
   await screen.findByTestId('stats-muscle-body-card');
   expect(screen.getByTestId('settings-muscle-view-3d')).toHaveProp('accessibilityState', { selected: true });
   fireEvent.press(screen.getByTestId('settings-muscle-view-list'));
@@ -319,11 +326,11 @@ it('keeps muscle targets and muscle setup off the Progress sub-page', async () =
 it('keeps the effort choices on their own page, not under Progress', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  render(<ProgressSettingsScreen />);
+  renderWithTheme(<ProgressSettingsScreen />);
   await waitFor(() => expect(screen.getByTestId('settings-target-window')).toHaveProp('value', '4'));
   expect(screen.queryByTestId('settings-effort-selections')).toBeNull();
   screen.unmount();
-  render(<EffortSettingsScreen />);
+  renderWithTheme(<EffortSettingsScreen />);
   expect(screen.getByTestId('settings-effort-selections')).toBeTruthy();
 });
 
@@ -409,7 +416,7 @@ it('updates a mounted picker while keeping its hidden selected effort intact', a
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
   const select = jest.fn();
-  render(<EffortSheet visible selected="rir_2" onSelect={select} onDismiss={jest.fn()} />);
+  renderWithTheme(<EffortSheet visible selected="rir_2" onSelect={select} onDismiss={jest.fn()} />);
   expect(screen.getByTestId('exercise-effort-option-rir_2')).toHaveProp('accessibilityState', { selected: true, disabled: false });
   act(() => updatePreferences({ displayEfforts: ['rir_0', 'technique'] }));
   expect(screen.queryByTestId('exercise-effort-option-rir_2')).toBeNull();
@@ -423,7 +430,7 @@ it('updates a mounted picker while keeping its hidden selected effort intact', a
 it('turns the title-bar timer on and off on Everything else, off by default and saved per account', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  render(<EverythingElseSettingsScreen />);
+  renderWithTheme(<EverythingElseSettingsScreen />);
   const toggle = screen.getByTestId('settings-timer-in-title-bar');
   expect(toggle).toHaveProp('accessibilityState', { checked: false });
   fireEvent.press(toggle);
@@ -438,7 +445,7 @@ it('turns the title-bar timer on and off on Everything else, off by default and 
 it('offers no Today layout on Everything else', async () => {
   setAccountLocalPreferenceAccount('A', true);
   await ensureAccountLocalPreferencesLoaded();
-  render(<EverythingElseSettingsScreen />);
+  renderWithTheme(<EverythingElseSettingsScreen />);
   expect(screen.getByTestId('settings-timer-in-title-bar')).toBeTruthy();
   expect(screen.getByTestId('settings-date-format-row')).toBeTruthy();
   expect(screen.queryByText('Today layout')).toBeNull();
