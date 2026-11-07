@@ -162,7 +162,7 @@ Archivo **600**, the selected one **700**; headline figures stay Plex Mono 700,
 micro-labels Archivo 700, sheet titles Archivo 800.
 
 **Text roles.** A screen names what its text does and takes face, weight, size
-and line-height from `useTextRoles()` (`apps/mobile/components/ui/text-roles.ts`); it
+and line-height from `useUiText()` (`apps/mobile/components/ui/text-roles.ts`); it
 never assembles them itself. Decided 2026-10-27 on Today, where twenty mixes
 had grown for nine jobs.
 
@@ -186,7 +186,7 @@ had grown for nine jobs.
 | `figure` | Plex Mono 500 · `base` | every number in a row or table, on `body`'s line |
 | `figureSmall` | Plex Mono 500 · `sm`, muted | a quiet date, time or comparison |
 
-Colour (`tone`: ink, muted, faint, accent, gain, danger, record) and one step of
+Colour (`useUiTextTone()`: ink, muted, faint, accent, gain, danger, record) and one step of
 emphasis (`uiTextEmphasis.strong`: mine, live, the gym) are modifiers, never new
 roles; layout styles follow the role and set no type. A line mixing words and
 figures keeps its word role and draws only the figures in Plex Mono 500

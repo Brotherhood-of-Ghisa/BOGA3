@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import { Card } from '@/components/ui/card';
 import { ListRow } from '@/components/ui/list-row';
-import { useTextRoles } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import type { PickerGroupRow, PickerGroupSection } from '@/src/groups';
 
@@ -18,7 +18,8 @@ export function PickerGroupSectionList({
   sections: PickerGroupSection[];
   onPressRow: (row: PickerGroupRow) => void;
 }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   if (sections.length === 0) {
     return null;
   }

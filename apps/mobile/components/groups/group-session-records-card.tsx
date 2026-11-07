@@ -1,7 +1,7 @@
 import { useRouter, type Href } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
-import { FigureText, makeStyles, uiBorder, uiGeometry, uiSpace, useTextRoles } from '@/components/ui';
+import { FigureText, makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { GroupRole } from '@/src/groups';
 import type { SessionRecordRow } from '@/src/groups/competition-session-records-view-model';
 
@@ -26,7 +26,8 @@ type CardProps = {
  */
 export function GroupSessionRecordsCard({ rows, ...rest }: CardProps) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   if (rows.length === 0) return null;
   return (
     <View style={styles.card} testID="group-session-records">
@@ -45,7 +46,8 @@ export function GroupSessionRecordsCard({ rows, ...rest }: CardProps) {
 function RecordRow({ row, ...rest }: { row: SessionRecordRow } & Omit<CardProps, 'rows'>) {
   const router = useRouter();
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const scoreStyle = useScoreStyle();
   const testID = `group-session-record-${row.key}`;
   return (

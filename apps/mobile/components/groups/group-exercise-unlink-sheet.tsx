@@ -1,6 +1,6 @@
 import { ScrollView, StyleSheet, Text } from 'react-native';
 
-import { ActionButton, ListRow, Sheet, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, ListRow, Sheet, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { PersonalExerciseLinkChoice } from '@/src/groups/exercise-view-model';
 
 type Props = {
@@ -21,7 +21,8 @@ type Props = {
  * personal ID; its host confirms once the sheet has gone. No Cancel (G5).
  */
 export function GroupExerciseUnlinkSheet({ visible, groupName, groupExerciseName, choices, onSelect, onClose, onDismissed }: Props) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <Sheet
       dismissLabel="Dismiss your linked exercises"

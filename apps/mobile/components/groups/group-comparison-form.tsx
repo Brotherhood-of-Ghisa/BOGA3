@@ -1,7 +1,7 @@
 import { Text, View } from 'react-native';
 
 import { ExerciseNameField, ExerciseWeightSection } from '@/components/exercise-core/exercise-core-fields';
-import { ActionButton, FigureText, FormSection, ListRow, SegmentedControl, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, FigureText, FormSection, ListRow, SegmentedControl, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { deriveComparisonFormStatus, validateCompetitionFormRules } from '@/src/groups/comparison-form-model';
 import { GROUP_COMPETITION_METRICS as GROUP_METRICS, type CompetitionRules as GroupExerciseRules, type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
 import type { CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
@@ -47,7 +47,8 @@ export function GroupComparisonForm({ bodyweightCalculationsEnabled, initialRule
 
 export function GroupComparisonFormFields({ bodyweightCalculationsEnabled,existing,submitLabel,pendingLabel,pending,errorMessage,onSubmit,draft }:
   Props & { draft: ReturnType<typeof useComparisonDraft> }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const validation = validateCompetitionFormRules({ name: draft.name, loadInputMode: draft.loadInputMode,
     bodyweightCalculationsEnabled, bodyweightContribution: draft.contribution,
     defaultMetric: draft.defaultMetric });

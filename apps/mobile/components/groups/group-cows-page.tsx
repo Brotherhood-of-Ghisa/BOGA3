@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
-import { ActionButton, Card, FigureText, Icon, ListRow, ScreenScroll, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, Card, FigureText, Icon, ListRow, ScreenScroll, uiSpace, useUiText } from '@/components/ui';
 import { GroupInlineError, GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
 import { CoWPreview } from '@/components/groups/cow-preview';
@@ -25,7 +25,7 @@ const itemKey = (cow: CoWDefinitionWire) => cow.cow_id;
 export function GroupCoWsPage({ userId, groupId, cowId = null, metric = null, embedded = false }: {
   userId: string; groupId: string; cowId?: string | null; metric?: string | null; embedded?: boolean;
 }) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   const router = useRouter();
   const dateFormat = useDateFormat();
   const groupFetcher = useCallback(() => getGroup(groupId), [groupId]);
@@ -78,7 +78,7 @@ function CoWNextSection({ calendar, cows, next, manager, groupId, name, open, da
   next: CoWDefinitionWire | undefined; manager: boolean; groupId: string; name: (cow: CoWDefinitionWire) => string;
   open: (cow: CoWDefinitionWire) => void; dateFormat: ExerciseDateFormat;
 }) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   const router = useRouter();
   const week = next?.week_start ?? calendar.firstPage?.next_week_start;
   const zone = next?.time_zone ?? calendar.firstPage?.time_zone;
@@ -102,7 +102,7 @@ function CoWPastSection({ cows, past, name, open, dateFormat }: {
   cows: GroupOnlinePagesState<CoWListWire, CoWDefinitionWire>; past: CoWDefinitionWire[];
   name: (cow: CoWDefinitionWire) => string; open: (cow: CoWDefinitionWire) => void; dateFormat: ExerciseDateFormat;
 }) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   return cows.firstPage ? <View style={{ gap: uiSpace.sm }}>{past.map(cow => <Card key={cow.cow_id}><ListRow density="list" accessibilityLabel={`${name(cow)}, ${coWStatus(cow)}`}
       onPress={() => open(cow)} testID={`cows-past-${cow.cow_id}`} trailing={<Icon name="chevron-right" colorRole="inkMuted" size="sm" />}
       meta={<Text allowFontScaling={false} style={[text.meta, { textAlign: 'right' }]} accessibilityLabel={coWAccessibleDates(cow.week_start, dateFormat)}><FigureText>{coWDateRange(cow.week_start, dateFormat)}</FigureText></Text>}>

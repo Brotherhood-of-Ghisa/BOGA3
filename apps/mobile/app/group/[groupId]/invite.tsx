@@ -14,7 +14,7 @@ import {
   Card,
   ScreenScroll,
   uiSpace,
-  useTextRoles,
+  useUiText,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -58,7 +58,7 @@ type Feedback = { tone: 'error' | 'success'; message: string };
 
 function GroupInviteContent({ userId, groupId }: { userId: string; groupId: string }) {
   const groupScreenStyles = useGroupScreenStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({
     userId,

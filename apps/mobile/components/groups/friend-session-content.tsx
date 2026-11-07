@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { Icon } from '@/components/ui/icon';
-import { useTextRoles } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import type { GroupRole } from '@/src/groups';
 import {
@@ -49,7 +49,8 @@ export type FriendSessionRecordsProps = {
 
 export function FriendSessionContent({ session, records, groupId, userId, myRole, online, onRecordsChanged }:
   { session: CompetitionSessionWire } & FriendSessionRecordsProps) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const dateFormat = useDateFormat();
   const model = useMemo(() => buildCompetitionSession(session),[session]);
   const { rows, bands } = useMemo(() => {

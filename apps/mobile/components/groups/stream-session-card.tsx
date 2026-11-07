@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { CompactCard, CompactHeader, FigureText, makeStyles, uiSpace, uiTextEmphasis, useTextRoles } from '@/components/ui';
+import { CompactCard, CompactHeader, FigureText, makeStyles, uiSpace, uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui';
 import type {
   CompetitionSessionCard as StreamSessionCardViewModel,
   CompetitionSessionRecordLine,
@@ -18,7 +18,8 @@ type GroupStreamSessionCardProps = {
 /** One group record the session took, under its figures. */
 function RecordLine({ line, onPress, testID }: { line: CompetitionSessionRecordLine; onPress?: () => void; testID: string }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <Pressable
       accessibilityHint={onPress ? 'Opens the record' : undefined}
@@ -46,7 +47,8 @@ function RecordLine({ line, onPress, testID }: { line: CompetitionSessionRecordL
  */
 export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressRecord }: GroupStreamSessionCardProps) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const testID = `group-stream-session-card-${card.key}`;
   const context = [card.startedAtLabel, card.gymName?.trim() || null].filter(Boolean).join(' · ');
   const records = card.records;

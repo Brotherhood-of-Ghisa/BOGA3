@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, FormField, SegmentedControl, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, FormField, SegmentedControl, uiSpace, useUiText } from '@/components/ui';
 import {
   GROUP_DESCRIPTION_MAX_LENGTH,
   GROUP_NAME_MAX_LENGTH,
@@ -49,7 +49,7 @@ export function GroupDetailsForm(props: GroupDetailsFormProps) {
 export function GroupDetailsFormFields({
   initialBodyweightCalculationsEnabled,positiveContributionCount=null,submitLabel,pendingLabel,pending,errorMessage,onSubmit,draft,
 }: GroupDetailsFormProps & { draft: ReturnType<typeof useGroupDetailsDraft> }) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   const { name,description,bodyweightCalculationsEnabled,setName,setDescription,setBodyweightCalculationsEnabled }=draft;
   const [showErrors, setShowErrors] = useState(false);
   const validation = validateGroupDetails(name, description);

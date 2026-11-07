@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { useTextRoles } from '@/components/ui/text-roles';
+import { useUiText } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 
 import { GroupSwitchSheet, type GroupSwitchOption } from './group-switch-sheet';
@@ -91,7 +91,7 @@ export function GroupScreenHeader({ groups, selectedGroupId, groupName, onSelect
 }
 
 function GroupsTitle({ name, canSwitch, maxWidth, onPress }: { name: string; canSwitch: boolean; maxWidth: number; onPress: () => void }) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   // A long name shrinks before it truncates.
   const label = (
     <Text

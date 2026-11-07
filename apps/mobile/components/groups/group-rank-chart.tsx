@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 
-import { useTextRoles } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { useUiRoles } from '@/components/ui/theme-context';
 import { uiFonts, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { GroupRankSeries } from '@/src/groups/home-view-model';
@@ -36,7 +36,8 @@ export type GroupRankChartProps = {
  */
 export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, accessibilityLabel }: GroupRankChartProps) {
   const roles = useUiRoles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [plotWidth, setPlotWidth] = useState(FALLBACK_PLOT_WIDTH);
   const onLayout = (event: LayoutChangeEvent) => {
     const width = event.nativeEvent.layout.width;

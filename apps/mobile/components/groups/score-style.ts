@@ -1,4 +1,4 @@
-import { useTextRoles } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui';
 
 /**
  * A board or record score: a figure in the slot's figure role, or — when the
@@ -7,7 +7,8 @@ import { useTextRoles } from '@/components/ui';
  * `scoreStyle(label, size)` is the style for one score.
  */
 export function useScoreStyle() {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (label: string, size: 'large' | 'base' | 'small') => {
     const available = scoreHasFigure(label);
     if (size === 'small') return available ? text.figureSmall : text.meta;

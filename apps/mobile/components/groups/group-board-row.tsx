@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 
-import { FigureText, ListRow, makeStyles, uiSpace, uiTextEmphasis, useTextRoles } from '@/components/ui';
+import { FigureText, ListRow, makeStyles, uiSpace, uiTextEmphasis, useUiText } from '@/components/ui';
 import { UNCERTIFIED_MARK_LABEL, type BoardRowViewModel } from '@/src/groups';
 
 import { GroupCertificationStatus } from './certification-status';
@@ -24,7 +24,7 @@ type GroupBoardRowProps = {
  */
 export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps) {
   const styles = useStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   const scoreStyle = useScoreStyle();
   const cardListItemStyles = useCardListItemStyles();
   const testID = `group-board-row-${row.rank}`;

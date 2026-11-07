@@ -40,12 +40,11 @@ import CoWScheduleRoute from '@/app/group/[groupId]/cows/schedule';
 import GroupRoute from '@/app/group/[groupId]';
 import EditGroupRoute from '@/app/group/[groupId]/edit';
 import { waitForGone } from './helpers/wait-for-gone';
+import { uiText, uiTextTone } from '@/components/ui/text-roles';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
-import { textRoles } from '@/components/ui/text-roles';
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
 const themeRoles = rolesFor(DEFAULT_APPEARANCE);
-const { text: themeText, tone: themeTone } = textRoles(themeRoles);
 
 const api = groupApi as jest.Mocked<typeof groupApi>;
 const NOW = new Date(2026, 9, 30, 12);
@@ -128,10 +127,10 @@ it.each([false, true])('uses the same compact card typography and right-aligned 
   renderWithTheme(<CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" previous={previous} onOpen={jest.fn()} testID="preview" />);
   const title = screen.getByText('CoW');
   const date = screen.getByLabelText(previous ? '19-10-2026 – 25-10-2026' : '26-10-2026 – 01-11-2026');
-  expect(title).toHaveStyle({ ...themeText.label, ...themeTone.ink });
-  expect(date).toHaveStyle({ ...themeText.meta, textAlign: 'right', marginLeft: 'auto' });
-  expect(screen.getByText('Pull-up')).toHaveStyle(themeText.bodyStrong);
-  expect(screen.getByText(previous ? 'Last week · Final' : 'Live')).toHaveStyle(themeText.meta);
+  expect(title).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
+  expect(date).toHaveStyle({ ...uiText.meta, textAlign: 'right', marginLeft: 'auto' });
+  expect(screen.getByText('Pull-up')).toHaveStyle(uiText.bodyStrong);
+  expect(screen.getByText(previous ? 'Last week · Final' : 'Live')).toHaveStyle(uiText.meta);
 });
 it.each(['pending','unavailable','empty'] as const)('keeps current %s distinct from absence', async state => {
   const value = summary();
@@ -185,9 +184,9 @@ it('browses current, next and past with archived names retained, and management 
   renderWithTheme(<CoWsRoute />);
   expect(await screen.findByTestId('cows-preview')).toBeTruthy(); expect(await screen.findByTestId('cows-next')).toBeTruthy();
   expect(screen.getByText('Archived squat')).toBeTruthy();
-  expect(screen.getByText('Archived squat')).toHaveStyle(themeText.bodyStrong);
-  expect(within(screen.getByTestId('cows-past-past')).getByText('Final')).toHaveStyle(themeText.meta);
-  expect(within(screen.getByTestId('cows-next')).getByText('Pull-up')).toHaveStyle(themeText.bodyStrong);
+  expect(screen.getByText('Archived squat')).toHaveStyle(uiText.bodyStrong);
+  expect(within(screen.getByTestId('cows-past-past')).getByText('Final')).toHaveStyle(uiText.meta);
+  expect(within(screen.getByTestId('cows-next')).getByText('Pull-up')).toHaveStyle(uiText.bodyStrong);
   fireEvent.press(screen.getByTestId('cows-past-past'));
   expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows/past?metric=e1rm');
   fireEvent.press(screen.getByTestId('cows-schedule')); expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows/schedule?cowId=next');
@@ -671,11 +670,11 @@ it('Today shares uppercase headings, right-aligned date rows and compact text be
     const section = within(screen.getByTestId(prefix));
     const heading = section.getByText(title);
     const range = section.getByText(date);
-    expect(heading).toHaveStyle({ ...themeText.label, ...themeTone.ink });
-    expect(range).toHaveStyle({ ...themeText.meta, textAlign: 'right', marginLeft: 'auto' });
-    expect(section.getByTestId(`${prefix}-exercise`)).toHaveStyle(themeText.bodyStrong);
+    expect(heading).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
+    expect(range).toHaveStyle({ ...uiText.meta, textAlign: 'right', marginLeft: 'auto' });
+    expect(section.getByTestId(`${prefix}-exercise`)).toHaveStyle(uiText.bodyStrong);
   }
-  expect(screen.getByTestId('today-cow-winner-e1rm-name')).toHaveStyle({ ...themeText.meta, ...themeTone.ink });
+  expect(screen.getByTestId('today-cow-winner-e1rm-name')).toHaveStyle({ ...uiText.meta, ...uiTextTone.ink });
 });
 
 it('Today retains the public winner identity when its figure is redacted and never promotes a runner-up', async () => {

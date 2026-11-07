@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { ActionButton, FormField, FormSection, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, FormField, FormSection, uiSpace, useUiText } from '@/components/ui';
 import { setCoWCalendar } from '@/src/groups/api';
 import { useCoWCalendar } from '@/src/groups/use-cow-calendar';
 import { useGroupAction } from '@/src/groups/use-group-action';
@@ -8,7 +8,7 @@ import { GroupMissingDataState, pickInlineError } from './group-state-view';
 
 /** Calendar management is an explicit online write; it never moves a published CoW. */
 export function CoWTimeZone({ groupId, userId, autoFocus, onAccessChange }: { groupId: string; userId: string; autoFocus: boolean; onAccessChange: () => void }) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   const calendar = useCoWCalendar(groupId, userId);
   const [draft, setDraft] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);

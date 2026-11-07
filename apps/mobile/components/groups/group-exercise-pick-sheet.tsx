@@ -9,7 +9,7 @@ import {
   SearchField,
   Sheet,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import {
   buildPickSheetModel,
@@ -66,7 +66,8 @@ type GroupExercisePickSheetProps = {
  * to a session. The target is always `mode: 'link'` there.
  */
 export function GroupExercisePickSheet(props: GroupExercisePickSheetProps) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const { target, exercises, links, onRequestClose, onLinkAndAdd, onAddAsNew } = props;
   const purpose = props.purpose ?? 'add-to-session';
   // The muscle-group index the shared exercise search matches on.
@@ -263,7 +264,8 @@ function RadioRow({
   onPress: () => void;
   testID: string;
 }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <ListRow
       accessibilityLabel={detail ? `${label}, ${detail}` : label}

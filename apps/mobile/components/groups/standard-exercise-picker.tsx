@@ -10,7 +10,7 @@ import {
   makeStyles,
   uiBorder,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -28,7 +28,8 @@ type StandardExercisePickerProps = {
  */
 export function StandardExercisePicker({ selectedId, onPick }: StandardExercisePickerProps) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [query, setQuery] = useState('');
   const { muscleSetup } = useExerciseCatalog();
   const { options, total } = useMemo(() => searchStandardExercises(query, muscleSetup), [query, muscleSetup]);

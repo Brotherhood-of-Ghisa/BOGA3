@@ -1,7 +1,7 @@
 import type { Ref } from 'react';
 import { Text, View, type ViewInstance } from 'react-native';
 
-import { ActionButton, Icon, ListRow, Tag, makeStyles, uiBorder, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, Icon, ListRow, Tag, makeStyles, uiBorder, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { GroupExerciseRowViewModel } from '@/src/groups';
 
 type GroupExerciseRowProps = {
@@ -29,7 +29,8 @@ type GroupExerciseRowProps = {
  */
 export function GroupExerciseRow({ row, onPress, onLink, onUnlink, unlinkPending, focusRef, divider = false }: GroupExerciseRowProps) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const id = row.groupExerciseId;
   const label = [row.name, row.loadInputModeLabel, row.archived ? 'archived' : null, row.linkStatus]
     .filter(Boolean)

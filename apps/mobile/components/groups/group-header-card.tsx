@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Card, FigureText, uiSpace, useTextRoles } from '@/components/ui';
+import { Card, FigureText, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 
 type GroupHeaderCardProps = {
   name: string;
@@ -21,7 +21,8 @@ type GroupHeaderCardProps = {
  * any rows.
  */
 export function GroupHeaderCard({ name, description, meta, nameTestID, metaTestID, testID, children }: GroupHeaderCardProps) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <Card testID={testID}>
       <View style={styles.words}>

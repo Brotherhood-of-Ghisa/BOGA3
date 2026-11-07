@@ -2,7 +2,7 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import { useRouter, type Href } from 'expo-router';
 import { ScrollView, Text, View } from 'react-native';
 
-import { FigureText, Icon, ListRow, Sheet, makeStyles, uiBorder, uiSpace, useTextRoles } from '@/components/ui';
+import { FigureText, Icon, ListRow, Sheet, makeStyles, uiBorder, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { groupBoardPath, useNetworkOnline, type GroupRole } from '@/src/groups';
 import { isCompetitionMetric } from '@/src/groups/competition-contract';
 import { buildStreamRecordSheet } from '@/src/groups/competition-stream-view-model';
@@ -24,7 +24,8 @@ type Props = {
 export function GroupMetricStreamRecordSheet({ record, detail, userId, myRole, onClose, onChanged }: Props) {
   const dateFormat = useDateFormat();
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const scoreStyle = useScoreStyle();
   const router = useRouter();
   const online = useNetworkOnline();

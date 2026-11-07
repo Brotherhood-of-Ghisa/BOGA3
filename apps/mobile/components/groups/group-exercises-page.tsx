@@ -11,7 +11,7 @@ import {
   type SegmentedControlOption,
   uiGeometry,
   uiSpace,
-  useTextRoles,
+  useUiText,
 } from '@/components/ui';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
@@ -97,7 +97,7 @@ export function GroupExercisesPage({
   refreshGroup,
   userId,
 }: GroupExercisesPageProps) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'leaderboards' | 'shared'>('leaderboards');
   const links = useMyGroupExerciseLinks(groupId);

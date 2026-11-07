@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Card, CompactHeader, FigureText, Icon, ListRow, SegmentedControl, makeStyles, uiBorder, uiGeometry, uiSpace, uiTextEmphasis, useTextRoles } from '@/components/ui';
+import { Card, CompactHeader, FigureText, Icon, ListRow, SegmentedControl, makeStyles, uiBorder, uiGeometry, uiSpace, uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { CoWMetric } from '@/src/groups/cow-scoring';
 import type { CoWRankingWire, CoWResultWire } from '@/src/groups/cow-wire';
@@ -17,7 +17,8 @@ export function CoWMetricTabs({ metrics, metric, onChange, testID }: {
 /** Server places and figures only: no viewer substitution, reranking or eligibility guesses. */
 export function CoWRows({ ranking, userId, testID }: { ranking: CoWRankingWire; userId: string; testID: string }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return <View testID={testID}>
     <Text allowFontScaling={false} style={[text.label, styles.column]}>{coWMetricHeading(ranking)}</Text>
     {ranking.entries.map(row => <View key={row.member.user_id} style={styles.row} testID={`${testID}-${row.member.user_id}`}>
@@ -37,7 +38,7 @@ export function CoWResultHeading({ result, dateFormat, today = false, previous =
   result: CoWResultWire; dateFormat: ExerciseDateFormat; today?: boolean; previous?: boolean;
 }) {
   const styles = useStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   return <View style={styles.heading}>
     <View style={styles.headingLabel}>
       <CompactHeader label="CoW" metadata={coWDateRange(result.cow.week_start, dateFormat, today)}
@@ -57,7 +58,7 @@ export function CoWPreview({ result, userId, dateFormat, today, previous, initia
   browseLabel?: string; initialMetric?: string | null; onOpen: (metric: CoWMetric) => void; onBrowse?: (metric: CoWMetric) => void; testID: string;
 }) {
   const styles = useStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   const [picked, setPicked] = useState<CoWMetric>(() => coWMetric(initialMetric, result.cow.metrics));
   const metric = coWMetric(picked, result.cow.metrics);
   const ranking = result.rankings.find(row => row.metric === metric);

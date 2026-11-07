@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 
-import { Card, FigureText, SearchField, Tag, makeStyles, uiBorder, uiSpace, uiTextEmphasis, useTextRoles } from '@/components/ui';
+import { Card, FigureText, SearchField, Tag, makeStyles, uiBorder, uiSpace, uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui';
 import {
   groupBoardPath,
   type GroupApiError,
@@ -125,7 +125,8 @@ export function sortPodiumCards<T extends { name: string; archived: boolean; lat
  */
 export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; onPress: () => void }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const scoreStyle = useScoreStyle();
   const testID = `group-podium-card-${card.exerciseId}`;
   return (

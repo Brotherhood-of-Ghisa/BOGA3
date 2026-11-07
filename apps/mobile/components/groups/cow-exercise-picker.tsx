@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Keyboard, ScrollView, Text, View } from 'react-native';
-import { ActionButton, Icon, ListRow, SearchField, Sheet, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, Icon, ListRow, SearchField, Sheet, uiSpace, useUiText } from '@/components/ui';
 import type { CompetitionExerciseWire } from '@/src/groups/competition-wire';
 import type { GroupApiError } from '@/src/groups/api';
 import { GroupInlineError, GroupMissingDataState } from './group-state-view';
@@ -10,7 +10,7 @@ export function CoWExercisePicker({ visible, onDismiss, onDismissed, exercises, 
   visible: boolean; onDismiss: () => void; onDismissed: () => void; exercises: CompetitionExerciseWire[] | null;
   selectedId: string | null; onPick: (id: string) => void; error: GroupApiError | null; offline: boolean; onRetry: () => void; onAdd: () => void;
 }) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   const [query, setQuery] = useState('');
   const active = exercises?.filter(row => row.archived_at_ms === null);
   const matches = active?.filter(row => row.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));

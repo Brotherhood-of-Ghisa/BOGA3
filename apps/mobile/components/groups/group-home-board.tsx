@@ -1,19 +1,21 @@
 import { Text, View } from 'react-native';
-import { FigureText, ListCard, ListCardHeader, ListRow, makeStyles, uiGeometry, uiSpace, useTextRoles } from '@/components/ui';
+import { FigureText, ListCard, ListCardHeader, ListRow, makeStyles, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { statsTableColumnWidth } from '@/components/stats/stats-table';
 import { GROUP_HOME_METRIC_COLUMN, type GroupHomeBoard as BoardModel, type GroupHomeBoardRow } from '@/src/groups/home-view-model';
 import type { GroupHomeMetric } from '@/src/groups/home-periods';
 
 function BoardValue({ record, testID, value, width }: { record: boolean; testID: string; value: string; width: number }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return <Text allowFontScaling={false} style={[text.figure, tone.ink, record ? tone.record : null,
     styles.value, { width }]} testID={testID}>{value}</Text>;
 }
 
 function BoardRow({ metric, row, valueWidth }: { metric: GroupHomeMetric; row: GroupHomeBoardRow; valueWidth: number }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const testID = `group-home-board-row-${row.userId}`;
   return <ListRow density="compact" own={row.isMe} testID={testID}
     leading={<Text allowFontScaling={false} style={[text.figure, tone.muted, styles.rank]} testID={`${testID}-rank`}>{row.rank}</Text>}
@@ -30,7 +32,8 @@ function BoardRow({ metric, row, valueWidth }: { metric: GroupHomeMetric; row: G
 /** Passive top-five board; ranking, ties, figures and full spoken names come from its model. */
 export function GroupHomeBoard({ board, metric, title }: { board: BoardModel; metric: GroupHomeMetric; title?: string }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const column = GROUP_HOME_METRIC_COLUMN[metric];
   const valueWidth = Math.max(40, statsTableColumnWidth(column, [...board.rows.map(row => row.valueLabel), board.me?.valueLabel ?? '']));
   return <ListCard testID="group-home-board-card" regionTestID="group-home-board" accessibilityLabel={board.accessibilityLabel}

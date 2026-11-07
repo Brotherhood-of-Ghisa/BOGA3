@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Icon, ListRow, uiSpace, useTextRoles } from '@/components/ui';
+import { Icon, ListRow, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { formatMemberCount, formatMyRole, type GroupSummary } from '@/src/groups';
 
 type GroupSummaryRowProps = {
@@ -16,7 +16,8 @@ type GroupSummaryRowProps = {
  * and a chevron. A tap opens the group.
  */
 export function GroupSummaryRow({ group, onPress, divider }: GroupSummaryRowProps) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const meta = `${formatMemberCount(group.member_count)} · ${formatMyRole(group.my_role)}`;
   return (
     <ListRow

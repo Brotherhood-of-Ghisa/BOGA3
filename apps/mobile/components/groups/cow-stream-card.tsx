@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { Card, FigureText, uiSpace, useTextRoles } from '@/components/ui';
+import { Card, FigureText, uiSpace, useUiText } from '@/components/ui';
 import { useDateFormat } from '@/src/preferences/hooks';
 import type { CoWStreamItemWire } from '@/src/groups/competition-wire';
 import { buildCoWStreamCard } from '@/src/groups/cow-stream-view-model';
@@ -8,7 +8,7 @@ import { buildCoWStreamCard } from '@/src/groups/cow-stream-view-model';
 /** A lifecycle snapshot opens its exact CoW, including cancelled/replaced weeks. */
 export function CoWStreamCard({ item,userId }: { item: CoWStreamItemWire; userId: string | null }) {
   const router=useRouter();
-  const { text }=useTextRoles();
+  const text = useUiText();
   const model=buildCoWStreamCard(item,userId,useDateFormat());
   return <Card style={styles.card} accessibilityLabel={model.accessibilityLabel} onPress={() => router.push(model.path)} testID={`cow-stream-${item.key}`}>
     <View style={styles.heading}>

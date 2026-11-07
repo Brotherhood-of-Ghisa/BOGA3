@@ -21,7 +21,7 @@ import {
   FigureText,
   ListRow,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { useCoWCalendar } from '@/src/groups/use-cow-calendar';
@@ -72,7 +72,8 @@ function LostAccessState() {
 
 function GroupScreenContent({ userId, groupId }: { userId: string; groupId: string }) {
   const groupScreenStyles = useGroupScreenStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const router = useRouter();
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({

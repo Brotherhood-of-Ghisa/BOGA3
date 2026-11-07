@@ -1,7 +1,7 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, FigureText, Icon, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, FigureText, Icon, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { GroupRole } from '@/src/groups';
 import { sessionRecordCertificationStatus, type SessionRecordCertification } from '@/src/groups/competition-session-records-view-model';
 import { buildMetricRecordSheetModel, metricCertificationEndConfirmation } from '@/src/groups/metric-record-sheet-view-model';
@@ -21,7 +21,8 @@ export function GroupSetCertification({ certification, groupId, userId, myRole, 
   /** `between`: status left, action right (a row's own line). `end`: both at the end (beside the set). */
   align?: 'between' | 'end'; testID: string;
 }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const dateFormat = useDateFormat();
   const state = useMetricCertification({ groupId, userId, row: certification.target, exercise: certification.exercise,
     online, readOnlyReason, onChanged });

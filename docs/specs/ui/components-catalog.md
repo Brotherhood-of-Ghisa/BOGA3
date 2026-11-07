@@ -73,7 +73,7 @@ and executable examples, load `docs/specs/08-ux-delivery-standard.md` and
 | One option or setting on or off, in a sheet (`Show deleted sessions`) or a form card (`Track each gym separately`, `density="list"`, optional `description`) | `SwitchRow` (`switch-row.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`); every other page takes the native header (`ux-rules.md` "Pages") |
-| Live theme colours: a stylesheet, a colour prop, the mode | `makeStyles`, `useUiRoles`, `useUiMode` (`theme-context.tsx`), `useTextRoles` (`text-roles.ts`) |
+| Live theme colours: a stylesheet, a colour prop, the mode | `makeStyles`, `useUiRoles`, `useUiMode` (`theme-context.tsx`), `useUiText` (`text-roles.ts`) |
 | Colour roles, fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
 
 ### Gallery and adoption scope

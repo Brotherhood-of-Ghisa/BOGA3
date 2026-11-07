@@ -1,9 +1,10 @@
 import { forwardRef, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, type TextInputInstance, View } from 'react-native';
+import { Pressable, Text, TextInput, type TextInputInstance, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { formatEffort } from '@/src/session-recorder/exercise-page-model';
 
@@ -29,6 +30,9 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
     onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, testID, children },
   weightInputRef,
 ) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const effort = formatEffort(setType);
   const effortText = setType === 'technique' || setType === 'cooldown'
     ? formatSessionSetType(setType, 'compact')
@@ -44,14 +48,14 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
         onLongPress={onOpenEffort}
         style={[styles.field, styles.effortField]}
         testID={`${testID}-effort`}>
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Effort</Text>
+        <Text allowFontScaling={false} style={[text.label, tone.faint]}>Effort</Text>
         <View style={styles.effortValue}>
-          <Text allowFontScaling={false} numberOfLines={1} style={[uiText.title, styles.effortText]}>{effortText}</Text>
-          <Icon color={uiRoles.inkFaint} name="chevron-down" size="xs" />
+          <Text allowFontScaling={false} numberOfLines={1} style={[text.title, styles.effortText]}>{effortText}</Text>
+          <Icon colorRole="inkFaint" name="chevron-down" size="xs" />
         </View>
       </Pressable>
       <View style={[styles.field, styles.weightField, weightError ? styles.invalid : null]}>
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Weight</Text>
+        <Text allowFontScaling={false} style={[text.label, tone.faint]}>Weight</Text>
         <TextInput
           allowFontScaling={false}
           accessibilityLabel={`Set ${number} weight`}
@@ -59,20 +63,20 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
           onChangeText={onChangeWeight}
           ref={weightInputRef}
           selectTextOnFocus
-          style={[uiText.figureHero, styles.input]}
+          style={[text.figureHero, styles.input]}
           testID={`${testID}-weight`}
           value={weightValue}
         />
       </View>
       <View style={[styles.field, styles.repsField, repsError ? styles.invalid : null]}>
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Reps</Text>
+        <Text allowFontScaling={false} style={[text.label, tone.faint]}>Reps</Text>
         <TextInput
           allowFontScaling={false}
           accessibilityLabel={`Set ${number} reps`}
           keyboardType="number-pad"
           onChangeText={onChangeReps}
           selectTextOnFocus
-          style={[uiText.figureHero, styles.input]}
+          style={[text.figureHero, styles.input]}
           testID={`${testID}-reps`}
           value={repsValue}
         />
@@ -82,18 +86,18 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   fields: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   field: {
     height: uiGeometry.fieldHeight,
     paddingHorizontal: uiSpace.sm,
     paddingTop: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.control,
   },
-  invalid: { borderColor: uiRoles.danger },
+  invalid: { borderColor: roles.danger },
   effortField: { width: uiGeometry.tapTarget * 2 },
   weightField: { flex: 1, maxWidth: uiGeometry.tapTarget * 2 + uiSpace.xl },
   repsField: { width: uiGeometry.fieldHeight + uiSpace.md },
@@ -103,4 +107,4 @@ const styles = StyleSheet.create({
   },
   effortValue: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
   effortText: { flexShrink: 1 },
-});
+}));

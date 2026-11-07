@@ -1,6 +1,6 @@
 import { Pressable, Text, type StyleProp, type ViewStyle } from 'react-native';
 
-import { makeStyles, uiBorder, uiGeometry, uiSpace, useTextRoles } from '@/components/ui';
+import { makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 
 export type GroupCycleOption<TValue extends string> = { value: TValue; label: string };
 
@@ -19,7 +19,8 @@ export function GroupCycleButton<TValue extends string>({ options, value, onChan
   testID: string;
 }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const index = Math.max(0, options.findIndex(option => option.value === value));
   const current = options[index];
   const next = options[(index + 1) % options.length];

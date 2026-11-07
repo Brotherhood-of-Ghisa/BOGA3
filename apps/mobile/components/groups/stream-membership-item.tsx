@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { makeStyles, uiBorder, uiGeometry, uiSpace, useTextRoles } from '@/components/ui';
+import { makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { StreamMembershipViewModel } from '@/src/groups';
 
 type GroupStreamMembershipItemProps = {
@@ -13,7 +13,8 @@ type GroupStreamMembershipItemProps = {
 /** "X joined / left the group / was removed": a light row, not a card (08 pattern 6). */
 export function GroupStreamMembershipItem({ item, showGroupName, onPress }: GroupStreamMembershipItemProps) {
   const streamRowStyles = useStreamRowStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const testID = `group-stream-membership-${item.key}`;
   const content = (
     <View style={streamRowStyles.row}>

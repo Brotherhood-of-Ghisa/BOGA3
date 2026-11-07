@@ -2,7 +2,7 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import { useRouter } from 'expo-router';
 import { Text, Alert, ScrollView } from 'react-native';
 
-import { ActionButton, FigureText, ListRow, SegmentedControl, Sheet, Stat, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, FigureText, ListRow, SegmentedControl, Sheet, Stat, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { formatBoardDate, formatBoardMemberLabel, useNetworkOnline, type GroupRole } from '@/src/groups';
 import { formatCompetitionValue as formatGroupMetricValue,formatSetFigure,COMPETITION_LABELS as GROUP_METRIC_LABELS,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS } from '@/src/groups/competition-view-model';
 import type { CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
@@ -23,7 +23,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
   myRole: GroupRole | null; onClose: () => void; onChanged: () => Promise<void>;
 }) {
   const dateFormat = useDateFormat();
-  const { text } = useTextRoles();
+  const text = useUiText();
   const router = useRouter();
   const online = useNetworkOnline();
   const { certification, pending, needsReview, notice, perform, refresh } = useMetricCertification({
@@ -69,6 +69,7 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
 }
 
 function MutedLine({ text: line }: { text: string | null }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return line ? <Text allowFontScaling={false} style={[text.body, tone.muted]}>{line}</Text> : null;
 }

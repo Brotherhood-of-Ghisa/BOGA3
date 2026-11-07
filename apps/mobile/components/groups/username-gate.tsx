@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text } from 'react-native';
 
-import { ActionButton, Card, FormField, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, Card, FormField, uiSpace, useUiText } from '@/components/ui';
 import { loadUserProfile, saveUsername } from '@/src/auth/profile';
 import { describeGroupWriteError, useGroupAction } from '@/src/groups';
 
@@ -68,7 +68,7 @@ type UsernameGateProps = {
  * screen's one `accent`.
  */
 export function UsernameGate({ userId, notice, onSaved }: UsernameGateProps) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   const [username, setUsername] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const save = useGroupAction((value: string) => saveUsername(userId, value));

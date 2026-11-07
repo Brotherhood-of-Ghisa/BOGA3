@@ -3,7 +3,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Text, FlatList, RefreshControl, View } from 'react-native';
 
-import { ActionButton, SegmentedControl, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, SegmentedControl, uiSpace, useUiText } from '@/components/ui';
 import { getGroup, groupCacheKeys, useGroupOnlinePages, useGroupResource, type GroupBoardScope, type GroupGetResult } from '@/src/groups';
 import { getCompetitionBoard } from '@/src/groups/api';
 import { GROUP_COMPETITION_METRICS as GROUP_METRICS,isCompetitionMetric as isGroupMetric,type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
@@ -28,7 +28,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
 }) {
   const dateFormat = useDateFormat();
   const router = useRouter();
-  const { text } = useTextRoles();
+  const text = useUiText();
   const groupScreenStyles = useGroupScreenStyles();
   const allowed = GROUP_METRICS;
   const [pickedMetric, setPickedMetric] = useState<GroupMetric | null>(isGroupMetric(initialMetric) ? initialMetric : null);

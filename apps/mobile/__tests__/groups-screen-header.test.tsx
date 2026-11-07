@@ -11,12 +11,11 @@ import { StyleSheet, Text, type TextStyle } from 'react-native';
 
 
 import { GroupScreenHeader } from '@/components/groups/group-screen-header';
+import { uiText } from '@/components/ui/text-roles';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
-import { textRoles } from '@/components/ui/text-roles';
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
 const themeRoles = rolesFor(DEFAULT_APPEARANCE);
-const { text: themeText } = textRoles(themeRoles);
 
 jest.mock('expo-router', () => ({
   // The header's custom title and right action render inline, so a test can read them.
@@ -52,7 +51,7 @@ describe('the Groups header', () => {
     expect(name).toHaveTextContent('The Brotherhood of the Iron Ghisa');
     expect(name.props.numberOfLines).toBe(1);
     expect(name.props.adjustsFontSizeToFit).toBe(true);
-    expect(titleStyle()).toMatchObject(StyleSheet.flatten(themeText.sheetTitle) ?? {});
+    expect(titleStyle()).toMatchObject(StyleSheet.flatten(uiText.sheetTitle) ?? {});
     // A title says where you are on its own: no line under it.
     expect(screen.queryByTestId('groups-subtitle')).toBeNull();
   });

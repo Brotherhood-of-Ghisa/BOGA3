@@ -1,6 +1,5 @@
 import { hexToLch, lchToHex, type Lch } from '@/components/ui/lch';
-import type { ThemeMode } from '@/components/ui/theme';
-import { uiMode, uiRoles } from '@/components/ui/tokens';
+import type { ThemeMode, UiRoles } from '@/components/ui/theme';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
@@ -24,7 +23,7 @@ export type MuscleSetTargets = {
 };
 
 export type ThemeShadeRoles = Pick<
-  typeof uiRoles,
+  UiRoles,
   'paper' | 'rule' | 'viz1' | 'viz2' | 'viz4' | 'ink' | 'inkMuted' | 'onInk'
 >;
 
@@ -204,12 +203,10 @@ const buildShadeRamp = (
 };
 
 /**
- * Keeps anatomical lighting within the theme's shades ([[comparison.colour-scale]]).
+ * Keeps anatomical lighting within the theme's shades ([[comparison.colour-scale]]),
+ * in the roles and mode the body is drawn in now.
  */
-export function buildThemeShadePalette(
-  roles: ThemeShadeRoles = uiRoles,
-  mode: ThemeMode = uiMode,
-): ThemeShadePalette {
+export function buildThemeShadePalette(roles: ThemeShadeRoles, mode: ThemeMode): ThemeShadePalette {
   const { lightness: paperL, chroma: paperC, hue: paperH } = hexToLch(roles.paper);
   const { lightness: ruleL, chroma: ruleC } = hexToLch(roles.rule);
   const neutralBase = hexToLch(lchToHex({
@@ -247,17 +244,6 @@ export function buildMuscleShadeRamp(score: number | null, palette: ThemeShadePa
     hue: middle.hue + hueDelta * t,
   }, 22);
 }
-
-let cachedDefaultPalette: { roles: ThemeShadeRoles; palette: ThemeShadePalette } | null = null;
-
-const getDefaultPalette = (): ThemeShadePalette => {
-  if (cachedDefaultPalette && cachedDefaultPalette.roles === uiRoles) {
-    return cachedDefaultPalette.palette;
-  }
-  const palette = buildThemeShadePalette(uiRoles, uiMode);
-  cachedDefaultPalette = { roles: uiRoles, palette };
-  return palette;
-};
 
 const computeLightStep = (nx: number, ny: number, nz: number): number => {
   const key = Math.max(0, nx * 0.34 + ny * 0.52 + nz * 0.78);
@@ -657,7 +643,8 @@ export type ProjectMuscleBodyOptions = {
   readonly selectedId?: string | null;
   /** The user's muscle setup; unset shows every anatomy entry as its own muscle. */
   readonly report?: MuscleReportAssignment;
-  readonly palette?: ThemeShadePalette;
+  /** The shades to draw in: `buildThemeShadePalette(roles, mode)` for the theme now in use. */
+  readonly palette: ThemeShadePalette;
   readonly mesh?: MuscleBodyMesh;
   /** Prepared for this selection/report; omit to resolve directly from the source asset. */
   readonly selectedFibres?: MuscleBodyFibreSelection;
@@ -676,7 +663,7 @@ export function projectMuscleBody({
   scores,
   selectedId = null,
   report,
-  palette = getDefaultPalette(),
+  palette,
   mesh = MUSCLE_BODY_MESH,
   selectedFibres = selectMuscleFibres(selectedId, report),
   november = false,

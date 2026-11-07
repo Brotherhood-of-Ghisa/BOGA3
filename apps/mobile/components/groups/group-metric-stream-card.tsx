@@ -1,7 +1,7 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { CompactCard, CompactHeader, FigureText, uiSpace, useTextRoles } from '@/components/ui';
+import { CompactCard, CompactHeader, FigureText, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { buildCompetitionEventCard } from '@/src/groups/competition-stream-view-model';
 import type { CompetitionEventWire, CompetitionStreamRecordWire } from '@/src/groups/competition-wire';
 import { GroupCertificationStatus } from './certification-status';
@@ -16,7 +16,8 @@ export function GroupMetricStreamCard({ item,record,userId,showGroupName,onPress
   item: CompetitionEventWire; record?: CompetitionStreamRecordWire; userId: string | null; showGroupName: boolean; onPress?: () => void;
 }) {
   const dateFormat = useDateFormat();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const router = useRouter();
   const model = buildCompetitionEventCard(item,userId,showGroupName,record,dateFormat);
   const testID = `group-metric-stream-${item.event_id}`;

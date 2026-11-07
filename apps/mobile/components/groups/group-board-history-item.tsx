@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 
-import { FigureText, makeStyles, uiBorder, uiSpace, useTextRoles } from '@/components/ui';
+import { FigureText, makeStyles, uiBorder, uiSpace, useUiText } from '@/components/ui';
 import type { BoardHistoryItemViewModel } from '@/src/groups';
 
 import { useCardListItemStyles } from './screen-styles';
@@ -17,7 +17,7 @@ type GroupBoardHistoryItemProps = {
 export function GroupBoardHistoryItem({ item, testID, index, count }: GroupBoardHistoryItemProps) {
   const styles = useStyles();
   const cardListItemStyles = useCardListItemStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   return (
     <View style={cardListItemStyles(index, count)}>
       <View

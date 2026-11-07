@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, Icon, uiSpace, useTextRoles } from '@/components/ui';
+import { FigureText, Icon, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { RecordCertificationStatus } from '@/src/groups';
 
 /** `body`: a card's or sheet's status line. `meta`: the small mark beside a board row's date. */
@@ -31,7 +31,8 @@ export function GroupCertificationStatus({
   iconTestID?: string;
   size?: GroupCertificationStatusSize;
 }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const certified = status === 'certified';
   // The status line in a card or sheet is a strong body line; beside a board
   // row's date it is the row's quiet meta. Either way the figures in it (a date)
