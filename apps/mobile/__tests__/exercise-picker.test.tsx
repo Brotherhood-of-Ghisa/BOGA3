@@ -21,7 +21,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { and, eq, isNull } from 'drizzle-orm';
 import { Keyboard, StyleSheet } from 'react-native';
 
@@ -68,7 +68,7 @@ jest.mock('@/src/groups/api', () => ({
 
 import { ExerciseSwapSheet } from '@/components/exercise-page/exercise-swap-sheet';
 import { ExercisePicker } from '@/components/session-recorder/exercise-picker';
-import { uiRoles } from '@/components/ui/tokens';
+
 import * as blockHistory from '@/src/data/exercise-block-history';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import * as linksRepository from '@/src/data/exercise-group-links';
@@ -93,6 +93,10 @@ import {
 import { waitForGone } from './helpers/wait-for-gone';
 import { exerciseEditorHrefs, exerciseEditorPage, exerciseEditorParams, WithExerciseEditorPage } from './helpers/exercise-editor-page';
 import { readExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
@@ -253,7 +257,7 @@ const renderPicker = async (
     onAddPlanBlock: jest.fn(),
     onOpenManage: jest.fn(),
   };
-  const result = render(<WithExerciseEditorPage><ExercisePicker {...callbacks} {...props} /></WithExerciseEditorPage>);
+  const result = renderWithTheme(<WithExerciseEditorPage><ExercisePicker {...callbacks} {...props} /></WithExerciseEditorPage>);
   unmountPicker = result.unmount;
   await act(async () => {});
   if (expandFamilies) {
@@ -326,7 +330,7 @@ describe('picker: group exercises (E0.1)', () => {
 
     expect(screen.getByTestId('exercise-picker-groups-toggle')).toHaveProp('accessibilityState', { checked: true });
     expect(StyleSheet.flatten(screen.getByTestId('exercise-picker-groups-toggle').props.style)).toMatchObject({
-      backgroundColor: uiRoles.ink,
+      backgroundColor: themeRoles.ink,
     });
     expect(screen.queryByLabelText('Select exercise Barbell Squat')).toBeNull();
     expect(screen.getByLabelText('Group exercise Back Squat in Tuesday Crew, linked: Barbell Squat')).toBeTruthy();
@@ -574,7 +578,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(screen.getByTestId('exercise-picker-plan-set-row-2-values')).toHaveTextContent('120.0 × 5');
     expect(screen.getByTestId('exercise-picker-plan-set-row-2-vol')).toHaveTextContent(/600/);
     expect(StyleSheet.flatten(screen.getByTestId('exercise-picker-plan-set-row-2-values').props.style).color).toBe(
-      uiRoles.inkFaint,
+      themeRoles.inkFaint,
     );
 
     const repeatButton = screen.getByTestId('exercise-picker-repeat-last-button');
@@ -584,7 +588,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     const accentNodes = screen.UNSAFE_root.findAll(
       (node: Node) =>
         typeof node.type === 'string' &&
-        (StyleSheet.flatten(node.props.style as any) ?? {}).backgroundColor === uiRoles.accent,
+        (StyleSheet.flatten(node.props.style as any) ?? {}).backgroundColor === themeRoles.accent,
     );
     expect(accentNodes.map((node: Node) => node.props.testID)).toEqual(['exercise-picker-repeat-last-button']);
     fireEvent.press(repeatButton);
@@ -739,7 +743,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     mockUserId = null;
     await seedCatalog(INTERACTION_FIXTURE_EXERCISES);
     await bootLocalApp();
-    const result = render(<ExercisePicker {...callbacks} notice="Couldn't add that exercise. Try again." />);
+    const result = renderWithTheme(<ExercisePicker {...callbacks} notice="Couldn't add that exercise. Try again." />);
     unmountPicker = result.unmount;
 
     expect(await screen.findByTestId('exercise-picker-notice')).toHaveTextContent("Couldn't add that exercise. Try again.");
@@ -814,7 +818,7 @@ describe('picker: from planner', () => {
       onAddPlanBlock: jest.fn(),
       onOpenManage: jest.fn(),
     };
-    const result = render(<ExercisePicker {...callbacks} />);
+    const result = renderWithTheme(<ExercisePicker {...callbacks} />);
     unmountPicker = result.unmount;
     await act(async () => {});
     fireEvent.press(screen.getByTestId('exercise-picker-planner-toggle'));
@@ -886,7 +890,7 @@ it('shares sort/never-done edits across Add and Swap while retaining independent
   fireEvent.changeText(picker.getByLabelText('Exercise filter input'), 'bench');
   fireEvent.press(picker.getByLabelText('Sort: Favourite'));
   fireEvent.press(picker.getByLabelText('Show never-done'));
-  const swap = render(<ExerciseSwapSheet visible currentExerciseDefinitionId="seed_barbell_bench_press" onSelect={jest.fn()} onDismiss={jest.fn()} />);
+  const swap = renderWithTheme(<ExerciseSwapSheet visible currentExerciseDefinitionId="seed_barbell_bench_press" onSelect={jest.fn()} onDismiss={jest.fn()} />);
   const swapUI = within(swap.getByTestId('exercise-swap-sheet'));
   await waitFor(() => expect(swapUI.getByText('No exercises match the current filters.')).toBeTruthy());
   expect(swapUI.getByLabelText('Sort: A–Z')).toBeTruthy();

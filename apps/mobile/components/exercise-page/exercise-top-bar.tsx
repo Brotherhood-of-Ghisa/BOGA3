@@ -1,10 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { TitleBarTimer, type TitleBarTimerProps } from '@/components/session-recorder/title-bar-timer';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 type ExerciseTopBarProps = {
   title: string;
@@ -30,6 +31,8 @@ export function ExerciseTopBar({
   restTimerActive = false,
   titleBarTimer,
 }: ExerciseTopBarProps) {
+  const styles = useStyles();
+  const text = useUiText();
   return (
     <View style={styles.bar}>
       <IconButton accessibilityLabel="Back to session" name="chevron-left" onPress={onBack} testID="exercise-page-back" />
@@ -42,13 +45,13 @@ export function ExerciseTopBar({
           onPress={onOpenSwitcher}
           style={({ pressed }) => [styles.switcher, pressed ? styles.pressed : null]}
           testID="exercise-page-title">
-          <Text allowFontScaling={false} numberOfLines={1} style={[uiText.title, styles.switcherTitle]}>
+          <Text allowFontScaling={false} numberOfLines={1} style={[text.title, styles.switcherTitle]}>
             {title}
           </Text>
-          <Icon color={uiRoles.inkMuted} name="chevron-down" size="sm" />
+          <Icon colorRole="inkMuted" name="chevron-down" size="sm" />
         </Pressable>
       ) : (
-        <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[uiText.title, styles.title]} testID="exercise-page-title">
+        <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[text.title, styles.title]} testID="exercise-page-title">
           {title}
         </Text>
       )}
@@ -76,15 +79,15 @@ export function ExerciseTopBar({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
     paddingHorizontal: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderBottomWidth: uiBorder.width,
-    borderBottomColor: uiRoles.rule,
+    borderBottomColor: roles.rule,
   },
   spacer: {
     width: uiGeometry.tapTarget,
@@ -111,4 +114,4 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.7,
   },
-});
+}));

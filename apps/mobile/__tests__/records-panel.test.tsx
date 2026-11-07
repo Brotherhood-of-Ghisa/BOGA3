@@ -6,11 +6,12 @@
  * the Progress link, the gym filter) is in `exercise-page-screen.test.tsx`.
  */
 
-import { render, screen, within } from '@testing-library/react-native';
+import { screen, within } from '@testing-library/react-native';
 
 import { RecordsPanel, type RecordsView } from '@/components/exercise-page/records-panel';
 import type { ExerciseRecords, LastSession } from '@/src/session-recorder/exercise-records';
 import type { ExerciseRecordsState } from '@/src/session-recorder/use-exercise-records';
+import { renderWithTheme } from './helpers/theme';
 
 const SEP_12 = new Date(2026, 8, 12, 18, 0);
 const SEP_10 = new Date(2026, 8, 10, 18, 0);
@@ -45,7 +46,7 @@ const renderPanel = (
   state: ExerciseRecordsState,
   { view = 'records', expanded = false, isFilteredByGym }: { view?: RecordsView; expanded?: boolean; isFilteredByGym?: boolean } = {},
 ) =>
-  render(
+  renderWithTheme(
     <RecordsPanel
       dateFormat="YYYY-MM-DD"
       expanded={expanded}

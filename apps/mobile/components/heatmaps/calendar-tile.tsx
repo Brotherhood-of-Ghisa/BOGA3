@@ -1,8 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { makeStyles, uiBorder, uiGeometry, uiSpace, useUiRoles } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { heatRamp } from './heatmap-metric';
-import { heatmapStyles } from './heatmap-style';
+import { heatmapRestCell, heatmapStyles } from './heatmap-style';
 import type { DayCell, WeekCell } from './heatmapData';
 
 type Props = {
@@ -33,21 +34,25 @@ function description({ cell, future, metricLabel, formatValue }: Props) {
 }
 
 export function CalendarTile(props: Props) {
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const { cell, dateLabel, future, weekly, current, formatValue, targetAveraged, testID, onPress, accessibilityHint } = props;
   const value = calendarValue(cell, future, formatValue);
   const target = cell?.targetAttainment;
   const prCount = cell?.prCount ?? 0;
   const content = <>
-    <Text allowFontScaling={false} style={[uiText.figureSmall, uiTextTone.ink, styles.value]} numberOfLines={1} testID={`${testID}-value`}>{value}</Text>
+    <Text allowFontScaling={false} style={[text.figureSmall, tone.ink, styles.value]} numberOfLines={1} testID={`${testID}-value`}>{value}</Text>
     {!weekly && !future && prCount > 0 ? <Svg accessible={false} accessibilityElementsHidden pointerEvents="none"
       width={uiSpace.sm} height={uiSpace.sm} viewBox="0 0 8 8" style={styles.pr} testID={`${testID}-pr`}>
-      <Path d="M0 0H8V8Z" fill={uiRoles.record} />
+      <Path d="M0 0H8V8Z" fill={roles.record} />
     </Svg> : null}
   </>;
   const shared = {
     accessibilityLabel: `${dateLabel}, ${description(props)}${prCount > 0 ? `, ${prCount} PR${prCount === 1 ? '' : 's'}` : ''}${current ? weekly ? ', Current week' : ', Today' : ''}${target === undefined ? '' : `, ${Math.round(target * 100)}% of weekly muscle target${targetAveraged ? ', averaged across muscles' : ''}`}`,
     testID,
-    style: [styles.tile, weekly && heatmapStyles.weekColumn, { backgroundColor: heatRamp(uiRoles)[cell?.level ?? 0] },
+    style: [styles.tile, weekly && heatmapStyles.weekColumn, { backgroundColor: heatRamp(roles)[cell?.level ?? 0] },
       cell?.unavailable ? styles.unavailable : null],
   };
   return onPress
@@ -56,11 +61,11 @@ export function CalendarTile(props: Props) {
     : <View accessible accessibilityRole="text" {...shared}>{content}</View>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   pr: { position: 'absolute', top: uiSpace.xs, right: uiSpace.xs },
   tile: { flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget,
     borderRadius: uiGeometry.radius.control, borderWidth: StyleSheet.hairlineWidth,
-    ...heatmapStyles.restCell, justifyContent: 'center' },
-  unavailable: { borderStyle: 'dashed', borderWidth: uiBorder.width, borderColor: uiRoles.rule },
+    ...heatmapRestCell(roles), justifyContent: 'center' },
+  unavailable: { borderStyle: 'dashed', borderWidth: uiBorder.width, borderColor: roles.rule },
   value: { textAlign: 'center' },
-});
+}));

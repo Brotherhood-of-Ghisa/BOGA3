@@ -1,5 +1,5 @@
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
@@ -7,8 +7,9 @@ import { FigureText } from '@/components/ui/figure-text';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Icon } from '@/components/ui/icon';
 import { Stat } from '@/components/ui/stat';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatShortDate, type ExerciseDateFormat } from '@/src/exercise-catalog/list-model';
 import {
   formatEffort,
@@ -57,6 +58,7 @@ export function RecordsPanel({
   onOpenProgress,
   now,
 }: RecordsPanelProps) {
+  const styles = useStyles();
   return (
     <Card testID="exercise-records-panel">
       <View style={[styles.header, expanded ? styles.headerExpanded : null]}>
@@ -67,7 +69,7 @@ export function RecordsPanel({
           onPress={onToggleExpanded}
           style={styles.toggle}
           testID="exercise-records-toggle">
-          <Icon color={uiRoles.ink} name={expanded ? 'chevron-down' : 'chevron-right'} size="sm" />
+          <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size="sm" />
         </Pressable>
         <SegmentedControl
           hitSlop={uiSpace.sm}
@@ -175,11 +177,14 @@ function PanelBody({
 }
 
 function StatusMessage({ status, expanded }: { status: 'loading' | 'error'; expanded: boolean }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   if (!expanded && status === 'loading') {
     return <CollapsedStats {...NO_STATS} />;
   }
   return (
-    <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.message]} testID="exercise-records-message">
+    <Text allowFontScaling={false} style={[text.body, tone.muted, styles.message]} testID="exercise-records-message">
       {status === 'loading' ? 'Loading records…' : 'Records unavailable.'}
     </Text>
   );
@@ -196,13 +201,15 @@ function RecordList({ lines }: { lines: RecordLineContent[] }) {
 }
 
 function LastSessionDetail({ last, dateFormat, now }: { last: LastSession; dateFormat: ExerciseDateFormat; now?: Date }) {
+  const styles = useStyles();
+  const text = useUiText();
   return (
     <View style={styles.last} testID="exercise-records-last">
       <View style={styles.lastSummary}>
-        <Text allowFontScaling={false} style={uiText.meta}>
+        <Text allowFontScaling={false} style={text.meta}>
           <FigureText>{datedDetail(last.completedAt, last.gymName, formatDaysAgo(last.completedAt, now), dateFormat)}</FigureText>
         </Text>
-        <Text allowFontScaling={false} style={uiText.meta}>
+        <Text allowFontScaling={false} style={text.meta}>
           <FigureText>{`1RM ${orDash(last.oneRepMax, formatOneRepMax)} · VOL ${orDash(last.volume, formatVolume)}`}</FigureText>
         </Text>
       </View>
@@ -222,6 +229,7 @@ function CollapsedStats({
   maxWeight: string;
   volume: string;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.collapsed} testID="exercise-records-collapsed">
       <View style={styles.collapsedCell}>
@@ -250,17 +258,20 @@ function RecordLine({
   divider?: boolean;
   testID: string;
 }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View
       accessibilityLabel={`${label} record ${value}${detail ? `, ${detail}` : ''}`}
       accessible
       style={[styles.recordLine, divider ? styles.recordDivider : null]}
       testID={testID}>
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint, styles.recordLabel]}>{label}</Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.figureLarge, styles.recordValue]}>
+      <Text allowFontScaling={false} style={[text.label, tone.faint, styles.recordLabel]}>{label}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.figureLarge, styles.recordValue]}>
         {value}
       </Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, styles.recordDetail]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, styles.recordDetail]}>
         <FigureText>{detail}</FigureText>
       </Text>
     </View>
@@ -268,10 +279,13 @@ function RecordLine({
 }
 
 function LastSetLine({ set, index }: { set: RecordSet; index: number }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.lastSet} testID={`exercise-records-last-set-${index}`}>
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink, styles.typeLabel]}>{formatEffort(set.setType)}</Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.figure, styles.lastSetFigure]}>
+      <Text allowFontScaling={false} style={[text.label, tone.ink, styles.typeLabel]}>{formatEffort(set.setType)}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.figure, styles.lastSetFigure]}>
         {`${formatWeight(set.weight)} × ${set.reps}`}
       </Text>
       <Stat
@@ -285,8 +299,11 @@ function LastSetLine({ set, index }: { set: RecordSet; index: number }) {
 }
 
 function Empty({ isFilteredByGym }: { isFilteredByGym?: boolean }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
-    <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.message]} testID="exercise-records-empty">
+    <Text allowFontScaling={false} style={[text.body, tone.muted, styles.message]} testID="exercise-records-empty">
       {isFilteredByGym
         ? 'No completed sessions for this gym yet.'
         : 'No completed sessions with this exercise yet.'}
@@ -294,7 +311,7 @@ function Empty({ isFilteredByGym }: { isFilteredByGym?: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -302,7 +319,7 @@ const styles = StyleSheet.create({
   },
   headerExpanded: {
     borderBottomWidth: uiBorder.width,
-    borderBottomColor: uiRoles.ruleSoft,
+    borderBottomColor: roles.ruleSoft,
   },
   toggle: {
     width: uiGeometry.tapTarget,
@@ -331,7 +348,7 @@ const styles = StyleSheet.create({
   },
   recordDivider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   recordLabel: {
     width: uiGeometry.tapTarget,
@@ -370,4 +387,4 @@ const styles = StyleSheet.create({
     paddingBottom: uiSpace.md,
     paddingTop: uiSpace.xs,
   },
-});
+}));

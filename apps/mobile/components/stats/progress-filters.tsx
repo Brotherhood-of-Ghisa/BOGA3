@@ -6,8 +6,9 @@ import { GymScopeChoices, offersGymChoice } from '@/components/gyms/gym-picker';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
 import { SwitchRow } from '@/components/ui/switch-row';
-import { uiText } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { useUiRoles } from '@/components/ui/theme-context';
+import { uiSpace } from '@/components/ui/tokens';
 import { gymScopeLabel, type GymScopeOption } from '@/src/utils/gym-scope-route';
 
 /** `opening` is the value the view opened on (Settings' default); on when absent. */
@@ -47,6 +48,8 @@ export const changedFilters = ({ grouping, secondary, secondaryVolume, gym }: Om
  * offers. With none, there is no button.
  */
 export function ProgressFilters({ grouping, secondary, secondaryVolume, gym, testID }: ProgressFiltersProps) {
+  const text = useUiText();
+  const roles = useUiRoles();
   const [open, setOpen] = useState(false);
   const origin = useRef<ComponentRef<typeof View> | null>(null);
   const offeredGym = gym && offersGymChoice(gym.value, gym.options) ? gym : undefined;
@@ -72,7 +75,7 @@ export function ProgressFilters({ grouping, secondary, secondaryVolume, gym, tes
           }}
           size="compact"
           testID={testID}
-          trailing={<Icon color={changed.length > 0 ? uiRoles.onInk : uiRoles.inkMuted} name="chevron-down" size="xs" />}
+          trailing={<Icon color={changed.length > 0 ? roles.onInk : roles.inkMuted} name="chevron-down" size="xs" />}
         />
       </View>
       <Sheet dismissLabel="Dismiss filters" onDismiss={() => setOpen(false)} onDismissed={restoreFocus}
@@ -87,7 +90,7 @@ export function ProgressFilters({ grouping, secondary, secondaryVolume, gym, tes
             onValueChange={primaryOnly => secondaryVolume.onChange(!primaryOnly)}
             testID="stats-volume-primary-only-toggle" value={!secondaryVolume.value} /> : null}
           {offeredGym ? <>
-            <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, styles.sectionLabel]}>Gym</Text>
+            <Text accessibilityRole="header" allowFontScaling={false} style={[text.label, styles.sectionLabel]}>Gym</Text>
             <GymScopeChoices allSessionCount={offeredGym.allSessionCount} onChoose={offeredGym.onChange} options={offeredGym.options}
               testID="stats-gym" value={offeredGym.value} />
           </> : null}

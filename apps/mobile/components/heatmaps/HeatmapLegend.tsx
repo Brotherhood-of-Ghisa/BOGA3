@@ -3,28 +3,33 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 import { heatRamp } from './heatmap-metric';
 
 export function HeatmapLegend({ target = false }: { target?: boolean }) {
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.legend}>
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+      <Text allowFontScaling={false} style={[text.label, tone.faint]}>
         {target ? '% of target' : '% of max'}
       </Text>
       <View style={styles.ramp}>
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+        <Text allowFontScaling={false} style={[text.label, tone.faint]}>
           0%
         </Text>
-        {heatRamp(uiRoles).map((color, i) => (
+        {heatRamp(roles).map((color, i) => (
           <View
             key={color}
             style={[styles.swatch, { backgroundColor: color }, i === 0 ? styles.restSwatch : null]}
           />
         ))}
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+        <Text allowFontScaling={false} style={[text.label, tone.faint]}>
           100%
         </Text>
       </View>
@@ -32,7 +37,7 @@ export function HeatmapLegend({ target = false }: { target?: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -47,6 +52,6 @@ const styles = StyleSheet.create({
   },
   restSwatch: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
   },
-});
+}));

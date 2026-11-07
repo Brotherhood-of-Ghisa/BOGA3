@@ -1,21 +1,16 @@
 import { useId, useRef, useState } from 'react';
 import { Platform, Pressable, Text, type ViewInstance } from 'react-native';
 import Svg, { Circle, ClipPath, Defs, Ellipse, G, Line, Polyline, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import type { UiRoles } from '@/components/ui/theme';
+import { useUiRoles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import type { ObservationUncertainty, RegimeCurve } from '@/src/strength-regimes/assessment';
 import { FIXED_REGIME_UNCERTAINTY } from '@/src/strength-regimes/fit';
 import type { RmCurveModel } from '@/src/rm-curve/model';
 import { axisLabel, curveGeometry, pointsAt, PLOT_HEIGHT } from './geometry';
 
-// An axis tick is a legend: the micro-label, faint, drawn by the SVG's own text
-// props (`design-language.md` §3).
-const TICK = {
-  fill: uiTextTone.faint.color, fontFamily: uiText.label.fontFamily, fontWeight: uiText.label.fontWeight,
-  fontSize: uiText.label.fontSize, letterSpacing: uiText.label.letterSpacing,
-};
-
-export const periodColour = (period: RegimeCurve['period']) => period === 'newer' ? uiRoles.regimeNewer : uiRoles.regimeOlder;
+export const periodColour = (roles: UiRoles, period: RegimeCurve['period']) => period === 'newer' ? roles.regimeNewer : roles.regimeOlder;
 
 /** Exact coordinates; complete-session date partitions share curve and point identity. */
 export function RmCurveChart({ model, selectedId, onPick, curves = [], boundary = null, uncertainty = FIXED_REGIME_UNCERTAINTY }: {
@@ -23,11 +18,20 @@ export function RmCurveChart({ model, selectedId, onPick, curves = [], boundary 
   uncertainty?: ObservationUncertainty | null;
   model: RmCurveModel; selectedId: string | null; onPick: (ids: string[]) => void;
 }) {
+  const roles = useUiRoles();
+  const text = useUiText();
+  const textTone = useUiTextTone();
+  // An axis tick is a legend: the micro-label, faint, drawn by the SVG's own text
+  // props (`design-language.md` §3).
+  const TICK = {
+    fill: textTone.faint.color, fontFamily: text.label.fontFamily, fontWeight: text.label.fontWeight,
+    fontSize: text.label.fontSize, letterSpacing: text.label.letterSpacing,
+  };
   const [width, setWidth] = useState(300);
   const haloId = useId();
   const host = useRef<ViewInstance | null>(null);
   const plot = curveGeometry(model, width, curves, uncertainty);
-  const colours = { neutral: uiRoles.inkMuted, older: periodColour('older'), newer: periodColour('newer') };
+  const colours = { neutral: roles.inkMuted, older: periodColour(roles, 'older'), newer: periodColour(roles, 'newer') };
   const marks = plot.points.map((p, index) => {
     const observation = model.observations[index];
     const newer = boundary !== null && observation.completedAt.getTime() >= boundary;
@@ -65,7 +69,7 @@ export function RmCurveChart({ model, selectedId, onPick, curves = [], boundary 
           </RadialGradient>)}
         </Defs>
         {[0, 1, 2, 3, 4].map(i => <Line key={i} x1={plot.x(0)} x2={plot.x(plot.maxReps)}
-          y1={plot.y(plot.maxLoad * (i / 4))} y2={plot.y(plot.maxLoad * (i / 4))} stroke={uiRoles.ruleSoft} />)}
+          y1={plot.y(plot.maxLoad * (i / 4))} y2={plot.y(plot.maxLoad * (i / 4))} stroke={roles.ruleSoft} />)}
         {[0, 1, 2, 3, 4].map(i => <SvgText key={i} x={plot.x(0) - uiSpace.xs}
           y={plot.y(plot.maxLoad * (i / 4)) + uiSpace.xs} textAnchor="end" {...TICK}>
           {axisLabel(plot.maxLoad * (i / 4))}
@@ -75,7 +79,7 @@ export function RmCurveChart({ model, selectedId, onPick, curves = [], boundary 
           {axisLabel(plot.maxReps * (i / 4))}
         </SvgText>)}
         {plot.lines.map(line => <Polyline key={line.period} testID={`rm-fit-${line.period}`} points={line.line} fill="none"
-          stroke={periodColour(line.period)} strokeWidth={2} strokeDasharray={line.period === 'newer' ? '6 4' : undefined} opacity={line.opacity} />)}
+          stroke={periodColour(roles, line.period)} strokeWidth={2} strokeDasharray={line.period === 'newer' ? '6 4' : undefined} opacity={line.opacity} />)}
         {/* One error scale beyond the marker footprint; this is not a probability contour. */}
         <G clipPath={`url(#${haloId}-clip)`}>
           {marks.filter(p => p.halo !== null).map(p => <Ellipse key={p.id} testID={`rm-halo-${p.id}`}
@@ -83,14 +87,14 @@ export function RmCurveChart({ model, selectedId, onPick, curves = [], boundary 
             fill={`url(#${haloId}-${p.tone})`} />)}
         </G>
         {marks.map(p => p.newer ? <Polyline key={p.id} testID={`rm-point-${p.id}`} points={`${p.x},${p.y - 5} ${p.x + 5},${p.y} ${p.x},${p.y + 5} ${p.x - 5},${p.y} ${p.x},${p.y - 5}`}
-            fill={uiRoles.surface} stroke={colours[p.tone]} strokeWidth={2} />
+            fill={roles.surface} stroke={colours[p.tone]} strokeWidth={2} />
             : <Circle key={p.id} testID={`rm-point-${p.id}`} cx={p.x} cy={p.y} r={4}
-              fill={uiRoles.surface} stroke={colours[p.tone]} strokeWidth={2} />)}
+              fill={roles.surface} stroke={colours[p.tone]} strokeWidth={2} />)}
         {plot.points.filter(p => p.id === selectedId).map(p => <Polyline key={p.id} testID="rm-selection-caret"
           points={`${p.x - 4},${p.y - 12} ${p.x},${p.y - 8} ${p.x + 4},${p.y - 12}`}
-          fill="none" stroke={uiRoles.ink} strokeWidth={2} />)}
+          fill="none" stroke={roles.ink} strokeWidth={2} />)}
       </Svg>
     </Pressable>
-    <Text allowFontScaling={false} style={uiText.label}>REPS + RIR</Text>
+    <Text allowFontScaling={false} style={text.label}>REPS + RIR</Text>
   </>;
 }

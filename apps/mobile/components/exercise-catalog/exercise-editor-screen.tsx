@@ -17,11 +17,9 @@ import {
   StatePanel,
   SwitchRow,
   FormSection,
-  uiRoles,
   uiSpace,
-  uiText,
-  uiTextTone,
 } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-preference';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import type { ReportedMuscle } from '@/src/data/muscle-analytics';
@@ -241,6 +239,8 @@ function OptionsSection({ form }: { form: EditorFormState }) {
  * the picker stays open while muscles are ticked.
  */
 function MusclePickerSheet({ form }: { form: EditorFormState }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const { muscles } = useExerciseCatalog().muscleSetup;
   const mode = form.muscleSelectorMode;
   const isPrimary = mode === 'primary';
@@ -262,8 +262,8 @@ function MusclePickerSheet({ form }: { form: EditorFormState }) {
               divider={index > 0}
               key={muscle.id}
               label={muscle.displayName}
-              leading={<Icon color={isOn ? uiRoles.accent : uiRoles.inkMuted} name={isOn ? 'check' : 'circle'} size="md" />}
-              meta={<Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.muted]}>{muscle.familyName}</Text>}
+              leading={<Icon colorRole={isOn ? 'accent' : 'inkMuted'} name={isOn ? 'check' : 'circle'} size="md" />}
+              meta={<Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.muted]}>{muscle.familyName}</Text>}
               selected={isOn}
               onPress={() => (isPrimary ? form.togglePrimaryMuscle(muscle.id) : form.toggleSecondaryMuscle(muscle.id))}
               testID={`exercise-editor-muscle-option-${muscle.id}`}

@@ -1,7 +1,9 @@
 import { Fragment, type ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { changeToneColour, FigureText, uiBorder, uiGeometry, uiIconSize, uiSpace, uiText } from '@/components/ui';
+import { FigureText, uiBorder, uiGeometry, uiIconSize, uiSpace, useUiRoles } from '@/components/ui';
+import { changeToneColourIn } from '@/components/ui/change-tone';
+import { useUiText } from '@/components/ui/text-roles';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { formatOneRepMax, formatWholeSetCount } from '@/src/exercise-calculations/format';
 import type { ProgressExerciseMetric } from '@/src/preferences/model';
@@ -217,9 +219,10 @@ export const comparisonValuesLabel = (row: ComparisonRow, metric: ComparisonMetr
 export function ComparisonValues({ row, metric, layout, prefix, speak = true, compact = false }: {
   row: ComparisonRow; metric: ComparisonMetric; layout: ComparisonLayout; prefix: string; speak?: boolean; compact?: boolean;
 }) {
+  const roles = useUiRoles();
   const figures = comparisonFigures(row, metric);
   const texts = [figures.now, figures.previous, figures.change.text];
-  const changeColour = { color: changeToneColour(figures.change.tone) };
+  const changeColour = { color: changeToneColourIn(roles, figures.change.tone) };
   return <View accessible={speak || undefined}
     accessibilityLabel={speak ? comparisonValuesLabel(row, metric) : undefined}
     style={[layout.stacked && styles.stackedFigures, compact && layout.stacked && styles.compactFigures]} testID={`${prefix}-figures`}>
@@ -235,8 +238,9 @@ export function ComparisonValues({ row, metric, layout, prefix, speak = true, co
 function ComparisonCell({ text, width, colour, testID }: {
   text: string; width: number; colour?: { color: string }; testID: string;
 }) {
+  const textRoles = useUiText();
   const word = /[A-Za-z]/.test(text);
-  return <Text allowFontScaling={false} style={[word ? uiText.body : uiText.figure, statsTableStyles.figure, { width }, colour]}
+  return <Text allowFontScaling={false} style={[word ? textRoles.body : textRoles.figure, statsTableStyles.figure, { width }, colour]}
     testID={testID}>{word ? <FigureText>{text}</FigureText> : text}</Text>;
 }
 
