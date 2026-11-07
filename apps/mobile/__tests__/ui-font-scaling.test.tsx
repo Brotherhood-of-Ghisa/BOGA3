@@ -1,10 +1,12 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import { readdirSync, readFileSync } from 'fs';
 import { join, relative } from 'path';
 import ts from 'typescript';
 
 import { FormField } from '@/components/ui/form-field';
 import { SearchField } from '@/components/ui/search-field';
+
+import { renderWithTheme as render } from './helpers/theme';
 
 const APP_ROOT = join(__dirname, '..');
 
