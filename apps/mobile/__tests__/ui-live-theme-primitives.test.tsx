@@ -93,8 +93,14 @@ describe('components/ui repaints when the theme changes', () => {
   });
 
   it('ListRow: the selected wash and a danger label', async () => {
-    renderWithTheme(<ListRow label="Delete" selected testID="row" tone="danger" />);
+    renderWithTheme(
+      <>
+        <ListRow label="Pick" selected testID="row" />
+        <ListRow label="Delete" tone="danger" />
+      </>,
+    );
     await repaints(() => style('row').backgroundColor, (roles) => roles.accentWash);
+    expect(StyleSheet.flatten(screen.getByText('Delete').props.style).color).toBe(rolesFor(SLATE_DARK).danger);
   });
 
   it('StatePanel: its words', async () => {
@@ -107,6 +113,7 @@ describe('components/ui repaints when the theme changes', () => {
     renderWithTheme(<Stat emphasis="record" label="1RM" value="120" />);
     const figure = () => StyleSheet.flatten(screen.getByText('120').props.style).color;
     await repaints(figure, (roles) => roles.record);
+    expect(StyleSheet.flatten(screen.getByText('1RM').props.style).color).toBe(rolesFor(SLATE_DARK).inkFaint);
   });
 
   it('Tag and ToggleChip: surface and rule', async () => {

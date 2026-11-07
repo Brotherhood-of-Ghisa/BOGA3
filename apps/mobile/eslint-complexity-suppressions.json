@@ -1,10 +1,10 @@
 {
-  "app/completed-session/[sessionId].tsx": {
+  "app/exercise-catalog.tsx": {
     "max-lines-per-function": {
       "count": 1
     }
   },
-  "app/exercise-catalog.tsx": {
+  "app/completed-session/[sessionId].tsx": {
     "max-lines-per-function": {
       "count": 1
     }
@@ -19,6 +19,11 @@
   },
   "app/group/join.tsx": {
     "sonarjs/cognitive-complexity": {
+      "count": 1
+    }
+  },
+  "components/session-view/session-view-screen.tsx": {
+    "max-lines-per-function": {
       "count": 1
     }
   },
@@ -51,11 +56,6 @@
     }
   },
   "components/session-recorder/exercise-picker.tsx": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "components/session-view/session-view-screen.tsx": {
     "max-lines-per-function": {
       "count": 1
     }

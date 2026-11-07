@@ -33,7 +33,7 @@ export type StatProps = {
   // for planned values, which cannot be one (`design-language.md` §5).
   emphasis?: StatEmphasis;
   // `text` sets the value in the body face (a profile's email), not the figure
-  // face; `heading` in the card-title face, on a headline figure's line so it
+  // face; `heading` in the card-title face, on a headline figure's line so i
   // shares that figure's baseline beside it (the session's gym).
   kind?: StatKind;
   // Stacked only: `end` right-aligns label and value (a trailing column).
@@ -78,14 +78,14 @@ export function Stat({
     // Android needs `textAlignVertical`).
     heading: [textRoles.title, { lineHeight: textRoles.figureStat.lineHeight, textAlignVertical: 'bottom' as const }],
   };
-  
+
   // The set row's 1RM line in ink, its quieter VOL line muted. Plex Mono 500 is
   // its lightest embedded face, so a `record` (700) stands out from it.
   const inlineValueStyles = {
     primary: [textRoles.figureSmall, textTones.ink],
     secondary: textRoles.figureSmall,
   };
-  
+
   const emphasisStyles: Record<StatEmphasis, TextStyle | null> = {
     none: null,
     record: textTones.record,

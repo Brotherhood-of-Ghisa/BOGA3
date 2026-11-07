@@ -5,12 +5,17 @@
  * form-card density.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
-import { ActionRow, ChoiceRow, FormError, FormSection, InputRow, SwitchRow, uiRoles } from '@/components/ui';
+import { ActionRow, ChoiceRow, FormError, FormSection, InputRow, SwitchRow } from '@/components/ui';
 
 import { drawsGlyph } from './helpers/draws-glyph';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
+import { renderWithTheme as render, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 describe('FormSection', () => {
   it('heads its card with the group name and shows one error under it', () => {
@@ -113,13 +118,13 @@ describe('ActionRow', () => {
 
   it('puts accent words on navigate and act, and danger words on danger', () => {
     const view = render(<ActionRow label="Review changes" onPress={jest.fn()} />);
-    expect(screen.getByText('Review changes')).toHaveStyle({ color: uiRoles.accent });
+    expect(screen.getByText('Review changes')).toHaveStyle({ color: roles.accent });
     view.rerender(<ActionRow kind="act" label="Export database" onPress={jest.fn()} />);
-    expect(screen.getByText('Export database')).toHaveStyle({ color: uiRoles.accent });
+    expect(screen.getByText('Export database')).toHaveStyle({ color: roles.accent });
     view.rerender(<ActionRow kind="danger" label="Wipe local" onPress={jest.fn()} />);
-    expect(screen.getByText('Wipe local')).toHaveStyle({ color: uiRoles.danger });
+    expect(screen.getByText('Wipe local')).toHaveStyle({ color: roles.danger });
     view.rerender(<ActionRow kind="danger" disabled label="Wipe local" onPress={jest.fn()} />);
-    expect(screen.getByText('Wipe local')).toHaveStyle({ color: uiRoles.inkGhost });
+    expect(screen.getByText('Wipe local')).toHaveStyle({ color: roles.inkGhost });
   });
 
   it('presses a danger or act row, and blocks a disabled one', () => {
