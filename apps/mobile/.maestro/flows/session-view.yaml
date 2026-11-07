@@ -50,7 +50,6 @@ appId: com.dinoderek.mobile
 # A conflicting Resume must leave the completed workout intact, and its link
 # must cross from completed detail back into the actual current Train tab.
 - openLink: "boga3://maestro-harness?teleport=completed-session&sessionId=maestro_m24_completion_one_pr"
-- runFlow: ../scripts/dismiss-notification-permission.yaml
 - extendedWaitUntil:
     visible:
       id: "completed-session-detail-options-button"

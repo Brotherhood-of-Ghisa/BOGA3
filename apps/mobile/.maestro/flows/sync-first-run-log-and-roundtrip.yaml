@@ -60,7 +60,6 @@ appId: com.dinoderek.mobile
 # On small phones Continue is below the intro fold; at its scroll end it
 # is fully visible above chrome but cannot move to the viewport centre.
 - openLink: "${MAESTRO_DEV_CLIENT_URL}"
-- runFlow: ../scripts/dismiss-notification-permission.yaml
 # A wiped November launch changes the native icon, and UIKit's confirmation
 # covers the dev menu (as in auth-profile): dismiss it before scrolling to
 # Continue.

@@ -20,6 +20,7 @@ import {
 } from '@/src/maestro/harness';
 
 import { prepareExerciseHistoryReadForMaestro } from '@/src/exercise-catalog/stats-cache';
+import { suppressNotificationPrompt } from '@/src/session-recorder/notification-prompt-suppression';
 
 type HarnessStatus =
   | { kind: 'running'; message: string }
@@ -134,6 +135,10 @@ export default function MaestroHarnessScreen() {
       maestroCatalog: maestroCatalogParam,
       presentation: presentationParam,
     });
+
+    // Before anything a flow can tap: the rest timer must never raise the iOS
+    // notification dialog over a Maestro run.
+    suppressNotificationPrompt();
 
     void (async () => {
       try {

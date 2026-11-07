@@ -187,6 +187,26 @@ maestro_seed_dev_menu_preferences() {
   echo "[maestro] seeded dev-menu preferences (onboarding finished, no launch menu) for $bundle_id"
 }
 
+# Stop the app raising iOS's "Would Like to Send You Notifications" dialog. The
+# rest timer asks the first time it starts, and the dialog lands seconds after
+# the tap, over whatever a flow asserts next; `simctl privacy` has no
+# notification service to pre-answer it. The dev build skips the request while
+# this user-defaults key is set (src/session-recorder/notification-prompt-suppression.ts),
+# so the dialog never exists. A flow's `clearState` wipes the seed; the harness
+# link writes the key back. Not best-effort: a miss brings the race back.
+maestro_seed_notification_prompt_suppression() {
+  local udid="$1"
+  local bundle_id="$2"
+  local container plist
+
+  container="$(xcrun simctl get_app_container "$udid" "$bundle_id" data 2>/dev/null)" \
+    || maestro_fail "Unable to resolve the $bundle_id data container on $udid to suppress the notification prompt."
+  plist="$container/Library/Preferences/$bundle_id.plist"
+  xcrun simctl spawn "$udid" defaults write "$plist" BogaMaestroSuppressNotificationPrompt -bool true \
+    || maestro_fail "Unable to seed BogaMaestroSuppressNotificationPrompt in $plist."
+  echo "[maestro] seeded notification-prompt suppression for $bundle_id"
+}
+
 maestro_dev_client_bundle_id() {
   local app_path="$1"
   [[ -f "$app_path/Info.plist" ]] || maestro_fail "Missing Info.plist under dev client app path: $app_path"

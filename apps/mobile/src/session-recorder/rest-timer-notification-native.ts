@@ -10,12 +10,35 @@ import {
 } from 'expo-notifications';
 import { Platform } from 'react-native';
 
+import { isNotificationPromptSuppressed } from './notification-prompt-suppression';
+
 export const REST_TIMER_NOTIFICATION_ID = 'boga-rest-timer';
 export const REST_TIMER_NOTIFICATION_CHANNEL_ID = 'boga-rest-timer';
 
 let operations = Promise.resolve();
 let permissionRequested = false;
 let soundUpgradeRequested = false;
+
+// The system dialog is raised here and nowhere else in the rest timer. Under
+// the Maestro harness it is suppressed (notification-prompt-suppression.ts):
+// the timer still schedules, and iOS drops the unauthorized notification.
+async function requestAlertAndSoundAsync(): Promise<boolean> {
+  if (isNotificationPromptSuppressed()) {
+    return false;
+  }
+  const requested = await requestPermissionsAsync({
+    ios: {
+      allowAlert: true,
+      allowBadge: false,
+      allowSound: true,
+    },
+  });
+  return (
+    requested.granted ||
+    requested.ios?.status === IosAuthorizationStatus.AUTHORIZED ||
+    requested.ios?.status === IosAuthorizationStatus.PROVISIONAL
+  );
+}
 
 async function ensureNotificationPermissionsAsync(): Promise<boolean> {
   try {
@@ -31,18 +54,7 @@ async function ensureNotificationPermissionsAsync(): Promise<boolean> {
       }
       if (isGranted && current.ios?.allowsSound === false && !soundUpgradeRequested) {
         soundUpgradeRequested = true;
-        const requested = await requestPermissionsAsync({
-          ios: {
-            allowAlert: true,
-            allowBadge: false,
-            allowSound: true,
-          },
-        });
-        return (
-          requested.granted ||
-          requested.ios?.status === IosAuthorizationStatus.AUTHORIZED ||
-          requested.ios?.status === IosAuthorizationStatus.PROVISIONAL
-        );
+        return await requestAlertAndSoundAsync();
       }
       if (isGranted) {
         return true;
@@ -53,18 +65,7 @@ async function ensureNotificationPermissionsAsync(): Promise<boolean> {
 
     if (current.status === 'undetermined' && !permissionRequested) {
       permissionRequested = true;
-      const requested = await requestPermissionsAsync({
-        ios: {
-          allowAlert: true,
-          allowBadge: false,
-          allowSound: true,
-        },
-      });
-      return (
-        requested.granted ||
-        requested.ios?.status === IosAuthorizationStatus.AUTHORIZED ||
-        requested.ios?.status === IosAuthorizationStatus.PROVISIONAL
-      );
+      return await requestAlertAndSoundAsync();
     }
     return false;
   } catch {
