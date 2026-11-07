@@ -19,6 +19,7 @@ appId: com.dinoderek.mobile
 
 # The completion-two-prs fixture's newest session beats both histories.
 - openLink: "boga3://maestro-harness?reset=data&fixture=completion-two-prs&teleport=completed-session&sessionId=maestro_m24_completion_two_prs&presentation=completion"
+- runFlow: ../scripts/dismiss-notification-permission.yaml
 - extendedWaitUntil:
     visible:
       id: "session-completion-presentation"

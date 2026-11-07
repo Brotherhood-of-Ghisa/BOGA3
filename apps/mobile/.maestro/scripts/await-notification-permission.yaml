@@ -1,0 +1,13 @@
+appId: com.dinoderek.mobile
+---
+# Wait briefly for the iOS notification dialog, then allow it
+# (`dismiss-notification-permission.yaml`). Called right after a step that
+# starts the rest timer (committing a set): the dialog is raised a moment after
+# the tap, so a check that runs at once can miss it and every later assertion
+# fails behind it. The wait is optional, so a lane where the permission is
+# already answered, or Android, continues after the timeout.
+- extendedWaitUntil:
+    visible: ".*Would Like to Send You Notifications.*"
+    timeout: 3000
+    optional: true
+- runFlow: dismiss-notification-permission.yaml

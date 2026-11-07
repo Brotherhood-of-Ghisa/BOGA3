@@ -52,6 +52,7 @@ appId: com.dinoderek.mobile
 
 # --- Setup: the List view; the catalogue's rows are Detailed after the reset ---
 - openLink: "boga3://settings-progress"
+- runFlow: ../scripts/dismiss-notification-permission.yaml
 - scrollUntilVisible:
     element:
       id: "settings-muscle-view-list"
