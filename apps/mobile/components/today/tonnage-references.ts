@@ -37,13 +37,13 @@ export const REFERENCE_GAP = uiSpace.xs;
 export const finiteMaximum = (values: readonly (number | null)[]): number =>
   values.reduce<number>((maximum, value) => value !== null && Number.isFinite(value) ? Math.max(maximum, value) : maximum, 0);
 
-/** Eligibility before fitting: [[comparison.tonnage-references]]. */
+/** Only the selected values determine eligibility, before any layout fitting. */
 export const eligibleTonnageReferences = (values: readonly (number | null)[]): readonly Reference[] => {
   const reach = finiteMaximum(values);
   return TONNAGE_REFERENCES.filter(reference => reference.value <= reach).slice(-6);
 };
 
-/** Fit just the missing points above the annotation: [[comparison.tonnage-references]]. */
+/** Add only the clearance needed above the highest annotation. */
 export const fitTonnageMaximum = (
   baseMaximum: number, references: readonly Reference[], plot: { top: number; bottom: number },
 ): number => {

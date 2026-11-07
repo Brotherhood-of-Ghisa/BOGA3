@@ -13,13 +13,11 @@ Code: `supabase/migrations/20261027163253_exercise_merge.sql`; client orchestrat
 
 ### exercise.merge-values · calculation · accepted
 
-Moved history uses the destination's current definition and existing group links.
-Actual and planned Weight convert between total and per-side input without display
-rounding; same-mode stored text stays verbatim. Tombstoned child sets convert
-without revival. No coefficient compensation or warning is added.
-Historical tag labels survive; destination normalized-name matches are reused,
-including deleted tags without revival. Definitions, muscle mappings, plans and
-group links are never copied.
+Moved history follows the destination exercise's current definition and group
+links wherever it appears. Moving it preserves the original external load and
+retains historical tags by name, reusing equivalent destination tags.
+The destination's bodyweight contribution applies
+without compensating the stored Weight or warning about the contribution change.
 
 Why: transferred history must use consistent units while retaining its raw training and provenance.
 Code: `supabase/migrations/20261027163253_exercise_merge.sql`.

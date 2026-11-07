@@ -121,8 +121,7 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
 // The arrows either side of the compared range step to an earlier or later
 // period, never later than the previous one. The chart takes the height the
 // block is given.
-// Tons adds the references of [[comparison.tonnage-references]]; their quiet
-// passive labels stay legible over the series; selection markers stay above.
+// Tonnage references are passive labels over the series; selection markers stay above.
 export function PeriodPace({
   period,
   onShowCompared,
@@ -141,7 +140,8 @@ export function PeriodPace({
   const figures = periodDayFigures(period, selection?.periodKey === periodKey ? selection.dayIndex : null, metric);
   const { width, height } = size;
   const geometry = periodChartGeometry(period, width, height, figures);
-  // Leave a right-hand column for every annotation, even on a short phone.
+  // TODO: Keep the chart's base minimum height and omit the lightest references
+  // when space runs out. The current minimum grows with the reference count.
   const referenceMinimumHeight = (geometry.references.length + 1) * (REFERENCE_HEIGHT + REFERENCE_GAP);
 
   const onLayout = (event: LayoutChangeEvent) => {
