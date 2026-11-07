@@ -52,6 +52,7 @@ import { customFromSeeds, generateCustomRoles } from '@/components/ui/theme-cust
 import { seedsFromHue } from '@/components/ui/theme-hue';
 import { getThemePreset } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
+import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 import { waitForGone } from './helpers/wait-for-gone';
 
 const currentRequest = () => mockProcess.mock.calls.at(-1)![0];
@@ -81,6 +82,23 @@ it("shares the recipient's applied app theme, custom colours included, for expan
   expect(mockSetTheme.mock.calls[0][0]).not.toEqual(expect.objectContaining({ paper: warm.paper, ink: warm.ink, record: warm.record }));
   view.unmount();
   expect(mockStop).toHaveBeenCalledTimes(1);
+});
+
+it('shares the theme again when a new appearance is saved, without restarting the lifecycle', async () => {
+  renderWithTheme(<NotificationTapBridge />);
+  expect(mockStart).toHaveBeenCalledTimes(1);
+
+  const slateDark = { theme: 'slate', mode: 'dark', custom: null } as const;
+  await switchTheme(slateDark);
+
+  const roles = rolesFor(slateDark);
+  expect(mockSetTheme).toHaveBeenLastCalledWith({
+    paper: roles.paper, surface: roles.surface, rule: roles.rule,
+    ink: roles.ink, inkMuted: roles.inkMuted, record: roles.record, recordWash: roles.recordWash,
+  });
+  // Native listeners live across a theme save: neither stopped nor started again.
+  expect(mockStop).not.toHaveBeenCalled();
+  expect(mockStart).toHaveBeenCalledTimes(1);
 });
 
 it.each(['sign-in', 'sync-setup'])('keeps taps pending while protected route access is %s', access => {

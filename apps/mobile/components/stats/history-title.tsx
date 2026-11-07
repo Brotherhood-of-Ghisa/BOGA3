@@ -19,8 +19,8 @@ const TITLE_MAX_WIDTH = 220;
  * The history page's native header title, in the sheet-title role: a step
  * above the stack's title role; a long exercise name shrinks before it truncates.
  * Given muscles, it is a button: a chevron follows the name, and a tap opens a
- * sheet of the user's muscles in Progress's family sections
- * ([[muscle.family-sections]]), the current one checked.
+ * sheet of the user's muscles in Progress's family sections, with the current
+ * muscle checked.
  */
 export function HistoryTitle({ title, muscles, currentId, onChoose }: {
   title: string;

@@ -14,7 +14,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { StyleSheet, type TextStyle } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -61,7 +61,7 @@ import {
 import { localWeekWindow } from '@/src/utils/local-calendar';
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { updatePreferences } from '@/src/preferences/hooks';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui';
+import { uiFonts, uiTypography } from '@/components/ui';
 import type { ExerciseHistorySummary } from '@/src/data';
 import * as historyRepository from '@/src/data/exercise-history';
 import { upsertLocalGym } from '@/src/data/local-gyms';
@@ -78,6 +78,11 @@ import {
   loadMaestroFixture,
   resetLocalData,
 } from './helpers/local-data';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const buildSummary = (overrides: Partial<ExerciseHistorySummary> = {}): ExerciseHistorySummary => ({
   exerciseDefinitionId: 'ex-bench',
@@ -198,7 +203,7 @@ describe('ExerciseHistoryRoute over real data', () => {
     await prepare?.();
     await bootLocalApp();
     mockSearchParams = params;
-    render(<ExerciseHistoryRoute />);
+    renderWithTheme(<ExerciseHistoryRoute />);
     await waitFor(() =>
       expect(
         screen.queryByTestId('exercise-history-best-card') ?? screen.queryByTestId('exercise-history-error-state')
@@ -259,7 +264,7 @@ describe('ExerciseHistoryRoute over real data', () => {
     const oldRead = new Promise<ExerciseHistorySummary>(resolve => { finishOld = resolve; });
     jest.spyOn(historyRepository, 'loadExercisePerformanceHistory').mockReturnValueOnce(oldRead);
     mockSearchParams = { exerciseDefinitionId: SQUAT };
-    render(<ExerciseHistoryRoute />);
+    renderWithTheme(<ExerciseHistoryRoute />);
     expect(screen.getByTestId('exercise-history-loading-state')).toBeTruthy();
     fireEvent.press(screen.getByTestId('exercise-history-period-chip-progress'));
     await screen.findByTestId('exercise-history-best-card');
@@ -376,7 +381,7 @@ describe('ExerciseHistoryRoute over real data', () => {
     expect(screen.getByTestId(`${onePr}-record-1`)).toHaveTextContent('New 1RM · 320.6 + top weight275.0 × 5');
     expect(screen.queryByTestId(`${onePr}-record-2`)).toBeNull();
     expect(screen.getByTestId('exercise-history-set-row-maestro_m24_completion_one_pr_squat_set-values'))
-      .toHaveStyle({ color: uiRoles.record });
+      .toHaveStyle({ color: roles.record });
     // The oldest session set the records: a baseline is no PR.
     expect(screen.queryByTestId('exercise-history-session-card-maestro_exercise_block_history_squat_6_a-record')).toBeNull();
   });
@@ -404,7 +409,7 @@ describe('ExerciseHistoryRoute over real data', () => {
     screen.unmount();
 
     act(() => setExerciseListPreferences({ pastRecordsGymScope: 'current-gym' }));
-    render(<ExerciseHistoryRoute />);
+    renderWithTheme(<ExerciseHistoryRoute />);
     await waitFor(() => expect(screen.queryByTestId('exercise-history-best-card')).toBeTruthy());
 
     await waitFor(() => expect(sessionCards()).toHaveLength(9));
@@ -481,7 +486,7 @@ describe('ExerciseHistoryRoute over real data', () => {
   it('draws its own back arrow that pops the stack', async () => {
     await openHistory({ exerciseDefinitionId: SQUAT });
 
-    render(mockScreenOptions.headerLeft!());
+    renderWithTheme(mockScreenOptions.headerLeft!());
     fireEvent.press(screen.getByTestId('exercise-history-back'));
 
     expect(mockBack).toHaveBeenCalledTimes(1);
@@ -492,7 +497,7 @@ describe('ExerciseHistoryRoute over real data', () => {
     mockCanGoBack = false;
     await openHistory({ exerciseDefinitionId: SQUAT });
 
-    render(mockScreenOptions.headerLeft!());
+    renderWithTheme(mockScreenOptions.headerLeft!());
     fireEvent.press(screen.getByTestId('exercise-history-back'));
 
     expect(mockBack).not.toHaveBeenCalled();
@@ -523,7 +528,7 @@ describe('ExerciseHistoryRoute over real data', () => {
 
 describe('ExerciseHistoryScreenShell', () => {
   it('renders the all-time best card and session list', () => {
-    render(
+    renderWithTheme(
       <ExerciseHistoryScreenShell
         summary={buildSummary()}
         period="history"
@@ -545,7 +550,7 @@ describe('ExerciseHistoryScreenShell', () => {
   });
 
   it('names no gym on the all-time bests, and keeps the tag row as tall as its chips', () => {
-    render(
+    renderWithTheme(
       <ExerciseHistoryScreenShell
         summary={buildSummary({ gymOptions: [{ gymId: null, name: 'No gym', occurrenceCount: 2 }] })}
         period="history"
@@ -566,7 +571,7 @@ describe('ExerciseHistoryScreenShell', () => {
 
   it('invokes onSelectTag with tagDefinitionId and toggles back to null', () => {
     const onSelectTag = jest.fn();
-    render(
+    renderWithTheme(
       <ExerciseHistoryScreenShell
         summary={buildSummary()}
         period="history"
@@ -594,7 +599,7 @@ describe('ExerciseHistoryScreenShell', () => {
   });
 
   it('renders the in-section empty state when no sessions match the filter', () => {
-    render(
+    renderWithTheme(
       <ExerciseHistoryScreenShell
         summary={buildSummary({ sessions: [] })}
         period="week"
@@ -620,7 +625,7 @@ describe('ExerciseHistoryScreenShell', () => {
     ['gym-westside' as string | null, /this gym/],
     [null, /without a gym/],
   ])('names the gym scope %p in the empty state', (appliedGymId, expected) => {
-    render(
+    renderWithTheme(
       <ExerciseHistoryScreenShell
         summary={buildSummary({ sessions: [] })}
         period="week"
@@ -654,7 +659,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
       ],
     });
 
-    render(
+    renderWithTheme(
       <ExerciseHistoryScreenShell
         summary={summary}
         period="history"
@@ -672,7 +677,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
   });
 
   it('shows the deleted-exercise banner when the exercise itself is soft-deleted', () => {
-    render(
+    renderWithTheme(
       <ExerciseHistoryScreenShell
         summary={buildSummary({ exerciseDeletedAt: new Date('2026-05-01T00:00:00.000Z') })}
         period="history"
@@ -694,7 +699,7 @@ describe('ExerciseHistoryScreenShell — deleted tag visibility', () => {
 
 describe('ExerciseHistoryScreenShell — design language', () => {
   const renderShell = (overrides: Partial<ExerciseHistoryScreenShellProps> = {}) =>
-    render(
+    renderWithTheme(
       <ExerciseHistoryScreenShell
         summary={buildSummary()}
         period="history"
@@ -714,9 +719,9 @@ describe('ExerciseHistoryScreenShell — design language', () => {
     renderShell({ onPressSession });
 
     expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveTextContent('230.0');
-    expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveStyle({ color: uiRoles.record });
+    expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveStyle({ color: roles.record });
     expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveTextContent('185.0 × 8');
-    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveStyle({ color: uiRoles.record });
+    expect(screen.getByTestId('exercise-history-best-top-weight-value')).toHaveStyle({ color: roles.record });
     expect(screen.getByTestId('exercise-history-best-card')).toHaveTextContent(/1RM/);
     expect(screen.queryByText(/Est\.? 1RM/)).toBeNull();
 
@@ -728,7 +733,7 @@ describe('ExerciseHistoryScreenShell — design language', () => {
     renderShell({ summary: buildSummary({ allTimeBest: { estimatedOneRepMax: null, topWeight: null } }) });
 
     expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveTextContent('—');
-    expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveStyle({ color: uiRoles.inkFaint });
+    expect(screen.getByTestId('exercise-history-best-est-1rm-value')).toHaveStyle({ color: roles.inkFaint });
   });
 
   it("draws each session with View Session's set rows, warm-ups included", () => {
@@ -755,21 +760,21 @@ describe('ExerciseHistoryScreenShell — design language', () => {
       fontFamily: uiFonts.display.family,
       fontSize: uiTypography.size.xxs,
       textTransform: 'uppercase',
-      color: uiRoles.inkFaint,
+      color: roles.inkFaint,
     });
     // A best is the large figure, drawn heavy in record.
     expect(styleOf(screen.getByTestId('exercise-history-best-est-1rm-value'))).toMatchObject({
       fontFamily: uiFonts.figure.family,
       fontSize: uiTypography.size.lg,
       fontWeight: '700',
-      color: uiRoles.record,
+      color: roles.record,
     });
     // Its date is a line of words, the figures in the figure face.
     const date = within(screen.getByTestId('exercise-history-best-est-1rm')).getByText(/^18-05-2026 \d/);
     expect(styleOf(date)).toMatchObject(meta);
     expect(styleOf(within(date).getByText('18-05-2026'))).toMatchObject({ fontFamily: uiFonts.figure.family });
-    expect(styleOf(screen.getByText('Westside Barbell Club'))).toMatchObject({ ...meta, fontWeight: '600', color: uiRoles.inkMuted });
-    expect(styleOf(screen.getByText('Older sessions'))).toMatchObject({ ...meta, color: uiRoles.inkMuted });
+    expect(styleOf(screen.getByText('Westside Barbell Club'))).toMatchObject({ ...meta, fontWeight: '600', color: roles.inkMuted });
+    expect(styleOf(screen.getByText('Older sessions'))).toMatchObject({ ...meta, color: roles.inkMuted });
   });
 
   it('draws a missing best as the large figure, faint', () => {
@@ -778,7 +783,7 @@ describe('ExerciseHistoryScreenShell — design language', () => {
       fontFamily: uiFonts.figure.family,
       fontWeight: '600',
       fontSize: uiTypography.size.lg,
-      color: uiRoles.inkFaint,
+      color: roles.inkFaint,
     });
   });
 
@@ -811,7 +816,7 @@ it('uses ordinary strength copy while bodyweight changes only the calculation', 
     sets: [{ ...summary.sessions[0].sets[0], weightValue: '20' }],
   }];
   summary.allTimeBest = { estimatedOneRepMax: null, topWeight: null };
-  render(<ExerciseHistoryScreenShell summary={summary} period="history" appliedTagDefinitionId={null}
+  renderWithTheme(<ExerciseHistoryScreenShell summary={summary} period="history" appliedTagDefinitionId={null}
     isLoading={false} errorMessage={null} onSelectPeriod={jest.fn()} onSelectTag={jest.fn()}
     onPressSession={jest.fn()} onSelectMainTab={jest.fn()} />);
   expect(screen.getByTestId('exercise-history-best-est-1rm').props.accessibilityLabel).toBe('1RM —');

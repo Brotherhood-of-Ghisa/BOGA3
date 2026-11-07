@@ -21,6 +21,7 @@ import CompletedSessionDetailRoute, {
   type CompletedSessionDetailRecord,
 } from '../app/completed-session/[sessionId]';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
 const roles = rolesFor(DEFAULT_APPEARANCE);

@@ -1,10 +1,11 @@
 import { DarkTheme, DefaultTheme, type Theme } from 'expo-router';
+import { useMemo } from 'react';
 
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
-import { uiMode, uiRoles } from '@/components/ui/tokens';
+import { useUiMode, useUiRoles } from '@/components/ui/theme-context';
 
 /**
- * The navigators' theme in this launch's roles and mode. Without one,
+ * The navigators' theme in the given roles and mode. Without one,
  * React Navigation draws what no screen paints (the ground behind a push, a
  * sheet's backdrop card, a default header) in its own fixed light greys.
  */
@@ -24,7 +25,12 @@ export function navigationTheme(roles: UiRoles, mode: ThemeMode): Theme {
   };
 }
 
-export const NAVIGATION_THEME = navigationTheme(uiRoles, uiMode);
+// The navigators' theme in the roles and mode the app is drawn in now.
+export function useNavigationTheme(): Theme {
+  const roles = useUiRoles();
+  const mode = useUiMode();
+  return useMemo(() => navigationTheme(roles, mode), [roles, mode]);
+}
 
 // The status bar's content: dark on a light page, light on a dark one.
 export function statusBarStyleFor(mode: ThemeMode): 'dark' | 'light' {

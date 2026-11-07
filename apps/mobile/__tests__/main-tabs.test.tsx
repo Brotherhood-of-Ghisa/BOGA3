@@ -1,8 +1,15 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { fireEvent, renderHook, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
-import { uiText } from '@/components/ui/text-roles';
-import { uiRoles } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { AppThemeProvider } from '@/components/ui/theme-context';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
+// The live text roles. Read before the render under test: `renderHook` would
+// otherwise take over `screen`.
+const liveText = () => renderHook(() => useUiText(), { wrapper: AppThemeProvider }).result.current;
 
 const mockPush = jest.fn();
 const mockTabsProps: { screenOptions?: object; screens: Record<string, object> } = { screens: {} };
@@ -85,9 +92,9 @@ describe('main tab model', () => {
 describe('MainTabBar', () => {
   it('is the tabs on the paper ground, with no collapsible tray handle', () => {
     const onSelect = jest.fn();
-    render(<MainTabBar activeTab="train" onSelect={onSelect} />);
+    renderWithTheme(<MainTabBar activeTab="train" onSelect={onSelect} />);
 
-    expect(StyleSheet.flatten(screen.getByTestId('main-tab-bar').props.style).backgroundColor).toBe(uiRoles.paper);
+    expect(StyleSheet.flatten(screen.getByTestId('main-tab-bar').props.style).backgroundColor).toBe(roles.paper);
     expect(screen.getByLabelText('Open Train').props.accessibilityState.selected).toBe(true);
     expect(screen.queryByTestId('bottom-tray-handle')).toBeNull();
     fireEvent.press(screen.getByLabelText('Open More'));
@@ -97,44 +104,44 @@ describe('MainTabBar', () => {
 
 describe('TabsLayout', () => {
   it('paints the status-bar inset on the paper ground, matching the tab pages', () => {
-    render(<TabsLayout />);
+    renderWithTheme(<TabsLayout />);
     expect(mockTabsProps.screenOptions).toMatchObject({
-      sceneStyle: { backgroundColor: uiRoles.paper, paddingTop: expect.any(Number) },
+      sceneStyle: { backgroundColor: roles.paper, paddingTop: expect.any(Number) },
     });
   });
 
   it("leaves Train to clear the status bar itself, so its workout's top bar runs under it", () => {
-    render(<TabsLayout />);
+    renderWithTheme(<TabsLayout />);
     expect(mockTabsProps.screens.train).toEqual({
       title: 'Train',
-      sceneStyle: { backgroundColor: uiRoles.paper },
+      sceneStyle: { backgroundColor: roles.paper },
     });
   });
 });
 
 describe('TabsBar', () => {
   it("selects the tab navigator's focused route, so a screen pushed over the tabs never hides it", () => {
-    render(<TabsBar routeName="train" />);
+    renderWithTheme(<TabsBar routeName="train" />);
     expect(screen.getByLabelText('Open Train').props.accessibilityState.selected).toBe(true);
     screen.unmount();
 
-    render(<TabsBar routeName="stats-history" />);
+    renderWithTheme(<TabsBar routeName="stats-history" />);
     expect(screen.getByLabelText('Open Progress').props.accessibilityState.selected).toBe(true);
     screen.unmount();
 
-    render(<TabsBar routeName="groups" />);
+    renderWithTheme(<TabsBar routeName="groups" />);
     expect(screen.getByLabelText('Open Groups').props.accessibilityState.selected).toBe(true);
   });
 
   it('switches tabs in place: Train is a tab like any other, with the workout on it', () => {
-    render(<TabsBar routeName="today" />);
+    renderWithTheme(<TabsBar routeName="today" />);
     fireEvent.press(screen.getByLabelText('Open Train'));
     fireEvent.press(screen.getByLabelText('Open Progress'));
     expect(mockPush.mock.calls).toEqual([['/train'], ['/progress']]);
   });
 
   it('draws nothing for a route no tab owns', () => {
-    render(<TabsBar routeName="unknown" />);
+    renderWithTheme(<TabsBar routeName="unknown" />);
     expect(screen.queryByTestId('main-tab-bar')).toBeNull();
   });
 });
@@ -142,7 +149,7 @@ describe('TabsBar', () => {
 describe('MainTabs', () => {
   it('renders accessible selected state and reports every tab press', () => {
     const onSelect = jest.fn();
-    render(<MainTabs activeTab="today" onSelect={onSelect} />);
+    renderWithTheme(<MainTabs activeTab="today" onSelect={onSelect} />);
 
     for (const tab of MAIN_TAB_DEFINITIONS) {
       const element = screen.getByTestId(tab.testID);
@@ -156,7 +163,7 @@ describe('MainTabs', () => {
   });
 
   it('draws four labelled tabs and More as a bare ⋮, with no Settings tab', () => {
-    render(<MainTabs activeTab="more" onSelect={jest.fn()} />);
+    renderWithTheme(<MainTabs activeTab="more" onSelect={jest.fn()} />);
 
     expect(screen.getByTestId('main-bottom-tabs')).toBeTruthy();
     expect(screen.getAllByRole('tab')).toHaveLength(5);
@@ -166,7 +173,7 @@ describe('MainTabs', () => {
   });
 
   it('keeps the ⋮ inside the bordered tab card, not beside it', () => {
-    render(<MainTabs activeTab="today" onSelect={jest.fn()} />);
+    renderWithTheme(<MainTabs activeTab="today" onSelect={jest.fn()} />);
 
     const card = screen.getByTestId('main-bottom-tabs');
     expect(StyleSheet.flatten(card.props.style)).toMatchObject({ borderWidth: expect.any(Number) });
@@ -182,7 +189,7 @@ describe('MainTabs', () => {
 describe('MainTabs presentation', () => {
   it('is a tab list whose tabs report selection and navigate on press', () => {
     const onSelect = jest.fn();
-    render(<MainTabs activeTab="today" onSelect={onSelect} />);
+    renderWithTheme(<MainTabs activeTab="today" onSelect={onSelect} />);
 
     expect(screen.getByTestId('main-bottom-tabs').props.accessibilityRole).toBe('tablist');
     expect(screen.getByLabelText('Open Today').props.accessibilityState.selected).toBe(true);
@@ -198,18 +205,19 @@ describe('MainTabs presentation', () => {
   });
 
   it('draws each tab as a micro-label, the active one in ink over an underline, never accent', () => {
-    render(<MainTabs activeTab="progress" onSelect={jest.fn()} />);
+    const uiText = liveText();
+    renderWithTheme(<MainTabs activeTab="progress" onSelect={jest.fn()} />);
 
     const active = StyleSheet.flatten(screen.getByText('Progress').props.style);
     const idle = StyleSheet.flatten(screen.getByText('Today').props.style);
-    expect(active).toEqual({ ...StyleSheet.flatten(uiText.label), color: uiRoles.ink });
+    expect(active).toEqual({ ...StyleSheet.flatten(uiText.label), color: roles.ink });
     expect(idle).toEqual(StyleSheet.flatten(uiText.label));
-    expect(idle).toMatchObject({ color: uiRoles.inkMuted, textTransform: 'uppercase' });
+    expect(idle).toMatchObject({ color: roles.inkMuted, textTransform: 'uppercase' });
 
     const underlines = MAIN_TAB_DEFINITIONS.map(
       (tab) => StyleSheet.flatten(screen.getByTestId(`${tab.testID}-indicator`).props.style).backgroundColor,
     );
-    expect(underlines).toEqual(['transparent', 'transparent', uiRoles.ink, 'transparent', 'transparent']);
-    expect(JSON.stringify(screen.toJSON())).not.toContain(uiRoles.accent);
+    expect(underlines).toEqual(['transparent', 'transparent', roles.ink, 'transparent', 'transparent']);
+    expect(JSON.stringify(screen.toJSON())).not.toContain(roles.accent);
   });
 });

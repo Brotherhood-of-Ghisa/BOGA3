@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type Insets } from 'react-native';
+import { Pressable, View, type Insets } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type StepArrowsProps = {
   /** Steps back in time: an older session, an earlier period. Null when there is none. */
@@ -43,6 +44,7 @@ export function StepArrow({
   testID: string;
   hitSlop?: Insets;
 }) {
+  const styles = useStyles();
   const disabled = onPress === null;
   return (
     <Pressable
@@ -54,7 +56,7 @@ export function StepArrow({
       onPress={onPress ?? undefined}
       style={({ pressed }) => [styles.arrow, pressed && !disabled ? styles.pressed : null]}
       testID={testID}>
-      <Icon color={disabled ? uiRoles.inkGhost : uiRoles.inkMuted} name={`chevron-${direction}`} size="sm" />
+      <Icon colorRole={disabled ? 'inkGhost' : 'inkMuted'} name={`chevron-${direction}`} size="sm" />
     </Pressable>
   );
 }
@@ -64,6 +66,7 @@ export function StepArrow({
  * older on the left. Each keeps its 44pt reach outward, away from the label.
  */
 export function StepAround({ onOlder, onNewer, noun, testID, children }: StepArrowsProps & { children: ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.around} testID={testID}>
       <StepArrow direction="left" label={`Previous ${noun}`} onPress={onOlder} testID={`${testID}-older`} />
@@ -73,7 +76,7 @@ export function StepAround({ onOlder, onNewer, noun, testID, children }: StepArr
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   around: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -92,6 +95,6 @@ const styles = StyleSheet.create({
     borderRadius: uiGeometry.radius.control,
   },
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
-});
+}));

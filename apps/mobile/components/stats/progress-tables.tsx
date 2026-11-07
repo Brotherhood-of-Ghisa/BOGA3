@@ -53,9 +53,9 @@ export const countFamilyMuscles = (families: Iterable<string>): ReadonlyMap<stri
 };
 
 /**
- * Whether a family gets a header: only above two or more of the user's muscles
- * ([[muscle.family-sections]]). A header over one muscle repeats it. With no
- * counts every family has one, as does `Other`, which is not a muscle family.
+ * A family gets a header only above two or more of the user's muscles.
+ * A header over one muscle repeats it. With no counts every family has one,
+ * as does `Other`, which is not a muscle family.
  */
 export const familyHasHeader = (family: string, counts?: ReadonlyMap<string, number>): boolean =>
   counts === undefined || family === 'Other' || (counts.get(family) ?? 0) >= 2;

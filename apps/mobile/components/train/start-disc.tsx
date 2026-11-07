@@ -1,11 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
+import { makeStyles } from '@/components/ui/theme-context';
 import {
   uiBorder,
   uiFonts,
   uiGeometry,
-  uiRoles,
   uiSpace,
   uiTypography,
 } from '@/components/ui/tokens';
@@ -39,6 +39,7 @@ export function StartDisc({
   accessibilityLabel,
   testID,
 }: StartDiscProps) {
+  const styles = useStyles();
   const disc = compact ? DISC_COMPACT : DISC;
   const ring = disc + RING_GAP * 2;
   return (
@@ -58,7 +59,7 @@ export function StartDisc({
           pressed && !busy ? styles.discPressed : null,
         ]}
         testID={testID}>
-        <Icon color={uiRoles.onAccent} name="play" size="lg" />
+        <Icon colorRole="onAccent" name="play" size="lg" />
         <Text allowFontScaling={false} style={styles.label}>
           {label}
         </Text>
@@ -67,20 +68,20 @@ export function StartDisc({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   ring: {
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: uiGeometry.radius.pill,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
   },
   disc: {
     alignItems: 'center',
     justifyContent: 'center',
     gap: uiSpace.sm,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.accent,
+    backgroundColor: roles.accent,
   },
   // As the primary button: depth is never an elevation.
   discPressed: {
@@ -93,6 +94,6 @@ const styles = StyleSheet.create({
     lineHeight: uiTypography.lineHeight.xxl,
     letterSpacing: uiTypography.size.xxl * uiGeometry.microLabelTracking,
     textTransform: 'uppercase',
-    color: uiRoles.onAccent,
+    color: roles.onAccent,
   },
-});
+}));
