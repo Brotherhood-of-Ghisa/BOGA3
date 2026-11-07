@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { uiRoles, uiText, uiTextTone } from '@/components/ui';
+import { useUiRoles, useUiText, useUiTextTone } from '@/components/ui';
 import { hueName, normaliseHue, seedsFromHue } from '@/components/ui/theme-hue';
 
 type HueRingProps = {
@@ -50,6 +50,9 @@ export function HueRing({
   accessibilityLabel = 'Hue',
   testID,
 }: HueRingProps) {
+  const roles = useUiRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const segmentColours = useMemo(
     () => (colourAt === defaultColourAt ? DEFAULT_SEGMENT_COLOURS : SEGMENT_HUES.map(colourAt)),
     [colourAt],
@@ -105,14 +108,14 @@ export function HueRing({
               />
             );
           })}
-          <Circle cx={thumb[0]} cy={thumb[1]} fill={uiRoles.surface} r={THUMB_RADIUS} stroke={uiRoles.ink} strokeWidth={1} />
+          <Circle cx={thumb[0]} cy={thumb[1]} fill={roles.surface} r={THUMB_RADIUS} stroke={roles.ink} strokeWidth={1} />
           <Circle cx={thumb[0]} cy={thumb[1]} fill={colourAt(hue)} r={THUMB_RADIUS - 4} />
         </Svg>
         <View pointerEvents="none" style={styles.centre}>
-          <Text allowFontScaling={false} style={uiText.title} testID={testID ? `${testID}-name` : undefined}>
+          <Text allowFontScaling={false} style={text.title} testID={testID ? `${testID}-name` : undefined}>
             {hueName(hue)}
           </Text>
-          <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.muted]}>
+          <Text allowFontScaling={false} style={[text.figure, tone.muted]}>
             {hue}°
           </Text>
         </View>

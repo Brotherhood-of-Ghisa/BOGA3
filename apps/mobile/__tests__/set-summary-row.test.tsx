@@ -1,15 +1,19 @@
-import { render, screen } from '@testing-library/react-native';
+import { screen } from '@testing-library/react-native';
 
 import { SetSummaryRow } from '@/components/session-detail/set-summary-row';
 import { ExerciseSetsCard } from '@/components/session-detail/exercise-sets-card';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatSetRow } from '@/src/session-recorder/session-view-model';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const row = formatSetRow({ id: 'set', weight: 60, reps: 8, setType: null, done: true });
 
 it('keeps each percentage set on one line with the unit only in the exercise heading', () => {
   const normalized = { ...row, weightReps: '100.0 %BW × 8', oneRepMax: '127.7 %BW', volume: '800.0 %BW·reps' };
-  render(<ExerciseSetsCard name="Bodyweight Bulgarian Split Squat" count="2 sets" percentageMetrics testID="card" rows={[
+  renderWithTheme(<ExerciseSetsCard name="Bodyweight Bulgarian Split Squat" count="2 sets" percentageMetrics testID="card" rows={[
     normalized, { ...normalized, id: 'next', weightReps: '125.0 %BW × 999', oneRepMax: '1234.5 %BW', volume: '123456.7 %BW·reps' },
   ]} />);
 
@@ -31,7 +35,7 @@ it('keeps each percentage set on one line with the unit only in the exercise hea
 });
 
 it('keeps ordinary rows compact with inline metrics', () => {
-  render(<ExerciseSetsCard name="Bench Press" count="1 set" rows={[row]} testID="ordinary-card" rowTestID={() => 'ordinary'} />);
+  renderWithTheme(<ExerciseSetsCard name="Bench Press" count="1 set" rows={[row]} testID="ordinary-card" rowTestID={() => 'ordinary'} />);
   expect(screen.getByText('Bench Press')).toHaveProp('ellipsizeMode', 'tail');
   expect(screen.queryByText(/% BW/)).toBeNull();
   expect(screen.getByTestId('ordinary')).toHaveStyle({ flexDirection: 'row', alignItems: 'baseline' });
@@ -40,7 +44,7 @@ it('keeps ordinary rows compact with inline metrics', () => {
 });
 
 it('sets 1RM and Vol in two equal fixed columns, each legend hugging its right-aligned value', () => {
-  render(<SetSummaryRow row={row} testID="cols" />);
+  renderWithTheme(<SetSummaryRow row={row} testID="cols" />);
   const oneRepMaxColumn = screen.getByTestId('cols-1rm-column');
   const volumeColumn = screen.getByTestId('cols-vol-column');
   expect(oneRepMaxColumn).toHaveStyle({ width: uiGeometry.metricValueWidth + uiSpace.xl, alignItems: 'flex-end' });
@@ -49,7 +53,7 @@ it('sets 1RM and Vol in two equal fixed columns, each legend hugging its right-a
 });
 
 it('retains reps-only context when normalized metrics are undisclosed', () => {
-  render(<ExerciseSetsCard name="Pull-Up" count="1 set" rows={[{ ...row, weightReps: '8 reps' }]}
+  renderWithTheme(<ExerciseSetsCard name="Pull-Up" count="1 set" rows={[{ ...row, weightReps: '8 reps' }]}
     percentageMetrics hideDerivedMetrics testID="private" />);
   expect(screen.getByText('8 reps')).toBeTruthy();
   expect(screen.getByText('Pull-Up (% BW)')).toBeTruthy();
@@ -60,11 +64,11 @@ it('retains reps-only context when normalized metrics are undisclosed', () => {
 
 it('preserves unavailable figures and record/planned emphasis in percentage columns', () => {
   const metrics = { ...row, oneRepMax: '127.7 %BW', volume: '800.0 %BW·reps', oneRepMaxRecord: true };
-  const rendered = render(<SetSummaryRow row={metrics} percentageMetrics testID="state" />);
-  expect(screen.getByTestId('state-1rm')).toHaveStyle({ color: uiRoles.record });
+  const rendered = renderWithTheme(<SetSummaryRow row={metrics} percentageMetrics testID="state" />);
+  expect(screen.getByTestId('state-1rm')).toHaveStyle({ color: roles.record });
   rendered.rerender(<SetSummaryRow row={{ ...metrics, done: false }} percentageMetrics testID="state" />);
-  expect(screen.getByTestId('state-1rm')).toHaveStyle({ color: uiRoles.inkFaint });
-  expect(screen.getByTestId('state-vol')).toHaveStyle({ color: uiRoles.inkFaint });
+  expect(screen.getByTestId('state-1rm')).toHaveStyle({ color: roles.inkFaint });
+  expect(screen.getByTestId('state-vol')).toHaveStyle({ color: roles.inkFaint });
   rendered.rerender(<SetSummaryRow row={{ ...metrics, oneRepMax: '—', volume: '—', oneRepMaxRecord: false }} percentageMetrics testID="state" />);
   expect(screen.getByLabelText('1RM —')).toHaveTextContent('—');
   expect(screen.getByLabelText('Vol —')).toHaveTextContent('—');

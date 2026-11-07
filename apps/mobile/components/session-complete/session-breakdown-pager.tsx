@@ -1,9 +1,10 @@
 import { useRef, useState, type ComponentRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
+import { Pressable, ScrollView, Text, View, type LayoutChangeEvent, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatVolume, formatWeight, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import type { SessionBreakdownExerciseRow, SessionBreakdownMuscleRow } from '@/src/session-insights';
 
@@ -35,17 +36,21 @@ const exerciseRowLabel = (row: SessionBreakdownExerciseRow): string =>
   `top weight ${weight(row.topWeight)}; ${plural(row.recordCount, 'record')}`;
 
 function Figure({ value, total = false, wide = false }: { value: string; total?: boolean; wide?: boolean }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <Text
       allowFontScaling={false}
       numberOfLines={1}
-      style={[uiText.figure, value === '—' ? uiTextTone.faint : total ? null : uiTextTone.muted, styles.figure, wide && styles.figureWide]}>
+      style={[text.figure, value === '—' ? tone.faint : total ? null : tone.muted, styles.figure, wide && styles.figureWide]}>
       {value}
     </Text>
   );
 }
 
 function PagerDots({ page, onSelect, testID }: { page: number; onSelect: (next: number) => void; testID: string }) {
+  const styles = useStyles();
   return (
     <View accessibilityRole="tablist" style={styles.dots} testID={testID}>
       {PAGES.map((entry, index) => (
@@ -80,22 +85,27 @@ function EmptyPage({
   emptyMessage: string;
   testID: string;
 }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
-    <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID={testID}>
+    <Text allowFontScaling={false} style={[text.body, tone.muted]} testID={testID}>
       {state === 'loading' ? loadingMessage : state === 'error' ? errorMessage : emptyMessage}
     </Text>
   );
 }
 
 function MuscleTable({ rows, testID }: { rows: SessionBreakdownMuscleRow[]; testID: string }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View testID={testID}>
       <View style={styles.row}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.faint, styles.nameCell]}>Muscle</Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.faint, styles.cell]}>Pri</Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.faint, styles.cell]}>Sec</Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.faint, styles.volumeCell]}>Vol</Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.faint, styles.cell]}>PR</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint, styles.nameCell]}>Muscle</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint, styles.cell]}>Pri</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint, styles.cell]}>Sec</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint, styles.volumeCell]}>Vol</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint, styles.cell]}>PR</Text>
       </View>
       {rows.map((row) => (
         <View
@@ -104,7 +114,7 @@ function MuscleTable({ rows, testID }: { rows: SessionBreakdownMuscleRow[]; test
           key={row.id}
           style={[styles.row, styles.bodyRow]}
           testID={`${testID}-${row.id}`}>
-          <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.nameCell]}>{row.displayName}</Text>
+          <Text allowFontScaling={false} numberOfLines={1} style={[text.bodyStrong, styles.nameCell]}>{row.displayName}</Text>
           <Figure total value={roleFigure(row.primarySetCount)} />
           <Figure total value={roleFigure(row.secondarySetCount)} />
           <Figure total value={volume(row.volume)} wide />
@@ -116,14 +126,17 @@ function MuscleTable({ rows, testID }: { rows: SessionBreakdownMuscleRow[]; test
 }
 
 function ExerciseTable({ rows, testID }: { rows: SessionBreakdownExerciseRow[]; testID: string }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View testID={testID}>
       <View style={styles.row}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.faint, styles.nameCell]}>Exercise</Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.faint, styles.cell]}>Sets</Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.faint, styles.volumeCell]}>Vol</Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.faint, styles.volumeCell]}>Max</Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.faint, styles.cell]}>PR</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint, styles.nameCell]}>Exercise</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint, styles.cell]}>Sets</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint, styles.volumeCell]}>Vol</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint, styles.volumeCell]}>Max</Text>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint, styles.cell]}>PR</Text>
       </View>
       {rows.map((row) => (
         <View
@@ -132,7 +145,7 @@ function ExerciseTable({ rows, testID }: { rows: SessionBreakdownExerciseRow[]; 
           key={row.id}
           style={[styles.row, styles.bodyRow]}
           testID={`${testID}-${row.id}`}>
-          <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.nameCell]}>
+          <Text allowFontScaling={false} numberOfLines={1} style={[text.bodyStrong, styles.nameCell]}>
             <FigureText strong>{row.name}</FigureText>
           </Text>
           <Figure total value={String(row.workingSetCount)} />
@@ -166,6 +179,8 @@ export function SessionBreakdownPager({
   catalogState?: BreakdownCatalogState;
   testID?: string;
 }) {
+  const styles = useStyles();
+  const text = useUiText();
   const [page, setPage] = useState(0);
   const [width, setWidth] = useState(0);
   // Each page's own content height, so the pager is as tall as the page being
@@ -198,7 +213,7 @@ export function SessionBreakdownPager({
   return (
     <View style={styles.pager} testID={testID}>
       <View style={styles.header}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.title, styles.cardTitle]} testID={`${testID}-title`}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[text.title, styles.cardTitle]} testID={`${testID}-title`}>
           {PAGES[page].title}
         </Text>
         <PagerDots onSelect={goToPage} page={page} testID={`${testID}-dots`} />
@@ -245,14 +260,14 @@ export function SessionBreakdownPager({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   pager: {
     marginHorizontal: uiSpace.md,
     paddingTop: uiSpace.sm,
     paddingBottom: uiSpace.md,
     gap: uiSpace.sm,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   header: {
     flexDirection: 'row',
@@ -271,10 +286,10 @@ const styles = StyleSheet.create({
     width: uiSpace.sm,
     height: uiSpace.sm,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.inkGhost,
+    backgroundColor: roles.inkGhost,
   },
   dotActive: {
-    backgroundColor: uiRoles.ink,
+    backgroundColor: roles.ink,
   },
   row: {
     flexDirection: 'row',
@@ -284,7 +299,7 @@ const styles = StyleSheet.create({
   bodyRow: {
     paddingVertical: uiSpace.xs,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   nameCell: {
     flex: 1,
@@ -307,4 +322,4 @@ const styles = StyleSheet.create({
     width: uiGeometry.metricValueWidth,
     textAlign: 'right',
   },
-});
+}));

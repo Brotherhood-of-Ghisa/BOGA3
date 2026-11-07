@@ -13,7 +13,7 @@
  * after unmount), driven through an injected client.
  */
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, SectionList, type AlertButton } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -69,6 +69,7 @@ import { planQueries, planRepository, skipPlanBlock, skipSessionPlanUse, startSe
 import { createDrizzleSessionPlanStore } from '@/src/data/session-plan-store';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
+import { renderWithTheme } from './helpers/theme';
 
 const ACTIVE = SESSION_VIEW_FIXTURE.sessionId;
 const NEWEST_COMPLETED = EXERCISE_BLOCK_HISTORY_FIXTURE.unmappedCompletionSessionId;
@@ -78,7 +79,7 @@ const openSessions = async (prepare?: () => Promise<unknown>) => {
   await loadMaestroFixture('session-view');
   await prepare?.();
   await bootLocalApp();
-  const view = render(<SessionsRoute />);
+  const view = renderWithTheme(<SessionsRoute />);
   await screen.findByTestId(`completed-session-row-${NEWEST_COMPLETED}`);
   return view;
 };
@@ -255,7 +256,7 @@ describe('Sessions over real data', () => {
     const load = loadSpy().mockRejectedValueOnce(new Error('Database unavailable'));
     await loadMaestroFixture('session-view');
     await bootLocalApp();
-    render(<SessionsRoute />);
+    renderWithTheme(<SessionsRoute />);
 
     const error = await screen.findByTestId('session-list-load-error');
     expect(error).toHaveTextContent(/Could not load sessions/);
@@ -415,13 +416,13 @@ describe('Sessions opened at a week or day of a history grid', () => {
   ];
 
   it('lands a day jump on its newest row, and a day without one on its week heading', async () => {
-    const view = render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(wednesday) })} />);
+    const view = renderWithTheme(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(wednesday) })} />);
     await screen.findByTestId('completed-session-row-friday');
     // Section 1 is the target week; row 1 is Friday, row 2 Wednesday's newest.
     expect(scrollToLocation).toHaveBeenLastCalledWith({ sectionIndex: 1, itemIndex: 2, viewPosition: 0, animated: false });
     view.unmount();
 
-    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(at(wednesday, 1, 12)) })} />);
+    renderWithTheme(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(at(wednesday, 1, 12)) })} />);
     await screen.findByTestId('completed-session-row-friday');
     expect(scrollToLocation).toHaveBeenLastCalledWith({ sectionIndex: 1, itemIndex: 0, viewPosition: 0, animated: false });
   });
@@ -429,7 +430,7 @@ describe('Sessions opened at a week or day of a history grid', () => {
   it('jumps once: a focus reload keeps the reader where they scrolled', async () => {
     const client = clientWith(sessions);
     const jumpTo = parseHistoryJump({ week: localDateKey(wednesday) });
-    const view = render(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
+    const view = renderWithTheme(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
     await screen.findByTestId('completed-session-row-friday');
 
     view.rerender(<SessionsScreen dataClient={client} isFocused={false} jumpTo={jumpTo} />);
@@ -447,7 +448,7 @@ describe('Sessions opened at a week or day of a history grid', () => {
       .mockResolvedValue(sessions);
     const client = { ...clientWith(sessions), loadSessions };
     const jumpTo = parseHistoryJump({ week: localDateKey(wednesday) });
-    const view = render(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
+    const view = renderWithTheme(<SessionsScreen dataClient={client} isFocused jumpTo={jumpTo} />);
     await screen.findByTestId('completed-session-row-today');
 
     view.rerender(<SessionsScreen dataClient={client} isFocused={false} jumpTo={jumpTo} />);
@@ -464,7 +465,7 @@ describe('Sessions opened at a week or day of a history grid', () => {
       await plansLoaded;
       return [];
     });
-    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ week: localDateKey(wednesday) })} />);
+    renderWithTheme(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ week: localDateKey(wednesday) })} />);
     await screen.findByTestId('completed-session-row-friday');
     expect(upcoming).toHaveBeenCalled();
     expect(scrollToLocation).not.toHaveBeenCalled();
@@ -476,7 +477,7 @@ describe('Sessions opened at a week or day of a history grid', () => {
   });
 
   it('renders every row down to the target up front, so its offset is measured, not estimated', async () => {
-    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(wednesday) })} />);
+    renderWithTheme(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ day: localDateKey(wednesday) })} />);
     await screen.findByTestId('completed-session-row-friday');
 
     // Week 0: heading, row, footer; then the target week's heading, Friday and Wednesday's newest.
@@ -485,7 +486,7 @@ describe('Sessions opened at a week or day of a history grid', () => {
 
   it('aims again until the rows are measured, and logs a jump it cannot make', async () => {
     const warn = jest.spyOn(logEventModule, 'logEvent').mockResolvedValue();
-    render(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ week: localDateKey(wednesday) })} />);
+    renderWithTheme(<SessionsScreen dataClient={clientWith(sessions)} isFocused jumpTo={parseHistoryJump({ week: localDateKey(wednesday) })} />);
     await screen.findByTestId('completed-session-row-friday');
     const list = screen.UNSAFE_getByType(SectionList);
     expect(scrollToLocation).toHaveBeenCalledTimes(1);
@@ -553,7 +554,7 @@ describe('Sessions list load races', () => {
     const firstLoad = createDeferred<SessionListItem[]>();
     const secondLoad = createDeferred<SessionListItem[]>();
     const dataClient = heldClient(firstLoad.promise, secondLoad.promise);
-    render(<SessionsScreen dataClient={dataClient} isFocused />);
+    renderWithTheme(<SessionsScreen dataClient={dataClient} isFocused />);
 
     await waitFor(() => expect(dataClient.loadSessions).toHaveBeenCalledTimes(1));
     showDeletedSessions();
@@ -577,7 +578,7 @@ describe('Sessions list load races', () => {
     const shown = session('completed-session-1', '2026-07-25T10:00:00.000Z');
     const reload = createDeferred<SessionListItem[]>();
     const dataClient = heldClient(Promise.resolve([shown]), reload.promise);
-    const view = render(<SessionsScreen dataClient={dataClient} isFocused />);
+    const view = renderWithTheme(<SessionsScreen dataClient={dataClient} isFocused />);
     expect(await screen.findByTestId(`completed-session-row-${shown.id}`)).toBeTruthy();
 
     view.rerender(<SessionsScreen dataClient={dataClient} isFocused={false} />);
@@ -596,7 +597,7 @@ describe('Sessions list load races', () => {
   it('invalidates an in-flight request when the consumer unmounts (a race)', async () => {
     const lateLoad = createDeferred<SessionListItem[]>();
     const dataClient = heldClient(lateLoad.promise);
-    const view = render(<SessionsScreen dataClient={dataClient} isFocused />);
+    const view = renderWithTheme(<SessionsScreen dataClient={dataClient} isFocused />);
 
     await waitFor(() => expect(dataClient.loadSessions).toHaveBeenCalledTimes(1));
     view.unmount();
@@ -639,7 +640,7 @@ describe('Sessions history weeks', () => {
   });
 
   it('heads each week holding sessions, and folds the empty weeks between into one line', async () => {
-    render(
+    renderWithTheme(
       <SessionsScreen
         dataClient={clientWith([
           completed('this-week', daysAgo(0)),
@@ -664,7 +665,7 @@ describe('Sessions history weeks', () => {
 
   it('renders a long history a screenful at a time, not every row up front', async () => {
     const history = Array.from({ length: 200 }, (_, index) => completed(`history-${index}`, daysAgo(index)));
-    render(<SessionsScreen dataClient={clientWith(history)} isFocused />);
+    renderWithTheme(<SessionsScreen dataClient={clientWith(history)} isFocused />);
 
     await screen.findByTestId('completed-session-row-history-0');
     const rendered = screen.getAllByTestId(/^completed-session-row-/).length;
@@ -951,7 +952,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     jest.spyOn(planQueries, 'listUpcomingPlans').mockResolvedValue([...upcoming, ...upcoming]);
     jest.spyOn(planQueries, 'listUnscheduledPlans').mockResolvedValue(upcoming);
     jest.spyOn(planQueries, 'listProgrammeSummaries').mockResolvedValue([...programmes, ...programmes]);
-    render(<SessionsRoute />);
+    renderWithTheme(<SessionsRoute />);
     await screen.findByTestId('session-list-empty-state');
     openOptions(); toggleCompleted(); dismissOptions();
     expect(rowIds('completed')).toEqual([programmeRow(programme.programmeId, 'completed'), planRow(programme.planIds[0], 'completed')]);
@@ -1072,7 +1073,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     const partial = await store.savePlanGraph({ ...planInput('In progress'), exercises: [...planInput('').exercises, ...planInput('').exercises] });
     const partialDetail = await planQueries.loadPlanDetail(partial);
     await skipPlanBlock(partialDetail!.blocks[0].id);
-    render(<SessionsRoute />);
+    renderWithTheme(<SessionsRoute />);
     await screen.findByTestId(planRow(partial));
 
     expect(screen.getByTestId(planRow(emptyPlan))).toBeTruthy();
@@ -1093,7 +1094,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     const id = await store.savePlanGraph(planInput('Complete elsewhere', now));
     const started = await startSessionPlan(id);
     if (started.status !== 'started') throw new Error('Expected started session');
-    const view = render(<SessionsRoute />);
+    const view = renderWithTheme(<SessionsRoute />);
     await screen.findByTestId(planRow(id, 'upcoming'));
     if (showCompleted) { openOptions(); toggleCompleted(); dismissOptions(); }
     mockIsFocused = false;
@@ -1143,7 +1144,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     expect(screen.queryByTestId(planRow(deletedPlan))).toBeNull();
     view.unmount();
 
-    render(<SessionsRoute />);
+    renderWithTheme(<SessionsRoute />);
     await screen.findByTestId(`completed-session-row-${NEWEST_COMPLETED}`);
     expect(screen.queryByTestId(planRow(id, 'completed'))).toBeNull();
     expect(screen.queryByTestId(`completed-session-row-${OLDER_COMPLETED}`)).toBeNull();
@@ -1158,7 +1159,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     const unscheduled = await store.savePlanGraph(planInput('Completed unscheduled'));
     const programme = await store.saveProgrammeGraph({ name: 'All skipped programme', description: null, plans: [planInput('Skipped')] });
     await resolvePlan(scheduled); await resolvePlan(unscheduled); await resolvePlan(programme.planIds[0], 'skipped');
-    render(<SessionsRoute />);
+    renderWithTheme(<SessionsRoute />);
     await screen.findByTestId('session-list-empty-state');
     expect(screen.queryByTestId('sessions-plan-section-upcoming')).toBeNull();
     expect(screen.queryByTestId('sessions-plan-section-unscheduled')).toBeNull();
@@ -1183,7 +1184,7 @@ describe('Sessions completed-plan visibility over real data', () => {
     let release!: () => void;
     const held = new Promise<void>((resolve) => { release = resolve; });
     jest.spyOn(planQueries, 'listUpcomingPlans').mockImplementation(async () => { await held; return realUpcoming(); });
-    render(<SessionsRoute />);
+    renderWithTheme(<SessionsRoute />);
     await waitForGone(() => screen.queryByTestId('session-list-loading-state'));
     expect(screen.queryByTestId('session-list-empty-state')).toBeNull();
     openOptions(); toggleCompleted(); dismissOptions();
@@ -1195,7 +1196,7 @@ describe('Sessions completed-plan visibility over real data', () => {
   it('retains the plan-read error and options instead of showing the global empty state (failed read)', async () => {
     await bootLocalApp();
     jest.spyOn(planQueries, 'listUpcomingPlans').mockRejectedValueOnce(new Error('Database unavailable'));
-    render(<SessionsRoute />);
+    renderWithTheme(<SessionsRoute />);
     await screen.findByTestId('sessions-plan-section-routines-error');
     expect(screen.queryByTestId('session-list-empty-state')).toBeNull();
     openOptions(); toggleCompleted(); dismissOptions();

@@ -19,7 +19,7 @@ import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { eq, inArray } from 'drizzle-orm';
 import { Alert, StyleSheet } from 'react-native';
 
@@ -85,7 +85,7 @@ import { AddExerciseScreen } from '../app/session/[sessionId]/add-exercise';
 import { SessionCompareScreen } from '../app/session/[sessionId]/compare';
 import { SessionViewScreen } from '@/components/session-view/session-view-screen';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { upsertLocalGym, setLocalGymArchived } from '@/src/data/local-gyms';
 import { gyms, muscleGroups, sessions } from '@/src/data/schema';
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
@@ -108,6 +108,11 @@ import {
   resetLocalData,
 } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
+
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const defaultRoles = rolesFor(DEFAULT_APPEARANCE);
 
 const location = jest.requireMock('@/src/location/foreground-location-lazy') as {
   getCurrentForegroundPositionLazy: jest.Mock;
@@ -197,7 +202,7 @@ const WithAddExerciseRoute = ({ children }: { children: mockReact.ReactNode }) =
   );
 };
 const renderSessionView = (sessionId: string, placement: 'tab' | 'page' = 'tab') =>
-  render(
+  renderWithTheme(
     <WithAddExerciseRoute>
       {placement === 'tab' ? (
         <SessionViewScreen {...ON_TAB} sessionId={sessionId} />
@@ -296,7 +301,7 @@ describe('Session view', () => {
       .spyOn(sessionFacts, 'loadEarlierBestsByDefinition')
       .mockRejectedValueOnce(new Error('Facts read failed'));
     await seed();
-    render(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
+    renderWithTheme(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
 
     await waitFor(() => expect(failedRead).toHaveBeenCalled());
     await act(async () => {
@@ -403,7 +408,7 @@ describe('Session view', () => {
     const notice = await screen.findByTestId('session-view-notice');
     expect(notice).toHaveTextContent("Couldn't abandon this session. Try again.");
     expect(StyleSheet.flatten(notice.props.style)).toMatchObject({
-      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: uiRoles.danger,
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: defaultRoles.danger,
     });
     expect(mockOnEnded).not.toHaveBeenCalled();
   });
@@ -811,7 +816,7 @@ describe('Session view', () => {
 
   it('says so when its session is no longer the active draft', async () => {
     await seed(() => setSessionDeletedState(SESSION, true));
-    render(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
+    renderWithTheme(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
 
     expect(await screen.findByText('This session is no longer active.')).toBeTruthy();
     fireEvent.press(screen.getByTestId('session-view-back'));
@@ -821,7 +826,7 @@ describe('Session view', () => {
   it('shows a retryable error when the draft read fails (a failed read)', async () => {
     await seed();
     jest.spyOn(sessionDrafts, 'loadLatestSessionDraftSnapshot').mockRejectedValueOnce(new Error('disk'));
-    render(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
+    renderWithTheme(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
 
     fireEvent.press(await screen.findByTestId('session-view-retry'));
     expect(await screen.findByLabelText(BENCH_LABEL)).toBeTruthy();
@@ -859,7 +864,7 @@ describe('Session view', () => {
 
     // Navigating to the exercise page sees the same active rest timer.
     screen.unmount();
-    render(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
     expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
     expect(screen.getByTestId(countdownId)).toHaveTextContent(countdown);
     if (mode === 'repeating') {
@@ -875,7 +880,7 @@ describe('Session view', () => {
 
     // Returning to the session view and abandoning the session clears the timer.
     screen.unmount();
-    render(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
+    renderWithTheme(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
     expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
 
     answerAlerts(() => 'Abandon');
@@ -1177,7 +1182,7 @@ describe('Session view: editing a completed session', () => {
       );
       await sessionDrafts.completeSessionDraft(DONE, { completedAt: COMPLETED_AT, now: COMPLETED_AT });
     });
-    render(
+    renderWithTheme(
       <>
         <SessionViewScreen placement="page" sessionId={DONE} />
         <ExercisePageScreen sessionExerciseId="done_bench" sessionId={DONE} />
@@ -1307,7 +1312,7 @@ describe('Session view: editing a completed session', () => {
 
     expect(await screen.findByLabelText('Barbell Bench Press, 1 of 2 sets done, new top weight 160.0 × 8')).toBeTruthy();
     expect(screen.getByTestId('session-view-exercise-done_bench-record')).toHaveTextContent('New top weight160.0 × 8');
-    expect(screen.getByTestId('session-view-exercise-done_bench-set-1-values')).toHaveStyle({ color: uiRoles.record });
+    expect(screen.getByTestId('session-view-exercise-done_bench-set-1-values')).toHaveStyle({ color: defaultRoles.record });
     expect(screen.getByLabelText('1RM 204.3')).toBeTruthy();
   });
 
@@ -1357,7 +1362,7 @@ describe('Session vs history', () => {
     const read = jest.spyOn(insightsRepository, 'loadSessionInsightHistory')
       .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }))
       .mockRejectedValueOnce(new Error('new window failed'));
-    render(<SessionCompareScreen sessionId={SESSION} />);
+    renderWithTheme(<SessionCompareScreen sessionId={SESSION} />);
     await screen.findByText('Loading comparisons…');
     act(() => setAccountLocalPreferences({ historyLookbackWeeks: 1 }));
     await screen.findByText('Comparisons unavailable. Return to this session to retry.');
@@ -1368,7 +1373,7 @@ describe('Session vs history', () => {
 
   it('pools the open session by name, in both groupings, while its history builds', async () => {
     await seed();
-    render(<SessionCompareScreen sessionId={SESSION} />);
+    renderWithTheme(<SessionCompareScreen sessionId={SESSION} />);
 
     expect(await screen.findByTestId('session-insight-comparison-unavailable-exercise')).toHaveTextContent(
       /Barbell Bench Press/
@@ -1384,7 +1389,7 @@ describe('Session vs history', () => {
       localDatabase().update(muscleGroups).set({ reportGroup: muscle.key }).where(inArray(muscleGroups.id, [...muscle.entries])).run();
     }
     invalidateExerciseCatalogCache();
-    render(<SessionCompareScreen sessionId={SESSION} />);
+    renderWithTheme(<SessionCompareScreen sessionId={SESSION} />);
 
     await screen.findByTestId('session-insight-comparison-unavailable-exercise');
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
@@ -1395,7 +1400,7 @@ describe('Session vs history', () => {
 
   it('shows quartiles in both groupings when the viewed session has six prior observations', async () => {
     await seed();
-    render(<SessionCompareScreen sessionId={EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId} />);
+    renderWithTheme(<SessionCompareScreen sessionId={EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId} />);
 
     expect(await screen.findByLabelText(/Barbell Back Squat, 1 set\. .*twenty-fifth to seventy-fifth percentile/)).toBeTruthy();
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
@@ -1413,14 +1418,14 @@ describe('Session vs history', () => {
       .spyOn(insightsRepository, 'loadSessionInsightHistory')
       .mockRejectedValueOnce(new Error('History read failed'));
     await seed();
-    render(<SessionCompareScreen sessionId={SESSION} />);
+    renderWithTheme(<SessionCompareScreen sessionId={SESSION} />);
 
     await screen.findByText('Comparisons unavailable. Return to this session to retry.');
     expect(screen.queryByText('No comparison history yet')).toBeNull();
   });
 
   it('says the session is gone when it no longer exists', async () => {
-    render(<SessionCompareScreen sessionId="missing-session" />);
+    renderWithTheme(<SessionCompareScreen sessionId="missing-session" />);
 
     expect(await screen.findByText('This session is no longer active.')).toBeTruthy();
   });

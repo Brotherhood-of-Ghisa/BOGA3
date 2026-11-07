@@ -15,7 +15,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { eq, inArray } from 'drizzle-orm';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -79,7 +79,7 @@ import {
 import { saveBodyWeightReading } from '@/src/data/bodyweight';
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { StyleSheet } from 'react-native';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { exerciseDefinitions, exerciseSets, muscleGroups, sessions } from '@/src/data/schema';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
@@ -97,6 +97,10 @@ import {
   resetLocalData,
 } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const ONE_PR = EXERCISE_BLOCK_HISTORY_FIXTURE.onePrCompletionSessionId;
 const NO_PR = EXERCISE_BLOCK_HISTORY_FIXTURE.noPrCompletionSessionId;
@@ -129,7 +133,7 @@ const openSession = async (
   await bootLocalApp();
   afterBoot?.();
   mockParams = params;
-  render(<CompletedSessionDetailRoute />);
+  renderWithTheme(<CompletedSessionDetailRoute />);
   // Loaded: the presentation, the detail summary, or one of the missing-session exits.
   await waitFor(() =>
     expect(
@@ -290,7 +294,7 @@ const openDesignSession = async (
   await seedDesignSession(seed);
   await bootLocalApp();
   mockParams = { sessionId: DESIGN.sessionId, ...params };
-  render(<CompletedSessionDetailRoute />);
+  renderWithTheme(<CompletedSessionDetailRoute />);
   await waitFor(() =>
     expect(
       ['session-completion-presentation', 'view-session-section-sets', 'completed-session-detail-empty'].some(
@@ -567,7 +571,7 @@ describe('a session written through the app', () => {
     await seedDesignSession();
     await bootLocalApp();
     mockParams = { sessionId: DESIGN.sessionId };
-    render(<CompletedSessionDetailRoute />);
+    renderWithTheme(<CompletedSessionDetailRoute />);
 
     expect(screen.getByTestId('completed-session-detail-loading')).toBeTruthy();
     await screen.findByTestId('view-session-section-sets');
@@ -632,7 +636,7 @@ describe('a session written through the app', () => {
       });
       await bootLocalApp();
       mockParams = { sessionId: DESIGN.sessionId };
-      render(<CompletedSessionDetailRoute />);
+      renderWithTheme(<CompletedSessionDetailRoute />);
       await screen.findByTestId('completed-session-detail-summary');
       await settle();
       expect(screen.queryByText(/Body weight|BW \+|82(\.0)? ?kg/i)).toBeNull();
@@ -855,7 +859,7 @@ describe('a session written through the app', () => {
 
     screen.unmount();
     mockParams = { sessionId: DESIGN.sessionId };
-    render(<CompletedSessionDetailRoute />);
+    renderWithTheme(<CompletedSessionDetailRoute />);
     expect(await screen.findByText('No working sets to compare.')).toBeTruthy();
     expect(label('completed-session-detail-sets')).toBe('Sets 0');
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
@@ -863,7 +867,7 @@ describe('a session written through the app', () => {
       'No exercises logged in this session.'
     );
     expect(StyleSheet.flatten(screen.getByTestId('completed-session-detail-no-exercises').props.style)).toMatchObject({
-      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: uiRoles.inkMuted,
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base, color: roles.inkMuted,
     });
   });
 
@@ -894,7 +898,7 @@ describe('records, sharing and deleted sessions over real data', () => {
       expect(
         within(squat).getByLabelText(/^Barbell Back Squat, 2 records: new 1RM \d+\.\d and top weight \d+\.\d × \d+$/)
       ).toBeTruthy();
-      expect(within(squat).getByTestId(`${SQUAT_PR}-record`)).toHaveStyle({ backgroundColor: uiRoles.recordWash });
+      expect(within(squat).getByTestId(`${SQUAT_PR}-record`)).toHaveStyle({ backgroundColor: roles.recordWash });
       expect(within(squat).getByTestId(`${SQUAT_PR}-record-1`)).toHaveTextContent(/^New 1RM · \d+\.\d \+ top weight\d+\.\d × \d+$/);
 
       fireEvent.press(screen.getByTestId('session-completion-share-session'));
@@ -949,7 +953,7 @@ describe('records, sharing and deleted sessions over real data', () => {
       .where(eq(exerciseDefinitions.id, 'seed_barbell_bench_press')).run();
     await bootLocalApp();
     mockParams = { sessionId: DESIGN.sessionId, presentation: 'completion' };
-    render(<CompletedSessionDetailRoute />);
+    renderWithTheme(<CompletedSessionDetailRoute />);
 
     const bench = await screen.findByTestId('session-completion-pr-seed_barbell_bench_press');
     // Exactly the records of the unpooled test below: the Iron Temple session
@@ -975,7 +979,7 @@ describe('records, sharing and deleted sessions over real data', () => {
     });
     await bootLocalApp();
     mockParams = { sessionId: DESIGN.sessionId, presentation: 'completion' };
-    render(<CompletedSessionDetailRoute />);
+    renderWithTheme(<CompletedSessionDetailRoute />);
 
     const bench = await screen.findByTestId('session-completion-pr-seed_barbell_bench_press');
     const pulldown = screen.getByTestId(`session-completion-pr-${DESIGN.pulldownExerciseId}`);
@@ -987,7 +991,7 @@ describe('records, sharing and deleted sessions over real data', () => {
     expect(within(bench).getByLabelText('Barbell Bench Press, 2 records: new top weight 185.0 × 8; new volume record 3515')).toBeTruthy();
     expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-record-1')).toHaveTextContent('New top weight185.0 × 8');
     expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-record-2')).toHaveTextContent('New volume record · 3515');
-    expect(within(bench).getByText('185.0 × 8')).toHaveStyle({ color: uiRoles.record });
+    expect(within(bench).getByText('185.0 × 8')).toHaveStyle({ color: roles.record });
     expect(within(pulldown).getByLabelText(/^Lat Pulldown, 3 records: new 1RM \d+\.\d and top weight 120\.0 × 12; new volume record 1440$/)).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('session-completion-share-session'));
@@ -1000,7 +1004,7 @@ describe('records, sharing and deleted sessions over real data', () => {
     // The detail's set cards band the same records, a line each.
     screen.unmount();
     mockParams = { sessionId: DESIGN.sessionId };
-    render(<CompletedSessionDetailRoute />);
+    renderWithTheme(<CompletedSessionDetailRoute />);
     await openSets();
     expect(await screen.findByTestId(`completed-session-detail-exercise-${DESIGN.bench}-record-1`))
       .toHaveTextContent('New top weight185.0 × 8');
@@ -1026,7 +1030,7 @@ describe('records, sharing and deleted sessions over real data', () => {
       .where(eq(exerciseDefinitions.id, DESIGN.pulldownExerciseId)).run();
     await bootLocalApp();
     mockParams = { sessionId: DESIGN.sessionId, presentation: 'completion' };
-    render(<CompletedSessionDetailRoute />);
+    renderWithTheme(<CompletedSessionDetailRoute />);
 
     const bench = await screen.findByTestId('session-completion-pr-seed_barbell_bench_press');
     expect(within(bench).getByTestId('session-completion-pr-seed_barbell_bench_press-count')).toHaveTextContent('3 records');
@@ -1039,7 +1043,7 @@ describe('records, sharing and deleted sessions over real data', () => {
 
     const volumeOnly = screen.getByTestId(`session-completion-pr-${DESIGN.pulldownExerciseId}`);
     expect(within(volumeOnly).getByLabelText('Dumbbell Bulgarian Split Squat, 1 record: new volume record 119880')).toBeTruthy();
-    expect(within(volumeOnly).getByText('New volume record · 119880')).toHaveStyle({ color: uiRoles.record });
+    expect(within(volumeOnly).getByText('New volume record · 119880')).toHaveStyle({ color: roles.record });
     expect(within(volumeOnly).queryByText('120.0 × 999')).toBeNull();
     expect(within(volumeOnly).getAllByTestId(/-record-\d+$/)).toHaveLength(1);
   });

@@ -1,28 +1,27 @@
-/* eslint-disable import/first */
-
-// A dark launch: `tokens.ts` as `theme-launch.ts` resolves it when Dark is
-// chosen. The native picker takes the launch's mode, not a fixed light.
-jest.mock('@/components/ui/tokens', () => {
-  const actual = jest.requireActual('@/components/ui/tokens');
-  const { defaultThemeSeeds, generateRoles } = jest.requireActual('@/components/ui/theme');
-  return { ...actual, uiMode: 'dark', uiRoles: generateRoles(defaultThemeSeeds, 'dark') };
-});
-
-import { render, screen } from '@testing-library/react-native';
+import { screen } from '@testing-library/react-native';
 import { Platform } from 'react-native';
 
 import { PlanScheduleSheet } from '@/components/session-planner/plan-schedule-sheet';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 
-describe('PlanScheduleSheet in a dark launch', () => {
+import { renderWithTheme, switchTheme } from './helpers/theme';
+
+// The native picker takes the mode the app is drawn in, not a fixed light.
+describe('PlanScheduleSheet in a dark theme', () => {
   const originalPlatform = Platform.OS;
 
-  afterEach(() => {
+  afterEach(async () => {
     Platform.OS = originalPlatform;
+    await switchTheme(DEFAULT_APPEARANCE);
   });
 
-  it('draws the iOS picker dark', () => {
+  it('draws the iOS picker dark, and light again when the theme goes back', async () => {
     Platform.OS = 'ios';
-    render(<PlanScheduleSheet currentSchedule={null} onConfirm={jest.fn()} onDismiss={jest.fn()} visible />);
+    await switchTheme({ ...DEFAULT_APPEARANCE, mode: 'dark' });
+    renderWithTheme(<PlanScheduleSheet currentSchedule={null} onConfirm={jest.fn()} onDismiss={jest.fn()} visible />);
     expect(screen.getByTestId('plan-schedule-picker-native').props.themeVariant).toBe('dark');
+
+    await switchTheme({ ...DEFAULT_APPEARANCE, mode: 'light' });
+    expect(screen.getByTestId('plan-schedule-picker-native').props.themeVariant).toBe('light');
   });
 });

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View, type AccessibilityActionEvent, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type AccessibilityActionEvent } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace, type UiRoleToken } from '@/components/ui/tokens';
 import type { RestTimerView } from '@/src/session-recorder/rest-timer';
 
 export type TitleBarTimerProps = {
@@ -29,6 +30,10 @@ const ACCESSIBILITY_ACTIONS = [
  */
 export function TitleBarTimer({ view, onPress, onLongPress, testID }: TitleBarTimerProps) {
   const copy = describeTitleBarTimer(view);
+  const styles = useStyles();
+  const text = useUiText();
+  const roles = useUiRoles();
+  const pillTone = { running: styles.running, paused: styles.paused, done: styles.done };
   const onAccessibilityAction = (event: AccessibilityActionEvent) => {
     if (event.nativeEvent.actionName === 'longpress') onLongPress();
     else onPress();
@@ -47,11 +52,11 @@ export function TitleBarTimer({ view, onPress, onLongPress, testID }: TitleBarTi
       style={({ pressed }) => [styles.control, pressed ? styles.pressed : null]}
       testID={testID}>
       {view.status === 'idle' ? (
-        <Icon color={uiRoles.ink} name="timer" />
+        <Icon colorRole="ink" name="timer" />
       ) : (
-        <View style={[styles.pill, PILL_TONE[copy.tone]]} testID={`${testID}-pill`}>
-          <Icon color={GLYPH_COLOR[copy.tone]} name={copy.tone === 'done' ? 'success' : 'timer'} size="sm" />
-          <Text allowFontScaling={false} style={[uiText.figureLarge, { color: GLYPH_COLOR[copy.tone] }]}
+        <View style={[styles.pill, pillTone[copy.tone]]} testID={`${testID}-pill`}>
+          <Icon colorRole={GLYPH_ROLE[copy.tone]} name={copy.tone === 'done' ? 'success' : 'timer'} size="sm" />
+          <Text allowFontScaling={false} style={[text.figureLarge, { color: roles[GLYPH_ROLE[copy.tone]] }]}
             testID={`${testID}-countdown`}>
             {view.formatted}
           </Text>
@@ -112,13 +117,13 @@ export function useTitleBarTimer(timer: TimerControls, setting: boolean) {
   };
 }
 
-const GLYPH_COLOR: Record<Tone, string> = {
-  running: uiRoles.ink,
-  paused: uiRoles.inkMuted,
-  done: uiRoles.onInk,
+const GLYPH_ROLE: Record<Tone, UiRoleToken> = {
+  running: 'ink',
+  paused: 'inkMuted',
+  done: 'onInk',
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   control: {
     minWidth: uiGeometry.tapTarget,
     height: uiGeometry.tapTarget,
@@ -138,20 +143,14 @@ const styles = StyleSheet.create({
     borderWidth: uiBorder.width,
   },
   running: {
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
   },
   paused: {
-    borderColor: uiRoles.ruleSoft,
+    borderColor: roles.ruleSoft,
     borderStyle: 'dashed',
   },
   done: {
-    borderColor: uiRoles.ink,
-    backgroundColor: uiRoles.ink,
+    borderColor: roles.ink,
+    backgroundColor: roles.ink,
   },
-});
-
-const PILL_TONE: Record<Tone, ViewStyle> = {
-  running: styles.running,
-  paused: styles.paused,
-  done: styles.done,
-};
+}));

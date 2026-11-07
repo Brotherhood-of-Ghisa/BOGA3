@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 
-import { ActionButton, Icon, IconButton, Screen, uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiText, uiTypography } from '@/components/ui';
+import { ActionButton, Icon, IconButton, Screen, makeStyles, uiBorder, uiFonts, uiGeometry, uiSpace, uiTypography, useUiRoles, useUiText } from '@/components/ui';
 import { MAX_REPEATING_TIMER_INTERVAL_SECONDS, MIN_REPEATING_TIMER_INTERVAL_SECONDS } from '@/src/preferences/model';
 import { formatRestTimerSeconds, REPEATING_TIMER_PREPARATION_SEC, REPEATING_TIMER_STEP_SEC, type RepeatingTimerModeView } from '@/src/session-recorder/rest-timer';
 
@@ -25,6 +25,8 @@ type Props = {
  * Reset. Countdown changes are read on demand, never announced every second.
  */
 export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, children }: Props) {
+  const styles = useStyles();
+  const text = useUiText();
   const [expanded, setExpanded] = useState(false);
   const trigger = useRef<ViewInstance>(null);
   const title = useRef<TextInstance>(null);
@@ -32,7 +34,7 @@ export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, childre
   const { width, height } = useWindowDimensions();
   const controlsHeight = uiGeometry.tapTarget + uiSpace.sm * 2 + uiBorder.width
     + uiTypography.lineHeight.xxl * 2
-    + uiText.label.lineHeight + uiSpace.xs + uiText.figureHero.lineHeight + uiSpace.lg + uiBorder.width
+    + text.label.lineHeight + uiSpace.xs + text.figureHero.lineHeight + uiSpace.lg + uiBorder.width
     + uiGeometry.tapTarget + uiSpace.xl + uiGeometry.tapTarget + uiSpace.xl + uiSpace.lg
     + uiSpace.lg * 6;
   const diameter = Math.min(
@@ -56,7 +58,7 @@ export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, childre
         style={styles.trigger}
         testID="repeating-timer-expand">
         {children}
-        <Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />
+        <Icon colorRole="inkMuted" name="chevron-right" size="sm" />
       </Pressable>
       <Modal
         animationType="slide"
@@ -73,7 +75,7 @@ export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, childre
             style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
             testID="repeating-timer-focus">
             <View style={styles.header}>
-              <Text allowFontScaling={false} accessibilityRole="header" ref={title} style={styles.title}>Repeating</Text>
+              <Text allowFontScaling={false} accessibilityRole="header" ref={title} style={text.sheetTitle}>Repeating</Text>
               <IconButton accessibilityLabel="Collapse repeating timer" name="x" onPress={close} testID="repeating-timer-focus-close" />
             </View>
             <ScrollView contentContainerStyle={styles.body}>
@@ -104,8 +106,8 @@ export function RepeatingTimerFocus({ view, onAdjust, onToggle, onReset, childre
                   <ActionButton accessibilityLabel="Subtract 15 seconds" disabled={view.intervalSec <= MIN_REPEATING_TIMER_INTERVAL_SECONDS} label="−15s" onPress={() => onAdjust(-REPEATING_TIMER_STEP_SEC)} testID="repeating-timer-focus-minus" variant="outline" />
                 </View>
                 <View style={styles.interval}>
-                  <Text allowFontScaling={false} style={styles.intervalLabel}>Interval</Text>
-                  <Text accessibilityLabel={`Interval ${formatRestTimerSeconds(view.intervalSec)}`} allowFontScaling={false} style={styles.intervalValue} testID="repeating-timer-focus-interval">{formatRestTimerSeconds(view.intervalSec)}</Text>
+                  <Text allowFontScaling={false} style={text.label}>Interval</Text>
+                  <Text accessibilityLabel={`Interval ${formatRestTimerSeconds(view.intervalSec)}`} allowFontScaling={false} style={text.figureHero} testID="repeating-timer-focus-interval">{formatRestTimerSeconds(view.intervalSec)}</Text>
                 </View>
                 <View style={styles.intervalControl}>
                   <ActionButton accessibilityLabel="Add 15 seconds" disabled={view.intervalSec >= MAX_REPEATING_TIMER_INTERVAL_SECONDS} label="+15s" onPress={() => onAdjust(REPEATING_TIMER_STEP_SEC)} testID="repeating-timer-focus-plus" variant="outline" />
@@ -131,6 +133,7 @@ function focus(node: ViewInstance | TextInstance | null) {
 }
 
 function TimerRing({ diameter, view }: { diameter: number; view: RepeatingTimerModeView }) {
+  const roles = useUiRoles();
   const stroke = uiSpace.sm;
   const radius = (diameter - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -138,27 +141,24 @@ function TimerRing({ diameter, view }: { diameter: number; view: RepeatingTimerM
   const remaining = Math.min(1, Math.max(0, view.remainingSec / duration));
   return (
     <Svg accessible={false} height={diameter} pointerEvents="none" style={StyleSheet.absoluteFill} width={diameter}>
-      <Circle cx={diameter / 2} cy={diameter / 2} fill="none" r={radius} stroke={uiRoles.rule} strokeWidth={stroke} />
-      <Circle cx={diameter / 2} cy={diameter / 2} fill="none" r={radius} rotation={-90} origin={`${diameter / 2}, ${diameter / 2}`} stroke={uiRoles.accent} strokeDasharray={[circumference, circumference]} strokeDashoffset={circumference * (1 - remaining)} strokeLinecap="round" strokeWidth={stroke} testID="repeating-timer-focus-progress" />
+      <Circle cx={diameter / 2} cy={diameter / 2} fill="none" r={radius} stroke={roles.rule} strokeWidth={stroke} />
+      <Circle cx={diameter / 2} cy={diameter / 2} fill="none" r={radius} rotation={-90} origin={`${diameter / 2}, ${diameter / 2}`} stroke={roles.accent} strokeDasharray={[circumference, circumference]} strokeDashoffset={circumference * (1 - remaining)} strokeLinecap="round" strokeWidth={stroke} testID="repeating-timer-focus-progress" />
     </Svg>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   trigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm },
   screen: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: uiSpace.lg, paddingVertical: uiSpace.sm, borderBottomWidth: uiBorder.width, borderBottomColor: uiRoles.rule },
-  title: uiText.sheetTitle,
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: uiSpace.lg, paddingVertical: uiSpace.sm, borderBottomWidth: uiBorder.width, borderBottomColor: roles.rule },
   body: { flexGrow: 1, alignItems: 'center', padding: uiSpace.lg, gap: uiSpace.lg },
   meter: { alignItems: 'center', justifyContent: 'center' },
   readout: { width: '80%', alignItems: 'center', gap: uiSpace.sm },
-  phase: { alignSelf: 'stretch', textAlign: 'center', fontFamily: uiFonts.display.family, fontWeight: '800', fontSize: uiTypography.size.xxl * 2, lineHeight: uiTypography.lineHeight.xxl * 2, color: uiRoles.ink },
-  intervalLabel: uiText.label,
-  countdown: { alignSelf: 'stretch', textAlign: 'center', fontFamily: uiFonts.figure.family, fontWeight: '700', fontVariant: ['tabular-nums'], color: uiRoles.ink },
+  phase: { alignSelf: 'stretch', textAlign: 'center', fontFamily: uiFonts.display.family, fontWeight: '800', fontSize: uiTypography.size.xxl * 2, lineHeight: uiTypography.lineHeight.xxl * 2, color: roles.ink },
+  countdown: { alignSelf: 'stretch', textAlign: 'center', fontFamily: uiFonts.figure.family, fontWeight: '700', fontVariant: ['tabular-nums'], color: roles.ink },
   primary: { alignSelf: 'stretch' },
   reset: { marginTop: 'auto', paddingTop: uiSpace.lg, alignSelf: 'stretch' },
-  intervalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: uiSpace.sm, borderTopWidth: uiBorder.width, borderTopColor: uiRoles.rule, paddingTop: uiSpace.lg },
+  intervalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: uiSpace.sm, borderTopWidth: uiBorder.width, borderTopColor: roles.rule, paddingTop: uiSpace.lg },
   intervalControl: { width: '29%' },
   interval: { alignItems: 'center', gap: uiSpace.xs },
-  intervalValue: uiText.figureHero,
-});
+}));

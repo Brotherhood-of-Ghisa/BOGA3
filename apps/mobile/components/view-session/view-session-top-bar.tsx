@@ -1,11 +1,12 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiSpace } from '@/components/ui/tokens';
 
 type ViewSessionTopBarProps = {
   onBack: () => void;
@@ -24,12 +25,14 @@ type ViewSessionTopBarProps = {
 // place.
 export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit, title = 'View Session', busy = false }: ViewSessionTopBarProps) {
   const insets = useSafeAreaInsets();
+  const styles = useStyles();
+  const text = useUiText();
   return (
     <View style={[styles.bar, { paddingTop: insets.top }]} testID="completed-session-detail-top-bar">
       <IconButton accessibilityLabel="Back" name="chevron-left" onPress={onBack} testID="completed-session-detail-back" />
       {/* Shrinks to fit rather than truncate, as the active session's title does. */}
       <Text allowFontScaling={false} accessibilityRole="header" adjustsFontSizeToFit minimumFontScale={0.7}
-        numberOfLines={1} style={[uiText.title, styles.title]} testID="completed-session-detail-title">
+        numberOfLines={1} style={[text.title, styles.title]} testID="completed-session-detail-title">
         <FigureText strong>{title}</FigureText>
       </Text>
       {onOpenOptions ? (
@@ -54,7 +57,7 @@ export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit, title = 'View
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -62,12 +65,12 @@ const styles = StyleSheet.create({
     paddingLeft: uiSpace.xs,
     paddingRight: uiSpace.sm,
     paddingBottom: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderBottomWidth: uiBorder.width,
-    borderBottomColor: uiRoles.rule,
+    borderBottomColor: roles.rule,
   },
   title: {
     flex: 1,
     minWidth: 0,
   },
-});
+}));

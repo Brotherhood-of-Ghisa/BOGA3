@@ -1,7 +1,7 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Card, FigureText, IconButton, ListRow, Tag, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { Card, FigureText, IconButton, ListRow, Tag, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { PlanDetailView } from '@/src/session-planner';
 import { blockCountsLabel, planDateLabel, planOutcomeLabel } from './progress-labels';
 
@@ -16,6 +16,8 @@ export function ProgrammePlanList({
   onOpenPlan,
   onReorderPlans,
 }: ProgrammePlanListProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const dateFormat = useDateFormat();
   const movePlan = (index: number, step: -1 | 1) => {
     if (!onReorderPlans) return;
@@ -29,7 +31,7 @@ export function ProgrammePlanList({
 
   return (
     <View style={styles.container} testID="programme-plan-list">
-      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
         Sessions ({plans.length})
       </Text>
 
@@ -66,16 +68,16 @@ export function ProgrammePlanList({
             }>
             <View style={styles.rowText}>
               <View style={styles.rowTitleLine}>
-                <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
+                <Text allowFontScaling={false} numberOfLines={1} style={[text.bodyStrong, styles.title]}>
                   {plan.title}
                 </Text>
                 {plan.progress === 'completed' ? <Tag label={planOutcomeLabel(plan)} /> : (
-                  <Text allowFontScaling={false} style={uiText.label}>
+                  <Text allowFontScaling={false} style={text.label}>
                     {planOutcomeLabel(plan)}
                   </Text>
                 )}
               </View>
-              <Text allowFontScaling={false} style={uiText.meta}>
+              <Text allowFontScaling={false} style={text.meta}>
                 <FigureText>{[planDateLabel(plan, dateFormat), blockCountsLabel(plan.blockCounts)].filter(Boolean).join(' · ')}</FigureText>
               </Text>
             </View>

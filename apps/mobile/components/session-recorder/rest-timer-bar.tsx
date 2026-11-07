@@ -1,12 +1,13 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiSpace } from '@/components/ui/tokens';
 import {
   REPEATING_TIMER_STEP_SEC,
   REST_TIMER_STEP_SEC,
@@ -50,6 +51,7 @@ export function RestTimerBar({
   onResetRepeating,
   onCollapse,
 }: RestTimerBarProps) {
+  const styles = useStyles();
   if (view.status === 'idle') {
     return null;
   }
@@ -155,6 +157,9 @@ export function RestTimerBar({
 }
 
 function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' }> }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const isRepeating = view.mode === 'repeating';
   const isCompleted = view.mode === 'rest' && view.status === 'completed';
   const isPaused = isRepeating && view.isPaused;
@@ -175,13 +180,13 @@ function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' 
       style={styles.readout}
       testID={isRepeating ? 'repeating-timer-readout' : undefined}>
       <Icon
-        color={isCompleted ? uiRoles.ink : uiRoles.inkMuted}
+        colorRole={isCompleted ? 'ink' : 'inkMuted'}
         name={isCompleted ? 'success' : 'timer'}
         size="sm"
       />
       <Text
         allowFontScaling={false}
-        style={[uiText.label, isCompleted ? uiTextTone.ink : null]}
+        style={[text.label, isCompleted ? tone.ink : null]}
         testID={isRepeating ? 'repeating-timer-round' : 'rest-timer-status'}>
         <FigureText>{statusLabel}</FigureText>
       </Text>
@@ -190,7 +195,7 @@ function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' 
         allowFontScaling={false}
         accessibilityLabel={isRepeating ? undefined : countdownLabel}
         accessibilityLiveRegion={isRepeating ? 'none' : 'polite'}
-        style={uiText.figureLarge}
+        style={text.figureLarge}
         testID={isRepeating ? 'repeating-timer-countdown' : 'rest-timer-countdown'}>
         {view.formatted}
       </Text>
@@ -198,11 +203,11 @@ function TimerReadout({ view }: { view: Exclude<RestTimerView, { status: 'idle' 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   bar: {
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderBottomWidth: uiBorder.width,
-    borderBottomColor: uiRoles.rule,
+    borderBottomColor: roles.rule,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.xs,
     gap: uiSpace.xs,
@@ -238,4 +243,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: uiSpace.xs,
   },
-});
+}));

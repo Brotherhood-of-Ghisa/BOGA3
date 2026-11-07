@@ -7,9 +7,9 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { BackHandler, StyleSheet } from 'react-native';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { setAccountLocalPreferenceAccount, setAccountLocalPreferences } from '@/src/preferences/account-local';
 import { ActiveSessionConflictError, SessionUnavailableError } from '@/src/data/session-drafts';
 import { subscribeOpenedWorkout } from '@/components/navigation/use-open-main-tab';
@@ -20,6 +20,10 @@ import CompletedSessionDetailRoute, {
   type CompletedSessionDetailDataClient,
   type CompletedSessionDetailRecord,
 } from '../app/completed-session/[sessionId]';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 let mockLocalSearchParams: Record<string, string | undefined> = {
   sessionId: 'session-completed-1',
@@ -216,7 +220,7 @@ describe('CompletedSessionDetailScreenShell', () => {
   it('distinguishes pending and failed comparisons from absent history without blocking sets, actions or sharing', async () => {
     let rejectInsights!: (error: Error) => void;
     const loadInsights = jest.fn().mockReturnValue(new Promise((_resolve, reject) => { rejectInsights = reject; }));
-    render(<CompletedSessionDetailScreenShell dataClient={detailClient({ loadInsights })} sessionId="completed-under-test" />);
+    renderWithTheme(<CompletedSessionDetailScreenShell dataClient={detailClient({ loadInsights })} sessionId="completed-under-test" />);
     await screen.findByText('Loading comparisons…');
     expect(screen.getByTestId('completed-session-detail-sets')).toHaveProp('accessibilityLabel', 'Sets 4');
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
@@ -240,7 +244,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     const loadInsights = jest.fn()
       .mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }))
       .mockRejectedValueOnce(new Error('latest history failed'));
-    render(<CompletedSessionDetailScreenShell dataClient={detailClient({ loadInsights })} sessionId="completed-under-test" />);
+    renderWithTheme(<CompletedSessionDetailScreenShell dataClient={detailClient({ loadInsights })} sessionId="completed-under-test" />);
     await screen.findByText('Loading comparisons…');
     act(() => jest.requireMock('expo-router').__triggerFocus());
     await screen.findByText('Comparisons unavailable. Return to this session to retry.');
@@ -254,7 +258,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     const loadInsights = jest.fn()
       .mockReturnValueOnce(new Promise(resolve => { resolveOld = resolve; }))
       .mockRejectedValueOnce(new Error('new context failed'));
-    render(<CompletedSessionDetailScreenShell dataClient={detailClient({ loadInsights })} sessionId="completed-under-test" />);
+    renderWithTheme(<CompletedSessionDetailScreenShell dataClient={detailClient({ loadInsights })} sessionId="completed-under-test" />);
     await screen.findByText('Loading comparisons…');
     expect(loadInsights).toHaveBeenLastCalledWith('completed-under-test', 52);
     act(() => {
@@ -275,7 +279,7 @@ describe('CompletedSessionDetailScreenShell', () => {
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
-    render(
+    renderWithTheme(
       <CompletedSessionDetailScreenShell
         dataClient={dataClient}
         presentation="completion"
@@ -303,7 +307,7 @@ describe('CompletedSessionDetailScreenShell', () => {
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
-    render(
+    renderWithTheme(
       <CompletedSessionDetailScreenShell
         dataClient={dataClient}
         presentation="completion"
@@ -337,7 +341,7 @@ describe('CompletedSessionDetailScreenShell', () => {
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
-    render(
+    renderWithTheme(
       <CompletedSessionDetailScreenShell
         dataClient={dataClient}
         presentation="completion"
@@ -360,10 +364,10 @@ describe('CompletedSessionDetailScreenShell', () => {
     });
     // A share error is a strong meta line in `danger`.
     expect(StyleSheet.flatten(screen.getByTestId('session-share-error').props.style)).toMatchObject({
-      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.sm, color: uiRoles.danger, textAlign: 'center',
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.sm, color: roles.danger, textAlign: 'center',
     });
     expect(StyleSheet.flatten(screen.getByText('Nothing is shared until you choose an app.').props.style)).toMatchObject({
-      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: uiRoles.inkMuted, textAlign: 'center',
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: roles.inkMuted, textAlign: 'center',
     });
     expect(mockCaptureRef).not.toHaveBeenCalled();
 
@@ -405,7 +409,7 @@ describe('CompletedSessionDetailScreenShell', () => {
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
-    const view = render(
+    const view = renderWithTheme(
       <CompletedSessionDetailScreenShell
         dataClient={dataClient}
         presentation="completion"
@@ -441,7 +445,7 @@ describe('CompletedSessionDetailScreenShell', () => {
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
-    render(
+    renderWithTheme(
       <CompletedSessionDetailScreenShell
         dataClient={dataClient}
         presentation="completion"
@@ -470,7 +474,7 @@ describe('CompletedSessionDetailScreenShell', () => {
       setCompletedSessionDeletedState: jest.fn().mockResolvedValue(undefined),
     };
 
-    render(
+    renderWithTheme(
       <CompletedSessionDetailScreenShell
         dataClient={dataClient}
         presentation="completion"
@@ -493,7 +497,7 @@ describe('CompletedSessionDetailScreenShell', () => {
   });
 
   const renderDetail = async (dataClient: CompletedSessionDetailDataClient) => {
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
+    renderWithTheme(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={dataClient} />);
     await screen.findByTestId('completed-session-detail-screen');
     fireEvent.press(screen.getByTestId('view-session-section-sets'));
   };
@@ -605,7 +609,7 @@ describe('CompletedSessionDetailScreenShell', () => {
   });
 
   it('titles the session and shows Start and Duration, then Gym, Ex, Sets and Volume', async () => {
-    render(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={detailClient()} />);
+    renderWithTheme(<CompletedSessionDetailScreenShell sessionId="completed-under-test" dataClient={detailClient()} />);
     await screen.findByTestId('completed-session-detail-screen');
 
     // 16:00 UTC is 16:00 in London in February: an afternoon.
@@ -647,7 +651,7 @@ describe('CompletedSessionDetailScreenShell', () => {
     expect(await screen.findByTestId('completed-session-detail-deleted-band')).toBeTruthy();
     // The band's words are a muted micro-label.
     expect(StyleSheet.flatten(screen.getByText('Deleted · hidden from history').props.style)).toMatchObject({
-      fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase', color: uiRoles.inkMuted,
+      fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase', color: roles.inkMuted,
     });
   });
 
@@ -665,14 +669,14 @@ describe('CompletedSessionDetailScreenShell', () => {
       'Unable to update deleted state'
     );
     expect(StyleSheet.flatten(screen.getByTestId('completed-session-detail-error-notice').props.style)).toMatchObject({
-      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: uiRoles.danger,
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: roles.danger,
     });
     expect(screen.queryByTestId('completed-session-detail-deleted-band')).toBeNull();
     expect(screen.getByTestId('completed-session-detail-edit-button')).toBeTruthy();
   });
 
   it('renders an error state when loading fails', async () => {
-    render(
+    renderWithTheme(
       <CompletedSessionDetailScreenShell
         sessionId="broken-session"
         dataClient={detailClient({ loadCompletedSession: jest.fn().mockRejectedValue(new Error('boom')) })}
@@ -698,7 +702,7 @@ describe('CompletedSessionDetailRoute', () => {
   it('redirects route intent=edit to the session view', async () => {
     mockLocalSearchParams = { sessionId: 'session-completed-1', intent: 'edit' };
 
-    render(<CompletedSessionDetailRoute />);
+    renderWithTheme(<CompletedSessionDetailRoute />);
 
     expect(screen.getByTestId('completed-session-detail-edit-redirect')).toBeTruthy();
     await waitFor(() => {

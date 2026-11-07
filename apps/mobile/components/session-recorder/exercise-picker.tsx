@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useOpenExerciseEditor, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-request';
@@ -18,7 +18,8 @@ import { Notice } from '@/components/ui/notice';
 import { PageSheetHeader } from '@/components/ui/page-sheet';
 import { SearchField } from '@/components/ui/search-field';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiFonts, uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { loadSuggestedExercisePlan, type ExerciseBlockHistorySuggestedPlan } from '@/src/data';
 import type { ExercisePickerPreselectionState } from '@/components/session-recorder/types';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
@@ -92,6 +93,7 @@ export function ExercisePicker({
   plannerEnabled = true,
   sessionId = null,
 }: ExercisePickerProps) {
+  const styles = useStyles();
   const groupLinkingUserId = useGroupLinkingUserId();
   const groupLinking = useGroupExerciseLinking({ userId: groupLinkingUserId });
   const [searchValue, setSearchValue] = useState('');
@@ -415,10 +417,10 @@ export function ExercisePicker({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   screen: {
     flex: 1,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
   },
   controls: {
     gap: uiSpace.sm,
@@ -438,4 +440,4 @@ const styles = StyleSheet.create({
   preselectionDismissArea: {
     minHeight: 120,
   },
-});
+}));

@@ -57,10 +57,10 @@ jest.mock('@/src/logging/logEvent', () => ({
   logEvent: () => Promise.resolve(),
 }));
 
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
-import { uiRoles, uiText } from '@/components/ui';
+import { uiText } from '@/components/ui';
 import { INITIAL_SYNC_PROGRESS, type SyncProgress } from '@/src/sync/progress';
 import { startSyncScheduler, stopSyncScheduler } from '@/src/sync/scheduler';
 import { SyncSetupScreen, SYNC_GATE_TEST_IDS } from '@/src/sync/SyncGate';
@@ -69,6 +69,11 @@ import {
   publishSyncGateState,
   type LastCycleErrorCode,
 } from '@/src/sync/sync-gate-state';
+
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const defaultRoles = rolesFor(DEFAULT_APPEARANCE);
 
 type AuthValue = {
   isConfigured: boolean;
@@ -79,7 +84,7 @@ const signedInAuth: AuthValue = { isConfigured: true, session: { user: { id: 'us
 
 // Which routes exist around the block (sign-in, the block, or the app) is the root
 // stack's decision, covered by root-route-access.test.ts and root-stack-routing.test.tsx.
-const renderGate = () => render(<SyncSetupScreen />);
+const renderGate = () => renderWithTheme(<SyncSetupScreen />);
 
 /**
  * Publishes a fresh gate-state snapshot (and, when given, the progress the
@@ -216,7 +221,7 @@ describe('SyncSetupScreen', () => {
     publish({ lastCycleErrorCode: 'INTERNAL' });
 
     expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorMessage).props.style).color).toBe(
-      uiRoles.danger
+      defaultRoles.danger
     );
   });
 
@@ -227,7 +232,7 @@ describe('SyncSetupScreen', () => {
 
     expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorMessage).props.style)).toMatchObject({
       ...uiText.bodyStrong,
-      color: uiRoles.danger,
+      color: defaultRoles.danger,
     });
     expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorDetail).props.style)).toMatchObject(uiText.figureSmall);
   });

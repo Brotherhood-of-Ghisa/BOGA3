@@ -1,10 +1,11 @@
-import { ScrollView, StyleSheet, Text, useWindowDimensions } from 'react-native';
+import { ScrollView, Text, useWindowDimensions } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiSpace } from '@/components/ui/tokens';
 import { SessionGpsPanel, type SessionGpsPanelProps } from './session-gps-panel';
 import type { SessionGymOption } from '@/src/session-recorder/gym-options';
 
@@ -41,6 +42,9 @@ export function SessionGymSheet({
   gpsPanel,
 }: SessionGymSheetProps) {
   const { height } = useWindowDimensions();
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   // Suggesting the gym the session already has would say nothing; its
   // neighbour still says something when two gyms share a site.
   const nearby = options === null ? [] : suggestions.filter((suggestion) => suggestion.id !== selectedGymId);
@@ -56,7 +60,7 @@ export function SessionGymSheet({
         onPress={() => onSelect(gym)}
         selected={isSelected}
         testID={gym ? `session-view-gym-option-${gym.id}` : 'session-view-gym-option-none'}
-        trailing={isSelected ? <Icon color={uiRoles.accent} name="check" /> : undefined}
+        trailing={isSelected ? <Icon colorRole="accent" name="check" /> : undefined}
       />
     );
   };
@@ -68,7 +72,7 @@ export function SessionGymSheet({
       ) : null}
       <ScrollView style={{ maxHeight: height * LIST_SHARE_OF_SCREEN }} testID="session-view-gym-list">
         {options === null ? (
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.message]}>Loading gyms…</Text>
+          <Text allowFontScaling={false} style={[text.body, tone.muted, styles.message]}>Loading gyms…</Text>
         ) : (
           <>
             {nearby.map((gym, index) => (
@@ -77,7 +81,7 @@ export function SessionGymSheet({
                 divider={index > 0}
                 key={gym.id}
                 label={`Nearby · ${gym.name}`}
-                leading={<Icon color={uiRoles.accent} name="location" />}
+                leading={<Icon colorRole="accent" name="location" />}
                 onPress={() => onSelect(gym)}
                 testID={index === 0 ? 'session-view-gym-suggestion' : `session-view-gym-suggestion-${gym.id}`}
               />
@@ -89,19 +93,19 @@ export function SessionGymSheet({
       {/* A footer action, not an option: caps control label, like `+ Add exercise`. */}
       <ListRow
         accessibilityLabel="Manage gyms"
-        leading={<Icon color={uiRoles.inkMuted} name="settings" />}
+        leading={<Icon colorRole="inkMuted" name="settings" />}
         onPress={onManage}
         testID="session-view-gym-manage"
-        trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}>
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>Manage gyms</Text>
+        trailing={<Icon colorRole="inkMuted" name="chevron-right" />}>
+        <Text allowFontScaling={false} style={[text.label, tone.ink]}>Manage gyms</Text>
       </ListRow>
     </Sheet>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(() => ({
   message: {
     paddingHorizontal: uiSpace.lg,
     paddingVertical: uiSpace.md,
   },
-});
+}));
