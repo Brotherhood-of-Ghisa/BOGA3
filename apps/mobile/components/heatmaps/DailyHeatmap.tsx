@@ -5,7 +5,8 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, uiBorder, uiGeometry, uiRoles, uiSpace, uiText } from '@/components/ui';
+import { FigureText, makeStyles, uiBorder, uiGeometry, uiSpace } from '@/components/ui';
+import { useUiText } from '@/components/ui/text-roles';
 import { buildCalendarMonths, type CalendarMonth, type CalendarWeek } from './daily-calendar';
 import { CalendarTile } from './calendar-tile';
 import { heatmapStyles } from './heatmap-style';
@@ -39,9 +40,11 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
   data: HeatmapData; metricLabel: string; formatValue: Props['formatValue']; testID: string; gap: number;
 } & Openers) {
   const dateFormat = useDateFormat();
+  const styles = useStyles();
+  const text = useUiText();
   const week = row.week;
   return <View style={styles.row} testID={`${testID}-row-${row.weekStartDateKey}`}>
-    <Text allowFontScaling={false} accessibilityLabel={`Week of ${formatCalendarDate(row.weekStartDateKey, dateFormat)}`} style={[uiText.figureSmall, styles.rowLabel]}
+    <Text allowFontScaling={false} accessibilityLabel={`Week of ${formatCalendarDate(row.weekStartDateKey, dateFormat)}`} style={[text.figureSmall, styles.rowLabel]}
       testID={`${testID}-row-label-${row.weekStartDateKey}`}>{row.startDay}</Text>
     <View style={[styles.cells, { gap }]}>
       {row.days.map(day => day.day && !day.future ? <CalendarTile key={day.dateKey} cell={day.day} dateLabel={formatCalendarDate(day.dateKey, dateFormat)}
@@ -64,14 +67,16 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
 }
 
 function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<typeof CalendarRow>[0], 'row' | 'monthKey'>) {
+  const styles = useStyles();
+  const text = useUiText();
   const hasTraining = month.weeks.some(row => row.days.some(({ day, future }) =>
     !future && day && (day.hasTraining ?? day.value > 0)));
   return <View style={styles.month} testID={`${props.testID}-month-${month.key}`}>
-    <Text allowFontScaling={false} accessibilityRole="header" style={uiText.meta} testID={`${props.testID}-month-title-${month.key}`}><FigureText>{month.title}</FigureText></Text>
+    <Text allowFontScaling={false} accessibilityRole="header" style={text.meta} testID={`${props.testID}-month-title-${month.key}`}><FigureText>{month.title}</FigureText></Text>
     {hasTraining ? <View style={styles.calendar}>
       <View style={styles.row}>
         <View style={styles.labelSpacer} />
-        <View style={[styles.cells, { gap: props.gap }]}>{HEADERS.map(label => <Text key={label} allowFontScaling={false} style={[uiText.label, styles.column, label === 'Week' && heatmapStyles.weekColumn]}>{label}</Text>)}</View>
+        <View style={[styles.cells, { gap: props.gap }]}>{HEADERS.map(label => <Text key={label} allowFontScaling={false} style={[text.label, styles.column, label === 'Week' && heatmapStyles.weekColumn]}>{label}</Text>)}</View>
       </View>
       {month.weeks.map(row => <CalendarRow key={row.weekStartDateKey} {...props} row={row} monthKey={month.key} />)}
       {/* Eight equal columns, with an extra Week margin: place the rule at
@@ -84,6 +89,7 @@ function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<t
 }
 
 export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, header, onOpenDay, onOpenWeek }: Props) {
+  const styles = useStyles();
   const [width, setWidth] = useState(0);
   const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm * 3 - ROW_LABEL_GUTTER - HEADERS.length * uiGeometry.tapTarget) / (HEADERS.length - 1)));
   const months = useMemo(() => buildCalendarMonths(data), [data]);
@@ -106,13 +112,13 @@ export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, hea
   </View>;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   wrap: { flex: 1 },
   content: { paddingVertical: uiSpace.lg, paddingHorizontal: uiSpace.sm, gap: uiSpace.lg },
   header: { gap: uiSpace.lg, paddingTop: uiSpace.xs },
-  month: { gap: uiSpace.xs, paddingBottom: uiSpace.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: uiRoles.rule },
+  month: { gap: uiSpace.xs, paddingBottom: uiSpace.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: roles.rule },
   calendar: { position: 'relative', gap: uiSpace.xs },
-  weekSeparator: { position: 'absolute', top: 0, bottom: 0, right: '12.5%', width: uiBorder.width, backgroundColor: uiRoles.rule },
+  weekSeparator: { position: 'absolute', top: 0, bottom: 0, right: '12.5%', width: uiBorder.width, backgroundColor: roles.rule },
   row: { flexDirection: 'row', gap: uiSpace.xs, alignItems: 'center' },
   cells: { flex: 1, minWidth: 0, flexDirection: 'row' },
   labelSpacer: { width: ROW_LABEL_WIDTH },
@@ -120,6 +126,6 @@ const styles = StyleSheet.create({
   gridOverlay: { position: 'absolute', left: ROW_LABEL_GUTTER, right: 0, top: 0, bottom: 0 },
   blankTile: { flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget },
   column: { flex: 1, minWidth: 0, textAlign: 'center' },
-});
+}));
 
 export default DailyHeatmap;

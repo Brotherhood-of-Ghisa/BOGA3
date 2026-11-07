@@ -5,7 +5,7 @@
  * screens' own tests cover what each does with a pick.
  */
 
-import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, renderHook, screen, within } from '@testing-library/react-native';
 import { StyleSheet, Text, type StyleProp, type TextStyle } from 'react-native';
 
 import {
@@ -15,12 +15,16 @@ import {
   FilterChip,
   useFamilyExpansion,
 } from '@/components/exercise-catalog/exercise-list-controls';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui';
+import { uiFonts, uiTypography } from '@/components/ui';
 import {
   DEFAULT_EXERCISE_LIST_PREFERENCES,
   type ExerciseListItem,
   type ExerciseListSection,
 } from '@/src/exercise-catalog/list-model';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
 
 const item = (id: string, name: string, overrides: Partial<ExerciseListItem> = {}): ExerciseListItem =>
   ({
@@ -45,7 +49,7 @@ const expansion = (open: string[] = []): FamilyExpansion & { toggle: jest.Mock }
 
 const renderList = (props: Partial<Parameters<typeof ExerciseListContent>[0]> = {}) => {
   const handlers = { onPressExercise: jest.fn() };
-  render(
+  renderWithTheme(
     <ExerciseListContent
       emptyText="No exercises match that filter."
       familyExpansion={expansion(['Chest'])}
@@ -80,7 +84,7 @@ describe('ExerciseListContent rows', () => {
     expect(onPressExercise).toHaveBeenCalledWith(bench);
     const stats = screen.getAllByText('Never done')[0];
     expect(StyleSheet.flatten(stats.props.style).fontFamily).toBe(uiFonts.body.family);
-    expect(colorOf(stats)).toBe(uiRoles.ink);
+    expect(colorOf(stats)).toBe(themeRoles.ink);
   });
 
   it('marks a deleted exercise with a faint tag and faded text, never a warning hue', () => {
@@ -88,10 +92,10 @@ describe('ExerciseListContent rows', () => {
 
     const row = within(screen.getByLabelText('Select exercise Cable Fly'));
     expect(row.getByText('Deleted')).toBeTruthy();
-    expect(colorOf(row.getByText('Deleted'))).toBe(uiRoles.inkFaint);
-    expect(colorOf(row.getByText('Cable Fly'))).toBe(uiRoles.inkFaint);
+    expect(colorOf(row.getByText('Deleted'))).toBe(themeRoles.inkFaint);
+    expect(colorOf(row.getByText('Cable Fly'))).toBe(themeRoles.inkFaint);
     expect(colorOf(within(screen.getByLabelText('Select exercise Bench Press')).getByText('Bench Press'))).toBe(
-      uiRoles.ink,
+      themeRoles.ink,
     );
   });
 
@@ -153,7 +157,7 @@ describe('ExerciseListContent grouped', () => {
 
 describe('ExerciseListPreferenceControls', () => {
   it('lays Never-done, the host chips and Sort out in one row', () => {
-    render(
+    renderWithTheme(
       <ExerciseListPreferenceControls onChangePreferences={jest.fn()} preferences={DEFAULT_EXERCISE_LIST_PREFERENCES}>
         <Text testID="host-chip">Groups</Text>
       </ExerciseListPreferenceControls>,
@@ -170,7 +174,7 @@ describe('ExerciseListPreferenceControls', () => {
 
   it('Sort switches between the two orders; Never-done is a checkbox, ink while on', () => {
     const onChangePreferences = jest.fn();
-    const view = render(<ExerciseListPreferenceControls onChangePreferences={onChangePreferences} preferences={DEFAULT_EXERCISE_LIST_PREFERENCES} />);
+    const view = renderWithTheme(<ExerciseListPreferenceControls onChangePreferences={onChangePreferences} preferences={DEFAULT_EXERCISE_LIST_PREFERENCES} />);
 
     const sort = screen.getByLabelText('Sort: Favourite');
     expect(sort).toHaveProp('accessibilityRole', 'button');
@@ -183,7 +187,7 @@ describe('ExerciseListPreferenceControls', () => {
     const neverDone = screen.getByLabelText('Show never-done');
     expect(neverDone).toHaveProp('accessibilityState', { checked: true });
     expect(within(neverDone).getByText('Never-done')).toBeTruthy();
-    expect(StyleSheet.flatten(neverDone.props.style)).toMatchObject({ backgroundColor: uiRoles.ink });
+    expect(StyleSheet.flatten(neverDone.props.style)).toMatchObject({ backgroundColor: themeRoles.ink });
     fireEvent.press(neverDone);
     expect(onChangePreferences).toHaveBeenLastCalledWith({ showNeverDone: false });
 
@@ -192,7 +196,7 @@ describe('ExerciseListPreferenceControls', () => {
     expect(onChangePreferences).toHaveBeenLastCalledWith({ sort: 'favourite' });
     expect(screen.getByLabelText('Show never-done')).toHaveProp('accessibilityState', { checked: false });
     expect(StyleSheet.flatten(screen.getByLabelText('Show never-done').props.style)).toMatchObject({
-      backgroundColor: uiRoles.surface,
+      backgroundColor: themeRoles.surface,
     });
   });
 });
@@ -241,7 +245,7 @@ it('a search match can be collapsed and reopened from its family header', () => 
       sections={[{ familyName: 'Chest', count: 1, exercises: [bench] }]}
     />
   );
-  const view = render(<Harness searching />);
+  const view = renderWithTheme(<Harness searching />);
   expect(screen.getByLabelText('Select exercise Bench Press')).toBeTruthy();
 
   fireEvent.press(screen.getByTestId('exercise-family-group-chest'));
@@ -261,7 +265,7 @@ it('keeps empty families collapsed and disabled even when previously expanded', 
 it('replaces unknown history with loading or a retryable error, never Never done', () => {
   const onRetryHistory = jest.fn();
   const props = { items: [bench], sections: [{ familyName: 'Chest', count: 1, exercises: [bench] }], familyExpansion: expansion(['Chest']), emptyText: 'No matches', onPressExercise: jest.fn(), onRetryHistory };
-  const view = render(<ExerciseListContent {...props} historyStatus="loading" />);
+  const view = renderWithTheme(<ExerciseListContent {...props} historyStatus="loading" />);
   expect(screen.getByText('Loading exercise history…')).toBeTruthy();
   expect(screen.queryByText('Never done')).toBeNull();
   view.rerender(<ExerciseListContent {...props} historyStatus="error" />);
@@ -276,14 +280,14 @@ describe('text roles', () => {
   const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' };
   const META = { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, lineHeight: uiTypography.lineHeight.sm };
   const chip = (props: Partial<Parameters<typeof FilterChip>[0]>) =>
-    render(
+    renderWithTheme(
       <FilterChip accessibilityLabel="Chest" accessibilityRole="button" label="Chest" on={false} onPress={jest.fn()} testID="chip" {...props} />,
     );
 
   it.each([
-    ['a pill chip in ink', {}, uiRoles.ink],
-    ['a compact chip muted', { size: 'compact' as const }, uiRoles.inkMuted],
-    ['a selected chip in the surface colour on its ink pill', { on: true }, uiRoles.surface],
+    ['a pill chip in ink', {}, themeRoles.ink],
+    ['a compact chip muted', { size: 'compact' as const }, themeRoles.inkMuted],
+    ['a selected chip in the surface colour on its ink pill', { on: true }, themeRoles.surface],
   ])('labels %s', (_, props, color) => {
     chip(props);
     expect(styleOf(screen.getByText('Chest'))).toMatchObject({ ...LABEL, color });
@@ -297,22 +301,22 @@ describe('text roles', () => {
       fontFamily: uiFonts.display.family,
       fontWeight: '600',
       fontSize: uiTypography.size.lg,
-      color: uiRoles.ink,
+      color: themeRoles.ink,
     });
     const stats = row.getByText(/^Last:/);
-    expect(styleOf(stats)).toMatchObject({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.ink });
+    expect(styleOf(stats)).toMatchObject({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: themeRoles.ink });
     expect(styleOf(within(stats).getByText('12-10-2026'))).toMatchObject({ fontFamily: uiFonts.figure.family });
     for (const line of [MUSCLE_LINE, SECONDARY_LINE]) {
-      expect(styleOf(row.getByText(line))).toMatchObject({ ...META, color: uiRoles.inkMuted });
+      expect(styleOf(row.getByText(line))).toMatchObject({ ...META, color: themeRoles.inkMuted });
     }
   });
 
   it('fades every line of a deleted row', () => {
     renderList();
     const row = within(screen.getByLabelText('Select exercise Cable Fly'));
-    expect(styleOf(row.getByText('Cable Fly'))).toMatchObject({ fontWeight: '600', color: uiRoles.inkFaint });
-    expect(colorOf(row.getByText(MUSCLE_LINE))).toBe(uiRoles.inkFaint);
-    expect(colorOf(row.getByText('Never done'))).toBe(uiRoles.inkFaint);
+    expect(styleOf(row.getByText('Cable Fly'))).toMatchObject({ fontWeight: '600', color: themeRoles.inkFaint });
+    expect(colorOf(row.getByText(MUSCLE_LINE))).toBe(themeRoles.inkFaint);
+    expect(colorOf(row.getByText('Never done'))).toBe(themeRoles.inkFaint);
   });
 
   it('counts a family in the small figure, an empty one faint', () => {
@@ -323,7 +327,7 @@ describe('text roles', () => {
       ],
     });
     const small = { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.sm };
-    expect(styleOf(screen.getByText('2'))).toMatchObject({ ...small, color: uiRoles.inkMuted });
-    expect(styleOf(screen.getByText('0'))).toMatchObject({ ...small, color: uiRoles.inkFaint });
+    expect(styleOf(screen.getByText('2'))).toMatchObject({ ...small, color: themeRoles.inkMuted });
+    expect(styleOf(screen.getByText('0'))).toMatchObject({ ...small, color: themeRoles.inkFaint });
   });
 });

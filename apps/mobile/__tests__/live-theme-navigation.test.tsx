@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react-native';
 import { Text } from 'react-native';
 
-import { headerStyleOptions, useHeaderStyleOptions } from '@/components/navigation/header-style';
+import { useHeaderStyleOptions } from '@/components/navigation/header-style';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { navigationTheme, useNavigationTheme } from '@/components/navigation/navigation-theme';
 import { DEFAULT_APPEARANCE, type AppearanceChoice } from '@/components/ui/theme-presets';
@@ -41,9 +41,16 @@ describe('the navigation folder on a saved appearance', () => {
     expect(screen.getByTestId('probe')).toHaveTextContent(`${String(navigationTheme(roles, "dark").colors.background)}|${roles.ink}`);
   });
 
-  it('draws the header in the roles it is given', () => {
+  it('draws the header in the roles and text role in force', async () => {
+    function HeaderProbe() {
+      const header = useHeaderStyleOptions();
+      return <Text testID="header-probe">{JSON.stringify(header)}</Text>;
+    }
+    renderWithTheme(<HeaderProbe />);
+    await switchTheme(SLATE_DARK);
     const roles = rolesFor(SLATE_DARK);
-    expect(headerStyleOptions(roles)).toMatchObject({
+    const header = JSON.parse(String(screen.getByTestId('header-probe').props.children));
+    expect(header).toMatchObject({
       headerStyle: { backgroundColor: roles.paper },
       headerTintColor: roles.ink,
       headerTitleStyle: { color: roles.ink },

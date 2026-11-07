@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { Text, View } from 'react-native';
 
-import { CompactHeader, FigureText, Icon, ListRow, makeStyles, uiBorder, uiSpace, useTextRoles } from '@/components/ui';
+import { CompactHeader, FigureText, Icon, ListRow, makeStyles, uiBorder, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { GroupInlineError, GroupMissingDataState, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
 import { formatBoardMemberLabel } from '@/src/groups/board-view-model';
@@ -17,7 +17,8 @@ import type { ExerciseDateFormat } from '@/src/preferences/model';
 /** Rank-one identity survives figure redaction; never promote a visible runner-up. */
 function WinnerRows({ result }: { result: CoWResultWire }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   if (result.cow.state !== 'final' || result.state !== 'ready') {
     return <Text allowFontScaling={false} style={text.meta}>{coWStatus(result.cow, result.state)}</Text>;
   }
@@ -77,7 +78,8 @@ export function TodayCoWSummarySection({ resource, previous, dateFormat, onOpen,
 
 function SummaryResult({ result, previous, prefix }: { result: CoWResultWire; previous: boolean; prefix: string }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const exercise = result.exercise?.name ?? 'Exercise unavailable';
   const metrics = result.cow.metrics.map(metric => COW_METRIC_LABELS[metric]).join(' · ');
   return <>

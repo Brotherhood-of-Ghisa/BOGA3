@@ -13,7 +13,7 @@ import {
   ScreenScroll,
   StatePanel,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import {
   DEFAULT_SESSION_ENTRY_COORDINATOR,
@@ -128,7 +128,8 @@ export function TrainScreen({
   sessionEntry = DEFAULT_SESSION_ENTRY_COORDINATOR,
   renderWorkout = renderSessionView,
 }: TrainScreenProps) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const insets = useSafeAreaInsets();
   const launchInFlightRef = useRef(false);
   const [launchError, setLaunchError] = useState<{
@@ -252,7 +253,8 @@ function TrainPlanning({
   onStart: (materialize: PlannedSessionMaterializer) => void;
   planningState: TrainPlanningState;
 }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   if (planningState.status === 'unavailable' || planningState.status === 'loading') {
     return null;
   }

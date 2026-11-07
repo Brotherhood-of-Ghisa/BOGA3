@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { useTextRoles } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import {
@@ -26,7 +26,8 @@ const OVERFLOW_TABS = MAIN_TAB_DEFINITIONS.filter((tab) => tab.presentation === 
  */
 export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const tabProps = (tab: MainTabDefinition) => {
     const active = activeTab === tab.key;
     return {

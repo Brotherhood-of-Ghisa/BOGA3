@@ -16,7 +16,7 @@ import {
   ScreenScroll,
   Tag,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -261,7 +261,8 @@ function ExerciseShareCard({
   muscleLookup: Map<string, string>;
   payload: ExerciseSharePayload;
 }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const primaryMuscles = payload.mappings
     .filter((m) => m.role === 'primary' || !m.role)
     .map((m) => muscleLookup.get(m.muscleGroupId) ?? m.muscleGroupId);

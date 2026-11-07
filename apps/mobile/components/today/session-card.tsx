@@ -12,7 +12,7 @@ import {
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
-import { uiTextEmphasis, useTextRoles } from '@/components/ui/text-roles';
+import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
@@ -42,7 +42,8 @@ const ROW_HEIGHT = 32;
 
 function ExerciseRow({ line, index }: { line: SessionExerciseLine; index: number }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const testID = `today-latest-session-exercise-${index}`;
   return (
     <View style={[styles.row, styles.exerciseRow]} testID={testID}>
@@ -67,7 +68,8 @@ function ExerciseRow({ line, index }: { line: SessionExerciseLine; index: number
 }
 
 function SummaryLine({ session }: { session: LatestSessionSummary }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const gym = session.gymName?.trim();
   const prs = session.records.length;
   // The rows' count (one per exercise, however often it was logged), so the line and the table agree.
@@ -138,7 +140,8 @@ function useRowScroller(rowCount: number) {
 // row, so the table is hidden from assistive tech.
 function ExerciseTable({ lines, onOpen }: { lines: SessionExerciseLine[]; onOpen: () => void }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const { scroller, overflows, onScroll, onLayout, onUp, onDown } = useRowScroller(lines.length);
   if (lines.length === 0) return null;
   const rows = lines.map((line, index) => <ExerciseRow index={index} key={`${index}:${line.name}`} line={line} />);
@@ -192,7 +195,8 @@ export function TodaySessionCard({
   onShowSession,
 }: TodaySessionCardProps) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const stamp = (
     // The start reads as a Sessions row's does: the whole stamp, month included, in the figure face.
     <Text allowFontScaling={false} numberOfLines={1} style={text.body} testID="today-latest-session-start">

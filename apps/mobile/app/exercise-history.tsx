@@ -28,7 +28,7 @@ import {
   uiBorder,
   uiSpace,
   uiTextEmphasis,
-  useTextRoles,
+  useUiText, useUiTextTone,
   makeStyles,
   FigureText,
   type ChipOption,
@@ -250,7 +250,7 @@ function HistorySessionCards({ summary, historyStart, onPressSession }: {
   onPressSession: (sessionId: string) => void;
 }) {
   const styles = useStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   const firstOlder = historyStart ? summary.sessions.findIndex(entry => entry.completedAt < historyStart) : -1;
   return summary.sessions.map((entry, index) => (
     <Fragment key={entry.sessionExerciseId}>
@@ -279,7 +279,8 @@ function BestCard({
   onPressSession: (sessionId: string) => void;
 }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const dateFormat = useDateFormat();
   const oneRm = best.estimatedOneRepMax;
   const topWeight = best.topWeight;
@@ -323,7 +324,8 @@ function BestRow({
   onPress?: () => void;
 }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <ListRow
       accessibilityHint={onPress ? 'Opens the session' : undefined}
@@ -362,7 +364,7 @@ function SessionCard({
   onPress: () => void;
 }) {
   const styles = useStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   const dateFormat = useDateFormat();
   const date = formatLocalDateTime(entry.completedAt.getTime(), dateFormat);
   const tags = entry.tagIds

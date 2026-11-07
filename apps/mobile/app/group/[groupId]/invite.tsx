@@ -14,7 +14,7 @@ import {
   Card,
   ScreenScroll,
   uiSpace,
-  useTextRoles,
+  useUiText,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -57,7 +57,7 @@ export default function GroupInviteRoute() {
 type Feedback = { tone: 'error' | 'success'; message: string };
 
 function GroupInviteContent({ userId, groupId }: { userId: string; groupId: string }) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({
     userId,

@@ -1,6 +1,5 @@
 import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import { Icon } from '@/components/ui/icon';
-import { uiRoles } from '@/components/ui/tokens';
 
 export type SecondarySetsChipProps = {
   /** Whether secondary sets count ([[muscle.secondary-filter]]). */
@@ -24,7 +23,7 @@ export function SecondarySetsChip({ value, onChange, testID, metric = 'workingSe
       accessibilityRole="switch"
       accessibilityState={{ checked: !value }}
       label={value ? 'Sec' : 'Pri'}
-      leading={<Icon color={uiRoles.inkMuted} name={value ? 'role-secondary' : 'role-primary'} size="xs" />}
+      leading={<Icon colorRole="inkMuted" name={value ? 'role-secondary' : 'role-primary'} size="xs" />}
       on={false}
       onPress={() => onChange(!value)}
       size="compact"

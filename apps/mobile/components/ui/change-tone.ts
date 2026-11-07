@@ -15,9 +15,9 @@ export type ChangeTone = 'positive' | 'negative' | 'neutral' | 'new';
 /**
  * A change's ink in `roles`. Colour is never the only channel: the figure
  * carries its sign (`+3`, `−12%`, or a plain `0`) whatever this returns, so the
- * direction still reads without hue.
+ * direction still reads without hue. A live component passes `useUiRoles()`.
  */
-export const changeToneInk = (roles: UiRoles, tone: ChangeTone): string => {
+export const changeToneColourIn = (roles: UiRoles, tone: ChangeTone): string => {
   switch (tone) {
     case 'positive':
     case 'new':
@@ -29,5 +29,5 @@ export const changeToneInk = (roles: UiRoles, tone: ChangeTone): string => {
   }
 };
 
-/** A change's ink as this launch drew it; a module not yet migrated reads this. */
-export const changeToneColour = (tone: ChangeTone): string => changeToneInk(uiRoles, tone);
+/** A change's ink in the launch roles; only a file still to migrate reads this. */
+export const changeToneColour = (tone: ChangeTone): string => changeToneColourIn(uiRoles, tone);

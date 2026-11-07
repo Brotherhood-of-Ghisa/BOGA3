@@ -5,7 +5,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiTextEmphasis, useTextRoles } from '@/components/ui/text-roles';
+import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
 import {
@@ -41,7 +41,8 @@ export type TodayGroupCardProps = {
 
 function SessionRow({ row, onPress }: { row: GroupSessionRowViewModel; onPress: () => void }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const testID = `today-group-session-${row.sessionId}`;
   const { record } = row;
   return (
@@ -95,7 +96,8 @@ function SessionsSection({ title, rows, onOpenSession, testID }: {
   testID: string;
 }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   if (rows.length === 0) return null;
   return (
     <View testID={testID}>
@@ -127,7 +129,7 @@ export function TodayGroupCard({
   loadStreamPage,
 }: TodayGroupCardProps) {
   const styles = useStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   const board = buildWeekBoard(summary.members, myUserId);
   const range = formatPeriodRange(localWeekWindow(new Date(nowMs)));
   // The week summary carries one completed session; the stream fills the rest.

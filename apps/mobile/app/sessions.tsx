@@ -27,7 +27,7 @@ import {
   Sheet,
   SwitchRow,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 
@@ -51,7 +51,8 @@ export function SessionsScreen({
   jumpTo = null,
 }: SessionsScreenProps) {
   const router = useRouter();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [showCompletedPlans, setShowCompletedPlans] = useState(false);
   const [showDeletedSessions, setShowDeletedSessions] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);

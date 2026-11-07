@@ -16,7 +16,7 @@ import {
   FigureText,
   ScreenScroll,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -47,7 +47,8 @@ export default function JoinGroupRoute() {
 }
 
 function JoinGroupContent({ userId, initialCode }: { userId: string; initialCode: string }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const router = useRouter();
   const gate = useUsernameGate(userId);
   const [code, setCode] = useState(initialCode);

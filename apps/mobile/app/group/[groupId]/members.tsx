@@ -16,7 +16,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { ActionButton, Card, useTextRoles } from '@/components/ui';
+import { ActionButton, Card, useUiText, useUiTextTone } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   OWNER_LEAVE_NOTICE,
@@ -88,7 +88,8 @@ function LostAccessState() {
 
 function GroupMembersContent({ userId, groupId }: { userId: string; groupId: string }) {
   const router = useRouter();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({
     userId,

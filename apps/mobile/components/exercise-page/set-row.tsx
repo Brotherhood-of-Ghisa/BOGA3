@@ -4,7 +4,7 @@ import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calc
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Stat } from '@/components/ui/stat';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import {
   formatEffort,
@@ -38,6 +38,8 @@ const describeValues = (row: SetRowView) =>
  * one in the shell); `onDrop` is its accessibility action.
  */
 export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const performed = row.kind === 'performed';
   const values = describeValues(row);
   const effort = formatEffort(row.setType);
@@ -50,7 +52,7 @@ export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) 
       density="list"
       divider={divider}
       leading={
-        <Text allowFontScaling={false} style={[uiText.label, performed ? uiTextTone.ink : uiTextTone.faint, styles.type]}>
+        <Text allowFontScaling={false} style={[text.label, performed ? tone.ink : tone.faint, styles.type]}>
           {effort}
         </Text>
       }
@@ -104,8 +106,8 @@ export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) 
           allowFontScaling={false}
           numberOfLines={1}
           style={[
-            uiText.figure,
-            performed ? (row.weightRecord ? uiTextTone.record : null) : uiTextTone.faint,
+            text.figure,
+            performed ? (row.weightRecord ? tone.record : null) : tone.faint,
           ]}
           testID={`exercise-set-${row.number}-values`}>
           {row.weight === null && row.reps === null

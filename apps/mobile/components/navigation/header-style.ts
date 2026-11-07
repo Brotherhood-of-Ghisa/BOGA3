@@ -2,14 +2,13 @@ import { useMemo } from 'react';
 
 import type { UiRoles } from '@/components/ui/theme';
 import { useUiRoles } from '@/components/ui/theme-context';
-import { textRolesFor } from '@/components/ui/text-roles';
+import { useUiText } from '@/components/ui/text-roles';
 
 /**
  * One header style on every header (`navigation-contract.md` "Header
  * titles"): the root stack's, and the Groups tab's in the tab layout.
  */
-export function headerStyleOptions(roles: UiRoles) {
-  const { title } = textRolesFor(roles).text;
+export function headerStyleOptions(roles: UiRoles, title: ReturnType<typeof useUiText>['title']) {
   return {
     // The page's own `paper` ground with no shadow line, so header and
     // page read as one surface, the `title` role, an `ink` back arrow. The header
@@ -29,5 +28,6 @@ export function headerStyleOptions(roles: UiRoles) {
 // The header style in the roles the app is drawn in now.
 export function useHeaderStyleOptions() {
   const roles = useUiRoles();
-  return useMemo(() => headerStyleOptions(roles), [roles]);
+  const { title } = useUiText();
+  return useMemo(() => headerStyleOptions(roles, title), [roles, title]);
 }

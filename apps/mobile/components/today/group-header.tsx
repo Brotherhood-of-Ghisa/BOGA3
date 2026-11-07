@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { GroupSwitchSheet } from '@/components/groups/group-switch-sheet';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { useTextRoles } from '@/components/ui/text-roles';
+import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
@@ -26,7 +26,7 @@ export type TodayGroupHeaderProps = {
  */
 export function TodayGroupHeader({ groupName, onOpenHome, groups, selectedGroupId, onSelectGroup }: TodayGroupHeaderProps) {
   const styles = useStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   return (
     <View style={styles.header}>
       <Pressable

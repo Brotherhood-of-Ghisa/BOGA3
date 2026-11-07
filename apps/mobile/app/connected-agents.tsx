@@ -14,7 +14,7 @@ import {
   SwitchRow,
   Tag,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -53,7 +53,8 @@ function ConnectedAgentCard({
   savingAccess,
   savingEdit,
 }: ConnectedAgentCardProps) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const dateFormat = useDateFormat();
   const isAccessUnavailable = agent.planAccessEnabled === 'unavailable';
   const isEditUnavailable = agent.planEditEnabled === 'unavailable';

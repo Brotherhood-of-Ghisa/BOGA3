@@ -4,7 +4,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { useTextRoles } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatWholeSetCount, formatWorkingSetCount } from '@/src/exercise-calculations/format';
@@ -64,7 +64,8 @@ function RecoveryDayColumn({ children, weekStart = false, heading = false }: { c
 
 function DayCell({ count, weekStart, testID }: { count: number | null; weekStart: boolean; testID: string }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <RecoveryDayColumn weekStart={weekStart}>
       <View style={[styles.dayCell, count === null ? styles.dayCellRest : styles.dayCellTrained]} testID={testID}>
@@ -78,7 +79,8 @@ function DayCell({ count, weekStart, testID }: { count: number | null; weekStart
 
 function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: RecoveryRow; days: Date[]; weekStartIndex: number; onPress: () => void }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const testID = `today-plan-muscle-${row.muscleGroupId}`;
   const met = row.weekSets >= row.target;
   return (
@@ -112,7 +114,8 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
 // The first rows show and the rest scroll, with no indicator over the targets.
 function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCardsProps, 'onOpenPlan' | 'onOpenSessions'>) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const label = [text.label, tone.faint];
   const weekStart = localWeekWindow(plan.today).start;
   const firstCurrentDay = [...plan.recoveryDays, plan.today].findIndex((day) => day >= weekStart);
@@ -158,7 +161,8 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
 function WeekDayCell({ day }: { day: PlanWeekDay }) {
   const styles = useStyles();
   const markStyles = useMarkStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const state = day.trained ? 'trained' : day.planned ? 'planned' : 'nothing';
   const spoken = `${spokenDate(day.date)}${day.isToday ? ', today' : ''}: ${day.trained ? 'trained' : day.planned ? 'planned' : 'nothing'}`;
   return (
@@ -179,7 +183,7 @@ const plannedDay = (session: NextPlannedSession, now: Date) =>
 
 function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; now: Date; onPress: () => void }) {
   const styles = useStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   const testID = `today-plan-next-${session.planId}`;
   const day = plannedDay(session, now);
   const time = formatClockTime(session.scheduledFor.getTime());
@@ -222,7 +226,8 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
   onOpenSessions: () => void;
 }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <Card style={styles.card} testID="today-plan-week-card">
       <View style={styles.header}>

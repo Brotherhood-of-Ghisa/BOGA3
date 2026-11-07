@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text } from 'react-native';
 
-import { makeStyles, Screen, textRolesFor, uiSpace, useUiRoles } from '@/components/ui';
+import { makeStyles, Screen, uiSpace, useUiRoles, useUiText } from '@/components/ui';
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
@@ -33,6 +33,7 @@ const HARNESS_NOT_ALLOWED: HarnessStatus = {
 
 export default function MaestroHarnessScreen() {
   const styles = useStyles();
+  const text = useUiText();
   const roles = useUiRoles();
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -189,7 +190,7 @@ export default function MaestroHarnessScreen() {
   return (
     <Screen style={styles.screen} testID="maestro-harness-screen">
       {shownStatus.kind === 'running' ? <ActivityIndicator color={roles.inkMuted} size="small" /> : null}
-      <Text allowFontScaling={false} selectable style={[styles.message, shownStatus.kind === 'error' ? styles.errorMessage : null]} testID="maestro-harness-status">
+      <Text allowFontScaling={false} selectable style={[text.body, styles.message, shownStatus.kind === 'error' ? styles.errorMessage : null]} testID="maestro-harness-status">
         {shownStatus.message}
       </Text>
     </Screen>
@@ -204,7 +205,6 @@ const useStyles = makeStyles((roles) => ({
     paddingHorizontal: uiSpace.xl,
   },
   message: {
-    ...textRolesFor(roles).text.body,
     textAlign: 'center',
   },
   errorMessage: {

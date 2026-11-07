@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { FigureText } from '@/components/ui/figure-text';
-import { useTextRoles } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import type { UiRoles } from '@/components/ui/theme';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
 import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
@@ -58,7 +58,8 @@ type FigureProps = {
 export function WeekFigure({ label, current, previous, record = false, previousWeek = LAST_WEEK, testID,
   metric = 'workingSetCount', onToggleMetric }: FigureProps) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const showRecord = record && current !== null && current > 0;
   const currentText = formatPaceValue(current, metric);
   const previousText = formatPaceValue(previous, metric);
@@ -102,7 +103,8 @@ export function WeekFigure({ label, current, previous, record = false, previousW
 // one says little.
 export function WeekFigures({ week, metric, onToggleMetric }: { week: TodayProgressWeek; metric: ProgressMetric; onToggleMetric: () => void }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.block} testID="today-progress-week">
       <View style={styles.heading}>

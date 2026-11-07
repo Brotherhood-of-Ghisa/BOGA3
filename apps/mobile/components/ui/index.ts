@@ -9,7 +9,7 @@ export { Card } from '@/components/ui/card';
 export { SummaryTile } from '@/components/ui/summary-tile';
 export { CompactCard, CompactHeader } from '@/components/ui/compact-card';
 export { ListCard, ListCardHeader } from '@/components/ui/list-card';
-export { changeToneColour, changeToneInk, type ChangeTone } from '@/components/ui/change-tone';
+export { changeToneColour, changeToneColourIn, type ChangeTone } from '@/components/ui/change-tone';
 export {
   ChipGroup,
   type ChipGroupProps,
@@ -86,7 +86,7 @@ export {
   type StatePanelProps,
 } from '@/components/ui/state-panel';
 export { Tag, type TagProps, type TagTone } from '@/components/ui/tag';
-export { textRolesFor, uiText, uiTextEmphasis, uiTextTone, useTextRoles, type TextRoles } from '@/components/ui/text-roles';
+export { uiText, uiTextEmphasis, uiTextTone, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 export { AppThemeProvider, makeStyles, useUiMode, useUiRoles, type AppTheme } from '@/components/ui/theme-context';
 export {
   ToggleChip,

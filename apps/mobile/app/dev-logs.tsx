@@ -12,9 +12,8 @@ import {
   makeStyles,
   uiBorder,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
   type ChipOption,
-  type TextRoles,
 } from '@/components/ui';
 import {
   clearRecentLogs,
@@ -41,7 +40,7 @@ const LEVEL_TONE = {
   warn: 'ink',
   info: 'muted',
   debug: 'faint',
-} as const satisfies Record<LogLevel, keyof TextRoles['tone']>;
+} as const satisfies Record<LogLevel, keyof ReturnType<typeof useUiTextTone>>;
 
 const formatTime = (iso: string): string => {
   const date = new Date(iso);
@@ -50,7 +49,8 @@ const formatTime = (iso: string): string => {
 
 function LogRow({ record, divider }: { record: LogRecord; divider: boolean }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [expanded, setExpanded] = useState(false);
   const hasContext = record.context != null && Object.keys(record.context).length > 0;
 

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
-import { Card, ListCard, ListCardHeader, ListRow, makeStyles, uiGeometry, uiSpace, useTextRoles } from '@/components/ui';
+import { Card, ListCard, ListCardHeader, ListRow, makeStyles, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { statsTableColumnWidth } from '@/components/stats/stats-table';
 import type { WeekBoardRowViewModel, WeekBoardViewModel } from '@/src/groups';
 
@@ -8,7 +8,8 @@ type BoardColumns = { rank: number; sets: number; prs: number };
 
 function BoardFigure({ value, record = false, testID, width }: { value: number; record?: boolean; testID: string; width: number }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return <Text allowFontScaling={false} style={[text.figure, styles.figure, { width }, record && value > 0 ? tone.record : null]} testID={testID}>{value}</Text>;
 }
 
@@ -22,7 +23,8 @@ function RowFigures({ sets, prs, columns, testID }: { sets: number; prs: number;
 
 function BoardRow({ row, columns }: { row: WeekBoardRowViewModel; columns: BoardColumns }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const testID = `today-group-board-row-${row.userId}`;
   return <ListRow density="compact" own={row.isMe} testID={testID}
     leading={<Text allowFontScaling={false} style={[text.figure, tone.muted, { width: columns.rank }]} testID={`${testID}-rank`}>{row.rank}</Text>}
@@ -47,7 +49,8 @@ export function TodayWeekBoardCard({ board, range, onOpenGroup, header, challeng
   board: WeekBoardViewModel; range: string; onOpenGroup: () => void; header: ReactNode; challenges: ReactNode;
 }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const all = [...board.rows, ...(board.me ? [board.me] : [])];
   const columns = {
     rank: Math.max(22, statsTableColumnWidth('', [board.me?.rankLabel ?? ''])),

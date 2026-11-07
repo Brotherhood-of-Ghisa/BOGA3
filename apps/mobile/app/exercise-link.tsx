@@ -21,7 +21,7 @@ import {
   ScreenScroll,
   SearchField,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { linkExercise } from '@/src/data/exercise-group-links';
@@ -61,7 +61,8 @@ export default function ExerciseLinkRoute() {
 type LinkNotice = { tone: 'success' | 'error'; text: string };
 
 function ExerciseLinkContent({ userId }: { userId: string }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const params = useLocalSearchParams<{ exerciseDefinitionId?: string | string[] }>();
   const exerciseDefinitionId = coerceParam(params.exerciseDefinitionId);
   const catalog = useExerciseCatalog();
@@ -289,7 +290,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   return (
     <View style={styles.section}>
       <Text allowFontScaling={false} accessibilityRole="header" style={text.label}>
@@ -302,7 +303,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 /** A row's words: the name (· group), then any status lines in `ink-muted`. */
 function RowText({ name, groupName, lines }: { name: string; groupName?: string; lines: (string | null | undefined)[] }) {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.rowText}>
       <Text allowFontScaling={false} style={text.bodyStrong}>

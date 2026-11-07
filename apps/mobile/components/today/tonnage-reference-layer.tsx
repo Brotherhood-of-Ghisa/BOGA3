@@ -1,6 +1,6 @@
 import { G, Line, Path, Rect, Text } from 'react-native-svg';
 
-import { useTextRoles } from '@/components/ui/text-roles';
+import { useUiText } from '@/components/ui/text-roles';
 import { useUiRoles } from '@/components/ui/theme-context';
 
 import {
@@ -11,7 +11,7 @@ import {
 /** Passive annotation variant of PeriodPace; the chart speaks for all glyphs. */
 export function TonnageReferenceLayer({ annotations, width }: { annotations: TonnageAnnotation[]; width: number }) {
   const roles = useUiRoles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   return (
     <G pointerEvents="none" testID="today-tonnage-references">
       {annotations.map(reference => (

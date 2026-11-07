@@ -2,7 +2,7 @@ import { GroupsSignInRequired } from '@/components/groups/sign-in-required';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, findNodeHandle, Keyboard, Pressable, Text, View, type ViewInstance } from 'react-native';
-import { ActionButton, ChoiceRow, FigureText, FormSection, Icon, ScreenScroll, makeStyles, uiBorder, uiGeometry, uiSpace, useTextRoles } from '@/components/ui';
+import { ActionButton, ChoiceRow, FigureText, FormSection, Icon, ScreenScroll, makeStyles, uiBorder, uiGeometry, uiSpace, useUiText } from '@/components/ui';
 import { GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupWriteNotice } from '@/components/groups/write-notice';
 import { CoWExercisePicker } from '@/components/groups/cow-exercise-picker';
@@ -50,7 +50,7 @@ function CoWEditorFields({ model, groupId, editing, picker, setPicker, onSave, o
 }) {
   const router = useRouter();
   const styles = useStyles();
-  const { text } = useTextRoles();
+  const text = useUiText();
   const dateFormat = useDateFormat();
   const launcher = useRef<ViewInstance>(null);
   const metricsLauncher = useRef<ViewInstance>(null);

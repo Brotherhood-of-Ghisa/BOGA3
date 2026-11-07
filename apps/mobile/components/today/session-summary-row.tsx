@@ -3,7 +3,7 @@ import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-nat
 
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
-import { uiTextEmphasis, useTextRoles } from '@/components/ui/text-roles';
+import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import type { SessionRecordLine } from '@/src/session-insights/record-line';
@@ -40,7 +40,8 @@ export function TrainingNowMark({ children }: { children: ReactNode }) {
 
 function RecordLine({ line, testID }: { line: SessionRecordLine; testID: string }) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.recordLine} testID={`${testID}-record`}>
       <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.meta, styles.recordText]}>
@@ -71,7 +72,8 @@ export function SessionSummaryRow({
   style,
 }: SessionSummaryRowProps) {
   const styles = useStyles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const gymName = gym?.trim();
   return (
     <Pressable

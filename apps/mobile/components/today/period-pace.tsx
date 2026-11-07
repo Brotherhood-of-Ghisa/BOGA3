@@ -9,9 +9,9 @@ import {
 } from 'react-native';
 import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
-import { changeToneInk } from '@/components/ui/change-tone';
+import { changeToneColourIn } from '@/components/ui/change-tone';
 import { FigureText } from '@/components/ui/figure-text';
-import { useTextRoles } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressPeriod } from '@/src/progress-summary';
@@ -137,7 +137,8 @@ export function PeriodPace({
 }) {
   const styles = useStyles();
   const roles = useUiRoles();
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [size, setSize] = useState({ width: FALLBACK_CHART_WIDTH, height: CHART_HEIGHT });
   // The selected day belongs to the period it was picked in; another period
   // (a new day, a changed Progress period) starts again at today.
@@ -236,7 +237,7 @@ export function PeriodPace({
             {/* The difference takes its direction's colour, like every other
                 change figure (`design-language.md` §6). */}
             <Text allowFontScaling={false} testID="today-progress-period-difference"
-              style={[text.figureLarge, { color: changeToneInk(roles, delta.tone) }]}>
+              style={[text.figureLarge, { color: changeToneColourIn(roles, delta.tone) }]}>
               {delta.text}
             </Text>
           </View>

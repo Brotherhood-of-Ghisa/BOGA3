@@ -15,7 +15,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { and, eq, isNull } from 'drizzle-orm';
 import { Alert, Keyboard, Platform, ScrollView, StyleSheet, type ViewStyle } from 'react-native';
 
@@ -64,7 +64,7 @@ jest.mock('expo-router', () => ({
 import ExerciseCatalogScreen from '../app/exercise-catalog';
 import { ensureExerciseCatalogLoaded } from '@/src/exercise-catalog/cache';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
-import { Sheet, uiRoles } from '@/components/ui';
+import { Sheet } from '@/components/ui';
 import {
   __resetBodyweightCalculationPreferenceForTests,
   setBodyweightCalculationsEnabled,
@@ -90,6 +90,10 @@ import {
   WithExerciseEditorPage,
 } from './helpers/exercise-editor-page';
 import { readExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
 
 type TestNode = typeof screen.UNSAFE_root;
 
@@ -99,7 +103,7 @@ const accentGrounds = (root: TestNode = screen.UNSAFE_root) =>
     .findAll((node: TestNode) => typeof node.type === 'string')
     .filter(
       (node: TestNode) =>
-        (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === uiRoles.accent
+        (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === themeRoles.accent
     );
 
 const openCatalog = async ({
@@ -114,7 +118,7 @@ const openCatalog = async ({
     prepare();
   }
   await bootLocalApp();
-  render(<WithExerciseEditorPage><ExerciseCatalogScreen /></WithExerciseEditorPage>);
+  renderWithTheme(<WithExerciseEditorPage><ExerciseCatalogScreen /></WithExerciseEditorPage>);
   await screen.findByLabelText('Create new exercise');
   // Past the search debounce the screen arms at mount (150 ms), inside act.
   await act(async () => {
@@ -713,8 +717,8 @@ describe('ExerciseCatalogScreen', () => {
       expect(screen.getByTestId('exercise-action-edit')).toBeTruthy();
       expect(screen.getByTestId('exercise-action-duplicate')).toBeTruthy();
       expect(screen.getByTestId('exercise-action-delete')).toBeTruthy();
-      expect(screen.getByText('Delete')).toHaveStyle({ color: uiRoles.danger });
-      expect(screen.getByText('Merge into…')).toHaveStyle({ color: uiRoles.danger });
+      expect(screen.getByText('Delete')).toHaveStyle({ color: themeRoles.danger });
+      expect(screen.getByText('Merge into…')).toHaveStyle({ color: themeRoles.danger });
       const rows = within(screen.getByTestId('exercise-catalog-actions-sheet')).getAllByRole('button');
       const mergeIndex = rows.findIndex(row => row.props.testID === 'exercise-action-merge');
       expect(rows[mergeIndex + 1].props.testID).toBe('exercise-action-delete');

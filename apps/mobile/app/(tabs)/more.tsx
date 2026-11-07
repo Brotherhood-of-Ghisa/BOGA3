@@ -10,7 +10,7 @@ import {
   ListRow,
   ScreenScroll,
   uiSpace,
-  useTextRoles,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { MORE_GROUPS, type MoreDestination } from '@/src/navigation/more-destinations';
@@ -18,7 +18,8 @@ import { getAgentConnectUrl } from '@/src/utils/agent-connect';
 
 // Like the other tabs, More has no title: two untitled cards of destinations.
 export default function MoreScreen() {
-  const { text, tone } = useTextRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const router = useRouter();
   const { user } = useAuth();
   const agentNames = useConnectedAgentNames(user?.id ?? null);

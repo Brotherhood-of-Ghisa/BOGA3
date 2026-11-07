@@ -1,13 +1,17 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 
 import { TimelineHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { Text } from 'react-native';
 import { Path } from 'react-native-svg';
 
 import { MIN_TIMELINE_COLUMN_WIDTH } from '@/components/heatmaps/timeline';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui';
+import { uiFonts, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const TODAY = '2026-10-07';
 const ID = 'history-timeline';
@@ -38,19 +42,19 @@ const chart = ({ metric = 'totalVolume', weeks = 4, selectedWeekKey = null, onSe
 </TimelineHeatmap>;
 
 it('draws a zero-based column per trained week on a y scale with no unit label over it', () => {
-  render(chart());
+  renderWithTheme(chart());
   expect(screen.getByTestId(`${ID}-bar-2026-09-14`)).toBeTruthy();
   expect(screen.getByTestId(`${ID}-bar-2026-09-28`)).toBeTruthy();
   expect(screen.queryByTestId(`${ID}-bar-2026-09-21`)).toBeNull();
   // The newest week is the focused one until another is selected.
-  expect(barFill(`${ID}-bar-2026-10-05`)).toBe(uiRoles.ink);
+  expect(barFill(`${ID}-bar-2026-10-05`)).toBe(roles.ink);
   expect(hidden(`${ID}-tick-0`)).toHaveTextContent('0');
   expect(hidden(`${ID}-tick-400`)).toHaveTextContent('400');
   expect(screen.queryByTestId(`${ID}-unit`, { includeHiddenElements: true })).toBeNull();
 });
 
 it('draws 1RM as columns too, its whole ticks without a decimal', () => {
-  const { rerender } = render(chart({ metric: 'estimatedRM1', days: [day('2026-10-05', { estimatedRM1: 9 })] }));
+  const { rerender } = renderWithTheme(chart({ metric: 'estimatedRM1', days: [day('2026-10-05', { estimatedRM1: 9 })] }));
   expect(hidden(`${ID}-tick-2.5`)).toHaveTextContent('2.5');
   expect(hidden(`${ID}-tick-5`)).toHaveTextContent('5');
   rerender(chart({ metric: 'estimatedRM1' }));
@@ -59,13 +63,13 @@ it('draws 1RM as columns too, its whole ticks without a decimal', () => {
 });
 
 it('fills the selected column in ink, so a full column still shows it', () => {
-  render(chart({ selectedWeekKey: '2026-09-14' }));
-  expect(barFill(`${ID}-bar-2026-09-14`)).toBe(uiRoles.ink);
-  expect(barFill(`${ID}-bar-2026-09-28`)).toBe(uiRoles.viz4);
+  renderWithTheme(chart({ selectedWeekKey: '2026-09-14' }));
+  expect(barFill(`${ID}-bar-2026-09-14`)).toBe(roles.ink);
+  expect(barFill(`${ID}-bar-2026-09-28`)).toBe(roles.viz4);
 });
 
 it('marks the week it reads out, selected or not, so the two never disagree', () => {
-  const { rerender } = render(chart());
+  const { rerender } = renderWithTheme(chart());
   expect(hidden(`${ID}-readout-week`)).toHaveTextContent('5–11 Oct 2026');
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('100 volume');
   // The readout names the week alone: the current week takes no note.
@@ -80,14 +84,14 @@ it('marks the week it reads out, selected or not, so the two never disagree', ()
 });
 
 it('draws the focused week as the readout\'s heading, in the display face', () => {
-  render(chart());
+  renderWithTheme(chart());
   expect(hidden(`${ID}-readout-week`)).toHaveStyle({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg });
 });
 
 it('steps to the previous and next week with the readout\'s arrows, stopping at the window\'s ends', () => {
   const onSelectWeek = jest.fn();
   // Opens on the newest week: there is no next one.
-  const { rerender } = render(chart({ onSelectWeek }));
+  const { rerender } = renderWithTheme(chart({ onSelectWeek }));
   expect(screen.getByTestId(`${ID}-next-week`)).toBeDisabled();
   expect(screen.getByTestId(`${ID}-previous-week`)).toBeEnabled();
   fireEvent.press(screen.getByTestId(`${ID}-previous-week`));
@@ -105,7 +109,7 @@ it('steps to the previous and next week with the readout\'s arrows, stopping at 
 });
 
 it('reads a rest week as zero for a sum and as no sets for a best', () => {
-  const { rerender } = render(chart({ selectedWeekKey: '2026-09-21' }));
+  const { rerender } = renderWithTheme(chart({ selectedWeekKey: '2026-09-21' }));
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('0 volume');
   expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 21-09-2026 – 27-09-2026, Volume 0' });
 
@@ -115,30 +119,30 @@ it('reads a rest week as zero for a sum and as no sets for a best', () => {
 });
 
 it('speaks a unit that differs from the metric', () => {
-  render(chart({ metric: 'estimatedRM1' }));
+  renderWithTheme(chart({ metric: 'estimatedRM1' }));
   expect(screen.getByTestId(`${ID}-plot`)).toHaveProp('accessibilityValue', { text: 'Week of 05-10-2026 – 11-10-2026, 1RM 80.0 kg, Current week' });
 });
 
 it('reads an unavailable week as unavailable', () => {
-  render(chart({ days: [day('2026-10-05', { totalVolume: null })] }));
+  renderWithTheme(chart({ days: [day('2026-10-05', { totalVolume: null })] }));
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('Unavailable');
 });
 
 it('leaves View sessions to the page: the chart holds no button for it', () => {
-  render(chart());
+  renderWithTheme(chart());
   expect(screen.queryByText('View sessions', { includeHiddenElements: true })).toBeNull();
   expect(screen.queryByTestId(`${ID}-view-sessions`, { includeHiddenElements: true })).toBeNull();
 });
 
 it('names one set in the singular', () => {
-  render(chart({ metric: 'workingSetCount', days: [day('2026-10-05', { workingSetCount: 1 })] }));
+  renderWithTheme(chart({ metric: 'workingSetCount', days: [day('2026-10-05', { workingSetCount: 1 })] }));
   expect(hidden(`${ID}-readout-value`)).toHaveTextContent('1 set');
   expect(hidden(`${ID}-readout-value`)).not.toHaveTextContent('1 sets');
 });
 
 it('keeps the announced week on a VoiceOver double tap, which presses with no location', () => {
   const onSelectWeek = jest.fn();
-  render(chart({ onSelectWeek, selectedWeekKey: '2026-09-14' }));
+  renderWithTheme(chart({ onSelectWeek, selectedWeekKey: '2026-09-14' }));
   // The announced week is already the focused one, so there is nothing to toggle.
   expect(screen.getByTestId(`${ID}-plot`).props.accessibilityActions)
     .toEqual([{ name: 'increment' }, { name: 'decrement' }]);
@@ -147,14 +151,14 @@ it('keeps the announced week on a VoiceOver double tap, which presses with no lo
 });
 
 it('shows the week detail below the chart', () => {
-  render(chart({ children: <Text testID="week-detail">sets</Text> }));
+  renderWithTheme(chart({ children: <Text testID="week-detail">sets</Text> }));
   expect(screen.getByTestId('week-detail')).toBeTruthy();
 });
 
 it('focuses the tapped week, and a second tap on it changes nothing', () => {
   const onSelectWeek = jest.fn();
   // Five rows over the 300pt fallback plot: 60pt columns.
-  const { rerender } = render(chart({ onSelectWeek }));
+  const { rerender } = renderWithTheme(chart({ onSelectWeek }));
   fireEvent.press(screen.getByTestId(`${ID}-plot`), { nativeEvent: { locationX: 190 } });
   expect(onSelectWeek).toHaveBeenLastCalledWith('2026-09-28');
 
@@ -166,7 +170,7 @@ it('focuses the tapped week, and a second tap on it changes nothing', () => {
 
 it('steps through weeks as an adjustable element', () => {
   const onSelectWeek = jest.fn();
-  const { rerender } = render(chart({ onSelectWeek }));
+  const { rerender } = renderWithTheme(chart({ onSelectWeek }));
   const plot = screen.getByTestId(`${ID}-plot`);
   expect(plot).toHaveProp('accessibilityRole', 'adjustable');
   expect(plot).toHaveProp('accessibilityValue', { text: 'Week of 05-10-2026 – 11-10-2026, Volume 100, Current week' });
@@ -181,7 +185,7 @@ it('steps through weeks as an adjustable element', () => {
 });
 
 it('keeps every week a tappable column, scrolling sideways once the window outgrows the plot', () => {
-  const { rerender } = render(chart());
+  const { rerender } = renderWithTheme(chart());
   expect(screen.getByTestId(`${ID}-scroll`)).toHaveProp('scrollEnabled', false);
   rerender(chart({ weeks: 104 }));
   expect(screen.getByTestId(`${ID}-scroll`)).toHaveProp('scrollEnabled', true);
@@ -191,7 +195,7 @@ it('keeps every week a tappable column, scrolling sideways once the window outgr
 });
 
 it('labels months at the first week starting in each, which wider columns all have room for', () => {
-  render(chart({ weeks: 16 }));
+  renderWithTheme(chart({ weeks: 16 }));
   expect(screen.getByTestId(`${ID}-month-3`)).toHaveTextContent('Jul');
   expect(screen.getByText('2026')).toBeTruthy();
   expect(screen.getByTestId(`${ID}-month-7`)).toHaveTextContent('Aug');

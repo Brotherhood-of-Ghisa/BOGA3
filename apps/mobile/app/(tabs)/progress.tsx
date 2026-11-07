@@ -23,7 +23,7 @@ import {
   StatePanel,
   ToggleChip,
   uiSpace,
-  useTextRoles,
+  useUiText,
 } from '@/components/ui';
 import { type ProgressComparisons, type ProgressMuscleComparison } from '@/src/data';
 import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
@@ -321,7 +321,7 @@ export function StatsScreenShell({
   defaultCountSecondaryVolume = true,
   defaultGrouped = true,
 }: StatsScreenShellProps) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
   );
@@ -503,7 +503,7 @@ function ExerciseListView({
   sortMode: ExerciseSortMode;
   onPressSortHeader: (header: ExerciseSortHeader) => void;
 }) {
-  const { text } = useTextRoles();
+  const text = useUiText();
   const links = useRef(new Map<string, ComponentRef<typeof View>>());
   const { width } = useWindowDimensions();
   if (items.length === 0) {

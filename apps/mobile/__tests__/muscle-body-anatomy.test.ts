@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { isModelFibre, MUSCLE_BODY_FASCICLES, type ModelFibreSegment } from '@/components/stats/muscle-body-fibres';
 import { MUSCLE_BODY_MESH } from '@/components/stats/muscle-body-mesh';
-import { projectMuscleBody } from '@/components/stats/muscle-body-projection';
+import { projectMuscleBody } from './helpers/muscle-body-palette';
 
 const { registeredGuides } = require('../scripts/anatomy/apply-guides.cjs');
 const source = require('../scripts/anatomy/source.json');

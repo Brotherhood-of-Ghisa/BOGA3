@@ -6,11 +6,13 @@
  * `progress-history-local-data`).
  */
 
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 
 import { GymPicker } from '@/components/gyms/gym-picker';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { GymScopeOption } from '@/src/utils/gym-scope-route';
+
+import { renderWithTheme } from './helpers/theme';
 
 const OPTIONS: GymScopeOption[] = [
   { gymId: 'club', name: 'Club', sessionCount: 12 },
@@ -20,7 +22,7 @@ const OPTIONS: GymScopeOption[] = [
 
 const renderPicker = (value: string | null | undefined, options: GymScopeOption[] = OPTIONS) => {
   const onChange = jest.fn();
-  render(<GymPicker allSessionCount={19} onChange={onChange} options={options} testID="gym" value={value} />);
+  renderWithTheme(<GymPicker allSessionCount={19} onChange={onChange} options={options} testID="gym" value={value} />);
   return onChange;
 };
 
@@ -64,7 +66,7 @@ describe('GymPicker', () => {
 
   it('draws the same button at the compact size, for a row it shares with a segmented control', () => {
     const onChange = jest.fn();
-    render(<GymPicker onChange={onChange} options={OPTIONS} size="compact" testID="gym" value="home" />);
+    renderWithTheme(<GymPicker onChange={onChange} options={OPTIONS} size="compact" testID="gym" value="home" />);
     expect(screen.getByLabelText('Gym: Home')).toHaveProp('hitSlop', 8);
     fireEvent.press(screen.getByTestId('gym'));
     fireEvent.press(screen.getByTestId('gym-option-all'));
