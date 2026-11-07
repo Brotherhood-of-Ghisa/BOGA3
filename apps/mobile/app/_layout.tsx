@@ -11,6 +11,7 @@ import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
 import { NAVIGATION_THEME, statusBarStyleFor } from '@/components/navigation/navigation-theme';
 import { NotificationTapBridge } from '@/components/navigation/notification-tap-bridge';
 import { RootStack } from '@/components/navigation/root-stack';
+import { AppThemeProvider } from '@/components/ui/theme-context';
 import { launchTheme } from '@/components/ui/theme-launch';
 import { uiMode } from '@/components/ui/tokens';
 import { reportLaunchThemeProblem } from '@/src/appearance/launch-theme-report';
@@ -80,23 +81,28 @@ export default function RootLayout() {
     };
   }, []);
 
+  // The theme sits outside everything else, so every screen and sheet below
+  // that reads it through the theme hooks follows a saved appearance. The
+  // navigation theme and the status bar below still take the launch theme.
   return (
-    <GestureHandlerRootView style={styles.gestureRoot}>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <ThemeProvider value={NAVIGATION_THEME}>
-            <AuthRouteGuard>
-              <RootStack />
-              <NotificationTapBridge />
-            </AuthRouteGuard>
-          </ThemeProvider>
-          {/* The status bar follows this launch's mode, never the phone's:
-              `auto` would follow a phone switched to the other mode while the
-              app runs, leaving the clock unreadable on the page. */}
-          <StatusBar style={statusBarStyleFor(uiMode)} />
-        </AuthProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <AppThemeProvider>
+      <GestureHandlerRootView style={styles.gestureRoot}>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <ThemeProvider value={NAVIGATION_THEME}>
+              <AuthRouteGuard>
+                <RootStack />
+                <NotificationTapBridge />
+              </AuthRouteGuard>
+            </ThemeProvider>
+            {/* The status bar follows this launch's mode, never the phone's:
+                `auto` would follow a phone switched to the other mode while the
+                app runs, leaving the clock unreadable on the page. */}
+            <StatusBar style={statusBarStyleFor(uiMode)} />
+          </AuthProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </AppThemeProvider>
   );
 }
 

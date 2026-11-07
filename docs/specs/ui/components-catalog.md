@@ -66,20 +66,21 @@ and executable examples, load `docs/specs/08-ux-delivery-standard.md` and
 | A form's section (optional `title`, `footnote`) and its rows: a choice that opens a picker (optional leading `icon`), a short figure in place, an action (`ActionRow` `kind`: `navigate` chevron, `act` accent, `danger`), a section error | `FormSection`, `ChoiceRow`, `InputRow`, `ActionRow`, `FormError` (`form-section.tsx`; `ux-rules.md` "Forms") |
 | A Settings row: one of ≤3 options under its label, the one chosen of many (radio, optional `meta` swatch), several (checkbox), a read-only value (one accessible element unless it has a `valueTestID`; optional glyph, `danger` tone), a whole number on a track (`SliderRow`) | `SegmentRow`, `RadioRow`, `CheckRow`, `ValueRow` (`form-rows.tsx`), `SliderRow` (`slider-row.tsx`; `ux-rules.md` "Settings pages") |
 | A search input | `SearchField` (`search-field.tsx`) |
-| Full-width pages swiped between under tabs that name them (UX pattern 15) | `SwipePages` (`swipe-pages.tsx`) — Today's cards, the Groups screen's pages |
+| Full-width pages swiped between under tabs that name them (UX pattern 15) | `SwipePages` (`swipe-pages.tsx`) |
 | One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral, or `selection` for filters (black; white in dark) |
 | One filter of a few values where a row of them cannot afford every label | `ToggleChip` (`toggle-chip.tsx`) — the value in force plus the `swap` glyph; a tap steps to the next |
 | Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
 | One option or setting on or off, in a sheet (`Show deleted sessions`) or a form card (`Track each gym separately`, `density="list"`, optional `description`) | `SwitchRow` (`switch-row.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`); every other page takes the native header (`ux-rules.md` "Pages") |
+| Live theme colours: a stylesheet, a colour prop, the mode | `makeStyles`, `useUiRoles`, `useUiMode` (`theme-context.tsx`) |
 | Colour roles, fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
 
 ### Gallery and adoption scope
 
 Open `app/ui-gallery.tsx` by explicit development-only deep link:
 `boga3://ui-gallery?family=<family>&review=1`. Families are `compact`, `list`,
-`table` and `summary`; the existing `sample=summary` link also works.
+`table` and `summary`; `sample=summary` also works.
 Omit `review=1` for controls; `long=1` selects long content.
 Use list/table `sample=rows` to compare identical passive, wrapped, own/selected
 and independent-control rows. Compact samples cover Stream, CoW and embedded summaries. Route and navigator share `isUiGalleryAllowed`.
@@ -174,7 +175,7 @@ folder rather than re-implementing its row, card or sheet.
 | `session-complete/` | the post-submit presentation: `SessionCompletionScreen`, `SessionBreakdownPager` (two pages, `By muscle` then `By exercise`), `SessionMuscleBreakdown` / `SessionSummaryContent` (shared with historical review), `PersonalRecordCard`, `ExerciseVolumeCard` (drawn only with a distribution) with `ComparisonUnavailableCard` pooling the rest by name, and `SessionShareSheet` / `SessionShareCard`. The share image is privacy-limited: all PRs and drawn comparisons, never gym or location data |
 | `view-session/` | View Session's composition, top bar and sheets (route `app/completed-session/[sessionId].tsx`) |
 | `session-list/` | `SessionSummaryLine`, `ActiveSessionRow`, `HistoryList` (Sessions' one virtualized `SectionList`, the hub blocks as its header; one section per calendar week, newest first), the week grouping (`history-weeks.ts`), and the `SessionListItem` types plus the `useSessionListData` hook and data client (`history-data.ts`, which attaches each session's PRs) |
-| `today/` | the Today cards: `TodayProgressCard` (the progress card with `WeekFigures`, `ShareBar` and `PeriodPace`, over `TodaySessionCard`); the group's board (headed by `TodayGroupHeader`: the group's name and `TodayGroupSwitch`) and sessions cards; `StepAround`; and `SessionSummaryRow` + `TrainingNowMark`, the session row Sessions' history uses. The pager: `TodayCards` on `SwipePages` (UX pattern 15), and `TodayPanel`. Reads: `apps/mobile/src/progress-summary/` |
+| `today/` | the Today cards: `TodayProgressCard` (the progress card with `WeekFigures`, `ShareBar` and `PeriodPace`, over `TodaySessionCard`); the group's board (headed by `TodayGroupHeader`: the group's name and `TodayGroupSwitch`) and sessions cards; `StepAround`; and `SessionSummaryRow` + `TrainingNowMark`, the session row Sessions' history uses. The pager: `TodayCards` on `SwipePages`, and `TodayPanel`. Reads: `apps/mobile/src/progress-summary/` |
 | `train/` | `StartDisc`, Train's one action |
 | `heatmaps/` | `DailyHeatmap` / `WeeklyHeatmap`, `HeatmapLegend` and their data and metric modules; semantics in `apps/mobile/components/heatmaps/README.md` |
 | `stats/` | `HistoryView` and `HistoryTitle` own muscle/exercise history and focus return; Timeline uses `ExerciseSetsCard`. `MuscleBodyCard` draws the rotatable model with [[comparison.colour-scale]]. `ProgressMuscleView` selects list or body presentation; both reuse `ProgressContributionRows`. `StatsTable` owns the table frame/rows, `comparison-columns.tsx` responsive figures, `comparison-format.ts` formatting and `ui/change-tone.ts` colour. `ProgressFilters` owns grouping, secondary-set and gym choices. |
