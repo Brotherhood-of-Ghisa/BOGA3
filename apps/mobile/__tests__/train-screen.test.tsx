@@ -16,7 +16,7 @@
  * a failed draft write, a failed plan write and a failed active-session read.
  */
 
-import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, renderHook, screen, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -42,7 +42,11 @@ jest.mock('@/components/session-view/session-view-screen', () => {
 
 import TrainRoute, { TrainScreen, type TrainPlanningState } from '../app/(tabs)/train';
 import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 import * as sessionDrafts from '@/src/data/session-drafts';
 import * as sessionList from '@/src/data/session-list';
 import { listSessionListBuckets, setSessionDeletedState } from '@/src/data/session-list';
@@ -68,7 +72,7 @@ const checked = () => waitFor(() => expect(isBusy()).toBe(false));
 
 const openTrain = async (fixture?: 'session-view') => {
   await seed(fixture);
-  render(<TrainRoute />);
+  renderWithTheme(<TrainRoute />);
   await checked();
 };
 
@@ -121,7 +125,7 @@ const readyPlan = (overrides: Partial<Extract<TrainPlanningState, { status: 'rea
 });
 
 const renderWithPlan = async (planningState: TrainPlanningState, sessionEntry?: SessionEntryCoordinator) => {
-  render(<TrainScreen planningState={planningState} {...(sessionEntry ? { sessionEntry } : {})} />);
+  renderWithTheme(<TrainScreen planningState={planningState} {...(sessionEntry ? { sessionEntry } : {})} />);
   await checked();
 };
 
@@ -157,7 +161,7 @@ describe('Train over real data', () => {
 
   it('is the workout in progress: the session view in place of the disc, offering no button for it', async () => {
     await seed('session-view');
-    render(<TrainRoute />);
+    renderWithTheme(<TrainRoute />);
 
     await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
     expect(screen.queryByTestId('train-start-empty-button')).toBeNull();
@@ -166,7 +170,7 @@ describe('Train over real data', () => {
 
   it('waits for focus before reading for a workout in progress', async () => {
     await seed('session-view');
-    render(<TrainScreen isFocused={false} />);
+    renderWithTheme(<TrainScreen isFocused={false} />);
     await act(async () => undefined);
 
     expect(shownWorkout()).toBeNull();
@@ -175,7 +179,7 @@ describe('Train over real data', () => {
 
   it('keeps the workout shown while a focus re-reads it, and shows the disc once it was abandoned', async () => {
     await seed('session-view');
-    const view = render(<TrainScreen isFocused />);
+    const view = renderWithTheme(<TrainScreen isFocused />);
     await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
 
     view.rerender(<TrainScreen isFocused={false} />);
@@ -190,7 +194,7 @@ describe('Train over real data', () => {
 
   it('keeps the workout shown when a focus re-read fails', async () => {
     await seed('session-view');
-    const view = render(<TrainScreen isFocused />);
+    const view = renderWithTheme(<TrainScreen isFocused />);
     await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
     jest.spyOn(sessionList, 'findActiveSessionId').mockRejectedValueOnce(new Error('Unable to read sessions'));
 
@@ -214,7 +218,7 @@ describe('Train over real data', () => {
   it('keeps a resumed workout visible when focus returns after its earlier Finish', async () => {
     const { result } = renderHook(() => useOpenActiveWorkout());
     await seed('session-view');
-    const view = render(<TrainScreen isFocused />);
+    const view = renderWithTheme(<TrainScreen isFocused />);
     await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
     fireEvent.press(screen.getByTestId('train-workout-finish'));
     view.rerender(<TrainScreen isFocused={false} />);
@@ -226,7 +230,7 @@ describe('Train over real data', () => {
 
   it('returns to the disc at once, ready to start, when the workout is abandoned', async () => {
     await seed('session-view');
-    render(<TrainRoute />);
+    renderWithTheme(<TrainRoute />);
     await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
 
     fireEvent.press(screen.getByTestId('train-workout-abandon'));
@@ -237,7 +241,7 @@ describe('Train over real data', () => {
 
   it("keeps a finished workout under Finish's summary, and shows the disc once Train is back", async () => {
     await seed('session-view');
-    const view = render(<TrainScreen isFocused />);
+    const view = renderWithTheme(<TrainScreen isFocused />);
     await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
 
     // The summary fades in over Train: nothing beneath may change.
@@ -274,7 +278,7 @@ describe('Train over real data', () => {
   it('starts a fresh workout once the one in progress was discarded', async () => {
     await seed('session-view');
     await setSessionDeletedState(ACTIVE, true);
-    render(<TrainRoute />);
+    renderWithTheme(<TrainRoute />);
     await checked();
 
     fireEvent.press(screen.getByTestId('train-start-empty-button'));
@@ -288,7 +292,7 @@ describe('Train over real data', () => {
   it('shows the workout in progress rather than offering a plan', async () => {
     const plan = readyPlan({ title: 'Lower body', detail: '4 exercises' });
     await seed('session-view');
-    render(<TrainScreen planningState={plan} />);
+    renderWithTheme(<TrainScreen planningState={plan} />);
 
     await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
     expect(screen.queryByTestId('train-start-planned-button')).toBeNull();
@@ -305,7 +309,7 @@ describe('Train over real data', () => {
 
     expect(await screen.findByTestId('train-empty-launch-error')).toHaveTextContent("Couldn't start. Try again.");
     expect(StyleSheet.flatten(screen.getByTestId('train-empty-launch-error').props.style)).toMatchObject({
-      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: uiRoles.danger, textAlign: 'center',
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: roles.danger, textAlign: 'center',
     });
     expect(await activeSessionId()).toBeNull();
 
@@ -330,7 +334,7 @@ describe('Train over real data', () => {
       fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base,
     });
     expect(StyleSheet.flatten(screen.getByText('Bench press').props.style)).toMatchObject({
-      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: uiRoles.inkMuted,
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: roles.inkMuted,
     });
     fireEvent.press(screen.getByRole('button', { name: 'Start Upper body' }));
 
@@ -351,7 +355,7 @@ describe('Train over real data', () => {
       "Couldn't start this plan. Try again.",
     );
     expect(StyleSheet.flatten(screen.getByTestId('train-planned-launch-error').props.style)).toMatchObject({
-      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: uiRoles.danger, textAlign: 'center',
+      fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base, color: roles.danger, textAlign: 'center',
     });
     expect(isBusy()).toBe(false);
     expect(await activeSessionId()).toBeNull();
@@ -362,7 +366,7 @@ describe('Train over real data', () => {
       .spyOn(sessionList, 'findActiveSessionId')
       .mockRejectedValueOnce(new Error('Unable to read sessions'));
     await seed();
-    render(<TrainRoute />);
+    renderWithTheme(<TrainRoute />);
 
     expect(await screen.findByTestId('train-session-error')).toHaveTextContent(/Unable to read sessions/);
     expect(screen.queryByTestId('train-start-empty-button')).toBeNull();
@@ -408,7 +412,7 @@ describe('Train planning states', () => {
 describe('Train launch states', () => {
   it('shows the same disc, ignoring presses, while it checks for a workout in progress', () => {
     const start = jest.fn();
-    render(
+    renderWithTheme(
       <TrainScreen
         loadActiveSessionId={() => new Promise(() => undefined)}
         sessionEntry={{ startEmptyOrResume: start, startPlannedOrResume: jest.fn(), resumeCompletedSession: jest.fn() }}
@@ -417,7 +421,7 @@ describe('Train launch states', () => {
 
     const disc = screen.getByTestId('train-start-empty-button');
     expect(isBusy()).toBe(true);
-    expect(StyleSheet.flatten(disc.props.style).backgroundColor).toBe(uiRoles.accent);
+    expect(StyleSheet.flatten(disc.props.style).backgroundColor).toBe(roles.accent);
     fireEvent.press(disc);
     expect(start).not.toHaveBeenCalled();
   });
@@ -445,7 +449,7 @@ describe('Train launch states', () => {
     const accentButtons = () =>
       ['train-start-empty-button', 'train-start-planned-button', 'train-manage-planning-button']
         .map((testID) => screen.queryByTestId(testID))
-        .filter((node) => node && StyleSheet.flatten(node.props.style).backgroundColor === uiRoles.accent)
+        .filter((node) => node && StyleSheet.flatten(node.props.style).backgroundColor === roles.accent)
         .map((node) => node?.props.testID);
     const discWidth = () => StyleSheet.flatten(screen.getByTestId('train-start-empty-button').props.style).width;
 
@@ -455,7 +459,7 @@ describe('Train launch states', () => {
     const compact = discWidth();
     screen.unmount();
 
-    render(<TrainRoute />);
+    renderWithTheme(<TrainRoute />);
     await checked();
     expect(accentButtons()).toEqual(['train-start-empty-button']);
     expect(discWidth()).toBeGreaterThan(compact);

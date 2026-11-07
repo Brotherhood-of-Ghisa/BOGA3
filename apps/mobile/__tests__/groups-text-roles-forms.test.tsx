@@ -4,7 +4,7 @@
  * `title`, controls and headings `label`; words never take Plex Mono, only
  * the figures inside them do (`FigureText`).
  */
-import { render, screen, within } from '@testing-library/react-native';
+import { screen, within } from '@testing-library/react-native';
 import { StyleSheet, type TextStyle } from 'react-native';
 import { Text as SvgText } from 'react-native-svg';
 
@@ -17,8 +17,13 @@ import { PickerGroupSectionList } from '@/components/groups/picker-group-section
 import { SessionSummaryLine } from '@/components/session-list/session-summary-line';
 import { SessionSummaryRow } from '@/components/today/session-summary-row';
 import { WeekFigure } from '@/components/today/week-figures';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { PickerGroupRow } from '@/src/groups';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const style = (node: { props: { style?: unknown } }): TextStyle => StyleSheet.flatten(node.props.style as never) as TextStyle;
 
@@ -28,7 +33,7 @@ const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize:
 
 describe('Groups: names and titles', () => {
   it('names a My groups row in bodyStrong, not Archivo', () => {
-    render(
+    renderWithTheme(
       <GroupSummaryRow
         divider={false}
         group={{ group_id: 'g1', name: 'Garage Gym', description: null, member_count: 5, my_role: 'owner', bodyweight_calculations_enabled: false }}
@@ -39,7 +44,7 @@ describe('Groups: names and titles', () => {
   });
 
   it('names a group exercise row in bodyStrong', () => {
-    render(
+    renderWithTheme(
       <GroupExerciseRow
         row={{ groupExerciseId: 'ge1', name: 'Bench Press', loadInputModeLabel: 'Total', archived: false, linkStatus: 'Not linked', linkable: false, personalLinks: [] }}
       />,
@@ -56,16 +61,16 @@ describe('Groups: names and titles', () => {
       linkedExercises: [],
       statusLabel: 'not linked',
     };
-    render(<PickerGroupSectionList onPressRow={jest.fn()} sections={[{ groupId: 'g1', groupName: 'Garage Gym', rows: [row] }]} />);
+    renderWithTheme(<PickerGroupSectionList onPressRow={jest.fn()} sections={[{ groupId: 'g1', groupName: 'Garage Gym', rows: [row] }]} />);
     const name = screen.getByText(/^Bench Press/);
     expect(style(name)).toMatchObject(BODY_STRONG);
     // The nested group name resets the weight its parent would hand down.
-    expect(style(within(name).getByText(/Garage Gym/))).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', color: uiRoles.inkMuted });
+    expect(style(within(name).getByText(/Garage Gym/))).toMatchObject({ fontFamily: uiFonts.body.family, fontWeight: '400', color: roles.inkMuted });
     expect(style(screen.getByText('not linked'))).toMatchObject(META);
   });
 
   it('titles the group header card at the title size, its counts in the figure face', () => {
-    render(<GroupHeaderCard meta="5 members · Owner" metaTestID="meta" name="Garage Gym" nameTestID="name" />);
+    renderWithTheme(<GroupHeaderCard meta="5 members · Owner" metaTestID="meta" name="Garage Gym" nameTestID="name" />);
     expect(style(screen.getByTestId('name'))).toMatchObject({ fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg });
     const meta = screen.getByTestId('meta');
     expect(style(meta).fontFamily).toBe(uiFonts.body.family);
@@ -73,7 +78,7 @@ describe('Groups: names and titles', () => {
   });
 
   it('labels a filter pill as a micro-label in ink', () => {
-    render(
+    renderWithTheme(
       <GroupCycleButton
         accessibilityLabel="Section"
         onChange={jest.fn()}
@@ -82,11 +87,11 @@ describe('Groups: names and titles', () => {
         value="a"
       />,
     );
-    expect(style(screen.getByText('Stream'))).toMatchObject({ ...LABEL, color: uiRoles.ink });
+    expect(style(screen.getByText('Stream'))).toMatchObject({ ...LABEL, color: roles.ink });
   });
 
   it('draws the rank chart\'s initials in Archivo, not Plex Mono: they are letters', () => {
-    const view = render(
+    const view = renderWithTheme(
       <GroupRankChart
         accessibilityLabel="Place"
         columnLabels={['5 Oct']}
@@ -101,7 +106,7 @@ describe('Groups: names and titles', () => {
   });
 
   it('labels a selected marker in the colour its fill carries: on-ink on yours, `ink` on a `viz4` one', () => {
-    const view = render(
+    const view = renderWithTheme(
       <GroupRankChart
         accessibilityLabel="Place"
         columnLabels={['28 Sep', '5 Oct']}
@@ -119,13 +124,13 @@ describe('Groups: names and titles', () => {
     );
     const fills = view.UNSAFE_getAllByType(SvgText).map((node) => node.props.fill);
     // Per line, per period: Dino's then Marco's; period 1 is selected.
-    expect(fills).toEqual([uiRoles.inkMuted, uiRoles.onInk, uiRoles.inkMuted, uiRoles.ink]);
+    expect(fills).toEqual([roles.inkMuted, roles.onInk, roles.inkMuted, roles.ink]);
   });
 });
 
 describe('Sessions and week figures: words out of Plex Mono', () => {
   it('reads an active session\'s counts as words, with only the figures in Plex Mono', () => {
-    render(
+    renderWithTheme(
       <SessionSummaryLine
         dateFormat="DD-MM-YYYY"
         session={{
@@ -148,12 +153,12 @@ describe('Sessions and week figures: words out of Plex Mono', () => {
     const sets = screen.getByTestId('row-sets');
     expect(style(sets)).toMatchObject(META);
     expect(style(within(sets).getByText('12'))).toMatchObject({ fontFamily: uiFonts.figure.family });
-    expect(style(screen.getByTestId('row-start'))).toMatchObject({ fontFamily: uiFonts.figure.family, fontSize: uiTypography.size.sm, color: uiRoles.ink });
-    expect(style(screen.getByTestId('row-gym'))).toMatchObject({ ...META, fontWeight: '600', color: uiRoles.ink });
+    expect(style(screen.getByTestId('row-start'))).toMatchObject({ fontFamily: uiFonts.figure.family, fontSize: uiTypography.size.sm, color: roles.ink });
+    expect(style(screen.getByTestId('row-gym'))).toMatchObject({ ...META, fontWeight: '600', color: roles.ink });
   });
 
   it('reads a history row\'s `sets · exercises` line as words, its figures in Plex Mono', () => {
-    render(
+    renderWithTheme(
       <SessionSummaryRow
         accessibilityHint=""
         accessibilityLabel=""
@@ -172,7 +177,7 @@ describe('Sessions and week figures: words out of Plex Mono', () => {
   });
 
   it('keeps `vs … last wk` in words, the previous figure alone in Plex Mono', () => {
-    render(<WeekFigure current={3} label="Sets" previous={4} testID="fig" />);
+    renderWithTheme(<WeekFigure current={3} label="Sets" previous={4} testID="fig" />);
     const previous = screen.getByTestId('fig-previous');
     expect(style(previous)).toMatchObject(META);
     expect(previous).toHaveTextContent('vs 4 last wk');

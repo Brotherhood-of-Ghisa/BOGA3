@@ -9,7 +9,7 @@
  * (jest.config.js).
  */
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -22,7 +22,11 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 import * as exerciseCatalogData from '@/src/data/exercise-catalog';
 import { setMuscleTracked } from '@/src/data/muscle-report-settings';
 import type { Transaction } from '@/src/data/clock';
@@ -93,7 +97,7 @@ const createPlan = async (title: string, scheduledFor: Date | null, exercises = 
 
 const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
   await bootLocalApp();
-  const view = render(<TodayScreen groupState={signedOut} now={clock} {...props} />);
+  const view = renderWithTheme(<TodayScreen groupState={signedOut} now={clock} {...props} />);
   await waitForGone(() => screen.queryByTestId('today-plan-loading'));
   await waitForGone(() => screen.queryByTestId('today-progress-loading'));
   return view;
@@ -183,13 +187,13 @@ describe('Today: the Plan page over real data', () => {
     } else {
       expect(boundary).toBeNull();
     }
-    expect(text('today-plan-muscle-quads-today')).not.toHaveStyle({ borderColor: uiRoles.accent });
+    expect(text('today-plan-muscle-quads-today')).not.toHaveStyle({ borderColor: roles.accent });
   });
 
   it.each([
-    ['below', 15, uiRoles.ink],
-    ['at', 16, uiRoles.gain],
-    ['above', 17, uiRoles.gain],
+    ['below', 15, roles.ink],
+    ['at', 16, roles.gain],
+    ['above', 17, roles.gain],
   ])('colours the weekly total %s target, flooring optional secondary half-credit for display', async (_state, count, color) => {
     await bootLocalApp();
     act(() => updatePreferences({ progressCountSecondary: true }));
@@ -199,7 +203,7 @@ describe('Today: the Plan page over real data', () => {
     // Triceps gets 7.5, 8 and 8.5 allocated sets; colour uses the unrounded target comparison.
     const week = within(text('today-plan-muscle-triceps-week'));
     expect(week.getByText(String(Math.floor(count / 2)))).toHaveStyle({ color });
-    expect(week.getByText('/8')).toHaveStyle({ color: uiRoles.inkMuted });
+    expect(week.getByText('/8')).toHaveStyle({ color: roles.inkMuted });
     expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent(String(Math.floor(count / 2)));
     // The spoken label keeps one decimal.
     expect(text('today-plan-muscle-triceps').props.accessibilityLabel).toContain(`this week ${count / 2} of 8 sets`);
@@ -225,7 +229,7 @@ describe('Today: the Plan page over real data', () => {
     await renderToday();
 
     expect(text('today-plan-muscle-chest-day-2')).toHaveTextContent('1');
-    expect(within(text('today-plan-muscle-chest-week')).getByText('1')).toHaveStyle({ color: uiRoles.ink });
+    expect(within(text('today-plan-muscle-chest-week')).getByText('1')).toHaveStyle({ color: roles.ink });
     expect(text('today-plan-muscle-chest').props.accessibilityLabel).toContain('today: none yet, this week 1 of 8 sets');
   });
 
@@ -296,7 +300,7 @@ describe('Today: the Plan page over real data', () => {
   it('reports a failed catalogue in Per muscle mode, and Retry loads it again (a failed catalogue read)', async () => {
     act(() => updatePreferences({ muscleTargetMode: 'per-muscle', muscleTargetOverrides: { detailed: { chest: 2 } } }));
     const groups = jest.spyOn(exerciseCatalogData, 'listExerciseCatalogMuscleGroups').mockRejectedValueOnce(new Error('database is locked'));
-    render(<TodayScreen groupState={signedOut} now={clock} />);
+    renderWithTheme(<TodayScreen groupState={signedOut} now={clock} />);
 
     await waitFor(() => expect(text('today-plan-error')).toBeTruthy());
     fireEvent.press(text('today-plan-error-retry'));
@@ -363,7 +367,7 @@ describe('Today: the Plan page over real data', () => {
 
   it('shows loading while the first read is pending (a pending read)', async () => {
     await bootLocalApp();
-    render(<TodayScreen groupState={signedOut} loadPlan={() => new Promise<TodayPlan>(() => {})} now={clock} />);
+    renderWithTheme(<TodayScreen groupState={signedOut} loadPlan={() => new Promise<TodayPlan>(() => {})} now={clock} />);
     expect(text('today-plan-loading')).toBeTruthy();
   });
 
@@ -371,7 +375,7 @@ describe('Today: the Plan page over real data', () => {
     await bootLocalApp();
     const loadPlan = jest.fn().mockRejectedValueOnce(new Error('database is locked'));
     loadPlan.mockResolvedValue({ recoveryDays: [], today: NOW, muscles: [], week: [], next: [] } satisfies TodayPlan);
-    render(<TodayScreen groupState={signedOut} loadPlan={loadPlan} now={clock} />);
+    renderWithTheme(<TodayScreen groupState={signedOut} loadPlan={loadPlan} now={clock} />);
 
     await waitFor(() => expect(text('today-plan-error')).toBeTruthy());
     expect(screen.getByText("Couldn't load your plan")).toBeTruthy();
@@ -409,7 +413,7 @@ describe('Today: the Plan page among the cards', () => {
 
   it("fills the Plan page's card with its panel for a failed read", async () => {
     await bootLocalApp();
-    render(<TodayScreen groupState={signedOut} loadPlan={() => Promise.reject(new Error('locked'))} now={clock} />);
+    renderWithTheme(<TodayScreen groupState={signedOut} loadPlan={() => Promise.reject(new Error('locked'))} now={clock} />);
 
     await waitFor(() => expect(within(text('today-plan-section')).getByTestId('today-plan-error')).toBeTruthy());
     expect(text('today-plan-error')).toHaveStyle({ flex: 1, justifyContent: 'center' });

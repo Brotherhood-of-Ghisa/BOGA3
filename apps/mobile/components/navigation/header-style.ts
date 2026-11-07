@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import type { TextStyle } from 'react-native';
 
 import type { UiRoles } from '@/components/ui/theme';
 import { useUiRoles } from '@/components/ui/theme-context';
@@ -8,7 +9,7 @@ import { useUiText } from '@/components/ui/text-roles';
  * One header style on every header (`navigation-contract.md` "Header
  * titles"): the root stack's, and the Groups tab's in the tab layout.
  */
-export function headerStyleOptions(roles: UiRoles, title: ReturnType<typeof useUiText>['title']) {
+export function headerStyleOptions(roles: UiRoles, title: Pick<TextStyle, 'fontFamily' | 'fontWeight' | 'fontSize' | 'color'>) {
   return {
     // The page's own `paper` ground with no shadow line, so header and
     // page read as one surface, the `title` role, an `ink` back arrow. The header

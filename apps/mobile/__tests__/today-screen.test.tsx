@@ -12,7 +12,7 @@
  * progress read and a failed one.
  */
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { AppState, ScrollView, StyleSheet, type AppStateStatus } from 'react-native';
 import Svg, { Line, Rect, TSpan } from 'react-native-svg';
 
@@ -30,7 +30,11 @@ jest.mock('expo-router', () => ({
 import { ShareBar } from '@/components/today';
 import { CHART_RIGHT_GUTTER } from '@/components/today/progress-format';
 import { Storage } from 'expo-sqlite/kv-store';
-import { uiFonts, uiGeometry, uiIconSize, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiGeometry, uiIconSize, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 import { upsertLocalGym } from '@/src/data/local-gyms';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { setSessionDeletedState } from '@/src/data/session-list';
@@ -95,7 +99,7 @@ const logHistory = async () => {
 
 const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
   await bootLocalApp();
-  const view = render(<TodayScreen now={clock} groupState={signedOut} {...props} />);
+  const view = renderWithTheme(<TodayScreen now={clock} groupState={signedOut} {...props} />);
   await waitForGone(() => screen.queryByTestId('today-progress-loading'));
   return view;
 };
@@ -157,7 +161,7 @@ describe('Today: the Progress card over real data', () => {
     const sessions = figure('sessions');
     expect(sessions.value).toHaveTextContent('1');
     expect(sessions.previous).toHaveTextContent('vs 2');
-    expect(sessions.fill).toHaveStyle({ width: '50%', backgroundColor: uiRoles.viz2 });
+    expect(sessions.fill).toHaveStyle({ width: '50%', backgroundColor: roles.viz2 });
     expect(text('today-progress-week-sessions')).toHaveProp('accessibilityLabel', 'Sessions 1, vs 2 last week');
 
     const workingSets = figure('working-sets');
@@ -337,7 +341,7 @@ describe('Today: the Progress card over real data', () => {
     expect(new Set(y).size).toBe(3);
     for (const id of ['elephant', 'wagon', 'humpback', 'fin-whale', 'ferry']) {
       const ground = screen.UNSAFE_getAllByType(Rect).find(node => node.props.testID === `today-tonnage-ground-${id}`)!;
-      expect(ground.props.fill).toBe(uiRoles.surface);
+      expect(ground.props.fill).toBe(roles.surface);
       expect(ground.props.x + ground.props.width).toBeCloseTo(311 - CHART_RIGHT_GUTTER - uiSpace.xs);
       const leader = screen.UNSAFE_getAllByType(Line).find(node => node.props.testID === `today-tonnage-leader-${id}`);
       if (leader) expect(leader.props.x1).toBeLessThan(ground.props.x);
@@ -397,7 +401,7 @@ describe('Today: the Progress card over real data', () => {
     expect(StyleSheet.flatten(within(text('today-progress-period-previous-sets')).getByText('sets').props.style)).toMatchObject(meta);
     // Ahead is an improvement, in the one colour every change figure uses for
     // one (`design-language.md` §6).
-    expect(text('today-progress-period-difference')).toHaveStyle({ color: uiRoles.gain });
+    expect(text('today-progress-period-difference')).toHaveStyle({ color: roles.gain });
     expect(screen.queryByText(/pace/)).toBeNull();
     // The spoken label carries the projection the chart draws (18 over 12 days, across 28: 42).
     expect(text('today-progress-chart')).toHaveProp(
@@ -478,22 +482,22 @@ describe('Today: the Progress card over real data', () => {
     const body = text('today-latest-session');
     expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 · 07:12');
     // The start reads as a Sessions row: a body line, ink, only its figures in the figure face.
-    expect(text('today-latest-session-start')).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.ink });
+    expect(text('today-latest-session-start')).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: roles.ink });
     expect(within(text('today-latest-session-start')).getByText('07:12')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
     // The month takes the figure face with its day and year, as a Sessions row's stamp does.
     expect(within(text('today-latest-session-start')).getByText('15 Oct 26')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
     // A faint separator holds the date and the time apart.
-    expect(within(text('today-latest-session-start')).getByText(' · ')).toHaveStyle({ color: uiRoles.inkFaint });
+    expect(within(text('today-latest-session-start')).getByText(' · ')).toHaveStyle({ color: roles.inkFaint });
     // Sets are ink like the other figure columns, not muted.
-    expect(rowText('today-latest-session-exercise-0-sets')).toHaveStyle({ color: uiRoles.ink });
+    expect(rowText('today-latest-session-exercise-0-sets')).toHaveStyle({ color: roles.ink });
     // The figure columns sit a clear step apart.
     expect(rowText('today-latest-session-exercise-0')).toHaveStyle({ gap: uiSpace.md });
     expect(text('today-latest-session-figures')).toHaveTextContent('2 exercises · 6 sets · 3 PRs @ Iron House');
     // One row per exercise: working sets, best set, its 1RM; the bench's 1RM a PR.
     expect(rowText('today-latest-session-exercise-0')).toHaveTextContent('Barbell Bench Press3115.0 × 5134.1');
-    expect(rowText('today-latest-session-exercise-0-1rm')).toHaveStyle({ color: uiRoles.record });
+    expect(rowText('today-latest-session-exercise-0-1rm')).toHaveStyle({ color: roles.record });
     expect(rowText('today-latest-session-exercise-1')).toHaveTextContent('Barbell Back Squat3100.0 × 5116.6');
-    expect(rowText('today-latest-session-exercise-1-1rm')).not.toHaveStyle({ color: uiRoles.record });
+    expect(rowText('today-latest-session-exercise-1-1rm')).not.toHaveStyle({ color: roles.record });
     expect(body.props.accessibilityLabel).toBe(
       'Session on 15 Oct 26 07:12; 2 exercises; 6 sets; 3 PRs; at Iron House; '
         + 'Barbell Bench Press, 3 sets, best 115.0 × 5, 1RM 134.1, a 1RM PR; Barbell Back Squat, 3 sets, best 100.0 × 5, 1RM 116.6',
@@ -648,7 +652,7 @@ describe('Today: the day changing while it is open', () => {
   it('reads again at each local midnight while focused, and stops when unfocused', () => {
     jest.useFakeTimers({ now: NOW });
     const loadProgress = jest.fn<Promise<TodayProgress>, [Date, number]>().mockResolvedValue({ status: 'empty' });
-    const view = render(<TodayScreen loadProgress={loadProgress} now={() => new Date()} groupState={signedOut} />);
+    const view = renderWithTheme(<TodayScreen loadProgress={loadProgress} now={() => new Date()} groupState={signedOut} />);
     expect(loadProgress).toHaveBeenCalledTimes(1);
 
     // Noon to a minute before midnight: no read; midnight: one, dated the new day.
@@ -674,7 +678,7 @@ describe('Today: the day changing while it is open', () => {
     });
     jest.useFakeTimers({ now: NOW });
     const loadProgress = jest.fn<Promise<TodayProgress>, [Date, number]>().mockResolvedValue({ status: 'empty' });
-    render(<TodayScreen loadProgress={loadProgress} now={() => new Date()} groupState={signedOut} />);
+    renderWithTheme(<TodayScreen loadProgress={loadProgress} now={() => new Date()} groupState={signedOut} />);
 
     // Suspended at noon, back at 22:00 the same day with the clock moved but the timer not counted.
     jest.setSystemTime(local(2026, 10, 16, 22));
@@ -740,7 +744,7 @@ describe('Today: the today-progress harness fixture', () => {
 describe('Today: progress read states', () => {
   it('shows loading while the first read is pending (a pending read)', async () => {
     await bootLocalApp();
-    render(<TodayScreen loadProgress={() => new Promise<TodayProgress>(() => {})} now={clock} groupState={signedOut} />);
+    renderWithTheme(<TodayScreen loadProgress={() => new Promise<TodayProgress>(() => {})} now={clock} groupState={signedOut} />);
 
     expect(text('today-progress-loading')).toBeTruthy();
     expect(screen.getByText('Loading your progress…')).toBeTruthy();
@@ -764,7 +768,7 @@ describe('Today: progress read states', () => {
   it('does not read while unfocused', async () => {
     const loadProgress = jest.fn<Promise<TodayProgress>, [Date, number]>().mockResolvedValue({ status: 'empty' });
     await bootLocalApp();
-    render(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} groupState={signedOut} />);
+    renderWithTheme(<TodayScreen isFocused={false} loadProgress={loadProgress} now={clock} groupState={signedOut} />);
 
     expect(loadProgress).not.toHaveBeenCalled();
     expect(text('today-progress-loading')).toBeTruthy();
@@ -773,29 +777,29 @@ describe('Today: progress read states', () => {
 
 describe('Today: the share bar', () => {
   const bar = (current: number, previous: number) => {
-    render(<ShareBar current={current} previous={previous} testID="bar" />);
+    renderWithTheme(<ShareBar current={current} previous={previous} testID="bar" />);
     return { track: screen.getByTestId('bar'), fill: screen.getByTestId('bar-fill') };
   };
 
   it('fills the first lap over the empty track up to last week', () => {
     const { track, fill } = bar(2, 3);
 
-    expect(track).toHaveStyle({ backgroundColor: uiRoles.viz0 });
-    expect(fill).toHaveStyle({ width: '67%', backgroundColor: uiRoles.viz2 });
+    expect(track).toHaveStyle({ backgroundColor: roles.viz0 });
+    expect(fill).toHaveStyle({ width: '67%', backgroundColor: roles.viz2 });
   });
 
   it('fills the next step over a full first lap once past last week', () => {
     const { track, fill } = bar(4, 3);
 
-    expect(track).toHaveStyle({ backgroundColor: uiRoles.viz2 });
-    expect(fill).toHaveStyle({ width: '33%', backgroundColor: uiRoles.viz3 });
+    expect(track).toHaveStyle({ backgroundColor: roles.viz2 });
+    expect(fill).toHaveStyle({ width: '33%', backgroundColor: roles.viz3 });
   });
 
   it('stops full in the darkest step past three times last week', () => {
     const { track, fill } = bar(12, 3);
 
-    expect(track).toHaveStyle({ backgroundColor: uiRoles.viz3 });
-    expect(fill).toHaveStyle({ width: '100%', backgroundColor: uiRoles.viz4 });
+    expect(track).toHaveStyle({ backgroundColor: roles.viz3 });
+    expect(fill).toHaveStyle({ width: '100%', backgroundColor: roles.viz4 });
   });
 });
 
@@ -892,7 +896,7 @@ describe('Today: the cards', () => {
     ['no completed session', () => Promise.resolve({ status: 'empty' } as const), 'today-progress-empty'],
   ])("fills the You page's card with its panel for %s", async (_state, loadProgress, panel) => {
     await bootLocalApp();
-    render(<TodayScreen groupState={signedOut} loadProgress={loadProgress} now={clock} />);
+    renderWithTheme(<TodayScreen groupState={signedOut} loadProgress={loadProgress} now={clock} />);
 
     await waitFor(() => expect(within(text('today-progress-section')).getByTestId(panel)).toBeTruthy());
     // Centred in the card's whole body rather than drawn in a card of its own.
