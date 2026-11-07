@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useTextRoles } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatWholeSetCount, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
@@ -46,6 +47,7 @@ const recoveryRowLabel = (row: RecoveryRow, days: Date[]) =>
 
 // A wider gutter only at the Monday boundary; the line stays centred in it.
 function RecoveryDayColumn({ children, weekStart = false, heading = false }: { children: ReactNode; weekStart?: boolean; heading?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={[styles.dayColumn, weekStart ? styles.weekStartColumn : null]}>
       {children}
@@ -61,10 +63,12 @@ function RecoveryDayColumn({ children, weekStart = false, heading = false }: { c
 }
 
 function DayCell({ count, weekStart, testID }: { count: number | null; weekStart: boolean; testID: string }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   return (
     <RecoveryDayColumn weekStart={weekStart}>
       <View style={[styles.dayCell, count === null ? styles.dayCellRest : styles.dayCellTrained]} testID={testID}>
-        <Text allowFontScaling={false} style={[uiText.figureSmall, uiTextTone.ink]}>
+        <Text allowFontScaling={false} style={[text.figureSmall, tone.ink]}>
           {count === null ? '' : wholeSets(count)}
         </Text>
       </View>
@@ -73,6 +77,8 @@ function DayCell({ count, weekStart, testID }: { count: number | null; weekStart
 }
 
 function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: RecoveryRow; days: Date[]; weekStartIndex: number; onPress: () => void }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   const testID = `today-plan-muscle-${row.muscleGroupId}`;
   const met = row.weekSets >= row.target;
   return (
@@ -83,16 +89,16 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
       onPress={onPress}
       style={({ pressed }) => [styles.muscleRow, pressed ? styles.pressed : null]}
       testID={testID}>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.body, styles.nameCell]}>
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.body, styles.nameCell]}>
         {row.name}
       </Text>
       {row.days.map((count, index) => (
         <DayCell count={count} key={days[index].getTime()} testID={`${testID}-day-${index}`} weekStart={index === weekStartIndex} />
       ))}
       <DayCell count={row.today} testID={`${testID}-today`} weekStart={days.length === weekStartIndex} />
-      <Text allowFontScaling={false} style={[uiText.figure, styles.weekCell]} testID={`${testID}-week`}>
-        <Text allowFontScaling={false} style={met ? uiTextTone.gain : uiTextTone.ink}>{wholeSets(row.weekSets)}</Text>
-        <Text allowFontScaling={false} style={uiTextTone.muted}>{`/${row.target}`}</Text>
+      <Text allowFontScaling={false} style={[text.figure, styles.weekCell]} testID={`${testID}-week`}>
+        <Text allowFontScaling={false} style={met ? tone.gain : tone.ink}>{wholeSets(row.weekSets)}</Text>
+        <Text allowFontScaling={false} style={tone.muted}>{`/${row.target}`}</Text>
       </Text>
     </Pressable>
   );
@@ -105,7 +111,9 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
 // totals turn green; the numeric ratio also communicates whether it is met.
 // The first rows show and the rest scroll, with no indicator over the targets.
 function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCardsProps, 'onOpenPlan' | 'onOpenSessions'>) {
-  const label = [uiText.label, uiTextTone.faint];
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
+  const label = [text.label, tone.faint];
   const weekStart = localWeekWindow(plan.today).start;
   const firstCurrentDay = [...plan.recoveryDays, plan.today].findIndex((day) => day >= weekStart);
   const weekStartIndex = firstCurrentDay > 0 ? firstCurrentDay : -1;
@@ -121,7 +129,7 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
   return (
     <Card style={[styles.card, styles.fillCard]} testID="today-plan-recovery-card">
       <View style={styles.header}>
-        <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
+        <Text accessibilityRole="header" allowFontScaling={false} style={[text.label, tone.ink]}>
           Recovery
         </Text>
         <ActionButton label="Progress" onPress={onOpenProgress} testID="today-plan-progress-button" variant="link" />
@@ -134,7 +142,7 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
           </RecoveryDayColumn>
         ))}
         <RecoveryDayColumn heading weekStart={plan.recoveryDays.length === weekStartIndex}>
-          <Text allowFontScaling={false} style={[...label, styles.dayLabel, uiTextTone.accent]} testID="today-plan-recovery-today">
+          <Text allowFontScaling={false} style={[...label, styles.dayLabel, tone.accent]} testID="today-plan-recovery-today">
             {weekdayLetter(plan.today)}
           </Text>
         </RecoveryDayColumn>
@@ -148,14 +156,17 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
 }
 
 function WeekDayCell({ day }: { day: PlanWeekDay }) {
+  const styles = useStyles();
+  const markStyles = useMarkStyles();
+  const { text, tone } = useTextRoles();
   const state = day.trained ? 'trained' : day.planned ? 'planned' : 'nothing';
   const spoken = `${spokenDate(day.date)}${day.isToday ? ', today' : ''}: ${day.trained ? 'trained' : day.planned ? 'planned' : 'nothing'}`;
   return (
     <View accessibilityLabel={spoken} accessible style={[styles.weekDay, day.isToday ? styles.weekDayToday : null]} testID={`today-plan-week-day-${day.date.getDay()}`}>
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+      <Text allowFontScaling={false} style={[text.label, tone.faint]}>
         {weekdayLetter(day.date)}
       </Text>
-      <Text allowFontScaling={false} style={[uiText.figure, day.isToday ? uiTextTone.accent : null]}>
+      <Text allowFontScaling={false} style={[text.figure, day.isToday ? tone.accent : null]}>
         {day.date.getDate()}
       </Text>
       <View style={[styles.mark, markStyles[state]]} testID={`today-plan-week-day-${day.date.getDay()}-${state}`} />
@@ -167,6 +178,8 @@ const plannedDay = (session: NextPlannedSession, now: Date) =>
   localDateKey(session.scheduledFor) === localDateKey(now) ? 'Today' : weekdayShort(session.scheduledFor);
 
 function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; now: Date; onPress: () => void }) {
+  const styles = useStyles();
+  const { text } = useTextRoles();
   const testID = `today-plan-next-${session.planId}`;
   const day = plannedDay(session, now);
   const time = formatClockTime(session.scheduledFor.getTime());
@@ -182,16 +195,16 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
       style={({ pressed }) => [styles.plannedRow, pressed ? styles.pressed : null]}
       testID={testID}>
       <View style={styles.plannedWhen}>
-        <Text allowFontScaling={false} style={uiText.bodyStrong} testID={`${testID}-day`}>{day}</Text>
-        <Text allowFontScaling={false} style={uiText.figureSmall}>{time}</Text>
+        <Text allowFontScaling={false} style={text.bodyStrong} testID={`${testID}-day`}>{day}</Text>
+        <Text allowFontScaling={false} style={text.figureSmall}>{time}</Text>
       </View>
       <View style={styles.plannedBody}>
         <View style={styles.plannedTop}>
-          <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.bodyStrong, styles.plannedTitle]}>{session.title}</Text>
-          <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-figures`}><FigureText>{figures}</FigureText></Text>
+          <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.bodyStrong, styles.plannedTitle]}>{session.title}</Text>
+          <Text allowFontScaling={false} style={text.meta} testID={`${testID}-figures`}><FigureText>{figures}</FigureText></Text>
         </View>
         {muscles ? (
-          <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={uiText.meta} testID={`${testID}-muscles`}>
+          <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={text.meta} testID={`${testID}-muscles`}>
             {muscles}
           </Text>
         ) : null}
@@ -208,10 +221,12 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
   onOpenPlan: (planId: string) => void;
   onOpenSessions: () => void;
 }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   return (
     <Card style={styles.card} testID="today-plan-week-card">
       <View style={styles.header}>
-        <Text accessibilityRole="header" allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
+        <Text accessibilityRole="header" allowFontScaling={false} style={[text.label, tone.ink]}>
           Plan
         </Text>
         <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-plan-sessions-button" variant="link" />
@@ -222,7 +237,7 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
         ))}
       </View>
       {plan.next.length === 0 ? (
-        <Text allowFontScaling={false} style={[uiText.meta, styles.empty]} testID="today-plan-next-empty">
+        <Text allowFontScaling={false} style={[text.meta, styles.empty]} testID="today-plan-next-empty">
           Nothing planned this week.
         </Text>
       ) : (
@@ -238,6 +253,7 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
 
 /** Today's Plan page: the recovery card over the week's plan. */
 export function TodayPlanCards({ now, ...props }: TodayPlanCardsProps & { now: Date }) {
+  const styles = useStyles();
   return (
     <View style={[styles.stack, styles.fill]}>
       <RecoveryCard {...props} />
@@ -256,13 +272,13 @@ const ROW_HEIGHT = 32;
 const MARK = 8;
 const PLANNED_WHEN_WIDTH = 52;
 
-const markStyles = StyleSheet.create({
-  trained: { backgroundColor: uiRoles.ink },
-  planned: { borderWidth: 2, borderColor: uiRoles.accent },
-  nothing: { backgroundColor: uiRoles.ruleSoft },
-});
+const useMarkStyles = makeStyles((roles) => ({
+  trained: { backgroundColor: roles.ink },
+  planned: { borderWidth: 2, borderColor: roles.accent },
+  nothing: { backgroundColor: roles.ruleSoft },
+}));
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   stack: {
     gap: uiSpace.sm,
   },
@@ -305,10 +321,10 @@ const styles = StyleSheet.create({
     gap: uiSpace.xs,
     height: ROW_HEIGHT,
     borderTopWidth: 1,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   // Gutters either side of the day grid keep it clear of the name and the target.
   nameCell: {
@@ -330,7 +346,7 @@ const styles = StyleSheet.create({
     top: -1,
     bottom: 0,
     width: 1,
-    backgroundColor: uiRoles.rule,
+    backgroundColor: roles.rule,
   },
   weekDividerHeading: {
     bottom: -uiSpace.xs,
@@ -347,10 +363,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dayCellRest: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   dayCellTrained: {
-    backgroundColor: uiRoles.viz2,
+    backgroundColor: roles.viz2,
   },
   weekCell: {
     width: WEEK_WIDTH,
@@ -369,7 +385,7 @@ const styles = StyleSheet.create({
     borderRadius: uiGeometry.radius.control,
   },
   weekDayToday: {
-    backgroundColor: uiRoles.accentWash,
+    backgroundColor: roles.accentWash,
   },
   mark: {
     width: MARK,
@@ -387,7 +403,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
     paddingVertical: uiSpace.sm,
     borderTopWidth: 1,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   plannedWhen: {
     width: PLANNED_WHEN_WIDTH,
@@ -404,4 +420,4 @@ const styles = StyleSheet.create({
   plannedTitle: {
     flexShrink: 1,
   },
-});
+}));

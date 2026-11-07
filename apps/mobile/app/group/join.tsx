@@ -16,8 +16,7 @@ import {
   FigureText,
   ScreenScroll,
   uiSpace,
-  uiText,
-  uiTextTone,
+  useTextRoles,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -48,6 +47,7 @@ export default function JoinGroupRoute() {
 }
 
 function JoinGroupContent({ userId, initialCode }: { userId: string; initialCode: string }) {
+  const { text, tone } = useTextRoles();
   const router = useRouter();
   const gate = useUsernameGate(userId);
   const [code, setCode] = useState(initialCode);
@@ -149,10 +149,10 @@ function JoinGroupContent({ userId, initialCode }: { userId: string; initialCode
           </View>
           {preview ? (
             <Card style={styles.preview} testID="group-join-preview">
-              <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title} testID="group-join-preview-name">
+              <Text allowFontScaling={false} accessibilityRole="header" style={text.title} testID="group-join-preview-name">
                 {preview.name}
               </Text>
-              <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="group-join-preview-meta">
+              <Text allowFontScaling={false} style={[text.body, tone.muted]} testID="group-join-preview-meta">
                 <FigureText>
                   {preview.already_member
                     ? `${formatMemberCount(preview.member_count)} · You're already a member`

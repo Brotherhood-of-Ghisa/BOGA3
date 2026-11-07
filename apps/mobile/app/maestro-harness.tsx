@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native';
 
-import { Screen, uiRoles, uiSpace, uiText } from '@/components/ui';
+import { makeStyles, Screen, textRolesFor, uiSpace, useUiRoles } from '@/components/ui';
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
@@ -32,6 +32,8 @@ const HARNESS_NOT_ALLOWED: HarnessStatus = {
 };
 
 export default function MaestroHarnessScreen() {
+  const styles = useStyles();
+  const roles = useUiRoles();
   const router = useRouter();
   const params = useLocalSearchParams<{
     reset?: string | string[];
@@ -186,7 +188,7 @@ export default function MaestroHarnessScreen() {
   // Dev/test-only (plan G8). Flows wait on the status copy, so it never changes.
   return (
     <Screen style={styles.screen} testID="maestro-harness-screen">
-      {shownStatus.kind === 'running' ? <ActivityIndicator color={uiRoles.inkMuted} size="small" /> : null}
+      {shownStatus.kind === 'running' ? <ActivityIndicator color={roles.inkMuted} size="small" /> : null}
       <Text allowFontScaling={false} selectable style={[styles.message, shownStatus.kind === 'error' ? styles.errorMessage : null]} testID="maestro-harness-status">
         {shownStatus.message}
       </Text>
@@ -194,7 +196,7 @@ export default function MaestroHarnessScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   screen: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -202,11 +204,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.xl,
   },
   message: {
-    ...uiText.body,
+    ...textRolesFor(roles).text.body,
     textAlign: 'center',
   },
   errorMessage: {
     fontWeight: '600',
-    color: uiRoles.danger,
+    color: roles.danger,
   },
-});
+}));

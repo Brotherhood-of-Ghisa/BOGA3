@@ -146,7 +146,6 @@ import { act, render, screen, waitFor } from '@testing-library/react-native';
 import RootLayout from '../app/_layout';
 import * as themeLaunch from '@/components/ui/theme-launch';
 import { CUSTOM_THEME, themePresets } from '@/components/ui/theme-presets';
-import * as tokens from '@/components/ui/tokens';
 import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
 import { getExerciseCatalogSnapshot } from '@/src/exercise-catalog/cache';
 import { closeLocalData, localDataClient, resetLocalData } from './helpers/local-data';
@@ -178,7 +177,7 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockBootstrapAuthState.mockResolvedValue(undefined);
   });
 
-  it('draws the status bar and the navigators in this launch\'s mode and roles', () => {
+  it('draws the status bar and the navigators in the launch mode and roles', () => {
     render(<RootLayout />);
 
     // Tests launch light: dark status-bar content on the light page.
@@ -200,15 +199,21 @@ describe('RootLayout auth bootstrap wiring', () => {
     expect(mockThemeUnderLayout).toHaveBeenLastCalledWith(rolesFor(slateDark));
   });
 
-  it('draws light status-bar content in a dark launch', () => {
-    jest.replaceProperty(tokens, 'uiMode', 'dark');
-    try {
-      render(<RootLayout />);
+  it('follows a theme saved while the app runs in the status bar and the navigators', async () => {
+    render(<RootLayout />);
+    expect(mockStatusBar).toHaveBeenLastCalledWith({ style: 'dark' });
 
-      expect(mockStatusBar).toHaveBeenLastCalledWith({ style: 'light' });
-    } finally {
-      jest.restoreAllMocks();
-    }
+    const slateDark = { theme: 'slate', mode: 'dark', custom: null } as const;
+    await switchTheme(slateDark);
+
+    // Light content on a dark page, and the navigators drawn in its roles.
+    expect(mockStatusBar).toHaveBeenLastCalledWith({ style: 'light' });
+    expect(mockThemeProvider).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        dark: true,
+        colors: expect.objectContaining({ background: rolesFor(slateDark).paper, text: rolesFor(slateDark).ink }),
+      }),
+    );
   });
 
   it('reports why the launch theme is not the stored choice, once on mount', () => {

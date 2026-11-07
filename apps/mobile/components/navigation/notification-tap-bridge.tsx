@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 
 import { GroupStateView } from '@/components/groups/group-state-view';
-import { Sheet, uiRoles, uiSpace } from '@/components/ui';
+import { Sheet, uiSpace, useUiRoles } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { logEvent } from '@/src/logging';
 import { useRootRouteAccess } from '@/src/navigation/root-route-access';
@@ -20,6 +20,7 @@ import {
 // Native listeners live across protected-route changes; a tap waits for both
 // the mounted navigator and the existing account/first-sync gates.
 export function NotificationTapBridge() {
+  const roles = useUiRoles();
   const { status, user } = useAuth();
   const access = useRootRouteAccess();
   const navigator = useRootNavigationState();
@@ -35,17 +36,20 @@ export function NotificationTapBridge() {
   const unavailable = failure.userId === userId ? failure.reason : null;
   const ready = status === 'ready' && Boolean(userId && navigator?.key) && access === 'app';
 
+  // Shared again on each saved appearance, so a notification is drawn in the
+  // theme the app is in now.
   useEffect(() => {
     try {
       setAppliedNotificationTheme({
-        paper: uiRoles.paper, surface: uiRoles.surface, rule: uiRoles.rule,
-        ink: uiRoles.ink, inkMuted: uiRoles.inkMuted, record: uiRoles.record, recordWash: uiRoles.recordWash,
+        paper: roles.paper, surface: roles.surface, rule: roles.rule,
+        ink: roles.ink, inkMuted: roles.inkMuted, record: roles.record, recordWash: roles.recordWash,
       });
     } catch {
       void logEvent({ level: 'warn', event: 'notifications.theme_failed', message: 'Could not share the applied notification theme.' });
     }
-    return startNotificationLifecycle();
-  }, []);
+  }, [roles]);
+
+  useEffect(() => startNotificationLifecycle(), []);
 
   const showUnavailable = useCallback((reason: 'offline' | 'unavailable' | null) => {
     setFailure(previous => previous.userId === userId ? { userId, reason } : previous);

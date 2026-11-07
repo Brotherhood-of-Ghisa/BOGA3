@@ -14,7 +14,7 @@ import {
   Card,
   ScreenScroll,
   uiSpace,
-  uiText,
+  useTextRoles,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -57,6 +57,7 @@ export default function GroupInviteRoute() {
 type Feedback = { tone: 'error' | 'success'; message: string };
 
 function GroupInviteContent({ userId, groupId }: { userId: string; groupId: string }) {
+  const { text } = useTextRoles();
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({
     userId,
@@ -137,11 +138,11 @@ function GroupInviteContent({ userId, groupId }: { userId: string; groupId: stri
           allowFontScaling={false}
           accessibilityLabel={`Invite code ${code.split('').join(' ')}`}
           selectable
-          style={[uiText.figureHero, styles.code]}
+          style={[text.figureHero, styles.code]}
           testID="group-invite-code">
           {code}
         </Text>
-        <Text allowFontScaling={false} selectable style={[uiText.meta, styles.link]} testID="group-invite-link">
+        <Text allowFontScaling={false} selectable style={[text.meta, styles.link]} testID="group-invite-link">
           {groupInviteLink(code)}
         </Text>
       </>
@@ -158,7 +159,7 @@ function GroupInviteContent({ userId, groupId }: { userId: string; groupId: stri
   return (
     <ScreenScroll testID="group-invite-screen">
       <Card style={styles.card}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={text.title}>
           {groupName ? `Invite friends to ${groupName}` : 'Invite friends'}
         </Text>
         {codeArea}

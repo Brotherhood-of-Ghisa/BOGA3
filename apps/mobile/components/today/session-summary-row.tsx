@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
-import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextEmphasis, useTextRoles } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import type { SessionRecordLine } from '@/src/session-insights/record-line';
 
 export type SessionSummaryRowProps = {
@@ -28,6 +29,7 @@ export type SessionSummaryRowProps = {
 
 /** The `set-current` ring before a training-now label. */
 export function TrainingNowMark({ children }: { children: ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.liveMark}>
       <Icon name="set-current" size="xs" />
@@ -37,13 +39,15 @@ export function TrainingNowMark({ children }: { children: ReactNode }) {
 }
 
 function RecordLine({ line, testID }: { line: SessionRecordLine; testID: string }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   return (
     <View style={styles.recordLine} testID={`${testID}-record`}>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.meta, styles.recordText]}>
-        <Text allowFontScaling={false} style={uiTextTone.record}>
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.meta, styles.recordText]}>
+        <Text allowFontScaling={false} style={tone.record}>
           {line.kind === 'one' ? line.lead : line.count}
         </Text>
-        {line.kind === 'one' ? <Text allowFontScaling={false} style={uiTextTone.muted}>{` · ${line.note}`}</Text> : null}
+        {line.kind === 'one' ? <Text allowFontScaling={false} style={tone.muted}>{` · ${line.note}`}</Text> : null}
       </Text>
     </View>
   );
@@ -66,6 +70,8 @@ export function SessionSummaryRow({
   children,
   style,
 }: SessionSummaryRowProps) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   const gymName = gym?.trim();
   return (
     <Pressable
@@ -76,24 +82,24 @@ export function SessionSummaryRow({
       style={({ pressed }) => [styles.row, style, pressed ? styles.pressed : null]}
       testID={testID}>
       <View style={styles.copy}>
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={uiText.body}>
-          <Text allowFontScaling={false} style={uiText.inlineFigure} testID={`${testID}-start`}>
+        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={text.body}>
+          <Text allowFontScaling={false} style={text.inlineFigure} testID={`${testID}-start`}>
             {stamp}
           </Text>
           {duration ? (
             <>
-              <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
-              <Text allowFontScaling={false} style={uiText.inlineFigure}>{duration}</Text>
+              <Text allowFontScaling={false} style={tone.faint}> · </Text>
+              <Text allowFontScaling={false} style={text.inlineFigure}>{duration}</Text>
             </>
           ) : null}
           {gymName ? (
             <>
-              <Text allowFontScaling={false} style={uiTextTone.faint}> @ </Text>
+              <Text allowFontScaling={false} style={tone.faint}> @ </Text>
               <Text allowFontScaling={false} style={uiTextEmphasis.strong}>{gymName}</Text>
             </>
           ) : null}
         </Text>
-        <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-figures`}>
+        <Text allowFontScaling={false} style={text.meta} testID={`${testID}-figures`}>
           <FigureText>{figures}</FigureText>
         </Text>
         {record ? <RecordLine line={record} testID={testID} /> : null}
@@ -103,7 +109,7 @@ export function SessionSummaryRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -112,7 +118,7 @@ const styles = StyleSheet.create({
   },
   // A pressed row takes the `paper` ground, as `ListRow` does.
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   copy: {
     flex: 1,
@@ -131,4 +137,4 @@ const styles = StyleSheet.create({
   recordText: {
     flexShrink: 1,
   },
-});
+}));

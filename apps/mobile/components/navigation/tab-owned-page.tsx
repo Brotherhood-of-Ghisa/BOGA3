@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { useOpenMainTabFromPage } from '@/components/navigation/use-open-main-tab';
-import { uiRoles } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
 import type { MainTabKey } from '@/src/navigation/main-tabs';
 
 type TabOwnedPageProps = {
@@ -18,6 +18,7 @@ type TabOwnedPageProps = {
  * (`useOpenMainTabFromPage`).
  */
 export function TabOwnedPage({ children, activeTab = 'more' }: TabOwnedPageProps) {
+  const styles = useStyles();
   const openTab = useOpenMainTabFromPage();
   return (
     <View style={styles.page}>
@@ -27,12 +28,12 @@ export function TabOwnedPage({ children, activeTab = 'more' }: TabOwnedPageProps
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   page: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   body: {
     flex: 1,
   },
-});
+}));

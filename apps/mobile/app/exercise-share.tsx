@@ -16,8 +16,7 @@ import {
   ScreenScroll,
   Tag,
   uiSpace,
-  uiText,
-  uiTextTone,
+  useTextRoles,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -262,6 +261,7 @@ function ExerciseShareCard({
   muscleLookup: Map<string, string>;
   payload: ExerciseSharePayload;
 }) {
+  const { text, tone } = useTextRoles();
   const primaryMuscles = payload.mappings
     .filter((m) => m.role === 'primary' || !m.role)
     .map((m) => muscleLookup.get(m.muscleGroupId) ?? m.muscleGroupId);
@@ -273,12 +273,12 @@ function ExerciseShareCard({
   return (
     <Card style={styles.card} testID="exercise-share-card">
       <View style={styles.eyebrowRow}>
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]} testID="exercise-share-group-eyebrow">
+        <Text allowFontScaling={false} style={[text.label, tone.faint]} testID="exercise-share-group-eyebrow">
           Shared via {groupName}
         </Text>
       </View>
 
-      <Text allowFontScaling={false} style={uiText.title} testID="exercise-share-title">
+      <Text allowFontScaling={false} style={text.title} testID="exercise-share-title">
         {payload.name}
       </Text>
 
@@ -294,10 +294,10 @@ function ExerciseShareCard({
 
       {primaryMuscles.length > 0 ? (
         <View style={styles.muscleSection}>
-          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+          <Text allowFontScaling={false} style={[text.label, tone.faint]}>
             Primary muscle{primaryMuscles.length > 1 ? 's' : ''}
           </Text>
-          <Text allowFontScaling={false} style={uiText.body} testID="exercise-share-primary-muscles">
+          <Text allowFontScaling={false} style={text.body} testID="exercise-share-primary-muscles">
             {primaryMuscles.join(', ')}
           </Text>
         </View>
@@ -305,10 +305,10 @@ function ExerciseShareCard({
 
       {secondaryMuscles.length > 0 ? (
         <View style={styles.muscleSection}>
-          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+          <Text allowFontScaling={false} style={[text.label, tone.faint]}>
             Secondary muscle{secondaryMuscles.length > 1 ? 's' : ''}
           </Text>
-          <Text allowFontScaling={false} style={uiText.body} testID="exercise-share-secondary-muscles">
+          <Text allowFontScaling={false} style={text.body} testID="exercise-share-secondary-muscles">
             {secondaryMuscles.join(', ')}
           </Text>
         </View>

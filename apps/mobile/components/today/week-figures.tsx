@@ -2,8 +2,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiIconSize, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useTextRoles } from '@/components/ui/text-roles';
+import type { UiRoles } from '@/components/ui/theme';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
 import type { ProgressMetric } from '@/src/preferences/model';
 
@@ -14,18 +16,21 @@ type ShareBarProps = { current: number | null; previous: number | null; testID?:
 // One `viz` step per lap of `previous` (`weekShare`): `viz2` up to it, `viz3`
 // up to twice it, `viz4` beyond. A lap fills over the one before, full; the
 // first over the `viz0` track.
-const LAP_FILLS = [uiRoles.viz2, uiRoles.viz3, uiRoles.viz4] as const;
+const lapFills = (roles: UiRoles) => [roles.viz2, roles.viz3, roles.viz4] as const;
 
 // A thin bar on the `viz` ramp: `current` as a share of `previous`, in laps.
 export function ShareBar({ current, previous, testID }: ShareBarProps) {
+  const styles = useStyles();
+  const roles = useUiRoles();
   if (current === null || previous === null) return <View style={styles.track} testID={testID} />;
   const { lap, fraction } = weekShare({ current, previous });
+  const fills = lapFills(roles);
   return (
     <View
-      style={[styles.track, lap > 0 ? { backgroundColor: LAP_FILLS[lap - 1] } : null]}
+      style={[styles.track, lap > 0 ? { backgroundColor: fills[lap - 1] } : null]}
       testID={testID}>
       <View
-        style={[styles.fill, { width: `${Math.round(fraction * 100)}%`, backgroundColor: LAP_FILLS[lap] }]}
+        style={[styles.fill, { width: `${Math.round(fraction * 100)}%`, backgroundColor: fills[lap] }]}
         testID={testID ? `${testID}-fill` : undefined}
       />
     </View>
@@ -52,6 +57,8 @@ type FigureProps = {
 
 export function WeekFigure({ label, current, previous, record = false, previousWeek = LAST_WEEK, testID,
   metric = 'workingSetCount', onToggleMetric }: FigureProps) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   const showRecord = record && current !== null && current > 0;
   const currentText = formatPaceValue(current, metric);
   const previousText = formatPaceValue(previous, metric);
@@ -65,19 +72,19 @@ export function WeekFigure({ label, current, previous, record = false, previousW
       style={styles.figure}
       testID={testID}>
       <View style={styles.metricLabel}>
-        <Text allowFontScaling={false} style={uiText.label}>{label}</Text>
-        {onToggleMetric ? <Icon color={uiRoles.inkMuted} name="swap" size="sm" /> : null}
+        <Text allowFontScaling={false} style={text.label}>{label}</Text>
+        {onToggleMetric ? <Icon colorRole="inkMuted" name="swap" size="sm" /> : null}
       </View>
       <View style={styles.valueRow}>
         <Text
           allowFontScaling={false}
-          style={[uiText.figureHero, showRecord ? uiTextTone.record : null]}
+          style={[text.figureHero, showRecord ? tone.record : null]}
           testID={`${testID}-value`}>
           {currentText}
         </Text>
       </View>
       <ShareBar current={current} previous={previous} testID={`${testID}-bar`} />
-      <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-previous`}>
+      <Text allowFontScaling={false} style={text.meta} testID={`${testID}-previous`}>
         <FigureText>{previousWeek.short ? `vs ${previousText} ${previousWeek.short}` : `vs ${previousText}`}</FigureText>
       </Text>
     </View>
@@ -94,15 +101,17 @@ export function WeekFigure({ label, current, previous, record = false, previousW
 // over last week's whole total. No signed deltas: a part week against a whole
 // one says little.
 export function WeekFigures({ week, metric, onToggleMetric }: { week: TodayProgressWeek; metric: ProgressMetric; onToggleMetric: () => void }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   return (
     <View style={styles.block} testID="today-progress-week">
       <View style={styles.heading}>
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
+        <Text allowFontScaling={false} style={[text.label, tone.ink]}>
           This week
         </Text>
         <Text
           allowFontScaling={false}
-          style={[uiText.label, uiTextTone.faint]}
+          style={[text.label, tone.faint]}
           testID="today-progress-week-range">
           {formatPeriodRange(week.window)}
         </Text>
@@ -146,7 +155,7 @@ export const weekFigureStyles = StyleSheet.create({
   },
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   block: {
     gap: uiSpace.md,
   },
@@ -170,7 +179,7 @@ const styles = StyleSheet.create({
   track: {
     height: BAR_HEIGHT,
     borderRadius: uiGeometry.radius.control,
-    backgroundColor: uiRoles.viz0,
+    backgroundColor: roles.viz0,
     marginTop: uiSpace.xs,
     overflow: 'hidden',
   },
@@ -178,4 +187,4 @@ const styles = StyleSheet.create({
     height: BAR_HEIGHT,
     borderRadius: uiGeometry.radius.control,
   },
-});
+}));

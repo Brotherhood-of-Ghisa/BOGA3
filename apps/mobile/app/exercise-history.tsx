@@ -6,7 +6,7 @@ import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-seman
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
@@ -26,11 +26,10 @@ import {
   StatePanel,
   Tag,
   uiBorder,
-  uiRoles,
   uiSpace,
-  uiText,
   uiTextEmphasis,
-  uiTextTone,
+  useTextRoles,
+  makeStyles,
   FigureText,
   type ChipOption,
 } from '@/components/ui';
@@ -121,6 +120,7 @@ export function ExerciseHistoryScreenShell({
   activeMainTab = 'progress',
   onSelectMainTab,
 }: ExerciseHistoryScreenShellProps) {
+  const styles = useStyles();
   const { values } = useAccountLocalPreferenceState();
   const periodOptions = [
     { value: 'week' as const, label: 'This week' },
@@ -249,13 +249,15 @@ function HistorySessionCards({ summary, historyStart, onPressSession }: {
   historyStart?: Date;
   onPressSession: (sessionId: string) => void;
 }) {
+  const styles = useStyles();
+  const { text } = useTextRoles();
   const firstOlder = historyStart ? summary.sessions.findIndex(entry => entry.completedAt < historyStart) : -1;
   return summary.sessions.map((entry, index) => (
     <Fragment key={entry.sessionExerciseId}>
       {index === firstOlder ? (
         <View style={styles.olderDivider} testID="exercise-history-older-divider">
           <View style={styles.olderRule} />
-          <Text accessibilityRole="header" allowFontScaling={false} style={uiText.meta}>Older sessions</Text>
+          <Text accessibilityRole="header" allowFontScaling={false} style={text.meta}>Older sessions</Text>
           <View style={styles.olderRule} />
         </View>
       ) : null}
@@ -276,12 +278,14 @@ function BestCard({
   gymLabel: string | null;
   onPressSession: (sessionId: string) => void;
 }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   const dateFormat = useDateFormat();
   const oneRm = best.estimatedOneRepMax;
   const topWeight = best.topWeight;
   return (
     <Card testID="exercise-history-best-card">
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint, styles.cardLabel]} testID="exercise-history-best-label">
+      <Text allowFontScaling={false} style={[text.label, tone.faint, styles.cardLabel]} testID="exercise-history-best-label">
         {gymLabel ? `All-time bests · ${gymLabel}` : 'All-time bests'}
       </Text>
       <BestRow
@@ -318,6 +322,8 @@ function BestRow({
   divider?: boolean;
   onPress?: () => void;
 }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   return (
     <ListRow
       accessibilityHint={onPress ? 'Opens the session' : undefined}
@@ -329,16 +335,16 @@ function BestRow({
         <View style={styles.bestFigures}>
           <Text
             allowFontScaling={false}
-            style={[uiText.figureLarge, date ? uiTextTone.record : uiTextTone.faint]}
+            style={[text.figureLarge, date ? tone.record : tone.faint]}
             testID={`${testID}-value`}>
             {value}
           </Text>
-          {date ? <Text allowFontScaling={false} style={uiText.meta}><FigureText>{date}</FigureText></Text> : null}
+          {date ? <Text allowFontScaling={false} style={text.meta}><FigureText>{date}</FigureText></Text> : null}
         </View>
       }
       onPress={onPress}
       testID={testID}
-      trailing={onPress ? <Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" /> : null}
+      trailing={onPress ? <Icon colorRole="inkMuted" name="chevron-right" size="sm" /> : null}
     />
   );
 }
@@ -355,6 +361,8 @@ function SessionCard({
   tagOptions: ExerciseHistoryTagOption[];
   onPress: () => void;
 }) {
+  const styles = useStyles();
+  const { text } = useTextRoles();
   const dateFormat = useDateFormat();
   const date = formatLocalDateTime(entry.completedAt.getTime(), dateFormat);
   const tags = entry.tagIds
@@ -388,7 +396,7 @@ function SessionCard({
       rows={rows}
       summary={
         <View style={styles.sessionSummary}>
-          <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextEmphasis.strong]}>
+          <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, uiTextEmphasis.strong]}>
             {entry.gymName?.trim() ? entry.gymName : 'No gym'}
           </Text>
           {tags.length > 0 ? (
@@ -568,14 +576,14 @@ export default function ExerciseHistoryRoute() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   olderDivider: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
     paddingVertical: uiSpace.xs,
   },
-  olderRule: { flex: 1, height: uiBorder.width, backgroundColor: uiRoles.rule },
+  olderRule: { flex: 1, height: uiBorder.width, backgroundColor: roles.rule },
   // A chip row is as tall as its chips: a ScrollView grows by default, and
   // inside the page's scroll that stretched them into circles.
   chipScroll: {
@@ -611,4 +619,4 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: uiSpace.sm,
   },
-});
+}));

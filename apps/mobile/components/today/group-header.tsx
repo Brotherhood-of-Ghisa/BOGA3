@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { GroupSwitchSheet } from '@/components/groups/group-switch-sheet';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiText } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useTextRoles } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type TodayGroupHeaderProps = {
   /** The primary group's name. */
@@ -24,6 +25,8 @@ export type TodayGroupHeaderProps = {
  * group is primary. One group needs no switch.
  */
 export function TodayGroupHeader({ groupName, onOpenHome, groups, selectedGroupId, onSelectGroup }: TodayGroupHeaderProps) {
+  const styles = useStyles();
+  const { text } = useTextRoles();
   return (
     <View style={styles.header}>
       <Pressable
@@ -33,10 +36,10 @@ export function TodayGroupHeader({ groupName, onOpenHome, groups, selectedGroupI
         onPress={onOpenHome}
         style={({ pressed }) => [styles.title, pressed ? styles.pressed : null]}
         testID="today-group-title">
-        <Text allowFontScaling={false} accessibilityRole="header" ellipsizeMode="tail" numberOfLines={1} style={[uiText.title, styles.titleText]}>
+        <Text allowFontScaling={false} accessibilityRole="header" ellipsizeMode="tail" numberOfLines={1} style={[text.title, styles.titleText]}>
           {groupName}
         </Text>
-        <Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />
+        <Icon colorRole="inkMuted" name="chevron-right" size="sm" />
       </Pressable>
       <TodayGroupSwitch groups={groups} onSelectGroup={onSelectGroup} selectedGroupId={selectedGroupId} />
     </View>
@@ -73,7 +76,7 @@ export function TodayGroupSwitch({ groups, selectedGroupId, onSelectGroup }: Tod
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   // A tap-height row, ruled off from the board below it.
   header: {
     flexDirection: 'row',
@@ -83,7 +86,7 @@ const styles = StyleSheet.create({
     paddingLeft: uiSpace.md,
     paddingRight: uiSpace.xs,
     borderBottomWidth: 1,
-    borderBottomColor: uiRoles.ruleSoft,
+    borderBottomColor: roles.ruleSoft,
   },
   title: {
     flex: 1,
@@ -100,4 +103,4 @@ const styles = StyleSheet.create({
   titleText: {
     flexShrink: 1,
   },
-});
+}));

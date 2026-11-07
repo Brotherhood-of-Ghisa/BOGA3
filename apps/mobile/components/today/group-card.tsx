@@ -1,12 +1,13 @@
 import { TodayWeekBoardCard } from './today-week-board';
 import { TodayCoWSummaries } from './group-cow-summary';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextEmphasis, useTextRoles } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiSpace } from '@/components/ui/tokens';
 import {
   GROUP_SESSIONS_SHOWN,
   buildGroupSessions,
@@ -39,6 +40,8 @@ export type TodayGroupCardProps = {
 };
 
 function SessionRow({ row, onPress }: { row: GroupSessionRowViewModel; onPress: () => void }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   const testID = `today-group-session-${row.sessionId}`;
   const { record } = row;
   return (
@@ -50,32 +53,32 @@ function SessionRow({ row, onPress }: { row: GroupSessionRowViewModel; onPress: 
       style={({ pressed }) => [styles.sessionRow, pressed ? styles.pressed : null]}
       testID={testID}>
       <View style={styles.sessionTop}>
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.bodyStrong, styles.who]} testID={`${testID}-member`}>
+        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.bodyStrong, styles.who]} testID={`${testID}-member`}>
           {row.name}
         </Text>
         {row.live ? (
           <TrainingNowMark>
-            <Text allowFontScaling={false} style={[uiText.meta, uiTextEmphasis.strong, uiTextTone.ink]} testID={`${testID}-when`}>
+            <Text allowFontScaling={false} style={[text.meta, uiTextEmphasis.strong, tone.ink]} testID={`${testID}-when`}>
               <FigureText strong>{row.when}</FigureText>
             </Text>
           </TrainingNowMark>
         ) : (
-          <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-when`}>
+          <Text allowFontScaling={false} style={text.meta} testID={`${testID}-when`}>
             <FigureText>{row.when}</FigureText>
           </Text>
         )}
       </View>
       {row.gym?.trim() ? (
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={uiText.meta}>
+        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={text.meta}>
           {row.gym.trim()}
         </Text>
       ) : null}
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.meta, uiTextTone.ink]} testID={`${testID}-figures`}>
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.meta, tone.ink]} testID={`${testID}-figures`}>
         <FigureText>{row.figures}</FigureText>
         {record ? (
           <>
-            <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
-            <Text allowFontScaling={false} style={uiTextTone.record} testID={`${testID}-record`}>
+            <Text allowFontScaling={false} style={tone.faint}> · </Text>
+            <Text allowFontScaling={false} style={tone.record} testID={`${testID}-record`}>
               {record.kind === 'one' ? record.lead : record.count}
             </Text>
           </>
@@ -91,10 +94,12 @@ function SessionsSection({ title, rows, onOpenSession, testID }: {
   onOpenSession: (row: GroupSessionRowViewModel) => void;
   testID: string;
 }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   if (rows.length === 0) return null;
   return (
     <View testID={testID}>
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink, styles.sectionLabel]}>
+      <Text allowFontScaling={false} style={[text.label, tone.ink, styles.sectionLabel]}>
         {title}
       </Text>
       {rows.map((row, index) => (
@@ -121,6 +126,8 @@ export function TodayGroupCard({
   onOpenSession,
   loadStreamPage,
 }: TodayGroupCardProps) {
+  const styles = useStyles();
+  const { text } = useTextRoles();
   const board = buildWeekBoard(summary.members, myUserId);
   const range = formatPeriodRange(localWeekWindow(new Date(nowMs)));
   // The week summary carries one completed session; the stream fills the rest.
@@ -136,12 +143,12 @@ export function TodayGroupCard({
     <View style={styles.sessionsBody}>
       <SessionsSection onOpenSession={openSession} rows={sessions.recent} testID="today-group-recent" title="Recent" />
       {empty ? (
-        <Text allowFontScaling={false} style={uiText.meta} testID="today-group-latest-empty">
+        <Text allowFontScaling={false} style={text.meta} testID="today-group-latest-empty">
           No sessions shared to this group yet.
         </Text>
       ) : null}
       {recent.failed ? (
-        <Text allowFontScaling={false} style={uiText.meta} testID="today-group-recent-failed">
+        <Text allowFontScaling={false} style={text.meta} testID="today-group-recent-failed">
           {"Couldn't load earlier sessions."}
         </Text>
       ) : null}
@@ -184,6 +191,7 @@ export function TodayGroupCard({
 
 // A sessions card; the last one fills the page, taking the height the board leaves and scrolling its rows.
 function SessionsCard({ fill, testID, children }: { fill: boolean; testID: string; children: ReactNode }) {
+  const styles = useStyles();
   return (
     <Card style={[styles.sessionsCard, fill ? styles.fill : null]} testID={testID}>
       {fill ? (
@@ -197,7 +205,7 @@ function SessionsCard({ fill, testID, children }: { fill: boolean; testID: strin
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   stack: {
     gap: uiSpace.sm,
   },
@@ -207,7 +215,7 @@ const styles = StyleSheet.create({
   },
   // A pressed row takes the `paper` ground, as `ListRow` does.
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   sessionsCard: {
     paddingHorizontal: uiSpace.md,
@@ -221,7 +229,7 @@ const styles = StyleSheet.create({
   },
   sessionDivider: {
     borderTopWidth: 1,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   sessionRow: {
     paddingVertical: uiSpace.sm,
@@ -235,4 +243,4 @@ const styles = StyleSheet.create({
   who: {
     flexShrink: 1,
   },
-});
+}));

@@ -14,8 +14,7 @@ import {
   SwitchRow,
   Tag,
   uiSpace,
-  uiText,
-  uiTextTone,
+  useTextRoles,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
@@ -54,6 +53,7 @@ function ConnectedAgentCard({
   savingAccess,
   savingEdit,
 }: ConnectedAgentCardProps) {
+  const { text, tone } = useTextRoles();
   const dateFormat = useDateFormat();
   const isAccessUnavailable = agent.planAccessEnabled === 'unavailable';
   const isEditUnavailable = agent.planEditEnabled === 'unavailable';
@@ -67,28 +67,28 @@ function ConnectedAgentCard({
     <Card testID={`connected-agent-${agent.clientId}`}>
       <View style={styles.agentHeader}>
         <View style={styles.agentTitle}>
-          <Text allowFontScaling={false} style={uiText.title}>{agent.name}</Text>
-          <Text allowFontScaling={false} style={uiText.meta}>Read training data</Text>
+          <Text allowFontScaling={false} style={text.title}>{agent.name}</Text>
+          <Text allowFontScaling={false} style={text.meta}>Read training data</Text>
         </View>
         <Tag label="AI" />
       </View>
       <ListRow
         density="list"
         meta={
-          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`connected-agent-granted-${agent.clientId}`}>
+          <Text allowFontScaling={false} style={[text.meta, tone.ink]} testID={`connected-agent-granted-${agent.clientId}`}>
             <FigureText>{formatTimestamp(agent.grantedAt, dateFormat)}</FigureText>
           </Text>
         }>
-        <Text allowFontScaling={false} style={uiText.body}>Access granted</Text>
+        <Text allowFontScaling={false} style={text.body}>Access granted</Text>
       </ListRow>
       <ListRow
         density="list"
         meta={
-          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`connected-agent-last-access-${agent.clientId}`}>
+          <Text allowFontScaling={false} style={[text.meta, tone.ink]} testID={`connected-agent-last-access-${agent.clientId}`}>
             <FigureText>{formatTimestamp(agent.lastAccessAt, dateFormat)}</FigureText>
           </Text>
         }>
-        <Text allowFontScaling={false} style={uiText.body}>Last access</Text>
+        <Text allowFontScaling={false} style={text.body}>Last access</Text>
       </ListRow>
       {/* A separate, opt-in authorization: the base OAuth grant stays read-only. */}
       <View style={styles.permission}>
@@ -104,14 +104,14 @@ function ConnectedAgentCard({
         {isUnavailable ? (
           <Text
             allowFontScaling={false}
-            style={[uiText.meta, uiTextTone.danger, styles.permissionUnavailable]}
+            style={[text.meta, tone.danger, styles.permissionUnavailable]}
             testID={`connected-agent-plan-unavailable-${agent.clientId}`}>
             Change settings are temporarily unavailable for this coach.
           </Text>
         ) : null}
         <Text
           allowFontScaling={false}
-          style={[uiText.meta, styles.permissionDisclosure]}
+          style={[text.meta, styles.permissionDisclosure]}
           testID={`connected-agent-plan-disclosure-${agent.clientId}`}>
           {`Lets ${agent.name} read your upcoming and unscheduled plans, create new plans and programmes, and add, edit, delete or restore exercises and their muscles. Exercise changes also recalculate your past figures. It can never start a workout or change your logged sets.`}
         </Text>
@@ -126,7 +126,7 @@ function ConnectedAgentCard({
         />
         <Text
           allowFontScaling={false}
-          style={[uiText.meta, styles.permissionDisclosure]}
+          style={[text.meta, styles.permissionDisclosure]}
           testID={`connected-agent-plan-edit-disclosure-${agent.clientId}`}>
           {`Lets ${agent.name} edit pending session plans and training programmes. It can never edit workouts in progress or change logged workout history.`}
         </Text>

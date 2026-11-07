@@ -16,7 +16,7 @@ import {
   pickInlineError,
   usePullToRefresh,
 } from '@/components/groups';
-import { ActionButton, Card, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, Card, useTextRoles } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   OWNER_LEAVE_NOTICE,
@@ -88,6 +88,7 @@ function LostAccessState() {
 
 function GroupMembersContent({ userId, groupId }: { userId: string; groupId: string }) {
   const router = useRouter();
+  const { text, tone } = useTextRoles();
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({
     userId,
@@ -206,7 +207,7 @@ function GroupMembersContent({ userId, groupId }: { userId: string; groupId: str
           variant="outline"
         />
       ) : (
-        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="group-members-owner-leave-notice">
+        <Text allowFontScaling={false} style={[text.body, tone.muted]} testID="group-members-owner-leave-notice">
           {`${OWNER_LEAVE_NOTICE}. Open a member to make them the owner.`}
         </Text>
       )}

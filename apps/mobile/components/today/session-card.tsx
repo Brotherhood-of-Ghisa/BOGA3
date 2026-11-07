@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   type LayoutChangeEvent,
@@ -13,8 +12,9 @@ import {
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
-import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextEmphasis, useTextRoles } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { LatestSessionSummary, SessionExerciseLine } from '@/src/progress-summary';
 import { formatClockTime, formatCompactDate } from '@/src/utils/local-time';
@@ -41,22 +41,24 @@ export const VISIBLE_EXERCISE_ROWS = 4;
 const ROW_HEIGHT = 32;
 
 function ExerciseRow({ line, index }: { line: SessionExerciseLine; index: number }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   const testID = `today-latest-session-exercise-${index}`;
   return (
     <View style={[styles.row, styles.exerciseRow]} testID={testID}>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.body, styles.nameCell]}>
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.body, styles.nameCell]}>
         {line.name}
       </Text>
-      <Text allowFontScaling={false} style={[uiText.figure, styles.sets]} testID={`${testID}-sets`}>
+      <Text allowFontScaling={false} style={[text.figure, styles.sets]} testID={`${testID}-sets`}>
         {line.workingSets}
       </Text>
       {/* No working set: the best-set cells stay blank ([[copy.blank-history]]). */}
-      <Text allowFontScaling={false} style={[uiText.figure, styles.best]} testID={`${testID}-best`}>
+      <Text allowFontScaling={false} style={[text.figure, styles.best]} testID={`${testID}-best`}>
         {line.bestSet ? formatBestSet(line.bestSet) : ''}
       </Text>
       <Text
         allowFontScaling={false}
-        style={[uiText.figure, styles.oneRepMax, line.oneRepMaxRecord ? uiTextTone.record : null]}
+        style={[text.figure, styles.oneRepMax, line.oneRepMaxRecord ? tone.record : null]}
         testID={`${testID}-1rm`}>
         {line.bestSet ? formatOneRepMax(line.bestSet.oneRepMaxKg) : ''}
       </Text>
@@ -65,25 +67,26 @@ function ExerciseRow({ line, index }: { line: SessionExerciseLine; index: number
 }
 
 function SummaryLine({ session }: { session: LatestSessionSummary }) {
+  const { text, tone } = useTextRoles();
   const gym = session.gymName?.trim();
   const prs = session.records.length;
   // The rows' count (one per exercise, however often it was logged), so the line and the table agree.
   const exercises = session.exercises.length;
   return (
-    <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={uiText.body} testID="today-latest-session-figures">
-      <Text allowFontScaling={false} style={uiText.inlineFigure}>{exercises}</Text>
+    <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={text.body} testID="today-latest-session-figures">
+      <Text allowFontScaling={false} style={text.inlineFigure}>{exercises}</Text>
       {exercises === 1 ? ' exercise' : ' exercises'}
-      <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
-      <Text allowFontScaling={false} style={uiText.inlineFigure}>{session.workingSets}</Text>
+      <Text allowFontScaling={false} style={tone.faint}> · </Text>
+      <Text allowFontScaling={false} style={text.inlineFigure}>{session.workingSets}</Text>
       {session.workingSets === 1 ? ' set' : ' sets'}
-      <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
-      <Text allowFontScaling={false} style={prs > 0 ? uiTextTone.record : null} testID="today-latest-session-prs">
-        <Text allowFontScaling={false} style={uiText.inlineFigure}>{prs}</Text>
+      <Text allowFontScaling={false} style={tone.faint}> · </Text>
+      <Text allowFontScaling={false} style={prs > 0 ? tone.record : null} testID="today-latest-session-prs">
+        <Text allowFontScaling={false} style={text.inlineFigure}>{prs}</Text>
         {prs === 1 ? ' PR' : ' PRs'}
       </Text>
       {gym ? (
         <>
-          <Text allowFontScaling={false} style={uiTextTone.faint}> @ </Text>
+          <Text allowFontScaling={false} style={tone.faint}> @ </Text>
           <Text allowFontScaling={false} style={uiTextEmphasis.strong}>{gym}</Text>
         </>
       ) : null}
@@ -134,10 +137,12 @@ function useRowScroller(rowCount: number) {
 // swipe, and opens the session itself. The button's label already reads every
 // row, so the table is hidden from assistive tech.
 function ExerciseTable({ lines, onOpen }: { lines: SessionExerciseLine[]; onOpen: () => void }) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   const { scroller, overflows, onScroll, onLayout, onUp, onDown } = useRowScroller(lines.length);
   if (lines.length === 0) return null;
   const rows = lines.map((line, index) => <ExerciseRow index={index} key={`${index}:${line.name}`} line={line} />);
-  const label = [uiText.label, uiTextTone.faint];
+  const label = [text.label, tone.faint];
   return (
     <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.fillTable}>
       <View style={[styles.row, styles.tableHeader]}>
@@ -186,12 +191,14 @@ export function TodaySessionCard({
   onOpenSessions,
   onShowSession,
 }: TodaySessionCardProps) {
+  const styles = useStyles();
+  const { text, tone } = useTextRoles();
   const stamp = (
     // The start reads as a Sessions row's does: the whole stamp, month included, in the figure face.
-    <Text allowFontScaling={false} numberOfLines={1} style={uiText.body} testID="today-latest-session-start">
-      <Text allowFontScaling={false} style={uiText.inlineFigure}>{formatCompactDate(session.startedAt)}</Text>
-      <Text allowFontScaling={false} style={uiTextTone.faint}> · </Text>
-      <Text allowFontScaling={false} style={uiText.inlineFigure}>{formatClockTime(session.startedAt.getTime())}</Text>
+    <Text allowFontScaling={false} numberOfLines={1} style={text.body} testID="today-latest-session-start">
+      <Text allowFontScaling={false} style={text.inlineFigure}>{formatCompactDate(session.startedAt)}</Text>
+      <Text allowFontScaling={false} style={tone.faint}> · </Text>
+      <Text allowFontScaling={false} style={text.inlineFigure}>{formatClockTime(session.startedAt.getTime())}</Text>
     </Text>
   );
   return (
@@ -227,7 +234,7 @@ export function TodaySessionCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   // Three sections, a clear step apart: the stepped start, the summary, the exercises.
   card: {
     paddingHorizontal: uiSpace.md,
@@ -292,7 +299,7 @@ const styles = StyleSheet.create({
   exerciseRow: {
     height: ROW_HEIGHT,
     borderTopWidth: 1,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   sets: {
     width: 32,
@@ -306,4 +313,4 @@ const styles = StyleSheet.create({
     width: 48,
     textAlign: 'right',
   },
-});
+}));

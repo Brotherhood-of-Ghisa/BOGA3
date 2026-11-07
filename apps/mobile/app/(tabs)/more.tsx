@@ -9,10 +9,8 @@ import {
   Icon,
   ListRow,
   ScreenScroll,
-  uiRoles,
   uiSpace,
-  uiText,
-  uiTextTone,
+  useTextRoles,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { MORE_GROUPS, type MoreDestination } from '@/src/navigation/more-destinations';
@@ -20,6 +18,7 @@ import { getAgentConnectUrl } from '@/src/utils/agent-connect';
 
 // Like the other tabs, More has no title: two untitled cards of destinations.
 export default function MoreScreen() {
+  const { text, tone } = useTextRoles();
   const router = useRouter();
   const { user } = useAuth();
   const agentNames = useConnectedAgentNames(user?.id ?? null);
@@ -66,14 +65,14 @@ export default function MoreScreen() {
                   description={description}
                   divider={index > 0}
                   label={destination.label}
-                  leading={<Icon color={uiRoles.inkMuted} name={destination.icon} />}
+                  leading={<Icon colorRole="inkMuted" name={destination.icon} />}
                   onPress={() => {
                     void openDestination(destination);
                   }}
                   testID={destination.testID}
                   trailing={
                     <Icon
-                      color={uiRoles.inkFaint}
+                      colorRole="inkFaint"
                       name={external ? 'arrow-up-right' : 'chevron-right'}
                       size="sm"
                     />
@@ -83,7 +82,7 @@ export default function MoreScreen() {
                   <Text
                     allowFontScaling={false}
                     accessibilityLiveRegion="polite"
-                    style={[uiText.bodyStrong, uiTextTone.danger, styles.inlineError]}
+                    style={[text.bodyStrong, tone.danger, styles.inlineError]}
                     testID="more-connect-ai-error">
                     {connectError}
                   </Text>

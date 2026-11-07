@@ -21,8 +21,7 @@ import {
   ScreenScroll,
   SearchField,
   uiSpace,
-  uiText,
-  uiTextTone,
+  useTextRoles,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { linkExercise } from '@/src/data/exercise-group-links';
@@ -62,6 +61,7 @@ export default function ExerciseLinkRoute() {
 type LinkNotice = { tone: 'success' | 'error'; text: string };
 
 function ExerciseLinkContent({ userId }: { userId: string }) {
+  const { text, tone } = useTextRoles();
   const params = useLocalSearchParams<{ exerciseDefinitionId?: string | string[] }>();
   const exerciseDefinitionId = coerceParam(params.exerciseDefinitionId);
   const catalog = useExerciseCatalog();
@@ -263,7 +263,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
             <Section title="All group exercises">
               {model.groups.map((group) => (
                 <View key={group.groupId} style={styles.group}>
-                  <Text allowFontScaling={false} style={uiText.title}>{group.groupName}</Text>
+                  <Text allowFontScaling={false} style={text.title}>{group.groupName}</Text>
                   <Card>
                     {group.rows.map((row, index) => (
                       <AvailableRow divider={index > 0} key={row.key} onLink={link} pendingKey={mutationPending || !linking.linksReady ? 'pending' : null} row={row} />
@@ -274,7 +274,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
             </Section>
           ) : null}
           {offeredCount === 0 ? (
-            <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="exercise-link-empty">
+            <Text allowFontScaling={false} style={[text.body, tone.muted]} testID="exercise-link-empty">
               {(linking.catalogs?.length ?? 0) === 0
                 ? "You're not in any groups yet."
                 : query.trim().length > 0
@@ -289,9 +289,10 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const { text } = useTextRoles();
   return (
     <View style={styles.section}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={text.label}>
         {title}
       </Text>
       {children}
@@ -301,14 +302,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 /** A row's words: the name (· group), then any status lines in `ink-muted`. */
 function RowText({ name, groupName, lines }: { name: string; groupName?: string; lines: (string | null | undefined)[] }) {
+  const { text, tone } = useTextRoles();
   return (
     <View style={styles.rowText}>
-      <Text allowFontScaling={false} style={uiText.bodyStrong}>
+      <Text allowFontScaling={false} style={text.bodyStrong}>
         {name}
-        {groupName ? <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}> · {groupName}</Text> : null}
+        {groupName ? <Text allowFontScaling={false} style={[text.body, tone.muted]}> · {groupName}</Text> : null}
       </Text>
       {lines.filter(Boolean).map((line) => (
-        <Text allowFontScaling={false} key={line} style={[uiText.body, uiTextTone.muted]}>
+        <Text allowFontScaling={false} key={line} style={[text.body, tone.muted]}>
           {line}
         </Text>
       ))}
