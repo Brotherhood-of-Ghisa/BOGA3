@@ -6,7 +6,7 @@ import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { EMPTY_SESSION_WEIGHT, type ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, StyleSheet, View } from 'react-native';
+import { BackHandler, View } from 'react-native';
 
 import { SessionMuscleBreakdown, SessionSummaryContent, type MuscleCatalogState } from '@/components/session-complete/session-summary-content';
 import type { SessionComparisonMode } from '@/components/session-recorder/session-insight-presentation';
@@ -16,7 +16,7 @@ import { SessionCompletionScreen } from '@/components/session-complete';
 import { SessionTopBar } from '@/components/session-view';
 import { ActionButton } from '@/components/ui/action-button';
 import { StatePanel, type StatePanelKind } from '@/components/ui/state-panel';
-import { uiRoles } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
 import { ViewSessionScreen, ViewSessionTopBar } from '@/components/view-session';
 import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 import { DEFAULT_SESSION_ENTRY_COORDINATOR } from '@/src/session-entry';
@@ -222,6 +222,7 @@ export function CompletedSessionDetailScreenShell({
   shouldFailNextMaestroCatalog = false,
   maestroInsights,
 }: CompletedSessionDetailScreenShellProps) {
+  const styles = useStyles();
   const dateFormat = useDateFormat();
   const router = useRouter();
   const openActiveWorkout = useOpenActiveWorkout();
@@ -714,6 +715,7 @@ export function CompletedSessionDetailScreenShell({
 }
 
 export default function CompletedSessionDetailRoute() {
+  const styles = useStyles();
   const router = useRouter();
   const params = useLocalSearchParams<{
     sessionId?: string | string[];
@@ -760,9 +762,9 @@ export default function CompletedSessionDetailRoute() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   frame: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
-});
+}));

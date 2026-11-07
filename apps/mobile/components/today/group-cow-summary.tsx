@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { CompactHeader, FigureText, Icon, ListRow, uiBorder, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { CompactHeader, FigureText, Icon, ListRow, makeStyles, uiBorder, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { GroupInlineError, GroupMissingDataState, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
 import { formatBoardMemberLabel } from '@/src/groups/board-view-model';
@@ -16,8 +16,11 @@ import type { ExerciseDateFormat } from '@/src/preferences/model';
 
 /** Rank-one identity survives figure redaction; never promote a visible runner-up. */
 function WinnerRows({ result }: { result: CoWResultWire }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   if (result.cow.state !== 'final' || result.state !== 'ready') {
-    return <Text allowFontScaling={false} style={uiText.meta}>{coWStatus(result.cow, result.state)}</Text>;
+    return <Text allowFontScaling={false} style={text.meta}>{coWStatus(result.cow, result.state)}</Text>;
   }
   return result.cow.metrics.map(metric => {
     const ranking = result.rankings.find(row => row.metric === metric);
@@ -27,9 +30,9 @@ function WinnerRows({ result }: { result: CoWResultWire }) {
     const suffix = `[${COW_METRIC_LABELS[metric]}]`;
     return <View key={metric} accessible accessibilityLabel={`${name} ${suffix}`} style={styles.winner}
       testID={`today-cow-winner-${metric}`}>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[uiText.meta, uiTextTone.ink, styles.name]}
+      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.meta, tone.ink, styles.name]}
         testID={`today-cow-winner-${metric}-name`}>{name}</Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.ink, styles.metric]}><FigureText>{suffix}</FigureText></Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.ink, styles.metric]}><FigureText>{suffix}</FigureText></Text>
     </View>;
   });
 }
@@ -43,6 +46,7 @@ type SectionProps = {
 };
 
 export function TodayCoWSummarySection({ resource, previous, dateFormat, onOpen, onRetry }: SectionProps) {
+  const styles = useStyles();
   const { data, offline, error, lastUpdatedAtMs } = resource;
   const prefix = previous ? 'today-cow-previous' : 'today-cow-current';
   const result = data?.result;
@@ -73,15 +77,18 @@ export function TodayCoWSummarySection({ resource, previous, dateFormat, onOpen,
 }
 
 function SummaryResult({ result, previous, prefix }: { result: CoWResultWire; previous: boolean; prefix: string }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const exercise = result.exercise?.name ?? 'Exercise unavailable';
   const metrics = result.cow.metrics.map(metric => COW_METRIC_LABELS[metric]).join(' · ');
   return <>
     <View style={styles.exerciseRow}>
-      <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={[uiText.bodyStrong, styles.name]}
+      <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={[text.bodyStrong, styles.name]}
         accessibilityLabel={exercise} testID={`${prefix}-exercise`}>{exercise}</Text>
-      {!previous ? <Icon name="chevron-right" color={uiRoles.inkMuted} size="sm" /> : null}
+      {!previous ? <Icon name="chevron-right" colorRole="inkMuted" size="sm" /> : null}
     </View>
-    {previous ? <WinnerRows result={result} /> : <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]}>
+    {previous ? <WinnerRows result={result} /> : <Text allowFontScaling={false} style={[text.meta, tone.ink]}>
       <FigureText>{metrics}</FigureText>
     </Text>}
   </>;
@@ -89,6 +96,7 @@ function SummaryResult({ result, previous, prefix }: { result: CoWResultWire; pr
 
 /** Today's compact summaries sit above its unchanged weekly board, inside the same card. */
 export function TodayCoWSummaries({ groupId, userId }: { groupId: string; userId: string }) {
+  const styles = useStyles();
   const router = useRouter();
   const dateFormat = useDateFormat();
   const current = useCoWSummary(groupId, userId);
@@ -109,12 +117,12 @@ export function TodayCoWSummaries({ groupId, userId }: { groupId: string; userId
   </View>;
 }
 
-const styles = StyleSheet.create({
-  sections: { borderBottomWidth: uiBorder.width, borderBottomColor: uiRoles.ruleSoft },
+const useStyles = makeStyles((roles) => ({
+  sections: { borderBottomWidth: uiBorder.width, borderBottomColor: roles.ruleSoft },
   content: { paddingVertical: uiSpace.sm },
   heading: { marginBottom: uiSpace.xs },
   exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
   winner: { flexDirection: 'row', alignItems: 'baseline', gap: uiSpace.xs, maxWidth: '100%' },
   name: { flexShrink: 1, minWidth: 0 },
   metric: { flexShrink: 0 },
-});
+}));

@@ -29,11 +29,19 @@ jest.mock('@/src/utils/agent-connect', () => ({
   getAgentConnectUrl: () => 'https://example.test/connect',
 }));
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, renderHook, screen, waitFor } from '@testing-library/react-native';
 
 import { StyleSheet } from 'react-native';
 
-import { uiRoles, uiText } from '@/components/ui';
+import { useUiText } from '@/components/ui/text-roles';
+import { AppThemeProvider } from '@/components/ui/theme-context';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
+// The live text roles. Read before the render under test: `renderHook` would
+// otherwise take over `screen`.
+const liveText = () => renderHook(() => useUiText(), { wrapper: AppThemeProvider }).result.current;
 import MoreScreen from '../app/(tabs)/more';
 
 const agent = (name: string) => ({ clientId: name, grantedAt: '', lastAccessAt: null, name, planAccessEnabled: false, scopes: [] });
@@ -47,7 +55,7 @@ describe('More screen', () => {
   });
 
   it('shows two untitled cards in order, with no page title', async () => {
-    render(<MoreScreen />);
+    renderWithTheme(<MoreScreen />);
 
     const rowsOf = (testID: string) =>
       screen
@@ -67,7 +75,7 @@ describe('More screen', () => {
     ['more-exercises-row', '/exercise-catalog'],
     ['more-settings-row', '/settings'],
   ])('opens %s at its route', async (testID, route) => {
-    render(<MoreScreen />);
+    renderWithTheme(<MoreScreen />);
     await waitFor(() => expect(mockListConnectedAgents).toHaveBeenCalled());
 
     fireEvent.press(screen.getByTestId(testID));
@@ -76,7 +84,7 @@ describe('More screen', () => {
   });
 
   it('names Exercises and Settings by their labels alone', async () => {
-    render(<MoreScreen />);
+    renderWithTheme(<MoreScreen />);
     await waitFor(() => expect(mockListConnectedAgents).toHaveBeenCalled());
 
     expect(screen.getByTestId('more-exercises-row').props.accessibilityLabel).toBe('Exercises');
@@ -85,7 +93,7 @@ describe('More screen', () => {
 
   it('shows the connected agent and opens the agents screen', async () => {
     mockListConnectedAgents.mockResolvedValue([agent('Claude')]);
-    render(<MoreScreen />);
+    renderWithTheme(<MoreScreen />);
 
     expect(await screen.findByText('Claude')).toBeTruthy();
     const row = screen.getByTestId('more-connect-ai-row');
@@ -99,13 +107,13 @@ describe('More screen', () => {
 
   it('names every connected agent', async () => {
     mockListConnectedAgents.mockResolvedValue([agent('Claude'), agent('ChatGPT')]);
-    render(<MoreScreen />);
+    renderWithTheme(<MoreScreen />);
 
     expect(await screen.findByText('Claude, ChatGPT')).toBeTruthy();
   });
 
   it('opens the setup instructions externally when no agent is connected', async () => {
-    render(<MoreScreen />);
+    renderWithTheme(<MoreScreen />);
     await waitFor(() => expect(screen.getByTestId('more-connect-ai-row').props.accessibilityRole).toBe('link'));
 
     fireEvent.press(screen.getByTestId('more-connect-ai-row'));
@@ -116,7 +124,7 @@ describe('More screen', () => {
 
   it('opens the setup instructions when signed out, without reading agents', async () => {
     mockUseAuth.mockReturnValue({ user: null });
-    render(<MoreScreen />);
+    renderWithTheme(<MoreScreen />);
 
     const row = screen.getByTestId('more-connect-ai-row');
     expect(row.props.accessibilityRole).toBe('link');
@@ -128,7 +136,7 @@ describe('More screen', () => {
 
   it('opens the agents screen when the agent list cannot be read', async () => {
     mockListConnectedAgents.mockRejectedValue(new Error('offline'));
-    render(<MoreScreen />);
+    renderWithTheme(<MoreScreen />);
     await waitFor(() => expect(mockListConnectedAgents).toHaveBeenCalled());
 
     fireEvent.press(screen.getByTestId('more-connect-ai-row'));
@@ -139,12 +147,13 @@ describe('More screen', () => {
   it('shows an inline error when the setup page cannot open', async () => {
     mockOpenURL.mockRejectedValue(new Error('browser unavailable'));
     mockUseAuth.mockReturnValue({ user: null });
-    render(<MoreScreen />);
+    const uiText = liveText();
+    renderWithTheme(<MoreScreen />);
 
     fireEvent.press(screen.getByTestId('more-connect-ai-row'));
 
     const error = await screen.findByTestId('more-connect-ai-error');
     expect(error).toHaveTextContent('Couldn’t open the setup page. Try again.');
-    expect(error).toHaveStyle({ ...StyleSheet.flatten(uiText.bodyStrong), color: uiRoles.danger });
+    expect(error).toHaveStyle({ ...StyleSheet.flatten(uiText.bodyStrong), color: roles.danger });
   });
 });

@@ -515,7 +515,7 @@ describe('ProgressHistoryScreen', () => {
       const title = screen.getByLabelText('Side delts, switch muscle');
       fireEvent.press(title);
       const sheet = screen.getByTestId('progress-history-muscle-sheet');
-      // One muscle per family: no family header repeats its muscle ([[muscle.family-sections]]).
+      // One muscle per family: no family header repeats its muscle.
       expect(sheet).toHaveTextContent(/^Muscle(Side delts|Triceps|Core){3}$/);
       expect(within(sheet).queryAllByRole('header').map(header => header.props.children)).not.toContain('Core');
       expect(screen.getByTestId('progress-history-muscle-option-front_delts')).toHaveProp('accessibilityState', { checked: true });

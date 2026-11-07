@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, Text, View } from 'react-native';
 
 import {
   ActionButton,
@@ -9,11 +9,10 @@ import {
   Icon,
   Screen,
   StatePanel,
+  makeStyles,
   uiBorder,
-  uiRoles,
   uiSpace,
-  uiText,
-  uiTextTone,
+  useUiText, useUiTextTone,
   type ChipOption,
 } from '@/components/ui';
 import {
@@ -37,11 +36,11 @@ const FILTER_OPTIONS: readonly ChipOption<LevelFilter>[] = [
 
 // Only an error takes a hue; a warning is `ink` plus the warning glyph (G3).
 const LEVEL_TONE = {
-  error: uiTextTone.danger,
-  warn: uiTextTone.ink,
-  info: uiTextTone.muted,
-  debug: uiTextTone.faint,
-} satisfies Record<LogLevel, object>;
+  error: 'danger',
+  warn: 'ink',
+  info: 'muted',
+  debug: 'faint',
+} as const satisfies Record<LogLevel, keyof ReturnType<typeof useUiTextTone>>;
 
 const formatTime = (iso: string): string => {
   const date = new Date(iso);
@@ -49,6 +48,9 @@ const formatTime = (iso: string): string => {
 };
 
 function LogRow({ record, divider }: { record: LogRecord; divider: boolean }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [expanded, setExpanded] = useState(false);
   const hasContext = record.context != null && Object.keys(record.context).length > 0;
 
@@ -61,32 +63,33 @@ function LogRow({ record, divider }: { record: LogRecord; divider: boolean }) {
       <View style={styles.rowHeader}>
         <View style={styles.levelMark}>
           {record.level === 'warn' ? <Icon name="warning" size="xs" /> : null}
-          <Text allowFontScaling={false} style={[uiText.label, LEVEL_TONE[record.level]]}>{record.level.toUpperCase()}</Text>
+          <Text allowFontScaling={false} style={[text.label, tone[LEVEL_TONE[record.level]]]}>{record.level.toUpperCase()}</Text>
         </View>
-        <Text allowFontScaling={false} style={uiText.meta} testID={`dev-logs-row-${record.seq}-time`}>
+        <Text allowFontScaling={false} style={text.meta} testID={`dev-logs-row-${record.seq}-time`}>
           <FigureText>{formatTime(record.createdAt)}</FigureText>
         </Text>
       </View>
-      <Text allowFontScaling={false} selectable style={uiText.bodyStrong}>
+      <Text allowFontScaling={false} selectable style={text.bodyStrong}>
         {record.source} · {record.event}
       </Text>
       {record.message ? (
-        <Text allowFontScaling={false} selectable style={[uiText.body, uiTextTone.muted]}>
+        <Text allowFontScaling={false} selectable style={[text.body, tone.muted]}>
           {record.message}
         </Text>
       ) : null}
       {/* A dump of code, so it keeps the figure face whole: the one place words take Plex Mono. */}
       {hasContext && expanded ? (
-        <Text allowFontScaling={false} selectable style={[uiText.figureSmall, styles.context]}>
+        <Text allowFontScaling={false} selectable style={[text.figureSmall, styles.context]}>
           {JSON.stringify(record.context, null, 2)}
         </Text>
       ) : null}
-      {hasContext && !expanded ? <Text allowFontScaling={false} style={uiText.meta}>Tap to show context</Text> : null}
+      {hasContext && !expanded ? <Text allowFontScaling={false} style={text.meta}>Tap to show context</Text> : null}
     </Pressable>
   );
 }
 
 export default function DevLogsScreen() {
+  const styles = useStyles();
   const [logs, setLogs] = useState<LogRecord[]>(() => getRecentLogs());
   const [filter, setFilter] = useState<LevelFilter>('all');
 
@@ -140,7 +143,7 @@ export default function DevLogsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -161,10 +164,10 @@ const styles = StyleSheet.create({
   },
   rowDivider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   rowPressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   rowHeader: {
     flexDirection: 'row',
@@ -179,6 +182,6 @@ const styles = StyleSheet.create({
   context: {
     paddingTop: uiSpace.sm,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
-});
+}));

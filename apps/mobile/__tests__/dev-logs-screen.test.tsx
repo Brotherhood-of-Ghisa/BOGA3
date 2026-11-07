@@ -13,10 +13,19 @@ jest.mock('@/src/logging', () => ({
 }));
 jest.mock('@/src/utils/isDevMode', () => ({ isDevMode: () => mockIsDevMode() }));
 
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { fireEvent, renderHook, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
-import { uiFonts, uiRoles, uiText } from '@/components/ui';
+import { uiFonts } from '@/components/ui';
+import { useUiText } from '@/components/ui/text-roles';
+import { AppThemeProvider } from '@/components/ui/theme-context';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
+// The live text roles. Read before the render under test: `renderHook` would
+// otherwise take over `screen`.
+const liveText = () => renderHook(() => useUiText(), { wrapper: AppThemeProvider }).result.current;
 import DevLogsScreen from '../app/dev-logs';
 
 const record = (seq: number, level: LogRecord['level'], extra: Partial<LogRecord> = {}): LogRecord => ({
@@ -33,6 +42,10 @@ const record = (seq: number, level: LogRecord['level'], extra: Partial<LogRecord
   ...extra,
 } as LogRecord);
 
+let uiText: ReturnType<typeof liveText>;
+beforeEach(() => {
+  uiText = liveText();
+});
 const role = (name: keyof typeof uiText) => StyleSheet.flatten(uiText[name]);
 
 describe('Dev logs screen', () => {
@@ -48,20 +61,20 @@ describe('Dev logs screen', () => {
   });
 
   it('draws each level as a micro-label in its own tone; only an error takes a hue', () => {
-    render(<DevLogsScreen />);
+    renderWithTheme(<DevLogsScreen />);
 
-    expect(screen.getByText('ERROR')).toHaveStyle({ ...role('label'), color: uiRoles.danger });
-    expect(screen.getByText('WARN')).toHaveStyle({ ...role('label'), color: uiRoles.ink });
-    expect(screen.getByText('INFO')).toHaveStyle({ ...role('label'), color: uiRoles.inkMuted });
-    expect(screen.getByText('DEBUG')).toHaveStyle({ ...role('label'), color: uiRoles.inkFaint });
+    expect(screen.getByText('ERROR')).toHaveStyle({ ...role('label'), color: roles.danger });
+    expect(screen.getByText('WARN')).toHaveStyle({ ...role('label'), color: roles.ink });
+    expect(screen.getByText('INFO')).toHaveStyle({ ...role('label'), color: roles.inkMuted });
+    expect(screen.getByText('DEBUG')).toHaveStyle({ ...role('label'), color: roles.inkFaint });
   });
 
   it('takes the row name, message and hint from the roles, and keeps the context dump in Plex Mono', () => {
-    render(<DevLogsScreen />);
+    renderWithTheme(<DevLogsScreen />);
     const row = within(screen.getByTestId('dev-logs-row-4'));
 
     expect(row.getByText('sync · event_4')).toHaveStyle(role('bodyStrong'));
-    expect(row.getByText('Push failed.')).toHaveStyle({ ...role('body'), color: uiRoles.inkMuted });
+    expect(row.getByText('Push failed.')).toHaveStyle({ ...role('body'), color: roles.inkMuted });
     expect(row.getByText('Tap to show context')).toHaveStyle(role('meta'));
 
     fireEvent.press(screen.getByTestId('dev-logs-row-4'));
@@ -70,7 +83,7 @@ describe('Dev logs screen', () => {
   });
 
   it('draws the time as a meta line with its digits in the figure face', () => {
-    render(<DevLogsScreen />);
+    renderWithTheme(<DevLogsScreen />);
     const line = screen.getByTestId('dev-logs-row-1-time');
     expect(line).toHaveTextContent(new Date('2026-10-27T10:05:12.000Z').toLocaleTimeString());
 
@@ -81,7 +94,7 @@ describe('Dev logs screen', () => {
   });
 
   it('filters by level and clears the view', () => {
-    render(<DevLogsScreen />);
+    renderWithTheme(<DevLogsScreen />);
 
     fireEvent.press(screen.getByTestId('dev-logs-filter-error'));
     expect(screen.queryByText('DEBUG')).toBeNull();
@@ -93,7 +106,7 @@ describe('Dev logs screen', () => {
 
   it('shows only a notice outside developer builds', () => {
     mockIsDevMode.mockReturnValue(false);
-    render(<DevLogsScreen />);
+    renderWithTheme(<DevLogsScreen />);
 
     expect(screen.getByText('Log viewer is available in developer builds only.')).toBeTruthy();
     expect(screen.queryByTestId('dev-logs-list')).toBeNull();

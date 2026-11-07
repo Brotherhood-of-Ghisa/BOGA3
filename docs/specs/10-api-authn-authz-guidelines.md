@@ -120,14 +120,12 @@ targets only while an
 app-owned, default-denied `public.agent_plan_permissions` row (the app's
 write-access switches, [[agents.write-access]]) matches the live grant timestamp; a missing, false or
 grant-mismatched row returns `403 PLAN_PERMISSION_REQUIRED` before any
-referenced resource is resolved. Editing authored plans and programmes requires
-the separate `plan_edit_enabled = true` permission; if disabled, edit requests fail
-with `403 PLAN_EDIT_PERMISSION_REQUIRED`. Agent writes go through service-role-only
-atomic RPCs: they create plans, mutate pending authored plans/programmes under
-optimistic graph version tokens, and create, edit, soft delete and restore
-exercise definitions and muscle mappings, and set the synced weekly muscle
-targets, under a revision check. They never
-touch performed sessions, session exercises or sets. Details in
+referenced resource is resolved. The planned edit routes for authored plans and
+programmes require a separate grant ([[agents.write-access]] records their
+implementation status) and specify `403 PLAN_EDIT_PERMISSION_REQUIRED` if
+disabled. Agent writes go through service-role-only atomic RPCs. Exercise and
+weekly target writes check revisions; plan edits check graph versions. Agent
+writes never touch performed sessions, session exercises or sets. Details in
 [`session-planning-contract.md`](tech/session-planning-contract.md) §6 and the
 [agent API contract](../../supabase/functions/agent-api/README.md#exercise-editing)
 and [`#muscle-targets`](../../supabase/functions/agent-api/README.md#muscle-targets).
