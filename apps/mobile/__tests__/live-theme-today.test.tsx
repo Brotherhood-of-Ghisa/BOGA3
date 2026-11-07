@@ -12,6 +12,10 @@ import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 
 const SLATE_DARK: AppearanceChoice = { theme: 'slate', mode: 'dark', custom: null };
 
+afterEach(async () => {
+  await switchTheme(DEFAULT_APPEARANCE);
+});
+
 describe('Today on a saved appearance', () => {
   it('repaints the share bar track and lap fill', async () => {
     renderWithTheme(<ShareBar current={2} previous={3} testID="bar" />);

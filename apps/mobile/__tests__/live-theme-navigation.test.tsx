@@ -24,6 +24,10 @@ function Probe() {
   return <Text testID="probe">{`${String(theme.colors.background)}|${String(header.headerTintColor)}`}</Text>;
 }
 
+afterEach(async () => {
+  await switchTheme(DEFAULT_APPEARANCE);
+});
+
 describe('the navigation folder on a saved appearance', () => {
   it('repaints the tab bar', async () => {
     renderWithTheme(<MainTabBar activeTab="today" onSelect={jest.fn()} />);
@@ -36,6 +40,8 @@ describe('the navigation folder on a saved appearance', () => {
 
   it('hands the navigators the roles and mode in force', async () => {
     renderWithTheme(<Probe />);
+    const launch = rolesFor(DEFAULT_APPEARANCE);
+    expect(screen.getByTestId('probe')).toHaveTextContent(`${launch.paper}|${launch.ink}`);
     await switchTheme(SLATE_DARK);
     const roles = rolesFor(SLATE_DARK);
     expect(screen.getByTestId('probe')).toHaveTextContent(`${String(navigationTheme(roles, "dark").colors.background)}|${roles.ink}`);
