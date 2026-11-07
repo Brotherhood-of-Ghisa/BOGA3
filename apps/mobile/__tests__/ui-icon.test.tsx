@@ -1,13 +1,17 @@
-import { render, screen } from '@testing-library/react-native';
+import { screen } from '@testing-library/react-native';
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import { Circle, Path } from 'react-native-svg';
 
 import { ICON_GLYPHS } from '@/components/ui/icon-glyphs';
-import { Icon, type IconName, uiIconSize, uiRoles } from '@/components/ui';
+import { Icon, type IconName, uiIconSize } from '@/components/ui';
 
 import { requireWithReactCompiler } from './helpers/react-compiler';
-import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
+import { renderWithTheme, renderWithTheme as render, rolesFor, switchTheme } from './helpers/theme';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const ICON_NAMES = Object.keys(ICON_GLYPHS) as IconName[];
 
@@ -35,18 +39,18 @@ describe('Icon', () => {
 
   it('paints in the given role colour, defaulting to ink', () => {
     const { UNSAFE_getAllByType, rerender } = render(<Icon name="x" />);
-    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([uiRoles.ink, uiRoles.ink]);
+    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([roles.ink, roles.ink]);
 
-    rerender(<Icon color={uiRoles.danger} name="x" />);
-    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([uiRoles.danger, uiRoles.danger]);
+    rerender(<Icon color={roles.danger} name="x" />);
+    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([roles.danger, roles.danger]);
   });
 
   it('paints in a role named by `colorRole`, which wins over the glyph\'s own', () => {
     const { UNSAFE_getAllByType, rerender } = render(<Icon name="x" colorRole="inkMuted" />);
-    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([uiRoles.inkMuted, uiRoles.inkMuted]);
+    expect(UNSAFE_getAllByType(Path).map((path) => path.props.stroke)).toEqual([roles.inkMuted, roles.inkMuted]);
 
     rerender(<Icon name="set-current" colorRole="danger" />);
-    expect(UNSAFE_getAllByType(Circle)[0].props.stroke).toBe(uiRoles.danger);
+    expect(UNSAFE_getAllByType(Circle)[0].props.stroke).toBe(roles.danger);
   });
 
   // The Icon colour pattern: a call site names the role, and the icon reads
@@ -62,7 +66,7 @@ describe('Icon', () => {
         <CompiledIcon name="set-done" />
       </>,
     );
-    expect(UNSAFE_getAllByType(Path)[0].props.stroke).toBe(uiRoles.accent);
+    expect(UNSAFE_getAllByType(Path)[0].props.stroke).toBe(roles.accent);
 
     await switchTheme(slateDark);
     const [cross, , tick] = UNSAFE_getAllByType(Path);
@@ -76,21 +80,21 @@ describe('Icon', () => {
   it('gives the set-state glyphs their design-language colours', () => {
     const done = render(<Icon name="set-done" />);
     const [disc] = done.UNSAFE_getAllByType(Circle);
-    expect(disc.props).toMatchObject({ fill: uiRoles.ink, stroke: uiRoles.ink });
-    expect(done.UNSAFE_getAllByType(Path)[0].props.stroke).toBe(uiRoles.surface);
+    expect(disc.props).toMatchObject({ fill: roles.ink, stroke: roles.ink });
+    expect(done.UNSAFE_getAllByType(Path)[0].props.stroke).toBe(roles.surface);
     done.unmount();
 
     const current = render(<Icon name="set-current" />);
     expect(current.UNSAFE_getAllByType(Circle)[0].props).toMatchObject({
       fill: 'none',
-      stroke: uiRoles.accent,
+      stroke: roles.accent,
     });
     current.unmount();
 
     const planned = render(<Icon name="set-planned" />);
     const arcs = planned.UNSAFE_getAllByType(Path);
     expect(arcs).toHaveLength(8);
-    expect(arcs.every((arc) => arc.props.stroke === uiRoles.inkGhost)).toBe(true);
+    expect(arcs.every((arc) => arc.props.stroke === roles.inkGhost)).toBe(true);
   });
 });
 
@@ -139,7 +143,7 @@ describe('no record figure draws a mark beside the number', () => {
   // `name="arrow-up"` and `name={'arrow-up'}` both; `color` as the role or
   // through the `record` text style.
   const ARROW_NAME = /name=\{?['"]arrow-/;
-  const RECORD_COLOUR = /uiRoles\.record\b|record\.color\b/;
+  const RECORD_COLOUR = /roles\.record\b|record\.color\b/;
 
   it('pairs a record colour with no arrow glyph in app, components or src', () => {
     const offenders = uiSources().flatMap((file) =>

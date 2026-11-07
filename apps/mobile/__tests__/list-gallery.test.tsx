@@ -1,9 +1,16 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { fireEvent, screen, within } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { ListGallery } from '@/components/pattern-gallery/list-gallery';
 import { COMPACT_ROW_FIXTURES } from '@/components/pattern-gallery/compact-row-fixtures';
 import { listGalleryWeekBoard } from '@/components/pattern-gallery/list-fixtures';
-import { ListRow, uiSpace, uiText } from '@/components/ui';
+import { ListRow, uiSpace } from '@/components/ui';
+import { uiTextFor } from '@/components/ui/text-roles';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
+import { renderWithTheme as render, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
+const textRoles = uiTextFor(roles);
 
 it('preserves passive row identities, order, full names, unabridged figures and the single board action', () => {
   render(<ListGallery initialLong />);
@@ -21,7 +28,7 @@ it('preserves passive row identities, order, full names, unabridged figures and 
 it('keeps own and tied rows in the feature models and ellipsizes only the visible name', () => {
   const view = render(<ListGallery initialState="own" />);
   expect(screen.getByTestId('today-group-board-row-me-name')).toHaveTextContent('You');
-  expect(screen.getByTestId('today-group-board-row-me-name')).toHaveStyle(uiText.bodyStrong);
+  expect(screen.getByTestId('today-group-board-row-me-name')).toHaveStyle(textRoles.bodyStrong);
   expect(screen.queryByTestId('today-group-board-me')).toBeNull();
   view.unmount();
   render(<ListGallery initialState="ties" />);

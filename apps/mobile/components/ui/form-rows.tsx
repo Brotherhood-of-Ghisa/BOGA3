@@ -1,12 +1,11 @@
 import type { ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
-import { makeStyles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
 
 // The rest of the Settings row vocabulary (`ux-rules.md` "Forms"), beside the
@@ -29,7 +28,6 @@ export type SegmentRowProps<TValue extends string | number> = {
 export function SegmentRow<TValue extends string | number>({
   label, options, value, onChange, testIDPrefix, divider = false, disabled = false, testID,
 }: SegmentRowProps<TValue>) {
-  const styles = useStyles();
   return (
     <ListRow density="list" disabled={disabled} divider={divider} label={label} testID={testID}>
       <View style={styles.segment}>
@@ -119,7 +117,6 @@ export type ValueRowProps = {
 export function ValueRow({
   label, value, valueIcon, valueTestID, valueIconTestID, tone = 'default', divider = false, accessibilityLabel, testID,
 }: ValueRowProps) {
-  const styles = useStyles();
   const textRoles = useUiText();
   const textTones = useUiTextTone();
   return (
@@ -146,7 +143,7 @@ export function ValueRow({
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const styles = StyleSheet.create({
   segment: {
     paddingBottom: uiSpace.sm,
     paddingTop: uiSpace.xs,
@@ -162,4 +159,4 @@ const useStyles = makeStyles((roles) => ({
     flexShrink: 1,
     textAlign: 'right',
   },
-}));
+});

@@ -14,7 +14,7 @@ const FIGURE_RUN = /(\d+(?:[.,:-]\d+)*(?![\dA-Z]))/;
  * line's size (`design-language.md` §3, "Text roles"). Render it inside the
  * line's `Text`; on an emphasised line pass `strong`, since the figure's own
  * weight would otherwise override the line's. A line drawn in a tone with a
- * weight of its own (`uiTextTone.record`) passes that tone as `figureStyle`.
+ * weight of its own (`useUiTextTone().record`) passes that tone as `figureStyle`.
  */
 export function FigureText({
   children,

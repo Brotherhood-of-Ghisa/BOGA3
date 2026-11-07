@@ -33,7 +33,7 @@ export type StatProps = {
   // for planned values, which cannot be one (`design-language.md` §5).
   emphasis?: StatEmphasis;
   // `text` sets the value in the body face (a profile's email), not the figure
-  // face; `heading` in the card-title face, on a headline figure's line so i
+  // face; `heading` in the card-title face, on a headline figure's line so it
   // shares that figure's baseline beside it (the session's gym).
   kind?: StatKind;
   // Stacked only: `end` right-aligns label and value (a trailing column).
