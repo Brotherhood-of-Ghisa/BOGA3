@@ -8,6 +8,7 @@ import {
   MIN_REPEATING_TIMER_INTERVAL_SECONDS,
 } from '../preferences/model';
 import { playRepeatingTimerCue, prepareRepeatingTimerAudio, setRepeatingTimerAwake, stopRepeatingTimerAudio } from './repeating-timer-native';
+import { cancelRestTimerNotification, scheduleRestTimerNotification } from './rest-timer-notification-native';
 
 export const REST_TIMER_STEP_SEC = 15;
 export const REPEATING_TIMER_STEP_SEC = 15;
@@ -128,6 +129,7 @@ export const checkAndTriggerRestCompletion = (
   if (nowMs >= entry.endsAtMs) {
     if (lastSignaledRestEndsAtMs !== entry.endsAtMs) {
       lastSignaledRestEndsAtMs = entry.endsAtMs;
+      cancelRestTimerNotification();
       if (nowMs - entry.endsAtMs <= REST_TIMER_MAX_COMPLETION_DELAY_MS) {
         triggerRestCompletionCue();
       }
@@ -178,26 +180,31 @@ export const deriveRepeatingTimerView = (
 
 // The store owns native resources across both hosts, including after a view unmounts.
 function updateRepeatingTimerResources(): void {
-  if (activeEntry?.mode !== 'repeating' && !appStateSubscription) return;
+  if (!activeEntry && !appStateSubscription) return;
   stopRepeatingTimerAudio();
-  if (activeEntry?.mode === 'repeating') {
+  if (activeEntry) {
     if (!appStateSubscription) {
       // Unknown initial state waits for an active event rather than retaining foreground resources.
       isForeground = AppState.currentState === 'active';
       appStateSubscription = AppState.addEventListener('change', (state) => {
         isForeground = state === 'active';
+        if (state === 'active' && activeEntry?.mode === 'rest') {
+          scheduleRestCompletionCue();
+        }
         stopRepeatingTimerAudio();
         setRepeatingTimerAwake(isForeground && activeEntry?.mode === 'repeating' && activeEntry.pausedAtMs === null);
         scheduleRoundBoundaryCue();
         for (const listener of listeners) listener();
       });
     }
-    prepareRepeatingTimerAudio();
+    if (activeEntry.mode === 'repeating') {
+      prepareRepeatingTimerAudio();
+    }
   } else {
     appStateSubscription?.remove();
     appStateSubscription = null;
   }
-  setRepeatingTimerAwake(isForeground && activeEntry?.mode === 'repeating' && activeEntry.pausedAtMs === null);
+  setRepeatingTimerAwake(isForeground && activeEntry?.mode === 'repeating' && activeEntry?.pausedAtMs === null);
 }
 
 function scheduleRoundBoundaryCue(): void {
@@ -236,6 +243,7 @@ function scheduleRestCompletionCue(): void {
   }
   if (!activeEntry || activeEntry.mode !== 'rest') {
     lastSignaledRestEndsAtMs = null;
+    cancelRestTimerNotification();
     return;
   }
 
@@ -243,12 +251,16 @@ function scheduleRestCompletionCue(): void {
   const remainingMs = Math.max(0, targetEndsAtMs - Date.now());
   if (remainingMs <= 0) {
     checkAndTriggerRestCompletion(activeEntry, Date.now());
+    cancelRestTimerNotification();
     return;
   }
+
+  scheduleRestTimerNotification(targetEndsAtMs);
 
   restCompletionTimeout = setTimeout(() => {
     if (activeEntry?.mode === 'rest' && activeEntry.endsAtMs === targetEndsAtMs) {
       checkAndTriggerRestCompletion(activeEntry, Date.now());
+      cancelRestTimerNotification();
       for (const listener of listeners) {
         listener();
       }
@@ -539,6 +551,7 @@ export const __resetRestTimerForTests = (): void => {
   lastSignaledRestEndsAtMs = null;
   suppressedAutoStartSessionIds.clear();
   lastStartedMode = 'rest';
+  cancelRestTimerNotification();
   updateRepeatingTimerResources();
   scheduleRoundBoundaryCue();
   scheduleRestCompletionCue();

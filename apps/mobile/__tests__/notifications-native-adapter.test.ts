@@ -134,3 +134,14 @@ test('token acquisition preserves SDK failures and removes its deadline timer', 
     expect(jest.getTimerCount()).toBe(0);
   } finally { jest.useRealTimers(); }
 });
+
+test('clearNotifications dismisses all notifications and cancels scheduled items while preserving boga-rest-timer', async () => {
+  jest.mocked(Notifications.getAllScheduledNotificationsAsync).mockResolvedValueOnce([
+    { identifier: 'boga-rest-timer' } as Notifications.NotificationRequest,
+    { identifier: 'other-scheduled-id' } as Notifications.NotificationRequest,
+  ]);
+  await native.clearNotifications();
+  expect(Notifications.dismissAllNotificationsAsync).toHaveBeenCalledTimes(1);
+  expect(Notifications.cancelScheduledNotificationAsync).toHaveBeenCalledWith('other-scheduled-id');
+  expect(Notifications.cancelScheduledNotificationAsync).not.toHaveBeenCalledWith('boga-rest-timer');
+});

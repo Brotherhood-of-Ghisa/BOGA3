@@ -16,6 +16,6 @@ facts as needed. Authoring: load `docs/procedures/product-facts-authoring.md`.
 | `gym.md` | gyms, gym pickers, or per-gym exercise figures |
 | `groups.md` | certification, CoW rules and Stream lifecycle |
 | `notifications.md` | which notifications are sent, to whom, with what counts |
-| `timer.md` | rest timer defaults |
+| `timer.md` | rest timer rules |
 | `agents.md` | what a coaching agent (MCP) may read or change |
 | `planner.md` | session plans, programmes, block completion or consumption |
