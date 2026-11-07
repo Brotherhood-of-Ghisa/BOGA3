@@ -1,7 +1,9 @@
 import { screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { Polyline } from 'react-native-svg';
 
 import { GroupRankChart } from '@/components/groups/group-rank-chart';
+import { GroupComparisonBoundary } from '@/components/groups/group-comparison-boundary';
 import { GroupBoardRow } from '@/components/groups/group-board-row';
 import { GroupSummaryRow } from '@/components/groups/group-summary-row';
 import { DEFAULT_APPEARANCE, type AppearanceChoice } from '@/components/ui/theme-presets';
@@ -20,6 +22,11 @@ const DARK = rolesFor(SLATE_DARK);
 afterEach(async () => {
   await switchTheme(DEFAULT_APPEARANCE);
 });
+
+jest.mock('@/src/groups', () => ({
+  ...jest.requireActual('@/src/groups'),
+  useGroupResource: () => ({ data: null, lostAccess: true, error: null, offline: false, refresh: jest.fn() }),
+}));
 
 const row: BoardRowViewModel = {
   key: 'sam', rank: 1, rankLabel: '1', memberLabel: 'Sam', isMe: false, former: false,
@@ -76,5 +83,23 @@ describe('the My groups row', () => {
     await switchTheme(SLATE_DARK);
 
     expect(screen.getByText('Lifts')).toHaveStyle({ color: DARK.inkMuted });
+  });
+});
+
+describe('a group page', () => {
+  it('repaints the ground it stands on when the theme changes', async () => {
+    const view = renderWithTheme(
+      <GroupComparisonBoundary exerciseId="e1" groupId="g1" userId="u1">{() => null}</GroupComparisonBoundary>,
+    );
+    const grounds = () =>
+      view.UNSAFE_root.findAll((node) => typeof node.type === 'string').map((node) => (StyleSheet.flatten(node.props.style) as { backgroundColor?: string } | undefined)?.backgroundColor);
+    expect(screen.getByTestId('group-board-lost-access')).toBeTruthy();
+    expect(grounds()).toContain(LIGHT.paper);
+
+    await switchTheme(SLATE_DARK);
+
+    expect(grounds()).toContain(DARK.paper);
+    expect(grounds()).not.toContain(LIGHT.paper);
+    expect(DARK.paper).not.toBe(LIGHT.paper);
   });
 });

@@ -201,15 +201,15 @@ export function textRoles(roles: UiRoles): TextRoles {
 }
 
 /**
- * The text roles and tones in the colours the app is drawn in now; a component
- * reads `const { text, tone } = useTextRoles()` where it once read `uiText` and
- * `uiTextTone`.
+ * The text roles and tones in the colours the app is drawn in now: a live
+ * component reads `const { text, tone } = useTextRoles()`.
  */
 export function useTextRoles(): TextRoles {
   return textRoles(useUiRoles());
 }
 
-// The text roles in the launch theme, for the screens not yet live
-// (`ui-live-theme-guard.allowlist.json`). A live screen uses `useTextRoles()`.
+// The text roles in the launch theme: what a file on the live-theme guard's
+// allowlist (`ui-live-theme-guard.allowlist.json`) reads. A live component
+// reads `useTextRoles()`.
 export const uiText = textRoles(uiRoles).text;
 export const uiTextTone = textRoles(uiRoles).tone;
