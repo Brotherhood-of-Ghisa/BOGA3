@@ -421,10 +421,118 @@ describe('Add exercise route', () => {
     });
   };
 
+  it('copies a personal exercise: name, load mode, and auto-links on success', async () => {
+    addMyExercise('ex-incline', 'My Incline Press');
+    __resetExerciseCatalogCacheForTests();
+    api.createCompetitionExercise.mockResolvedValue({
+      contract_version: 4,
+      exercise: { ...BENCH, group_exercise_id: 'gx-incline', name: 'My Incline Press' },
+    });
+    const linkSpy = jest.spyOn(linksRepo, 'linkExercise');
+
+    await renderNew();
+    expect(screen.getByTestId('group-personal-exercise-picker')).toBeTruthy();
+    fireEvent.changeText(screen.getByTestId('group-personal-exercise-search'), 'Incline');
+    fireEvent.press(screen.getByTestId('group-personal-exercise-ex-incline'));
+
+    expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe('My Incline Press');
+
+    await submit();
+    expect(api.createCompetitionExercise).toHaveBeenCalledWith({
+      groupId: GROUP_ID,
+      name: 'My Incline Press',
+      mode: 'total_load',
+      sourceId: null,
+      contribution: 0,
+      metric: 'e1rm',
+    });
+    expect(linkSpy).toHaveBeenCalledWith('ex-incline', GROUP_ID, 'gx-incline');
+    expect(mockRouter.back).toHaveBeenCalled();
+  });
+
+  it('surfaces local link errors, keeps screen open, and retries link without duplicating exercise', async () => {
+    addMyExercise('ex-incline', 'My Incline Press');
+    __resetExerciseCatalogCacheForTests();
+    api.createCompetitionExercise.mockResolvedValue({
+      contract_version: 4,
+      exercise: { ...BENCH, group_exercise_id: 'gx-incline', name: 'My Incline Press' },
+    });
+    const linkSpy = jest.spyOn(linksRepo, 'linkExercise').mockRejectedValueOnce(new Error('Disk full'));
+
+    await renderNew();
+    fireEvent.changeText(screen.getByTestId('group-personal-exercise-search'), 'Incline');
+    fireEvent.press(screen.getByTestId('group-personal-exercise-ex-incline'));
+
+    await submit();
+    expect(api.createCompetitionExercise).toHaveBeenCalledTimes(1);
+    expect(linkSpy).toHaveBeenCalledWith('ex-incline', GROUP_ID, 'gx-incline');
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(
+      'Group exercise was added, but failed to link your personal exercise: Disk full',
+    );
+    expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Retry link');
+
+    // Retrying link uses the existing group exercise without calling createCompetitionExercise again
+    linkSpy.mockResolvedValueOnce(undefined as never);
+    await submit();
+    expect(api.createCompetitionExercise).toHaveBeenCalledTimes(1);
+    expect(linkSpy).toHaveBeenCalledTimes(2);
+    expect(mockRouter.back).toHaveBeenCalled();
+  });
+
+  it('add personal exercise: links even if user navigates back while network RPC is awaiting', async () => {
+    let resolvePending!: (value: { contract_version: 4; exercise: CompetitionExerciseWire }) => void;
+    const pending = new Promise<{ contract_version: 4; exercise: CompetitionExerciseWire }>((resolve) => {
+      resolvePending = resolve;
+    });
+    api.createCompetitionExercise.mockReturnValue(pending);
+    addMyExercise('ex-incline', 'My Incline Press');
+    __resetExerciseCatalogCacheForTests();
+    const linkSpy = jest.spyOn(linksRepo, 'linkExercise').mockResolvedValue(undefined as never);
+
+    await renderNew();
+    fireEvent.changeText(screen.getByTestId('group-personal-exercise-search'), 'Incline');
+    fireEvent.press(screen.getByTestId('group-personal-exercise-ex-incline'));
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+
+    expect(api.createCompetitionExercise).toHaveBeenCalled();
+    // User navigates back while network create is in flight
+    screen.unmount();
+    await act(async () => {
+      resolvePending({ contract_version: 4, exercise: { ...BENCH, group_exercise_id: 'gx-incline' } });
+    });
+
+    expect(linkSpy).toHaveBeenCalledWith('ex-incline', GROUP_ID, 'gx-incline');
+    expect(mockRouter.back).not.toHaveBeenCalled();
+  });
+
+  it('preserves seed id as sourceId when copying a seeded personal exercise', async () => {
+    addMyExercise('seed_barbell_bench_press', 'Barbell Bench Press');
+    __resetExerciseCatalogCacheForTests();
+    api.createCompetitionExercise.mockResolvedValue({ contract_version: 4, exercise: BENCH });
+    const linkSpy = jest.spyOn(linksRepo, 'linkExercise');
+
+    await renderNew();
+    fireEvent.changeText(screen.getByTestId('group-personal-exercise-search'), 'Bench');
+    fireEvent.press(screen.getByTestId('group-personal-exercise-seed_barbell_bench_press'));
+
+    await submit();
+    expect(api.createCompetitionExercise).toHaveBeenCalledWith(
+      expect.objectContaining({
+        groupId: GROUP_ID,
+        name: 'Barbell Bench Press',
+        sourceId: 'seed_barbell_bench_press',
+      }),
+    );
+    expect(linkSpy).toHaveBeenCalledWith('seed_barbell_bench_press', GROUP_ID, 'ge-bench');
+    expect(mockRouter.back).toHaveBeenCalled();
+  });
+
   it('copies a standard exercise: its seed id, name, and weight entry', async () => {
     const seed = STANDARD_EXERCISE_DEFINITION_SEEDS.find((candidate) => candidate.id === 'seed_barbell_bench_press')!;
     api.createCompetitionExercise.mockResolvedValue({ contract_version: 4, exercise: BENCH });
     await renderNew();
+    fireEvent.press(screen.getByTestId('group-exercise-source-catalogue'));
     expect(screen.queryByTestId('group-exercise-form')).toBeNull();
     expect(screen.queryByText('Pick a standard exercise to copy.')).toBeNull();
 
@@ -446,6 +554,7 @@ describe('Add exercise route', () => {
   it('keeps the seed id when the copied name is changed', async () => {
     api.createCompetitionExercise.mockResolvedValue({ contract_version: 4, exercise: BENCH });
     await renderNew();
+    fireEvent.press(screen.getByTestId('group-exercise-source-catalogue'));
     fireEvent.changeText(screen.getByTestId('group-standard-exercise-search'), 'barbell bench');
     fireEvent.press(screen.getByTestId('group-standard-exercise-seed_barbell_bench_press'));
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Comp Bench');
@@ -457,6 +566,7 @@ describe('Add exercise route', () => {
 
   it('says so when no standard exercise matches', async () => {
     await renderNew();
+    fireEvent.press(screen.getByTestId('group-exercise-source-catalogue'));
     fireEvent.changeText(screen.getByTestId('group-standard-exercise-search'), 'zzz-no-such-lift');
     expect(screen.getByTestId('group-standard-exercise-no-match')).toBeTruthy();
   });
@@ -596,6 +706,7 @@ describe('Edit exercise route', () => {
 
 describe('Every exercise write: offline refusal and server failure', () => {
   const pickBench = () => {
+    fireEvent.press(screen.getByTestId('group-exercise-source-catalogue'));
     fireEvent.changeText(screen.getByTestId('group-standard-exercise-search'), 'barbell bench');
     fireEvent.press(screen.getByTestId('group-standard-exercise-seed_barbell_bench_press'));
   };
@@ -1159,10 +1270,26 @@ describe('Design language', () => {
     expect(screen.getByTestId('group-pick-sheet-option-add-new').props.accessibilityState).toEqual({ checked: false });
   });
 
+  it('Add exercise: the picked personal exercise is the checked radio, and the submit the one accent', async () => {
+    addMyExercise('ex-bench', 'Barbell Bench Press');
+    addMyExercise('ex-squat', 'Back Squat');
+    __resetExerciseCatalogCacheForTests();
+    renderWithTheme(<NewGroupExerciseRoute />);
+    await screen.findByTestId('group-exercise-source-row');
+    expect(accentGrounds(screen.UNSAFE_root)).toEqual([]);
+
+    fireEvent.changeText(screen.getByTestId('group-personal-exercise-search'), 'Bench');
+    fireEvent.press(screen.getByTestId('group-personal-exercise-ex-bench'));
+
+    expect(screen.getByTestId('group-personal-exercise-ex-bench').props.accessibilityState).toEqual({ checked: true });
+    expect(accentGrounds(screen.UNSAFE_root)).toEqual(['group-exercise-form-submit']);
+  });
+
   it('Add exercise: the picked standard exercise is the checked radio, and the submit the one accent', async () => {
     renderWithTheme(<NewGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-source-row');
     expect(accentGrounds(screen.UNSAFE_root)).toEqual([]);
+    fireEvent.press(screen.getByTestId('group-exercise-source-catalogue'));
     fireEvent.changeText(screen.getByTestId('group-standard-exercise-search'), 'barbell bench');
     fireEvent.press(screen.getByTestId('group-standard-exercise-seed_barbell_bench_press'));
 
