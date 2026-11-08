@@ -7,7 +7,7 @@
  * Over the migrated in-memory SQLite database (helpers/local-data.ts).
  */
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, Keyboard, Modal } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -51,6 +51,7 @@ import { planQueries, planRepository, addPlanBlockToSession, skipPlanBlock } fro
 import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
+import { renderWithTheme } from './helpers/theme';
 
 describe('programme screens', () => {
   let alertSpy: jest.SpyInstance;
@@ -105,7 +106,7 @@ describe('programme screens', () => {
 
   describe('programme create (/programme/new)', () => {
     it('saves a valid programme with two sessions offline and navigates to its detail', async () => {
-      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
 
       // Enter programme name and description
       fireEvent.changeText(screen.getByTestId('programme-form-name'), '6-Week Wave');
@@ -161,7 +162,7 @@ describe('programme screens', () => {
     });
 
     it('refuses save when name is missing and writes nothing', async () => {
-      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
 
       await act(async () => {
         fireEvent.press(screen.getByTestId('programme-form-save'));
@@ -177,7 +178,7 @@ describe('programme screens', () => {
 
     it('shares target effort defaults, picker, copying and validation with standalone plans', async () => {
       updatePreferences({ displayEfforts: ['rir_4', 'rir_2'] });
-      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
       fireEvent.changeText(screen.getByTestId('programme-form-name'), 'Copy wave');
       fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
       expect(screen.getByTestId('programme-child-plan-schedule-row')).toHaveTextContent(/Unscheduled/);
@@ -245,7 +246,7 @@ describe('programme screens', () => {
     });
 
     it('refuses save when sessions count drops below 2', async () => {
-      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
       fireEvent.changeText(screen.getByTestId('programme-form-name'), 'Short Programme');
 
       // Remove session 2
@@ -261,7 +262,7 @@ describe('programme screens', () => {
     });
 
     it('supports duplicating and reordering sessions within the form', async () => {
-      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
       fireEvent.changeText(screen.getByTestId('programme-form-name'), '3-Day Split');
 
       // Duplicate Session 1
@@ -275,7 +276,7 @@ describe('programme screens', () => {
     });
 
     it('saves a programme whose sessions use a seeded gym that has no gyms row yet', async () => {
-      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
       fireEvent.changeText(screen.getByTestId('programme-form-name'), 'Gym Wave');
 
       // Session 1 at the seeded "Downtown Iron Temple" gym — its gyms row is
@@ -305,7 +306,7 @@ describe('programme screens', () => {
     });
 
     it('insets the child session editor body to the sheet gutter', () => {
-      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
 
       fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
 
@@ -315,7 +316,7 @@ describe('programme screens', () => {
     });
 
     it('gives the child session editor a scrolling body', () => {
-      render(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
 
       fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
 
@@ -373,7 +374,7 @@ describe('programme screens', () => {
     };
 
     it('persists an edited child session title', async () => {
-      render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
       await screen.findByTestId('programme-form-name');
 
       fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
@@ -387,7 +388,7 @@ describe('programme screens', () => {
     });
 
     it('persists a duplicated child session', async () => {
-      render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
       await screen.findByTestId('programme-form-name');
 
       fireEvent.press(screen.getByTestId('programme-form-plan-1-duplicate'));
@@ -400,7 +401,7 @@ describe('programme screens', () => {
     });
 
     it('adds exact copies of the last child target in the existing sheet, cancels with Back and persists only that child', async () => {
-      const { unmount } = render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      const { unmount } = renderWithTheme(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
       await screen.findByTestId('programme-form-name');
       fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
       fireEvent(screen.getByTestId('plan-form-block-1-set-1-effort'), 'longPress');
@@ -431,14 +432,14 @@ describe('programme screens', () => {
       const otherChild = await planQueries.loadPlanDetail(detail!.plans[1].id);
       expect(otherChild!.blocks[0].targets).toHaveLength(1);
       unmount();
-      render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
       await screen.findByTestId('programme-form-name');
       fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
       expect(screen.getByTestId('plan-form-block-1-set-10-reps')).toHaveProp('value', '5');
     });
 
     it('persists removing a child session', async () => {
-      render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
       await screen.findByTestId('programme-form-name');
 
       fireEvent.press(screen.getByTestId('programme-form-plan-1-remove'));
@@ -450,7 +451,7 @@ describe('programme screens', () => {
     });
 
     it('persists a reordered child session list', async () => {
-      render(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
       await screen.findByTestId('programme-form-name');
 
       fireEvent.press(screen.getByTestId('programme-form-plan-3-up'));
@@ -507,7 +508,7 @@ describe('programme screens', () => {
     });
 
     it('renders detail with title, progress, next unresolved block and child plans', async () => {
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
 
       await waitFor(() => {
         expect(screen.getByText('Hypertrophy Wave')).toBeTruthy();
@@ -556,7 +557,7 @@ describe('programme screens', () => {
       });
       expect(derived.plans[1].blocks[0].attachedSessionId).toBeNull();
 
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
       expect(await screen.findByTestId('programme-detail-stats')).toHaveTextContent('2 sessions · 1 completed · 1 skipped');
       expect(screen.getByTestId('programme-detail-progress-badge')).toHaveTextContent('Completed');
       const completed = screen.getByTestId(`programme-plan-row-${before.plans[0].id}`);
@@ -580,7 +581,7 @@ describe('programme screens', () => {
           .set({ progressStatus: 'skipped', resolvedAt: null })
           .where(eq(sessionPlanExercises.id, plan.blocks[0].id)).run();
       }
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
       expect(await screen.findByTestId('programme-detail-progress-badge')).toHaveTextContent('Completed');
       expect(screen.queryByTestId('programme-detail-completed-date')).toBeNull();
       const child = screen.getByTestId(`programme-plan-row-${detail.plans[0].id}`);
@@ -604,7 +605,7 @@ describe('programme screens', () => {
       await finishBlock(detail.plans[0].blocks[0].id);
       await skipPlanBlock(detail.plans[0].blocks[1].id);
       await skipPlanBlock(detail.plans[1].blocks[0].id);
-      render(<ProgrammeDetailScreen programmeId={result.id} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={result.id} />);
       expect(await screen.findByTestId('programme-detail-stats')).toHaveTextContent(`2 sessions · ${resolved ? 1 : 0} completed · 1 skipped`);
       const row = screen.getByTestId(`programme-plan-row-${detail.plans[0].id}`);
       const outcome = resolved ? 'Completed' : 'In progress';
@@ -622,7 +623,7 @@ describe('programme screens', () => {
       for (const plan of detail.plans.slice(remaining)) {
         localDatabase().delete(sessionPlans).where(eq(sessionPlans.id, plan.id)).run();
       }
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
       expect(await screen.findByTestId('programme-detail-stats')).toHaveTextContent(
         `${remaining} ${remaining === 1 ? 'session' : 'sessions'} · 0 completed · 0 skipped`,
       );
@@ -632,7 +633,7 @@ describe('programme screens', () => {
     it('shows all completed sessions without inventing skipped work', async () => {
       const detail = (await planQueries.loadProgrammeDetail(seededProgrammeId))!;
       for (const plan of detail.plans) await finishBlock(plan.blocks[0].id);
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
       expect(await screen.findByTestId('programme-detail-stats')).toHaveTextContent('2 sessions · 2 completed · 0 skipped');
       expect(screen.getByTestId('programme-detail-progress-badge')).toHaveTextContent('Completed');
     });
@@ -641,7 +642,7 @@ describe('programme screens', () => {
       const detail = (await planQueries.loadProgrammeDetail(seededProgrammeId))!;
       await skipPlanBlock(detail.plans[0].blocks[0].id);
       await addPlanBlockToSession(detail.plans[1].blocks[0].id);
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
       expect(await screen.findByTestId('programme-detail-stats')).toHaveTextContent('2 sessions · 0 completed · 1 skipped');
       expect(screen.getByTestId('programme-detail-progress-badge')).toHaveTextContent('In progress');
       expect(screen.getByTestId(`programme-plan-row-${detail.plans[1].id}`)).toHaveProp(
@@ -650,7 +651,7 @@ describe('programme screens', () => {
     });
 
     it('adds the next block to session on press', async () => {
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
 
       await waitFor(() => {
         expect(screen.getByTestId('programme-next-block-add')).toBeTruthy();
@@ -667,7 +668,7 @@ describe('programme screens', () => {
     });
 
     it('skips the next block and advances to the next unresolved block in sequence', async () => {
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
 
       await waitFor(() => {
         expect(screen.getByTestId('programme-next-block-skip')).toBeTruthy();
@@ -690,7 +691,7 @@ describe('programme screens', () => {
         await addPlanBlockToSession(blockId);
       }
 
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
 
       await waitFor(() => {
         expect(screen.getByTestId('programme-next-block-empty')).toBeTruthy();
@@ -701,7 +702,7 @@ describe('programme screens', () => {
     });
 
     it('claims completion only once every block is resolved', async () => {
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
 
       await screen.findByTestId('programme-next-block-skip');
       await act(async () => {
@@ -723,7 +724,7 @@ describe('programme screens', () => {
     });
 
     it('reorders sessions in the programme via Move controls', async () => {
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
 
       await waitFor(() => {
         expect(screen.getByText('Lower A')).toBeTruthy();
@@ -750,7 +751,7 @@ describe('programme screens', () => {
         deleteButton?.onPress?.();
       });
 
-      render(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId={seededProgrammeId} />);
 
       await waitFor(() => {
         expect(screen.getByTestId('programme-detail-delete')).toBeTruthy();
@@ -777,7 +778,7 @@ describe('programme screens', () => {
     });
 
     it('displays unavailable state when programme does not exist', async () => {
-      render(<ProgrammeDetailScreen programmeId="non-existent-programme-id" />);
+      renderWithTheme(<ProgrammeDetailScreen programmeId="non-existent-programme-id" />);
 
       await waitFor(() => {
         expect(screen.getByTestId('programme-detail-unavailable')).toBeTruthy();

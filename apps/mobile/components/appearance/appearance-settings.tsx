@@ -16,7 +16,7 @@ import {
 import { ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
 import { SubPage } from '@/components/settings/sub-page';
-import { ActionRow, ChoiceRow, FormSection, Notice, RadioRow, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ActionRow, ChoiceRow, FormSection, Notice, RadioRow, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { generateRoles, type ThemeMode } from '@/components/ui/theme';
 import {
   DEFAULT_THEME_PRESET_ID,
@@ -137,13 +137,15 @@ export function AppearanceSettingsScreen() {
 
 // The choice drawn on a small mock of the app, and when it applies.
 function PreviewBlock({ appearance }: { appearance: AppearanceChoice }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.preview}>
-      <Text accessibilityRole="header" allowFontScaling={false} style={uiText.label}>
+      <Text accessibilityRole="header" allowFontScaling={false} style={text.label}>
         Preview
       </Text>
       <ThemePreview roles={appearanceRoles(appearance)} testID="settings-appearance-preview" />
-      <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.muted]} testID="settings-appearance-footnote">
+      <Text allowFontScaling={false} style={[text.meta, tone.muted]} testID="settings-appearance-footnote">
         Applies next launch
       </Text>
     </View>

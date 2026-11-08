@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText } from '@/components/ui/text-roles';
+import { useUiText } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
@@ -24,16 +24,17 @@ type ComparisonUnavailableCardProps = {
  * plot is missing. One accessible node: a shortfall is read as one statement.
  */
 export function ComparisonUnavailableCard({ names, testID }: ComparisonUnavailableCardProps) {
+  const text = useUiText();
   if (names.length === 0) return null;
   return (
     <Card testID={testID}>
       <View accessibilityLabel={`${STATEMENT}. ${names.join(', ')}.`} accessible style={styles.body}>
-        <Text allowFontScaling={false} style={uiText.bodyStrong}>
+        <Text allowFontScaling={false} style={text.bodyStrong}>
           <FigureText strong>{STATEMENT}</FigureText>
         </Text>
         <View style={styles.names}>
           {names.map((name, index) => (
-            <Text allowFontScaling={false} key={`${index}-${name}`} style={uiText.bodyStrong}>{name}</Text>
+            <Text allowFontScaling={false} key={`${index}-${name}`} style={text.bodyStrong}>{name}</Text>
           ))}
         </View>
       </View>

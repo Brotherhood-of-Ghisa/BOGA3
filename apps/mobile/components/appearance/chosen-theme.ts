@@ -118,8 +118,8 @@ export function appearanceLabel(appearance: AppearanceChoice): string {
 }
 
 // The roles a choice draws, in the mode it would open in, for a preview or a
-// swatch: the screens bake this launch's `uiRoles` in, so another theme's
-// colours cannot be roles of this one.
+// swatch: the screens are drawn in the saved theme's roles, so another
+// theme's colours are not roles of the live theme.
 export function appearanceRoles(appearance: AppearanceChoice): UiRoles {
   return rolesInMode(appearance, previewMode(appearance));
 }

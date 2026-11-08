@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { SessionInsightPresentation, type SessionComparisonMode } from '@/components/session-recorder/session-insight-presentation';
 import { ActionButton } from '@/components/ui/action-button';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import type {
   CurrentSessionMuscleSummary, ExerciseVolumeComparison, SessionMuscleWorkingSetEntry,
@@ -27,9 +28,12 @@ const muscleRowLabel = (muscle: SessionMuscleWorkingSetEntry): string =>
 
 // A role with no sets is an absent value: a dash in `faint`.
 function RoleCount({ count }: { count: number }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const figure = formatWorkingSetCount(count);
   return (
-    <Text allowFontScaling={false} style={[uiText.figure, figure === '0' ? uiTextTone.faint : uiTextTone.muted, styles.countCell]}>
+    <Text allowFontScaling={false} style={[text.figure, figure === '0' ? tone.faint : tone.muted, styles.countCell]}>
       {figure === '0' ? '—' : figure}
     </Text>
   );
@@ -43,18 +47,21 @@ export function SessionMuscleBreakdown({
   muscleCatalogState: MuscleCatalogState;
   standalone?: boolean;
 }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const workingSetsByMuscle = muscleSummary?.workingSetsByMuscle ?? [];
   return (
     <>
       {workingSetCount > 0 ? (
         <View style={[styles.muscles, standalone && styles.standaloneMuscles]} testID="session-completion-muscle-breakdown">
-          <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>Sets by muscle</Text>
+          <Text allowFontScaling={false} accessibilityRole="header" style={text.title}>Sets by muscle</Text>
           {workingSetsByMuscle.length > 0 ? (
             <View testID="session-completion-muscle-table">
               <View style={styles.tableRow}>
-                <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint, styles.nameCell]}>Muscle</Text>
+                <Text allowFontScaling={false} style={[text.label, tone.faint, styles.nameCell]}>Muscle</Text>
                 {MUSCLE_TABLE_COLUMNS.map((column) => (
-                  <Text allowFontScaling={false} key={column} style={[uiText.label, uiTextTone.faint, styles.countCell]}>{column}</Text>
+                  <Text allowFontScaling={false} key={column} style={[text.label, tone.faint, styles.countCell]}>{column}</Text>
                 ))}
               </View>
               {workingSetsByMuscle.map((muscle) => (
@@ -64,17 +71,17 @@ export function SessionMuscleBreakdown({
                   key={muscle.id}
                   style={[styles.tableRow, styles.bodyRow]}
                   testID={`session-completion-muscle-${muscle.id}`}>
-                  <Text allowFontScaling={false} style={[uiText.bodyStrong, styles.nameCell]}>{muscle.displayName}</Text>
+                  <Text allowFontScaling={false} style={[text.bodyStrong, styles.nameCell]}>{muscle.displayName}</Text>
                   <RoleCount count={muscle.primarySetCount} />
                   <RoleCount count={muscle.secondarySetCount} />
-                  <Text allowFontScaling={false} style={[uiText.figure, styles.countCell]}>
+                  <Text allowFontScaling={false} style={[text.figure, styles.countCell]}>
                     {formatWorkingSetCount(muscle.weightedSetCount)}
                   </Text>
                 </View>
               ))}
             </View>
           ) : (
-            <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="session-completion-muscle-empty-state">
+            <Text allowFontScaling={false} style={[text.body, tone.muted]} testID="session-completion-muscle-empty-state">
               {muscleCatalogState === 'loading'
                 ? 'Loading muscle breakdown…'
                 : muscleCatalogState === 'error'
@@ -105,12 +112,14 @@ export function SessionSummaryContent({
   historyState = 'ready', unavailableMessage, muscleCatalogState = 'ready', comparisonMode, onComparisonModeChange,
   shouldFailNextShare = false,
 }: SessionSummaryContentProps) {
+  const styles = useStyles();
+  const text = useUiText();
   const [isSharePreviewOpen, setIsSharePreviewOpen] = useState(false);
   return (
     <>
       {personalRecords.length > 0 ? (
         <View style={styles.section} testID="session-completion-personal-records">
-          <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={text.title}>
             Personal records
           </Text>
           {personalRecords.map((personalRecord) => (
@@ -158,7 +167,7 @@ export function SessionSummaryContent({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   section: {
     gap: uiSpace.sm,
   },
@@ -168,7 +177,7 @@ const styles = StyleSheet.create({
     paddingBottom: uiSpace.md,
     gap: uiSpace.sm,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   standaloneMuscles: {
     borderTopWidth: 0,
@@ -182,7 +191,7 @@ const styles = StyleSheet.create({
   bodyRow: {
     paddingVertical: uiSpace.xs,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   nameCell: {
     flex: 1,
@@ -191,4 +200,4 @@ const styles = StyleSheet.create({
     width: uiGeometry.metricValueWidth,
     textAlign: 'right',
   },
-});
+}));

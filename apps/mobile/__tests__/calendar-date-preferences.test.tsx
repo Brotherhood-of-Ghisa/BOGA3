@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from '@testing-library/react-native';
+import { act, screen, waitFor } from '@testing-library/react-native';
 import { Text, View } from 'react-native';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -14,6 +14,7 @@ import { formatCalendarDate, formatCalendarWeek, formatCalendarWeekHeading, form
   parseSessionDateTime, reformatDateTime } from '@/src/utils/local-time';
 import { formatSessionTimes, resolveSessionTimes } from '@/src/session-recorder/session-times';
 import { resolveMeasurementDate } from '@/src/bodyweight/weight-entry';
+import { renderWithTheme } from './helpers/theme';
 
 const at = new Date(2026, 8, 17, 0, 30, 42, 123);
 const formats = [
@@ -72,7 +73,7 @@ test('mounted date consumers and the share image update through every setting', 
   __resetAccountLocalPreferencesForTests();
   initializeAccountLocalPreferences(false);
   await ensureAccountLocalPreferencesLoaded();
-  render(<View><DateProbe /><SessionShareCard snapshot={snapshot} /></View>);
+  renderWithTheme(<View><DateProbe /><SessionShareCard snapshot={snapshot} /></View>);
   for (const [dateFormat, expected] of formats) {
     act(() => setAccountLocalPreferences({ dateFormat }));
     await waitFor(() => expect(screen.getByTestId('preference-date')).toHaveTextContent(`${expected} 00:30`));

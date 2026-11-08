@@ -1,8 +1,9 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 
 import { SessionFactsCard } from '@/components/session-detail';
 import { SessionTopBar } from '@/components/session-view';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiSpace } from '@/components/ui/tokens';
 import {
   personalRecordCount,
   type ExercisePersonalRecord,
@@ -69,6 +70,7 @@ export function SessionCompletionScreen({
   shouldFailNextShare = false,
   onDone,
 }: SessionCompletionScreenProps) {
+  const styles = useStyles();
   return (
     <View style={styles.screen}>
       <SessionTopBar mode="complete" onDone={onDone} />
@@ -122,13 +124,13 @@ export function SessionCompletionScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   screen: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   content: {
     padding: uiSpace.lg,
     gap: uiSpace.md,
   },
-});
+}));

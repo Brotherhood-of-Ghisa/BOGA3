@@ -4,7 +4,7 @@ import { useDateFormat, useAccountLocalPreferenceState } from '@/src/preferences
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, ActionRow, Card, ChoiceRow, FormError, FormField, FormSection, ListRow, Notice, Sheet, StatePanel, SwitchRow, ValueRow, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, ActionRow, Card, ChoiceRow, FormError, FormField, FormSection, ListRow, Notice, Sheet, StatePanel, SwitchRow, ValueRow, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanExercisePickSheet, type PlanExercisePickResult } from '@/components/session-planner/plan-exercise-pick-sheet';
 import { PlanScheduleSheet } from '@/components/session-planner/plan-schedule-sheet';
@@ -104,6 +104,8 @@ function PlanScheduleRow({ form, onOpen }: { form: PlanFormState; onOpen: () => 
  * write — this screen never touches the repository.
  */
 export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScreenProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [form, setForm] = useState<PlanFormState>(initialForm);
   const [submitted, setSubmitted] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
@@ -268,7 +270,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
         </Card>
         <FormError message={errors.get('exercises')} testID="plan-form-blocks-error" />
         {form.blocks.length === 0 ? (
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="plan-form-blocks-empty">
+          <Text allowFontScaling={false} style={[text.body, tone.muted]} testID="plan-form-blocks-empty">
             A plan needs at least one exercise.
           </Text>
         ) : null}

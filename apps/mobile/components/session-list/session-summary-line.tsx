@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
+import { useUiText, uiTextEmphasis, useUiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
@@ -42,6 +42,8 @@ export function SessionSummaryLine({
   nowMs,
   dateFormat,
 }: SessionSummaryLineProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [listPreferences] = useExerciseListPreferences();
   const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   const durationLabel =
@@ -59,24 +61,24 @@ export function SessionSummaryLine({
           allowFontScaling={false}
           selectable
           numberOfLines={1}
-          style={[uiText.figureSmall, uiTextTone.ink]}
+          style={[text.figureSmall, tone.ink]}
           testID={`${testIdPrefix}-start`}>
           {formatDateTimeStamp(session.startedAt, resolvedDateFormat)}
         </Text>
-        <Text allowFontScaling={false} selectable style={[uiText.meta, uiTextTone.faint]}>
+        <Text allowFontScaling={false} selectable style={[text.meta, tone.faint]}>
           ·
         </Text>
         <Text
           allowFontScaling={false}
           selectable
           numberOfLines={1}
-          style={[uiText.figureSmall, uiTextTone.ink]}
+          style={[text.figureSmall, tone.ink]}
           testID={`${testIdPrefix}-duration`}>
           {durationLabel}
         </Text>
         {locationLabel ? (
           <>
-            <Text allowFontScaling={false} selectable style={[uiText.meta, uiTextTone.faint]}>
+            <Text allowFontScaling={false} selectable style={[text.meta, tone.faint]}>
               @
             </Text>
             <Text
@@ -84,7 +86,7 @@ export function SessionSummaryLine({
               selectable
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={[uiText.meta, uiTextTone.ink, uiTextEmphasis.strong, styles.summaryFlexibleToken]}
+              style={[text.meta, tone.ink, uiTextEmphasis.strong, styles.summaryFlexibleToken]}
               testID={`${testIdPrefix}-gym`}>
               {locationLabel}
             </Text>
@@ -97,11 +99,11 @@ export function SessionSummaryLine({
           allowFontScaling={false}
           selectable
           numberOfLines={1}
-          style={uiText.meta}
+          style={text.meta}
           testID={`${testIdPrefix}-sets`}>
           <FigureText>{formatSetCount(session.setCount)}</FigureText>
         </Text>
-        <Text allowFontScaling={false} selectable style={[uiText.meta, uiTextTone.faint]}>
+        <Text allowFontScaling={false} selectable style={[text.meta, tone.faint]}>
           ·
         </Text>
         <Text
@@ -109,7 +111,7 @@ export function SessionSummaryLine({
           selectable
           numberOfLines={1}
           ellipsizeMode="tail"
-          style={[uiText.meta, styles.summaryFlexibleToken]}
+          style={[text.meta, styles.summaryFlexibleToken]}
           testID={`${testIdPrefix}-exercises`}>
           <FigureText>{formatExerciseCount(session.exerciseCount)}</FigureText>
         </Text>

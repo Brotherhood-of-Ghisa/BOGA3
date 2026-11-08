@@ -16,7 +16,7 @@ jest.mock('@/src/session-recorder/gym-options', () => ({
   listGymDirectory: () => Promise.resolve([]),
 }));
 
-import { render, screen, within } from '@testing-library/react-native';
+import { screen, within } from '@testing-library/react-native';
 import { StyleSheet, type TextStyle } from 'react-native';
 
 import { PickerPreselectionCard } from '@/components/session-recorder/picker-preselection-card';
@@ -28,9 +28,14 @@ import { SessionGymSheet } from '@/components/session-view/session-gym-sheet';
 import { SessionTimesFields } from '@/components/session-view/session-times-fields';
 import { SessionTopBar } from '@/components/session-view/session-top-bar';
 import { ViewSessionTopBar } from '@/components/view-session/view-session-top-bar';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { ExercisePickerPreselectionState } from '@/components/session-recorder/types';
 import type { RestTimerView } from '@/src/session-recorder/rest-timer';
+
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const defaultRoles = rolesFor(DEFAULT_APPEARANCE);
 
 const style = (node: { props: { style?: unknown } }): TextStyle => StyleSheet.flatten(node.props.style as never) as TextStyle;
 
@@ -54,10 +59,10 @@ describe('Recorder: the picker', () => {
         sets: [{ setId: 'set-1', weightValue: '60', repsValue: '8', setType: null }],
       },
     } as unknown as ExercisePickerPreselectionState;
-    render(<PickerPreselectionCard onAddEmptySet={jest.fn()} onRepeat={jest.fn()} repeatDisabled={false} state={state} />);
+    renderWithTheme(<PickerPreselectionCard onAddEmptySet={jest.fn()} onRepeat={jest.fn()} repeatDisabled={false} state={state} />);
     expect(style(screen.getByText('Bench Press'))).toMatchObject(TITLE);
     const source = screen.getByTestId('exercise-picker-plan-source');
-    expect(style(source)).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
+    expect(style(source)).toMatchObject({ ...LABEL, color: defaultRoles.inkMuted });
     expect(style(within(source).getByText('07:00'))).toMatchObject(INLINE_FIGURE);
   });
 
@@ -65,11 +70,11 @@ describe('Recorder: the picker', () => {
     mockListAvailablePlanBlocks.mockResolvedValue([
       { block: { id: 'b1', name: 'Squat', orderIndex: 1 }, planTitle: 'Push day', planBlockCount: 4 },
     ]);
-    render(<PlannerBlockSection onPickBlock={jest.fn()} />);
+    renderWithTheme(<PlannerBlockSection onPickBlock={jest.fn()} />);
     expect(style(await screen.findByText('Squat'))).toMatchObject(BODY_STRONG);
     expect(style(screen.getByText('From planner'))).toMatchObject(LABEL);
     const source = screen.getByText(/Push day/);
-    expect(style(source)).toMatchObject({ ...META, color: uiRoles.inkMuted });
+    expect(style(source)).toMatchObject({ ...META, color: defaultRoles.inkMuted });
     expect(style(within(source).getByText('2'))).toMatchObject(INLINE_FIGURE);
     expect(style(within(source).getByText('4'))).toMatchObject(INLINE_FIGURE);
   });
@@ -77,18 +82,18 @@ describe('Recorder: the picker', () => {
 
 describe('Recorder: the rest timer', () => {
   const bar = (view: RestTimerView) =>
-    render(<RestTimerBar onAdjust={jest.fn()} onDismiss={jest.fn()} onRestart={jest.fn()} view={view} />);
+    renderWithTheme(<RestTimerBar onAdjust={jest.fn()} onDismiss={jest.fn()} onRestart={jest.fn()} view={view} />);
 
   it('labels a running rest muted, its countdown in figureLarge', () => {
     bar({ mode: 'rest', status: 'running', sessionId: 's1', remainingSec: 90, formatted: '1:30', durationSec: 90 });
-    expect(style(screen.getByTestId('rest-timer-status'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
-    expect(style(screen.getByTestId('rest-timer-countdown'))).toMatchObject({ ...FIGURE_LARGE, color: uiRoles.ink });
+    expect(style(screen.getByTestId('rest-timer-status'))).toMatchObject({ ...LABEL, color: defaultRoles.inkMuted });
+    expect(style(screen.getByTestId('rest-timer-countdown'))).toMatchObject({ ...FIGURE_LARGE, color: defaultRoles.ink });
   });
 
   it('labels a finished rest in ink', () => {
     bar({ mode: 'rest', status: 'completed', sessionId: 's1', remainingSec: 0, formatted: '0:00', durationSec: 90 } as RestTimerView);
     expect(screen.getByTestId('rest-timer-status')).toHaveTextContent('Rest complete');
-    expect(style(screen.getByTestId('rest-timer-status'))).toMatchObject({ ...LABEL, color: uiRoles.ink });
+    expect(style(screen.getByTestId('rest-timer-status'))).toMatchObject({ ...LABEL, color: defaultRoles.ink });
   });
 
   it('draws the round number of a repeating timer in the figure face', () => {
@@ -101,27 +106,27 @@ describe('Recorder: the rest timer', () => {
   });
 
   it.each([
-    ['running', { mode: 'rest', status: 'running', sessionId: 's1', remainingSec: 60, formatted: '1:00', durationSec: 90 }, uiRoles.ink],
-    ['done', { mode: 'rest', status: 'completed', sessionId: 's1', remainingSec: 0, formatted: '0:00', durationSec: 90 }, uiRoles.surface],
+    ['running', { mode: 'rest', status: 'running', sessionId: 's1', remainingSec: 60, formatted: '1:00', durationSec: 90 }, defaultRoles.ink],
+    ['done', { mode: 'rest', status: 'completed', sessionId: 's1', remainingSec: 0, formatted: '0:00', durationSec: 90 }, defaultRoles.surface],
     ['paused', {
       mode: 'repeating', status: 'paused', sessionId: 's1', round: 2, remainingSec: 30, formatted: '0:30', intervalSec: 60, isPaused: true,
-    }, uiRoles.inkMuted],
+    }, defaultRoles.inkMuted],
   ])('draws the title-bar countdown in figureLarge (%s)', (_name, view, color) => {
-    render(<TitleBarTimer onLongPress={jest.fn()} onPress={jest.fn()} testID="tb" view={view as RestTimerView} />);
+    renderWithTheme(<TitleBarTimer onLongPress={jest.fn()} onPress={jest.fn()} testID="tb" view={view as RestTimerView} />);
     expect(style(screen.getByTestId('tb-countdown'))).toMatchObject({ ...FIGURE_LARGE, color });
   });
 });
 
 describe('Recorder: comparisons', () => {
   it('states a loading comparison in meta', () => {
-    render(<SessionInsightPresentation exerciseComparisons={[]} historyState="loading" />);
-    expect(style(screen.getByTestId('session-insight-empty'))).toMatchObject({ ...META, color: uiRoles.inkMuted });
+    renderWithTheme(<SessionInsightPresentation exerciseComparisons={[]} historyState="loading" />);
+    expect(style(screen.getByTestId('session-insight-empty'))).toMatchObject({ ...META, color: defaultRoles.inkMuted });
   });
 });
 
 describe('Session view: the gym sheet', () => {
   const sheet = (options: Parameters<typeof SessionGymSheet>[0]['options']) =>
-    render(
+    renderWithTheme(
       <SessionGymSheet
         gpsPanel={{
           state: {
@@ -146,23 +151,23 @@ describe('Session view: the gym sheet', () => {
 
   it('labels Manage gyms in ink and states loading in muted body', () => {
     sheet(null);
-    expect(style(screen.getByText('Manage gyms'))).toMatchObject({ ...LABEL, color: uiRoles.ink });
-    expect(style(screen.getByText('Loading gyms…'))).toMatchObject({ ...BODY, color: uiRoles.inkMuted });
+    expect(style(screen.getByText('Manage gyms'))).toMatchObject({ ...LABEL, color: defaultRoles.ink });
+    expect(style(screen.getByText('Loading gyms…'))).toMatchObject({ ...BODY, color: defaultRoles.inkMuted });
   });
 
   it('heads the GPS panel with a label, its rows in meta, values strong with strong figures', () => {
     sheet([]);
-    expect(style(screen.getByText('GPS state'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
-    expect(style(screen.getByText('Fix'))).toMatchObject({ ...META, color: uiRoles.inkMuted });
+    expect(style(screen.getByText('GPS state'))).toMatchObject({ ...LABEL, color: defaultRoles.inkMuted });
+    expect(style(screen.getByText('Fix'))).toMatchObject({ ...META, color: defaultRoles.inkMuted });
     const value = screen.getByTestId('session-gps-value-fix');
-    expect(style(value)).toMatchObject({ ...META, fontWeight: '600', color: uiRoles.ink, textAlign: 'right' });
+    expect(style(value)).toMatchObject({ ...META, fontWeight: '600', color: defaultRoles.ink, textAlign: 'right' });
     expect(style(within(value).getByText('30'))).toMatchObject({ fontFamily: uiFonts.figure.family, fontWeight: '600' });
   });
 });
 
 describe('Session view: the times and the title bars', () => {
   it('states the autosave-paused notice in meta', () => {
-    render(
+    renderWithTheme(
       <SessionTimesFields
         errors={{ start: null, end: null }}
         notice="Autosave paused until Start/End times are valid."
@@ -173,12 +178,12 @@ describe('Session view: the times and the title bars', () => {
         text={{ start: '2026-10-27 07:00', end: '2026-10-27 08:00' }}
       />,
     );
-    expect(style(screen.getByTestId('session-view-times-notice'))).toMatchObject({ ...META, color: uiRoles.inkMuted });
+    expect(style(screen.getByTestId('session-view-times-notice'))).toMatchObject({ ...META, color: defaultRoles.inkMuted });
   });
 
   it('titles an active session in title, its elapsed time in strong figures', () => {
     const startedAt = new Date(2026, 8, 23, 18, 0, 0);
-    render(
+    renderWithTheme(
       <SessionTopBar
         mode="active"
         now={() => new Date(2026, 8, 23, 18, 42, 17)}
@@ -193,12 +198,12 @@ describe('Session view: the times and the title bars', () => {
   });
 
   it('titles a completed edit in title', () => {
-    render(<SessionTopBar mode="completed" onDone={jest.fn()} />);
+    renderWithTheme(<SessionTopBar mode="completed" onDone={jest.fn()} />);
     expect(style(screen.getByText('Edit session'))).toMatchObject(TITLE);
   });
 
   it('titles View Session in title, the date in strong figures', () => {
-    render(<ViewSessionTopBar onBack={jest.fn()} title="Morning training · 27-10-2026" />);
+    renderWithTheme(<ViewSessionTopBar onBack={jest.fn()} title="Morning training · 27-10-2026" />);
     const title = screen.getByTestId('completed-session-detail-title');
     expect(style(title)).toMatchObject({ ...TITLE, flex: 1 });
     expect(style(within(title).getByText('27-10-2026'))).toMatchObject({ fontFamily: uiFonts.figure.family, fontWeight: '600' });

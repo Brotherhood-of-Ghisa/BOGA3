@@ -2,7 +2,7 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { FormField } from '@/components/ui/form-field';
-import { uiText } from '@/components/ui/text-roles';
+import { useUiText } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import type { SessionTimesText, SessionTimesValidation } from '@/src/session-recorder/session-times';
 
@@ -66,6 +66,7 @@ export function SessionTimesFields({
   onCommitStart,
   onCommitEnd,
 }: SessionTimesFieldsProps) {
+  const roleText = useUiText();
   return (
     <View style={styles.section} testID="session-view-times">
       <View style={styles.row}>
@@ -87,7 +88,7 @@ export function SessionTimesFields({
         />
       </View>
       {notice ? (
-        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={uiText.meta} testID="session-view-times-notice">
+        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={roleText.meta} testID="session-view-times-notice">
           {notice}
         </Text>
       ) : null}

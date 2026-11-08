@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/ui/card';
 import { Stat } from '@/components/ui/stat';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 
 export type SessionFact = {
@@ -76,10 +76,12 @@ export function SessionFactsCard({ header, times, facts, children, testID }: Ses
 }
 
 function TimeReadout({ label, value, testID }: { label: string; value: string; testID?: string }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View accessibilityLabel={`${label} ${value}`} accessible style={styles.time} testID={testID}>
-      <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>{label}</Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={uiText.body}>
+      <Text allowFontScaling={false} style={[text.label, tone.faint]}>{label}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={text.body}>
         <FigureText>{value}</FigureText>
       </Text>
     </View>

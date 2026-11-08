@@ -15,10 +15,10 @@ import {
   IconButton,
   Notice,
   PageSheet,
-  uiRoles,
   uiSpace,
-  uiText,
-  uiTextTone,
+  makeStyles,
+  useUiText,
+  useUiTextTone,
 } from '@/components/ui';
 import { PlanBlockEditor } from '@/components/session-planner/plan-block-editor';
 import { PlanSetAddForm } from '@/components/session-planner/plan-set-add-form';
@@ -140,10 +140,12 @@ function ProgrammeChildPlanBlocks({
   onRemoveBlock,
   onRemoveSet,
 }: ProgrammeChildPlanBlocksProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.fieldBlock}>
       <View style={styles.blocksHeader}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={text.label}>
           Exercise blocks
         </Text>
         <ActionButton
@@ -175,7 +177,7 @@ function ProgrammeChildPlanBlocks({
         />
       ))}
       {blocks.length === 0 ? (
-        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="programme-child-plan-blocks-empty">
+        <Text allowFontScaling={false} style={[text.body, tone.muted]} testID="programme-child-plan-blocks-empty">
           A session needs at least one exercise.
         </Text>
       ) : null}
@@ -460,6 +462,9 @@ function ProgrammeChildPlanCard({
   onDuplicate: () => void;
   onRemove: () => void;
 }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
+  const errorStyles = useErrorStyles();
   const dateFormat = useDateFormat();
   const blockCount = plan.blocks.length;
   const scheduleSummary = planScheduleLabel(plan.scheduleText, dateFormat);
@@ -467,13 +472,13 @@ function ProgrammeChildPlanCard({
   const testID = `programme-form-plan-${index + 1}`;
 
   return (
-    <Card style={[styles.planCard, hasError && styles.planCardError]} testID={testID}>
+    <Card style={[styles.planCard, hasError && errorStyles.planCardError]} testID={testID}>
       <View style={styles.planCardTopRow}>
         <View style={styles.planCardInfo}>
-          <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
+          <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong}>
             {name}
           </Text>
-          <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+          <Text allowFontScaling={false} numberOfLines={1} style={text.meta}>
             <FigureText>{`${scheduleSummary} · ${blockCount} ${blockCount === 1 ? 'block' : 'blocks'}`}</FigureText>
           </Text>
         </View>
@@ -524,7 +529,7 @@ function ProgrammeChildPlanCard({
       </View>
 
       {hasError ? (
-        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.danger, styles.planCardErrorText]}>
+        <Text allowFontScaling={false} style={[text.meta, tone.danger, styles.planCardErrorText]}>
           Please review errors inside this session.
         </Text>
       ) : null}
@@ -537,6 +542,8 @@ export function ProgrammeFormScreen({
   onSave,
   saveLabel,
 }: ProgrammeFormScreenProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [form, setForm] = useState<ProgrammeFormState>(initialForm);
   const [editingPlanIndex, setEditingPlanIndex] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -610,7 +617,7 @@ export function ProgrammeFormScreen({
 
       <View style={styles.sessionsHeader}>
         <View style={styles.sessionsHeaderTitle}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
             Sessions ({form.plans.length})
           </Text>
         </View>
@@ -664,6 +671,11 @@ export function ProgrammeFormScreen({
   );
 }
 
+// The one sheet that draws a colour: a plan card with a problem.
+const useErrorStyles = makeStyles((roles) => ({
+  planCardError: { borderColor: roles.danger, borderWidth: 1 },
+}));
+
 const styles = StyleSheet.create({
   container: {
     gap: uiSpace.md,
@@ -684,10 +696,6 @@ const styles = StyleSheet.create({
   planCard: {
     padding: uiSpace.md,
     gap: uiSpace.sm,
-  },
-  planCardError: {
-    borderColor: uiRoles.danger,
-    borderWidth: 1,
   },
   planCardTopRow: {
     flexDirection: 'row',

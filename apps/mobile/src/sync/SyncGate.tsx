@@ -5,9 +5,10 @@ import {
   Card,
   Notice,
   Screen,
-  uiRoles,
   uiSpace,
-  uiText,
+  useUiRoles,
+  useUiText,
+  useUiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { SYNC_VERSION_MISMATCH_MESSAGE } from '@/src/sync/cycle-error-signal';
@@ -68,11 +69,12 @@ export function SyncSetupScreen() {
   const { isConfigured, session } = useAuth();
   const snapshot = useSyncGateState();
   const mode = selectSyncGateMode({ isConfigured, session }, snapshot);
+  const text = useUiText();
 
   return (
     <Screen style={styles.container} testID={SYNC_GATE_TEST_IDS.block}>
       <Card style={styles.card}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={styles.heading}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[text.title, styles.heading]}>
           {mode.kind === 'error' && mode.errorCode === 'UPDATE_REQUIRED' ? 'Sync version mismatch' : 'Setting up your data…'}
         </Text>
 
@@ -88,9 +90,11 @@ export function SyncSetupScreen() {
 
 /** The in-progress body: phase label plus an advancing activity / offline signal. */
 function GateProgress({ progress }: { progress: SyncProgress }) {
+  const roles = useUiRoles();
+  const text = useUiText();
   return (
     <View style={styles.body}>
-      <Text allowFontScaling={false} style={styles.phaseLabel} testID={SYNC_GATE_TEST_IDS.phaseLabel}>
+      <Text allowFontScaling={false} style={[text.bodyStrong, styles.phaseLabel]} testID={SYNC_GATE_TEST_IDS.phaseLabel}>
         {PHASE_LABELS[progress.phase]}
       </Text>
 
@@ -110,9 +114,9 @@ function GateProgress({ progress }: { progress: SyncProgress }) {
               the indicator would never see it. A plain View wrapper is reliably
               queryable by both Maestro and React Native Testing Library. */}
           <View testID={SYNC_GATE_TEST_IDS.activityIndicator}>
-            <ActivityIndicator color={uiRoles.inkMuted} size="large" />
+            <ActivityIndicator color={roles.inkMuted} size="large" />
           </View>
-          <Text allowFontScaling={false} style={styles.activityDetail} testID={SYNC_GATE_TEST_IDS.activityDetail}>
+          <Text allowFontScaling={false} style={[text.figureSmall, styles.activityDetail]} testID={SYNC_GATE_TEST_IDS.activityDetail}>
             {describeActivity(progress)}
           </Text>
         </View>
@@ -133,12 +137,14 @@ function GateError({
   errorCode: 'FK_VIOLATION' | 'LOCAL_FK_VIOLATION' | 'UPDATE_REQUIRED' | 'INTERNAL';
   detail: string | null;
 }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.body}>
-      <Text allowFontScaling={false} accessibilityRole="alert" style={styles.errorMessage} testID={SYNC_GATE_TEST_IDS.errorMessage}>
+      <Text allowFontScaling={false} accessibilityRole="alert" style={[text.bodyStrong, tone.danger, styles.errorMessage]} testID={SYNC_GATE_TEST_IDS.errorMessage}>
         {ERROR_MESSAGES[errorCode]}
       </Text>
-      <Text allowFontScaling={false} selectable style={styles.errorDetail} testID={SYNC_GATE_TEST_IDS.errorDetail}>
+      <Text allowFontScaling={false} selectable style={[text.figureSmall, styles.errorDetail]} testID={SYNC_GATE_TEST_IDS.errorDetail}>
         {detail ? `${errorCode}: ${detail}` : errorCode}
       </Text>
       {errorCode !== 'UPDATE_REQUIRED' ? <ActionButton
@@ -194,7 +200,6 @@ const styles = StyleSheet.create({
     gap: uiSpace.xl,
   },
   heading: {
-    ...uiText.title,
     textAlign: 'center',
   },
   body: {
@@ -202,7 +207,6 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   phaseLabel: {
-    ...uiText.bodyStrong,
     textAlign: 'center',
   },
   activityRow: {
@@ -211,19 +215,15 @@ const styles = StyleSheet.create({
   },
   // `Layer K of N · M items`: counters, so Plex Mono.
   activityDetail: {
-    ...uiText.figureSmall,
     textAlign: 'center',
   },
   // The failure's code + sanitized exception text: diagnostic, so Plex Mono and
   // muted like the activity counters; selectable so it can be copied.
   errorDetail: {
-    ...uiText.figureSmall,
     textAlign: 'center',
   },
   // An error, so `danger`, beside the one `accent` Retry.
   errorMessage: {
-    ...uiText.bodyStrong,
-    color: uiRoles.danger,
     textAlign: 'center',
   },
 });

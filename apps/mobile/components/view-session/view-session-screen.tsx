@@ -1,13 +1,14 @@
 import { type ReactNode, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import type { CompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 
 import { ViewSessionOptionsSheet } from './view-session-sheets';
@@ -64,6 +65,9 @@ export function ViewSessionScreen({
   busy = false,
   isResuming = false,
 }: ViewSessionScreenProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [isOptionsVisible, setIsOptionsVisible] = useState(false);
 
   return (
@@ -78,12 +82,12 @@ export function ViewSessionScreen({
       <ScreenScroll keyboardShouldPersistTaps="handled" testID="completed-session-detail-screen">
         {summary.deleted ? (
           <View style={styles.band} testID="completed-session-detail-deleted-band">
-            <Icon color={uiRoles.inkMuted} name="trash" size="xs" />
-            <Text allowFontScaling={false} style={uiText.label}>Deleted · hidden from history</Text>
+            <Icon colorRole="inkMuted" name="trash" size="xs" />
+            <Text allowFontScaling={false} style={text.label}>Deleted · hidden from history</Text>
           </View>
         ) : null}
         {error ? (
-          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.bodyStrong, uiTextTone.danger]} testID="completed-session-detail-error-notice">
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger]} testID="completed-session-detail-error-notice">
             {error}
           </Text>
         ) : null}
@@ -113,7 +117,7 @@ export function ViewSessionScreen({
           testIDPrefix="view-session-section"
         />
         {section === 'summary' ? summaryContent : model.cards.length === 0 ? (
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="completed-session-detail-no-exercises">
+          <Text allowFontScaling={false} style={[text.body, tone.muted]} testID="completed-session-detail-no-exercises">
             No exercises logged in this session.
           </Text>
         ) : (
@@ -156,16 +160,16 @@ export function ViewSessionScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   band: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.card,
   },
-});
+}));

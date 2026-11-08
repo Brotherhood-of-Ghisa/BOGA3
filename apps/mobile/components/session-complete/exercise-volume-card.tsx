@@ -1,12 +1,13 @@
 import { formatVolume } from '@/src/exercise-calculations/format';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { changeToneColour, type ChangeTone } from '@/components/ui/change-tone';
+import { changeToneColourIn, type ChangeTone } from '@/components/ui/change-tone';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { hasVolumeReference, type ExerciseVolumeComparison } from '@/src/session-insights';
 
 type ExerciseVolumeCardProps = {
@@ -82,6 +83,10 @@ const markerPosition = (value: number, comparison: ExerciseVolumeComparison): nu
  * Shared by the session summary, live comparison and captured share image.
  */
 export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: ExerciseVolumeCardProps) {
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const hasDistribution = hasVolumeReference(comparison);
   const low = hasDistribution ? markerPosition(comparison.percentile25Volume as number, comparison) : 50;
   const high = hasDistribution ? markerPosition(comparison.percentile75Volume as number, comparison) : 50;
@@ -102,20 +107,20 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
     <Card style={variant === 'share' ? styles.shareCard : null} testID={testID}>
       <View accessibilityLabel={buildAccessibilityLabel(comparison)} accessible style={styles.body}>
         <View style={styles.headingRow} testID={testID ? `${testID}-heading` : undefined}>
-          <Text allowFontScaling={false} numberOfLines={2} style={[uiText.bodyStrong, styles.name]}>
+          <Text allowFontScaling={false} numberOfLines={2} style={[text.bodyStrong, styles.name]}>
             <FigureText strong>{comparison.exerciseName}</FigureText>
           </Text>
-          <Text allowFontScaling={false} style={uiText.meta}>
+          <Text allowFontScaling={false} style={text.meta}>
             <FigureText>{formatExerciseSetCount(comparison.workingSetCount)}</FigureText>
           </Text>
         </View>
         <View style={styles.valueRow}>
           <View style={styles.legend}>
-            <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>Vol</Text>
-            <Text allowFontScaling={false} style={uiText.figureHero}>{comparison.currentVolume === null ? '—' : formatVolume(comparison.currentVolume)}</Text>
+            <Text allowFontScaling={false} style={[text.label, tone.faint]}>Vol</Text>
+            <Text allowFontScaling={false} style={text.figureHero}>{comparison.currentVolume === null ? '—' : formatVolume(comparison.currentVolume)}</Text>
           </View>
           {hasDistribution ? <Text allowFontScaling={false}
-            style={[uiText.meta, uiTextEmphasis.strong, styles.delta, { color: changeToneColour(exerciseVolumeTone(comparison)) }]}>
+            style={[text.meta, uiTextEmphasis.strong, styles.delta, { color: changeToneColourIn(roles, exerciseVolumeTone(comparison)) }]}>
             <FigureText strong>{formatExerciseVolumeComparison(comparison)}</FigureText>
           </Text> : null}
         </View>
@@ -138,11 +143,11 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
                   transform: [{ translateX: reference.position / 100 * plotWidth - annotationWidths[index] / 2 }],
                   opacity: plotWidth > 0 && annotationWidths[index] > 0 && (index === 1 || showQuartileLabels) ? 1 : 0,
                 }]}>
-                <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+                <Text allowFontScaling={false} style={[text.label, tone.faint]}>
                   <FigureText>{reference.label}</FigureText>
                 </Text>
                 <View style={styles.annotationGap} />
-                <Text allowFontScaling={false} style={uiText.figureSmall}>{formatVolume(reference.value as number)}</Text>
+                <Text allowFontScaling={false} style={text.figureSmall}>{formatVolume(reference.value as number)}</Text>
               </View>
             ))}
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.trackWrap}>
@@ -164,9 +169,9 @@ export function ExerciseVolumeCard({ comparison, variant = 'app', testID }: Exer
 // over the track and the median tick.
 const MARKER = uiSpace.md;
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   shareCard: {
-    borderColor: uiRoles.ruleSoft,
+    borderColor: roles.ruleSoft,
   },
   body: {
     paddingHorizontal: uiSpace.md,
@@ -217,20 +222,20 @@ const styles = StyleSheet.create({
   track: {
     height: uiSpace.xs,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.ruleSoft,
+    backgroundColor: roles.ruleSoft,
   },
   interval: {
     position: 'absolute',
     height: uiSpace.xs,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.rule,
+    backgroundColor: roles.rule,
   },
   referenceMarker: {
     position: 'absolute',
     width: uiBorder.width * 2,
     height: uiSpace.lg,
     marginLeft: -uiBorder.width,
-    backgroundColor: uiRoles.inkMuted,
+    backgroundColor: roles.inkMuted,
   },
   currentMarker: {
     position: 'absolute',
@@ -239,7 +244,7 @@ const styles = StyleSheet.create({
     marginLeft: -MARKER / 2,
     borderRadius: uiGeometry.radius.pill,
     borderWidth: uiBorder.width * 2,
-    borderColor: uiRoles.onInk,
-    backgroundColor: uiRoles.ink,
+    borderColor: roles.onInk,
+    backgroundColor: roles.ink,
   },
-});
+}));

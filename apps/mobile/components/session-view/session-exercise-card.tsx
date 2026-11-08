@@ -1,6 +1,5 @@
 import { ExerciseSetsCard } from '@/components/session-detail';
 import { Icon } from '@/components/ui/icon';
-import { uiRoles } from '@/components/ui/tokens';
 import type { SessionViewExerciseCard } from '@/src/session-recorder/session-view-model';
 
 type SessionExerciseCardProps = {
@@ -23,7 +22,7 @@ export function SessionExerciseCard({ card, onPress }: SessionExerciseCardProps)
   return (
     <ExerciseSetsCard
       accessibilityLabel={label}
-      accessory={<Icon color={uiRoles.inkFaint} name="chevron-right" size="sm" />}
+      accessory={<Icon colorRole="inkFaint" name="chevron-right" size="sm" />}
       count={`${card.doneCount}/${card.totalCount}`}
       countMuted={card.doneCount === 0}
       name={card.name}
