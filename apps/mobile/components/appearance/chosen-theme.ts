@@ -5,7 +5,7 @@ import type { ThemeMode, UiRoles } from '@/components/ui/theme';
 import { useAppTheme } from '@/components/ui/theme-context';
 import type { CustomPart } from '@/components/ui/theme-custom';
 import { hueName } from '@/components/ui/theme-hue';
-import { launchTheme, readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
+import { readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
 import {
   appearanceMode,
   appearanceRoles as rolesInMode,
@@ -16,9 +16,9 @@ import {
 } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
-// The stored choice. Falls back to the theme in use, logged, when the store
-// cannot be read.
-export function readStoredAppearance(): AppearanceChoice {
+// The stored choice. Falls back to `inUse`, the theme the app is drawn in,
+// logged, when the store cannot be read.
+export function readStoredAppearance(inUse: AppearanceChoice): AppearanceChoice {
   try {
     return readStoredTheme().appearance;
   } catch (error) {
@@ -28,25 +28,36 @@ export function readStoredAppearance(): AppearanceChoice {
       message: 'Could not read the stored appearance; showing the theme in use.',
       context: { error: error instanceof Error ? error.message : String(error) },
     });
-    return launchTheme.appearance;
+    return inUse;
   }
 }
 
 // The stored choice with the saves still on their way applied; the stored
 // choice itself when none is. Falls back as `readStoredAppearance` does.
-export function readIntendedAppearance(): AppearanceChoice {
+export function readIntendedAppearance(inUse: AppearanceChoice): AppearanceChoice {
   try {
     return readIntendedTheme();
   } catch {
-    return readStoredAppearance();
+    return readStoredAppearance(inUse);
+  }
+}
+
+// Whether the stored choice is one the app could not use (an unknown id, an
+// invalid record), so saving even the same choice replaces it.
+export function storedChoiceUnusable(): boolean {
+  try {
+    return readStoredTheme().problem !== null;
+  } catch {
+    return false;
   }
 }
 
 // The stored choice, kept current when any page saves one. The setter shows a
 // choice before its save returns.
 export function useStoredAppearance(): [AppearanceChoice, (appearance: AppearanceChoice) => void] {
-  const [appearance, setAppearance] = useState<AppearanceChoice>(readStoredAppearance);
-  useEffect(() => subscribeThemeSaved(() => setAppearance(readStoredAppearance())), []);
+  const inUse = useAppTheme().appearance;
+  const [appearance, setAppearance] = useState<AppearanceChoice>(() => readStoredAppearance(inUse));
+  useEffect(() => subscribeThemeSaved(() => setAppearance(readStoredAppearance(inUse))), [inUse]);
   return [appearance, setAppearance];
 }
 
@@ -63,7 +74,8 @@ export const CUSTOM_PART_LABELS: Record<CustomPart, string> = {
 };
 
 // The phone's mode as the app last read it (`theme-context.tsx`): what a
-// preview of System draws in, also while the app is pinned to another mode.
+// preview of System draws in. While native UI is pinned the OS reports only
+// the pin, so a phone change since the last read shows once System is chosen.
 export function usePhoneScheme(): ColorSchemeName | null {
   return useAppTheme().phoneScheme;
 }

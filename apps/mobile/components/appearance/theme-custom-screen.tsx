@@ -55,7 +55,7 @@ export function ThemeCustomScreen({ part }: { part: CustomPart }) {
     setDraft(next);
     // The colours the saves on their way will store, so another part's save
     // is not overwritten.
-    const custom = { ...customOf(readIntendedAppearance(), phoneScheme), [part]: next };
+    const custom = { ...customOf(readIntendedAppearance(appearance), phoneScheme), [part]: next };
     await commit(
       { theme: 'custom', custom },
       { message: 'Couldn’t save the colour. Nothing changed.', context: { part, value: next } },

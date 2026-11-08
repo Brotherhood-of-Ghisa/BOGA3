@@ -41,11 +41,10 @@ import { appearanceRoles } from '@/components/appearance/chosen-theme';
 import { generateRoles } from '@/components/ui/theme';
 import { customFromSeeds, generateCustomRoles, type CustomColours } from '@/components/ui/theme-custom';
 import { DEFAULT_APPEARANCE, getThemePreset } from '@/components/ui/theme-presets';
-import * as themeLaunch from '@/components/ui/theme-launch';
-import { APPEARANCE_STORAGE_KEY, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
+import { APPEARANCE_STORAGE_KEY, saveAppearance, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { ensureExerciseListPreferencesLoaded } from '@/src/exercise-catalog/list-preferences';
-import { renderWithTheme } from './helpers/theme';
+import { renderWithTheme, switchTheme } from './helpers/theme';
 import SettingsAppearanceRoute from '../app/settings-appearance';
 import SettingsRoute from '../app/settings';
 
@@ -161,19 +160,37 @@ it('shows the theme in use, and logs why, when the store cannot be read', () => 
   );
 });
 
-it('replaces an unusable stored choice when the default is chosen again', async () => {
-  // This launch fell back to Warm because the stored id names no preset.
+it('replaces an unusable stored choice when the default is chosen again, then writes nothing more', async () => {
+  // The stored id names no preset, so the app draws Warm.
   Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'neon');
-  jest.replaceProperty(themeLaunch, 'launchTheme', {
-    ...themeLaunch.launchTheme,
-    problem: { kind: 'unknown-preset', storedId: 'neon' },
-  });
   render(<SettingsAppearanceRoute />);
   expect(radio('Warm, default').props.accessibilityState).toEqual({ checked: true });
 
   fireEvent.press(screen.getByTestId('settings-appearance-option-warm'));
 
   await waitFor(() => expect(storedAccent()).toBe('warm'));
+  const setItem = jest.spyOn(Storage, 'setItem');
+  fireEvent.press(screen.getByTestId('settings-appearance-option-warm'));
+  await act(async () => {});
+  expect(setItem).not.toHaveBeenCalled();
+});
+
+it('shows the theme the app is drawn in, not the launch one, when the store cannot be read', async () => {
+  renderWithTheme(<SettingsRoute />);
+  await switchTheme({ theme: 'slate', mode: 'light', custom: null });
+  const read = jest.spyOn(Storage, 'getItemSync').mockImplementation(() => {
+    throw new Error('database is locked');
+  });
+  try {
+    // Another page saves; the row re-reads, and the read fails.
+    await act(async () => {
+      await saveAppearance({ theme: 'plum', mode: 'light', custom: null });
+    });
+  } finally {
+    read.mockRestore();
+  }
+  expect(screen.getByLabelText('Appearance, Slate')).toBeTruthy();
+  expect(mockLogEvent).toHaveBeenCalledWith(expect.objectContaining({ event: 'theme.read_failed' }));
 });
 
 it('shows a choice made earlier this run, read from the store', () => {

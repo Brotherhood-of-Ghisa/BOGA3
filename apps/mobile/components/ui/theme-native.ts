@@ -1,4 +1,4 @@
-import { Appearance, type ColorSchemeName } from 'react-native';
+import { Appearance, AppState, type ColorSchemeName } from 'react-native';
 
 import type { ThemeMode } from '@/components/ui/theme';
 import { appearanceMode, type AppearanceChoice } from '@/components/ui/theme-presets';
@@ -30,10 +30,19 @@ export function pinNativeMode(mode: ThemeMode | null): void {
   Appearance.setColorScheme?.(mode ?? 'unspecified');
 }
 
-// Calls `listener` with the phone's mode each time the OS reports a change: the
-// phone's own while unpinned, and the pin's when native UI is pinned to the
-// other mode.
+// Calls `listener` with the phone's mode each time the OS reports a change
+// while the app is active, and again on each return to it. In the background
+// iOS flips the mode to snapshot the app in both, which is no change of the
+// phone's.
 export function subscribePhoneScheme(listener: (scheme: ColorSchemeName | null) => void): () => void {
-  const subscription = Appearance.addChangeListener(({ colorScheme }) => listener(colorScheme ?? null));
-  return () => subscription.remove();
+  const modes = Appearance.addChangeListener(({ colorScheme }) => {
+    if (AppState.currentState === 'active') listener(colorScheme ?? null);
+  });
+  const returns = AppState.addEventListener('change', (state) => {
+    if (state === 'active') listener(readPhoneScheme());
+  });
+  return () => {
+    modes.remove();
+    returns.remove();
+  };
 }

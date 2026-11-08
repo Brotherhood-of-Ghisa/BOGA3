@@ -100,7 +100,7 @@ export function AppearanceSettingsScreen() {
             // From the store and the saves on their way, not this render: a
             // part saved on its picker may not have reached this page yet.
             setPresetsShown(false);
-            const intended = readIntendedAppearance();
+            const intended = readIntendedAppearance(appearance);
             if (intended.theme === 'custom') return;
             void commit(
               { theme: 'custom', custom: startingCustom(intended, previewMode(intended, phoneScheme)) },

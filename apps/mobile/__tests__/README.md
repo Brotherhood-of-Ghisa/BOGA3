@@ -124,6 +124,9 @@
   React Compiler repaints on a switch. Render a themed component with
   `helpers/theme.tsx` (`renderWithTheme`, `switchTheme`), and take expected
   colours from `rolesFor(...)`, never a module constant.
+- `theme-native.test.ts` covers the one phone-mode reader and pinner: unpin
+  for System, no pin on web, no OS report heard in the background, a read on
+  return; `ui-theme-context.test.tsx` fakes an OS that reports its pin.
 - `theme-app-icon-live.test.tsx` proves the launcher icon follows each saved
   theme; `theme-app-icon.test.ts` covers the native boundary and its OS limits.
 - `ui-live-theme-primitives.test.tsx` switches the theme through the provider and

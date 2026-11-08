@@ -59,7 +59,7 @@ export type AppearanceRecordField = 'json' | 'theme' | 'mode' | 'custom' | 'acce
 export type CustomTheme = { id: 'custom'; label: string };
 export const CUSTOM_THEME: CustomTheme = { id: 'custom', label: 'Custom' };
 
-// Light, dark, or the OS's mode at launch, for a preset. A custom theme's page
+// Light, dark, or the phone's mode, followed while the app runs, for a preset. A custom theme's page
 // lightness sets its mode.
 export type AppearanceMode = 'light' | 'dark' | 'system';
 export const APPEARANCE_MODES: readonly AppearanceMode[] = ['light', 'dark', 'system'];

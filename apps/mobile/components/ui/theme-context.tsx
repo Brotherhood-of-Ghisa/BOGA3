@@ -58,6 +58,13 @@ function readSavedAppearance(): AppearanceChoice | null {
   }
 }
 
+// The phone's mode a saved choice is drawn on. A save into System from a
+// pinned mode starts from the pin, which is what the OS reports while pinned,
+// and draws it until the OS reports the phone's own, rather than flicking
+// through an older reading. Any other save keeps the last reading.
+const phoneFor = (current: AppTheme, appearance: AppearanceChoice): ColorSchemeName | null =>
+  followsPhone(appearance) && !followsPhone(current.appearance) ? current.mode : current.phoneScheme;
+
 // Holds the theme for everything below it: the stored choice when it mounts
 // (the launch theme if the store cannot be read then), then each choice saved
 // while the app runs (`subscribeThemeSaved`), and with System each phone
@@ -79,7 +86,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     () =>
       subscribeThemeSaved(() => {
         const appearance = readSavedAppearance();
-        if (appearance) startTransition(() => setTheme((current) => withChoice(current, appearance, current.phoneScheme)));
+        if (appearance) startTransition(() => setTheme((current) => withChoice(current, appearance, phoneFor(current, appearance))));
       }),
     [],
   );
@@ -91,8 +98,9 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     if (pin) return undefined;
     const follow = (phoneScheme: ColorSchemeName | null) =>
       startTransition(() => setTheme((current) => withChoice(current, current.appearance, phoneScheme)));
-    // Unpinned, the phone may differ from the mode last read: read it now, and
-    // the OS reports it again if the pin it left still showed.
+    // Just unpinned, the OS still reports the pin it left (`phoneFor`), and
+    // reports the phone's mode once it differs; read it now for the case where
+    // nothing was pinned.
     follow(readPhoneScheme());
     return subscribePhoneScheme(follow);
   }, [pin]);

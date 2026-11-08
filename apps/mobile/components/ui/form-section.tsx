@@ -24,7 +24,7 @@ export type FormSectionProps = {
   // The section's one validation message, under its card in `danger`.
   error?: string | null;
   errorTestID?: string;
-  // A muted note under the card, above any error (`Applies next launch`).
+  // A muted note under the card, above any error (`System follows the phone’s mode`).
   footnote?: string;
   testID?: string;
 };

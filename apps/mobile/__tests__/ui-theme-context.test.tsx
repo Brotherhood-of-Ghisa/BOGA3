@@ -6,7 +6,7 @@ jest.mock('@/src/logging', () => ({ logEvent: (...args: unknown[]) => mockLogEve
 import { act, render, screen } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
 import { Suspense } from 'react';
-import { Appearance, Text, type ColorSchemeName } from 'react-native';
+import { Appearance, AppState, Text, type AppStateStatus, type ColorSchemeName } from 'react-native';
 
 import type { UiRoles } from '@/components/ui/theme';
 import { makeStyles, useUiMode, useUiRoles } from '@/components/ui/theme-context';
@@ -165,15 +165,37 @@ describe('AppThemeProvider', () => {
 // and the phone followed (`components/ui/theme-native.ts`). The phone is a
 // fake: the mode it reports and the change events the OS would send.
 describe('native UI and the phone', () => {
-  let phone: ColorSchemeName | null;
+  // The fake OS, as React Native's Appearance behaves: `getColorScheme` returns
+  // what the OS last reported, which while native UI is pinned is the pin.
+  // Pinning reports the pin when it differs; unpinning reports the phone's own
+  // mode, a moment later, only when it differs from the pin just lifted.
+  let phone: ColorSchemeName;
+  let reported: ColorSchemeName | null;
+  let pinned: ColorSchemeName | null;
   let listeners: Set<(preferences: { colorScheme: ColorSchemeName | null }) => void>;
   let pin: jest.SpyInstance;
+  const report = (scheme: ColorSchemeName) => {
+    if (reported === scheme) return;
+    reported = scheme;
+    listeners.forEach((listener) => listener({ colorScheme: scheme }));
+  };
 
   beforeEach(() => {
     phone = 'light';
+    reported = null;
+    pinned = null;
     listeners = new Set();
-    jest.spyOn(Appearance, 'getColorScheme').mockImplementation(() => phone);
-    pin = jest.spyOn(Appearance, 'setColorScheme').mockImplementation(() => {});
+    jest.spyOn(Appearance, 'getColorScheme').mockImplementation(() => reported ?? phone);
+    pin = jest.spyOn(Appearance, 'setColorScheme').mockImplementation((scheme) => {
+      reported ??= phone;
+      if (scheme === 'light' || scheme === 'dark') {
+        pinned = scheme;
+        queueMicrotask(() => report(scheme));
+      } else {
+        pinned = null;
+        queueMicrotask(() => report(phone));
+      }
+    });
     jest.spyOn(Appearance, 'addChangeListener').mockImplementation((listener) => {
       listeners.add(listener);
       return { remove: () => listeners.delete(listener) } as ReturnType<typeof Appearance.addChangeListener>;
@@ -181,11 +203,16 @@ describe('native UI and the phone', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  // The phone switches mode, and the OS says so to whoever listens.
+  // The phone switches mode; the OS reports it only while native UI is unpinned.
   const phoneSwitches = async (scheme: ColorSchemeName) => {
     phone = scheme;
-    await act(async () => listeners.forEach((listener) => listener({ colorScheme: scheme })));
+    await act(async () => {
+      if (!pinned) report(scheme);
+    });
   };
+  // The modes the app drew from `from` on, each change once.
+  const drawnModes = (from: number) =>
+    seen.slice(from).map((render) => render.mode).filter((mode, index, modes) => index === 0 || mode !== modes[index - 1]);
   const SLATE_SYSTEM: AppearanceChoice = { ...SLATE_DARK, mode: 'system' };
 
   it('pins native UI to the stored mode as it mounts, whatever the phone', () => {
@@ -229,15 +256,30 @@ describe('native UI and the phone', () => {
     expect(pin.mock.calls).toEqual([['unspecified']]);
   });
 
-  it('reads the phone afresh when System is saved, and follows the OS once the old pin lifts', async () => {
+  it('switches from a pinned Dark into System on a light phone in one repaint, when the OS reports the phone', async () => {
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord(SLATE_DARK));
     renderWithTheme(<Probe />);
-    expect(pin.mock.calls).toEqual([['light']]);
-    // Pinned to light, the phone went dark unseen: the OS still reports the pin.
+    await act(async () => {});
+    expect(latest().mode).toBe('dark');
+    const before = seen.length;
+
     await switchTheme(SLATE_SYSTEM);
+
     expect(pin).toHaveBeenLastCalledWith('unspecified');
-    expect(latest().mode).toBe('light');
-    // Unpinned, the OS reports the phone's own mode.
+    expect(drawnModes(before)).toEqual(['dark', 'light']);
+  });
+
+  it('stays in a pinned Dark switched into System when the phone turned dark while pinned, with no OS report', async () => {
+    // Cold start on a light phone, Dark stored and pinned; then the phone goes
+    // dark, unseen behind the pin.
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord(SLATE_DARK));
+    renderWithTheme(<Probe />);
     await phoneSwitches('dark');
+    const before = seen.length;
+
+    await switchTheme(SLATE_SYSTEM);
+
+    expect(drawnModes(before)).toEqual(['dark']);
     expect(latest()).toEqual({ roles: rolesOn(SLATE_SYSTEM, 'dark'), mode: 'dark' });
   });
 
@@ -253,6 +295,42 @@ describe('native UI and the phone', () => {
     await phoneSwitches('light');
     await phoneSwitches('dark');
     expect(latest().mode).toBe('light');
+  });
+
+  it('switches from a pinned Light into System on a dark phone without drawing the stale reading', async () => {
+    // Cold start: the phone is dark, Light is stored; the read before the pin saw dark.
+    phone = 'dark';
+    renderWithTheme(<Probe />);
+    await act(async () => {});
+    expect(latest().mode).toBe('light');
+    const before = seen.length;
+
+    await switchTheme({ ...DEFAULT_APPEARANCE, mode: 'system' });
+
+    expect(drawnModes(before)).toEqual(['light', 'dark']);
+  });
+
+  it('ignores the mode flips iOS makes in the background, and reads the phone on return', async () => {
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord(SLATE_SYSTEM));
+    const returns = new Set<(state: AppStateStatus) => void>();
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
+      returns.add(listener);
+      return { remove: () => returns.delete(listener) } as ReturnType<typeof AppState.addEventListener>;
+    });
+    renderWithTheme(<Probe />);
+    expect(latest().mode).toBe('light');
+
+    AppState.currentState = 'background';
+    await phoneSwitches('dark');
+    await phoneSwitches('light');
+    expect(seen.every((render) => render.mode === 'light')).toBe(true);
+
+    // The phone went dark while the app was away; the report came unheard.
+    await phoneSwitches('dark');
+    expect(latest().mode).toBe('light');
+    AppState.currentState = 'active';
+    await act(async () => returns.forEach((listener) => listener('active')));
+    expect(latest().mode).toBe('dark');
   });
 
   it('stops following the phone once unmounted', async () => {

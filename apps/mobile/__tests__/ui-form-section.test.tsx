@@ -30,11 +30,11 @@ describe('FormSection', () => {
 
   it('shows its footnote under the card, muted, above any error', () => {
     render(
-      <FormSection error="Pick one." errorTestID="section-error" footnote="Applies next launch" testID="section" title="Theme">
+      <FormSection error="Pick one." errorTestID="section-error" footnote="System follows the phone’s mode" testID="section" title="Theme">
         <ChoiceRow label="Primary" onPress={jest.fn()} />
       </FormSection>,
     );
-    expect(screen.getByTestId('section-footnote')).toHaveTextContent('Applies next launch');
+    expect(screen.getByTestId('section-footnote')).toHaveTextContent('System follows the phone’s mode');
     expect(screen.getByTestId('section-error')).toHaveTextContent('Pick one.');
   });
 
