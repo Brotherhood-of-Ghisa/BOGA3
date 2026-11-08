@@ -1,8 +1,17 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
-import { SummaryTile, Stat, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { fireEvent, render, renderHook, screen, within } from '@testing-library/react-native';
+import { SummaryTile, Stat, uiSpace, uiText, uiTextTone, useUiText } from '@/components/ui';
+import { AppThemeProvider } from '@/components/ui/theme-context';
 import { GroupWeekTotalsFigures } from '@/components/groups/group-week-totals';
 import { SummaryGallery } from '@/components/pattern-gallery/summary-gallery';
 import { SUMMARY_STATES } from '@/components/pattern-gallery/summary-fixtures';
+import { renderWithTheme } from './helpers/theme';
+
+// The live text roles for the Groups case, read once before any render under
+// test: `renderHook` would otherwise take over `screen`.
+let liveText!: ReturnType<typeof useUiText>;
+beforeAll(() => {
+  liveText = renderHook(() => useUiText(), { wrapper: AppThemeProvider }).result.current;
+});
 
 it('owns the reference inset and header gap, reusing the shared header and existing metric roles', () => {
   render(<SummaryTile title="Group stats" titleTestID="title" testID="tile" metrics={<Stat label="Sets" value="178" testID="metric" />} />);
@@ -14,11 +23,11 @@ it('owns the reference inset and header gap, reusing the shared header and exist
 });
 
 it.each([0, 6, 123456])('keeps both WeekFigure metrics, existing comparison bars and record emphasis for %s', current => {
-  render(<SummaryTile title="Group stats" metrics={<GroupWeekTotalsFigures current={{ sets: current, prs: current }} previous={{ sets: 152, prs: 4 }} offset={0} />} />);
+  renderWithTheme(<SummaryTile title="Group stats" metrics={<GroupWeekTotalsFigures current={{ sets: current, prs: current }} previous={{ sets: 152, prs: 4 }} offset={0} />} />);
   for (const metric of ['sets', 'prs']) expect(screen.getByTestId(`group-week-totals-${metric}-value`)).toHaveTextContent(String(current));
   expect(screen.getByTestId('group-week-totals-sets-previous')).toHaveTextContent('vs 152 last wk');
   expect(screen.getByTestId('group-week-totals-prs').props.accessibilityLabel).toBe(`PRs ${current}, vs 4 last week`);
-  expect(screen.getByTestId('group-week-totals-sets-value')).toHaveStyle(uiText.figureHero);
+  expect(screen.getByTestId('group-week-totals-sets-value')).toHaveStyle(liveText.figureHero);
 });
 
 it('keeps the page metric scoped to the board/chart and the period scoped to the whole page', () => {

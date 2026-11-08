@@ -1,11 +1,21 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { fireEvent, render, renderHook, screen, within } from '@testing-library/react-native';
 import { Text } from 'react-native';
-import { CompactCard, CompactHeader, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { CompactCard, CompactHeader, uiSpace, uiText, uiTextTone, useUiText, useUiTextTone } from '@/components/ui';
+import { AppThemeProvider } from '@/components/ui/theme-context';
 import { CoWResultHeading } from '@/components/groups/cow-preview';
 import { GroupStreamSessionCard } from '@/components/groups/stream-session-card';
 import { gallerySession } from '@/components/pattern-gallery/fixtures';
 import { cowResult } from './helpers/cow-fixtures';
 import { coWAccessibleDates } from '@/src/groups/cow-presentation';
+import { renderWithTheme } from './helpers/theme';
+
+// The live text roles for the Groups cases, read once before any render under
+// test: `renderHook` would otherwise take over `screen`.
+let liveText!: ReturnType<typeof useUiText>;
+let liveTone!: ReturnType<typeof useUiTextTone>;
+beforeAll(() => {
+  ({ text: liveText, tone: liveTone } = renderHook(() => ({ text: useUiText(), tone: useUiTextTone() }), { wrapper: AppThemeProvider }).result.current);
+});
 
 it('keeps compact insets fixed while retaining the Card link and accessibility action contract', () => {
   const onPress = jest.fn();
@@ -58,11 +68,11 @@ it('can keep list context beside the label while retaining its metadata role and
 
 it.each([false, true])('keeps the corrected CoW heading/date roles for previous=%s; the old title-role arrangement fails', previous => {
   const result = cowResult();
-  render(<CoWResultHeading result={result} previous={previous} today dateFormat="DD-MM-YYYY" />);
-  expect(screen.getByText('CoW')).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
-  expect(screen.getByText('Pull-up')).toHaveStyle(uiText.bodyStrong);
-  expect(screen.getByLabelText(coWAccessibleDates(result.cow.week_start, 'DD-MM-YYYY'))).toHaveStyle(uiText.meta);
-  expect(screen.getByText(previous ? 'Last week · Final' : 'Live')).toHaveStyle(uiText.meta);
+  renderWithTheme(<CoWResultHeading result={result} previous={previous} today dateFormat="DD-MM-YYYY" />);
+  expect(screen.getByText('CoW')).toHaveStyle({ ...liveText.label, ...liveTone.ink });
+  expect(screen.getByText('Pull-up')).toHaveStyle(liveText.bodyStrong);
+  expect(screen.getByLabelText(coWAccessibleDates(result.cow.week_start, 'DD-MM-YYYY'))).toHaveStyle(liveText.meta);
+  expect(screen.getByText(previous ? 'Last week · Final' : 'Live')).toHaveStyle(liveText.meta);
 });
 
 it('keeps session activation and every record action distinct for touch and the VoiceOver action menu', () => {
@@ -70,7 +80,7 @@ it('keeps session activation and every record action distinct for touch and the 
   const onPressRecord = jest.fn();
   const card = { ...gallerySession, records: [...gallerySession.records,
     { ...gallerySession.records[0], key: 'second', exercise: 'Squat', accessibilityLabel: 'Squat record' }] };
-  render(<GroupStreamSessionCard card={card} showGroupNames onPress={onPress} onPressRecord={onPressRecord} />);
+  renderWithTheme(<GroupStreamSessionCard card={card} showGroupNames onPress={onPress} onPressRecord={onPressRecord} />);
   const root = screen.getByTestId('group-stream-session-card-reference');
   fireEvent.press(root);
   expect(onPress).toHaveBeenCalledWith(card);
@@ -87,7 +97,7 @@ it('keeps session activation and every record action distinct for touch and the 
 });
 
 it('exposes no record action when the feature supplies no record callback', () => {
-  render(<GroupStreamSessionCard card={gallerySession} showGroupNames={false} onPress={jest.fn()} />);
+  renderWithTheme(<GroupStreamSessionCard card={gallerySession} showGroupNames={false} onPress={jest.fn()} />);
   const card = screen.getByTestId('group-stream-session-card-reference');
   expect(card.props.accessibilityActions).toBeUndefined();
   expect(card.props.onAccessibilityAction).toBeUndefined();
