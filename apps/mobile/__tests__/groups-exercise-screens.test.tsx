@@ -1274,7 +1274,7 @@ describe('Design language', () => {
     addMyExercise('ex-bench', 'Barbell Bench Press');
     addMyExercise('ex-squat', 'Back Squat');
     __resetExerciseCatalogCacheForTests();
-    render(<NewGroupExerciseRoute />);
+    renderWithTheme(<NewGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-source-row');
     expect(accentGrounds(screen.UNSAFE_root)).toEqual([]);
 
