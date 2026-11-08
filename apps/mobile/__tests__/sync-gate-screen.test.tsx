@@ -60,7 +60,7 @@ jest.mock('@/src/logging/logEvent', () => ({
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
-import { uiText } from '@/components/ui';
+import { uiTextFor } from '@/components/ui';
 import { INITIAL_SYNC_PROGRESS, type SyncProgress } from '@/src/sync/progress';
 import { startSyncScheduler, stopSyncScheduler } from '@/src/sync/scheduler';
 import { SyncSetupScreen, SYNC_GATE_TEST_IDS } from '@/src/sync/SyncGate';
@@ -234,11 +234,11 @@ describe('SyncSetupScreen', () => {
     publish({ lastCycleErrorCode: 'INTERNAL', lastCycleErrorDetail: 'boom' });
 
     expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorMessage).props.style)).toMatchObject({
-      ...typographyOf(uiText.bodyStrong),
+      ...typographyOf(uiTextFor(defaultRoles).bodyStrong),
       color: defaultRoles.danger,
     });
     expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorDetail).props.style)).toMatchObject({
-      ...typographyOf(uiText.figureSmall),
+      ...typographyOf(uiTextFor(defaultRoles).figureSmall),
       color: defaultRoles.inkMuted,
     });
   });

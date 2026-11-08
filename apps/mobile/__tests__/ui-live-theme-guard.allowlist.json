@@ -1,9 +1,0 @@
-[
-  "components/pattern-gallery/compact-gallery.tsx",
-  "components/pattern-gallery/compact-row-fixtures.tsx",
-  "components/preferences/muscle-settings.tsx",
-  "components/ui/change-tone.ts",
-  "components/ui/index.ts",
-  "components/ui/text-roles.ts",
-  "components/ui/tokens.ts"
-]

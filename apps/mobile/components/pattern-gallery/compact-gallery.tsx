@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Card, CompactCard, Notice, ScreenScroll, SegmentedControl, SwitchRow, ToggleChip, uiSpace, uiText } from '@/components/ui';
+import { Card, CompactCard, Notice, ScreenScroll, SegmentedControl, SwitchRow, ToggleChip, uiSpace, useUiText } from '@/components/ui';
 import { CoWPreview, CoWResultHeading } from '@/components/groups/cow-preview';
 import { GroupMetricStreamCard } from '@/components/groups/group-metric-stream-card';
 import { GroupStreamSessionCard } from '@/components/groups/stream-session-card';
@@ -22,6 +22,7 @@ export function CompactGallery({ initialSample, initialState, initialLong = fals
   const state = sample !== 'stream' && stateOptions.some(item => item.value === selectedState) ? selectedState : 'ready';
   const [long, setLong] = useState(initialLong);
   const [action, setAction] = useState('');
+  const text = useUiText();
   const result = galleryCow(state, long);
   const session = { ...gallerySession,
     memberName: long ? 'Contessa Serbelloni Mazzanti Vien dal Mare' : gallerySession.memberName,
@@ -57,7 +58,7 @@ export function CompactGallery({ initialSample, initialState, initialLong = fals
         <TodayCoWSummarySection resource={resource} previous={state === 'past'} dateFormat="DD-MM-YYYY"
           onOpen={() => setAction('Current CoW')} onRetry={retry} />
       </Card>}
-    {sample === 'embedded' && state === 'absent' ? <Text allowFontScaling={false} style={uiText.meta} testID="gallery-absent">No CoW summary</Text> : null}
+    {sample === 'embedded' && state === 'absent' ? <Text allowFontScaling={false} style={text.meta} testID="gallery-absent">No CoW summary</Text> : null}
     {action ? <Notice live message={action} testID="ui-gallery-action" /> : null}
   </ScreenScroll>;
 }

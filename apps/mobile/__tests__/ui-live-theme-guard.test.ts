@@ -2,18 +2,14 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import ts from 'typescript';
 
-import ALLOWLIST from './ui-live-theme-guard.allowlist.json';
-
 // A saved appearance repaints every mounted screen (`components/ui/theme-context.tsx`),
-// so nothing may read the colour roles or the mode from the launch-time
-// constants `uiRoles` / `uiMode` (`components/ui/tokens.ts`), nor the colours
-// built from them once at launch: the text roles and tones (`uiText`,
-// `uiTextTone`) and `changeToneColour`. A module that does stays in the launch
-// theme. Read them through `useUiRoles()`, `useUiMode()` or a `makeStyles`
-// sheet; a helper that builds colours takes `roles` as an argument.
-//
-// The allowlist holds the files that still read them. It only shrinks: a
-// migrated file leaves it, and the guard fails until it does.
+// so no module may hold the colour roles or the mode in a module constant:
+// one would stay in the theme it was built in. The launch-time constants
+// `uiRoles`, `uiMode`, `uiText`, `uiTextTone` and `changeToneColour` are gone
+// (`ui-design-tokens.test.ts` proves they are not exported), and nothing in
+// `app/`, `components/` or `src/` may bring one of those names back. Read the
+// theme through `useUiRoles()`, `useUiMode()` or a `makeStyles` sheet; a helper
+// that builds colours takes `roles` as an argument.
 
 const MOBILE_ROOT = join(__dirname, '..');
 const SCANNED = ['app', 'components', 'src'];
@@ -49,16 +45,8 @@ const readers = (): string[] =>
     .sort();
 
 describe('no read of the launch-time theme constants', () => {
-  const allowed = new Set<string>(ALLOWLIST);
-
-  it('outside the files still to migrate', () => {
-    expect(readers().filter((path) => !allowed.has(path))).toEqual([]);
-  });
-
-  it('keeps the allowlist to files that still read them', () => {
-    const stillReading = new Set(readers());
-    expect(ALLOWLIST.filter((path) => !stillReading.has(path))).toEqual([]);
-    expect(ALLOWLIST).toEqual([...allowed].sort());
+  it('anywhere in app/, components/ or src/', () => {
+    expect(readers()).toEqual([]);
   });
 
   it.each([

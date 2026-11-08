@@ -44,11 +44,15 @@ import {
   setExerciseListPreferences,
 } from '@/src/exercise-catalog/list-preferences';
 import EverythingElseRoute from '../app/settings-everything-else';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
+import { launchTheme } from '@/components/ui/theme-launch';
+import { rolesFor } from './helpers/theme';
 import * as devReset from '@/src/data/dev-reset';
 import * as devAffordances from '@/src/sync/dev-affordances';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';
+
+const roles = rolesFor(launchTheme.appearance);
 
 const count = (table: string, where = '1 = 1') =>
   (localDataClient().prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`).get() as { n: number }).n;
@@ -110,9 +114,9 @@ describe('settings developer data affordances', () => {
   it('draws the tools as rows of the Developer section: acts in accent words, Wipe remote in danger words, last', async () => {
     await openSettings();
     expect(screen.getByText('Developer')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
-    expect(screen.getByText('Reset local data')).toHaveStyle({ color: uiRoles.accent });
-    expect(screen.getByText('Wipe local')).toHaveStyle({ color: uiRoles.accent });
-    expect(screen.getByText('Wipe remote')).toHaveStyle({ color: uiRoles.danger });
+    expect(screen.getByText('Reset local data')).toHaveStyle({ color: roles.accent });
+    expect(screen.getByText('Wipe local')).toHaveStyle({ color: roles.accent });
+    expect(screen.getByText('Wipe remote')).toHaveStyle({ color: roles.danger });
     const tree = JSON.stringify(screen.toJSON());
     const order = ['settings-developer-mode-switch', 'settings-dev-logs-button', 'settings-dev-reset-button', 'settings-dev-wipe-local-button', 'settings-dev-wipe-remote-button']
       .map((id) => tree.indexOf(`"testID":"${id}"`));

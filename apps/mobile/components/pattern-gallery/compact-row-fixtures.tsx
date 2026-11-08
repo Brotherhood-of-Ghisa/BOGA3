@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { IconButton, ListCard, ListCardHeader, ListRow, uiSpace, uiText } from '@/components/ui';
+import { IconButton, ListCard, ListCardHeader, ListRow, uiSpace, useUiText } from '@/components/ui';
 import { StatsTable, StatsTableRow } from '@/components/stats/stats-table';
 
 /** Identical inputs in the production list and table row exports. */
@@ -13,13 +13,14 @@ export const COMPACT_ROW_FIXTURES = [
 
 export function CompactRowFixtures({ surface, onAction }: { surface: 'list' | 'table'; onAction: (action: string) => void }) {
   const Row = surface === 'table' ? StatsTableRow : CompactListFixtureRow;
+  const text = useUiText();
   return <View testID={`compact-${surface}-fixtures`}>
     {COMPACT_ROW_FIXTURES.map(row => <View key={row.id} onLayout={event => console.info('LIST_ROW_NATIVE', surface, row.id, event.nativeEvent.layout.height)}>
       <Row testID={`${surface}-row-${row.id}`}
       own={'own' in row} selected={'selected' in row}
-      leading={<Text allowFontScaling={false} style={uiText.figure}>1</Text>}
-      meta={<Text allowFontScaling={false} style={[uiText.figure, styles.value]}>{row.value}</Text>}>
-      <Text allowFontScaling={false} style={'own' in row || 'selected' in row ? uiText.bodyStrong : uiText.body}>{row.name}</Text>
+      leading={<Text allowFontScaling={false} style={text.figure}>1</Text>}
+      meta={<Text allowFontScaling={false} style={[text.figure, styles.value]}>{row.value}</Text>}>
+      <Text allowFontScaling={false} style={'own' in row || 'selected' in row ? text.bodyStrong : text.body}>{row.name}</Text>
     </Row></View>)}
     <Row label="Row with action" testID={`${surface}-row-control`}
       trailing={<IconButton name="more-vertical" accessibilityLabel={`${surface} row actions`} onPress={() => onAction('Row action')} testID={`${surface}-row-action`} />} />

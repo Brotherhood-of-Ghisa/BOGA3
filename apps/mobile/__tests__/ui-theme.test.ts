@@ -1,11 +1,11 @@
 import { createHash } from 'crypto';
 
-import { uiRoles } from '@/components/ui';
 import { hexToLch, lchToHex, withAlpha } from '@/components/ui/lch';
 import { defaultThemeSeeds, generateRoles, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
 import { hueName, hueThemeId, parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
-import { DEFAULT_THEME_PRESET_ID, getThemePreset, themePresets } from '@/components/ui/theme-presets';
+import { DEFAULT_APPEARANCE, DEFAULT_THEME_PRESET_ID, getThemePreset, themePresets } from '@/components/ui/theme-presets';
 
+import { rolesFor } from './helpers/theme';
 import themeRolesLight from './fixtures/theme-roles-light.json';
 
 // The theme generator (`docs/specs/ui/design-language.md` §2, "Derivation"
@@ -123,8 +123,8 @@ describe('lch colour space', () => {
 });
 
 describe('theme generator', () => {
-  it('is what the app ships: `uiRoles` is the default seeds, generated', () => {
-    expect(uiRoles).toEqual(generateRoles(defaultThemeSeeds));
+  it('is what the app ships: the default appearance draws the default seeds, generated', () => {
+    expect(rolesFor(DEFAULT_APPEARANCE)).toEqual(generateRoles(defaultThemeSeeds));
   });
 
   it('reproduces the palette picked on device within ΔE*ab 3', () => {

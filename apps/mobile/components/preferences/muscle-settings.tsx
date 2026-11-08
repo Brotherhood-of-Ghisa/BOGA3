@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 import { ActionButton, ChoiceRow, FormSection, Notice, ScreenScroll, SegmentRow, SwitchRow, ValueRow,
-  uiSpace, uiText } from '@/components/ui';
+  uiSpace, useUiText } from '@/components/ui';
 import { buildSettingsMuscleSections, deriveMuscleReportPreset, setMuscleReportPreset, setMuscleTracked,
   type SettingsMuscleSection } from '@/src/data/muscle-report-settings';
 import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
@@ -26,6 +26,7 @@ export function MuscleSettingsPage({ page }: { page: Page }) {
 
 function MusclePageBody({ page, preferences }: { page: Page; preferences: Preferences }) {
   const setup = useMuscleSetup(preferences.accountRevision);
+  const text = useUiText();
   const scope = setup.rows ? deriveMuscleReportPreset(setup.rows) : null;
   const sections = setup.rows ? buildSettingsMuscleSections(page === 'enabled'
     ? setup.rows.map(row => ({ ...row, reportGroup: null })) : setup.rows) : [];
@@ -37,7 +38,7 @@ function MusclePageBody({ page, preferences }: { page: Page; preferences: Prefer
     {setup.error ? <Notice action={<ActionButton label="Retry" disabled={setup.busy} onPress={setup.retry} variant="text" />}
       icon="warning" live message={setup.error} testID="settings-muscles-error" tone="danger" /> : null}
     {page === 'muscles' ? <MuscleChoices preferences={preferences} scope={scope} setup={setup} sections={sections} /> : null}
-    {!setup.rows && !setup.error ? <Text allowFontScaling={false} style={uiText.meta}>Loading muscles…</Text> : null}
+    {!setup.rows && !setup.error ? <Text allowFontScaling={false} style={text.meta}>Loading muscles…</Text> : null}
     {page === 'targets' && scope ? <TargetSections preferences={preferences} scope={scope} sections={sections} /> : null}
     {page === 'enabled' ? sections.map(section => <FormSection key={section.family} testID={`settings-muscles-family-${section.family}`} title={section.showHeader ? section.family : undefined}>
       {section.muscles.map((muscle, index) => <SwitchRow key={muscle.id} density="list" disabled={setup.busy} divider={index > 0} label={muscle.label}
@@ -92,6 +93,7 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
 
 function TargetSections({ preferences, scope, sections }: { preferences: Preferences; scope: MuscleTargetScope; sections: SettingsMuscleSection[] }) {
   const current = { ...preferences.values, ...preferences.pending };
+  const text = useUiText();
   const enabled = sections.map(section => {
     const muscles = section.muscles.filter(muscle => muscle.tracked);
     return { ...section, muscles, showHeader: muscles.length >= 2 };
@@ -114,7 +116,7 @@ function TargetSections({ preferences, scope, sections }: { preferences: Prefere
         value={Object.hasOwn(current.muscleTargetOverrides[scope] ?? {}, muscle.id) ? current.muscleTargetOverrides[scope]![muscle.id] : undefined}
         onCommit={target => save(muscle.id, target)} />)}
     </FormSection>)}
-    {enabled.length === 0 ? <Text allowFontScaling={false} style={uiText.meta} testID="settings-muscle-targets-empty">No muscles enabled.</Text> : null}
+    {enabled.length === 0 ? <Text allowFontScaling={false} style={text.meta} testID="settings-muscle-targets-empty">No muscles enabled.</Text> : null}
   </>;
 }
 

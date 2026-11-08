@@ -1,8 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { ExerciseMergeReviewScreen } from '@/components/sync-status/exercise-merge-review';
-import { uiRoles } from '@/components/ui';
+import { launchTheme } from '@/components/ui/theme-launch';
+import { rolesFor } from './helpers/theme';
 import type { MergeReviewItem } from '@/src/exercise-core/merge-types';
+
+const roles = rolesFor(launchTheme.appearance);
 
 const mockLoad = jest.fn();
 const mockResolve = jest.fn();
@@ -35,8 +38,8 @@ it('shows each changed field as a value row, current then saved, under the exerc
   expect(screen.getByLabelText('Weight: current 20, saved 25')).toBeTruthy();
   expect(screen.getByLabelText('History: current Kept, saved Removed')).toBeTruthy();
   expect(screen.getByText('Destination')).toBeTruthy();
-  expect(screen.getByText('Apply saved removal')).toHaveStyle({ color: uiRoles.danger });
-  expect(screen.getByText('Keep current history')).toHaveStyle({ color: uiRoles.accent });
+  expect(screen.getByText('Apply saved removal')).toHaveStyle({ color: roles.danger });
+  expect(screen.getByText('Keep current history')).toHaveStyle({ color: roles.accent });
 });
 
 it('confirms a saved removal in an Alert and retains refreshed review after a race', async () => {

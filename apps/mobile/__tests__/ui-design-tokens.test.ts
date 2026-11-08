@@ -1,7 +1,11 @@
-import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui';
+import * as ui from '@/components/ui';
+import { uiFonts, uiGeometry, uiTypography } from '@/components/ui';
 import { defaultThemeSeeds, generateRoles, type ThemeMode } from '@/components/ui/theme';
 import { withNeutrals } from '@/components/ui/theme-neutrals';
 import * as tokens from '@/components/ui/tokens';
+
+// The default theme on the light ladder: what a new device draws.
+const lightRoles = generateRoles(defaultThemeSeeds, 'light');
 
 const MODES: readonly ThemeMode[] = ['light', 'dark'];
 
@@ -25,7 +29,7 @@ describe('design-language tokens', () => {
   });
 
   it('carries every colour role named in design-language.md §2', () => {
-    expect(Object.keys(uiRoles).sort()).toEqual(
+    expect(Object.keys(lightRoles).sort()).toEqual(
       [
         'accent',
         'accentWash',
@@ -80,9 +84,21 @@ describe('design-language tokens', () => {
     for (const retired of ['uiColors', 'uiRadius', 'uiElevation', 'uiTokens']) {
       expect(exported).not.toContain(retired);
     }
-    expect(exported.sort()).toEqual(
-      ['uiBorder', 'uiFonts', 'uiGeometry', 'uiIconSize', 'uiMode', 'uiRoles', 'uiSpace', 'uiTypography'].sort(),
-    );
+    expect(exported.sort()).toEqual(['uiBorder', 'uiFonts', 'uiGeometry', 'uiIconSize', 'uiSpace', 'uiTypography'].sort());
+  });
+
+  it('exports no colour role or mode as a constant: they are the live theme', () => {
+    // A launch-time constant would stay in the launch theme after a save
+    // (`theme-context.tsx`). Reading one fails to typecheck:
+    /* eslint-disable import/namespace -- the point: these are not exported. */
+    // @ts-expect-error `uiRoles` is not exported
+    expect(tokens.uiRoles).toBeUndefined();
+    // @ts-expect-error `uiMode` is not exported
+    expect(tokens.uiMode).toBeUndefined();
+    /* eslint-enable import/namespace */
+    for (const name of ['uiRoles', 'uiMode', 'uiText', 'uiTextTone', 'changeToneColour']) {
+      expect(ui).not.toHaveProperty(name);
+    }
   });
 
   it('carries exactly the typefaces and weights named in design-language.md §3', () => {
@@ -94,16 +110,13 @@ describe('design-language tokens', () => {
   });
 
   it('dims a sheet backdrop with ink in light mode, and with black in dark', () => {
-    expect(uiRoles.scrim).toBe('rgba(27, 23, 18, 0.42)');
+    expect(lightRoles.scrim).toBe('rgba(27, 23, 18, 0.42)');
     // `ink` (#1B1712) is rgb(27, 23, 18).
-    expect(uiRoles.ink).toBe('#1B1712');
+    expect(lightRoles.ink).toBe('#1B1712');
     // Dark mode's `ink` is pale: a backdrop of it would lighten the page.
     expect(generateRoles(defaultThemeSeeds, 'dark').scrim).toBe('rgba(0, 0, 0, 0.6)');
   });
 
-  it('ships the light roles: `uiRoles` is the default seeds on the light ladder', () => {
-    expect(uiRoles).toEqual(generateRoles(defaultThemeSeeds, 'light'));
-  });
 
   // Every invariant below holds on both ladders (design-language.md §2). Light
   // mode is what ships; dark is the same seeds on the dark ladder.

@@ -4,11 +4,12 @@ import {
   type ProjectMuscleBodyOptions,
   type ThemeShadePalette,
 } from '@/components/stats/muscle-body-projection';
-import { launchOsScheme, launchTheme } from '@/components/ui/theme-launch';
+import { launchTheme } from '@/components/ui/theme-launch';
+import { readPhoneScheme } from '@/components/ui/theme-native';
 import { appearanceMode, appearanceRoles } from '@/components/ui/theme-presets';
 
 /** The mode and roles a test launch draws in: what a screen outside a saved choice reads. */
-export const testMode = appearanceMode(launchTheme.appearance, launchOsScheme);
+export const testMode = appearanceMode(launchTheme.appearance, readPhoneScheme());
 export const testRoles = appearanceRoles(launchTheme.appearance, testMode);
 
 /** The body's shades in the test launch's theme. */

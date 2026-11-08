@@ -1,25 +1,25 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
 
-// Every screen draws in the mode chosen at launch (`docs/specs/ui/ux-rules.md`
-// "Appearance"). A colour comes from a role and a native surface's mode from
-// `uiMode` (`components/ui/tokens.ts`), so nothing outside the theme files may
-// fix either: no hex, rgb, hsl or named colour literal, no literal
-// `themeVariant`, status-bar style, `keyboardAppearance` or alert
-// `userInterfaceStyle`. And the mode is read from the OS once, by
-// `theme-launch.ts`, before it pins native UI: anything else reading or
-// following the OS mode would see the pin, or change mid-session.
+// Every screen draws in the mode the app is drawn in now
+// (`docs/specs/ui/ux-rules.md` "Appearance"). A colour comes from a role and a
+// native surface's mode from `useUiMode()` (`components/ui/theme-context.tsx`),
+// so nothing outside the theme files may fix either: no hex, rgb, hsl or named
+// colour literal, no literal `themeVariant`, status-bar style,
+// `keyboardAppearance` or alert `userInterfaceStyle`. And only
+// `theme-native.ts` reads, follows or pins the phone's mode: anything else
+// would see the pin, or follow the phone while the app is pinned.
 
 const MOBILE_ROOT = join(__dirname, '..');
 const SCANNED = ['app', 'components', 'src'];
 // The files that hold the seeds and the fixed role values, and the one that
-// reads and pins the OS mode.
+// reads, follows and pins the phone's mode.
 const THEME_FILES = new Set([
   'components/ui/theme.ts',
   'components/ui/theme-presets.ts',
   'components/ui/theme-hue.ts',
 ]);
-const OS_MODE_READER = 'components/ui/theme-launch.ts';
+const OS_MODE_READER = 'components/ui/theme-native.ts';
 
 const COLOUR_LITERAL =
   /['"`]#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})['"`]|(?:rgba?|hsla?)\(\s*\d{1,3}\s*,|\b(?:\w*[cC]olor|fill|stroke)(?::\s*|=\{?\s*)['"`](?:white|black)['"`]/g;
@@ -86,9 +86,9 @@ describe('no light-only literal outside the theme files', () => {
   });
 
   it.each([
-    ['a mode-following date picker', '<DateTimePicker themeVariant={uiMode} value={date} />'],
-    ['a mode-following status bar', '<StatusBar style={statusBarStyleFor(uiMode)} />'],
-    ['a role', 'backgroundColor: uiRoles.paper,'],
+    ['a mode-following date picker', '<DateTimePicker themeVariant={mode} value={date} />'],
+    ['a mode-following status bar', '<StatusBar style={statusBarStyleFor(mode)} />'],
+    ['a role', 'backgroundColor: roles.paper,'],
     ['an id that is not a colour', "const href = `#${definitionId}`;"],
     ['a swatch id that names a colour', "{ id: 'white', label: 'White', hue: 0, chroma: 0 },"],
     ['the config value named in a comment', '// `userInterfaceStyle: "automatic"` (`app.config.ts`)'],
@@ -96,8 +96,10 @@ describe('no light-only literal outside the theme files', () => {
     expect(offences('components/example.tsx', source)).toEqual([]);
   });
 
-  it('lets the theme files hold the seeds, and theme-launch read the OS mode', () => {
+  it('lets the theme files hold the seeds, and theme-native read and pin the OS mode', () => {
     expect(offences('components/ui/theme.ts', "selection: '#000000',")).toEqual([]);
     expect(offences(OS_MODE_READER, 'const osScheme = Appearance.getColorScheme();')).toEqual([]);
+    expect(offences(OS_MODE_READER, "Appearance.setColorScheme?.('unspecified');")).toEqual([]);
+    expect(offences('components/ui/theme-launch.ts', 'const osScheme = Appearance.getColorScheme();')).not.toEqual([]);
   });
 });

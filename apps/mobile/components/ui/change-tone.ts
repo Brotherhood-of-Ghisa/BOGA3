@@ -1,5 +1,4 @@
 import type { UiRoles } from '@/components/ui/theme';
-import { uiRoles } from '@/components/ui/tokens';
 
 // The one rule for a change against an earlier period (`design-language.md`
 // §6): which direction it went, and the colour that says so. Every screen that
@@ -28,6 +27,3 @@ export const changeToneColourIn = (roles: UiRoles, tone: ChangeTone): string => 
       return roles.ink;
   }
 };
-
-/** A change's ink in the launch roles; only a file still to migrate reads this. */
-export const changeToneColour = (tone: ChangeTone): string => changeToneColourIn(uiRoles, tone);

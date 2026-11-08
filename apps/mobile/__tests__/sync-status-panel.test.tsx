@@ -33,9 +33,14 @@ import { StyleSheet } from 'react-native';
 import { waitForGone } from './helpers/wait-for-gone';
 
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
-import { uiRoles, uiText } from '@/components/ui';
+import { uiTextFor } from '@/components/ui';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
+import { launchTheme } from '@/components/ui/theme-launch';
+import { rolesFor } from './helpers/theme';
 import type { SyncStatusSnapshot } from '@/src/sync/sync-status';
+
+const roles = rolesFor(launchTheme.appearance);
+const uiText = uiTextFor(roles);
 
 const baseStatus: SyncStatusSnapshot = {
   lastSuccessAtMs: null,
@@ -169,12 +174,12 @@ describe('Settings sync-status panel', () => {
     expect(screen.getByText('Sync status')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
     expect(screen.getByText('Pending changes')).toHaveStyle(uiText.option);
     const network = screen.getByTestId('settings-sync-status-network');
-    expect(network).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.inkMuted });
+    expect(network).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: roles.inkMuted });
     const dirty = screen.getByTestId('settings-sync-status-dirty-count');
     expect(dirty).toHaveStyle({ fontFamily: uiFonts.body.family });
     expect(within(dirty).getByText('7')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
     const error = screen.getByTestId('settings-sync-status-error');
-    expect(error).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.danger });
+    expect(error).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: roles.danger });
     expect(within(error).getByText('503')).toHaveStyle({ fontFamily: uiFonts.figure.family });
   });
 
@@ -207,7 +212,7 @@ describe('Settings sync-status panel', () => {
     });
     expect(screen.getByTestId('settings-sync-status-network-offline-glyph', { includeHiddenElements: true })).toBeTruthy();
     expect(StyleSheet.flatten(screen.getByTestId('settings-sync-status-network').props.style).color).toBe(
-      uiRoles.inkMuted,
+      roles.inkMuted,
     );
   });
 
@@ -245,14 +250,14 @@ describe('Settings sync-status panel', () => {
     });
     expect(screen.getByTestId('settings-sync-status-error')).toHaveProp('accessibilityLiveRegion', 'polite');
     expect(StyleSheet.flatten(screen.getByTestId('settings-sync-status-error').props.style).color).toBe(
-      uiRoles.danger,
+      roles.danger,
     );
   });
 
   it('offers Review changes as a navigate row to its page only while there are changes to review', async () => {
     const { rerender } = renderPanel({ mergeReviewCount: 2 });
     expect(await screen.findByTestId('settings-merge-review')).toBeTruthy();
-    expect(screen.getByText('Review changes')).toHaveStyle({ color: uiRoles.accent });
+    expect(screen.getByText('Review changes')).toHaveStyle({ color: roles.accent });
     fireEvent.press(screen.getByTestId('settings-merge-review'));
     expect(mockPush).toHaveBeenCalledWith('/settings-review-changes');
     const readEmptyStatus = jest.fn(() =>

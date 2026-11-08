@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type ColorSchemeName } from 'react-native';
 
 import { ChoiceMeta, CustomSection } from '@/components/appearance/appearance-custom';
 import { ModeSection } from '@/components/appearance/appearance-mode';
@@ -8,15 +8,15 @@ import {
   appearanceLabel,
   appearanceSummary,
   appearanceRoles,
-  pendingAppearance,
   previewMode,
   readIntendedAppearance,
+  usePhoneScheme,
   useStoredAppearance,
 } from '@/components/appearance/chosen-theme';
 import { ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
 import { SubPage } from '@/components/settings/sub-page';
-import { ActionRow, ChoiceRow, FormSection, Notice, RadioRow, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { ActionRow, ChoiceRow, FormSection, Notice, RadioRow, uiSpace, useUiText } from '@/components/ui';
 import { generateRoles, type ThemeMode } from '@/components/ui/theme';
 import {
   DEFAULT_THEME_PRESET_ID,
@@ -24,23 +24,19 @@ import {
   themePresets,
   type ThemePreset,
   type AppearanceChoice,
-  type ThemePresetId,
 } from '@/components/ui/theme-presets';
 import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
 
 // Settings home's Appearance row (`docs/specs/ui/design-language.md` "Choosing
 // one"): names the chosen theme and opens the Appearance page. The row shows
-// the theme, a preset's mode when it is not light, and `from next launch` on a
-// pending choice (a choice applies on the next launch, as the app cannot
-// restart itself); VoiceOver hears the whole choice.
+// the theme and a preset's mode when it is not light; VoiceOver hears the
+// whole choice.
 export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }) {
   const router = useRouter();
   const [appearance] = useStoredAppearance();
-  const label = appearanceLabel(appearance);
-  const spoken = pendingAppearance(appearance).any ? `${label} from next launch` : label;
   return (
     <ChoiceRow
-      accessibilityLabel={`Appearance, ${spoken}`}
+      accessibilityLabel={`Appearance, ${appearanceLabel(appearance)}`}
       divider={divider}
       icon="palette"
       label="Appearance"
@@ -56,28 +52,26 @@ export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }
 // Custom. While Custom is chosen, Theme collapses to its Custom row and a
 // `Show presets` row that lists the presets again; Hide presets or a tap on
 // Custom folds them. Each choice is saved at
-// once and labelled `Next launch` until the app reopens.
+// once, and the app repaints in it.
 export function AppearanceSettingsScreen() {
   const { appearance, saveError, commit } = useAppearanceCommit();
+  const phoneScheme = usePhoneScheme();
   const [presetsShown, setPresetsShown] = useState(false);
-  const pending = pendingAppearance(appearance);
   const custom = appearance.theme === 'custom';
   const presetsListed = !custom || presetsShown;
   const customChoice: AppearanceChoice = {
     ...appearance,
     theme: 'custom',
-    custom: startingCustom(appearance, previewMode(appearance)),
+    custom: startingCustom(appearance, previewMode(appearance, phoneScheme)),
   };
-  // Custom waits for the next launch when it, or any part of it, does.
-  const customDetail = custom && pending.any ? ['Next launch'] : [];
 
   return (
     <SubPage testID="settings-appearance-screen">
-      <PreviewBlock appearance={appearance} />
+      <PreviewBlock appearance={appearance} phoneScheme={phoneScheme} />
       <FormSection title="Theme">
         {(presetsListed ? themePresets : []).map((preset, index) => {
           const checked = preset.id === appearance.theme;
-          const detail = presetDetails(preset.id, checked, pending.theme);
+          const detail = preset.id === DEFAULT_THEME_PRESET_ID ? ['Default'] : [];
           return (
             <RadioRow
               accessibilityLabel={[preset.label, ...detail.map((word) => word.toLowerCase())].join(', ')}
@@ -85,7 +79,7 @@ export function AppearanceSettingsScreen() {
               divider={index > 0}
               key={preset.id}
               label={preset.label}
-              meta={<PresetMeta details={detail} mode={previewMode({ ...appearance, theme: preset.id })} preset={preset} />}
+              meta={<PresetMeta details={detail} mode={previewMode({ ...appearance, theme: preset.id }, phoneScheme)} preset={preset} />}
               onPress={() => {
                 void commit(
                   { theme: preset.id },
@@ -97,19 +91,19 @@ export function AppearanceSettingsScreen() {
           );
         })}
         <RadioRow
-          accessibilityLabel={['Custom', ...customDetail.map((word) => word.toLowerCase())].join(', ')}
+          accessibilityLabel="Custom"
           checked={custom}
           divider={presetsListed}
           label="Custom"
-          meta={<ChoiceMeta details={customDetail} roles={appearanceRoles(customChoice)} />}
+          meta={<ChoiceMeta details={[]} roles={appearanceRoles(customChoice, phoneScheme)} />}
           onPress={() => {
             // From the store and the saves on their way, not this render: a
             // part saved on its picker may not have reached this page yet.
             setPresetsShown(false);
-            const intended = readIntendedAppearance();
+            const intended = readIntendedAppearance(appearance);
             if (intended.theme === 'custom') return;
             void commit(
-              { theme: 'custom', custom: startingCustom(intended, previewMode(intended)) },
+              { theme: 'custom', custom: startingCustom(intended, previewMode(intended, phoneScheme)) },
               { message: 'Couldn’t save the theme. Nothing changed.', context: { presetId: 'custom' } },
             );
           }}
@@ -126,39 +120,26 @@ export function AppearanceSettingsScreen() {
         ) : null}
       </FormSection>
       {custom ? (
-        <CustomSection appearance={appearance} pending={pending} />
+        <CustomSection appearance={appearance} />
       ) : (
-        <ModeSection appearance={appearance} commit={commit} pending={pending} />
+        <ModeSection appearance={appearance} commit={commit} />
       )}
       {saveError ? <Notice icon="warning" live message={saveError} testID="settings-appearance-error" tone="danger" /> : null}
     </SubPage>
   );
 }
 
-// The choice drawn on a small mock of the app, and when it applies.
-function PreviewBlock({ appearance }: { appearance: AppearanceChoice }) {
+// The choice drawn on a small mock of the app.
+function PreviewBlock({ appearance, phoneScheme }: { appearance: AppearanceChoice; phoneScheme: ColorSchemeName | null }) {
   const text = useUiText();
-  const tone = useUiTextTone();
   return (
     <View style={styles.preview}>
       <Text accessibilityRole="header" allowFontScaling={false} style={text.label}>
         Preview
       </Text>
-      <ThemePreview roles={appearanceRoles(appearance)} testID="settings-appearance-preview" />
-      <Text allowFontScaling={false} style={[text.meta, tone.muted]} testID="settings-appearance-footnote">
-        Applies next launch
-      </Text>
+      <ThemePreview roles={appearanceRoles(appearance, phoneScheme)} testID="settings-appearance-preview" />
     </View>
   );
-}
-
-// The words beside a preset's name: `Default`, and `Next launch` on the chosen
-// preset while it waits for the next launch.
-function presetDetails(id: ThemePresetId, checked: boolean, pending: boolean): string[] {
-  return [
-    ...(id === DEFAULT_THEME_PRESET_ID ? ['Default'] : []),
-    ...(checked && pending ? ['Next launch'] : []),
-  ];
 }
 
 // Each preset's roles in each mode, for its swatch.

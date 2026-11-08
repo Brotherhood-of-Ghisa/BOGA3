@@ -2,7 +2,7 @@ import { StyleSheet } from 'react-native';
 
 import type { UiRoles } from '@/components/ui/theme';
 import { useUiRoles } from '@/components/ui/theme-context';
-import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiGeometry, uiTypography } from '@/components/ui/tokens';
 
 // The text roles (`docs/specs/ui/design-language.md` §3, "Text roles"). A
 // screen names what its text does — a title, a row's name, a quiet figure —
@@ -205,12 +205,6 @@ export function useUiText() {
 export function useUiTextTone() {
   return uiTextToneFor(useUiRoles());
 }
-
-// The same roles and tones in the colours this launch found, for the screens
-// not yet moved to the hooks. They stay in the launch theme and leave with the
-// last of them (`__tests__/ui-live-theme-guard.allowlist.json`).
-export const uiText = uiTextFor(uiRoles);
-export const uiTextTone = uiTextToneFor(uiRoles);
 
 // One embedded weight up, for the row that is mine, a live session, the gym.
 export const uiTextEmphasis = StyleSheet.create({
