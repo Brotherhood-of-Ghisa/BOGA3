@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, type ReactElement, type RefObject } from 'react';
-import { SectionList, StyleSheet, Text, View } from 'react-native';
+import { SectionList, Text, View } from 'react-native';
 
 import {
   formatSessionSummaryDuration,
@@ -9,7 +9,7 @@ import {
   type SessionSummaryFigures,
 } from '@/components/today/progress-format';
 import { SessionSummaryRow } from '@/components/today/session-summary-row';
-import { Card, StatePanel, Tag, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { Card, StatePanel, Tag, makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { logEvent } from '@/src/logging';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
@@ -74,6 +74,7 @@ export function HistoryList({
   jumpTo = null,
   dateFormat,
 }: HistoryListProps) {
+  const styles = useStyles();
   const [listPreferences] = useExerciseListPreferences();
   const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   const now = new Date(nowMs);
@@ -177,23 +178,26 @@ function useJumpOnce(
 }
 
 function WeekHeading({ section, dateFormat }: { section: HistoryWeekSection; dateFormat: ExerciseDateFormat }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const heading = historyWeekHeading(section, dateFormat);
   return (
     <View style={styles.weekHeading} testID={`completed-history-week-${section.key}`}>
       {section.emptyWeeksBefore > 0 ? (
         <View style={styles.gap} testID={`completed-history-gap-${section.key}`}>
           <View style={styles.gapRule} />
-          <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+          <Text allowFontScaling={false} style={[text.label, tone.faint]}>
             {formatEmptyWeeks(section.emptyWeeksBefore)}
           </Text>
           <View style={styles.gapRule} />
         </View>
       ) : null}
       <View accessibilityRole="header" accessible style={styles.weekTitleRow}>
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.ink]}>
+        <Text allowFontScaling={false} style={[text.label, tone.ink]}>
           {heading.title}
         </Text>
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>
+        <Text allowFontScaling={false} style={[text.label, tone.faint]}>
           {heading.detail}
         </Text>
       </View>
@@ -214,6 +218,7 @@ function HistoryRow({
   dateFormat: ExerciseDateFormat;
   onOpen: (sessionId: string) => void;
 }) {
+  const styles = useStyles();
   const deleted = session.deletedAt !== null;
   const figures = toSummaryFigures(session);
   const label = sessionSummaryAccessibilityLabel(figures, dateFormat);
@@ -244,6 +249,7 @@ function HistoryState({
   loadErrorMessage,
   onRetryLoad,
 }: Pick<HistoryListProps, 'isLoading' | 'loadErrorMessage' | 'onRetryLoad'>) {
+  const styles = useStyles();
   if (isLoading) {
     return (
       <Card style={styles.state}>
@@ -273,6 +279,7 @@ function HistoryState({
 }
 
 function GlobalEmptyState() {
+  const styles = useStyles();
   return (
     <Card style={styles.footer}>
       <StatePanel
@@ -285,10 +292,10 @@ function GlobalEmptyState() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   list: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   content: {
     padding: uiSpace.lg,
@@ -323,14 +330,14 @@ const styles = StyleSheet.create({
   gapRule: {
     flex: 1,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.rule,
+    borderTopColor: roles.rule,
   },
   // A week's rows read as one `Card`: each cell draws its share of the
   // border, so the list can recycle rows one by one.
   cell: {
     overflow: 'hidden',
-    backgroundColor: uiRoles.surface,
-    borderColor: uiRoles.rule,
+    backgroundColor: roles.surface,
+    borderColor: roles.rule,
     borderLeftWidth: uiBorder.width,
     borderRightWidth: uiBorder.width,
   },
@@ -346,7 +353,7 @@ const styles = StyleSheet.create({
   },
   cellDivider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   row: {
     paddingHorizontal: uiSpace.md,
@@ -356,4 +363,4 @@ const styles = StyleSheet.create({
   deletedRow: {
     opacity: 0.6,
   },
-});
+}));

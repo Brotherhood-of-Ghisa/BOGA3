@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, Text, View } from 'react-native';
 
-import { IconButton, ListRow, Sheet, uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { IconButton, ListRow, Sheet, makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import { SetEntryFields } from '@/components/exercise-page/set-entry-fields';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
@@ -51,6 +51,9 @@ export function PlanBlockEditor({
   errorPrefix,
   displayEfforts,
 }: PlanBlockEditorProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [effortSetId, setEffortSetId] = useState<string | null>(null);
   const [addSetsOpen, setAddSetsOpen] = useState(false);
   const effortSet = block.sets.find((set) => set.id === effortSetId);
@@ -66,7 +69,7 @@ export function PlanBlockEditor({
           onPress={() => onPickExercise(block.id)}
           style={styles.blockPick}
           testID={`plan-form-block-${index + 1}-pick`}>
-          <Text allowFontScaling={false} numberOfLines={1} style={uiText.title}>
+          <Text allowFontScaling={false} numberOfLines={1} style={text.title}>
             {block.name.length > 0 ? block.name : 'Choose exercise'}
           </Text>
         </Pressable>
@@ -94,7 +97,7 @@ export function PlanBlockEditor({
         </View>
       </View>
       {errors.get(`${blockPath}.name`) ? (
-        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.danger]} testID={`plan-form-block-${index + 1}-name-error`}>
+        <Text allowFontScaling={false} style={[text.meta, tone.danger]} testID={`plan-form-block-${index + 1}-name-error`}>
           {errors.get(`${blockPath}.name`)}
         </Text>
       ) : null}
@@ -135,7 +138,7 @@ export function PlanBlockEditor({
               <Text
                 allowFontScaling={false}
                 accessibilityLiveRegion="polite"
-                style={[uiText.meta, uiTextTone.danger]}
+                style={[text.meta, tone.danger]}
                 testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-weight-error`}>
                 {weightError}
               </Text>
@@ -144,7 +147,7 @@ export function PlanBlockEditor({
               <Text
                 allowFontScaling={false}
                 accessibilityLiveRegion="polite"
-                style={[uiText.meta, uiTextTone.danger]}
+                style={[text.meta, tone.danger]}
                 testID={`plan-form-block-${index + 1}-set-${setIndex + 1}-reps-error`}>
                 {repsError}
               </Text>
@@ -153,7 +156,7 @@ export function PlanBlockEditor({
         );
       })}
       {errors.get(`${blockPath}.sets`) ? (
-        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.danger]}>{errors.get(`${blockPath}.sets`)}</Text>
+        <Text allowFontScaling={false} style={[text.meta, tone.danger]}>{errors.get(`${blockPath}.sets`)}</Text>
       ) : null}
       {onOpenEffort ? null : (
         <EffortSheet
@@ -203,16 +206,16 @@ export function PlanBlockEditor({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   addSetsSheetBody: {
     paddingHorizontal: uiSpace.lg,
   },
   block: {
     gap: uiSpace.sm,
     padding: uiSpace.md,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.card,
   },
   blockActions: {
@@ -240,4 +243,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

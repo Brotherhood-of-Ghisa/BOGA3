@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { ListRow } from '@/components/ui/list-row';
 import { StatePanel } from '@/components/ui/state-panel';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText } from '@/components/ui/text-roles';
+import { useUiText } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import { listAvailablePlanBlocks, type AvailablePlanBlockView } from '@/src/session-planner/available-blocks';
 
@@ -37,6 +37,7 @@ type PlannerBlockSectionProps = {
 };
 
 export function PlannerBlockSection({ onPickBlock }: PlannerBlockSectionProps) {
+  const text = useUiText();
   const [state, setState] = useState<
     | { phase: 'loading' }
     | { phase: 'error' }
@@ -71,7 +72,7 @@ export function PlannerBlockSection({ onPickBlock }: PlannerBlockSectionProps) {
 
   return (
     <View style={styles.section} testID="exercise-picker-planner-section">
-      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={text.label}>
         From planner
       </Text>
       <Card>
@@ -84,10 +85,10 @@ export function PlannerBlockSection({ onPickBlock }: PlannerBlockSectionProps) {
             onPress={() => onPickBlock(row.block.id)}
             testID={`exercise-picker-planner-block-${row.block.id}`}>
             <View style={styles.rowText}>
-              <Text allowFontScaling={false} numberOfLines={2} style={uiText.bodyStrong}>
+              <Text allowFontScaling={false} numberOfLines={2} style={text.bodyStrong}>
                 <FigureText strong>{row.block.name}</FigureText>
               </Text>
-              <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+              <Text allowFontScaling={false} numberOfLines={1} style={text.meta}>
                 <FigureText>{`${row.planTitle} · Block ${row.block.orderIndex + 1} of ${row.planBlockCount}`}</FigureText>
               </Text>
             </View>

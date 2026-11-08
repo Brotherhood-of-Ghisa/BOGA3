@@ -10,8 +10,8 @@ import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
 import { Tag } from '@/components/ui/tag';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 import { planQueries, type PlanSummaryView, type ProgrammeSummaryView } from '@/src/session-planner';
 import { blockCountsLabel, planDateLabel, planOutcomeLabel, routineOutcomeLine } from './progress-labels';
 
@@ -57,6 +57,8 @@ export function PlanSection({
   errorMessage,
   onRetry,
 }: PlanSectionProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const dateFormat = useDateFormat();
   const empty = plans.length === 0 && programmes.length === 0;
   if (empty && !emptyMessage && !isLoading && !errorMessage) {
@@ -64,7 +66,7 @@ export function PlanSection({
   }
   return (
     <View style={styles.section} testID={testID}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
         {label}
       </Text>
       {errorMessage ? <StatePanel action={onRetry ? { label: 'Retry', onPress: onRetry, testID: `${testID}-retry` } : undefined}
@@ -82,12 +84,12 @@ export function PlanSection({
             testID={`${testID}-programme-${programme.id}`}>
             <View style={styles.rowText}>
               <View style={styles.titleRow}>
-                <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
+                <Text allowFontScaling={false} numberOfLines={1} style={[text.bodyStrong, styles.title]}>
                   {programme.name}
                 </Text>
                 <Tag label={programme.progress === 'completed' ? 'Completed' : `${programme.completedSessionCount} over ${programme.planCount}`} />
               </View>
-              <Text allowFontScaling={false} style={uiText.meta}>
+              <Text allowFontScaling={false} style={text.meta}>
                 <FigureText>{`Programme · ${programme.planCount} ${programme.planCount === 1 ? 'session' : 'sessions'}${programme.skippedSessionCount > 0 ? ` · ${programme.skippedSessionCount} skipped` : ''}`}</FigureText>
               </Text>
             </View>
@@ -106,12 +108,12 @@ export function PlanSection({
             testID={`${testID}-row-${plan.id}`}>
             <View style={styles.rowText}>
               <View style={styles.titleRow}>
-                <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.title]}>
+                <Text allowFontScaling={false} numberOfLines={1} style={[text.bodyStrong, styles.title]}>
                   {plan.title}
                 </Text>
                 {plan.routine?.activeSessionId ? <Tag label="In progress" /> : !plan.isRoutine && plan.progress === 'completed' ? <Tag label={planOutcomeLabel(plan)} /> : null}
               </View>
-              <Text allowFontScaling={false} style={uiText.meta}>
+              <Text allowFontScaling={false} style={text.meta}>
                 <FigureText>{planDetailLine(plan, dateFormat)}</FigureText>
               </Text>
             </View>
@@ -137,7 +139,7 @@ export function PlanSessionAction({ onPress, testID = 'plan-session-action' }: {
       accessibilityLabel="Plan a session"
       density="list"
       divider={false}
-      leading={<Icon color={uiRoles.ink} name="plus" size="xs" />}
+      leading={<Icon name="plus" size="xs" />}
       label="Plan session"
       onPress={onPress}
       testID={testID}
@@ -152,7 +154,7 @@ export function NewProgrammeAction({ onPress, testID = 'sessions-new-programme-a
       accessibilityLabel="New training programme"
       density="list"
       divider={false}
-      leading={<Icon color={uiRoles.ink} name="plus" size="xs" />}
+      leading={<Icon name="plus" size="xs" />}
       label="New programme"
       onPress={onPress}
       testID={testID}

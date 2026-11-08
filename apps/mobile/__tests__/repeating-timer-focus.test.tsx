@@ -1,14 +1,19 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { Vibration } from 'react-native';
 import { Circle } from 'react-native-svg';
 
 import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
-import { uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiTypography } from '@/components/ui/tokens';
 import { setRepeatingTimerAwake } from '@/src/session-recorder/repeating-timer-native';
 import {
   __resetRestTimerForTests, adjustRepeatingTimer, getRestTimerEntry, startRepeatingTimer,
   stopRepeatingTimer, useSessionRestTimer,
 } from '@/src/session-recorder/rest-timer';
+
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const defaultRoles = rolesFor(DEFAULT_APPEARANCE);
 
 function TimerHost() {
   const timer = useSessionRestTimer('session-1');
@@ -19,7 +24,7 @@ const expand = () => fireEvent.press(screen.getByTestId('repeating-timer-expand'
 const advance = (ms: number) => act(() => jest.advanceTimersByTime(ms));
 const expectProgress = (remaining: number) => {
   const ring = screen.UNSAFE_getAllByType(Circle).find((circle) => circle.props.testID === 'repeating-timer-focus-progress')!;
-  expect(ring.props.stroke).toBe(uiRoles.accent);
+  expect(ring.props.stroke).toBe(defaultRoles.accent);
   expect(ring.props.strokeDashoffset).toBeCloseTo(ring.props.strokeDasharray[0] * (1 - remaining));
 };
 
@@ -37,14 +42,14 @@ afterEach(() => {
 it('uses the live store through preparation, rollover, pause/resume, reset and collapse/reopen', () => {
   const cue = jest.spyOn(Vibration, 'vibrate').mockImplementation(() => {});
   startRepeatingTimer('session-1', 60);
-  render(<TimerHost />);
+  renderWithTheme(<TimerHost />);
   expand();
   expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent('Get ready');
   expect(screen.getByTestId('repeating-timer-focus-round')).toHaveStyle({ textAlign: 'center' });
   const reset = screen.getByTestId('repeating-timer-focus-reset');
   expect(within(reset).getByText('Reset')).toHaveStyle({ fontSize: uiTypography.size.xxl });
   expect(reset).not.toHaveStyle({ borderWidth: 1 });
-  expect(reset).not.toHaveStyle({ backgroundColor: uiRoles.accent });
+  expect(reset).not.toHaveStyle({ backgroundColor: defaultRoles.accent });
   expect(screen.getByTestId('repeating-timer-focus-countdown')).toHaveTextContent('0:15');
   expect(screen.getByTestId('repeating-timer-focus-toggle').props.accessibilityLabel).toBe('Pause repeating timer');
   const meter = screen.getByTestId('repeating-timer-focus-meter');
@@ -89,7 +94,7 @@ it('uses the live store through preparation, rollover, pause/resume, reset and c
 it.each([false, true])('adjusts within bounds while preserving preparation and paused=%s', (paused) => {
   startRepeatingTimer('session-1', 15);
   if (paused) stopRepeatingTimer('session-1');
-  render(<TimerHost />);
+  renderWithTheme(<TimerHost />);
   expand();
   expect(screen.getByTestId('repeating-timer-focus-minus')).toBeDisabled();
   fireEvent.press(screen.getByTestId('repeating-timer-focus-minus'));
@@ -111,7 +116,7 @@ it.each([false, true])('adjusts within bounds while preserving preparation and p
 
 it('shares interval changes and shortened-round rollover between compact and fullscreen controls', () => {
   startRepeatingTimer('session-1', 60);
-  render(<TimerHost />);
+  renderWithTheme(<TimerHost />);
   advance(125_125); // Round 2, 50.125 seconds elapsed.
   fireEvent.press(screen.getByTestId('repeating-timer-plus-15'));
   expect(screen.getByTestId('repeating-timer-round')).toHaveTextContent(/^Round 2$/);
@@ -131,7 +136,7 @@ it('shares interval changes and shortened-round rollover between compact and ful
 
 it('updates the persistent accessibility readout when phase/pause change at the same visible countdown', () => {
   startRepeatingTimer('session-1', 15);
-  render(<TimerHost />);
+  renderWithTheme(<TimerHost />);
   expand();
   advance(3_000);
   const readout = screen.getByTestId('repeating-timer-focus-readout');
@@ -152,7 +157,7 @@ it('updates the persistent accessibility readout when phase/pause change at the 
 
 it.each(['requestClose', 'accessibilityEscape'] as const)('%s collapses without dismissing or pausing', (event) => {
   startRepeatingTimer('session-1', 60);
-  render(<TimerHost />);
+  renderWithTheme(<TimerHost />);
   expand();
   const entry = getRestTimerEntry();
   fireEvent(screen.getByTestId(event === 'requestClose' ? 'repeating-timer-focus-modal' : 'repeating-timer-focus'), event);
@@ -166,7 +171,7 @@ it.each(['requestClose', 'accessibilityEscape'] as const)('%s collapses without 
 it.each([false, true])('collapsing or reopening fullscreen neither releases nor reacquires keep-awake (paused=%s)', (paused) => {
   startRepeatingTimer('session-1', 60);
   if (paused) stopRepeatingTimer('session-1');
-  render(<TimerHost />);
+  renderWithTheme(<TimerHost />);
   expand();
   jest.mocked(setRepeatingTimerAwake).mockClear();
   fireEvent.press(screen.getByTestId('repeating-timer-focus-close'));
@@ -178,7 +183,7 @@ it.each([false, true])('collapsing or reopening fullscreen neither releases nor 
 
 it('fits long figures, keeps rounds open-ended, and never announces countdown ticks', () => {
   startRepeatingTimer('session-1', 600, -(999 * 600 + 15) * 1000);
-  render(<TimerHost />);
+  renderWithTheme(<TimerHost />);
   expand();
   expect(screen.getByTestId('repeating-timer-focus-round')).toHaveTextContent('Round 1000');
   const countdown = screen.getByTestId('repeating-timer-focus-countdown');

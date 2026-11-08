@@ -3,7 +3,7 @@ import { StyleSheet, Text, View, type AccessibilityActionEvent, type Accessibili
 
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import type { RecordLine } from '@/src/session-insights/record-band';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
@@ -68,13 +68,15 @@ export function ExerciseSetsCard({
   accessibilityActions,
   onAccessibilityAction,
 }: ExerciseSetsCardProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const content = (
     <>
       <View style={styles.header}>
-        <Text allowFontScaling={false} ellipsizeMode={percentageMetrics ? 'middle' : 'tail'} numberOfLines={1} style={[uiText.title, styles.name]}>
+        <Text allowFontScaling={false} ellipsizeMode={percentageMetrics ? 'middle' : 'tail'} numberOfLines={1} style={[text.title, styles.name]}>
           <FigureText strong>{`${name}${percentageMetrics ? ' (% BW)' : ''}`}</FigureText>
         </Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, styles.count, countMuted ? uiTextTone.faint : null]} testID={`${testID}-count`}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, styles.count, countMuted ? tone.faint : null]} testID={`${testID}-count`}>
           <FigureText>{count}</FigureText>
         </Text>
         {accessory}

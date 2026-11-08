@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, FigureText, Icon, ListRow, Sheet, uiRoles, uiSpace, uiText } from '@/components/ui';
+import { ActionButton, FigureText, Icon, ListRow, Sheet, uiSpace, useUiText } from '@/components/ui';
 
 export type PlanCardChoice = {
   /** The candidate card's `sessionExerciseId`. */
@@ -27,6 +27,7 @@ export type PlanCardChoiceSheetProps = {
  * rows for the choice, and the confirm as the sheet's one `accent`.
  */
 export function PlanCardChoiceSheet({ blockName, candidates, onConfirm, onDismiss }: PlanCardChoiceSheetProps) {
+  const text = useUiText();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   // A new target resets the selection: keyed on the block and the exact
@@ -65,7 +66,7 @@ export function PlanCardChoiceSheet({ blockName, candidates, onConfirm, onDismis
       testID="plan-card-choice-sheet"
       title={blockName}
       visible>
-      <Text allowFontScaling={false} style={[uiText.body, styles.prompt]}>
+      <Text allowFontScaling={false} style={[text.body, styles.prompt]}>
         Which {blockName} card?
       </Text>
       <ScrollView keyboardShouldPersistTaps="handled" style={styles.list}>
@@ -78,14 +79,14 @@ export function PlanCardChoiceSheet({ blockName, candidates, onConfirm, onDismis
               density="list"
               divider={index > 0}
               key={candidate.id}
-              leading={<Icon color={uiRoles.ink} name={checked ? 'radio-on' : 'radio-off'} />}
+              leading={<Icon name={checked ? 'radio-on' : 'radio-off'} />}
               onPress={() => setSelectedId(candidate.id)}
               testID={`plan-card-choice-${candidate.id}`}>
               <View style={styles.choiceText}>
-                <Text allowFontScaling={false} style={uiText.bodyStrong}>
+                <Text allowFontScaling={false} style={text.bodyStrong}>
                   {candidate.exerciseName}
                 </Text>
-                <Text allowFontScaling={false} style={uiText.meta}>
+                <Text allowFontScaling={false} style={text.meta}>
                   <FigureText>{`${candidate.setCount} ${candidate.setCount === 1 ? 'set' : 'sets'}`}</FigureText>
                 </Text>
               </View>

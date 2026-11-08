@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TitleBarTimer, type TitleBarTimerProps } from '@/components/session-recorder/title-bar-timer';
 import { ActionButton } from '@/components/ui/action-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatElapsed } from '@/src/session-recorder/session-view-model';
 
 type SessionTopBarProps =
@@ -55,6 +56,8 @@ const systemNow = () => new Date();
 // `Training · 42:17`: ticks on its own so the rest of the screen does
 // not re-render each second.
 function ActiveTitle({ startedAt, now }: { startedAt: Date; now: () => Date }) {
+  const styles = useStyles();
+  const text = useUiText();
   const [current, setCurrent] = useState(now);
   useEffect(() => {
     const interval = setInterval(() => setCurrent(now()), 1000);
@@ -65,7 +68,7 @@ function ActiveTitle({ startedAt, now }: { startedAt: Date; now: () => Date }) {
     // Shrinks to fit rather than truncate, so the elapsed time stays visible
     // past the hour on a narrow phone.
     <Text allowFontScaling={false} accessibilityRole="header" adjustsFontSizeToFit minimumFontScale={0.7}
-      numberOfLines={1} style={[uiText.title, styles.title]} testID="session-view-title">
+      numberOfLines={1} style={[text.title, styles.title]} testID="session-view-title">
       <FigureText strong>{`Training · ${formatElapsed(startedAt, current)}`}</FigureText>
     </Text>
   );
@@ -75,6 +78,8 @@ function ActiveTitle({ startedAt, now }: { startedAt: Date; now: () => Date }) {
 // `Edit session` · Done for a completed session; `Session summary` · Done
 // after Finish. The primary is the screen's one `accent` action.
 export function SessionTopBar(props: SessionTopBarProps) {
+  const styles = useStyles();
+  const text = useUiText();
   const insets = useSafeAreaInsets();
   const copy = PRIMARY[props.mode];
   const onPrimary = props.mode === 'active' ? props.onFinish : props.onDone;
@@ -87,7 +92,7 @@ export function SessionTopBar(props: SessionTopBarProps) {
       {props.mode === 'active' ? (
         <ActiveTitle now={props.now ?? systemNow} startedAt={props.startedAt} />
       ) : (
-        <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[uiText.title, styles.title]}>
+        <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[text.title, styles.title]}>
           {copy.title}
         </Text>
       )}
@@ -138,7 +143,7 @@ export function SessionTopBar(props: SessionTopBarProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -146,9 +151,9 @@ const styles = StyleSheet.create({
     paddingLeft: uiSpace.lg,
     paddingRight: uiSpace.sm,
     paddingBottom: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderBottomWidth: uiBorder.width,
-    borderBottomColor: uiRoles.rule,
+    borderBottomColor: roles.rule,
   },
   title: {
     flex: 1,
@@ -157,4 +162,4 @@ const styles = StyleSheet.create({
     width: uiGeometry.tapTarget,
     height: uiGeometry.tapTarget,
   },
-});
+}));

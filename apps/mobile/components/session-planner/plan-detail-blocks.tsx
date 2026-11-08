@@ -1,6 +1,6 @@
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { Card, FigureText, ListRow, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { Card, FigureText, ListRow, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { formatSessionSetType } from '@/src/data/set-types';
 import type { PlanBlockView, PlanDetailView } from '@/src/session-planner';
 
@@ -37,18 +37,20 @@ const blockTargetsLine = (block: PlanBlockView): string => {
  * once consumed and claimed. Consumed blocks expose no edit or delete.
  */
 export function PlanDetailBlocks({ detail, onAdd, onSkip, onOpenSession }: PlanDetailBlocksProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <>
       {detail.blocks.map((block, index) => (
         <Card key={block.id} testID={`plan-detail-block-${index + 1}`}>
           <View style={styles.blockHeader}>
-            <Text allowFontScaling={false} accessibilityRole="header" style={uiText.title}>
+            <Text allowFontScaling={false} accessibilityRole="header" style={text.title}>
               {block.name}
             </Text>
-            <Text allowFontScaling={false} style={uiText.meta} testID={`plan-detail-block-${index + 1}-state`}>
+            <Text allowFontScaling={false} style={text.meta} testID={`plan-detail-block-${index + 1}-state`}>
               <FigureText>{`${detail.isRoutine ? '' : `${blockStateWord(block)} · `}Block ${index + 1} of ${detail.blocks.length}`}</FigureText>
             </Text>
-            <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`plan-detail-block-${index + 1}-targets`}>
+            <Text allowFontScaling={false} style={[text.meta, tone.ink]} testID={`plan-detail-block-${index + 1}-targets`}>
               <FigureText>{blockTargetsLine(block)}</FigureText>
             </Text>
           </View>

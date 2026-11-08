@@ -7,7 +7,7 @@ import {
   type PendingAppearance,
 } from '@/components/appearance/chosen-theme';
 import type { CommitFailure, CommitOutcome } from '@/components/appearance/use-appearance-commit';
-import { ChoiceRow, FormSection, uiBorder, uiGeometry, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ChoiceRow, FormSection, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
 import { CUSTOM_PARTS } from '@/components/ui/theme-custom';
 import type { AppearanceChoice } from '@/components/ui/theme-presets';
@@ -53,10 +53,12 @@ export function CustomSection({ appearance, pending }: Omit<SectionProps, 'commi
 
 // A choice's words, then its swatch.
 export function ChoiceMeta({ details: words, roles, swatchTestID }: { details: string[]; roles: UiRoles; swatchTestID?: string }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.meta}>
       {words.length > 0 ? (
-        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.muted]}>
+        <Text allowFontScaling={false} style={[text.meta, tone.muted]}>
           {words.join(' · ')}
         </Text>
       ) : null}

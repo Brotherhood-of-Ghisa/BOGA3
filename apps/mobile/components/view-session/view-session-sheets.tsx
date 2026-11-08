@@ -1,7 +1,6 @@
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { uiRoles } from '@/components/ui/tokens';
 
 type ViewSessionOptionsSheetProps = {
   visible: boolean;
@@ -27,7 +26,7 @@ export function ViewSessionOptionsSheet({ visible, deleted, onDismiss, onToggleD
         <ListRow
           disabled={busy}
           label={isResuming ? 'Resuming session…' : 'Resume session'}
-          leading={<Icon color={uiRoles.inkMuted} name="play" size="md" />}
+          leading={<Icon colorRole="inkMuted" name="play" size="md" />}
           onPress={onResume}
           testID="completed-session-detail-resume-button"
         />
@@ -38,7 +37,7 @@ export function ViewSessionOptionsSheet({ visible, deleted, onDismiss, onToggleD
         <ListRow
           disabled={busy}
           label="Delete session"
-          leading={<Icon color={uiRoles.danger} name="trash" size="md" />}
+          leading={<Icon colorRole="danger" name="trash" size="md" />}
           onPress={onToggleDeleted}
           testID="completed-session-detail-delete-button"
           tone="danger"

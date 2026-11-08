@@ -13,7 +13,7 @@
  * reached by really consuming the block first.
  */
 
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, Keyboard } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -63,6 +63,7 @@ import { completeActiveSession, loadActiveSessionGraph } from '@/src/session-rec
 import { loadActiveSessionId } from '@/src/session-entry';
 import { planQueries } from '@/src/session-planner/plan-queries';
 import { parseSessionDateTime } from '@/src/utils/local-time';
+import { renderWithTheme } from './helpers/theme';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, localDatabase, resetLocalData } from './helpers/local-data';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -187,7 +188,7 @@ const pressAlertButton = (label: string) => {
 describe('plan form: create', () => {
   it('saves a valid plan offline; it lands in the Unscheduled queue immediately', async () => {
     await seedCatalog();
-    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
     expect(screen.getByTestId('plan-form-scroll')).toHaveProp('automaticallyAdjustKeyboardInsets', true);
     expect(screen.getByTestId('plan-form-scroll')).toHaveProp('keyboardDismissMode', 'on-drag');
 
@@ -212,7 +213,7 @@ describe('plan form: create', () => {
 
   it('uses recorder effort entry and keeps the last target effort unchanged when adding sets', async () => {
     await seedCatalog();
-    const { unmount } = render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    const { unmount } = renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
     fillTitle('Copy targets');
     await addExerciseBlock('Bench Press');
     const first = 'plan-form-block-1-set-1';
@@ -255,7 +256,7 @@ describe('plan form: create', () => {
     ]);
     unmount();
     mockParams = { planId: plan.id };
-    render(<SessionPlanDetailRoute />);
+    renderWithTheme(<SessionPlanDetailRoute />);
     expect(await screen.findByTestId('plan-detail-block-1-targets')).toHaveTextContent(
       '40.5 × 100 (W-Up) · 40.5 × 100 (RIR 3) · 45 × 101 (RIR 3)'
     );
@@ -264,7 +265,7 @@ describe('plan form: create', () => {
   it('starts a new target at the first displayed effort and keeps the picker choices current', async () => {
     await seedCatalog();
     updatePreferences({ displayEfforts: ['rir_2', 'technique', 'cooldown'] });
-    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
     await addExerciseBlock('Barbell Squat');
     const effort = 'plan-form-block-1-set-1-effort';
     expect(screen.getByTestId(effort)).toHaveTextContent('EffortRIR 2');
@@ -284,7 +285,7 @@ describe('plan form: create', () => {
 
   it('adds one or nine exact last-target copies, cancels safely, then saves and reopens ordinary targets', async () => {
     await seedCatalog();
-    const { unmount } = render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    const { unmount } = renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
     fillTitle('Repeated squat');
     await addExerciseBlock('Barbell Squat');
     fillSet(1, 1, '40.50', '8');
@@ -330,14 +331,14 @@ describe('plan form: create', () => {
     expect(targets.slice(1).every((target) =>
       target.targetWeightValue === '50' && target.targetReps === 6 && target.targetSetType === null)).toBe(true);
     unmount();
-    render(<SessionPlanNewScreen editPlanId={plan.id} fromPlanId={null} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={plan.id} fromPlanId={null} />);
     expect(await screen.findByTestId('plan-form-block-1-set-11-weight')).toHaveProp('value', '50');
     expect(screen.queryByTestId('plan-form-block-1-set-12-weight')).toBeNull();
   });
 
   it('keeps invalid fields in place with accessible messages and writes nothing', async () => {
     await seedCatalog();
-    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
 
     // No title and invalid reps: their errors stay at the fields.
     await addExerciseBlock('Barbell Squat');
@@ -354,7 +355,7 @@ describe('plan form: create', () => {
 
   it('schedules the plan when a schedule is picked', async () => {
     await seedCatalog();
-    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
 
     fillTitle('Tomorrow Work');
     await addExerciseBlock('Barbell Squat');
@@ -371,7 +372,7 @@ describe('plan form: create', () => {
   it('prefills from the source plan and saving creates a new plan, never an in-place copy', async () => {
     await seedCatalog();
     const sourceId = await createPlanThroughRepository({ title: 'Original', scheduledFor: new Date(2026, 9, 6, 7) });
-    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={sourceId} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={sourceId} />);
 
     expect(await screen.findByTestId('plan-form-title')).toHaveProp('value', 'Original');
     expect(screen.getByTestId('plan-form-schedule')).toHaveTextContent(/06-10-2026 07:00/);
@@ -414,7 +415,7 @@ describe('plan form: create', () => {
     await completeSessionDraft(historySessionId, { completedAt: historyDate, now: historyDate });
 
     const suggest = jest.spyOn(blockHistory, 'loadSuggestedExercisePlan');
-    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
 
     fillTitle('Repeat Plan');
     await addExerciseBlock('Barbell Squat', 'repeat');
@@ -439,7 +440,7 @@ describe('plan form: create', () => {
 describe('plan detail', () => {
   const openDetail = async (planId: string) => {
     mockParams = { planId };
-    render(<SessionPlanDetailRoute />);
+    renderWithTheme(<SessionPlanDetailRoute />);
     await screen.findByTestId('plan-detail');
   };
 
@@ -572,7 +573,7 @@ describe('plan detail', () => {
 describe('plan detail: edit, skip, and the recorder complete', () => {
   const openDetail = async (planId: string) => {
     mockParams = { planId };
-    render(<SessionPlanDetailRoute />);
+    renderWithTheme(<SessionPlanDetailRoute />);
     await screen.findByTestId('plan-detail');
   };
 
@@ -586,7 +587,7 @@ describe('plan detail: edit, skip, and the recorder complete', () => {
 
     // The edit form over real data: prefill, change, save through the sync.
     mockParams = { edit: planId };
-    render(<SessionPlanNewRoute />);
+    renderWithTheme(<SessionPlanNewRoute />);
     expect(await screen.findByTestId('plan-form-title')).toHaveProp('value', 'Heavy Day');
     expect(screen.getByTestId('plan-form-save')).toHaveTextContent('Save');
     fillTitle('Heavy Day II');
@@ -609,7 +610,7 @@ describe('plan detail: edit, skip, and the recorder complete', () => {
     await waitFor(() => expect(mockDismissTo).toHaveBeenCalledTimes(1));
 
     mockParams = { edit: planId };
-    render(<SessionPlanNewRoute />);
+    renderWithTheme(<SessionPlanNewRoute />);
     expect(await screen.findByTestId('plan-form-title')).toHaveProp('value', 'Heavy Day');
     // Meta alone stays editable with a consumed block; the BLOCK is the
     // read-only snapshot.
@@ -618,7 +619,7 @@ describe('plan detail: edit, skip, and the recorder complete', () => {
     await waitFor(async () => expect(mockBack).toHaveBeenCalled());
 
     // Now the block: rename it and the whole edit refuses, nothing writes.
-    render(<SessionPlanNewRoute />);
+    renderWithTheme(<SessionPlanNewRoute />);
     expect(await screen.findByTestId('plan-form-title')).toHaveProp('value', 'Rewritten');
     await fillBlockName(1, 'Bench Press');
     fillSet(1, 1, '999', '5');
@@ -677,7 +678,7 @@ describe('recorder: complete block on a sourced card', () => {
     const planId = await createPlanThroughRepository();
     const cardId = await startFromPlan(planId);
 
-    render(<ExercisePageScreen sessionExerciseId={cardId} sessionId={await determineSessionId()} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={cardId} sessionId={await determineSessionId()} />);
     await screen.findByTestId('exercise-page');
 
     fireEvent.press(screen.getByTestId('exercise-page-options'));
@@ -696,7 +697,7 @@ describe('recorder: complete block on a sourced card', () => {
     const planId = await createPlanThroughRepository();
     const cardId = await startFromPlan(planId);
 
-    render(<ExercisePageScreen sessionExerciseId={cardId} sessionId={await determineSessionId()} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={cardId} sessionId={await determineSessionId()} />);
     await screen.findByTestId('exercise-page');
 
     // The planned rows are the cursor: type the first one's values and commit.
@@ -722,7 +723,7 @@ describe('recorder: complete block on a sourced card', () => {
     const cardId = await startFromPlan(planId);
     const sessionId = await determineSessionId();
 
-    render(<ExercisePageScreen sessionExerciseId={cardId} sessionId={sessionId} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={cardId} sessionId={sessionId} />);
     await screen.findByTestId('exercise-page');
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '100');
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '5');
@@ -745,7 +746,7 @@ describe('recorder: complete block on a sourced card', () => {
     const cardId = await startFromPlan(planId);
     const sessionId = await determineSessionId();
 
-    render(<ExercisePageScreen sessionExerciseId={cardId} sessionId={sessionId} />);
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={cardId} sessionId={sessionId} />);
     await screen.findByTestId('exercise-page');
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '100');
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-reps'), '5');
@@ -905,7 +906,7 @@ describe('plan edit sync: order and refusals', () => {
 describe('review fixes: candidate filter, skip refusal, resolved card, completed session', () => {
   const openDetail = async (planId: string) => {
     mockParams = { planId };
-    render(<SessionPlanDetailRoute />);
+    renderWithTheme(<SessionPlanDetailRoute />);
     await screen.findByTestId('plan-detail');
   };
 
@@ -1035,11 +1036,11 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
 
   it('the completed-session picker hides the From planner entry', async () => {
     await seedCatalog();
-    const view = render(<ExercisePicker {...callbackMocks()} plannerEnabled={false} />);
+    const view = renderWithTheme(<ExercisePicker {...callbackMocks()} plannerEnabled={false} />);
     await act(async () => {});
     expect(view.queryByTestId('exercise-picker-planner-toggle')).toBeNull();
     // The default keeps the entry: it is only suppressed for a completed session.
-    const enabled = render(<ExercisePicker {...callbackMocks()} />);
+    const enabled = renderWithTheme(<ExercisePicker {...callbackMocks()} />);
     await act(async () => {});
     expect(enabled.getByTestId('exercise-picker-planner-toggle')).toBeTruthy();
     enabled.unmount();
@@ -1134,7 +1135,7 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
       { id: 'c1', exerciseName: 'Bench Press', setCount: 3 },
       { id: 'c2', exerciseName: 'Bench Press', setCount: 2 },
     ];
-    const { rerender } = render(
+    const { rerender } = renderWithTheme(
       <PlanCardChoiceSheet
         blockName="Bench Press"
         candidates={candidates}
@@ -1184,7 +1185,7 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
   it('catches rejected planner saves and displays error notice', async () => {
     const onSave = jest.fn().mockRejectedValueOnce(new Error('SQLITE_FULL'))
       .mockResolvedValueOnce({ status: 'saved', planId: null });
-    render(
+    renderWithTheme(
       <PlanFormScreen
         initialForm={{
           title: 'Test Plan',
@@ -1223,7 +1224,7 @@ describe('review fixes: candidate filter, skip refusal, resolved card, completed
     await loadMaestroFixture('exercise-browser');
     await bootLocalApp();
 
-    render(
+    renderWithTheme(
       <PlanFormScreen
         initialForm={{
           title: 'Plan With History',
@@ -1266,7 +1267,7 @@ describe('Routine screens over real data', () => {
   };
   const openRoutine = async (planId: string) => {
     mockParams = { planId };
-    const view = render(<SessionPlanDetailRoute />);
+    const view = renderWithTheme(<SessionPlanDetailRoute />);
     await screen.findByTestId('plan-detail');
     return view;
   };
@@ -1275,7 +1276,7 @@ describe('Routine screens over real data', () => {
     await seedCatalog();
     const scheduledFor = new Date(2026, 10, 6, 8, 12, 34, 567);
     const planId = await createPlanThroughRepository({ scheduledFor });
-    render(<SessionPlanNewScreen editPlanId={planId} fromPlanId={null} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={planId} fromPlanId={null} />);
     await screen.findByTestId('plan-form-title');
     fireEvent.press(screen.getByTestId('plan-form-routine'));
     expect(screen.getByTestId('plan-form-routine')).toHaveProp('accessibilityState', expect.objectContaining({ checked: true }));
@@ -1297,7 +1298,7 @@ describe('Routine screens over real data', () => {
     await seedCatalog();
     const planId = await createPlanThroughRepository({ scheduledFor: new Date(2026, 10, 8, 11, 30) });
     jest.spyOn(planRepository, 'createPlan').mockRejectedValueOnce(new Error('SQLITE_FULL: simulated write failure'));
-    render(<SessionPlanNewScreen editPlanId={null} fromPlanId={planId} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={planId} />);
     await screen.findByTestId('plan-form-title');
     fillTitle('Travel Routine');
     fireEvent.press(screen.getByTestId('plan-form-routine'));
@@ -1318,7 +1319,7 @@ describe('Routine screens over real data', () => {
     const result = await planRepository.createProgramme({ name: 'Programme', description: '', plans: [child, { ...child, title: 'Second' }] });
     if (result.status !== 'saved') throw new Error('Programme fixture failed');
     const detail = (await planQueries.loadProgrammeDetail(result.id))!;
-    render(<SessionPlanNewScreen editPlanId={detail.plans[0].id} fromPlanId={null} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={detail.plans[0].id} fromPlanId={null} />);
     await screen.findByTestId('plan-form-title');
     expect(screen.queryByTestId('plan-form-routine')).toBeNull();
     expect(screen.getByRole('button', { name: /^Plan schedule/ })).toBeTruthy();
@@ -1361,7 +1362,7 @@ describe('Routine screens over real data', () => {
 
   it('keeps typed edits and Routine selected when a newer authored graph makes Save stale', async () => {
     const planId = await createRoutine();
-    render(<SessionPlanNewScreen editPlanId={planId} fromPlanId={null} />);
+    renderWithTheme(<SessionPlanNewScreen editPlanId={planId} fromPlanId={null} />);
     await screen.findByTestId('plan-form-title');
     fillTitle('My unsaved intent');
     await act(async () => { await planRepository.updatePlanMeta(planId, { title: 'Synced newer title' }); });
@@ -1395,7 +1396,7 @@ describe('Routine screens over real data', () => {
     if (started.status !== 'started') throw new Error('Routine start failed');
     const snapshot = (await loadSessionSnapshotById(started.sessionId))!;
     const exercise = snapshot.exercises[0];
-    const page = render(<ExercisePageScreen sessionExerciseId={exercise.id} sessionId={started.sessionId} />);
+    const page = renderWithTheme(<ExercisePageScreen sessionExerciseId={exercise.id} sessionId={started.sessionId} />);
     await screen.findByTestId('exercise-page');
     fireEvent.press(screen.getByTestId('exercise-page-options'));
     await screen.findByTestId('exercise-options-sheet');

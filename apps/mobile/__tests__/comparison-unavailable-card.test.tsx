@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react-native';
+import { screen } from '@testing-library/react-native';
 
 import { ComparisonUnavailableCard } from '@/components/session-complete/comparison-unavailable-card';
+import { renderWithTheme } from './helpers/theme';
 
 it('states the cutoff once and lists the names in order, with no figures', () => {
-  render(<ComparisonUnavailableCard names={['Barbell Bench Press', 'Pull-Up']} testID="pooled" />);
+  renderWithTheme(<ComparisonUnavailableCard names={['Barbell Bench Press', 'Pull-Up']} testID="pooled" />);
 
   expect(screen.getByText('Comparison unavailable — needs at least 7 sessions')).toBeTruthy();
   expect(screen.getByTestId('pooled')).toHaveTextContent(
@@ -17,7 +18,7 @@ it('states the cutoff once and lists the names in order, with no figures', () =>
 });
 
 it('draws nothing when every comparison has its history', () => {
-  render(<ComparisonUnavailableCard names={[]} testID="pooled" />);
+  renderWithTheme(<ComparisonUnavailableCard names={[]} testID="pooled" />);
 
   expect(screen.queryByTestId('pooled')).toBeNull();
   expect(screen.queryByText(/Comparison unavailable/)).toBeNull();

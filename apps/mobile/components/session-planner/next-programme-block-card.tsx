@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Card, FigureText, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, Card, FigureText, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { formatSessionSetType } from '@/src/data/set-types';
 import type { PlanBlockView, PlanTargetView } from '@/src/session-planner';
 
@@ -42,13 +42,15 @@ export function NextProgrammeBlockCard({
   onAdd,
   onSkip,
 }: NextProgrammeBlockCardProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   if (nextBlock === null) {
     return (
       <Card style={styles.emptyCard} testID="programme-next-block-empty">
-        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
           Next block
         </Text>
-        <Text allowFontScaling={false} style={uiText.meta} testID="programme-next-block-empty-text">
+        <Text allowFontScaling={false} style={text.meta} testID="programme-next-block-empty-text">
           {emptyMessage(blockCounts)}
         </Text>
       </Card>
@@ -58,16 +60,16 @@ export function NextProgrammeBlockCard({
   return (
     <Card style={styles.card} testID="programme-next-block-card">
       <View style={styles.headerRow}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, uiTextTone.faint]}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
           Next up
         </Text>
       </View>
 
       <View style={styles.content}>
-        <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong} testID="programme-next-block-name">
+        <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong} testID="programme-next-block-name">
           {nextBlock.name}
         </Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta} testID="programme-next-block-targets">
+        <Text allowFontScaling={false} numberOfLines={1} style={text.meta} testID="programme-next-block-targets">
           <FigureText>{formatTargetLine(nextBlock.targets)}</FigureText>
         </Text>
       </View>
