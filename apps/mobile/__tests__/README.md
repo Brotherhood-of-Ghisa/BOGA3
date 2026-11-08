@@ -88,13 +88,14 @@
 ## Design-token coverage policy
 
 - Applies to the one token vocabulary in `apps/mobile/components/ui/tokens.ts`
-  (`uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`,
-  `uiBorder`; `docs/specs/ui/design-language.md` §2–§4).
+  (`uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`,
+  `uiBorder`) and the colour roles (`docs/specs/ui/design-language.md` §2–§4).
 - `ui-design-tokens.test.ts` asserts, by whole-object equality: the eight ordinary type
   rungs plus the fullscreen timer figure and their line-heights, the colour roles named in §2, the geometry of
   §4 and the embedded faces of §3; and that `record !== accent` and `record`
   clears 4.5:1 on `paper`, `surface` and `record-wash`; and that `tokens.ts`
-  exports exactly that vocabulary. Change a value there and in the spec
+  exports exactly that vocabulary, with no colour role or mode as a constant
+  (a `@ts-expect-error` read fails typecheck if one returns). Change a value there and in the spec
   together — never loosen the test to make an unrelated change pass.
 - `ui-theme.test.ts` gates every theme preset
   (`components/ui/theme-presets.ts`): the generator rules for its seeds, plus
@@ -107,27 +108,29 @@
   the stored choice: the appearance record's parser, the older accent id read
   while no record exists and left in place, the default fallback for an
   unknown id, an invalid record or an unreadable store, and that each
-  fallback is logged; and the launch mode: each stored mode × OS scheme, the
-  OS read before the pin, and `uiRoles` drawn on the resolved ladder.
-- `ui-mode-literal-guard.test.ts` keeps every surface on the launch mode: no
+  fallback is logged; each stored mode × phone scheme resolved; and that
+  loading or saving the choice pins nothing.
+- `ui-mode-literal-guard.test.ts` keeps every surface on the drawn mode: no
   colour literal outside the theme files, no fixed `themeVariant`, status-bar
-  style, keyboard or alert style, and no OS-mode read but `theme-launch.ts`,
-  with self-tests for what it rejects and allows.
+  style, keyboard or alert style, and no OS-mode read, listener or pin but
+  `theme-native.ts`, with self-tests for what it rejects and allows.
 - `ui-theme-context.test.tsx` covers the live theme (`components/ui/theme-context.tsx`):
   the provider starting from the stored choice and re-resolving roles and
   mode on each save as one transition, an unchanged save keeping the same
-  roles, an unreadable store keeping the theme and logging, and `makeStyles`
+  roles, an unreadable store keeping the theme and logging, native UI pinned
+  to each save's mode, System unpinning and following phone changes until a
+  fixed mode is saved, and `makeStyles`
   building one sheet per set of roles; a fixture component loaded through the
   React Compiler repaints on a switch. Render a themed component with
   `helpers/theme.tsx` (`renderWithTheme`, `switchTheme`), and take expected
-  colours from `rolesFor(...)`, not from `uiRoles`.
+  colours from `rolesFor(...)`, never a module constant.
+- `theme-app-icon-live.test.tsx` proves the launcher icon follows each saved
+  theme; `theme-app-icon.test.ts` covers the native boundary and its OS limits.
 - `ui-live-theme-primitives.test.tsx` switches the theme through the provider and
   checks each `components/ui` primitive repaints, reading colours from `rolesFor(...)`.
-- `ui-live-theme-guard.test.ts` fails on any code read of `uiRoles` / `uiMode`,
-  or of the launch colours built from them (`uiText`, `uiTextTone`,
-  `changeToneColour`), in `app/`, `components/` or `src/` outside
-  `ui-live-theme-guard.allowlist.json`, the files still to migrate. A
-  migrated file leaves the list in the same change; the list only shrinks.
+- `ui-live-theme-guard.test.ts` fails on any code naming the removed launch
+  constants (`uiRoles`, `uiMode`, `uiText`, `uiTextTone`, `changeToneColour`)
+  in `app/`, `components/` or `src/`.
 - `ui-on-colour-guard.test.ts` keeps `surface` a ground: any use in `app/` or
   `components/` other than a `backgroundColor`, a shape's `fill` or a role set
   handed on fails, with self-tests for what it rejects and allows.

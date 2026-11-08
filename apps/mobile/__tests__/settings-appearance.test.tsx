@@ -3,7 +3,7 @@
 /**
  * Settings → Appearance (`docs/specs/ui/design-language.md` "Presets"): the
  * theme presets and Custom as radio rows on a page, a choice saved per device
- * at once and applied on the next launch, Mode for a preset, the custom
+ * at once and drawn by the app at once, Mode for a preset, the custom
  * colours' rows that open their pickers, and the failures that must be logged
  * rather than silent. Settings home's row names the choice and pushes the page.
  *
@@ -35,7 +35,7 @@ jest.mock('@/src/logging/logEvent', () => ({ logEvent: (...args: unknown[]) => m
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
-import { StyleSheet } from 'react-native';
+import { Appearance, StyleSheet } from 'react-native';
 
 import { appearanceRoles } from '@/components/appearance/chosen-theme';
 import { generateRoles } from '@/components/ui/theme';
@@ -45,6 +45,7 @@ import * as themeLaunch from '@/components/ui/theme-launch';
 import { APPEARANCE_STORAGE_KEY, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { ensureExerciseListPreferencesLoaded } from '@/src/exercise-catalog/list-preferences';
+import { renderWithTheme } from './helpers/theme';
 import SettingsAppearanceRoute from '../app/settings-appearance';
 import SettingsRoute from '../app/settings';
 
@@ -91,9 +92,8 @@ it('lists every preset as a radio row with its swatch, the current one checked',
   }
   expect(radio('Warm, default').props.accessibilityState).toEqual({ checked: true });
   expect(radio('Slate').props.accessibilityState).toEqual({ checked: false });
-  // Only the section's footnote states when a choice applies; nothing is pending.
-  expect(screen.getByText('Applies next launch')).toBeTruthy();
-  expect(screen.queryByText('Next launch')).toBeNull();
+  // A choice applies at once: nothing on the page says it waits for a launch.
+  expect(screen.queryByText(/next launch/i)).toBeNull();
   // The vocabulary's rows only: no button on the page.
   expect(screen.queryByRole('button', { name: /use this colour|save|apply/i })).toBeNull();
 });
@@ -103,20 +103,30 @@ it('shows a preset’s detail as meta beside its swatch', () => {
   expect(within(screen.getByTestId('settings-appearance-option-warm')).getByText('Default')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm });
 });
 
-it('saves a choice at once and labels it as applying next launch', async () => {
+it('saves a choice at once, with no word that it waits for the next launch', async () => {
   render(<SettingsAppearanceRoute />);
 
   fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
 
   await waitFor(() => expect(storedAccent()).toBe('slate'));
-  expect(radio('Slate, next launch').props.accessibilityState).toEqual({ checked: true });
-  expect(within(screen.getByTestId('settings-appearance-option-slate')).getByText('Next launch')).toBeTruthy();
+  expect(radio('Slate').props.accessibilityState).toEqual({ checked: true });
+  expect(screen.queryByText(/next launch/i)).toBeNull();
 
-  // Choosing the theme in use again leaves nothing pending.
   fireEvent.press(screen.getByTestId('settings-appearance-option-warm'));
   await waitFor(() => expect(storedAccent()).toBe('warm'));
-  expect(screen.queryByText('Next launch')).toBeNull();
   expect(within(screen.getByTestId('settings-appearance-option-warm')).getByText('Default')).toBeTruthy();
+});
+
+it('writes nothing when the choice in use is chosen again', async () => {
+  Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"theme":"slate","mode":"dark","custom":null}');
+  const setItem = jest.spyOn(Storage, 'setItem');
+  render(<SettingsAppearanceRoute />);
+
+  fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
+  fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
+  await act(async () => {});
+
+  expect(setItem).not.toHaveBeenCalled();
 });
 
 it('keeps the previous choice and says nothing changed, in a danger notice, when the save fails', async () => {
@@ -169,16 +179,15 @@ it('replaces an unusable stored choice when the default is chosen again', async 
 it('shows a choice made earlier this run, read from the store', () => {
   Storage.setItemSync(THEME_PRESET_STORAGE_KEY, 'plum');
   render(<SettingsRoute />);
-  expect(screen.getByLabelText('Appearance, Plum from next launch')).toBeTruthy();
-  // Untinted, the row shows the accent and that it waits.
-  expect(within(screen.getByTestId('settings-appearance-row')).getByText('Plum from next launch')).toBeTruthy();
+  expect(screen.getByLabelText('Appearance, Plum')).toBeTruthy();
+  expect(within(screen.getByTestId('settings-appearance-row')).getByText('Plum')).toBeTruthy();
 });
 
 it('keeps the custom colours and mode in the record when a preset is chosen', async () => {
   const custom = customFromSeeds(getThemePreset('slate').seeds, 'light');
   Storage.setItemSync(APPEARANCE_STORAGE_KEY, JSON.stringify({ theme: 'plum', mode: 'dark', custom }));
   render(<SettingsAppearanceRoute />);
-  expect(radio('Plum, next launch').props.accessibilityState).toEqual({ checked: true });
+  expect(radio('Plum').props.accessibilityState).toEqual({ checked: true });
 
   fireEvent.press(screen.getByTestId('settings-appearance-option-forest'));
 
@@ -197,7 +206,7 @@ it('updates Settings home when the Appearance page saves a choice', async () => 
 
   fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
 
-  expect(await screen.findByLabelText('Appearance, Slate from next launch')).toBeTruthy();
+  expect(await screen.findByLabelText('Appearance, Slate')).toBeTruthy();
 });
 
 describe('custom', () => {
@@ -227,7 +236,7 @@ describe('custom', () => {
     fireEvent.press(radio('Custom'));
 
     await waitFor(() => expect(storedRecord()).toEqual({ theme: 'custom', mode: 'light', custom: WARM_CUSTOM }));
-    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+    expect(radio('Custom').props.accessibilityState).toEqual({ checked: true });
     expect(previewGround()).toBe(generateCustomRoles(WARM_CUSTOM).paper);
     expect(screen.queryByTestId('settings-appearance-mode')).toBeNull();
     for (const label of ['Background', 'Primary text', 'Secondary text', 'Accent', 'Best ever', 'Charts']) {
@@ -248,9 +257,9 @@ describe('custom', () => {
     const rows = screen.getByTestId('settings-appearance-custom');
     expect(within(rows).getByText('Teal, 30%, light 20')).toBeTruthy();
     expect(within(rows).getByText('Purple, 80%')).toBeTruthy();
-    expect(screen.getByLabelText('Primary text, Blue, 40%, next launch')).toBeTruthy();
-    expect(screen.getByLabelText('Best ever, Olive, 60%, next launch')).toBeTruthy();
-    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+    expect(screen.getByLabelText('Primary text, Blue, 40%')).toBeTruthy();
+    expect(screen.getByLabelText('Best ever, Olive, 60%')).toBeTruthy();
+    expect(radio('Custom').props.accessibilityState).toEqual({ checked: true });
 
     fireEvent.press(screen.getByTestId('settings-appearance-custom-record'));
 
@@ -264,7 +273,7 @@ describe('custom', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Show presets' }));
 
     expect(screen.getByTestId('settings-appearance-option-warm')).toBeTruthy();
-    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+    expect(radio('Custom').props.accessibilityState).toEqual({ checked: true });
 
     fireEvent.press(screen.getByRole('button', { name: 'Hide presets' }));
 
@@ -277,7 +286,7 @@ describe('custom', () => {
     render(<SettingsAppearanceRoute />);
     fireEvent.press(screen.getByRole('button', { name: 'Show presets' }));
 
-    fireEvent.press(radio('Custom, next launch'));
+    fireEvent.press(radio('Custom'));
 
     expect(screen.queryByTestId('settings-appearance-option-warm')).toBeNull();
     expect(setItem).not.toHaveBeenCalled();
@@ -292,7 +301,7 @@ describe('custom', () => {
     fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
 
     expect(await screen.findByText('Couldn’t save the theme. Nothing changed.')).toBeTruthy();
-    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+    expect(radio('Custom').props.accessibilityState).toEqual({ checked: true });
     expect(screen.getByTestId('settings-appearance-option-slate')).toBeTruthy();
   });
 
@@ -317,14 +326,14 @@ describe('custom', () => {
   it('names Custom on Settings home', () => {
     storeCustom();
     render(<SettingsRoute />);
-    expect(screen.getByLabelText('Appearance, Custom from next launch')).toBeTruthy();
-    expect(within(screen.getByTestId('settings-appearance-row')).getByText('Custom from next launch')).toBeTruthy();
+    expect(screen.getByLabelText('Appearance, Custom')).toBeTruthy();
+    expect(within(screen.getByTestId('settings-appearance-row')).getByText('Custom')).toBeTruthy();
   });
 
   it('reads a record from before custom themes as the custom theme it drew', () => {
     Storage.setItemSync('boga3.appearance.v2', '{"accent":"hue:200","background":"rose","text":"navy","mode":"light"}');
     render(<SettingsAppearanceRoute />);
-    expect(radio('Custom, next launch').props.accessibilityState).toEqual({ checked: true });
+    expect(radio('Custom').props.accessibilityState).toEqual({ checked: true });
   });
 
   it('says nothing changed, and logs it, when Custom cannot be saved', async () => {
@@ -344,7 +353,7 @@ describe('custom', () => {
     storeCustom();
     const setItem = jest.spyOn(Storage, 'setItem');
     render(<SettingsAppearanceRoute />);
-    fireEvent.press(radio('Custom, next launch'));
+    fireEvent.press(radio('Custom'));
     await act(async () => {});
     expect(setItem).not.toHaveBeenCalled();
   });
@@ -355,37 +364,30 @@ describe('mode', () => {
   const darkPaper = generateRoles(getThemePreset('warm').seeds, 'dark').paper;
   const lightPaper = generateRoles(getThemePreset('warm').seeds, 'light').paper;
 
-  it('offers Light, Dark and System, Light the default and checked, and says when System applies', () => {
+  it('offers Light, Dark and System, Light the default and checked, and says System follows the phone', () => {
     render(<SettingsAppearanceRoute />);
     expect(screen.getByRole('radio', { name: 'Light, default' }).props.accessibilityState).toEqual({ checked: true });
     expect(screen.getByRole('radio', { name: 'Dark' }).props.accessibilityState).toEqual({ checked: false });
     expect(screen.getByRole('radio', { name: 'System' }).props.accessibilityState).toEqual({ checked: false });
-    expect(screen.getByText('System applies the phone’s mode at launch')).toBeTruthy();
+    expect(screen.getByText('System follows the phone’s mode')).toBeTruthy();
   });
 
-  it('saves a mode at once, keeping the rest, repaints the preview in it and labels it as applying next launch', async () => {
+  it('saves a mode at once, keeping the rest, and repaints the preview in it', async () => {
     Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"theme":"slate","mode":"light","custom":null}');
     render(<SettingsAppearanceRoute />);
-    expect(previewGround()).toBe(appearanceRoles({ theme: 'slate', mode: 'light', custom: null }).paper);
+    expect(previewGround()).toBe(appearanceRoles({ theme: 'slate', mode: 'light', custom: null }, 'light').paper);
 
     fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
 
     expect(previewGround()).toBe(generateRoles(getThemePreset('slate').seeds, 'dark').paper);
     await waitFor(() => expect(storedRecord()).toEqual({ theme: 'slate', mode: 'dark', custom: null }));
-    expect(screen.getByRole('radio', { name: 'Dark, next launch' }).props.accessibilityState).toEqual({ checked: true });
-  });
-
-  it('labels only the mode as pending when only the mode changed', async () => {
-    render(<SettingsAppearanceRoute />);
-    fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
-    await waitFor(() => expect(storedRecord()?.mode).toBe('dark'));
-    expect(screen.getAllByText('Next launch')).toHaveLength(1);
-    expect(within(screen.getByTestId('settings-appearance-mode-dark')).getByText('Next launch')).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Dark' }).props.accessibilityState).toEqual({ checked: true });
+    expect(screen.queryByText(/next launch/i)).toBeNull();
   });
 
   it('draws the preset swatches in the mode the choice would open in', async () => {
     render(<SettingsAppearanceRoute />);
-    expect(appearanceRoles({ ...DEFAULT_APPEARANCE, mode: 'dark' }).paper).toBe(darkPaper);
+    expect(appearanceRoles({ ...DEFAULT_APPEARANCE, mode: 'dark' }, 'light').paper).toBe(darkPaper);
     expect(StyleSheet.flatten(screen.getByTestId('settings-appearance-swatch-warm', { includeHiddenElements: true }).props.style).backgroundColor).toBe(lightPaper);
 
     fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
@@ -393,17 +395,26 @@ describe('mode', () => {
     await waitFor(() => expect(storedRecord()?.mode).toBe('dark'));
   });
 
-  it('previews System in the phone’s mode as this launch found it', async () => {
-    jest.replaceProperty(themeLaunch, 'launchOsScheme', 'dark');
-    render(<SettingsAppearanceRoute />);
+  // Native UI is not pinned in Jest: `setColorScheme` is stubbed, so the
+  // phone's mode is what `getColorScheme` reports.
+  const onPhone = (scheme: 'dark' | null) => {
+    jest.spyOn(Appearance, 'getColorScheme').mockReturnValue(scheme);
+    jest.spyOn(Appearance, 'setColorScheme').mockImplementation(() => {});
+  };
+
+  it('previews System in the phone’s mode as the app read it', async () => {
+    onPhone('dark');
+    renderWithTheme(<SettingsAppearanceRoute />);
+    expect(StyleSheet.flatten(screen.getByTestId('settings-appearance-swatch-warm', { includeHiddenElements: true }).props.style).backgroundColor).toBe(lightPaper);
     fireEvent.press(screen.getByTestId('settings-appearance-mode-system'));
     expect(previewGround()).toBe(darkPaper);
     await waitFor(() => expect(storedRecord()?.mode).toBe('system'));
+    expect(previewGround()).toBe(darkPaper);
   });
 
-  it('previews System light when the phone was light, or stated no mode, at launch', async () => {
-    jest.replaceProperty(themeLaunch, 'launchOsScheme', null);
-    render(<SettingsAppearanceRoute />);
+  it('previews System light when the phone states no mode', async () => {
+    onPhone(null);
+    renderWithTheme(<SettingsAppearanceRoute />);
     fireEvent.press(screen.getByTestId('settings-appearance-mode-system'));
     expect(previewGround()).toBe(lightPaper);
     await waitFor(() => expect(storedRecord()?.mode).toBe('system'));
@@ -430,7 +441,7 @@ describe('mode', () => {
       </>,
     );
     fireEvent.press(screen.getByTestId('settings-appearance-mode-dark'));
-    expect(await screen.findByLabelText('Appearance, Warm, Dark mode from next launch')).toBeTruthy();
+    expect(await screen.findByLabelText('Appearance, Warm, Dark mode')).toBeTruthy();
     expect(within(screen.getByTestId('settings-appearance-row')).getByText('Warm, dark')).toBeTruthy();
   });
 });

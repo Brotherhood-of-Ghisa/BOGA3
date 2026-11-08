@@ -9,7 +9,7 @@ export { Card } from '@/components/ui/card';
 export { SummaryTile } from '@/components/ui/summary-tile';
 export { CompactCard, CompactHeader } from '@/components/ui/compact-card';
 export { ListCard, ListCardHeader } from '@/components/ui/list-card';
-export { changeToneColour, changeToneColourIn, type ChangeTone } from '@/components/ui/change-tone';
+export { changeToneColourIn, type ChangeTone } from '@/components/ui/change-tone';
 export {
   ChipGroup,
   type ChipGroupProps,
@@ -86,8 +86,8 @@ export {
   type StatePanelProps,
 } from '@/components/ui/state-panel';
 export { Tag, type TagProps, type TagTone } from '@/components/ui/tag';
-export { uiText, uiTextEmphasis, uiTextFor, uiTextTone, uiTextToneFor, useUiText, useUiTextTone } from '@/components/ui/text-roles';
-export { AppThemeProvider, makeStyles, useUiMode, useUiRoles, type AppTheme } from '@/components/ui/theme-context';
+export { uiTextEmphasis, uiTextFor, uiTextToneFor, useUiText, useUiTextTone } from '@/components/ui/text-roles';
+export { AppThemeProvider, makeStyles, useAppTheme, useUiMode, useUiRoles, type AppTheme } from '@/components/ui/theme-context';
 export {
   ToggleChip,
   type ToggleChipOption,
@@ -98,8 +98,6 @@ export {
   uiFonts,
   uiGeometry,
   uiIconSize,
-  uiMode,
-  uiRoles,
   uiSpace,
   uiTypography,
   type UiFontToken,

@@ -1,42 +1,44 @@
-import { createContext, startTransition, useContext, useEffect, useState, type ReactNode } from 'react';
-import { StyleSheet } from 'react-native';
+import { createContext, startTransition, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
+import { StyleSheet, type ColorSchemeName } from 'react-native';
 
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
-import { launchOsScheme, launchTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
+import { launchTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
+import { followsPhone, pinNativeMode, readPhoneScheme, subscribePhoneScheme } from '@/components/ui/theme-native';
 import { appearanceMode, appearanceRoles, type AppearanceChoice } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
-// The appearance the app is drawn in while it runs: the stored choice, its
-// mode and the colour roles it resolves to. A component reads the roles and the
-// mode through `useUiRoles()`, `useUiMode()` or a `makeStyles` sheet, never
-// from a module constant, so a saved choice repaints it.
+// The appearance the app is drawn in while it runs: the stored choice, the
+// phone's mode as last read, the mode they resolve to and its colour roles. A
+// component reads the roles and the mode through `useUiRoles()`, `useUiMode()`
+// or a `makeStyles` sheet, never from a module constant, so a saved choice, and
+// with System a phone change, repaints it.
 export type AppTheme = {
   appearance: AppearanceChoice;
+  phoneScheme: ColorSchemeName | null;
   mode: ThemeMode;
   roles: UiRoles;
 };
 
-// The mode is resolved against the OS's mode as this launch found it: native
-// UI stays pinned to the launch mode (`theme-launch.ts`), and while pinned
-// the OS reports the pin, not the phone.
-function resolveAppTheme(appearance: AppearanceChoice): AppTheme {
-  const mode = appearanceMode(appearance, launchOsScheme);
-  return { appearance, mode, roles: appearanceRoles(appearance, mode) };
+function resolveAppTheme(appearance: AppearanceChoice, phoneScheme: ColorSchemeName | null): AppTheme {
+  const mode = appearanceMode(appearance, phoneScheme);
+  return { appearance, phoneScheme, mode, roles: appearanceRoles(appearance, mode) };
 }
 
-// The theme a saved choice draws. Roles that resolve to the same colours keep
-// the current roles object, so every cached sheet stays; a choice that changes
-// nothing keeps the current theme and re-renders nothing.
-function withAppearance(current: AppTheme, appearance: AppearanceChoice): AppTheme {
-  const next = resolveAppTheme(appearance);
-  if (next.mode !== current.mode || JSON.stringify(next.roles) !== JSON.stringify(current.roles)) return next;
-  if (JSON.stringify(next.appearance) === JSON.stringify(current.appearance)) return current;
-  return { ...current, appearance };
+const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+// The theme a choice and a phone mode draw. Roles that resolve to the same
+// colours keep the current roles object, so every cached sheet stays; a change
+// that changes nothing keeps the current theme and re-renders nothing.
+function withChoice(current: AppTheme, appearance: AppearanceChoice, phoneScheme: ColorSchemeName | null): AppTheme {
+  const next = resolveAppTheme(appearance, phoneScheme);
+  if (next.mode !== current.mode || !same(next.roles, current.roles)) return next;
+  if (same(appearance, current.appearance) && phoneScheme === current.phoneScheme) return current;
+  return { ...current, appearance, phoneScheme };
 }
 
 // The theme this launch is drawn in. What a component reads outside an
 // `AppThemeProvider` (a test that renders it alone).
-const launchAppTheme: AppTheme = resolveAppTheme(launchTheme.appearance);
+const launchAppTheme: AppTheme = resolveAppTheme(launchTheme.appearance, readPhoneScheme());
 
 const AppThemeContext = createContext<AppTheme>(launchAppTheme);
 
@@ -58,23 +60,50 @@ function readSavedAppearance(): AppearanceChoice | null {
 
 // Holds the theme for everything below it: the stored choice when it mounts
 // (the launch theme if the store cannot be read then), then each choice saved
-// while the app runs (`subscribeThemeSaved`). Mounted once, by the root layout.
+// while the app runs (`subscribeThemeSaved`), and with System each phone
+// change. Mounted once, by the root layout.
 //
-// A save repaints every mounted screen that reads the theme, the stack behind
-// the current one included, which costs far more than the tap that saved it.
-// So the repaint is a transition: the control that saved it answers at once,
-// and those screens then change theme together in one commit.
+// Native UI is drawn in the same mode: pinned to it, or with System unpinned so
+// it follows the phone, and the phone is then followed (`theme-native.ts`).
+//
+// A change repaints every mounted screen that reads the theme, the stack
+// behind the current one included, which costs far more than the tap that
+// saved it. So the repaint is a transition: the control that saved it answers
+// at once, and those screens then change theme together in one commit.
 export function AppThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState(() => withAppearance(launchAppTheme, readSavedAppearance() ?? launchAppTheme.appearance));
+  // Read before the first pin, so at a cold start it is the phone's own mode.
+  const [theme, setTheme] = useState(() =>
+    withChoice(launchAppTheme, readSavedAppearance() ?? launchAppTheme.appearance, readPhoneScheme()),
+  );
   useEffect(
     () =>
       subscribeThemeSaved(() => {
         const appearance = readSavedAppearance();
-        if (appearance) startTransition(() => setTheme((current) => withAppearance(current, appearance)));
+        if (appearance) startTransition(() => setTheme((current) => withChoice(current, appearance, current.phoneScheme)));
       }),
     [],
   );
+  // The mode native UI is pinned to, or null to follow the phone. Set before
+  // the commit that draws the new mode paints, so both change together.
+  const pin = followsPhone(theme.appearance) ? null : theme.mode;
+  useLayoutEffect(() => {
+    pinNativeMode(pin);
+    if (pin) return undefined;
+    const follow = (phoneScheme: ColorSchemeName | null) =>
+      startTransition(() => setTheme((current) => withChoice(current, current.appearance, phoneScheme)));
+    // Unpinned, the phone may differ from the mode last read: read it now, and
+    // the OS reports it again if the pin it left still showed.
+    follow(readPhoneScheme());
+    return subscribePhoneScheme(follow);
+  }, [pin]);
   return <AppThemeContext.Provider value={theme}>{children}</AppThemeContext.Provider>;
+}
+
+// The whole theme the app is drawn in now: what a module takes when it needs
+// the choice itself (the launcher icon) or the phone's mode (a preview of
+// System).
+export function useAppTheme(): AppTheme {
+  return useContext(AppThemeContext);
 }
 
 // The colour roles the app is drawn in now (`docs/specs/ui/design-language.md`

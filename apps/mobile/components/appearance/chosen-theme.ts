@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import type { ColorSchemeName } from 'react-native';
 
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
+import { useAppTheme } from '@/components/ui/theme-context';
 import type { CustomPart } from '@/components/ui/theme-custom';
 import { hueName } from '@/components/ui/theme-hue';
-import { launchOsScheme, launchTheme, readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
+import { launchTheme, readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
 import {
   appearanceMode,
   appearanceRoles as rolesInMode,
@@ -48,35 +50,6 @@ export function useStoredAppearance(): [AppearanceChoice, (appearance: Appearanc
   return [appearance, setAppearance];
 }
 
-const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
-
-// Which parts of a choice wait for the next launch: each differs from the
-// theme in use. `custom` is per part, and counts only while Custom is chosen.
-export type PendingAppearance = {
-  theme: boolean;
-  mode: boolean;
-  custom: Record<CustomPart, boolean>;
-  any: boolean;
-};
-
-export function pendingAppearance(appearance: AppearanceChoice): PendingAppearance {
-  const launched = launchTheme.appearance;
-  const theme = appearance.theme !== launched.theme;
-  const mode = appearance.mode !== launched.mode;
-  const customPart = (part: CustomPart) =>
-    appearance.theme === 'custom' && !same(appearance.custom?.[part], launched.custom?.[part]);
-  const custom = {
-    background: customPart('background'),
-    ink: customPart('ink'),
-    text: customPart('text'),
-    accent: customPart('accent'),
-    record: customPart('record'),
-    viz: customPart('viz'),
-  };
-  const drawnMode = appearance.theme !== 'custom' && mode;
-  return { theme, mode, custom, any: theme || drawnMode || Object.values(custom).some(Boolean) };
-}
-
 export const MODE_LABELS: Record<AppearanceMode, string> = { light: 'Light', dark: 'Dark', system: 'System' };
 
 // The custom parts as the Appearance page names them, in its order.
@@ -89,10 +62,15 @@ export const CUSTOM_PART_LABELS: Record<CustomPart, string> = {
   viz: 'Charts',
 };
 
-// The ladder a choice would draw on if the app opened now: `system` takes the
-// OS's mode as this launch found it, since the pin hides any change since.
-export function previewMode(appearance: AppearanceChoice): ThemeMode {
-  return appearanceMode(appearance, launchOsScheme);
+// The phone's mode as the app last read it (`theme-context.tsx`): what a
+// preview of System draws in, also while the app is pinned to another mode.
+export function usePhoneScheme(): ColorSchemeName | null {
+  return useAppTheme().phoneScheme;
+}
+
+// The ladder a choice draws on: `system` takes `phoneScheme`.
+export function previewMode(appearance: AppearanceChoice, phoneScheme: ColorSchemeName | null): ThemeMode {
+  return appearanceMode(appearance, phoneScheme);
 }
 
 export function themeLabel(appearance: AppearanceChoice): string {
@@ -117,20 +95,18 @@ export function appearanceLabel(appearance: AppearanceChoice): string {
   return `${label}, ${MODE_LABELS[appearance.mode]} mode`;
 }
 
-// The roles a choice draws, in the mode it would open in, for a preview or a
-// swatch: the screens are drawn in the saved theme's roles, so another
-// theme's colours are not roles of the live theme.
-export function appearanceRoles(appearance: AppearanceChoice): UiRoles {
-  return rolesInMode(appearance, previewMode(appearance));
+// The roles a choice draws, in its mode, for a preview or a swatch: the
+// screens are drawn in the saved theme's roles, so another theme's colours are
+// not roles of the live theme.
+export function appearanceRoles(appearance: AppearanceChoice, phoneScheme: ColorSchemeName | null): UiRoles {
+  return rolesInMode(appearance, previewMode(appearance, phoneScheme));
 }
 
 // What fits at the end of Settings home's row: the theme, then a preset's mode
-// when it is not light; with neither, `from next launch` while the choice
-// waits. The row's accessibility label carries `appearanceLabel`.
+// when it is not light. The row's accessibility label carries
+// `appearanceLabel`.
 export function appearanceSummary(appearance: AppearanceChoice): string {
   const label = themeLabel(appearance);
-  if (appearance.theme !== 'custom' && appearance.mode !== 'light') {
-    return `${label}, ${MODE_LABELS[appearance.mode].toLowerCase()}`;
-  }
-  return pendingAppearance(appearance).any ? `${label} from next launch` : label;
+  if (appearance.theme === 'custom' || appearance.mode === 'light') return label;
+  return `${label}, ${MODE_LABELS[appearance.mode].toLowerCase()}`;
 }

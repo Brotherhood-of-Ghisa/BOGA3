@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { AppState } from 'react-native';
 
 import { getAppIconName, setAlternateAppIcon, supportsAlternateIcons } from 'expo-alternate-app-icons';
 
-import { DEFAULT_THEME_PRESET_ID, type ResolvedTheme } from '@/components/ui/theme-presets';
+import { useAppTheme } from '@/components/ui/theme-context';
+import { DEFAULT_THEME_PRESET_ID, resolveAppearance, type ResolvedTheme } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 import { isNovember, watchNovemberAppearance } from '@/src/utils/seasonal-appearance';
 
@@ -76,4 +78,12 @@ export function startThemeAppIcon(preset: ResolvedTheme['preset']): () => void {
     subscription.remove();
     stopCalendar();
   };
+}
+
+// Keeps the launcher icon on the theme the app is drawn in: the stored one at
+// launch, then each one saved while the app runs. A new theme stops the old
+// watch and starts one for it; a request still in flight finishes first.
+export function useThemeAppIcon(): void {
+  const { preset } = resolveAppearance(useAppTheme().appearance);
+  useEffect(() => startThemeAppIcon(preset), [preset]);
 }

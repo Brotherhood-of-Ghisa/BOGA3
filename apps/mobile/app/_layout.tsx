@@ -6,7 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { startThemeAppIcon } from '@/components/appearance/theme-app-icon';
+import { useThemeAppIcon } from '@/components/appearance/theme-app-icon';
 import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
 import { statusBarStyleFor, useNavigationTheme } from '@/components/navigation/navigation-theme';
 import { NotificationTapBridge } from '@/components/navigation/notification-tap-bridge';
@@ -44,7 +44,6 @@ export default function RootLayout() {
     // A stored theme this launch could not use (unknown preset, unreadable
     // store) falls back to the default theme; say so in the logs.
     reportLaunchThemeProblem(launchTheme.problem);
-    const stopThemeAppIcon = startThemeAppIcon(launchTheme.preset);
 
     // Ask the OS to schedule the background sync task. Registration is async and
     // must not block boot, and a rejection (e.g. Background App Refresh disabled
@@ -73,7 +72,6 @@ export default function RootLayout() {
     return () => {
       mounted = false;
       stopDatabaseBackups?.();
-      stopThemeAppIcon();
       stopSyncGateStateBridge();
       stopSyncScheduler();
       stopLogFlushLoop();
@@ -82,7 +80,7 @@ export default function RootLayout() {
 
   // The theme sits outside everything else, so every screen and sheet below
   // that reads it through the theme hooks follows a saved appearance, and so do
-  // the navigation theme and the status bar (`ThemedChrome`).
+  // the navigation theme, the status bar and the launcher icon (`ThemedChrome`).
   return (
     <AppThemeProvider>
       <GestureHandlerRootView style={styles.gestureRoot}>
@@ -101,11 +99,12 @@ export default function RootLayout() {
   );
 }
 
-// What the navigators and the status bar take from the theme the app is drawn
-// in now.
+// What the navigators, the status bar and the launcher icon take from the
+// theme the app is drawn in now.
 function ThemedChrome({ children }: { children: ReactNode }) {
   const navigationTheme = useNavigationTheme();
   const mode = useUiMode();
+  useThemeAppIcon();
   return (
     <>
       <ThemeProvider value={navigationTheme}>{children}</ThemeProvider>

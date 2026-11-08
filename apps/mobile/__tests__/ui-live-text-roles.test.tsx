@@ -1,8 +1,8 @@
 import { Text } from 'react-native';
 import { screen } from '@testing-library/react-native';
 
-import { changeToneColour, changeToneColourIn } from '@/components/ui/change-tone';
-import { uiText, uiTextTone, useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { changeToneColourIn } from '@/components/ui/change-tone';
+import { uiTextFor, uiTextToneFor, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { DEFAULT_APPEARANCE, type AppearanceChoice } from '@/components/ui/theme-presets';
 
 import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
@@ -32,10 +32,10 @@ describe('live text roles', () => {
     expect(colour()).not.toBe(rolesFor(DEFAULT_APPEARANCE).accent);
   });
 
-  it('keep the launch constants equal in value to the live sheets at launch', () => {
+  it('build sheets coloured by the given roles', () => {
     const roles = rolesFor(DEFAULT_APPEARANCE);
-    expect(uiText.title.color).toBe(roles.ink);
-    expect(uiTextTone.record).toMatchObject({ color: roles.record, fontWeight: '700' });
+    expect(uiTextFor(roles).title.color).toBe(roles.ink);
+    expect(uiTextToneFor(roles).record).toMatchObject({ color: roles.record, fontWeight: '700' });
   });
 });
 
@@ -48,6 +48,5 @@ describe('changeToneColourIn', () => {
   ] as const)('draws %s in the %s role of the given roles', (tone, role) => {
     const roles = rolesFor(SLATE_DARK);
     expect(changeToneColourIn(roles, tone)).toBe(roles[role]);
-    expect(changeToneColour(tone)).toBe(changeToneColourIn(rolesFor(DEFAULT_APPEARANCE), tone));
   });
 });

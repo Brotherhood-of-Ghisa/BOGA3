@@ -2,7 +2,7 @@ import type { ChangeTone } from '@/components/ui';
 import { formatOneRepMax, formatWholeSetCount } from '@/src/exercise-calculations/format';
 
 // How a change between two periods is said ([[comparison.change-display]]).
-// The tone is its direction, drawn by `changeToneColour`; the text carries the
+// The tone is its direction, drawn by `changeToneColourIn`; the text carries the
 // sign of any change, so the direction reads without the colour. No change is
 // a plain `0`, with no sign.
 export type DeltaDisplay = { text: string; tone: ChangeTone };

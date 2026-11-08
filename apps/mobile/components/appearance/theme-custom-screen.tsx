@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type ColorSchemeName } from 'react-native';
 
 import {
   appearanceRoles,
-  pendingAppearance,
   previewMode,
   readIntendedAppearance,
+  usePhoneScheme,
 } from '@/components/appearance/chosen-theme';
 import { HueRing } from '@/components/appearance/hue-ring';
 import { ThemePreview } from '@/components/appearance/theme-preview';
@@ -34,35 +34,32 @@ const RING_COLOURS = Object.fromEntries(
 const lightnessLabel = (value: number): string => (value === 0 ? 'Black' : value === LIGHTNESS_MAX ? 'White' : `${value}`);
 
 // The custom colours a choice draws, or the ones it would start from.
-function customOf(appearance: AppearanceChoice): CustomColours {
-  return startingCustom(appearance, previewMode(appearance));
+function customOf(appearance: AppearanceChoice, phoneScheme: ColorSchemeName | null): CustomColours {
+  return startingCustom(appearance, previewMode(appearance, phoneScheme));
 }
 
 // Settings → Appearance → Custom → one part (background, primary text,
 // secondary text, accent, best ever, charts): a hue on a ring and a strength, and for the background its
-// lightness and depth, with the theme they make, live, on a small mock. A part
-// saves when the ring or a slider is let go (or a VoiceOver step is made) and
-// applies on the next launch (`theme-launch.ts`), which the page says once it
-// has saved.
+// lightness and depth, with the theme they make, live, on a small mock while
+// a control is held. A part saves when the ring or a slider is let go (or a
+// VoiceOver step is made), and the app repaints in it.
 export function ThemeCustomScreen({ part }: { part: CustomPart }) {
   const { appearance, saveError, commit } = useAppearanceCommit();
-  const [draft, setDraft] = useState<Draft>(() => customOf(appearance)[part]);
-  const [savedHere, setSavedHere] = useState(false);
-  const chosen: AppearanceChoice = { ...appearance, theme: 'custom', custom: { ...customOf(appearance), [part]: draft } };
-  const roles = appearanceRoles(chosen);
-  const saved = appearance.theme === 'custom' && JSON.stringify(appearance.custom?.[part]) === JSON.stringify(draft);
+  const phoneScheme = usePhoneScheme();
+  const [draft, setDraft] = useState<Draft>(() => customOf(appearance, phoneScheme)[part]);
+  const chosen: AppearanceChoice = { ...appearance, theme: 'custom', custom: { ...customOf(appearance, phoneScheme), [part]: draft } };
+  const roles = appearanceRoles(chosen, phoneScheme);
 
   // `next` is the value let go at: the event is the truth, not the last render.
   const save = async (next: Draft) => {
     setDraft(next);
     // The colours the saves on their way will store, so another part's save
     // is not overwritten.
-    const custom = { ...customOf(readIntendedAppearance()), [part]: next };
-    const outcome = await commit(
+    const custom = { ...customOf(readIntendedAppearance(), phoneScheme), [part]: next };
+    await commit(
       { theme: 'custom', custom },
       { message: 'Couldn’t save the colour. Nothing changed.', context: { part, value: next } },
     );
-    if (outcome === 'saved') setSavedHere(true);
   };
   const change = (field: keyof CustomBackground) => (value: number) => setDraft((current) => ({ ...current, [field]: value }));
   const end = (field: keyof CustomBackground) => (value: number) => {
@@ -119,9 +116,6 @@ export function ThemeCustomScreen({ part }: { part: CustomPart }) {
         </FormSection>
         <ThemePreview roles={roles} testID="theme-custom-preview" />
         {saveError ? <Notice icon="warning" live message={saveError} testID="theme-custom-error" tone="danger" /> : null}
-        {savedHere && saved && !saveError && pendingAppearance(appearance).custom[part] ? (
-          <Notice icon="success" live message="Saved · next launch" testID="theme-custom-status" />
-        ) : null}
       </View>
     </Screen>
   );

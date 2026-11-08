@@ -74,7 +74,7 @@ and executable examples, load `docs/specs/08-ux-delivery-standard.md` and
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`); every other page takes the native header (`ux-rules.md` "Pages") |
 | Live theme colours: a stylesheet, a colour prop, the mode | `makeStyles`, `useUiRoles`, `useUiMode` (`theme-context.tsx`), `useUiText` (`text-roles.ts`) |
-| Colour roles, fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiRoles`, `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
+| Fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
 
 ### Gallery and adoption scope
 
@@ -128,7 +128,7 @@ Enforcement scope is above.
 
 Rules the code cannot state for itself:
 
-- A primitive draws on `uiRoles` / `uiFonts` / `uiGeometry` only — never a
+- A primitive draws on `useUiRoles` / `uiFonts` / `uiGeometry` only — never a
   feature module, never a literal. Values: `apps/mobile/components/ui/tokens.ts`;
   the rules that govern them: `design-language.md`.
 - **There is no elevation token and no second palette.** The legacy vocabulary
