@@ -19,13 +19,8 @@ let operations = Promise.resolve();
 let permissionRequested = false;
 let soundUpgradeRequested = false;
 
-// The system dialog is raised here and nowhere else in the rest timer. Under
-// the Maestro harness it is suppressed (notification-prompt-suppression.ts):
-// the timer still schedules, and iOS drops the unauthorized notification.
+// The only place the rest timer raises the system dialog.
 async function requestAlertAndSoundAsync(): Promise<boolean> {
-  if (isNotificationPromptSuppressed()) {
-    return false;
-  }
   const requested = await requestPermissionsAsync({
     ios: {
       allowAlert: true,
@@ -47,6 +42,12 @@ async function ensureNotificationPermissionsAsync(): Promise<boolean> {
       current.granted ||
       current.ios?.status === IosAuthorizationStatus.AUTHORIZED ||
       current.ios?.status === IosAuthorizationStatus.PROVISIONAL;
+    // Under the Maestro harness the dialog is never raised
+    // (notification-prompt-suppression.ts) and the once-only flags stay unset:
+    // the timer still schedules, and iOS drops an unauthorized notification.
+    if (isNotificationPromptSuppressed()) {
+      return isGranted;
+    }
 
     if (Platform.OS === 'ios') {
       if (isGranted && current.ios?.allowsSound !== false) {

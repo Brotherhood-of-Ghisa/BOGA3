@@ -5,9 +5,11 @@ import {
   suppressNotificationPrompt,
   SUPPRESS_NOTIFICATION_PROMPT_KEY,
 } from '@/src/session-recorder/notification-prompt-suppression';
+import { getAppFlavor } from '@/src/utils/app-flavor';
 import { isDevMode } from '@/src/utils/isDevMode';
 
 jest.mock('@/src/utils/isDevMode', () => ({ isDevMode: jest.fn(() => true) }));
+jest.mock('@/src/utils/app-flavor', () => ({ getAppFlavor: jest.fn(() => 'local') }));
 // The real module reads the iOS SettingsManager native module, absent in Jest.
 jest.mock('react-native/Libraries/Settings/Settings', () => ({
   __esModule: true,
@@ -22,6 +24,7 @@ describe('isNotificationPromptSuppressed', () => {
   beforeEach(() => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true });
     jest.mocked(isDevMode).mockReturnValue(true);
+    jest.mocked(getAppFlavor).mockReturnValue('local');
     settingsGet.mockReset();
     settingsSet.mockReset();
   });
@@ -30,19 +33,26 @@ describe('isNotificationPromptSuppressed', () => {
     Object.defineProperty(Platform, 'OS', { value: originalOs, configurable: true });
   });
 
-  it.each([true, 1, '1', 'true', 'YES'])('is on for a dev iOS build whose defaults hold %p', value => {
+  it.each([true, 1])('is on for a local iOS dev client whose defaults hold %p', value => {
     settingsGet.mockReturnValue(value);
     expect(isNotificationPromptSuppressed()).toBe(true);
     expect(settingsGet).toHaveBeenCalledWith(SUPPRESS_NOTIFICATION_PROMPT_KEY);
   });
 
-  it.each([undefined, null, false, 0, 'false', 'NO'])('is off when the key holds %p', value => {
+  it.each([undefined, null, false, 0, 'true', 'YES'])('is off when the key holds %p', value => {
     settingsGet.mockReturnValue(value);
     expect(isNotificationPromptSuppressed()).toBe(false);
   });
 
   it('ignores the key outside developer builds', () => {
     jest.mocked(isDevMode).mockReturnValue(false);
+    settingsGet.mockReturnValue(true);
+    expect(isNotificationPromptSuppressed()).toBe(false);
+    expect(settingsGet).not.toHaveBeenCalled();
+  });
+
+  it('ignores the key on the TestFlight dev build (preview flavor)', () => {
+    jest.mocked(getAppFlavor).mockReturnValue('preview');
     settingsGet.mockReturnValue(true);
     expect(isNotificationPromptSuppressed()).toBe(false);
     expect(settingsGet).not.toHaveBeenCalled();
@@ -70,6 +80,12 @@ describe('isNotificationPromptSuppressed', () => {
 
     it('writes nothing in a release build', () => {
       jest.mocked(isDevMode).mockReturnValue(false);
+      suppressNotificationPrompt();
+      expect(settingsSet).not.toHaveBeenCalled();
+    });
+
+    it('writes nothing on the TestFlight dev build (preview flavor)', () => {
+      jest.mocked(getAppFlavor).mockReturnValue('preview');
       suppressNotificationPrompt();
       expect(settingsSet).not.toHaveBeenCalled();
     });

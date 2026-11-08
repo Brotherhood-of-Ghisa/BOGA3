@@ -171,7 +171,7 @@ the scripts' names:
    iOS cannot pre-grant notifications (`simctl privacy` has no such service), so
    the app never asks under Maestro: the launch seeds the user-defaults key
    `BogaMaestroSuppressNotificationPrompt`, every harness link writes it again
-   (a `clearState` wipes it), and a dev build holding it skips the rest timer's
+   (a `clearState` wipes it), and a local dev client holding it skips the rest timer's
    permission request. No flow taps the dialog away; if it ever shows, the
    next assertion fails.
 5. **iOS password AutoFill preflight.** Auth/profile, sync and groups lanes

@@ -168,43 +168,45 @@ maestro_preauthorize_location() {
 # stays off after a flow's `clearState`.) The keys are expo-dev-menu's own
 # (ios/Modules/DevMenuPreferences.swift), written into the app's preferences
 # plist, where UserDefaults.standard reads them ahead of the registered defaults.
-# The write goes through the simulator's own `defaults` so its cfprefsd records
-# it; a host-side write to the plist is overwritten by cfprefsd's cached copy.
 #
 # Not best-effort: a miss leaves the sheet over every screen, so the flow's first
 # assertion would fail far from the cause. Fail here instead.
 maestro_seed_dev_menu_preferences() {
-  local udid="$1"
-  local bundle_id="$2"
-  local container plist
-
-  container="$(xcrun simctl get_app_container "$udid" "$bundle_id" data 2>/dev/null)" \
-    || maestro_fail "Unable to resolve the $bundle_id data container on $udid to seed dev-menu preferences."
-  plist="$container/Library/Preferences/$bundle_id.plist"
-  xcrun simctl spawn "$udid" defaults write "$plist" EXDevMenuIsOnboardingFinished -bool true \
-    && xcrun simctl spawn "$udid" defaults write "$plist" EXDevMenuShowsAtLaunch -bool false \
-    || maestro_fail "Unable to seed dev-menu preferences in $plist."
-  echo "[maestro] seeded dev-menu preferences (onboarding finished, no launch menu) for $bundle_id"
+  maestro_write_app_defaults "$1" "$2" "seed dev-menu preferences" \
+    EXDevMenuIsOnboardingFinished -bool true \
+    EXDevMenuShowsAtLaunch -bool false
+  echo "[maestro] seeded dev-menu preferences (onboarding finished, no launch menu) for $2"
 }
 
 # Stop the app raising iOS's "Would Like to Send You Notifications" dialog. The
-# rest timer asks the first time it starts, and the dialog lands seconds after
-# the tap, over whatever a flow asserts next; `simctl privacy` has no
-# notification service to pre-answer it. The dev build skips the request while
-# this user-defaults key is set (src/session-recorder/notification-prompt-suppression.ts),
-# so the dialog never exists. A flow's `clearState` wipes the seed; the harness
-# link writes the key back. Not best-effort: a miss brings the race back.
+# rest timer asks the first time it starts, and the dialog lands up to many
+# seconds after the tap, over whatever a flow asserts next; `simctl privacy`
+# has no notification service to pre-answer it. A local dev client skips the
+# request while this key is set (src/session-recorder/notification-prompt-suppression.ts),
+# so the dialog never exists. A flow's `clearState` wipes the seed; the next
+# harness link writes the key back. Not best-effort: a miss brings the race back.
 maestro_seed_notification_prompt_suppression() {
-  local udid="$1"
-  local bundle_id="$2"
+  maestro_write_app_defaults "$1" "$2" "suppress the notification prompt" \
+    BogaMaestroSuppressNotificationPrompt -bool true
+  echo "[maestro] seeded notification-prompt suppression for $2"
+}
+
+# Write <key> <type> <value> triples into an app's own preferences plist. The
+# write goes through the simulator's `defaults` so its cfprefsd records it; a
+# host-side write to the plist is overwritten by cfprefsd's cached copy.
+maestro_write_app_defaults() {
+  local udid="$1" bundle_id="$2" purpose="$3"
   local container plist
+  shift 3
 
   container="$(xcrun simctl get_app_container "$udid" "$bundle_id" data 2>/dev/null)" \
-    || maestro_fail "Unable to resolve the $bundle_id data container on $udid to suppress the notification prompt."
+    || maestro_fail "Unable to resolve the $bundle_id data container on $udid to $purpose."
   plist="$container/Library/Preferences/$bundle_id.plist"
-  xcrun simctl spawn "$udid" defaults write "$plist" BogaMaestroSuppressNotificationPrompt -bool true \
-    || maestro_fail "Unable to seed BogaMaestroSuppressNotificationPrompt in $plist."
-  echo "[maestro] seeded notification-prompt suppression for $bundle_id"
+  while (( $# >= 3 )); do
+    xcrun simctl spawn "$udid" defaults write "$plist" "$1" "$2" "$3" \
+      || maestro_fail "Unable to write $1 in $plist (to $purpose)."
+    shift 3
+  done
 }
 
 maestro_dev_client_bundle_id() {

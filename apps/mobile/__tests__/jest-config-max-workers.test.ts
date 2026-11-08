@@ -24,4 +24,8 @@ describe('jest.config maxWorkers', () => {
   it.each(['3', '25%'])('passes %s through as maxWorkers', value => {
     expect(loadConfig(value)).toHaveProperty('maxWorkers', value);
   });
+
+  it.each(['three', '0', '-2', '3.5'])('rejects %s instead of passing it to Jest', value => {
+    expect(() => loadConfig(value)).toThrow('BOGA_JEST_MAX_WORKERS must be a worker count or a percentage');
+  });
 });

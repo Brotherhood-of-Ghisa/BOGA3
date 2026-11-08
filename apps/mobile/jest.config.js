@@ -6,6 +6,9 @@ process.env.TZ = 'Europe/London';
 // cores - 1 workers per run, so parallel worktrees oversubscribe the CPU and
 // unrelated suites hit their timeouts. Unset, Jest keeps its default.
 const maxWorkers = process.env.BOGA_JEST_MAX_WORKERS?.trim() || undefined;
+if (maxWorkers && !/^[1-9]\d*%?$/.test(maxWorkers)) {
+  throw new Error(`BOGA_JEST_MAX_WORKERS must be a worker count or a percentage, got "${maxWorkers}".`);
+}
 
 module.exports = {
   preset: 'jest-expo',

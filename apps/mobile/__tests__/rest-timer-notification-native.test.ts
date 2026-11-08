@@ -106,6 +106,27 @@ describe('rest-timer-notification-native adapter', () => {
     }
   });
 
+  it('asks once the suppression is lifted, because a suppressed run never consumed the request', async () => {
+    const undetermined = {
+      granted: false,
+      canAskAgain: true,
+      status: 'undetermined',
+      expires: 'never',
+      ios: { status: Notifications.IosAuthorizationStatus.NOT_DETERMINED },
+    } as unknown as Notifications.NotificationPermissionsStatus;
+    jest.mocked(Notifications.getPermissionsAsync).mockResolvedValue(undetermined);
+
+    jest.mocked(isNotificationPromptSuppressed).mockReturnValue(true);
+    scheduleRestTimerNotification(Date.now() + 60_000);
+    await flushRestTimerNotificationQueueForTests();
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+
+    jest.mocked(isNotificationPromptSuppressed).mockReturnValue(false);
+    scheduleRestTimerNotification(Date.now() + 60_000);
+    await flushRestTimerNotificationQueueForTests();
+    expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+  });
+
   it('does not request permissions again if already granted', async () => {
     scheduleRestTimerNotification(Date.now() + 60_000);
     await flushRestTimerNotificationQueueForTests();
