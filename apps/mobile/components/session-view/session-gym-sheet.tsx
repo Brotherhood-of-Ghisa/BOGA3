@@ -1,10 +1,9 @@
-import { ScrollView, Text, useWindowDimensions } from 'react-native';
+import { ScrollView, StyleSheet, Text, useWindowDimensions } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
-import { makeStyles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
 import { SessionGpsPanel, type SessionGpsPanelProps } from './session-gps-panel';
 import type { SessionGymOption } from '@/src/session-recorder/gym-options';
@@ -42,7 +41,6 @@ export function SessionGymSheet({
   gpsPanel,
 }: SessionGymSheetProps) {
   const { height } = useWindowDimensions();
-  const styles = useStyles();
   const text = useUiText();
   const tone = useUiTextTone();
   // Suggesting the gym the session already has would say nothing; its
@@ -103,9 +101,9 @@ export function SessionGymSheet({
   );
 }
 
-const useStyles = makeStyles(() => ({
+const styles = StyleSheet.create({
   message: {
     paddingHorizontal: uiSpace.lg,
     paddingVertical: uiSpace.md,
   },
-}));
+});

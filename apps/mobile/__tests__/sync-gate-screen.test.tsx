@@ -75,6 +75,9 @@ import { renderWithTheme, rolesFor } from './helpers/theme';
 
 const defaultRoles = rolesFor(DEFAULT_APPEARANCE);
 
+// The type fields of a text role; its colour comes from the roles under test, never the launch constant.
+const typographyOf = ({ color: _color, ...typography }: { color?: unknown } & Record<string, unknown>) => typography;
+
 type AuthValue = {
   isConfigured: boolean;
   session: unknown;
@@ -231,10 +234,13 @@ describe('SyncSetupScreen', () => {
     publish({ lastCycleErrorCode: 'INTERNAL', lastCycleErrorDetail: 'boom' });
 
     expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorMessage).props.style)).toMatchObject({
-      ...uiText.bodyStrong,
+      ...typographyOf(uiText.bodyStrong),
       color: defaultRoles.danger,
     });
-    expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorDetail).props.style)).toMatchObject(uiText.figureSmall);
+    expect(StyleSheet.flatten(screen.getByTestId(SYNC_GATE_TEST_IDS.errorDetail).props.style)).toMatchObject({
+      ...typographyOf(uiText.figureSmall),
+      color: defaultRoles.inkMuted,
+    });
   });
 
   it('says what failed: the error code and the sanitized detail under the message', () => {
