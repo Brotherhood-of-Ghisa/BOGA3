@@ -1,9 +1,10 @@
 import type { ComponentRef } from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon, type IconName } from '@/components/ui/icon';
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace, type UiRoleToken } from '@/components/ui/tokens';
 
 export type SegmentedControlOption<TValue extends string | number> = {
   value: TValue;
@@ -69,6 +70,10 @@ export function SegmentedControl<TValue extends string | number>({
   disabled = false,
   style,
 }: SegmentedControlProps<TValue>) {
+  const styles = useStyles();
+  const textRoles = useUiText();
+  const selectedStyles = { ink: styles.segmentSelected, selection: styles.segmentSelectedFilter };
+  const selectedLabelStyles = { ink: styles.labelOnInk, selection: styles.labelOnSelection };
   const fill = layout === 'fill';
   const fit = layout === 'fit';
   const compact = density === 'compact';
@@ -106,7 +111,7 @@ export function SegmentedControl<TValue extends string | number>({
             testID={`${testIDPrefix}-${option.value}`}>
             {option.icon ? (
               <Icon
-                color={labelColor(selected, disabled, selectedGround)}
+                colorRole={labelRole(selected, disabled, selectedGround)}
                 name={option.icon}
                 size="sm"
               />
@@ -114,7 +119,7 @@ export function SegmentedControl<TValue extends string | number>({
               <Text
                 allowFontScaling={false}
                 numberOfLines={1}
-                style={[uiText.label, selected ? selectedLabelStyles[selectedGround] : null,
+                style={[textRoles.label, selected ? selectedLabelStyles[selectedGround] : null,
                   disabled && !selected ? styles.labelDisabled : null]}>
                 {option.label}
               </Text>
@@ -126,12 +131,12 @@ export function SegmentedControl<TValue extends string | number>({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   control: {
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.control,
   },
   controlFill: {
@@ -141,7 +146,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
   },
   segmentCompact: {
     paddingHorizontal: uiSpace.sm,
@@ -156,33 +161,31 @@ const styles = StyleSheet.create({
   },
   segmentDivider: {
     borderLeftWidth: uiBorder.width,
-    borderLeftColor: uiRoles.rule,
+    borderLeftColor: roles.rule,
   },
   segmentSelected: {
-    backgroundColor: uiRoles.ink,
+    backgroundColor: roles.ink,
   },
   segmentSelectedFilter: {
-    backgroundColor: uiRoles.selection,
+    backgroundColor: roles.selection,
   },
   segmentSelectedDisabled: {
-    backgroundColor: uiRoles.inkGhost,
+    backgroundColor: roles.inkGhost,
   },
   labelOnInk: {
-    color: uiRoles.onInk,
+    color: roles.onInk,
   },
   labelOnSelection: {
-    color: uiRoles.onSelection,
+    color: roles.onSelection,
   },
   labelDisabled: {
-    color: uiRoles.inkGhost,
+    color: roles.inkGhost,
   },
-});
+}));
 
-const selectedStyles = { ink: styles.segmentSelected, selection: styles.segmentSelectedFilter };
-const selectedLabelStyles = { ink: styles.labelOnInk, selection: styles.labelOnSelection };
-const ON_SELECTED_GROUND = { ink: uiRoles.onInk, selection: uiRoles.onSelection };
+const ON_SELECTED_GROUND: Record<'ink' | 'selection', UiRoleToken> = { ink: 'onInk', selection: 'onSelection' };
 
 // An icon segment takes the label's colour, so the selected and disabled
 // states read the same whichever a segment draws.
-const labelColor = (selected: boolean, disabled: boolean, ground: 'ink' | 'selection'): string =>
-  selected ? ON_SELECTED_GROUND[ground] : disabled ? uiRoles.inkGhost : uiRoles.inkMuted;
+const labelRole = (selected: boolean, disabled: boolean, ground: 'ink' | 'selection'): UiRoleToken =>
+  selected ? ON_SELECTED_GROUND[ground] : disabled ? 'inkGhost' : 'inkMuted';

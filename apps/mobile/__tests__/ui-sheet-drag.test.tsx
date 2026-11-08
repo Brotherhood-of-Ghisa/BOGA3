@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Native mechanism mock factories. */
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { Dimensions, Modal, Platform, Pressable, ScrollView, Text } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
 import { Information } from '@/components/ui/information';
 import { Sheet } from '@/components/ui/sheet';
 import { shouldDismissSheet, type SheetDrag } from '@/components/ui/sheet-gesture';
+
+import { renderWithTheme as render } from './helpers/theme';
 
 type Animation = { value: number; config: { duration: number; reduceMotion: string } };
 let mockAnimations: Animation[] = [];

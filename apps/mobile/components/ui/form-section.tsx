@@ -1,12 +1,13 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextFor, useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 // The form grammar (`ux-rules.md` "Forms"): every field of an edit page sits in
 // a `FormSection` — a micro-label naming the group over one card of rows — and
@@ -29,15 +30,18 @@ export type FormSectionProps = {
 };
 
 export function FormSection({ title, titleAccessory, children, error, errorTestID, footnote, testID }: FormSectionProps) {
+  const styles = useStyles();
+  const textRoles = useUiText();
+  const textTones = useUiTextTone();
   const heading = title ? (
-    <Text allowFontScaling={false} accessibilityRole="header" style={uiText.label}>{title}</Text>
+    <Text allowFontScaling={false} accessibilityRole="header" style={textRoles.label}>{title}</Text>
   ) : null;
   return (
     <View style={styles.section} testID={testID}>
       {title && titleAccessory ? <View style={styles.heading}>{heading}{titleAccessory}</View> : heading}
       <Card style={error ? styles.cardInvalid : null}>{children}</Card>
       {footnote ? (
-        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.muted]} testID={testID ? `${testID}-footnote` : undefined}>
+        <Text allowFontScaling={false} style={[textRoles.meta, textTones.muted]} testID={testID ? `${testID}-footnote` : undefined}>
           {footnote}
         </Text>
       ) : null}
@@ -48,6 +52,7 @@ export function FormSection({ title, titleAccessory, children, error, errorTestI
 
 /** A field's or section's validation message, the one way forms show one. */
 export function FormError({ message, testID }: { message?: string | null; testID?: string }) {
+  const styles = useStyles();
   return message ? (
     <Text allowFontScaling={false} accessibilityLiveRegion="polite" selectable style={styles.error} testID={testID}>
       {message}
@@ -72,6 +77,9 @@ export type ChoiceRowProps = {
 
 /** A field whose value is chosen elsewhere (a picker sheet, a page): label, value, chevron. */
 export function ChoiceRow({ label, value, placeholder, icon, onPress, divider = false, disabled, accessibilityLabel, testID, ref }: ChoiceRowProps) {
+  const styles = useStyles();
+  const textRoles = useUiText();
+  const textTones = useUiTextTone();
   const shown = value && value.length > 0 ? value : null;
   return (
     <ListRow
@@ -81,18 +89,18 @@ export function ChoiceRow({ label, value, placeholder, icon, onPress, divider = 
       disabled={disabled}
       divider={divider}
       label={label}
-      leading={icon ? <Icon color={disabled ? uiRoles.inkGhost : uiRoles.inkMuted} name={icon} size="md" /> : undefined}
+      leading={icon ? <Icon colorRole={disabled ? 'inkGhost' : 'inkMuted'} name={icon} size="md" /> : undefined}
       meta={
         <Text
           allowFontScaling={false}
           numberOfLines={1}
-          style={[uiText.body, shown ? uiTextTone.muted : uiTextTone.faint, styles.value]}>
+          style={[textRoles.body, shown ? textTones.muted : textTones.faint, styles.value]}>
           <FigureText>{shown ?? placeholder ?? ''}</FigureText>
         </Text>
       }
       onPress={onPress}
       testID={testID}
-      trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
+      trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
     />
   );
 }
@@ -118,6 +126,9 @@ export function InputRow({
   label, value, onChangeText, onEndEditing, placeholder, keyboardType = 'number-pad', editable = true, invalid = false,
   divider = false, accessibilityLabel, testID,
 }: InputRowProps) {
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const textRoles = useUiText();
   return (
     <ListRow
       density="list"
@@ -131,9 +142,9 @@ export function InputRow({
           onChangeText={onChangeText}
           onEndEditing={onEndEditing}
           placeholder={placeholder}
-          placeholderTextColor={uiRoles.inkGhost}
+          placeholderTextColor={roles.inkGhost}
           selectTextOnFocus
-          style={[uiText.input, uiText.inlineFigure, styles.input, invalid ? styles.inputInvalid : null]}
+          style={[textRoles.input, textRoles.inlineFigure, styles.input, invalid ? styles.inputInvalid : null]}
           testID={testID}
           value={value}
           allowFontScaling={false}
@@ -161,35 +172,38 @@ export type ActionRowProps = {
 
 /** A form's action row: the kind says whether it leaves (chevron), acts now, or destroys. */
 export function ActionRow({ label, kind = 'navigate', icon, onPress, divider = false, disabled, accessibilityLabel, testID }: ActionRowProps) {
-  const colour = disabled ? uiRoles.inkGhost : kind === 'danger' ? uiRoles.danger : uiRoles.accent;
+  const roles = useUiRoles();
+  const textRoles = useUiText();
+  const colourRole = disabled ? 'inkGhost' : kind === 'danger' ? 'danger' : 'accent';
+  const colour = roles[colourRole];
   return (
     <ListRow
       accessibilityLabel={accessibilityLabel ?? label}
       density="list"
       disabled={disabled}
       divider={divider}
-      leading={icon ? <Icon color={colour} name={icon} size="md" /> : undefined}
+      leading={icon ? <Icon colorRole={colourRole} name={icon} size="md" /> : undefined}
       onPress={onPress}
       testID={testID}
-      trailing={kind === 'navigate' ? <Icon color={colour} name="chevron-right" size="sm" /> : undefined}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.option, { color: colour }]}>
+      trailing={kind === 'navigate' ? <Icon colorRole={colourRole} name="chevron-right" size="sm" /> : undefined}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[textRoles.option, { color: colour }]}>
         {label}
       </Text>
     </ListRow>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   heading: { flexDirection: 'row', alignItems: 'center' },
   section: {
     gap: uiSpace.sm,
   },
   cardInvalid: {
-    borderColor: uiRoles.danger,
+    borderColor: roles.danger,
   },
   error: {
-    ...uiText.meta,
-    color: uiRoles.danger,
+    ...uiTextFor(roles).meta,
+    color: roles.danger,
   },
   value: {
     flexShrink: 1,
@@ -203,11 +217,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.sm,
     paddingVertical: 0,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.control,
     textAlign: 'right',
   },
   inputInvalid: {
-    borderColor: uiRoles.danger,
+    borderColor: roles.danger,
   },
-});
+}));

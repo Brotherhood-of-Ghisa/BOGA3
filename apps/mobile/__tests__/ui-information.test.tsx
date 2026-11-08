@@ -1,7 +1,12 @@
-import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { fireEvent, screen, within } from '@testing-library/react-native';
 import { Modal, ScrollView, StyleSheet, Text } from 'react-native';
 
-import { Icon, IconButton, Information, uiFonts, uiGeometry, uiIconSize, uiRoles, uiSpace } from '@/components/ui';
+import { Icon, IconButton, Information, uiFonts, uiGeometry, uiIconSize, uiSpace } from '@/components/ui';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
+import { renderWithTheme as render, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 it('offers a labelled 44pt target and keeps the 16pt glyph 4pt from an adjacent heading', () => {
   render(<Information label="Example" title="About Example" body="Lorem ipsum." testIDPrefix="example" />);
@@ -22,9 +27,9 @@ it.each(['backdrop', 'escape', 'back'])('reads arbitrary help and dismisses thro
   fireEvent.press(screen.getByTestId('example-info'));
   const panel = screen.getByTestId('example-help');
   const help = within(panel);
-  expect(panel).toHaveStyle({ backgroundColor: uiRoles.surface });
-  expect(help.getByRole('header', { name: 'About Example' })).toHaveStyle({ fontFamily: uiFonts.display.family, color: uiRoles.ink });
-  expect(help.getByText('Lorem ipsum.')).toHaveStyle({ fontFamily: uiFonts.body.family, color: uiRoles.inkMuted });
+  expect(panel).toHaveStyle({ backgroundColor: roles.surface });
+  expect(help.getByRole('header', { name: 'About Example' })).toHaveStyle({ fontFamily: uiFonts.display.family, color: roles.ink });
+  expect(help.getByText('Lorem ipsum.')).toHaveStyle({ fontFamily: uiFonts.body.family, color: roles.inkMuted });
   expect(help.getByRole('header', { name: 'Last section' })).toBeTruthy();
   expect(help.getByText('Consectetur adipiscing elit.')).toBeTruthy();
   expect(StyleSheet.flatten(screen.UNSAFE_getByType(ScrollView).props.style)).toMatchObject({ flexShrink: 1 });
