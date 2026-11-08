@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable } from 'react-native';
 import { Touchable } from 'react-native-gesture-handler';
 
 import { Icon, type IconName } from '@/components/ui/icon';
-import { uiGeometry, uiRoles, type UiIconSizeToken } from '@/components/ui/tokens';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiGeometry, type UiIconSizeToken, type UiRoleToken } from '@/components/ui/tokens';
 
 // `default`: an `ink` glyph (back, ⋮ in a top bar). `muted`: an `ink-muted`
 // glyph for a control inside a card. `danger`: a destructive control.
@@ -25,11 +26,11 @@ export type IconButtonProps = {
   nativeHeader?: boolean;
 };
 
-const GLYPH_COLOR: Record<IconButtonTone, string> = {
-  default: uiRoles.ink,
-  muted: uiRoles.inkMuted,
-  danger: uiRoles.danger,
-  accent: uiRoles.onAccent,
+const GLYPH_ROLE: Record<IconButtonTone, UiRoleToken> = {
+  default: 'ink',
+  muted: 'inkMuted',
+  danger: 'danger',
+  accent: 'onAccent',
 };
 
 // A 44pt icon-only control (`design-language.md` §4): every top bar's back and
@@ -47,13 +48,15 @@ export function IconButton({
   testID,
   nativeHeader = false,
 }: IconButtonProps) {
-  const glyph = <Icon color={disabled && tone !== 'accent' ? uiRoles.inkGhost : GLYPH_COLOR[tone]} name={name} size={size} />;
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const glyph = <Icon colorRole={disabled && tone !== 'accent' ? 'inkGhost' : GLYPH_ROLE[tone]} name={name} size={size} />;
   if (nativeHeader) return (
     <Touchable
       accessible accessibilityHint={accessibilityHint} accessibilityLabel={accessibilityLabel} accessibilityRole="button"
       accessibilityState={disabled ? { disabled } : undefined} disabled={disabled} hitSlop={hitSlop} onPress={onPress}
       activeOpacity={tone === 'accent' ? 0.85 : 0.7} activeUnderlayOpacity={tone === 'accent' ? 0 : 1}
-      underlayColor={uiRoles.paper}
+      underlayColor={roles.paper}
       style={[styles.control, tone === 'accent' ? (disabled ? styles.accentDisabled : styles.accent) : null]}
       testID={testID}>
       {glyph}
@@ -79,7 +82,7 @@ export function IconButton({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   control: {
     width: uiGeometry.tapTarget,
     height: uiGeometry.tapTarget,
@@ -88,17 +91,17 @@ const styles = StyleSheet.create({
     borderRadius: uiGeometry.radius.control,
   },
   accent: {
-    backgroundColor: uiRoles.accent,
+    backgroundColor: roles.accent,
   },
   accentDisabled: {
-    backgroundColor: uiRoles.inkGhost,
+    backgroundColor: roles.inkGhost,
   },
   accentPressed: {
     opacity: 0.85,
   },
   // Depth is a ground change, never an elevation.
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
     opacity: 0.7,
   },
-});
+}));

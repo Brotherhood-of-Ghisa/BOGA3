@@ -3,7 +3,6 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  StyleSheet,
   Text,
   View,
   useWindowDimensions,
@@ -13,8 +12,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconButton } from '@/components/ui/icon-button';
-import { uiText } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type PageSheetHeaderProps = {
   title: string;
@@ -56,6 +56,8 @@ export function PageSheetHeader({
   titleTestID,
   closeTestID,
 }: PageSheetHeaderProps) {
+  const styles = useStyles();
+  const textRoles = useUiText();
   return (
     <>
       {/* The page sheet's own grabber: swiping down closes it. */}
@@ -66,7 +68,7 @@ export function PageSheetHeader({
         {leading}
         <View style={styles.titleBlock}>
           {eyebrow ? (
-            <Text allowFontScaling={false} style={uiText.label}>
+            <Text allowFontScaling={false} style={textRoles.label}>
               {eyebrow}
             </Text>
           ) : null}
@@ -75,7 +77,7 @@ export function PageSheetHeader({
             allowFontScaling={false}
             accessibilityRole="header"
             numberOfLines={2}
-            style={uiText.sheetTitle}
+            style={textRoles.sheetTitle}
             testID={titleTestID}>
             {title}
           </Text>
@@ -141,6 +143,7 @@ export function PageSheet({
   children,
   testID,
 }: PageSheetProps) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   // The sheet sits below the top of the window, but `KeyboardAvoidingView`
@@ -234,13 +237,13 @@ export function PageSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   root: {
     flex: 1,
   },
   sheet: {
     flex: 1,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
   },
   body: {
     flex: 1,
@@ -254,7 +257,7 @@ const styles = StyleSheet.create({
     width: uiGeometry.sheetHandle.width,
     height: uiGeometry.sheetHandle.height,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.rule,
+    backgroundColor: roles.rule,
   },
   // As the Sheet's title row: the controls bring their own 44pt targets.
   header: {
@@ -271,4 +274,4 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: uiSpace.xs,
   },
-});
+}));

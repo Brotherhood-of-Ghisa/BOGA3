@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { uiSpace } from '@/components/ui/tokens';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 
 type CompactCardProps = ComponentProps<typeof Card> & { style?: never };
 
@@ -30,14 +30,16 @@ type CompactHeaderProps = {
 /** The same wrapping label/date header also fits an existing embedded container. */
 export function CompactHeader({ label, metadata, metadataPlacement = 'trailing', metadataAccessibilityLabel, tone = 'ink', icon,
   accessibilityRole, testID, labelTestID, metadataTestID }: CompactHeaderProps) {
+  const textRoles = useUiText();
+  const textTones = useUiTextTone();
   return <View style={[styles.header, metadataPlacement === 'inline' ? styles.inlineHeader : null]} testID={testID}>
     <View style={styles.label} testID={testID ? `${testID}-label-row` : undefined}>
       <Text accessibilityRole={accessibilityRole} allowFontScaling={false}
-        style={[uiText.label, uiTextTone[tone], styles.labelText]} testID={labelTestID}>{label}</Text>
+        style={[textRoles.label, textTones[tone], styles.labelText]} testID={labelTestID}>{label}</Text>
       {icon ? <Icon name={icon} size="xs" /> : null}
     </View>
     {metadata ? <Text accessibilityLabel={metadataAccessibilityLabel} allowFontScaling={false}
-      style={[uiText.meta, styles.metadata, metadataPlacement === 'inline' ? styles.inlineMetadata : null]} testID={metadataTestID}>
+      style={[textRoles.meta, styles.metadata, metadataPlacement === 'inline' ? styles.inlineMetadata : null]} testID={metadataTestID}>
       <FigureText>{metadata}</FigureText>
     </Text> : null}
   </View>;

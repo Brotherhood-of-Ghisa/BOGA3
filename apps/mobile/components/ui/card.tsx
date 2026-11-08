@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import {
   Pressable,
-  StyleSheet,
   View,
   type AccessibilityActionEvent,
   type AccessibilityActionInfo,
@@ -9,7 +8,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { uiBorder, uiGeometry, uiRoles } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry } from '@/components/ui/tokens';
 
 type CardBaseProps = {
   children: ReactNode;
@@ -35,6 +35,7 @@ type CardProps = CardBaseProps &
 // `rule`, no shadow. It clips its content so a band or divider meets the
 // rounded corners, and carries no padding — the content owns its insets.
 export function Card({ children, style, testID, onPress, accessibilityLabel, accessibilityActions, onAccessibilityAction }: CardProps) {
+  const styles = useStyles();
   if (!onPress) {
     return (
       <View accessibilityLabel={accessibilityLabel} style={[styles.card, style]} testID={testID}>
@@ -57,16 +58,16 @@ export function Card({ children, style, testID, onPress, accessibilityLabel, acc
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   card: {
     overflow: 'hidden',
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.card,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
   },
   // Depth is a ground change, never an elevation.
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
-});
+}));

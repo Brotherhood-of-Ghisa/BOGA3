@@ -4,12 +4,17 @@
  * callback, and exposes the right accessibility role and state.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import { StyleSheet, Text } from 'react-native';
 
-import { CheckRow, FormSection, RadioRow, SegmentRow, ValueRow, uiRoles } from '@/components/ui';
+import { CheckRow, FormSection, RadioRow, SegmentRow, ValueRow } from '@/components/ui';
 
 import { drawsGlyph } from './helpers/draws-glyph';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
+import { renderWithTheme as render, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const VIEWS = [
   { value: 'list', label: 'List' },
@@ -107,7 +112,7 @@ describe('ValueRow', () => {
 
   it('draws a failure value in danger words, wrapping a sentence', () => {
     render(<ValueRow label="Error" tone="danger" value="server unreachable, 3 tries" valueTestID="error" />);
-    expect(StyleSheet.flatten(screen.getByTestId('error').props.style).color).toBe(uiRoles.danger);
+    expect(StyleSheet.flatten(screen.getByTestId('error').props.style).color).toBe(roles.danger);
     expect(screen.getByTestId('error')).not.toHaveProp('numberOfLines');
   });
 

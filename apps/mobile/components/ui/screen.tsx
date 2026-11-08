@@ -1,7 +1,6 @@
 import type { ReactNode, Ref } from 'react';
 import {
   ScrollView,
-  StyleSheet,
   View,
   type ScrollViewProps,
   type ScrollViewInstance,
@@ -9,7 +8,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiSpace } from '@/components/ui/tokens';
 
 type ScreenProps = {
   children: ReactNode;
@@ -19,6 +19,7 @@ type ScreenProps = {
 
 // A screen's ground: `paper`, filling the route (`design-language.md` §2, §4).
 export function Screen({ children, style, testID }: ScreenProps) {
+  const styles = useStyles();
   return (
     <View style={[styles.screen, style]} testID={testID}>
       {children}
@@ -42,6 +43,7 @@ type ScreenScrollProps = Omit<ScrollViewProps, 'style' | 'contentContainerStyle'
 // route's root): the page gutter around its content, and the `md` gap between
 // cards. Other `ScrollView` props (refresh, keyboard insets) pass through.
 export function ScreenScroll({ children, gutter = 'lg', contentContainerStyle, ...scrollProps }: ScreenScrollProps) {
+  const styles = useStyles();
   return (
     <ScrollView
       {...scrollProps}
@@ -52,16 +54,16 @@ export function ScreenScroll({ children, gutter = 'lg', contentContainerStyle, .
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   screen: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   scroll: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   content: {
     gap: uiSpace.md,
   },
-});
+}));

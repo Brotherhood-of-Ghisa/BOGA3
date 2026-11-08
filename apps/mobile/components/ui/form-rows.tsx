@@ -5,8 +5,8 @@ import { FigureText } from '@/components/ui/figure-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 
 // The rest of the Settings row vocabulary (`ux-rules.md` "Forms"), beside the
 // rows of `form-section.tsx`: all at `ListRow`'s list density, label left,
@@ -69,7 +69,7 @@ export function RadioRow({ label, checked, meta, onPress, divider = false, disab
       disabled={disabled}
       divider={divider}
       label={label}
-      leading={<Icon color={disabled ? uiRoles.inkGhost : uiRoles.ink} name={checked ? 'radio-on' : 'radio-off'} />}
+      leading={<Icon colorRole={disabled ? 'inkGhost' : 'ink'} name={checked ? 'radio-on' : 'radio-off'} />}
       meta={meta}
       onPress={onPress}
       testID={testID}
@@ -92,7 +92,7 @@ export function CheckRow({ label, checked, onPress, divider = false, disabled, a
       label={label}
       onPress={onPress}
       testID={testID}
-      trailing={checked ? <Icon color={disabled ? uiRoles.inkGhost : uiRoles.accent} name="check" size="md" /> : null}
+      trailing={checked ? <Icon colorRole={disabled ? 'inkGhost' : 'accent'} name="check" size="md" /> : null}
     />
   );
 }
@@ -117,6 +117,8 @@ export type ValueRowProps = {
 export function ValueRow({
   label, value, valueIcon, valueTestID, valueIconTestID, tone = 'default', divider = false, accessibilityLabel, testID,
 }: ValueRowProps) {
+  const textRoles = useUiText();
+  const textTones = useUiTextTone();
   return (
     <ListRow
       accessibilityLabel={accessibilityLabel ?? `${label}: ${value}`}
@@ -126,11 +128,11 @@ export function ValueRow({
       label={label}
       meta={
         <View style={styles.valueGroup}>
-          {valueIcon ? <Icon color={uiRoles.inkMuted} name={valueIcon} size="sm" testID={valueIconTestID} /> : null}
+          {valueIcon ? <Icon colorRole="inkMuted" name={valueIcon} size="sm" testID={valueIconTestID} /> : null}
           <Text
             allowFontScaling={false}
             accessibilityLiveRegion={tone === 'danger' ? 'polite' : undefined}
-            style={[uiText.body, tone === 'danger' ? uiTextTone.danger : uiTextTone.muted, styles.value]}
+            style={[textRoles.body, tone === 'danger' ? textTones.danger : textTones.muted, styles.value]}
             testID={valueTestID}>
             <FigureText>{value}</FigureText>
           </Text>

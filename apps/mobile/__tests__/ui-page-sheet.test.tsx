@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import { Dimensions, KeyboardAvoidingView, Modal, Platform, Text } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
 import { PageSheet } from '@/components/ui/page-sheet';
+
+import { renderWithTheme as render } from './helpers/theme';
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 47, bottom: 34, left: 0, right: 0 }),
