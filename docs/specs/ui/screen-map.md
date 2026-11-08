@@ -65,7 +65,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 | `/connected-agents` | Signed-in review and revocation of OAuth grants, plus the per-coach **Allow this coach to make changes** permission (default off) | `connected-agents.tsx` |
 | `/theme-custom?part=` | One custom part: hue, strength (background: lightness, depth); preview; saves on release | `theme-custom.tsx`, `components/appearance/` |
 | `/body-weight` | Settings → Bodyweight: the `Bodyweight calculations` On/Off, then private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
-| `/settings-appearance`, `/settings-notifications` | Appearance: preview; Theme radio rows (Custom folds presets), then Mode or the Custom part rows (open pickers); `Applies next launch`. Notifications: one switch (state as description) or `Open iOS Settings` / `Sign in`; Categories while on; one Notice with Retry | `settings-*.tsx`, `components/appearance/`, `components/notifications/` |
+| `/settings-appearance`, `/settings-notifications` | Appearance: preview; Theme radio rows (Custom folds presets), then Mode or the Custom part rows (open pickers); a choice repaints the app at once. Notifications: one switch (state as description) or `Open iOS Settings` / `Sign in`; Categories while on; one Notice with Retry | `settings-*.tsx`, `components/appearance/`, `components/notifications/` |
 | `/settings-rest-timer`, `/settings-progress`, `/settings-effort`, `/settings-data-sync`, `/settings-review-changes`, `/settings-everything-else` | Settings' sub pages: rest timer; Progress (Opens on, Display, Periods, Counting); Effort (Display, Working set, Volume checks); Data & sync (Sync status, Backups) and its Review changes; Everything else: Display (date format), Records (gym filter), Experiments (title-bar timer), Developer (mode; dev-only tools) | `settings-*.tsx`, `components/settings/` |
 | `/settings-muscles`, `/settings-muscle-targets`, `/settings-enabled-muscles` | Muscles' Weekly targets and Muscle breakdown sections link to full target/enablement pages; a blank target shows and uses the default ([[muscle.weekly-targets]], [[muscle.report-groups]]). Native Back; loading, retryable errors, empty targets | `settings-*.tsx`, `components/preferences/muscle-settings.tsx` |
 | `/gyms` | Manage the gyms a session can be at, and their private locations | `gyms.tsx`, `components/gyms/` |
@@ -161,8 +161,8 @@ the tab bar (`TabOwnedPage`), owned by More.
   database rebuild preserves them. Preference-storage failures surface in one
   place — Settings' Data & sync `Error` row, retried by its `Refresh` — so no
   preference control or exercise browser grows its own error box.
-- Settings home's Appearance row reads the accent, `, tinted` with a
-  background or text, else `from next launch` while pending.
+- Settings home's Appearance row names the theme, and a preset's mode when it
+  is not light.
 - The body weight log is reachable from Settings' Bodyweight card regardless
   of the bodyweight-calculation preference, and no session, detail or logger surface shows or links to a
   reading.

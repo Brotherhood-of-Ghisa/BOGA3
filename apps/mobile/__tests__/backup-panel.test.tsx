@@ -1,11 +1,16 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 
 import { BackupPanel } from '@/components/settings/backup-panel';
-import { uiText } from '@/components/ui';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiTextFor } from '@/components/ui';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
+import { launchTheme } from '@/components/ui/theme-launch';
+import { rolesFor } from './helpers/theme';
 import type { DatabaseBackups } from '@/src/backup/database-backups';
 import type { Snapshot } from '@/src/backup/snapshots';
 import { formatLocalDateTime } from '@/src/utils/local-time';
+
+const roles = rolesFor(launchTheme.appearance);
+const uiText = uiTextFor(roles);
 
 // Data & sync's Backups section over a fake backups object (the real one is
 // `database-backups.test.ts`): the newest snapshot, the count, Export.
@@ -62,7 +67,7 @@ it('draws the section on the row vocabulary: a micro-label, option-role names, m
   expect(screen.getByText('Backups')).toHaveStyle({ fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase' });
   expect(screen.getByText('Last backup')).toHaveStyle(uiText.option);
   const last = screen.getByTestId('settings-backup-last');
-  expect(last).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.inkMuted });
+  expect(last).toHaveStyle({ fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: roles.inkMuted });
   expect(within(last).getByText('25-10-2026')).toHaveStyle({ fontFamily: uiFonts.figure.family, fontWeight: '500' });
 });
 

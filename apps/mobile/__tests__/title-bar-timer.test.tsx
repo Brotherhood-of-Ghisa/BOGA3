@@ -1,10 +1,14 @@
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react-native';
+import { act, fireEvent, renderHook, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { TitleBarTimer, describeTitleBarTimer, useTitleBarTimer } from '@/components/session-recorder/title-bar-timer';
 import { SessionTopBar } from '@/components/session-view/session-top-bar';
-import { uiRoles } from '@/components/ui/tokens';
 import type { RestTimerView } from '@/src/session-recorder/rest-timer';
+
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const defaultRoles = rolesFor(DEFAULT_APPEARANCE);
 
 const REST: RestTimerView = {
   mode: 'rest', status: 'running', sessionId: 's', remainingSec: 83, formatted: '1:23', durationSec: 90,
@@ -19,7 +23,7 @@ const pillStyle = () => StyleSheet.flatten(screen.getByTestId('timer-pill').prop
 
 describe('TitleBarTimer', () => {
   it('is the timer glyph while idle and a countdown pill while running', () => {
-    const { rerender } = render(<TitleBarTimer onLongPress={jest.fn()} onPress={jest.fn()} testID="timer" view={{ status: 'idle' }} />);
+    const { rerender } = renderWithTheme(<TitleBarTimer onLongPress={jest.fn()} onPress={jest.fn()} testID="timer" view={{ status: 'idle' }} />);
     expect(screen.queryByTestId('timer-pill')).toBeNull();
     expect(screen.getByTestId('timer')).toHaveProp('accessibilityLabel', 'Start timer');
 
@@ -29,8 +33,8 @@ describe('TitleBarTimer', () => {
   });
 
   it('inverts the pill when a rest finishes and dashes it while a repeating timer is paused', () => {
-    const { rerender } = render(<TitleBarTimer onLongPress={jest.fn()} onPress={jest.fn()} testID="timer" view={DONE} />);
-    expect(pillStyle().backgroundColor).toBe(uiRoles.ink);
+    const { rerender } = renderWithTheme(<TitleBarTimer onLongPress={jest.fn()} onPress={jest.fn()} testID="timer" view={DONE} />);
+    expect(pillStyle().backgroundColor).toBe(defaultRoles.ink);
     expect(screen.getByTestId('timer')).toHaveProp('accessibilityLabel', 'Rest complete');
 
     rerender(<TitleBarTimer onLongPress={jest.fn()} onPress={jest.fn()} testID="timer" view={repeating(true)} />);
@@ -40,7 +44,7 @@ describe('TitleBarTimer', () => {
   it('taps, long presses and offers both as accessibility actions', () => {
     const onPress = jest.fn();
     const onLongPress = jest.fn();
-    render(<TitleBarTimer onLongPress={onLongPress} onPress={onPress} testID="timer" view={REST} />);
+    renderWithTheme(<TitleBarTimer onLongPress={onLongPress} onPress={onPress} testID="timer" view={REST} />);
     const control = screen.getByTestId('timer');
     expect(control.props.accessibilityHint).toBe('Stops the timer. Long press for the timer controls.');
     expect(control.props.accessibilityActions).toEqual([
@@ -118,7 +122,7 @@ describe('useTitleBarTimer', () => {
 it('puts the title-bar timer in place of the session timer button', () => {
   const onToggle = jest.fn();
   const onPress = jest.fn();
-  render(
+  renderWithTheme(
     <SessionTopBar mode="active" onFinish={jest.fn()} onOpenOptions={jest.fn()} onToggleRestTimer={onToggle}
       startedAt={new Date(2026, 8, 23, 18, 0, 0)}
       titleBarTimer={{ view: REST, onPress, onLongPress: jest.fn() }} />,

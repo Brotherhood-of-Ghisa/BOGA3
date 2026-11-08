@@ -1,6 +1,6 @@
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
@@ -16,8 +16,8 @@ import { SessionTopBar } from '@/components/session-view/session-top-bar';
 import { ActionButton } from '@/components/ui/action-button';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiRoles } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
 import { sessionAddExerciseHref, sessionCompareHref, sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { GYMS_ROUTE } from '@/src/navigation/routes';
 import { findNearbyGymSuggestions } from '@/src/location/gym-location-reads';
@@ -145,6 +145,9 @@ export type SessionViewScreenProps = {
  */
 export function SessionViewScreen(props: SessionViewScreenProps) {
   const { sessionId } = props;
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, reload } = useSessionView(sessionId);
@@ -458,7 +461,7 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
           variant="outline"
         />
         {notice ? (
-          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.bodyStrong, uiTextTone.danger]} testID="session-view-notice">
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger]} testID="session-view-notice">
             {notice}
           </Text>
         ) : null}
@@ -543,8 +546,8 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   statusSpacer: {
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
   },
-});
+}));

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
   useWindowDimensions,
@@ -12,8 +11,9 @@ import {
   type ScrollViewInstance,
 } from 'react-native';
 
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 /** The box a page is drawn in: the pager's measured width and height (the height unknown until measured, and in Jest). */
 export type SwipePageFrame = { width: number; height: number | undefined };
@@ -53,6 +53,7 @@ export type SwipePagesProps = {
  * and the bottom of the screen.
  */
 export function SwipePages({ pages, page, onPageChange, banner, testID }: SwipePagesProps) {
+  const styles = useStyles();
   const window = useWindowDimensions();
   const [width, setWidth] = useState(window.width);
   // A horizontal scroller sizes its content to the content, so the pages take
@@ -134,6 +135,9 @@ export function SwipePages({ pages, page, onPageChange, banner, testID }: SwipeP
 }
 
 function Tab({ label, selected, onPress, testID, compact }: { label: string; selected: boolean; onPress: () => void; testID: string; compact: boolean }) {
+  const styles = useStyles();
+  const textRoles = useUiText();
+  const textTones = useUiTextTone();
   return (
     <Pressable
       accessibilityRole="tab"
@@ -147,7 +151,7 @@ function Tab({ label, selected, onPress, testID, compact }: { label: string; sel
         minimumFontScale={0.75}
         ellipsizeMode="tail"
         numberOfLines={1}
-        style={[uiText.title, selected ? null : uiTextTone.faint]}>
+        style={[textRoles.title, selected ? null : textTones.faint]}>
         {label}
       </Text>
       <View style={[styles.tabMark, selected ? styles.tabMarkSelected : null]} />
@@ -159,10 +163,10 @@ const TAB_MARK = 2;
 const TRACK_PADDING_TOP = uiSpace.md;
 const TRACK_PADDING_BOTTOM = uiSpace.lg;
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   screen: {
     flex: 1,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   header: {
     flexDirection: 'row',
@@ -190,7 +194,7 @@ const styles = StyleSheet.create({
     borderRadius: TAB_MARK / 2,
   },
   tabMarkSelected: {
-    backgroundColor: uiRoles.ink,
+    backgroundColor: roles.ink,
   },
   pager: {
     flex: 1,
@@ -201,4 +205,4 @@ const styles = StyleSheet.create({
     paddingTop: TRACK_PADDING_TOP,
     paddingBottom: TRACK_PADDING_BOTTOM,
   },
-});
+}));

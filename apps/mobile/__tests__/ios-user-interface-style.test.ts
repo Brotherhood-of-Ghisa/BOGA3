@@ -1,10 +1,11 @@
 // Why this file exists
 // --------------------
 // `app.config.ts` sets `userInterfaceStyle: "automatic"` so the app can read
-// the phone's mode at launch; under a pinned "light" the OS reports light
+// and follow the phone's mode; under a pinned "light" the OS reports light
 // whatever the phone is set to, and Light / Dark / System could never resolve
 // System to dark. The app then pins its own native UI to the chosen mode at
-// runtime (`components/ui/theme-launch.ts`, tested in `ui-theme-launch.test.ts`).
+// runtime, or unpins it for System (`components/ui/theme-native.ts`, tested in
+// `theme-native.test.ts` and `ui-theme-context.test.tsx`).
 //
 // The splash stays white in both modes: it is drawn before JS reads the chosen
 // mode, so a `dark` variant would follow the phone rather than the choice.

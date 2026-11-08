@@ -3,9 +3,9 @@ import { buildCompetitionPodiums as buildGroupMetricPodiums } from '@/src/groups
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { Card, FigureText, SearchField, Tag, uiBorder, uiRoles, uiSpace, uiText, uiTextEmphasis, uiTextTone } from '@/components/ui';
+import { Card, FigureText, SearchField, Tag, makeStyles, uiBorder, uiSpace, uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui';
 import {
   groupBoardPath,
   type GroupApiError,
@@ -15,7 +15,7 @@ import {
 
 import { GroupCycleButton } from './group-cycle-button';
 import { GroupMissingDataState, GroupStateView } from './group-state-view';
-import { scoreStyle } from './score-style';
+import { useScoreStyle } from './score-style';
 
 type GroupLeaderboardsPageProps = {
   groupId: string;
@@ -42,6 +42,7 @@ const ORDER_OPTIONS = [
  * by most recent record. A card opens its full board.
  */
 export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error, onRetry }: GroupLeaderboardsPageProps) {
+  const styles = useStyles();
   const dateFormat = useDateFormat();
   const router = useRouter();
   const cards = useMemo(() => (boards.data ? buildGroupMetricPodiums(boards.data, userId, dateFormat) : null), [boards.data, userId, dateFormat]);
@@ -123,11 +124,15 @@ export function sortPodiumCards<T extends { name: string; archived: boolean; lat
  * Plex Mono, the member in Source Sans, and my row reads "You" in bold.
  */
 export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; onPress: () => void }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
+  const scoreStyle = useScoreStyle();
   const testID = `group-podium-card-${card.exerciseId}`;
   return (
     <Card accessibilityLabel={card.accessibilityLabel} onPress={onPress} style={styles.card} testID={testID}>
       <View style={styles.titleRow}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[uiText.title, styles.name]} testID={`${testID}-name`}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.title, styles.name]} testID={`${testID}-name`}>
           {card.name}
         </Text>
         {card.archived ? (
@@ -137,23 +142,23 @@ export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; 
           </View>
         ) : null}
       </View>
-      <Text allowFontScaling={false} style={uiText.label} testID={`${testID}-view`}>
+      <Text allowFontScaling={false} style={text.label} testID={`${testID}-view`}>
         {card.viewLabel}
       </Text>
       {card.rows.length > 0 ? (
         <View style={styles.rows}>
           {card.rows.map((row) => (
             <View key={row.key} style={styles.podiumRow} testID={`${testID}-row-${row.rank}`}>
-              <Text allowFontScaling={false} style={[uiText.figure, styles.rank]}>
+              <Text allowFontScaling={false} style={[text.figure, styles.rank]}>
                 {String(row.rank)}
               </Text>
-              <Text allowFontScaling={false} numberOfLines={1} style={[uiText.body, row.isMe ? uiTextEmphasis.strong : null, styles.member]}>
+              <Text allowFontScaling={false} numberOfLines={1} style={[text.body, row.isMe ? uiTextEmphasis.strong : null, styles.member]}>
                 {row.memberLabel}
               </Text>
               <Text allowFontScaling={false} style={scoreStyle(row.valueLabel, 'base')}>
                 {row.valueLabel}
               </Text>
-              <Text allowFontScaling={false} style={[uiText.figureSmall, styles.date]}>
+              <Text allowFontScaling={false} style={[text.figureSmall, styles.date]}>
                 {row.dateLabel}
               </Text>
             </View>
@@ -161,12 +166,12 @@ export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; 
         </View>
       ) : null}
       {card.emptyLabel ? (
-        <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-empty`}>
+        <Text allowFontScaling={false} style={text.meta} testID={`${testID}-empty`}>
           {card.emptyLabel}
         </Text>
       ) : null}
       {card.youLabel ? (
-        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, uiTextEmphasis.strong]} testID={`${testID}-you`}>
+        <Text allowFontScaling={false} style={[text.meta, tone.ink, uiTextEmphasis.strong]} testID={`${testID}-you`}>
           <FigureText strong>{card.youLabel}</FigureText>
         </Text>
       ) : null}
@@ -174,7 +179,7 @@ export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   list: {
     gap: uiSpace.md,
   },
@@ -213,7 +218,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
     paddingVertical: uiSpace.xs,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   rank: {
     minWidth: 16,
@@ -226,4 +231,4 @@ const styles = StyleSheet.create({
     minWidth: 52,
     textAlign: 'right',
   },
-});
+}));

@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import { Text, type StyleProp, type TextStyle } from 'react-native';
 
-import { uiText, uiTextEmphasis } from '@/components/ui/text-roles';
+import { uiTextEmphasis, useUiText } from '@/components/ui/text-roles';
 
 // A run of digits, with the separators a figure carries inside it (`102.5`,
 // `10:05`, `1,250`, `12-10-2026`). A run that starts a capitalised
@@ -14,7 +14,7 @@ const FIGURE_RUN = /(\d+(?:[.,:-]\d+)*(?![\dA-Z]))/;
  * line's size (`design-language.md` §3, "Text roles"). Render it inside the
  * line's `Text`; on an emphasised line pass `strong`, since the figure's own
  * weight would otherwise override the line's. A line drawn in a tone with a
- * weight of its own (`uiTextTone.record`) passes that tone as `figureStyle`.
+ * weight of its own (`useUiTextTone().record`) passes that tone as `figureStyle`.
  */
 export function FigureText({
   children,
@@ -25,9 +25,10 @@ export function FigureText({
   strong?: boolean;
   figureStyle?: StyleProp<TextStyle>;
 }) {
+  const textRoles = useUiText();
   return children.split(FIGURE_RUN).map((part, index) =>
     index % 2 === 1 ? (
-      <Text allowFontScaling={false} key={index} style={[uiText.inlineFigure, strong ? uiTextEmphasis.strong : null, figureStyle]}>
+      <Text allowFontScaling={false} key={index} style={[textRoles.inlineFigure, strong ? uiTextEmphasis.strong : null, figureStyle]}>
         {part}
       </Text>
     ) : (

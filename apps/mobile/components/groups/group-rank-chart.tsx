@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiFonts, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { useUiRoles } from '@/components/ui/theme-context';
+import { uiFonts, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { GroupRankSeries } from '@/src/groups/home-view-model';
 
 // Until the first layout pass reports the plot's width (and in Jest, where
@@ -34,6 +35,9 @@ export type GroupRankChartProps = {
  * label, selects it: the screen's selected period, which every card reads.
  */
 export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, accessibilityLabel }: GroupRankChartProps) {
+  const roles = useUiRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [plotWidth, setPlotWidth] = useState(FALLBACK_PLOT_WIDTH);
   const onLayout = (event: LayoutChangeEvent) => {
     const width = event.nativeEvent.layout.width;
@@ -52,7 +56,7 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
       <View style={styles.plotRow}>
         <View style={[styles.axis, { height }]}>
           {Array.from({ length: series.depth }, (_, index) => (
-            <Text allowFontScaling={false} key={index} style={[uiText.label, uiTextTone.faint, styles.axisLabel]}>
+            <Text allowFontScaling={false} key={index} style={[text.label, tone.faint, styles.axisLabel]}>
               {index + 1}
             </Text>
           ))}
@@ -67,7 +71,7 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
           testID="group-rank-chart-plot">
           <Svg height={height} width={plotWidth}>
             <Rect
-              fill={uiRoles.ruleSoft}
+              fill={roles.ruleSoft}
               height={height}
               width={bandWidth}
               x={selectedIndex * bandWidth}
@@ -78,7 +82,7 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
                 fill="none"
                 key={line.userId}
                 points={line.ranks.map((rank, index) => `${columnX(index, count, plotWidth)},${rowY(rank)}`).join(' ')}
-                stroke={line.isMe ? uiRoles.ink : uiRoles.viz2}
+                stroke={line.isMe ? roles.ink : roles.viz2}
                 strokeWidth={line.isMe ? 2 : 1.5}
               />
             ))}
@@ -89,10 +93,10 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
                   <Circle
                     cx={columnX(index, count, plotWidth)}
                     cy={rowY(rank)}
-                    fill={selected ? (line.isMe ? uiRoles.ink : uiRoles.viz4) : uiRoles.surface}
+                    fill={selected ? (line.isMe ? roles.ink : roles.viz4) : roles.surface}
                     key={`${line.userId}-${index}`}
                     r={MARKER_RADIUS}
-                    stroke={line.isMe ? uiRoles.ink : uiRoles.viz3}
+                    stroke={line.isMe ? roles.ink : roles.viz3}
                     strokeWidth={line.isMe ? 2 : 1}
                   />
                 );
@@ -103,7 +107,7 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
                 <SvgText
                   // The selected marker is filled `ink` (yours), which carries the on-ink label, or
                   // `viz4`, which carries `ink` like any text on a `viz` ground.
-                  fill={index === selectedIndex ? (line.isMe ? uiRoles.onInk : uiRoles.ink) : uiRoles.inkMuted}
+                  fill={index === selectedIndex ? (line.isMe ? roles.onInk : roles.ink) : roles.inkMuted}
                   fontFamily={uiFonts.display.family}
                   fontSize={uiTypography.size.xxs}
                   fontWeight="700"
@@ -131,8 +135,8 @@ export function GroupRankChart({ series, selectedIndex, onSelect, columnLabels, 
             <Text
               allowFontScaling={false}
               style={[
-                uiText.label,
-                index === selectedIndex ? uiTextTone.ink : uiTextTone.faint,
+                text.label,
+                index === selectedIndex ? tone.ink : tone.faint,
                 styles.columnLabelText,
               ]}>
               {label}

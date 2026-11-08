@@ -3,8 +3,8 @@
 /**
  * Settings → Appearance → Custom → one part: a hue ring and a strength slider
  * (and, for the background, lightness and depth sliders) repaint a preview
- * live; letting one go stores the part for the next launch and the page says
- * so. There is no save button. The choice lives in expo-sqlite's key-value
+ * live; letting one go stores the part and the app repaints in it. There is
+ * no save button. The choice lives in expo-sqlite's key-value
  * store, faked in memory by jest.setup.ts. Replaced: the log sink, which is
  * observed, and expo-router's params and stack title. Gesture-handler is
  * stubbed (jest.setup.ts), so a release is driven by calling the handler the
@@ -23,14 +23,15 @@ jest.mock('expo-router', () => ({
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 
 import { pointToValue } from '@/components/ui/slider-row';
 import { customFromSeeds, generateCustomRoles, type CustomColours } from '@/components/ui/theme-custom';
-import * as themeLaunch from '@/components/ui/theme-launch';
+import { useUiRoles } from '@/components/ui/theme-context';
 import { APPEARANCE_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { getThemePreset } from '@/components/ui/theme-presets';
 import ThemeCustomRoute from '../app/theme-custom';
+import { renderWithTheme } from './helpers/theme';
 
 const CUSTOM: CustomColours = {
   background: { hue: 80, strength: 20, lightness: 90, depth: 100 },
@@ -124,7 +125,7 @@ it('repaints the preview as a slider moves, and saves only when it is let go', a
 
   await act(async () => drag(slider('Lightness')).onEnd({ x: 20 }, true));
   await waitFor(() => expect(storedCustom()).toEqual(dark));
-  expect(await screen.findByText('Saved · next launch')).toBeTruthy();
+  expect(screen.queryByText(/next launch/i)).toBeNull();
 });
 
 it('saves a tap on the track, and nothing when the page scroll takes the touch', async () => {
@@ -142,15 +143,26 @@ it('saves a tap on the track, and nothing when the page scroll takes the touch',
   await waitFor(() => expect(storedCustom()?.background.depth).toBe(30));
 });
 
-it('says nothing is saved for the next launch when the part is set back to the theme in use', async () => {
+it('repaints the app in the part let go, behind the page as well as on it', async () => {
   store(CUSTOM);
-  jest.replaceProperty(themeLaunch, 'launchTheme', { ...themeLaunch.launchTheme, appearance: { theme: 'custom', mode: 'light', custom: CUSTOM } });
-  render(<ThemeCustomRoute />);
-  await step(slider('Strength'), 'increment');
-  expect(await screen.findByText('Saved · next launch')).toBeTruthy();
-  await step(slider('Strength'), 'decrement');
-  await waitFor(() => expect(storedCustom()).toEqual(CUSTOM));
-  expect(screen.queryByTestId('theme-custom-status')).toBeNull();
+  function Behind() {
+    return <Text testID="behind">{useUiRoles().paper}</Text>;
+  }
+  renderWithTheme(
+    <>
+      <Behind />
+      <ThemeCustomRoute />
+    </>,
+  );
+  expect(screen.getByTestId('behind')).toHaveTextContent(generateCustomRoles(CUSTOM).paper);
+
+  await step(slider('Lightness'), 'decrement');
+
+  await waitFor(() => expect(storedCustom()?.background.lightness).toBeLessThan(CUSTOM.background.lightness));
+  const saved = storedCustom()!;
+  expect(generateCustomRoles(saved).paper).not.toBe(generateCustomRoles(CUSTOM).paper);
+  expect(screen.getByTestId('behind')).toHaveTextContent(generateCustomRoles(saved).paper);
+  expect(screen.queryByText(/saved|next launch/i)).toBeNull();
 });
 
 it('saves a hue when the ring is let go, keeping the other parts', async () => {
@@ -205,7 +217,6 @@ it('writes nothing when a slider is let go at the value already stored', async (
   await act(async () => tap(slider('Strength')).onEnd({ x: 20 }, true));
 
   expect(setItem).not.toHaveBeenCalled();
-  expect(screen.queryByTestId('theme-custom-status')).toBeNull();
 });
 
 it('says nothing changed, and logs why, when the save fails', async () => {

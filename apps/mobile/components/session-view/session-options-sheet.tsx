@@ -1,7 +1,6 @@
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { uiRoles } from '@/components/ui/tokens';
 
 type SessionOptionsSheetProps = {
   visible: boolean;
@@ -21,15 +20,15 @@ export function SessionOptionsSheet({ visible, onDismiss, onAbandon, onCompare }
       visible={visible}>
       <ListRow
         label="Session vs history"
-        leading={<Icon color={uiRoles.inkMuted} name="list" size="md" />}
+        leading={<Icon colorRole="inkMuted" name="list" size="md" />}
         onPress={onCompare}
         testID="session-view-compare"
-        trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
+        trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
       />
       <ListRow
         divider
         label="Abandon session"
-        leading={<Icon color={uiRoles.danger} name="trash" size="md" />}
+        leading={<Icon colorRole="danger" name="trash" size="md" />}
         onPress={onAbandon}
         testID="session-view-abandon"
         tone="danger"

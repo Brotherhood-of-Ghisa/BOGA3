@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import { ListRow } from '@/components/ui/list-row';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type SliderRowProps = {
   label: string;
@@ -39,6 +40,9 @@ export function pointToValue(x: number, width: number, max: number): number {
 
 /** A Settings row for a whole number from 0 to `max`: the label, then a track to drag or tap and the value beside it. Reports every move, so the caller can repaint a preview live, and the value it is let go at. */
 export function SliderRow({ label, value, max, format, onChange, onChangeEnd, divider = false, testID }: SliderRowProps) {
+  const styles = useStyles();
+  const textRoles = useUiText();
+  const textTones = useUiTextTone();
   const [width, setWidth] = useState(0);
   const at = (x: number) => pointToValue(x, width, max);
   // The gestures run their callbacks on the JS thread (`runOnJS(true)`), so
@@ -86,7 +90,7 @@ export function SliderRow({ label, value, max, format, onChange, onChangeEnd, di
             <View style={[styles.thumb, { left: share * width - THUMB / 2 }]} />
           </View>
         </GestureDetector>
-        <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.muted, styles.value]} testID={`${testID}-value`}>
+        <Text allowFontScaling={false} style={[textRoles.meta, textTones.muted, styles.value]} testID={`${testID}-value`}>
           {format(value)}
         </Text>
       </View>
@@ -94,7 +98,7 @@ export function SliderRow({ label, value, max, format, onChange, onChangeEnd, di
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   control: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -109,11 +113,11 @@ const styles = StyleSheet.create({
     height: TRACK,
     borderRadius: TRACK / 2,
     overflow: 'hidden',
-    backgroundColor: uiRoles.rule,
+    backgroundColor: roles.rule,
   },
   fill: {
     height: TRACK,
-    backgroundColor: uiRoles.ink,
+    backgroundColor: roles.ink,
   },
   // Depth is a rule plus a ground change, never a shadow.
   thumb: {
@@ -122,11 +126,11 @@ const styles = StyleSheet.create({
     height: THUMB,
     borderRadius: THUMB / 2,
     borderWidth: 1,
-    borderColor: uiRoles.ink,
-    backgroundColor: uiRoles.surface,
+    borderColor: roles.ink,
+    backgroundColor: roles.surface,
   },
   value: {
     width: VALUE_WIDTH,
     textAlign: 'right',
   },
-});
+}));

@@ -18,7 +18,7 @@ import { HistoryTitle, type HistoryTitleMuscle } from '@/components/stats/histor
 import { SecondarySetsChip } from '@/components/stats/secondary-sets-chip';
 import { decodeGymRouteParam, encodeGymRouteParam } from '@/src/utils/gym-scope-route';
 import {
-  ActionButton, Icon, IconButton, ListRow, Notice, Screen, Sheet, StatePanel, uiRoles, uiSpace,
+  ActionButton, Icon, IconButton, ListRow, Notice, Screen, Sheet, StatePanel, uiSpace,
 } from '@/components/ui';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { loadActiveSessionId } from '@/src/session-entry';
@@ -164,29 +164,29 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
         {onOpenHistory ? (
           <ListRow
             label="History"
-            leading={<Icon color={uiRoles.inkMuted} name="list" size="md" />}
+            leading={<Icon colorRole="inkMuted" name="list" size="md" />}
             onPress={() => { setOptionsVisible(false); onOpenHistory(); }}
             testID="progress-history-exercise-history"
-            trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
+            trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
           />
         ) : null}
         {onOpenCurve ? (
           <ListRow
             label="RM curve"
-            leading={<Icon color={uiRoles.inkMuted} name="timeline-columns" size="md" />}
+            leading={<Icon colorRole="inkMuted" name="timeline-columns" size="md" />}
             onPress={() => { setOptionsVisible(false); onOpenCurve(); }}
             testID="progress-history-rm-curve"
-            trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
+            trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
           />
         ) : null}
         {sessionsWeek ? (
           <ListRow
             description={sessionsWeek.label}
             label="View sessions"
-            leading={<Icon color={uiRoles.inkMuted} name="list" size="md" />}
+            leading={<Icon colorRole="inkMuted" name="list" size="md" />}
             onPress={openWeek}
             testID="progress-history-view-sessions"
-            trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
+            trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
           />
         ) : null}
         {muscles.map(muscle => (
@@ -194,10 +194,10 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
             description={ROLE_LABELS[muscle.role]}
             key={muscle.id}
             label={muscle.name}
-            leading={<Icon color={uiRoles.inkMuted} name="timeline-columns" size="md" />}
+            leading={<Icon colorRole="inkMuted" name="timeline-columns" size="md" />}
             onPress={() => openMuscle(muscle.id)}
             testID={`progress-history-muscle-${muscle.id}`}
-            trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
+            trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
           />
         ))}
       </Sheet>

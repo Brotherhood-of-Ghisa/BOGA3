@@ -4,7 +4,11 @@ import { TableGallery } from '@/components/pattern-gallery/table-gallery';
 import { resolveComparisonLayout, ComparisonHeaders } from '@/components/stats/comparison-columns';
 import { tableGalleryMuscles } from '@/components/pattern-gallery/table-fixtures';
 import { StatsTableRow, StatsTableName, StatsTableFamily, statsTableStyles } from '@/components/stats/stats-table';
-import { ListRow, uiGeometry, uiSpace, uiText } from '@/components/ui';
+import { ListRow, uiGeometry, uiSpace, uiTextFor } from '@/components/ui';
+import { launchTheme } from '@/components/ui/theme-launch';
+import { rolesFor } from './helpers/theme';
+
+const uiText = uiTextFor(rolesFor(launchTheme.appearance));
 
 it('shares the compact list recipe and keeps wrapping content free of nested padding/minimums', () => {
   render(<><ListRow density="compact" testID="list"><Text style={uiText.body}>{'Long name\nSecond line'}</Text></ListRow>

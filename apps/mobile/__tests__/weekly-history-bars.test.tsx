@@ -1,12 +1,16 @@
 import React from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { FlatList, ScrollView, StyleSheet } from 'react-native';
 
 import { WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
 import { HistoryView, EXERCISE_HISTORY_METRIC_OPTIONS, MUSCLE_HISTORY_METRIC_OPTIONS } from '@/components/stats/history-view';
-import { uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui';
+import { uiGeometry, uiSpace, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
 import { ensureAccountLocalPreferencesLoaded, initializeAccountLocalPreferences, setAccountLocalPreferences } from '@/src/preferences/account-local';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const TODAY = '2026-10-05';
 const PREFIX = 'bars';
@@ -23,7 +27,7 @@ const chart = (loaded: ReturnType<typeof data>, onOpenWeek: (key: string) => voi
 it('shows occupied months with rest weeks newest first, compact week dates, aligned values and proportional Volume lengths', () => {
   const loaded = data([day(TODAY, 12), day('2026-09-28', 54), day('2026-09-14', 60)]);
   const chronological = loaded.weekly.map(week => week.weekStartDateKey);
-  render(chart(loaded));
+  renderWithTheme(chart(loaded));
   expect(screen.getAllByTestId(/^bars-heatmap-cell-/).map(row => row.props.testID)).toEqual(
     ['2026-10-05', '2026-09-28', '2026-09-21', '2026-09-14', '2026-09-07'].map(key => `bars-heatmap-cell-${key}`));
   expect(loaded.weekly.map(week => week.weekStartDateKey)).toEqual(chronological);
@@ -39,7 +43,7 @@ it('shows occupied months with rest weeks newest first, compact week dates, alig
 const DATES = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
 
 it('shows only the end year for a week crossing New Year', () => {
-  render(chart(data([day('2025-12-31', 1750)], 52)));
+  renderWithTheme(chart(data([day('2025-12-31', 1750)], 52)));
   expect(screen.getByTestId('bars-heatmap-date-2025-12-29')).toHaveTextContent('29 Dec – 4 Jan');
   expect(screen.getByTestId('bars-heatmap-cell-2025-12-29')).toHaveProp(
     'accessibilityLabel', 'Week of 29-12-2025, Volume 1750');
@@ -53,13 +57,13 @@ it.each([
   ['2025-12-29', '29 Dec – 4 Jan 2026'],
 ])('places the complete %s range left of its bar with the muted year on a second line', (key, caption) => {
   const loaded = buildHeatmapData([day(key, 12345)], 'totalVolume', { todayDateKey: key, weeks: 1 });
-  render(chart(loaded));
+  renderWithTheme(chart(loaded));
   const date = screen.getByTestId(`bars-heatmap-date-${key}`);
   expect(date).toHaveTextContent(caption.replace(/ ?2026 ?/, ''));
   expect(date).toHaveProp('numberOfLines', 1);
   expect(date).toHaveProp('allowFontScaling', false);
-  expect(StyleSheet.flatten(date.props.style)).toMatchObject({ fontSize: uiTypography.size.base, color: uiRoles.ink });
-  expect(screen.getByTestId(`bars-heatmap-date-year-${key}`)).toHaveStyle({ color: uiRoles.inkMuted, fontSize: uiTypography.size.sm });
+  expect(StyleSheet.flatten(date.props.style)).toMatchObject({ fontSize: uiTypography.size.base, color: roles.ink });
+  expect(screen.getByTestId(`bars-heatmap-date-year-${key}`)).toHaveStyle({ color: roles.inkMuted, fontSize: uiTypography.size.sm });
   expect(screen.getAllByTestId(new RegExp(`^bars-heatmap-(date|plot-row)-${key}$`)).map(node => node.props.testID))
     .toEqual([`bars-heatmap-plot-row-${key}`, `bars-heatmap-date-${key}`]);
   expect(style(`bars-heatmap-plot-row-${key}`)).toMatchObject({
@@ -77,7 +81,7 @@ it('keeps the quieter year below the range when the Date format changes on a mou
   initializeAccountLocalPreferences(false);
   await ensureAccountLocalPreferencesLoaded();
   const loaded = buildHeatmapData([day('2025-12-29', 1750)], 'totalVolume', { todayDateKey: '2026-01-04', weeks: 1 });
-  render(chart(loaded));
+  renderWithTheme(chart(loaded));
   for (const [dateFormat, caption, spoken] of [
     ['MM-DD-YYYY', 'Dec 29 – Jan 4 2026', '12-29-2025'],
     ['YYYY-MM-DD', '2026 Dec 29 – Jan 4', '2025-12-29'],
@@ -86,13 +90,13 @@ it('keeps the quieter year below the range when the Date format changes on a mou
     act(() => setAccountLocalPreferences({ dateFormat }));
     expect(screen.getByTestId('bars-heatmap-date-2025-12-29')).toHaveTextContent(caption.replace(/ ?2026 ?/, ''));
     expect(screen.getByTestId('bars-heatmap-date-year-2025-12-29')).toHaveTextContent('2026');
-    expect(screen.getByTestId('bars-heatmap-date-year-2025-12-29')).toHaveStyle({ color: uiRoles.inkMuted });
+    expect(screen.getByTestId('bars-heatmap-date-year-2025-12-29')).toHaveStyle({ color: roles.inkMuted });
     expect(screen.getByTestId('bars-heatmap-cell-2025-12-29')).toHaveProp('accessibilityLabel', `Week of ${spoken}, Volume 1750, Current week`);
   }
 });
 
 const percentage = (id: string, property: 'left' | 'width') => Number.parseFloat(style(id)[property]);
-const renderValues = (values: number[], metric: CalendarHeatmapMetric) => render(<WeeklyHeatmap
+const renderValues = (values: number[], metric: CalendarHeatmapMetric) => renderWithTheme(<WeeklyHeatmap
   data={buildHeatmapData(values.map((value, index) => day(DATES[index], value)), metric, { todayDateKey: TODAY, weeks: 8 })}
   metric={metric} testIDPrefix={PREFIX} formatValue={String} />);
 
@@ -183,7 +187,7 @@ it.each([15, 52])('uses the full %i-week history for displayed weeks and referen
     ...['2026-07-20', '2026-07-27', '2026-08-03', '2026-08-10'].map((date, index) => day(date, index * 10)),
     day('2026-09-21', null), day('2026-09-28', 100), day(TODAY, 200),
   ];
-  const { rerender } = render(chart(data(days, weeks)));
+  const { rerender } = renderWithTheme(chart(data(days, weeks)));
   expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(weeks === 15 ? 16 : 27);
   expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', `${weeks + 1}-week median 30`);
   expect(style('bars-heatmap-median').left).toBe('3%');
@@ -201,7 +205,7 @@ it.each([15, 52])('uses the full %i-week history for displayed weeks and referen
 it('counts eligible older training weeks across the saved window and omits references when excluded', () => {
   const dates = ['2026-03-02', '2026-03-09', '2026-03-16', '2026-03-23', '2026-03-30', '2026-04-06'];
   const days = dates.map((date, index) => day(date, index * 20));
-  const { rerender } = render(chart(data(days, 52)));
+  const { rerender } = renderWithTheme(chart(data(days, 52)));
   expect(screen.getByTestId('bars-heatmap-median')).toHaveProp('accessibilityLabel', '53-week median 50');
   expect(style('bars-heatmap-median').left).toBe('50%');
   rerender(chart(data(days, 12)));
@@ -232,7 +236,7 @@ it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as c
 
 it('opens a training week, holds no selection, and announces the current week', () => {
   const open = jest.fn();
-  render(chart(data([day(TODAY, 12), day('2026-09-28', 54)]), open));
+  renderWithTheme(chart(data([day(TODAY, 12), day('2026-09-28', 54)]), open));
   const week = screen.getByTestId('bars-heatmap-cell-2026-09-28');
   expect(week).toHaveProp('accessibilityRole', 'button');
   expect(week).toHaveProp('accessibilityHint', "Opens the week's sessions");
@@ -247,7 +251,7 @@ it('opens a training week, holds no selection, and announces the current week', 
 
 it('retains blank, non-interactive rest weeks alongside zero and unavailable training', () => {
   const open = jest.fn();
-  render(chart(data([day(TODAY, 0), day('2026-09-28', null)]), open));
+  renderWithTheme(chart(data([day(TODAY, 0), day('2026-09-28', null)]), open));
   expect(screen.getByTestId('bars-heatmap-value-2026-10-05')).toHaveTextContent(/^0$/);
   expect(style('bars-heatmap-bar-2026-10-05').width).toBe('0%');
   expect(screen.getByTestId('bars-heatmap-value-2026-09-28')).toHaveTextContent('', { exact: true });
@@ -271,9 +275,9 @@ it('retains target colour independently of length and bounds long formatted valu
     { ...day(TODAY, 8), workingSetCountsByMuscle: { quads: 8 } },
     { ...day('2026-09-28', 16), workingSetCountsByMuscle: { quads: 16 } },
   ], 'workingSetCount', { todayDateKey: TODAY, weeks: 2, muscleTargets: { muscleIds: ['quads'], weeklyTarget: 8 } });
-  render(<WeeklyHeatmap data={loaded} metric="workingSetCount" testIDPrefix={PREFIX} formatValue={value => `${value}000000000000000000`} />);
-  expect(style('bars-heatmap-bar-2026-10-05')).toMatchObject({ width: '50%', backgroundColor: uiRoles.viz4 });
-  expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ width: '100%', backgroundColor: uiRoles.viz4 });
+  renderWithTheme(<WeeklyHeatmap data={loaded} metric="workingSetCount" testIDPrefix={PREFIX} formatValue={value => `${value}000000000000000000`} />);
+  expect(style('bars-heatmap-bar-2026-10-05')).toMatchObject({ width: '50%', backgroundColor: roles.viz4 });
+  expect(style('bars-heatmap-bar-2026-09-28')).toMatchObject({ width: '100%', backgroundColor: roles.viz4 });
   expect(style('bars-heatmap-value-2026-10-05')).toMatchObject({ textAlign: 'right' });
   expect(style('bars-heatmap-value-column-2026-10-05')).toMatchObject({ width: 96, position: 'relative' });
   expect(screen.getByTestId('bars-heatmap-cell-2026-10-05').props.accessibilityLabel).toContain('100% of weekly muscle target');
@@ -285,21 +289,21 @@ it('retains target colour independently of length and bounds long formatted valu
 
 it('virtualizes a dense 520-week training window while initially rendering a small recent subset', () => {
   const loaded = data(data([], 520).weekly.map(week => day(week.weekStartDateKey, 12)), 520);
-  render(chart(loaded));
+  renderWithTheme(chart(loaded));
   expect(screen.UNSAFE_getByType(FlatList).props.data).toHaveLength(521);
   expect(screen.getAllByTestId(/^bars-heatmap-cell-/).length).toBeLessThan(30);
   expect(screen.getAllByTestId(/^bars-heatmap-cell-/)[0]).toHaveProp('testID', 'bars-heatmap-cell-2026-10-05');
 });
 
 it('handles a truly empty adapter array without a reference or invalid scale', () => {
-  render(chart({ daily: [], weekly: [], todayDateKey: TODAY }));
+  renderWithTheme(chart({ daily: [], weekly: [], todayDateKey: TODAY }));
   expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
   expect(screen.queryAllByTestId(/^bars-heatmap-cell-/)).toEqual([]);
 });
 
 it.each([0, 3, 6])('omits repeated footer disclaimers with %i known training weeks', count => {
   const days = Array.from({ length: count }, (_, index) => day(new Date(Date.UTC(2026, 9, 5) - index * 7 * 86400000).toISOString().slice(0, 10), 20));
-  render(chart(data(days)));
+  renderWithTheme(chart(data(days)));
   expect(screen.queryByText('Current week is in progress.')).toBeNull();
   expect(screen.queryByText(/week average:/)).toBeNull();
   expect(screen.queryByText('Current week')).toBeNull();
@@ -310,7 +314,7 @@ it.each([0, 3, 6])('omits repeated footer disclaimers with %i known training wee
 
 it('opens rows without a banner and uses one active vertical scroller', () => {
   const open = jest.fn();
-  render(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
+  renderWithTheme(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={8} isLoading={false} errorMessage={null}
     onOpenWeek={open} todayDateKey={TODAY}
@@ -329,7 +333,7 @@ it('opens rows without a banner and uses one active vertical scroller', () => {
 
 it.each(['loading', 'error', 'empty'])('keeps the %s state inline and offers only the relevant action', state => {
   const retry = jest.fn();
-  render(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
+  renderWithTheme(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="highestWeight" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={1} isLoading={state === 'loading'}
     errorMessage={state === 'error' ? 'Read failed' : null}
@@ -348,7 +352,7 @@ it.each(['loading', 'error', 'empty'])('keeps the %s state inline and offers onl
 
 it('formats fractional Top weight references to one decimal without floating-point noise', () => {
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
-  render(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
+  renderWithTheme(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="highestWeight" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={6} isLoading={false} errorMessage={null}
     todayDateKey={TODAY} weeklyEffort={[]}
@@ -364,7 +368,7 @@ it('formats fractional Top weight references to one decimal without floating-poi
 
 it('retains coincident reference positions and announces all their values on the current week', () => {
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
-  render(chart(data(dates.map(date => day(date, 20)))));
+  renderWithTheme(chart(data(dates.map(date => day(date, 20)))));
   for (const [id, description] of [['p25', '25th percentile'], ['median', 'median'], ['p75', '75th percentile']]) {
     expect(screen.getByTestId(`bars-heatmap-${id}`)).toHaveProp('accessibilityLabel', `9-week ${description} 20`);
     expect(style(`bars-heatmap-${id}`).left).toBe('100%');
@@ -377,7 +381,7 @@ it('retains coincident reference positions and announces all their values on the
 
 it.each(['muscle', 'exercise'] as const)('shows only the current-week Sets median for %s history', kind => {
   const dates = ['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28', TODAY];
-  render(<HistoryView timeline={TIMELINE} kind={kind} subject="Training"
+  renderWithTheme(<HistoryView timeline={TIMELINE} kind={kind} subject="Training"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="workingSetCount" onSelectMetric={jest.fn()}
     view="weekly" onSelectView={jest.fn()} lookbackWeeks={6} isLoading={false} errorMessage={null}
     todayDateKey={TODAY} weeklyEffort={[]}
@@ -397,21 +401,21 @@ it('excludes future observations from reference eligibility', () => {
   const loaded = data(['2026-08-31', '2026-09-07', '2026-09-14', '2026-09-21', '2026-09-28']
     .map(date => day(date, 20)));
   loaded.weekly.push({ ...loaded.weekly.at(-1)!, weekStartDateKey: '2026-10-12', value: 100, hasTraining: true });
-  render(chart(loaded));
+  renderWithTheme(chart(loaded));
   expect(screen.queryByTestId('bars-heatmap-median')).toBeNull();
   expect(screen.queryByTestId('bars-heatmap-cell-2026-10-12')).toBeNull();
   expect(style(`bars-heatmap-bar-${DATES[0]}`).width).toBe('100%');
 });
 
 it('draws no view title in either view: the page title and selectors name what is shown', () => {
-  const { unmount } = render(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
+  const { unmount } = renderWithTheme(<HistoryView timeline={TIMELINE} kind="exercise" subject="Bench Press"
     metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS} metric="totalVolume" onSelectMetric={jest.fn()}
     view="daily" onSelectView={jest.fn()} lookbackWeeks={8} isLoading={false} errorMessage={null}
     todayDateKey={TODAY} dailyMetrics={[day(TODAY, 20)]} weeklyEffort={[]} />);
   expect(screen.queryByText('Daily training load')).toBeNull();
   expect(screen.queryByText('Bench Press')).toBeNull();
   unmount();
-  render(chart(data([day(TODAY, 20)])));
+  renderWithTheme(chart(data([day(TODAY, 20)])));
   expect(screen.queryByText('Weekly training load')).toBeNull();
 });
 
@@ -438,7 +442,7 @@ it.each([
   const readings = strength ? [100, 100, 110, 110, 120, 150]
     : metric === 'totalVolume' ? [100, 200, 300, 400, 500, 2000]
     : kind === 'muscle' ? [.5, 1, 1.5, 2, 2.5, 10] : [1, 2, 3, 4, 5, 20];
-  render(<HistoryView timeline={TIMELINE} kind={kind} subject="Training"
+  renderWithTheme(<HistoryView timeline={TIMELINE} kind={kind} subject="Training"
     metricOptions={kind === 'muscle' ? MUSCLE_HISTORY_METRIC_OPTIONS : EXERCISE_HISTORY_METRIC_OPTIONS}
     metric={metric} onSelectMetric={jest.fn()} view="weekly" onSelectView={jest.fn()}
     lookbackWeeks={8} isLoading={false} errorMessage={null} todayDateKey={TODAY}
@@ -479,7 +483,7 @@ const layoutReferences = (plotWidth: number, labels: [string, number][]) => {
 it.each(['totalVolume', 'workingSetCount', 'estimatedRM1', 'highestWeight'] as const)(
   'labels only the current %s bar with percentile names and formatted values', metric => {
     const values = [10, 20, 30, 40, 50, 60];
-    render(<WeeklyHeatmap
+    renderWithTheme(<WeeklyHeatmap
       data={buildHeatmapData(values.map((value, index) => day(DATES[index], value)), metric, { todayDateKey: TODAY, weeks: 8 })}
       metric={metric} testIDPrefix={PREFIX} formatValue={value => `row ${value}`}
       formatReferenceValue={value => value.toFixed(1)} />);
@@ -573,7 +577,7 @@ it.each([100, 200])('uses measured text bounds and leaves marks fixed at a %i-po
 
 it('bounds edge annotations, keeps the centre and exposes full long values on their ticks', () => {
   const format = (value: number) => `${value}00000000000000000000000000000000000000000000`;
-  render(<WeeklyHeatmap data={data([day(TODAY, 1000)])} metric="totalVolume"
+  renderWithTheme(<WeeklyHeatmap data={data([day(TODAY, 1000)])} metric="totalVolume"
     testIDPrefix={PREFIX} formatValue={format} />);
   layoutAxis(100, [[0, 100], [500, 100], [1000, 100]]);
   for (const value of [0, 500, 1000]) {
@@ -595,7 +599,7 @@ it('remeasures annotations when switching between strength and Volume, with no s
   const days = [100, 110, 120].map((value, index) => day(DATES[index], value));
   const strength = <WeeklyHeatmap data={buildHeatmapData(days, 'highestWeight', { todayDateKey: TODAY, weeks: 8 })}
     metric="highestWeight" formatValue={value => value.toFixed(1)} testIDPrefix={PREFIX} />;
-  const { rerender } = render(strength);
+  const { rerender } = renderWithTheme(strength);
   layoutAxis(200, [[100, 30], [110, 30], [120, 30]]);
   expect(style('bars-heatmap-axis-value-110')).toMatchObject({ opacity: 1, transform: [{ translateX: 85 }] });
   rerender(<WeeklyHeatmap data={data(days)} metric="totalVolume" formatValue={String} testIDPrefix={PREFIX} />);
@@ -621,7 +625,7 @@ it.each(['estimatedRM1', 'highestWeight'] as const)('centres constant %s referen
 });
 
 it('bounds long percentile labels inside the plot without moving their ticks', () => {
-  render(<WeeklyHeatmap data={data(DATES.map((date, index) => day(date, index * 100)))} metric="totalVolume"
+  renderWithTheme(<WeeklyHeatmap data={data(DATES.map((date, index) => day(date, index * 100)))} metric="totalVolume"
     testIDPrefix={PREFIX} formatValue={String} formatReferenceValue={value => `${value}000000000000000000000000000000`} />);
   layoutReferences(40, [['p25', 40], ['median', 40], ['p75', 40]]);
   for (const id of ['p25', 'median', 'p75']) {
@@ -634,7 +638,7 @@ it('bounds long percentile labels inside the plot without moving their ticks', (
 
 it('collapses each empty month to one accessible row between occupied months', () => {
   const open = jest.fn();
-  render(chart(data([day('2026-10-05', 20), day('2026-07-20', 10)], 16), open));
+  renderWithTheme(chart(data([day('2026-10-05', 20), day('2026-07-20', 10)], 16), open));
   expect(screen.getAllByTestId(/^bars-heatmap-empty-month-/).map(row => row.props.testID)).toEqual([
     'bars-heatmap-empty-month-2026-09', 'bars-heatmap-empty-month-2026-08', 'bars-heatmap-empty-month-2026-06',
   ]);
@@ -642,7 +646,7 @@ it('collapses each empty month to one accessible row between occupied months', (
   expect(september).toHaveProp('accessibilityLabel', 'September 2026, No training');
   expect(september).toHaveProp('accessibilityRole', 'text');
   expect(within(september).getByText('September')).toHaveStyle({ fontSize: uiTypography.size.base });
-  expect(within(september).getByText('2026')).toHaveStyle({ fontSize: uiTypography.size.sm, color: uiRoles.inkMuted });
+  expect(within(september).getByText('2026')).toHaveStyle({ fontSize: uiTypography.size.sm, color: roles.inkMuted });
   expect(september.props.onPress).toBeUndefined();
   expect(screen.queryByTestId('bars-heatmap-cell-2026-09-28')).toBeNull();
   expect(screen.queryByTestId('bars-heatmap-value-2026-09-28')).toBeNull();
@@ -656,7 +660,7 @@ it('collapses each empty month to one accessible row between occupied months', (
 
 it.each([0, null])('keeps a Monday-owned month expanded for cross-month zero/unavailable training (%s)', value => {
   const loaded = data([day('2026-10-01', value)]);
-  const { rerender } = render(chart(loaded));
+  const { rerender } = renderWithTheme(chart(loaded));
   expect(screen.queryByTestId('bars-heatmap-empty-month-2026-09')).toBeNull();
   expect(screen.getByTestId('bars-heatmap-cell-2026-09-07')).toBeTruthy();
   expect(screen.getByTestId('bars-heatmap-cell-2026-09-28').props.accessibilityLabel)
@@ -669,7 +673,7 @@ it.each([0, null])('keeps a Monday-owned month expanded for cross-month zero/una
 });
 
 it('keeps the blank current week visible in an entirely empty window and collapses older months', () => {
-  render(chart(data([])));
+  renderWithTheme(chart(data([])));
   expect(screen.getAllByTestId(/^bars-heatmap-cell-/).map(row => row.props.testID)).toEqual([`bars-heatmap-cell-${TODAY}`]);
   expect(screen.getByTestId(`bars-heatmap-cell-${TODAY}`)).toHaveProp('accessibilityRole', 'text');
   expect(screen.getByTestId(`bars-heatmap-value-${TODAY}`)).toHaveTextContent('', { exact: true });
@@ -689,7 +693,7 @@ it.each(['muscle', 'exercise'] as const)('keeps an untrained current %s week wit
     metric="totalVolume" onSelectMetric={jest.fn()} view="weekly" onSelectView={jest.fn()}
     lookbackWeeks={8} isLoading={false} errorMessage={null} todayDateKey={TODAY}
     dailyMetrics={days} weeklyEffort={[]} onOpenWeek={open} />;
-  const { rerender } = render(view(prior));
+  const { rerender } = renderWithTheme(view(prior));
   const prefix = `stats-${kind}-history-heatmap`;
   expect(screen.getByTestId(`${prefix}-cell-${TODAY}`)).toHaveProp('accessibilityRole', 'text');
   expect(screen.getByTestId(`${prefix}-cell-${TODAY}`).props.accessibilityLabel).toContain('Rest week, Current week');

@@ -1,16 +1,16 @@
 import { formatOneRepMax, formatVolume } from '@/src/exercise-calculations/format';
 import { forwardRef } from 'react';
-import { Pressable, StyleSheet, Text, type TextInputInstance, View } from 'react-native';
+import { Pressable, Text, type TextInputInstance, View } from 'react-native';
 
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
 import {
   uiBorder,
   uiGeometry,
-  uiRoles,
   uiSpace,
 } from '@/components/ui/tokens';
 import type { SessionSetTypeValue } from '@/src/data/set-types';
@@ -66,6 +66,9 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
   { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, onConfirm, onDrop, loadContext },
   weightInputRef
 ) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const canonicalWeight = canonicalizeWeightForReps(weightValue, repsValue);
   const { oneRepMax, volume } = previewMetrics(canonicalWeight, repsValue, loadContext);
   const canCommit = canCommitLogger({ weightValue, repsValue });
@@ -86,8 +89,8 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
         }}
         style={styles.header}
         testID="exercise-set-logger-header">
-        <Text allowFontScaling={false} style={[uiText.label, uiTextTone.accent]}>{`Set ${number}`}</Text>
-        <Text allowFontScaling={false} style={uiText.meta} testID="exercise-set-logger-preview">
+        <Text allowFontScaling={false} style={[text.label, tone.accent]}>{`Set ${number}`}</Text>
+        <Text allowFontScaling={false} style={text.meta} testID="exercise-set-logger-preview">
           <FigureText>{`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}</FigureText>
         </Text>
       </View>
@@ -96,8 +99,8 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
         weightValue={weightValue}
         repsValue={repsValue}
         setType={setType}
-        onChangeWeight={(text) => { if (isWeightInput(text)) onChangeWeight(text); }}
-        onChangeReps={(text) => { if (REPS_PATTERN.test(text)) onChangeReps(text); }}
+        onChangeWeight={(value) => { if (isWeightInput(value)) onChangeWeight(value); }}
+        onChangeReps={(value) => { if (REPS_PATTERN.test(value)) onChangeReps(value); }}
         onCycleEffort={onCycleEffort}
         onOpenEffort={onOpenEffort}
         ref={weightInputRef}
@@ -111,7 +114,7 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
             onPress={onCommit}
             style={[styles.tick, canCommit ? null : styles.tickDisabled]}
             testID="exercise-set-logger-commit">
-            <Icon color={uiRoles.onAccent} name="check" />
+            <Icon colorRole="onAccent" name="check" />
           </Pressable>
         </View>
       </SetEntryFields>
@@ -119,7 +122,7 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   // The row being edited: `accent-wash` ground with an `accent` rule on its
   // leading edge. Rule + padding keep the tick on the list's control axis.
   logger: {
@@ -128,13 +131,13 @@ const styles = StyleSheet.create({
     paddingBottom: uiSpace.md,
     paddingLeft: uiSpace.sm,
     paddingRight: uiSpace.md,
-    backgroundColor: uiRoles.accentWash,
+    backgroundColor: roles.accentWash,
     borderLeftWidth: uiSpace.xs,
-    borderLeftColor: uiRoles.accent,
+    borderLeftColor: roles.accent,
     borderTopWidth: uiBorder.width,
     borderBottomWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
-    borderBottomColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
+    borderBottomColor: roles.ruleSoft,
   },
   header: {
     flexDirection: 'row',
@@ -154,9 +157,9 @@ const styles = StyleSheet.create({
     borderRadius: uiGeometry.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: uiRoles.accent,
+    backgroundColor: roles.accent,
   },
   tickDisabled: {
-    backgroundColor: uiRoles.inkGhost,
+    backgroundColor: roles.inkGhost,
   },
-});
+}));

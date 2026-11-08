@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { Screen, StatePanel } from '@/components/ui';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 
-import { groupScreenStyles } from './screen-styles';
+import { useGroupScreenStyles } from './screen-styles';
 
 /** Signed out or auth-unconfigured: groups need an account. The panel centres on the page. */
 export function GroupsSignInRequired({
@@ -14,6 +14,7 @@ export function GroupsSignInRequired({
   isConfigured: boolean;
   leading?: ReactNode;
 }) {
+  const groupScreenStyles = useGroupScreenStyles();
   const router = useRouter();
   return (
     <Screen style={groupScreenStyles.content}>

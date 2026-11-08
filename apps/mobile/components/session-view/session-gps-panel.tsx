@@ -1,8 +1,9 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
-import { uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { DEFAULT_SUGGESTION_RADIUS_M } from '@/src/location/gym-location-matcher';
 import { SESSION_POSITION_GOOD_ACCURACY_M, type SessionPositionState } from '@/src/location/session-position';
 
@@ -71,6 +72,9 @@ const suggestionOutcome = (state: SessionPositionState | null, nearbyGymCount: n
  * a lifter.
  */
 export function SessionGpsPanel({ state, nearbyGymCount, suggestionCount }: SessionGpsPanelProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const position = state?.position ?? null;
 
   const rows: { key: string; label: string; value: string }[] = [
@@ -102,22 +106,22 @@ export function SessionGpsPanel({ state, nearbyGymCount, suggestionCount }: Sess
 
   return (
     <View style={styles.panel} testID="session-gps-panel">
-      <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.label, styles.title]}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, styles.title]}>
         GPS state
       </Text>
       {rows.map((row, index) => (
         <View key={row.key} style={[styles.row, index > 0 ? styles.rowDivider : null]} testID={`session-gps-row-${row.key}`}>
-          <Text allowFontScaling={false} style={uiText.meta}>{row.label}</Text>
-          <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink, uiTextEmphasis.strong, styles.value]} testID={`session-gps-value-${row.key}`}><FigureText strong>{row.value}</FigureText></Text>
+          <Text allowFontScaling={false} style={text.meta}>{row.label}</Text>
+          <Text allowFontScaling={false} style={[text.meta, tone.ink, uiTextEmphasis.strong, styles.value]} testID={`session-gps-value-${row.key}`}><FigureText strong>{row.value}</FigureText></Text>
         </View>
       ))}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   panel: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
     borderRadius: uiGeometry.radius.card,
     marginBottom: uiSpace.md,
     marginHorizontal: uiSpace.lg,
@@ -134,10 +138,10 @@ const styles = StyleSheet.create({
   },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: uiRoles.rule,
+    borderTopColor: roles.rule,
   },
   value: {
     flexShrink: 1,
     textAlign: 'right',
   },
-});
+}));

@@ -74,11 +74,12 @@ export default ({ config }: { config: ExpoConfig }) => ({
     orientation: "portrait",
     icon: "./assets/images/app-icons/warm.png",
     scheme: APP_SCHEME,
-    // "automatic", so the app can read the phone's mode at launch: a pinned
+    // "automatic", so the app can read and follow the phone's mode: a pinned
     // "light" makes the OS report light whatever the phone is set to. The
     // app then pins its own native UI — alerts, the keyboard, pickers — to
-    // the mode the user chose (components/ui/theme-launch.ts), so this value
-    // never decides how a screen looks.
+    // the mode the user chose, or unpins it for System
+    // (components/ui/theme-native.ts), so this value never decides how a
+    // screen looks.
     userInterfaceStyle: "automatic",
 
     ios: {

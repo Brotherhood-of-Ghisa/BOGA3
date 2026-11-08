@@ -7,7 +7,7 @@
  * `progress-history-page.test.tsx`.
  */
 
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import * as ReactNative from 'react-native';
 import { Modal, StyleSheet } from 'react-native';
 import type { ReactTestInstance } from 'react-test-renderer';
@@ -33,13 +33,17 @@ import { compareProgressFamilies, nextMuscleSortMode, sortProgressMuscles } from
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
 import { breakdownParam, periodParam } from '@/components/stats/use-progress-filters';
 import ProgressRoute from '../app/(tabs)/progress';
-import { ListRow, uiGeometry, uiRoles } from '@/components/ui';
+import { ListRow, uiGeometry } from '@/components/ui';
 import {
   resolveComparisonLayout,
   type ComparisonPeriodFigures,
 } from '@/components/stats/comparison-columns';
 import { compareProgressVolume, type ProgressComparison } from '@/src/data/progress-comparisons';
 import type { StatsSummary, ProgressComparisons } from '@/src/data';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+import { launchTheme } from '@/components/ui/theme-launch';
+
+const roles = rolesFor(launchTheme.appearance);
 
 const buildLegacySummary = (overrides: Partial<StatsSummary> = {}): StatsSummary => ({
   current: {
@@ -232,7 +236,7 @@ const sortArrow = (header: ExerciseSortHeader): 'up' | 'down' | null => {
 };
 
 const renderStatsScreenShell = (overrides: Partial<StatsScreenShellProps> = {}) =>
-  render(<StatsScreenShell {...buildShellProps(overrides)} />);
+  renderWithTheme(<StatsScreenShell {...buildShellProps(overrides)} />);
 
 describe('Progress route parity', () => {
   it('uses the existing Stats / History implementation without an analytics fork', () => {
@@ -513,7 +517,7 @@ describe('StatsScreenShell', () => {
 
   it('restores list names, inline contribution disclosure and the saved history entry', () => {
     const props = buildShellProps({ muscleLayout: 'list' });
-    render(<StatsScreenShell {...props} />);
+    renderWithTheme(<StatsScreenShell {...props} />);
     fireEvent.press(screen.getByTestId('stats-muscle-history-chest'));
     expect(props.onOpenMuscleHistory).toHaveBeenLastCalledWith({ muscleGroupId: 'chest' }, undefined);
     const disclosure = screen.getByTestId('stats-muscle-select-chest');
@@ -693,10 +697,10 @@ describe('StatsScreenShell — view mode toggle', () => {
     expect(cell('up', 'now')).toHaveTextContent('6');
     expect(cell('up', 'previous')).toHaveTextContent('4');
     expect(cell('up', 'change')).toHaveTextContent('+2');
-    expect(cell('up', 'change')).toHaveStyle({ color: uiRoles.gain });
+    expect(cell('up', 'change')).toHaveStyle({ color: roles.gain });
     expect(cell('down', 'change')).toHaveTextContent('−3');
-    expect(cell('down', 'change')).toHaveStyle({ color: uiRoles.loss });
-    expect(cell('up', 'now')).toHaveStyle({ color: uiRoles.ink });
+    expect(cell('down', 'change')).toHaveStyle({ color: roles.loss });
+    expect(cell('up', 'now')).toHaveStyle({ color: roles.ink });
 
     view.rerender(<StatsScreenShell {...buildShellProps({ viewMode: 'exercise',
       exerciseMetric: 'totalVolume', exerciseListItems: items })} />);
@@ -855,7 +859,7 @@ describe('StatsScreenShell — view mode toggle', () => {
       buildExerciseListItem('alpha', 'Alpha', { current: { totalVolume: 100 } }),
       buildExerciseListItem('beta', 'Beta', { current: { totalVolume: 300 } }),
     ];
-    const view = render(
+    const view = renderWithTheme(
       <StatsScreenShell
         {...buildShellProps({ viewMode: 'exercise', exerciseMetric: 'totalVolume', exerciseListItems: initialItems })}
       />
@@ -927,7 +931,7 @@ describe('StatsScreenShell — search & filtering', () => {
 
   it('calls onSearchQueryChange when typing and shows clear button', () => {
     const onSearchQueryChange = jest.fn();
-    const { rerender } = render(
+    const { rerender } = renderWithTheme(
       <StatsScreenShell
         {...buildShellProps({
           searchQuery: '',
@@ -957,7 +961,7 @@ describe('StatsScreenShell — search & filtering', () => {
   });
 
   it('filters exercises based on searchQuery', () => {
-    render(
+    renderWithTheme(
       <StatsScreenShell
         {...buildShellProps({
           viewMode: 'exercise',
@@ -975,7 +979,7 @@ describe('StatsScreenShell — search & filtering', () => {
   });
 
   it('matches exercises on their muscle groups, as the exercise picker does', () => {
-    render(
+    renderWithTheme(
       <StatsScreenShell
         {...buildShellProps({
           viewMode: 'exercise',
@@ -994,7 +998,7 @@ describe('StatsScreenShell — search & filtering', () => {
   });
 
   it('shows correct empty state when no exercises match', () => {
-    render(
+    renderWithTheme(
       <StatsScreenShell
         {...buildShellProps({
           viewMode: 'exercise',
@@ -1015,7 +1019,7 @@ describe('StatsScreenShell — search & filtering', () => {
 });
 
 it('shows Volume with no coverage note and uses ordinary strength copy for bodyweight arithmetic', () => {
-  render(<StatsScreenShell {...buildShellProps({ viewMode: 'exercise', exerciseMetric: 'totalVolume',
+  renderWithTheme(<StatsScreenShell {...buildShellProps({ viewMode: 'exercise', exerciseMetric: 'totalVolume',
     exerciseListItems: [
       listItem('bw', { name: 'Pull-up', current: { workingSetCount: 2, totalVolume: 800, volumeSetCount: 2, estimatedOneRepMax: 127.7 } }),
       listItem('huge', { name: 'Overflowed', current: { workingSetCount: 1, totalVolume: null, volumeSetCount: 1 } }),
@@ -1111,7 +1115,7 @@ it.each([['3d', 320], ['3d', 390], ['list', 320], ['list', 390]] as const)(
       current: { workingSetCount: 1, totalVolume: 188271603422374, volumeSetCount: 1 },
       previous: { workingSetCount: 1, totalVolume: 6172839456170, volumeSetCount: 1 } }];
     const onExerciseHistory = jest.fn();
-    render(<ProgressMuscleView muscles={[muscle]} metric="totalVolume" selectedId={muscle.muscleGroupId}
+    renderWithTheme(<ProgressMuscleView muscles={[muscle]} metric="totalVolume" selectedId={muscle.muscleGroupId}
       muscleLayout={muscleLayout} onSelect={jest.fn()} onMuscleHistory={jest.fn()} onExerciseHistory={onExerciseHistory} />);
     const axis = muscleLayout === 'list';
     const header = screen.UNSAFE_getAllByType(ComparisonHeaders)
@@ -1154,7 +1158,7 @@ it.each([320, 430])('keeps full muscle figures and contribution columns at %ipt'
     expect(screen.getByTestId(`stats-contribution-bench-${column}`)).toHaveStyle(
       { width: StyleSheet.flatten(screen.getByTestId(`stats-muscle-row-chest-${column}`).props.style).width });
   }
-  expect(screen.getByTestId('stats-muscle-row-chest-previous')).toHaveStyle({ color: uiRoles.ink });
+  expect(screen.getByTestId('stats-muscle-row-chest-previous')).toHaveStyle({ color: roles.ink });
   expect(screen.getByRole('link', { name: 'Open Long exercise name history' })).toBeTruthy();
   expect(within(screen.getByTestId('stats-muscle-table-header')).getByText('Δ')).toBeTruthy();
   act(() => ReactNative.Dimensions.set({ window: dimensions }));
@@ -1167,7 +1171,7 @@ it('returns screen-reader focus to the retained exercise row that launched histo
   const props = buildShellProps({ viewMode: 'exercise', exerciseListItems: [
     listItem('lift', { name: 'Lift', current: { workingSetCount: 1, totalVolume: 100, volumeSetCount: 1 } }),
   ] });
-  const view = render(<StatsScreenShell {...props} />);
+  const view = renderWithTheme(<StatsScreenShell {...props} />);
   // The native Pressable mock has no host instance; supply its ref callback
   // so this check exercises the screen's launch/return focus wiring.
   const row = screen.UNSAFE_getAllByType(ListRow).find(item => item.props.testID === 'stats-exercise-row-lift')!;
@@ -1189,7 +1193,7 @@ it.each(['muscle', 'contributor'] as const)('restores reader focus to the %s his
   const summary = buildSummary();
   summary.muscles[0].exercises = [{ ...summary.muscles[0], exerciseDefinitionId: 'bench', displayName: 'Bench', role: 'primary' }];
   const props = buildShellProps({ summary });
-  const view = render(<StatsScreenShell {...props} />);
+  const view = renderWithTheme(<StatsScreenShell {...props} />);
   fireEvent.press(screen.getByTestId('stats-muscle-select-chest'));
   // Jest has no native Pressable instance. Supply the native target at the
   // component boundary; activation wiring itself is covered above.
@@ -1213,7 +1217,7 @@ it('leaves the reader where it landed when the return was not from history', asy
   const props = buildShellProps({ viewMode: 'exercise', exerciseListItems: [
     listItem('lift', { name: 'Lift', current: { workingSetCount: 1, totalVolume: 100, volumeSetCount: 1 } }),
   ] });
-  const view = render(<StatsScreenShell {...props} />);
+  const view = renderWithTheme(<StatsScreenShell {...props} />);
   const row = screen.UNSAFE_getAllByType(ListRow).find(item => item.props.testID === 'stats-exercise-row-lift')!;
   act(() => row.props.ref({ canonical: { nativeTag: 77 } }));
   fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
@@ -1234,7 +1238,7 @@ it('leaves focus alone on a first load, with no row to return to', async () => {
   const enabled = jest.spyOn(ReactNative.AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(true);
   const focused = jest.spyOn(ReactNative.AccessibilityInfo, 'setAccessibilityFocus').mockImplementation(() => undefined);
   const props = buildShellProps({ viewMode: 'exercise' });
-  const view = render(<StatsScreenShell {...props} isFocused={false} />);
+  const view = renderWithTheme(<StatsScreenShell {...props} isFocused={false} />);
   view.rerender(<StatsScreenShell {...props} isFocused />);
   await act(async () => {});
   expect(focused).not.toHaveBeenCalled();
@@ -1249,7 +1253,7 @@ it.each(['reopen', 'unmount'])('ignores a pending focus check after %s', async a
   const props = buildShellProps({ viewMode: 'exercise', exerciseListItems: [
     listItem('lift', { name: 'Lift', current: { workingSetCount: 1, totalVolume: 100, volumeSetCount: 1 } }),
   ] });
-  const view = render(<StatsScreenShell {...props} />);
+  const view = renderWithTheme(<StatsScreenShell {...props} />);
   const row = screen.UNSAFE_getAllByType(ListRow).find(item => item.props.testID === 'stats-exercise-row-lift')!;
   act(() => row.props.ref({ canonical: { nativeTag: 77 } }));
   fireEvent.press(screen.getByTestId('stats-exercise-row-lift'));
@@ -1270,9 +1274,9 @@ it('draws the three filter chips as one equal-width outline row', () => {
     ['stats-metric-chip', 'Sets']] as const) {
     const chip = screen.getByTestId(id);
     expect(within(row).getByTestId(id)).toBeTruthy();
-    expect(chip).toHaveStyle({ flex: 1, backgroundColor: uiRoles.surface, borderColor: uiRoles.rule });
+    expect(chip).toHaveStyle({ flex: 1, backgroundColor: roles.surface, borderColor: roles.rule });
     expect(chip).toHaveTextContent(label);
-    expect(StyleSheet.flatten(within(chip).getByText(label).props.style).color).toBe(uiRoles.ink);
+    expect(StyleSheet.flatten(within(chip).getByText(label).props.style).color).toBe(roles.ink);
   }
 });
 

@@ -13,7 +13,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { eq } from 'drizzle-orm';
 
 jest.mock('@/src/data/bootstrap', () =>
@@ -34,12 +34,16 @@ jest.mock('expo-router', () => ({
 }));
 
 import { GymsScreen } from '@/components/gyms';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import GymsRoute from '../app/gyms';
 import * as localGyms from '@/src/data/local-gyms';
 import { gyms } from '@/src/data/schema';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
+import { renderWithTheme, rolesFor } from './helpers/theme';
 import { waitForGone } from './helpers/wait-for-gone';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const FIX = {
   status: 'success' as const,
@@ -66,7 +70,7 @@ const seed = async () => {
 
 const renderScreen = async () => {
   await seed();
-  render(<GymsScreen readPosition={readPosition} />);
+  renderWithTheme(<GymsScreen readPosition={readPosition} />);
   await screen.findByTestId('gyms-list');
 };
 
@@ -117,8 +121,8 @@ describe('Gyms screen over real data', () => {
 
     await openEditor('Synced Strength House');
     // The name field's micro-label (faint, inside the field); Location heads its form section (muted).
-    expect(screen.getByText('Name')).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: uiRoles.inkFaint });
-    expect(screen.getByText('Location')).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: uiRoles.inkMuted });
+    expect(screen.getByText('Name')).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: roles.inkFaint });
+    expect(screen.getByText('Location')).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: roles.inkMuted });
     expect(screen.getByTestId('gym-editor-location-status')).toHaveStyle({ fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base });
     // No inline explanation under the section ([[copy.no-inline-explanation]]).
     expect(screen.queryByText(/^Private to you/)).toBeNull();
@@ -134,7 +138,7 @@ describe('Gyms screen over real data', () => {
       fireEvent.press(screen.getByLabelText('Save current location for gym Downtown Iron Temple'));
     });
     expect(screen.getByTestId('gym-editor-feedback')).toHaveStyle({
-      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: uiRoles.danger,
+      fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: roles.danger,
     });
   });
 
@@ -339,7 +343,7 @@ describe('Gyms screen over real data', () => {
     fireEvent.press(screen.getByTestId('gyms-toggle-archived'));
     expect(screen.getByTestId('gyms-toggle-archived')).toHaveTextContent('Hide archived');
     expect(screen.getByTestId('gyms-row-downtown-iron-temple-status')).toHaveTextContent('Archived');
-    expect(screen.getAllByText('Archived').find((node) => node.props.testID === undefined)).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: uiRoles.inkFaint });
+    expect(screen.getAllByText('Archived').find((node) => node.props.testID === undefined)).toHaveStyle({ fontFamily: uiFonts.display.family, textTransform: 'uppercase', color: roles.inkFaint });
 
     await openEditor('Downtown Iron Temple');
     await act(async () => {
@@ -354,7 +358,7 @@ describe('Gyms screen over real data', () => {
   it('draws no back of its own: the native header is the one way back, from More or a session', async () => {
     await seed();
     mockSearchParams = { source: 'more' };
-    render(<GymsRoute />);
+    renderWithTheme(<GymsRoute />);
     await screen.findByTestId('gyms-list');
 
     expect(screen.queryByTestId('back-to-more-button')).toBeNull();
@@ -366,10 +370,10 @@ describe('Gyms screen over real data', () => {
   it('offers a retry when the gyms read fails (a failed read)', async () => {
     jest.spyOn(localGyms, 'listLocalGymsIncludingArchived').mockRejectedValueOnce(new Error('disk'));
     await seed();
-    render(<GymsScreen readPosition={readPosition} />);
+    renderWithTheme(<GymsScreen readPosition={readPosition} />);
 
     expect(await screen.findByText("Couldn't load your gyms.")).toHaveStyle({
-      fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: uiRoles.inkMuted,
+      fontFamily: uiFonts.body.family, fontSize: uiTypography.size.base, color: roles.inkMuted,
     });
     fireEvent.press(screen.getByTestId('gyms-retry'));
     expect(await screen.findByTestId('gyms-list')).toBeTruthy();

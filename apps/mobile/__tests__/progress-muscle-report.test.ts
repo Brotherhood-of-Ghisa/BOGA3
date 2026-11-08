@@ -1,9 +1,10 @@
 // Progress reads the user's muscles ([[muscle.report-groups]]): the data path, the
 // 3D body and the helpers the screens share.
 import {
-  buildThemeShadePalette, buildMuscleShadeRamp, hitTestProjectedMuscle, projectMuscleBody,
+  buildMuscleShadeRamp, hitTestProjectedMuscle,
 } from '@/components/stats/muscle-body-projection';
 import { MUSCLE_BODY_MESH } from '@/components/stats/muscle-body-mesh';
+import { projectMuscleBody, testPalette } from './helpers/muscle-body-palette';
 import {
   compareFamilySections, countFamilyMuscles, familyHasHeader, sortProgressMuscles,
 } from '@/components/stats/progress-tables';
@@ -36,7 +37,7 @@ describe('3D body under the user’s muscles', () => {
   const scores = new Map([['back_lats', 1], ['chest', -1]]);
   const project = (report?: typeof BROAD, angleDeg = 180) =>
     projectMuscleBody({ angleDeg, width: 300, height: 560, scores, report });
-  const palette = buildThemeShadePalette();
+  const palette = testPalette;
 
   it('gives every member mesh of a muscle its shade and the muscle’s id', () => {
     const detailed = project(undefined);

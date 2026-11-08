@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native';
 
-import { Screen, uiRoles, uiSpace, uiText } from '@/components/ui';
+import { makeStyles, Screen, uiSpace, useUiRoles, useUiText } from '@/components/ui';
 import {
   coerceMaestroHarnessQueryParam,
   isMaestroHarnessAllowed,
@@ -20,6 +20,7 @@ import {
 } from '@/src/maestro/harness';
 
 import { prepareExerciseHistoryReadForMaestro } from '@/src/exercise-catalog/stats-cache';
+import { suppressNotificationPrompt } from '@/src/session-recorder/notification-prompt-suppression';
 
 type HarnessStatus =
   | { kind: 'running'; message: string }
@@ -32,6 +33,9 @@ const HARNESS_NOT_ALLOWED: HarnessStatus = {
 };
 
 export default function MaestroHarnessScreen() {
+  const styles = useStyles();
+  const text = useUiText();
+  const roles = useUiRoles();
   const router = useRouter();
   const params = useLocalSearchParams<{
     reset?: string | string[];
@@ -132,6 +136,10 @@ export default function MaestroHarnessScreen() {
       presentation: presentationParam,
     });
 
+    // Before anything a flow can tap: the rest timer must never raise the iOS
+    // notification dialog over a Maestro run.
+    suppressNotificationPrompt();
+
     void (async () => {
       try {
         await runMaestroHarnessReset(resetMode);
@@ -186,15 +194,15 @@ export default function MaestroHarnessScreen() {
   // Dev/test-only (plan G8). Flows wait on the status copy, so it never changes.
   return (
     <Screen style={styles.screen} testID="maestro-harness-screen">
-      {shownStatus.kind === 'running' ? <ActivityIndicator color={uiRoles.inkMuted} size="small" /> : null}
-      <Text allowFontScaling={false} selectable style={[styles.message, shownStatus.kind === 'error' ? styles.errorMessage : null]} testID="maestro-harness-status">
+      {shownStatus.kind === 'running' ? <ActivityIndicator color={roles.inkMuted} size="small" /> : null}
+      <Text allowFontScaling={false} selectable style={[text.body, styles.message, shownStatus.kind === 'error' ? styles.errorMessage : null]} testID="maestro-harness-status">
         {shownStatus.message}
       </Text>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   screen: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -202,11 +210,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.xl,
   },
   message: {
-    ...uiText.body,
     textAlign: 'center',
   },
   errorMessage: {
     fontWeight: '600',
-    color: uiRoles.danger,
+    color: roles.danger,
   },
-});
+}));

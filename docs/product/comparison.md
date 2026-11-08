@@ -1,18 +1,5 @@
 # Comparison
 
-### comparison.tonnage-references · presentation · accepted
-
-Tonnage references are fixed, approximate familiar-weight comparisons. Either
-period's cumulative figure at the selected day makes them eligible: today by
-default, with current-period projection for future days. Visual fitting cannot
-add references. Drop the lightest comparisons first rather than increasing the
-chart's existing minimum height. Shown references share the data's linear
-scale, with only necessary top clearance. Sets has no references.
-
-Why: relatable weights must not change the figures or imply an achievement.
-Code: `apps/mobile/components/today/tonnage-references.ts`;
-`apps/mobile/components/today/period-pace.tsx`.
-
 ### comparison.change-display · presentation · accepted
 
 | Figure | Shown as | Examples |
@@ -27,7 +14,7 @@ Today's week figures and a group's At a glance total show none: each fills a
 bar in laps of the previous week's total.
 
 Why: counts and strength differences read directly; ratios make Volume changes comparable.
-Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColour` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/period-pace.tsx`; `apps/mobile/components/groups/group-week-totals.tsx`.
+Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColourIn` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/period-pace.tsx`; `apps/mobile/components/groups/group-week-totals.tsx`.
 
 ### comparison.allowed-periods · principle · accepted
 

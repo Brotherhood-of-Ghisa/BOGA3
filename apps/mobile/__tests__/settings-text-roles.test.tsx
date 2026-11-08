@@ -3,14 +3,19 @@
  * "Text roles"): titles `title`, micro-labels `label`, figures in Plex Mono and
  * words never. The theme preview keeps the colours of the theme it previews.
  */
-import { configure, render, screen, within } from '@testing-library/react-native';
+import { configure, screen, within } from '@testing-library/react-native';
 
 import { HueRing } from '@/components/appearance/hue-ring';
 import { ThemePreview } from '@/components/appearance/theme-preview';
 import { SignedOutCard } from '@/components/profile/profile-cards';
 import { generateRoles } from '@/components/ui/theme';
 import { seedsFromHue } from '@/components/ui/theme-hue';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
+
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const defaultRoles = rolesFor(DEFAULT_APPEARANCE);
 
 const TITLE = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg, lineHeight: uiTypography.lineHeight.lg } as const;
 const FIGURE = { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.base } as const;
@@ -22,7 +27,7 @@ describe('ThemePreview', () => {
   afterAll(() => configure({ defaultIncludeHiddenElements: false }));
   const roles = generateRoles(seedsFromHue(200));
   const renderPreview = () => {
-    render(<ThemePreview roles={roles} testID="preview" />);
+    renderWithTheme(<ThemePreview roles={roles} testID="preview" />);
     return within(screen.getByTestId('preview'));
   };
 
@@ -56,15 +61,15 @@ describe('ThemePreview', () => {
 
 describe('HueRing', () => {
   it('names the hue as a title and its degrees as a muted figure', () => {
-    render(<HueRing hue={47} onChange={jest.fn()} testID="ring" />);
+    renderWithTheme(<HueRing hue={47} onChange={jest.fn()} testID="ring" />);
     expect(screen.getByTestId('ring-name')).toHaveStyle(TITLE);
-    expect(screen.getByText('47°')).toHaveStyle({ ...FIGURE, color: uiRoles.inkMuted });
+    expect(screen.getByText('47°')).toHaveStyle({ ...FIGURE, color: defaultRoles.inkMuted });
   });
 });
 
 describe('SignedOutCard', () => {
   it('titles the card', () => {
-    render(
+    renderWithTheme(
       <SignedOutCard disabled={false} email="" inlineError={null} isSubmitting={false} onChangeEmail={jest.fn()}
         onChangePassword={jest.fn()} onSignIn={jest.fn()} password="" />,
     );

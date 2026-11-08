@@ -4,13 +4,23 @@
  * it, and `Manage` on the right. The screen's own behaviour is
  * groups-screens.test.tsx.
  */
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, renderHook, screen } from '@testing-library/react-native';
 import * as mockReact from 'react';
 import { StyleSheet, Text, type TextStyle } from 'react-native';
 
-import { uiText } from '@/components/ui/text-roles';
+
 
 import { GroupScreenHeader } from '@/components/groups/group-screen-header';
+import { useUiText } from '@/components/ui/text-roles';
+import { AppThemeProvider } from '@/components/ui/theme-context';
+import { renderWithTheme } from './helpers/theme';
+
+// The live text roles, read once before any render under test: `renderHook`
+// would otherwise take over `screen`.
+let uiText!: ReturnType<typeof useUiText>;
+beforeAll(() => {
+  uiText = renderHook(() => useUiText(), { wrapper: AppThemeProvider }).result.current;
+});
 
 jest.mock('expo-router', () => ({
   // The header's custom title and right action render inline, so a test can read them.
@@ -26,7 +36,7 @@ const GROUPS = [
 ];
 
 const renderHeader = (overrides: Partial<Parameters<typeof GroupScreenHeader>[0]> = {}) =>
-  render(
+  renderWithTheme(
     <GroupScreenHeader
       groupName="Garage Gym"
       groups={GROUPS}

@@ -168,6 +168,12 @@ the scripts' names:
    `EXDevMenuIsOnboardingFinished=true` via the
    `apps/mobile/plugins/with-android-dev-menu-preferences.js` config plugin.
    Best-effort on both — a failed grant is logged, not fatal.
+   iOS cannot pre-grant notifications (`simctl privacy` has no such service), so
+   the app never asks under Maestro: the launch seeds the user-defaults key
+   `BogaMaestroSuppressNotificationPrompt`, every harness link writes it again
+   (a `clearState` wipes it), and a local dev client holding it skips the rest timer's
+   permission request. No flow taps the dialog away; if it ever shows, the
+   next assertion fails.
 5. **iOS password AutoFill preflight.** Auth/profile, sync and groups lanes
    require AutoFill off. After resolving and persisting the actual simulator
    UDID, provision invokes `maestro-ios-autofill.js` before app install/launch.

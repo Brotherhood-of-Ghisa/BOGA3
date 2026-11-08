@@ -6,7 +6,7 @@
  * `meta` in `danger`; words never take Plex Mono, only the figures inside them
  * do (`FigureText`).
  */
-import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import { StyleSheet, type TextStyle } from 'react-native';
 
 jest.mock('expo-router', () => ({
@@ -24,8 +24,14 @@ import { PlanSection } from '@/components/session-planner/plan-sections';
 import { ProgrammeDetailHeader } from '@/components/session-planner/programme-detail-header';
 import { ProgrammeFormScreen } from '@/components/session-planner/programme-form-screen';
 import { ProgrammePlanList } from '@/components/session-planner/programme-plan-list';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { PlanBlockView, PlanDetailView, ProgrammeDetailView } from '@/src/session-planner';
+
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+// The roles the app is drawn in, as the provider resolves them.
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const style = (node: { props: { style?: unknown } }): TextStyle => StyleSheet.flatten(node.props.style as never) as TextStyle;
 
@@ -78,22 +84,22 @@ const plan = (overrides: Partial<PlanDetailView> = {}): PlanDetailView => ({
 
 describe('Plan detail', () => {
   it('titles the plan in title, its supporting lines in meta with figures in Plex Mono', () => {
-    render(<PlanDetailSummary deletable detail={plan()} onDelete={jest.fn()} onDuplicate={jest.fn()} onEdit={jest.fn()} onStartAll={jest.fn()} />);
-    expect(style(screen.getByTestId('plan-detail-title'))).toMatchObject({ ...TITLE, color: uiRoles.ink });
+    renderWithTheme(<PlanDetailSummary deletable detail={plan()} onDelete={jest.fn()} onDuplicate={jest.fn()} onEdit={jest.fn()} onStartAll={jest.fn()} />);
+    expect(style(screen.getByTestId('plan-detail-title'))).toMatchObject({ ...TITLE, color: roles.ink });
     expectFigureInWords(screen.getByTestId('plan-detail-schedule'), '28-10-2026');
     expectFigureInWords(screen.getByTestId('plan-detail-progress'), '3');
     expectFigureInWords(screen.getByTestId('plan-detail-programme-badge'), '2');
-    expect(style(screen.getByTestId('plan-detail-provenance'))).toMatchObject({ ...META, color: uiRoles.inkMuted });
+    expect(style(screen.getByTestId('plan-detail-provenance'))).toMatchObject({ ...META, color: roles.inkMuted });
   });
 
   it('titles each block in title, its state in meta and its targets in ink, figures in Plex Mono', () => {
-    render(<PlanDetailBlocks detail={plan()} onAdd={jest.fn()} onOpenSession={jest.fn()} onSkip={jest.fn()} />);
+    renderWithTheme(<PlanDetailBlocks detail={plan()} onAdd={jest.fn()} onOpenSession={jest.fn()} onSkip={jest.fn()} />);
     expect(style(screen.getByText('Bench Press'))).toMatchObject(TITLE);
     const state = screen.getByTestId('plan-detail-block-1-state');
-    expect(style(state)).toMatchObject({ ...META, color: uiRoles.inkMuted });
+    expect(style(state)).toMatchObject({ ...META, color: roles.inkMuted });
     expectFigureInWords(state, '1');
     const targets = screen.getByTestId('plan-detail-block-1-targets');
-    expect(style(targets)).toMatchObject({ ...META, color: uiRoles.ink });
+    expect(style(targets)).toMatchObject({ ...META, color: roles.ink });
     expect(style(within(targets).getByText('100'))).toMatchObject(FIGURE);
   });
 });
@@ -112,38 +118,38 @@ describe('Programme detail', () => {
   };
 
   it('titles the programme, its description and stats in meta', () => {
-    render(<ProgrammeDetailHeader detail={detail} onDelete={jest.fn()} onDuplicate={jest.fn()} onEdit={jest.fn()} />);
+    renderWithTheme(<ProgrammeDetailHeader detail={detail} onDelete={jest.fn()} onDuplicate={jest.fn()} onEdit={jest.fn()} />);
     expect(style(screen.getByText('Strength block'))).toMatchObject(TITLE);
     expect(style(screen.getByText('Four weeks of triples.'))).toMatchObject(META);
     expectFigureInWords(screen.getByTestId('programme-detail-stats'), '3');
   });
 
   it('heads the next block in a faint label, its name in bodyStrong, its targets in meta', () => {
-    render(<NextProgrammeBlockCard blockCounts={counts} nextBlock={block()} onAdd={jest.fn()} onSkip={jest.fn()} />);
-    expect(style(screen.getByText('Next up'))).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
+    renderWithTheme(<NextProgrammeBlockCard blockCounts={counts} nextBlock={block()} onAdd={jest.fn()} onSkip={jest.fn()} />);
+    expect(style(screen.getByText('Next up'))).toMatchObject({ ...LABEL, color: roles.inkFaint });
     expect(style(screen.getByTestId('programme-next-block-name'))).toMatchObject(BODY_STRONG);
     expectFigureInWords(screen.getByTestId('programme-next-block-targets'), '100');
   });
 
   it('writes the empty next-block card in meta', () => {
-    render(<NextProgrammeBlockCard blockCounts={counts} nextBlock={null} onAdd={jest.fn()} onSkip={jest.fn()} />);
-    expect(style(screen.getByText('Next block'))).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
+    renderWithTheme(<NextProgrammeBlockCard blockCounts={counts} nextBlock={null} onAdd={jest.fn()} onSkip={jest.fn()} />);
+    expect(style(screen.getByText('Next block'))).toMatchObject({ ...LABEL, color: roles.inkFaint });
     expect(style(screen.getByTestId('programme-next-block-empty-text'))).toMatchObject(META);
   });
 
   it('lists sessions under a faint label, names in bodyStrong, status in label, detail in meta', () => {
-    render(<ProgrammePlanList onOpenPlan={jest.fn()} plans={[plan()]} />);
+    renderWithTheme(<ProgrammePlanList onOpenPlan={jest.fn()} plans={[plan()]} />);
     // A micro-label's count stays in the label's own face: Plex Mono 500 would sit lighter than its caps.
     const heading = screen.getByText('Sessions (1)');
-    expect(style(heading)).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
+    expect(style(heading)).toMatchObject({ ...LABEL, color: roles.inkFaint });
     expect(within(heading).queryAllByText('1')).toHaveLength(0);
     expect(style(screen.getByText('Heavy day'))).toMatchObject({ ...BODY_STRONG, flex: 1 });
-    expect(style(screen.getByText('Planned'))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted });
+    expect(style(screen.getByText('Planned'))).toMatchObject({ ...LABEL, color: roles.inkMuted });
     expectFigureInWords(screen.getByText(/· 3 blocks · 1 completed · 0 skipped$/), '28-10-2026');
   });
 
   it('asks which card in body, names each card in bodyStrong and counts its sets in meta', () => {
-    render(
+    renderWithTheme(
       <PlanCardChoiceSheet
         blockName="Bench Press"
         candidates={[{ id: 'c1', exerciseName: 'Bench Press', setCount: 2 }]}
@@ -159,7 +165,7 @@ describe('Programme detail', () => {
 
 describe('Sessions planning sections', () => {
   it('heads a section in a faint label, names rows in bodyStrong, details in meta', () => {
-    render(
+    renderWithTheme(
       <PlanSection
         label="Unscheduled"
         onOpenPlan={jest.fn()}
@@ -168,7 +174,7 @@ describe('Sessions planning sections', () => {
         testID="section"
       />,
     );
-    expect(style(screen.getByText('Unscheduled'))).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
+    expect(style(screen.getByText('Unscheduled'))).toMatchObject({ ...LABEL, color: roles.inkFaint });
     expect(style(screen.getByText('Strength block'))).toMatchObject(BODY_STRONG);
     expect(style(screen.getByText('Heavy day'))).toMatchObject(BODY_STRONG);
     expectFigureInWords(screen.getByText(/^Programme ·/), '3');
@@ -180,7 +186,7 @@ describe('Plan and programme forms', () => {
   const formBlock = { id: 'fb1', sourceBlockId: null, exerciseDefinitionId: null, name: 'Bench Press', loadInputMode: null, sets: [{ id: 's1', targetWeightText: '', targetRepsText: '', targetSetType: 'rir_2' as const }] };
 
   it('titles a block in title and draws its errors in meta, danger', () => {
-    render(
+    renderWithTheme(
       <PlanBlockEditor
         block={formBlock}
         count={1}
@@ -195,20 +201,20 @@ describe('Plan and programme forms', () => {
       />,
     );
     expect(style(within(screen.getByTestId('plan-form-block-1-pick')).getByText('Bench Press'))).toMatchObject(TITLE);
-    expect(style(screen.getByTestId('plan-form-block-1-name-error'))).toMatchObject({ ...META, color: uiRoles.danger });
-    expect(style(screen.getByTestId('plan-form-block-1-set-1-reps-error'))).toMatchObject({ ...META, color: uiRoles.danger });
+    expect(style(screen.getByTestId('plan-form-block-1-name-error'))).toMatchObject({ ...META, color: roles.danger });
+    expect(style(screen.getByTestId('plan-form-block-1-set-1-reps-error'))).toMatchObject({ ...META, color: roles.danger });
   });
 
   it('draws the plan form\'s blocks error in meta, danger and its hint in muted body', async () => {
-    render(<PlanFormScreen initialForm={{ title: '', scheduleText: '', gymId: null, blocks: [] }} onSave={jest.fn()} saveLabel="Save plan" />);
+    renderWithTheme(<PlanFormScreen initialForm={{ title: '', scheduleText: '', gymId: null, blocks: [] }} onSave={jest.fn()} saveLabel="Save plan" />);
     await act(async () => {});
     await act(async () => fireEvent.press(screen.getByTestId('plan-form-save')));
-    expect(style(screen.getByTestId('plan-form-blocks-error'))).toMatchObject({ ...META, color: uiRoles.danger });
-    expect(style(screen.getByTestId('plan-form-blocks-empty'))).toMatchObject({ ...BODY, color: uiRoles.inkMuted });
+    expect(style(screen.getByTestId('plan-form-blocks-error'))).toMatchObject({ ...META, color: roles.danger });
+    expect(style(screen.getByTestId('plan-form-blocks-empty'))).toMatchObject({ ...BODY, color: roles.inkMuted });
   });
 
   it('heads the programme\'s sessions in a faint label, names each in bodyStrong, its error in meta, danger', async () => {
-    render(
+    renderWithTheme(
       <ProgrammeFormScreen
         initialForm={{ name: 'Strength block', description: '', plans: [{ id: 'cp1', sourcePlanId: null, title: 'Week 1', scheduleText: '', gymId: null, blocks: [] }] }}
         onSave={jest.fn()}
@@ -217,16 +223,16 @@ describe('Plan and programme forms', () => {
     );
     await act(async () => {});
     const heading = screen.getByText('Sessions (1)');
-    expect(style(heading)).toMatchObject({ ...LABEL, color: uiRoles.inkFaint });
+    expect(style(heading)).toMatchObject({ ...LABEL, color: roles.inkFaint });
     expect(within(heading).queryAllByText('1')).toHaveLength(0);
     expect(style(screen.getByText('Week 1'))).toMatchObject(BODY_STRONG);
     expectFigureInWords(screen.getByText(/· 0 blocks$/), '0');
     await act(async () => fireEvent.press(screen.getByTestId('programme-form-save')));
-    expect(style(screen.getByText('Please review errors inside this session.'))).toMatchObject({ ...META, color: uiRoles.danger });
+    expect(style(screen.getByText('Please review errors inside this session.'))).toMatchObject({ ...META, color: roles.danger });
   });
 
   it('heads the child session editor\'s fields in label, its empty-blocks hint in muted body', async () => {
-    render(
+    renderWithTheme(
       <ProgrammeFormScreen
         initialForm={{ name: 'Strength block', description: '', plans: [{ id: 'cp1', sourcePlanId: null, title: 'Week 1', scheduleText: '', gymId: null, blocks: [] }] }}
         onSave={jest.fn()}
@@ -236,8 +242,8 @@ describe('Plan and programme forms', () => {
     await act(async () => {});
     await act(async () => fireEvent.press(screen.getByTestId('programme-form-plan-1-edit')));
     ['Exercise blocks', 'When and where'].forEach((text) =>
-      expect(style(screen.getByText(text))).toMatchObject({ ...LABEL, color: uiRoles.inkMuted }),
+      expect(style(screen.getByText(text))).toMatchObject({ ...LABEL, color: roles.inkMuted }),
     );
-    expect(style(screen.getByTestId('programme-child-plan-blocks-empty'))).toMatchObject({ ...BODY, color: uiRoles.inkMuted });
+    expect(style(screen.getByTestId('programme-child-plan-blocks-empty'))).toMatchObject({ ...BODY, color: roles.inkMuted });
   });
 });

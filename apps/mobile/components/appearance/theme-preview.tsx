@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, uiBorder, uiGeometry, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { FigureText, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
@@ -18,10 +18,12 @@ const PREVIEW_ONE_REP_MAX = { performed: oneRepMax(80, 8), planned: oneRepMax(82
 
 const HEATMAP: (keyof UiRoles)[] = ['viz0', 'viz2', 'viz1', 'viz0', 'viz3', 'viz4', 'viz2', 'viz0', 'viz1', 'viz3', 'viz4', 'viz0'];
 
-// A small mock of the app drawn in another theme's roles: the screens bake
-// this launch's `uiRoles` in, so the preview cannot reuse them. Every colour
+// A small mock of the app drawn in another theme's roles: the screens are drawn
+// in the saved theme, so the preview cannot reuse their colours. Every colour
 // here comes from `roles`; the layout comes from the shared tokens.
 export function ThemePreview({ roles, testID }: ThemePreviewProps) {
+  const type = useUiText();
+  const tone = useUiTextTone();
   const text = (colour: string) => ({ color: colour });
   return (
     <View
@@ -31,40 +33,40 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
       testID={testID}>
       <View style={[styles.card, { backgroundColor: roles.surface, borderColor: roles.rule }]}>
         <View style={styles.cardHeader}>
-          <Text allowFontScaling={false} style={[uiText.title, text(roles.ink)]}>
+          <Text allowFontScaling={false} style={[type.title, text(roles.ink)]}>
             Bench Press
           </Text>
-          <Text allowFontScaling={false} style={[uiText.meta, text(roles.inkMuted)]}>
+          <Text allowFontScaling={false} style={[type.meta, text(roles.inkMuted)]}>
             <FigureText>{`1 set · 1RM ${PREVIEW_ONE_REP_MAX.performed}`}</FigureText>
           </Text>
         </View>
         <View style={[styles.setRow, { borderTopColor: roles.ruleSoft }]}>
-          <Text allowFontScaling={false} style={[uiText.figure, styles.setIndex, text(roles.inkFaint)]}>
+          <Text allowFontScaling={false} style={[type.figure, styles.setIndex, text(roles.inkFaint)]}>
             1
           </Text>
-          <Text allowFontScaling={false} style={[uiText.figure, styles.figureCell, text(roles.ink)]}>
+          <Text allowFontScaling={false} style={[type.figure, styles.figureCell, text(roles.ink)]}>
             80 × 8
           </Text>
-          <Text allowFontScaling={false} style={[uiText.meta, text(roles.inkFaint)]}>
+          <Text allowFontScaling={false} style={[type.meta, text(roles.inkFaint)]}>
             <FigureText>{`1RM ${PREVIEW_ONE_REP_MAX.performed}`}</FigureText>
           </Text>
         </View>
         <View style={[styles.setRow, { borderTopColor: roles.ruleSoft, backgroundColor: roles.accentWash }]}>
-          <Text allowFontScaling={false} style={[uiText.figure, styles.setIndex, text(roles.accent)]}>
+          <Text allowFontScaling={false} style={[type.figure, styles.setIndex, text(roles.accent)]}>
             2
           </Text>
-          <Text allowFontScaling={false} style={[uiText.figure, styles.figureCell, text(roles.ink)]}>
+          <Text allowFontScaling={false} style={[type.figure, styles.figureCell, text(roles.ink)]}>
             82.5 × 8
           </Text>
-          <Text allowFontScaling={false} style={[uiText.meta, text(roles.inkGhost)]}>
+          <Text allowFontScaling={false} style={[type.meta, text(roles.inkGhost)]}>
             <FigureText>{`1RM ${PREVIEW_ONE_REP_MAX.planned}`}</FigureText>
           </Text>
         </View>
         <View style={[styles.record, { backgroundColor: roles.recordWash, borderTopColor: roles.recordRule }]}>
-          <Text allowFontScaling={false} style={[uiText.label, text(roles.record)]}>
+          <Text allowFontScaling={false} style={[type.label, text(roles.record)]}>
             BEST EVER
           </Text>
-          <Text allowFontScaling={false} style={[uiText.figure, uiTextTone.record, styles.figureCell, styles.recordFigure, text(roles.record)]}>
+          <Text allowFontScaling={false} style={[type.figure, tone.record, styles.figureCell, styles.recordFigure, text(roles.record)]}>
             105.0
           </Text>
         </View>
@@ -83,12 +85,12 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
       </View>
       <View style={styles.actions}>
         <View style={[styles.button, styles.buttonOutline, { borderColor: roles.danger, backgroundColor: roles.surface }]}>
-          <Text allowFontScaling={false} style={[uiText.button, text(roles.danger)]}>
+          <Text allowFontScaling={false} style={[type.button, text(roles.danger)]}>
             DELETE
           </Text>
         </View>
         <View style={[styles.button, styles.buttonPrimary, { backgroundColor: roles.accent }]}>
-          <Text allowFontScaling={false} style={[uiText.button, text(roles.onAccent)]}>
+          <Text allowFontScaling={false} style={[type.button, text(roles.onAccent)]}>
             LOG SET
           </Text>
         </View>

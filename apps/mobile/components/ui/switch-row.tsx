@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, Switch, Text, View } from 'react-native';
 
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextFor, useUiText } from '@/components/ui/text-roles';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type SwitchRowProps = {
   // `sheet` (default): a roomy row among a sheet's options. `list`: a form
@@ -24,6 +25,9 @@ export type SwitchRowProps = {
  * accessible switch; the drawn switch is its glyph.
  */
 export function SwitchRow({ density = 'sheet', disabled = false, divider = false, label, description, value, onValueChange, testID }: SwitchRowProps) {
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const textRoles = useUiText();
   return (
     <Pressable
       accessibilityLabel={description !== undefined ? `${label}, ${description}` : label}
@@ -42,7 +46,7 @@ export function SwitchRow({ density = 'sheet', disabled = false, divider = false
       ]}
       testID={testID}>
       <View style={styles.text}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[density === 'list' ? uiText.option : uiText.optionLarge, disabled ? styles.labelDisabled : null]}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[density === 'list' ? textRoles.option : textRoles.optionLarge, disabled ? styles.labelDisabled : null]}>
           {label}
         </Text>
         {description !== undefined ? <Text allowFontScaling={false} style={styles.description}>{description}</Text> : null}
@@ -52,7 +56,7 @@ export function SwitchRow({ density = 'sheet', disabled = false, divider = false
           disabled={disabled}
           onValueChange={onValueChange}
           testID={testID ? `${testID}-switch` : undefined}
-          trackColor={{ false: uiRoles.rule, true: uiRoles.accent }}
+          trackColor={{ false: roles.rule, true: roles.accent }}
           value={value}
         />
       </View>
@@ -61,7 +65,7 @@ export function SwitchRow({ density = 'sheet', disabled = false, divider = false
 }
 
 // The sheet density of `ListRow`, so it sits among a sheet's rows.
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -77,10 +81,10 @@ const styles = StyleSheet.create({
   },
   divider: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   disabled: {
     opacity: 0.5,
@@ -90,10 +94,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   description: {
-    ...uiText.body,
-    color: uiRoles.inkMuted,
+    ...uiTextFor(roles).body,
+    color: roles.inkMuted,
   },
   labelDisabled: {
-    color: uiRoles.inkMuted,
+    color: roles.inkMuted,
   },
-});
+}));

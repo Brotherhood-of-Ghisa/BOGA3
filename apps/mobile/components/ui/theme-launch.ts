@@ -1,9 +1,7 @@
 import { Storage } from 'expo-sqlite/kv-store';
-import { Appearance, type ColorSchemeName } from 'react-native';
 
-import type { ThemeMode } from '@/components/ui/theme';
+import { readPhoneScheme } from '@/components/ui/theme-native';
 import {
-  appearanceMode,
   defaultTheme,
   resolveAppearance,
   resolveThemePreset,
@@ -17,12 +15,10 @@ import {
   type AppearanceRecordResult,
 } from '@/components/ui/theme-record';
 
-
 // The chosen appearance, per device: it is not synced to the account. Read
-// synchronously when `tokens.ts` first evaluates, for the launch-time
-// `uiRoles` / `uiMode`. Modules that still read those take a choice on the
-// next launch (`docs/specs/ui/design-language.md` §2, "Choosing one");
-// modules that read the theme hooks (`theme-context.tsx`) follow each save.
+// synchronously when the theme provider (`theme-context.tsx`) first loads, and
+// again after each save, which repaints the app
+// (`docs/specs/ui/design-language.md` §2, "Choosing one").
 //
 // The record (`theme-record.ts`). Every save writes it.
 export const APPEARANCE_STORAGE_KEY = 'boga3.appearance.v3';
@@ -39,7 +35,7 @@ export function readStoredTheme(): ResolvedTheme {
   const record = Storage.getItemSync(APPEARANCE_STORAGE_KEY);
   if (record !== null) return resolveRecord(parseAppearanceRecord(record));
   const legacy = Storage.getItemSync(LEGACY_APPEARANCE_STORAGE_KEY);
-  if (legacy !== null) return resolveRecord(parseLegacyAppearanceRecord(legacy, Appearance.getColorScheme()));
+  if (legacy !== null) return resolveRecord(parseLegacyAppearanceRecord(legacy, readPhoneScheme()));
   return resolveThemePreset(Storage.getItemSync(THEME_PRESET_STORAGE_KEY));
 }
 
@@ -55,37 +51,14 @@ export function readLaunchTheme(): ResolvedTheme {
   }
 }
 
-// The theme this launch is drawn in. Never changes while the app runs.
+// The stored choice as this launch found it: the theme the app first draws,
+// and any problem that made it fall back to the default.
 export const launchTheme: ResolvedTheme = readLaunchTheme();
-
-// Reads the OS's mode, then pins the app's native UI (alerts, the date picker,
-// the keyboard, the status bar's default) to the resolved mode (a custom
-// theme's from its page) until the app
-// is next launched, so an OS change while the app runs never mixes modes. The
-// read must come first: once pinned, the OS reports the pin.
-// `userInterfaceStyle: "automatic"` (`app.config.ts`) is what lets the read
-// see a dark OS at all. A JS reload inside the same process (the dev
-// client's reload) reads the previous pin, so it keeps that launch's mode;
-// only a cold start reads the OS afresh.
-export function pinLaunchMode(appearance: AppearanceChoice): { osScheme: ColorSchemeName | null; mode: ThemeMode } {
-  const osScheme = Appearance.getColorScheme() ?? null;
-  const resolved = appearanceMode(appearance, osScheme);
-  // react-native-web's Appearance cannot pin; the web build has no native UI to pin.
-  Appearance.setColorScheme?.(resolved);
-  return { osScheme, mode: resolved };
-}
-
-// The OS's mode as this launch found it, and the mode this launch is drawn in.
-// Resolved here, in the module `tokens.ts` evaluates first, so no module reads
-// a role before the mode is fixed. Never changes while the app runs.
-const launchPin = pinLaunchMode(launchTheme.appearance);
-export const launchOsScheme: ColorSchemeName | null = launchPin.osScheme;
-export const launchMode: ThemeMode = launchPin.mode;
 
 const savedListeners = new Set<() => void>();
 
-// Called after every successful save, so a row showing the stored choice
-// (Settings home, Appearance) re-reads it when another page saved.
+// Called after every successful save: the theme provider repaints the app, and
+// a row showing the stored choice (Settings home, Appearance) re-reads it.
 export function subscribeThemeSaved(listener: () => void): () => void {
   savedListeners.add(listener);
   return () => {

@@ -25,7 +25,8 @@ import {
 } from 'react-native';
 import Svg, { Line, Path, Rect } from 'react-native-svg';
 
-import { FigureText, IconButton, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone, uiTypography } from '@/components/ui';
+import { FigureText, IconButton, uiGeometry, uiSpace, uiTypography, useUiRoles } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import type { CalendarHeatmapMetric } from '@/src/data';
 
 import type { HeatmapData } from './heatmapData';
@@ -83,8 +84,8 @@ const weekDescription = (week: TimelineWeek, figure: Figure, metricLabel: string
   return `Week of ${range}, ${metricLabel} ${figure.value}${unit}${week.isCurrentWeek ? ', Current week' : ''}`;
 };
 
-// A title's figures are as heavy as its words.
-const TITLE_FIGURE = { fontWeight: uiText.title.fontWeight };
+// A title's figures are as heavy as its words (the `title` text role's weight).
+const TITLE_FIGURE = { fontWeight: uiTypography.weight.bold };
 
 // The focused week, its figure, and the two steps away from it. The label is
 // read by neither arrow nor plot: the plot's adjustable value speaks for it.
@@ -93,20 +94,22 @@ function Readout({ week, figure, onStep, hasPrevious, hasNext, testID }: {
   onStep: (delta: number) => void; hasPrevious: boolean; hasNext: boolean; testID: string;
 }) {
   const dateFormat = useDateFormat();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return <View style={styles.readout}>
     <View style={styles.weekNav}>
       <IconButton accessibilityLabel="Previous week" disabled={!hasPrevious} name="chevron-left"
         onPress={() => onStep(-1)} testID={`${testID}-previous-week`} />
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.weekColumn}>
-        <Text allowFontScaling={false} style={uiText.title}
+        <Text allowFontScaling={false} style={text.title}
           testID={`${testID}-readout-week`}><FigureText figureStyle={TITLE_FIGURE}>{weekLabel(week.monday, dateFormat)}</FigureText></Text>
       </View>
       <IconButton accessibilityLabel="Next week" disabled={!hasNext} name="chevron-right"
         onPress={() => onStep(1)} testID={`${testID}-next-week`} />
     </View>
     <Text importantForAccessibility="no" accessibilityElementsHidden allowFontScaling={false}
-      style={uiText.figureLarge} testID={`${testID}-readout-value`}>
-      {figure.value}{figure.unit ? <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}> {figure.unit}</Text> : null}
+      style={text.figureLarge} testID={`${testID}-readout-value`}>
+      {figure.value}{figure.unit ? <Text allowFontScaling={false} style={[text.label, tone.faint]}> {figure.unit}</Text> : null}
     </Text>
   </View>;
 }
@@ -114,6 +117,8 @@ function Readout({ week, figure, onStep, hasPrevious, hasNext, testID }: {
 export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, testIDPrefix, formatValue,
   metricLabel, unitLabel, header, children }: Props) {
   const dateFormat = useDateFormat();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const testID = `${testIDPrefix}-timeline`;
   const series = useMemo(() => buildTimelineSeries(data.weekly, metric), [data.weekly, metric]);
   const [plotWidth, setPlotWidth] = useState(FALLBACK_PLOT_WIDTH);
@@ -167,7 +172,7 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
     <View style={styles.chartRow}>
       <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={[styles.axis, { width: axisWidth }]}>
         {geometry.ticks.map((tick, index) => <Text key={tick.value} allowFontScaling={false} numberOfLines={1}
-          style={[uiText.label, uiTextTone.faint, styles.tick, { top: tick.y - uiTypography.lineHeight.xxs / 2 }]}
+          style={[text.label, tone.faint, styles.tick, { top: tick.y - uiTypography.lineHeight.xxs / 2 }]}
           testID={`${testID}-tick-${tick.value}`}>{tickLabels[index]}</Text>)}
       </View>
       <View style={styles.plot} onLayout={onLayout}>
@@ -183,8 +188,8 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
             <TimelinePlot geometry={geometry} focusedIndex={focusedIndex} testID={testID} />
             <View pointerEvents="none" style={styles.months}>
               {geometry.months.map(month => <View key={month.index} style={[styles.month, { left: month.x }]}>
-                <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]} testID={`${testID}-month-${month.index}`}>{month.label}</Text>
-                {month.year === undefined ? null : <Text allowFontScaling={false} style={[uiText.label, uiTextTone.faint]}>{month.year}</Text>}
+                <Text allowFontScaling={false} style={[text.label, tone.faint]} testID={`${testID}-month-${month.index}`}>{month.label}</Text>
+                {month.year === undefined ? null : <Text allowFontScaling={false} style={[text.label, tone.faint]}>{month.year}</Text>}
               </View>)}
             </View>
           </Pressable>
@@ -198,15 +203,16 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
 function TimelinePlot({ geometry, focusedIndex, testID }: {
   geometry: ReturnType<typeof timelineGeometry>; focusedIndex: number; testID: string;
 }) {
+  const roles = useUiRoles();
   const { width, height, columnWidth } = geometry;
   return <View pointerEvents="none">
     <Svg height={height} width={width}>
-      {focusedIndex >= 0 ? <Rect fill={uiRoles.ruleSoft} height={height} testID={`${testID}-selected`}
+      {focusedIndex >= 0 ? <Rect fill={roles.ruleSoft} height={height} testID={`${testID}-selected`}
         width={columnWidth} x={focusedIndex * columnWidth} y={0} /> : null}
-      {geometry.ticks.map((tick, index) => <Line key={tick.value} stroke={index === 0 ? uiRoles.rule : uiRoles.ruleSoft}
+      {geometry.ticks.map((tick, index) => <Line key={tick.value} stroke={index === 0 ? roles.rule : roles.ruleSoft}
         strokeWidth={1} x1={0} x2={width} y1={tick.y} y2={tick.y} />)}
       {geometry.bars.map(bar => <Path key={bar.weekStartDateKey} d={barPath(bar)}
-        fill={bar.index === focusedIndex ? uiRoles.ink : uiRoles.viz4} testID={`${testID}-bar-${bar.weekStartDateKey}`} />)}
+        fill={bar.index === focusedIndex ? roles.ink : roles.viz4} testID={`${testID}-bar-${bar.weekStartDateKey}`} />)}
     </Svg>
   </View>;
 }

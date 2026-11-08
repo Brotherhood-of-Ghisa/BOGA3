@@ -1,5 +1,5 @@
 import { memo, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
@@ -7,8 +7,9 @@ import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { StatePanel } from '@/components/ui/state-panel';
 import { Tag } from '@/components/ui/tag';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import {
   type ExerciseListItem,
   type ExerciseListPreferences,
@@ -29,6 +30,7 @@ const SORT_LABELS = { favourite: 'Favourite', name: 'A–Z' } as const;
 // filter, the host's own chips, and Sort, which switches between the two orders
 // and shows the current one (`Favourite ⌄`; spoken `Sort: Favourite`).
 export function ExerciseListPreferenceControls({ preferences, onChangePreferences, children }: PreferenceControlsProps) {
+  const styles = useStyles();
   const nextSort = preferences.sort === 'favourite' ? 'name' : 'favourite';
   return (
     <View style={styles.controlsRow} testID="exercise-list-controls">
@@ -48,7 +50,7 @@ export function ExerciseListPreferenceControls({ preferences, onChangePreference
         accessibilityRole="button"
         label={SORT_LABELS[preferences.sort]}
         on={false}
-        trailing={<Icon color={uiRoles.inkMuted} name="chevron-down" size="sm" />}
+        trailing={<Icon colorRole="inkMuted" name="chevron-down" size="sm" />}
         onPress={() => onChangePreferences({ sort: nextSort })}
         testID="exercise-list-sort"
       />
@@ -73,6 +75,9 @@ type FilterChipProps = {
 // Full-height filters or compact row controls share their pill and selected
 // state. Compact controls keep a 44pt tap target through hit slop.
 export function FilterChip({ label, size = 'pill', leading, trailing, on, onPress, testID, ...a11y }: FilterChipProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const compact = size === 'compact';
   return (
     <Pressable
@@ -82,7 +87,7 @@ export function FilterChip({ label, size = 'pill', leading, trailing, on, onPres
       style={({ pressed }) => [styles.chip, compact && styles.compact, on ? styles.chipOn : null, pressed && !on ? styles.chipPressed : null]}
       testID={testID}>
       {leading}
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, compact ? styles.compactLabel : uiTextTone.ink, on ? styles.chipLabelOn : null]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.label, compact ? styles.compactLabel : tone.ink, on ? styles.chipLabelOn : null]}>
         {label}
       </Text>
       {trailing}
@@ -152,6 +157,9 @@ export function ExerciseListContent({
   renderActions,
   linkedExerciseIds,
 }: ExerciseListContentProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   if (historyStatus === 'error') {
     return <StatePanel body="Unable to load exercise history." fill={false} kind="error"
       action={onRetryHistory ? { label: 'Retry', accessibilityLabel: 'Retry exercise history', onPress: onRetryHistory } : undefined} />;
@@ -187,12 +195,12 @@ export function ExerciseListContent({
               divider={false}
               expanded={isExpanded}
               label={section.familyName}
-              meta={<Text allowFontScaling={false} style={[uiText.figureSmall, empty ? uiTextTone.faint : null]}>{section.count}</Text>}
+              meta={<Text allowFontScaling={false} style={[text.figureSmall, empty ? tone.faint : null]}>{section.count}</Text>}
               onPress={() => familyExpansion.toggle(section.familyName)}
               testID={getFamilyGroupTestId(section.familyName)}
               trailing={
                 <Icon
-                  color={empty ? uiRoles.inkGhost : uiRoles.inkMuted}
+                  colorRole={empty ? 'inkGhost' : 'inkMuted'}
                   name={isExpanded ? 'chevron-down' : 'chevron-right'}
                   size="sm"
                 />
@@ -227,11 +235,14 @@ const ExerciseListRow = memo(function ExerciseListRow({
   getAccessibilityLabel,
   renderActions,
 }: ExerciseListRowProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const deleted = Boolean(exercise.deletedAt);
-  const faint = deleted ? uiTextTone.faint : null;
+  const faint = deleted ? tone.faint : null;
   const accessibilityLabel = getAccessibilityLabel?.(exercise) ?? `Select exercise ${exercise.name}`;
   const accessibilityHint = `${linked ? 'Linked to a group exercise. ' : ''}${exercise.muscleLines.primary}. ${exercise.muscleLines.secondary}. ${exercise.statsSummary}.`;
-  const text = (
+  const content = (
     <View style={styles.rowText}>
       <View style={styles.titleRow}>
         <Text allowFontScaling={false}
@@ -239,17 +250,17 @@ const ExerciseListRow = memo(function ExerciseListRow({
           ellipsizeMode="clip"
           minimumFontScale={0.82}
           numberOfLines={2}
-          style={[uiText.option, faint, styles.name]}>
+          style={[text.option, faint, styles.name]}>
           {exercise.name}
         </Text>
-        {linked ? <Icon color={uiRoles.inkMuted} name="link" size="sm" testID={`exercise-linked-${exercise.id}`} /> : null}
+        {linked ? <Icon colorRole="inkMuted" name="link" size="sm" testID={`exercise-linked-${exercise.id}`} /> : null}
         {deleted ? <Tag label="Deleted" tone="faint" /> : null}
       </View>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.body, faint]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.body, faint]}>
         <FigureText>{exercise.statsSummary}</FigureText>
       </Text>
-      <Text allowFontScaling={false} style={[uiText.meta, faint]}>{exercise.muscleLines.primary}</Text>
-      <Text allowFontScaling={false} style={[uiText.meta, faint]}>{exercise.muscleLines.secondary}</Text>
+      <Text allowFontScaling={false} style={[text.meta, faint]}>{exercise.muscleLines.primary}</Text>
+      <Text allowFontScaling={false} style={[text.meta, faint]}>{exercise.muscleLines.secondary}</Text>
     </View>
   );
 
@@ -259,7 +270,7 @@ const ExerciseListRow = memo(function ExerciseListRow({
     return (
       <ListRow density="list" divider={divider} trailing={renderActions(exercise)}>
         <Pressable accessibilityLabel={accessibilityLabel} accessibilityHint={accessibilityHint} accessibilityRole="button" onPress={() => onPressExercise(exercise)}>
-          {text}
+          {content}
         </Pressable>
       </ListRow>
     );
@@ -271,7 +282,7 @@ const ExerciseListRow = memo(function ExerciseListRow({
       density="list"
       divider={divider}
       onPress={() => onPressExercise(exercise)}>
-      {text}
+      {content}
     </ListRow>
   );
 });
@@ -280,7 +291,7 @@ function getFamilyGroupTestId(familyName: string): string {
   return `exercise-family-group-${familyName.toLowerCase().replace(/\s+/g, '-')}`;
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   // One row; on the narrowest phones the last chip wraps rather than scrolling.
   controlsRow: {
     flexDirection: 'row',
@@ -297,9 +308,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: uiSpace.xs,
     paddingHorizontal: uiSpace.sm,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.pill,
   },
   compact: {
@@ -318,16 +329,16 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   chipOn: {
-    backgroundColor: uiRoles.ink,
-    borderColor: uiRoles.ink,
+    backgroundColor: roles.ink,
+    borderColor: roles.ink,
   },
   chipPressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   // The ink pill's label: no text tone draws on ink, so the selected chip takes
   // the on-ink colour here.
   chipLabelOn: {
-    color: uiRoles.onInk,
+    color: roles.onInk,
   },
   sections: {
     gap: uiSpace.sm,
@@ -344,4 +355,4 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
   },
-});
+}));

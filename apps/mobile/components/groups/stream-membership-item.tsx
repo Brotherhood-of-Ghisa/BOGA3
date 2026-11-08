@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { StreamMembershipViewModel } from '@/src/groups';
 
 type GroupStreamMembershipItemProps = {
@@ -12,14 +12,17 @@ type GroupStreamMembershipItemProps = {
 
 /** "X joined / left the group / was removed": a light row, not a card (08 pattern 6). */
 export function GroupStreamMembershipItem({ item, showGroupName, onPress }: GroupStreamMembershipItemProps) {
+  const streamRowStyles = useStreamRowStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const testID = `group-stream-membership-${item.key}`;
   const content = (
     <View style={streamRowStyles.row}>
-      <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
+      <Text allowFontScaling={false} style={[text.body, tone.muted]}>
         {item.sentence}
       </Text>
       {showGroupName ? (
-        <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta}>
+        <Text allowFontScaling={false} numberOfLines={1} style={text.meta}>
           {item.groupName}
         </Text>
       ) : null}
@@ -43,7 +46,7 @@ export function GroupStreamMembershipItem({ item, showGroupName, onPress }: Grou
 }
 
 /** The stream's light row: words on the page ground behind a `rule` hairline. */
-const streamRowStyles = StyleSheet.create({
+const useStreamRowStyles = makeStyles((roles) => ({
   row: {
     minHeight: uiGeometry.tapTarget,
     justifyContent: 'center',
@@ -51,9 +54,9 @@ const streamRowStyles = StyleSheet.create({
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     borderLeftWidth: uiBorder.width,
-    borderLeftColor: uiRoles.rule,
+    borderLeftColor: roles.rule,
   },
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
-});
+}));

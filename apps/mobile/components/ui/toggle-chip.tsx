@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextFor } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type ToggleChipOption<TValue extends string | number> = {
   value: TValue;
@@ -36,6 +37,7 @@ export function ToggleChip<TValue extends string | number>({
   testID,
   style,
 }: ToggleChipProps<TValue>) {
+  const styles = useStyles();
   const index = Math.max(0, options.findIndex(option => option.value === value));
   const current = options[index];
   const next = options[(index + 1) % options.length];
@@ -63,14 +65,14 @@ export function ToggleChip<TValue extends string | number>({
       </Text>
       {inert ? null : (
         <View accessible={false} style={styles.glyph}>
-          <Icon color={uiRoles.inkMuted} name="swap" size="xs" />
+          <Icon colorRole="inkMuted" name="swap" size="xs" />
         </View>
       )}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   // `flex: 1` with no basis: every chip in a row takes an equal share, so the
   // row reads as one control strip whichever values are in force.
   chip: {
@@ -84,19 +86,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: uiSpace.sm,
     paddingVertical: uiSpace.xs,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.control,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
   },
   chipPressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   label: {
-    ...uiText.label,
+    ...uiTextFor(roles).label,
     flexShrink: 1,
-    color: uiRoles.ink,
+    color: roles.ink,
   },
   glyph: {
     flexShrink: 0,
   },
-});
+}));

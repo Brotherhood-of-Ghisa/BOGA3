@@ -12,11 +12,11 @@ import {
   GroupOfflineBanner,
   GroupWriteNotice,
   GroupsSignInRequired,
-  groupScreenStyles,
   pickInlineError,
+  useGroupScreenStyles,
   usePullToRefresh,
 } from '@/components/groups';
-import { ActionButton, Card, uiText, uiTextTone } from '@/components/ui';
+import { ActionButton, Card, useUiText, useUiTextTone } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import {
   OWNER_LEAVE_NOTICE,
@@ -79,6 +79,7 @@ export default function GroupMembersRoute() {
 }
 
 function LostAccessState() {
+  const groupScreenStyles = useGroupScreenStyles();
   return (
     <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
       <GroupLostAccessState testID="group-members-lost-access" />
@@ -87,6 +88,9 @@ function LostAccessState() {
 }
 
 function GroupMembersContent({ userId, groupId }: { userId: string; groupId: string }) {
+  const groupScreenStyles = useGroupScreenStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const router = useRouter();
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({
@@ -206,7 +210,7 @@ function GroupMembersContent({ userId, groupId }: { userId: string; groupId: str
           variant="outline"
         />
       ) : (
-        <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]} testID="group-members-owner-leave-notice">
+        <Text allowFontScaling={false} style={[text.body, tone.muted]} testID="group-members-owner-leave-notice">
           {`${OWNER_LEAVE_NOTICE}. Open a member to make them the owner.`}
         </Text>
       )}

@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
-import { uiText } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextFor } from '@/components/ui/text-roles';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiSpace } from '@/components/ui/tokens';
 
 export type StatePanelKind = 'loading' | 'message' | 'error';
 
@@ -42,12 +43,14 @@ export function StatePanel({
   fill = true,
   testID,
 }: StatePanelProps) {
+  const styles = useStyles();
+  const roles = useUiRoles();
   return (
     <View
       accessibilityLiveRegion={kind === 'message' ? undefined : 'polite'}
       style={[styles.panel, fill ? styles.fill : null]}
       testID={testID}>
-      {kind === 'loading' ? <ActivityIndicator color={uiRoles.inkMuted} /> : null}
+      {kind === 'loading' ? <ActivityIndicator color={roles.inkMuted} /> : null}
       {title ? <Text allowFontScaling={false} style={styles.title}>{title}</Text> : null}
       {body ? <Text allowFontScaling={false} style={styles.body}>{body}</Text> : null}
       {action ? (
@@ -64,7 +67,7 @@ export function StatePanel({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   panel: {
     padding: uiSpace.lg,
     alignItems: 'center',
@@ -75,12 +78,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    ...uiText.title,
+    ...uiTextFor(roles).title,
     textAlign: 'center',
   },
   body: {
-    ...uiText.body,
-    color: uiRoles.inkMuted,
+    ...uiTextFor(roles).body,
+    color: roles.inkMuted,
     textAlign: 'center',
   },
-});
+}));

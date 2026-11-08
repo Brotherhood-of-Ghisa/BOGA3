@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, Icon, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { FigureText, Icon, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { RecordCertificationStatus } from '@/src/groups';
 
 /** `body`: a card's or sheet's status line. `meta`: the small mark beside a board row's date. */
@@ -31,7 +31,13 @@ export function GroupCertificationStatus({
   iconTestID?: string;
   size?: GroupCertificationStatusSize;
 }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const certified = status === 'certified';
+  // The status line in a card or sheet is a strong body line; beside a board
+  // row's date it is the row's quiet meta. Either way the figures in it (a date)
+  // take the figure face.
+  const labelRole = size === 'body' ? [text.bodyStrong, tone.muted] : text.meta;
   return (
     <View
       accessibilityLabel={label ?? undefined}
@@ -40,14 +46,14 @@ export function GroupCertificationStatus({
       testID={testID}>
       {status === 'voided' ? null : (
         <Icon
-          color={certified ? uiRoles.ink : uiRoles.inkMuted}
+          colorRole={certified ? 'ink' : 'inkMuted'}
           name={certified ? 'check' : 'circle'}
           size={size === 'meta' ? 'xs' : 'sm'}
           testID={iconTestID}
         />
       )}
       {label ? (
-        <Text allowFontScaling={false} style={[LABEL_ROLE[size], certified ? uiTextTone.ink : null]}>
+        <Text allowFontScaling={false} style={[labelRole, certified ? tone.ink : null]}>
           <FigureText strong={size === 'body'}>{label}</FigureText>
         </Text>
       ) : null}
@@ -62,11 +68,3 @@ const styles = StyleSheet.create({
     gap: uiSpace.xs,
   },
 });
-
-// The status line in a card or sheet is a strong body line; beside a board
-// row's date it is the row's quiet meta. Either way the figures in it (a date)
-// take the figure face.
-const LABEL_ROLE = {
-  body: [uiText.bodyStrong, uiTextTone.muted],
-  meta: uiText.meta,
-} as const;

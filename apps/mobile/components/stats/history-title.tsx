@@ -5,8 +5,8 @@ import { compareFamilySections, countFamilyMuscles, familyHasHeader } from '@/co
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { uiText } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 
 /** A muscle the title can switch to, as the user's muscle setup names and groups it. */
 export type HistoryTitleMuscle = { id: string; displayName: string; familyName: string };
@@ -19,8 +19,8 @@ const TITLE_MAX_WIDTH = 220;
  * The history page's native header title, in the sheet-title role: a step
  * above the stack's title role; a long exercise name shrinks before it truncates.
  * Given muscles, it is a button: a chevron follows the name, and a tap opens a
- * sheet of the user's muscles in Progress's family sections
- * ([[muscle.family-sections]]), the current one checked.
+ * sheet of the user's muscles in Progress's family sections, with the current
+ * muscle checked.
  */
 export function HistoryTitle({ title, muscles, currentId, onChoose }: {
   title: string;
@@ -28,9 +28,10 @@ export function HistoryTitle({ title, muscles, currentId, onChoose }: {
   currentId?: string;
   onChoose?: (muscleGroupId: string) => void;
 }) {
+  const text = useUiText();
   const [open, setOpen] = useState(false);
   const label = <Text adjustsFontSizeToFit allowFontScaling={false} minimumFontScale={0.75} numberOfLines={1}
-    style={[uiText.sheetTitle, styles.text]} testID="progress-history-title-text">{title}</Text>;
+    style={[text.sheetTitle, styles.text]} testID="progress-history-title-text">{title}</Text>;
   if (!muscles || muscles.length < 2 || !onChoose) {
     return <View accessibilityRole="header" accessible style={styles.root} testID="progress-history-title">{label}</View>;
   }
@@ -44,7 +45,7 @@ export function HistoryTitle({ title, muscles, currentId, onChoose }: {
         accessibilityRole="button" hitSlop={uiSpace.sm} onPress={() => setOpen(true)}
         style={({ pressed }) => [styles.root, pressed ? styles.pressed : null]} testID="progress-history-title">
         {label}
-        <Icon color={uiRoles.inkMuted} name="chevron-down" size="sm" />
+        <Icon colorRole="inkMuted" name="chevron-down" size="sm" />
       </Pressable>
       <Sheet dismissLabel="Dismiss muscles" onDismiss={() => setOpen(false)} testID="progress-history-muscle-sheet"
         title="Muscle" visible={open}>
@@ -52,7 +53,7 @@ export function HistoryTitle({ title, muscles, currentId, onChoose }: {
           {familySections(muscles).map(({ familyName, header, members }) => (
             <Fragment key={familyName}>
               {header ? <Text accessibilityRole="header" allowFontScaling={false}
-                style={[uiText.label, styles.family]}>{familyName}</Text> : null}
+                style={[text.label, styles.family]}>{familyName}</Text> : null}
               {members.map(muscle => {
                 const checked = muscle.id === currentId;
                 return <ListRow checked={checked} key={muscle.id} label={muscle.displayName}

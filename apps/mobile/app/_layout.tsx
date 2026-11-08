@@ -1,19 +1,18 @@
 import { ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { startThemeAppIcon } from '@/components/appearance/theme-app-icon';
+import { useThemeAppIcon } from '@/components/appearance/theme-app-icon';
 import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
-import { NAVIGATION_THEME, statusBarStyleFor } from '@/components/navigation/navigation-theme';
+import { statusBarStyleFor, useNavigationTheme } from '@/components/navigation/navigation-theme';
 import { NotificationTapBridge } from '@/components/navigation/notification-tap-bridge';
 import { RootStack } from '@/components/navigation/root-stack';
-import { AppThemeProvider } from '@/components/ui/theme-context';
+import { AppThemeProvider, useUiMode } from '@/components/ui/theme-context';
 import { launchTheme } from '@/components/ui/theme-launch';
-import { uiMode } from '@/components/ui/tokens';
 import { reportLaunchThemeProblem } from '@/src/appearance/launch-theme-report';
 import { AuthProvider, bootstrapAuthState } from '@/src/auth';
 import { getDatabaseBackups } from '@/src/backup/database-backups';
@@ -45,7 +44,6 @@ export default function RootLayout() {
     // A stored theme this launch could not use (unknown preset, unreadable
     // store) falls back to the default theme; say so in the logs.
     reportLaunchThemeProblem(launchTheme.problem);
-    const stopThemeAppIcon = startThemeAppIcon(launchTheme.preset);
 
     // Ask the OS to schedule the background sync task. Registration is async and
     // must not block boot, and a rejection (e.g. Background App Refresh disabled
@@ -74,7 +72,6 @@ export default function RootLayout() {
     return () => {
       mounted = false;
       stopDatabaseBackups?.();
-      stopThemeAppIcon();
       stopSyncGateStateBridge();
       stopSyncScheduler();
       stopLogFlushLoop();
@@ -82,27 +79,40 @@ export default function RootLayout() {
   }, []);
 
   // The theme sits outside everything else, so every screen and sheet below
-  // that reads it through the theme hooks follows a saved appearance. The
-  // navigation theme and the status bar below still take the launch theme.
+  // that reads it through the theme hooks follows a saved appearance, and so do
+  // the navigation theme, the status bar and the launcher icon (`ThemedChrome`).
   return (
     <AppThemeProvider>
       <GestureHandlerRootView style={styles.gestureRoot}>
         <SafeAreaProvider>
           <AuthProvider>
-            <ThemeProvider value={NAVIGATION_THEME}>
+            <ThemedChrome>
               <AuthRouteGuard>
                 <RootStack />
                 <NotificationTapBridge />
               </AuthRouteGuard>
-            </ThemeProvider>
-            {/* The status bar follows this launch's mode, never the phone's:
-                `auto` would follow a phone switched to the other mode while the
-                app runs, leaving the clock unreadable on the page. */}
-            <StatusBar style={statusBarStyleFor(uiMode)} />
+            </ThemedChrome>
           </AuthProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </AppThemeProvider>
+  );
+}
+
+// What the navigators, the status bar and the launcher icon take from the
+// theme the app is drawn in now.
+function ThemedChrome({ children }: { children: ReactNode }) {
+  const navigationTheme = useNavigationTheme();
+  const mode = useUiMode();
+  useThemeAppIcon();
+  return (
+    <>
+      <ThemeProvider value={navigationTheme}>{children}</ThemeProvider>
+      {/* The status bar follows the app's mode, never the phone's: `auto`
+          would follow a phone switched to the other mode while the app runs,
+          leaving the clock unreadable on the page. */}
+      <StatusBar style={statusBarStyleFor(mode)} />
+    </>
   );
 }
 

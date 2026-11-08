@@ -5,8 +5,7 @@ import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { uiText } from '@/components/ui/text-roles';
-import { uiRoles } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
 import {
   ALL_GYMS_LABEL,
   SELECTED_GYM_LABEL,
@@ -95,7 +94,7 @@ export function GymPickerButton({ value, options, onPress, size = 'pill', testID
       accessibilityRole="button"
       label={label}
       size={size}
-      trailing={size === 'compact' ? <Icon color={value !== undefined ? uiRoles.onInk : uiRoles.inkMuted} name="chevron-down" size="xs" /> : undefined}
+      trailing={size === 'compact' ? <Icon colorRole={value !== undefined ? 'onInk' : 'inkMuted'} name="chevron-down" size="xs" /> : undefined}
       on={value !== undefined}
       onPress={onPress}
       testID={testID}
@@ -134,6 +133,7 @@ export type GymScopeChoicesProps = GymScopeChoiceProps & Pick<GymPickerSheetProp
  * them among other choices; its rows are `<testID>-option-<gym>`.
  */
 export function GymScopeChoices({ value, options, allSessionCount, onChoose, testID }: GymScopeChoicesProps) {
+  const text = useUiText();
   const choices: Choice[] = [
     { key: 'all', gymId: undefined, label: ALL_GYMS_LABEL, count: allSessionCount },
     ...offeredOptions(value, options).map((option) => ({
@@ -151,10 +151,10 @@ export function GymScopeChoices({ value, options, allSessionCount, onChoose, tes
         checked={checked}
         key={choice.key}
         leading={<Icon name={checked ? 'radio-on' : 'radio-off'} />}
-        meta={choice.count === undefined ? undefined : <Text allowFontScaling={false} style={uiText.figureSmall}>{choice.count}</Text>}
+        meta={choice.count === undefined ? undefined : <Text allowFontScaling={false} style={text.figureSmall}>{choice.count}</Text>}
         onPress={() => onChoose(choice.gymId)}
         testID={`${testID}-option-${choice.key}`}>
-        <Text allowFontScaling={false} style={uiText.body}>{choice.label}</Text>
+        <Text allowFontScaling={false} style={text.body}>{choice.label}</Text>
       </ListRow>
     );
   });

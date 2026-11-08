@@ -1,5 +1,6 @@
 import { Text, View } from 'react-native';
-import { FigureText, uiText, uiTextTone } from '@/components/ui';
+import { FigureText, useUiRoles } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { RmCurveModel } from '@/src/rm-curve/model';
@@ -8,26 +9,30 @@ import { FIXED_REGIME_UNCERTAINTY } from '@/src/strength-regimes/fit';
 import type { useRegimeAssessment } from '@/src/strength-regimes/use-assessment';
 import { formatShortDate } from '@/src/utils/local-time';
 import { RmCurveChart, periodColour } from './chart';
-import { curveStyles as styles } from './styles';
+import { useCurveStyles } from './styles';
 
 /** Fitted amplitudes and observation-error scales; unsupported histories stay exploratory. */
 export function RmRegimes({ model, result, method, selectedId, dateFormat, onPick }: {
   model: RmCurveModel; result: ReturnType<typeof useRegimeAssessment>; selectedId: string | null;
   method: UncertaintyMethod; dateFormat: ExerciseDateFormat; onPick: (ids: string[]) => void;
 }) {
+  const styles = useCurveStyles();
+  const roles = useUiRoles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const assessment = result?.data;
   const factor = model.definition.loadInputMode === 'per_side_load' ? 2 : 1;
   return <>
     <RmCurveChart model={model} selectedId={selectedId} onPick={onPick}
       uncertainty={method === 'fixed' ? FIXED_REGIME_UNCERTAINTY : assessment?.uncertainty ?? null}
       curves={assessment?.curves ?? []} boundary={assessment?.boundary ?? null} />
-    <Text testID="rm-fit-state" accessibilityLiveRegion="polite" allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
+    <Text testID="rm-fit-state" accessibilityLiveRegion="polite" allowFontScaling={false} style={[text.body, tone.muted]}>
       {result === null ? 'Fitting curves' : result.limited ? 'Choose a shorter range' : result.error ? 'Fit unavailable' : assessment?.message}
     </Text>
-    {assessment ? <Text allowFontScaling={false} style={uiText.body}><FigureText>{`${assessment.sampledSessions} fitting sessions`}</FigureText></Text> : null}
+    {assessment ? <Text allowFontScaling={false} style={text.body}><FigureText>{`${assessment.sampledSessions} fitting sessions`}</FigureText></Text> : null}
     {assessment?.curves.map(curve => <View key={curve.period} style={styles.legend}>
-      <View style={[styles.dot, { borderColor: periodColour(curve.period), backgroundColor: 'transparent' }, curve.period === 'newer' ? { borderRadius: 0, transform: [{ rotate: '45deg' }] } : null]} />
-      <Text allowFontScaling={false} style={[uiText.body, styles.shrink, { color: periodColour(curve.period) }]}>
+      <View style={[styles.dot, { borderColor: periodColour(roles, curve.period), backgroundColor: 'transparent' }, curve.period === 'newer' ? { borderRadius: 0, transform: [{ rotate: '45deg' }] } : null]} />
+      <Text allowFontScaling={false} style={[text.body, styles.shrink, { color: periodColour(roles, curve.period) }]}>
         <FigureText>{`${periodLabel(curve.period, assessment.boundary, dateFormat)} · 1RM ${formatOneRepMax(curve.totalRm / factor)}${factor === 2 ? ' per side' : ''}`}</FigureText>
       </Text>
     </View>)}

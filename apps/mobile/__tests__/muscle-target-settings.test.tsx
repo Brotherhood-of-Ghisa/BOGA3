@@ -10,8 +10,10 @@ import { eq } from 'drizzle-orm';
 import MusclesRoute from '../app/settings-muscles';
 import TargetsRoute from '../app/settings-muscle-targets';
 import EnabledRoute from '../app/settings-enabled-muscles';
-import { uiText } from '@/components/ui';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiTextFor } from '@/components/ui';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
+import { launchTheme } from '@/components/ui/theme-launch';
+import { rolesFor } from './helpers/theme';
 import { muscleGroups } from '@/src/data/schema';
 import { stampLocalDataOwner } from '@/src/data/local-wipe';
 import * as setup from '@/src/data/muscle-report-settings';
@@ -24,6 +26,9 @@ import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLo
 import { updatePreferences } from '@/src/preferences/hooks';
 import { closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
+
+const roles = rolesFor(launchTheme.appearance);
+const uiText = uiTextFor(roles);
 
 const values = () => getAccountLocalPreferenceState().values;
 const edit = (id: string, value: string) => {
@@ -68,7 +73,7 @@ it('draws Muscles on the row vocabulary: section headings as micro-labels, row n
   expect(screen.getByText('Default target (sets / week)')).toHaveStyle(uiText.option);
   expect(screen.getByText('Breakdown')).toHaveStyle(uiText.option);
   const status = within(screen.getByTestId('settings-enabled-muscles-row')).getByText(/\d+ \/ \d+/);
-  expect(status).toHaveStyle({ fontFamily: uiFonts.body.family, color: uiRoles.inkMuted });
+  expect(status).toHaveStyle({ fontFamily: uiFonts.body.family, color: roles.inkMuted });
   within(status).getAllByText(/^\d+$/).forEach(figure => expect(figure).toHaveStyle({ fontFamily: uiFonts.figure.family }));
   expect(screen.getByTestId('settings-enabled-muscles-row')).toHaveTextContent(/Enabled muscles/);
 });
@@ -81,7 +86,7 @@ it('draws a muscle target row: the name as an option, a blank showing the defaul
   expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('placeholder', '8');
   expect(screen.queryByTestId('settings-muscle-target-chest-reset')).toBeNull();
   edit('settings-muscle-target-chest', '0');
-  expect(screen.getByTestId('settings-muscle-target-chest-error')).toHaveStyle({ ...META, color: uiRoles.danger });
+  expect(screen.getByTestId('settings-muscle-target-chest-error')).toHaveStyle({ ...META, color: roles.danger });
 });
 
 it('names the breakdown the targets apply to under the default', async () => {

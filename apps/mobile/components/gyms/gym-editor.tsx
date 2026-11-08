@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { FormField } from '@/components/ui/form-field';
 import { FormError, FormSection } from '@/components/ui/form-section';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiSpace } from '@/components/ui/tokens';
 import {
   readGymCoordinates,
   type GymCoordinates,
@@ -48,6 +49,9 @@ export type GymEditorProps = {
  * location is a section.
  */
 export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPosition }: GymEditorProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [name, setName] = useState(gym?.name ?? '');
   // A new gym's location waits here until the gym is added.
   const [stagedCoordinates, setStagedCoordinates] = useState<GymCoordinates | null>(null);
@@ -139,7 +143,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
   if (pending) {
     locationActions = (
       <View style={styles.confirm} testID="gym-editor-confirm">
-        <Text allowFontScaling={false} style={uiText.bodyStrong}>
+        <Text allowFontScaling={false} style={text.bodyStrong}>
           {pending === 'replace'
             ? 'Replace the saved location with where you are now?'
             : "Clear the saved location? This gym won't be suggested nearby."}
@@ -219,7 +223,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
         label={gym ? gym.name : 'New gym'}
         onPress={onCancel}
         testID="gym-editor-close"
-        trailing={<Icon color={uiRoles.inkMuted} name="chevron-up" />}
+        trailing={<Icon colorRole="inkMuted" name="chevron-up" />}
       />
       <FormField
         accessibilityLabel="Gym name"
@@ -234,8 +238,8 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
       />
 
       <FormSection title="Location">
-        <ListRow density="list" divider={false} leading={<Icon color={hasLocation ? uiRoles.ink : uiRoles.inkGhost} name="location" size="sm" />}>
-          <Text allowFontScaling={false} style={uiText.bodyStrong} testID="gym-editor-location-status">
+        <ListRow density="list" divider={false} leading={<Icon colorRole={hasLocation ? 'ink' : 'inkGhost'} name="location" size="sm" />}>
+          <Text allowFontScaling={false} style={text.bodyStrong} testID="gym-editor-location-status">
             {hasLocation ? (gym ? 'Location saved' : 'Location ready') : 'No location saved'}
           </Text>
         </ListRow>
@@ -245,7 +249,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
         <Text
           allowFontScaling={false}
           accessibilityLiveRegion="polite"
-          style={[uiText.meta, uiTextTone.muted]}
+          style={[text.meta, tone.muted]}
           testID="gym-editor-feedback">
           {feedback.message}
         </Text>
@@ -279,7 +283,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   // The row being edited: `accent-wash` with an `accent` leading rule, like the
   // exercise page's logger.
   editor: {
@@ -287,9 +291,9 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.md,
     paddingLeft: uiSpace.sm,
     paddingRight: uiSpace.md,
-    backgroundColor: uiRoles.accentWash,
+    backgroundColor: roles.accentWash,
     borderLeftWidth: uiSpace.xs,
-    borderLeftColor: uiRoles.accent,
+    borderLeftColor: roles.accent,
   },
   confirm: {
     gap: uiSpace.sm,
@@ -303,11 +307,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingTop: uiSpace.sm,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   buttonRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: uiSpace.sm,
   },
-});
+}));

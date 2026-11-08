@@ -11,7 +11,7 @@
 //    or `uiTokens.colors|radius|elevation`, in `app/**`, `components/**` or
 //    `src/**` (`.ts` and `.tsx`, tests excluded) blocks on sight. There is no
 //    budget and no allowlist; the list only ever grows. The replacements are
-//    `uiRoles`, `uiGeometry.radius` and the `@/components/ui` primitives
+//    `useUiRoles()` / `makeStyles`, `uiGeometry.radius` and the `@/components/ui` primitives
 //    (`docs/specs/ui/components-catalog.md`).
 //
 // 3. `ratchetRules` — type, spacing and radius. These started at 196 / 416 /

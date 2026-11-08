@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
-import { uiText } from '@/components/ui/text-roles';
+import { uiTextFor, useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
 
 type PageHeaderProps = {
@@ -11,9 +12,11 @@ type PageHeaderProps = {
 // A tab screen's in-content title (the tab screens have no native header):
 // Archivo 800 at `xxl`, standing alone ([[copy.no-subtitles]]).
 export function PageHeader({ title }: PageHeaderProps) {
+  const styles = useStyles();
+  const textRoles = useUiText();
   return (
     <View style={styles.page}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={uiText.pageTitle}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={textRoles.pageTitle}>
         {title}
       </Text>
     </View>
@@ -30,6 +33,7 @@ type SectionHeaderProps = {
 // A section's heading inside a screen: Archivo 700 at `lg`, with an optional
 // text action on the right.
 export function SectionHeader({ title, action }: SectionHeaderProps) {
+  const styles = useStyles();
   return (
     <View style={styles.section}>
       <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionTitle}>
@@ -48,7 +52,7 @@ export function SectionHeader({ title, action }: SectionHeaderProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   page: {
     gap: uiSpace.xs,
   },
@@ -59,7 +63,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.sm,
   },
   sectionTitle: {
-    ...uiText.title,
+    ...uiTextFor(roles).title,
     flex: 1,
   },
-});
+}));

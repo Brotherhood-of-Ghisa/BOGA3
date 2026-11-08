@@ -8,8 +8,8 @@
 > **Load when:** building or reviewing any screen.
 
 The app's one styling vocabulary, on every screen: the tokens in
-`apps/mobile/components/ui/tokens.ts` (`uiRoles`, `uiFonts`, `uiGeometry`,
-`uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`) and the primitives in
+`apps/mobile/components/ui/tokens.ts` (`uiFonts`, `uiGeometry`, `uiSpace`,
+`uiTypography`, `uiIconSize`, `uiBorder`), the live colour roles and the primitives in
 `apps/mobile/components/ui/` (`components-catalog.md`). This doc states the
 rules; the token files hold the values. The retired legacy vocabulary is
 blocked by a guardrail (`ux-rules.md` "Styling guardrails").
@@ -29,7 +29,7 @@ tap.
 
 Semantic roles, not a palette: **a screen names the role, never the hex.** The
 values are generated per theme, so neither a doc nor a screen may hold one —
-`uiRoles` is the only source, and `UiRoles` in
+`useUiRoles()` is the only source, and `UiRoles` in
 `apps/mobile/components/ui/theme.ts` documents what each role is for.
 
 Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
@@ -60,8 +60,7 @@ with readable text contrast; they do not reuse the sequential `viz` ramp or
 the gain/loss meanings.
 
 **Five seeds make a theme.** `generateRoles(seeds)` turns `background`,
-`text`, `accent`, `record` and `viz` into every role, synchronously at module load so every
-module-scope `StyleSheet.create` keeps working. A seed sets hue and chroma; the
+`text`, `accent`, `record` and `viz` into every role. A seed sets hue and chroma; the
 role sets its own fixed L\* — contrast depends on lightness, so the text floors
 hold whatever the seed. In light mode `accent` and `record` are used as given, so
 their floors are the seed's to meet.
@@ -72,18 +71,18 @@ their floors are the seed's to meet.
 `danger`, `gain`, `loss` and the regimes keep their light hues at L\*64;
 `selection` turns white, `scrim` 60% black. The `viz` ramp lightens in even
 steps, ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
-`uiRoles` take the launch mode's ladder; `tokens.ts` exports it as `uiMode`.
+The roles take the drawn mode's ladder; `useUiMode()` reads that mode.
 
-**Choosing one.** A theme — four presets or Custom — per device, resolved when
-`tokens.ts` first evaluates (`theme-presets.ts`, `theme-launch.ts`), stored as
-the JSON record `boga3.appearance.v3`, `{theme, mode, custom}`
-(`theme-record.ts`). With no record, the older `boga3.appearance.v2`
-(`{accent, background, text, mode}`) is converted — a preset left to match
-stays that preset, anything else becomes the custom theme it drew — and before
-it the accent id `boga3.themePreset.v1`; the first save writes the record and
-leaves both in place. A preset takes `mode`: `light` (default), `dark` or
-`system` (the phone's at launch). An unknown id, an invalid record or an
-unreadable store opens in the default and is logged. `record` stays a brass
+**Choosing one.** A theme — four presets or Custom — per device, stored as
+`boga3.appearance.v3`, `{theme, mode, custom}` (`theme-record.ts`). Each save
+repaints every mounted screen (`theme-context.tsx`). With no record, the older
+`boga3.appearance.v2` is converted — a preset left to match stays that preset,
+anything else becomes the custom theme it drew — and before it the accent id
+`boga3.themePreset.v1`; the first save writes the record and leaves both in
+place. A preset takes `mode`: `light` (default), `dark` or `system` (the
+phone's, followed live). Native UI is pinned to the drawn mode, unpinned under
+`system`, since a pinned OS reports the pin (`theme-native.ts`). An unknown id,
+an invalid record or an unreadable store opens in the default and is logged. `record` stays a brass
 across presets, so "your best ever" keeps one look. Settings → Appearance
 (`ux-rules.md` "Appearance") sets each part with a live preview.
 
@@ -96,12 +95,12 @@ distance, moved onto the chosen page. Depth scales that share for `surface`,
 starts from the preset in use. Custom themes are not gated against the floors
 above: only presets are hand-checked (`ui-theme-custom.test.ts`).
 
-The launcher icon follows the theme applied at launch: one per preset, one
+The launcher icon follows the drawn theme: one per preset, one
 rainbow icon for every custom theme, Warm as default and fallback. The native boundary,
 `apps/mobile/components/appearance/theme-app-icon.ts`, serializes requests while
 active and retries interruptions after foregrounding. Other native failures
-attempt the primary icon and are logged without blocking boot. Matching icons
-are left alone to avoid repeated OS alerts. `app.config.ts` bundles the PNGs in
+attempt the primary icon and are logged. Matching icons are left alone, avoiding
+repeated OS alerts. `app.config.ts` bundles the PNGs in
 `apps/mobile/assets/images/app-icons/` and supplies Android scheme filters to
 every launcher alias. Seasonal identity follows [[appearance.november]]; its
 alternates require a native build, while ordinary Warm remains primary.
@@ -162,7 +161,7 @@ Archivo **600**, the selected one **700**; headline figures stay Plex Mono 700,
 micro-labels Archivo 700, sheet titles Archivo 800.
 
 **Text roles.** A screen names what its text does and takes face, weight, size
-and line-height from `uiText` (`apps/mobile/components/ui/text-roles.ts`); it
+and line-height from `useUiText()` (`apps/mobile/components/ui/text-roles.ts`); it
 never assembles them itself. Decided 2026-10-27 on Today, where twenty mixes
 had grown for nine jobs.
 
@@ -186,7 +185,7 @@ had grown for nine jobs.
 | `figure` | Plex Mono 500 · `base` | every number in a row or table, on `body`'s line |
 | `figureSmall` | Plex Mono 500 · `sm`, muted | a quiet date, time or comparison |
 
-Colour (`uiTextTone`: ink, muted, faint, accent, gain, danger, record) and one step of
+Colour (`useUiTextTone()`: ink, muted, faint, accent, gain, danger, record) and one step of
 emphasis (`uiTextEmphasis.strong`: mine, live, the gym) are modifiers, never new
 roles; layout styles follow the role and set no type. A line mixing words and
 figures keeps its word role and draws only the figures in Plex Mono 500
@@ -303,7 +302,7 @@ additionally render faded ([[set.row-figures]], §6).
   "better" never follows the picked accent's hue; they sit at one lightness and
   differ only in hue, so neither shouts. **Colour is never the only channel:**
   the figure still says `+3`, `−12%`, `0`, `new` or `—`. One rule, every
-  change figure — `changeToneColour` (`components/ui/change-tone.ts`) is where
+  change figure — `changeToneColourIn` (`components/ui/change-tone.ts`) is where
   it lives, and no screen picks a delta colour of its own. 3D muscle fills
   follow [[comparison.colour-scale]].
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex

@@ -46,7 +46,8 @@ import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidat
 import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
-import { computeMuscleScores, projectMuscleBody } from '@/components/stats/muscle-body-projection';
+import { computeMuscleScores } from '@/components/stats/muscle-body-projection';
+import { projectMuscleBody } from './helpers/muscle-body-palette';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { chooseBroadLocally } from './helpers/broad-muscle-report';
 import { closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';

@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
-import { ActionButton, ListRow, Notice, SwitchRow, uiBorder, uiRoles, uiSpace } from '@/components/ui';
+import { ActionButton, ListRow, Notice, SwitchRow, uiBorder, uiSpace } from '@/components/ui';
+import { makeStyles } from '@/components/ui/theme-context';
 import {
   getGroupNotificationPreferences, NotificationApiError, setGroupNotificationMuted,
   type NotificationPreferences,
 } from '@/src/notifications';
 
 export function GroupNotificationMuteRow({ groupId, offline }: { groupId: string; offline: boolean }) {
+  const styles = useStyles();
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export function GroupNotificationMuteRow({ groupId, offline }: { groupId: string
   );
 }
 
-const styles = StyleSheet.create({
-  row: { borderTopWidth: uiBorder.width, borderTopColor: uiRoles.ruleSoft },
+const useStyles = makeStyles((roles) => ({
+  row: { borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft },
   feedback: { paddingHorizontal: uiSpace.lg, paddingBottom: uiSpace.md },
-});
+}));

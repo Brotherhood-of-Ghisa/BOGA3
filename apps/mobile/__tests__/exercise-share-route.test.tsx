@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { StyleSheet, type TextStyle } from 'react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
@@ -60,7 +60,7 @@ import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cach
 import type { LocalDatabase } from '@/src/data/bootstrap';
 import { readExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
 import ExerciseShareRoute from '../app/exercise-share';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 
 import {
   exerciseEditorHrefs,
@@ -68,6 +68,10 @@ import {
   exerciseEditorParams,
   WithExerciseEditorPage,
 } from './helpers/exercise-editor-page';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const themeRoles = rolesFor(DEFAULT_APPEARANCE);
 
 const SAMPLE_PAYLOAD: ExerciseSharePayload = {
   v: 1,
@@ -116,19 +120,19 @@ afterEach(() => {
 describe('ExerciseShareRoute', () => {
   it('renders sign-in gate when user is signed out or unconfigured', () => {
     mockUseAuth.mockReturnValue({ isConfigured: false, user: null });
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
     expect(screen.getByTestId('groups-signed-out-state')).toBeTruthy();
   });
 
   it('renders invalid link view when params are missing', () => {
     mockParams = {};
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
     expect(screen.getByTestId('exercise-share-invalid')).toBeTruthy();
   });
 
   it('renders corrupt data view when payload cannot be decoded', () => {
     mockParams = { groupId: 'group-1', payload: 'corrupt-payload' };
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
     expect(screen.getByTestId('exercise-share-corrupt')).toBeTruthy();
   });
 
@@ -136,13 +140,13 @@ describe('ExerciseShareRoute', () => {
     (groupsApi.getGroup as jest.Mock).mockRejectedValue(
       new groupsApi.GroupApiError('NOT_FOUND', 'Group not found')
     );
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
 
     expect(await screen.findByTestId('exercise-share-not-member')).toBeTruthy();
   });
 
   it('renders exercise preview when user is an active member', async () => {
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
 
     expect(await screen.findByTestId('exercise-share-card')).toBeTruthy();
     expect(screen.getByTestId('exercise-share-title')).toHaveTextContent('Bulgarian Split Squat');
@@ -156,10 +160,10 @@ describe('ExerciseShareRoute', () => {
   });
 
   it('takes every text from the shared text roles', async () => {
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
     await screen.findByTestId('exercise-share-card');
     const styleOf = (testID: string) => StyleSheet.flatten(screen.getByTestId(testID).props.style) as TextStyle;
-    const faintLabel = { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase', color: uiRoles.inkFaint };
+    const faintLabel = { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.xxs, textTransform: 'uppercase', color: themeRoles.inkFaint };
 
     expect(styleOf('exercise-share-group-eyebrow')).toMatchObject(faintLabel);
     expect(StyleSheet.flatten(screen.getByText('Primary muscle').props.style)).toMatchObject(faintLabel);
@@ -173,13 +177,13 @@ describe('ExerciseShareRoute', () => {
       fontFamily: uiFonts.body.family,
       fontWeight: '400',
       fontSize: uiTypography.size.base,
-      color: uiRoles.ink,
+      color: themeRoles.ink,
     });
   });
 
   it('saves the exercise directly when save button is pressed', async () => {
     const saveSpy = jest.spyOn(exerciseCatalogData, 'saveExerciseCatalogExercise');
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
 
     expect(await screen.findByTestId('exercise-share-save-btn')).toBeTruthy();
 
@@ -205,7 +209,7 @@ describe('ExerciseShareRoute', () => {
   });
 
   it('resets import state when link parameters change', async () => {
-    const { rerender } = render(<ExerciseShareRoute />);
+    const { rerender } = renderWithTheme(<ExerciseShareRoute />);
 
     expect(await screen.findByTestId('exercise-share-card')).toBeTruthy();
     expect(screen.getByTestId('exercise-share-title')).toHaveTextContent('Bulgarian Split Squat');
@@ -243,7 +247,7 @@ describe('ExerciseShareRoute', () => {
     (groupsApi.getGroup as jest.Mock).mockRejectedValue(
       new groupsApi.GroupApiError('NETWORK', 'Network request failed.')
     );
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
 
     expect(await screen.findByTestId('exercise-share-offline-empty-state')).toBeTruthy();
     expect(screen.getByText("You're offline")).toBeTruthy();
@@ -254,7 +258,7 @@ describe('ExerciseShareRoute', () => {
     (groupsApi.getGroup as jest.Mock).mockRejectedValueOnce(
       new groupsApi.GroupApiError('INTERNAL', 'Server error')
     );
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
 
     expect(await screen.findByTestId('exercise-share-error-state')).toBeTruthy();
     expect(screen.getByText("Couldn't load this")).toBeTruthy();
@@ -273,7 +277,7 @@ describe('ExerciseShareRoute', () => {
     (groupsApi.getGroup as jest.Mock).mockRejectedValue(
       new groupsApi.GroupApiError('UPDATE_REQUIRED', 'Upgrade app')
     );
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
 
     expect(await screen.findByTestId('exercise-share-error-state')).toBeTruthy();
     expect(screen.getByText('Group comparisons unavailable')).toBeTruthy();
@@ -283,7 +287,7 @@ describe('ExerciseShareRoute', () => {
     await exerciseCatalogData.saveExerciseCatalogExercise({
       name: SAMPLE_PAYLOAD.name, loadInputMode: SAMPLE_PAYLOAD.loadInputMode, mappings: SAMPLE_PAYLOAD.mappings,
     });
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
 
     expect(await screen.findByTestId('exercise-share-exists-notice')).toHaveTextContent(
       'You already have an active exercise named "Bulgarian Split Squat".'
@@ -305,7 +309,7 @@ describe('ExerciseShareRoute', () => {
       payload: encodeExerciseSharePayload(novelPayload),
     };
 
-    render(<ExerciseShareRoute />);
+    renderWithTheme(<ExerciseShareRoute />);
 
     expect(await screen.findByTestId('exercise-share-card')).toBeTruthy();
     expect(screen.queryByTestId('exercise-share-exists-notice')).toBeNull();
@@ -315,7 +319,7 @@ describe('ExerciseShareRoute', () => {
   it('opens the prefilled editor page from "Customize and add…", and its save reports the added exercise', async () => {
     mockRouter.push.mockImplementation((href: unknown) => exerciseEditorPage.push(href));
     mockRouter.back.mockImplementation(() => exerciseEditorPage.back());
-    render(<WithExerciseEditorPage><ExerciseShareRoute /></WithExerciseEditorPage>);
+    renderWithTheme(<WithExerciseEditorPage><ExerciseShareRoute /></WithExerciseEditorPage>);
 
     expect(await screen.findByTestId('exercise-share-customize-btn')).toBeTruthy();
     await act(async () => {

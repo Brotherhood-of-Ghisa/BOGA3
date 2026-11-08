@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import {
   MAIN_TAB_DEFINITIONS,
   type MainTabDefinition,
@@ -24,6 +25,9 @@ const OVERFLOW_TABS = MAIN_TAB_DEFINITIONS.filter((tab) => tab.presentation === 
  * `accent` (`ux-rules.md` "Actions and emphasis").
  */
 export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const tabProps = (tab: MainTabDefinition) => {
     const active = activeTab === tab.key;
     return {
@@ -57,7 +61,7 @@ export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
             {...pressable}
             key={tab.key}
             style={({ pressed }) => [styles.tab, pressed && !active ? styles.pressed : null]}>
-            <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, active ? uiTextTone.ink : null]}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[text.label, active ? tone.ink : null]}>
               {tab.label}
             </Text>
             {indicator}
@@ -71,7 +75,7 @@ export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
             {...pressable}
             key={tab.key}
             style={({ pressed }) => [styles.overflow, pressed && !active ? styles.pressed : null]}>
-            <Icon color={active ? uiRoles.ink : uiRoles.inkMuted} name="more-vertical" />
+            <Icon colorRole={active ? 'ink' : 'inkMuted'} name="more-vertical" />
             {indicator}
           </Pressable>
         );
@@ -80,14 +84,14 @@ export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   shell: {
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.card,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
   },
   tab: {
     flex: 1,
@@ -108,7 +112,7 @@ const styles = StyleSheet.create({
   },
   // Depth is a ground change, never an elevation.
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   // Always laid out, so the labels do not shift when the active tab changes.
   indicator: {
@@ -122,6 +126,6 @@ const styles = StyleSheet.create({
     marginHorizontal: uiSpace.sm,
   },
   indicatorActive: {
-    backgroundColor: uiRoles.ink,
+    backgroundColor: roles.ink,
   },
-});
+}));

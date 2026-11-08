@@ -3,7 +3,8 @@ import type { ComponentType, ReactElement, ReactNode } from 'react';
 
 import type { UiRoles } from '@/components/ui/theme';
 import { AppThemeProvider } from '@/components/ui/theme-context';
-import { launchOsScheme, saveAppearance } from '@/components/ui/theme-launch';
+import { saveAppearance } from '@/components/ui/theme-launch';
+import { readPhoneScheme } from '@/components/ui/theme-native';
 import { appearanceMode, appearanceRoles, type AppearanceChoice } from '@/components/ui/theme-presets';
 
 /**
@@ -28,9 +29,10 @@ export async function switchTheme(appearance: AppearanceChoice): Promise<void> {
 }
 
 /**
- * The roles a choice draws, as the provider resolves them. A colour assertion
- * takes its expected value from here, not from a module constant.
+ * The roles a choice draws, as the provider resolves them on the phone's
+ * current mode. A colour assertion takes its expected value from here, not
+ * from a module constant.
  */
 export function rolesFor(appearance: AppearanceChoice): UiRoles {
-  return appearanceRoles(appearance, appearanceMode(appearance, launchOsScheme));
+  return appearanceRoles(appearance, appearanceMode(appearance, readPhoneScheme()));
 }

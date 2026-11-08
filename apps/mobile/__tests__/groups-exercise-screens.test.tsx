@@ -10,7 +10,7 @@
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, Modal, StyleSheet, type AlertButton, type ViewStyle } from 'react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
@@ -82,7 +82,7 @@ jest.mock('@/src/data/exercise-group-links', () => ({
   createExerciseWithGroupLink: jest.fn(),
 }));
 
-import { uiRoles } from '@/components/ui';
+
 import { readExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
 import { exerciseEditorHrefs, exerciseEditorPage, exerciseEditorParams, WithExerciseEditorPage } from './helpers/exercise-editor-page';
 import { STANDARD_EXERCISE_DEFINITION_SEEDS } from '@/src/data/exercise-catalog-seeds';
@@ -107,6 +107,11 @@ import type { CompetitionExerciseWire, CompetitionExerciseListWire } from '@/src
 import EditGroupExerciseRoute from '../app/group/[groupId]/exercises/[exerciseId]/edit';
 import NewGroupExerciseRoute from '../app/group/[groupId]/exercises/new';
 import GroupScreenRoute from '../app/group/[groupId]/index';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
+import { renderWithTheme, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
@@ -173,7 +178,7 @@ const pressAlertButton = async (spy: jest.SpyInstance, text: string) => {
 const openGroupAs = async (role: GroupRole) => {
   api.getGroup.mockResolvedValue(detailFor(role));
   // The exercise editor page opens over the group page (Add as new).
-  render(<WithExerciseEditorPage><GroupScreenRoute /></WithExerciseEditorPage>);
+  renderWithTheme(<WithExerciseEditorPage><GroupScreenRoute /></WithExerciseEditorPage>);
   // Without a jest cache, CI runs this file first, so its first render also
   // pays the process's cold start; the 1 s default can expire before it lands.
   await screen.findByText(META[role], {}, { timeout: 10_000 });
@@ -194,7 +199,7 @@ const primaryGrounds = (): string[] =>
     .findAll((node: TestNode) => typeof node.type === 'string')
     .filter((node: TestNode) => {
       const ground = (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor;
-      return ground === uiRoles.accent;
+      return ground === roles.accent;
     })
     .map((node: TestNode) => String(node.props.testID));
 
@@ -320,7 +325,7 @@ describe('Exercises page (E0.4)', () => {
     mockInitialOnline = false;
     api.getGroup.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
     api.listCompetitionExercises.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
-    render(<GroupScreenRoute />);
+    renderWithTheme(<GroupScreenRoute />);
     await screen.findByText(META.owner);
     await screen.findByTestId('group-exercises-list');
     expect(await screen.findByText(/Offline · last updated 09:05/)).toBeTruthy();
@@ -338,7 +343,7 @@ describe('Exercises page (E0.4)', () => {
     seedCache(groupCacheKeys.groupExercises(GROUP_ID), LIST);
     api.listCompetitionExercises.mockRejectedValue(new GroupApiError('NOT_FOUND', 'group not found'));
     api.getGroup.mockResolvedValue(detailFor('owner'));
-    render(<GroupScreenRoute />);
+    renderWithTheme(<GroupScreenRoute />);
     expect(await screen.findByTestId('group-screen-lost-access')).toBeTruthy();
     await waitFor(() => expect(readGroupCache(fixture.database, groupCacheKeys.groupExercises(GROUP_ID), USER_ID)).toBeNull());
   });
@@ -406,7 +411,7 @@ describe('Exercises page: archive and unarchive (owner, admin)', () => {
 
 describe('Add exercise route', () => {
   const renderNew = async () => {
-    render(<NewGroupExerciseRoute />);
+    renderWithTheme(<NewGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-source-row');
   };
 
@@ -615,7 +620,7 @@ describe('Add exercise route', () => {
 
   it('does not offer the form to a member', async () => {
     api.getGroup.mockResolvedValue(detailFor('member'));
-    render(<NewGroupExerciseRoute />);
+    renderWithTheme(<NewGroupExerciseRoute />);
     expect(await screen.findByTestId('group-exercise-new-forbidden')).toBeTruthy();
     expect(screen.queryByTestId('group-exercise-form')).toBeNull();
   });
@@ -629,7 +634,7 @@ describe('Edit exercise route', () => {
 
   const renderEdit = (exerciseId: string) => {
     mockParams = { groupId: GROUP_ID, exerciseId };
-    render(<EditGroupExerciseRoute />);
+    renderWithTheme(<EditGroupExerciseRoute />);
   };
 
   it('prefills the shared form from the list and saves the new name and weight entry', async () => {
@@ -751,7 +756,7 @@ describe('Every exercise write: offline refusal and server failure', () => {
   });
 
   it('catalogue add: refused offline with no RPC, keeping the pick', async () => {
-    render(<NewGroupExerciseRoute />);
+    renderWithTheme(<NewGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-source-row');
     emitNetInfo(false);
     pickBench();
@@ -763,7 +768,7 @@ describe('Every exercise write: offline refusal and server failure', () => {
 
   it('catalogue add: a server failure shows "nothing changed" and stays', async () => {
     api.createCompetitionExercise.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
-    render(<NewGroupExerciseRoute />);
+    renderWithTheme(<NewGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-source-row');
     pickBench();
     await pressSubmit();
@@ -779,7 +784,7 @@ describe('Every exercise write: offline refusal and server failure', () => {
     });
 
     it('is refused offline with no RPC and keeps the edit', async () => {
-      render(<EditGroupExerciseRoute />);
+      renderWithTheme(<EditGroupExerciseRoute />);
       const nameInput = await screen.findByTestId('group-exercise-form-name-input');
       emitNetInfo(false);
       fireEvent.changeText(nameInput, 'Seated Cable Row');
@@ -791,7 +796,7 @@ describe('Every exercise write: offline refusal and server failure', () => {
 
     it('shows a transport failure as "nothing changed" and stays', async () => {
       api.updateCompetitionExercise.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
-      render(<EditGroupExerciseRoute />);
+      renderWithTheme(<EditGroupExerciseRoute />);
       await screen.findByTestId('group-exercise-form');
       await pressSubmit();
       expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(GROUP_WRITE_UNREACHABLE_MESSAGE);
@@ -958,7 +963,7 @@ describe('Add / edit exercise: stale prefill and late navigation (review follow-
     const fresh = deferred<CompetitionExerciseListWire>();
     api.listCompetitionExercises.mockReturnValue(fresh.promise);
     mockParams = { groupId: GROUP_ID, exerciseId: 'ge-row' };
-    render(<EditGroupExerciseRoute />);
+    renderWithTheme(<EditGroupExerciseRoute />);
     return fresh;
   };
 
@@ -992,7 +997,7 @@ describe('Add / edit exercise: stale prefill and late navigation (review follow-
   it('a new exercise route with the same revision cannot inherit another exercise’s dirty draft',async()=>{
     api.updateCompetitionExercise.mockResolvedValue({ contract_version: 4,exercise: BENCH });
     mockParams={ groupId: GROUP_ID,exerciseId: 'ge-row' };
-    render(<EditGroupExerciseRoute />);
+    renderWithTheme(<EditGroupExerciseRoute />);
     fireEvent.changeText(await screen.findByTestId('group-exercise-form-name-input'),'Typed for Row');
     mockParams={ groupId: GROUP_ID,exerciseId: 'ge-bench' };
     screen.rerender(<EditGroupExerciseRoute />);
@@ -1005,7 +1010,7 @@ describe('Add / edit exercise: stale prefill and late navigation (review follow-
   it('add: a save that finishes after the user left does not navigate back again', async () => {
     const pending = deferred<{ contract_version: 4; exercise: CompetitionExerciseWire }>();
     api.createCompetitionExercise.mockReturnValue(pending.promise);
-    render(<NewGroupExerciseRoute />);
+    renderWithTheme(<NewGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-source-row');
     fireEvent.press(screen.getByTestId('group-exercise-source-custom'));
     fireEvent.changeText(screen.getByTestId('group-exercise-form-name-input'), 'Sled Push');
@@ -1025,7 +1030,7 @@ describe('Add / edit exercise: stale prefill and late navigation (review follow-
     seedCache(groupCacheKeys.group(GROUP_ID), detailFor('owner'));
     seedCache(groupCacheKeys.groupExercises(GROUP_ID), LIST);
     mockParams = { groupId: GROUP_ID, exerciseId: 'ge-row' };
-    render(<EditGroupExerciseRoute />);
+    renderWithTheme(<EditGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-form');
     fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
     expect(api.updateCompetitionExercise).toHaveBeenCalled();
@@ -1239,7 +1244,7 @@ describe('Design language', () => {
   const accentGrounds = (root: TestNode): string[] =>
     root
       .findAll((node: TestNode) => typeof node.type === 'string')
-      .filter((node: TestNode) => (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === uiRoles.accent)
+      .filter((node: TestNode) => (StyleSheet.flatten(node.props.style) as ViewStyle | undefined)?.backgroundColor === roles.accent)
       .map((node: TestNode) => String(node.props.testID));
 
   it('the Exercises section draws no accent: Add exercise is an outline, Archived a Tag', async () => {
@@ -1247,8 +1252,8 @@ describe('Design language', () => {
     const section = screen.getByTestId('group-screen-exercises');
     expect(accentGrounds(section)).toEqual([]);
     expect(StyleSheet.flatten(screen.getByTestId('group-exercises-add-button').props.style)).toMatchObject({
-      borderColor: uiRoles.rule,
-      backgroundColor: uiRoles.surface,
+      borderColor: roles.rule,
+      backgroundColor: roles.surface,
     });
     expect(screen.getByTestId('group-exercise-archived-ge-old')).toHaveTextContent('Archived');
   });
@@ -1281,7 +1286,7 @@ describe('Design language', () => {
   });
 
   it('Add exercise: the picked standard exercise is the checked radio, and the submit the one accent', async () => {
-    render(<NewGroupExerciseRoute />);
+    renderWithTheme(<NewGroupExerciseRoute />);
     await screen.findByTestId('group-exercise-source-row');
     expect(accentGrounds(screen.UNSAFE_root)).toEqual([]);
     fireEvent.press(screen.getByTestId('group-exercise-source-catalogue'));

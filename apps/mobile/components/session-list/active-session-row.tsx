@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
-import { Card, Icon, IconButton, ListRow, Sheet, uiRoles, uiSpace } from '@/components/ui';
+import { Card, Icon, IconButton, ListRow, Sheet, uiSpace } from '@/components/ui';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 
@@ -61,7 +61,7 @@ export function ActiveSessionRow({
         <ListRow
           density="list"
           divider={false}
-          leading={<Icon color={uiRoles.ink} name="set-current" size="sm" />}
+          leading={<Icon colorRole="ink" name="set-current" size="sm" />}
           meta={
             <IconButton
               accessibilityLabel="Review and complete active session"

@@ -1,7 +1,8 @@
-import { StyleSheet, Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
+import { Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextFor, useUiText } from '@/components/ui/text-roles';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 // `figure`: a number, date or code in Plex Mono (`design-language.md` §3).
 // `text`: words (a name, an email) in Source Sans.
@@ -41,6 +42,9 @@ export function FormField({
   testID,
   ...inputProps
 }: FormFieldProps) {
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const textRoles = useUiText();
   return (
     <View style={[styles.column, containerStyle]}>
       <View style={[styles.field, multiline ? styles.fieldMultiline : null, error ? styles.fieldInvalid : null]}>
@@ -49,8 +53,8 @@ export function FormField({
           {...inputProps}
           allowFontScaling={false}
           multiline={multiline}
-          placeholderTextColor={uiRoles.inkGhost}
-          style={[uiText.input, face === 'figure' ? uiText.inlineFigure : null, styles.input]}
+          placeholderTextColor={roles.inkGhost}
+          style={[textRoles.input, face === 'figure' ? textRoles.inlineFigure : null, styles.input]}
           testID={testID}
         />
       </View>
@@ -63,12 +67,12 @@ export function FormField({
           {error}
         </Text>
       ) : null}
-      {hint ? <Text allowFontScaling={false} style={uiText.meta}>{hint}</Text> : null}
+      {hint ? <Text allowFontScaling={false} style={textRoles.meta}>{hint}</Text> : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   column: {
     gap: uiSpace.xs,
   },
@@ -76,9 +80,9 @@ const styles = StyleSheet.create({
     height: uiGeometry.fieldHeight,
     paddingHorizontal: uiSpace.sm,
     paddingTop: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.control,
   },
   // Grows with its text from one field height.
@@ -88,18 +92,18 @@ const styles = StyleSheet.create({
     paddingBottom: uiSpace.xs,
   },
   fieldInvalid: {
-    borderColor: uiRoles.danger,
+    borderColor: roles.danger,
   },
   label: {
-    ...uiText.label,
-    color: uiRoles.inkFaint,
+    ...uiTextFor(roles).label,
+    color: roles.inkFaint,
   },
   input: {
     flex: 1,
     padding: 0,
   },
   error: {
-    ...uiText.meta,
-    color: uiRoles.danger,
+    ...uiTextFor(roles).meta,
+    color: roles.danger,
   },
-});
+}));

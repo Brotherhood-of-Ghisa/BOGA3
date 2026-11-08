@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { SegmentedControl, uiSpace, uiText } from '@/components/ui';
+import { SegmentedControl, uiSpace } from '@/components/ui';
+import { useUiText } from '@/components/ui/text-roles';
 import { hasComparisonMetric, resolveComparisonLayout } from './comparison-columns';
 import { StatsTable, statsTableStyles } from './stats-table';
 import { MuscleBodyCard } from './muscle-body-card';
@@ -14,6 +15,7 @@ type Props = ProgressTablesProps & { muscleLayout: ProgressMuscleLayout; report?
 // Settings chooses the layout; both share contribution rows and selection.
 export function ProgressMuscleView(props: Props) {
   const { muscles, metric, selectedId, muscleLayout, onSelect, onMuscleHistory, onExerciseHistory, report } = props;
+  const text = useUiText();
   const { width } = useWindowDimensions();
   if (muscleLayout === 'list') return <ProgressTables {...props} />;
   const selected = muscles.find(row => row.muscleGroupId === selectedId);
@@ -23,7 +25,7 @@ export function ProgressMuscleView(props: Props) {
     <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedId} onSelect={onSelect} report={report} setTargets={props.setTargets} />
     {selected ? <StatsTable testID="stats-contributions">
       <View style={statsTableStyles.sectionHeader}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={[uiText.title, styles.heading]}>{selected.displayName}</Text>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[text.title, styles.heading]}>{selected.displayName}</Text>
         <SegmentedControl accessibilityLabel={`Open ${selected.displayName} history`} density="compact" layout="inline"
           hitSlop={uiSpace.md} options={HISTORY_VIEW_OPTIONS.map(option => ({ ...option,
             accessibilityLabel: `Open ${selected.displayName} ${option.value === 'daily' ? 'Daily Heatmap' : option.value === 'weekly' ? 'Weekly Heatmap' : 'Timeline'}` }))}

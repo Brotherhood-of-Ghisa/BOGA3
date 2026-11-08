@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { ActionButton, FormField, FormSection, uiSpace, uiText } from '@/components/ui';
+import { ActionButton, FormField, FormSection, uiSpace, useUiText } from '@/components/ui';
 import { setCoWCalendar } from '@/src/groups/api';
 import { useCoWCalendar } from '@/src/groups/use-cow-calendar';
 import { useGroupAction } from '@/src/groups/use-group-action';
@@ -8,6 +8,7 @@ import { GroupMissingDataState, pickInlineError } from './group-state-view';
 
 /** Calendar management is an explicit online write; it never moves a published CoW. */
 export function CoWTimeZone({ groupId, userId, autoFocus, onAccessChange }: { groupId: string; userId: string; autoFocus: boolean; onAccessChange: () => void }) {
+  const text = useUiText();
   const calendar = useCoWCalendar(groupId, userId);
   const [draft, setDraft] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -27,7 +28,7 @@ export function CoWTimeZone({ groupId, userId, autoFocus, onAccessChange }: { gr
         accessibilityLabel="Group time zone" value={draft ?? calendar.firstPage.time_zone ?? ''} onChangeText={value => { setDraft(value); setSaved(false); }}
         placeholder="Europe/London" editable={!action.pending} error={action.error ? action.offline ? "You're offline. Connect to save." : 'Check the time zone and try again.' : null} testID="cow-zone-input" />
       <ActionButton label={action.pending ? 'Saving…' : 'Save time zone'} variant="outline" disabled={action.pending} onPress={() => void save()} testID="cow-zone-save" />
-      {saved ? <Text allowFontScaling={false} style={uiText.meta} testID="cow-zone-saved">Time zone saved</Text> : null}
+      {saved ? <Text allowFontScaling={false} style={text.meta} testID="cow-zone-saved">Time zone saved</Text> : null}
     </View>
   </FormSection>;
 }

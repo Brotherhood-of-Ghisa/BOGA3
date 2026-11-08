@@ -218,7 +218,7 @@ export type UiRoles = {
   // Destructive actions only.
   danger: string;
   // A change against an earlier period: `gain` an improvement, `loss` a
-  // decrease (`changeToneColour` in `change-tone.ts` is the only caller). The
+  // decrease (`changeToneColourIn` in `change-tone.ts` is the only caller). The
   // sign is always drawn too — colour is never the only channel.
   gain: string;
   loss: string;

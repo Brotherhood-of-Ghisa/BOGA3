@@ -27,11 +27,15 @@ const mockReportLaunchThemeProblem = jest.fn();
 const mockStatusBar = jest.fn();
 const mockThemeProvider = jest.fn();
 const mockThemeUnderLayout = jest.fn();
-const mockStopThemeAppIcon = jest.fn();
-const mockStartThemeAppIcon = jest.fn();
-
+// The launcher icon's native boundary has its own suite
+// (`theme-app-icon.test.ts`); here, which theme the layout asks it to follow.
+const mockThemeAppIcon = jest.fn();
 jest.mock('@/components/appearance/theme-app-icon', () => ({
-  startThemeAppIcon: (...args: unknown[]) => mockStartThemeAppIcon(...args),
+  useThemeAppIcon: () =>
+    mockThemeAppIcon(
+      (jest.requireActual('@/components/ui/theme-context') as typeof import('@/components/ui/theme-context')).useAppTheme()
+        .appearance.theme,
+    ),
 }));
 
 // Native notification routing has its own bridge and lifecycle suites.
@@ -142,15 +146,20 @@ jest.mock('expo-router', () => {
 });
 
 import { act, render, screen, waitFor } from '@testing-library/react-native';
+import { Storage } from 'expo-sqlite/kv-store';
 
 import RootLayout from '../app/_layout';
 import * as themeLaunch from '@/components/ui/theme-launch';
-import { CUSTOM_THEME, themePresets } from '@/components/ui/theme-presets';
-import * as tokens from '@/components/ui/tokens';
-import { uiFonts, uiRoles, uiTypography } from '@/components/ui/tokens';
+import { APPEARANCE_STORAGE_KEY } from '@/components/ui/theme-launch';
+import { DEFAULT_APPEARANCE, startingCustom, themePresets } from '@/components/ui/theme-presets';
+import { serialiseAppearanceRecord } from '@/components/ui/theme-record';
+import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { getExerciseCatalogSnapshot } from '@/src/exercise-catalog/cache';
 import { closeLocalData, localDataClient, resetLocalData } from './helpers/local-data';
 import { rolesFor, switchTheme } from './helpers/theme';
+
+// Tests launch in the default appearance.
+const launchRoles = rolesFor(DEFAULT_APPEARANCE);
 
 describe('RootLayout auth bootstrap wiring', () => {
   afterEach(async () => {
@@ -172,13 +181,12 @@ describe('RootLayout auth bootstrap wiring', () => {
     mockRegisterBackgroundSyncTask.mockReset();
     mockStackScreen.mockReset();
     mockReportLaunchThemeProblem.mockReset();
-    mockStartThemeAppIcon.mockReset().mockReturnValue(mockStopThemeAppIcon);
-    mockStopThemeAppIcon.mockReset();
+    mockThemeAppIcon.mockReset();
     mockRegisterBackgroundSyncTask.mockResolvedValue(undefined);
     mockBootstrapAuthState.mockResolvedValue(undefined);
   });
 
-  it('draws the status bar and the navigators in this launch\'s mode and roles', () => {
+  it('draws the status bar and the navigators in the launch mode and roles', () => {
     render(<RootLayout />);
 
     // Tests launch light: dark status-bar content on the light page.
@@ -186,29 +194,35 @@ describe('RootLayout auth bootstrap wiring', () => {
     expect(mockThemeProvider).toHaveBeenLastCalledWith(
       expect.objectContaining({
         dark: false,
-        colors: expect.objectContaining({ background: uiRoles.paper, card: uiRoles.paper, text: uiRoles.ink }),
+        colors: expect.objectContaining({ background: launchRoles.paper, card: launchRoles.paper, text: launchRoles.ink }),
       }),
     );
   });
 
   it('draws every screen in the theme saved while the app runs', async () => {
     render(<RootLayout />);
-    expect(mockThemeUnderLayout).toHaveBeenLastCalledWith(uiRoles);
+    expect(mockThemeUnderLayout).toHaveBeenLastCalledWith(launchRoles);
 
     const slateDark = { theme: 'slate', mode: 'dark', custom: null } as const;
     await switchTheme(slateDark);
     expect(mockThemeUnderLayout).toHaveBeenLastCalledWith(rolesFor(slateDark));
   });
 
-  it('draws light status-bar content in a dark launch', () => {
-    jest.replaceProperty(tokens, 'uiMode', 'dark');
-    try {
-      render(<RootLayout />);
+  it('follows a theme saved while the app runs in the status bar and the navigators', async () => {
+    render(<RootLayout />);
+    expect(mockStatusBar).toHaveBeenLastCalledWith({ style: 'dark' });
 
-      expect(mockStatusBar).toHaveBeenLastCalledWith({ style: 'light' });
-    } finally {
-      jest.restoreAllMocks();
-    }
+    const slateDark = { theme: 'slate', mode: 'dark', custom: null } as const;
+    await switchTheme(slateDark);
+
+    // Light content on a dark page, and the navigators drawn in its roles.
+    expect(mockStatusBar).toHaveBeenLastCalledWith({ style: 'light' });
+    expect(mockThemeProvider).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        dark: true,
+        colors: expect.objectContaining({ background: rolesFor(slateDark).paper, text: rolesFor(slateDark).ink }),
+      }),
+    );
   });
 
   it('reports why the launch theme is not the stored choice, once on mount', () => {
@@ -222,21 +236,19 @@ describe('RootLayout auth bootstrap wiring', () => {
     jest.restoreAllMocks();
   });
 
-  it.each([...themePresets, CUSTOM_THEME])('applies the $label icon policy once on mount', (preset) => {
-    jest.replaceProperty(themeLaunch, 'launchTheme', { ...themeLaunch.launchTheme, preset, problem: null });
+  it.each([...themePresets.map((preset) => preset.id), 'custom' as const])(
+    'keeps the launcher icon on the stored %s theme, then on each theme saved while the app runs',
+    async (theme) => {
+      const custom = theme === 'custom' ? startingCustom(DEFAULT_APPEARANCE, 'light') : null;
+      Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord({ theme, mode: 'light', custom }));
+      render(<RootLayout />);
+      expect(mockThemeAppIcon).toHaveBeenLastCalledWith(theme);
 
-    render(<RootLayout />);
-
-    expect(mockStartThemeAppIcon).toHaveBeenCalledTimes(1);
-    expect(mockStartThemeAppIcon).toHaveBeenCalledWith(preset);
-    jest.restoreAllMocks();
-  });
-
-  it('stops icon recovery on unmount', () => {
-    const view = render(<RootLayout />);
-    view.unmount();
-    expect(mockStopThemeAppIcon).toHaveBeenCalledTimes(1);
-  });
+      const next = theme === 'slate' ? 'plum' : 'slate';
+      await switchTheme({ theme: next, mode: 'light', custom });
+      expect(mockThemeAppIcon).toHaveBeenLastCalledWith(next);
+    },
+  );
 
   it('boots the local data layer, the exercise catalog and auth on mount', async () => {
     render(<RootLayout />);
@@ -265,15 +277,15 @@ describe('RootLayout auth bootstrap wiring', () => {
         headerBackButtonDisplayMode: 'minimal',
         // One design-language header style on every stack route: the page's
         // own `paper` ground with no shadow line, and the title role.
-        headerStyle: { backgroundColor: uiRoles.paper },
+        headerStyle: { backgroundColor: launchRoles.paper },
         headerShadowVisible: false,
         headerTitleStyle: {
           fontFamily: uiFonts.display.family,
           fontWeight: '700',
           fontSize: uiTypography.size.lg,
-          color: uiRoles.ink,
+          color: launchRoles.ink,
         },
-        headerTintColor: uiRoles.ink,
+        headerTintColor: launchRoles.ink,
       },
     });
     // The back item's hidden label (read by VoiceOver) is the previous title: never "(tabs)".

@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { CompactCard, CompactHeader, FigureText, uiRoles, uiSpace, uiText, uiTextEmphasis, uiTextTone } from '@/components/ui';
+import { CompactCard, CompactHeader, FigureText, makeStyles, uiSpace, uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui';
 import type {
   CompetitionSessionCard as StreamSessionCardViewModel,
   CompetitionSessionRecordLine,
@@ -17,6 +17,9 @@ type GroupStreamSessionCardProps = {
 
 /** One group record the session took, under its figures. */
 function RecordLine({ line, onPress, testID }: { line: CompetitionSessionRecordLine; onPress?: () => void; testID: string }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <Pressable
       accessibilityHint={onPress ? 'Opens the record' : undefined}
@@ -26,12 +29,12 @@ function RecordLine({ line, onPress, testID }: { line: CompetitionSessionRecordL
       onPress={onPress}
       style={({ pressed }) => [styles.recordLine, pressed ? styles.recordPressed : null]}
       testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.ink, uiTextEmphasis.strong, styles.recordExercise]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.ink, uiTextEmphasis.strong, styles.recordExercise]}>
         {line.exercise}
       </Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.record, styles.recordValue]} testID={`${testID}-value`}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.record, styles.recordValue]} testID={`${testID}-value`}>
         {/* The record line is drawn heavy, its figures as heavy as its words. */}
-        <FigureText figureStyle={uiTextTone.record}>{line.value}</FigureText>
+        <FigureText figureStyle={tone.record}>{line.value}</FigureText>
       </Text>
     </Pressable>
   );
@@ -43,6 +46,9 @@ function RecordLine({ line, onPress, testID }: { line: CompetitionSessionRecordL
  * `set-current` ring and the words, never a colour (G3).
  */
 export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressRecord }: GroupStreamSessionCardProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const testID = `group-stream-session-card-${card.key}`;
   const context = [card.startedAtLabel, card.gymName?.trim() || null].filter(Boolean).join(' · ');
   const records = card.records;
@@ -61,10 +67,10 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressR
       <CompactHeader label={card.statusLabel} metadata={context}
         icon={card.isTrainingNow ? 'set-current' : undefined} tone={card.isTrainingNow ? 'ink' : 'muted'}
         labelTestID={`${testID}-status`} metadataTestID={`${testID}-context`} />
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.bodyStrong, styles.member]} testID={`${testID}-member`}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.bodyStrong, styles.member]} testID={`${testID}-member`}>
         {card.memberName}
       </Text>
-      <Text allowFontScaling={false} style={[uiText.meta, uiTextTone.ink]} testID={`${testID}-metrics`}>
+      <Text allowFontScaling={false} style={[text.meta, tone.ink]} testID={`${testID}-metrics`}>
         <FigureText>{`${card.setsLabel} · ${card.exercisesLabel}`}</FigureText>
       </Text>
       {records.length > 0 ? (
@@ -80,7 +86,7 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressR
         </View>
       ) : null}
       {showGroupNames && card.groupNames.length > 0 ? (
-        <Text allowFontScaling={false} numberOfLines={1} style={uiText.meta} testID={`${testID}-groups`}>
+        <Text allowFontScaling={false} numberOfLines={1} style={text.meta} testID={`${testID}-groups`}>
           {card.groupNames.join(', ')}
         </Text>
       ) : null}
@@ -88,14 +94,14 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressR
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   member: { flexShrink: 1, minWidth: 0 },
   // The records sit under the figures, behind a `rule-soft` hairline.
   records: {
     marginTop: uiSpace.xs,
     paddingTop: uiSpace.xs,
     borderTopWidth: 1,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
     gap: uiSpace.xs,
   },
   recordLine: {
@@ -105,7 +111,7 @@ const styles = StyleSheet.create({
     paddingVertical: uiSpace.xs,
   },
   recordPressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   recordExercise: {
     flexShrink: 1,
@@ -113,4 +119,4 @@ const styles = StyleSheet.create({
   recordValue: {
     flexShrink: 1,
   },
-});
+}));

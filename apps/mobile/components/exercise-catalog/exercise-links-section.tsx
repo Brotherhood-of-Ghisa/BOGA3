@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { Text } from 'react-native';
 
-import { ActionRow, FormSection, Icon, ListRow, uiRoles, uiText, uiTextTone } from '@/components/ui';
+import { ActionRow, FormSection, Icon, ListRow } from '@/components/ui';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { buildLinkScreenModel } from '@/src/groups';
@@ -16,6 +17,8 @@ import { exerciseLinkHref } from '@/src/navigation/routes';
  * focus. Signed-in only, for a saved exercise.
  */
 export function ExerciseLinksSection({ exercise, userId }: { exercise: ExerciseCatalogExercise; userId: string }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const router = useRouter();
   const linking = useGroupExerciseLinking({ userId });
   const { muscleSetup } = useExerciseCatalog();
@@ -36,15 +39,15 @@ export function ExerciseLinksSection({ exercise, userId }: { exercise: ExerciseC
           divider={index > 0}
           key={row.key}
           label={row.groupExerciseName}
-          leading={<Icon color={uiRoles.inkMuted} name="link" size="md" />}
+          leading={<Icon colorRole="inkMuted" name="link" size="md" />}
           meta={
-            <Text allowFontScaling={false} numberOfLines={1} style={[uiText.meta, uiTextTone.muted]}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.muted]}>
               {row.statusLabel ? `${row.groupName} · ${row.statusLabel}` : row.groupName}
             </Text>
           }
           onPress={openLink}
           testID={`exercise-editor-linked-${row.groupExerciseId}`}
-          trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" size="sm" />}
+          trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
         />
       )) : null}
       <ActionRow

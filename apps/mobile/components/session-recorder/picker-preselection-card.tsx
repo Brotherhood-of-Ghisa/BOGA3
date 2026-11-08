@@ -1,12 +1,13 @@
 import { useDateFormat } from '@/src/preferences/hooks';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { SetSummaryRow } from '@/components/session-detail/set-summary-row';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiSpace } from '@/components/ui/tokens';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { formatLocalDateTime } from '@/src/utils/local-time';
@@ -28,14 +29,16 @@ export type PickerPreselectionCardProps = {
  */
 export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, onRepeat }: PickerPreselectionCardProps) {
   const dateFormat = useDateFormat();
+  const styles = useStyles();
+  const text = useUiText();
   return (
     <Card testID="exercise-picker-preselection-panel">
-      <Text allowFontScaling={false} style={[uiText.title, styles.preselectionTitle]}>
+      <Text allowFontScaling={false} style={[text.title, styles.preselectionTitle]}>
         <FigureText strong>{state.exercise.name}</FigureText>
       </Text>
       {state.suggestion ? (
         <View style={styles.plan}>
-          <Text allowFontScaling={false} style={uiText.label} testID="exercise-picker-plan-source">
+          <Text allowFontScaling={false} style={text.label} testID="exercise-picker-plan-source">
             <FigureText>{`From ${formatLocalDateTime(state.suggestion.completedAt.getTime(), dateFormat)}`}</FigureText>
           </Text>
           <ScrollView
@@ -85,7 +88,7 @@ export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, o
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   preselectionTitle: {
     paddingHorizontal: uiSpace.md,
     paddingTop: uiSpace.md,
@@ -108,11 +111,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: uiSpace.sm,
     padding: uiSpace.md,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
   action: {
     flex: 1,
   },
-});
+}));

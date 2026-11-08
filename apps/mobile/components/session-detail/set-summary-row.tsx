@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { Stat } from '@/components/ui/stat';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import type { SessionViewSetRow } from '@/src/session-recorder/session-view-model';
 
@@ -13,28 +13,30 @@ import type { SessionViewSetRow } from '@/src/session-recorder/session-view-mode
 // (decided on device 2026-09-23: per-column bests read as noise).
 export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percentageMetrics = false }:
   { row: SessionViewSetRow; testID: string; hideDerivedMetrics?: boolean; percentageMetrics?: boolean }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const state = row.done ? 'realised' : 'planned';
   return (
     <View style={[styles.setRow, percentageMetrics && styles.percentageRow]} testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, row.done ? uiTextTone.ink : uiTextTone.faint, styles.effortColumn]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.label, row.done ? tone.ink : tone.faint, styles.effortColumn]}>
         <FigureText>{row.typeLabel}</FigureText>
       </Text>
       <Text
         allowFontScaling={false}
         accessibilityLabel={percentageMetrics ? row.weightReps : undefined}
         numberOfLines={1}
-        style={[uiText.figure, row.done ? (row.weightRecord ? uiTextTone.record : null) : uiTextTone.faint, styles.weightReps]}
+        style={[text.figure, row.done ? (row.weightRecord ? tone.record : null) : tone.faint, styles.weightReps]}
         testID={`${testID}-values`}>
         {percentageMetrics ? row.weightReps.replace(' %BW', '') : row.weightReps}
       </Text>
       {!hideDerivedMetrics ? percentageMetrics ? <>
         <Text allowFontScaling={false} numberOfLines={1}
           accessibilityLabel={`1RM ${row.oneRepMax}`}
-          style={[uiText.figureSmall, row.done ? (row.oneRepMaxRecord ? uiTextTone.record : uiTextTone.ink) : uiTextTone.faint, styles.metric, styles.oneRepMax]}
+          style={[text.figureSmall, row.done ? (row.oneRepMaxRecord ? tone.record : tone.ink) : tone.faint, styles.metric, styles.oneRepMax]}
           testID={`${testID}-1rm`}>{row.oneRepMax.replace(' %BW', '')}</Text>
         <Text allowFontScaling={false} numberOfLines={1}
           accessibilityLabel={`Vol ${row.volume}`}
-          style={[uiText.figureSmall, row.done ? uiTextTone.ink : uiTextTone.faint, styles.metric, styles.volume]}
+          style={[text.figureSmall, row.done ? tone.ink : tone.faint, styles.metric, styles.volume]}
           testID={`${testID}-vol`}>{row.volume.replace(' %BW·reps', '')}</Text>
       </> : <>
       <View style={[styles.metricColumn, styles.oneRepMaxColumn]} testID={`${testID}-1rm-column`}>

@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { RecordBand } from '@/components/session-detail';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiText } from '@/components/ui/text-roles';
+import { useUiText } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import { personalRecordCount, type ExercisePersonalRecord } from '@/src/session-insights';
 import { personalRecordLines } from '@/src/session-insights/record-band';
@@ -21,6 +21,7 @@ const formatRecordCount = (count: number): string => `${count} ${count === 1 ? '
  * Only the achievements and their earning sets; full set details live in Sets.
  */
 export function PersonalRecordCard({ personalRecord, testID }: PersonalRecordCardProps) {
+  const text = useUiText();
   const count = formatRecordCount(personalRecordCount(personalRecord));
   const lines = personalRecordLines(personalRecord);
 
@@ -30,10 +31,10 @@ export function PersonalRecordCard({ personalRecord, testID }: PersonalRecordCar
         accessibilityLabel={`${personalRecord.exerciseName}, ${count}: ${lines.map((line) => line.spoken).join('; ')}`}
         accessible>
         <View style={styles.header}>
-          <Text allowFontScaling={false} numberOfLines={2} style={[uiText.title, styles.name]}>
+          <Text allowFontScaling={false} numberOfLines={2} style={[text.title, styles.name]}>
             <FigureText strong>{personalRecord.exerciseName}</FigureText>
           </Text>
-          <Text allowFontScaling={false} style={uiText.meta} testID={`${testID}-count`}>
+          <Text allowFontScaling={false} style={text.meta} testID={`${testID}-count`}>
             <FigureText>{count}</FigureText>
           </Text>
         </View>

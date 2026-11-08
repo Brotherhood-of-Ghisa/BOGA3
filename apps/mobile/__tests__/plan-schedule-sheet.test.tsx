@@ -1,8 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, screen } from '@testing-library/react-native';
 import { Platform } from 'react-native';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 import { PlanScheduleSheet } from '@/components/session-planner/plan-schedule-sheet';
+
+import { renderWithTheme } from './helpers/theme';
 
 describe('PlanScheduleSheet', () => {
   const originalPlatform = Platform.OS;
@@ -13,7 +15,7 @@ describe('PlanScheduleSheet', () => {
   });
 
   it('renders nothing when visible is false', () => {
-    render(
+    renderWithTheme(
       <PlanScheduleSheet
         currentSchedule={null}
         onConfirm={jest.fn()}
@@ -34,7 +36,7 @@ describe('PlanScheduleSheet', () => {
       const onDismiss = jest.fn();
       const initial = new Date(2026, 9, 10, 10, 0, 0);
 
-      render(
+      renderWithTheme(
         <PlanScheduleSheet
           currentSchedule={initial}
           onConfirm={onConfirm}
@@ -59,7 +61,7 @@ describe('PlanScheduleSheet', () => {
     });
 
     it('handles undefined date change event without throwing', () => {
-      render(
+      renderWithTheme(
         <PlanScheduleSheet
           currentSchedule={null}
           onConfirm={jest.fn()}
@@ -77,7 +79,7 @@ describe('PlanScheduleSheet', () => {
       const onConfirm = jest.fn();
       const onDismiss = jest.fn();
 
-      render(
+      renderWithTheme(
         <PlanScheduleSheet
           currentSchedule={new Date(2026, 9, 10, 10, 0, 0)}
           onConfirm={onConfirm}
@@ -102,7 +104,7 @@ describe('PlanScheduleSheet', () => {
       const onDismiss = jest.fn();
       const initial = new Date(2026, 9, 10, 10, 0, 0);
 
-      render(
+      renderWithTheme(
         <PlanScheduleSheet
           currentSchedule={initial}
           onConfirm={onConfirm}

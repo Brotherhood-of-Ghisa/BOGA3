@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Icon, ListRow, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { Icon, ListRow, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { formatMemberCount, formatMyRole, type GroupSummary } from '@/src/groups';
 
 type GroupSummaryRowProps = {
@@ -16,6 +16,8 @@ type GroupSummaryRowProps = {
  * and a chevron. A tap opens the group.
  */
 export function GroupSummaryRow({ group, onPress, divider }: GroupSummaryRowProps) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   const meta = `${formatMemberCount(group.member_count)} · ${formatMyRole(group.my_role)}`;
   return (
     <ListRow
@@ -24,17 +26,17 @@ export function GroupSummaryRow({ group, onPress, divider }: GroupSummaryRowProp
       divider={divider}
       onPress={() => onPress(group)}
       testID={`group-summary-row-${group.group_id}`}
-      trailing={<Icon color={uiRoles.inkMuted} name="chevron-right" />}>
+      trailing={<Icon colorRole="inkMuted" name="chevron-right" />}>
       <View style={styles.content}>
-        <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>
+        <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong}>
           {group.name}
         </Text>
         {group.description ? (
-          <Text allowFontScaling={false} numberOfLines={2} style={[uiText.body, uiTextTone.muted]}>
+          <Text allowFontScaling={false} numberOfLines={2} style={[text.body, tone.muted]}>
             {group.description}
           </Text>
         ) : null}
-        <Text allowFontScaling={false} style={uiText.label}>
+        <Text allowFontScaling={false} style={text.label}>
           {meta}
         </Text>
       </View>

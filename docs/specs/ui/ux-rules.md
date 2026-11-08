@@ -244,12 +244,12 @@ after a cleanup).
 
 ## Appearance
 
-A launch draws every screen in one mode: Light (the default), Dark, or System,
-the phone's mode at launch. Native UI (alerts, keyboard, date picker) is pinned
-to it, so a phone change mid-session shows at the next launch (decision
-register, `docs/specs/03-technical-architecture.md`). Presets, seeds and the
-next-launch rule are `design-language.md` "Choosing one". The status bar, the
-date picker and the navigators take `uiMode`, never a fixed mode or colour
+Every screen draws in one mode: Light (the default), Dark, or System, which
+follows the phone while the app runs. Native UI (alerts, keyboard, date picker)
+draws in the same mode (decision register,
+`docs/specs/03-technical-architecture.md`). Presets, seeds and the live rule
+are `design-language.md` "Choosing one". The status bar, the date picker and
+the navigators take `useUiMode()`, never a fixed mode or colour
 (`apps/mobile/__tests__/ui-mode-literal-guard.test.ts`). The splash stays white
 (`app.config.ts`). The stack header takes `paper` (no shadow line) and `ink`, so
 header and page read as one surface ("Pages").
@@ -260,7 +260,7 @@ presets`), then Mode (Light, Dark, System) for a preset or one
 row per Custom part (Background, Primary text, Secondary text, Accent, Best
 ever, Charts), each opening a picker: hue ring, strength `SliderRow`, and for the
 background lightness and depth. A tap or release saves at once, writing nothing
-when already stored; the chosen row reads `Next launch` until the app reopens.
+when already stored, and the whole app repaints in it.
 A failed save shows a danger `Notice` saying nothing changed and is logged.
 Settings home names the choice.
 
@@ -336,11 +336,9 @@ Decided with mobile training programmes.
 ### Connected agent write permission
 
 - **Named disclosure of every capability.** The Connected Agents card names the
-  client and states every capability of **Allow this coach to make changes**
-  next to the toggle: reading upcoming/unscheduled plans, creating plans and
-  programmes, and adding, editing, deleting or restoring exercises, whose
-  changes recalculate past figures ([[agents.write-access]]). Base OAuth consent is never labelled
-  as write access.
+  client and states every capability in [[agents.write-access]] next to its
+  toggle. It explains that exercise changes recalculate past figures. Base OAuth
+  consent is never labelled as write access.
 - **Default off, revert on failure.** Write access is off until explicitly
   enabled, never by a loading fallback; it applies optimistically and reverts
   to the server value with a retryable error on failure.

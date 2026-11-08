@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
-import { ActionButton, Card, FigureText, Icon, ListRow, ScreenScroll, uiRoles, uiSpace, uiText } from '@/components/ui';
+import { ActionButton, Card, FigureText, Icon, ListRow, ScreenScroll, uiSpace, useUiText } from '@/components/ui';
 import { GroupInlineError, GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
 import { CoWPreview } from '@/components/groups/cow-preview';
@@ -25,6 +25,7 @@ const itemKey = (cow: CoWDefinitionWire) => cow.cow_id;
 export function GroupCoWsPage({ userId, groupId, cowId = null, metric = null, embedded = false }: {
   userId: string; groupId: string; cowId?: string | null; metric?: string | null; embedded?: boolean;
 }) {
+  const text = useUiText();
   const router = useRouter();
   const dateFormat = useDateFormat();
   const groupFetcher = useCallback(() => getGroup(groupId), [groupId]);
@@ -57,14 +58,14 @@ export function GroupCoWsPage({ userId, groupId, cowId = null, metric = null, em
     initialMetric={metric} testID="cows-preview" onOpen={selected => open(shown.cow, selected)} browseLabel="Full standings" onBrowse={selected => open(shown.cow, selected)} /> : null;
   const manager = Boolean(group.data && canManageGroup(group.data.group.my_role));
   return <ScreenScroll testID="cows-screen" contentContainerStyle={embedded ? { padding: 0 } : undefined} refreshControl={<RefreshControl refreshing={cows.refreshing || summary.refreshing} onRefresh={() => void refresh()} />}>
-    {!embedded ? <Text allowFontScaling={false} style={uiText.title}>{group.data?.group.name ?? 'Group'}</Text> : null}
+    {!embedded ? <Text allowFontScaling={false} style={text.title}>{group.data?.group.name ?? 'Group'}</Text> : null}
     {offline ? <GroupOfflineBanner lastUpdatedAtMs={summary.lastUpdatedAtMs} /> : null}
     {error && (summary.data || cows.firstPage) ? <GroupInlineError error={error} onRetry={() => void refresh()} testID="cows-error" /> : null}
-    <Text allowFontScaling={false} style={uiText.label}>This week</Text>
-    {summary.data ? summary.data.selection === 'current' ? preview : <Text allowFontScaling={false} style={uiText.meta}>No CoW this week</Text>
+    <Text allowFontScaling={false} style={text.label}>This week</Text>
+    {summary.data ? summary.data.selection === 'current' ? preview : <Text allowFontScaling={false} style={text.meta}>No CoW this week</Text>
       : <GroupMissingDataState error={pickInlineError(summary.error)} offline={summary.offline} onRetry={() => void summary.refresh()} testIDPrefix="cows-current" />}
     <CoWNextSection calendar={calendar} cows={cows} next={next} manager={manager} groupId={groupId} name={name} open={open} dateFormat={dateFormat} />
-    <Text allowFontScaling={false} style={uiText.label}>Past CoWs</Text>
+    <Text allowFontScaling={false} style={text.label}>Past CoWs</Text>
     {summary.data?.selection === 'previous_final' && shown && (!cowId || cowId === shown.cow.cow_id) ? preview : null}
     <CoWPastSection cows={cows} past={past} name={name} open={open} dateFormat={dateFormat} />
     {!group.data && error ? <GroupStateView title="Couldn't load CoWs" actionLabel="Retry" onAction={() => void refresh()} testID="cows-unavailable" /> : null}
@@ -77,19 +78,20 @@ function CoWNextSection({ calendar, cows, next, manager, groupId, name, open, da
   next: CoWDefinitionWire | undefined; manager: boolean; groupId: string; name: (cow: CoWDefinitionWire) => string;
   open: (cow: CoWDefinitionWire) => void; dateFormat: ExerciseDateFormat;
 }) {
+  const text = useUiText();
   const router = useRouter();
   const week = next?.week_start ?? calendar.firstPage?.next_week_start;
   const zone = next?.time_zone ?? calendar.firstPage?.time_zone;
   return <>
-    <Text allowFontScaling={false} style={uiText.label}>Next week</Text>
-    {week ? <Text allowFontScaling={false} style={[uiText.meta, { textAlign: 'right' }]} accessibilityLabel={`${coWAccessibleDates(week, dateFormat)} · ${zone ?? ''}`}><FigureText>{`${coWDateRange(week, dateFormat)} · ${zone ?? ''}`}</FigureText></Text> : null}
+    <Text allowFontScaling={false} style={text.label}>Next week</Text>
+    {week ? <Text allowFontScaling={false} style={[text.meta, { textAlign: 'right' }]} accessibilityLabel={`${coWAccessibleDates(week, dateFormat)} · ${zone ?? ''}`}><FigureText>{`${coWDateRange(week, dateFormat)} · ${zone ?? ''}`}</FigureText></Text> : null}
     {cows.firstPage ? next ? <Card><ListRow density="list" onPress={() => open(next)} accessibilityLabel={`${name(next)}, ${coWStatus(next)}`}
-      meta={<Text allowFontScaling={false} style={[uiText.meta, { textAlign: 'right' }]} accessibilityLabel={coWAccessibleDates(next.week_start, dateFormat)}><FigureText>{coWDateRange(next.week_start, dateFormat)}</FigureText></Text>}
-      testID="cows-next" trailing={<Icon name="chevron-right" color={uiRoles.inkMuted} size="sm" />}>
-      <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>{name(next)}</Text>
-      <Text allowFontScaling={false} style={uiText.meta}>{coWStatus(next)}</Text>
+      meta={<Text allowFontScaling={false} style={[text.meta, { textAlign: 'right' }]} accessibilityLabel={coWAccessibleDates(next.week_start, dateFormat)}><FigureText>{coWDateRange(next.week_start, dateFormat)}</FigureText></Text>}
+      testID="cows-next" trailing={<Icon name="chevron-right" colorRole="inkMuted" size="sm" />}>
+      <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong}>{name(next)}</Text>
+      <Text allowFontScaling={false} style={text.meta}>{coWStatus(next)}</Text>
     </ListRow></Card>
-      : <Text allowFontScaling={false} style={uiText.meta}>Nothing scheduled</Text>
+      : <Text allowFontScaling={false} style={text.meta}>Nothing scheduled</Text>
       : <GroupMissingDataState error={pickInlineError(cows.error)} offline={cows.offline} onRetry={() => void cows.refresh()} testIDPrefix="cows-list" />}
     {manager && cows.firstPage ? <ActionButton variant="outline" label={next ? 'Edit next CoW' : 'Schedule next CoW'}
       testID="cows-schedule" onPress={() => router.push(coWScheduleHref(groupId, next?.cow_id))} /> : null}
@@ -100,13 +102,14 @@ function CoWPastSection({ cows, past, name, open, dateFormat }: {
   cows: GroupOnlinePagesState<CoWListWire, CoWDefinitionWire>; past: CoWDefinitionWire[];
   name: (cow: CoWDefinitionWire) => string; open: (cow: CoWDefinitionWire) => void; dateFormat: ExerciseDateFormat;
 }) {
+  const text = useUiText();
   return cows.firstPage ? <View style={{ gap: uiSpace.sm }}>{past.map(cow => <Card key={cow.cow_id}><ListRow density="list" accessibilityLabel={`${name(cow)}, ${coWStatus(cow)}`}
-      onPress={() => open(cow)} testID={`cows-past-${cow.cow_id}`} trailing={<Icon name="chevron-right" color={uiRoles.inkMuted} size="sm" />}
-      meta={<Text allowFontScaling={false} style={[uiText.meta, { textAlign: 'right' }]} accessibilityLabel={coWAccessibleDates(cow.week_start, dateFormat)}><FigureText>{coWDateRange(cow.week_start, dateFormat)}</FigureText></Text>}>
-      <Text allowFontScaling={false} numberOfLines={1} style={uiText.bodyStrong}>{name(cow)}</Text>
-      <Text allowFontScaling={false} style={uiText.meta}>{coWStatus(cow)}</Text>
+      onPress={() => open(cow)} testID={`cows-past-${cow.cow_id}`} trailing={<Icon name="chevron-right" colorRole="inkMuted" size="sm" />}
+      meta={<Text allowFontScaling={false} style={[text.meta, { textAlign: 'right' }]} accessibilityLabel={coWAccessibleDates(cow.week_start, dateFormat)}><FigureText>{coWDateRange(cow.week_start, dateFormat)}</FigureText></Text>}>
+      <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong}>{name(cow)}</Text>
+      <Text allowFontScaling={false} style={text.meta}>{coWStatus(cow)}</Text>
     </ListRow></Card>)}
-      {past.length === 0 ? <Text allowFontScaling={false} style={uiText.meta}>No past CoWs</Text> : null}
+      {past.length === 0 ? <Text allowFontScaling={false} style={text.meta}>No past CoWs</Text> : null}
       {cows.hasMore ? <ActionButton label={cows.loadingMore ? 'Loading…' : 'More CoWs'} variant="outline" onPress={() => void cows.loadMore()} testID="cows-more" /> : null}
       {cows.loadMoreError ? <GroupInlineError error={cows.loadMoreError} onRetry={() => void cows.loadMore()} testID="cows-more-error" /> : null}
     </View> : null;

@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet, Text, View, type RefreshControlProps, type Styl
 
 import { Card } from '@/components/ui/card';
 import { SummaryTile } from '@/components/ui/summary-tile';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import type { GroupApiError } from '@/src/groups/api';
 import {
@@ -221,8 +221,10 @@ function GlanceCards({
 
 /** A card's heading, as Today's cards head theirs: an ink micro-label at the card's top. */
 function CardTitle({ title, testID }: { title: string; testID: string }) {
+  const text = useUiText();
+  const tone = useUiTextTone();
   return (
-    <Text accessibilityRole="header" allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.ink]} testID={testID}>
+    <Text accessibilityRole="header" allowFontScaling={false} numberOfLines={1} style={[text.label, tone.ink]} testID={testID}>
       {title}
     </Text>
   );

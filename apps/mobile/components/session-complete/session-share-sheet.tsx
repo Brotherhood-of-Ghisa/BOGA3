@@ -2,12 +2,13 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import { formatShortDate } from '@/src/utils/local-time';
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, type ViewInstance, type LayoutChangeEvent } from 'react-native';
+import { ScrollView, Text, View, type ViewInstance, type LayoutChangeEvent } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { PageSheet } from '@/components/ui/page-sheet';
-import { uiText, uiTextEmphasis, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiFonts, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { useUiText, uiTextEmphasis, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiFonts, uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
 import {
   captureSessionShareImage,
   hasVolumeReference,
@@ -58,6 +59,7 @@ const shareRecordsOf = (records: ExercisePersonalRecord[]): ShareRecord[] =>
 
 /** One record line: the kind in words (the image has no screen reader), the figures it set in `record`. */
 function ShareRecordRow({ record, set }: ShareRecord) {
+  const styles = useStyles();
   const oneRepMax = set.estimatedOneRepMax === null ? '—' : formatOneRepMax(set.estimatedOneRepMax);
   return (
     <View style={styles.recordRow} testID={`session-share-card-pr-${record.exerciseDefinitionId}`}>
@@ -90,6 +92,7 @@ function ShareRecordRow({ record, set }: ShareRecord) {
  * can compare, in the design language. It never shows the gym or any location.
  */
 export function SessionShareCard({ snapshot }: { snapshot: SessionShareSnapshot }) {
+  const styles = useStyles();
   const dateFormat = useDateFormat();
   const shareRecords = shareRecordsOf(snapshot.personalRecords);
   // The image carries comparisons, not shortfalls: an exercise the session
@@ -156,6 +159,9 @@ export function SessionShareSheet({
   shareImageAction = shareSessionImage,
   releaseImageAction = releaseSessionShareImage,
 }: SessionShareSheetProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const shareCardRef = useRef<ViewInstance | null>(null);
   const hasFailedShareRef = useRef(false);
   const [cardDimensions, setCardDimensions] = useState<SessionShareCaptureDimensions | null>(null);
@@ -226,9 +232,9 @@ export function SessionShareSheet({
         </View>
       </ScrollView>
       <View style={styles.footer}>
-        <Text allowFontScaling={false} style={[uiText.meta, styles.centered]}>Nothing is shared until you choose an app.</Text>
+        <Text allowFontScaling={false} style={[text.meta, styles.centered]}>Nothing is shared until you choose an app.</Text>
         {shareError ? (
-          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[uiText.meta, uiTextEmphasis.strong, uiTextTone.danger, styles.centered]} testID="session-share-error">
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.meta, uiTextEmphasis.strong, tone.danger, styles.centered]} testID="session-share-error">
             {shareError}
           </Text>
         ) : null}
@@ -255,7 +261,7 @@ const microLabel = {
   textTransform: 'uppercase' as const,
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   previewContent: {
     paddingHorizontal: uiSpace.lg,
     paddingBottom: uiSpace.sm,
@@ -279,9 +285,9 @@ const styles = StyleSheet.create({
     width: '100%',
     padding: uiSpace.lg,
     gap: uiSpace.sm,
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.card,
   },
   brandRow: {
@@ -296,37 +302,37 @@ const styles = StyleSheet.create({
     fontSize: uiTypography.size.xl,
     lineHeight: uiTypography.lineHeight.xl,
     letterSpacing: uiTypography.size.xl * uiGeometry.microLabelTracking,
-    color: uiRoles.ink,
+    color: roles.ink,
   },
   tagline: {
     ...microLabel,
-    color: uiRoles.inkFaint,
+    color: roles.inkFaint,
   },
   shareTitle: {
     fontFamily: uiFonts.display.family,
     fontWeight: '800',
     fontSize: uiTypography.size.xxl,
     lineHeight: uiTypography.lineHeight.xxl,
-    color: uiRoles.ink,
+    color: roles.ink,
   },
   totals: {
     fontFamily: uiFonts.figure.family,
     fontWeight: '600',
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
+    color: roles.ink,
   },
   meta: {
     fontFamily: uiFonts.figure.family,
     fontWeight: '500',
     fontSize: uiTypography.size.sm,
     lineHeight: uiTypography.lineHeight.sm,
-    color: uiRoles.inkMuted,
+    color: roles.inkMuted,
   },
   records: {
-    backgroundColor: uiRoles.recordWash,
+    backgroundColor: roles.recordWash,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.recordRule,
+    borderColor: roles.recordRule,
     borderRadius: uiGeometry.radius.card,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
@@ -334,12 +340,12 @@ const styles = StyleSheet.create({
   },
   recordsTitle: {
     ...microLabel,
-    color: uiRoles.record,
+    color: roles.record,
   },
   recordRow: {
     paddingTop: uiSpace.xs,
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.recordRule,
+    borderTopColor: roles.recordRule,
   },
   recordNameRow: {
     flexDirection: 'row',
@@ -349,7 +355,7 @@ const styles = StyleSheet.create({
   },
   recordKind: {
     ...microLabel,
-    color: uiRoles.record,
+    color: roles.record,
   },
   recordName: {
     flexShrink: 1,
@@ -357,29 +363,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
-    color: uiRoles.ink,
+    color: roles.ink,
   },
   recordFact: {
     fontFamily: uiFonts.figure.family,
     fontWeight: '500',
     fontSize: uiTypography.size.md,
     lineHeight: uiTypography.lineHeight.md,
-    color: uiRoles.ink,
+    color: roles.ink,
   },
   recordFigure: {
     fontWeight: '700',
-    color: uiRoles.record,
+    color: roles.record,
   },
   exercises: {
     gap: uiSpace.sm,
   },
   sectionTitle: {
     ...microLabel,
-    color: uiRoles.inkFaint,
+    color: roles.inkFaint,
   },
   madeWith: {
     ...microLabel,
     textAlign: 'center',
-    color: uiRoles.inkFaint,
+    color: roles.inkFaint,
   },
-});
+}));
