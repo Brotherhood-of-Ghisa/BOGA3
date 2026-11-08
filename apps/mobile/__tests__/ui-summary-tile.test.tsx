@@ -1,33 +1,32 @@
-import { fireEvent, render, renderHook, screen, within } from '@testing-library/react-native';
-import { SummaryTile, Stat, uiSpace, uiText, uiTextTone, useUiText } from '@/components/ui';
-import { AppThemeProvider } from '@/components/ui/theme-context';
+import { fireEvent, screen, within } from '@testing-library/react-native';
+import { SummaryTile, Stat, uiSpace } from '@/components/ui';
 import { GroupWeekTotalsFigures } from '@/components/groups/group-week-totals';
 import { SummaryGallery } from '@/components/pattern-gallery/summary-gallery';
 import { SUMMARY_STATES } from '@/components/pattern-gallery/summary-fixtures';
-import { renderWithTheme } from './helpers/theme';
+import { uiTextFor, uiTextToneFor } from '@/components/ui/text-roles';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 
-// The live text roles for the Groups case, read once before any render under
-// test: `renderHook` would otherwise take over `screen`.
-let liveText!: ReturnType<typeof useUiText>;
-beforeAll(() => {
-  liveText = renderHook(() => useUiText(), { wrapper: AppThemeProvider }).result.current;
-});
+import { renderWithTheme as render, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
+const textRoles = uiTextFor(roles);
+const textTones = uiTextToneFor(roles);
 
 it('owns the reference inset and header gap, reusing the shared header and existing metric roles', () => {
   render(<SummaryTile title="Group stats" titleTestID="title" testID="tile" metrics={<Stat label="Sets" value="178" testID="metric" />} />);
   expect(screen.getByTestId('tile')).toHaveStyle({ padding: uiSpace.md, gap: uiSpace.sm });
-  expect(screen.getByTestId('title')).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
+  expect(screen.getByTestId('title')).toHaveStyle({ ...textRoles.label, ...textTones.ink });
   expect(screen.getByTestId('title').props.accessibilityRole).toBe('header');
-  expect(within(screen.getByTestId('metric')).getByText('178')).toHaveStyle(uiText.figureStat);
+  expect(within(screen.getByTestId('metric')).getByText('178')).toHaveStyle(textRoles.figureStat);
   expect(screen.getByTestId('tile').props.accessible).not.toBe(true);
 });
 
 it.each([0, 6, 123456])('keeps both WeekFigure metrics, existing comparison bars and record emphasis for %s', current => {
-  renderWithTheme(<SummaryTile title="Group stats" metrics={<GroupWeekTotalsFigures current={{ sets: current, prs: current }} previous={{ sets: 152, prs: 4 }} offset={0} />} />);
+  render(<SummaryTile title="Group stats" metrics={<GroupWeekTotalsFigures current={{ sets: current, prs: current }} previous={{ sets: 152, prs: 4 }} offset={0} />} />);
   for (const metric of ['sets', 'prs']) expect(screen.getByTestId(`group-week-totals-${metric}-value`)).toHaveTextContent(String(current));
   expect(screen.getByTestId('group-week-totals-sets-previous')).toHaveTextContent('vs 152 last wk');
   expect(screen.getByTestId('group-week-totals-prs').props.accessibilityLabel).toBe(`PRs ${current}, vs 4 last week`);
-  expect(screen.getByTestId('group-week-totals-sets-value')).toHaveStyle(liveText.figureHero);
+  expect(screen.getByTestId('group-week-totals-sets-value')).toHaveStyle(textRoles.figureHero);
 });
 
 it('keeps the page metric scoped to the board/chart and the period scoped to the whole page', () => {

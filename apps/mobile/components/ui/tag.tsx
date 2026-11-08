@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 // `neutral`: a fact about the row (`Archived`, a role). `faint`: a row that has
 // stepped back (`Deleted`), drawn fainter still.
@@ -16,26 +17,28 @@ export type TagProps = {
 // A static pill naming a state in words (`Archived`, `Deleted`, `Admin`), so
 // the state never rides colour alone. Not pressable.
 export function Tag({ label, tone = 'neutral', testID }: TagProps) {
+  const styles = useStyles();
+  const textRoles = useUiText();
   return (
     <View style={[styles.tag, tone === 'faint' ? styles.tagFaint : null]} testID={testID}>
-      <Text allowFontScaling={false} style={[uiText.label, tone === 'faint' ? styles.labelFaint : null]}>{label}</Text>
+      <Text allowFontScaling={false} style={[textRoles.label, tone === 'faint' ? styles.labelFaint : null]}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   tag: {
     alignSelf: 'flex-start',
     paddingHorizontal: uiSpace.sm,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.pill,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
   },
   tagFaint: {
-    borderColor: uiRoles.ruleSoft,
+    borderColor: roles.ruleSoft,
   },
   labelFaint: {
-    color: uiRoles.inkFaint,
+    color: roles.inkFaint,
   },
-});
+}));

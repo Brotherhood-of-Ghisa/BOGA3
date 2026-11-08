@@ -121,6 +121,8 @@
   React Compiler repaints on a switch. Render a themed component with
   `helpers/theme.tsx` (`renderWithTheme`, `switchTheme`), and take expected
   colours from `rolesFor(...)`, not from `uiRoles`.
+- `ui-live-theme-primitives.test.tsx` switches the theme through the provider and
+  checks each `components/ui` primitive repaints, reading colours from `rolesFor(...)`.
 - `ui-live-theme-guard.test.ts` fails on any code read of `uiRoles` / `uiMode`,
   or of the launch colours built from them (`uiText`, `uiTextTone`,
   `changeToneColour`), in `app/`, `components/` or `src/` outside

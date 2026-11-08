@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { uiText } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace } from '@/components/ui/tokens';
+import { uiTextFor } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type ChipOption<TValue extends string | number> = {
   value: TValue;
@@ -46,6 +47,7 @@ export type ChipGroupProps<TValue extends string | number> = ChipGroupBaseProps<
 // (`checked`), so state never rides colour alone.
 export function ChipGroup<TValue extends string | number>(props: ChipGroupProps<TValue>) {
   const { options, testIDPrefix, accessibilityLabel, style } = props;
+  const styles = useStyles();
   const isOn = (value: TValue) =>
     props.mode === 'single' ? props.value === value : props.values.includes(value);
 
@@ -88,7 +90,7 @@ export function ChipGroup<TValue extends string | number>(props: ChipGroupProps<
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   group: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -98,26 +100,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.xs,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.pill,
   },
   chipOn: {
-    backgroundColor: uiRoles.ink,
-    borderColor: uiRoles.ink,
+    backgroundColor: roles.ink,
+    borderColor: roles.ink,
   },
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
   label: {
-    ...uiText.label,
-    color: uiRoles.ink,
+    ...uiTextFor(roles).label,
+    color: roles.ink,
   },
   labelOn: {
-    color: uiRoles.onInk,
+    color: roles.onInk,
   },
   labelFaint: {
-    color: uiRoles.inkFaint,
+    color: roles.inkFaint,
   },
-});
+}));

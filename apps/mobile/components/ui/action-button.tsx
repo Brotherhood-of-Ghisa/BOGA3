@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, Text } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
-import { uiText, uiTextTone } from '@/components/ui/text-roles';
-import { uiBorder, uiGeometry, uiRoles, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { uiBorder, uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 export type ActionButtonVariant = 'primary' | 'outline' | 'text' | 'link';
 export type ActionButtonTone = 'default' | 'danger';
@@ -46,6 +47,10 @@ export function ActionButton({
   accessibilityHint,
   testID,
 }: ActionButtonProps) {
+  const styles = useStyles();
+  const roles = useUiRoles();
+  const textRoles = useUiText();
+  const textTones = useUiTextTone();
   const danger = tone === 'danger' && variant !== 'primary';
   return (
     <Pressable
@@ -70,9 +75,9 @@ export function ActionButton({
       testID={testID}>
       <Text
         allowFontScaling={false}
-        style={variant === 'link' ? [uiText.label, disabled ? styles.labelDisabled : null] : [
-          uiText.button,
-          size === 'compact' ? [uiText.label, uiTextTone.ink] : null,
+        style={variant === 'link' ? [textRoles.label, disabled ? styles.labelDisabled : null] : [
+          textRoles.button,
+          size === 'compact' ? [textRoles.label, textTones.ink] : null,
           size === 'large' ? styles.labelLarge : null,
           variant === 'primary' ? styles.labelPrimary : null,
           danger ? styles.labelDanger : null,
@@ -80,14 +85,14 @@ export function ActionButton({
         ]}>
         {label}
       </Text>
-      {variant === 'link' ? <Icon color={disabled ? uiRoles.inkGhost : uiRoles.inkMuted} name="chevron-right" size="xs" /> : null}
+      {variant === 'link' ? <Icon color={disabled ? roles.inkGhost : roles.inkMuted} name="chevron-right" size="xs" /> : null}
     </Pressable>
   );
 }
 
 const COMPACT_HIT_SLOP = (uiGeometry.tapTarget - uiGeometry.compactControlHeight) / 2;
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   base: {
     minHeight: uiGeometry.tapTarget,
     paddingHorizontal: uiSpace.md,
@@ -108,10 +113,10 @@ const styles = StyleSheet.create({
     gap: uiSpace.xs,
   },
   primary: {
-    backgroundColor: uiRoles.accent,
+    backgroundColor: roles.accent,
   },
   primaryDisabled: {
-    backgroundColor: uiRoles.inkGhost,
+    backgroundColor: roles.inkGhost,
   },
   primaryPressed: {
     opacity: 0.85,
@@ -120,31 +125,31 @@ const styles = StyleSheet.create({
   // so the outline never outweighs the text it frames.
   outline: {
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
-    backgroundColor: uiRoles.surface,
+    borderColor: roles.rule,
+    backgroundColor: roles.surface,
   },
   outlineDanger: {
-    borderColor: uiRoles.danger,
+    borderColor: roles.danger,
   },
   // Fainter than an enabled outline, so a disabled one never reads stronger.
   outlineDisabled: {
-    borderColor: uiRoles.ruleSoft,
+    borderColor: roles.ruleSoft,
   },
   // Depth is a ground change, never an elevation.
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
     opacity: 0.7,
   },
   // The full-screen repeating timer's controls: display art, so off the roles
   // (`design-language.md` §3).
   labelLarge: { fontSize: uiTypography.size.xxl, lineHeight: uiTypography.lineHeight.xxl },
   labelPrimary: {
-    color: uiRoles.onAccent,
+    color: roles.onAccent,
   },
   labelDanger: {
-    color: uiRoles.danger,
+    color: roles.danger,
   },
   labelDisabled: {
-    color: uiRoles.inkGhost,
+    color: roles.inkGhost,
   },
-});
+}));

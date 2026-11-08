@@ -1,16 +1,16 @@
 import { StyleSheet } from 'react-native';
 
 import type { UiRoles } from '@/components/ui/theme';
-import { makeStyles } from '@/components/ui/theme-context';
+import { useUiRoles } from '@/components/ui/theme-context';
 import { uiFonts, uiGeometry, uiRoles, uiTypography } from '@/components/ui/tokens';
 
 // The text roles (`docs/specs/ui/design-language.md` §3, "Text roles"). A
 // screen names what its text does — a title, a row's name, a quiet figure —
 // and takes the face, weight, size and line-height from here; it never picks
-// them itself. Colour is a separate choice (`uiTextTone`), and so is the one
+// them itself. Colour is a separate choice (`useUiTextTone()`), and so is the one
 // step of emphasis (`uiTextEmphasis`). Layout (width, alignment, flex) stays
 // in the screen's own styles, listed after the role.
-const textRoles = (roles: UiRoles) =>
+const buildText = (roles: UiRoles) =>
   StyleSheet.create({
     // A page's own title, at the top of its scroll.
     pageTitle: {
@@ -162,16 +162,8 @@ const textRoles = (roles: UiRoles) =>
     },
   });
 
-// The text roles in the launch roles. Only a file still to migrate reads this;
-// a live one calls `useUiText()`, so a saved theme repaints it.
-export const uiText = textRoles(uiRoles);
-
-// The text roles in the colours the app is drawn in now: call it in the
-// component, as with any `makeStyles` sheet.
-export const useUiText = makeStyles(textRoles);
-
 // A role's colour, when it is not the role's own.
-const toneRoles = (roles: UiRoles) =>
+const buildTone = (roles: UiRoles) =>
   StyleSheet.create({
     ink: { color: roles.ink },
     muted: { color: roles.inkMuted },
@@ -183,9 +175,42 @@ const toneRoles = (roles: UiRoles) =>
     record: { color: roles.record, fontWeight: '700' },
   });
 
-// The tones in the launch roles (see `uiText`); a live file calls `useUiTextTone()`.
-export const uiTextTone = toneRoles(uiRoles);
-export const useUiTextTone = makeStyles(toneRoles);
+// One sheet per set of roles, so a theme switch builds each once and a hook
+// returns the same object between switches (as `makeStyles` does).
+function cachedBy<T>(build: (roles: UiRoles) => T): (roles: UiRoles) => T {
+  const sheets = new WeakMap<UiRoles, T>();
+  return (roles) => {
+    const cached = sheets.get(roles);
+    if (cached) return cached;
+    const sheet = build(roles);
+    sheets.set(roles, sheet);
+    return sheet;
+  };
+}
+
+// The text roles drawn in `roles`: what a `makeStyles` builder takes
+// (`uiTextFor(roles).label`) where a helper has the roles in hand.
+export const uiTextFor = cachedBy(buildText);
+
+// A role's colour, when it is not the role's own, drawn in `roles`.
+export const uiTextToneFor = cachedBy(buildTone);
+
+// The text roles in the colours the app is drawn in now, for a component to read
+// in render (`const text = useUiText(); style={text.label}`).
+export function useUiText() {
+  return uiTextFor(useUiRoles());
+}
+
+// `uiTextToneFor`, in the colours the app is drawn in now.
+export function useUiTextTone() {
+  return uiTextToneFor(useUiRoles());
+}
+
+// The same roles and tones in the colours this launch found, for the screens
+// not yet moved to the hooks. They stay in the launch theme and leave with the
+// last of them (`__tests__/ui-live-theme-guard.allowlist.json`).
+export const uiText = uiTextFor(uiRoles);
+export const uiTextTone = uiTextToneFor(uiRoles);
 
 // One embedded weight up, for the row that is mine, a live session, the gym.
 export const uiTextEmphasis = StyleSheet.create({

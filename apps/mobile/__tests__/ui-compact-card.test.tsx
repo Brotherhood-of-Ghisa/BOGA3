@@ -1,21 +1,19 @@
-import { fireEvent, render, renderHook, screen, within } from '@testing-library/react-native';
+import { fireEvent, screen, within } from '@testing-library/react-native';
 import { Text } from 'react-native';
-import { CompactCard, CompactHeader, uiSpace, uiText, uiTextTone, useUiText, useUiTextTone } from '@/components/ui';
-import { AppThemeProvider } from '@/components/ui/theme-context';
+import { CompactCard, CompactHeader, uiSpace } from '@/components/ui';
 import { CoWResultHeading } from '@/components/groups/cow-preview';
 import { GroupStreamSessionCard } from '@/components/groups/stream-session-card';
 import { gallerySession } from '@/components/pattern-gallery/fixtures';
 import { cowResult } from './helpers/cow-fixtures';
 import { coWAccessibleDates } from '@/src/groups/cow-presentation';
-import { renderWithTheme } from './helpers/theme';
+import { uiTextFor, uiTextToneFor } from '@/components/ui/text-roles';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 
-// The live text roles for the Groups cases, read once before any render under
-// test: `renderHook` would otherwise take over `screen`.
-let liveText!: ReturnType<typeof useUiText>;
-let liveTone!: ReturnType<typeof useUiTextTone>;
-beforeAll(() => {
-  ({ text: liveText, tone: liveTone } = renderHook(() => ({ text: useUiText(), tone: useUiTextTone() }), { wrapper: AppThemeProvider }).result.current);
-});
+import { renderWithTheme as render, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
+const textRoles = uiTextFor(roles);
+const textTones = uiTextToneFor(roles);
 
 it('keeps compact insets fixed while retaining the Card link and accessibility action contract', () => {
   const onPress = jest.fn();
@@ -46,33 +44,33 @@ it.each(['ink', 'record', 'muted'] as const)('pairs a %s label with quiet, right
   expect(labelRow).toHaveStyle({ flexDirection: 'row-reverse' });
   // Yoga takes the first child's baseline; an icon first can overlap wrapped metadata.
   expect(labelRow.children[0]).toMatchObject({ props: { testID: 'label' } });
-  expect(screen.getByTestId('label')).toHaveStyle({ ...uiText.label, ...uiTextTone[tone], flexShrink: 1 });
+  expect(screen.getByTestId('label')).toHaveStyle({ ...textRoles.label, ...textTones[tone], flexShrink: 1 });
   const date = screen.getByTestId('date');
-  expect(date).toHaveStyle({ ...uiText.meta, textAlign: 'right', marginLeft: 'auto' });
+  expect(date).toHaveStyle({ ...textRoles.meta, textAlign: 'right', marginLeft: 'auto' });
   expect(date.props.accessibilityLabel).toBe('30 October 2026');
-  expect(within(date).getByText('30-10-2026')).toHaveStyle(uiText.inlineFigure);
+  expect(within(date).getByText('30-10-2026')).toHaveStyle(textRoles.inlineFigure);
 });
 
 it('omits absent metadata without drawing a placeholder or a second card', () => {
   render(<CompactHeader label="Current CoW" metadataTestID="date" testID="header" />);
   expect(screen.queryByTestId('date')).toBeNull();
-  expect(screen.getByText('Current CoW')).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
+  expect(screen.getByText('Current CoW')).toHaveStyle({ ...textRoles.label, ...textTones.ink });
 });
 
 it('can keep list context beside the label while retaining its metadata role and wrapping', () => {
   render(<CompactHeader label="This week" metadata="26 Oct – 1 Nov 26" metadataPlacement="inline"
     testID="heading" metadataTestID="date" />);
   expect(screen.getByTestId('heading')).toHaveStyle({ justifyContent: 'flex-start', gap: uiSpace.sm, flexWrap: 'wrap', alignItems: 'baseline' });
-  expect(screen.getByTestId('date')).toHaveStyle({ ...uiText.meta, marginLeft: 0, textAlign: 'left' });
+  expect(screen.getByTestId('date')).toHaveStyle({ ...textRoles.meta, marginLeft: 0, textAlign: 'left' });
 });
 
 it.each([false, true])('keeps the corrected CoW heading/date roles for previous=%s; the old title-role arrangement fails', previous => {
   const result = cowResult();
-  renderWithTheme(<CoWResultHeading result={result} previous={previous} today dateFormat="DD-MM-YYYY" />);
-  expect(screen.getByText('CoW')).toHaveStyle({ ...liveText.label, ...liveTone.ink });
-  expect(screen.getByText('Pull-up')).toHaveStyle(liveText.bodyStrong);
-  expect(screen.getByLabelText(coWAccessibleDates(result.cow.week_start, 'DD-MM-YYYY'))).toHaveStyle(liveText.meta);
-  expect(screen.getByText(previous ? 'Last week · Final' : 'Live')).toHaveStyle(liveText.meta);
+  render(<CoWResultHeading result={result} previous={previous} today dateFormat="DD-MM-YYYY" />);
+  expect(screen.getByText('CoW')).toHaveStyle({ ...textRoles.label, ...textTones.ink });
+  expect(screen.getByText('Pull-up')).toHaveStyle(textRoles.bodyStrong);
+  expect(screen.getByLabelText(coWAccessibleDates(result.cow.week_start, 'DD-MM-YYYY'))).toHaveStyle(textRoles.meta);
+  expect(screen.getByText(previous ? 'Last week · Final' : 'Live')).toHaveStyle(textRoles.meta);
 });
 
 it('keeps session activation and every record action distinct for touch and the VoiceOver action menu', () => {
@@ -80,7 +78,7 @@ it('keeps session activation and every record action distinct for touch and the 
   const onPressRecord = jest.fn();
   const card = { ...gallerySession, records: [...gallerySession.records,
     { ...gallerySession.records[0], key: 'second', exercise: 'Squat', accessibilityLabel: 'Squat record' }] };
-  renderWithTheme(<GroupStreamSessionCard card={card} showGroupNames onPress={onPress} onPressRecord={onPressRecord} />);
+  render(<GroupStreamSessionCard card={card} showGroupNames onPress={onPress} onPressRecord={onPressRecord} />);
   const root = screen.getByTestId('group-stream-session-card-reference');
   fireEvent.press(root);
   expect(onPress).toHaveBeenCalledWith(card);
@@ -97,7 +95,7 @@ it('keeps session activation and every record action distinct for touch and the 
 });
 
 it('exposes no record action when the feature supplies no record callback', () => {
-  renderWithTheme(<GroupStreamSessionCard card={gallerySession} showGroupNames={false} onPress={jest.fn()} />);
+  render(<GroupStreamSessionCard card={gallerySession} showGroupNames={false} onPress={jest.fn()} />);
   const card = screen.getByTestId('group-stream-session-card-reference');
   expect(card.props.accessibilityActions).toBeUndefined();
   expect(card.props.onAccessibilityAction).toBeUndefined();

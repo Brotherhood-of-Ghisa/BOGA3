@@ -1,6 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import { StyleSheet, Text, View } from 'react-native';
-import { IconButton, ListCard, ListCardHeader, ListRow, uiBorder, uiGeometry, uiRoles, uiSpace, uiText } from '@/components/ui';
+import { IconButton, ListCard, ListCardHeader, ListRow, uiBorder, uiGeometry, uiSpace } from '@/components/ui';
+import { uiTextFor } from '@/components/ui/text-roles';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+
+import { renderWithTheme as render, rolesFor } from './helpers/theme';
+
+const roles = rolesFor(DEFAULT_APPEARANCE);
+const textRoles = uiTextFor(roles);
 
 it('gives passive compact content one shared line and 4pt insets without a touch minimum', () => {
   render(<ListRow density="compact" label="Alex" leading={<Text testID="rank">1</Text>}
@@ -8,7 +15,7 @@ it('gives passive compact content one shared line and 4pt insets without a touch
   const row = screen.getByTestId('row');
   expect(row).toHaveStyle({ paddingHorizontal: uiSpace.md, gap: uiSpace.sm, borderTopWidth: uiBorder.width });
   expect(StyleSheet.flatten(row.props.style).minHeight).toBeUndefined();
-  expect(screen.getByText('Alex')).toHaveStyle(uiText.body);
+  expect(screen.getByText('Alex')).toHaveStyle(textRoles.body);
   for (const content of [screen.getByText('Alex'), screen.getByTestId('rank'), screen.getByTestId('value')]) {
     expect(StyleSheet.flatten(content.parent?.parent?.props.style)).toMatchObject({ paddingVertical: uiSpace.xs });
   }
@@ -31,12 +38,12 @@ it('keeps a control target at 44 with no row padding added around it', () => {
 it('retains selected/own emphasis and the independent row action', () => {
   const open = jest.fn();
   const view = render(<ListRow density="compact" own label="You" onPress={open} testID="row" />);
-  expect(screen.getByText('You')).toHaveStyle(uiText.bodyStrong);
-  expect(screen.getByTestId('row')).toHaveStyle({ minHeight: uiGeometry.tapTarget, backgroundColor: uiRoles.paper });
+  expect(screen.getByText('You')).toHaveStyle(textRoles.bodyStrong);
+  expect(screen.getByTestId('row')).toHaveStyle({ minHeight: uiGeometry.tapTarget, backgroundColor: roles.paper });
   fireEvent.press(screen.getByTestId('row'));
   expect(open).toHaveBeenCalledTimes(1);
   view.rerender(<ListRow density="compact" selected label="Selected" testID="row" />);
-  expect(screen.getByTestId('row')).toHaveStyle({ backgroundColor: uiRoles.accentWash });
+  expect(screen.getByTestId('row')).toHaveStyle({ backgroundColor: roles.accentWash });
 });
 
 it('puts an independent history target around its inset content, beside disclosure', () => {
