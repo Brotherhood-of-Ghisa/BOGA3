@@ -133,8 +133,8 @@
   checks each `components/ui` primitive repaints, reading colours from `rolesFor(...)`.
 - `live-theme-acceptance.test.tsx` keeps Today, a group page and the exercise
   page mounted behind Appearance and saves a theme there: no light-only colour
-  is left in their styles or svg, native UI is pinned to the new mode, and a
-  typed value survives (nothing remounts).
+  is left in their styles or svg, native UI is pinned to the new mode, and
+  nothing remounts (each screen keeps its host views and a typed value).
 - `ui-live-theme-guard.test.ts` fails on any code naming the removed launch
   constants (`uiRoles`, `uiMode`, `uiText`, `uiTextTone`, `changeToneColour`)
   in `app/`, `components/` or `src/`.

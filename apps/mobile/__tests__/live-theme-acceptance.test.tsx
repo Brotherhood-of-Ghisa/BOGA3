@@ -4,8 +4,9 @@
  * The live theme end to end: Today, a group page and the exercise page stay
  * mounted, as they stand in the stack behind Settings, while Settings →
  * Appearance saves a theme and a mode. One save repaints all of them in one
- * provider, native UI is re-pinned to the new mode, and nothing remounts: a
- * value typed on the exercise page survives the switch.
+ * provider, native UI is re-pinned to the new mode, and nothing remounts:
+ * each screen keeps its host views, and a value typed on the exercise page
+ * is kept.
  *
  * Each screen runs over real data: the migrated in-memory SQLite database
  * (helpers/local-data.ts) seeded with the `exercise-page` fixture. Replaced:
@@ -91,15 +92,19 @@ const SVG_PAINTS = ['fill', 'stroke'] as const;
 
 const colourNumber = (colour: string): number => processColor(colour) as number;
 
-type Drawn = { all: Set<number>; svg: Set<number> };
+type Drawn = { all: Set<number>; styles: Set<number>; svg: Set<number> };
 
 function coloursUnder(root: ReactTestInstance): Drawn {
-  const drawn: Drawn = { all: new Set(), svg: new Set() };
+  const drawn: Drawn = { all: new Set(), styles: new Set(), svg: new Set() };
   for (const node of root.findAll((candidate) => typeof candidate.type === 'string')) {
     const style = (StyleSheet.flatten(node.props.style) ?? {}) as Record<string, unknown>;
-    for (const key of COLOUR_KEYS) if (typeof style[key] === 'string') drawn.all.add(colourNumber(style[key] as string));
-    for (const prop of ['color', 'placeholderTextColor', ...SVG_PAINTS]) {
-      if (typeof node.props[prop] === 'string') drawn.all.add(colourNumber(node.props[prop]));
+    const named = [
+      ...COLOUR_KEYS.map((key) => style[key]),
+      ...['color', 'placeholderTextColor', ...SVG_PAINTS].map((prop) => node.props[prop]),
+    ].filter((colour): colour is string => typeof colour === 'string');
+    for (const colour of named) {
+      drawn.all.add(colourNumber(colour));
+      drawn.styles.add(colourNumber(colour));
     }
     for (const prop of SVG_PAINTS) {
       const paint = node.props[prop] as { type?: number; payload?: unknown } | undefined;
@@ -113,7 +118,8 @@ function coloursUnder(root: ReactTestInstance): Drawn {
 }
 
 // The colours a light page draws that the dark one does not: a screen still
-// showing one of them after the switch did not repaint.
+// showing one of them after the switch did not repaint. Only a role's exact
+// value is caught; a colour derived from a role (an alpha, a mix) is not.
 const staleColours = (before: UiRoles, after: UiRoles): number[] => {
   const kept = new Set(Object.values(after).map(colourNumber));
   return [...new Set(Object.values(before).map(colourNumber))].filter((colour) => !kept.has(colour));
@@ -160,12 +166,13 @@ it('repaints Today, a group page and the exercise page behind Appearance on one 
   // Each screen draws light-only colours in its styles and in its svg (icons,
   // charts), so the check after the switch covers both.
   for (const testID of SCREENS) {
-    const { all, svg } = coloursUnder(screen.getByTestId(testID));
-    expect({ screen: testID, styles: [...all].some((colour) => stale.includes(colour)), svg: [...svg].some((colour) => stale.includes(colour)) })
+    const { styles, svg } = coloursUnder(screen.getByTestId(testID));
+    expect({ screen: testID, styles: [...styles].some((colour) => stale.includes(colour)), svg: [...svg].some((colour) => stale.includes(colour)) })
       .toEqual({ screen: testID, styles: true, svg: true });
   }
 
-  // State a remount would lose: a weight typed but not committed.
+  // A remount replaces these host views; the switch must keep each one.
+  const mounted = [...SCREENS, 'exercise-set-logger-weight'].map((testID) => screen.getByTestId(testID));
   fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '97.5');
   jest.mocked(Appearance.setColorScheme).mockClear();
 
@@ -179,6 +186,7 @@ it('repaints Today, a group page and the exercise page behind Appearance on one 
     expect({ screen: testID, ink: all.has(colourNumber(after.ink)), svg: svg.size > 0 }).toEqual({ screen: testID, ink: true, svg: true });
   }
   expect(coloursUnder(screen.getByTestId('settings-appearance-screen')).all.has(colourNumber(after.ink))).toBe(true);
+  [...SCREENS, 'exercise-set-logger-weight'].forEach((testID, index) => expect(screen.getByTestId(testID)).toBe(mounted[index]));
   expect(screen.getByTestId('exercise-set-logger-weight')).toHaveProp('value', '97.5');
   expect(within(screen.getByTestId('group-screen')).getByText('Garage Gym')).toBeTruthy();
   expect(screen.queryByText(/next launch/i)).toBeNull();
