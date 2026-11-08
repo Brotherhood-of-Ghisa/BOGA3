@@ -18,6 +18,7 @@ export { GroupSwitchSheet, type GroupSwitchOption } from './group-switch-sheet';
 export { GroupLeaderboardsPage, GroupPodiumCard } from './group-leaderboards-page';
 export { GroupPagesFooter } from './group-pages-footer';
 export { PickerGroupSectionList, PickerGroupsToggle } from './picker-group-section';
+export { PersonalExercisePicker } from './personal-exercise-picker';
 export { StandardExercisePicker } from './standard-exercise-picker';
 export {
   GROUPS_EMPTY_BODY,
