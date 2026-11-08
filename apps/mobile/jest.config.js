@@ -2,8 +2,14 @@
 // months, DST changes) are tested in Europe/London, which observes DST.
 process.env.TZ = 'Europe/London';
 
+// Worker cap for a busy machine (spec 02, "Busy machine"): Jest defaults to
+// cores - 1 workers per run, so parallel worktrees oversubscribe the CPU and
+// unrelated suites hit their timeouts. Unset, Jest keeps its default.
+const maxWorkers = process.env.BOGA_JEST_MAX_WORKERS?.trim() || undefined;
+
 module.exports = {
   preset: 'jest-expo',
+  ...(maxWorkers ? { maxWorkers } : {}),
   cacheDirectory: '<rootDir>/.jest-cache',
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   // Edge worker tests import code outside this directory; resolve its transforms from this worktree's mobile deps.
