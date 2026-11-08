@@ -59,18 +59,16 @@ jest.mock('@/components/bodyweight/settings-row', () => ({ BodyWeightSettingsRow
 jest.mock('@/components/sync-status/sync-status-panel', () => ({ SyncStatusPanel: () => null }));
 
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { Storage } from 'expo-sqlite/kv-store';
 import { Appearance, StyleSheet } from 'react-native';
 import type { ReactTestInstance } from 'react-test-renderer';
 
 import type { UiRoles } from '@/components/ui/theme';
-import { APPEARANCE_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { DEFAULT_APPEARANCE, type AppearanceChoice } from '@/components/ui/theme-presets';
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { EXERCISE_PAGE_FIXTURE } from '@/src/maestro/exercise-page-fixture';
 
 import { bootLocalApp, closeLocalData, loadMaestroFixture, resetLocalData } from './helpers/local-data';
-import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
+import { renderWithTheme, rolesFor } from './helpers/theme';
 import { waitForGone } from './helpers/wait-for-gone';
 
 import { TodayScreen } from '../app/(tabs)/today';
@@ -81,7 +79,10 @@ const SLATE_DARK: AppearanceChoice = { theme: 'slate', mode: 'dark', custom: nul
 
 // Every colour a host view under `root` is drawn in: its style's colours and
 // the colour props it hands to native views and svg.
-const COLOUR_KEYS = ['color', 'backgroundColor', 'borderColor', 'borderTopColor', 'borderBottomColor', 'tintColor'] as const;
+const COLOUR_KEYS = [
+  'color', 'backgroundColor', 'borderColor', 'borderTopColor', 'borderBottomColor', 'borderLeftColor', 'borderRightColor',
+  'shadowColor', 'textDecorationColor', 'tintColor',
+] as const;
 function coloursUnder(root: ReactTestInstance): Set<string> {
   const colours = new Set<string>();
   for (const node of root.findAll((candidate) => typeof candidate.type === 'string')) {
@@ -107,13 +108,11 @@ const SCREENS = ['today-screen', 'group-screen', 'exercise-page'] as const;
 
 beforeEach(() => {
   resetLocalData();
-  Storage.removeItemSync(APPEARANCE_STORAGE_KEY);
   jest.spyOn(Appearance, 'getColorScheme').mockReturnValue('light');
   jest.spyOn(Appearance, 'setColorScheme').mockImplementation(() => {});
 });
 
-afterEach(async () => {
-  await switchTheme(DEFAULT_APPEARANCE);
+afterEach(() => {
   jest.restoreAllMocks();
   closeLocalData();
 });
