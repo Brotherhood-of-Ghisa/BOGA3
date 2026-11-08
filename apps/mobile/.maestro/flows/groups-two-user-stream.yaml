@@ -69,7 +69,6 @@ appId: com.dinoderek.mobile
     clearState: true
     clearKeychain: true
 - openLink: "${MAESTRO_DEV_CLIENT_URL}"
-- runFlow: ../scripts/dismiss-notification-permission.yaml
 # SDK 58 can open the developer overlay directly, without the intro.
 - extendedWaitUntil:
     visible:

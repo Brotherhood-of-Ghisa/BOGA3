@@ -100,6 +100,9 @@ maestro_preauthorize_location "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID
 # Keep expo-dev-menu's onboarding sheet and floating button off the RN root.
 maestro_seed_dev_menu_preferences "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID"
 
+# Keep the rest timer's notification-permission dialog from ever appearing.
+maestro_seed_notification_prompt_suppression "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID"
+
 xcrun simctl terminate "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl launch "$IOS_SIM_UDID" "$MAESTRO_IOS_DEV_CLIENT_BUNDLE_ID" >/dev/null 2>&1 || true
 xcrun simctl openurl "$IOS_SIM_UDID" "$MAESTRO_DEV_CLIENT_URL"

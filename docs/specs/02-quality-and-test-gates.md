@@ -251,4 +251,4 @@ test's purpose; `./boga timings` owns durations.
   `06-testing-strategy.md` (per-entry-point catalog, coverage policies).
 - Writing or debugging a Maestro flow: `11-maestro-runtime-and-testing-conventions.md`.
 - A slot-lease or isolation failure: `12-worktree-config-and-isolation.md`.
-- Interpreting a measured duration: `docs/testing/local-test-timings.md`.
+- Measured durations, or Jest timeouts under load: `docs/testing/local-test-timings.md`.
