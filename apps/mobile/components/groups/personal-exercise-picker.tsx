@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Keyboard, Text, View } from 'react-native';
 
 import {
@@ -14,16 +14,22 @@ import {
   uiSpace,
   uiTypography,
 } from '@/components/ui';
+import { GroupLoadingState } from '@/components/groups/group-state-view';
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import {
   filterIndexedExerciseCatalogExercises,
   type IndexedExerciseCatalogExercise,
 } from '@/src/exercise-catalog/search';
+import { describeAlreadyLinkedIn, linkedExerciseIdsInGroup } from '@/src/groups/link-view-model';
+import { listLinks } from '@/src/data/exercise-group-links';
 
 type PersonalExercisePickerProps = {
   selectedId: string | null;
   onPick: (exercise: IndexedExerciseCatalogExercise) => void;
+  groupId?: string;
+  groupName?: string;
+  unavailableExerciseIds?: ReadonlySet<string>;
 };
 
 export const PERSONAL_EXERCISE_RESULT_LIMIT = 30;
@@ -32,18 +38,49 @@ export const PERSONAL_EXERCISE_RESULT_LIMIT = 30;
  * Search the user's personal exercise catalog and pick one to copy into the group
  * (Add exercise → My exercises): a `SearchField` over one `Card` of radio
  * rows, the pick marked by `radio-on` in `ink` (no ground change).
+ *
+ * Exercises already linked in this group are marked disabled and indicate
+ * their link status to prevent stealth link re-targeting.
  */
-export function PersonalExercisePicker({ selectedId, onPick }: PersonalExercisePickerProps) {
+export function PersonalExercisePicker({
+  selectedId,
+  onPick,
+  groupId,
+  groupName,
+  unavailableExerciseIds,
+}: PersonalExercisePickerProps) {
   const styles = useStyles();
   const [query, setQuery] = useState('');
-  const { exercises } = useExerciseCatalog();
+  const catalog = useExerciseCatalog();
+  const [fetchedLinks, setFetchedLinks] = useState<ReadonlySet<string>>(new Set());
+
+  useEffect(() => {
+    if (unavailableExerciseIds || !groupId) {
+      return;
+    }
+    let active = true;
+    listLinks()
+      .then((links) => {
+        if (!active) return;
+        setFetchedLinks(linkedExerciseIdsInGroup(groupId, links));
+      })
+      .catch(() => {
+        if (!active) return;
+        setFetchedLinks(new Set());
+      });
+    return () => {
+      active = false;
+    };
+  }, [groupId, unavailableExerciseIds]);
+
+  const linkedInGroup = unavailableExerciseIds ?? fetchedLinks;
 
   const active = useMemo(
     () =>
-      exercises
+      catalog.exercises
         .filter((candidate) => !candidate.deletedAt)
         .sort((left, right) => left.name.localeCompare(right.name)),
-    [exercises],
+    [catalog.exercises],
   );
 
   const { options, total } = useMemo(() => {
@@ -71,7 +108,18 @@ export function PersonalExercisePicker({ selectedId, onPick }: PersonalExerciseP
         value={query}
       />
       <Card>
-        {options.length === 0 ? (
+        {catalog.status === 'idle' || catalog.status === 'loading' ? (
+          <GroupLoadingState testID="group-personal-exercise-loading" />
+        ) : catalog.status === 'error' ? (
+          <Text
+            allowFontScaling={false}
+            style={styles.message}
+            testID="group-personal-exercise-error">
+            {catalog.lastError
+              ? `Failed to load exercises: ${catalog.lastError}`
+              : 'Failed to load exercises.'}
+          </Text>
+        ) : options.length === 0 ? (
           <Text
             allowFontScaling={false}
             style={styles.message}
@@ -84,33 +132,54 @@ export function PersonalExercisePicker({ selectedId, onPick }: PersonalExerciseP
           options.map((option, index) => {
             const selected = option.id === selectedId;
             const modeLabel = LOAD_INPUT_MODE_LABELS[option.loadInputMode ?? 'total_load'];
+            const unavailableReason = linkedInGroup.has(option.id)
+              ? describeAlreadyLinkedIn(groupName ?? 'this group')
+              : null;
+            const isUnavailable = unavailableReason !== null;
+
             return (
               <ListRow
-                accessibilityLabel={`${option.name}, ${modeLabel}`}
+                accessibilityLabel={
+                  unavailableReason
+                    ? `${option.name}, ${unavailableReason}`
+                    : `${option.name}, ${modeLabel}`
+                }
                 checked={selected}
                 density="list"
+                disabled={isUnavailable}
                 divider={index > 0}
                 key={option.id}
-                leading={<Icon name={selected ? 'radio-on' : 'radio-off'} />}
+                leading={
+                  <Icon
+                    colorRole={isUnavailable ? 'inkMuted' : 'ink'}
+                    name={selected ? 'radio-on' : 'radio-off'}
+                  />
+                }
                 meta={
-                  <Text allowFontScaling={false} style={styles.meta}>
-                    {modeLabel}
+                  <Text
+                    allowFontScaling={false}
+                    style={[styles.meta, isUnavailable && styles.metaDisabled]}>
+                    {unavailableReason ?? modeLabel}
                   </Text>
                 }
                 onPress={() => {
+                  if (isUnavailable) return;
                   // Bring the prefilled form below into view.
                   Keyboard.dismiss();
                   onPick(option);
                 }}
                 testID={`group-personal-exercise-${option.id}`}>
-                <Text allowFontScaling={false} numberOfLines={2} style={styles.name}>
+                <Text
+                  allowFontScaling={false}
+                  numberOfLines={2}
+                  style={[styles.name, isUnavailable && styles.nameDisabled]}>
                   {option.name}
                 </Text>
               </ListRow>
             );
           })
         )}
-        {total > options.length ? (
+        {catalog.status === 'ready' && total > options.length ? (
           <Text
             allowFontScaling={false}
             style={[styles.message, styles.more]}
@@ -140,15 +209,21 @@ const useStyles = makeStyles((roles) => ({
     paddingVertical: uiSpace.sm,
     fontFamily: uiFonts.body.family,
     fontWeight: '600',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
     color: roles.ink,
+  },
+  nameDisabled: {
+    color: roles.inkMuted,
   },
   meta: {
     fontFamily: uiFonts.body.family,
     fontWeight: '400',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
+    color: roles.inkMuted,
+  },
+  metaDisabled: {
     color: roles.inkMuted,
   },
   message: {
@@ -156,8 +231,8 @@ const useStyles = makeStyles((roles) => ({
     paddingVertical: uiSpace.md,
     fontFamily: uiFonts.body.family,
     fontWeight: '400',
-    fontSize: uiTypography.size.md,
-    lineHeight: uiTypography.lineHeight.md,
+    fontSize: uiTypography.size.base,
+    lineHeight: uiTypography.lineHeight.base,
     color: roles.inkMuted,
   },
   more: {

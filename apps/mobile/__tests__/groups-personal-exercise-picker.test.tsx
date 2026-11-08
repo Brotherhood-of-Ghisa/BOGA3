@@ -6,6 +6,7 @@ jest.mock('@/src/data/bootstrap', () =>
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { PersonalExercisePicker } from '@/components/groups';
+import { linkExercise } from '@/src/data/exercise-group-links';
 import { exerciseDefinitions } from '@/src/data/schema';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import { closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
@@ -101,4 +102,41 @@ it('marks the selected exercise with checked radio and fires onPick on tap', asy
   expect(screen.getByTestId('group-personal-exercise-ex-beta').props.accessibilityState).toEqual({
     checked: false,
   });
+});
+
+it('disables exercises already linked in this group and prevents selecting them', async () => {
+  seedExercises([
+    { id: 'ex-bench', name: 'Custom Linked Bench' },
+    { id: 'ex-squat', name: 'Custom Free Squat' },
+  ]);
+
+  await linkExercise('ex-bench', 'grp-test', 'gx-bench');
+
+  const onPick = jest.fn();
+  render(
+    <PersonalExercisePicker
+      groupId="grp-test"
+      groupName="Iron Brotherhood"
+      onPick={onPick}
+      selectedId={null}
+    />,
+  );
+
+  expect(await screen.findByText('Custom Linked Bench')).toBeTruthy();
+  expect(await screen.findByText('already linked in Iron Brotherhood')).toBeTruthy();
+
+  const linkedRow = screen.getByTestId('group-personal-exercise-ex-bench');
+  expect(linkedRow.props.accessibilityState).toMatchObject({ disabled: true });
+  expect(linkedRow.props.accessibilityLabel).toContain('already linked in Iron Brotherhood');
+
+  fireEvent.press(linkedRow);
+  expect(onPick).not.toHaveBeenCalled();
+
+  const availableRow = screen.getByTestId('group-personal-exercise-ex-squat');
+  expect(availableRow.props.accessibilityState.disabled).toBeUndefined();
+
+  fireEvent.press(availableRow);
+  expect(onPick).toHaveBeenCalledWith(
+    expect.objectContaining({ id: 'ex-squat', name: 'Custom Free Squat' }),
+  );
 });

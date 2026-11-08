@@ -431,7 +431,6 @@ describe('Add exercise route', () => {
     fireEvent.press(screen.getByTestId('group-personal-exercise-ex-incline'));
 
     expect(screen.getByTestId('group-exercise-form-name-input').props.value).toBe('My Incline Press');
-    expect(screen.getByTestId('group-personal-exercise-link-notice')).toBeTruthy();
 
     await submit();
     expect(api.createCompetitionExercise).toHaveBeenCalledWith({
@@ -444,6 +443,62 @@ describe('Add exercise route', () => {
     });
     expect(linkSpy).toHaveBeenCalledWith('ex-incline', GROUP_ID, 'gx-incline');
     expect(mockRouter.back).toHaveBeenCalled();
+  });
+
+  it('surfaces local link errors, keeps screen open, and retries link without duplicating exercise', async () => {
+    addMyExercise('ex-incline', 'My Incline Press');
+    __resetExerciseCatalogCacheForTests();
+    api.createCompetitionExercise.mockResolvedValue({
+      contract_version: 4,
+      exercise: { ...BENCH, group_exercise_id: 'gx-incline', name: 'My Incline Press' },
+    });
+    const linkSpy = jest.spyOn(linksRepo, 'linkExercise').mockRejectedValueOnce(new Error('Disk full'));
+
+    await renderNew();
+    fireEvent.changeText(screen.getByTestId('group-personal-exercise-search'), 'Incline');
+    fireEvent.press(screen.getByTestId('group-personal-exercise-ex-incline'));
+
+    await submit();
+    expect(api.createCompetitionExercise).toHaveBeenCalledTimes(1);
+    expect(linkSpy).toHaveBeenCalledWith('ex-incline', GROUP_ID, 'gx-incline');
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    expect(screen.getByTestId('group-exercise-form-error')).toHaveTextContent(
+      'Group exercise was added, but failed to link your personal exercise: Disk full',
+    );
+    expect(screen.getByTestId('group-exercise-form-submit')).toHaveTextContent('Retry link');
+
+    // Retrying link uses the existing group exercise without calling createCompetitionExercise again
+    linkSpy.mockResolvedValueOnce(undefined as never);
+    await submit();
+    expect(api.createCompetitionExercise).toHaveBeenCalledTimes(1);
+    expect(linkSpy).toHaveBeenCalledTimes(2);
+    expect(mockRouter.back).toHaveBeenCalled();
+  });
+
+  it('add personal exercise: links even if user navigates back while network RPC is awaiting', async () => {
+    let resolvePending!: (value: { contract_version: 4; exercise: CompetitionExerciseWire }) => void;
+    const pending = new Promise<{ contract_version: 4; exercise: CompetitionExerciseWire }>((resolve) => {
+      resolvePending = resolve;
+    });
+    api.createCompetitionExercise.mockReturnValue(pending);
+    addMyExercise('ex-incline', 'My Incline Press');
+    __resetExerciseCatalogCacheForTests();
+    const linkSpy = jest.spyOn(linksRepo, 'linkExercise').mockResolvedValue(undefined as never);
+
+    await renderNew();
+    fireEvent.changeText(screen.getByTestId('group-personal-exercise-search'), 'Incline');
+    fireEvent.press(screen.getByTestId('group-personal-exercise-ex-incline'));
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+
+    expect(api.createCompetitionExercise).toHaveBeenCalled();
+    // User navigates back while network create is in flight
+    screen.unmount();
+    await act(async () => {
+      resolvePending({ contract_version: 4, exercise: { ...BENCH, group_exercise_id: 'gx-incline' } });
+    });
+
+    expect(linkSpy).toHaveBeenCalledWith('ex-incline', GROUP_ID, 'gx-incline');
+    expect(mockRouter.back).not.toHaveBeenCalled();
   });
 
   it('preserves seed id as sourceId when copying a seeded personal exercise', async () => {
