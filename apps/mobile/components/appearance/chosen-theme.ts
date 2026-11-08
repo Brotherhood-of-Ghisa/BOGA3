@@ -17,8 +17,9 @@ import {
 } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
-// The stored choice. Falls back to `inUse`, the theme the app is drawn in,
-// logged, when the store cannot be read.
+// The stored choice. Falls back to `inUse`, logged, when the store cannot be
+// read: the choice to show instead (the theme the app is drawn in, or the
+// page's own).
 export function readStoredAppearance(inUse: AppearanceChoice): AppearanceChoice {
   try {
     return readStoredTheme().appearance;

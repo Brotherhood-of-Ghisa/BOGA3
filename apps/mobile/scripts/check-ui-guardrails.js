@@ -70,7 +70,7 @@ function buildLegacyVocabularyRegex(identifiers = legacyVocabularyRule?.identifi
 const LEGACY_VOCABULARY_SCOPE = { targets: ['app', 'components', 'src'], extensions: ['.ts', '.tsx'] };
 
 const LEGACY_VOCABULARY_REMEDY =
-  'use uiRoles (colour) and uiGeometry.radius (radii) from @/components/ui/tokens, and Card / Stat / ' +
+  'use useUiRoles() or a makeStyles sheet (colour) from @/components/ui, uiGeometry.radius (radii) from @/components/ui/tokens, and Card / Stat / ' +
   'ListRow / ActionButton / SegmentedControl / ChipGroup from @/components/ui for the retired primitives';
 
 const UI_SCOPE = { targets: ['app', 'components'], extensions: ['.tsx'] };
