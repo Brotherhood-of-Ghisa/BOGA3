@@ -7,7 +7,7 @@ import {
   GroupMissingDataState,
   GroupStateView,
   GroupsSignInRequired,
-  groupScreenStyles,
+  useGroupScreenStyles,
 } from '@/components/groups';
 import {
   ActionButton,
@@ -44,6 +44,7 @@ const firstParam = (value: string | string[] | undefined): string | null => {
 };
 
 export default function ExerciseShareRoute() {
+  const groupScreenStyles = useGroupScreenStyles();
   const { isConfigured, user } = useAuth();
   const params = useLocalSearchParams<{ groupId?: string | string[]; payload?: string | string[] }>();
   const groupId = firstParam(params.groupId);
@@ -85,6 +86,7 @@ function ExerciseShareContent({
   rawPayload: string;
   userId: string;
 }) {
+  const groupScreenStyles = useGroupScreenStyles();
   const router = useRouter();
   const catalog = useExerciseCatalog();
   const payload = useMemo(() => decodeExerciseSharePayload(rawPayload), [rawPayload]);

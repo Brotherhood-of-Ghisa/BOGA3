@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Keyboard, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Text, View } from 'react-native';
 
 import {
   Card,
@@ -7,11 +7,10 @@ import {
   ListRow,
   SearchField,
   FigureText,
+  makeStyles,
   uiBorder,
-  uiRoles,
   uiSpace,
-  uiText,
-  uiTextTone,
+  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { LOAD_INPUT_MODE_LABELS } from '@/src/exercise-core';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
@@ -28,13 +27,16 @@ type StandardExercisePickerProps = {
  * rows, the pick marked by `radio-on` in `ink` (no ground change).
  */
 export function StandardExercisePicker({ selectedId, onPick }: StandardExercisePickerProps) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const [query, setQuery] = useState('');
   const { muscleSetup } = useExerciseCatalog();
   const { options, total } = useMemo(() => searchStandardExercises(query, muscleSetup), [query, muscleSetup]);
 
   return (
     <View style={styles.picker} testID="group-standard-exercise-picker">
-      <Text allowFontScaling={false} style={uiText.label}>
+      <Text allowFontScaling={false} style={text.label}>
         Standard exercise
       </Text>
       <SearchField
@@ -46,7 +48,7 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
       />
       <Card>
         {options.length === 0 ? (
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.message]} testID="group-standard-exercise-no-match">
+          <Text allowFontScaling={false} style={[text.body, tone.muted, styles.message]} testID="group-standard-exercise-no-match">
             {`No standard exercise matches "${query.trim()}".`}
           </Text>
         ) : (
@@ -60,9 +62,9 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
                 density="list"
                 divider={index > 0}
                 key={option.sourceExerciseId}
-                leading={<Icon color={uiRoles.ink} name={selected ? 'radio-on' : 'radio-off'} />}
+                leading={<Icon colorRole="ink" name={selected ? 'radio-on' : 'radio-off'} />}
                 meta={
-                  <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted]}>
+                  <Text allowFontScaling={false} style={[text.body, tone.muted]}>
                     {modeLabel}
                   </Text>
                 }
@@ -72,7 +74,7 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
                   onPick(option);
                 }}
                 testID={`group-standard-exercise-${option.sourceExerciseId}`}>
-                <Text allowFontScaling={false} numberOfLines={2} style={[uiText.bodyStrong, styles.name]}>
+                <Text allowFontScaling={false} numberOfLines={2} style={[text.bodyStrong, styles.name]}>
                   {option.name}
                 </Text>
               </ListRow>
@@ -80,7 +82,7 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
           })
         )}
         {total > options.length ? (
-          <Text allowFontScaling={false} style={[uiText.body, uiTextTone.muted, styles.message, styles.more]} testID="group-standard-exercise-more">
+          <Text allowFontScaling={false} style={[text.body, tone.muted, styles.message, styles.more]} testID="group-standard-exercise-more">
             <FigureText>{`Showing ${options.length} of ${total}. Search to narrow the list.`}</FigureText>
           </Text>
         ) : null}
@@ -89,7 +91,7 @@ export function StandardExercisePicker({ selectedId, onPick }: StandardExerciseP
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   picker: {
     gap: uiSpace.sm,
   },
@@ -102,6 +104,6 @@ const styles = StyleSheet.create({
   },
   more: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: uiRoles.ruleSoft,
+    borderTopColor: roles.ruleSoft,
   },
-});
+}));

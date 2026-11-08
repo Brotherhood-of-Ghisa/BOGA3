@@ -4,8 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
-import { uiText } from '@/components/ui/text-roles';
-import { uiRoles, uiSpace } from '@/components/ui/tokens';
+import { useUiText } from '@/components/ui/text-roles';
+import { uiSpace } from '@/components/ui/tokens';
 
 import { GroupSwitchSheet, type GroupSwitchOption } from './group-switch-sheet';
 
@@ -91,6 +91,7 @@ export function GroupScreenHeader({ groups, selectedGroupId, groupName, onSelect
 }
 
 function GroupsTitle({ name, canSwitch, maxWidth, onPress }: { name: string; canSwitch: boolean; maxWidth: number; onPress: () => void }) {
+  const text = useUiText();
   // A long name shrinks before it truncates.
   const label = (
     <Text
@@ -99,7 +100,7 @@ function GroupsTitle({ name, canSwitch, maxWidth, onPress }: { name: string; can
       ellipsizeMode="tail"
       minimumFontScale={0.75}
       numberOfLines={1}
-      style={[uiText.sheetTitle, styles.text]}
+      style={[text.sheetTitle, styles.text]}
       testID="groups-title-name">
       {name}
     </Text>
@@ -121,7 +122,7 @@ function GroupsTitle({ name, canSwitch, maxWidth, onPress }: { name: string; can
       style={({ pressed }) => [styles.title, { maxWidth }, pressed ? styles.pressed : null]}
       testID="groups-title">
       {label}
-      <Icon color={uiRoles.inkMuted} name="chevron-down" size="sm" />
+      <Icon colorRole="inkMuted" name="chevron-down" size="sm" />
     </Pressable>
   );
 }

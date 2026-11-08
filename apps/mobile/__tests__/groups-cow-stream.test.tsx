@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, renderHook, screen } from '@testing-library/react-native';
 import { CoWStreamCard } from '@/components/groups/cow-stream-card';
-import { uiText } from '@/components/ui';
+
 import { isCompetitionStreamWire } from '@/src/groups/competition-reader-guards';
 import { isCoWStreamItemWire } from '@/src/groups/cow-stream-wire';
 import { buildCoWStreamCard } from '@/src/groups/cow-stream-view-model';
@@ -11,6 +11,16 @@ import { groupCacheKeys, readGroupCache, writeGroupCache, observeGroupCompetitio
 import { cowStreamItem } from './helpers/cow-fixtures';
 import { competitionSession } from './helpers/competition-fixtures';
 import { createInMemoryDatabase } from './helpers/in-memory-db';
+import { useUiText } from '@/components/ui/text-roles';
+import { AppThemeProvider } from '@/components/ui/theme-context';
+import { renderWithTheme } from './helpers/theme';
+
+// The live text roles, read once before any render under test: `renderHook`
+// would otherwise take over `screen`.
+let uiText!: ReturnType<typeof useUiText>;
+beforeAll(() => {
+  uiText = renderHook(() => useUiText(), { wrapper: AppThemeProvider }).result.current;
+});
 
 const mockPush=jest.fn();
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
@@ -22,7 +32,7 @@ it.each(events)('accepts the closed %s projection and renders one default-visibl
   expect(isCoWStreamItemWire(item)).toBe(true);
   expect(isCompetitionStreamWire(stream(event))).toBe(true);
   expect(buildCompetitionStreamModels([item],undefined,'DD-MM-YYYY')).toEqual([item]);
-  render(<CoWStreamCard item={item} userId="u1" />);
+  renderWithTheme(<CoWStreamCard item={item} userId="u1" />);
   const card=screen.getByTestId(`cow-stream-${item.key}`);
   expect(card).toHaveTextContent('Bench press',{ exact: false });
   expect(card).toHaveTextContent('Europe/London',{ exact: false });

@@ -12,8 +12,8 @@ import {
   GroupOfflineBanner,
   GroupWriteNotice,
   GroupsSignInRequired,
-  groupScreenStyles,
   pickInlineError,
+  useGroupScreenStyles,
   usePullToRefresh,
 } from '@/components/groups';
 import { ActionButton, Card, useUiText, useUiTextTone } from '@/components/ui';
@@ -79,6 +79,7 @@ export default function GroupMembersRoute() {
 }
 
 function LostAccessState() {
+  const groupScreenStyles = useGroupScreenStyles();
   return (
     <View style={[groupScreenStyles.screen, groupScreenStyles.content]}>
       <GroupLostAccessState testID="group-members-lost-access" />
@@ -87,9 +88,10 @@ function LostAccessState() {
 }
 
 function GroupMembersContent({ userId, groupId }: { userId: string; groupId: string }) {
-  const router = useRouter();
+  const groupScreenStyles = useGroupScreenStyles();
   const text = useUiText();
   const tone = useUiTextTone();
+  const router = useRouter();
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({
     userId,

@@ -19,8 +19,8 @@ import {
   GroupsSignInRequired,
   GROUP_SECTIONS,
   GROUP_SECTION_LABELS,
-  groupScreenStyles,
   pickInlineError,
+  useGroupScreenStyles,
   usePullToRefresh,
   type GroupsSection,
 } from '@/components/groups';
@@ -72,6 +72,7 @@ export default function GroupsRoute() {
 
 function GroupsTabContent({ userId }: { userId: string }) {
   const styles = useStyles();
+  const groupScreenStyles = useGroupScreenStyles();
   const router = useRouter();
   const params = useLocalSearchParams<{ groupId?: string | string[]; section?: string | string[] }>();
   const requestedGroupId = firstParam(params.groupId);

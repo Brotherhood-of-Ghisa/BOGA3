@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
 
 import {
   useOpenExerciseEditor,
@@ -13,8 +13,8 @@ import {
   SearchField,
   Sheet,
   Tag,
+  makeStyles,
   uiFonts,
-  uiRoles,
   uiSpace,
   uiTypography,
 } from '@/components/ui';
@@ -88,6 +88,7 @@ function GroupSharedExerciseCard({
   onDirectAdd,
   onCustomize,
 }: GroupSharedExerciseCardProps) {
+  const styles = useStyles();
   const isAuthor = item.shared_by.user_id === userId;
   const who = isAuthor ? 'You' : formatMemberName(item.shared_by.username);
   const date = formatBoardDate(item.exercise.created_at_ms, dateFormat);
@@ -251,6 +252,7 @@ function ShareExercisePickerSheet({
   exercises,
   onSelect,
 }: ShareExercisePickerSheetProps) {
+  const styles = useStyles();
   return (
     <Sheet
       dismissLabel="Close exercise picker"
@@ -342,6 +344,7 @@ async function importSharedExercise(
 }
 
 export function GroupSharedExercisesList({ groupId, groupName, myRole, userId, offline }: Props) {
+  const styles = useStyles();
   const dateFormat = useDateFormat();
   const catalog = useExerciseCatalog();
   const links = useMyGroupExerciseLinks(groupId);
@@ -539,18 +542,18 @@ export function GroupSharedExercisesList({ groupId, groupName, myRole, userId, o
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   container: { gap: uiSpace.md },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  microLabel: { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.sm, color: uiRoles.inkMuted },
+  microLabel: { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.sm, color: roles.inkMuted },
   list: { gap: uiSpace.sm },
   card: { padding: uiSpace.md, gap: uiSpace.xs },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardAuthor: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: uiRoles.inkMuted },
-  exerciseName: { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.lg, color: uiRoles.ink },
+  cardAuthor: { fontFamily: uiFonts.body.family, fontSize: uiTypography.size.sm, color: roles.inkMuted },
+  exerciseName: { fontFamily: uiFonts.display.family, fontSize: uiTypography.size.lg, color: roles.ink },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: uiSpace.xs, marginTop: uiSpace.xs },
   cardActions: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: uiSpace.sm, marginTop: uiSpace.xs },
   sheetContent: { gap: uiSpace.md, maxHeight: 400 },
   sheetList: { maxHeight: 320 },
-  emptySearchText: { padding: uiSpace.md, textAlign: 'center', color: uiRoles.inkMuted },
-});
+  emptySearchText: { padding: uiSpace.md, textAlign: 'center', color: roles.inkMuted },
+}));

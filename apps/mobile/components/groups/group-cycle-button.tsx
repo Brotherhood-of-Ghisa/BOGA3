@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, type StyleProp, type ViewStyle } from 'react-native';
 
-import { uiBorder, uiGeometry, uiRoles, uiSpace, uiText, uiTextTone } from '@/components/ui';
+import { makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 
 export type GroupCycleOption<TValue extends string> = { value: TValue; label: string };
 
@@ -18,6 +18,9 @@ export function GroupCycleButton<TValue extends string>({ options, value, onChan
   accessibilityLabel: string;
   testID: string;
 }) {
+  const styles = useStyles();
+  const text = useUiText();
+  const tone = useUiTextTone();
   const index = Math.max(0, options.findIndex(option => option.value === value));
   const current = options[index];
   const next = options[(index + 1) % options.length];
@@ -31,24 +34,24 @@ export function GroupCycleButton<TValue extends string>({ options, value, onChan
       onPress={() => { if (next) onChange(next.value); }}
       style={({ pressed }) => [styles.pill, style, pressed ? styles.pressed : null]}
       testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[uiText.label, uiTextTone.ink]}>{current?.label ?? ''}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.ink]}>{current?.label ?? ''}</Text>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((roles) => ({
   pill: {
     flex: 1,
     minHeight: uiGeometry.tapTarget,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: uiSpace.sm,
-    backgroundColor: uiRoles.surface,
+    backgroundColor: roles.surface,
     borderWidth: uiBorder.width,
-    borderColor: uiRoles.rule,
+    borderColor: roles.rule,
     borderRadius: uiGeometry.radius.pill,
   },
   pressed: {
-    backgroundColor: uiRoles.paper,
+    backgroundColor: roles.paper,
   },
-});
+}));

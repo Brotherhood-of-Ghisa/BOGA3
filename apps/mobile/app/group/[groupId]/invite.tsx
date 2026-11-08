@@ -7,7 +7,7 @@ import {
   GroupStateView,
   GroupWriteNotice,
   GroupsSignInRequired,
-  groupScreenStyles,
+  useGroupScreenStyles,
 } from '@/components/groups';
 import {
   ActionButton,
@@ -57,6 +57,7 @@ export default function GroupInviteRoute() {
 type Feedback = { tone: 'error' | 'success'; message: string };
 
 function GroupInviteContent({ userId, groupId }: { userId: string; groupId: string }) {
+  const groupScreenStyles = useGroupScreenStyles();
   const text = useUiText();
   const fetcher = useCallback(() => getGroup(groupId), [groupId]);
   const group = useGroupResource<GroupGetResult>({
