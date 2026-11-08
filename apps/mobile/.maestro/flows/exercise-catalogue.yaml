@@ -24,7 +24,6 @@ appId: com.dinoderek.mobile
 #   __tests__/exercise-page-screen.test.tsx (swap).
 
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-browser&teleport=exercise-catalog"
-- runFlow: ../scripts/dismiss-notification-permission.yaml
 # Wait for the fixture's catalogue, not the previous screen (spec 06 rule 4).
 - extendedWaitUntil:
     visible: "Chest exercises 25"

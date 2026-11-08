@@ -44,6 +44,19 @@ lane run via `scripts/lane-timing.sh`), and are read with:
 4. **Failed runs are recorded but excluded from medians** (the reader counts
    only `exit_code == 0`), so a red lane can't poison the timing data.
 
+## Busy machine: cap Jest workers
+
+Jest starts one worker per core but one, per run, so parallel worktrees
+oversubscribe the CPU. Before a Jest lane (`fast`, `jest-full`,
+`jest-coverage`), run `uptime`; if the 1-minute load average exceeds the core
+count (`sysctl -n hw.ncpu`), as when other worktrees test or a simulator lane
+runs, cap the workers at about cores ÷ concurrent Jest runs:
+`BOGA_JEST_MAX_WORKERS=3 ./boga test fast` (a number or a percentage, e.g.
+`25%`; `apps/mobile/jest.config.js` reads it). Timeouts across unrelated suites,
+a `waitFor` that gives up, or a SIGKILLed worker on a loaded machine are load,
+not test bugs: re-run capped before debugging a test. A run above its ceiling
+on a loaded machine says the same.
+
 ## How records are produced
 
 - Every lane invoked through `./boga test <gate|lane>` (and the legacy
