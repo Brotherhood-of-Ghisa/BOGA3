@@ -8,7 +8,6 @@ appId: com.dinoderek.mobile
 # rm-curve-navigation.test.tsx own numerics, source races, SQLite scope and controls.
 # Fixture is synthetic UI data, never calibration evidence or a real-user export.
 - openLink: "boga3://maestro-harness?reset=data&fixture=strength-regimes&teleport=exercise-page&sessionId=maestro_exercise_page_session&sessionExerciseId=maestro_exercise_page_bench"
-- runFlow: ../scripts/dismiss-notification-permission.yaml
 - extendedWaitUntil:
     visible: { id: "exercise-page" }
     timeout: 30000

@@ -247,7 +247,7 @@ Applies to every lane that hits a running stack rather than a mocked client.
 - **Parallel runs:** runtime ownership covers setup, test bodies and teardown;
   competing commands refuse before mutation. For ownership or interruption
   failures, load `12-worktree-config-and-isolation.md`, "Runtime ownership".
-  `scripts/tests/runtime-guard.test.sh` (also exercised by Jest) proves
+  `scripts/tests/runtime-guard.test.sh` (`meta-tests` lane) proves
   contention, direct reset paths, nesting, independent runtimes and signal
   cleanup. The real `backend-fast` smoke still proves reset against Supabase.
   Each worktree owns its stack, Metro port and simulator; every local gate

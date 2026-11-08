@@ -50,7 +50,6 @@ appId: com.dinoderek.mobile
     maxRetries: 3
     commands:
       - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
-      - runFlow: ../scripts/dismiss-notification-permission.yaml
       - extendedWaitUntil:
           visible:
             id: "stats-history-screen"
@@ -118,7 +117,6 @@ appId: com.dinoderek.mobile
 # (a hideKeyboard here cost ~4.3s).
 - tapOn:
     id: "exercise-set-logger-commit"
-- runFlow: ../scripts/await-notification-permission.yaml
 - extendedWaitUntil:
     visible:
       id: "exercise-set-1-toggle"

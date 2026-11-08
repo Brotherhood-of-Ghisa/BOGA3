@@ -9,13 +9,18 @@ import {
   scheduleRestTimerNotification,
   __resetRestTimerNotificationForTests,
 } from '@/src/session-recorder/rest-timer-notification-native';
+import { isNotificationPromptSuppressed } from '@/src/session-recorder/notification-prompt-suppression';
 
 jest.unmock('@/src/session-recorder/rest-timer-notification-native');
+jest.mock('@/src/session-recorder/notification-prompt-suppression', () => ({
+  isNotificationPromptSuppressed: jest.fn(() => false),
+}));
 
 describe('rest-timer-notification-native adapter', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     __resetRestTimerNotificationForTests();
+    jest.mocked(isNotificationPromptSuppressed).mockReturnValue(false);
     jest.mocked(Notifications.getPermissionsAsync).mockResolvedValue({
       granted: true,
       canAskAgain: true,
@@ -59,6 +64,67 @@ describe('rest-timer-notification-native adapter', () => {
       },
     });
     expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('never raises the permission dialog while the prompt is suppressed, and still schedules', async () => {
+    jest.mocked(isNotificationPromptSuppressed).mockReturnValue(true);
+    jest.mocked(Notifications.getPermissionsAsync).mockResolvedValue({
+      granted: false,
+      canAskAgain: true,
+      status: 'undetermined',
+      expires: 'never',
+      ios: { status: Notifications.IosAuthorizationStatus.NOT_DETERMINED },
+    } as unknown as Notifications.NotificationPermissionsStatus);
+
+    scheduleRestTimerNotification(Date.now() + 60_000);
+    await flushRestTimerNotificationQueueForTests();
+
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+    expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the sound-upgrade dialog while the prompt is suppressed', async () => {
+    const originalOs = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true });
+    try {
+      jest.mocked(isNotificationPromptSuppressed).mockReturnValue(true);
+      jest.mocked(Notifications.getPermissionsAsync).mockResolvedValueOnce({
+        granted: true,
+        canAskAgain: true,
+        status: 'granted',
+        expires: 'never',
+        ios: { status: Notifications.IosAuthorizationStatus.AUTHORIZED, allowsSound: false },
+      } as unknown as Notifications.NotificationPermissionsStatus);
+
+      scheduleRestTimerNotification(Date.now() + 60_000);
+      await flushRestTimerNotificationQueueForTests();
+
+      expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+      expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: originalOs, configurable: true });
+    }
+  });
+
+  it('asks once the suppression is lifted, because a suppressed run never consumed the request', async () => {
+    const undetermined = {
+      granted: false,
+      canAskAgain: true,
+      status: 'undetermined',
+      expires: 'never',
+      ios: { status: Notifications.IosAuthorizationStatus.NOT_DETERMINED },
+    } as unknown as Notifications.NotificationPermissionsStatus;
+    jest.mocked(Notifications.getPermissionsAsync).mockResolvedValue(undetermined);
+
+    jest.mocked(isNotificationPromptSuppressed).mockReturnValue(true);
+    scheduleRestTimerNotification(Date.now() + 60_000);
+    await flushRestTimerNotificationQueueForTests();
+    expect(Notifications.requestPermissionsAsync).not.toHaveBeenCalled();
+
+    jest.mocked(isNotificationPromptSuppressed).mockReturnValue(false);
+    scheduleRestTimerNotification(Date.now() + 60_000);
+    await flushRestTimerNotificationQueueForTests();
+    expect(Notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
   });
 
   it('does not request permissions again if already granted', async () => {
