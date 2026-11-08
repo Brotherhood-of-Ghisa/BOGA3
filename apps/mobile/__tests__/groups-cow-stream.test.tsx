@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react-native';
+import { fireEvent, renderHook, screen } from '@testing-library/react-native';
 import { CoWStreamCard } from '@/components/groups/cow-stream-card';
 
 import { isCompetitionStreamWire } from '@/src/groups/competition-reader-guards';
@@ -11,11 +11,16 @@ import { groupCacheKeys, readGroupCache, writeGroupCache, observeGroupCompetitio
 import { cowStreamItem } from './helpers/cow-fixtures';
 import { competitionSession } from './helpers/competition-fixtures';
 import { createInMemoryDatabase } from './helpers/in-memory-db';
-import { uiText } from '@/components/ui/text-roles';
-import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
-import { renderWithTheme, rolesFor } from './helpers/theme';
+import { useUiText } from '@/components/ui/text-roles';
+import { AppThemeProvider } from '@/components/ui/theme-context';
+import { renderWithTheme } from './helpers/theme';
 
-const themeRoles = rolesFor(DEFAULT_APPEARANCE);
+// The live text roles, read once before any render under test: `renderHook`
+// would otherwise take over `screen`.
+let uiText!: ReturnType<typeof useUiText>;
+beforeAll(() => {
+  uiText = renderHook(() => useUiText(), { wrapper: AppThemeProvider }).result.current;
+});
 
 const mockPush=jest.fn();
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));

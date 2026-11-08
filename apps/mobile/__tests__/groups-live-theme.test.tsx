@@ -70,7 +70,7 @@ describe('the rank chart', () => {
 });
 
 describe('the My groups row', () => {
-  it('repaints a muted line and its chevron when the theme changes', async () => {
+  it('repaints a muted line when the theme changes', async () => {
     renderWithTheme(
       <GroupSummaryRow
         divider={false}
