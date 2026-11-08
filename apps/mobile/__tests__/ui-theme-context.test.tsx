@@ -201,7 +201,10 @@ describe('native UI and the phone', () => {
       return { remove: () => listeners.delete(listener) } as ReturnType<typeof Appearance.addChangeListener>;
     });
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+    AppState.currentState = 'active';
+  });
 
   // The phone switches mode; the OS reports it only while native UI is unpinned.
   const phoneSwitches = async (scheme: ColorSchemeName) => {
@@ -310,7 +313,10 @@ describe('native UI and the phone', () => {
     expect(drawnModes(before)).toEqual(['light', 'dark']);
   });
 
-  it('ignores the mode flips iOS makes in the background, and reads the phone on return', async () => {
+  // Inactive (Control Center open) is what this fake models faithfully: the OS
+  // reports and the app does not listen. In the background iOS drops the
+  // reports natively, so a change made then is a device check.
+  it('ignores OS reports while the app is not active, and reads the phone on return', async () => {
     Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord(SLATE_SYSTEM));
     const returns = new Set<(state: AppStateStatus) => void>();
     jest.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
@@ -320,12 +326,12 @@ describe('native UI and the phone', () => {
     renderWithTheme(<Probe />);
     expect(latest().mode).toBe('light');
 
-    AppState.currentState = 'background';
+    AppState.currentState = 'inactive';
     await phoneSwitches('dark');
     await phoneSwitches('light');
     expect(seen.every((render) => render.mode === 'light')).toBe(true);
 
-    // The phone went dark while the app was away; the report came unheard.
+    // The phone went dark from Control Center; the report came unheard.
     await phoneSwitches('dark');
     expect(latest().mode).toBe('light');
     AppState.currentState = 'active';

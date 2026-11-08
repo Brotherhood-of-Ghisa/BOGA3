@@ -41,6 +41,8 @@ describe('statusBarStyleFor', () => {
 });
 
 describe('useNavigationTheme', () => {
+  afterEach(() => jest.restoreAllMocks());
+
   it('follows the phone into dark while the saved mode is System', async () => {
     let phone: 'light' | 'dark' = 'light';
     const listeners = new Set<(preferences: { colorScheme: 'light' | 'dark' }) => void>();
@@ -64,6 +66,5 @@ describe('useNavigationTheme', () => {
 
     const dark = generateRoles(defaultThemeSeeds, 'dark');
     expect(seen[seen.length - 1]).toMatchObject({ dark: true, colors: { background: dark.paper, text: dark.ink } });
-    jest.restoreAllMocks();
   });
 });

@@ -3,6 +3,7 @@ import type { ColorSchemeName } from 'react-native';
 
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
 import { useAppTheme } from '@/components/ui/theme-context';
+import { followsPhone } from '@/components/ui/theme-native';
 import type { CustomPart } from '@/components/ui/theme-custom';
 import { hueName } from '@/components/ui/theme-hue';
 import { readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
@@ -73,11 +74,13 @@ export const CUSTOM_PART_LABELS: Record<CustomPart, string> = {
   viz: 'Charts',
 };
 
-// The phone's mode as the app last read it (`theme-context.tsx`): what a
-// preview of System draws in. While native UI is pinned the OS reports only
-// the pin, so a phone change since the last read shows once System is chosen.
+// The phone's mode as the OS reports it now (`theme-context.tsx`): what a
+// preview of System draws in. While native UI is pinned the OS reports the
+// pin, so System previews in the drawn mode, as choosing it first draws, until
+// the OS reports the phone's own.
 export function usePhoneScheme(): ColorSchemeName | null {
-  return useAppTheme().phoneScheme;
+  const theme = useAppTheme();
+  return followsPhone(theme.appearance) ? theme.phoneScheme : theme.mode;
 }
 
 // The ladder a choice draws on: `system` takes `phoneScheme`.

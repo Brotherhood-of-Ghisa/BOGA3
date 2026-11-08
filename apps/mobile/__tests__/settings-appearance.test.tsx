@@ -419,14 +419,15 @@ describe('mode', () => {
     jest.spyOn(Appearance, 'setColorScheme').mockImplementation(() => {});
   };
 
-  it('previews System in the phone’s mode as the app read it', async () => {
+  it('previews System in the pinned mode, as choosing it first draws, then in the phone’s once the OS reports it', async () => {
     onPhone('dark');
     renderWithTheme(<SettingsAppearanceRoute />);
-    expect(StyleSheet.flatten(screen.getByTestId('settings-appearance-swatch-warm', { includeHiddenElements: true }).props.style).backgroundColor).toBe(lightPaper);
+    // Pinned to Light, the OS reports light: the preview never shows a mode the app will not draw.
     fireEvent.press(screen.getByTestId('settings-appearance-mode-system'));
-    expect(previewGround()).toBe(darkPaper);
+    expect(previewGround()).toBe(lightPaper);
     await waitFor(() => expect(storedRecord()?.mode).toBe('system'));
-    expect(previewGround()).toBe(darkPaper);
+    // Unpinned, the phone reads dark, and preview and app follow it together.
+    await waitFor(() => expect(previewGround()).toBe(darkPaper));
   });
 
   it('previews System light when the phone states no mode', async () => {
