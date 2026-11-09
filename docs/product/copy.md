@@ -54,12 +54,15 @@ Complete dates displayed, spoken or edited use Date format, including ranges
 and shared images, preserving device-local days and stored instants. Month/day
 headings, relative and time-only labels keep their roles.
 
-Calendar-week headings use a named month and shared day range in the selected
-order, with only the end date's year even across New Year; accessibility retains
+Calendar-week headings use named months and shared days in selected
+order, with only the end year even across New Year; accessibility retains
 complete numeric dates.
 
 - **Exception — Today** (decided 2026-10-26): every Today date is `26 Oct 26`,
   whatever the setting. A range takes one dash and the year once, at its end:
   `12 – 18 Oct 26`, `26 Oct – 1 Nov 26`; across years both ends carry it.
+- **Exception — schedule picker:** iOS uses preference-mapped
+  locales with abbreviations and omitted years; Android uses system
+  date order and language. App-owned labels follow Date format.
 
 Code: `apps/mobile/src/utils/local-time.ts` (Today: `formatCompactDate`, `formatCompactDateRange`).
