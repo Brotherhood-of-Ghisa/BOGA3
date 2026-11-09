@@ -155,7 +155,7 @@ needs separate human acceptance (spec `08`); agents never post that acceptance.
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |
 | iOS release (build, database migration, submission, optional tag) | `docs/procedures/ios-release.md` (agree profile, name/version and tagging upfront) |
-| You were given no build process (no skill such as engine or the task protocol, no user-given process) | `docs/procedures/build.md` (the default; any other process replaces it, the test gates still apply) |
+| You were given no build process (no skill such as engine's `build`, no user-given process) | `docs/procedures/build.md` (the default; any other process replaces it, the test gates still apply) |
 | Product/domain context | `docs/specs/00-product.md`, `docs/specs/README.md` (full spec index) |
 
 **Editing tests in a directory ⇒ read that directory's `README.md` first** —
@@ -174,10 +174,9 @@ persistent doc, load `docs/specs/README.md` ("Doc rules").
 
 ## Planning is optional and ephemeral
 
-How work is planned is the user's choice: no plan, a single plan doc, a
-milestone with task cards, or anything else. Milestones and task cards are one
-optional workflow (`docs/plans/README.md`). Every planning doc lives under
-`docs/plans/**` and is deleted once its work ships; git history keeps it.
+Planning one PR is the user's choice: no plan, a plan doc, or anything else
+(`docs/plans/README.md`). Every planning doc lives under `docs/plans/**` and
+is deleted once its work ships; git history keeps it.
 Durable decisions belong in `docs/specs/**`, and a PR updates the owning spec
 when it ships the decision.
 
@@ -187,11 +186,11 @@ migrations, specs, or other docs — state the rule itself in the owning spec.
 Commit messages and PR bodies may cite them. `docs-check` enforces both halves;
 already-applied migrations are exempt (`scripts/plan-ref-exempt.txt`).
 
-**Task protocol.** When the user wants to plan multi-PR work together, or hands
-you a task card to execute, offer the task protocol in
-[`docs/plans/README.md`](docs/plans/README.md#task-protocol-boga)
-(Claude Code: the user-level `/task-protocol` skill): one session per task,
-from plan to merge and worktree cleanup.
+**Engine plugin** (enabled in `.claude/settings.json`). Build one task or card
+with its `build` skill, gated unless the user asks for hands-off; agree the
+lane set with your reviewer agent, and add `/security-review` for auth/RLS/API
+changes. Plan multi-PR work as an engine server plan (the `engine` skill's
+`plan <ask>`): the engine server is its only source, never repo files.
 
 `docs/plans/**` and `docs/brainstorms/**` are working notes, not
 source-of-truth, and may be stale. **Do not read them, and do not let them

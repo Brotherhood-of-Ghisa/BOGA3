@@ -42,7 +42,7 @@ drifted from the code. Git history has them.)
 ## Maintenance rules (for future tasks)
 
 This section is the canonical trigger map for UI docs maintenance.
-Task templates/task cards may summarize these triggers for convenience, but should defer to this section if wording drifts.
+Plans and task cards may summarize these triggers for convenience, but should defer to this section if wording drifts.
 
 1. Route files added/removed/renamed:
    - Update `screen-map.md` — it owns the route inventory (route, purpose, file)
