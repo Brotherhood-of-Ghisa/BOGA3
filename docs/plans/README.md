@@ -10,12 +10,12 @@ they are **optional**: the user chooses how each piece of work is planned.
 | No plan | Small or obvious work | Go straight to a PR; the PR body carries the evidence. |
 | Single plan doc | One PR that needs design notes | `docs/plans/<short-name>.md`, in whatever structure helps. |
 | Engine server plan | Multi-PR work | The engine plugin's `engine` skill, `plan <ask>` mode. The plan lives only on the engine server, never in repo files (`AGENTS.md`, "Engine plugin"). |
-| Anything else | The user's call | Keep it under `docs/plans/`. |
+| Anything else | One PR, the user's call | Keep it under `docs/plans/`. |
 
 ## Lifecycle
 
-- **Ephemeral.** Delete a plan in the change that ships or abandons its
-  work. There is no archive; git history keeps it.
+- **Ephemeral.** Delete a plan, or a task card (and its milestone with its
+  last card), in the change that ships or abandons its work. There is no archive; git history keeps it.
 - **Never referenced.** Code, tests, flows, migrations, specs, and other docs
   never cite a plan path or a task/milestone ID. Commit messages and PR bodies
   may. `docs-check` fails on a `docs/plans/<file>` path or a milestone/task ID
