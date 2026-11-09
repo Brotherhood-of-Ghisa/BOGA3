@@ -18,8 +18,6 @@ Approved 2026-10-22.
 Code: `loadPlanPermission` in `supabase/functions/agent-api/index.ts`; the edit switch in
 `apps/mobile/app/connected-agents.tsx`; edit RPCs in
 `supabase/migrations/20261024140000_agent_plan_programme_mutation_rpcs.sql`.
-Pending: The edit switch saves the grant, but `supabase/functions/agent-api/index.ts`
-has no plan or programme edit routes and does not call those RPCs.
-`services/boga-mcp/src/tools.ts` does not expose the corresponding edits.
-The main switch's disclosure in `apps/mobile/app/connected-agents.tsx` omits
+Pending: services/boga-mcp/src/tools.ts does not expose the corresponding edits.
+The main switch's disclosure in apps/mobile/app/connected-agents.tsx omits
 weekly muscle target changes.
