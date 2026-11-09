@@ -187,8 +187,8 @@ Commit messages and PR bodies may cite them. `docs-check` enforces both halves;
 already-applied migrations are exempt (`scripts/plan-ref-exempt.txt`).
 
 **Engine plugin** (enabled in `.claude/settings.json`). Asked to build a task
-or card, use its `build` skill, gated unless the user asks for hands-off;
-agree the lane set with your reviewer agent, and add `/security-review` for
+or card, use its `build` skill, gated unless asked for hands-off; agree the
+lane set with a separate agent first, and add `/security-review` for
 auth/RLS/API changes. Plan multi-PR work as an engine server plan (the `engine` skill's
 `plan <ask>`): the engine server is its only source, never repo files.
 
