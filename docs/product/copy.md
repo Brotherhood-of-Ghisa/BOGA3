@@ -50,16 +50,22 @@ Code: `apps/mobile/src/groups/competition-view-model.ts` and mobile label compon
 
 ### copy.calendar-dates · presentation · accepted
 
-Complete dates displayed, spoken or edited use Date format, including ranges
-and shared images, preserving device-local days and stored instants. Month/day
-headings, relative and time-only labels keep their roles.
+Date format pairs full numeric, yearless short and compact named-month forms,
+including Today. Compact days are unpadded; only year-first compact dates use
+four-digit years. Spoken and edited dates remain full numeric. Images follow
+their visible presentation. Device-local days and stored instants are preserved.
+Month-only, weekday, relative and time-only labels keep their roles.
 
-Calendar-week headings use a named month and shared day range in the selected
-order, with only the end date's year even across New Year; accessibility retains
-complete numeric dates.
+| Date format | Yearless short | Compact complete |
+| --- | --- | --- |
+| `DD-MM-YYYY` | `17 Sep` | `17 Sep 26` |
+| `MM-DD-YYYY` | `Sep 17` | `Sep 17 26` |
+| `YYYY-MM-DD` | `Sep 17` | `2026 Sep 17` |
 
-- **Exception — Today** (decided 2026-10-26): every Today date is `26 Oct 26`,
-  whatever the setting. A range takes one dash and the year once, at its end:
-  `12 – 18 Oct 26`, `26 Oct – 1 Nov 26`; across years both ends carry it.
+Compact timestamps append the 24-hour clock. Ranges share month/year where
+possible in selected order; cross-year endpoints retain both years.
 
-Code: `apps/mobile/src/utils/local-time.ts` (Today: `formatCompactDate`, `formatCompactDateRange`).
+Calendar-week headings retain selected order and only the end date's four-digit
+year, even across New Year; accessibility retains complete numeric dates.
+
+Code: `apps/mobile/src/utils/local-time.ts`.

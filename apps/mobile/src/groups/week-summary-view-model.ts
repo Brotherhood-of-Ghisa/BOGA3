@@ -9,7 +9,8 @@ import {
   sessionRecordLineText,
   type SessionRecordLine,
 } from '@/src/session-insights/record-line';
-import { formatClockTime, formatCompactDateTime } from '@/src/utils/local-time';
+import { formatClockTime, formatCompactDateTime, formatLocalDateTime } from '@/src/utils/local-time';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 
 import { formatOrdinal } from './board-view-model';
 import { buildCompetitionSession } from './competition-session-view-model';
@@ -84,9 +85,9 @@ export const buildWeekBoard = (members: GroupWeekBoardRow[], myUserId: string, s
 
 const isSameLocalDay = (a: number, b: number): boolean => localDateKey(new Date(a)) === localDateKey(new Date(b));
 
-/** `Started 07:40` today; Today's compact date and time on an earlier day: `Started 25 Oct 26 23:10`. */
-export const formatTrainingStart = (startedAtMs: number, nowMs: number): string =>
-  `Started ${isSameLocalDay(startedAtMs, nowMs) ? formatClockTime(startedAtMs) : formatCompactDateTime(startedAtMs)}`;
+/** Today's starts keep their clock-only role; earlier starts use the selected compact family. */
+export const formatTrainingStart = (startedAtMs: number, nowMs: number, dateFormat: ExerciseDateFormat): string =>
+  `Started ${isSameLocalDay(startedAtMs, nowMs) ? formatClockTime(startedAtMs) : formatCompactDateTime(startedAtMs, dateFormat)}`;
 
 /** One group record: a record event and one shown board it took #1 on. */
 type GroupRecordBoard = { event: CompetitionEventWire; value: CompetitionHistoryValueWire };
@@ -143,9 +144,11 @@ const sessionFigures = (session: { working_sets: number; exercise_count: number 
 const sessionLabel = (parts: (string | null | undefined)[]): string =>
   parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part)).join(', ');
 
-const liveRow = (session: GroupWeekTrainingSession, myUserId: string, nowMs: number): GroupSessionRowViewModel => {
+const liveRow = (session: GroupWeekTrainingSession, myUserId: string, nowMs: number, dateFormat: ExerciseDateFormat): GroupSessionRowViewModel => {
   const name = formatStreamPersonName(session.member, myUserId);
-  const when = formatTrainingStart(session.started_at_ms, nowMs);
+  const when = formatTrainingStart(session.started_at_ms, nowMs, dateFormat);
+  const spokenWhen = `Started ${isSameLocalDay(session.started_at_ms, nowMs)
+    ? formatClockTime(session.started_at_ms) : formatLocalDateTime(session.started_at_ms, dateFormat)}`;
   const figures = sessionFigures(session, true);
   return {
     memberUserId: session.member.user_id,
@@ -156,13 +159,13 @@ const liveRow = (session: GroupWeekTrainingSession, myUserId: string, nowMs: num
     gym: session.gym_name,
     figures,
     record: null,
-    accessibilityLabel: sessionLabel([name, 'training now', when, session.gym_name && `at ${session.gym_name}`, figures]),
+    accessibilityLabel: sessionLabel([name, 'training now', spokenWhen, session.gym_name && `at ${session.gym_name}`, figures]),
   };
 };
 
-const recentRow = (session: GroupWeekLatestSession, myUserId: string): GroupSessionRowViewModel => {
+const recentRow = (session: GroupWeekLatestSession, myUserId: string, dateFormat: ExerciseDateFormat): GroupSessionRowViewModel => {
   const name = formatStreamPersonName(session.member, myUserId);
-  const when = formatCompactDateTime(session.started_at_ms);
+  const when = formatCompactDateTime(session.started_at_ms, dateFormat);
   const figures = sessionFigures(session, false);
   const record = buildGroupRecordLine(session.group_records);
   return {
@@ -176,7 +179,7 @@ const recentRow = (session: GroupWeekLatestSession, myUserId: string): GroupSess
     record,
     accessibilityLabel: sessionLabel([
       name,
-      `completed session on ${when}`,
+      `completed session on ${formatLocalDateTime(session.started_at_ms, dateFormat)}`,
       session.gym_name && `at ${session.gym_name}`,
       figures,
       sessionRecordLineText(record),
@@ -195,8 +198,9 @@ export const buildGroupSessions = (
   recent: GroupWeekLatestSession[],
   myUserId: string,
   nowMs: number,
+  dateFormat: ExerciseDateFormat,
 ): GroupSessionsViewModel => {
-  const live = summary.training_now.slice(0, GROUP_SESSIONS_SHOWN).map((session) => liveRow(session, myUserId, nowMs));
+  const live = summary.training_now.slice(0, GROUP_SESSIONS_SHOWN).map((session) => liveRow(session, myUserId, nowMs, dateFormat));
   const liveIds = new Set(summary.training_now.map((session) => session.session_id));
   const seen = new Set<string>();
   const completed = [...(summary.latest_completed ? [summary.latest_completed] : []), ...recent].filter((session) => {
@@ -206,7 +210,7 @@ export const buildGroupSessions = (
   });
   return {
     live,
-    recent: completed.slice(0, GROUP_SESSIONS_SHOWN - live.length).map((session) => recentRow(session, myUserId)),
+    recent: completed.slice(0, GROUP_SESSIONS_SHOWN - live.length).map((session) => recentRow(session, myUserId, dateFormat)),
   };
 };
 

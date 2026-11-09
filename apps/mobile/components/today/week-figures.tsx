@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
@@ -9,7 +10,7 @@ import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
 import type { ProgressMetric } from '@/src/preferences/model';
 
-import { formatPaceValue, formatPeriodRange, weekFigureAccessibilityLabel, weekShare } from './progress-format';
+import { formatPaceValue, formatPeriodRange, formatWeekRange, weekFigureAccessibilityLabel, weekShare } from './progress-format';
 
 type ShareBarProps = { current: number | null; previous: number | null; testID?: string };
 
@@ -102,6 +103,7 @@ export function WeekFigure({ label, current, previous, record = false, previousW
 // over last week's whole total. No signed deltas: a part week against a whole
 // one says little.
 export function WeekFigures({ week, metric, onToggleMetric }: { week: TodayProgressWeek; metric: ProgressMetric; onToggleMetric: () => void }) {
+  const dateFormat = useDateFormat();
   const styles = useStyles();
   const text = useUiText();
   const tone = useUiTextTone();
@@ -114,8 +116,9 @@ export function WeekFigures({ week, metric, onToggleMetric }: { week: TodayProgr
         <Text
           allowFontScaling={false}
           style={[text.label, tone.faint]}
+          accessibilityLabel={formatWeekRange(week.window, dateFormat)}
           testID="today-progress-week-range">
-          {formatPeriodRange(week.window)}
+          {formatPeriodRange(week.window, dateFormat)}
         </Text>
       </View>
       <View style={weekFigureStyles.figures}>
