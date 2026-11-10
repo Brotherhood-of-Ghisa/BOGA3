@@ -20,6 +20,10 @@ type MergeAdapter = {
 type SnapshotPage = { sequence: number; token: string; rows: MergeWireEntity[]; nextOffset: number; hasMore: boolean };
 type Stage = { after: number; token: string | null; nextOffset: number; sequence: number; complete: boolean };
 
+export class MergeRpcError extends Error {
+  constructor(message: string, readonly code: string) { super(message); this.name = 'MergeRpcError'; }
+}
+
 export async function mergeRpc<T>(name: string, args: Record<string, unknown>, expectedOwner: string): Promise<T> {
   const client = getRequiredSupabaseMobileClient();
   const { data: auth } = await client.auth.getSession();
@@ -28,7 +32,7 @@ export async function mergeRpc<T>(name: string, args: Record<string, unknown>, e
   const { data, error } = await client.schema('app_public').rpc(name, args)
     .setHeader('Authorization', 'Bearer ' + session.access_token);
   if (await getSignedInUserId() !== expectedOwner) throw new Error('Your account changed. Open the exercise again.');
-  if (error) throw new Error(error.message || 'Unable to update exercise history.');
+  if (error) throw new MergeRpcError(error.message || 'Unable to update exercise history.', error.code);
   return data as T;
 }
 

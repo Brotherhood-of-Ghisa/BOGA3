@@ -6,6 +6,19 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
+it('replaces Finish with the AI robot, opens control options and leaves the timer usable', () => {
+  const onFinish = jest.fn(); const onOpenOptions = jest.fn(); const onTimer = jest.fn();
+  render(<SessionTopBar aiControlled mode="active" onFinish={onFinish} onOpenOptions={onOpenOptions}
+    onToggleRestTimer={onTimer} startedAt={new Date()} />);
+  expect(screen.queryByTestId('session-view-finish-button')).toBeNull();
+  expect(screen.queryByText('Logging via MCP')).toBeNull();
+  fireEvent.press(screen.getByTestId('session-view-ai-control'));
+  fireEvent.press(screen.getByTestId('session-view-rest-timer-button'));
+  expect(onOpenOptions).toHaveBeenCalledTimes(1);
+  expect(onTimer).toHaveBeenCalledTimes(1);
+  expect(onFinish).not.toHaveBeenCalled();
+});
+
 it('titles an active session Training, without its time of day, and ticks the elapsed time each second', () => {
   jest.useFakeTimers();
   const startedAt = new Date(2026, 8, 23, 18, 0, 0);

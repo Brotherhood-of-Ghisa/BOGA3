@@ -31,6 +31,7 @@ export const mapRepositorySummaryToSessionListItem = (
   return {
     id: summary.id,
     mergeRevision: summary.mergeRevision ?? 0,
+    loggingClientId: summary.loggingClientId ?? null,
     startedAt: summary.startedAt.toISOString(),
     status: summary.status,
     completedAt: summary.completedAt ? summary.completedAt.toISOString() : null,

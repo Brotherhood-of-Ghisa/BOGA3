@@ -100,6 +100,13 @@ load the [workout contract](../../docs/specs/tech/agent-workout-contract.md).
 
 ### Conversational logging
 
+Workouts have one controller ([[agents.write-access]]). Start assigns this
+client immediately. Existing workouts require `control.can_edit: true`; the
+person gives this client control through the app's Session menu. Never
+self-claim a human-owned workout. Reads report the current controller and
+`WORKOUT_CONTROL_REQUIRED` stops writes/replays after takeover. This informs
+the client on its next workout call, without an unsolicited push channel.
+
 1. Read profile/exercise context to resolve gym/exercise IDs, explicit units and
    total/per-side input meaning. Convert an explicitly different unit to kg
    before calling; ask when identity or load meaning is ambiguous. Do not

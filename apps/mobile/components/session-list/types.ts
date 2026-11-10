@@ -3,6 +3,7 @@ import type { SessionPersonalRecord } from '@/src/progress-summary';
 
 export type SessionListItem = {
   id: string;
+  loggingClientId?: string | null;
   mergeRevision?: number;
   startedAt: string;
   status: 'active' | 'completed';

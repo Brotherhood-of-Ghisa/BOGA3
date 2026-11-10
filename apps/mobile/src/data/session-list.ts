@@ -7,6 +7,7 @@ import { nowMonotonic } from './clock';
 import { selectInProgressSessionRow } from './in-progress-session';
 import { WorkoutLifecycleChanged } from './session-edit-baseline';
 import { exerciseSets, gyms, sessionExercises, sessions } from './schema';
+import { assertWorkoutWritable } from './workout-control';
 import {
   isWorkingSet,
   normalizeSessionSetPerformanceStatus,
@@ -17,6 +18,7 @@ type SessionLifecycleStatus = 'active' | 'completed';
 
 export type SessionListStoreRecord = {
   id: string;
+  loggingClientId?: string | null;
   mergeRevision?: number;
   status: SessionLifecycleStatus;
   startedAt: Date;
@@ -42,6 +44,7 @@ export type SessionListStore = {
 
 export type SessionListSummary = {
   id: string;
+  loggingClientId?: string | null;
   mergeRevision?: number;
   status: 'active' | 'completed';
   startedAt: Date;
@@ -126,6 +129,7 @@ const mapStoreSessionRow = (row: typeof sessions.$inferSelect, gymName: string |
 
   return {
     id: row.id,
+    loggingClientId: row.loggingClientId,
     mergeRevision: row.mergeRevision,
     status: normalizeSessionLifecycleStatus(row.status as string),
     startedAt,
@@ -252,6 +256,7 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
   },
   async setSessionDeletedState(input) {
     const database = await bootstrapLocalDataLayer();
+    assertWorkoutWritable(database, input.sessionId);
     database.transaction((tx) => {
       const current = tx.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
       if (input.expectedRevision !== undefined && current?.mergeRevision !== input.expectedRevision) {
@@ -311,6 +316,7 @@ const compareCompletedDesc = (left: SessionListStoreRecord, right: SessionListSt
 
 const toSummary = (record: SessionListStoreRecord): SessionListSummary => ({
   id: record.id,
+  loggingClientId: record.loggingClientId ?? null,
   mergeRevision: record.mergeRevision ?? 0,
   status: record.status === 'completed' ? 'completed' : 'active',
   startedAt: record.startedAt,

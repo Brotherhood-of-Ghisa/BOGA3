@@ -35,6 +35,7 @@ export function ActiveSessionRow({
   const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   const [menuVisible, setMenuVisible] = useState(false);
   const closeMenu = () => setMenuVisible(false);
+  const aiControlled = Boolean(session.loggingClientId);
   const workoutLabel = [formatLocalDateTime(Date.parse(session.startedAt), resolvedDateFormat), session.gymName].filter(Boolean).join(', ');
 
   // The alert opens over the sheet; either answer closes both.
@@ -66,9 +67,9 @@ export function ActiveSessionRow({
           leading={<Icon colorRole="ink" name="set-current" size="sm" />}
           meta={
             <IconButton
-              accessibilityLabel={`Review and complete active session, ${workoutLabel}`}
-              name="check"
-              onPress={onComplete}
+              accessibilityLabel={`${aiControlled ? 'AI is logging. View session' : 'Review and complete active session'}, ${workoutLabel}`}
+              name={aiControlled ? 'ai-logging' : 'check'}
+              onPress={aiControlled ? onResume : onComplete}
               testID="complete-active-session-button"
             />
           }
@@ -105,11 +106,13 @@ export function ActiveSessionRow({
         visible={menuVisible}>
         <View>
           <ListRow
+            disabled={aiControlled}
             accessibilityLabel="Delete active session"
             label="Delete"
             onPress={confirmDelete}
             testID="discard-active-session-button"
             tone="danger"
+            trailing={aiControlled ? <Icon name="lock" size="sm" colorRole="inkMuted" /> : undefined}
           />
         </View>
       </Sheet>

@@ -129,6 +129,7 @@ describe('maestro harness helpers', () => {
       'exercise-block-history'
     );
     expect(resolveMaestroHarnessFixtureName('session-view')).toBe('session-view');
+    expect(resolveMaestroHarnessFixtureName('session-view-ai')).toBe('session-view-ai');
     expect(resolveMaestroHarnessFixtureName('unexpected')).toBe('none');
     expect(resolveMaestroHarnessBootstrapAction('complete')).toBe('complete');
     expect(resolveMaestroHarnessBootstrapAction('reset')).toBe('reset');

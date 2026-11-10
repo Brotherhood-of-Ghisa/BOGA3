@@ -96,6 +96,48 @@ remains the normal post-convergence app path.
 
 ## Mobile handoff
 
+### Exclusive session control
+
+`sessions.logging_client_id` and `logging_granted_at` are server-maintained,
+nullable sync columns. Null means human control; an MCP start binds both to
+the caller and its live grant. Ordinary phone inserts remain human-controlled.
+Sync projects these columns but ignores incoming assignments. A separate graph
+trigger enforces the control boundary even for privileged merge/recovery
+writers; it does not trust the generic merge-internal flag. MCP completion
+releases control so completed-history editing remains available in the app.
+
+The app-only `workout_set_control` RPC uses the owner lock, an immutable action
+ID and the loaded session epoch. Human-to-MCP assignment checks and locks the
+selected client's live consent and independent logging permission, rejects
+plan-backed workouts and unresolved saved input, and fences the whole graph.
+Takeover needs no remaining agent permission. Both directions preserve all
+workout/block/set IDs. An old receipt reports current control without reapplying
+its transfer; a changed payload under its ID fails. Reauthorization never
+revives control bound to an earlier grant.
+
+The app converges sync before transferring and again before unlocking. It
+persists an unconfirmed request in account-private control storage, keeps
+editing locked across restart, and retries the same operation. A clean newer
+terminal epoch makes an old pending active-session handoff obsolete. A stale
+editor arriving after a known AI-control fence preserves only its actual
+changes at the original epoch for review. Recovery Apply remains locked until
+human takeover; explicitly declining saved input remains available.
+
+The recorder's existing Finish position shows a robot while AI controls the
+session. It opens the existing Session sheet, which offers Take over logging;
+human control offers Let AI log this session and an authorised-client chooser
+when needed. Add exercise, gym/set editing, Finish and Abandon stay locked;
+the device-local timer remains independent. There is no persistent status
+banner. Unavailable or unconfirmed transfers never imply a successful grant.
+
+Every active-header/selected MCP read and mutation reports `control` with
+`owner`, `client_id` and Boolean `can_edit`. A displaced client's next write
+or active-session receipt replay returns `409 WORKOUT_CONTROL_REQUIRED` with
+handoff guidance. No tool can claim control. This is notification on the next
+workout call; the stateless MCP transport provides no unsolicited push channel.
+
+### Revision and recovery protection
+
 Protocol 7 extends the existing revision/snapshot/recovery contract. Every
 agent write advances one session epoch across its entire graph, including
 empty workouts. Factor-one contexts retain raw units. Old app writers fail

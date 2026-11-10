@@ -690,6 +690,8 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
   ],
   sessions: [
     KEEP('merge_revision', 'mergeRevision'),
+    KEEP('logging_client_id', 'loggingClientId'),
+    KEEP('logging_granted_at', 'loggingGrantedAt'),
     SC('source_plan_use_id', 'sourcePlanUseId'),
     SC('gym_id', 'gymId'),
     SC('source_plan_id', 'sourcePlanId'),

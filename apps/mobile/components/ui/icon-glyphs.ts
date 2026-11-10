@@ -40,6 +40,8 @@ const DASHED_RING = [
 ];
 
 export const ICON_GLYPHS = {
+  // Lucide `bot`: the active workout's AI-controlled logging state.
+  'ai-logging': [path('M12 8V4H8'), path('M6 8h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z'), path('M2 14h2'), path('M20 14h2'), path('M15 13v2'), path('M9 13v2')],
   // Lucide `lock`: a retained schedule is read-only while Routine is on.
   lock: [path('M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z'), path('M7 11V7a5 5 0 0 1 10 0v4')],
   // --- Direction and disclosure ---

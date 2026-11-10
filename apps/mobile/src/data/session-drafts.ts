@@ -23,6 +23,7 @@ import type { SessionDraftStatus, SessionDraftExerciseInput, SessionTimingBaseli
 import type { MergeWireEntity } from '@/src/exercise-core/merge-types';
 import { captureSessionEditBaseline, rebaseWorkoutTimes, sessionHeaderToWire, WorkoutChangesSavedForReview, WorkoutLifecycleChanged } from './session-edit-baseline';
 import { rebaseSessionEdit } from './session-edit-rebase';
+import { assertWorkoutWritable } from './workout-control';
 
 export type { SessionDraftStatus, SessionDraftSetInput, SessionDraftExerciseInput } from './session-inputs';
 
@@ -1167,6 +1168,7 @@ export const updateSessionMetadata = async (sessionId: string, input: {
       preserved = changed;
       return;
     }
+    assertWorkoutWritable(database, sessionId);
     if (row.deletedAt) throw new Error('This session is unavailable.');
     if (input.times && row.status !== 'completed') throw new Error('This session is not completed.');
     appliedTimes = timing?.times;
@@ -1366,6 +1368,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
   },
   async completeSession(input) {
     const database = await bootstrapLocalDataLayer();
+    assertWorkoutWritable(database, input.sessionId);
     database.transaction((tx) => {
       const current = tx.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
       if (input.expectedRevision !== undefined && current?.mergeRevision !== input.expectedRevision) throw new WorkoutLifecycleChanged();

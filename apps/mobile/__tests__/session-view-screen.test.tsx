@@ -22,6 +22,7 @@ import * as mockReact from 'react';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { eq, inArray } from 'drizzle-orm';
 import { Alert, StyleSheet } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -87,7 +88,11 @@ import { SessionViewScreen } from '@/components/session-view/session-view-screen
 import { ExercisePageScreen } from '@/components/exercise-page/exercise-page-screen';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { upsertLocalGym, setLocalGymArchived } from '@/src/data/local-gyms';
-import { gyms, muscleGroups, sessions } from '@/src/data/schema';
+import { exerciseSets, gyms, muscleGroups, sessionExercises, sessionExerciseTags, sessions, syncRuntimeState } from '@/src/data/schema';
+import { getSignedInUserId } from '@/src/auth/session-user';
+import * as connectedAgents from '@/src/auth/connected-agents';
+import * as syncCycle from '@/src/sync/cycle';
+import * as mergeRpc from '@/src/sync/exercise-merge';
 import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import * as sessionFacts from '@/src/data/exercise-session-facts';
@@ -259,6 +264,77 @@ describe('Session view', () => {
     await seed(prepare);
     await renderReady();
   };
+
+  it('shows an MCP-owned workout without editing entry points, with a working timer and locked Abandon', async () => {
+    await loadMaestroFixture('session-view-ai');
+    await bootLocalApp();
+    await renderReady();
+    expect(await screen.findByTestId('session-view-ai-control')).toBeTruthy();
+    expect(screen.queryByTestId('session-view-add-exercise')).toBeNull();
+    expect(screen.queryByTestId('session-view-finish-button')).toBeNull();
+    expect(screen.getByTestId('session-view-summary-gym-button')).toBeDisabled();
+    fireEvent.press(screen.getByTestId('session-view-summary-gym-button'));
+    expect(screen.queryByTestId('session-view-gym-sheet')).toBeNull();
+    fireEvent.press(screen.getByTestId('session-view-rest-timer-button'));
+    expect(await screen.findByTestId('rest-timer-bar')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('session-view-ai-control'));
+    expect(await screen.findByTestId('session-view-abandon')).toBeDisabled();
+    expect(screen.getByTestId('session-view-control-action')).toHaveTextContent('Take over logging');
+    jest.mocked(getSignedInUserId).mockRejectedValueOnce(new Error('Supabase environment variables are missing'));
+    fireEvent.press(screen.getByTestId('session-view-control-action'));
+    expect(await screen.findByTestId('session-control-notice')).toHaveTextContent(
+      'Session control is unavailable. Check your account in Profile and try again.',
+    );
+    expect(screen.getByTestId('session-view-abandon')).toBeDisabled();
+    expect((await readSession(SESSION))?.status).toBe('active');
+  });
+
+  it('takes over the same workout, then chooses an authorised client and gives control back through the existing sheet', async () => {
+    await loadMaestroFixture('session-view-ai');
+    await bootLocalApp();
+    const database = localDatabase();
+    const originalSetIds = database.select({ id: exerciseSets.id }).from(exerciseSets).all();
+    for (const table of [sessions, sessionExercises, exerciseSets, sessionExerciseTags]) {
+      database.update(table).set({ localDirty: false }).run();
+    }
+    database.insert(syncRuntimeState).values({ id: 'primary', accountUserId: 'owner' }).onConflictDoUpdate({
+      target: syncRuntimeState.id, set: { accountUserId: 'owner' },
+    }).run();
+    // The HTTP/auth boundaries confirm control; the hook, durable request,
+    // local repositories and screen reload remain production code.
+    jest.mocked(getSignedInUserId).mockResolvedValue('owner');
+    jest.spyOn(NetInfo, 'fetch').mockResolvedValue({ isConnected: true } as Awaited<ReturnType<typeof NetInfo.fetch>>);
+    jest.spyOn(syncCycle, 'runSyncCycle').mockResolvedValue('converged');
+    const grant = { clientId: 'coach-one', name: 'Coach One', grantedAt: '2026-11-10T12:00:00Z',
+      lastAccessAt: null, scopes: [], planAccessEnabled: false, planEditEnabled: false, workoutLoggingEnabled: true };
+    jest.spyOn(connectedAgents, 'listConnectedAgents').mockResolvedValue([grant, { ...grant, clientId: 'coach-two', name: 'Coach Two' }]);
+    const rpc = jest.spyOn(mergeRpc, 'mergeRpc').mockImplementation(async (_name, args) => {
+      database.update(sessions).set({ loggingClientId: args.p_client_id as string | null,
+        loggingGrantedAt: args.p_granted_at as string | null, mergeRevision: (sessionRow(SESSION)?.mergeRevision ?? 0) + 1,
+      }).where(eq(sessions.id, SESSION)).run();
+      return {};
+    });
+    try {
+      await renderReady();
+      fireEvent.press(await screen.findByTestId('session-view-ai-control'));
+      fireEvent.press(await screen.findByTestId('session-view-control-action'));
+      expect(await screen.findByTestId('session-view-finish-button')).toBeEnabled();
+      expect(await screen.findByTestId('session-view-add-exercise')).toBeEnabled();
+      await waitForGone(() => screen.queryByTestId('session-view-options-sheet'));
+      fireEvent.press(screen.getByTestId('session-view-options-button'));
+      fireEvent.press(await screen.findByTestId('session-view-control-action'));
+      expect(await screen.findByText('Coach One')).toBeTruthy();
+      expect(screen.getByText('Coach Two')).toBeTruthy();
+      expect(rpc).toHaveBeenCalledTimes(1);
+      fireEvent.press(screen.getByText('Coach Two'));
+      expect(await screen.findByTestId('session-view-ai-control')).toBeTruthy();
+      await waitForGone(() => screen.queryByTestId('session-view-options-sheet'));
+      expect(screen.queryByTestId('session-view-add-exercise')).toBeNull();
+      expect(sessionRow(SESSION)?.loggingClientId).toBe('coach-two');
+      expect(database.select({ id: exerciseSets.id }).from(exerciseSets).all()).toEqual(originalSetIds);
+      expect(rpc.mock.calls[1][1]).toMatchObject({ p_client_id: 'coach-two', p_session_id: SESSION });
+    } finally { jest.mocked(getSignedInUserId).mockResolvedValue(null); }
+  });
 
   it('shows the summary and one read-only card per exercise, with its record band', async () => {
     await openSession();

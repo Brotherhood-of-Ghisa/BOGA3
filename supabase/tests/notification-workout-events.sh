@@ -688,7 +688,7 @@ assert_sql 'replacement evidence with unchanged raw inputs does not retain a new
   and performance_inputs='${RAW_INPUTS}'::jsonb
   from app_public.notification_workout_targets where member_user_id='${B_UID}' and session_id='${EVIDENCE_SESSION}' and group_exercise_id='${X1}';"
 # The actual input clock may clamp; canonical domain contents still confirm exactly.
-CLAMP="$(e_session "clamped-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "$((NOW_MS+21600000))" | jq '.fields.source_plan_id=null | .fields.source_plan_use_id=null')"
+CLAMP="$(e_session "clamped-${RUN_TAG}" "${NOW_MS}" completed "$((NOW_MS+1000))" 1 null "$((NOW_MS+21600000))" | jq '.fields.source_plan_id=null | .fields.source_plan_use_id=null | .fields.logging_client_id=null | .fields.logging_granted_at=null')"
 push "${A_TOKEN}" 'future clock clamp' "${CLAMP}"
 confirm "${A_TOKEN}" "clamped-${RUN_TAG}" "$(jq '[{type,id,fields}]' <<<"${CLAMP}")"; check 'clamped clock does not prevent canonical confirmation' '.confirmed==true'
 # One accepted installation freezes the logical content; an explicit rejected handoff can still adopt a newer generation.

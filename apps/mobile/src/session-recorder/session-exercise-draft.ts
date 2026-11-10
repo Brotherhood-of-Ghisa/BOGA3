@@ -8,6 +8,8 @@ import {
 } from '@/src/data/session-drafts';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import type { MergeWireEntity } from '@/src/exercise-core/merge-types';
+import { workoutLoggingClientId } from '@/src/exercise-core/workout-control';
+import { loadPendingWorkoutControl } from '@/src/data/workout-control';
 
 /**
  * One session exercise of an active draft or a completed session, read and
@@ -23,16 +25,18 @@ export type SessionExerciseDraftClient = {
   loadSessionSnapshotById: (sessionId: string) => Promise<SessionGraphSnapshot | null>;
   persistSessionDraftSnapshot: typeof persistSessionDraftSnapshot;
   persistCompletedSessionSnapshot: typeof persistCompletedSessionSnapshot;
+  loadPendingWorkoutControl?: typeof loadPendingWorkoutControl;
 };
 
 export const defaultSessionExerciseDraftClient: SessionExerciseDraftClient = {
   loadSessionSnapshotById,
   persistSessionDraftSnapshot,
   persistCompletedSessionSnapshot,
+  loadPendingWorkoutControl,
 };
 
 // `not-editable`: the session was abandoned or deleted.
-export type SessionExerciseDraftLoadError = 'missing-session' | 'not-editable' | 'missing-exercise';
+export type SessionExerciseDraftLoadError = 'missing-session' | 'not-editable' | 'missing-exercise' | 'ai-controlled' | 'control-unconfirmed';
 
 export type SessionExerciseDraftLoad =
   | {
@@ -70,6 +74,8 @@ export const loadSessionExerciseDraft = async (
   const session = await client.loadSessionSnapshotById(sessionId);
   if (!session) return { status: 'missing-session' };
   if (!isEditable(session)) return { status: 'not-editable' };
+  if (workoutLoggingClientId(session.editBaseline)) return { status: 'ai-controlled' };
+  if (await client.loadPendingWorkoutControl?.(sessionId)) return { status: 'control-unconfirmed' };
   const exercise = session.exercises.find((candidate) => candidate.id === sessionExerciseId);
   const sessionBlocks = session.exercises.map(({ id, exerciseDefinitionId, name, sets }) => ({ id, exerciseDefinitionId, name, sets }));
   return exercise ? { status: 'ready', exercise, editBaseline: session.editBaseline, sessionStatus: session.status, gymId: session.gymId, sessionBlocks, bodyWeight: {

@@ -503,8 +503,8 @@ require a current-grant row in `public.agent_plan_permissions`
 (`plan_access_enabled = true` and `granted_at` equal to the live OAuth grant
 timestamp). A missing, false or grant-mismatched row returns `403
 PLAN_PERMISSION_REQUIRED` before any referenced resource is resolved. The person
-enables it per client on the Connected Agents screen (one switch covers all
-writes); base OAuth consent is never described as write access.
+enables it per client on the Connected Agents screen for these plan, exercise
+and target routes ([[agents.write-access]]); base OAuth consent is read-only.
 
 ### `GET /v1/agent/session-plans`
 

@@ -10,6 +10,8 @@ import { hydrateSessionSetPerformanceStatus, type SessionSetPerformanceStatus } 
 import { normalizeSessionSetType } from './set-types';
 import type { MergeValue, MergeWireEntity } from '@/src/exercise-core/merge-types';
 import { rebaseWorkoutEdit } from '@/src/exercise-core/workout-rebase';
+import { workoutLoggingClientId } from '@/src/exercise-core/workout-control';
+import { assertWorkoutWritable } from './workout-control';
 
 const newId = (type: string) => type + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
 
@@ -86,10 +88,31 @@ function exercisesFromRows(rows: MergeWireEntity[]): SessionDraftExerciseInput[]
   }));
 }
 
+function preserveEditAfterAiHandoff(database: LocalDatabase, input: WorkoutEditInput, current: MergeWireEntity[]): void {
+  const before = input.editBaseline?.find(row => row.type === 'sessions');
+  const header = current.find(row => row.type === 'sessions');
+  if (!before || !workoutLoggingClientId(current)
+    || Number(header?.fields.merge_revision ?? 0) <= Number(before.fields.merge_revision ?? 0)) return;
+  const baseline = new Map(input.editBaseline!.map(row => [row.type + ':' + row.id, row]));
+  const changes = editedRows(input).filter(row => {
+    const prior = baseline.get(row.type + ':' + row.id);
+    return !prior || Object.keys(row.fields).some(key => key !== 'updated_at' && row.fields[key] !== prior.fields[key]);
+  });
+  database.transaction(tx => {
+    const owner = tx.select().from(syncRuntimeState).where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).get()?.accountUserId;
+    if (!owner) throw new Error('Refresh this workout before saving.');
+    for (const row of changes) preserveMergeEntity(tx, owner, row);
+  });
+  throw new WorkoutChangesSavedForReview(changes.length > 0);
+}
+
 export function rebaseSessionEdit<T extends WorkoutEditInput>(database: LocalDatabase, input: T): T {
-  if (!input.sessionId || !input.editBaseline?.length) return input;
+  if (!input.sessionId) return input;
+  if (!input.editBaseline?.length) { assertWorkoutWritable(database, input.sessionId); return input; }
   const baseline = input.editBaseline;
   const current = captureSessionEditBaseline(database, input.sessionId);
+  preserveEditAfterAiHandoff(database, input, current);
+  assertWorkoutWritable(database, input.sessionId);
   const known = new Map(baseline.map(row => [row.type + ':' + row.id, row]));
   const loadedRevision = Number(baseline.find(row => row.type === 'sessions')?.fields.merge_revision ?? 0);
   input = { ...input, exercises: input.exercises.map(block => ({ ...block,

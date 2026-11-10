@@ -33,6 +33,10 @@ changes recalculate derived history without touching raw sets.
 
 ## Scope classification
 
+Session control columns are **in sync scope** but server-written;
+pending handoffs use non-sync recovery storage. Load
+[`tech/agent-workout-contract.md`](tech/agent-workout-contract.md) when changing control.
+
 Every table sits in exactly one bucket: `in sync scope` means Sync v2 mirrors
 it and a reinstall restores it; `out of sync scope` means it does not
 round-trip and the drift checker ignores it.

@@ -36,7 +36,7 @@ if [[ "${WORKOUT_ACTIVE_IDS}" != '[]' ]]; then
   agent_post 'workouts/start' '{}' "${RUN_TAG}-workout-existing"
   assert_status 409 'start requires an explicit choice when another workout is active'
 fi
-run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on';
+run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on'; set local boga.workout_control_write='on';
   update app_public.sessions set status='completed' where owner_user_id='${USER_A_UUID}'
     and id in(select json_array_elements_text('${WORKOUT_ACTIVE_IDS}'::json)); commit;" >/dev/null
 
@@ -45,7 +45,7 @@ agent_post 'workouts/start' "${WORKOUT_START_BODY}" "${RUN_TAG}-workout-start"
 assert_status 200 'start workout'
 WORKOUT_ID="$(jq -er '.data.session_id' <<<"${RESPONSE_BODY}")"
 WORKOUT_REV="$(jq -er '.data.revision' <<<"${RESPONSE_BODY}")"
-run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on';
+run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on'; set local boga.workout_control_write='on';
   insert into app_public.session_plans(owner_user_id,id,title,created_at,updated_at,client_updated_at_ms)
     values('${USER_A_UUID}','agent-api-${RUN_TAG}-workout-source','Scope boundary',${NOW_MS},${NOW_MS},${NOW_MS});
   update app_public.sessions set source_plan_id='agent-api-${RUN_TAG}-workout-source'
@@ -56,7 +56,7 @@ jq -e '.error.code=="WORKOUT_REQUIRES_APP"' <<<"${RESPONSE_BODY}" >/dev/null || 
 agent_get "workouts/active?session_id=${WORKOUT_ID}"
 assert_status 200 'plan-backed workout remains discoverable'
 jq -e '.data.workout.requires_app' <<<"${RESPONSE_BODY}" >/dev/null || fail 'plan-backed recovery omitted the app handoff'
-run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on';
+run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on'; set local boga.workout_control_write='on';
   update app_public.sessions set source_plan_id=null where owner_user_id='${USER_A_UUID}' and id='${WORKOUT_ID}'; commit;" >/dev/null
 agent_get "workouts/active?session_id=${WORKOUT_ID}"
 WORKOUT_REV="$(jq -er '.data.workout.revision' <<<"${RESPONSE_BODY}")"
@@ -125,6 +125,8 @@ end \$\$;
 select (select count(*) from public.agent_plan_write_receipts where idempotency_key='${RUN_TAG}-workout-atomic')||':'||
   (select count(*) from app_public.exercise_sets where owner_user_id='${USER_A_UUID}' and session_exercise_id='${WORKOUT_BLOCK}');")"
 [[ "${WORKOUT_ATOMIC_RESULT}" == '0:4' ]] || fail 'failed batch left partial sets or a success receipt'
+
+source "${SUPABASE_DIR}/tests/lib/agent-workout-control.sh"
 
 WORKOUT_DELETE_BODY="$(jq -nc --arg sid "${WORKOUT_ID}" --arg rev "${WORKOUT_REV}" --arg set "${WORKOUT_SET}" \
   '{session_id:$sid,expected_revision:$rev,set_id:$set}')"
@@ -206,7 +208,7 @@ if [[ "$(run_psql "select status from app_public.sessions where owner_user_id='$
 fi
 rm -rf "${WORKOUT_RACE_DIR}"
 
-run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on';
+run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on'; set local boga.workout_control_write='on';
   update public.agent_workout_permissions set workout_logging_enabled=false where owner_user_id='${USER_A_UUID}';
   update app_public.sessions set status='active' where owner_user_id='${USER_A_UUID}'
     and id in(select json_array_elements_text('${WORKOUT_ACTIVE_IDS}'::json)); commit;" >/dev/null

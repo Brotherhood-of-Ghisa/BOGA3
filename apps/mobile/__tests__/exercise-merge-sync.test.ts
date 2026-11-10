@@ -76,6 +76,31 @@ function rpcPages(rows = canonical()) {
 }
 const sync = () => syncExerciseMerges({ database, owner, remoteSequence: 1, conflictCount: 0, adapter });
 
+async function withDatabase<T>(operation: () => Promise<T>): Promise<T> {
+  const bootstrap = jest.spyOn(dataBootstrap, 'bootstrapLocalDataLayer').mockResolvedValue(database);
+  try { return await operation(); } finally { bootstrap.mockRestore(); }
+}
+
+it('keeps a stale editor’s actual input for review when AI takes control, without changing the canonical graph', async () => {
+  database.update(sessions).set({ status: 'active', completedAt: null, mergeRevision: 1 }).run();
+  database.update(sessionExercises).set({ mergeRevision: 1 }).run();
+  database.update(exerciseSets).set({ mergeRevision: 1 }).run();
+  const snapshot = await withDatabase(() => loadSessionSnapshotById('session'));
+  const session = mapDraftSnapshotToSession(snapshot!);
+  session.exercises[0].sets[0].weight = '55';
+  database.update(sessions).set({ loggingClientId: 'coach', loggingGrantedAt: '2026-11-10T10:00:00Z', mergeRevision: 2 }).run();
+  database.update(sessionExercises).set({ mergeRevision: 2 }).run();
+  database.update(exerciseSets).set({ mergeRevision: 2 }).run();
+  await withDatabase(async () => {
+    await expect(createDrizzleSessionDraftStore().saveDraftGraph({ sessionId: 'session', gymId: null,
+      startedAt: snapshot!.startedAt, status: 'active', now: new Date(), exercises: toPersistDraftExercises(session),
+      editBaseline: snapshot!.editBaseline })).rejects.toThrow(/saved for review/);
+  });
+  expect(database.select().from(exerciseSets).get()?.weightValue).toBe('40');
+  const saved = listMergeLocal(database, owner, 'pending').map(row => JSON.parse(row.payload) as MergeWireEntity);
+  expect(saved.some(row => row.type === 'exercise_sets' && row.fields.weight_value === '55' && row.fields.merge_revision === 1)).toBe(true);
+});
+
 it('drains a protected dirty graph before the final header and reuses its lifecycle ID until the intent changes', () => {
   database.update(sessions).set({ mergeRevision: 1, localDirty: true, localUpdatedAtMs: 500 }).run();
   database.update(sessionExercises).set({ mergeRevision: 1 }).run();
@@ -148,6 +173,24 @@ it('rebases independent timing fields and preserves an actual same-field timing 
     expect(saved).toHaveLength(1);
     expect(saved[0]).toMatchObject({ type: 'sessions', fields: { completed_at: 250000, merge_revision: 1 } });
   } finally { boot.mockRestore(); }
+});
+
+it('preserves completed time edits when another phone resumes the workout and gives AI control', async () => {
+  await withDatabase(async () => {
+    database.update(sessions).set({ status: 'active', completedAt: null, mergeRevision: 2,
+      loggingClientId: 'coach', loggingGrantedAt: '2026-11-10T12:00:00Z', localDirty: false }).run();
+    await expect(updateSessionMetadata('session', {
+      times: { startedAt: new Date(0), completedAt: new Date(250000) },
+      timesBaseline: { revision: 0, startedAt: new Date(1), completedAt: new Date(2) },
+    })).rejects.toThrow(/saved for review/);
+    expect(database.select().from(sessions).get()).toMatchObject({
+      status: 'active', completedAt: null, loggingClientId: 'coach', mergeRevision: 2, localDirty: false,
+    });
+    expect(listMergeLocal(database, owner, 'pending').map(row => JSON.parse(row.payload))).toMatchObject([
+      { type: 'sessions', fields: { status: 'completed', started_at: 0, completed_at: 250000, merge_revision: 0 } },
+    ]);
+    await expect(updateSessionMetadata('session', { gymId: null })).rejects.toThrow(/AI is logging/);
+  });
 });
 
 it('keeps ordinary timing edits usable on a workout that has never entered a protected epoch', async () => {

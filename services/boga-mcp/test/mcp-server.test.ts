@@ -295,9 +295,10 @@ describe('BoGa MCP server', () => {
   it('forwards workout IDs, page revisions, raw results, token and operation headers to the API', async () => {
     const graph = 'a'.repeat(32);
     const snapshot = { visibility: 'server_synced_only', workout: { id: 'workout/a', revision: graph,
-      status: 'completed', requires_app: true }, rows: [{ type: 'set', id: 'set-a', weight_kg: '80', reps: '8' }], next_cursor: 's:next' };
+      status: 'completed', requires_app: true, control: { owner: 'human', client_id: null, can_edit: false } },
+      rows: [{ type: 'set', id: 'set-a', weight_kg: '80', reps: '8' }], next_cursor: 's:next' };
     const mutation = { session_id: 'workout/a', revision: graph, status: 'active', idempotent_replay: false,
-      session_exercise_id: 'block-a', set_ids: ['set-a'] };
+      session_exercise_id: 'block-a', set_ids: ['set-a'], control: { owner: 'mcp', client_id: 'coach', can_edit: true } };
     const running = await startMcp({ ...Object.fromEntries(['start', 'log-sets', 'update-set', 'delete-set', 'finish']
       .map(operation => [`/functions/v1/agent-api/v1/agent/workouts/${operation}`, envelopeResponse(mutation)])),
       '/functions/v1/agent-api/v1/agent/workouts/active': envelopeResponse(snapshot) });
@@ -360,7 +361,7 @@ describe('BoGa MCP server', () => {
   });
 
   it.each(['WORKOUT_PERMISSION_REQUIRED', 'REVISION_CONFLICT', 'ACTIVE_WORKOUT_CONFLICT', 'WORKOUT_NOT_ACTIVE',
-    'AMBIGUOUS_EXERCISE_BLOCK', 'WORKOUT_REQUIRES_APP', 'IDEMPOTENCY_CONFLICT'])('preserves actionable workout error %s', async code => {
+    'AMBIGUOUS_EXERCISE_BLOCK', 'WORKOUT_REQUIRES_APP', 'WORKOUT_CONTROL_REQUIRED', 'IDEMPOTENCY_CONFLICT'])('preserves actionable workout error %s', async code => {
     const running = await startMcp({ '/functions/v1/agent-api/v1/agent/workouts/start': Response.json({
       error: { code, message: 'Read current state before continuing.', request_id: 'workout-request' },
     }, { status: code === 'WORKOUT_PERMISSION_REQUIRED' ? 403 : 409 }) }); active.push(running);

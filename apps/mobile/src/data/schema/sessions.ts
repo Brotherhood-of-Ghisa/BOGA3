@@ -16,6 +16,8 @@ export const sessions = sqliteTable(
     sourcePlanId: text('source_plan_id').references(() => sessionPlans.id, { onDelete: 'set null' }),
     sourcePlanUseId: text('source_plan_use_id').references(() => sessionPlanUses.id, { onDelete: 'set null' }),
     mergeRevision: integer('merge_revision').notNull().default(0),
+    loggingClientId: text('logging_client_id'),
+    loggingGrantedAt: text('logging_granted_at'),
     status: text('status', { enum: ['active', 'completed'] })
       .notNull()
       .default('active'),
