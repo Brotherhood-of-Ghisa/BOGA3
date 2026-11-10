@@ -294,8 +294,8 @@ choices may change which recorded set qualifies.
   contributes `E`, retaining the same muscle Volume.
 
 **A muscle's set count** is [[muscle.set-count]], derived everywhere by
-`countMuscleSets` (`muscle-analytics.ts`). Families deduplicate physical
-sets at their strongest role. Figures remain unrounded through
+`countMuscleSets` (`muscle-analytics.ts`); family totals follow the same fact.
+Figures remain unrounded through
 aggregation. Nothing is stored: these are read-time derivations, so local
 facts and group scoring versions stay unchanged. Coaching publishes the
 allocation change under its own metric revision. The window's working-set

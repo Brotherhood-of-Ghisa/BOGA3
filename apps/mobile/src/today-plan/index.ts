@@ -1,5 +1,6 @@
 export {
   deriveRecoveryRows,
+  groupRecoveryRows,
   derivePlanWeek,
   NEXT_PLANNED_LIMIT,
   RECOVERY_DAYS,
@@ -8,6 +9,7 @@ export {
   type PlannedSessionInput,
   type PlanWeekDay,
   type RecoveryRow,
+  type RecoverySection,
   type RecoveryTargets,
   type TodayPlanWindow,
 } from './calculations';
