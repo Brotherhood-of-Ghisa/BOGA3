@@ -49,6 +49,7 @@ import { DEFAULT_APPEARANCE, getThemePreset } from '@/components/ui/theme-preset
 import { APPEARANCE_STORAGE_KEY, saveAppearance, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { ensureExerciseListPreferencesLoaded } from '@/src/exercise-catalog/list-preferences';
+import { waitForGone } from './helpers/wait-for-gone';
 import { renderWithTheme, switchTheme } from './helpers/theme';
 import SettingsAppearanceRoute from '../app/settings-appearance';
 import SettingsRoute from '../app/settings';
@@ -152,7 +153,7 @@ it('shows the applying indicator from a choice until the app is drawn in it, and
   await waitFor(() => expect(Storage.setItem).toHaveBeenCalled());
   expect(screen.getByRole('progressbar', { name: 'Applying the theme' })).toBeTruthy();
   await act(async () => finish());
-  await waitFor(() => expect(screen.queryByTestId('settings-appearance-applying')).toBeNull());
+  await waitForGone(() => screen.queryByTestId('settings-appearance-applying'));
 
   jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
   fireEvent.press(screen.getByTestId('settings-appearance-option-plum'));

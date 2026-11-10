@@ -13,7 +13,7 @@ import {
   usePhoneScheme,
   useStoredAppearance,
 } from '@/components/appearance/chosen-theme';
-import { ApplyingIndicator } from '@/components/appearance/theme-header';
+import { applyingHeaderRight } from '@/components/appearance/theme-header';
 import { ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
 import { SubPage } from '@/components/settings/sub-page';
@@ -68,7 +68,8 @@ export function AppearanceSettingsScreen() {
 
   return (
     <SubPage testID="settings-appearance-screen">
-      <Stack.Screen options={{ headerRight: () => <ApplyingIndicator applying={applying} testID="settings-appearance-applying" /> }} />
+      {/* Named either way: options merge across renders. */}
+      <Stack.Screen options={{ headerRight: applyingHeaderRight(applying, 'settings-appearance-applying') }} />
       <FormSection title="Theme">
         {(presetsListed ? themePresets : []).map((preset, index) => {
           const checked = preset.id === appearance.theme;

@@ -10,7 +10,7 @@ import { act, screen } from '@testing-library/react-native';
 import { ActivityIndicator, StyleSheet, type TextStyle } from 'react-native';
 
 import { ChoiceMeta } from '@/components/appearance/appearance-custom';
-import { ApplyingIndicator } from '@/components/appearance/theme-header';
+import { applyingHeaderRight } from '@/components/appearance/theme-header';
 import { DEFAULT_APPEARANCE, type AppearanceChoice } from '@/components/ui/theme-presets';
 import { SyncSetupScreen, SYNC_GATE_TEST_IDS } from '@/src/sync/SyncGate';
 import { __resetSyncGateStateForTests, publishSyncGateState } from '@/src/sync/sync-gate-state';
@@ -38,7 +38,7 @@ describe('Settings → Appearance and the sync gate: live theme', () => {
 
     renderWithTheme(
       <>
-        <ApplyingIndicator applying testID="applying" />
+        {applyingHeaderRight(true, 'applying')!()}
         <ChoiceMeta details={['Default']} roles={before} />
       </>,
     );

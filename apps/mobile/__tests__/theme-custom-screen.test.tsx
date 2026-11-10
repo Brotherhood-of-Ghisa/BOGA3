@@ -35,7 +35,7 @@ jest.mock('expo-router', () => ({
 
 import { act, configure, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { SPOTLIGHT } from '@/components/appearance/theme-preview';
 import { pointToValue } from '@/components/ui/slider-row';
@@ -51,6 +51,7 @@ import { useUiRoles } from '@/components/ui/theme-context';
 import { APPEARANCE_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { getThemePreset } from '@/components/ui/theme-presets';
 import ThemeCustomRoute from '../app/theme-custom';
+import { waitForGone } from './helpers/wait-for-gone';
 import { renderWithTheme } from './helpers/theme';
 
 const CUSTOM: CustomColours = {
@@ -200,9 +201,9 @@ it('paints the hue bar in the part’s colours, words for VoiceOver only, and sw
   store(CUSTOM);
   mockPart = 'accent';
   render(<ThemeCustomRoute />);
-  const paint = screen.getByTestId('theme-custom-hue-paint').props.children as { props: { style: unknown[] } }[];
+  const paint: { props: { style: StyleProp<ViewStyle> } }[] = screen.getByTestId('theme-custom-hue-paint').props.children;
   expect(paint).toHaveLength(36);
-  const colours = paint.map((segment) => StyleSheet.flatten(segment.props.style).backgroundColor);
+  const colours = paint.map((segment) => StyleSheet.flatten(segment.props.style)?.backgroundColor);
   expect(new Set(colours).size).toBeGreaterThan(30);
   expect(colours[0]).toBe(customSeed('accent', { hue: 5, strength: 100 }));
   expect(screen.queryByTestId('theme-custom-hue-value')).toBeNull();
@@ -291,7 +292,7 @@ it('shows the applying indicator from a save until the app is drawn in it', asyn
   await waitFor(() => expect(Storage.setItem).toHaveBeenCalled());
   expect(screen.getByRole('progressbar', { name: 'Applying the theme' })).toBeTruthy();
   await act(async () => finish());
-  await waitFor(() => expect(screen.queryByTestId('theme-custom-applying')).toBeNull());
+  await waitForGone(() => screen.queryByTestId('theme-custom-applying'));
   expect(storedCustom()?.background.strength).toBe(25);
 });
 

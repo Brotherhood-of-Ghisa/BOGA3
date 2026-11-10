@@ -4,14 +4,14 @@ import { StyleSheet, View, type ColorSchemeName } from 'react-native';
 
 import {
   appearanceRoles,
+  CUSTOM_PART_LABELS,
   previewMode,
   readIntendedAppearance,
   usePhoneScheme,
 } from '@/components/appearance/chosen-theme';
-import { ApplyingIndicator } from '@/components/appearance/theme-header';
+import { applyingHeaderRight } from '@/components/appearance/theme-header';
 import { PartSpotlight, ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
-import { CUSTOM_PART_LABELS } from '@/components/appearance/chosen-theme';
 import { FormSection, HeaderTitleMenu, Notice, Screen, SliderRow, uiBorder, uiGeometry, uiSpace, useUiRoles } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
 import {
@@ -102,7 +102,8 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
           headerTitle: () => (
             <HeaderTitleMenu currentId={part} onChoose={onChoosePart} options={PART_OPTIONS} sheetTitle="Colour" testID="theme-custom-title" />
           ),
-          headerRight: () => <ApplyingIndicator applying={applying} testID="theme-custom-applying" />,
+          // Named either way: options merge across renders.
+          headerRight: applyingHeaderRight(applying, 'theme-custom-applying'),
         }}
       />
       <View style={styles.body}>
