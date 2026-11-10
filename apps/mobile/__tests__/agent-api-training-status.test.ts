@@ -389,7 +389,7 @@ const todayPlanOf = (fixture: ParityFixture, settings: StatusSettingsRow) => {
 };
 
 const planRowsOf = (result: ReturnType<typeof buildTrainingStatus>) => result.muscles.map((muscle) => ({
-  muscleGroupId: muscle.id, name: muscle.name, days: muscle.recovery_days.map((day) => day.sets),
+  muscleGroupId: muscle.id, name: muscle.name, familyName: muscle.family, days: muscle.recovery_days.map((day) => day.sets),
   today: muscle.today_sets, weekSets: muscle.week_sets, target: muscle.weekly_target,
 }));
 

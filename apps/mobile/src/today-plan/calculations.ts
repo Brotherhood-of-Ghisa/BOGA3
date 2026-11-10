@@ -36,6 +36,7 @@ export const todayPlanWindow = (now: Date): TodayPlanWindow => {
 export type RecoveryRow = {
   muscleGroupId: string;
   name: string;
+  familyName: string;
   /** Sets on each recovery day, oldest first; null for a day without any. */
   days: (number | null)[];
   /** Sets so far today; null for none. Not part of the row's order. */
@@ -69,6 +70,7 @@ export const deriveRecoveryRows = (daily: MuscleDailySets, window: TodayPlanWind
       row: {
         muscleGroupId: muscle.id,
         name: muscle.displayName,
+        familyName: muscle.familyName,
         days: recoveryKeys.map((key) => byDay[key] ?? null),
         today: byDay[todayKey] ?? null,
         weekSets: sumDays(byDay, weekKeys),
@@ -78,6 +80,19 @@ export const deriveRecoveryRows = (daily: MuscleDailySets, window: TodayPlanWind
   });
   rows.sort((left, right) => left.recent - right.recent || left.row.weekSets - right.row.weekSets || left.order - right.order);
   return rows.map(({ row }) => row);
+};
+
+export type RecoverySection = { name: string; muscles: RecoveryRow[]; weekSets: number };
+
+/** Family sections retain the recovery order; their total is attributed child work, not unique sets. */
+export const groupRecoveryRows = (rows: RecoveryRow[]): RecoverySection[] => {
+  const families = new Map<string, RecoveryRow[]>();
+  for (const row of rows) {
+    const members = families.get(row.familyName) ?? [];
+    members.push(row);
+    families.set(row.familyName, members);
+  }
+  return [...families].map(([name, muscles]) => ({ name, muscles, weekSets: sumNumbers(muscles.map(row => row.weekSets)) }));
 };
 
 /** A plan as the page reads it: its schedule, figures and muscles. */

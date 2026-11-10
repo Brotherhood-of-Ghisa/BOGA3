@@ -7,6 +7,7 @@ import type { MuscleDailySets } from '@/src/data';
 import {
   derivePlanWeek,
   deriveRecoveryRows,
+  groupRecoveryRows,
   selectNextPlans,
   todayPlanWindow,
   type PlannedSessionInput,
@@ -79,7 +80,7 @@ describe('deriveRecoveryRows', () => {
 
   it('shows an untrained muscle with every day blank', () => {
     const rows = deriveRecoveryRows({ muscles: [muscle('core', 9)], sets: {}, sessionDays: [] }, window, TARGETS);
-    expect(rows).toEqual([{ muscleGroupId: 'core', name: 'Core', days: [null, null, null], today: null, weekSets: 0, target: 8 }]);
+    expect(rows).toEqual([{ muscleGroupId: 'core', name: 'Core', familyName: 'F', days: [null, null, null], today: null, weekSets: 0, target: 8 }]);
   });
 
   it("carries today's sets so far in their own column, outside the order", () => {
@@ -97,6 +98,23 @@ describe('deriveRecoveryRows', () => {
     expect(rows.find((row) => row.muscleGroupId === 'chest')?.target).toBe(12);
     expect(rows.find((row) => row.muscleGroupId === 'back')?.target).toBe(8);
   });
+});
+
+it('groups using reported family names, retaining child recovery order, unrounded sums, and known zero', () => {
+  const daily: MuscleDailySets = {
+    muscles: [
+      { ...muscle('a', 1), familyName: 'My custom family' },
+      { ...muscle('b', 2), familyName: 'Other' },
+      { ...muscle('c', 3), familyName: 'My custom family' },
+    ],
+    sets: { a: { '2026-10-30': 1.5 }, c: { '2026-10-30': 1.5 } }, sessionDays: [],
+  };
+  const rows = deriveRecoveryRows(daily, window, TARGETS);
+  expect(groupRecoveryRows(rows)).toEqual([
+    { name: 'Other', muscles: [rows[0]], weekSets: 0 },
+    { name: 'My custom family', muscles: [rows[1], rows[2]], weekSets: 3 },
+  ]);
+  expect(groupRecoveryRows([])).toEqual([]);
 });
 
 describe('the next planned sessions and the week', () => {
