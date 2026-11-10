@@ -38,3 +38,18 @@ Code: MCP logging tools in `services/boga-mcp/src/workout-tools.ts` delegate to
 Code: exclusive session control and handoff in
 `supabase/migrations/20261110192235_workout_logging_control.sql` and
 `apps/mobile/src/sync/workout-control.ts`.
+
+### agents.health-activities · definition · accepted
+
+A connected coach reads the workouts the person's phone imports from their
+health app (Apple Health): every activity type, summary figures only (no
+routes or samples), under the base read grant with no extra switch. Imported
+activities never count as sets, Volume, records or group figures and are never
+shared with groups. A watch strength workout overlapping a logged session is
+the same training: it stays listed, flagged, and is left out of the coach's
+cardio summary.
+
+Why: the coach should factor cardio into advice without counting a gym session twice.
+Code: `supabase/functions/agent-api/activities.ts`;
+`supabase/migrations/20261110213906_health_activities.sql`.
+Pending: The app does not import activities yet: `apps/mobile` has no health-store reader.

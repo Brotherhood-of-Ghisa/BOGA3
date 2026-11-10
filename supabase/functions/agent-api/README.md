@@ -13,8 +13,9 @@ accept `GET` only; the write routes accept `POST` (`PUT` for muscle targets)
 and require their current-grant permission. GET bodies and caller identity
 fields (`user_id`, `userId`, `owner_user_id`) are rejected.
 
-For active workout reads/writes and staged enablement, load
-[workout logging](../../../docs/specs/tech/agent-workout-contract.md).
+Load [workout logging](../../../docs/specs/tech/agent-workout-contract.md) for
+active workouts, and [health activities](../../../docs/specs/tech/health-activities-contract.md)
+for `/activities` and training-status `cardio`.
 
 Success envelope:
 
@@ -56,8 +57,7 @@ minute per function instance.
 }
 ```
 
-The MCP resource server calls this route to validate every bearer token; it
-returns no user or account fields.
+The MCP server validates every bearer token here; no user or account fields.
 
 ## Training profile
 

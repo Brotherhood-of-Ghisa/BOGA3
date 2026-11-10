@@ -101,6 +101,15 @@ const responses: Record<string, Record<string, unknown>> = {
     muscles: [{ id: 'chest_sternal', name: 'Chest', week_sets: 4.5, weekly_target: 10 }],
     targets: { default_weekly_sets: 10, mode: 'single', revision: 1_730_000_000_000, uploaded: true },
   },
+  '/functions/v1/agent-api/v1/agent/activities': {
+    activities: [{
+      activity_type: 'traditional_strength_training', duration_seconds: 3000, external_id: 'hk-1',
+      overlapping_session_id: 'workout-a', overlaps_logged_session: true, source: 'apple_health',
+      started_at: '2026-10-27T17:05:00.000Z',
+    }],
+    next_cursor: null,
+    overlap_complete: true,
+  },
   '/functions/v1/agent-api/v1/agent/muscle-targets': {
     idempotent_replay: false,
     overrides: { chest_sternal: 14 },
@@ -220,7 +229,7 @@ afterEach(async () => {
 });
 
 describe('BoGa MCP server', () => {
-  it('discovers exactly twenty-two tools with correct annotations', async () => {
+  it('discovers exactly twenty-three tools with correct annotations', async () => {
     const running = await startMcp();
     active.push(running);
     const result = await running.client.listTools();
@@ -235,6 +244,7 @@ describe('BoGa MCP server', () => {
       'get_active_workout',
       'get_exercise_context',
       'get_exercise_history',
+      'get_recent_activities',
       'get_recent_workouts',
       'get_training_profile',
       'get_training_status',
@@ -253,6 +263,7 @@ describe('BoGa MCP server', () => {
       'get_active_workout',
       'get_exercise_context',
       'get_exercise_history',
+      'get_recent_activities',
       'get_recent_workouts',
       'get_training_profile',
       'get_training_status',
@@ -262,8 +273,8 @@ describe('BoGa MCP server', () => {
       'search_exercises',
     ]);
     // The instructions count the read-only tools a client can call.
-    expect(readOnlyNames.size).toBe(10);
-    expect(running.client.getInstructions()).toContain('Ten read-only tools');
+    expect(readOnlyNames.size).toBe(11);
+    expect(running.client.getInstructions()).toContain('Eleven read-only tools');
     // Edits, deletes and new targets replace what the person had, so clients confirm them.
     const destructiveNames = new Set(['delete_exercise', 'set_muscle_targets', 'update_exercise', 'update_set', 'delete_set', 'finish_workout']);
     for (const tool of result.tools) {
@@ -401,6 +412,10 @@ describe('BoGa MCP server', () => {
       name: 'get_workout_detail',
     });
     const status = await running.client.callTool({ arguments: {}, name: 'get_training_status' });
+    const activities = await running.client.callTool({
+      arguments: { from: '2026-10-01T00:00:00Z', limit: 5, to: '2026-11-01T00:00:00Z' },
+      name: 'get_recent_activities',
+    });
     const plans = await running.client.callTool({
       arguments: { include_unscheduled: true, limit: 5 },
       name: 'get_upcoming_session_plans',
@@ -450,6 +465,9 @@ describe('BoGa MCP server', () => {
     expect(status.structuredContent).toEqual(responses[
       '/functions/v1/agent-api/v1/agent/training-status'
     ]);
+    expect(activities.structuredContent).toEqual(responses[
+      '/functions/v1/agent-api/v1/agent/activities'
+    ]);
     expect(plans.structuredContent).toEqual(responses[
       '/functions/v1/agent-api/v1/agent/session-plans'
     ]);
@@ -471,6 +489,9 @@ describe('BoGa MCP server', () => {
       'GET /functions/v1/agent-api/v1/agent/workouts/recent?limit=4',
     );
     expect(called).toContain('GET /functions/v1/agent-api/v1/agent/training-status');
+    expect(called).toContain(
+      'GET /functions/v1/agent-api/v1/agent/activities?from=2026-10-01T00%3A00%3A00Z&limit=5&to=2026-11-01T00%3A00%3A00Z',
+    );
     expect(called).toContain(
       'GET /functions/v1/agent-api/v1/agent/exercises/exercise-a/history?limit=10',
     );

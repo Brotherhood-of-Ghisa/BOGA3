@@ -53,6 +53,7 @@ round-trip and the drift checker ignores it.
 | `app_public.user_profiles` (`training_unit`, `time_zone` included) | out — auth/profile layer, explicitly outside the seventeen-table mirror | `supabase/migrations/` |
 | `public.app_logs` | out — operational diagnostics. Authenticated clients **insert only**; client `SELECT`/`UPDATE`/`DELETE` are intentionally unavailable and rows are read through operator tooling | `supabase/migrations/` |
 | `public.agent_access_audit`, `public.agent_plan_permissions`, `public.agent_workout_permissions`, `public.agent_plan_write_receipts` | out — control/security metadata: audit is service-insert only; permissions are per-client current-grant controls; receipts keep hashes and result IDs/tokens, service-role only | `supabase/migrations/` |
+| `app_public.health_activities` | out — imported health-app summaries (the health store is the device copy), written only by an owner RPC ([`tech/health-activities-contract.md`](tech/health-activities-contract.md)) | `supabase/migrations/` |
 | Every `app_public.notification_*` table | out — operational installations, preferences and durable delivery; no `owner_user_id` or mirror FK | `supabase/migrations/` |
 | Every `app_public.group_*` table | out — server-authoritative, multi-reader rows with no per-owner LWW, so they can never be Sync v2 entities | `supabase/migrations/`, [`tech/groups-contract.md`](tech/groups-contract.md) |
 
@@ -84,8 +85,8 @@ what the effort selections mean.
   with a distinct profile for local-only builds, so they **survive sign-out,
   account switches and sync database rebuilds** — the wipe below empties SQL
   rows and the target adoption markers (rule 12).
-- **Any future explicit preference reset must address only its intended
-  profile and fields** — never clear the whole key-value store.
+- **A preference reset addresses only its own profile and fields**, never the
+  whole key-value store.
 
 ## Exercise session facts (local-only, derived)
 
@@ -160,11 +161,10 @@ Three paths use it (`apps/mobile/src/sync/account-wipe.ts`,
 - **The developer reset** ("Reset local data and re-seed") wipes, keeps the
   owner, and re-seeds the starter catalog; the next cycle re-pulls the rest.
 
-Pull cursors are reset with the rows because they are positions in the server's
-change stream: kept over an emptied (or another account's) store they skip
-every older server row, so a child layer can return rows whose parents were
-skipped — a local FK failure on every retry. Every wipe runs under the sync
-cycle's lock, so it never lands between two pages of a pull.
+Pull cursors reset with the rows: kept over an emptied or foreign store they
+skip older server rows, so a child can arrive without its parent (a local FK
+failure on every retry). Wipes run under the sync cycle's lock, never between
+two pull pages.
 
 ## Local sync bookkeeping (Sync v2)
 

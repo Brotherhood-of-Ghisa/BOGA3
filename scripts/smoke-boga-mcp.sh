@@ -151,6 +151,8 @@ cleanup() {
         delete from public.agent_access_audit
           where owner_user_id = '${USER_UUID}'::uuid
             and oauth_client_id = '${AGENT_CLIENT_ID}';
+        delete from app_public.health_activities
+          where owner_user_id = '${USER_UUID}'::uuid and external_id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.exercise_sets
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.session_exercises
@@ -230,6 +232,8 @@ else
   # the stored report_group and tracked = false, not just the keys.
   GROUPED_MUSCLE_ID="mcp-smoke-${RUN_TAG}-muscle-grouped"
   SET_ID="mcp-smoke-${RUN_TAG}-set"
+  # Imported health activities: a run, and a watch strength workout inside the session.
+  ACTIVITY_PREFIX="mcp-smoke-${RUN_TAG}-activity"
   EXPECT_BODYWEIGHT=1
   EXERCISE_QUERY="MCP Smoke ${RUN_TAG}"
   NOW_MS="$(($(date +%s) * 1000))"
@@ -291,6 +295,13 @@ else
          ${NOW_MS},${NOW_MS},${NOW_MS}),
         ('${USER_UUID}'::uuid,'${SET_ID}-warm-up','${BLOCK_ID}',1,'60','5','warm_up',
          ${NOW_MS},${NOW_MS},${NOW_MS});
+      insert into app_public.health_activities
+        (owner_user_id,source,external_id,activity_type,started_at,ended_at,duration_sec,distance_m,active_energy_kcal)
+      values
+        ('${USER_UUID}'::uuid,'apple_health','${ACTIVITY_PREFIX}-run','running',
+         to_timestamp($((NOW_MS - 300000)) / 1000.0),to_timestamp($((NOW_MS - 60000)) / 1000.0),240,800,60),
+        ('${USER_UUID}'::uuid,'apple_health','${ACTIVITY_PREFIX}-lift','traditional_strength_training',
+         to_timestamp($((NOW_MS - 880000)) / 1000.0),to_timestamp($((NOW_MS - 620000)) / 1000.0),260,null,40);
       -- Pre-existing sentinel plan to prove smoke cleanup does not delete unrelated user plans
       insert into app_public.session_plans
         (owner_user_id,id,title,provenance,created_at,updated_at,client_updated_at_ms)
@@ -357,6 +368,7 @@ BOGA_MCP_SMOKE_EXERCISE_ID="${EXERCISE_ID}" \
 BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
 BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
 BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
+BOGA_MCP_SMOKE_ACTIVITY_PREFIX="${ACTIVITY_PREFIX:-}" \
 BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
 BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
   npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
@@ -389,6 +401,7 @@ if [[ -n "${USER_UUID}" ]]; then
   BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
   BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
   BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
+  BOGA_MCP_SMOKE_ACTIVITY_PREFIX="${ACTIVITY_PREFIX:-}" \
   BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_PLAN_ENABLED="1" \
     npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
@@ -434,6 +447,7 @@ if [[ -n "${USER_UUID}" ]]; then
   BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
   BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
   BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
+  BOGA_MCP_SMOKE_ACTIVITY_PREFIX="${ACTIVITY_PREFIX:-}" \
   BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
     npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client

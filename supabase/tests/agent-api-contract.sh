@@ -352,6 +352,9 @@ cleanup() {
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from public.agent_plan_permissions
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
+      delete from app_public.health_activities
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
+          and external_id like 'agent-api-${RUN_TAG}-%';
       delete from app_public.exercise_sets
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and id like 'agent-api-${RUN_TAG}-%';
@@ -2258,6 +2261,152 @@ echo "[agent-api-test] letting the per-minute request windows reset before the t
 # the seeded-history check and the targets block make ~30 more requests and a
 # 30-write rate-limit probe.
 sleep 61
+echo "[agent-api-test] verifying imported health activities: the app write path, RLS and the coach's reads"
+# The overlap rule, range parsing and weekly cardio buckets are the pure
+# module's, in apps/mobile/__tests__/agent-api-activities.test.ts. Here: the
+# owner-only RPC and table boundary, and the route's reads, shape and paging.
+ACTIVITY_RUN="agent-api-${RUN_TAG}-activity-run"
+ACTIVITY_LIFT="agent-api-${RUN_TAG}-activity-lift"
+ACTIVITY_B="agent-api-${RUN_TAG}-activity-b"
+iso_ms() { node -e "process.stdout.write(new Date(Number(process.argv[1])).toISOString())" "$1"; }
+RUN_START="$(iso_ms $((NOW_MS - 10800000)))"
+RUN_END="$(iso_ms $((NOW_MS - 9000000)))"
+# Inside SESSION_A (STARTED_MS..COMPLETED_MS): the watch recorded the same lifting.
+LIFT_START="$(iso_ms $((STARTED_MS + 120000)))"
+LIFT_END="$(iso_ms $((COMPLETED_MS - 60000)))"
+activity_payload() {
+  jq -nc --arg run "${ACTIVITY_RUN}" --arg lift "${ACTIVITY_LIFT}" \
+    --arg rs "${RUN_START}" --arg re "${RUN_END}" --arg ls "${LIFT_START}" --arg le "${LIFT_END}" --argjson km "$1" '{
+    p_source: "apple_health",
+    p_upserts: [
+      {external_id: $run, activity_type: "running", started_at: $rs, ended_at: $re, duration_sec: 1800,
+       distance_m: $km, active_energy_kcal: 312.5, avg_heart_rate_bpm: 151, max_heart_rate_bpm: 176,
+       elevation_gain_m: 18, source_name: "Workout", device_name: "Apple Watch"},
+      {external_id: $lift, activity_type: "traditional_strength_training", started_at: $ls, ended_at: $le,
+       duration_sec: 420, active_energy_kcal: 90}
+    ]
+  }'
+}
+run_psql "insert into app_public.health_activities
+  (owner_user_id,source,external_id,activity_type,started_at,ended_at,duration_sec)
+  values ('${USER_B_UUID}'::uuid,'apple_health','${ACTIVITY_B}','running',now() - interval '1 hour',now(),3600);" >/dev/null
+
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(activity_payload 4000)"
+assert_status "200" "app imports activities"
+printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 2, deleted: 0, pruned: 0}' >/dev/null ||
+  fail "activity import did not report two upserts"
+# A re-import of the same workouts updates them in place: idempotent by (owner, source, external id).
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(activity_payload 4321.5)"
+assert_status "200" "app re-imports activities"
+[[ "$(run_psql "select count(*) || ':' || max(distance_m) from app_public.health_activities
+  where owner_user_id = '${USER_A_UUID}'::uuid and external_id in ('${ACTIVITY_RUN}','${ACTIVITY_LIFT}');")" == "2:4321.5" ]] ||
+  fail "a re-import duplicated or did not update the activity"
+
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" \
+  "$(activity_payload 1 | jq -c '.p_upserts[0].route = []')"
+assert_non_2xx "an unknown activity field"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.message | test("INVALID_ARGUMENT: unknown activity field route")' >/dev/null ||
+  fail "an unknown activity field was not rejected by name"
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" \
+  "$(activity_payload 1 | jq -c '.p_upserts[0].max_heart_rate_bpm = 900')"
+assert_non_2xx "an out-of-range heart rate"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.message | test("INVALID_ARGUMENT: .*max_heart_rate_bpm")' >/dev/null ||
+  fail "an out-of-range figure was not rejected naming its check"
+[[ "$(run_psql "select distance_m from app_public.health_activities
+  where owner_user_id = '${USER_A_UUID}'::uuid and external_id = '${ACTIVITY_RUN}';")" == "4321.5" ]] ||
+  fail "a rejected batch changed stored activities"
+
+app_public_request GET "health_activities?select=external_id" "${APP_ACCESS_TOKEN}"
+assert_status "200" "owner app reads its activities"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg run "${ACTIVITY_RUN}" --arg b "${ACTIVITY_B}" \
+  '(map(.external_id) | index($run)) != null and (map(.external_id) | index($b)) == null' >/dev/null ||
+  fail "the owner read crossed the ownership boundary"
+app_public_request POST "health_activities" "${APP_ACCESS_TOKEN}" \
+  "$(jq -nc --arg u "${USER_A_UUID}" '{owner_user_id: $u, source: "apple_health", external_id: "direct",
+    activity_type: "running", started_at: "2026-01-01T00:00:00Z", ended_at: "2026-01-01T00:10:00Z", duration_sec: 600}')"
+assert_non_2xx "a direct app insert"
+app_public_request GET "health_activities?select=external_id" "${AGENT_ACCESS_TOKEN}"
+[[ "${RESPONSE_STATUS}" != "200" || "$(printf '%s' "${RESPONSE_BODY}" | jq 'length')" == "0" ]] ||
+  fail "an OAuth token read activities directly"
+app_public_request POST "rpc/health_activities_apply" "${AGENT_ACCESS_TOKEN}" "$(activity_payload 1)"
+assert_non_2xx "an OAuth token import"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.message | test("AGENT_FORBIDDEN")' >/dev/null ||
+  fail "an OAuth token import was not refused as AGENT_FORBIDDEN"
+
+agent_get "activities?limit=50"
+assert_status "200" "recent activities"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg run "${ACTIVITY_RUN}" --arg lift "${ACTIVITY_LIFT}" \
+  --arg b "${ACTIVITY_B}" --arg session "${SESSION_A}" --arg rs "${RUN_START}" '
+    .data.activities as $a
+    | ($a | map(select(.external_id == $run)) | first) as $r
+    | ($a | map(select(.external_id == $lift)) | first) as $l
+    | ($a | map(.started_at)) == ($a | map(.started_at) | sort | reverse)
+    and ($a | map(.external_id) | index($b)) == null
+    and $r.started_at == $rs and $r.activity_type == "running" and $r.duration_seconds == 1800
+    and $r.distance_m == 4321.5 and $r.max_heart_rate_bpm == 176 and $r.device_name == "Apple Watch"
+    and $r.overlaps_logged_session == false and $r.overlapping_session_id == null
+    and $l.overlaps_logged_session == true and $l.overlapping_session_id == $session
+    and $l.distance_m == null and .data.overlap_complete == true
+  ' >/dev/null || fail "recent activities shape, order, ownership or overlap flag is wrong"
+RANGE_TO="$(iso_ms $((NOW_MS + 60000)))"
+agent_get "activities?limit=1&from=${RUN_START}&to=${RANGE_TO}"
+assert_status "200" "first page of a bounded range"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg lift "${ACTIVITY_LIFT}" \
+  '(.data.activities | map(.external_id)) == [$lift] and (.data.next_cursor | type) == "string"' >/dev/null ||
+  fail "a bounded first page did not return only the newest activity in range"
+agent_get "activities?limit=1&from=${RUN_START}&to=${RANGE_TO}&cursor=$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.next_cursor')"
+assert_status "200" "second page of a bounded range"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg run "${ACTIVITY_RUN}" \
+  '(.data.activities | map(.external_id)) == [$run] and .data.next_cursor == null' >/dev/null ||
+  fail "the second page did not continue to the older activity and stop at the range start"
+agent_get "activities?from=2026-11-01"
+assert_status "400" "a range bound without a time and zone"
+agent_get "activities?days=7"
+assert_status "400" "an unknown activities parameter"
+agent_get "activities?cursor=$(printf '%s' '{"kind":"workout","id":"x"}' | base64 | tr '+/' '-_' | tr -d '=')"
+assert_status "400" "another route's cursor"
+
+agent_get "training-status"
+assert_status "200" "training status with imported activities"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+    .data.cardio as $c
+    | ([$c.this_week, $c.last_4_weeks[]] | map(.by_type[] | select(.activity_type == "running") | .distance_m) | add // 0) as $km
+    | ($c.last_4_weeks | length) == 4
+    and ($c.this_week.week_start == .data.week_start)
+    and $km >= 4322
+    and $c.overlapping_excluded >= 1
+    and ([$c.this_week, $c.last_4_weeks[]] | map(.by_type[] | select(.activity_type == "traditional_strength_training")) | length) == 0
+    and ($c.complete | type) == "boolean"
+  ' >/dev/null || fail "the cardio summary did not count the run and exclude the overlapping strength workout"
+[[ "$(run_psql "select count(*) from public.agent_access_audit
+  where owner_user_id = '${USER_A_UUID}'::uuid and oauth_client_id = '${AGENT_CLIENT_ID}'
+    and tool_name = 'get_recent_activities' and http_status = 200;")" -ge 1 ]] ||
+  fail "recent activities were not audited under their tool name"
+
+# HealthKit deletions remove rows; a fresh backfill's complete window prunes the rest.
+FUTURE_A="agent-api-${RUN_TAG}-activity-future-a"
+FUTURE_B="agent-api-${RUN_TAG}-activity-future-b"
+future_activity() { jq -nc --arg id "$1" --arg s "$2" '{external_id: $id, activity_type: "walking",
+  started_at: $s, ended_at: $s, duration_sec: 0}'; }
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(jq -nc \
+  --argjson a "$(future_activity "${FUTURE_A}" 2031-01-02T08:00:00Z)" \
+  --argjson b "$(future_activity "${FUTURE_B}" 2031-01-03T08:00:00Z)" \
+  --arg run "${ACTIVITY_RUN}" '{p_source: "apple_health", p_upserts: [$a, $b], p_deletes: [$run]}')"
+assert_status "200" "an import with a deletion"
+printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 2, deleted: 1, pruned: 0}' >/dev/null ||
+  fail "a HealthKit deletion did not delete the activity"
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(jq -nc \
+  --argjson b "$(future_activity "${FUTURE_B}" 2031-01-03T08:00:00Z)" \
+  '{p_source: "apple_health", p_upserts: [$b], p_complete_since: "2031-01-01T00:00:00Z"}')"
+assert_status "200" "a complete backfill window"
+printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 1, deleted: 0, pruned: 1}' >/dev/null ||
+  fail "a complete window did not prune the activity the store no longer has"
+[[ "$(run_psql "select string_agg(external_id, ',' order by external_id) from app_public.health_activities
+  where owner_user_id = '${USER_A_UUID}'::uuid and external_id like 'agent-api-${RUN_TAG}-%';")" == \
+  "${FUTURE_B},${ACTIVITY_LIFT}" ]] || fail "deletion or pruning touched the wrong activities"
+[[ "$(run_psql "select count(*) from app_public.health_activities where owner_user_id = '${USER_B_UUID}'::uuid
+  and external_id = '${ACTIVITY_B}';")" == "1" ]] || fail "another owner's activity was deleted"
+
 echo "[agent-api-test] verifying the training status figures over a seeded seven-week history"
 # Figures worked out by hand from the rows below (UTC, the fixture's zone).
 # The muscle's sets fall on the Thursdays of the 1st, 2nd and 4th full weeks
