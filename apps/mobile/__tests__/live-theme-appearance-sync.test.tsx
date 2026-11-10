@@ -7,11 +7,10 @@ jest.mock('@/src/sync/scheduler', () => ({
 }));
 
 import { act, screen } from '@testing-library/react-native';
-import { StyleSheet, type TextStyle } from 'react-native';
-import { Circle } from 'react-native-svg';
+import { ActivityIndicator, StyleSheet, type TextStyle } from 'react-native';
 
 import { ChoiceMeta } from '@/components/appearance/appearance-custom';
-import { HueRing } from '@/components/appearance/hue-ring';
+import { applyingHeaderRight } from '@/components/appearance/theme-header';
 import { DEFAULT_APPEARANCE, type AppearanceChoice } from '@/components/ui/theme-presets';
 import { SyncSetupScreen, SYNC_GATE_TEST_IDS } from '@/src/sync/SyncGate';
 import { __resetSyncGateStateForTests, publishSyncGateState } from '@/src/sync/sync-gate-state';
@@ -32,24 +31,24 @@ describe('Settings → Appearance and the sync gate: live theme', () => {
     __resetSyncGateStateForTests();
   });
 
-  it('repaints the hue ring thumb and a choice row’s words when the theme is saved', async () => {
+  it('repaints the applying indicator and a choice row’s words when the theme is saved', async () => {
     const before = rolesFor(DEFAULT_APPEARANCE);
     const after = rolesFor(SLATE_DARK);
     expect(after.ink).not.toBe(before.ink);
 
     renderWithTheme(
       <>
-        <HueRing hue={47} onChange={jest.fn()} testID="ring" />
+        {applyingHeaderRight(true, 'applying')!()}
         <ChoiceMeta details={['Default']} roles={before} />
       </>,
     );
-    const thumb = () => screen.UNSAFE_getAllByType(Circle).find((circle) => circle.props.strokeWidth === 1)!;
-    expect(thumb().props).toMatchObject({ fill: before.surface, stroke: before.ink });
+    const spinner = () => screen.UNSAFE_getByType(ActivityIndicator);
+    expect(spinner().props.color).toBe(before.inkMuted);
     expect(flat(screen.getByText('Default')).color).toBe(before.inkMuted);
 
     await switchTheme(SLATE_DARK);
 
-    expect(thumb().props).toMatchObject({ fill: after.surface, stroke: after.ink });
+    expect(spinner().props.color).toBe(after.inkMuted);
     expect(flat(screen.getByText('Default')).color).toBe(after.inkMuted);
   });
 

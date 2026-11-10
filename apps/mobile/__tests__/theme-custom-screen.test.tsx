@@ -1,14 +1,17 @@
 /* eslint-disable import/first */
 
 /**
- * Settings → Appearance → Custom → one part: a hue ring and a strength slider
- * (and, for the background, lightness and depth sliders) repaint a preview
- * live; letting one go stores the part and the app repaints in it. There is
- * no save button. The choice lives in expo-sqlite's key-value
- * store, faked in memory by jest.setup.ts. Replaced: the log sink, which is
- * observed, and expo-router's params and stack title. Gesture-handler is
- * stubbed (jest.setup.ts), so a release is driven by calling the handler the
- * stub kept on the gesture; the real gesture path is proved on the simulator.
+ * Settings → Appearance → Custom → one part: a painted hue bar and a strength
+ * slider (and, for the background, lightness and depth sliders) repaint the
+ * part's spotlight and a preview live; letting one go stores the part and the
+ * app repaints in it, the header's indicator showing until it has. The title
+ * switches part in place. There is no save button. The choice lives in
+ * expo-sqlite's key-value store, faked in memory by jest.setup.ts. Replaced:
+ * the log sink, which is observed, and expo-router's params, `setParams` and
+ * stack options (the header's title and right control are rendered in place).
+ * Gesture-handler is stubbed (jest.setup.ts), so a release is driven by
+ * calling the handler the stub kept on the gesture; the real gesture path is
+ * proved on the simulator.
  */
 
 const mockLogEvent = jest.fn();
@@ -16,21 +19,39 @@ jest.mock('@/src/logging/logEvent', () => ({ logEvent: (...args: unknown[]) => m
 
 let mockPart: string | undefined = 'background';
 const mockTitles: string[] = [];
+const mockSetParams = jest.fn();
+type MockOptions = { title: string; headerTitle?: () => unknown; headerRight?: () => unknown };
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ part: mockPart }),
-  Stack: { Screen: ({ options }: { options: { title: string } }) => (mockTitles.push(options.title), null) },
+  useRouter: () => ({ setParams: mockSetParams }),
+  Stack: {
+    Screen: ({ options }: { options: MockOptions }) => {
+      mockTitles.push(options.title);
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- resolve after mock hoisting.
+      return require('react').createElement(require('react').Fragment, null, options.headerTitle?.(), options.headerRight?.());
+    },
+  },
 }));
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, configure, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
+import { SPOTLIGHT } from '@/components/appearance/theme-preview';
 import { pointToValue } from '@/components/ui/slider-row';
-import { customFromSeeds, generateCustomRoles, type CustomColours } from '@/components/ui/theme-custom';
+import {
+  CUSTOM_PARTS,
+  customFromSeeds,
+  customSeed,
+  generateCustomRoles,
+  type CustomColours,
+  type CustomPart,
+} from '@/components/ui/theme-custom';
 import { useUiRoles } from '@/components/ui/theme-context';
 import { APPEARANCE_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { getThemePreset } from '@/components/ui/theme-presets';
 import ThemeCustomRoute from '../app/theme-custom';
+import { waitForGone } from './helpers/wait-for-gone';
 import { renderWithTheme } from './helpers/theme';
 
 const CUSTOM: CustomColours = {
@@ -51,6 +72,7 @@ const storedCustom = (): CustomColours | null => {
 
 beforeEach(() => {
   mockLogEvent.mockReset();
+  mockSetParams.mockReset();
   mockPart = 'background';
   mockTitles.length = 0;
 });
@@ -60,11 +82,10 @@ afterEach(() => {
 });
 
 type Handlers = Record<'onBegin' | 'onUpdate' | 'onEnd' | 'onFinalize', (event?: unknown, success?: boolean) => void>;
-const handlers = (element: ReturnType<typeof screen.getByRole>) => element.props.gesture.handlers as Handlers;
 // A slider's gesture is a drag raced against a tap.
 const drag = (element: ReturnType<typeof screen.getByRole>) => element.props.gesture.gestures[0].handlers as Handlers;
 const tap = (element: ReturnType<typeof screen.getByRole>) => element.props.gesture.gestures[1].handlers as Handlers;
-const ring = () => screen.getByRole('adjustable', { name: 'Hue' });
+const hueBar = () => screen.getByRole('adjustable', { name: 'Hue' });
 const slider = (name: string) => screen.getByRole('adjustable', { name });
 const step = (element: ReturnType<typeof slider>, actionName: 'increment' | 'decrement') =>
   act(async () => {
@@ -92,10 +113,10 @@ it('offers lightness and depth for the background only', () => {
   mockPart = 'accent';
   screen.unmount();
   render(<ThemeCustomRoute />);
-  expect(ring().props.accessibilityValue).toEqual({ text: 'Red, 30 degrees' });
+  expect(hueBar().props.accessibilityValue).toEqual({ text: 'Red, 30 degrees' });
   expect(slider('Strength').props.accessibilityValue).toEqual({ text: '70%' });
   expect(screen.queryByRole('adjustable', { name: 'Lightness' })).toBeNull();
-  expect(screen.queryByRole('button')).toBeNull();
+  expect(screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)).toEqual(['Accent, switch colour']);
 });
 
 it('names the ends of the lightness slider', async () => {
@@ -165,18 +186,114 @@ it('repaints the app in the part let go, behind the page as well as on it', asyn
   expect(screen.queryByText(/saved|next launch/i)).toBeNull();
 });
 
-it('saves a hue when the ring is let go, keeping the other parts', async () => {
+it('saves a hue when the bar is let go, keeping the other parts', async () => {
   store(CUSTOM);
   mockPart = 'viz';
   render(<ThemeCustomRoute />);
+  fireEvent(screen.getByTestId('theme-custom-hue-track'), 'layout', { nativeEvent: { layout: { width: 359 } } });
 
-  // A touch at the right edge of the 240pt ring is 90°.
-  await act(async () => {
-    handlers(ring()).onBegin({ x: 240, y: 120 });
-    handlers(ring()).onFinalize({ x: 240, y: 120 });
-  });
+  await act(async () => drag(hueBar()).onEnd({ x: 90 }, true));
 
   await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, viz: { hue: 90, strength: 40 } }));
+});
+
+it('paints the hue bar in the part’s colours, words for VoiceOver only, and swatches the part as it would be drawn', () => {
+  store(CUSTOM);
+  mockPart = 'accent';
+  render(<ThemeCustomRoute />);
+  const paint: { props: { style: StyleProp<ViewStyle> } }[] = screen.getByTestId('theme-custom-hue-paint').props.children;
+  expect(paint).toHaveLength(36);
+  const colours = paint.map((segment) => StyleSheet.flatten(segment.props.style)?.backgroundColor);
+  expect(new Set(colours).size).toBeGreaterThan(30);
+  expect(colours[0]).toBe(customSeed('accent', { hue: 5, strength: 100 }));
+  expect(screen.queryByTestId('theme-custom-hue-value')).toBeNull();
+  expect(screen.queryByText(/degrees|Red/)).toBeNull();
+  const swatch = () => StyleSheet.flatten(screen.getByTestId('theme-custom-hue-swatch').props.style).backgroundColor;
+  expect(swatch()).toBe(generateCustomRoles(CUSTOM).accent);
+
+  act(() => drag(hueBar()).onUpdate({ x: 0 }));
+  expect(swatch()).toBe(generateCustomRoles({ ...CUSTOM, accent: { hue: 0, strength: 70 } }).accent);
+});
+
+it('switches to another part from the title, and only closes the menu for the part already open', () => {
+  store(CUSTOM);
+  mockPart = 'text';
+  render(<ThemeCustomRoute />);
+  fireEvent.press(screen.getByRole('button', { name: 'Secondary text, switch colour' }));
+  expect(screen.getByTestId('theme-custom-title-option-text').props.accessibilityState).toMatchObject({ checked: true });
+
+  fireEvent.press(screen.getByTestId('theme-custom-title-option-text'));
+  expect(mockSetParams).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByRole('button', { name: 'Secondary text, switch colour' }));
+  fireEvent.press(screen.getByTestId('theme-custom-title-option-viz'));
+  expect(mockSetParams).toHaveBeenCalledWith({ part: 'viz' });
+});
+
+it('spotlights every role the part moves, live as a control moves', () => {
+  configure({ defaultIncludeHiddenElements: true });
+  try {
+    store(CUSTOM);
+    render(<ThemeCustomRoute />);
+    const tile = (index: number) => StyleSheet.flatten(screen.getByTestId(`theme-custom-spotlight-${index}`).props.style).backgroundColor;
+    const roles = generateCustomRoles(CUSTOM);
+    expect([0, 1, 4].map(tile)).toEqual([roles.paper, roles.surface, roles.viz0]);
+    expect(screen.getByText('Divider')).toBeTruthy();
+
+    fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
+    act(() => drag(slider('Lightness')).onUpdate({ x: 20 }));
+    expect(tile(0)).toBe(generateCustomRoles({ ...CUSTOM, background: { ...CUSTOM.background, lightness: 20 } }).paper);
+  } finally {
+    configure({ defaultIncludeHiddenElements: false });
+  }
+});
+
+it('spotlights, for each part, only roles a hue and strength change of that part moves, and every one of them', () => {
+  // A role a part moves changes by more than the sRGB rounding a shift of
+  // the ink's L* by gamut carries into every role.
+  const channels = (colour: string) =>
+    colour.startsWith('#') ? [1, 3, 5].map((at) => parseInt(colour.slice(at, at + 2), 16)) : (colour.match(/[\d.]+/g) ?? []).map(Number);
+  const differs = (a: string, b: string) => channels(a).some((value, index) => Math.abs(value - channels(b)[index]) > 6);
+  const moved = (part: CustomPart) => {
+    const before = generateCustomRoles(CUSTOM);
+    const shifted = { ...CUSTOM, [part]: { ...CUSTOM[part], hue: (CUSTOM[part].hue + 120) % 360, strength: 100 } };
+    const after = generateCustomRoles(shifted);
+    return new Set((Object.keys(before) as (keyof typeof before)[]).filter((role) => before[role] !== after[role] && differs(before[role], after[role])));
+  };
+  CUSTOM_PARTS.forEach((part) => {
+    const roles = SPOTLIGHT[part].flatMap((sample) => (sample.kind === 'fill' ? [sample.role] : [sample.role, sample.ground]));
+    // Each sample but a context one draws at least one role of its own part.
+    SPOTLIGHT[part].filter((sample) => !sample.context).forEach((sample) => {
+      const own = sample.kind === 'fill' ? [sample.role] : [sample.role, sample.ground];
+      expect({ part, sample: sample.label, moves: own.some((role) => moved(part).has(role)) }).toEqual({ part, sample: sample.label, moves: true });
+    });
+    // And every role the part moves is among them.
+    expect({ part, missing: [...moved(part)].filter((role) => !roles.includes(role)) }).toEqual({ part, missing: [] });
+  });
+});
+
+it('shows the applying indicator from a save until the app is drawn in it', async () => {
+  store(CUSTOM);
+  let finish: () => void = () => undefined;
+  const setItem = jest.spyOn(Storage, 'setItem');
+  setItem.mockImplementationOnce((key, value) => new Promise<void>((resolve) => {
+    finish = () => {
+      Storage.setItemSync(key, value as string);
+      resolve();
+    };
+  }));
+  renderWithTheme(<ThemeCustomRoute />);
+  expect(screen.queryByTestId('theme-custom-applying')).toBeNull();
+
+  await step(slider('Strength'), 'increment');
+  expect(screen.getByRole('progressbar', { name: 'Applying the theme' })).toBeTruthy();
+
+  // The save is queued behind earlier ones: let it reach the store first.
+  await waitFor(() => expect(Storage.setItem).toHaveBeenCalled());
+  expect(screen.getByRole('progressbar', { name: 'Applying the theme' })).toBeTruthy();
+  await act(async () => finish());
+  await waitForGone(() => screen.queryByTestId('theme-custom-applying'));
+  expect(storedCustom()?.background.strength).toBe(25);
 });
 
 it('opens Primary text with a hue and strength only, and saves it as `ink`', async () => {
@@ -184,7 +301,7 @@ it('opens Primary text with a hue and strength only, and saves it as `ink`', asy
   mockPart = 'ink';
   render(<ThemeCustomRoute />);
   expect(mockTitles).toContain('Primary text');
-  expect(ring().props.accessibilityValue).toEqual({ text: 'Blue, 265 degrees' });
+  expect(hueBar().props.accessibilityValue).toEqual({ text: 'Blue, 265 degrees' });
   expect(screen.queryByRole('adjustable', { name: 'Lightness' })).toBeNull();
 
   await step(slider('Strength'), 'increment');
