@@ -171,8 +171,15 @@ export const normalizeBlockInput = (
   ]);
   rejectUnknownKeys(obj, allowed);
   const name = readOptionalTitle(obj.name, MAX_BLOCK_NAME_LENGTH, `${label}.name`);
-  const rawDefId = obj.exercise_definition_id ?? (allowExerciseIdAsDefinition ? obj.exercise_id : undefined);
-  const exerciseDefinitionId = readOptionalId(rawDefId, `${label}.exercise_definition_id`);
+  const hasExerciseDefinition =
+    Object.prototype.hasOwnProperty.call(obj, 'exercise_definition_id') ||
+    (allowExerciseIdAsDefinition && Object.prototype.hasOwnProperty.call(obj, 'exercise_id'));
+  const rawDefId = obj.exercise_definition_id !== undefined
+    ? obj.exercise_definition_id
+    : (allowExerciseIdAsDefinition ? obj.exercise_id : undefined);
+  const exerciseDefinitionId = hasExerciseDefinition
+    ? readOptionalId(rawDefId, `${label}.exercise_definition_id`)
+    : undefined;
 
   let sets: PlanSetInput[] | undefined;
   if (obj.sets !== undefined) {
@@ -191,14 +198,14 @@ export const normalizeBlockInput = (
       return fail(`${label} must provide either name or exercise_definition_id.`);
     }
   } else {
-    if (!name && !exerciseDefinitionId && sets === undefined) {
+    if (!name && !hasExerciseDefinition && sets === undefined) {
       return fail(`${label} must provide at least one field to update (name, exercise_definition_id, or sets).`);
     }
   }
 
   return {
     ...(name !== null ? { name } : {}),
-    ...(exerciseDefinitionId !== null ? { exercise_definition_id: exerciseDefinitionId } : {}),
+    ...(hasExerciseDefinition ? { exercise_definition_id: exerciseDefinitionId } : {}),
     ...(sets !== undefined ? { sets } : {}),
   };
 };

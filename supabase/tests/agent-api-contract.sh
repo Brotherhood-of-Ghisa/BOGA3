@@ -2068,6 +2068,25 @@ agent_post "session-plans" "${HTTP_PLAN_BODY}" "${HTTP_PLAN_KEY}"
 assert_status "200" "create plan for http edits"
 HTTP_PLAN_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.plan_id')"
 
+# Browser CORS preflight for PATCH
+CORS_PREFLIGHT_RESP="$(curl -s -D - -o /dev/null -X OPTIONS "${AGENT_API_BASE}/session-plans/${HTTP_PLAN_ID}" \
+  -H "Origin: https://app.example.com" \
+  -H "Access-Control-Request-Method: PATCH")"
+echo "${CORS_PREFLIGHT_RESP}" | grep -qi "HTTP/[12].* 20[04]" || fail "OPTIONS preflight did not return 2xx (200 or 204)"
+echo "${CORS_PREFLIGHT_RESP}" | grep -qi "access-control-allow-methods:.*PATCH" || fail "OPTIONS preflight response missing PATCH in access-control-allow-methods"
+
+EDGE_CONTAINER="${DB_CONTAINER/supabase_db_/supabase_edge_runtime_}"
+EDGE_IP="$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${EDGE_CONTAINER}" 2>/dev/null || true)"
+if [[ -n "${EDGE_IP}" ]]; then
+  EDGE_PREFLIGHT_RESP="$(curl -s -D - -o /dev/null -X OPTIONS "http://${EDGE_IP}:8081/agent-api/v1/agent/session-plans/${HTTP_PLAN_ID}" \
+    -H "Origin: https://app.example.com" \
+    -H "Access-Control-Request-Method: PATCH" 2>/dev/null || true)"
+  if [[ -n "${EDGE_PREFLIGHT_RESP}" ]]; then
+    echo "${EDGE_PREFLIGHT_RESP}" | grep -qi "HTTP/[12].* 204" || fail "direct edge runtime OPTIONS preflight did not return 204"
+    echo "${EDGE_PREFLIGHT_RESP}" | grep -qi "access-control-allow-methods:.*PATCH" || fail "direct edge runtime response missing PATCH in access-control-allow-methods"
+  fi
+fi
+
 # Verify GET /v1/agent/session-plans returns graph version tokens
 agent_get "session-plans"
 assert_status "200" "get session-plans includes version tokens"
@@ -2138,6 +2157,16 @@ UPD_BLK_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN_3}" --arg blk "${NEW_BLOCK_ID}"
 agent_patch "session-plans/${HTTP_PLAN_ID}" "${UPD_BLK_BODY}" "${HTTP_UPD_BLK_KEY}"
 assert_status "200" "update_plan_block via PATCH"
 V_PLAN_TOKEN_4="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+
+# Update plan block: clear exercise definition link (exercise_definition_id: null)
+HTTP_CLEAR_DEF_KEY="agent-api-${RUN_TAG}-clear-def"
+CLEAR_DEF_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN_4}" --arg blk "${NEW_BLOCK_ID}" '
+  {operation:"update_plan_block",base_version:$ver,exercise_id:$blk,exercise_definition_id:null}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${CLEAR_DEF_BODY}" "${HTTP_CLEAR_DEF_KEY}"
+assert_status "200" "update_plan_block clear exercise_definition_id via PATCH"
+V_PLAN_TOKEN_4="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+[[ "$(run_psql "select exercise_definition_id is null from app_public.session_plan_exercises where id = '${NEW_BLOCK_ID}';")" == "t" ]] ||
+  fail "update_plan_block with exercise_definition_id: null did not clear definition link in db"
 
 # 7. Reorder sets and blocks via PATCH
 INITIAL_BLOCK_ID="$(run_psql "select id from app_public.session_plan_exercises where session_plan_id = '${HTTP_PLAN_ID}' and id != '${NEW_BLOCK_ID}' and deleted_at is null;")"
@@ -2213,11 +2242,33 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
   and .data.version_token != null
   and (.data.plans | length) == 3
   and .data.plans[0].version_token != null
-' >/dev/null || fail "get programme detail response missing expected fields or child plan versions"
+  and .data.programme == null
+' >/dev/null || fail "get programme detail response missing expected fields or duplicate programme object present"
+PROG_DETAIL_BYTES=$(printf '%s' "${RESPONSE_BODY}" | wc -c)
+[[ "${PROG_DETAIL_BYTES}" -lt 262144 ]] || fail "programme detail exceeded 256 KiB budget: ${PROG_DETAIL_BYTES} bytes"
 V_PROG_TOKEN="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
 HTTP_PLAN_A_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.plans[0].id')"
 HTTP_PLAN_B_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.plans[1].id')"
 HTTP_PLAN_C_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.plans[2].id')"
+
+# Cross-target idempotency conflict: reusing the same idempotency key across different plans returns 409 IDEMPOTENCY_CONFLICT
+CROSS_IDEM_KEY="agent-api-${RUN_TAG}-cross-target-idem"
+V_PLAN_A_TOKEN="$(run_psql "select coalesce(graph_version::text, updated_at::text) from app_public.session_plans where id = '${HTTP_PLAN_A_ID}';")"
+V_PLAN_B_TOKEN="$(run_psql "select coalesce(graph_version::text, updated_at::text) from app_public.session_plans where id = '${HTTP_PLAN_B_ID}';")"
+CROSS_PAYLOAD_A="$(jq -nc --arg ver "${V_PLAN_A_TOKEN}" '{operation:"update_plan_meta",base_version:$ver,title:"Cross Target Title"}')"
+agent_patch "session-plans/${HTTP_PLAN_A_ID}" "${CROSS_PAYLOAD_A}" "${CROSS_IDEM_KEY}"
+assert_status "200" "patch plan A with cross-target idempotency key"
+
+CROSS_PAYLOAD_B="$(jq -nc --arg ver "${V_PLAN_B_TOKEN}" '{operation:"update_plan_meta",base_version:$ver,title:"Cross Target Title"}')"
+agent_patch "session-plans/${HTTP_PLAN_B_ID}" "${CROSS_PAYLOAD_B}" "${CROSS_IDEM_KEY}"
+assert_status "409" "reusing idempotency key on plan B returns 409 conflict"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IDEMPOTENCY_CONFLICT" ]] ||
+  fail "reusing idempotency key across targets did not return IDEMPOTENCY_CONFLICT"
+
+# Re-read programme version since updating child plan advanced the programme's graph version
+agent_get "programmes/${HTTP_PROG_ID}"
+assert_status "200" "get updated programme detail"
+V_PROG_TOKEN="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
 
 # GET non-existent programme returns 404
 agent_get "programmes/agent-api-${RUN_TAG}-missing-prog"
@@ -2284,6 +2335,31 @@ assert_status "200" "tombstone_programme via PATCH"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.deleted')" == "true" ]] || fail "tombstone programme response missing deleted: true"
 [[ "$(run_psql "select deleted_at is not null from app_public.training_programmes where id = '${HTTP_PROG_ID}';")" == "t" ]] ||
   fail "programme was not tombstoned in db"
+
+# Programme detail response size regression: multiweek programme fits comfortably within MAX_RESPONSE_BYTES (256 KiB)
+HTTP_LARGE_PROG_KEY="agent-api-${RUN_TAG}-large-prog"
+HTTP_LARGE_PROG_BODY="$(jq -nc --arg gym "${GYM_A}" --arg ex "${EXERCISE_A}" --argjson now "${NOW_MS}" '
+  {name:"Multiweek Heavy Programme",description:"10 week progression",
+   plans:[range(10) | {
+     title: ("Week Plan " + (. | tostring)),
+     gym_id: $gym,
+     scheduled_for: ($now + (. * 86400000)),
+     exercises: [range(4) | {
+       exercise_definition_id: $ex,
+       name: ("Exercise Block " + (. | tostring)),
+       sets: [range(4) | {target_reps: (8 + .), target_weight_value: "80"}]
+     }]
+   }]}')"
+agent_post "programmes" "${HTTP_LARGE_PROG_BODY}" "${HTTP_LARGE_PROG_KEY}"
+assert_status "200" "create multiweek programme"
+LARGE_PROG_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.programme_id')"
+
+agent_get "programmes/${LARGE_PROG_ID}"
+assert_status "200" "get multiweek programme detail"
+LARGE_PROG_BYTES=$(printf '%s' "${RESPONSE_BODY}" | wc -c)
+[[ "${LARGE_PROG_BYTES}" -lt 262144 ]] || fail "multiweek programme detail exceeded 256 KiB budget: ${LARGE_PROG_BYTES} bytes"
+printf '%s' "${RESPONSE_BODY}" | jq -e '(.data.plans | length) == 10 and .data.programme == null' >/dev/null ||
+  fail "multiweek programme detail did not return 10 plans or contained duplicated programme"
 
 
 echo "[agent-api-test] verifying the muscle list and the exercise catalog view"

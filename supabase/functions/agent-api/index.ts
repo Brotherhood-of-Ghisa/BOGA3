@@ -64,7 +64,7 @@ const ISO_DATE_MAX_MS = 8_640_000_000_000_000;
 
 const CORS_HEADERS = {
   'access-control-allow-headers': 'authorization, content-type, x-request-id, idempotency-key',
-  'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+  'access-control-allow-methods': 'GET, POST, PUT, PATCH, OPTIONS',
   'access-control-allow-origin': '*',
 };
 
@@ -3163,14 +3163,6 @@ const getProgrammeDetail = async (
     version: progVersion,
     version_token: progVersion,
     plans: projectedPlans,
-    programme: {
-      id: programme.id,
-      name: programme.name,
-      description: programme.description,
-      version: progVersion,
-      version_token: progVersion,
-      plans: projectedPlans,
-    },
   };
 };
 
@@ -3194,7 +3186,7 @@ const mutateSessionPlan = async (
 
   let rpcName: string;
   let rpcArgs: Record<string, unknown>;
-  const payloadSha = await sha256Hex(JSON.stringify(mutation));
+  const payloadSha = await sha256Hex(JSON.stringify({ plan_id: planId, ...mutation }));
 
   switch (mutation.kind) {
     case 'update_plan_meta':
@@ -3292,7 +3284,7 @@ const mutateTrainingProgramme = async (
 
   let rpcName: string;
   let rpcArgs: Record<string, unknown>;
-  const payloadSha = await sha256Hex(JSON.stringify(mutation));
+  const payloadSha = await sha256Hex(JSON.stringify({ programme_id: programmeId, ...mutation }));
 
   switch (mutation.kind) {
     case 'update_programme_meta':

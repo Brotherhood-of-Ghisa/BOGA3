@@ -222,6 +222,50 @@ describe('agent plan mutations', () => {
         },
       });
     });
+
+    it('normalizes block update preserving explicit null exercise_definition_id', () => {
+      const mutation = normalizePlanMutation({
+        operation: 'update_plan_block',
+        base_version: BASE_VERSION,
+        exercise_id: 'squat',
+        exercise_definition_id: null,
+      });
+      expect(mutation).toEqual({
+        kind: 'update_plan_block',
+        base_version: BASE_VERSION,
+        exercise_id: 'squat',
+        block: {
+          exercise_definition_id: null,
+        },
+      });
+    });
+
+    it('normalizes nested block update preserving explicit null exercise_definition_id', () => {
+      const mutation = normalizePlanMutation({
+        operation: 'update_plan_block',
+        base_version: BASE_VERSION,
+        exercise_id: 'squat',
+        block: {
+          exercise_definition_id: null,
+        },
+      });
+      expect(mutation).toEqual({
+        kind: 'update_plan_block',
+        base_version: BASE_VERSION,
+        exercise_id: 'squat',
+        block: {
+          exercise_definition_id: null,
+        },
+      });
+    });
+
+    it('rejects update when no fields provided', () => {
+      expect(rejection(() => normalizePlanMutation({
+        operation: 'update_plan_block',
+        base_version: BASE_VERSION,
+        exercise_id: 'squat',
+      }))).toMatch(/must provide at least one field to update/);
+    });
   });
 
   describe('reorder_plan_blocks', () => {
