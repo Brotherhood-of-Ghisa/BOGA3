@@ -117,9 +117,15 @@ export const SPOTLIGHT: Record<CustomPart, readonly Sample[]> = {
   background: [
     { kind: 'fill', role: 'paper', label: 'Page' },
     { kind: 'fill', role: 'surface', label: 'Card' },
+    { kind: 'fill', role: 'viz0', label: 'Empty' },
+    // Borders that match the page move with it.
+    { kind: 'line', role: 'rule', ground: 'surface', label: 'Border', context: true },
+    { kind: 'line', role: 'ruleSoft', ground: 'surface', label: 'Divider', context: true },
+  ],
+  borders: [
     { kind: 'line', role: 'rule', ground: 'surface', label: 'Border' },
     { kind: 'line', role: 'ruleSoft', ground: 'surface', label: 'Divider' },
-    { kind: 'fill', role: 'viz0', label: 'Empty' },
+    { kind: 'line', role: 'rule', ground: 'paper', label: 'On page' },
   ],
   ink: [
     { kind: 'text', role: 'ink', ground: 'paper', label: 'Page' },

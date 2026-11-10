@@ -132,7 +132,7 @@ Decided 2026-10-27. The primitives are `components/ui/form-section.tsx` and `for
 Decided 2026-10-30. A `footnote` states only when a change applies or its
 status ([[copy.no-inline-explanation]]). Every destination is a pushed page of `FormSection`s
 (optional muted `footnote`), built only from `SwitchRow`, `SegmentRow` (≤3
-options), `SliderRow` (0–max), `RadioRow` (one of many), `CheckRow` (several), `InputRow` (blank =
+options), `SliderRow` (min–max, in steps), `RadioRow` (one of many), `CheckRow` (several), `InputRow` (blank =
 default), `FormField`, `ValueRow` (read-only), `ChoiceRow` and `ActionRow`.
 Four buttons: **rows** (chevron = a page; `accent` words = acts now; `danger`
 words = destroys, confirmed by an `Alert`), **primary** (≤1 per page, only to
@@ -258,8 +258,9 @@ Settings → Appearance: Theme (four presets and Custom as radio rows with
 swatches; Custom folds presets behind `Show presets`), then Mode (Light, Dark,
 System) for a preset or one row per Custom part, then a live `ThemePreview`.
 A part's picker (its title switches part): a painted hue `SliderRow`,
-strength, for the background lightness and depth; the part's roles; the
-preview. A tap or release saves at once, writing nothing when already stored,
+strength, then its own controls (background: Dark switch, lightness over the
+mode's range, depth; borders: Match background, contrast; texts: lightness or
+contrast); the part's roles; the preview. A tap, release or switch saves at once, writing nothing when already stored,
 and the app repaints in it; a header spinner shows until it has.
 A failed save shows a danger `Notice` saying nothing changed and is logged.
 Settings home names the choice.

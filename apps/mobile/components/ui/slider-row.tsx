@@ -10,7 +10,11 @@ import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 export type SliderRowProps = {
   label: string;
   value: number;
+  // The range, and the step a value moves in (default 0 and 1). A value
+  // outside the range shows as it is, its thumb at the nearer end.
+  min?: number;
   max: number;
+  step?: number;
   // What the row shows, and VoiceOver hears, for a value.
   format: (value: number) => string;
   onChange: (value: number) => void;
@@ -40,19 +44,25 @@ const ACCESSIBILITY_STEPS = 20;
 const ACTIVE_X = 6;
 const FAIL_Y = 10;
 
-// The whole number in 0…max under a point along a track this wide.
-export function pointToValue(x: number, width: number, max: number): number {
-  if (width <= 0) return 0;
-  return Math.round((Math.min(width, Math.max(0, x)) / width) * max);
+// The value in min…max, on a whole number of steps, under a point along a
+// track this wide.
+export function pointToValue(x: number, width: number, max: number, min = 0, step = 1): number {
+  if (width <= 0) return min;
+  const steps = Math.round(((Math.min(width, Math.max(0, x)) / width) * (max - min)) / step);
+  return onStep(min + steps * step);
 }
 
-/** A Settings row for a whole number from 0 to `max`: the label, then a track to drag or tap and the value beside it (or `trailing`). Reports every move, so the caller can repaint a preview live, and the value it is let go at. */
-export function SliderRow({ label, value, max, format, onChange, onChangeEnd, divider = false, trackColours, trailing, testID }: SliderRowProps) {
+// Rounds off the binary error a fractional step adds (0.1 + 0.2).
+const onStep = (value: number): number => Math.round(value * 1e6) / 1e6;
+const within = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+
+/** A Settings row for a number from `min` (default 0) to `max` in steps of `step` (default 1): the label, then a track to drag or tap and the value beside it (or `trailing`). Reports every move, so the caller can repaint a preview live, and the value it is let go at. */
+export function SliderRow({ label, value, min = 0, max, step = 1, format, onChange, onChangeEnd, divider = false, trackColours, trailing, testID }: SliderRowProps) {
   const styles = useStyles();
   const textRoles = useUiText();
   const textTones = useUiTextTone();
   const [width, setWidth] = useState(0);
-  const at = (x: number) => pointToValue(x, width, max);
+  const at = (x: number) => pointToValue(x, width, max, min, step);
   // The gestures run their callbacks on the JS thread (`runOnJS(true)`), so
   // they call the caller's handlers directly, with a plain number.
   const drag = Gesture.Pan()
@@ -70,8 +80,8 @@ export function SliderRow({ label, value, max, format, onChange, onChangeEnd, di
       onChange(at(event.x));
       onChangeEnd(at(event.x));
     });
-  const share = max > 0 ? value / max : 0;
-  const step = Math.max(1, Math.round(max / ACCESSIBILITY_STEPS));
+  const share = max > min ? within((value - min) / (max - min), 0, 1) : 0;
+  const accessibilityStep = Math.max(1, Math.round((max - min) / step / ACCESSIBILITY_STEPS)) * step;
 
   return (
     <ListRow density="list" divider={divider} label={label} testID={testID}>
@@ -84,8 +94,8 @@ export function SliderRow({ label, value, max, format, onChange, onChangeEnd, di
             accessibilityRole="adjustable"
             accessibilityValue={{ text: format(value) }}
             onAccessibilityAction={(event) => {
-              const delta = event.nativeEvent.actionName === 'increment' ? step : -step;
-              const next = Math.min(max, Math.max(0, value + delta));
+              const delta = event.nativeEvent.actionName === 'increment' ? accessibilityStep : -accessibilityStep;
+              const next = onStep(within(value + delta, min, max));
               onChange(next);
               onChangeEnd(next);
             }}

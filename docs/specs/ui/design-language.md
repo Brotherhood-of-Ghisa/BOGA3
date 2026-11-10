@@ -83,17 +83,18 @@ place. A preset takes `mode`: `light` (default), `dark` or `system` (the
 phone's, followed live). Native UI is pinned to the drawn mode, unpinned under
 `system`, since a pinned OS reports the pin (`theme-native.ts`). An unknown id,
 an invalid record or an unreadable store opens in the default and is logged. `record` stays a brass
-across presets, so "your best ever" keeps one look. Settings → Appearance
-(`ux-rules.md` "Appearance") sets each part with a live preview.
+across presets, so "your best ever" keeps one look. Its editor: `ux-rules.md` "Appearance".
 
-**Custom** (`theme-custom.ts`): a hue and a strength (0–100% of the part's
-chroma cap) per seed and for primary text (`ink` alone), and the page's lightness (L\* 0–100) and depth (0–300%).
-The seeds feed the ladder of the page's mode — light at L\* 50 and above, dark
-below — and each role keeps its hue, chroma and share of the `paper` → `ink`
-distance, moved onto the chosen page. Depth scales that share for `surface`,
-`rule`, `rule-soft` and `viz0`; `surface` takes the page's tint. Picking Custom
-starts from the preset in use. Custom themes are not gated against the floors
-above: only presets are hand-checked (`ui-theme-custom.test.ts`).
+**Custom** (`theme-custom.ts`): a hue and strength (0–100% of the part's
+chroma cap) per seed, for borders and for `ink`. The page picks its mode,
+L\* (dark 0–35, light 65–100, quarter steps) and depth. Each role
+keeps its hue, chroma and share of the `paper` → `ink` distance, moved onto
+the page; depth (0–300%) scales it for `surface` and `viz0`, border contrast
+(0–300%) for `rule`/`rule-soft` (the page's tint unless unmatched), text
+contrast (0–150%) for the lesser inks, never past `ink`'s chosen L\*. Chart
+strength is a share of each step's sRGB maximum; dark steps reach L\*58.
+Absent newer fields keep the older look. Custom starts from the preset in
+use, ungated against the floors above (`ui-theme-custom.test.ts`).
 
 The launcher icon follows the drawn theme: one per preset, one
 rainbow icon for every custom theme, Warm as default and fallback. The native boundary,
