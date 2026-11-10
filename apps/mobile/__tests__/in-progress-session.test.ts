@@ -106,6 +106,33 @@ describe('the workout in progress', () => {
     expect(selectDatedInProgressSession(db(), { start: earlier, end: date, now: NOW })).toBeNull();
   });
 
+  it('loads live completed entries without sets, excluding deleted sessions and blocks from browser history', async () => {
+    const rows = [
+      { id: 'live', status: 'completed' as const, deletedAt: null },
+      { id: 'deleted-session', status: 'completed' as const, deletedAt: NOW },
+      { id: 'deleted-block', status: 'completed' as const, deletedAt: null },
+      { id: 'active', status: 'active' as const, deletedAt: null },
+    ];
+    for (const row of rows) {
+      db().insert(exerciseDefinitions).values({ id: row.id, name: row.id }).run();
+      db().insert(sessions).values({
+        ...row, startedAt: new Date(NOW.getTime() - HOUR_MS),
+        completedAt: row.status === 'completed' ? NOW : null,
+      }).run();
+      db().insert(sessionExercises).values({
+        id: `${row.id}-entry`, sessionId: row.id, exerciseDefinitionId: row.id,
+        orderIndex: 0, name: row.id, deletedAt: row.id === 'deleted-block' ? NOW : null,
+      }).run();
+    }
+    const history = await loadExerciseCatalogStatsRawHistory();
+    expect(history.exerciseSets).toEqual([]);
+    const stats = aggregateExerciseCatalogStats(history, 'all', NOW);
+    expect([...stats.everDoneIds]).toEqual(['live']);
+    expect(stats.aggregatesById.size).toBe(0);
+    expect(stats.lastCompletedAtById.size).toBe(0);
+    expect(stats.recencyScoresById.size).toBe(0);
+  });
+
   it('rides in the catalogue history undated, counted only once Progress dates it', async () => {
     insertSession('completed', { status: 'completed', updatedAt: new Date(NOW.getTime() - 48 * HOUR_MS) });
     insertSession('active');

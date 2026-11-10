@@ -262,11 +262,10 @@ the data-model-level invariants.
    written again. On upgrade a valid pre-existing row with legacy `null` stays
    confirmed, while a blank or partial legacy draft row with `null` reads as
    `unperformed`, so later entry cannot silently confirm it.
-6. Only valid confirmed actual rows ([[set.performed]]) become completed
-   history, and **every reader with performed/completed semantics filters to
-   valid actual values plus confirmed status** — planned, legacy-skipped, unperformed, blank,
-   partial, invalid, deleted and tombstoned rows contribute to no count,
-   record, list, analytic or the agent coaching API. Blank and partial active
+6. **Performed-set history and metric readers filter by [[set.performed]]** —
+   planned, legacy-skipped, unperformed, blank, partial, invalid, deleted and
+   tombstoned sets contribute to no metric, performed-set list or coaching API.
+   Entry-based browsing follows [[exercise.browser-history]] independently. Blank and partial active
    rows are lossless drafts keeping their ids and order across save, hydration
    and navigation, and a blank `weight_value` with positive `reps_value`
    canonicalizes to `"0"` as a valid zero-load set — normalization inside

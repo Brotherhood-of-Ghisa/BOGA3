@@ -86,9 +86,8 @@ only (`apps/mobile/src/data/in-progress-session.ts`).
 - `countedMuscleAnalyticsSessionIds` applies the rule to the stats
   aggregation input.
 
-An aggregate that reads only working sets may instead count the distinct
-sessions those sets come from. That is the same rule, not a second one: the
-facts table, catalog stats, heatmaps and session comparisons work this way.
+Aggregates may count distinct sessions containing working sets: the
+facts table, catalog stats, heatmaps and session comparisons implement this rule.
 Nothing counts sessions from `sessions.length` or from session status alone.
 
 **History minimum.** Session volume comparisons and Weekly heatmap references share one minimum of known observations, zeros
@@ -121,6 +120,9 @@ session is its baseline only where it did the same
 | Agent API exercise context, `exercise_count` | per exercise |
 | Agent API training status: muscle sets, favourites' `sessions_28d` | per muscle / per exercise |
 | Group week summary and board counts | the group functions over facts with `working` (`tech/groups-contract.md`) |
+
+**Browser history:** `everDoneIds` implements [[exercise.browser-history]], separately
+from training statistics.
 
 **Lists, not statistics.** These show sessions, not counts:
 

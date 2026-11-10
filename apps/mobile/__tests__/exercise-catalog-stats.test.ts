@@ -137,7 +137,7 @@ describe('aggregateExerciseCatalogStats', () => {
     expect(curl?.sessionCount).toBe(1);
   });
 
-  it('does not count an exercise as done when it has no valid confirmed values', () => {
+  it('keeps an entry with invalid values in browser history without counting its sets', () => {
     const result = aggregateExerciseCatalogStats(
       {
         sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }],
@@ -150,11 +150,11 @@ describe('aggregateExerciseCatalogStats', () => {
       30,
       NOW
     );
-    expect(result.everDoneIds.has('ex-only-bad')).toBe(false);
+    expect(result.everDoneIds.has('ex-only-bad')).toBe(true);
     expect(result.aggregatesById.has('ex-only-bad')).toBe(false);
   });
 
-  it('does not count a warm-up-only exercise as done, recent or aggregated', () => {
+  it('keeps a warm-up-only entry in browser history without recency or metrics', () => {
     const result = aggregateExerciseCatalogStats(
       {
         sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }],
@@ -166,7 +166,7 @@ describe('aggregateExerciseCatalogStats', () => {
       30,
       NOW
     );
-    expect(result.everDoneIds.has('ex-warm-only')).toBe(false);
+    expect(result.everDoneIds.has('ex-warm-only')).toBe(true);
     expect(result.lastCompletedAtById.has('ex-warm-only')).toBe(false);
     expect(result.recencyScoresById.has('ex-warm-only')).toBe(false);
     expect(result.aggregatesById.has('ex-warm-only')).toBe(false);
@@ -202,7 +202,7 @@ describe('aggregateExerciseCatalogStats', () => {
     }));
   });
 
-  it('does not mark an exercise done or aggregate volume from unconfirmed sets', () => {
+  it('keeps unconfirmed entries in browser history without aggregating their volume', () => {
     const result = aggregateExerciseCatalogStats(
       {
         sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }],
@@ -232,9 +232,49 @@ describe('aggregateExerciseCatalogStats', () => {
     );
 
     expect(result.everDoneIds.has('ex-confirmed')).toBe(true);
-    expect(result.everDoneIds.has('ex-unconfirmed')).toBe(false);
+    expect(result.everDoneIds.has('ex-unconfirmed')).toBe(true);
     expect(result.aggregatesById.get('ex-confirmed')?.totalVolume).toBe(500);
     expect(result.aggregatesById.has('ex-unconfirmed')).toBe(false);
+  });
+
+  it('keeps setless entries outside the metric and Favourite windows in scoped browser history', () => {
+    const raw: ExerciseCatalogStatsRawHistory = {
+      sessions: [
+        { id: 'old', completedAt: daysBefore(NOW, 400), gymId: 'club' },
+        { id: 'other-gym', completedAt: daysBefore(NOW, 1), gymId: 'other' },
+        { id: 'no-gym', completedAt: daysBefore(NOW, 1) },
+      ],
+      inProgressSession: { id: 'active', gymId: 'club' },
+      sessionExercises: [
+        { id: 'old-1', sessionId: 'old', exerciseDefinitionId: 'setless' },
+        { id: 'old-2', sessionId: 'old', exerciseDefinitionId: 'setless' },
+        { id: 'other', sessionId: 'other-gym', exerciseDefinitionId: 'other' },
+        { id: 'none', sessionId: 'no-gym', exerciseDefinitionId: 'no-gym' },
+        { id: 'active', sessionId: 'active', exerciseDefinitionId: 'active' },
+        { id: 'orphan', sessionId: 'missing', exerciseDefinitionId: 'orphan' },
+        { id: 'unlinked', sessionId: 'old', exerciseDefinitionId: null },
+      ],
+      exerciseSets: [],
+    };
+    const scope = { historyStart: daysBefore(NOW, 120) };
+    const all = aggregateExerciseCatalogStats(raw, 7, NOW, scope);
+    expect([...all.everDoneIds]).toEqual(['setless', 'other', 'no-gym']);
+    expect(all.aggregatesById.size).toBe(0);
+    expect(all.lastCompletedAtById.size).toBe(0);
+    expect(all.recencyScoresById.size).toBe(0);
+    expect([...aggregateExerciseCatalogStats(raw, 7, NOW, { ...scope, gymId: 'club' }).everDoneIds])
+      .toEqual(['setless']);
+    expect([...aggregateExerciseCatalogStats(raw, 7, NOW, { ...scope, gymId: null }).everDoneIds])
+      .toEqual(['no-gym']);
+  });
+
+  it('keeps browser entry history when the effort policy excludes every set', () => {
+    const raw = buildRawHistory({ effortPolicy: { workingSetEfforts: [], volumeEfforts: [] } });
+    const stats = aggregateExerciseCatalogStats(raw, 'all', NOW);
+    expect([...stats.everDoneIds]).toEqual(['ex-bench', 'ex-curl', 'ex-squat']);
+    expect(stats.aggregatesById.size).toBe(0);
+    expect(stats.lastCompletedAtById.size).toBe(0);
+    expect(stats.recencyScoresById.size).toBe(0);
   });
 
   it('ignores sessionExercises with null exerciseDefinitionId', () => {
@@ -305,7 +345,7 @@ describe('Favourite and all-time browser history', () => {
     expect(all.everDoneIds.has('def5')).toBe(true);
   });
 
-  it('deduplicates repeated blocks/sets per session and rejects unperformed, invalid and orphan history', () => {
+  it('deduplicates entries while rejecting unperformed and invalid metrics and orphan history', () => {
     const raw: ExerciseCatalogStatsRawHistory = {
       sessions: [{ id: 's1', completedAt: daysBefore(NOW, 1) }, { id: 's2', completedAt: daysBefore(NOW, 400) }],
       sessionExercises: [
@@ -329,7 +369,7 @@ describe('Favourite and all-time browser history', () => {
     const stats = aggregateExerciseCatalogStats(raw, 'all', NOW, { historyStart: daysBefore(NOW, 120) });
     expect(stats.aggregatesById.get('valid')).toMatchObject({ sessionCount: 2, workingSetCount: 4 });
     expect(stats.recencyScoresById.get('valid')?.completedSetCount).toBe(3);
-    expect([...stats.everDoneIds]).toEqual(['valid']);
+    expect([...stats.everDoneIds]).toEqual(['valid', 'invalid']);
     expect([...stats.lastCompletedAtById.keys()]).toEqual(['valid']);
   });
 });

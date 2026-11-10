@@ -45,6 +45,7 @@ export type ExerciseRecencyScore = {
 export type ExerciseCatalogStats = {
   aggregatesById: Map<string, ExerciseAggregate>;
   recencyScoresById: Map<string, ExerciseRecencyScore>;
+  /** Entry history for browsing ([[exercise.browser-history]]), independent of set eligibility. */
   everDoneIds: Set<string>;
   lastCompletedAtById: Map<string, Date>;
 };
@@ -276,9 +277,24 @@ export const exerciseCatalogStatsGymOptions = (raw: ExerciseCatalogStatsRawHisto
     .map(({ option }) => option);
 };
 
+/** Browser entry links ([[exercise.browser-history]]), independent of set eligibility. */
+const collectBrowserHistoryIds = (
+  entries: ExerciseCatalogStatsRawHistory['sessionExercises'],
+  sessionById: Map<string, ExerciseCatalogStatsRawHistory['sessions'][number]>,
+  scope: ExerciseCatalogStatsScope
+): Set<string> => {
+  const ids = new Set<string>();
+  for (const link of entries) {
+    if (link.exerciseDefinitionId === null) continue;
+    const session = sessionById.get(link.sessionId);
+    if (session && inGymScope(session, scope)) ids.add(link.exerciseDefinitionId);
+  }
+  return ids;
+};
+
 /**
- * Working sets settle (`training-metrics-contract.md` "Counted set") "done", `Last:`,
- * favourite recency, session count and 1RM. Volume independently includes
+ * Entry history settles "done" ([[exercise.browser-history]]). Working sets settle
+ * `Last:`, favourite recency, session count and 1RM. Volume independently includes
  * selected performed efforts, even when there are no working sets.
  */
 export const aggregateExerciseCatalogStats = (
@@ -293,7 +309,7 @@ export const aggregateExerciseCatalogStats = (
   const definitionById = new Map((raw.exerciseDefinitions ?? []).map(row => [row.id, row]));
   const sessionExerciseById = new Map(raw.sessionExercises.map(row => [row.id, row]));
 
-  const everDoneIds = new Set<string>();
+  const everDoneIds = collectBrowserHistoryIds(raw.sessionExercises, sessionById, scope);
   const aggregatesById = new Map<string, ExerciseAggregate>();
   const recencyScoresById = new Map<string, ExerciseRecencyScore>();
   const lastCompletedAtById = new Map<string, Date>();
@@ -316,7 +332,6 @@ export const aggregateExerciseCatalogStats = (
     const { completedAt } = session;
 
     if (working) {
-      everDoneIds.add(defId);
       const previousUse = lastCompletedAtById.get(defId);
       if (!previousUse || completedAt > previousUse) lastCompletedAtById.set(defId, completedAt);
       // Favourite is independent of the Stats screen's selected metric period.
