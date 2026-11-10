@@ -1880,7 +1880,7 @@ const getRecentActivities = async (
   const cursor = rawCursor ? asActivityQuery(() => activityCursorFrom(rawCursor), 'INVALID_CURSOR') : null;
 
   let query = client.schema('app_public').from('health_activities').select(ACTIVITY_COLUMNS)
-    .eq('owner_user_id', userId)
+    .eq('user_id', userId)
     .order('started_at', { ascending: false }).order('source').order('external_id')
     .limit(limit + 1);
   if (range.from !== null) query = query.gte('started_at', range.from);
@@ -1918,7 +1918,7 @@ const loadStatusCardio = async (
   // covers any zone offset, and the builder keeps only the listed weeks.
   const readFrom = new Date(cardioReadStart(window).getTime() - DAY_MS);
   const { data, error } = await client.schema('app_public').from('health_activities').select(ACTIVITY_COLUMNS)
-    .eq('owner_user_id', userId).gte('started_at', readFrom.toISOString())
+    .eq('user_id', userId).gte('started_at', readFrom.toISOString())
     .order('started_at', { ascending: false }).order('source').order('external_id')
     .limit(STATUS_MAX_ACTIVITIES + 1).returns<ActivityRow[]>();
   throwDatabaseError(error);

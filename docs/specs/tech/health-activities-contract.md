@@ -18,12 +18,14 @@ shared with groups, and feeds no set, volume, record, PR or competition figure.
 | Path | Who | Authority |
 | --- | --- | --- |
 | `app_public.health_activities_apply` | owner app session | `SECURITY DEFINER`; derives the owner from `auth.uid()`; rejects an OAuth `client_id` (`AGENT_FORBIDDEN`) |
-| `SELECT` on `app_public.health_activities` | owner app session | RLS: `owner_user_id = auth.uid()` and no `client_id`; no client insert, update or delete privilege |
+| `SELECT` on `app_public.health_activities` | owner app session | RLS: `user_id = auth.uid()`, and a restrictive policy requires no `client_id`; no client insert, update or delete privilege |
 | `GET /v1/agent/activities`, training-status `cardio` | coach (OAuth) | the agent API's base read grant; service role, owner-filtered |
 
 ## Table
 
-One row per `(owner_user_id, source, external_id)`: `source` names the store
+One row per `(user_id, source, external_id)`. The owner column is `user_id` on
+purpose: the sync drift checker treats every `app_public` table with
+`owner_user_id` as a Sync v2 entity. `source` names the store
 (`apple_health`; another store adds a value to the check), `external_id` is the
 store's workout UUID. Summary columns only: `activity_type`, `started_at`,
 `ended_at`, `duration_sec`, `distance_m`, `active_energy_kcal`,

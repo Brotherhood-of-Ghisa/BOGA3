@@ -353,7 +353,7 @@ cleanup() {
       delete from public.agent_plan_permissions
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from app_public.health_activities
-        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
+        where user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and external_id like 'agent-api-${RUN_TAG}-%';
       delete from app_public.exercise_sets
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
@@ -2288,7 +2288,7 @@ activity_payload() {
   }'
 }
 run_psql "insert into app_public.health_activities
-  (owner_user_id,source,external_id,activity_type,started_at,ended_at,duration_sec)
+  (user_id,source,external_id,activity_type,started_at,ended_at,duration_sec)
   values ('${USER_B_UUID}'::uuid,'apple_health','${ACTIVITY_B}','running',now() - interval '1 hour',now(),3600);" >/dev/null
 
 app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(activity_payload 4000)"
@@ -2299,7 +2299,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 2, deleted: 0, pruned: 0
 app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(activity_payload 4321.5)"
 assert_status "200" "app re-imports activities"
 [[ "$(run_psql "select count(*) || ':' || max(distance_m) from app_public.health_activities
-  where owner_user_id = '${USER_A_UUID}'::uuid and external_id in ('${ACTIVITY_RUN}','${ACTIVITY_LIFT}');")" == "2:4321.5" ]] ||
+  where user_id = '${USER_A_UUID}'::uuid and external_id in ('${ACTIVITY_RUN}','${ACTIVITY_LIFT}');")" == "2:4321.5" ]] ||
   fail "a re-import duplicated or did not update the activity"
 
 app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" \
@@ -2313,7 +2313,7 @@ assert_non_2xx "an out-of-range heart rate"
 printf '%s' "${RESPONSE_BODY}" | jq -e '.message | test("INVALID_ARGUMENT: .*max_heart_rate_bpm")' >/dev/null ||
   fail "an out-of-range figure was not rejected naming its check"
 [[ "$(run_psql "select distance_m from app_public.health_activities
-  where owner_user_id = '${USER_A_UUID}'::uuid and external_id = '${ACTIVITY_RUN}';")" == "4321.5" ]] ||
+  where user_id = '${USER_A_UUID}'::uuid and external_id = '${ACTIVITY_RUN}';")" == "4321.5" ]] ||
   fail "a rejected batch changed stored activities"
 
 app_public_request GET "health_activities?select=external_id" "${APP_ACCESS_TOKEN}"
@@ -2322,7 +2322,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg run "${ACTIVITY_RUN}" --arg b "${AC
   '(map(.external_id) | index($run)) != null and (map(.external_id) | index($b)) == null' >/dev/null ||
   fail "the owner read crossed the ownership boundary"
 app_public_request POST "health_activities" "${APP_ACCESS_TOKEN}" \
-  "$(jq -nc --arg u "${USER_A_UUID}" '{owner_user_id: $u, source: "apple_health", external_id: "direct",
+  "$(jq -nc --arg u "${USER_A_UUID}" '{user_id: $u, source: "apple_health", external_id: "direct",
     activity_type: "running", started_at: "2026-01-01T00:00:00Z", ended_at: "2026-01-01T00:10:00Z", duration_sec: 600}')"
 assert_non_2xx "a direct app insert"
 app_public_request GET "health_activities?select=external_id" "${AGENT_ACCESS_TOKEN}"
@@ -2402,9 +2402,9 @@ assert_status "200" "a complete backfill window"
 printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 1, deleted: 0, pruned: 1}' >/dev/null ||
   fail "a complete window did not prune the activity the store no longer has"
 [[ "$(run_psql "select string_agg(external_id, ',' order by external_id) from app_public.health_activities
-  where owner_user_id = '${USER_A_UUID}'::uuid and external_id like 'agent-api-${RUN_TAG}-%';")" == \
+  where user_id = '${USER_A_UUID}'::uuid and external_id like 'agent-api-${RUN_TAG}-%';")" == \
   "${FUTURE_B},${ACTIVITY_LIFT}" ]] || fail "deletion or pruning touched the wrong activities"
-[[ "$(run_psql "select count(*) from app_public.health_activities where owner_user_id = '${USER_B_UUID}'::uuid
+[[ "$(run_psql "select count(*) from app_public.health_activities where user_id = '${USER_B_UUID}'::uuid
   and external_id = '${ACTIVITY_B}';")" == "1" ]] || fail "another owner's activity was deleted"
 
 echo "[agent-api-test] verifying the training status figures over a seeded seven-week history"

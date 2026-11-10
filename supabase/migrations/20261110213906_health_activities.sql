@@ -6,8 +6,10 @@
 -- never synced to devices, never shared with groups, and feed no set, volume,
 -- record or competition figure. Contract: docs/specs/tech/health-activities-contract.md.
 
+-- The owner column is `user_id`, not `owner_user_id`: every app_public table
+-- with `owner_user_id` is a Sync v2 entity to the drift checker, and this is not one.
 create table app_public.health_activities (
-  owner_user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
   source text not null check (source in ('apple_health')),
   external_id text not null check (length(external_id) between 1 and 200),
   activity_type text not null check (activity_type ~ '^[a-z][a-z0-9_]{0,63}$'),
@@ -23,7 +25,7 @@ create table app_public.health_activities (
   device_name text check (length(device_name) between 1 and 200),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  primary key (owner_user_id, source, external_id),
+  primary key (user_id, source, external_id),
   constraint health_activities_time_order check (
     ended_at >= started_at and ended_at - started_at <= interval '30 days'
   )
@@ -33,7 +35,7 @@ comment on table app_public.health_activities is
   'Owner-private imported workout summaries (no routes, no samples). Written only by health_activities_apply; read by the owner app and the agent API. Not a Sync v2 entity.';
 
 create index health_activities_owner_started
-  on app_public.health_activities (owner_user_id, started_at desc);
+  on app_public.health_activities (user_id, started_at desc);
 
 alter table app_public.health_activities enable row level security;
 revoke all on app_public.health_activities from public, anon, authenticated;
@@ -46,9 +48,19 @@ on app_public.health_activities
 for select
 to authenticated
 using (
-  owner_user_id = (select auth.uid())
+  user_id = (select auth.uid())
   and ((select auth.jwt()) ->> 'client_id') is null
 );
+
+-- The agent boundary's restrictive companion: no future permissive policy can
+-- open the table to an OAuth token.
+create policy health_activities_direct_app_only
+on app_public.health_activities
+as restrictive
+for all
+to authenticated
+using (((select auth.jwt()) ->> 'client_id') is null)
+with check (((select auth.jwt()) ->> 'client_id') is null);
 
 -- One validated row from an upload element. Unknown keys, wrong types, bad
 -- timestamps and out-of-range figures fail loud: the app must fix its mapping,
@@ -104,7 +116,7 @@ begin
   end loop;
 
   begin
-    r.owner_user_id := p_owner;
+    r.user_id := p_owner;
     r.source := p_source;
     r.external_id := p_item ->> 'external_id';
     r.activity_type := p_item ->> 'activity_type';
@@ -189,19 +201,19 @@ begin
   perform pg_advisory_xact_lock(hashtextextended('health-activities:' || _uid::text || ':' || p_source, 0));
 
   delete from app_public.health_activities
-   where owner_user_id = _uid and source = p_source and external_id = any(_delete_ids);
+   where user_id = _uid and source = p_source and external_id = any(_delete_ids);
   get diagnostics _deleted = row_count;
 
   begin
   insert into app_public.health_activities as a (
-    owner_user_id, source, external_id, activity_type, started_at, ended_at, duration_sec, distance_m,
+    user_id, source, external_id, activity_type, started_at, ended_at, duration_sec, distance_m,
     active_energy_kcal, avg_heart_rate_bpm, max_heart_rate_bpm, elevation_gain_m, source_name, device_name
   )
-  select r.owner_user_id, r.source, r.external_id, r.activity_type, r.started_at, r.ended_at, r.duration_sec,
+  select r.user_id, r.source, r.external_id, r.activity_type, r.started_at, r.ended_at, r.duration_sec,
     r.distance_m, r.active_energy_kcal, r.avg_heart_rate_bpm, r.max_heart_rate_bpm, r.elevation_gain_m,
     r.source_name, r.device_name
   from unnest(_rows) r
-  on conflict (owner_user_id, source, external_id) do update set
+  on conflict (user_id, source, external_id) do update set
     activity_type = excluded.activity_type,
     started_at = excluded.started_at,
     ended_at = excluded.ended_at,
@@ -221,7 +233,7 @@ begin
 
   if p_complete_since is not null then
     delete from app_public.health_activities
-     where owner_user_id = _uid and source = p_source and started_at >= p_complete_since
+     where user_id = _uid and source = p_source and started_at >= p_complete_since
        and not (external_id = any(_ids));
     get diagnostics _pruned = row_count;
   end if;
