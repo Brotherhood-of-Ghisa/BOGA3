@@ -137,7 +137,7 @@ default), `FormField`, `ValueRow` (read-only), `ChoiceRow` and `ActionRow`.
 Four buttons: **rows** (chevron = a page; `accent` words = acts now; `danger`
 words = destroys, confirmed by an `Alert`), **primary** (≤1 per page, only to
 create or commit what is not saved instantly), **text** (only in a `Notice`:
-Retry), **icon** (headers). No outline. Changes save instantly; an action's failure is
+Retry), **icon** (headers; a title may switch sibling pages). No outline. Changes save instantly; an action's failure is
 a `Notice` beside it, but preference-storage errors stay on Data & sync.
 Checked by `apps/mobile/__tests__/settings-conformance.test.ts`.
 
@@ -254,13 +254,13 @@ the navigators take `useUiMode()`, never a fixed mode or colour
 (`app.config.ts`). The stack header takes `paper` (no shadow line) and `ink`, so
 header and page read as one surface ("Pages").
 
-Settings → Appearance: a live `ThemePreview`, then Theme (four presets and
-Custom as radio rows with swatches; Custom folds presets behind `Show
-presets`), then Mode (Light, Dark, System) for a preset or one
-row per Custom part (Background, Primary text, Secondary text, Accent, Best
-ever, Charts), each opening a picker: hue ring, strength `SliderRow`, and for the
-background lightness and depth. A tap or release saves at once, writing nothing
-when already stored, and the whole app repaints in it.
+Settings → Appearance: Theme (four presets and Custom as radio rows with
+swatches; Custom folds presets behind `Show presets`), then Mode (Light, Dark,
+System) for a preset or one row per Custom part, then a live `ThemePreview`.
+A part's picker (its title switches part): a painted hue `SliderRow`,
+strength, for the background lightness and depth; the part's roles; the
+preview. A tap or release saves at once, writing nothing when already stored,
+and the app repaints in it; a header spinner shows until it has.
 A failed save shows a danger `Notice` saying nothing changed and is logged.
 Settings home names the choice.
 
