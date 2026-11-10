@@ -20,8 +20,8 @@ export const healthWorkout = (uuid: string, extra: Partial<HealthWorkout> = {}):
 
 /** A scripted store: each read returns the next queued change set (or throws it). */
 export const fakeHealthStore = (supported = true) => {
-  const reads: Array<{ anchor: string | null; since: Date }> = [];
-  const queue: Array<HealthWorkoutChanges | Error> = [];
+  const reads: { anchor: string | null; since: Date }[] = [];
+  const queue: (HealthWorkoutChanges | Error)[] = [];
   let authorizations = 0;
   let authorizationError: Error | null = null;
   const adapter: HealthStoreAdapter = {

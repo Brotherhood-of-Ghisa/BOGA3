@@ -14,6 +14,8 @@
  * `__tests__/health-import-*.test.ts`.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { createClientMockState } from '../helpers/sync-cycle-mocks';
 import { fakeHealthStore, healthWorkout } from '../helpers/health-import-fakes';
 import {
@@ -38,14 +40,16 @@ const RUN = `health-live-${Date.now()}`;
 const NOW = new Date();
 const DAY_MS = 24 * 60 * 60 * 1000;
 let user: AuthedTestClient;
-const service = createLocalServiceRoleClient(config);
+// The helper types only what the sync suites call; this suite filters by prefix too.
+const service = createLocalServiceRoleClient(config) as unknown as SupabaseClient;
+type ActivityRow = { external_id: string };
 
 const serverRows = async () => {
   const { data, error } = await service.schema(SYNC_RPC_SCHEMA).from('health_activities')
     .select('external_id,activity_type,distance_m,active_energy_kcal,max_heart_rate_bpm,elevation_gain_m,device_name')
     .eq('user_id', user.userId).like('external_id', `${RUN}-%`).order('external_id');
   if (error) throw new Error(error.message);
-  return data ?? [];
+  return (data ?? []) as ActivityRow[];
 };
 const removeRunRows = async () => {
   const { error } = await service.schema(SYNC_RPC_SCHEMA).from('health_activities')
@@ -92,12 +96,12 @@ it('backfills, applies a deletion, and fails loud on a batch the server rejects'
 
   store.queue({ workouts: [], deletedIds: [`${RUN}-lift`], newAnchor: 'anchor-2' });
   await expect(run(store)).resolves.toMatchObject({ status: 'imported', backfill: false, deleted: 1 });
-  expect((await serverRows()).map((row) => row.external_id)).toEqual([`${RUN}-run`]);
+  expect((await serverRows()).map((row: ActivityRow) => row.external_id)).toEqual([`${RUN}-run`]);
   expect(healthImportStore.readAnchor(user.userId)?.anchor).toBe('anchor-2');
 
   // A heart rate the server's range check refuses: the whole batch fails and the anchor stays.
   store.queue({ workouts: [healthWorkout(`${RUN}-bad`, { startDate: at(1), endDate: at(1), maxHeartRateBpm: 900 })], deletedIds: [], newAnchor: 'anchor-3' });
   await expect(run(store)).rejects.toMatchObject({ code: 'UPLOAD_FAILED', message: expect.stringContaining('INVALID_ARGUMENT') });
   expect(healthImportStore.readAnchor(user.userId)?.anchor).toBe('anchor-2');
-  expect((await serverRows()).map((row) => row.external_id)).toEqual([`${RUN}-run`]);
+  expect((await serverRows()).map((row: ActivityRow) => row.external_id)).toEqual([`${RUN}-run`]);
 });

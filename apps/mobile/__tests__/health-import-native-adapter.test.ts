@@ -30,7 +30,10 @@ const proxy = (extra: Record<string, unknown> = {}) => ({
 
 const loadAdapter = () => {
   let adapter: typeof import('@/src/health-import/native-adapter') | undefined;
-  jest.isolateModules(() => { adapter = require('@/src/health-import/native-adapter'); });
+  jest.isolateModules(() => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- a fresh module per case, after Platform.OS is set.
+    adapter = require('@/src/health-import/native-adapter');
+  });
   return adapter!.getHealthStoreAdapter();
 };
 
