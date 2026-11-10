@@ -111,10 +111,25 @@ it('groups using reported family names, retaining child recovery order, unrounde
   };
   const rows = deriveRecoveryRows(daily, window, TARGETS);
   expect(groupRecoveryRows(rows)).toEqual([
-    { name: 'Other', muscles: [rows[0]], weekSets: 0 },
-    { name: 'My custom family', muscles: [rows[1], rows[2]], weekSets: 3 },
+    { name: 'Other', muscles: [rows[0]], days: [0, 0, 0], today: 0, weekSets: 0 },
+    { name: 'My custom family', muscles: [rows[1], rows[2]], days: [0, 0, 3], today: 0, weekSets: 3 },
   ]);
   expect(groupRecoveryRows([])).toEqual([]);
+});
+
+it('keeps family daily, today and weekly sums separate, including fractional and absent contributions', () => {
+  const window = todayPlanWindow(local(2026, 11, 10, 15));
+  const rows = deriveRecoveryRows({
+    muscles: [muscle('a', 1), muscle('b', 2)],
+    sets: {
+      a: { '2026-11-07': 1.5, '2026-11-09': 0.5, '2026-11-10': 2 },
+      b: { '2026-11-07': 1.5, '2026-11-09': 0.5, '2026-11-10': 0.5 },
+    },
+    sessionDays: [],
+  }, window, TARGETS);
+  expect(groupRecoveryRows(rows)).toEqual([
+    { name: 'F', muscles: rows, days: [3, 0, 1], today: 2.5, weekSets: 3.5 },
+  ]);
 });
 
 describe('the next planned sessions and the week', () => {

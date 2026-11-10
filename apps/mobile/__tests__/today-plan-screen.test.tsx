@@ -24,7 +24,7 @@ jest.mock('expo-router', () => ({
 
 import { uiSpace } from '@/components/ui/tokens';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
-import { renderWithTheme, rolesFor } from './helpers/theme';
+import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 
 const roles = rolesFor(DEFAULT_APPEARANCE);
 import * as exerciseCatalogData from '@/src/data/exercise-catalog';
@@ -133,8 +133,19 @@ describe('Today: the Plan page over real data', () => {
     const arms = text('today-plan-group-Arms');
     expect(arms).toHaveProp('accessibilityState', { expanded: true });
     expect(arms).toHaveProp('accessibilityRole', 'button');
-    expect(arms).toHaveProp('accessibilityLabel', 'Arms, 3 sets');
+    expect(arms).toHaveProp('accessibilityLabel',
+      'Arms, 3 sets this week, Wednesday 28-10-2026: 0 sets, Thursday 29-10-2026: 0 sets, Friday 30-10-2026: 3 sets, today: 0 sets');
     expect(text('today-plan-group-Arms-total')).toHaveTextContent('3 sets');
+    expect(text('today-plan-group-Arms-day-0')).toHaveTextContent('0');
+    expect(text('today-plan-group-Arms-day-1')).toHaveTextContent('0');
+    expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('3');
+    expect(text('today-plan-group-Arms-today')).toHaveTextContent('0');
+    expect(arms).toHaveStyle({ backgroundColor: roles.accentWash });
+    expect(text('today-plan-group-Arms-day-2')).toHaveStyle({ backgroundColor: roles.accent });
+    expect(within(text('today-plan-group-Arms-day-2')).getByText('3')).toHaveStyle({ color: roles.onAccent });
+    expect(text('today-plan-group-Arms-day-0')).toHaveStyle({ backgroundColor: roles.surface, borderColor: roles.accent, borderWidth: 1 });
+    expect(screen.queryByText('Group tiles = daily set totals')).toBeNull();
+    expect(screen.queryByText('Daily total')).toBeNull();
     expect(text('today-plan-muscle-biceps-week')).toHaveTextContent('1/8');
     expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('1/8');
     expect(text('today-plan-muscle-biceps').props.accessibilityLabel).toContain('this week 1.5 of 8 sets');
@@ -142,6 +153,8 @@ describe('Today: the Plan page over real data', () => {
     expect(text('today-plan-group-Arms')).toHaveProp('accessibilityState', { expanded: false });
     expect(screen.getByTestId('today-plan-group-Arms-collapsed', { includeHiddenElements: true })).toBeTruthy();
     expect(text('today-plan-group-Arms-total')).toHaveTextContent('3 sets');
+    expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('3');
+    expect(text('today-plan-group-Arms-today')).toHaveTextContent('0');
     expect(screen.queryByTestId('today-plan-muscle-biceps')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Biceps,/ })).toBeNull();
     expect(text('today-plan-muscle-quads')).toBeTruthy();
@@ -153,9 +166,40 @@ describe('Today: the Plan page over real data', () => {
 
     act(() => updatePreferences({ progressCountSecondary: false }));
     await waitFor(() => expect(text('today-plan-group-Arms-total')).toHaveTextContent('0 sets'));
+    expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('0');
+    expect(text('today-plan-muscle-biceps-day-2')).toHaveTextContent('');
     act(() => updatePreferences({ progressGrouped: false }));
     expect(screen.queryByTestId('today-plan-group-Arms')).toBeNull();
     expect(text('today-plan-muscle-biceps')).toBeTruthy();
+  });
+
+  it('keeps previous-week daily tiles separate from today and the weekly total, and follows a live dark theme', async () => {
+    await bootLocalApp();
+    act(() => updatePreferences({ progressGrouped: true, progressCountSecondary: true }));
+    await exerciseCatalogData.saveExerciseCatalogExercise({ id: BENCH.id, name: BENCH.name,
+      mappings: ['biceps', 'triceps'].map(muscleGroupId => ({ muscleGroupId, role: 'secondary', weight: 1 })),
+    });
+    await logSession('sat', local(2026, 11, 7, 9), [{ ...BENCH, count: 3 }]);
+    await logSession('tue', local(2026, 11, 10, 9), [{ ...BENCH, count: 1 }]);
+    await renderToday({ now: () => local(2026, 11, 10, 15) });
+    expect(text('today-plan-group-Arms-day-0')).toHaveTextContent('3');
+    expect(text('today-plan-group-Arms-day-1')).toHaveTextContent('0');
+    expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('0');
+    expect(text('today-plan-group-Arms-today')).toHaveTextContent('1');
+    expect(text('today-plan-group-Arms-total')).toHaveTextContent('1 set');
+    expect(text('today-plan-muscle-biceps-today')).toHaveTextContent('½');
+    const dark = { theme: 'slate', mode: 'dark', custom: null } as const;
+    try {
+      await switchTheme(dark);
+      const darkRoles = rolesFor(dark);
+      expect(text('today-plan-group-Arms')).toHaveStyle({ backgroundColor: darkRoles.accentWash });
+      expect(text('today-plan-group-Arms-today')).toHaveStyle({ backgroundColor: darkRoles.accent });
+      expect(within(text('today-plan-group-Arms-today')).getByText('1')).toHaveStyle({ color: darkRoles.onAccent });
+      expect(text('today-plan-group-Arms-day-1')).toHaveStyle({ backgroundColor: darkRoles.surface, borderColor: darkRoles.accent });
+      expect(text('today-plan-muscle-biceps-today')).toHaveStyle({ backgroundColor: darkRoles.viz2 });
+    } finally {
+      await switchTheme(DEFAULT_APPEARANCE);
+    }
   });
 
   it('sums eligible reported children, respecting Broad merging, tracking, and the calendar week', async () => {
@@ -173,16 +217,19 @@ describe('Today: the Plan page over real data', () => {
     await act(() => setMuscleReportPreset('broad'));
     await waitForGone(() => screen.queryByTestId('today-plan-muscle-brachialis'));
     expect(text('today-plan-group-Arms-total')).toHaveTextContent('1 set');
-    expect(text('today-plan-group-Arms')).toHaveProp('accessibilityLabel', 'Arms, 1.5 sets');
+    expect(text('today-plan-group-Arms').props.accessibilityLabel).toContain('Arms, 1.5 sets this week');
+    expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('1');
     expect(text('today-plan-muscle-biceps-week')).toHaveTextContent('1/8');
 
     await act(() => setMuscleTracked(['triceps'], false));
     await waitForGone(() => screen.queryByTestId('today-plan-muscle-triceps'));
     expect(text('today-plan-group-Arms-total')).toHaveTextContent('1 set');
-    expect(text('today-plan-group-Arms')).toHaveProp('accessibilityLabel', 'Arms, 1 set');
+    expect(text('today-plan-group-Arms').props.accessibilityLabel).toContain('Arms, 1 set this week');
+    expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('1');
     await act(() => setMuscleReportPreset('detailed'));
     await waitFor(() => expect(text('today-plan-muscle-brachialis-week')).toHaveTextContent('½/8'));
-    expect(text('today-plan-group-Arms')).toHaveProp('accessibilityLabel', 'Arms, 1.5 sets');
+    expect(text('today-plan-group-Arms').props.accessibilityLabel).toContain('Arms, 1.5 sets this week');
+    expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('1');
   });
 
   it('takes grouping from the active account and clears its collapsed state on account switches', async () => {

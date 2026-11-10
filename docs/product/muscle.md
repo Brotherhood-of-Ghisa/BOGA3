@@ -5,7 +5,8 @@
 Each Primary muscle gets one working set; each Secondary gets ½ when included
 ([[muscle.secondary-filter]]). A reported muscle counts each physical set once
 at its strongest role. Recovery family totals sum unrounded eligible child
-muscle counts; other family figures deduplicate. Neither sum is a physical-session total.
+muscle counts for each day and the week; other family figures deduplicate.
+Neither sum is a physical-session total.
 
 Volume shares its base equally among Primaries, plus a shared ½ pool among
 included Secondaries. Allocation precedes filtering and Broad grouping; hidden
