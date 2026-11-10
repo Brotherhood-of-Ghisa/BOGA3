@@ -111,6 +111,32 @@ describe('exercise browser model', () => {
     expect(buildModel().items.find((item) => item.id === 'never')?.statsSummary).toBe('Never done');
   });
 
+  it.each(['setless', 'warm-up', 'invalid', 'unperformed', 'policy-excluded'])(
+    'keeps a %s entry visible with Never-done off without inventing training metrics', (kind) => {
+      const history: ExerciseCatalogStatsRawHistory = {
+        sessions: [{ id: 'completed', completedAt: daysBefore(2) }],
+        sessionExercises: [{ id: 'entry', sessionId: 'completed', exerciseDefinitionId: 'bench' }],
+        exerciseSets: kind === 'setless' ? [] : [{
+          sessionExerciseId: 'entry', weightValue: '20', repsValue: kind === 'invalid' ? '' : '10',
+          setType: kind === 'warm-up' ? 'warm_up' : 'rir_2',
+          performanceStatus: kind === 'unperformed' ? 'unperformed' : null,
+        }],
+        effortPolicy: kind === 'policy-excluded' ? { workingSetEfforts: [], volumeEfforts: [] } : undefined,
+      };
+      const model = buildExerciseListModel({
+        exercises, muscleGroups, muscleSetup, stats: aggregateExerciseCatalogStats(history, 'all', NOW),
+        preferences: { ...DEFAULT_EXERCISE_LIST_PREFERENCES, showNeverDone: false },
+        query: '', includeDeleted: false,
+      });
+      expect(model.items.map(item => item.id)).toEqual(['bench']);
+      expect(model.items[0]).toMatchObject({
+        hasAllTimeHistory: true, lastDoneDate: null, statsSummary: '0 sessions',
+      });
+      expect(model.items[0].recency).toBeUndefined();
+      expect(model.items[0].aggregate).toBeUndefined();
+    }
+  );
+
   it('searches existing name/primary-muscle terms and omits empty families only during search', () => {
     const model = buildModel({}, ' chest ');
     expect(model.isSearching).toBe(true);
