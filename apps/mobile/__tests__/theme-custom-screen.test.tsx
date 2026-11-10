@@ -49,18 +49,22 @@ import {
 } from '@/components/ui/theme-custom';
 import { useUiRoles } from '@/components/ui/theme-context';
 import { APPEARANCE_STORAGE_KEY } from '@/components/ui/theme-launch';
+import { hueName } from '@/components/ui/theme-hue';
 import { getThemePreset } from '@/components/ui/theme-presets';
 import ThemeCustomRoute from '../app/theme-custom';
 import { waitForGone } from './helpers/wait-for-gone';
 import { renderWithTheme } from './helpers/theme';
 
 const CUSTOM: CustomColours = {
-  background: { hue: 80, strength: 20, lightness: 90, depth: 100 },
-  ink: { hue: 265, strength: 30 },
-  text: { hue: 60, strength: 10 },
+  background: { hue: 80, strength: 20, mode: 'light', lightness: 90, depth: 100 },
+  // Borders of their own, so a change to the background's hue does not move
+  // them and a change to theirs does.
+  borders: { hue: 200, strength: 30, match: false, contrast: 100 },
+  ink: { hue: 265, strength: 30, lightness: 8 },
+  text: { hue: 60, strength: 10, contrast: 100 },
   accent: { hue: 30, strength: 70 },
   record: { hue: 90, strength: 50 },
-  viz: { hue: 150, strength: 40 },
+  viz: { hue: 150, strength: 40, gamut: true },
 };
 
 const store = (custom: CustomColours, theme = 'custom') =>
@@ -139,13 +143,14 @@ it('repaints the preview as a slider moves, and saves only when it is let go', a
   const track = screen.getByTestId('theme-custom-lightness-track');
   fireEvent(track, 'layout', { nativeEvent: { layout: { width: 200 } } });
 
+  // A light page's slider runs over L* 65–100 in quarter steps.
   act(() => drag(slider('Lightness')).onUpdate({ x: 20 }));
-  const dark = { ...CUSTOM, background: { ...CUSTOM.background, lightness: 10 } };
-  expect(previewGround()).toBe(generateCustomRoles(dark).paper);
+  const darker = { ...CUSTOM, background: { ...CUSTOM.background, lightness: 68.5 } };
+  expect(previewGround()).toBe(generateCustomRoles(darker).paper);
   expect(storedCustom()).toEqual(CUSTOM);
 
   await act(async () => drag(slider('Lightness')).onEnd({ x: 20 }, true));
-  await waitFor(() => expect(storedCustom()).toEqual(dark));
+  await waitFor(() => expect(storedCustom()).toEqual(darker));
   expect(screen.queryByText(/next launch/i)).toBeNull();
 });
 
@@ -194,7 +199,7 @@ it('saves a hue when the bar is let go, keeping the other parts', async () => {
 
   await act(async () => drag(hueBar()).onEnd({ x: 90 }, true));
 
-  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, viz: { hue: 90, strength: 40 } }));
+  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, viz: { ...CUSTOM.viz, hue: 90 } }));
 });
 
 it('paints the hue bar in the part’s colours, words for VoiceOver only, and swatches the part as it would be drawn', () => {
@@ -237,12 +242,12 @@ it('spotlights every role the part moves, live as a control moves', () => {
     render(<ThemeCustomRoute />);
     const tile = (index: number) => StyleSheet.flatten(screen.getByTestId(`theme-custom-spotlight-${index}`).props.style).backgroundColor;
     const roles = generateCustomRoles(CUSTOM);
-    expect([0, 1, 4].map(tile)).toEqual([roles.paper, roles.surface, roles.viz0]);
+    expect([0, 1, 2].map(tile)).toEqual([roles.paper, roles.surface, roles.viz0]);
     expect(screen.getByText('Divider')).toBeTruthy();
 
     fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
     act(() => drag(slider('Lightness')).onUpdate({ x: 20 }));
-    expect(tile(0)).toBe(generateCustomRoles({ ...CUSTOM, background: { ...CUSTOM.background, lightness: 20 } }).paper);
+    expect(tile(0)).toBe(generateCustomRoles({ ...CUSTOM, background: { ...CUSTOM.background, lightness: 72 } }).paper);
   } finally {
     configure({ defaultIncludeHiddenElements: false });
   }
@@ -296,17 +301,18 @@ it('shows the applying indicator from a save until the app is drawn in it', asyn
   expect(storedCustom()?.background.strength).toBe(25);
 });
 
-it('opens Primary text with a hue and strength only, and saves it as `ink`', async () => {
+it('opens Primary text with a hue, a strength and its lightness, and saves it as `ink`', async () => {
   store(CUSTOM);
   mockPart = 'ink';
   render(<ThemeCustomRoute />);
   expect(mockTitles).toContain('Primary text');
   expect(hueBar().props.accessibilityValue).toEqual({ text: 'Blue, 265 degrees' });
-  expect(screen.queryByRole('adjustable', { name: 'Lightness' })).toBeNull();
+  expect(slider('Lightness').props.accessibilityValue).toEqual({ text: '8' });
+  expect(screen.queryByRole('adjustable', { name: 'Depth' })).toBeNull();
 
   await step(slider('Strength'), 'increment');
 
-  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, ink: { hue: 265, strength: 35 } }));
+  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, ink: { ...CUSTOM.ink, strength: 35 } }));
 });
 
 it('saves a VoiceOver step on depth at once', async () => {
@@ -322,7 +328,7 @@ it('makes Custom the theme when a part is saved from a preset', async () => {
   render(<ThemeCustomRoute />);
   await step(slider('Strength'), 'increment');
   await waitFor(() => expect(JSON.parse(Storage.getItemSync(APPEARANCE_STORAGE_KEY)!).theme).toBe('custom'));
-  expect(storedCustom()?.text).toEqual({ hue: 60, strength: 15 });
+  expect(storedCustom()?.text).toEqual({ hue: 60, strength: 15, contrast: 100 });
 });
 
 it('writes nothing when a slider is let go at the value already stored', async () => {
@@ -350,9 +356,103 @@ it('says nothing changed, and logs why, when the save fails', async () => {
     expect.objectContaining({
       level: 'warn',
       event: 'theme.save_failed',
-      context: { part: 'background', value: { ...CUSTOM.background, strength: 25 }, error: 'disk full' },
+      context: { part: 'background', value: { background: { ...CUSTOM.background, strength: 25 } }, error: 'disk full' },
     }),
   );
+});
+
+it('switches the page to dark: the switch saves the mode, the page and the primary text at the dark ladder’s', async () => {
+  store(CUSTOM);
+  render(<ThemeCustomRoute />);
+  const dark = () => screen.getByRole('switch', { name: 'Dark' });
+  expect(dark().props.accessibilityState).toEqual({ checked: false });
+
+  await act(async () => fireEvent.press(dark()));
+
+  await waitFor(() =>
+    expect(storedCustom()).toEqual({
+      ...CUSTOM,
+      background: { ...CUSTOM.background, mode: 'dark', lightness: 10 },
+      ink: { ...CUSTOM.ink, lightness: 95 },
+    }),
+  );
+  expect(dark().props.accessibilityState).toEqual({ checked: true });
+  // The dark page's slider runs over L* 0–35.
+  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 140 } } });
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 9 }, true));
+  await waitFor(() => expect(storedCustom()?.background.lightness).toBe(2.25));
+  expect(previewGround()).toBe(generateCustomRoles(storedCustom()!).paper);
+});
+
+it('keeps a primary text saved meanwhile when the mode is switched, resetting only its lightness', async () => {
+  store(CUSTOM);
+  render(<ThemeCustomRoute />);
+  // Another part's save, stored after this page drew.
+  const inkSaved = { ...CUSTOM.ink, hue: 20, strength: 90 };
+  store({ ...CUSTOM, ink: inkSaved });
+
+  await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Dark' })));
+
+  await waitFor(() => expect(storedCustom()?.ink).toEqual({ ...inkSaved, lightness: 95 }));
+});
+
+it('shows a page saved outside its mode’s range as it is, until it is moved into it', async () => {
+  store({ ...CUSTOM, background: { ...CUSTOM.background, lightness: 50 } });
+  render(<ThemeCustomRoute />);
+  expect(slider('Lightness').props.accessibilityValue).toEqual({ text: '50' });
+  await step(slider('Lightness'), 'decrement');
+  await waitFor(() => expect(storedCustom()?.background.lightness).toBe(65));
+});
+
+it('gives the borders their own hue and strength, or the page’s, and a contrast', async () => {
+  store(CUSTOM);
+  mockPart = 'borders';
+  render(<ThemeCustomRoute />);
+  expect(mockTitles).toContain('Borders');
+  const match = () => screen.getByRole('switch', { name: 'Match background' });
+  expect(match().props.accessibilityState).toEqual({ checked: false });
+  expect(hueBar().props.accessibilityValue).toEqual({ text: 'Teal, 200 degrees' });
+
+  await step(slider('Contrast'), 'increment');
+  await waitFor(() => expect(storedCustom()?.borders).toEqual({ ...CUSTOM.borders, contrast: 115 }));
+
+  await act(async () => fireEvent.press(match()));
+  await waitFor(() => expect(storedCustom()?.borders.match).toBe(true));
+  expect(screen.queryByRole('adjustable', { name: 'Hue' })).toBeNull();
+  expect(screen.queryByRole('adjustable', { name: 'Strength' })).toBeNull();
+
+  // Unmatching starts from the page's colour, so nothing jumps.
+  await act(async () => fireEvent.press(match()));
+  await waitFor(() =>
+    expect(storedCustom()?.borders).toEqual({ hue: CUSTOM.background.hue, strength: CUSTOM.background.strength, match: false, contrast: 115 }),
+  );
+  expect(hueBar().props.accessibilityValue).toEqual({ text: `${hueName(CUSTOM.background.hue)}, ${CUSTOM.background.hue} degrees` });
+});
+
+it('moves the primary text’s lightness in quarter steps over its mode’s range', async () => {
+  store(CUSTOM);
+  mockPart = 'ink';
+  render(<ThemeCustomRoute />);
+  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 160 } } });
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 81 }, true));
+  await waitFor(() => expect(storedCustom()?.ink).toEqual({ ...CUSTOM.ink, lightness: 20.25 }));
+});
+
+it('saves the secondary text’s contrast', async () => {
+  store(CUSTOM);
+  mockPart = 'text';
+  render(<ThemeCustomRoute />);
+  expect(slider('Contrast').props.accessibilityValue).toEqual({ text: '100%' });
+  await step(slider('Contrast'), 'increment');
+  await waitFor(() => expect(storedCustom()?.text).toEqual({ ...CUSTOM.text, contrast: 108 }));
+});
+
+it('draws the charts on the gamut from their first edit', async () => {
+  store({ ...CUSTOM, viz: { ...CUSTOM.viz, gamut: false } });
+  mockPart = 'viz';
+  render(<ThemeCustomRoute />);
+  await step(slider('Strength'), 'increment');
+  await waitFor(() => expect(storedCustom()?.viz).toEqual({ ...CUSTOM.viz, strength: 45, gamut: true }));
 });
 
 describe('pointToValue', () => {
@@ -362,5 +462,13 @@ describe('pointToValue', () => {
     expect(pointToValue(201, 200, 300)).toBe(300);
     expect(pointToValue(-5, 200, 100)).toBe(0);
     expect(pointToValue(50, 0, 100)).toBe(0);
+  });
+
+  it('maps a point onto the steps of a range that does not start at 0', () => {
+    expect(pointToValue(0, 140, 100, 65, 0.25)).toBe(65);
+    expect(pointToValue(1, 140, 100, 65, 0.25)).toBe(65.25);
+    expect(pointToValue(70, 140, 100, 65, 0.25)).toBe(82.5);
+    expect(pointToValue(500, 140, 100, 65, 0.25)).toBe(100);
+    expect(pointToValue(50, 0, 100, 65, 0.25)).toBe(65);
   });
 });

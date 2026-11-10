@@ -252,6 +252,12 @@ export function inkStep(mode: ThemeMode): { lightness: number; chroma: number } 
   return { lightness, chroma };
 }
 
+// The L* of a mode's `viz1`…`viz4`, weakest first.
+export function rampLightness(mode: ThemeMode): number[] {
+  const ladder = mode === 'light' ? LIGHT_STEPS : DARK_STEPS;
+  return [ladder.viz1, ladder.viz2, ladder.viz3, ladder.viz4].map((rampStep) => rampStep.lightness);
+}
+
 // Every colour role from the seeds, on the light or the dark ladder. Pure and
 // synchronous: `tokens.ts` calls it once at module load. Throws on a seed that
 // is not `#RRGGBB`.
