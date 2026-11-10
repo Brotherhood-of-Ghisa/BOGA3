@@ -70,6 +70,8 @@ export function useAppearanceCommit() {
         context: { ...failure.context, error: error instanceof Error ? error.message : String(error) },
       });
       setAppearance(readStoredAppearance(inUse));
+      // Nothing was saved, so nothing is being drawn.
+      setCommitted(false);
       setSaveError(failure.message);
       return 'failed';
     } finally {
