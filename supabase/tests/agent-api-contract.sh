@@ -2404,11 +2404,17 @@ app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(j
   --arg b "${FUTURE_B}" \
   '{p_source: "apple_health", p_complete_since: "2031-01-01T00:00:00Z", p_complete_ids: [$b]}')"
 assert_status "200" "a complete backfill window"
-printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 0, deleted: 0, pruned: 1}' >/dev/null ||
+# Another run's leftover 2031 rows may be pruned too; the rows below pin this run's outcome.
+printf '%s' "${RESPONSE_BODY}" | jq -e '.upserted == 0 and .deleted == 0 and .pruned >= 1' >/dev/null ||
   fail "a complete window did not keep the listed activity and prune the one the store no longer has"
 [[ "$(run_psql "select string_agg(external_id, ',' order by external_id) from app_public.health_activities
   where user_id = '${USER_A_UUID}'::uuid and external_id like 'agent-api-${RUN_TAG}-%';")" == \
   "${FUTURE_B},${ACTIVITY_LIFT}" ]] || fail "deletion or pruning touched the wrong activities"
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" \
+  "$(activity_payload 1 | jq -c '.p_upserts[0].started_at = "2026-11-01T24:00:00Z"')"
+assert_non_2xx "an hour-24 start"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.message | test("INVALID_ARGUMENT: started_at")' >/dev/null ||
+  fail "an hour-24 start was not rejected like the read side rejects it"
 [[ "$(run_psql "select count(*) from app_public.health_activities where user_id = '${USER_B_UUID}'::uuid
   and external_id = '${ACTIVITY_B}';")" == "1" ]] || fail "another owner's activity was deleted"
 

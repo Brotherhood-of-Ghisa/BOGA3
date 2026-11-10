@@ -78,7 +78,7 @@ declare
     'active_energy_kcal', 'avg_heart_rate_bpm', 'max_heart_rate_bpm', 'elevation_gain_m',
     'source_name', 'device_name'
   ];
-  iso constant text := '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$';
+  iso constant text := '^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$';
   key text;
   field text;
 begin
