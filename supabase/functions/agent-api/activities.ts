@@ -28,12 +28,28 @@ export const ACTIVITY_COLUMNS =
 /** A caller's bad range or cursor; the route answers it as `400`. */
 export class ActivityQueryError extends Error {}
 
-const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/;
+const ISO_INSTANT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,6})?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
+
+/**
+ * Epoch ms of an ISO 8601 instant with an explicit zone, or NaN. Stricter than
+ * `Date.parse`, which rolls an impossible day (Feb 30) or hour 24 forward into
+ * a real instant instead of rejecting it.
+ */
+export const strictInstantMs = (raw: string): number => {
+  const match = ISO_INSTANT.exec(raw);
+  if (!match) return Number.NaN;
+  const [year, month, day, hour, minute, second = '0', offsetHour = '0', offsetMinute = '0'] = match.slice(1);
+  const daysInMonth = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
+  const valid = Number(month) >= 1 && Number(month) <= 12 && Number(day) >= 1 && Number(day) <= daysInMonth
+    && Number(hour) <= 23 && Number(minute) <= 59 && Number(second) <= 59
+    && Number(offsetHour) <= 23 && Number(offsetMinute) <= 59;
+  return valid ? Date.parse(raw) : Number.NaN;
+};
 
 /** An ISO 8601 instant with an explicit zone, as canonical UTC text; null when absent. */
 export const parseActivityInstant = (raw: string | null, label: string): string | null => {
   if (raw === null || raw === '') return null;
-  const ms = ISO_INSTANT.test(raw) ? Date.parse(raw) : Number.NaN;
+  const ms = strictInstantMs(raw);
   if (!Number.isFinite(ms)) {
     throw new ActivityQueryError(`${label} must be an ISO 8601 instant with a time zone, e.g. 2026-11-01T00:00:00Z.`);
   }
@@ -56,7 +72,7 @@ export type ActivityCursor = { started_at: string; source: string; external_id: 
 export const activityCursorFrom = (value: Record<string, unknown>): ActivityCursor => {
   const { started_at: startedAt, source, external_id: externalId } = value;
   if (
-    typeof startedAt !== 'string' || !ISO_INSTANT.test(startedAt) || !Number.isFinite(Date.parse(startedAt))
+    typeof startedAt !== 'string' || !Number.isFinite(strictInstantMs(startedAt))
     || typeof source !== 'string' || source.length === 0 || source.length > 40
     || typeof externalId !== 'string' || externalId.length === 0 || externalId.length > 200
   ) {
@@ -65,7 +81,13 @@ export const activityCursorFrom = (value: Record<string, unknown>): ActivityCurs
   return { started_at: startedAt, source, external_id: externalId };
 };
 
-/** A BoGa session's span; an active session runs until now. Epoch ms, as synced. */
+/**
+ * How long an unfinished (active) session can overlap anything: a session
+ * left open for days must not swallow every later strength workout.
+ */
+export const ACTIVE_SESSION_MAX_MS = 12 * 60 * 60 * 1000;
+
+/** A BoGa session's span; an active one runs until now, at most `ACTIVE_SESSION_MAX_MS`. Epoch ms, as synced. */
 export type OverlapSessionRow = { id: string; status: string; started_at: number; completed_at: number | null };
 
 /**
@@ -87,7 +109,9 @@ const instantMs = (value: string): number => {
 };
 
 const sessionEndMs = (session: OverlapSessionRow, nowMs: number): number | null =>
-  session.status === 'active' ? Math.max(nowMs, session.started_at) : session.completed_at;
+  session.status === 'active'
+    ? Math.max(session.started_at, Math.min(nowMs, session.started_at + ACTIVE_SESSION_MAX_MS))
+    : session.completed_at;
 
 /**
  * The first (earliest-starting, then by id) logged session a strength activity
@@ -131,14 +155,27 @@ export const projectActivity = (row: ActivityRow, sessions: readonly OverlapSess
   };
 };
 
-/** The span of sessions that could overlap these activities, or null when none is a strength type. */
-export const overlapReadSpan = (rows: readonly ActivityRow[]): { fromMs: number; toMs: number } | null => {
-  const strength = rows.filter((row) => STRENGTH_ACTIVITY_TYPES.has(row.activity_type));
-  if (strength.length === 0) return null;
-  return {
-    fromMs: Math.min(...strength.map((row) => instantMs(row.started_at))),
-    toMs: Math.max(...strength.map((row) => instantMs(row.ended_at))),
-  };
+/** Strength activities closer than this share one session read. */
+const OVERLAP_READ_MERGE_GAP_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The time windows whose sessions could overlap these activities: one per
+ * strength activity, merged when less than a day apart, oldest first. Empty
+ * when none is a strength type. Far-apart activities stay separate windows, so
+ * a page spanning years never reads every session in between.
+ */
+export const overlapReadWindows = (rows: readonly ActivityRow[]): Array<{ fromMs: number; toMs: number }> => {
+  const windows = rows
+    .filter((row) => STRENGTH_ACTIVITY_TYPES.has(row.activity_type))
+    .map((row) => ({ fromMs: instantMs(row.started_at), toMs: instantMs(row.ended_at) }))
+    .sort((left, right) => left.fromMs - right.fromMs);
+  const merged: Array<{ fromMs: number; toMs: number }> = [];
+  for (const window of windows) {
+    const last = merged[merged.length - 1];
+    if (last && window.fromMs - last.toMs < OVERLAP_READ_MERGE_GAP_MS) last.toMs = Math.max(last.toMs, window.toMs);
+    else merged.push({ ...window });
+  }
+  return merged;
 };
 
 type Totals = { activities: number; duration_seconds: number; distance_m: number; active_energy_kcal: number };

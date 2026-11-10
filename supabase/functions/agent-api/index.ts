@@ -1,7 +1,8 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.98.0';
 
 import {
-  ACTIVITY_COLUMNS, ActivityQueryError, activityCursorFrom, buildCardioSummary, cardioReadStart, overlapReadSpan,
+  ACTIVE_SESSION_MAX_MS, ACTIVITY_COLUMNS, ActivityQueryError, activityCursorFrom, buildCardioSummary, cardioReadStart,
+  overlapReadWindows,
   parseActivityRange, projectActivity, type ActivityRow, type OverlapSessionRow,
 } from './activities.ts';
 import { summarizeVolume } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
@@ -25,7 +26,7 @@ import {
   asMuscleReportRows, buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, STATUS_READ_DAYS, statusReadComplete,
   trainingStatusWindow,
   type StatusBlockRow, type StatusDefinitionRow, type StatusMappingRow, type StatusMuscleRow,
-  type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining,
+  type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining, type TrainingStatusWindow,
 } from './training-status.ts';
 import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
@@ -1843,27 +1844,25 @@ const asActivityQuery = <T>(read: () => T, code = 'INVALID_ARGUMENT'): T => {
 };
 
 /**
- * The owner's completed and active sessions that share time with
- * `[fromMs, toMs]`: the ones an imported strength activity may duplicate.
- * `truncated` when the read hit its cap, so a flag may be missing.
+ * The owner's completed and active sessions that share time with any
+ * strength activity in `rows` (`overlapReadWindows`): the ones such an
+ * activity may duplicate. `truncated` when the read hit its cap, so a flag may
+ * be missing. Every clause value is a number the server computed.
  */
-const loadOverlapSessions = async (
-  client: SupabaseClient, userId: string, fromMs: number, toMs: number,
+const loadActivityOverlaps = async (
+  client: SupabaseClient, userId: string, rows: readonly ActivityRow[],
 ): Promise<{ rows: OverlapSessionRow[]; truncated: boolean }> => {
+  const windows = overlapReadWindows(rows);
+  if (windows.length === 0) return { rows: [], truncated: false };
+  const clauses = windows.map(({ fromMs, toMs }) =>
+    `and(started_at.lt.${toMs},or(completed_at.gt.${fromMs},and(status.eq.active,started_at.gt.${fromMs - ACTIVE_SESSION_MAX_MS})))`);
   const { data, error } = await client.schema('app_public').from('sessions')
     .select('id,status,started_at,completed_at').eq('owner_user_id', userId).is('deleted_at', null)
-    .lt('started_at', toMs).or(`status.eq.active,completed_at.gt.${fromMs}`)
+    .or(clauses.join(','))
     .order('started_at', { ascending: false }).order('id').limit(MAX_OVERLAP_SESSIONS + 1)
     .returns<OverlapSessionRow[]>();
   throwDatabaseError(error);
   return { rows: (data ?? []).slice(0, MAX_OVERLAP_SESSIONS), truncated: (data?.length ?? 0) > MAX_OVERLAP_SESSIONS };
-};
-
-const loadActivityOverlaps = async (
-  client: SupabaseClient, userId: string, rows: readonly ActivityRow[],
-): Promise<{ rows: OverlapSessionRow[]; truncated: boolean }> => {
-  const span = overlapReadSpan(rows);
-  return span === null ? { rows: [], truncated: false } : loadOverlapSessions(client, userId, span.fromMs, span.toMs);
 };
 
 const getRecentActivities = async (
@@ -1911,14 +1910,14 @@ const getRecentActivities = async (
 
 /** The status's `cardio`: the activities since the oldest listed week, flagged against the sessions they overlap. */
 const loadStatusCardio = async (
-  client: SupabaseClient, userId: string, now: Date, timeZone: string,
+  client: SupabaseClient, userId: string, now: Date, window: TrainingStatusWindow, timeZone: string,
 ): Promise<JsonObject> => {
-  const window = trainingStatusWindow(now, timeZone);
   // The window's dates carry the profile's wall clock; a day's margin each side
   // covers any zone offset, and the builder keeps only the listed weeks.
   const readFrom = new Date(cardioReadStart(window).getTime() - DAY_MS);
+  const readTo = new Date(window.plan.week.end.getTime() + DAY_MS);
   const { data, error } = await client.schema('app_public').from('health_activities').select(ACTIVITY_COLUMNS)
-    .eq('user_id', userId).gte('started_at', readFrom.toISOString())
+    .eq('user_id', userId).gte('started_at', readFrom.toISOString()).lt('started_at', readTo.toISOString())
     .order('started_at', { ascending: false }).order('source').order('external_id')
     .limit(STATUS_MAX_ACTIVITIES + 1).returns<ActivityRow[]>();
   throwDatabaseError(error);
@@ -1974,10 +1973,10 @@ const getTrainingStatus = async (
   const training: StatusTraining = { sessions, blocks: blocks.rows, sets: sets.rows };
   const window = trainingStatusWindow(now, timeZone);
   const favourites = rankFavouriteExercises(training, definitions, bodyweightCalculationsEnabled, window, timeZone);
-  const history = await loadFavouriteHistory(
-    client, userId, favourites.map((favourite) => favourite.exerciseId), bodyweightCalculationsEnabled,
-  );
-  const cardio = await loadStatusCardio(client, userId, now, timeZone);
+  const [history, cardio] = await Promise.all([
+    loadFavouriteHistory(client, userId, favourites.map((favourite) => favourite.exerciseId), bodyweightCalculationsEnabled),
+    loadStatusCardio(client, userId, now, window, timeZone),
+  ]);
   const status = buildTrainingStatus({
     now, timeZone,
     settings: settings.data,

@@ -1,7 +1,7 @@
 # BoGa MCP Virtual Coach
 
 `services/boga-mcp` is the public, authenticated MCP resource server for the
-BoGa Virtual Coach. It exposes twenty-two tools over stateless Streamable HTTP
+BoGa Virtual Coach. It exposes twenty-three tools over stateless Streamable HTTP
 (eleven read-only tools and twelve mutations) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
 Supabase data credentials, SQL, or service-role key.
 

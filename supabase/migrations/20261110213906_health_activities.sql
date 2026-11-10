@@ -141,14 +141,16 @@ revoke all on function app_public.health_activity_row(uuid, text, jsonb) from pu
 
 -- The app's only write path. One call applies a batch from the health store's
 -- change feed: deletes, then upserts keyed by (owner, source, external_id), so
--- a re-import is idempotent. p_complete_since marks the upserts as the whole
--- set of this source's activities starting at or after it (a fresh backfill),
--- so rows in that window the store no longer has are removed too.
+-- a re-import is idempotent. A fresh backfill may span several batches; its
+-- last call passes p_complete_since with p_complete_ids, every external id the
+-- store still has from that instant on, and rows in that window outside the
+-- list are pruned. The prune never relies on one batch's upserts being whole.
 create function app_public.health_activities_apply(
   p_source text,
   p_upserts jsonb default '[]'::jsonb,
   p_deletes jsonb default '[]'::jsonb,
-  p_complete_since timestamptz default null
+  p_complete_since timestamptz default null,
+  p_complete_ids jsonb default null
 )
 returns jsonb
 language plpgsql
@@ -160,6 +162,7 @@ declare
   _rows app_public.health_activities[];
   _ids text[];
   _delete_ids text[];
+  _keep_ids text[];
   _deleted integer := 0;
   _pruned integer := 0;
   _upserted integer := 0;
@@ -178,6 +181,16 @@ begin
   end if;
   if jsonb_typeof(p_deletes) is distinct from 'array' or jsonb_array_length(p_deletes) > 1000 then
     raise exception 'INVALID_ARGUMENT: deletes must be an array of at most 1000' using errcode = 'P0001';
+  end if;
+  if (p_complete_since is null) <> (p_complete_ids is null) then
+    raise exception 'INVALID_ARGUMENT: complete_since and complete_ids go together' using errcode = 'P0001';
+  end if;
+  if p_complete_ids is not null and (
+    jsonb_typeof(p_complete_ids) <> 'array' or jsonb_array_length(p_complete_ids) > 20000
+    or exists (select 1 from jsonb_array_elements(p_complete_ids) k
+      where jsonb_typeof(k) <> 'string' or length(k #>> '{}') not between 1 and 200)
+  ) then
+    raise exception 'INVALID_ARGUMENT: complete_ids must be at most 20000 external ids' using errcode = 'P0001';
   end if;
   if exists (
     select 1 from jsonb_array_elements(p_deletes) d
@@ -232,14 +245,15 @@ begin
   end;
 
   if p_complete_since is not null then
+    select coalesce(array_agg(k #>> '{}'), '{}') into _keep_ids from jsonb_array_elements(p_complete_ids) k;
     delete from app_public.health_activities
      where user_id = _uid and source = p_source and started_at >= p_complete_since
-       and not (external_id = any(_ids));
+       and not (external_id = any(_ids || _keep_ids));
     get diagnostics _pruned = row_count;
   end if;
 
   return jsonb_build_object('upserted', _upserted, 'deleted', _deleted, 'pruned', _pruned);
 end $$;
 
-revoke all on function app_public.health_activities_apply(text, jsonb, jsonb, timestamptz) from public, anon;
-grant execute on function app_public.health_activities_apply(text, jsonb, jsonb, timestamptz) to authenticated;
+revoke all on function app_public.health_activities_apply(text, jsonb, jsonb, timestamptz, jsonb) from public, anon;
+grant execute on function app_public.health_activities_apply(text, jsonb, jsonb, timestamptz, jsonb) to authenticated;

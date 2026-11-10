@@ -39,15 +39,17 @@ and the server checks only its form, so a new store type needs no migration.
 
 ## Write RPC
 
-`health_activities_apply(p_source, p_upserts, p_deletes, p_complete_since)`
+`health_activities_apply(p_source, p_upserts, p_deletes, p_complete_since, p_complete_ids)`
 applies one batch of the store's change feed in one transaction, serialized
 per owner and source:
 
 1. `p_deletes` (≤ 1000 external ids) are deleted: the store reported them gone.
 2. `p_upserts` (≤ 1000 objects with exactly the table's summary fields) are
    inserted or updated in place, so a re-import is idempotent.
-3. With `p_complete_since`, the upserts are the source's whole set starting at
-   or after it (a fresh backfill), and other rows in that window are pruned.
+3. A fresh backfill may take several batches. Its closing call passes
+   `p_complete_since` with `p_complete_ids` (≤ 20000): every external id the
+   store still has from that instant on. Rows in that window outside the list
+   and this call's upserts are pruned. One without the other is rejected.
 
 Any unknown field, wrong type, zone-less timestamp, out-of-range figure,
 duplicate id, or id both upserted and deleted fails the whole batch with
@@ -59,7 +61,8 @@ duplicate id, or id both upserted and deleted fails the whole batch with
 This implements the overlap decision of [[agents.health-activities]]. An activity of type `traditional_strength_training`,
 `functional_strength_training`, `core_training` or `cross_training` overlaps a
 session when their half-open spans share any time; the session is an owner's
-non-deleted completed one, or an active one running until now. The row is kept
+non-deleted completed one, or an active one running until now but at most 12
+hours, so a session left open cannot swallow later workouts. The row is kept
 and flagged (`overlaps_logged_session`, `overlapping_session_id`: the
 earliest such session). Other types are never flagged: a run during a gym visit
 is cardio. The rule is `overlappingSessionId` in
@@ -72,7 +75,8 @@ is cardio. The rule is `overlappingSessionId` in
 `limit` `1..50` (default 20); opaque `cursor`. Newest start first, then source
 and external id. Each row has the summary fields (`duration_seconds`; null =
 not recorded) and the overlap flag; `overlap_complete: false` when the session
-read hit its cap (500).
+read (one window per strength activity, merged under a day apart) hit its cap
+(500).
 
 Training status `cardio` (tool `get_training_status`): `this_week` and
 `last_4_weeks` (oldest first) on the profile's Monday-start weeks, each with

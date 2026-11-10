@@ -2383,7 +2383,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
     and tool_name = 'get_recent_activities' and http_status = 200;")" -ge 1 ]] ||
   fail "recent activities were not audited under their tool name"
 
-# HealthKit deletions remove rows; a fresh backfill's complete window prunes the rest.
+# HealthKit deletions remove rows; a fresh backfill's complete id list prunes the rest.
 FUTURE_A="agent-api-${RUN_TAG}-activity-future-a"
 FUTURE_B="agent-api-${RUN_TAG}-activity-future-b"
 future_activity() { jq -nc --arg id "$1" --arg s "$2" '{external_id: $id, activity_type: "walking",
@@ -2396,11 +2396,16 @@ assert_status "200" "an import with a deletion"
 printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 2, deleted: 1, pruned: 0}' >/dev/null ||
   fail "a HealthKit deletion did not delete the activity"
 app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(jq -nc \
-  --argjson b "$(future_activity "${FUTURE_B}" 2031-01-03T08:00:00Z)" \
-  '{p_source: "apple_health", p_upserts: [$b], p_complete_since: "2031-01-01T00:00:00Z"}')"
+  --arg b "${FUTURE_B}" \
+  '{p_source: "apple_health", p_complete_since: "2031-01-01T00:00:00Z"}')"
+assert_non_2xx "a complete window without its id list"
+# The closing call of a multi-batch backfill: no upserts of its own, the whole id list.
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(jq -nc \
+  --arg b "${FUTURE_B}" \
+  '{p_source: "apple_health", p_complete_since: "2031-01-01T00:00:00Z", p_complete_ids: [$b]}')"
 assert_status "200" "a complete backfill window"
-printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 1, deleted: 0, pruned: 1}' >/dev/null ||
-  fail "a complete window did not prune the activity the store no longer has"
+printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 0, deleted: 0, pruned: 1}' >/dev/null ||
+  fail "a complete window did not keep the listed activity and prune the one the store no longer has"
 [[ "$(run_psql "select string_agg(external_id, ',' order by external_id) from app_public.health_activities
   where user_id = '${USER_A_UUID}'::uuid and external_id like 'agent-api-${RUN_TAG}-%';")" == \
   "${FUTURE_B},${ACTIVITY_LIFT}" ]] || fail "deletion or pruning touched the wrong activities"

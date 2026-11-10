@@ -5,8 +5,9 @@
  * runs in Europe/London (jest.config.js); each case names the status's zone.
  */
 import {
-  ActivityQueryError, activityCursorFrom, buildCardioSummary, overlapReadSpan, overlappingSessionId,
-  parseActivityInstant, parseActivityRange, projectActivity, STRENGTH_ACTIVITY_TYPES,
+  ACTIVE_SESSION_MAX_MS, ActivityQueryError, activityCursorFrom, buildCardioSummary, overlapReadWindows,
+  overlappingSessionId, parseActivityInstant, parseActivityRange, projectActivity, STRENGTH_ACTIVITY_TYPES,
+  strictInstantMs,
   type ActivityRow, type OverlapSessionRow,
 } from '../../../supabase/functions/agent-api/activities.ts';
 import { trainingStatusWindow } from '../../../supabase/functions/agent-api/training-status.ts';
@@ -70,6 +71,15 @@ describe('overlappingSessionId', () => {
       .toBeNull();
   });
 
+  it('caps an unfinished session at twelve hours, so a forgotten one cannot swallow later strength work', () => {
+    expect(ACTIVE_SESSION_MAX_MS).toBe(12 * 60 * 60 * 1000);
+    const forgotten = session('forgotten', '2026-10-27T06:00:00Z', null, 'active');
+    expect(overlappingSessionId(strength('w', '2026-10-27T17:30:00Z', '2026-10-27T18:30:00Z'), [forgotten], NOW.getTime()))
+      .toBe('forgotten');
+    expect(overlappingSessionId(strength('w', '2026-10-27T18:00:00Z', '2026-10-27T18:30:00Z'), [forgotten], NOW.getTime()))
+      .toBeNull();
+  });
+
   it('ignores a completed session with no end and names the earliest of several matches', () => {
     const open = session('open', '2026-10-27T16:00:00Z', null);
     const later = session('b-later', '2026-10-27T17:30:00Z', '2026-10-27T19:00:00Z');
@@ -113,14 +123,21 @@ describe('projectActivity', () => {
   });
 });
 
-describe('overlapReadSpan', () => {
-  it('spans only the strength activities, and is null without one', () => {
-    expect(overlapReadSpan([activity('run')])).toBeNull();
-    expect(overlapReadSpan([
+describe('overlapReadWindows', () => {
+  it('reads around strength activities only, and nothing without one', () => {
+    expect(overlapReadWindows([activity('run')])).toEqual([]);
+  });
+
+  it('merges strength activities under a day apart and keeps far-apart ones separate, oldest first', () => {
+    expect(overlapReadWindows([
       activity('run', { started_at: '2026-10-01T00:00:00Z' }),
-      strength('a', '2026-10-20T10:00:00Z', '2026-10-20T11:00:00Z'),
-      strength('b', '2026-10-22T10:00:00Z', '2026-10-22T11:30:00Z'),
-    ])).toEqual({ fromMs: at('2026-10-20T10:00:00Z'), toMs: at('2026-10-22T11:30:00Z') });
+      strength('late', '2026-10-22T10:00:00Z', '2026-10-22T11:30:00Z'),
+      strength('old', '2025-04-02T18:00:00Z', '2025-04-02T19:00:00Z'),
+      strength('a', '2026-10-21T18:00:00Z', '2026-10-21T19:00:00Z'),
+    ])).toEqual([
+      { fromMs: at('2025-04-02T18:00:00Z'), toMs: at('2025-04-02T19:00:00Z') },
+      { fromMs: at('2026-10-21T18:00:00Z'), toMs: at('2026-10-22T11:30:00Z') },
+    ]);
   });
 });
 
@@ -132,12 +149,21 @@ describe('activity query parsing', () => {
     expect(parseActivityRange('2026-10-01T00:00:00Z', null)).toEqual({ from: '2026-10-01T00:00:00.000Z', to: null });
   });
 
-  it.each(['2026-11-01', '2026-11-01T00:00:00', 'yesterday', '2026-13-45T00:00:00Z'])(
+  it.each([
+    '2026-11-01', '2026-11-01T00:00:00', 'yesterday', '2026-13-45T00:00:00Z',
+    // Date.parse would roll these forward into real instants.
+    '2026-02-30T00:00:00Z', '2026-02-29T00:00:00Z', '2026-04-31T00:00:00Z', '2026-11-01T24:00:00Z',
+    '2026-11-01T00:60:00Z', '2026-11-01T00:00:00+24:00',
+  ])(
     'rejects %s: an instant needs a date, a time and a zone',
     (raw) => {
       expect(() => parseActivityInstant(raw, 'from')).toThrow(ActivityQueryError);
     },
   );
+
+  it('accepts a real leap day', () => {
+    expect(strictInstantMs('2028-02-29T12:00:00.123+02:00')).toBe(at('2028-02-29T10:00:00.123Z'));
+  });
 
   it('rejects an empty or reversed range', () => {
     expect(() => parseActivityRange('2026-11-01T00:00:00Z', '2026-11-01T00:00:00Z')).toThrow('from must be before to.');
@@ -148,7 +174,8 @@ describe('activity query parsing', () => {
     const cursor = { started_at: '2026-10-27T07:00:00+00:00', source: 'apple_health', external_id: 'abc' };
     expect(activityCursorFrom({ kind: 'activity', ...cursor })).toEqual(cursor);
     for (const bad of [
-      { ...cursor, started_at: 1 }, { ...cursor, started_at: 'soon' }, { ...cursor, started_at: '2026-13-40T00:00Z' }, { ...cursor, source: '' },
+      { ...cursor, started_at: 1 }, { ...cursor, started_at: 'soon' }, { ...cursor, started_at: '2026-13-40T00:00Z' },
+      { ...cursor, started_at: '2026-02-30T00:00:00+00:00' }, { ...cursor, source: '' },
       { ...cursor, external_id: 'x'.repeat(201) }, {},
     ]) {
       expect(() => activityCursorFrom(bad)).toThrow('Cursor is invalid.');
