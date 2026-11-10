@@ -364,6 +364,19 @@ describe('addPlanBlockToSession', () => {
     return { planId: created.id, blockId: blocks[0].id };
   };
 
+  it('attaches a plan to a chat-protected workout using its loaded epoch without losing logged sets', async () => {
+    const active = await seedActiveSession('def-squat', 'Back Squat', [{ weightValue: '80', repsValue: '8' }]);
+    db().update(sessions).set({ mergeRevision: 1 }).where(eq(sessions.id, active.sessionId)).run();
+    db().update(sessionExercises).set({ mergeRevision: 1 }).where(eq(sessionExercises.id, active.cardId)).run();
+    db().update(exerciseSets).set({ mergeRevision: 1 }).run();
+    const { blockId } = await createdPlanWithBlock();
+    expect(await addPlanBlockToSession(blockId, active.cardId, T1)).toMatchObject({ status: 'attached', sessionExerciseId: active.cardId });
+    const graph = (await loadSessionSnapshotById(active.sessionId))!;
+    expect(graph.exercises[0]).toMatchObject({ mergeRevision: 1, sourcePlanExerciseId: blockId });
+    expect(graph.exercises[0].sets[0]).toMatchObject({ weightValue: '80', repsValue: '8', sourcePlanSetId: null });
+    expect(performedSetRows().every(set => set.mergeRevision === 1)).toBe(true);
+  });
+
   it('creates an active session from the plan when none exists', async () => {
     const { blockId } = await createdPlanWithBlock();
     const result = await addPlanBlockToSession(blockId, undefined, T1);

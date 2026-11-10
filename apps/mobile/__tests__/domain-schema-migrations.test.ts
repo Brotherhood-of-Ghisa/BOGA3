@@ -142,8 +142,9 @@ describe('domain schema and runtime migrations', () => {
     // m0022 adds last_modified_by across the four authored plan tables, and
     // m0023 adds the muscle report group and tracked flag, and m0024 adds the
     // exercise rest timer default; m0025 adds merge revisions and account-private recovery;
-    // m0026 adds synced muscle targets; m0027 separates the Volume choice; m0028 adds reusable plan uses.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(29);
+    // m0026 adds synced muscle targets; m0027 separates the Volume choice; m0028 adds reusable plan uses;
+    // m0029 extends the revision fence to the session lifecycle; m0030 mirrors server-owned logging control.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(31);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -202,6 +203,8 @@ describe('domain schema and runtime migrations', () => {
       'm0026',
       'm0027',
       'm0028',
+      'm0029',
+      'm0030',
     ]);
   });
 

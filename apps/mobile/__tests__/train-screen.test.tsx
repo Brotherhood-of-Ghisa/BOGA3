@@ -215,6 +215,34 @@ describe('Train over real data', () => {
     expect(shownWorkout()).toBe('tab workout opened-elsewhere');
   });
 
+  it('opens the chosen older workout when Train has not mounted yet', async () => {
+    await seed('session-view');
+    localDataClient().prepare("insert into sessions(id,status,started_at,created_at,updated_at) values('newest-active','active',1,1,9999999999999)").run();
+    const { result } = renderHook(() => useOpenActiveWorkout());
+    act(() => result.current(ACTIVE));
+    renderWithTheme(<TrainScreen isFocused />);
+    await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
+    // Flush the initial default lookup too; it must not replace the queued choice.
+    await act(async () => undefined);
+    expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`);
+    expect(activeSessionCount()).toBe(2);
+  });
+
+  it('keeps the explicitly selected active workout through focus when another active workout is newer', async () => {
+    const { result } = renderHook(() => useOpenActiveWorkout());
+    await seed('session-view');
+    const db = localDataClient();
+    db.prepare("insert into sessions(id,status,started_at,created_at,updated_at) values('second-active','active',1,1,9999999999999)").run();
+    const view = renderWithTheme(<TrainScreen isFocused />);
+    await waitFor(() => expect(shownWorkout()).toBe('tab workout second-active'));
+    view.rerender(<TrainScreen isFocused={false} />);
+    act(() => result.current(ACTIVE));
+    view.rerender(<TrainScreen isFocused />);
+    await waitFor(() => expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`));
+    expect(await sessionList.findActiveSessionId(ACTIVE)).toBe(ACTIVE);
+    expect(activeSessionCount()).toBe(2);
+  });
+
   it('keeps a resumed workout visible when focus returns after its earlier Finish', async () => {
     const { result } = renderHook(() => useOpenActiveWorkout());
     await seed('session-view');

@@ -22,6 +22,7 @@ import {
   revokeConnectedAgent,
   setAgentPlanEditEnabled,
   setAgentPlanPermission,
+  setAgentWorkoutLoggingEnabled,
   type ConnectedAgent,
 } from '@/src/auth/connected-agents';
 
@@ -37,10 +38,12 @@ type ConnectedAgentCardProps = {
   onRevoke: (agent: ConnectedAgent) => void;
   onTogglePlanAccess: (agent: ConnectedAgent, next: boolean) => void;
   onTogglePlanEdit: (agent: ConnectedAgent, next: boolean) => void;
+  onToggleWorkoutLogging: (agent: ConnectedAgent, next: boolean) => void;
   revokeDisabled: boolean;
   revoking: boolean;
   savingAccess: boolean;
   savingEdit: boolean;
+  savingWorkoutLogging: boolean;
 };
 
 function ConnectedAgentCard({
@@ -48,10 +51,12 @@ function ConnectedAgentCard({
   onRevoke,
   onTogglePlanAccess,
   onTogglePlanEdit,
+  onToggleWorkoutLogging,
   revokeDisabled,
   revoking,
   savingAccess,
   savingEdit,
+  savingWorkoutLogging,
 }: ConnectedAgentCardProps) {
   const text = useUiText();
   const tone = useUiTextTone();
@@ -95,7 +100,7 @@ function ConnectedAgentCard({
       <View style={styles.permission}>
         <SwitchRow
           disabled={isAccessSwitchDisabled}
-          label="Allow this coach to make changes"
+          label="Allow changes"
           onValueChange={(value) => {
             onTogglePlanAccess(agent, value);
           }}
@@ -114,11 +119,11 @@ function ConnectedAgentCard({
           allowFontScaling={false}
           style={[text.meta, styles.permissionDisclosure]}
           testID={`connected-agent-plan-disclosure-${agent.clientId}`}>
-          {`Lets ${agent.name} read your upcoming and unscheduled plans, create new plans and programmes, and add, edit, delete or restore exercises and their muscles. Exercise changes also recalculate your past figures. It can never start a workout or change your logged sets.`}
+          {`Lets ${agent.name} read your upcoming and unscheduled plans, create new plans and programmes, set weekly muscle targets, and add, edit, delete or restore exercises and their muscles. Exercise changes also recalculate your past figures. This setting does not allow workout logging.`}
         </Text>
         <SwitchRow
           disabled={isEditSwitchDisabled}
-          label="Allow this coach to edit plans"
+          label="Allow plan edits"
           onValueChange={(value) => {
             onTogglePlanEdit(agent, value);
           }}
@@ -129,7 +134,23 @@ function ConnectedAgentCard({
           allowFontScaling={false}
           style={[text.meta, styles.permissionDisclosure]}
           testID={`connected-agent-plan-edit-disclosure-${agent.clientId}`}>
-          {`Lets ${agent.name} edit pending session plans and training programmes. It can never edit workouts in progress or change logged workout history.`}
+          {`Lets ${agent.name} edit pending session plans and training programmes. This setting does not allow workout logging.`}
+        </Text>
+        <SwitchRow
+          disabled={savingWorkoutLogging || agent.workoutLoggingEnabled === 'unavailable'}
+          label="Allow workout logging"
+          onValueChange={value => onToggleWorkoutLogging(agent, value)}
+          testID={`connected-agent-workout-logging-${agent.clientId}`}
+          value={agent.workoutLoggingEnabled === true}
+        />
+        {agent.workoutLoggingEnabled === 'unavailable' ? <Text allowFontScaling={false}
+          style={[text.meta, tone.danger, styles.permissionUnavailable]}
+          testID={`connected-agent-workout-unavailable-${agent.clientId}`}>
+          Workout logging settings are unavailable. Retry loading connected agents.
+        </Text> : null}
+        <Text allowFontScaling={false} style={[text.meta, styles.permissionDisclosure]}
+          testID={`connected-agent-workout-disclosure-${agent.clientId}`}>
+          {`Lets ${agent.name} start and finish workouts without a plan, and record, correct or remove their sets while active. It cannot edit finished or plan-backed workouts.`}
         </Text>
       </View>
       {/* An outline in `danger`, behind the unchanged Alert confirm. */}
@@ -148,6 +169,33 @@ function ConnectedAgentCard({
   );
 }
 
+function useWorkoutLoggingPermission(
+  setAgents: (update: (current: ConnectedAgent[]) => ConnectedAgent[]) => void,
+  setError: (message: string | null) => void,
+) {
+  const [saving, setSaving] = useState<ReadonlySet<string>>(new Set());
+  const toggle = async (agent: ConnectedAgent, next: boolean) => {
+    if (saving.has(agent.clientId)) return;
+    setSaving(current => new Set([...current, agent.clientId]));
+    setError(null);
+    const setValue = (value: ConnectedAgent['workoutLoggingEnabled']) => setAgents(current => current.map(candidate =>
+      candidate.clientId === agent.clientId && candidate.grantedAt === agent.grantedAt
+        ? { ...candidate, workoutLoggingEnabled: value } : candidate));
+    try {
+      await setAgentWorkoutLoggingEnabled(agent.clientId, next, agent.grantedAt);
+      setValue(next);
+    } catch {
+      setValue('unavailable');
+      setError('Could not confirm workout logging access. Reload to check.');
+    } finally {
+      setSaving(current => {
+        const remaining = new Set(current); remaining.delete(agent.clientId); return remaining;
+      });
+    }
+  };
+  return { savingWorkoutClientIds: saving, toggleWorkoutLogging: toggle };
+}
+
 function useConnectedAgents(userId: string | null) {
   const [agents, setAgents] = useState<ConnectedAgent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +203,7 @@ function useConnectedAgents(userId: string | null) {
   const [revokingClientId, setRevokingClientId] = useState<string | null>(null);
   const [savingAccessClientIds, setSavingAccessClientIds] = useState<ReadonlySet<string>>(new Set());
   const [savingEditClientIds, setSavingEditClientIds] = useState<ReadonlySet<string>>(new Set());
+  const workoutLogging = useWorkoutLoggingPermission(setAgents, setError);
 
   // Fetches and applies the agents; the caller has already shown loading.
   const fetchAgents = () =>
@@ -305,6 +354,7 @@ function useConnectedAgents(userId: string | null) {
   };
 
   return {
+    ...workoutLogging,
     agents,
     error,
     isLoading,
@@ -328,6 +378,8 @@ export default function ConnectedAgentsScreen() {
     revokingClientId,
     savingAccessClientIds,
     savingEditClientIds,
+    savingWorkoutClientIds,
+    toggleWorkoutLogging,
     loadAgents,
     confirmRevoke,
     togglePlanAccess,
@@ -381,6 +433,8 @@ export default function ConnectedAgentsScreen() {
           revoking={revokingClientId === agent.clientId}
           savingAccess={savingAccessClientIds.has(agent.clientId)}
           savingEdit={savingEditClientIds.has(agent.clientId)}
+          savingWorkoutLogging={savingWorkoutClientIds.has(agent.clientId)}
+          onToggleWorkoutLogging={toggleWorkoutLogging}
         />
       ))}
 

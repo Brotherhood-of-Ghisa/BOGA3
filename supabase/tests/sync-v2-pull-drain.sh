@@ -58,7 +58,7 @@ http_request() {
   fi
   [[ -n "${prefer}" ]] && curl_args+=(-H "Prefer: ${prefer}")
   if [[ -n "${body}" ]]; then
-    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" --data "${body}")
+    curl_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-7}" -H "Content-Type: application/json" --data "${body}")
   fi
   REQUEST_STATUS="$(curl "${curl_args[@]}" "${url}")"
   REQUEST_BODY="$(cat "${response_file}")"
@@ -105,7 +105,7 @@ sign_in() {
   REQUEST_STATUS="$(curl --silent --show-error \
     -X POST \
     -H "apikey: ${ANON_KEY}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-7}" -H "Content-Type: application/json" \
     -o "${response_file}" \
     -w "%{http_code}" \
     --data "${payload}" \
@@ -222,11 +222,13 @@ SEED_PAYLOAD="$(jq -nc \
 
     # Layer 3 — sessions (parent for Layer 4 cards).
     {type: "sessions", id: ("pd-" + $tag + "-sess-1"), client_updated_at_ms: ($b + 60),
-     fields: {gym_id: ("pd-" + $tag + "-gym-1"), source_plan_id: null, source_plan_use_id: null, status: "active",
+     fields: {merge_revision: 0, gym_id: ("pd-" + $tag + "-gym-1"), source_plan_id: null, source_plan_use_id: null,
+              logging_client_id: null, logging_granted_at: null, status: "active",
               started_at: ($b + 60), completed_at: null, duration_sec: null,
               created_at: ($b + 60), updated_at: ($b + 60), deleted_at: null}},
     {type: "sessions", id: ("pd-" + $tag + "-sess-2"), client_updated_at_ms: ($b + 70),
-     fields: {gym_id: ("pd-" + $tag + "-gym-2"), source_plan_id: null, source_plan_use_id: null, status: "active",
+     fields: {merge_revision: 0, gym_id: ("pd-" + $tag + "-gym-2"), source_plan_id: null, source_plan_use_id: null,
+              logging_client_id: null, logging_granted_at: null, status: "active",
               started_at: ($b + 70), completed_at: null, duration_sec: null,
               created_at: ($b + 70), updated_at: ($b + 70), deleted_at: null}},
     # Layer 1 — mappings/tags/links (parents live at Layer 0).

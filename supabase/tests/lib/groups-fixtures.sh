@@ -126,7 +126,7 @@ rpc() {
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${bearer}" \
     -H "${GROUP_CONTRACT_HEADER}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-7}" -H "Content-Type: application/json" \
     -H "Content-Profile: app_public" \
     --data "${body}" \
     "${API_URL}/rest/v1/rpc/${name}"
@@ -142,7 +142,7 @@ rest() {
     -H "Content-Profile: app_public"
     -H "Prefer: return=representation")
   if [[ -n "${body}" ]]; then
-    args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" --data "${body}")
+    args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-7}" -H "Content-Type: application/json" --data "${body}")
   fi
   http_call "${args[@]}" "${API_URL}/rest/v1/${table}?${query}"
 }
@@ -150,7 +150,7 @@ rest() {
 # eval_drain [secret]: POST group-eval (direct-drain mode); STATUS/BODY hold the reply.
 eval_drain() {
   http_call -X POST -H "${GROUP_CONTRACT_HEADER}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-7}" -H "Content-Type: application/json" \
     -H "x-group-eval-secret: ${1-${EVAL_SECRET}}" \
     --data '{}' "${API_URL}/functions/v1/group-eval"
 }
@@ -180,7 +180,7 @@ sign_in() {
   local email="$1"
   http_call -X POST \
     -H "apikey: ${ANON_KEY}" -H "${GROUP_CONTRACT_HEADER}" \
-    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" \
+    -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-7}" -H "Content-Type: application/json" \
     --data "$(jq -nc --arg e "${email}" --arg p "${PASSWORD}" '{email: $e, password: $p}')" \
     "${API_URL}/auth/v1/token?grant_type=password"
   [[ "${STATUS}" == "200" ]] || fail "password sign-in for ${email}"
@@ -250,7 +250,7 @@ e_session() {
   jq -nc --arg id "$1" --argjson s "$2" --arg st "$3" --argjson done "$4" --argjson dur "$5" \
     --argjson del "$6" --argjson c "$7" --arg gym "${8:-}" \
     '{type: "sessions", id: $id, client_updated_at_ms: $c,
-      fields: {gym_id: (if $gym == "" then null else $gym end), status: $st, started_at: $s,
+      fields: {merge_revision: 0, gym_id: (if $gym == "" then null else $gym end), status: $st, started_at: $s,
                completed_at: $done, duration_sec: $dur, created_at: $s, updated_at: $c, deleted_at: $del}}'
 }
 # e_se <id> <session> <definition|""> <order> <name> <cuam> [deleted_ms]

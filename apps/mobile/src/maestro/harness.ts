@@ -33,6 +33,7 @@ export type MaestroHarnessFixtureName =
   | 'bodyweight-rm-volume'
   | 'exercise-page'
   | 'session-view'
+  | 'session-view-ai'
   | 'exercise-browser'
   // A completed history dated relative to now: Today's Progress card, populated.
   | 'today-progress'
@@ -97,6 +98,7 @@ export const resolveMaestroHarnessFixtureName = (
   value === 'bodyweight-rm-volume' ||
   value === 'exercise-page' ||
   value === 'session-view' ||
+  value === 'session-view-ai' ||
   value === 'exercise-browser' ||
   value === 'today-progress' ||
   value === 'muscle-report'
@@ -222,6 +224,7 @@ export const runMaestroHarnessFixture = async (fixtureName: MaestroHarnessFixtur
   if (fixtureName === 'session-view') {
     await seedSessionViewFixture();
   }
+  if (fixtureName === 'session-view-ai') await seedSessionViewFixture({ aiControlled: true });
   if (fixtureName === 'today-progress') await seedTodayProgressFixture();
   if (fixtureName === 'muscle-report') await seedMuscleReportFixture();
 };

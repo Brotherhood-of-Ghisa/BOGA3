@@ -166,6 +166,22 @@ export class BogaAgentApi {
     );
   }
 
+  async getActiveWorkout(
+    accessToken: string,
+    input: { session_id?: string; cursor?: string; limit?: number; revision?: string },
+  ): Promise<Record<string, unknown>> {
+    return this.#getObject('v1/agent/workouts/active', accessToken, input);
+  }
+
+  async writeWorkout(
+    accessToken: string,
+    operation: 'start' | 'log-sets' | 'update-set' | 'delete-set' | 'finish',
+    input: Record<string, unknown> & { idempotency_key: string },
+  ): Promise<Record<string, unknown>> {
+    const { idempotency_key, ...body } = input;
+    return this.#postObject(`v1/agent/workouts/${operation}`, accessToken, idempotency_key, body);
+  }
+
   async getRecentWorkouts(
     accessToken: string,
     input: { cursor?: string; limit?: number },

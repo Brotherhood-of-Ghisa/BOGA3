@@ -28,6 +28,8 @@ type SessionTopBarProps =
       titleBarTimer?: Omit<TitleBarTimerProps, 'testID'>;
       // While a Finish is being written, so a second tap cannot start another.
       finishDisabled?: boolean;
+      aiControlled?: boolean;
+      controlPending?: boolean;
     }
   | {
       // A completed session being edited: no options (nothing to abandon),
@@ -116,7 +118,15 @@ export function SessionTopBar(props: SessionTopBarProps) {
           testID="session-view-options-button"
         />
       ) : null}
-      {onPrimary && props.mode === 'active' ? (
+      {props.mode === 'active' && props.aiControlled ? (
+        <IconButton
+          accessibilityLabel={props.controlPending ? 'Session control is not confirmed. Open session controls' : 'AI is logging. Session is read only. Open session controls'}
+          name="ai-logging"
+          onPress={props.onOpenOptions}
+          testID="session-view-ai-control"
+          tone="accent"
+        />
+      ) : onPrimary && props.mode === 'active' ? (
         // Finish is a tick, the screen's one `accent` action as an icon.
         <IconButton
           accessibilityLabel={copy.a11y}

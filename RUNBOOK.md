@@ -229,7 +229,7 @@ A linked worktree cannot use `env dev` — boot its own stack with `./boga db up
 `mcp-smoke` starts or reuses the slot stack, migrates, provisions the
 deterministic users, inserts a unique training fixture, completes a real
 dynamic-registration + authorization-code + PKCE consent flow, builds and starts
-`services/boga-mcp`, calls each of the four tools with the OAuth token, verifies
+`services/boga-mcp`, calls every registered tool with the OAuth token, verifies
 the authorizing fixture IDs, and cleans up grant, audit metadata, process and
 fixture rows. To reuse an already-issued token, supply all four values:
 

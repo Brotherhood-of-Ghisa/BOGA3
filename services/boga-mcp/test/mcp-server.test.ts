@@ -153,7 +153,7 @@ const initializeRequest = {
   },
 };
 
-const startMcp = async () => {
+const startMcp = async (overrides: Record<string, Response> = {}) => {
   const requests: Array<{ method: string; url: URL; headers: Headers; body?: string }> = [];
   const fetchImplementation: typeof fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
@@ -162,6 +162,7 @@ const startMcp = async () => {
     const body = init?.body ? String(init.body) : undefined;
     requests.push({ body, headers, method, url });
     expect(headers.get('authorization')).toBe(`Bearer ${token}`);
+    if (overrides[url.pathname]) return overrides[url.pathname].clone();
     const response = responses[url.pathname];
     if (!response) {
       return Response.json(
@@ -219,7 +220,7 @@ afterEach(async () => {
 });
 
 describe('BoGa MCP server', () => {
-  it('discovers exactly sixteen tools with correct annotations', async () => {
+  it('discovers exactly twenty-two tools with correct annotations', async () => {
     const running = await startMcp();
     active.push(running);
     const result = await running.client.listTools();
@@ -229,6 +230,9 @@ describe('BoGa MCP server', () => {
       'create_session_plan',
       'create_training_programme',
       'delete_exercise',
+      'delete_set',
+      'finish_workout',
+      'get_active_workout',
       'get_exercise_context',
       'get_exercise_history',
       'get_recent_workouts',
@@ -237,12 +241,16 @@ describe('BoGa MCP server', () => {
       'get_upcoming_session_plans',
       'get_workout_detail',
       'list_muscles',
+      'log_sets',
       'restore_exercise',
       'search_exercises',
       'set_muscle_targets',
+      'start_workout',
       'update_exercise',
+      'update_set',
     ]);
     const readOnlyNames = new Set([
+      'get_active_workout',
       'get_exercise_context',
       'get_exercise_history',
       'get_recent_workouts',
@@ -254,10 +262,10 @@ describe('BoGa MCP server', () => {
       'search_exercises',
     ]);
     // The instructions count the read-only tools a client can call.
-    expect(readOnlyNames.size).toBe(9);
-    expect(running.client.getInstructions()).toContain('Nine read-only tools');
+    expect(readOnlyNames.size).toBe(10);
+    expect(running.client.getInstructions()).toContain('Ten read-only tools');
     // Edits, deletes and new targets replace what the person had, so clients confirm them.
-    const destructiveNames = new Set(['delete_exercise', 'set_muscle_targets', 'update_exercise']);
+    const destructiveNames = new Set(['delete_exercise', 'set_muscle_targets', 'update_exercise', 'update_set', 'delete_set', 'finish_workout']);
     for (const tool of result.tools) {
       if (destructiveNames.has(tool.name)) {
         expect(tool.annotations).toMatchObject({
@@ -282,6 +290,86 @@ describe('BoGa MCP server', () => {
         });
       }
     }
+  });
+
+  it('forwards workout IDs, page revisions, raw results, token and operation headers to the API', async () => {
+    const graph = 'a'.repeat(32);
+    const snapshot = { visibility: 'server_synced_only', workout: { id: 'workout/a', revision: graph,
+      status: 'completed', requires_app: true, control: { owner: 'human', client_id: null, can_edit: false } },
+      rows: [{ type: 'set', id: 'set-a', weight_kg: '80', reps: '8' }], next_cursor: 's:next' };
+    const mutation = { session_id: 'workout/a', revision: graph, status: 'active', idempotent_replay: false,
+      session_exercise_id: 'block-a', set_ids: ['set-a'], control: { owner: 'mcp', client_id: 'coach', can_edit: true } };
+    const running = await startMcp({ ...Object.fromEntries(['start', 'log-sets', 'update-set', 'delete-set', 'finish']
+      .map(operation => [`/functions/v1/agent-api/v1/agent/workouts/${operation}`, envelopeResponse(mutation)])),
+      '/functions/v1/agent-api/v1/agent/workouts/active': envelopeResponse(snapshot) });
+    active.push(running);
+    const read = await running.client.callTool({ name: 'get_active_workout', arguments: {
+      session_id: 'workout/a', revision: graph, limit: 2, cursor: 'block:next',
+    } });
+    expect(read.structuredContent).toEqual(snapshot);
+    const get = running.requests.find(r => r.url.pathname.endsWith('/workouts/active'))!;
+    expect(get.method).toBe('GET');
+    expect(Object.fromEntries(get.url.searchParams)).toEqual({ session_id: 'workout/a', revision: graph, limit: '2', cursor: 'block:next' });
+    const common = { session_id: 'workout/a', expected_revision: graph };
+    const set = { weight_kg: '80', reps: 8, set_type: 'rir_2' };
+    const writes: Array<[string, string, Record<string, unknown>]> = [
+      ['start_workout', 'start', { gym_id: null }],
+      ['log_sets', 'log-sets', { ...common, exercise_id: 'exercise-a', sets: [set] }],
+      ['log_sets', 'log-sets', { ...common, session_exercise_id: 'block-a', sets: [set, set] }],
+      ['update_set', 'update-set', { ...common, set_id: 'set-a', set }],
+      ['delete_set', 'delete-set', { ...common, set_id: 'set-a' }],
+      ['finish_workout', 'finish', common],
+    ];
+    for (const [name, operation, body] of writes) {
+      const before = running.requests.length;
+      const result = await running.client.callTool({ name, arguments: { ...body, idempotency_key: 'stable-key' } });
+      expect(result.structuredContent).toEqual(mutation);
+      const posted = running.requests.slice(before).find(r => r.method === 'POST')!;
+      expect(posted.url.pathname).toBe(`/functions/v1/agent-api/v1/agent/workouts/${operation}`);
+      expect(posted.headers.get('idempotency-key')).toBe('stable-key');
+      expect(posted.headers.get('authorization')).toBe(`Bearer ${token}`);
+      expect(JSON.parse(posted.body!)).toEqual(body);
+    }
+  });
+
+  it.each([
+    ['start_workout', { idempotency_key: 'key', owner_user_id: 'another' }],
+    ['start_workout', { idempotency_key: 'bad\nheader' }],
+    ['log_sets', { sets: [{ weight_kg: '80', reps: 8 }] }],
+    ['log_sets', { exercise_id: 'e', session_exercise_id: 'b', sets: [{ weight_kg: '80', reps: 8 }] }],
+    ['log_sets', { exercise_id: 'e', sets: [] }],
+    ['log_sets', { exercise_id: 'e', sets: Array.from({ length: 31 }, () => ({ weight_kg: '80', reps: 8 })) }],
+    ['log_sets', { exercise_id: 'e', sets: [{ weight_kg: '1e3', reps: 8 }] }],
+    ['log_sets', { exercise_id: 'e', sets: [{ weight_kg: '-1', reps: 8 }] }],
+    ['log_sets', { exercise_id: 'e', sets: [{ weight_kg: '80', reps: 1000 }] }],
+    ['log_sets', { exercise_id: 'e', sets: [{ weight_kg: '80', reps: 2.5 }] }],
+    ['log_sets', { exercise_id: 'e', sets: [{ weight_kg: '80', reps: 8, set_type: 'rir_5' }] }],
+    ['log_sets', { exercise_id: 'e', sets: [{ weight_kg: '80', reps: 8, performance_status: 'planned' }] }],
+    ['update_set', { set_id: 's', set: { weight_kg: '80', reps: 8, target_reps: 9 } }],
+    ['finish_workout', { expected_revision: 1 }],
+    ['get_active_workout', { cursor: 'x'.repeat(203) }],
+    ['get_active_workout', { limit: 101 }],
+    ['get_active_workout', { owner_user_id: 'another' }],
+  ])('rejects invalid %s input without a workout API request', async (name, patch) => {
+    const running = await startMcp(); active.push(running);
+    const input = name === 'start_workout' || name === 'get_active_workout' ? patch : {
+      session_id: 's', expected_revision: 'a'.repeat(32), idempotency_key: 'key', ...patch,
+    };
+    const result = await running.client.callTool({ name, arguments: input });
+    expect(result.isError).toBe(true);
+    expect(running.requests.filter(r => r.url.pathname.includes('/workouts/'))).toHaveLength(0);
+  });
+
+  it.each(['WORKOUT_PERMISSION_REQUIRED', 'REVISION_CONFLICT', 'ACTIVE_WORKOUT_CONFLICT', 'WORKOUT_NOT_ACTIVE',
+    'AMBIGUOUS_EXERCISE_BLOCK', 'WORKOUT_REQUIRES_APP', 'WORKOUT_CONTROL_REQUIRED', 'IDEMPOTENCY_CONFLICT'])('preserves actionable workout error %s', async code => {
+    const running = await startMcp({ '/functions/v1/agent-api/v1/agent/workouts/start': Response.json({
+      error: { code, message: 'Read current state before continuing.', request_id: 'workout-request' },
+    }, { status: code === 'WORKOUT_PERMISSION_REQUIRED' ? 403 : 409 }) }); active.push(running);
+    const result = await running.client.callTool({ name: 'start_workout', arguments: { idempotency_key: 'key' } });
+    expect(result.isError).toBe(true);
+    expect(JSON.parse((result.content as Array<{ text: string }>)[0].text)).toEqual({ error: {
+      code, message: 'Read current state before continuing.', request_id: 'workout-request',
+    } });
   });
 
   it('translates all tools into the dedicated API routes', async () => {

@@ -1,3 +1,4 @@
+import type { MergeWireEntity } from '@/src/exercise-core/merge-types';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import type { ExerciseListItem } from '@/src/exercise-catalog/list-model';
 import type { ExerciseBlockHistorySuggestedPlan } from '@/src/data';
@@ -41,6 +42,7 @@ export type SessionExercise = {
 };
 
 export type Session = {
+  editBaseline?: MergeWireEntity[];
   mergeRevisions?: Record<string, number>;
   dateTime: string;
   locationId: string | null;

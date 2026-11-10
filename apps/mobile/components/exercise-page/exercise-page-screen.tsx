@@ -79,6 +79,8 @@ type ExercisePageScreenProps = {
 type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'switcher';
 
 const LOAD_ERROR_MESSAGES = {
+  'ai-controlled': 'AI is logging this session. Take over logging in Session options to edit.',
+  'control-unconfirmed': 'Session control is not confirmed. Retry the handoff in Session options.',
   'missing-session': 'This session no longer exists.',
   'not-editable': 'This session was deleted, so its sets cannot be edited here.',
   'missing-exercise': 'This exercise is no longer in the session.',

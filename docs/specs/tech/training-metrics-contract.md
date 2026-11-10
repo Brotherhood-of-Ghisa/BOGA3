@@ -73,7 +73,8 @@ volume totals, volume heatmap cells and Volume records when it has a
 volume-included set. A scope with neither kind contributes nothing.
 
 **The workout in progress.** Progress's tables, `/progress-history` and
-Today's week and period also count the active session the recorder opens, dated
+Today's week and period also count the most recent active, non-deleted session,
+independently of the workout explicitly opened in Train, dated
 the instant before the read: where finishing it now would date it. It takes no
 PR until completed. Lists (the week drill-down, Sessions, Today's session
 card), records, the catalogue, groups and coaching read completed sessions

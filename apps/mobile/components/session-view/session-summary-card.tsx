@@ -12,7 +12,7 @@ type SessionSummaryCardProps = {
   workingSetCount: number;
   volume: string;
   // Opens the gym picker; the whole Gym cell is the target.
-  onPressGym: () => void;
+  onPressGym?: () => void;
   // A completed session being edited: its Start/End fields, above the row.
   times?: SessionTimesFieldsProps;
 };
@@ -34,9 +34,11 @@ export function SessionSummaryCard({
       {times ? <SessionTimesFields {...times} /> : null}
       <View style={styles.row}>
         <Pressable
-          accessibilityHint="Choose the gym for this session"
+          accessibilityHint={onPressGym ? 'Choose the gym for this session' : undefined}
           accessibilityLabel={`Gym ${gymName ?? 'No gym'}`}
           accessibilityRole="button"
+          accessibilityState={{ disabled: !onPressGym }}
+          disabled={!onPressGym}
           hitSlop={uiSpace.sm}
           onPress={onPressGym}
           style={styles.gym}

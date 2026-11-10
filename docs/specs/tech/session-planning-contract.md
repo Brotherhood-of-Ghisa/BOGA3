@@ -30,7 +30,8 @@ block lifecycle, or the agent plan-write API and MCP tools.
    `public.agent_plan_permissions` (`plan_access_enabled = true`). Mutating
    authored plans or programmes requires separate `plan_edit_enabled = true`
    permission (§6.1). Agents mutate pending, unattached blocks under optimistic
-   graph version tokens; they can never touch performed rows or advance workout lifecycle.
+   graph version tokens. These plan permissions never authorize performed-row
+   or lifecycle writes; independent logging authority is [[agents.write-access]].
 6. **Exhaustive coaching reads.** Coaching history reads drain qualifying history
    via stable keyset cursors to exhaustion. Silent row caps and unpaginated
    truncation are prohibited.
@@ -163,7 +164,7 @@ reject missing entities or forward references.
 | 5 | `exercise_sets`, assignments, private bodyweight readings |
 
 Migration `0028_true_outlaw_kid` resets `pull_cursor` to `{}`; replay is LWW
-idempotent. Header `x-boga-sync-protocol: 6` gates the changed projections;
+idempotent. Header `x-boga-sync-protocol: 7` gates the changed projections;
 older builds halt with `UPDATE_REQUIRED`. Deploy only in the operator-agreed
 coordinated backend/app release once the new build is available.
 

@@ -17,6 +17,7 @@ const exerciseQuery = required('BOGA_MCP_SMOKE_EXERCISE_QUERY');
 const smokeMuscleId = process.env.BOGA_MCP_SMOKE_MUSCLE_ID?.trim() ?? '';
 // Seeded beside it with report_group `mcp_smoke_group` and tracked 0.
 const smokeGroupedMuscleId = process.env.BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID?.trim() ?? '';
+const skipReads = process.env.BOGA_MCP_SMOKE_SKIP_READS === '1';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -71,8 +72,9 @@ const assertRejectedTokenIsChallenged = async (): Promise<void> => {
 };
 
 try {
-  await assertRejectedTokenIsChallenged();
+  if (!skipReads) await assertRejectedTokenIsChallenged();
   await client.connect(transport);
+  if (!skipReads) {
   const tools = await client.listTools();
   const names = tools.tools.map((tool) => tool.name).sort();
   const expectedNames = [
@@ -80,6 +82,9 @@ try {
     'create_session_plan',
     'create_training_programme',
     'delete_exercise',
+    'delete_set',
+    'finish_workout',
+    'get_active_workout',
     'get_exercise_context',
     'get_exercise_history',
     'get_recent_workouts',
@@ -88,15 +93,25 @@ try {
     'get_upcoming_session_plans',
     'get_workout_detail',
     'list_muscles',
+    'log_sets',
     'restore_exercise',
     'search_exercises',
     'set_muscle_targets',
+    'start_workout',
     'update_exercise',
+    'update_set',
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
     throw new Error(`Unexpected MCP tools: ${names.join(', ')}`);
   }
+  }
 
+  // Read projections once, not in every permission phase; keep the whole real-token
+  // proof below production rate limits without sleeps or relaxed limits.
+  let context: Record<string, unknown> = {};
+  let trainingStatus: Record<string, unknown> = {};
+  let workoutRows: unknown[] = [];
+  if (!skipReads) {
   const profile = structured(
     await client.callTool({ arguments: {}, name: 'get_training_profile' }),
     'get_training_profile',
@@ -124,7 +139,7 @@ try {
     throw new Error('Exercise search did not return the test user exercise.');
   }
 
-  const context = structured(
+  context = structured(
     await client.callTool({
       arguments: { exercise_id: expectedExerciseId, recent_sessions: 5 },
       name: 'get_exercise_context',
@@ -139,7 +154,7 @@ try {
     await client.callTool({ arguments: { limit: 5 }, name: 'get_recent_workouts' }),
     'get_recent_workouts',
   );
-  const workoutRows = Array.isArray(workouts.workouts) ? workouts.workouts : [];
+  workoutRows = Array.isArray(workouts.workouts) ? workouts.workouts : [];
   if (
     !workoutRows.some((workout) =>
       isObject(workout) && workout.id === expectedSessionId
@@ -149,7 +164,7 @@ try {
   }
 
   // One bounded status: the seeded exercise is a favourite of the last 28 days.
-  const trainingStatus = structured(
+  trainingStatus = structured(
     await client.callTool({ arguments: {}, name: 'get_training_status' }),
     'get_training_status',
   );
@@ -230,6 +245,16 @@ try {
     throw new Error('Workout detail page 2 did not return the second set.');
   }
 
+  } else if (process.env.BOGA_MCP_SMOKE_PLAN_ENABLED === '1') {
+    trainingStatus = structured(await client.callTool({ name: 'get_training_status', arguments: {} }), 'targets baseline');
+  }
+  if (smokeMuscleId && !skipReads) {
+    const denied = await client.callTool({ name: 'get_active_workout', arguments: {} });
+    if (!denied.isError || !JSON.stringify(denied).includes('WORKOUT_PERMISSION_REQUIRED')) {
+      throw new Error('Workout discovery did not require its independent permission.');
+    }
+  }
+
   // Planning tools: when permission is disabled, plan tools MUST fail with PLAN_PERMISSION_REQUIRED
   const planPermissionEnabled = process.env.BOGA_MCP_SMOKE_PLAN_ENABLED === '1';
   if (!planPermissionEnabled) {
@@ -247,6 +272,7 @@ try {
       throw new Error('create_session_plan succeeded or failed without PLAN_PERMISSION_REQUIRED when disabled.');
     }
 
+    if (!skipReads) {
     const unauthRead = await client.callTool({
       arguments: {},
       name: 'get_upcoming_session_plans',
@@ -254,8 +280,9 @@ try {
     if (!unauthRead.isError || !JSON.stringify(unauthRead).includes('PLAN_PERMISSION_REQUIRED')) {
       throw new Error('get_upcoming_session_plans succeeded or failed without PLAN_PERMISSION_REQUIRED when disabled.');
     }
+    }
 
-    if (smokeMuscleId) {
+    if (smokeMuscleId && !skipReads) {
       const unauthExercise = await client.callTool({
         arguments: {
           exercise: { muscles: [{ muscle_id: smokeMuscleId, role: 'primary' }], name: `${exerciseQuery} Denied` },
@@ -543,7 +570,7 @@ try {
     }
   }
 
-  if (process.env.BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT === '1') {
+  if (!skipReads && process.env.BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT === '1') {
     const performance = Array.isArray(context.recent_performances) ? context.recent_performances[0] : null;
     const sets = isObject(performance) && Array.isArray(performance.sets) ? performance.sets : [];
     const set = sets[0];
@@ -565,5 +592,5 @@ try {
   await client.close();
 }
 
-console.log('[boga-mcp-smoke] PASS: rejected token challenged; sixteen tools discovered and verified');
+console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-two tools discovered and reads/denials verified');
 

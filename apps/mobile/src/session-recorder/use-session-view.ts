@@ -6,7 +6,7 @@ import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import type { Session } from '@/components/session-recorder/types';
 import type { RecordBaseline } from '@/src/exercise-calculations/records';
 import { loadSessionInsightHistory, type PersonalRecordSessionInput } from '@/src/session-insights';
-import { loadLatestSessionDraftSnapshot, loadLocalGymById, loadSessionSnapshotById } from '@/src/data';
+import { loadLocalGymById, loadSessionSnapshotById } from '@/src/data';
 import { loadEarlierBestsByDefinition, recordBaselinesOf } from '@/src/data/exercise-session-facts';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { getAccountLocalPreferenceAccountRevision } from '@/src/preferences/account-local';
@@ -42,14 +42,11 @@ export type SessionViewState =
 // The route's session: the active draft when it is still `sessionId`, else a
 // completed (not deleted) session with that id.
 const loadViewedSession = async (sessionId: string | null) => {
-  const draft = await loadLatestSessionDraftSnapshot();
-  if (draft && draft.sessionId === sessionId) {
-    return { ...draft, status: 'active' as const, completedAt: null };
-  }
   if (!sessionId) return null;
   const snapshot = await loadSessionSnapshotById(sessionId);
-  return snapshot && snapshot.status === 'completed' && snapshot.deletedAt === null
-    ? { ...snapshot, status: 'completed' as const, completedAt: snapshot.completedAt ?? snapshot.startedAt }
+  return snapshot && snapshot.deletedAt === null
+    ? snapshot.status === 'active' ? { ...snapshot, status: 'active' as const, completedAt: null }
+      : { ...snapshot, status: 'completed' as const, completedAt: snapshot.completedAt ?? snapshot.startedAt }
     : null;
 };
 
