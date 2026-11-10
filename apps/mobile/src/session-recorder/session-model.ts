@@ -20,9 +20,10 @@ import { formatCurrentDateTime } from '@/src/utils/local-time';
 
 // Reads an active draft or a completed session graph alike.
 export function mapDraftSnapshotToSession(
-  snapshot: Pick<SessionDraftSnapshot, 'startedAt' | 'gymId' | 'exercises'>
+  snapshot: Pick<SessionDraftSnapshot, 'startedAt' | 'gymId' | 'exercises' | 'editBaseline'>
 ): Session {
   return {
+    editBaseline: snapshot.editBaseline,
     mergeRevisions: Object.fromEntries(snapshot.exercises.map(exercise => [exercise.id, exercise.mergeRevision ?? 0])),
     dateTime: formatCurrentDateTime(snapshot.startedAt),
     locationId: snapshot.gymId,

@@ -103,7 +103,7 @@ for bw_layer in 0 1 2 3 4 5; do
   esac
   assert_json_expr --argjson expected "${BW_BODY}" --argjson types "${bw_expected_types}" \
     '.entities as $rows | all($expected.entities[] | select(.type as $t | $types | index($t));
-      . as $e | ($e.fields + (if (["session_exercises","exercise_sets","session_exercise_tags"] | index($e.type)) then {merge_revision:0} else {} end) + (if (["sessions","session_exercises","exercise_sets"] | index($e.type)) then {source_plan_use_id:null} else {} end)) as $fields | any($rows[]; .id == $e.id and .type == $e.type and .fields == $fields))' \
+      . as $e | ($e.fields + (if (["sessions","session_exercises","exercise_sets","session_exercise_tags"] | index($e.type)) then {merge_revision:0} else {} end) + (if (["sessions","session_exercises","exercise_sets"] | index($e.type)) then {source_plan_use_id:null} else {} end)) as $fields | any($rows[]; .id == $e.id and .type == $e.type and .fields == $fields))' \
     "all current bodyweight fields round-trip layer ${bw_layer}"
 done
 
@@ -187,9 +187,9 @@ for projection in \
   assert_non_2xx "superseded column ${projection} is absent"
 done
 
-# Protocol 6 is the shipping contract. Older clients (including 5) fail
+# Protocol 7 is the shipping contract. Older clients (including 6) fail
 # before rows move.
-for old_protocol in "" 1 2 3 4 5 invalid; do
+for old_protocol in "" 1 2 3 4 5 6 invalid; do
   BOGA_TEST_SYNC_PROTOCOL="${old_protocol}" sync_push "${USER_A_TOKEN}" "${BW_BODY}"
   assert_non_2xx 'old client push rejected'
   assert_json_expr '.message | startswith("UPDATE_REQUIRED:")' 'actionable update-required push error'

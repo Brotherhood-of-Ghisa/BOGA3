@@ -4,6 +4,8 @@ import { reformatDateTime } from '@/src/utils/local-time';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
+import type { SessionTimingBaseline } from '@/src/data/session-inputs';
+import { WorkoutChangesSavedForReview } from '@/src/data/session-edit-baseline';
 
 import { createDraftAutosaveController } from './draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from './lifecycle-helpers';
@@ -55,6 +57,9 @@ type SessionTimesLive = {
   dateFormat: ExerciseDateFormat;
   // The instants first loaded: a field left showing them keeps them exactly.
   initial: SessionTimes | null;
+  baseline?: SessionTimingBaseline;
+  refresh: boolean;
+  refreshVersion: number;
   saveFailed: boolean;
   mounted: boolean;
 };
@@ -65,14 +70,18 @@ const createSessionTimesPersistence = ({
   setPaused,
   setSaveError,
   dateFormat,
+  setText,
+  setInitial,
 }: {
   sessionId: string | null;
   dateFormat: ExerciseDateFormat;
-  save: (sessionId: string, times: SessionTimes) => Promise<void>;
+  save: (sessionId: string, times: SessionTimes, baseline?: SessionTimingBaseline) => Promise<void | SessionTimes>;
   setPaused: (paused: boolean) => void;
   setSaveError: (message: string | null) => void;
+  setText: (text: SessionTimesText) => void;
+  setInitial: (times: SessionTimes) => void;
 }) => {
-  const live: SessionTimesLive = { text: EMPTY_TEXT, dateFormat, initial: null, saveFailed: false, mounted: true };
+  const live: SessionTimesLive = { text: EMPTY_TEXT, dateFormat, initial: null, refresh: false, refreshVersion: 0, saveFailed: false, mounted: true };
   const autosave = createDraftAutosaveController({
     persistDraft: async () => {
       const initial = live.initial;
@@ -82,15 +91,24 @@ const createSessionTimesPersistence = ({
         if (live.mounted) setPaused(true);
         return;
       }
-      await save(sessionId, times);
+      const before = live.text;
+      const applied = (await save(sessionId, times, live.baseline)) ?? times;
+      if (live.baseline) live.baseline = { ...live.baseline, ...applied };
+      const formatted = formatSessionTimes(applied, live.dateFormat);
+      live.text = { start: live.text.start === before.start ? formatted.start : live.text.start,
+        end: live.text.end === before.end ? formatted.end : live.text.end };
+      live.initial = applied;
       live.saveFailed = false;
       if (live.mounted) {
+        setText(live.text); setInitial(applied);
         setPaused(false);
         setSaveError(null);
       }
     },
     onError: (error) => {
-      live.saveFailed = true;
+      live.refresh = error instanceof WorkoutChangesSavedForReview;
+      if (live.refresh) live.refreshVersion += 1;
+      live.saveFailed = !live.refresh;
       if (live.mounted) setSaveError(describeSaveError(error));
     },
   });
@@ -107,12 +125,14 @@ const createSessionTimesPersistence = ({
 export const useCompletedSessionTimes = ({
   sessionId,
   persisted,
+  revision,
   save = setCompletedSessionTimes,
 }: {
   sessionId: string | null;
   // `null` until a completed session has loaded (and for an active one).
   persisted: SessionTimes | null;
-  save?: (sessionId: string, times: SessionTimes) => Promise<void>;
+  revision?: number;
+  save?: (sessionId: string, times: SessionTimes, baseline?: SessionTimingBaseline) => Promise<void | SessionTimes>;
 }): UseCompletedSessionTimes => {
   const dateFormat = useDateFormat();
   const [text, setText] = useState<SessionTimesText>(EMPTY_TEXT);
@@ -123,15 +143,16 @@ export const useCompletedSessionTimes = ({
   const [initial, setInitial] = useState<SessionTimes | null>(null);
   const navigation = useNavigation();
   const [{ live, setLive, autosave, lifecycle }] = useState(() =>
-    createSessionTimesPersistence({ sessionId, save, setPaused, setSaveError, dateFormat })
+    createSessionTimesPersistence({ sessionId, save, setPaused, setSaveError, dateFormat, setText, setInitial })
   );
 
   // Filled once: later reloads of the session must not overwrite the fields.
-  if (!initial && persisted) {
+  if ((!initial || live.refresh) && persisted) {
     setInitial(persisted);
     const next = formatSessionTimes(persisted, dateFormat);
     setText(next);
-    setLive({ initial: persisted, text: next, dateFormat });
+    setLive({ initial: persisted, text: next, dateFormat, refresh: false,
+      baseline: { ...persisted, revision: revision ?? 0 } });
   }
   if (live.dateFormat !== dateFormat) {
     const next = { start: reformatDateTime(live.text.start, live.dateFormat, dateFormat),
@@ -206,13 +227,14 @@ export const useCompletedSessionTimes = ({
     commitStart: () => commit('start'),
     commitEnd: () => commit('end'),
     submit: () => {
-      const times = initial ? resolveSessionTimes(live.text, initial, live.dateFormat) : null;
+      const times = live.initial ? resolveSessionTimes(live.text, live.initial, live.dateFormat) : null;
       if (!times) setTouched({ start: true, end: true });
       return times;
     },
     flush: async () => {
+      const version = live.refreshVersion;
       await autosave.flushNow();
-      return !live.saveFailed;
+      return version === live.refreshVersion && !live.saveFailed;
     },
   };
 };

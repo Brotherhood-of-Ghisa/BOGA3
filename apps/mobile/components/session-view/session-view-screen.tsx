@@ -50,6 +50,7 @@ import {
 import { buildSessionViewModel } from '@/src/session-recorder/session-view-model';
 import { useCompletedSessionTimes } from '@/src/session-recorder/use-completed-session-times';
 import { useSessionView } from '@/src/session-recorder/use-session-view';
+import { WorkoutChangesSavedForReview, WorkoutLifecycleChanged } from '@/src/data/session-edit-baseline';
 
 const isActiveSessionReady = (state: { status: string; data?: { status: string } }): boolean =>
   state.status === 'ready' && state.data?.status !== 'completed';
@@ -184,10 +185,11 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
   const times = useCompletedSessionTimes({
     sessionId,
     persisted: completedTimes,
+    revision: state.status === 'ready' ? Number(state.data.session.editBaseline?.find(row => row.type === 'sessions')?.fields.merge_revision ?? 0) : 0,
     // Records count the sessions before End, so a saved End re-reads them.
-    save: async (id, nextTimes) => {
-      await setCompletedSessionTimes(id, nextTimes);
-      await reload();
+    save: async (id, nextTimes, baseline) => {
+      try { return await setCompletedSessionTimes(id, nextTimes, baseline); }
+      finally { await reload(); }
     },
   });
 
@@ -316,8 +318,9 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
       } else {
         router.replace(completionHref);
       }
-    } catch {
-      setNotice("Couldn't finish this session. Try again.");
+    } catch (error) {
+      setNotice(error instanceof WorkoutChangesSavedForReview ? error.message : "Couldn't finish this session. Try again.");
+      if (error instanceof WorkoutChangesSavedForReview) await reload();
     } finally {
       setIsFinishing(false);
     }
@@ -329,7 +332,7 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
   const saveEdit = async () => {
     if (!sessionId || isSavingEdit) return;
     setNotice(null);
-    const editedTimes = times.submit();
+    let editedTimes = times.submit();
     if (!editedTimes) return;
     setIsSavingEdit(true);
     try {
@@ -337,6 +340,8 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
         setNotice("Couldn't save the times. Try again.");
         return;
       }
+      editedTimes = times.submit();
+      if (!editedTimes) return;
       // Read at press time, so the last write from the exercise page counts.
       const graph = await loadEditableSessionGraph(sessionId);
       if (!graph || graph.status !== 'completed') {
@@ -354,8 +359,9 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
       });
       if (router.canGoBack()) router.back();
       else router.replace(`/completed-session/${encodeURIComponent(graph.sessionId)}` as Href);
-    } catch {
-      setNotice("Couldn't save this session. Try again.");
+    } catch (error) {
+      setNotice(error instanceof WorkoutChangesSavedForReview ? error.message : "Couldn't save this session. Try again.");
+      if (error instanceof WorkoutChangesSavedForReview) await reload();
     } finally {
       setIsSavingEdit(false);
     }
@@ -363,6 +369,8 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
 
   const abandon = async () => {
     if (!sessionId) return;
+    const expectedRevision = state.status === 'ready'
+      ? Number(state.data.session.editBaseline?.find(row => row.type === 'sessions')?.fields.merge_revision ?? 0) : 0;
     // Asked over the open sheet: iOS drops an alert raised while a modal closes.
     const confirmed = await confirmAlert({
       title: 'Abandon session?',
@@ -374,10 +382,11 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
     setIsOptionsVisible(false);
     if (!confirmed) return;
     try {
-      await abandonActiveSession(sessionId);
+      await abandonActiveSession(sessionId, expectedRevision);
       endWorkout();
-    } catch {
-      setNotice("Couldn't abandon this session. Try again.");
+    } catch (error) {
+      setNotice(error instanceof WorkoutLifecycleChanged ? error.message : "Couldn't abandon this session. Try again.");
+      await reload();
     }
   };
 

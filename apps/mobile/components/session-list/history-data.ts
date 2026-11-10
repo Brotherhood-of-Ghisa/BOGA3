@@ -30,6 +30,7 @@ export const mapRepositorySummaryToSessionListItem = (
 
   return {
     id: summary.id,
+    mergeRevision: summary.mergeRevision ?? 0,
     startedAt: summary.startedAt.toISOString(),
     status: summary.status,
     completedAt: summary.completedAt ? summary.completedAt.toISOString() : null,
@@ -77,7 +78,8 @@ export const DEFAULT_SESSION_LIST_DATA_CLIENT: SessionListDataClient = {
       includeDeleted: showDeletedSessions,
     });
 
-    const active = mapRepositorySummaryToSessionListItem(buckets.active);
+    const active = (buckets.activeSessions ?? (buckets.active ? [buckets.active] : []))
+      .map(mapRepositorySummaryToSessionListItem).filter((row): row is SessionListItem => row !== null);
     const completed = buckets.completed
       .map((summary) => mapRepositorySummaryToSessionListItem(summary))
       .filter((summary): summary is SessionListItem => summary !== null);
@@ -93,7 +95,7 @@ export const DEFAULT_SESSION_LIST_DATA_CLIENT: SessionListDataClient = {
       return completed;
     });
 
-    return active ? [active, ...completedWithRecords] : completedWithRecords;
+    return [...active, ...completedWithRecords];
   },
   async startSession() {
     await persistSessionDraftSnapshot({
@@ -107,8 +109,8 @@ export const DEFAULT_SESSION_LIST_DATA_CLIENT: SessionListDataClient = {
     await completeSessionDraft(sessionId);
     await autoCompletePlanBlocksForSession(sessionId);
   },
-  async discardActiveSession(sessionId) {
-    await setSessionDeletedState(sessionId, true);
+  async discardActiveSession(sessionId, expectedRevision) {
+    await setSessionDeletedState(sessionId, true, { expectedRevision });
   },
 };
 

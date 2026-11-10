@@ -24,6 +24,7 @@ import { adoptOrUploadMuscleTargets } from '@/src/sync/muscle-target-adoption';
 import { and, asc, eq, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 
 import { mergePullCanApply, syncExerciseMerges, validateMergeOutcomes } from './exercise-merge';
+import { attachWorkoutLifecycle, clearWorkoutLifecycle, deferredWorkoutHeaders } from './workout-lifecycle';
 import type { MergeWireEntity } from '@/src/exercise-core/merge-types';
 import { confirmSyncedNotificationCompletions } from '@/src/notifications/completion';
 import { getSignedInUserId } from '@/src/auth/session-user';
@@ -89,6 +90,7 @@ export interface WireEntity {
   id: string;
   client_updated_at_ms: number;
   fields: WireFields;
+  lifecycle_action?: { id: string; base_revision: number };
 }
 
 /** An opaque per-layer pull cursor; round-tripped to the server verbatim. */
@@ -687,6 +689,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('updated_at', 'updatedAt'), TS('deleted_at', 'deletedAt'),
   ],
   sessions: [
+    KEEP('merge_revision', 'mergeRevision'),
     SC('source_plan_use_id', 'sourcePlanUseId'),
     SC('gym_id', 'gymId'),
     SC('source_plan_id', 'sourcePlanId'),
@@ -891,6 +894,9 @@ export const selectPushBatch = (
 ): WireEntity[] => {
   const batch: WireEntity[] = [];
   const quarantinedIdsByType = readQuarantine(tx).idsByType;
+  const deferredHeaders = deferredWorkoutHeaders(tx);
+  const owner = tx.select().from(schema.syncRuntimeState)
+    .where(eq(schema.syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).get()?.accountUserId ?? null;
 
   for (const type of ENTITY_ORDER) {
     if (batch.length >= batchCap) {
@@ -902,6 +908,7 @@ export const selectPushBatch = (
     const excludedIds = [
       ...(quarantinedIdsByType.get(type) ?? []),
       ...(drainedExclusions ?? []),
+      ...(type === 'sessions' ? deferredHeaders : []),
     ];
     const dirtyClause = eq(table.localDirty, true);
     const whereClause =
@@ -932,7 +939,9 @@ export const selectPushBatch = (
       .all() as EntityRow[];
 
     for (const row of rows) {
-      batch.push(entityToWire(row, type));
+      const entity = entityToWire(row, type);
+      attachWorkoutLifecycle(tx, owner, entity);
+      batch.push(entity);
     }
   }
 
@@ -2024,6 +2033,11 @@ const runPushLeg = async (database: LocalDatabase): Promise<number> => {
             .set({ localDirty: false } as never)
             .where(and(eq(table.id, entity.id), eq(table.localUpdatedAtMs, expected)))
             .run();
+          if (entity.lifecycle_action) {
+            const owner = transaction.select().from(schema.syncRuntimeState)
+              .where(eq(schema.syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).get()?.accountUserId;
+            if (owner) clearWorkoutLifecycle(transaction, owner, entity.id);
+          }
         }
       });
     }

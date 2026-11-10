@@ -96,7 +96,7 @@ const renderSetup = (): void => {
 
       <div class="denied-panel">
         <span class="denied-icon" aria-hidden="true">✓</span>
-        <p><strong>Your coach can only read training data.</strong> It cannot create, edit, or delete your workouts, exercises, or sets.</p>
+        <p><strong>This approval grants read-only training access.</strong> Changes require separate permissions you enable in BoGa → Connected agents.</p>
       </div>
       <p class="revoke-note">To disconnect later, open BoGa → Settings → Connected agents and revoke the connection.</p>
     </div>
@@ -164,7 +164,7 @@ const renderConsent = (details: ConsentDetails): void => {
       </div>
       <div class="denied-panel">
         <span class="denied-icon" aria-hidden="true">×</span>
-        <p><strong>It cannot change BoGa.</strong> The connection cannot create, edit, or delete workouts, exercises, or sets.</p>
+        <p><strong>This approval grants read-only training access.</strong> Changes require separate permissions you enable in BoGa → Connected agents.</p>
       </div>
       <div class="button-row">
         <button id="deny-button" class="secondary-button" type="button">Cancel</button>

@@ -3,7 +3,7 @@
 Load when changing conversational workout operations, their permission or app/chat handoff.
 Authority is [[agents.write-access]]; performance and eligibility are [[set.performed]] and [[set.eligibility]].
 
-## Boundary and staged rollout
+## Boundary and rollout
 
 The path is MCP → agent API → service-only atomic RPCs. Every HTTP request
 validates its token and live OAuth grant as the other agent routes do. The
@@ -15,10 +15,11 @@ replay. Permission rows are non-sync security metadata; no private set payload
 is stored there. SQL locks the permission through commit; revocation waits for
 an already-authorized transaction to finish.
 
-**Staged implementation:** authenticated app access to this table is withheld.
-Only local service fixtures enable it. No mobile enablement or MCP catalogue
-entry may ship before the handoff fence below is implemented and verified.
-Code integration does not authorize hosted migration, activation or deployment.
+The owner app alone manages this table through owner-scoped RLS. OAuth tokens
+cannot inspect or change it. Connected Agents keeps logging independent of
+both plan switches; failed reads or unconfirmed saves display unavailable
+until a reload confirms the value. Code integration does not authorize hosted
+migration, activation or deployment.
 
 ## HTTP operations
 
@@ -93,26 +94,31 @@ the existing group and notification triggers. A chat finish alone does not
 fabricate the app's exact-graph completion-notification confirmation; that
 remains the normal post-convergence app path.
 
-## Required handoff protection before enablement
+## Mobile handoff
 
-Extend the existing revision/snapshot/saved-change recovery contract, rather
-than relying on per-row clocks. A factor-one context protects raw values without
-changing exercise units. Fence the session and every block on each agent write,
-including empty sessions. New offline blocks carry the session revision they
-were created under, so they cannot bypass a remote finish through a later batch.
-Preserve stale session and child edits for explicit recovery before replacing
-them with canonical server state; force canonical lifecycle even over a future
-local clock. Recovery must support blocks absent from the canonical graph.
+Protocol 7 extends the existing revision/snapshot/recovery contract. Every
+agent write advances one session epoch across its entire graph, including
+empty workouts. Factor-one contexts retain raw units. Old app writers fail
+before push or pull; rollout is a coordinated server-first cutover with app
+distribution, following the [sync contract](sync-v2-server-contract.md) and,
+when changing activation, `docs/procedures/rule-upgrade.md`.
 
-Whole-graph autosave and narrow/lifecycle writers must carry the revision loaded
-by their editor. Stale same-exercise input cannot tombstone a chat-created set.
-Finished/deleted remote sessions cannot be silently reopened. Fresh intentional
-app edits/removals and deliberate completed-history editing must still work.
-Use a coordinated server-first protocol cutoff if older clients cannot echo
-these invariants; never treat a new permission as a sync fence. When changing
-that cutoff, load `docs/procedures/rule-upgrade.md` and the
-[sync contract](sync-v2-server-contract.md).
+Canonical snapshots preserve stale dirty headers, absent offline blocks and
+their children before replacement, even across split batches or future clocks.
+Editors retain the graph they loaded. Independent changes rebase; unseen
+remote rows survive; conflicting actual input is saved for explicit review.
+A saved-for-review outcome refreshes the editor and stops stale resubmission.
+Recovery metadata retains canonical lifecycle; missing parents apply before
+children, and removed parents require restoration. Sessions lists every active
+workout separately and opening a row retains that selected ID on return.
 
+Protected phone headers drain their dirty graph first, then use an immutable
+lifecycle action ID and loaded epoch. The server atomically commits the header,
+whole-graph fence and receipt; replay cannot act as a new stale reopen/delete.
+Receipt lookup verifies the original input before a lost response is recovered.
+History merges and recovery commits also advance already-protected sessions'
+epochs, without changing legacy revision-zero behavior. Details for shared
+recovery are in [the history merge contract](exercise-merge-contract.md).
 Proof: Jest validates the shared HTTP input boundary; `agent-api` runs real
 OAuth/SQL contracts for permission, replay, graph writes, ownership and lifecycle.
 Handoff additionally requires repository/sync regressions and `ios-sync-e2e`.

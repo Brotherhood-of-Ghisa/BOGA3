@@ -5,6 +5,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic } from './clock';
 import { selectInProgressSessionRow } from './in-progress-session';
+import { WorkoutLifecycleChanged } from './session-edit-baseline';
 import { exerciseSets, gyms, sessionExercises, sessions } from './schema';
 import {
   isWorkingSet,
@@ -16,6 +17,7 @@ type SessionLifecycleStatus = 'active' | 'completed';
 
 export type SessionListStoreRecord = {
   id: string;
+  mergeRevision?: number;
   status: SessionLifecycleStatus;
   startedAt: Date;
   completedAt: Date | null;
@@ -34,11 +36,13 @@ export type SessionListStore = {
     sessionId: string;
     deletedAt: Date | null;
     updatedAt: Date;
+    expectedRevision?: number;
   }): Promise<void>;
 };
 
 export type SessionListSummary = {
   id: string;
+  mergeRevision?: number;
   status: 'active' | 'completed';
   startedAt: Date;
   completedAt: Date | null;
@@ -52,6 +56,7 @@ export type SessionListSummary = {
 
 export type SessionListBuckets = {
   active: SessionListSummary | null;
+  activeSessions: SessionListSummary[];
   completed: SessionListSummary[];
 };
 
@@ -61,6 +66,7 @@ export type ListSessionBucketsOptions = {
 
 export type SetSessionDeletedStateOptions = {
   now?: Date;
+  expectedRevision?: number;
 };
 
 const isValidDate = (value: Date) => !Number.isNaN(value.getTime());
@@ -120,6 +126,7 @@ const mapStoreSessionRow = (row: typeof sessions.$inferSelect, gymName: string |
 
   return {
     id: row.id,
+    mergeRevision: row.mergeRevision,
     status: normalizeSessionLifecycleStatus(row.status as string),
     startedAt,
     completedAt: toDate(row.completedAt),
@@ -246,6 +253,10 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
   async setSessionDeletedState(input) {
     const database = await bootstrapLocalDataLayer();
     database.transaction((tx) => {
+      const current = tx.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
+      if (input.expectedRevision !== undefined && current?.mergeRevision !== input.expectedRevision) {
+        throw new WorkoutLifecycleChanged();
+      }
       tx.update(sessions)
         .set({
           deletedAt: input.deletedAt,
@@ -300,6 +311,7 @@ const compareCompletedDesc = (left: SessionListStoreRecord, right: SessionListSt
 
 const toSummary = (record: SessionListStoreRecord): SessionListSummary => ({
   id: record.id,
+  mergeRevision: record.mergeRevision ?? 0,
   status: record.status === 'completed' ? 'completed' : 'active',
   startedAt: record.startedAt,
   completedAt: record.completedAt,
@@ -331,6 +343,7 @@ export const createSessionListRepository = (store: SessionListStore = createDriz
 
     return {
       active,
+      activeSessions: activeCandidates.map(toSummary),
       completed,
     };
   },
@@ -342,6 +355,7 @@ export const createSessionListRepository = (store: SessionListStore = createDriz
       sessionId,
       deletedAt: isDeleted ? now : null,
       updatedAt: now,
+      expectedRevision: options.expectedRevision,
     });
   },
 });
@@ -356,7 +370,11 @@ export const setSessionDeletedState = defaultSessionListRepository.setDeletedSta
  * active, non-deleted one), read as one row instead of the whole history: the
  * Train tab looks it up on every press.
  */
-export const findActiveSessionId = async (): Promise<string | null> => {
+export const findActiveSessionId = async (preferredId?: string | null): Promise<string | null> => {
   const database = await bootstrapLocalDataLayer();
+  if (preferredId) {
+    const preferred = database.select().from(sessions).where(eq(sessions.id, preferredId)).get();
+    if (preferred?.status === 'active' && preferred.deletedAt === null) return preferred.id;
+  }
   return selectInProgressSessionRow(database)?.id ?? null;
 };

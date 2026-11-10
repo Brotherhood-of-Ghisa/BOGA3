@@ -15,7 +15,11 @@ const mockPermissionReturns = jest.fn();
 const mockPermissionIn = jest.fn(() => ({ returns: mockPermissionReturns }));
 const mockPermissionSelect = jest.fn(() => ({ in: mockPermissionIn }));
 
+const mockWorkoutReturns = jest.fn();
+const mockWorkoutSelect = jest.fn(() => ({ in: () => ({ returns: mockWorkoutReturns }) }));
+
 const mockFrom = jest.fn((table: string) => {
+  if (table === 'agent_workout_permissions') return { select: mockWorkoutSelect, upsert: mockUpsert };
   if (table === 'agent_plan_permissions') {
     return { select: mockPermissionSelect, upsert: mockUpsert };
   }
@@ -40,6 +44,7 @@ import {
   revokeConnectedAgent,
   setAgentPlanEditEnabled,
   setAgentPlanPermission,
+  setAgentWorkoutLoggingEnabled,
 } from '@/src/auth/connected-agents';
 
 describe('connected agent service', () => {
@@ -48,9 +53,34 @@ describe('connected agent service', () => {
     mockListGrants.mockResolvedValue({ data: [], error: null });
     mockAuditReturns.mockResolvedValue({ data: [], error: null });
     mockPermissionReturns.mockResolvedValue({ data: [], error: null });
+    mockWorkoutReturns.mockResolvedValue({ data: [], error: null });
     mockRevokeGrant.mockResolvedValue({ data: {}, error: null });
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-a' } }, error: null });
     mockUpsert.mockResolvedValue({ error: null });
+  });
+
+  it('binds workout logging to its own permission and exact live grant, independently of plan access', async () => {
+    mockListGrants.mockResolvedValue({ data: [{ client: { id: 'client-a', name: 'Coach' },
+      granted_at: '2026-07-24T12:00:00.000Z', scopes: [] }], error: null });
+    mockWorkoutReturns.mockResolvedValue({ data: [{ client_id: 'client-a', granted_at: '2026-07-24T12:00:00Z',
+      workout_logging_enabled: true }], error: null });
+    expect((await listConnectedAgents())[0]).toMatchObject({ workoutLoggingEnabled: true, planAccessEnabled: false, planEditEnabled: false });
+    mockWorkoutReturns.mockResolvedValue({ data: [{ client_id: 'client-a', granted_at: '2026-07-23T12:00:00Z',
+      workout_logging_enabled: true }], error: null });
+    expect((await listConnectedAgents())[0].workoutLoggingEnabled).toBe(false);
+    mockWorkoutReturns.mockResolvedValue({ data: null, error: { message: 'Offline' } });
+    expect((await listConnectedAgents())[0]).toMatchObject({ workoutLoggingEnabled: 'unavailable', planAccessEnabled: false });
+  });
+
+  it('writes only the dedicated workout permission and propagates an unconfirmed response', async () => {
+    await setAgentWorkoutLoggingEnabled(' client-a ', true, '2026-07-24T12:00:00Z');
+    expect(mockFrom).toHaveBeenCalledWith('agent_workout_permissions');
+    expect(mockUpsert).toHaveBeenCalledWith({ owner_user_id: 'user-a', client_id: 'client-a',
+      workout_logging_enabled: true, granted_at: '2026-07-24T12:00:00Z' }, { onConflict: 'owner_user_id,client_id' });
+    mockUpsert.mockResolvedValue({ error: { message: 'Offline' } });
+    await expect(setAgentWorkoutLoggingEnabled('client-a', false, '2026-07-24T12:00:00Z')).rejects.toThrow('Offline');
+    await expect(setAgentWorkoutLoggingEnabled('bad id', true, '2026-07-24T12:00:00Z')).rejects.toThrow(/identifier/);
+    await expect(setAgentWorkoutLoggingEnabled('client-a', true, 'bad date')).rejects.toThrow(/connection has changed/);
   });
 
   it('joins OAuth grants to metadata-only last access timestamps', async () => {
@@ -91,6 +121,7 @@ describe('connected agent service', () => {
         name: 'Coach B',
         planAccessEnabled: false,
         planEditEnabled: false,
+        workoutLoggingEnabled: false,
         scopes: ['openid'],
       },
       {
@@ -100,6 +131,7 @@ describe('connected agent service', () => {
         name: 'Coach A',
         planAccessEnabled: false,
         planEditEnabled: false,
+        workoutLoggingEnabled: false,
         scopes: ['openid', 'profile'],
       },
     ]);

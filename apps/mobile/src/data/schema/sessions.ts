@@ -15,6 +15,7 @@ export const sessions = sqliteTable(
     gymId: text('gym_id').references(() => gyms.id, { onDelete: 'set null' }),
     sourcePlanId: text('source_plan_id').references(() => sessionPlans.id, { onDelete: 'set null' }),
     sourcePlanUseId: text('source_plan_use_id').references(() => sessionPlanUses.id, { onDelete: 'set null' }),
+    mergeRevision: integer('merge_revision').notNull().default(0),
     status: text('status', { enum: ['active', 'completed'] })
       .notNull()
       .default('active'),

@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 
 import { ACTIVE_WORKOUT_HREF } from '@/src/navigation/active-session-entry';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
+import { getAccountLocalPreferenceAccountRevision } from '@/src/preferences/account-local';
 
 /**
  * A tab-bar press on a page pushed over the tabs (`TabOwnedPage`, exercise
@@ -26,6 +27,7 @@ export function useOpenMainTabFromPage(): (tab: MainTabKey) => void {
 
 type OpenedWorkoutListener = (sessionId: string) => void;
 const openedWorkoutListeners = new Set<OpenedWorkoutListener>();
+let pendingWorkout: { sessionId: string; accountRevision: number } | null = null;
 
 /**
  * Train's subscription to workouts opened from elsewhere, so it shows one
@@ -33,6 +35,10 @@ const openedWorkoutListeners = new Set<OpenedWorkoutListener>();
  */
 export function subscribeOpenedWorkout(listener: OpenedWorkoutListener): () => void {
   openedWorkoutListeners.add(listener);
+  // Tabs mount lazily: the first Resume can arrive before Train exists.
+  const pending = pendingWorkout;
+  pendingWorkout = null;
+  if (pending?.accountRevision === getAccountLocalPreferenceAccountRevision()) listener(pending.sessionId);
   return () => {
     openedWorkoutListeners.delete(listener);
   };
@@ -47,6 +53,8 @@ export function useOpenActiveWorkout(): (sessionId: string) => void {
   const router = useRouter();
   return useCallback(
     (sessionId: string) => {
+      pendingWorkout = openedWorkoutListeners.size === 0
+        ? { sessionId, accountRevision: getAccountLocalPreferenceAccountRevision() } : null;
       openedWorkoutListeners.forEach((listener) => listener(sessionId));
       router.dismissTo(ACTIVE_WORKOUT_HREF);
     },

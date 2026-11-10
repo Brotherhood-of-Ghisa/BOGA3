@@ -85,7 +85,7 @@ also deletes this milestone. Durable rules graduate to their owning docs.
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
 | M41-T01 | Permission, atomic logging API and compatibility contract | none | completed |
-| [M41-T02](../tasks/M41-T02_Mobile_workout_handoff.md) | Permission UI and safe app/chat/offline coexistence | T01 | planned |
+| M41-T02 | Permission UI and safe app/chat/offline coexistence | T01 | completed |
 | [M41-T03](../tasks/M41-T03_MCP_workout_tools.md) | MCP tools and complete conversational-flow proof | T01, T02 | planned |
 
 ## Risks and completion criteria

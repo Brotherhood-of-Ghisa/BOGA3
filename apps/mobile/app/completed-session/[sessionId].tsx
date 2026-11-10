@@ -21,6 +21,7 @@ import { ViewSessionScreen, ViewSessionTopBar } from '@/components/view-session'
 import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 import { DEFAULT_SESSION_ENTRY_COORDINATOR } from '@/src/session-entry';
 import { ActiveSessionConflictError, SessionUnavailableError } from '@/src/data/session-drafts';
+import { WorkoutLifecycleChanged } from '@/src/data/session-edit-baseline';
 import {
   formatSessionListCompactDuration,
   loadLocalGymById,
@@ -76,6 +77,7 @@ export type CompletedSessionDetailExercise = {
 };
 
 export type CompletedSessionDetailRecord = ResolvedSessionWeight & {
+  mergeRevision?: number;
   id: string;
   startedAt: string;
   completedAt: string;
@@ -86,7 +88,7 @@ export type CompletedSessionDetailRecord = ResolvedSessionWeight & {
 };
 
 export type CompletedSessionDetailDataClient = {
-  resumeCompletedSession?(sessionId: string): Promise<{ sessionId: string }>;
+  resumeCompletedSession?(sessionId: string, expectedRevision?: number): Promise<{ sessionId: string }>;
   loadCompletedSession(sessionId: string): Promise<CompletedSessionDetailRecord | null>;
   loadInsights?(sessionId: string, historyLookbackWeeks: number): Promise<CompletedSessionInsights | null>;
   // Each exercise's records in the sessions before this one, for the
@@ -95,7 +97,7 @@ export type CompletedSessionDetailDataClient = {
     session: { sessionId: string; completedAt: Date },
     exerciseDefinitionIds: string[]
   ): Promise<ReadonlyMap<string, RecordBaseline>>;
-  setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean): Promise<void>;
+  setCompletedSessionDeletedState(sessionId: string, isDeleted: boolean, expectedRevision?: number): Promise<void>;
 };
 
 export type CompletedSessionDetailScreenShellProps = {
@@ -180,7 +182,7 @@ const DEFAULT_COMPLETED_SESSION_DETAILS: Record<string, CompletedSessionDetailRe
 };
 
 export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetailDataClient = {
-  resumeCompletedSession: (sessionId) => DEFAULT_SESSION_ENTRY_COORDINATOR.resumeCompletedSession(sessionId),
+  resumeCompletedSession: (sessionId, expectedRevision) => DEFAULT_SESSION_ENTRY_COORDINATOR.resumeCompletedSession(sessionId, expectedRevision),
   async loadCompletedSession(sessionId) {
     const sessionGraph = await loadSessionSnapshotById(sessionId);
 
@@ -189,6 +191,7 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
       const completedAt = sessionGraph.completedAt ?? sessionGraph.startedAt;
       return {
         id: sessionGraph.sessionId,
+        mergeRevision: Number(sessionGraph.editBaseline?.find(row => row.type === 'sessions')?.fields.merge_revision ?? 0),
         bodyWeightKg: sessionGraph.bodyWeightKg,
         bodyWeightSource: sessionGraph.bodyWeightSource,
         bodyWeightMeasurementId: sessionGraph.bodyWeightMeasurementId,
@@ -209,8 +212,8 @@ export const DEFAULT_COMPLETED_SESSION_DETAIL_DATA_CLIENT: CompletedSessionDetai
     return loadCompletedSessionInsights(sessionId, historyLookbackWeeks);
   },
   loadHistoricalBests: loadSessionRecordBaselines,
-  async setCompletedSessionDeletedState(sessionId, isDeleted) {
-    await setSessionDeletedState(sessionId, isDeleted);
+  async setCompletedSessionDeletedState(sessionId, isDeleted, expectedRevision) {
+    await setSessionDeletedState(sessionId, isDeleted, { expectedRevision });
   },
 };
 
@@ -543,7 +546,7 @@ export function CompletedSessionDetailScreenShell({
     setIsTogglingDeletedState(true);
 
     void dataClient
-      .setCompletedSessionDeletedState(sessionId, nextIsDeleted)
+      .setCompletedSessionDeletedState(sessionId, nextIsDeleted, session.mergeRevision ?? 0)
       .then(() => {
         setSession((current) => {
           if (!current || current.id !== sessionId) {
@@ -557,6 +560,7 @@ export function CompletedSessionDetailScreenShell({
         });
       })
       .catch((error) => {
+        if (error instanceof WorkoutLifecycleChanged) reloadSession();
         setActionFeedback(
           error instanceof Error ? error.message : 'Unable to update deleted state for this session.'
         );
@@ -576,13 +580,14 @@ export function CompletedSessionDetailScreenShell({
     setIsResuming(true);
     setActionFeedback(null);
     setActiveConflictId(null);
-    void dataClient.resumeCompletedSession(targetId).then(() => {
+    void dataClient.resumeCompletedSession(targetId, session.mergeRevision ?? 0).then(() => {
       if (isCurrent()) openActiveWorkout(targetId);
     }).catch((error: unknown) => {
       if (!isCurrent()) return;
       if (error instanceof SessionUnavailableError) {
         setSession(null);
       } else {
+        if (error instanceof WorkoutLifecycleChanged) reloadSession();
         setActionFeedback(error instanceof Error ? error.message : 'Unable to resume session. Try again.');
         if (error instanceof ActiveSessionConflictError) setActiveConflictId(error.activeSessionId);
       }

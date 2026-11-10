@@ -5,6 +5,8 @@ import { AppState } from 'react-native';
 
 import { EMPTY_SESSION_WEIGHT, type ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import type { SessionDraftExerciseSnapshot, SessionGraphSnapshot } from '@/src/data/session-drafts';
+import { WorkoutChangesSavedForReview } from '@/src/data/session-edit-baseline';
+import type { MergeWireEntity } from '@/src/exercise-core/merge-types';
 
 import { createDraftAutosaveController } from './draft-autosave';
 import { createSessionRecorderLifecycleHelpers } from './lifecycle-helpers';
@@ -68,6 +70,8 @@ type ExerciseDraftLive = {
   bodyWeight: ResolvedSessionWeight;
   gymId: string | null;
   sessionBlocks: SessionBlock[];
+  editBaseline?: MergeWireEntity[];
+  savedForReview: boolean;
   saveFailed: boolean;
   mounted: boolean;
 };
@@ -77,11 +81,13 @@ const createExerciseDraftPersistence = ({
   sessionExerciseId,
   client,
   setSaveError,
+  setState,
 }: {
   sessionId: string;
   sessionExerciseId: string;
   client: SessionExerciseDraftClient;
   setSaveError: (message: string | null) => void;
+  setState: (state: SessionExerciseDraftState) => void;
 }) => {
   const live: ExerciseDraftLive = {
     exercise: null,
@@ -89,24 +95,49 @@ const createExerciseDraftPersistence = ({
     bodyWeight: { ...EMPTY_SESSION_WEIGHT },
     gymId: null,
     sessionBlocks: [],
+    savedForReview: false,
     saveFailed: false,
     mounted: true,
+  };
+  const reloadPreserved = async () => {
+    const prior = live.exercise;
+    try {
+      const result = await loadSessionExerciseDraft(sessionId, sessionExerciseId, client);
+      if (!live.mounted || prior !== live.exercise) return;
+      if (result.status === 'ready') {
+        Object.assign(live, result, { savedForReview: false });
+        setState(result);
+      } else {
+        live.exercise = null;
+        setState({ status: 'error', reason: result.status });
+      }
+    } catch (error) {
+      if (live.mounted) setSaveError(describeSaveError(error));
+    }
   };
   const autosave = createDraftAutosaveController({
     persistDraft: async () => {
       const exercise = live.exercise;
       if (!exercise) return;
-      await saveSessionExerciseDraft(
+      const result = await saveSessionExerciseDraft(
         sessionId,
-        { sessionExerciseId, exercise, sessionStatus: live.sessionStatus },
+        { sessionExerciseId, exercise, sessionStatus: live.sessionStatus, editBaseline: live.editBaseline },
         client
       );
       live.saveFailed = false;
+      if (result?.status === 'ready' && live.exercise === exercise) {
+        live.exercise = result.exercise;
+        live.editBaseline = result.editBaseline;
+        live.sessionBlocks = result.sessionBlocks;
+        if (live.mounted) setState(result);
+      }
       if (live.mounted) setSaveError(null);
     },
     onError: (error) => {
-      live.saveFailed = true;
+      live.savedForReview = error instanceof WorkoutChangesSavedForReview;
+      live.saveFailed = !live.savedForReview;
       if (live.mounted) setSaveError(describeSaveError(error));
+      if (live.savedForReview) void reloadPreserved();
     },
   });
   return {
@@ -134,7 +165,7 @@ export const useSessionExerciseDraft = ({
   const [saveError, setSaveError] = useState<string | null>(null);
   const navigation = useNavigation();
   const [{ live, setLive, autosave, lifecycle }] = useState(() =>
-    createExerciseDraftPersistence({ sessionId, sessionExerciseId, client, setSaveError })
+    createExerciseDraftPersistence({ sessionId, sessionExerciseId, client, setSaveError, setState })
   );
 
   useEffect(() => {
@@ -194,7 +225,8 @@ export const useSessionExerciseDraft = ({
     await autosave.dispose({ flushDirty: false });
     await saveSessionExerciseDraft(
       sessionId,
-      { sessionExerciseId, exercise: null, mergeRevision: live.exercise?.mergeRevision ?? 0, sessionStatus: live.sessionStatus },
+      { sessionExerciseId, exercise: null, mergeRevision: live.exercise?.mergeRevision ?? 0, sessionStatus: live.sessionStatus,
+        editBaseline: live.editBaseline },
       client
     );
   }, [autosave, client, live, sessionExerciseId, sessionId]);
@@ -211,9 +243,13 @@ export const useSessionExerciseDraft = ({
     const result = await loadSessionExerciseDraft(sessionId, sessionExerciseId, client);
     if (!live.mounted || prior !== live.exercise) return false;
     if (result.status === 'ready') {
-      setLive({ exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId, sessionBlocks: result.sessionBlocks });
+      setLive({ exercise: result.exercise, editBaseline: result.editBaseline, savedForReview: false,
+        sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId, sessionBlocks: result.sessionBlocks });
       setState({ status: 'ready', exercise: result.exercise, sessionStatus: result.sessionStatus, bodyWeight: result.bodyWeight, gymId: result.gymId, sessionBlocks: result.sessionBlocks });
-    } else setState({ status: 'error', reason: result.status });
+    } else {
+      setLive({ exercise: null, savedForReview: false });
+      setState({ status: 'error', reason: result.status });
+    }
     return result.status === 'ready';
     } catch (error) {
       if (live.mounted) { setState({ status: 'error', reason: 'load-failed' }); setSaveError(describeSaveError(error)); }

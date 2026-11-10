@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { createInMemoryDatabase } from '../helpers/in-memory-db';
 import { applyPullPage, type WireEntity } from '@/src/sync/cycle';
 import type { Transaction } from '@/src/data/clock';
@@ -8,11 +8,14 @@ import {
   createAuthedTestClient, readSyncTestEndpoint, USER_E, type AuthedTestClient,
 } from './helpers/sync-test-endpoint';
 
-type Entity = { type: string; id: string; client_updated_at_ms: number; fields: Record<string, unknown> };
+type Entity = { type: string; id: string; client_updated_at_ms: number; fields: Record<string, unknown>;
+  lifecycle_action?: { id: string; base_revision: number } };
 type Preview = { token: string; setCount: number; factor: number };
 type Receipt = { id: string; sequence: number };
 type Review = { id: string; entityId: string; token: string; saved: Record<string, unknown>; current: Record<string, unknown> | null };
 const endpoint = readSyncTestEndpoint();
+const workoutClient = 'handoff-contract';
+const workoutGrant = '2026-01-01T00:00:00.000Z';
 let account: AuthedTestClient;
 let other: AuthedTestClient;
 let serial = 0;
@@ -27,6 +30,30 @@ async function adminUser(method: string, path: string, body?: unknown) {
   });
   if (!response.ok) throw new Error('Local fixture admin failed: ' + response.status);
   return response.json() as Promise<{ id: string }>;
+}
+async function serviceRequest(path: string, body: Record<string, unknown>) {
+  if (!['127.0.0.1', 'localhost'].includes(new URL(endpoint.url).hostname)) throw new Error('Local endpoint required');
+  const key = process.env.SYNC_TEST_SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error('Run through boga test sync-infra');
+  const response = await fetch(endpoint.url + '/rest/v1/' + path, {
+    method: 'POST', headers: { apikey: key, Authorization: 'Bearer ' + key,
+      'Content-Type': 'application/json', ...(path.startsWith('rpc/') ? { 'Content-Profile': 'app_public' } : {}) },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error('Service fixture failed: ' + await response.text());
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+async function workoutState(sessionId: string): Promise<{ workout: { revision: string; status: string } }> {
+  return serviceRequest('rpc/agent_workout_read', {
+    p_owner: isolatedUserId, p_client_id: workoutClient, p_granted_at: workoutGrant, p_session_id: sessionId,
+  });
+}
+async function workoutWrite(operation: string, input: Record<string, unknown>) {
+  return serviceRequest('rpc/agent_workout_mutate', {
+    p_owner: isolatedUserId, p_client_id: workoutClient, p_granted_at: workoutGrant, p_operation: operation,
+    p_input: input, p_idempotency_key: prefix(), p_payload_sha256: createHash('sha256').update(JSON.stringify(input)).digest('hex'),
+  });
 }
 const prefix = () => 'merge-' + Date.now() + '-' + (++serial) + '-' + Math.random().toString(36).slice(2);
 const times = (stamp: number) => ({ created_at: stamp, updated_at: stamp, deleted_at: null });
@@ -101,10 +128,150 @@ beforeAll(async () => {
   isolatedUserId = (await adminUser('POST', '', { ...credentials, email_confirm: true })).id;
   account = await createAuthedTestClient(endpoint, credentials);
   other = await createAuthedTestClient(endpoint, USER_E);
+  await serviceRequest('agent_workout_permissions', {
+    owner_user_id: isolatedUserId, client_id: workoutClient, granted_at: workoutGrant, workout_logging_enabled: true,
+  });
 });
 afterAll(async () => {
   await account?.teardown(); await other?.teardown();
   if (isolatedUserId) await adminUser('DELETE', '/' + isolatedUserId);
+});
+
+async function activeWorkout() {
+  const c = await chain();
+  await push([{ ...c.entities[2], client_updated_at_ms: Date.now() + 1000,
+    fields: { ...c.entities[2].fields, status: 'active', completed_at: null, duration_sec: null, merge_revision: 0 } }]);
+  return c;
+}
+
+it('fences a chat-finished session and every set before LWW, even against a future-clock stale phone graph', async () => {
+  const c = await activeWorkout();
+  let state = await workoutState(c.session);
+  const logged = await workoutWrite('log_sets', { session_id: c.session, expected_revision: state.workout.revision,
+    session_exercise_id: c.block, sets: [{ weight_kg: '80', reps: 8, set_type: null }] });
+  state = await workoutState(c.session);
+  await workoutWrite('finish_workout', { session_id: c.session, expected_revision: state.workout.revision });
+  const stale = [c.entities[2], c.entities[3], c.sets[0]].map(entity => ({ ...entity,
+    client_updated_at_ms: Date.now() + 86400000, fields: { ...entity.fields, merge_revision: 0,
+      ...(entity.type === 'sessions' ? { status: 'active', completed_at: null } : { deleted_at: Date.now() }) } }));
+  expect((await push(stale)).outcomes.every(outcome => outcome.outcome === 'preserved')).toBe(true);
+  expect(await row('sessions', c.session)).toMatchObject({ status: 'completed', merge_revision: 2 });
+  expect(await row('exercise_sets', c.sets[0].id)).toMatchObject({ weight_value: '10.125', deleted_at: null, merge_revision: 2 });
+  expect(await row('exercise_sets', logged.set_ids[0])).toMatchObject({ weight_value: '80', deleted_at: null, merge_revision: 2 });
+});
+
+it('commits a protected phone finish once, reports its receipt, and preserves a competing old lifecycle action', async () => {
+  const c = await activeWorkout();
+  const state = await workoutState(c.session);
+  await workoutWrite('log_sets', { session_id: c.session, expected_revision: state.workout.revision,
+    session_exercise_id: c.block, sets: [{ weight_kg: '80', reps: 8, set_type: null }] });
+  const current = (await row('sessions', c.session))!;
+  const { owner_user_id: _owner, client_updated_at_ms: _clock, server_received_at: _received, id: _id, ...fields } = current;
+  const completed = Date.now() + 2000;
+  const action: Entity = { type: 'sessions', id: c.session, client_updated_at_ms: completed,
+    lifecycle_action: { id: 'lifecycle:' + prefix(), base_revision: 1 },
+    fields: { ...fields, status: 'completed', completed_at: completed,
+      duration_sec: Math.floor((completed - Number(fields.started_at)) / 1000), updated_at: completed } };
+  expect((await push([action])).outcomes[0].outcome).toBe('accepted');
+  expect(await row('sessions', c.session)).toMatchObject({ status: 'completed', merge_revision: 2 });
+  const receipt = await rpc('exercise_merge_status', { p_id: action.lifecycle_action!.id, p_row: { ...action.fields, id: c.session } });
+  expect(receipt).toMatchObject({ id: action.lifecycle_action!.id, sessionId: c.session, workoutRevision: 2, matchesInput: true });
+  expect((await push([action])).outcomes[0].outcome).toBe('accepted');
+  expect((await row('sessions', c.session))?.merge_revision).toBe(2);
+  await expect(push([{ ...action, fields: { ...action.fields, started_at: Number(fields.started_at) + 1 } }]))
+    .rejects.toThrow(/IDEMPOTENCY_CONFLICT/);
+  expect((await push([{ ...action, lifecycle_action: { id: 'lifecycle:' + prefix(), base_revision: 1 },
+    fields: { ...fields, status: 'active', completed_at: null, duration_sec: null } }])).outcomes[0].outcome).toBe('preserved');
+  expect(await row('sessions', c.session)).toMatchObject({ status: 'completed', merge_revision: 2 });
+  await push([{ ...c.sets[0], client_updated_at_ms: Date.now() + 9000,
+    fields: { ...c.sets[0].fields, weight_value: '19' } }]);
+  const savedSet = (await reviews()).find(item => item.entityId === c.sets[0].id)!;
+  await rpc('exercise_merge_resolve', { p_id: savedSet.id, p_keep: false, p_token: savedSet.token });
+  expect(await row('sessions', c.session)).toMatchObject({ status: 'completed', merge_revision: 3 });
+  expect(await row('exercise_sets', c.sets[0].id)).toMatchObject({ weight_value: '19', merge_revision: 3 });
+  expect((await push([{ ...action, lifecycle_action: { id: 'lifecycle:' + prefix(), base_revision: 2 },
+    fields: { ...action.fields, merge_revision: 2, deleted_at: Date.now() } }])).outcomes[0].outcome).toBe('preserved');
+  expect((await row('sessions', c.session))?.deleted_at).toBeNull();
+  const completedRow = (await row('sessions', c.session))!;
+  const { owner_user_id: _owner2, client_updated_at_ms: _clock2, server_received_at: _received2, id: _id2, ...completedFields } = completedRow;
+  await push([{ type: 'sessions', id: c.session, client_updated_at_ms: Date.now() + 12000,
+    lifecycle_action: { id: 'lifecycle:' + prefix(), base_revision: 3 },
+    fields: { ...completedFields, status: 'active', completed_at: null, duration_sec: null } }]);
+  const savedEnd = completed + 1000;
+  await push([{ type: 'sessions', id: c.session, client_updated_at_ms: Date.now() + 13000,
+    fields: { ...completedFields, completed_at: savedEnd, duration_sec: Math.floor((savedEnd - Number(completedFields.started_at)) / 1000) } }]);
+  const deferred = (await reviews()).find(item => item.entityId === c.session && item.saved?.completed_at === savedEnd)!;
+  expect(deferred).toMatchObject({ invalid: true, saved: { completed_at: savedEnd },
+    notice: 'Finish this workout in the app before applying its saved Start and End.' });
+  const reopened = await workoutState(c.session);
+  await workoutWrite('finish_workout', { session_id: c.session, expected_revision: reopened.workout.revision });
+  const ready = (await reviews()).find(item => item.id === deferred.id)!;
+  expect(ready).toMatchObject({ invalid: false, saved: { completed_at: savedEnd } });
+});
+
+it('accepts an app exercise and sets added under the current session epoch after chat logging', async () => {
+  const c = await activeWorkout();
+  const state = await workoutState(c.session);
+  await workoutWrite('log_sets', { session_id: c.session, expected_revision: state.workout.revision,
+    session_exercise_id: c.block, sets: [{ weight_kg: '80', reps: 8, set_type: null }] });
+  const block: Entity = { ...c.entities[3], id: c.id + '-app-block', client_updated_at_ms: Date.now() + 3000,
+    fields: { ...c.entities[3].fields, merge_revision: 1, order_index: 1 } };
+  const set: Entity = { ...c.sets[0], id: c.id + '-app-set', client_updated_at_ms: Date.now() + 3000,
+    fields: { ...c.sets[0].fields, session_exercise_id: block.id, merge_revision: 1 } };
+  expect((await push([block, set])).outcomes.every(result => result.outcome === 'accepted')).toBe(true);
+  expect(await row('exercise_sets', set.id)).toMatchObject({ merge_revision: 1, weight_value: '10.125', deleted_at: null });
+});
+
+it('preserves an unseen offline exercise and more than 200 child rows across arbitrary-order split batches', async () => {
+  const c = await activeWorkout();
+  const state = await workoutState(c.session);
+  await workoutWrite('log_sets', { session_id: c.session, expected_revision: state.workout.revision,
+    session_exercise_id: c.block, sets: [{ weight_kg: '80', reps: 8, set_type: null }] });
+  const before = await rpc<{ merge_conflict_count: number }>('exercise_merge_sync_state', {});
+  const block: Entity = { ...c.entities[3], id: c.id + '-offline-block', client_updated_at_ms: Date.now() + 10000,
+    fields: { ...c.entities[3].fields, order_index: 1, merge_revision: 0 } };
+  const sets = Array.from({ length: 205 }, (_, index): Entity => ({ ...c.sets[0], id: c.id + '-offline-' + index,
+    client_updated_at_ms: Date.now() + 10000, fields: { ...c.sets[0].fields,
+      session_exercise_id: block.id, order_index: index, merge_revision: 0 } }));
+  // Parent follows 199 children in the first batch; remaining children arrive later.
+  const result = await push([...sets.slice(0, 199), block, ...sets.slice(199)]);
+  expect(result.outcomes.every(outcome => outcome.outcome === 'preserved')).toBe(true);
+  expect(await row('session_exercises', block.id)).toBeNull();
+  expect(await row('exercise_sets', sets[204].id)).toBeNull();
+  const after = await rpc<{ merge_conflict_count: number }>('exercise_merge_sync_state', {});
+  expect(after.merge_conflict_count - before.merge_conflict_count).toBe(206);
+  const saved = (await reviews()).filter(item => item.entityId === block.id || item.entityId === sets[204].id);
+  expect(saved.map(item => item.entityId)).toEqual([block.id, sets[204].id]);
+  expect(saved[1]).toMatchObject({ invalid: true });
+  await rpc('exercise_merge_resolve', { p_id: saved[0].id, p_keep: false, p_token: saved[0].token });
+  const child = (await reviews()).find(item => item.entityId === sets[204].id)!;
+  expect(child).toMatchObject({ invalid: false });
+  await rpc('exercise_merge_resolve', { p_id: child.id, p_keep: false, p_token: child.token });
+  expect(await row('exercise_sets', sets[204].id)).toMatchObject({ weight_value: '10.125', deleted_at: null });
+});
+
+it('discovers an empty chat-finished workout through the durable snapshot sequence', async () => {
+  const id = prefix(), stamp = Date.now();
+  await push([{ type: 'sessions', id, client_updated_at_ms: stamp, fields: { gym_id: null, status: 'active',
+    started_at: stamp, completed_at: null, duration_sec: null, merge_revision: 0, ...times(stamp) } }]);
+  const before = await rpc<{ merge_sequence: number }>('exercise_merge_sync_state', {});
+  const state = await workoutState(id);
+  await workoutWrite('finish_workout', { session_id: id, expected_revision: state.workout.revision });
+  const snapshot = await rpc<{ rows: Entity[] }>('exercise_merge_snapshot', { p_after: before.merge_sequence });
+  expect(snapshot.rows).toEqual([expect.objectContaining({ type: 'sessions', id,
+    fields: expect.objectContaining({ status: 'completed', merge_revision: 1 }) })]);
+});
+
+it('rejects the formerly supported protocol before a stale client can write or pull a protected workout', async () => {
+  for (const name of ['sync_push', 'sync_pull']) {
+    const response = await fetch(endpoint.url + '/rest/v1/rpc/' + name, { method: 'POST',
+      headers: { apikey: endpoint.anonKey, Authorization: 'Bearer ' + account.jwt, 'Content-Profile': 'app_public',
+        'Content-Type': 'application/json', 'x-boga-sync-protocol': '6' },
+      body: JSON.stringify(name === 'sync_push' ? { entities: [] } : { layer: 0, limit: 1 }),
+    });
+    expect(response.ok).toBe(false);
+    expect(await response.text()).toContain('UPDATE_REQUIRED');
+  }
 });
 
 it('atomically moves every completed set beyond a sync batch, converts planned weights, and retries once', async () => {

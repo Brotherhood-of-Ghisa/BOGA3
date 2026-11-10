@@ -76,6 +76,56 @@ it('retains invalid saved values for reading while permitting only Keep current'
   expect(screen.getByTestId('exercise-merge-keep-saved')).not.toBeDisabled();
 });
 
+it('shows saved workout metadata alongside the current lifecycle and explains that Apply keeps it finished', async () => {
+  mockLoad.mockResolvedValue(review({ items: [{ ...item, type: 'sessions', exerciseName: 'Workout',
+    current: { status: 'completed', gym_id: 'home', gym_name: 'Home', started_at: 100, completed_at: 200, deleted_at: null },
+    saved: { status: 'completed', gym_id: 'gym', gym_name: 'Gym', started_at: 100, completed_at: 200, deleted_at: null },
+  }] }));
+  render(<ExerciseMergeReviewScreen />);
+  expect(await screen.findByLabelText('Gym: current Home, saved Gym')).toBeTruthy();
+  expect(screen.getByText('Finished')).toBeTruthy();
+  expect(screen.getByText('Applying saved metadata keeps this workout finished.')).toBeTruthy();
+  expect(screen.getByTestId('exercise-merge-apply-saved')).not.toBeDisabled();
+});
+
+it('explains that an absent exercise must be applied before its saved sets', async () => {
+  mockLoad.mockResolvedValue(review({ items: [{ ...item, invalid: true, current: null,
+    notice: 'Apply the saved exercise before applying its sets or tags.' }] }));
+  render(<ExerciseMergeReviewScreen />);
+  expect(await screen.findByText('Apply the saved exercise before applying its sets or tags.')).toBeTruthy();
+  expect(screen.getByTestId('exercise-merge-apply-saved')).toBeDisabled();
+  expect(screen.getByTestId('exercise-merge-keep-saved')).not.toBeDisabled();
+});
+
+it('shows exact timing differences when both instants fall within the same displayed minute', async () => {
+  mockLoad.mockResolvedValue(review({ items: [{ ...item, type: 'sessions', exerciseName: 'Workout',
+    current: { status: 'completed', started_at: 1000, completed_at: 100000, deleted_at: null },
+    saved: { status: 'completed', started_at: 2000, completed_at: 100000, deleted_at: null },
+  }] }));
+  render(<ExerciseMergeReviewScreen />);
+  expect(await screen.findByLabelText(/Start: current .*:01\.000, saved .*:02\.000/)).toBeTruthy();
+});
+
+it('keeps a lifecycle-only saved state visible without offering a metadata apply that changes nothing', async () => {
+  mockLoad.mockResolvedValue(review({ items: [{ ...item, type: 'sessions', exerciseName: 'Workout',
+    current: { status: 'completed', deleted_at: null }, saved: { status: 'completed', deleted_at: null },
+  }] }));
+  render(<ExerciseMergeReviewScreen />);
+  expect(await screen.findByText('No metadata changes need applying. Reopen or restore the workout in the app.')).toBeTruthy();
+  expect(screen.getByTestId('exercise-merge-apply-saved')).toBeDisabled();
+  expect(screen.getByTestId('exercise-merge-keep-saved')).not.toBeDisabled();
+});
+
+it('keeps a real assignment between identically named gyms distinguishable and applicable', async () => {
+  mockLoad.mockResolvedValue(review({ items: [{ ...item, type: 'sessions', exerciseName: 'Workout',
+    current: { status: 'completed', gym_id: 'gym-a', gym_name: 'North End', deleted_at: null },
+    saved: { status: 'completed', gym_id: 'gym-b', gym_name: 'North End', deleted_at: null },
+  }] }));
+  render(<ExerciseMergeReviewScreen />);
+  expect(await screen.findByLabelText('Gym: current North End, saved North End (different gym)')).toBeTruthy();
+  expect(screen.getByTestId('exercise-merge-apply-saved')).not.toBeDisabled();
+});
+
 it('describes an absent current set without NaN or undefined values', async () => {
   mockLoad.mockResolvedValue(review({ items: [{ ...item, current: null, sessionStartedAt: null,
     saved: { weight_value: '25', order_index: 0, performance_status: null, deleted_at: null } }] }));

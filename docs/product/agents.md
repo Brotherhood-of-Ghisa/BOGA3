@@ -24,9 +24,9 @@ Code: `loadPlanPermission` in `supabase/functions/agent-api/index.ts`; the edit 
 Pending: The edit switch saves the grant, but `supabase/functions/agent-api/index.ts`
 has no plan or programme edit routes and does not call those RPCs.
 `services/boga-mcp/src/tools.ts` does not expose the corresponding edits.
-The main switch's disclosure in `apps/mobile/app/connected-agents.tsx` omits
-weekly muscle target changes.
-Pending: Workout RPCs and API routes exist, but app permission enablement is
-withheld until safe mobile handoff; MCP logging tools are not exposed.
+Pending: MCP logging tools are not exposed.
+Code: the independent app grant and handoff live in
+`apps/mobile/src/auth/connected-agents.ts` and
+`supabase/migrations/20261110145636_workout_handoff.sql`.
 Code: `supabase/functions/agent-api/workout-input.ts`;
 `supabase/migrations/20261110141726_agent_workout_logging.sql`.

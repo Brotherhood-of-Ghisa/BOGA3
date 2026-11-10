@@ -123,6 +123,7 @@ export const startSessionPlan = async (planId: string, now: Date = new Date()): 
 const toDraftExerciseInput = (exercise: SessionDraftExerciseSnapshot): SessionDraftExerciseInput => ({
   id: exercise.id,
   exerciseDefinitionId: exercise.exerciseDefinitionId,
+  mergeRevision: exercise.mergeRevision ?? 0,
   name: exercise.name,
   machineName: exercise.machineName,
   sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
@@ -292,6 +293,8 @@ export const addPlanBlockToSession = async (
         startedAt: graph.startedAt,
         sourcePlanId: graph.sourcePlanId ?? null,
         sourcePlanUseId: graph.sourcePlanUseId ?? null,
+        editBaseline: graph.editBaseline,
+        mergeRevisions: Object.fromEntries(graph.exercises.map(exercise => [exercise.id, exercise.mergeRevision ?? 0])),
         exercises,
       },
       { now },
