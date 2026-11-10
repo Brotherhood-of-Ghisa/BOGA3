@@ -79,13 +79,14 @@ function customOf(appearance: AppearanceChoice, phoneScheme: ColorSchemeName | n
 
 // What a part's controls are given: the colours being made (the draft in
 // place), a live and a let-go handler per slider, a save of several parts at
-// once (a switch), and the hue bar's swatch.
+// once (a switch) built on the colours the saves on their way will store, and
+// the hue bar's swatch.
 type Controls = {
   part: CustomPart;
   colours: CustomColours;
   change: (field: Field) => (value: number) => void;
   end: (field: Field) => (value: number) => void;
-  save: (patch: Partial<CustomColours>) => void;
+  save: (patchOf: (intended: CustomColours) => Partial<CustomColours>) => void;
   swatch: ReactNode;
 };
 
@@ -126,10 +127,10 @@ function BackgroundControls(controls: Controls) {
   const { background } = colours;
   const switchMode = (dark: boolean) => {
     const mode: ThemeMode = dark ? 'dark' : 'light';
-    save({
+    save((intended) => ({
       background: { ...background, mode, lightness: PAGE_DEFAULT[mode] },
-      ink: { ...colours.ink, lightness: inkDefault(mode) },
-    });
+      ink: { ...intended.ink, lightness: inkDefault(mode) },
+    }));
   };
   const range = PAGE_RANGE[background.mode];
   return (
@@ -167,9 +168,11 @@ function BackgroundControls(controls: Controls) {
 // so nothing jumps.
 function BordersControls(controls: Controls) {
   const { colours, change, end, save } = controls;
-  const { borders, background } = colours;
+  const { borders } = colours;
   const match = (on: boolean) =>
-    save({ borders: on ? { ...borders, match: true } : { ...borders, match: false, hue: background.hue, strength: background.strength } });
+    save(({ background }) => ({
+      borders: on ? { ...borders, match: true } : { ...borders, match: false, hue: background.hue, strength: background.strength },
+    }));
   return (
     <>
       <SwitchRow density="list" label="Match background" onValueChange={match} testID="theme-custom-match" value={borders.match} />
@@ -270,17 +273,17 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
   const roles = appearanceRoles(chosen, phoneScheme);
   const liveRoles = useUiRoles();
 
-  // `patch` holds the values let go at: the event is the truth, not the last
-  // render.
-  const save = async (patch: Partial<CustomColours>) => {
+  // `patchOf` is given the colours the saves on their way will store, so
+  // another part's save is not overwritten; this part's values are the ones
+  // let go at: the event is the truth, not the last render.
+  const save = async (patchOf: (intended: CustomColours) => Partial<CustomColours>) => {
+    const intended = customOf(readIntendedAppearance(appearance), phoneScheme);
+    const patch = patchOf(intended);
     const next = patch[part];
     if (next !== undefined) setDraft(next);
-    // The colours the saves on their way will store, so another part's save
-    // is not overwritten.
-    const custom = { ...customOf(readIntendedAppearance(appearance), phoneScheme), ...patch };
     await commit(
-      { theme: 'custom', custom },
-      { message: 'Couldn’t save the colour. Nothing changed.', context: { part, value: Object.keys(patch).length === 1 && next !== undefined ? next : patch } },
+      { theme: 'custom', custom: { ...intended, ...patch } },
+      { message: 'Couldn’t save the colour. Nothing changed.', context: { part, value: patch } },
     );
   };
   const controls: Controls = {
@@ -288,10 +291,10 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
     colours,
     change: (field) => (value) => setDraft((current) => editOf(part, current, field, value)),
     end: (field) => (value) => {
-      void save({ [part]: editOf(part, draft, field, value) });
+      void save(() => ({ [part]: editOf(part, draft, field, value) }));
     },
-    save: (patch) => {
-      void save(patch);
+    save: (patchOf) => {
+      void save(patchOf);
     },
     swatch: <View style={[styles.swatch, { backgroundColor: roles[PART_ROLE[part]], borderColor: liveRoles.rule }]} testID="theme-custom-hue-swatch" />,
   };

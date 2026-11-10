@@ -356,7 +356,7 @@ it('says nothing changed, and logs why, when the save fails', async () => {
     expect.objectContaining({
       level: 'warn',
       event: 'theme.save_failed',
-      context: { part: 'background', value: { ...CUSTOM.background, strength: 25 }, error: 'disk full' },
+      context: { part: 'background', value: { background: { ...CUSTOM.background, strength: 25 } }, error: 'disk full' },
     }),
   );
 });
@@ -382,6 +382,18 @@ it('switches the page to dark: the switch saves the mode, the page and the prima
   await act(async () => tap(slider('Lightness')).onEnd({ x: 9 }, true));
   await waitFor(() => expect(storedCustom()?.background.lightness).toBe(2.25));
   expect(previewGround()).toBe(generateCustomRoles(storedCustom()!).paper);
+});
+
+it('keeps a primary text saved meanwhile when the mode is switched, resetting only its lightness', async () => {
+  store(CUSTOM);
+  render(<ThemeCustomRoute />);
+  // Another part's save, stored after this page drew.
+  const inkSaved = { ...CUSTOM.ink, hue: 20, strength: 90 };
+  store({ ...CUSTOM, ink: inkSaved });
+
+  await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Dark' })));
+
+  await waitFor(() => expect(storedCustom()?.ink).toEqual({ ...inkSaved, lightness: 95 }));
 });
 
 it('shows a page saved outside its mode’s range as it is, until it is moved into it', async () => {
