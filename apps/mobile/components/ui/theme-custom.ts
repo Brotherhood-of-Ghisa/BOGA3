@@ -194,7 +194,9 @@ export function generateCustomRoles(colours: CustomColours): UiRoles {
   };
   const frame: Frame = { paper: hexToLch(reference.paper), end: hexToLch(reference.ink).lightness, page: colours.background.lightness };
   // At its ladder's L*, `ink` is moved like every role (onto the ladder's
-  // end); elsewhere it is drawn at the chosen L*.
+  // end); elsewhere it is drawn at the chosen L*. The two paths differ only
+  // by rounding, but the first keeps a theme saved before the lightness
+  // existed byte-identical (`ui-theme-custom.test.ts`): do not merge them.
   const atLadder = colours.ink.lightness === inkDefault(mode);
   const inkLightness = atLadder ? frame.end : colours.ink.lightness;
 
