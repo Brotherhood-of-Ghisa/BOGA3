@@ -378,7 +378,7 @@ const useStyles = makeStyles((roles) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
-    minHeight: uiGeometry.tapTarget,
+    minHeight: ROW_HEIGHT,
     paddingVertical: uiSpace.xs,
     backgroundColor: roles.accentWash,
     borderRadius: uiGeometry.radius.control,
