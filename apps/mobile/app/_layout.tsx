@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useThemeAppIcon } from '@/components/appearance/theme-app-icon';
 import { AuthRouteGuard } from '@/components/navigation/auth-route-guard';
 import { statusBarStyleFor, useNavigationTheme } from '@/components/navigation/navigation-theme';
+import { HealthImportBridge } from '@/components/navigation/health-import-bridge';
 import { NotificationTapBridge } from '@/components/navigation/notification-tap-bridge';
 import { RootStack } from '@/components/navigation/root-stack';
 import { AppThemeProvider, useUiMode } from '@/components/ui/theme-context';
@@ -90,6 +91,7 @@ export default function RootLayout() {
               <AuthRouteGuard>
                 <RootStack />
                 <NotificationTapBridge />
+                <HealthImportBridge />
               </AuthRouteGuard>
             </ThemedChrome>
           </AuthProvider>
