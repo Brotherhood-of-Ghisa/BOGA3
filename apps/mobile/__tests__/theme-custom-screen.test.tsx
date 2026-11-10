@@ -248,7 +248,7 @@ it('spotlights every role the part moves, live as a control moves', () => {
   }
 });
 
-it('lists, for each part, only roles that part moves', () => {
+it('spotlights, for each part, only roles a hue and strength change of that part moves, and every one of them', () => {
   // A role a part moves changes by more than the sRGB rounding a shift of
   // the ink's L* by gamut carries into every role.
   const channels = (colour: string) =>

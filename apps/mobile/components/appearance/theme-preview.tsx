@@ -131,7 +131,7 @@ export const SPOTLIGHT: Record<CustomPart, readonly Sample[]> = {
   ],
   text: [
     { kind: 'text', role: 'inkMuted', ground: 'paper', label: 'Page' },
-    { kind: 'text', role: 'inkMuted', ground: 'surface', label: 'Muted' },
+    { kind: 'text', role: 'inkMuted', ground: 'surface', label: 'Card' },
     { kind: 'text', role: 'inkFaint', ground: 'surface', label: 'Faint' },
     { kind: 'text', role: 'inkGhost', ground: 'surface', label: 'Ghost' },
   ],
@@ -160,6 +160,7 @@ export function PartSpotlight({ part, roles, testID }: { part: CustomPart; roles
   const type = useUiText();
   return (
     <View
+      accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={[styles.page, styles.spotlight, { backgroundColor: roles.paper, borderColor: roles.rule }]}
       testID={testID}>

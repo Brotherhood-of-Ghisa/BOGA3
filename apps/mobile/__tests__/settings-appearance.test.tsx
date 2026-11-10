@@ -162,6 +162,15 @@ it('shows the applying indicator from a choice until the app is drawn in it, and
   await switchTheme(DEFAULT_APPEARANCE);
 });
 
+it('shows no applying indicator when the stored choice differs from the one drawn without a save', () => {
+  // Outside a provider the app is drawn in the launch theme, the default:
+  // the stored Slate differs, as an older record read on another mode would.
+  Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"theme":"slate","mode":"dark","custom":null}');
+  render(<SettingsAppearanceRoute />);
+  expect(radio('Slate').props.accessibilityState).toEqual({ checked: true });
+  expect(screen.queryByTestId('settings-appearance-applying')).toBeNull();
+});
+
 it('writes nothing when the choice in use is chosen again', async () => {
   Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"theme":"slate","mode":"dark","custom":null}');
   const setItem = jest.spyOn(Storage, 'setItem');
