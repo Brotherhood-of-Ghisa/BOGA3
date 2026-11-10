@@ -7,6 +7,7 @@ import type { MuscleDailySets } from '@/src/data';
 import {
   derivePlanWeek,
   deriveRecoveryRows,
+  groupRecoveryRows,
   selectNextPlans,
   todayPlanWindow,
   type PlannedSessionInput,
@@ -79,7 +80,7 @@ describe('deriveRecoveryRows', () => {
 
   it('shows an untrained muscle with every day blank', () => {
     const rows = deriveRecoveryRows({ muscles: [muscle('core', 9)], sets: {}, sessionDays: [] }, window, TARGETS);
-    expect(rows).toEqual([{ muscleGroupId: 'core', name: 'Core', days: [null, null, null], today: null, weekSets: 0, target: 8 }]);
+    expect(rows).toEqual([{ muscleGroupId: 'core', name: 'Core', familyName: 'F', days: [null, null, null], today: null, weekSets: 0, target: 8 }]);
   });
 
   it("carries today's sets so far in their own column, outside the order", () => {
@@ -97,6 +98,38 @@ describe('deriveRecoveryRows', () => {
     expect(rows.find((row) => row.muscleGroupId === 'chest')?.target).toBe(12);
     expect(rows.find((row) => row.muscleGroupId === 'back')?.target).toBe(8);
   });
+});
+
+it('groups using reported family names, retaining child recovery order, unrounded sums, and known zero', () => {
+  const daily: MuscleDailySets = {
+    muscles: [
+      { ...muscle('a', 1), familyName: 'My custom family' },
+      { ...muscle('b', 2), familyName: 'Other' },
+      { ...muscle('c', 3), familyName: 'My custom family' },
+    ],
+    sets: { a: { '2026-10-30': 1.5 }, c: { '2026-10-30': 1.5 } }, sessionDays: [],
+  };
+  const rows = deriveRecoveryRows(daily, window, TARGETS);
+  expect(groupRecoveryRows(rows)).toEqual([
+    { name: 'Other', muscles: [rows[0]], days: [0, 0, 0], today: 0, weekSets: 0 },
+    { name: 'My custom family', muscles: [rows[1], rows[2]], days: [0, 0, 3], today: 0, weekSets: 3 },
+  ]);
+  expect(groupRecoveryRows([])).toEqual([]);
+});
+
+it('keeps family daily, today and weekly sums separate, including fractional and absent contributions', () => {
+  const window = todayPlanWindow(local(2026, 11, 10, 15));
+  const rows = deriveRecoveryRows({
+    muscles: [muscle('a', 1), muscle('b', 2)],
+    sets: {
+      a: { '2026-11-07': 1.5, '2026-11-09': 0.5, '2026-11-10': 2 },
+      b: { '2026-11-07': 1.5, '2026-11-09': 0.5, '2026-11-10': 0.5 },
+    },
+    sessionDays: [],
+  }, window, TARGETS);
+  expect(groupRecoveryRows(rows)).toEqual([
+    { name: 'F', muscles: rows, days: [3, 0, 1], today: 2.5, weekSets: 3.5 },
+  ]);
 });
 
 describe('the next planned sessions and the week', () => {

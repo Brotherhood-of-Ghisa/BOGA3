@@ -124,6 +124,8 @@ describe('session list repository', () => {
 
     const result = await repository.listBuckets();
 
+    expect(result.activeSessions.map(session => session.id)).toEqual(['active-newer', 'active-older']);
+
     expect(result.active).toEqual(
       expect.objectContaining({
         id: 'active-newer',

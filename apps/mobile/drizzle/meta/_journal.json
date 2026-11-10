@@ -204,6 +204,20 @@
       "when": 1793963606279,
       "tag": "0028_true_outlaw_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1794322745670,
+      "tag": "0029_tough_zombie",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1794338904232,
+      "tag": "0030_panoramic_doomsday",
+      "breakpoints": true
     }
   ]
 }

@@ -60,6 +60,7 @@ import {
   type GroupSummary,
 } from '@/src/groups';
 import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src/groups/competition-wire';
+import { updatePreferences } from '@/src/preferences/hooks';
 import { SIGN_IN_ROUTE } from '@/src/navigation/routes';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 import { competitionEvent, competitionSession } from './helpers/competition-fixtures';
@@ -213,6 +214,27 @@ const sessionMembers = () => within(byId('today-group-section')).queryAllByTestI
   .map((node) => node.props.children as string);
 
 describe('Today: the group card', () => {
+  it('updates the mounted group week and session timestamps with the selected date family', async () => {
+    api.listMyGroups.mockResolvedValue({ groups: [IRON] });
+    api.getCompetitionWeek.mockResolvedValue(summary());
+    await renderToday();
+    await waitFor(() => expect(byId('today-group-session-dave-done')).toBeTruthy());
+    const session = byId('today-group-session-dave-done');
+    for (const [dateFormat, range, timestamp, numericRange, numericTimestamp] of [
+      ['MM-DD-YYYY', 'Oct 5 – 11 26', 'Oct 6 26 09:00', '10-05-2026 – 10-11-2026', '10-06-2026 09:00'],
+      ['YYYY-MM-DD', '2026 Oct 5 – 11', '2026 Oct 6 09:00', '2026-10-05 – 2026-10-11', '2026-10-06 09:00'],
+      ['DD-MM-YYYY', '5 – 11 Oct 26', '6 Oct 26 09:00', '05-10-2026 – 11-10-2026', '06-10-2026 09:00'],
+    ] as const) {
+      act(() => updatePreferences({ dateFormat }));
+      await waitFor(() => expect(byId('today-group-board-range')).toHaveTextContent(range));
+      expect(byId('today-group-board-range')).toHaveProp('accessibilityLabel', numericRange);
+      expect(byId('today-group-board').props.accessibilityLabel).toContain(numericRange);
+      expect(byId('today-group-session-dave-done-when')).toHaveTextContent(timestamp);
+      expect(byId('today-group-session-dave-done').props.accessibilityLabel).toContain(numericTimestamp);
+      expect(byId('today-group-session-dave-done')).toBe(session);
+    }
+  });
+
   it("with one group: the section is Groups, the board card's header row names the group with no switch, and this local week is read", async () => {
     api.listMyGroups.mockResolvedValue({ groups: [IRON] });
     api.getCompetitionWeek.mockResolvedValue(summary());
@@ -269,7 +291,7 @@ describe('Today: the group card', () => {
     expect(byId('today-group-board-me-records')).toHaveTextContent('2');
     // No count of the members left off.
     expect(screen.queryByText(/more$/)).toBeNull();
-    expect(byId('today-group-board').props.accessibilityLabel).toMatch(/^This week, 5 – 11 Oct 26; 1, dave, 60 sets, 0 PRs;.*; You, 7th, 30 sets, 2 PRs$/);
+    expect(byId('today-group-board').props.accessibilityLabel).toMatch(/^This week, 05-10-2026 – 11-10-2026; 1, dave, 60 sets, 0 PRs;.*; You, 7th, 30 sets, 2 PRs$/);
   });
 
   it("with several groups: the header row names the Groups screen pick, and its switch, on the same row, moves both", async () => {

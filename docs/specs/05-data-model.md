@@ -33,6 +33,10 @@ changes recalculate derived history without touching raw sets.
 
 ## Scope classification
 
+Session control columns are **in sync scope** but server-written;
+pending handoffs use non-sync recovery storage. Load
+[`tech/agent-workout-contract.md`](tech/agent-workout-contract.md) when changing control.
+
 Every table sits in exactly one bucket: `in sync scope` means Sync v2 mirrors
 it and a reinstall restores it; `out of sync scope` means it does not
 round-trip and the drift checker ignores it.
@@ -48,7 +52,7 @@ round-trip and the drift checker ignores it.
 | `smoke_records` | out — test scaffolding | `apps/mobile/src/data/schema/smoke.ts` |
 | `app_public.user_profiles` (`training_unit`, `time_zone` included) | out — auth/profile layer, explicitly outside the seventeen-table mirror | `supabase/migrations/` |
 | `public.app_logs` | out — operational diagnostics. Authenticated clients **insert only**; client `SELECT`/`UPDATE`/`DELETE` are intentionally unavailable and rows are read through operator tooling | `supabase/migrations/` |
-| `public.agent_access_audit`, `public.agent_plan_permissions`, `public.agent_plan_write_receipts` | out — control/security metadata: audit is service-insert only; permission is a default-denied per-client write grant (plans, exercises) the app owns; receipts are hash-only and service-role only | `supabase/migrations/` |
+| `public.agent_access_audit`, `public.agent_plan_permissions`, `public.agent_workout_permissions`, `public.agent_plan_write_receipts` | out — control/security metadata: audit is service-insert only; permissions are per-client current-grant controls; receipts keep hashes and result IDs/tokens, service-role only | `supabase/migrations/` |
 | Every `app_public.notification_*` table | out — operational installations, preferences and durable delivery; no `owner_user_id` or mirror FK | `supabase/migrations/` |
 | Every `app_public.group_*` table | out — server-authoritative, multi-reader rows with no per-owner LWW, so they can never be Sync v2 entities | `supabase/migrations/`, [`tech/groups-contract.md`](tech/groups-contract.md) |
 
@@ -262,11 +266,10 @@ the data-model-level invariants.
    written again. On upgrade a valid pre-existing row with legacy `null` stays
    confirmed, while a blank or partial legacy draft row with `null` reads as
    `unperformed`, so later entry cannot silently confirm it.
-6. Only valid confirmed actual rows ([[set.performed]]) become completed
-   history, and **every reader with performed/completed semantics filters to
-   valid actual values plus confirmed status** — planned, legacy-skipped, unperformed, blank,
-   partial, invalid, deleted and tombstoned rows contribute to no count,
-   record, list, analytic or the agent coaching API. Blank and partial active
+6. **Performed-set history and metric readers filter by [[set.performed]]** —
+   planned, legacy-skipped, unperformed, blank, partial, invalid, deleted and
+   tombstoned sets contribute to no metric, performed-set list or coaching API.
+   Entry-based browsing follows [[exercise.browser-history]] independently. Blank and partial active
    rows are lossless drafts keeping their ids and order across save, hydration
    and navigation, and a blank `weight_value` with positive `reps_value`
    canonicalizes to `"0"` as a valid zero-load set — normalization inside
@@ -340,7 +343,9 @@ only and ignores the rest. Keeping a stored value when a key is omitted is per
 column — only a `_fields ? '<key>'` branch or a `coalesce` does, which a new
 column needs so an older writer cannot clear it.
 Server-first additions must also keep unknown entity types out of old-reader
-pulls. The kg-only rename and protocol-6 Routine layer shift require coordinated cutovers.
+pulls. The kg-only rename, Routine layer shift and protocol-7 workout lifecycle fence
+require coordinated cutovers. For workout session epochs and recovery, load
+[the agent workout contract](tech/agent-workout-contract.md).
 
 The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, in the backend gate)
 introspects migrated local Postgres and checks the FK order in

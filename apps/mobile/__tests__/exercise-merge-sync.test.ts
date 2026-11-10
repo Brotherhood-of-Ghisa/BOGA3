@@ -2,14 +2,16 @@ import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
 import { eq } from 'drizzle-orm';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
-import { applyPullPage, entityToWire, runSyncCycle, type WireEntity } from '@/src/sync/cycle';
+import { applyPullPage, entityToWire, runSyncCycle, selectPushBatch, type WireEntity } from '@/src/sync/cycle';
 import { syncExerciseMerges, validateMergeOutcomes } from '@/src/sync/exercise-merge';
 import { guardSessionMergeEdit, listMergeLocal, readMergeLocal, writeMergeLocal } from '@/src/data/exercise-merge-store';
-import { exerciseDefinitions, exerciseSessionFacts, exerciseSessionFactsStale, exerciseSets, gyms, sessionExercises, sessionPlans, sessionPlanExercises, sessionPlanSets, sessionPlanUses, syncRuntimeState } from '@/src/data/schema';
+import { exerciseDefinitions, exerciseSessionFacts, exerciseSessionFactsStale, exerciseSets, gyms, sessionExercises, sessionPlans, sessionPlanExercises, sessionPlanSets, sessionPlanUses, sessions, syncRuntimeState } from '@/src/data/schema';
 import { wipeLocalDatabaseRows } from '@/src/data/local-wipe';
 import * as dataBootstrap from '@/src/data/bootstrap';
 import { createDrizzleSessionDraftStore, loadSessionSnapshotById, updateSessionMetadata } from '@/src/data/session-drafts';
-import { mapDraftSnapshotToSession } from '@/src/session-recorder/session-model';
+import { mapDraftSnapshotToSession, toPersistDraftExercises } from '@/src/session-recorder/session-model';
+import { captureSessionEditBaseline } from '@/src/data/session-edit-baseline';
+import { setSessionDeletedState } from '@/src/data/session-list';
 import { saveCompletedSessionEdit } from '@/src/session-recorder/session-lifecycle';
 import { drainExerciseSessionFacts, rebuildAllExerciseSessionFacts } from '@/src/data/exercise-session-facts';
 import type { LocalDatabase } from '@/src/data/bootstrap';
@@ -73,6 +75,248 @@ function rpcPages(rows = canonical()) {
   });
 }
 const sync = () => syncExerciseMerges({ database, owner, remoteSequence: 1, conflictCount: 0, adapter });
+
+async function withDatabase<T>(operation: () => Promise<T>): Promise<T> {
+  const bootstrap = jest.spyOn(dataBootstrap, 'bootstrapLocalDataLayer').mockResolvedValue(database);
+  try { return await operation(); } finally { bootstrap.mockRestore(); }
+}
+
+it('keeps a stale editor’s actual input for review when AI takes control, without changing the canonical graph', async () => {
+  database.update(sessions).set({ status: 'active', completedAt: null, mergeRevision: 1 }).run();
+  database.update(sessionExercises).set({ mergeRevision: 1 }).run();
+  database.update(exerciseSets).set({ mergeRevision: 1 }).run();
+  const snapshot = await withDatabase(() => loadSessionSnapshotById('session'));
+  const session = mapDraftSnapshotToSession(snapshot!);
+  session.exercises[0].sets[0].weight = '55';
+  database.update(sessions).set({ loggingClientId: 'coach', loggingGrantedAt: '2026-11-10T10:00:00Z', mergeRevision: 2 }).run();
+  database.update(sessionExercises).set({ mergeRevision: 2 }).run();
+  database.update(exerciseSets).set({ mergeRevision: 2 }).run();
+  await withDatabase(async () => {
+    await expect(createDrizzleSessionDraftStore().saveDraftGraph({ sessionId: 'session', gymId: null,
+      startedAt: snapshot!.startedAt, status: 'active', now: new Date(), exercises: toPersistDraftExercises(session),
+      editBaseline: snapshot!.editBaseline })).rejects.toThrow(/saved for review/);
+  });
+  expect(database.select().from(exerciseSets).get()?.weightValue).toBe('40');
+  const saved = listMergeLocal(database, owner, 'pending').map(row => JSON.parse(row.payload) as MergeWireEntity);
+  expect(saved.some(row => row.type === 'exercise_sets' && row.fields.weight_value === '55' && row.fields.merge_revision === 1)).toBe(true);
+});
+
+it('drains a protected dirty graph before the final header and reuses its lifecycle ID until the intent changes', () => {
+  database.update(sessions).set({ mergeRevision: 1, localDirty: true, localUpdatedAtMs: 500 }).run();
+  database.update(sessionExercises).set({ mergeRevision: 1 }).run();
+  database.update(exerciseSets).set({ mergeRevision: 1, localDirty: true }).run();
+  expect(database.transaction(tx => selectPushBatch(tx, 200)).map(row => row.type)).toEqual(['exercise_sets']);
+  database.update(exerciseSets).set({ localDirty: false }).run();
+  const first = database.transaction(tx => selectPushBatch(tx, 200));
+  expect(first).toHaveLength(1);
+  expect(first[0].lifecycle_action).toMatchObject({ id: expect.stringMatching(/^lifecycle:/), base_revision: 1 });
+  const retry = database.transaction(tx => selectPushBatch(tx, 200));
+  expect(retry[0].lifecycle_action).toEqual(first[0].lifecycle_action);
+  database.update(sessions).set({ startedAt: new Date(10), localUpdatedAtMs: 501 }).run();
+  expect(database.transaction(tx => selectPushBatch(tx, 200))[0].lifecycle_action?.id)
+    .not.toBe(first[0].lifecycle_action?.id);
+});
+
+it('recovers a lost lifecycle acknowledgement without saving already accepted intent as a conflict', async () => {
+  database.delete(exerciseSets).run(); database.delete(sessionExercises).run();
+  database.update(sessions).set({ mergeRevision: 1, localDirty: true, localUpdatedAtMs: 9999 }).run();
+  const [sent] = database.transaction(tx => selectPushBatch(tx, 200));
+  const current = database.select().from(sessions).get()!;
+  rpcPages([wire({ ...current, mergeRevision: 2, localUpdatedAtMs: 10000 }, 'sessions')]);
+  const pages = mockRpc.getMockImplementation()!;
+  mockRpc.mockImplementation(async (name: string, args) => name === 'exercise_merge_status'
+    ? { data: { id: sent.lifecycle_action!.id, sequence: 1, sessionId: 'session', workoutRevision: 2, matchesInput: true }, error: null }
+    : pages(name, args));
+  await sync();
+  expect(database.select().from(sessions).get()).toMatchObject({ mergeRevision: 2, localDirty: false });
+  expect(mockRpc.mock.calls.some(([name]) => name === 'exercise_merge_save_conflict')).toBe(false);
+  expect(readMergeLocal(database, owner, 'lifecycle:session')).toBeNull();
+});
+
+async function loadedEdit() {
+  const snapshot = (await loadSessionSnapshotById('session'))!;
+  return { snapshot, input: { sessionId: 'session', gymId: snapshot.gymId, startedAt: snapshot.startedAt,
+    completedAt: snapshot.completedAt!, durationSec: snapshot.durationSec ?? 0, now: new Date(300),
+    editBaseline: snapshot.editBaseline, exercises: toPersistDraftExercises(mapDraftSnapshotToSession(snapshot)),
+  } };
+}
+function advanceWorkout() {
+  database.update(sessions).set({ mergeRevision: 1 }).run();
+  database.update(sessionExercises).set({ mergeRevision: 1 }).run();
+  database.update(exerciseSets).set({ mergeRevision: 1 }).run();
+}
+
+it('rejects a discard confirmed from an older lifecycle instead of deleting the newly completed workout', async () => {
+  const boot = jest.spyOn(dataBootstrap, 'bootstrapLocalDataLayer').mockResolvedValue(database);
+  try {
+    advanceWorkout();
+    await expect(setSessionDeletedState('session', true, { expectedRevision: 0 })).rejects.toThrow(/changed elsewhere/);
+    expect(database.select().from(sessions).get()).toMatchObject({ status: 'completed', deletedAt: null, mergeRevision: 1 });
+    await setSessionDeletedState('session', true, { expectedRevision: 1 });
+    expect(database.select().from(sessions).get()?.deletedAt).not.toBeNull();
+  } finally { boot.mockRestore(); }
+});
+
+it('rebases independent timing fields and preserves an actual same-field timing conflict at the loaded epoch', async () => {
+  const boot = jest.spyOn(dataBootstrap, 'bootstrapLocalDataLayer').mockResolvedValue(database);
+  try {
+    database.update(sessions).set({ mergeRevision: 1, completedAt: new Date(200000) }).run();
+    const applied = await updateSessionMetadata('session', { times: { startedAt: new Date(0), completedAt: new Date(2) },
+      timesBaseline: { revision: 0, startedAt: new Date(1), completedAt: new Date(2) } });
+    expect(applied).toEqual({ startedAt: new Date(0), completedAt: new Date(200000) });
+    database.update(sessions).set({ mergeRevision: 2, completedAt: new Date(300000), localDirty: false }).run();
+    await expect(updateSessionMetadata('session', { times: { startedAt: new Date(0), completedAt: new Date(250000) },
+      timesBaseline: { revision: 1, startedAt: new Date(0), completedAt: new Date(200000) },
+    })).rejects.toThrow(/saved for review/);
+    expect(database.select().from(sessions).get()?.completedAt).toEqual(new Date(300000));
+    const saved = listMergeLocal(database, owner, 'pending').map(row => JSON.parse(row.payload));
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ type: 'sessions', fields: { completed_at: 250000, merge_revision: 1 } });
+  } finally { boot.mockRestore(); }
+});
+
+it('preserves completed time edits when another phone resumes the workout and gives AI control', async () => {
+  await withDatabase(async () => {
+    database.update(sessions).set({ status: 'active', completedAt: null, mergeRevision: 2,
+      loggingClientId: 'coach', loggingGrantedAt: '2026-11-10T12:00:00Z', localDirty: false }).run();
+    await expect(updateSessionMetadata('session', {
+      times: { startedAt: new Date(0), completedAt: new Date(250000) },
+      timesBaseline: { revision: 0, startedAt: new Date(1), completedAt: new Date(2) },
+    })).rejects.toThrow(/saved for review/);
+    expect(database.select().from(sessions).get()).toMatchObject({
+      status: 'active', completedAt: null, loggingClientId: 'coach', mergeRevision: 2, localDirty: false,
+    });
+    expect(listMergeLocal(database, owner, 'pending').map(row => JSON.parse(row.payload))).toMatchObject([
+      { type: 'sessions', fields: { status: 'completed', started_at: 0, completed_at: 250000, merge_revision: 0 } },
+    ]);
+    await expect(updateSessionMetadata('session', { gymId: null })).rejects.toThrow(/AI is logging/);
+  });
+});
+
+it('keeps ordinary timing edits usable on a workout that has never entered a protected epoch', async () => {
+  const boot = jest.spyOn(dataBootstrap, 'bootstrapLocalDataLayer').mockResolvedValue(database);
+  try {
+    database.update(sessions).set({ completedAt: new Date(200000) }).run();
+    await expect(updateSessionMetadata('session', { times: { startedAt: new Date(1), completedAt: new Date(250000) },
+      timesBaseline: { revision: 0, startedAt: new Date(1), completedAt: new Date(2) } })).resolves.toEqual({ startedAt: new Date(1), completedAt: new Date(250000) });
+    expect(database.select().from(sessions).get()?.completedAt).toEqual(new Date(250000));
+    expect(listMergeLocal(database, owner, 'pending')).toHaveLength(0);
+  } finally { boot.mockRestore(); }
+});
+
+it('rebases a loaded set edit while retaining a set added by chat that the editor never saw', async () => {
+  const boot = jest.spyOn(dataBootstrap, 'bootstrapLocalDataLayer').mockResolvedValue(database);
+  try {
+    const { input } = await loadedEdit();
+    input.exercises[0].sets[0].weightValue = '44';
+    advanceWorkout();
+    database.insert(exerciseSets).values({ id: 'chat-set', sessionExerciseId: 'block', orderIndex: 1,
+      weightValue: '60', repsValue: '8', mergeRevision: 1 }).run();
+    await createDrizzleSessionDraftStore().saveCompletedSessionGraph(input);
+    expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'set')).get()).toMatchObject({ weightValue: '44', mergeRevision: 1 });
+    expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'chat-set')).get()).toMatchObject({ weightValue: '60', deletedAt: null });
+    expect(listMergeLocal(database, owner, 'pending')).toHaveLength(0);
+  } finally { boot.mockRestore(); }
+});
+
+it('gives a freshly added exercise and its sets the session epoch actually loaded by the editor', async () => {
+  const boot = jest.spyOn(dataBootstrap, 'bootstrapLocalDataLayer').mockResolvedValue(database);
+  try {
+    advanceWorkout();
+    const { input } = await loadedEdit();
+    input.exercises.push({ id: 'fresh-block', exerciseDefinitionId: 'b', name: 'B', mergeRevision: 0,
+      machineName: null, sourcePlanExerciseId: null, sets: [{ id: 'fresh-set', weightValue: '10', repsValue: '8',
+        setType: null, plannedWeightValue: null, plannedRepsValue: null, plannedSetType: null,
+        performanceStatus: null, sourcePlanSetId: null }] });
+    await createDrizzleSessionDraftStore().saveCompletedSessionGraph(input);
+    expect(database.select().from(sessionExercises).where(eq(sessionExercises.id, 'fresh-block')).get()?.mergeRevision).toBe(1);
+    expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'fresh-set')).get()?.mergeRevision).toBe(1);
+    const batch = database.transaction(tx => selectPushBatch(tx, 200));
+    expect(batch.find(row => row.id === 'fresh-block')?.fields.merge_revision).toBe(1);
+    expect(batch.find(row => row.id === 'fresh-set')?.fields.merge_revision).toBe(1);
+    expect(batch.some(row => row.type === 'sessions')).toBe(false);
+  } finally { boot.mockRestore(); }
+});
+
+it('preserves only actual input when chat changes the same set, without inventing a removal for an unseen set', async () => {
+  const boot = jest.spyOn(dataBootstrap, 'bootstrapLocalDataLayer').mockResolvedValue(database);
+  try {
+    const { input } = await loadedEdit();
+    input.exercises[0].sets[0].weightValue = '44';
+    advanceWorkout();
+    database.update(exerciseSets).set({ weightValue: '50' }).where(eq(exerciseSets.id, 'set')).run();
+    database.insert(exerciseSets).values({ id: 'chat-set', sessionExerciseId: 'block', orderIndex: 1,
+      weightValue: '60', repsValue: '8', mergeRevision: 1 }).run();
+    await expect(createDrizzleSessionDraftStore().saveCompletedSessionGraph(input)).rejects.toThrow(/saved for review/);
+    const pending = listMergeLocal(database, owner, 'pending').map(row => JSON.parse(row.payload));
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ type: 'exercise_sets', id: 'set', fields: { weight_value: '44', merge_revision: 0, deleted_at: null } });
+    expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'set')).get()?.weightValue).toBe('50');
+  } finally { boot.mockRestore(); }
+});
+
+it('preserves an edited active buffer when chat finishes it and keeps the canonical completed lifecycle', async () => {
+  const boot = jest.spyOn(dataBootstrap, 'bootstrapLocalDataLayer').mockResolvedValue(database);
+  try {
+    database.update(sessions).set({ status: 'active', completedAt: null, durationSec: null }).run();
+    const baseline = captureSessionEditBaseline(database, 'session');
+    const snapshot = (await loadSessionSnapshotById('session'))!;
+    const exercises = toPersistDraftExercises(mapDraftSnapshotToSession(snapshot));
+    exercises[0].sets[0].weightValue = '44';
+    database.update(sessions).set({ status: 'completed', completedAt: new Date(500), durationSec: 1 }).run();
+    advanceWorkout();
+    await expect(createDrizzleSessionDraftStore().saveDraftGraph({ sessionId: 'session', gymId: null,
+      startedAt: new Date(1), status: 'active', now: new Date(600), editBaseline: baseline, exercises,
+    })).rejects.toThrow(/saved for review/);
+    expect(database.select().from(sessions).get()).toMatchObject({ status: 'completed', completedAt: new Date(500) });
+    const pending = listMergeLocal(database, owner, 'pending').map(row => JSON.parse(row.payload));
+    expect(pending).toHaveLength(1); expect(pending[0].id).toBe('set');
+  } finally { boot.mockRestore(); }
+});
+
+it('holds a dirty active session through ordinary pull, then preserves it before forcing a remote finish over a future clock', async () => {
+  const completed = database.select().from(sessions).get()!;
+  const incoming = wire({ ...completed, mergeRevision: 1, localUpdatedAtMs: 2000 }, 'sessions');
+  database.update(sessions).set({ status: 'active', completedAt: null, durationSec: null,
+    localDirty: true, localUpdatedAtMs: 1000 }).run();
+  database.transaction(tx => applyPullPage(tx, [incoming], 'sessions'));
+  expect(database.select().from(sessions).get()).toMatchObject({ status: 'active', localDirty: true });
+  database.update(sessions).set({ localUpdatedAtMs: 9999 }).run();
+  rpcPages([incoming, ...canonical()]);
+  await sync();
+  expect(database.select().from(sessions).get()).toMatchObject({ status: 'completed', mergeRevision: 1, localDirty: false });
+  expect(mockRpc).toHaveBeenCalledWith('exercise_merge_save_conflict', expect.objectContaining({
+    p_type: 'sessions', p_row: expect.objectContaining({ status: 'active', merge_revision: 0, client_updated_at_ms: 9999 }),
+  }));
+});
+
+it('preserves a new offline exercise before its sets instead of installing them into a chat-finished workout', async () => {
+  const completed = database.select().from(sessions).get()!;
+  database.insert(sessionExercises).values({ id: 'offline-block', sessionId: 'session', exerciseDefinitionId: 'a',
+    name: 'A', orderIndex: 1, localDirty: true, localUpdatedAtMs: 9999 }).run();
+  database.insert(exerciseSets).values({ id: 'offline-set', sessionExerciseId: 'offline-block',
+    orderIndex: 0, weightValue: '99', repsValue: '8', localDirty: true, localUpdatedAtMs: 9999 }).run();
+  rpcPages([wire({ ...completed, mergeRevision: 1, localUpdatedAtMs: 2000 }, 'sessions'), ...canonical()]);
+  await sync();
+  const uploads = mockRpc.mock.calls.filter(([name]) => name === 'exercise_merge_save_conflict').map(([, args]) => args);
+  expect(uploads.map(args => args.p_type)).toEqual(['session_exercises', 'exercise_sets']);
+  expect(uploads[0].p_row).toMatchObject({ id: 'offline-block', session_id: 'session' });
+  expect(uploads[1].p_row).toMatchObject({ id: 'offline-set', weight_value: '99' });
+  expect(database.select().from(sessionExercises).where(eq(sessionExercises.id, 'offline-block')).get()).toBeUndefined();
+  expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, 'offline-set')).get()).toBeUndefined();
+});
+
+it('installs an empty remotely deleted workout and preserves stale local metadata', async () => {
+  const current = database.select().from(sessions).get()!;
+  database.delete(exerciseSets).run(); database.delete(sessionExercises).run();
+  const incoming = wire({ ...current, deletedAt: new Date(500), mergeRevision: 1, localUpdatedAtMs: 2000 }, 'sessions');
+  database.update(sessions).set({ startedAt: new Date(10), localDirty: true, localUpdatedAtMs: 9999 }).run();
+  rpcPages([incoming]); await sync();
+  expect(database.select().from(sessions).get()).toMatchObject({ deletedAt: new Date(500), mergeRevision: 1, localDirty: false });
+  expect(mockRpc).toHaveBeenCalledWith('exercise_merge_save_conflict', expect.objectContaining({
+    p_type: 'sessions', p_row: expect.objectContaining({ started_at: 10 }),
+  }));
+});
 
 it('keeps the complete old graph on ordinary partial pulls, then installs the complete new context', async () => {
   const rows = canonical();
@@ -350,7 +594,7 @@ it('atomically repairs a missed slot winner while installing merge ancestors, pr
   const rows = [
     wire({ ...base, id: 'winning-use', sessionPlanId: 'plan', slotIndex: 1, kind: 'workout', skippedAt: null }, 'session_plan_uses'),
     wire({ ...base, id: 'remote-session', status: 'completed', gymId: null, startedAt: at, completedAt: at,
-      durationSec: 1, sourcePlanId: 'plan', sourcePlanUseId: 'winning-use' }, 'sessions'),
+      durationSec: 1, sourcePlanId: 'plan', sourcePlanUseId: 'winning-use', mergeRevision: 0 }, 'sessions'),
     ...canonical().map(row => ({ ...row, id: 'remote-' + row.id, fields: { ...row.fields, source_plan_use_id: 'winning-use',
       ...(row.type === 'session_exercises'
         ? { session_id: 'remote-session', source_plan_exercise_id: 'planned' }

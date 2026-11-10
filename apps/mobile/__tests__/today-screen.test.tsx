@@ -441,7 +441,7 @@ describe('Today: the Progress card over real data', () => {
     expect(text('today-progress-period-working-sets')).toHaveTextContent('17 Oct 26 20 sets');
     fireEvent(chart, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
     fireEvent(chart, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
-    expect(chart).toHaveProp('accessibilityValue', { text: '19 Oct 26 (projected): 23 sets, last period 6' });
+    expect(chart).toHaveProp('accessibilityValue', { text: '19-10-2026 (projected): 23 sets, last period 6' });
     touchDay(11);
     expect(text('today-progress-period-working-sets')).toHaveTextContent('Today 18 sets');
     expect(screen.queryByTestId('today-progress-chart-selection', { includeHiddenElements: true })).toBeNull();
@@ -499,7 +499,7 @@ describe('Today: the Progress card over real data', () => {
     expect(rowText('today-latest-session-exercise-1')).toHaveTextContent('Barbell Back Squat3100.0 × 5116.6');
     expect(rowText('today-latest-session-exercise-1-1rm')).not.toHaveStyle({ color: roles.record });
     expect(body.props.accessibilityLabel).toBe(
-      'Session on 15 Oct 26 07:12; 2 exercises; 6 sets; 3 PRs; at Iron House; '
+      'Session on 15-10-2026 07:12; 2 exercises; 6 sets; 3 PRs; at Iron House; '
         + 'Barbell Bench Press, 3 sets, best 115.0 × 5, 1RM 134.1, a 1RM PR; Barbell Back Squat, 3 sets, best 100.0 × 5, 1RM 116.6',
     );
 
@@ -578,18 +578,31 @@ describe('Today: the Progress card over real data', () => {
     await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent('20 Sep 26 · 09:00'));
   });
 
-  it("writes every Today date in Today's own format, whatever the Date format setting", async () => {
+  it('updates mounted Today dates, ranges and spoken dates through every Date format setting', async () => {
     await bootLocalApp();
     await logHistory();
     await renderToday();
+    const chart = text('today-progress-chart');
+    fireEvent(chart, 'responderRelease', { nativeEvent: { locationX: (2 / 27) * 318 } });
 
-    for (const dateFormat of ['MM-DD-YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY'] as const) {
+    for (const [dateFormat, sessionDate, week, period, day, numericSession, numericWeek, spokenDay] of [
+      ['MM-DD-YYYY', 'Oct 15 26', 'Oct 12 – 18 26', 'Oct 5 – Nov 1 26', 'Oct 7 26', '10-15-2026', '10-12-2026 – 10-18-2026', '10-07-2026'],
+      ['YYYY-MM-DD', '2026 Oct 15', '2026 Oct 12 – 18', '2026 Oct 5 – Nov 1', '2026 Oct 7', '2026-10-15', '2026-10-12 – 2026-10-18', '2026-10-07'],
+      ['DD-MM-YYYY', '15 Oct 26', '12 – 18 Oct 26', '5 Oct – 1 Nov 26', '7 Oct 26', '15-10-2026', '12-10-2026 – 18-10-2026', '07-10-2026'],
+    ] as const) {
       await act(async () => {
         setExerciseListPreferences({ dateFormat });
       });
-      expect(text('today-latest-session-start')).toHaveTextContent('15 Oct 26 · 07:12');
-      expect(text('today-progress-week-range')).toHaveTextContent('12 – 18 Oct 26');
-      expect(text('today-progress-period-range')).toHaveTextContent('5 Oct – 1 Nov 26');
+      await waitFor(() => expect(text('today-latest-session-start')).toHaveTextContent(`${sessionDate} · 07:12`));
+      expect(text('today-latest-session-start')).toHaveProp('accessibilityLabel', `${numericSession} 07:12`);
+      expect(text('today-latest-session')).toHaveProp('accessibilityLabel', expect.stringContaining(`Session on ${numericSession} 07:12`));
+      expect(text('today-progress-week-range')).toHaveTextContent(week);
+      expect(text('today-progress-week-range')).toHaveProp('accessibilityLabel', numericWeek);
+      expect(text('today-progress-period-range')).toHaveTextContent(period);
+      expect(text('today-progress-period-day')).toHaveTextContent(day);
+      expect(text('today-progress-chart').props.accessibilityValue.text).toContain(`${spokenDay}:`);
+      // Changing the date family does not reset the selected day or remount the chart.
+      expect(text('today-progress-chart')).toBe(chart);
     }
   });
 

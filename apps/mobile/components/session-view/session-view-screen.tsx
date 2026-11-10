@@ -50,6 +50,8 @@ import {
 import { buildSessionViewModel } from '@/src/session-recorder/session-view-model';
 import { useCompletedSessionTimes } from '@/src/session-recorder/use-completed-session-times';
 import { useSessionView } from '@/src/session-recorder/use-session-view';
+import { useWorkoutControl } from '@/src/session-recorder/use-workout-control';
+import { WorkoutChangesSavedForReview, WorkoutLifecycleChanged } from '@/src/data/session-edit-baseline';
 
 const isActiveSessionReady = (state: { status: string; data?: { status: string } }): boolean =>
   state.status === 'ready' && state.data?.status !== 'completed';
@@ -129,6 +131,84 @@ export type SessionViewScreenProps = {
   | { placement: 'page' }
 );
 
+function SessionViewBody({ state, sessionId, model, times, control, reload, endWorkout, openGymPicker, router, notice }: {
+  state: ReturnType<typeof useSessionView>['state']; sessionId: string | null;
+  model: ReturnType<typeof buildSessionViewModel> | null;
+  times: ReturnType<typeof useCompletedSessionTimes>;
+  control: Pick<ReturnType<typeof useWorkoutControl>, 'blocked'>;
+  reload: () => Promise<void>; endWorkout: () => void; openGymPicker: () => void;
+  router: ReturnType<typeof useRouter>; notice: string | null;
+}): ReactNode {
+  const text = useUiText();
+  const tone = useUiTextTone();
+  let body: ReactNode;
+  if (state.status === 'loading') {
+    body = <StatePanel kind="loading" testID="session-view-loading" />;
+  } else if (state.status === 'missing' || state.status === 'error' || !sessionId) {
+    body =
+      state.status === 'error' ? (
+        <StatePanel
+          action={{ label: 'Retry', onPress: () => void reload(), testID: 'session-view-retry' }}
+          kind="error"
+          testID="session-view-error"
+          title="Couldn't load this session."
+        />
+      ) : (
+        <StatePanel
+          action={{ label: 'Back to Train', onPress: endWorkout, testID: 'session-view-back' }}
+          testID="session-view-missing"
+          title="This session is no longer active."
+        />
+      );
+  } else if (model) {
+    const data = state.data;
+    body = (
+      <ScreenScroll keyboardShouldPersistTaps="handled" testID="session-view-scroll">
+        <SessionSummaryCard
+          exerciseCount={model.cards.length}
+          gymName={data.gymName}
+          onPressGym={control.blocked ? undefined : openGymPicker}
+          workingSetCount={model.workingSetCount}
+          times={
+            data.status === 'completed'
+              ? {
+                  text: times.text,
+                  errors: times.errors,
+                  notice: times.notice ?? (times.saveError ? `Not saved: ${times.saveError}` : null),
+                  onChangeStart: times.setStart,
+                  onChangeEnd: times.setEnd,
+                  onCommitStart: times.commitStart,
+                  onCommitEnd: times.commitEnd,
+                }
+              : undefined
+          }
+          volume={model.volume}
+        />
+        {model.cards.map((card) => (
+          <SessionExerciseCard
+            card={card}
+            key={card.id}
+            onPress={control.blocked ? undefined : () => router.push(sessionExerciseHref(data.sessionId, card.id))}
+          />
+        ))}
+        {!control.blocked ? <ActionButton
+          label="+ Add exercise"
+          onPress={() => router.push(sessionAddExerciseHref(data.sessionId))}
+          testID="session-view-add-exercise"
+          variant="outline"
+        /> : null}
+        {notice ? (
+          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger]} testID="session-view-notice">
+            {notice}
+          </Text>
+        ) : null}
+      </ScreenScroll>
+    );
+  }
+
+  return body ?? null;
+}
+
 /**
  * The session view: the active session, read-only and
  * navigational. Each exercise card links to its exercise page, where editing
@@ -146,11 +226,10 @@ export type SessionViewScreenProps = {
 export function SessionViewScreen(props: SessionViewScreenProps) {
   const { sessionId } = props;
   const styles = useStyles();
-  const text = useUiText();
-  const tone = useUiTextTone();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, reload } = useSessionView(sessionId);
+  const control = useWorkoutControl(sessionId, state.status === 'ready' ? state.data.session.editBaseline : undefined, reload);
   const { values: trainingPreferences } = useAccountLocalPreferenceState();
   const developerMode = trainingPreferences.developerMode;
   const restTimer = useSessionRestTimer(sessionId, {
@@ -184,10 +263,11 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
   const times = useCompletedSessionTimes({
     sessionId,
     persisted: completedTimes,
+    revision: state.status === 'ready' ? Number(state.data.session.editBaseline?.find(row => row.type === 'sessions')?.fields.merge_revision ?? 0) : 0,
     // Records count the sessions before End, so a saved End re-reads them.
-    save: async (id, nextTimes) => {
-      await setCompletedSessionTimes(id, nextTimes);
-      await reload();
+    save: async (id, nextTimes, baseline) => {
+      try { return await setCompletedSessionTimes(id, nextTimes, baseline); }
+      finally { await reload(); }
     },
   });
 
@@ -201,7 +281,7 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
 
   const openGymPicker = useCallback(() => {
     // A session id is what the position cache keys on; nothing to suggest for.
-    if (!sessionId) return;
+    if (!sessionId || control.blocked) return;
     const generation = ++gymPickerGenerationRef.current;
     const isCurrent = () => gymPickerGenerationRef.current === generation;
     setGymPicker({ visible: true, options: null, suggestions: [] });
@@ -247,7 +327,7 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
         setGymPicker(CLOSED_GYM_PICKER);
         setNotice("Couldn't load your gyms. Try again.");
       });
-  }, [sessionId]);
+  }, [sessionId, control.blocked]);
 
   const closeGymPicker = () => {
     gymPickerGenerationRef.current += 1;
@@ -288,7 +368,7 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
   const endWorkout = () => (props.placement === 'tab' ? props.onEnded('now') : openMainTab('train'));
 
   const finish = async () => {
-    if (!sessionId || isFinishing) return;
+    if (!sessionId || isFinishing || control.blocked) return;
     setIsFinishing(true);
     setNotice(null);
     try {
@@ -316,8 +396,9 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
       } else {
         router.replace(completionHref);
       }
-    } catch {
-      setNotice("Couldn't finish this session. Try again.");
+    } catch (error) {
+      setNotice(error instanceof WorkoutChangesSavedForReview ? error.message : "Couldn't finish this session. Try again.");
+      if (error instanceof WorkoutChangesSavedForReview) await reload();
     } finally {
       setIsFinishing(false);
     }
@@ -329,7 +410,7 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
   const saveEdit = async () => {
     if (!sessionId || isSavingEdit) return;
     setNotice(null);
-    const editedTimes = times.submit();
+    let editedTimes = times.submit();
     if (!editedTimes) return;
     setIsSavingEdit(true);
     try {
@@ -337,6 +418,8 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
         setNotice("Couldn't save the times. Try again.");
         return;
       }
+      editedTimes = times.submit();
+      if (!editedTimes) return;
       // Read at press time, so the last write from the exercise page counts.
       const graph = await loadEditableSessionGraph(sessionId);
       if (!graph || graph.status !== 'completed') {
@@ -354,15 +437,18 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
       });
       if (router.canGoBack()) router.back();
       else router.replace(`/completed-session/${encodeURIComponent(graph.sessionId)}` as Href);
-    } catch {
-      setNotice("Couldn't save this session. Try again.");
+    } catch (error) {
+      setNotice(error instanceof WorkoutChangesSavedForReview ? error.message : "Couldn't save this session. Try again.");
+      if (error instanceof WorkoutChangesSavedForReview) await reload();
     } finally {
       setIsSavingEdit(false);
     }
   };
 
   const abandon = async () => {
-    if (!sessionId) return;
+    if (!sessionId || control.blocked) return;
+    const expectedRevision = state.status === 'ready'
+      ? Number(state.data.session.editBaseline?.find(row => row.type === 'sessions')?.fields.merge_revision ?? 0) : 0;
     // Asked over the open sheet: iOS drops an alert raised while a modal closes.
     const confirmed = await confirmAlert({
       title: 'Abandon session?',
@@ -374,10 +460,11 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
     setIsOptionsVisible(false);
     if (!confirmed) return;
     try {
-      await abandonActiveSession(sessionId);
+      await abandonActiveSession(sessionId, expectedRevision);
       endWorkout();
-    } catch {
-      setNotice("Couldn't abandon this session. Try again.");
+    } catch (error) {
+      setNotice(error instanceof WorkoutLifecycleChanged ? error.message : "Couldn't abandon this session. Try again.");
+      await reload();
     }
   };
 
@@ -404,71 +491,6 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
     await reload();
   };
 
-  let body: ReactNode;
-  if (state.status === 'loading') {
-    body = <StatePanel kind="loading" testID="session-view-loading" />;
-  } else if (state.status === 'missing' || state.status === 'error' || !sessionId) {
-    body =
-      state.status === 'error' ? (
-        <StatePanel
-          action={{ label: 'Retry', onPress: () => void reload(), testID: 'session-view-retry' }}
-          kind="error"
-          testID="session-view-error"
-          title="Couldn't load this session."
-        />
-      ) : (
-        <StatePanel
-          action={{ label: 'Back to Train', onPress: endWorkout, testID: 'session-view-back' }}
-          testID="session-view-missing"
-          title="This session is no longer active."
-        />
-      );
-  } else if (model) {
-    const data = state.data;
-    body = (
-      <ScreenScroll keyboardShouldPersistTaps="handled" testID="session-view-scroll">
-        <SessionSummaryCard
-          exerciseCount={model.cards.length}
-          gymName={data.gymName}
-          onPressGym={openGymPicker}
-          workingSetCount={model.workingSetCount}
-          times={
-            data.status === 'completed'
-              ? {
-                  text: times.text,
-                  errors: times.errors,
-                  notice: times.notice ?? (times.saveError ? `Not saved: ${times.saveError}` : null),
-                  onChangeStart: times.setStart,
-                  onChangeEnd: times.setEnd,
-                  onCommitStart: times.commitStart,
-                  onCommitEnd: times.commitEnd,
-                }
-              : undefined
-          }
-          volume={model.volume}
-        />
-        {model.cards.map((card) => (
-          <SessionExerciseCard
-            card={card}
-            key={card.id}
-            onPress={() => router.push(sessionExerciseHref(data.sessionId, card.id))}
-          />
-        ))}
-        <ActionButton
-          label="+ Add exercise"
-          onPress={() => router.push(sessionAddExerciseHref(data.sessionId))}
-          testID="session-view-add-exercise"
-          variant="outline"
-        />
-        {notice ? (
-          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger]} testID="session-view-notice">
-            {notice}
-          </Text>
-        ) : null}
-      </ScreenScroll>
-    );
-  }
-
   const isCompleted = state.status === 'ready' && state.data.status === 'completed';
 
   // On the tab, a workout found completed (finished on another device) is
@@ -490,7 +512,9 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
           <SessionTopBar doneDisabled={isSavingEdit} mode="completed" onDone={() => void saveEdit()} />
         ) : (
           <SessionTopBar
-            finishDisabled={isFinishing}
+            aiControlled={control.aiControlled || control.pending}
+            controlPending={control.pending}
+            finishDisabled={isFinishing || control.blocked}
             mode="active"
             startedAt={state.data.startedAt}
             onFinish={() => void finish()}
@@ -515,7 +539,8 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
           view={restTimer.view}
         />
       ) : null}
-      {body}
+      <SessionViewBody control={control} endWorkout={endWorkout} model={model} notice={notice}
+        openGymPicker={openGymPicker} reload={reload} router={router} sessionId={sessionId} state={state} times={times} />
       {/* On the tab, the tab layout draws the bar. A completed session is
           history, which lives under Progress. */}
       {props.placement === 'page' ? (
@@ -523,9 +548,14 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
       ) : null}
 
       <SessionOptionsSheet
+        control={{ ...control,
+          onControl: () => { void control.openControl().then(changed => { if (changed) setIsOptionsVisible(false); }); },
+          onChoose: agent => { void control.choose(agent).then(changed => { if (changed) setIsOptionsVisible(false); }); },
+          onManageAgents: () => { setIsOptionsVisible(false); control.closeChoices(); router.push('/connected-agents'); },
+        }}
         onAbandon={() => void abandon()}
         onCompare={openCompare}
-        onDismiss={() => setIsOptionsVisible(false)}
+        onDismiss={() => { setIsOptionsVisible(false); control.closeChoices(); }}
         visible={isOptionsVisible}
       />
       <SessionGymSheet

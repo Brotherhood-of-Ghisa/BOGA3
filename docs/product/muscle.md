@@ -4,14 +4,15 @@
 
 Each Primary muscle gets one working set; each Secondary gets ½ when included
 ([[muscle.secondary-filter]]). A reported muscle counts each physical set once
-at its strongest role. Family buckets deduplicate likewise; overlapping muscle
-counts never form a physical-session total.
+at its strongest role. Recovery family totals sum unrounded eligible child
+muscle counts for each day and the week; other family figures deduplicate.
+Neither sum is a physical-session total.
 
-Volume independently shares its unchanged base equally among Primaries, plus
-a shared ½ pool among Secondaries when included. Allocation precedes filtering
-and Broad grouping; hidden entries never redistribute shares. A merged muscle
-sums surviving Volume, including mixed roles. Absent role pools remain unused.
-Stabilizers and stored weights add nothing. Exercise figures are unchanged.
+Volume shares its base equally among Primaries, plus a shared ½ pool among
+included Secondaries. Allocation precedes filtering and Broad grouping; hidden
+entries never redistribute shares. Merged muscles sum surviving Volume, including
+mixed roles. Absent pools remain unused. Stabilizers and stored weights add
+nothing. Exercise figures are unchanged.
 
 Figures and spoken labels show at most one decimal. Today and Progress draw
 whole sets, rounded down (`½`, `<1` below one); a change is the difference of
@@ -57,7 +58,8 @@ regardless of breakdown. A preset changes merging, never a switch; merges
 matching neither read `Custom`. Broad merges entries (first listed is the anchor);
 Other entries and custom muscles stay their own.
 A merged muscle counts its tracked entries as [[muscle.set-count]] says; untracked entries' work still drops. Each muscle stays in one family.
-
+The separate `Group by muscle family` switch arranges reported muscles in
+Progress and Recovery; it never exposes anatomy inside a merged muscle.
 
 Why: a simpler view.
 Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `deriveMuscleReportPreset` in `apps/mobile/src/data/muscle-report-setup.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/components/preferences/muscle-settings.tsx`.

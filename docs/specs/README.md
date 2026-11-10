@@ -23,7 +23,7 @@ gaps — `04`, `07` — from retired docs; gaps are intentional, do not renumber
 - `docs/specs/tech/README.md`: Index of the subsystem deep-dive contracts (sync, groups, metrics, bodyweight, session planning, competitions). Load it to find the one that owns your subsystem.
 - `docs/specs/ui/README.md`: Index of the UI docs and the maintenance trigger map. Load it when changing screens, components or routes.
 
-Planning docs (milestones, task cards, plans, and their templates) are not
+Planning docs (plans, milestones and task cards) are not
 specs. They are optional and ephemeral and live under `docs/plans/` (see
 `docs/plans/README.md`).
 

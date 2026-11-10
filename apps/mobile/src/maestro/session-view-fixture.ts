@@ -1,4 +1,7 @@
 import { persistSessionDraftSnapshot } from '@/src/data';
+import { eq } from 'drizzle-orm';
+import { bootstrapLocalDataLayer } from '@/src/data/bootstrap';
+import { sessions } from '@/src/data/schema';
 
 import { EXERCISE_BLOCK_HISTORY_FIXTURE, seedExerciseBlockHistoryFixture } from './exercise-block-history-fixture';
 
@@ -46,7 +49,7 @@ const planned = (id: string, plannedWeightValue: string, plannedRepsValue: strin
   performanceStatus: 'planned' as const,
 });
 
-export const seedSessionViewFixture = async ({ now = new Date() }: { now?: Date } = {}) => {
+export const seedSessionViewFixture = async ({ now = new Date(), aiControlled = false }: { now?: Date; aiControlled?: boolean } = {}) => {
   await seedExerciseBlockHistoryFixture({ now });
 
   await persistSessionDraftSnapshot({
@@ -90,5 +93,10 @@ export const seedSessionViewFixture = async ({ now = new Date() }: { now?: Date 
     ],
   });
 
+  if (aiControlled) {
+    const database = await bootstrapLocalDataLayer();
+    database.update(sessions).set({ loggingClientId: 'maestro-coach', loggingGrantedAt: '2026-11-10T12:00:00Z',
+      mergeRevision: 1, localDirty: false }).where(eq(sessions.id, SESSION_VIEW_FIXTURE.sessionId)).run();
+  }
   return SESSION_VIEW_FIXTURE;
 };

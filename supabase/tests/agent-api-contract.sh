@@ -71,7 +71,7 @@ app_public_request() {
     -w "%{http_code}"
   )
   if [[ -n "${body}" ]]; then
-    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" --data "${body}")
+    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-7}" -H "Content-Type: application/json" --data "${body}")
   fi
   RESPONSE_STATUS="$(curl "${request_args[@]}" "${API_URL}/rest/v1/${route}")"
   RESPONSE_BODY="$(cat "${response_file}")"
@@ -367,7 +367,12 @@ cleanup() {
       delete from public.agent_access_audit
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and request_id like 'agent-api-${RUN_TAG}-%';
+      delete from app_public.sessions s where s.owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
+        and s.id in(select result_ids->>'session_id' from public.agent_plan_write_receipts
+          where owner_user_id=s.owner_user_id and operation='start_workout');
       delete from public.agent_plan_write_receipts
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
+      delete from public.agent_workout_permissions
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from public.agent_plan_permissions
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
@@ -2884,6 +2889,9 @@ assert_status "200" "agent direct table read denial"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq 'length')" == "0" ]] ||
   fail "agent credential bypassed the dedicated API read boundary"
 
+# shellcheck source=lib/agent-workout-contract.sh
+source "${SUPABASE_DIR}/tests/lib/agent-workout-contract.sh"
+
 echo "[agent-api-test] verifying metadata-only audit records"
 AUDIT_COUNT="$(run_psql "
   select count(*) from public.agent_access_audit
@@ -2905,6 +2913,8 @@ request DELETE \
 assert_status "204" "OAuth grant revocation"
 agent_get "profile"
 assert_status "401" "revoked agent access"
+agent_get "workouts/active"
+assert_status "401" "revoked workout access"
 
 request POST "${API_URL}/auth/v1/token?grant_type=refresh_token" \
   "${ANON_KEY}" "${ANON_KEY}" \

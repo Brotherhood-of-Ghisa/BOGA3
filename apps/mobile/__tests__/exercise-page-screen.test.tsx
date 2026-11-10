@@ -55,7 +55,8 @@ import { Icon } from '@/components/ui/icon';
 import { uiIconSize } from '@/components/ui/tokens';
 import { defaultSessionExerciseDraftClient, type SessionExerciseDraftClient } from '@/src/session-recorder/session-exercise-draft';
 import { upsertLocalGym } from '@/src/data/local-gyms';
-import { exerciseDefinitions, sessions } from '@/src/data/schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessions, syncRuntimeState } from '@/src/data/schema';
+import { listMergeLocal } from '@/src/data/exercise-merge-store';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import * as sessionFacts from '@/src/data/exercise-session-facts';
 import { loadSessionSnapshotById } from '@/src/data/session-drafts';
@@ -174,6 +175,24 @@ describe('ExercisePageScreen', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     closeLocalData();
+  });
+
+  it('refreshes a stale active editor after saving its input for review and permits a fresh completed-history edit', async () => {
+    await openPage();
+    const db = localDatabase();
+    db.update(syncRuntimeState).set({ accountUserId: 'handoff-owner' }).run();
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
+    db.update(sessions).set({ status: 'completed', completedAt: new Date(), mergeRevision: 1 }).where(eq(sessions.id, SESSION)).run();
+    db.update(sessionExercises).set({ mergeRevision: 1 }).where(eq(sessionExercises.sessionId, SESSION)).run();
+    db.update(exerciseSets).set({ mergeRevision: 1 }).run();
+    fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+    await screen.findByText(/Your changes are saved for review in Data & Sync/);
+    await waitFor(() => expect(screen.getByTestId('exercise-set-logger-weight')).toHaveProp('value', '82.5'));
+    expect(listMergeLocal(db, 'handoff-owner', 'pending')).toHaveLength(1);
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '95');
+    fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+    await waitFor(async () => expect((await benchSets())[2].weightValue).toBe('95'));
+    expect((await readSession())?.status).toBe('completed');
   });
 
   it('renders the default state: records collapsed, set list, logger on the current set', async () => {

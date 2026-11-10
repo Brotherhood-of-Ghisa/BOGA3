@@ -7,6 +7,9 @@ import {
   type SessionGraphSnapshot,
 } from '@/src/data/session-drafts';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
+import type { MergeWireEntity } from '@/src/exercise-core/merge-types';
+import { workoutLoggingClientId } from '@/src/exercise-core/workout-control';
+import { loadPendingWorkoutControl } from '@/src/data/workout-control';
 
 /**
  * One session exercise of an active draft or a completed session, read and
@@ -22,22 +25,25 @@ export type SessionExerciseDraftClient = {
   loadSessionSnapshotById: (sessionId: string) => Promise<SessionGraphSnapshot | null>;
   persistSessionDraftSnapshot: typeof persistSessionDraftSnapshot;
   persistCompletedSessionSnapshot: typeof persistCompletedSessionSnapshot;
+  loadPendingWorkoutControl?: typeof loadPendingWorkoutControl;
 };
 
 export const defaultSessionExerciseDraftClient: SessionExerciseDraftClient = {
   loadSessionSnapshotById,
   persistSessionDraftSnapshot,
   persistCompletedSessionSnapshot,
+  loadPendingWorkoutControl,
 };
 
 // `not-editable`: the session was abandoned or deleted.
-export type SessionExerciseDraftLoadError = 'missing-session' | 'not-editable' | 'missing-exercise';
+export type SessionExerciseDraftLoadError = 'missing-session' | 'not-editable' | 'missing-exercise' | 'ai-controlled' | 'control-unconfirmed';
 
 export type SessionExerciseDraftLoad =
   | {
       status: 'ready';
       exercise: SessionDraftExerciseSnapshot;
       sessionStatus: SessionGraphSnapshot['status'];
+      editBaseline?: MergeWireEntity[];
       bodyWeight: ResolvedSessionWeight;
       gymId: string | null;
       // Every block of the session as loaded, in session order: a record is
@@ -68,9 +74,11 @@ export const loadSessionExerciseDraft = async (
   const session = await client.loadSessionSnapshotById(sessionId);
   if (!session) return { status: 'missing-session' };
   if (!isEditable(session)) return { status: 'not-editable' };
+  if (workoutLoggingClientId(session.editBaseline)) return { status: 'ai-controlled' };
+  if (await client.loadPendingWorkoutControl?.(sessionId)) return { status: 'control-unconfirmed' };
   const exercise = session.exercises.find((candidate) => candidate.id === sessionExerciseId);
   const sessionBlocks = session.exercises.map(({ id, exerciseDefinitionId, name, sets }) => ({ id, exerciseDefinitionId, name, sets }));
-  return exercise ? { status: 'ready', exercise, sessionStatus: session.status, gymId: session.gymId, sessionBlocks, bodyWeight: {
+  return exercise ? { status: 'ready', exercise, editBaseline: session.editBaseline, sessionStatus: session.status, gymId: session.gymId, sessionBlocks, bodyWeight: {
     bodyWeightKg: session.bodyWeightKg, bodyWeightSource: session.bodyWeightSource,
     bodyWeightMeasurementId: session.bodyWeightMeasurementId, bodyWeightMeasuredAt: session.bodyWeightMeasuredAt,
 
@@ -114,15 +122,17 @@ export const saveSessionExerciseDraft = async (
     exercise: SessionDraftExerciseSnapshot | null;
     // The status the page loaded the session with.
     sessionStatus: SessionGraphSnapshot['status'];
+    editBaseline?: MergeWireEntity[];
   },
   client: SessionExerciseDraftClient = defaultSessionExerciseDraftClient
-): Promise<void> => {
+): Promise<SessionExerciseDraftLoad | undefined> => {
   const session = await client.loadSessionSnapshotById(sessionId);
   if (!session) throw new SessionExerciseDraftError('missing-session');
-  if (!isEditable(session) || session.status !== change.sessionStatus) {
+  if ((!isEditable(session) || session.status !== change.sessionStatus) && !change.editBaseline) {
     throw new SessionExerciseDraftError('not-editable');
   }
-  if (!session.exercises.some((exercise) => exercise.id === change.sessionExerciseId)) {
+  const found = session.exercises.some((exercise) => exercise.id === change.sessionExerciseId);
+  if (!found && !change.editBaseline) {
     throw new SessionExerciseDraftError('missing-exercise');
   }
 
@@ -130,6 +140,16 @@ export const saveSessionExerciseDraft = async (
     if (exercise.id !== change.sessionExerciseId) return [exercise];
     return change.exercise ? [change.exercise] : [];
   });
+  if (!found && change.exercise) exercises.push(change.exercise);
+
+  const targetIds = new Set(change.editBaseline?.filter(row => row.type === 'session_exercises' && row.id === change.sessionExerciseId)
+    .map(row => row.id));
+  const belongsToTarget = (row: MergeWireEntity) => row.type === 'sessions' ||
+    (row.type === 'session_exercises' ? targetIds.has(row.id) : targetIds.has(String(row.fields.session_exercise_id)));
+  const editBaseline = change.editBaseline && [
+    ...change.editBaseline.filter(belongsToTarget),
+    ...(session.editBaseline ?? []).filter(row => !belongsToTarget(row)),
+  ];
 
   const graph = {
     sessionId: session.sessionId,
@@ -137,18 +157,20 @@ export const saveSessionExerciseDraft = async (
     startedAt: session.startedAt,
     sourcePlanId: session.sourcePlanId ?? null,
     sourcePlanUseId: session.sourcePlanUseId ?? null,
+    editBaseline,
     mergeRevisions: {
       ...Object.fromEntries(session.exercises.map(exercise => [exercise.id, exercise.mergeRevision ?? 0])),
       [change.sessionExerciseId]: change.mergeRevision ?? change.exercise?.mergeRevision ?? 0,
     },
     exercises: exercises.map(toSessionExerciseInput),
   };
-  if (session.status === 'completed') {
+  if (change.sessionStatus === 'completed') {
     await client.persistCompletedSessionSnapshot({
       ...graph,
       completedAt: session.completedAt ?? session.startedAt,
     });
-    return;
+    return loadSessionExerciseDraft(sessionId, change.sessionExerciseId, client);
   }
   await client.persistSessionDraftSnapshot({ ...graph, status: 'active' });
+  return loadSessionExerciseDraft(sessionId, change.sessionExerciseId, client);
 };

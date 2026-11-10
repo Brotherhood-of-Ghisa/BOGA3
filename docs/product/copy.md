@@ -32,6 +32,9 @@ Figures without training (rest or outside the data) stay blank: no `Rest`,
 `?`, dash or zero. Known zero stays numeric. Accessibility distinguishes rest,
 unavailable and known zero.
 
+Recovery family tiles show the numeric sum, including zero when no child
+contributes; absent individual-muscle cells stay blank.
+
 Why: distinguish missing data from measurements.
 Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`.
 
@@ -50,16 +53,26 @@ Code: `apps/mobile/src/groups/competition-view-model.ts` and mobile label compon
 
 ### copy.calendar-dates · presentation · accepted
 
-Complete dates displayed, spoken or edited use Date format, including ranges
-and shared images, preserving device-local days and stored instants. Month/day
-headings, relative and time-only labels keep their roles.
+Date format pairs numeric, yearless short and compact named-month forms,
+including Today. Compact days are unpadded; only year-first compact dates use
+four-digit years. Spoken/edited dates stay full numeric; images follow
+visible presentation. Preserve local days, stored instants and month-only,
+weekday, relative and time-only roles.
 
-Calendar-week headings use a named month and shared day range in the selected
-order, with only the end date's year even across New Year; accessibility retains
-complete numeric dates.
+| Date format | Yearless short | Compact complete |
+| --- | --- | --- |
+| `DD-MM-YYYY` | `17 Sep` | `17 Sep 26` |
+| `MM-DD-YYYY` | `Sep 17` | `Sep 17 26` |
+| `YYYY-MM-DD` | `Sep 17` | `2026 Sep 17` |
 
-- **Exception — Today** (decided 2026-10-26): every Today date is `26 Oct 26`,
-  whatever the setting. A range takes one dash and the year once, at its end:
-  `12 – 18 Oct 26`, `26 Oct – 1 Nov 26`; across years both ends carry it.
+Compact timestamps append 24-hour time. Ranges share month/year where possible;
+cross-year endpoints retain both years.
 
-Code: `apps/mobile/src/utils/local-time.ts` (Today: `formatCompactDate`, `formatCompactDateRange`).
+Calendar-week headings retain selected order and only the end date's four-digit
+year, even across New Year.
+
+- **Exception — schedule picker:** iOS uses preference-mapped
+  locales with abbreviations and omitted years; Android uses system
+  date order and language. App-owned labels follow Date format.
+
+Code: `apps/mobile/src/utils/local-time.ts`.

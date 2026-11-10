@@ -33,3 +33,14 @@ Unacknowledged recovery stays private to its account across account switches.
 
 Why: merging must never silently discard an offline edit, reverse an identity transfer or mix weight units.
 Code: `apps/mobile/src/sync/exercise-merge.ts`; `apps/mobile/src/data/exercise-merge-store.ts`.
+
+### exercise.browser-history · definition · accepted
+
+For the catalogue and exercise pickers, any live exercise entry in completed,
+non-deleted history establishes prior use in the selected gym scope, even without
+sets or eligible performed values. Active workouts and future plans do not.
+This controls Never-done visibility and wording; training figures remain governed
+by [[set.eligibility]].
+
+Why: a recorded entry should remain findable regardless of how its sets were logged or counted.
+Code: `aggregateExerciseCatalogStats` in `apps/mobile/src/data/exercise-catalog-stats.ts`; `apps/mobile/src/exercise-catalog/list-model.ts`.

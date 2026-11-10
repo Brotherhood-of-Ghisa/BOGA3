@@ -13,14 +13,14 @@ disagree):
 migrations, `apps/mobile/src/sync/` and
 `apps/mobile/scripts/check-sync-schema-drift.ts`.
 
-Authenticated app push and pull require the header `x-boga-sync-protocol: 6`
+Authenticated app push and pull require the header `x-boga-sync-protocol: 7`
 (see `sync_push`, "Update-required cutoff").
 
 ---
 
 # Part A — Server schema
 
-The server mirrors typed entities. For protocol-5 protected revisions, selective push outcomes,
+The server mirrors typed entities. For protected revisions, selective push outcomes,
 sequence discovery and atomic merge/recovery RPCs, load
 [`exercise-merge-contract.md`](exercise-merge-contract.md).
 
@@ -32,8 +32,9 @@ sequence discovery and atomic merge/recovery RPCs, load
   `(owner_user_id, id)`, so cross-owner references cannot exist.
 - **Timestamps are `bigint` epoch ms.** The only `timestamptz` is the
   server-set `server_received_at`, the pull cursor axis.
-- **Minimal server validation.** The client is the only writer, so the server
-  validates nothing it could not itself cause:
+- **Minimal sync validation.** App sync payloads mirror the client schema.
+  Dedicated agent operations validate their own inputs separately; when changing
+  workout writes, load [their contract](agent-workout-contract.md).
   - No CHECK constraints on enum text, numeric ranges or text content, except
     `exercise_definitions_load_input_mode_valid` (`total_load |
     per_side_load`; analytics read it, so both stores reject invalid values)
@@ -155,7 +156,7 @@ sync RPCs (rule 13 of `docs/specs/10-api-authn-authz-guidelines.md`).
 
 The sync RPCs are `security invoker`, so these `authenticated` policies govern
 RPC writes and direct access alike. No `service_role` or RPC-owner policy is
-needed; `service_role` bypasses RLS and is for ops scripts only.
+needed; `service_role` bypasses RLS and stays in server API/ops code.
 
 `owner_user_id` is immutable: a BEFORE UPDATE trigger
 (`app_public.enforce_owner_user_id_immutable()`) refuses any change to it and
@@ -277,7 +278,7 @@ LWW stays per row; there are no per-field clocks.
 `UPDATE_REQUIRED: …` before it touches any row. The cutoff is compatibility
 enforcement, not authorization; auth and OAuth denial are unchanged. The app
 client (`apps/mobile/src/auth/supabase.ts`) and the import CLI send
-protocol 6.
+protocol 7.
 
 **Batch building.** The client takes dirty rows layer by layer up to the cap,
 so no child ships without its parent: each FK target of a batched row is in an

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { deriveMuscleReportPreset } from '@/src/data/muscle-report-settings';
+import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { effectiveMuscleTargetOverrides } from '@/src/preferences/muscle-targets';
@@ -35,6 +36,9 @@ export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow 
   const { accountRevision: context, values } = useAccountLocalPreferenceState();
   const { weeklyWorkingSetTarget: weeklyTarget, progressCountSecondary: countSecondary } = values;
   const catalog = useExerciseCatalog();
+  const calculationRevision = useBodyWeightContextRevision();
+  const calculationInputs = [calculationRevision, catalog.exercises, catalog.muscleGroups] as const;
+  const previousInputs = useRef(calculationInputs);
   const perMuscle = values.muscleTargetMode === 'per-muscle';
   const overrides = effectiveMuscleTargetOverrides(values, deriveMuscleReportPreset(catalog.muscleGroups));
   const overridesKey = JSON.stringify(overrides);
@@ -76,6 +80,11 @@ export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow 
   }, [read, context, targetsReady]);
 
   useDailyReread(isFocused, readNow, nowRef, generationRef);
+  useEffect(() => {
+    if (calculationInputs.every((value, index) => value === previousInputs.current[index])) return;
+    previousInputs.current = calculationInputs;
+    if (isFocused) readNow();
+  }, [calculationInputs, isFocused, readNow]);
 
   const state: TodayPlanState = perMuscle && catalog.status === 'error'
     ? { status: 'error', message: catalog.lastError ?? 'Unable to load your muscle targets' }

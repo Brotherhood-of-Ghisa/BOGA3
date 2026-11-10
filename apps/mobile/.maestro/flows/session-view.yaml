@@ -19,6 +19,8 @@ appId: com.dinoderek.mobile
 #      no Resume.
 #   7. completed detail's native options modal → Resume returns the just-finished
 #      workout to Train with its saved cards, then Finish works again.
+#   8. the AI robot opens the existing native Session modal, its Abandon stays
+#      locked, and the timer remains usable across tab navigation.
 # Why device:
 #   1., 2. and 6. root-stack and tab navigation (Jest mocks the tab
 #      navigator, so only the device shows the workout kept on Train);
@@ -28,6 +30,8 @@ appId: com.dinoderek.mobile
 #   5. the summary pushed over the tabs after Finish, and a native alert.
 #   7. the modal-to-tab handoff and deferred Train focus after Finish need the
 #      native navigator; Jest replaces it and proves the persistence/timer rules.
+#   8. native modal presentation, dismissal and timer/tab wiring are not
+#      exercised by Jest's router/modal stand-ins; ownership rules stay in Jest/SQL.
 # Jest counterpart: __tests__/session-view-screen.test.tsx (summary and
 #   cards, record band, live comparison, ⋮ sheet, gym picking and
 #   suggestions, the Gyms round trip, the picker add, cleanup prompts, abandon
@@ -277,6 +281,68 @@ appId: com.dinoderek.mobile
 - assertNotVisible:
     id: "train-resume-session-button"
 - takeScreenshot: "02-abandoned-back-on-train"
+
+# --- 8. Robot-only AI control, the native options modal and working timer ---
+- openLink: "boga3://maestro-harness?reset=data&fixture=session-view-ai&teleport=session-view&sessionId=maestro_session_view_active"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-ai-control"
+    timeout: 30000
+- assertNotVisible:
+    id: "session-view-finish-button"
+- assertNotVisible:
+    id: "session-view-add-exercise"
+- takeScreenshot: "04-ai-controlled-session"
+- tapOn:
+    id: "session-view-rest-timer-button"
+- extendedWaitUntil:
+    visible:
+      id: "rest-timer-bar"
+    timeout: 10000
+- takeScreenshot: "05-ai-controlled-timer"
+- tapOn:
+    id: "top-level-tab-progress"
+- extendedWaitUntil:
+    visible:
+      id: "stats-history-screen"
+    timeout: 15000
+- tapOn:
+    id: "top-level-tab-train"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-ai-control"
+    timeout: 15000
+- assertVisible:
+    id: "rest-timer-bar"
+- tapOn:
+    id: "session-view-ai-control"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-control-action"
+    timeout: 10000
+- assertVisible: "Take over logging"
+- takeScreenshot: "06-ai-control-options"
+- assertVisible:
+    id: "session-view-abandon"
+    enabled: false
+- assertNotVisible: '^Abandon session\?$'
+- assertVisible:
+    id: "session-view-options-sheet"
+- tapOn:
+    id: "session-view-control-action"
+- extendedWaitUntil:
+    visible:
+      id: "session-control-notice"
+    timeout: 10000
+- takeScreenshot: "07-ai-control-unavailable"
+- swipe:
+    from:
+      id: "session-view-options-sheet-drag-zone"
+    direction: DOWN
+- extendedWaitUntil:
+    notVisible:
+      id: "session-view-options-sheet"
+    timeout: 10000
 
 # Leave the simulator as this flow found it: data reset.
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"

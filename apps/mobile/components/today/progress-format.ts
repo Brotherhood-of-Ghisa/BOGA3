@@ -24,9 +24,9 @@ import {
 import {
   formatCompactDate,
   formatCompactDateRange,
-  formatCompactDateTime,
   formatDateRange,
   formatMonthDayTime,
+  formatShortDate,
 } from '@/src/utils/local-time';
 import {
   eligibleTonnageReferences, finiteMaximum, fitTonnageMaximum, layoutTonnageReferences,
@@ -50,10 +50,10 @@ export const formatSignedCount = (difference: number): string => {
 export const paceTone = (difference: number): ChangeTone =>
   difference > 0 ? 'positive' : difference < 0 ? 'negative' : 'neutral';
 
-/** A window of whole weeks (a week, a period) by its Monday and Sunday, in Today's format: `5 Oct – 1 Nov 26`. */
-export const formatPeriodRange = (window: LocalWindow): string => {
+/** A whole-week window by its Monday and Sunday in the selected compact family. */
+export const formatPeriodRange = (window: LocalWindow, dateFormat: ExerciseDateFormat): string => {
   const sunday = new Date(window.end.getFullYear(), window.end.getMonth(), window.end.getDate() - 1);
-  return formatCompactDateRange(window.start, sunday);
+  return formatCompactDateRange(window.start, sunday, dateFormat);
 };
 
 const dayOf = (window: LocalWindow, dayIndex: number) =>
@@ -128,14 +128,15 @@ export const periodPaceDelta = (figures: PeriodDayFigures) => figures.metric ===
 
 /**
  * `Today`, `9 Oct 26`. A projected day shows as its date alone (the hollow
- * dot on the chart marks it); spoken, it says so: `27 Oct 26 (projected)`.
+ * dot on the chart marks it); spoken, it uses a complete numeric date and says projected.
  */
 export const formatPeriodDayLabel = (
   figures: PeriodDayFigures,
+  dateFormat: ExerciseDateFormat,
   { spoken = false }: { spoken?: boolean } = {}
 ): string => {
   if (figures.when === 'today') return 'Today';
-  const date = formatCompactDate(figures.date);
+  const date = spoken ? formatShortDate(figures.date, dateFormat) : formatCompactDate(figures.date, dateFormat);
   return spoken && figures.when === 'projected' ? `${date} (projected)` : date;
 };
 
@@ -170,12 +171,12 @@ const spokenPaceValue = (value: number | null, metric: ProgressMetric): string =
 };
 
 /** Both periods and the selected day's figures, spoken as one heading. */
-export const periodFiguresAccessibilityLabel = (period: TodayProgressPeriod, figures: PeriodDayFigures): string =>
+export const periodFiguresAccessibilityLabel = (period: TodayProgressPeriod, figures: PeriodDayFigures, dateFormat: ExerciseDateFormat): string =>
   [
-    `${period.weeks}-week period, ${formatPeriodRange(period.window)}:`,
-    `${formatPeriodDayLabel(figures, { spoken: true })} ${spokenPaceValue(figures.value, figures.metric)},`,
-    `against the ${comparedPeriodName(period)}, ${formatPeriodRange(period.previous.window)}:`,
-    `${spokenPaceValue(figures.previousValue, figures.metric)} by ${formatCompactDate(figures.previousDate)},`,
+    `${period.weeks}-week period, ${formatWeekRange(period.window, dateFormat)}:`,
+    `${formatPeriodDayLabel(figures, dateFormat, { spoken: true })} ${spokenPaceValue(figures.value, figures.metric)},`,
+    `against the ${comparedPeriodName(period)}, ${formatWeekRange(period.previous.window, dateFormat)}:`,
+    `${spokenPaceValue(figures.previousValue, figures.metric)} by ${formatShortDate(figures.previousDate, dateFormat)},`,
     periodPaceDelta(figures).text,
   ].join(' ');
 
@@ -194,10 +195,11 @@ export const periodChartAccessibilityLabel = (period: TodayProgressPeriod, metri
 /** The selected day, as the adjustable chart's value. */
 export const periodChartAccessibilityValue = (
   period: Pick<TodayProgressPeriod, 'compareBack'>,
-  figures: PeriodDayFigures
+  figures: PeriodDayFigures,
+  dateFormat: ExerciseDateFormat
 ): string =>
   [
-    `${formatPeriodDayLabel(figures, { spoken: true })}: ${spokenPaceValue(figures.value, figures.metric)}, ${comparedPeriodName(period)} ${figures.metric === 'totalVolume' ? spokenPaceValue(figures.previousValue, figures.metric) : figures.previousValue}`,
+    `${formatPeriodDayLabel(figures, dateFormat, { spoken: true })}: ${spokenPaceValue(figures.value, figures.metric)}, ${comparedPeriodName(period)} ${figures.metric === 'totalVolume' ? spokenPaceValue(figures.previousValue, figures.metric) : figures.previousValue}`,
     ...(figures.metric === 'totalVolume'
       ? eligibleTonnageReferences([figures.value, figures.previousValue]).map(reference => reference.spoken + '.') : []),
   ].join(' ');
@@ -361,10 +363,10 @@ const exerciseLineText = (line: SessionExerciseLine): string =>
     .join(', ');
 
 /** The session card's body, spoken: when, what, where, its PRs, then each exercise. */
-export const todaySessionAccessibilityLabel = (session: LatestSessionSummary): string => {
+export const todaySessionAccessibilityLabel = (session: LatestSessionSummary, dateFormat: ExerciseDateFormat): string => {
   const gym = session.gymName?.trim();
   return [
-    `Session on ${formatCompactDateTime(session.startedAt.getTime())}`,
+    `Session on ${formatMonthDayTime(session.startedAt.getTime(), dateFormat)}`,
     plural(session.exercises.length, 'exercise', 'exercises'),
     plural(session.workingSets, 'set', 'sets'),
     formatRecordCount(session.records.length),

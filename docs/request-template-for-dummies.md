@@ -27,9 +27,9 @@ Constraints:
 
 Planning (optional — pick one):
 - No plan: go straight to a PR.
-- A single plan doc under docs/plans/.
-- A milestone + task cards (docs/plans/templates/) for large, multi-PR work,
-  run with the task protocol (/task-protocol).
+- A single plan doc under docs/plans/, for one PR.
+- Multi-PR work: an engine server plan (the engine skill's `plan <ask>`
+  mode), never repo files.
 - If this affects shared behavior, update the relevant project-level specs too.
 
 Verification:
@@ -39,7 +39,7 @@ Verification:
 
 Closeout:
 - Put gate results and evidence in the PR body.
-- If you used a plan, milestone, or task card, move any durable decision into docs/specs/ and delete the plan once the work ships (git history keeps it).
+- If you used a plan doc, move any durable decision into docs/specs/ and delete the plan once the work ships (git history keeps it).
 ```
 
 ## Short version
@@ -58,5 +58,5 @@ Update tests and docs/specs as needed.
 - This template is intentionally plain and beginner-friendly.
 - Planning is optional and ephemeral (`docs/plans/README.md`): you choose
   whether and how the work is planned.
-- For larger work, ask for a plan or a milestone with task cards, then build it
-  as several small PRs.
+- For larger work, ask for an engine server plan, then build it as several
+  small PRs.

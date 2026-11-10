@@ -1,9 +1,8 @@
 # BoGa MCP Virtual Coach
 
 `services/boga-mcp` is the public, authenticated MCP resource server for the
-BoGa Virtual Coach. It exposes fourteen tools over stateless Streamable HTTP
-(eight read-only tools, two create-only planning tools and four exercise editing
-tools) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
+BoGa Virtual Coach. It exposes twenty-two tools over stateless Streamable HTTP
+(ten read-only tools and twelve mutations) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
 Supabase data credentials, SQL, or service-role key.
 
 ## Public endpoints
@@ -30,7 +29,7 @@ and does not offer server-sent event sessions.
 
 ## Tool surface
 
-Nine read-only tools:
+Ten read-only tools:
 - `get_training_status` — one bounded check-in: per tracked muscle, sets on the
   three recovery days, today, this week and the four weeks before, with its
   weekly target and last trained date (Today's Plan's counting and order, under
@@ -49,6 +48,11 @@ Nine read-only tools:
 - `get_exercise_history` — keyset-paginated performed set history.
 - `get_workout_detail` — exact session header, volume, and paginated sets.
 - `get_upcoming_session_plans` — upcoming and unscheduled authored plans.
+- `get_active_workout` — active headers or one selected workout's persisted
+  lifecycle, raw exercise/set rows, stable IDs and graph revision. Requires
+  workout permission even though read-only. A selected ID also reports
+  finished/deleted state; `requires_app` directs plan-backed work to BoGa.
+  Pages use the same `session_id` and `revision` with `next_cursor`.
 
 Two create-only planning tools (require write access, idempotent):
 - `create_session_plan` — create one authored session plan with pending blocks.
@@ -74,6 +78,57 @@ their next sync. `expected_revision` is `targets.revision` from
 `get_training_status`; before any device has uploaded targets it builds on the
 app's defaults. Rules and errors: the
 [agent API contract](../../supabase/functions/agent-api/README.md#muscle-targets).
+
+Five workout mutations, under the independent logging grant of
+[[agents.write-access]] (neither plan switch grants it):
+
+| Tool | Input beyond `idempotency_key` |
+| --- | --- |
+| `start_workout` | optional `gym_id`; server-time start, refuses an existing active workout |
+| `log_sets` | `session_id`, `expected_revision`, exactly one `exercise_id`/`session_exercise_id`, 1–30 performed `sets` |
+| `update_set` | `session_id`, `expected_revision`, `set_id`, replacement performed `set` |
+| `delete_set` | `session_id`, `expected_revision`, `set_id`; soft deletion |
+| `finish_workout` | `session_id`, `expected_revision`; one server completion instant/duration |
+
+Corrections, removal and finish carry destructive hints; start/log are additive.
+All writes are idempotent by their required printable ASCII operation key
+(1–128 characters, no whitespace). Strict nested schemas reject identity,
+plan targets and unsupported fields. The adapter forwards raw structured
+results and API errors, including stable IDs and current lifecycle, without
+recomputing metrics. For permission, bounds, concurrency and error recovery,
+load the [workout contract](../../docs/specs/tech/agent-workout-contract.md).
+
+### Conversational logging
+
+Workouts have one controller ([[agents.write-access]]). Start assigns this
+client immediately. Existing workouts require `control.can_edit: true`; the
+person gives this client control through the app's Session menu. Never
+self-claim a human-owned workout. Reads report the current controller and
+`WORKOUT_CONTROL_REQUIRED` stops writes/replays after takeover. This informs
+the client on its next workout call, without an unsolicited push channel.
+
+1. Read profile/exercise context to resolve gym/exercise IDs, explicit units and
+   total/per-side input meaning. Convert an explicitly different unit to kg
+   before calling; ask when identity or load meaning is ambiguous. Do not
+   create an exercise just because a name did not match.
+2. Discover active headers and explicitly choose a workout when several exist.
+   Server state excludes unsynced phone work. `ACTIVE_WORKOUT_CONFLICT` never
+   means automatically finish, merge or replace another workout.
+3. Record actual performance: `{weight_kg: "80", reps: 8, set_type: "rir_2"}`.
+   Use `"0"` for no external load and `null` for unspecified effort. Warm-up,
+   technique, cooldown and RIR are explicit; never invent them or convert plan
+   targets to performed sets ([[set.performed]], [[set.eligibility]]).
+4. “Same again, seven reps” resolves the previous persisted set, keeps only the
+   intended values, changes reps to seven, and uses a fresh operation key.
+   Preserve `session_exercise_id` to avoid an ambiguous repeated exercise.
+5. For “that was 75”, read the row, identify its `set_id`, retain its reps/effort
+   and replace only the intended performance. `update_set` requires a complete
+   performed input; omitting `set_type` would clear effort to unspecified.
+6. A lost response repeats the exact payload and key. A revision conflict
+   requires a fresh read and confirmed intent, then a fresh key; never silently
+   replace the revision. A fresh conversation drains persisted pages rather
+   than relying on earlier assistant messages. Finish only the selected
+   workout when the person asks; subsequent edits require the app.
 
 `get_exercise_context` reports `gym_usage` for every exercise: sessions with a
 working set per gym and with no gym, so a coach can judge `split_by_gym`.
@@ -178,7 +233,38 @@ rejected token is challenged, discovers and invokes every tool with the
 refreshed token, verifies fixture IDs, and cleans up. See
 `RUNBOOK.md` for the supplied-token form.
 
+### Reproducible walkthrough and evidence
+
+After an authorized deployment and the client's catalogue refresh/new-action
+approval, use a disposable test account with logging enabled and plan switches
+off. Ask: “Start a workout at my gym” → “Bench, 80 kg for eight, RIR two” →
+“Same again, seven reps” → “Actually the first set was 75 kg” → “Remove the
+second set”. Start a fresh chat, recover that workout and verify one 75×8 RIR2
+set; then ask “Finish”. Open BoGa, sync and inspect the same completed workout.
+
+`./boga test mcp-smoke` proves this protocol path with real local OAuth,
+including exact retry replay, intentional repetition, fresh-client paging,
+permission disable, actual OAuth-grant revocation and rejection after finish.
+It runs the read projections once across permission phases to stay under the
+unchanged request limits. New workout writes/revocation are confined to the
+seeded local fixture; supplied-token mode never runs them.
+
+**Supported chat-client UX: not verified by the local SDK test.** Record the
+actual client/version/date, refreshed 22-tool catalogue, new-action approval,
+per-call prompts, fresh-chat recovery and app convergence when doing the
+walkthrough. Annotations cannot guarantee prompt-free repeated logging.
+Code integration performs no hosted deployment or connector activation.
+
 ## Production deployment
+
+For a workout rollout, enforce the server's protocol-7 compatibility contract
+and ship the protected mobile handoff before exposing the new MCP catalogue;
+load [workout rollout](../../docs/specs/tech/agent-workout-contract.md) when
+performing those steps. Existing grants stay default-off under
+[[agents.write-access]]. Then deploy the MCP build and use the client's
+catalogue refresh/approval flow; the stateless HTTP service cannot push that
+refresh. Complete the supported-client walkthrough separately from local proof.
+
 
 1. Complete the hosted Supabase and consent-site steps in
    `apps/agent-auth-web/README.md` and `supabase/README.md`.

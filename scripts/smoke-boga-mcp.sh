@@ -41,6 +41,22 @@ cleanup() {
     run_psql "
       begin;
         set constraints all deferred;
+        set local boga.exercise_merge_internal = 'on';
+        create temp table smoke_workout_ids on commit drop as
+          select result_ids->>'session_id' as id from public.agent_plan_write_receipts
+          where owner_user_id='${USER_UUID}'::uuid and client_id='${AGENT_CLIENT_ID}' and operation='start_workout'
+          union select id from app_public.sessions where owner_user_id='${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
+        delete from public.exercise_merge_contexts where user_id='${USER_UUID}'::uuid and operation_id in
+          (select id from public.exercise_merge_operations where user_id='${USER_UUID}'::uuid and session_id in (select id from smoke_workout_ids));
+        delete from public.exercise_merge_conflicts where user_id='${USER_UUID}'::uuid and session_id in (select id from smoke_workout_ids);
+        delete from public.exercise_merge_operations where user_id='${USER_UUID}'::uuid and session_id in (select id from smoke_workout_ids);
+        delete from app_public.session_exercise_tags where owner_user_id='${USER_UUID}'::uuid and session_exercise_id in
+          (select id from app_public.session_exercises where owner_user_id='${USER_UUID}'::uuid and session_id in (select id from smoke_workout_ids));
+        delete from app_public.exercise_sets where owner_user_id='${USER_UUID}'::uuid and session_exercise_id in
+          (select id from app_public.session_exercises where owner_user_id='${USER_UUID}'::uuid and session_id in (select id from smoke_workout_ids));
+        delete from app_public.session_exercises where owner_user_id='${USER_UUID}'::uuid and session_id in (select id from smoke_workout_ids);
+        delete from app_public.sessions where owner_user_id='${USER_UUID}'::uuid and id in (select id from smoke_workout_ids);
+        delete from public.agent_workout_permissions where owner_user_id='${USER_UUID}'::uuid and client_id='${AGENT_CLIENT_ID}';
         -- Delete plans/programmes referenced in write receipts for this client run
         with client_receipts as (
           select result_ids
@@ -156,7 +172,10 @@ cleanup() {
         delete from app_public.session_plans
           where owner_user_id = '${USER_UUID}'::uuid and id = 'mcp-smoke-${RUN_TAG}-sentinel-plan';
       commit;
-    " >/dev/null 2>&1 || true
+    " >/dev/null || { echo "[boga-mcp-smoke] fixture cleanup failed" >&2; status=1; }
+  fi
+  if (( status != 0 )) && [[ -n "${MCP_LOG_FILE:-}" && -f "${MCP_LOG_FILE}" ]]; then
+    tail -n 20 "${MCP_LOG_FILE}" >&2 || true
   fi
   [[ -n "${TOKEN_FILE:-}" ]] && rm -f "${TOKEN_FILE}"
   [[ -n "${MCP_LOG_FILE:-}" ]] && rm -f "${MCP_LOG_FILE}"
@@ -362,6 +381,7 @@ if [[ -n "${USER_UUID}" ]]; then
   "
 
   echo "[boga-mcp-smoke] phase 2: calling planning tools with plan permission enabled"
+  BOGA_MCP_SMOKE_SKIP_READS="1" \
   BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT="${EXPECT_BODYWEIGHT}" \
   BOGA_MCP_SMOKE_URL="${MCP_URL}" \
   BOGA_MCP_SMOKE_ACCESS_TOKEN="${ACCESS_TOKEN}" \
@@ -406,6 +426,7 @@ if [[ -n "${USER_UUID}" ]]; then
     where owner_user_id = '${USER_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';
   "
 
+  BOGA_MCP_SMOKE_SKIP_READS="1" \
   BOGA_MCP_SMOKE_EXPECT_BODYWEIGHT="${EXPECT_BODYWEIGHT}" \
   BOGA_MCP_SMOKE_URL="${MCP_URL}" \
   BOGA_MCP_SMOKE_ACCESS_TOKEN="${ACCESS_TOKEN}" \
@@ -416,6 +437,28 @@ if [[ -n "${USER_UUID}" ]]; then
   BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
     npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
+
+  # This block is inside seeded local mode. Supplied tokens never enable or mutate workouts.
+  run_psql "insert into public.agent_workout_permissions(owner_user_id,client_id,workout_logging_enabled,granted_at)
+    values('${USER_UUID}'::uuid,'${AGENT_CLIENT_ID}',true,'${GRANTED_AT}');"
+  workout_smoke() {
+    BOGA_MCP_SMOKE_LOCAL_FIXTURE=1 BOGA_MCP_WORKOUT_SMOKE_MODE="$1" \
+    BOGA_MCP_SMOKE_URL="${MCP_URL}" BOGA_MCP_SMOKE_ACCESS_TOKEN="${ACCESS_TOKEN}" \
+    BOGA_MCP_SMOKE_EXERCISE_ID="${EXERCISE_ID}" BOGA_MCP_SMOKE_GYM_ID="${GYM_ID}" \
+      "${REPO_ROOT}/services/boga-mcp/node_modules/.bin/tsx" "${REPO_ROOT}/services/boga-mcp/scripts/workout-smoke.ts"
+  }
+  echo "[boga-mcp-smoke] workout flow with plan permission OFF and independent logging ON"
+  workout_smoke run
+  run_psql "update public.agent_workout_permissions set workout_logging_enabled=false
+    where owner_user_id='${USER_UUID}'::uuid and client_id='${AGENT_CLIENT_ID}';"
+  workout_smoke denied
+  curl --silent --show-error --fail -X DELETE -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${APP_ACCESS_TOKEN}" \
+    "${API_URL}/auth/v1/user/oauth/grants?client_id=${AGENT_CLIENT_ID}" >/dev/null
+  workout_smoke revoked
+  AUDIT_COUNT="$(run_psql "select count(*) from public.agent_access_audit
+    where owner_user_id='${USER_UUID}'::uuid and oauth_client_id='${AGENT_CLIENT_ID}';")"
+  [[ "${AUDIT_COUNT}" -le 118 ]] || fail "smoke request budget exceeds 118: ${AUDIT_COUNT}; do not rely on elapsed time to reset limits"
+  echo "[boga-mcp-smoke] audited requests: ${AUDIT_COUNT} (within the unchanged 120/minute API limit)"
 
   echo "[boga-mcp-smoke] verifying pre-existing plan sentinel survived all test phases"
   SENTINEL_EXISTS="$(run_psql "

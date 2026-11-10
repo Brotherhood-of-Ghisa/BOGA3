@@ -201,7 +201,7 @@ push_body="$(jq -nc --arg id "${A_SPE_PUSH}" --arg p "${A_SP}" --argjson now "${
 status="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST \
   -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${USER_A_TOKEN}" \
   -H "Accept-Profile: app_public" -H "Content-Profile: app_public" \
-  -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-6}" -H "Content-Type: application/json" \
+  -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-7}" -H "Content-Type: application/json" \
   --data "${push_body}" "${API_URL}/rest/v1/rpc/sync_push")"
 [[ "${status}" == "200" ]] || fail "user A's sync_push of an own block returned ${status}"
 A_VER_AFTER="$(run_psql_sql "select graph_version > '${A_VER_BEFORE}'::timestamptz from app_public.session_plans where owner_user_id = '${USER_A_UUID}' and id = '${A_SP}';")"

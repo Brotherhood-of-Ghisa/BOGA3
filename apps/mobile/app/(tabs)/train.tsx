@@ -38,7 +38,7 @@ export type TrainPlanningState =
 
 export type TrainScreenProps = {
   isFocused?: boolean;
-  loadActiveSessionId?: () => Promise<string | null>;
+  loadActiveSessionId?: (preferredId?: string | null) => Promise<string | null>;
   planningState?: TrainPlanningState;
   sessionEntry?: SessionEntryCoordinator;
   // The workout in progress, drawn in place of the disc; `onEnded` brings the disc back.
@@ -66,12 +66,14 @@ type ActiveCheck =
  * ended under a page that covers Train (Finish's summary) gives way to the
  * disc only once Train is back in focus, so the disc never shows through.
  */
-function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: () => Promise<string | null>) {
+function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: (preferredId?: string | null) => Promise<string | null>) {
   const [check, setCheck] = useState<ActiveCheck>({ status: 'checking' });
   const [workoutId, setWorkoutId] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [endsOnReturn, setEndsOnReturn] = useState(false);
   const [checkedFocus, setCheckedFocus] = useState(isFocused);
+  const preferredId = useRef<string | null>(null);
+  const selectionVersion = useRef(0);
   if (checkedFocus !== isFocused) {
     setCheckedFocus(isFocused);
     if (isFocused) setCheck({ status: 'checking' });
@@ -84,11 +86,13 @@ function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: () => Pr
   useEffect(() => {
     if (!isFocused) return;
     let current = true;
-    loadActiveSessionId().then(
+    const version = selectionVersion.current;
+    loadActiveSessionId(preferredId.current).then(
       (activeSessionId) => {
-        if (!current) return;
+        if (!current || version !== selectionVersion.current) return;
         setCheck({ status: 'done', activeSessionId });
         setWorkoutId(activeSessionId);
+        preferredId.current = activeSessionId;
       },
       (error: unknown) => {
         if (current) setCheck({ status: 'error', message: error instanceof Error ? error.message : 'Unable to read sessions' });
@@ -105,11 +109,18 @@ function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: () => Pr
   };
   // A workout opened or ended here: known without another read.
   const show = useCallback((activeSessionId: string | null) => {
+    selectionVersion.current += 1;
+    preferredId.current = activeSessionId;
     setEndsOnReturn(false);
     setCheck({ status: 'done', activeSessionId });
     setWorkoutId(activeSessionId);
   }, []);
-  const end = (moment: WorkoutEndMoment) => (moment === 'now' ? show(null) : setEndsOnReturn(true));
+  const end = (moment: WorkoutEndMoment) => {
+    if (moment === 'now') return show(null);
+    preferredId.current = null;
+    selectionVersion.current += 1;
+    setEndsOnReturn(true);
+  };
   return { check, end, retry, show, workoutId };
 }
 

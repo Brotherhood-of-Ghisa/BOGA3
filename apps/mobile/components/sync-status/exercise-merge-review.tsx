@@ -21,13 +21,27 @@ function display(value: MergeValue | undefined, key: string): string {
   if (key === 'performance_status') return value === null ? 'Performed' : String(value);
   return value === null || value === undefined || value === '' ? 'Empty' : String(value);
 }
-function changes(item: MergeReviewItem) {
+function changes(item: MergeReviewItem, dateFormat: Parameters<typeof formatLocalDateTime>[1]) {
   const fields: readonly (readonly [string, string])[] = item.type === 'exercise_sets' ? SET_FIELDS :
+    item.type === 'sessions' ? [['gym_name', 'Gym'], ['started_at', 'Start'], ['completed_at', 'End']] :
     item.type === 'session_exercises' ? [['machine_name', 'Machine'], ['order_index', 'Position']] :
       [['tag_name', 'Tag']];
-  const rows = fields.filter(([key]) => item.current?.[key] !== item.saved?.[key]).map(([key, label]) => ({
-    label, current: display(item.current?.[key], key), saved: display(item.saved?.[key], key),
-  }));
+  const value = (row: MergeReviewItem['current'], key: string) => {
+    const raw = row?.[key];
+    if (!['started_at', 'completed_at'].includes(key) || typeof raw !== 'number') return display(raw, key);
+    const formatted = formatLocalDateTime(raw, dateFormat);
+    const a = item.current?.[key], b = item.saved?.[key];
+    if (typeof a !== 'number' || typeof b !== 'number' || a === b ||
+        formatLocalDateTime(a, dateFormat) !== formatLocalDateTime(b, dateFormat)) return formatted;
+    // Show the stored difference when minute-rounded labels would look equal.
+    const date = new Date(raw);
+    return formatted + ':' + String(date.getSeconds()).padStart(2, '0') + '.' + String(date.getMilliseconds()).padStart(3, '0');
+  };
+  const rows = fields.filter(([key]) => key === 'gym_name' ? item.current?.gym_id !== item.saved?.gym_id
+    : item.current?.[key] !== item.saved?.[key]).map(([key, label]) => {
+    const current = value(item.current, key), saved = value(item.saved, key);
+    return { label, current, saved: key === 'gym_name' && current === saved ? saved + ' (different gym)' : saved };
+  });
   if (!item.current || Boolean(item.current.deleted_at) !== Boolean(item.saved?.deleted_at)) {
     rows.push({ label: 'History', current: !item.current ? 'Absent' : item.current.deleted_at ? 'Removed' : 'Kept',
       saved: item.saved?.deleted_at ? 'Removed' : 'Kept' });
@@ -102,17 +116,26 @@ export function ExerciseMergeReviewScreen() {
     {items.map(item => {
       const removal = Boolean(item.saved?.deleted_at);
       const apply = () => { void resolve(item, false); };
+      const fieldChanges = changes(item, dateFormat);
+      const noMetadata = item.type === 'sessions' && ['gym_id', 'started_at', 'completed_at']
+        .every(key => item.current?.[key] === item.saved?.[key]);
+      const lifecycle = item.current?.deleted_at ? 'deleted' : item.current?.status === 'completed' ? 'finished' : 'active';
+      const notice = noMetadata ? 'No metadata changes need applying. Reopen or restore the workout in the app.'
+        : item.type === 'sessions' ? `Applying saved metadata keeps this workout ${lifecycle}.`
+        : item.notice;
       return <FormSection key={item.id} title={item.exerciseName} testID={'exercise-merge-conflict-' + item.id}
-        error={item.invalid ? 'These saved values need correction before they can be applied.' : null}>
+        error={item.invalid ? item.notice ?? 'These saved values need correction before they can be applied.' : null}>
         {item.sessionStartedAt ? <ValueRow label="Session" value={formatLocalDateTime(item.sessionStartedAt, dateFormat)} /> : null}
-        {changes(item).map((change, index) => <ValueRow key={change.label}
+        {item.type === 'sessions' ? <ValueRow divider label="Workout" value={lifecycle === 'finished' ? 'Finished' : lifecycle === 'deleted' ? 'Deleted' : 'Active'} /> : null}
+        {notice && !item.invalid ? <Notice message={notice} /> : null}
+        {fieldChanges.map((change, index) => <ValueRow key={change.label}
           divider={index > 0 || Boolean(item.sessionStartedAt)} label={change.label}
           value={change.current + ' → ' + change.saved}
           accessibilityLabel={change.label + ': current ' + change.current + ', saved ' + change.saved} />)}
         <ActionRow divider kind="act" label="Keep current history" disabled={busy}
           onPress={() => { void resolve(item, true); }} testID={'exercise-merge-keep-' + item.id} />
         <ActionRow divider kind={removal ? 'danger' : 'act'} label={removal ? 'Apply saved removal' : 'Apply saved changes'}
-          disabled={busy || item.invalid} onPress={removal ? () => confirmRemoval(apply) : apply}
+          disabled={busy || item.invalid || noMetadata} onPress={removal ? () => confirmRemoval(apply) : apply}
           testID={'exercise-merge-apply-' + item.id} />
       </FormSection>;
     })}

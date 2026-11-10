@@ -115,7 +115,7 @@ done
 sync_pull() {
   http POST "${REST}/rpc/sync_pull" "${B_TOKEN}" \
     "$(jq -nc --argjson layer "$1" '{layer: $layer, cursor: null, limit: 1}')" \
-    "x-boga-sync-protocol: 6" "Prefer: params=single-object"
+    "x-boga-sync-protocol: 7" "Prefer: params=single-object"
   expect_2xx "sync_pull layer $1 as user_b"
 }
 LAST_LAYER=5

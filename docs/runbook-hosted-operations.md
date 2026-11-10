@@ -129,10 +129,11 @@ confirmed diagnosis. A Live badge or a successful `/health` request alone does
 not establish OAuth or tool health.
 
 After deployment, run the hosted rollout checklist below against these deployed
-URLs. Verify both discovery endpoints, explicit consent and deny, all four tools
-(`get_training_profile`, `search_exercises`, `get_exercise_context`,
-`get_recent_workouts`), grant revocation and the audit trail, plus the other
-hosted security checks in that checklist. Record the deployed revision, time,
+URLs. Verify both discovery endpoints, explicit consent and deny, every registered
+tool using a disposable test account with the required write grants, grant
+revocation and the audit trail, plus the other
+hosted security checks in that checklist. For the current catalogue, load
+`services/boga-mcp/README.md`. Record the deployed revision, time,
 URLs and results without tokens or payloads. **Local green is not hosted evidence.**
 
 Update this section when hosts, ownership, branch or public settings change.

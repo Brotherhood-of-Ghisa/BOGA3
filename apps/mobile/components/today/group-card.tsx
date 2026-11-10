@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { TodayWeekBoardCard } from './today-week-board';
 import { TodayCoWSummaries } from './group-cow-summary';
 import type { ReactNode } from 'react';
@@ -18,7 +19,7 @@ import type { CompetitionWeekSummaryWire as GroupWeekSummaryResult } from '@/src
 import { localWeekWindow } from '@/src/utils/local-calendar';
 
 import { TodayGroupHeader } from './group-header';
-import { formatPeriodRange } from './progress-format';
+import { formatPeriodRange, formatWeekRange } from './progress-format';
 import { TrainingNowMark } from './session-summary-row';
 import { useGroupRecentSessions, type GroupStreamPageLoader } from './use-group-recent-sessions';
 
@@ -128,14 +129,15 @@ export function TodayGroupCard({
   onOpenSession,
   loadStreamPage,
 }: TodayGroupCardProps) {
+  const dateFormat = useDateFormat();
   const styles = useStyles();
   const text = useUiText();
   const board = buildWeekBoard(summary.members, myUserId);
-  const range = formatPeriodRange(localWeekWindow(new Date(nowMs)));
+  const range = formatPeriodRange(localWeekWindow(new Date(nowMs)), dateFormat);
   // The week summary carries one completed session; the stream fills the rest.
   const wanted = GROUP_SESSIONS_SHOWN - summary.training_now.length - (summary.latest_completed ? 1 : 0);
   const recent = useGroupRecentSessions(selectedGroupId, summary.latest_completed?.session_id ?? null, wanted, loadStreamPage, summary);
-  const sessions = buildGroupSessions(summary, recent.sessions, myUserId, nowMs);
+  const sessions = buildGroupSessions(summary, recent.sessions, myUserId, nowMs, dateFormat);
   const openSession = (row: GroupSessionRowViewModel) => onOpenSession(row.memberUserId, row.sessionId, selectedGroupId);
   const empty = sessions.live.length === 0 && sessions.recent.length === 0;
   // The recent card shows unless the live card has everything to say.
@@ -173,6 +175,7 @@ export function TodayGroupCard({
         }
         onOpenGroup={() => onOpenGroup(selectedGroupId)}
         range={range}
+        accessibilityRange={formatWeekRange(localWeekWindow(new Date(nowMs)), dateFormat)}
       />
       {/* Members training now, then the latest completed sessions: a card each. */}
       {sessions.live.length > 0 ? (

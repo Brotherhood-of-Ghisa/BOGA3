@@ -3,7 +3,6 @@ import { getAuthSnapshot } from '@/src/auth';
 import { snapshotAfterSessionCompleted } from '@/src/backup/database-backups';
 import {
   completeSessionDraft,
-  loadLatestSessionDraftSnapshot,
   loadSessionSnapshotById,
   persistCompletedSessionSnapshot,
   persistSessionDraftSnapshot,
@@ -23,6 +22,7 @@ import {
 } from './session-model';
 import { clearRestTimerAutoStartSuppression, dismissRestTimer } from './rest-timer';
 import type { SessionTimes } from './session-times';
+import type { SessionTimingBaseline } from '@/src/data/session-inputs';
 import { autoCompletePlanBlocksForSession } from '@/src/session-planner';
 
 /**
@@ -44,6 +44,7 @@ export const completeActiveSession = async (input: {
     status: 'active',
     exercises: toPersistCompletedExercises(input.completedHistorySession),
     mergeRevisions: input.completedHistorySession.mergeRevisions,
+    editBaseline: input.completedHistorySession.editBaseline,
   });
 
   await completeSessionDraft(persisted.sessionId);
@@ -63,8 +64,8 @@ export const completeActiveSession = async (input: {
  * Abandons an active session: the same soft delete the Sessions list's
  * "Delete active session" performs, so it syncs as a tombstone.
  */
-export const abandonActiveSession = async (sessionId: string): Promise<void> => {
-  await setSessionDeletedState(sessionId, true);
+export const abandonActiveSession = async (sessionId: string, expectedRevision?: number): Promise<void> => {
+  await setSessionDeletedState(sessionId, true, { expectedRevision });
   dismissRestTimer(sessionId, { suppressAutoStart: false });
   clearRestTimerAutoStartSuppression(sessionId);
 };
@@ -78,8 +79,8 @@ export type ActiveSessionGraph = {
 
 /** The persisted active draft, if it is still `sessionId`. */
 export const loadActiveSessionGraph = async (sessionId: string): Promise<ActiveSessionGraph | null> => {
-  const snapshot = await loadLatestSessionDraftSnapshot();
-  if (!snapshot || snapshot.sessionId !== sessionId) {
+  const snapshot = await loadSessionSnapshotById(sessionId);
+  if (!snapshot || snapshot.status !== 'active' || snapshot.deletedAt !== null) {
     return null;
   }
   const session = mapDraftSnapshotToSession(snapshot);
@@ -136,6 +137,7 @@ const persistSessionGraph = (
         completedAt: graph.completedAt,
         exercises: toPersistDraftExercises(session),
         mergeRevisions: session.mergeRevisions,
+        editBaseline: session.editBaseline,
       })
     : persistSessionDraftSnapshot({
         sessionId: graph.sessionId,
@@ -144,6 +146,7 @@ const persistSessionGraph = (
         status: 'active',
         exercises: toPersistDraftExercises(session),
         mergeRevisions: session.mergeRevisions,
+        editBaseline: session.editBaseline,
       });
 
 const requireEditableSessionGraph = async (sessionId: string): Promise<EditableSessionGraph> => {
@@ -222,8 +225,8 @@ export const appendPlanToSession = async (
 };
 
 /** Autosaves a completed session's edited Start/End; its rows are kept as persisted. */
-export const setCompletedSessionTimes = async (sessionId: string, times: SessionTimes): Promise<void> => {
-  await updateSessionMetadata(sessionId, { times });
+export const setCompletedSessionTimes = async (sessionId: string, times: SessionTimes, timesBaseline?: SessionTimingBaseline): Promise<SessionTimes> => {
+  return (await updateSessionMetadata(sessionId, { times, timesBaseline })) ?? times;
 };
 
 /**
@@ -244,5 +247,6 @@ export const saveCompletedSessionEdit = async (input: {
     completedAt: input.times.completedAt,
     exercises: toPersistCompletedExercises(input.completedHistorySession),
     mergeRevisions: input.completedHistorySession.mergeRevisions,
+    editBaseline: input.completedHistorySession.editBaseline,
   });
 };

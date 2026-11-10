@@ -57,6 +57,7 @@ export function SessionsScreen({
   const [showDeletedSessions, setShowDeletedSessions] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [activeDurationNowMs, setActiveDurationNowMs] = useState(() => Date.now());
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { sessions, setSessions, isLoadingSessions, loadErrorMessage, loadedAtMs, reloadSessions } =
     useSessionListData({
@@ -78,7 +79,7 @@ export function SessionsScreen({
     .filter((programme) => programme.progress === 'completed')
     .map((programme) => [programme.id, programme])).values()] : [];
 
-  const activeSession = sessions.find(
+  const activeSessions = sessions.filter(
     (session) => session.status === 'active' && session.deletedAt === null
   );
   const completedSessions = sessions
@@ -103,12 +104,12 @@ export function SessionsScreen({
   const showGlobalEmptyState =
     !isLoadingSessions &&
     !loadErrorMessage &&
-    !activeSession &&
+    activeSessions.length === 0 &&
     planningEmpty &&
     completedSessions.length === 0;
 
   useEffect(() => {
-    if (!activeSession) {
+    if (activeSessions.length === 0) {
       return;
     }
 
@@ -119,20 +120,22 @@ export function SessionsScreen({
     return () => {
       clearInterval(intervalId);
     };
-  }, [activeSession]);
+  }, [activeSessions.length]);
 
   const openActiveSession = useOpenActiveWorkout();
 
-  const discardActiveSession = () => {
-    if (dataClient && activeSession) {
+  const discardActiveSession = (sessionId: string, expectedRevision: number) => {
+    if (dataClient) {
       return (async () => {
-        await dataClient.discardActiveSession(activeSession.id);
-        await reloadSessions();
+        setActionError(null);
+        try { await dataClient.discardActiveSession(sessionId, expectedRevision); }
+        catch (error) { setActionError(error instanceof Error ? error.message : 'Unable to discard this workout.'); }
+        finally { await reloadSessions(); }
       })();
     }
 
     setSessions((currentSessions) =>
-      currentSessions.filter((session) => session.status !== 'active')
+      currentSessions.filter((session) => session.id !== sessionId)
     );
   };
 
@@ -159,20 +162,21 @@ export function SessionsScreen({
 
   const hub = (
     <>
-      {activeSession ? (
+      {activeSessions.length > 0 ? (
         <View style={styles.block}>
           <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
             Active
           </Text>
-          <ActiveSessionRow
+          {activeSessions.map(activeSession => <ActiveSessionRow
+            key={activeSession.id}
             session={activeSession}
             nowMs={activeDurationNowMs}
             onResume={() => openActiveSession(activeSession.id)}
             onComplete={() => openActiveSession(activeSession.id)}
             onDelete={() => {
-              void discardActiveSession();
+              void discardActiveSession(activeSession.id, activeSession.mergeRevision ?? 0);
             }}
-          />
+          />)}
         </View>
       ) : null}
 
@@ -227,10 +231,11 @@ export function SessionsScreen({
         // The plans above the history load on their own: jump once they have,
         // so they cannot push the target down after it lands.
         jumpTo={planSections.isLoading ? null : jumpTo}
-        loadErrorMessage={loadErrorMessage}
+        loadErrorMessage={actionError ?? loadErrorMessage}
         nowMs={loadedAtMs}
         onOpenCompletedSession={openCompletedSessionSummary}
         onRetryLoad={() => {
+          setActionError(null);
           void reloadSessions();
         }}
         sessions={completedSessions}

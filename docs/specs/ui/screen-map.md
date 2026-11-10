@@ -43,7 +43,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 
 | Route | What it is for | File |
 | --- | --- | --- |
-| `/session/[sessionId]` | The session view as a page: the completed-session editor, with editable Start/End. The active session's view (summary card, one card per exercise, `Finish`) is the Train tab | `session/[sessionId]/index.tsx`, `components/session-view/session-view-screen.tsx` |
+| `/session/[sessionId]` | The session view as a page: the completed-session editor, with editable Start/End. The active view is the Train tab: summary, exercise cards and `Finish`, replaced by a robot and read-only controls during AI logging ([[agents.write-access]]); the timer remains usable | `session/[sessionId]/index.tsx`, `components/session-view/session-view-screen.tsx` |
 | `/session/[sessionId]/exercise/[sessionExerciseId]` | One exercise of that session: records panel, ordered set list with the in-place logger, `Complete exercise` | `session/[sessionId]/exercise/[sessionExerciseId].tsx`, `components/exercise-page/`, `apps/mobile/src/session-recorder/` |
 | `/session/[sessionId]/add-exercise` | Exercise picker (iOS page sheet): the catalogue browser in select mode, group exercises, inline create | `session/[sessionId]/add-exercise.tsx`, `components/session-recorder/exercise-picker.tsx` |
 | `/session/[sessionId]/compare` | Session vs history: the open session's exercise / muscle volume against earlier completed history, off the session view so logging stays uncluttered | `session/[sessionId]/compare.tsx` |
@@ -62,7 +62,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 | Route | What it is for | File |
 | --- | --- | --- |
 | `/profile` | Auth-aware account route: signed-out credentials, signed-in username / email / password management, sign-out | `profile.tsx` |
-| `/connected-agents` | Signed-in review and revocation of OAuth grants, plus the per-coach **Allow this coach to make changes** permission (default off) | `connected-agents.tsx` |
+| `/connected-agents` | Signed-in review and revocation of OAuth grants, with independent planning and workout-logging switches ([[agents.write-access]]) | `connected-agents.tsx` |
 | `/theme-custom?part=` | One custom part: hue, strength (background: lightness, depth); preview; saves on release | `theme-custom.tsx`, `components/appearance/` |
 | `/body-weight` | Settings → Bodyweight: the `Bodyweight calculations` On/Off, then private dated kg readings and their history | `body-weight.tsx`, `components/bodyweight/` |
 | `/settings-appearance`, `/settings-notifications` | Appearance: preview; Theme radio rows (Custom folds presets), then Mode or the Custom part rows (open pickers); a choice repaints the app at once. Notifications: one switch (state as description) or `Open iOS Settings` / `Sign in`; Categories while on; one Notice with Retry | `settings-*.tsx`, `components/appearance/`, `components/notifications/` |

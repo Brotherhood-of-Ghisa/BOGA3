@@ -46,7 +46,8 @@ so you can describe the way you actually lift.
 
 A compatible AI coach can connect through BoGa's authenticated MCP service to
 analyse training history. With a separate, explicit planning permission, it can
-also create session plans and programmes for you to use in the app.
+also create session plans and programmes for you to use in the app
+([[agents.write-access]]).
 
 ## Social features: turn shared training into friendly competition
 

@@ -4,7 +4,7 @@ import type { SessionViewExerciseCard } from '@/src/session-recorder/session-vie
 
 type SessionExerciseCardProps = {
   card: SessionViewExerciseCard;
-  onPress: () => void;
+  onPress?: () => void;
 };
 
 // An exercise in the session view: a read-only card that links to the exercise
@@ -22,7 +22,7 @@ export function SessionExerciseCard({ card, onPress }: SessionExerciseCardProps)
   return (
     <ExerciseSetsCard
       accessibilityLabel={label}
-      accessory={<Icon colorRole="inkFaint" name="chevron-right" size="sm" />}
+      accessory={onPress ? <Icon colorRole="inkFaint" name="chevron-right" size="sm" /> : undefined}
       count={`${card.doneCount}/${card.totalCount}`}
       countMuted={card.doneCount === 0}
       name={card.name}

@@ -9,6 +9,7 @@ export type ConnectedAgent = {
   name: string;
   planAccessEnabled: boolean | 'unavailable';
   planEditEnabled: boolean | 'unavailable';
+  workoutLoggingEnabled: boolean | 'unavailable';
   scopes: string[];
 };
 
@@ -22,6 +23,7 @@ type PlanPermissionRow = {
   granted_at: string;
   plan_access_enabled?: boolean;
   plan_edit_enabled?: boolean;
+  workout_logging_enabled?: boolean;
 };
 
 /**
@@ -32,7 +34,7 @@ type PlanPermissionRow = {
 const grantMatchesPermission = (
   permission: PlanPermissionRow | undefined,
   grantedAt: string,
-  flag: 'plan_access_enabled' | 'plan_edit_enabled' = 'plan_access_enabled',
+  flag: 'plan_access_enabled' | 'plan_edit_enabled' | 'workout_logging_enabled' = 'plan_access_enabled',
 ): boolean => {
   if (!permission || permission[flag] !== true) return false;
   const stored = Date.parse(permission.granted_at);
@@ -44,6 +46,7 @@ const normalizeGrant = (
   grant: OAuthGrant,
   lastAccessByClient: ReadonlyMap<string, string>,
   permissionByClient: ReadonlyMap<string, PlanPermissionRow>,
+  workoutPermissionByClient: ReadonlyMap<string, PlanPermissionRow>,
 ): ConnectedAgent => ({
   clientId: grant.client.id,
   grantedAt: grant.granted_at,
@@ -51,6 +54,7 @@ const normalizeGrant = (
   name: grant.client.name?.trim() || 'Connected agent',
   planAccessEnabled: grantMatchesPermission(permissionByClient.get(grant.client.id), grant.granted_at, 'plan_access_enabled'),
   planEditEnabled: grantMatchesPermission(permissionByClient.get(grant.client.id), grant.granted_at, 'plan_edit_enabled'),
+  workoutLoggingEnabled: grantMatchesPermission(workoutPermissionByClient.get(grant.client.id), grant.granted_at, 'workout_logging_enabled'),
   scopes: grant.scopes.filter((scope) => typeof scope === 'string'),
 });
 
@@ -63,7 +67,7 @@ export const listConnectedAgents = async (): Promise<ConnectedAgent[]> => {
   if (!grants || grants.length === 0) return [];
 
   const clientIds = grants.map((grant) => grant.client.id);
-  const [auditResult, permissionResult] = await Promise.all([
+  const [auditResult, permissionResult, workoutResult] = await Promise.all([
     client
       .from('agent_access_audit')
       .select('oauth_client_id,occurred_at')
@@ -76,6 +80,8 @@ export const listConnectedAgents = async (): Promise<ConnectedAgent[]> => {
       .select('client_id,granted_at,plan_access_enabled,plan_edit_enabled')
       .in('client_id', clientIds)
       .returns<PlanPermissionRow[]>(),
+    client.from('agent_workout_permissions').select('client_id,granted_at,workout_logging_enabled')
+      .in('client_id', clientIds).returns<PlanPermissionRow[]>(),
   ]);
 
   // Grant management remains usable if the optional last-access metadata is
@@ -101,9 +107,11 @@ export const listConnectedAgents = async (): Promise<ConnectedAgent[]> => {
     }
   }
 
+  const workoutPermissionByClient = new Map((workoutResult.data ?? []).map(row => [row.client_id, row]));
   return grants
     .map((grant) => {
-      const normalized = normalizeGrant(grant, lastAccessByClient, permissionByClient);
+      const normalized = normalizeGrant(grant, lastAccessByClient, permissionByClient, workoutPermissionByClient);
+      if (workoutResult.error) normalized.workoutLoggingEnabled = 'unavailable';
       if (permissionsUnavailable) {
         return {
           ...normalized,
@@ -225,3 +233,17 @@ export async function setAgentPlanEditEnabled(
     throw new Error(error.message || 'Unable to update access for this coach right now.');
   }
 }
+
+/** Independent default-off permission, bound to this exact OAuth grant. */
+export const setAgentWorkoutLoggingEnabled = async (clientId: string, enabled: boolean, grantedAt: string): Promise<void> => {
+  const normalizedClientId = clientId.trim();
+  if (!/^[A-Za-z0-9_-]{1,200}$/.test(normalizedClientId)) throw new Error('Connected agent identifier is invalid.');
+  if (!Number.isFinite(Date.parse(grantedAt))) throw new Error('This connection has changed. Reload the list and try again.');
+  const client = getRequiredSupabaseMobileClient();
+  const { data, error: userError } = await client.auth.getUser();
+  if (userError || !data?.user?.id) throw new Error('Sign in again to change access for this coach.');
+  const { error } = await client.from('agent_workout_permissions').upsert({
+    owner_user_id: data.user.id, client_id: normalizedClientId, workout_logging_enabled: enabled, granted_at: grantedAt,
+  }, { onConflict: 'owner_user_id,client_id' });
+  if (error) throw new Error(error.message || 'Could not confirm workout logging access. Reload to check.');
+};

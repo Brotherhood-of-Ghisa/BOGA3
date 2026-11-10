@@ -4,50 +4,31 @@ import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, notInArray } from 'drizzle-orm';
 
 import { bootstrapLocalDataLayer, type LocalDatabase } from './bootstrap';
-import { nowMonotonic, type Transaction } from './clock';
+import { nowMonotonic, PRIMARY_RUNTIME_STATE_ID, type Transaction } from './clock';
 import { selectInProgressSessionRow } from './in-progress-session';
 import { loadAsOfWeightResolver, resolveSessionWeights } from './bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
-import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessionPlanSets, sessionPlanUses, sessions, userSettings } from './schema';
+import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessionPlanSets, sessionPlanUses, sessions, syncRuntimeState, userSettings } from './schema';
 import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 import {
   hydrateSessionSetPerformanceStatus,
   normalizeSessionSetPerformanceStatus,
   type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
-import { guardSessionMergeEdit } from './exercise-merge-store';
+import { guardSessionMergeEdit, preserveMergeEntity } from './exercise-merge-store';
 import { insertPlanUseInTransaction } from './session-plan-use-store';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 
-export type SessionDraftStatus = 'active';
+import type { SessionDraftStatus, SessionDraftExerciseInput, SessionTimingBaseline } from './session-inputs';
+import type { MergeWireEntity } from '@/src/exercise-core/merge-types';
+import { captureSessionEditBaseline, rebaseWorkoutTimes, sessionHeaderToWire, WorkoutChangesSavedForReview, WorkoutLifecycleChanged } from './session-edit-baseline';
+import { rebaseSessionEdit } from './session-edit-rebase';
+import { assertWorkoutWritable } from './workout-control';
 
-export type SessionDraftSetInput = {
-  id?: string;
-  repsValue: string;
-  weightValue: string;
-  setType?: SessionSetTypeValue;
-  plannedRepsValue?: string | null;
-  plannedWeightValue?: string | null;
-  plannedSetType?: SessionSetTypeValue;
-  performanceStatus?: SessionSetPerformanceStatus;
-  /** Block provenance. Undefined preserves the stored value; null clears it. */
-  sourcePlanSetId?: string | null;
-  sourcePlanUseId?: string | null;
-};
-
-export type SessionDraftExerciseInput = {
-  id?: string;
-  exerciseDefinitionId: string;
-  mergeRevision?: number;
-  name: string;
-  machineName?: string | null;
-  sets: SessionDraftSetInput[];
-  /** Block provenance. Undefined preserves the stored value; null clears it. */
-  sourcePlanExerciseId?: string | null;
-  sourcePlanUseId?: string | null;
-};
+export type { SessionDraftStatus, SessionDraftSetInput, SessionDraftExerciseInput } from './session-inputs';
 
 export type PersistSessionDraftInput = {
+  editBaseline?: MergeWireEntity[];
   sessionId?: string;
   gymId: string | null;
   startedAt: Date;
@@ -64,6 +45,7 @@ export type PersistSessionDraftResult = {
 };
 
 export type PersistCompletedSessionInput = {
+  editBaseline?: MergeWireEntity[];
   sessionId: string;
   gymId: string | null;
   startedAt: Date;
@@ -104,6 +86,7 @@ export type SessionDraftExerciseSnapshot = {
 };
 
 export type SessionDraftSnapshot = ResolvedSessionWeight & {
+  editBaseline?: MergeWireEntity[];
   sessionId: string;
   gymId: string | null;
   status: SessionDraftStatus;
@@ -116,6 +99,7 @@ export type SessionDraftSnapshot = ResolvedSessionWeight & {
 };
 
 export type SessionGraphSnapshot = ResolvedSessionWeight & {
+  editBaseline?: MergeWireEntity[];
   sessionId: string;
   gymId: string | null;
   status: SessionPersistenceRecord['status'];
@@ -162,6 +146,7 @@ export type CompleteSessionResult = {
 
 export type ReopenCompletedSessionOptions = {
   now?: Date;
+  expectedRevision?: number;
 };
 
 export type ReopenCompletedSessionResult = {
@@ -186,6 +171,7 @@ export type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/se
 
 export type SessionPersistenceRecord = ResolvedSessionWeight & {
   id: string;
+  mergeRevision?: number;
   gymId: string | null;
   status: 'active' | 'completed';
   startedAt: Date;
@@ -234,6 +220,7 @@ type StoredSessionExerciseTagRecord = {
 };
 
 type StoredDraftGraph = {
+  editBaseline?: MergeWireEntity[];
   session: SessionPersistenceRecord;
   exercises: (StoredDraftExerciseRecord & {
     sets: StoredDraftSetRecord[];
@@ -241,6 +228,7 @@ type StoredDraftGraph = {
 };
 
 type SaveDraftGraphInput = {
+  editBaseline?: MergeWireEntity[];
   requireNoActiveSession?: boolean;
   newPlanUse?: { id: string; planId: string };
   sessionId?: string;
@@ -255,6 +243,7 @@ type SaveDraftGraphInput = {
 };
 
 type SaveCompletedSessionGraphInput = {
+  editBaseline?: MergeWireEntity[];
   sessionId: string;
   gymId: string | null;
   startedAt: Date;
@@ -276,10 +265,12 @@ export type SessionDraftStore = {
     completedAt: Date;
     durationSec: number;
     updatedAt: Date;
+    expectedRevision?: number;
   }): Promise<void>;
   reopenCompletedSession(input: {
     sessionId: string;
     updatedAt: Date;
+    expectedRevision?: number;
   }): Promise<void>;
   listCompletedSessions(): Promise<SessionPersistenceRecord[]>;
 };
@@ -344,6 +335,7 @@ const mapSessionRow = (row: typeof sessions.$inferSelect & ResolvedSessionWeight
 
   return {
     id: row.id,
+    mergeRevision: row.mergeRevision,
     gymId: row.gymId,
     bodyWeightKg: row.bodyWeightKg,
     bodyWeightSource: row.bodyWeightSource,
@@ -362,6 +354,7 @@ const mapSessionRow = (row: typeof sessions.$inferSelect & ResolvedSessionWeight
 };
 
 const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
+  editBaseline: graph.editBaseline,
   sessionId: graph.session.id,
   gymId: graph.session.gymId,
 
@@ -403,6 +396,7 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
 });
 
 const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot => ({
+  editBaseline: graph.editBaseline,
   sessionId: graph.session.id,
   gymId: graph.session.gymId,
 
@@ -516,6 +510,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
   }, new Map<string, StoredDraftSetRecord[]>());
 
   return {
+    editBaseline: captureSessionEditBaseline(database, sessionId),
     session: mapSessionRow({ ...sessionRow, ...weight }),
     exercises: exerciseRows.map((exercise) => {
       if (!exercise.exerciseDefinitionId) {
@@ -1146,24 +1141,49 @@ const requireNoOtherActiveSession = (tx: Transaction, sessionId: string): void =
 // Header edits are independent of exercise identity/weight revisions.
 export const updateSessionMetadata = async (sessionId: string, input: {
   gymId?: string | null; times?: { startedAt: Date; completedAt: Date };
-}): Promise<void> => {
+  timesBaseline?: SessionTimingBaseline;
+}): Promise<{ startedAt: Date; completedAt: Date } | undefined> => {
   if (input.times) assertCompletedSessionTiming(input.times.startedAt, input.times.completedAt);
   const database = await bootstrapLocalDataLayer();
   let startChanged = false;
+  let preserved: boolean | null = null;
+  let appliedTimes = input.times;
   database.transaction(tx => {
     const row = tx.select().from(sessions).where(eq(sessions.id, sessionId)).get();
-    if (!row || row.deletedAt) throw new Error('This session is unavailable.');
+    if (!row) throw new Error('This session is unavailable.');
+    const baseline = input.timesBaseline;
+    const timing = input.times ? rebaseWorkoutTimes(row, input.times, baseline) : null;
+    if (timing?.conflict && baseline) {
+      if (row.mergeRevision <= baseline.revision) throw new WorkoutLifecycleChanged();
+      const changed = timing.changed;
+      if (changed) {
+        const owner = tx.select().from(syncRuntimeState).where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).get()?.accountUserId;
+        if (!owner) throw new Error('Refresh this workout before saving.');
+        const saved = sessionHeaderToWire(row);
+        saved.client_updated_at_ms = Date.now();
+        Object.assign(saved.fields, { status: 'completed', merge_revision: baseline.revision, started_at: timing.times.startedAt.getTime(),
+          completed_at: timing.times.completedAt.getTime(), duration_sec: calculateSessionDurationSec(timing.times.startedAt, timing.times.completedAt) });
+        preserveMergeEntity(tx, owner, saved);
+      }
+      preserved = changed;
+      return;
+    }
+    assertWorkoutWritable(database, sessionId);
+    if (row.deletedAt) throw new Error('This session is unavailable.');
     if (input.times && row.status !== 'completed') throw new Error('This session is not completed.');
-    startChanged = !!input.times && row.startedAt.getTime() !== input.times.startedAt.getTime();
+    appliedTimes = timing?.times;
+    startChanged = !!appliedTimes && row.startedAt.getTime() !== appliedTimes.startedAt.getTime();
     tx.update(sessions).set({
       ...(input.gymId !== undefined ? { gymId: input.gymId } : {}),
-      ...(input.times ? { startedAt: input.times.startedAt, completedAt: input.times.completedAt,
-        durationSec: calculateSessionDurationSec(input.times.startedAt, input.times.completedAt) } : {}),
+      ...(appliedTimes ? { startedAt: appliedTimes.startedAt, completedAt: appliedTimes.completedAt,
+        durationSec: calculateSessionDurationSec(appliedTimes.startedAt, appliedTimes.completedAt) } : {}),
       localDirty: true, localUpdatedAtMs: nowMonotonic(tx), updatedAt: new Date(),
     }).where(eq(sessions.id, sessionId)).run();
   });
   notifyLocalWrite();
+  if (preserved !== null) throw new WorkoutChangesSavedForReview(preserved);
   if (startChanged) invalidateBodyWeightContext();
+  return appliedTimes;
 };
 
 const guardSessionGraphMerge = (database: LocalDatabase, input: SaveCompletedSessionGraphInput | SaveDraftGraphInput) => {
@@ -1194,6 +1214,7 @@ const guardSessionGraphMerge = (database: LocalDatabase, input: SaveCompletedSes
 export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
   async saveDraftGraph(input) {
     const database = await bootstrapLocalDataLayer();
+    input = rebaseSessionEdit(database, input);
     const sessionId = input.sessionId?.trim() || createLocalEntityId('session');
 
     const existingSession = database.select().from(sessions).where(eq(sessions.id, sessionId)).get();
@@ -1278,6 +1299,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
   },
   async saveCompletedSessionGraph(input) {
     const database = await bootstrapLocalDataLayer();
+    input = rebaseSessionEdit(database, input);
 
     const existingSession = database.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
     if (!existingSession) throw new Error(`Session ${input.sessionId} does not exist`);
@@ -1346,7 +1368,10 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
   },
   async completeSession(input) {
     const database = await bootstrapLocalDataLayer();
+    assertWorkoutWritable(database, input.sessionId);
     database.transaction((tx) => {
+      const current = tx.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
+      if (input.expectedRevision !== undefined && current?.mergeRevision !== input.expectedRevision) throw new WorkoutLifecycleChanged();
       tx.update(sessions)
         .set({
           status: 'completed',
@@ -1370,6 +1395,7 @@ export const createDrizzleSessionDraftStore = (): SessionDraftStore => ({
     const changed = database.transaction((tx) => {
       const existingSession = tx.select().from(sessions).where(eq(sessions.id, input.sessionId)).get();
       if (!existingSession || existingSession.deletedAt !== null) throw new SessionUnavailableError();
+      if (input.expectedRevision !== undefined && existingSession.mergeRevision !== input.expectedRevision) throw new WorkoutLifecycleChanged();
       requireNoOtherActiveSession(tx, input.sessionId);
       if (existingSession.status === 'active') return false;
 
@@ -1425,6 +1451,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       sourcePlanId: input.sourcePlanId,
       exercises: input.exercises,
       mergeRevisions: input.mergeRevisions,
+      editBaseline: input.editBaseline,
       now,
     });
   },
@@ -1465,6 +1492,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
       durationSec,
       exercises: input.exercises,
       mergeRevisions: input.mergeRevisions,
+      editBaseline: input.editBaseline,
       now,
     });
 
@@ -1484,6 +1512,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
     await store.reopenCompletedSession({
       sessionId,
       updatedAt: now,
+      ...(options.expectedRevision !== undefined ? { expectedRevision: options.expectedRevision } : {}),
     });
 
     return { sessionId };
@@ -1514,6 +1543,7 @@ export const createSessionDraftRepository = (store: SessionDraftStore = createDr
         completedAt: resolvedCompletedAt,
         durationSec: resolvedDurationSec,
         updatedAt: now,
+        ...(existingSession.mergeRevision !== undefined ? { expectedRevision: existingSession.mergeRevision } : {}),
       });
     }
 

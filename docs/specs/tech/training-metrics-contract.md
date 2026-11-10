@@ -73,7 +73,8 @@ volume totals, volume heatmap cells and Volume records when it has a
 volume-included set. A scope with neither kind contributes nothing.
 
 **The workout in progress.** Progress's tables, `/progress-history` and
-Today's week and period also count the active session the recorder opens, dated
+Today's week and period also count the most recent active, non-deleted session,
+independently of the workout explicitly opened in Train, dated
 the instant before the read: where finishing it now would date it. It takes no
 PR until completed. Lists (the week drill-down, Sessions, Today's session
 card), records, the catalogue, groups and coaching read completed sessions
@@ -86,9 +87,8 @@ only (`apps/mobile/src/data/in-progress-session.ts`).
 - `countedMuscleAnalyticsSessionIds` applies the rule to the stats
   aggregation input.
 
-An aggregate that reads only working sets may instead count the distinct
-sessions those sets come from. That is the same rule, not a second one: the
-facts table, catalog stats, heatmaps and session comparisons work this way.
+Aggregates may count distinct sessions containing working sets: the
+facts table, catalog stats, heatmaps and session comparisons implement this rule.
 Nothing counts sessions from `sessions.length` or from session status alone.
 
 **History minimum.** Session volume comparisons and Weekly heatmap references share one minimum of known observations, zeros
@@ -121,6 +121,9 @@ session is its baseline only where it did the same
 | Agent API exercise context, `exercise_count` | per exercise |
 | Agent API training status: muscle sets, favourites' `sessions_28d` | per muscle / per exercise |
 | Group week summary and board counts | the group functions over facts with `working` (`tech/groups-contract.md`) |
+
+**Browser history:** `everDoneIds` implements [[exercise.browser-history]], separately
+from training statistics.
 
 **Lists, not statistics.** These show sessions, not counts:
 
@@ -292,8 +295,8 @@ choices may change which recorded set qualifies.
   contributes `E`, retaining the same muscle Volume.
 
 **A muscle's set count** is [[muscle.set-count]], derived everywhere by
-`countMuscleSets` (`muscle-analytics.ts`). Families deduplicate physical
-sets at their strongest role. Figures remain unrounded through
+`countMuscleSets` (`muscle-analytics.ts`); family totals follow the same fact.
+Figures remain unrounded through
 aggregation. Nothing is stored: these are read-time derivations, so local
 facts and group scoring versions stay unchanged. Coaching publishes the
 allocation change under its own metric revision. The window's working-set
