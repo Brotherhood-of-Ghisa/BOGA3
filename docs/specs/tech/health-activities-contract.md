@@ -12,8 +12,8 @@
 The phone is the bridge: the health store (Apple Health) has no cloud API, so
 the app reads its workouts and writes summaries to the server; the coach reads
 server state only. The table is owner-private, out of sync scope (no local
-SQLite table, no Sync v2 entity: the health store is the device copy), never
-shared with groups, and feeds no set, volume, record, PR or competition figure.
+SQLite table, no Sync v2 entity: the health store is the device copy), and
+outside every training and group figure ([[agents.health-activities]]).
 
 | Path | Who | Authority |
 | --- | --- | --- |
@@ -56,8 +56,7 @@ duplicate id, or id both upserted and deleted fails the whole batch with
 
 ## Strength overlap
 
-A watch strength workout recorded during a BoGa session is the same training.
-An activity of type `traditional_strength_training`,
+This implements the overlap decision of [[agents.health-activities]]. An activity of type `traditional_strength_training`,
 `functional_strength_training`, `core_training` or `cross_training` overlaps a
 session when their half-open spans share any time; the session is an owner's
 non-deleted completed one, or an active one running until now. The row is kept
