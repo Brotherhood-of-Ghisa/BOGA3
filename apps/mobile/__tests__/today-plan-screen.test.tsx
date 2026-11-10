@@ -159,9 +159,9 @@ describe('Today: the Plan page over real data', () => {
     expect(order.indexOf('triceps')).toBeLessThan(order.indexOf('chest'));
     expect(order.indexOf('biceps')).toBeLessThan(order.indexOf('triceps'));
     expect(text('today-plan-muscle-chest').props.accessibilityLabel).toBe(
-      'Pectoralis, Wednesday 28 Oct 26: rest, Thursday 29 Oct 26: rest, Friday 30 Oct 26: 2 sets, today: none yet, this week 6 of 8 sets',
+      'Pectoralis, Wednesday 28-10-2026: rest, Thursday 29-10-2026: rest, Friday 30-10-2026: 2 sets, today: none yet, this week 6 of 8 sets',
     );
-    expect(text('today-plan-muscle-quads').props.accessibilityLabel).toContain('Friday 30 Oct 26: rest, today: 5 sets, this week 8 of 8 sets');
+    expect(text('today-plan-muscle-quads').props.accessibilityLabel).toContain('Friday 30-10-2026: rest, today: 5 sets, this week 8 of 8 sets');
   });
 
   it.each([
@@ -338,7 +338,7 @@ describe('Today: the Plan page over real data', () => {
     expect(text('today-plan-week-day-6-planned')).toBeTruthy();
     expect(text('today-plan-week-day-0-planned')).toBeTruthy();
     expect(text('today-plan-week-day-3-nothing')).toBeTruthy();
-    expect(text('today-plan-week-day-6').props.accessibilityLabel).toBe('Saturday 31 Oct 26, today: planned');
+    expect(text('today-plan-week-day-6').props.accessibilityLabel).toBe('Saturday 31-10-2026, today: planned');
 
     expect(plannedRows()).toEqual([`today-plan-next-${today}`, `today-plan-next-${sunday}`]);
     expect(text(`today-plan-next-${today}-day`)).toHaveTextContent('Today');
@@ -350,6 +350,25 @@ describe('Today: the Plan page over real data', () => {
 
     fireEvent.press(text(`today-plan-next-${sunday}`));
     expect(mockPush).toHaveBeenCalledWith(`/session-plan/${sunday}`);
+  });
+
+  it('updates complete Plan spoken dates live while weekday and relative labels retain their roles', async () => {
+    await bootLocalApp();
+    const next = await createPlan('Sunday plan', local(2026, 11, 1, 10));
+    await renderToday();
+    const dayCell = text('today-plan-week-day-6');
+    for (const [dateFormat, today, recoveryDay, scheduled] of [
+      ['MM-DD-YYYY', '10-31-2026', '10-28-2026', '11-01-2026'],
+      ['YYYY-MM-DD', '2026-10-31', '2026-10-28', '2026-11-01'],
+      ['DD-MM-YYYY', '31-10-2026', '28-10-2026', '01-11-2026'],
+    ] as const) {
+      act(() => updatePreferences({ dateFormat }));
+      await waitFor(() => expect(text('today-plan-week-day-6')).toHaveProp('accessibilityLabel', `Saturday ${today}, today: nothing`));
+      expect(text('today-plan-muscle-chest').props.accessibilityLabel).toContain(`Wednesday ${recoveryDay}:`);
+      expect(text(`today-plan-next-${next}`).props.accessibilityLabel).toContain(`Sunday ${scheduled} 10:00`);
+      expect(text(`today-plan-next-${next}-day`)).toHaveTextContent('Sun');
+      expect(text('today-plan-week-day-6')).toBe(dayCell);
+    }
   });
 
   it('lists at most three planned sessions', async () => {

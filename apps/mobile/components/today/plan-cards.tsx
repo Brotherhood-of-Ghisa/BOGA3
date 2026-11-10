@@ -1,3 +1,5 @@
+import { useDateFormat } from '@/src/preferences/hooks';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -11,7 +13,7 @@ import { formatWholeSetCount, formatWorkingSetCount } from '@/src/exercise-calcu
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 import type { NextPlannedSession, PlanWeekDay, RecoveryRow, TodayPlan } from '@/src/today-plan';
-import { formatClockTime, formatCompactDate } from '@/src/utils/local-time';
+import { formatClockTime, formatShortDate } from '@/src/utils/local-time';
 
 export type TodayPlanCardsProps = {
   plan: TodayPlan;
@@ -26,7 +28,7 @@ export type TodayPlanCardsProps = {
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const weekdayLetter = (date: Date) => WEEKDAYS[date.getDay()].charAt(0);
 const weekdayShort = (date: Date) => WEEKDAYS[date.getDay()].slice(0, 3);
-const spokenDate = (date: Date) => `${WEEKDAYS[date.getDay()]} ${formatCompactDate(date)}`;
+const spokenDate = (date: Date, dateFormat: ExerciseDateFormat) => `${WEEKDAYS[date.getDay()]} ${formatShortDate(date, dateFormat)}`;
 const sets = (count: number) => {
   const figure = formatWorkingSetCount(count);
   return `${figure} ${figure === '1' ? 'set' : 'sets'}`;
@@ -37,10 +39,10 @@ const targetSets = (count: number) => `${count} ${count === 1 ? 'target set' : '
 export const wholeSets = formatWholeSetCount;
 
 // No sets that day reads as a rest day ([[copy.blank-history]]); none yet today, as none.
-const recoveryRowLabel = (row: RecoveryRow, days: Date[]) =>
+const recoveryRowLabel = (row: RecoveryRow, days: Date[], dateFormat: ExerciseDateFormat) =>
   [
     row.name,
-    ...row.days.map((count, index) => `${spokenDate(days[index])}: ${count === null ? 'rest' : sets(count)}`),
+    ...row.days.map((count, index) => `${spokenDate(days[index], dateFormat)}: ${count === null ? 'rest' : sets(count)}`),
     `today: ${row.today === null ? 'none yet' : sets(row.today)}`,
     `this week ${formatWorkingSetCount(row.weekSets)} of ${row.target} sets`,
   ].join(', ');
@@ -78,6 +80,7 @@ function DayCell({ count, weekStart, testID }: { count: number | null; weekStart
 }
 
 function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: RecoveryRow; days: Date[]; weekStartIndex: number; onPress: () => void }) {
+  const dateFormat = useDateFormat();
   const styles = useStyles();
   const text = useUiText();
   const tone = useUiTextTone();
@@ -86,7 +89,7 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, onPress }: { row: Recove
   return (
     <Pressable
       accessibilityHint="Opens its progress"
-      accessibilityLabel={recoveryRowLabel(row, days)}
+      accessibilityLabel={recoveryRowLabel(row, days, dateFormat)}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.muscleRow, pressed ? styles.pressed : null]}
@@ -159,12 +162,13 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
 }
 
 function WeekDayCell({ day }: { day: PlanWeekDay }) {
+  const dateFormat = useDateFormat();
   const styles = useStyles();
   const markStyles = useMarkStyles();
   const text = useUiText();
   const tone = useUiTextTone();
   const state = day.trained ? 'trained' : day.planned ? 'planned' : 'nothing';
-  const spoken = `${spokenDate(day.date)}${day.isToday ? ', today' : ''}: ${day.trained ? 'trained' : day.planned ? 'planned' : 'nothing'}`;
+  const spoken = `${spokenDate(day.date, dateFormat)}${day.isToday ? ', today' : ''}: ${day.trained ? 'trained' : day.planned ? 'planned' : 'nothing'}`;
   return (
     <View accessibilityLabel={spoken} accessible style={[styles.weekDay, day.isToday ? styles.weekDayToday : null]} testID={`today-plan-week-day-${day.date.getDay()}`}>
       <Text allowFontScaling={false} style={[text.label, tone.faint]}>
@@ -182,6 +186,7 @@ const plannedDay = (session: NextPlannedSession, now: Date) =>
   localDateKey(session.scheduledFor) === localDateKey(now) ? 'Today' : weekdayShort(session.scheduledFor);
 
 function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; now: Date; onPress: () => void }) {
+  const dateFormat = useDateFormat();
   const styles = useStyles();
   const text = useUiText();
   const testID = `today-plan-next-${session.planId}`;
@@ -192,7 +197,7 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
   return (
     <Pressable
       accessibilityHint="Opens the plan"
-      accessibilityLabel={[session.title, `${day === 'Today' ? 'today' : spokenDate(session.scheduledFor)} ${time}`,
+      accessibilityLabel={[session.title, `${day === 'Today' ? 'today' : spokenDate(session.scheduledFor, dateFormat)} ${time}`,
         `${session.exerciseCount} ${session.exerciseCount === 1 ? 'exercise' : 'exercises'}`, targetSets(session.setCount), ...session.muscles].join(', ')}
       accessibilityRole="button"
       onPress={onPress}

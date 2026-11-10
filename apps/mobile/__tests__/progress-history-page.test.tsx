@@ -16,6 +16,7 @@ import * as mockReact from 'react';
 import { View } from 'react-native';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
+import { waitForGone } from './helpers/wait-for-gone';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- native database boundary.
@@ -511,7 +512,7 @@ describe('ProgressHistoryScreen', () => {
     mockPush.mockClear();
     try {
       renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
-      await waitFor(() => expect(screen.queryByTestId('stats-muscle-history-loading')).toBeNull());
+      await waitForGone(() => screen.queryByTestId('stats-muscle-history-loading'));
       const title = screen.getByLabelText('Side delts, switch muscle');
       fireEvent.press(title);
       const sheet = screen.getByTestId('progress-history-muscle-sheet');
@@ -536,7 +537,7 @@ describe('ProgressHistoryScreen', () => {
     Object.assign(mockCatalog, { muscleSetup: buildMuscleSetup(mockCatalog.muscleGroups) });
     try {
       renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex1' }} todayDateKey="2026-06-05" />);
-      await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-loading')).toBeNull());
+      await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
       expect(screen.getByTestId('progress-history-title-text')).toHaveTextContent('Bench Press');
       expect(screen.getByTestId('progress-history-title')).toHaveProp('accessibilityRole', 'header');
     } finally {

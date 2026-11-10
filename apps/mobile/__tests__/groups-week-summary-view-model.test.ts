@@ -130,7 +130,7 @@ describe('buildWeekBoard', () => {
 
 describe('buildGroupSessions', () => {
   it('draws a live session by its start, its figures so far and no record', () => {
-    const { live, recent } = buildGroupSessions({ training_now: [training('maria')], latest_completed: null }, [], ME, NOW);
+    const { live, recent } = buildGroupSessions({ training_now: [training('maria')], latest_completed: null }, [], ME, NOW, 'DD-MM-YYYY');
 
     expect(recent).toEqual([]);
     expect(live).toEqual([{
@@ -155,6 +155,7 @@ describe('buildGroupSessions', () => {
       [],
       ME,
       NOW,
+      'DD-MM-YYYY',
     );
 
     expect(recent).toEqual([{
@@ -166,7 +167,7 @@ describe('buildGroupSessions', () => {
       gym: 'Iron Works',
       figures: '4 exercises · 18 sets',
       record: { kind: 'one', lead: 'Deadlift 1RM 213.3', note: 'group record' },
-      accessibilityLabel: 'dave, completed session on 16 Oct 26 06:10, at Iron Works, 4 exercises · 18 sets, Deadlift 1RM 213.3 · group record',
+      accessibilityLabel: 'dave, completed session on 16-10-2026 06:10, at Iron Works, 4 exercises · 18 sets, Deadlift 1RM 213.3 · group record',
     }]);
   });
 
@@ -183,30 +184,48 @@ describe('buildGroupSessions', () => {
       stream,
       ME,
       NOW,
+      'DD-MM-YYYY',
     );
 
     expect(GROUP_SESSIONS_SHOWN).toBe(4);
     expect(sessions.live.map((session) => [session.sessionId, session.name])).toEqual([['maria-live', 'maria'], ['me-live', 'You']]);
     expect(sessions.recent.map((session) => session.sessionId)).toEqual(['dave-done', 'older-1']);
-    expect(sessions.recent[1]).toMatchObject({ gym: null, accessibilityLabel: 'dave, completed session on 16 Oct 26 06:10, 4 exercises · 18 sets' });
+    expect(sessions.recent[1]).toMatchObject({ gym: null, accessibilityLabel: 'dave, completed session on 16-10-2026 06:10, 4 exercises · 18 sets' });
   });
 
   it('gives every slot to live sessions when four or more are training', () => {
     const live = ['a', 'b', 'c', 'd', 'e'].map((id) => training(id));
-    const sessions = buildGroupSessions({ training_now: live, latest_completed: completed() }, [], ME, NOW);
+    const sessions = buildGroupSessions({ training_now: live, latest_completed: completed() }, [], ME, NOW, 'DD-MM-YYYY');
     expect(sessions.live).toHaveLength(4);
     expect(sessions.recent).toEqual([]);
   });
 
   it('is empty for a group with no live or completed session', () => {
-    expect(buildGroupSessions({ training_now: [], latest_completed: null }, [], ME, NOW)).toEqual({ live: [], recent: [] });
+    expect(buildGroupSessions({ training_now: [], latest_completed: null }, [], ME, NOW, 'DD-MM-YYYY')).toEqual({ live: [], recent: [] });
   });
 });
 
 describe('formatting', () => {
+  it.each([
+    ['DD-MM-YYYY', '15 Oct 26', '16 Oct 26', '15-10-2026', '16-10-2026'],
+    ['MM-DD-YYYY', 'Oct 15 26', 'Oct 16 26', '10-15-2026', '10-16-2026'],
+    ['YYYY-MM-DD', '2026 Oct 15', '2026 Oct 16', '2026-10-15', '2026-10-16'],
+  ] as const)('%s pairs compact group timestamps with full numeric spoken dates', (format, earlier, date, spokenEarlier, spokenDate) => {
+    const previousStart = local(2026, 10, 15, 23, 10);
+    const summary = { training_now: [training('maria', { started_at_ms: previousStart })], latest_completed: completed() };
+    const before = JSON.stringify(summary);
+    const { live, recent } = buildGroupSessions(summary, [], ME, NOW, format);
+    expect(live[0].when).toBe(`Started ${earlier} 23:10`);
+    expect(live[0].accessibilityLabel).toContain(`Started ${spokenEarlier} 23:10`);
+    expect(recent[0].when).toBe(`${date} 06:10`);
+    expect(recent[0].accessibilityLabel).toContain(`completed session on ${spokenDate} 06:10`);
+    expect(formatTrainingStart(local(2026, 10, 16, 7, 40), NOW, format)).toBe('Started 07:40');
+    expect(JSON.stringify(summary)).toBe(before);
+  });
+
   it('names a start time today by the clock, and an earlier day by its date', () => {
-    expect(formatTrainingStart(local(2026, 10, 16, 7, 40), NOW)).toBe('Started 07:40');
-    expect(formatTrainingStart(local(2026, 10, 15, 23, 10), NOW)).toBe('Started 15 Oct 26 23:10');
+    expect(formatTrainingStart(local(2026, 10, 16, 7, 40), NOW, 'DD-MM-YYYY')).toBe('Started 07:40');
+    expect(formatTrainingStart(local(2026, 10, 15, 23, 10), NOW, 'DD-MM-YYYY')).toBe('Started 15 Oct 26 23:10');
   });
 
   it('names one group record and only counts several, one per board taken', () => {

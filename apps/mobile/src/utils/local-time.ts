@@ -39,31 +39,34 @@ export const formatDayMonth = (date: Date, dateFormat: ExerciseDateFormat): stri
   return dateFormat === 'DD-MM-YYYY' ? `${date.getDate()} ${month}` : `${month} ${date.getDate()}`;
 };
 
-// Today's own date format ([[copy.calendar-dates]]): the day, the three-letter
-// month, and a two-digit year closing a date or a range. It does not follow
-// the Date format setting.
-const compactDayMonth = (date: Date): string => `${date.getDate()} ${MONTH_NAMES[date.getMonth()].slice(0, 3)}`;
-const compactYear = (date: Date): string => pad2(date.getFullYear() % 100);
+const compactYear = (date: Date, dateFormat: ExerciseDateFormat): string =>
+  dateFormat === 'YYYY-MM-DD' ? `${date.getFullYear()}` : pad2(date.getFullYear() % 100);
 
-/** `26 Oct 26`. */
-export const formatCompactDate = (date: Date): string =>
-  Number.isFinite(date.getTime()) ? `${compactDayMonth(date)} ${compactYear(date)}` : '—';
-
-/** `26 Oct 26 06:10`. */
-export const formatCompactDateTime = (epochMs: number): string => {
-  const date = new Date(epochMs);
-  return Number.isFinite(date.getTime()) ? `${formatCompactDate(date)} ${formatClockTime(epochMs)}` : '—';
+/** Named-month complete date paired with the selected numeric format. */
+export const formatCompactDate = (date: Date, dateFormat: ExerciseDateFormat): string => {
+  if (!Number.isFinite(date.getTime())) return '—';
+  const dayMonth = formatDayMonth(date, dateFormat);
+  const year = compactYear(date, dateFormat);
+  return dateFormat === 'YYYY-MM-DD' ? `${year} ${dayMonth}` : `${dayMonth} ${year}`;
 };
 
-/**
- * Inclusive days, the year once at the end: `12 – 18 Oct 26` within a month,
- * `26 Oct – 1 Nov 26` across months, `28 Dec 26 – 3 Jan 27` across years.
- */
-export const formatCompactDateRange = (start: Date, end: Date): string => {
+/** Selected compact date and local 24-hour clock. */
+export const formatCompactDateTime = (epochMs: number, dateFormat: ExerciseDateFormat): string => {
+  const date = new Date(epochMs);
+  return Number.isFinite(date.getTime()) ? `${formatCompactDate(date, dateFormat)} ${formatClockTime(epochMs)}` : '—';
+};
+
+/** Inclusive days: share the month/year where possible, in the selected order. */
+export const formatCompactDateRange = (start: Date, end: Date, dateFormat: ExerciseDateFormat): string => {
   if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return '—';
-  if (start.getFullYear() !== end.getFullYear()) return `${formatCompactDate(start)} – ${formatCompactDate(end)}`;
-  const from = start.getMonth() === end.getMonth() ? `${start.getDate()}` : compactDayMonth(start);
-  return `${from} – ${formatCompactDate(end)}`;
+  if (start.getFullYear() !== end.getFullYear()) return `${formatCompactDate(start, dateFormat)} – ${formatCompactDate(end, dateFormat)}`;
+  const range = start.getMonth() !== end.getMonth()
+    ? `${formatDayMonth(start, dateFormat)} – ${formatDayMonth(end, dateFormat)}`
+    : dateFormat === 'DD-MM-YYYY'
+      ? `${start.getDate()} – ${formatDayMonth(end, dateFormat)}`
+      : `${formatDayMonth(start, dateFormat)} – ${end.getDate()}`;
+  const year = compactYear(end, dateFormat);
+  return dateFormat === 'YYYY-MM-DD' ? `${year} ${range}` : `${range} ${year}`;
 };
 
 /** A local calendar date and 24-hour clock in the user's selected format. */

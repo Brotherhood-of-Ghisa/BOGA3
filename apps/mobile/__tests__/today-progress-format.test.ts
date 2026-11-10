@@ -141,7 +141,7 @@ describe('the period against the previous period', () => {
       value: 102,
       previousValue: 98,
     });
-    expect(formatPeriodDayLabel(periodDayFigures(october, null))).toBe('Today');
+    expect(formatPeriodDayLabel(periodDayFigures(october, null), 'DD-MM-YYYY')).toBe('Today');
   });
 
   it('gives a selected past day its counts, and a later day the projection at the same rate', () => {
@@ -154,14 +154,14 @@ describe('the period against the previous period', () => {
 
     const past = periodDayFigures(october, 4);
     expect(past).toMatchObject({ when: 'past', value: 10, previousValue: 12 });
-    expect(formatPeriodDayLabel(past)).toBe('9 Oct 26');
+    expect(formatPeriodDayLabel(past, 'DD-MM-YYYY')).toBe('9 Oct 26');
 
     // 38 sets over 19 days: 2 a day, reaching the projection on the last day.
     const projected = periodDayFigures(october, 21);
     expect(projected).toMatchObject({ when: 'projected', value: 44, previousValue: 63 });
     // Shown as its date alone; spoken, it says it is projected.
-    expect(formatPeriodDayLabel(projected)).toBe('26 Oct 26');
-    expect(formatPeriodDayLabel(projected, { spoken: true })).toBe('26 Oct 26 (projected)');
+    expect(formatPeriodDayLabel(projected, 'DD-MM-YYYY')).toBe('26 Oct 26');
+    expect(formatPeriodDayLabel(projected, 'DD-MM-YYYY', { spoken: true })).toBe('26-10-2026 (projected)');
     expect(periodDayFigures(october, 27).value).toBe(october.projectedWorkingSets);
 
     // A selection outside the period stays on its edge.
@@ -171,9 +171,9 @@ describe('the period against the previous period', () => {
 
   it("names both periods Monday to Sunday in Today's format, the year once at the end", () => {
     const october = period({ now, cumulative: days(19, () => 0) });
-    expect(formatPeriodRange(october.window)).toBe('5 Oct – 1 Nov 26');
-    expect(formatPeriodRange(october.previous.window)).toBe('7 Sep – 4 Oct 26');
-    expect(formatPeriodRange(localWeekWindow(local(2026, 10, 16)))).toBe('12 – 18 Oct 26');
+    expect(formatPeriodRange(october.window, 'DD-MM-YYYY')).toBe('5 Oct – 1 Nov 26');
+    expect(formatPeriodRange(october.previous.window, 'DD-MM-YYYY')).toBe('7 Sep – 4 Oct 26');
+    expect(formatPeriodRange(localWeekWindow(local(2026, 10, 16)), 'DD-MM-YYYY')).toBe('12 – 18 Oct 26');
     expect(formatDayMonth(local(2026, 12, 28), 'MM-DD-YYYY')).toBe('Dec 28');
     expect(formatDayMonth(new Date(Number.NaN), 'DD-MM-YYYY')).toBe('—');
     expect(formatWeekRange(october.window, 'DD-MM-YYYY')).toBe('05-10-2026 – 01-11-2026');
@@ -181,19 +181,19 @@ describe('the period against the previous period', () => {
 
   it('speaks both periods with the selected day as one heading', () => {
     const october = period({ now, cumulative: days(19, () => 18), toSameDay: counts(6) });
-    expect(periodFiguresAccessibilityLabel(october, periodDayFigures(october, null))).toBe(
-      '4-week period, 5 Oct – 1 Nov 26: Today 18 sets, against the last period, 7 Sep – 4 Oct 26: 6 sets by 25 Sep 26, +12',
+    expect(periodFiguresAccessibilityLabel(october, periodDayFigures(october, null), 'DD-MM-YYYY')).toBe(
+      '4-week period, 05-10-2026 – 01-11-2026: Today 18 sets, against the last period, 07-09-2026 – 04-10-2026: 6 sets by 25-09-2026, +12',
     );
-    expect(periodChartAccessibilityValue(october, periodDayFigures(october, null))).toBe('Today: 18 sets, last period 6');
+    expect(periodChartAccessibilityValue(october, periodDayFigures(october, null), 'DD-MM-YYYY')).toBe('Today: 18 sets, last period 6');
   });
 
   it('speaks an earlier compared period by how far back it is', () => {
     const october = period({ now, compareBack: 3, cumulative: days(19, () => 18), toSameDay: counts(6), total: counts(9) });
-    expect(formatPeriodRange(october.previous.window)).toBe('13 Jul – 9 Aug 26');
-    expect(periodFiguresAccessibilityLabel(october, periodDayFigures(october, null))).toBe(
-      '4-week period, 5 Oct – 1 Nov 26: Today 18 sets, against the period 3 back, 13 Jul – 9 Aug 26: 6 sets by 31 Jul 26, +12',
+    expect(formatPeriodRange(october.previous.window, 'DD-MM-YYYY')).toBe('13 Jul – 9 Aug 26');
+    expect(periodFiguresAccessibilityLabel(october, periodDayFigures(october, null), 'DD-MM-YYYY')).toBe(
+      '4-week period, 05-10-2026 – 01-11-2026: Today 18 sets, against the period 3 back, 13-07-2026 – 09-08-2026: 6 sets by 31-07-2026, +12',
     );
-    expect(periodChartAccessibilityValue(october, periodDayFigures(october, null))).toBe('Today: 18 sets, period 3 back 6');
+    expect(periodChartAccessibilityValue(october, periodDayFigures(october, null), 'DD-MM-YYYY')).toBe('Today: 18 sets, period 3 back 6');
     expect(periodChartAccessibilityLabel(october)).toContain('against the period 3 back 6 by day 19; the period 3 back finished at 9.');
   });
 
@@ -347,13 +347,13 @@ describe('the session card', () => {
   });
 
   it('speaks when, what, where and its PRs, then each exercise', () => {
-    expect(todaySessionAccessibilityLabel(latest({ exercises: lines }))).toBe(
+    expect(todaySessionAccessibilityLabel(latest({ exercises: lines }), 'DD-MM-YYYY')).toBe(
       // The exercises are the rows' count, so the line and the table agree.
-      'Session on 15 Oct 26 07:12; 2 exercises; 12 sets; 2 PRs; at Canal Street Gym; '
+      'Session on 15-10-2026 07:12; 2 exercises; 12 sets; 2 PRs; at Canal Street Gym; '
         + 'Bench Press, 4 sets, best 100.0 × 5, 1RM 116.6, a 1RM PR; Cable Fly, 0 sets',
     );
-    expect(todaySessionAccessibilityLabel(latest({ gymName: ' ', records: [], exercises: [] }))).toBe(
-      'Session on 15 Oct 26 07:12; 0 exercises; 12 sets; 0 PRs',
+    expect(todaySessionAccessibilityLabel(latest({ gymName: ' ', records: [], exercises: [] }), 'DD-MM-YYYY')).toBe(
+      'Session on 15-10-2026 07:12; 0 exercises; 12 sets; 0 PRs',
     );
   });
 });
@@ -386,9 +386,9 @@ describe('tonnage pace', () => {
     expect(periodDayFigures(input, 0, 'totalVolume').value).toBe(125);
     expect(periodDayFigures(input, 27, 'totalVolume').value).toBe(input.projectedVolumeKgReps);
     expect(periodChartAccessibilityLabel(input, 'totalVolume')).toContain('Cumulative tonnage: this period 12.5 tonnes');
-    expect(periodChartAccessibilityValue(input, today)).toBe('Today: 12.5 tonnes, last period 11.1 tonnes African elephant, approximately 6 tonnes.');
-    expect(periodFiguresAccessibilityLabel(input, today)).toContain('12.5 tonnes');
-    expect(periodFiguresAccessibilityLabel(input, today)).toContain('+12%');
+    expect(periodChartAccessibilityValue(input, today, 'DD-MM-YYYY')).toBe('Today: 12.5 tonnes, last period 11.1 tonnes African elephant, approximately 6 tonnes.');
+    expect(periodFiguresAccessibilityLabel(input, today, 'DD-MM-YYYY')).toContain('12.5 tonnes');
+    expect(periodFiguresAccessibilityLabel(input, today, 'DD-MM-YYYY')).toContain('+12%');
   });
 
   it('retains the kg scale for sub-tonne totals and omits unavailable cumulative segments and projection', () => {
@@ -403,7 +403,7 @@ describe('tonnage pace', () => {
     expect(geometry.selected.current).toBeNull();
     expect(geometry.projection).toBeNull();
     expect(periodPaceDelta(figures)).toEqual({ text: '—', tone: 'neutral' });
-    expect(periodChartAccessibilityValue(input, figures)).toContain('unavailable');
+    expect(periodChartAccessibilityValue(input, figures, 'DD-MM-YYYY')).toContain('unavailable');
   });
 
   it.each([[0, 0, '—'], [1000, 0, 'new'], [0, 1000, '−100%'], [1000, 1000, '0%']])(
@@ -462,11 +462,11 @@ describe('tonnage weight references', () => {
     expect(references[references.length - 1]).toMatchObject({ id, value, label, spoken });
     expect(new Set(references.map(reference => reference.path)).size).toBe(references.length);
     expect(TONNAGE_REFERENCES.map(reference => reference.id)).not.toContain('airplane');
-    expect(periodChartAccessibilityValue(input(value), periodDayFigures(input(value), null, 'totalVolume'))).toContain(spoken);
+    expect(periodChartAccessibilityValue(input(value), periodDayFigures(input(value), null, 'totalVolume'), 'DD-MM-YYYY')).toContain(spoken);
     const future = input(value * 0.8, value);
     expect(chart(future).references.some(reference => reference.id === id)).toBe(false);
     expect(chart(future, 326, 140, 27).references.map(reference => reference.id)).toContain(id);
-    expect(periodChartAccessibilityValue(future, periodDayFigures(future, 27, 'totalVolume'))).toContain(spoken);
+    expect(periodChartAccessibilityValue(future, periodDayFigures(future, 27, 'totalVolume'), 'DD-MM-YYYY')).toContain(spoken);
   });
 
   it.each(TONNAGE_REFERENCES.map(reference => [reference.value]))('compares raw values at the %s boundary', threshold => {
@@ -488,7 +488,7 @@ describe('tonnage weight references', () => {
   ] as const)('keeps the highest six comparisons at %s without growing the chart', (reach, ids) => {
     const data = input(reach);
     expect(chart(data, 326, 140).references.map(reference => reference.id)).toEqual(ids);
-    const spoken = periodChartAccessibilityValue(data, periodDayFigures(data, null, 'totalVolume'));
+    const spoken = periodChartAccessibilityValue(data, periodDayFigures(data, null, 'totalVolume'), 'DD-MM-YYYY');
     for (const reference of TONNAGE_REFERENCES) {
       expect(spoken.includes(reference.spoken)).toBe(ids.some(id => id === reference.id));
     }
@@ -598,7 +598,7 @@ describe('tonnage weight references', () => {
       expect(selected.previous.map(point => point.x)).toEqual(today.previous.map(point => point.x));
       expect(selected.projection?.from.x).toBe(today.projection?.from.x);
       expect(selected.projection?.to.x).toBe(today.projection?.to.x);
-      const spoken = periodChartAccessibilityValue(data, periodDayFigures(data, day, 'totalVolume'));
+      const spoken = periodChartAccessibilityValue(data, periodDayFigures(data, day, 'totalVolume'), 'DD-MM-YYYY');
       for (const reference of TONNAGE_REFERENCES) {
         expect(spoken.includes(reference.spoken)).toBe(selected.references.some(item => item.id === reference.id));
       }
@@ -608,6 +608,6 @@ describe('tonnage weight references', () => {
     expect(chart(currentOnly, 326, 126, 27).references.map(reference => reference.value)).toEqual([6000, 20000]);
     expect(periodChartAccessibilityLabel(data, 'totalVolume')).not.toContain('African elephant');
     expect(periodChartGeometry(data, 326).references).toEqual([]);
-    expect(periodChartAccessibilityValue(data, periodDayFigures(data, 27))).not.toContain('whale');
+    expect(periodChartAccessibilityValue(data, periodDayFigures(data, 27), 'DD-MM-YYYY')).not.toContain('whale');
   });
 });

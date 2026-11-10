@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useState } from 'react';
 import {
   StyleSheet,
@@ -20,6 +21,7 @@ import {
   CHART_HEIGHT,
   formatPeriodDayLabel,
   formatPeriodRange,
+  formatWeekRange,
   formatPaceValue,
   paceUnit,
   periodPaceDelta,
@@ -138,6 +140,7 @@ export function PeriodPace({
   const roles = useUiRoles();
   const text = useUiText();
   const tone = useUiTextTone();
+  const dateFormat = useDateFormat();
   const [size, setSize] = useState({ width: FALLBACK_CHART_WIDTH, height: CHART_HEIGHT });
   // The selected day belongs to the period it was picked in; another period
   // (a new day, a changed Progress period) starts again at today.
@@ -162,7 +165,7 @@ export function PeriodPace({
     select(periodDayAtX(event.nativeEvent.locationX, geometry.plot.width, period.daysInPeriod));
   const onAccessibilityAction = (event: AccessibilityActionEvent) =>
     select(figures.dayIndex + (event.nativeEvent.actionName === 'increment' ? 1 : -1));
-  const label = formatPeriodDayLabel(figures);
+  const label = formatPeriodDayLabel(figures, dateFormat);
   const delta = periodPaceDelta(figures);
   const canCompareNewer = period.compareBack > 1;
   const compareActions = onShowCompared
@@ -180,8 +183,9 @@ export function PeriodPace({
       allowFontScaling={false}
       numberOfLines={1}
       style={[text.label, tone.faint]}
+      accessibilityLabel={formatWeekRange(period.previous.window, dateFormat)}
       testID="today-progress-period-previous-range">
-      {formatPeriodRange(period.previous.window)}
+      {formatPeriodRange(period.previous.window, dateFormat)}
     </Text>
   );
 
@@ -190,20 +194,20 @@ export function PeriodPace({
       {/* The metric is selected in the weekly box; chart units are passive. */}
       <View
         accessibilityActions={compareActions}
-        accessibilityLabel={periodFiguresAccessibilityLabel(period, figures)}
+        accessibilityLabel={periodFiguresAccessibilityLabel(period, figures, dateFormat)}
         accessible={false}
         onAccessibilityAction={onCompareAction}
         style={styles.figures}
         testID="today-progress-period-figures">
         <View style={[styles.column, styles.currentColumn]}>
-          <Text allowFontScaling={false} style={[text.label, tone.ink]} testID="today-progress-period-range">
-            {formatPeriodRange(period.window)}
+          <Text accessibilityLabel={formatWeekRange(period.window, dateFormat)} allowFontScaling={false} style={[text.label, tone.ink]} testID="today-progress-period-range">
+            {formatPeriodRange(period.window, dateFormat)}
           </Text>
           {/* One line whatever the day's label: the figure shrinks rather
               than wraps, so the card keeps its height as the selection moves. */}
           <View style={[styles.currentRow, metric === 'totalVolume' ? styles.tonnageRow : null]} testID="today-progress-period-working-sets">
-            <Text allowFontScaling={false} numberOfLines={1} style={text.meta} testID="today-progress-period-day"><FigureText>{`${label} `}</FigureText></Text>
-            <Text accessibilityLabel={periodFiguresAccessibilityLabel(period, figures)}
+            <Text accessibilityLabel={formatPeriodDayLabel(figures, dateFormat, { spoken: true })} allowFontScaling={false} numberOfLines={1} style={text.meta} testID="today-progress-period-day"><FigureText>{`${label} `}</FigureText></Text>
+            <Text accessibilityLabel={periodFiguresAccessibilityLabel(period, figures, dateFormat)}
               accessibilityActions={compareActions} onAccessibilityAction={onCompareAction}
               adjustsFontSizeToFit={metric === 'workingSetCount'} allowFontScaling={false} numberOfLines={1} style={[text.figureHero, styles.currentFigure]}>
               {formatPaceValue(figures.value, metric)}
@@ -251,7 +255,7 @@ export function PeriodPace({
         accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
         accessibilityLabel={periodChartAccessibilityLabel(period, metric)}
         accessibilityRole="adjustable"
-        accessibilityValue={{ text: periodChartAccessibilityValue(period, figures) }}
+        accessibilityValue={{ text: periodChartAccessibilityValue(period, figures, dateFormat) }}
         onAccessibilityAction={onAccessibilityAction}
         onLayout={onLayout}
         onResponderRelease={onTouch}

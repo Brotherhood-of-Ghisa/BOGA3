@@ -45,8 +45,8 @@ const boardAccessibilityLabel = (range: string, board: WeekBoardViewModel): stri
 ].filter(Boolean).join('; ');
 
 /** The board alone is one target; group switching and CoW controls remain its siblings. */
-export function TodayWeekBoardCard({ board, range, onOpenGroup, header, challenges }: {
-  board: WeekBoardViewModel; range: string; onOpenGroup: () => void; header: ReactNode; challenges: ReactNode;
+export function TodayWeekBoardCard({ board, range, accessibilityRange, onOpenGroup, header, challenges }: {
+  board: WeekBoardViewModel; range: string; accessibilityRange: string; onOpenGroup: () => void; header: ReactNode; challenges: ReactNode;
 }) {
   const styles = useStyles();
   const text = useUiText();
@@ -60,8 +60,8 @@ export function TodayWeekBoardCard({ board, range, onOpenGroup, header, challeng
   return <Card testID="today-group-card">
     {header}{challenges}
     <ListCard variant="embedded" regionTestID="today-group-board" onPress={onOpenGroup}
-      accessibilityHint="Opens the group" accessibilityLabel={boardAccessibilityLabel(range, board)}
-      header={<ListCardHeader label="This week" metadata={range} metadataTestID="today-group-board-range" />}
+      accessibilityHint="Opens the group" accessibilityLabel={boardAccessibilityLabel(accessibilityRange, board)}
+      header={<ListCardHeader label="This week" metadata={range} metadataAccessibilityLabel={accessibilityRange} metadataTestID="today-group-board-range" />}
       columnLabels={<>
         <Text allowFontScaling={false} style={[text.label, tone.faint, styles.figure, { width: columns.sets }]}>Sets</Text>
         <Text allowFontScaling={false} style={[text.label, tone.faint, styles.figure, { width: columns.prs }]}>PRs</Text>

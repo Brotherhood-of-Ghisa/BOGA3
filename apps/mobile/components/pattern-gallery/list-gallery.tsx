@@ -48,7 +48,7 @@ export function ListGallery({ initialSample, initialState, initialLong = false, 
         onRetry={() => { setState('ready'); setAction('Retry'); }} />
     </View> : <>
       <GroupHomeBoard board={board} metric={metric} title="Top brothers" />
-      <TodayWeekBoardCard board={listGalleryWeekBoard(state, long)} range="26 Oct – 1 Nov 26"
+      <TodayWeekBoardCard board={listGalleryWeekBoard(state, long)} range="26 Oct – 1 Nov 26" accessibilityRange="26-10-2026 – 01-11-2026"
         challenges={sample === 'actions' ? <TodayCoWSummarySection resource={{ data: cowSummary(), lastUpdatedAtMs: LIST_GALLERY_NOW.getTime(),
           hydrated: true, refreshing: false, offline: false, error: null, lostAccess: false, refresh: async () => {} }}
           previous={false} dateFormat="DD-MM-YYYY" onOpen={() => setAction('Current CoW')} onRetry={() => setAction('CoW Retry')} /> : null}

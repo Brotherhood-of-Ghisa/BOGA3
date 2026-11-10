@@ -1,3 +1,4 @@
+import { useDateFormat } from '@/src/preferences/hooks';
 import { useRef, useState } from 'react';
 import {
   Pressable,
@@ -17,7 +18,7 @@ import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { LatestSessionSummary, SessionExerciseLine } from '@/src/progress-summary';
-import { formatClockTime, formatCompactDate } from '@/src/utils/local-time';
+import { formatClockTime, formatCompactDate, formatLocalDateTime } from '@/src/utils/local-time';
 
 import { formatBestSet, todaySessionAccessibilityLabel } from './progress-format';
 import { StepArrow, StepAround } from './step-arrows';
@@ -194,13 +195,14 @@ export function TodaySessionCard({
   onOpenSessions,
   onShowSession,
 }: TodaySessionCardProps) {
+  const dateFormat = useDateFormat();
   const styles = useStyles();
   const text = useUiText();
   const tone = useUiTextTone();
   const stamp = (
     // The start reads as a Sessions row's does: the whole stamp, month included, in the figure face.
-    <Text allowFontScaling={false} numberOfLines={1} style={text.body} testID="today-latest-session-start">
-      <Text allowFontScaling={false} style={text.inlineFigure}>{formatCompactDate(session.startedAt)}</Text>
+    <Text accessibilityLabel={formatLocalDateTime(session.startedAt.getTime(), dateFormat)} allowFontScaling={false} numberOfLines={1} style={text.body} testID="today-latest-session-start">
+      <Text allowFontScaling={false} style={text.inlineFigure}>{formatCompactDate(session.startedAt, dateFormat)}</Text>
       <Text allowFontScaling={false} style={tone.faint}> · </Text>
       <Text allowFontScaling={false} style={text.inlineFigure}>{formatClockTime(session.startedAt.getTime())}</Text>
     </Text>
@@ -224,7 +226,7 @@ export function TodaySessionCard({
       <View style={[styles.body, styles.fillBody]}>
         <Pressable
           accessibilityHint="Opens the completed session"
-          accessibilityLabel={todaySessionAccessibilityLabel(session)}
+          accessibilityLabel={todaySessionAccessibilityLabel(session, dateFormat)}
           accessibilityRole="button"
           onPress={() => onOpenSession(session.id)}
           style={({ pressed }) => (pressed ? styles.pressed : null)}

@@ -16,7 +16,7 @@ export function coWDateRange(week: string, dateFormat: ExerciseDateFormat, today
   if (!today) return formatCalendarWeekHeading(week, dateFormat);
   const start = new Date(`${week}T12:00:00`);
   const end = new Date(start); end.setDate(end.getDate() + 6);
-  return formatCompactDateRange(start, end);
+  return formatCompactDateRange(start, end, dateFormat);
 }
 export const coWAccessibleDates = (week: string, format: ExerciseDateFormat) => formatCalendarWeek(week, format);
 export function coWStatus(cow: CoWDefinitionWire, resultState?: CoWResultWire['state']): string {

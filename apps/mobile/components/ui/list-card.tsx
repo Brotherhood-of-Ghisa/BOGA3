@@ -33,12 +33,12 @@ export function ListCard({ header, columnLabels, children, footer, variant = 'st
 }
 
 /** Metadata stays beside the label; the trailing slot is reserved for a column label. */
-export function ListCardHeader({ label, metadata, metadataTestID, trailing }: {
-  label: string; metadata?: string; metadataTestID?: string; trailing?: ReactNode;
+export function ListCardHeader({ label, metadata, metadataAccessibilityLabel, metadataTestID, trailing }: {
+  label: string; metadata?: string; metadataAccessibilityLabel?: string; metadataTestID?: string; trailing?: ReactNode;
 }) {
   const styles = useStyles();
   return <View style={styles.header}>
-    <View style={styles.heading}><CompactHeader label={label} metadata={metadata} metadataPlacement="inline" metadataTestID={metadataTestID} /></View>
+    <View style={styles.heading}><CompactHeader label={label} metadata={metadata} metadataAccessibilityLabel={metadataAccessibilityLabel} metadataPlacement="inline" metadataTestID={metadataTestID} /></View>
     {trailing}
   </View>;
 }
