@@ -82,7 +82,13 @@ export const deriveRecoveryRows = (daily: MuscleDailySets, window: TodayPlanWind
   return rows.map(({ row }) => row);
 };
 
-export type RecoverySection = { name: string; muscles: RecoveryRow[]; weekSets: number };
+export type RecoverySection = {
+  name: string;
+  muscles: RecoveryRow[];
+  days: number[];
+  today: number;
+  weekSets: number;
+};
 
 /** Family sections retain the recovery order; their total is attributed child work, not unique sets. */
 export const groupRecoveryRows = (rows: RecoveryRow[]): RecoverySection[] => {
@@ -92,7 +98,13 @@ export const groupRecoveryRows = (rows: RecoveryRow[]): RecoverySection[] => {
     members.push(row);
     families.set(row.familyName, members);
   }
-  return [...families].map(([name, muscles]) => ({ name, muscles, weekSets: sumNumbers(muscles.map(row => row.weekSets)) }));
+  return [...families].map(([name, muscles]) => ({
+    name,
+    muscles,
+    days: muscles[0].days.map((_, index) => sumNumbers(muscles.map(row => row.days[index] ?? 0))),
+    today: sumNumbers(muscles.map(row => row.today ?? 0)),
+    weekSets: sumNumbers(muscles.map(row => row.weekSets)),
+  }));
 };
 
 /** A plan as the page reads it: its schedule, figures and muscles. */

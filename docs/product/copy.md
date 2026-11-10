@@ -32,6 +32,9 @@ Figures without training (rest or outside the data) stay blank: no `Rest`,
 `?`, dash or zero. Known zero stays numeric. Accessibility distinguishes rest,
 unavailable and known zero.
 
+Recovery family tiles show the numeric sum, including zero when no child
+contributes; absent individual-muscle cells stay blank.
+
 Why: distinguish missing data from measurements.
 Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/components/heatmaps/WeeklyHeatmap.tsx`.
 
