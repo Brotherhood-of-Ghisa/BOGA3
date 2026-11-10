@@ -110,5 +110,16 @@
     "tsx": "^4.22.3",
     "typescript": "~6.0.3"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "autolinking": {
+      "android": {
+        "exclude": [
+          "@kingstinct/react-native-healthkit",
+          "@react-native-healthkit/core",
+          "react-native-nitro-modules"
+        ]
+      }
+    }
+  }
 }
