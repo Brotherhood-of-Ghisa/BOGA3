@@ -56,7 +56,7 @@ export type ActivityCursor = { started_at: string; source: string; external_id: 
 export const activityCursorFrom = (value: Record<string, unknown>): ActivityCursor => {
   const { started_at: startedAt, source, external_id: externalId } = value;
   if (
-    typeof startedAt !== 'string' || !ISO_INSTANT.test(startedAt)
+    typeof startedAt !== 'string' || !ISO_INSTANT.test(startedAt) || !Number.isFinite(Date.parse(startedAt))
     || typeof source !== 'string' || source.length === 0 || source.length > 40
     || typeof externalId !== 'string' || externalId.length === 0 || externalId.length > 200
   ) {

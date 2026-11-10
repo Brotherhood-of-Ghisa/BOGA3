@@ -148,7 +148,7 @@ describe('activity query parsing', () => {
     const cursor = { started_at: '2026-10-27T07:00:00+00:00', source: 'apple_health', external_id: 'abc' };
     expect(activityCursorFrom({ kind: 'activity', ...cursor })).toEqual(cursor);
     for (const bad of [
-      { ...cursor, started_at: 1 }, { ...cursor, started_at: 'soon' }, { ...cursor, source: '' },
+      { ...cursor, started_at: 1 }, { ...cursor, started_at: 'soon' }, { ...cursor, started_at: '2026-13-40T00:00Z' }, { ...cursor, source: '' },
       { ...cursor, external_id: 'x'.repeat(201) }, {},
     ]) {
       expect(() => activityCursorFrom(bad)).toThrow('Cursor is invalid.');
