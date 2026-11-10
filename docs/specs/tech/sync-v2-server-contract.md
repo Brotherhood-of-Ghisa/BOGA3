@@ -13,14 +13,14 @@ disagree):
 migrations, `apps/mobile/src/sync/` and
 `apps/mobile/scripts/check-sync-schema-drift.ts`.
 
-Authenticated app push and pull require the header `x-boga-sync-protocol: 6`
+Authenticated app push and pull require the header `x-boga-sync-protocol: 7`
 (see `sync_push`, "Update-required cutoff").
 
 ---
 
 # Part A — Server schema
 
-The server mirrors typed entities. For protocol-5 protected revisions, selective push outcomes,
+The server mirrors typed entities. For protected revisions, selective push outcomes,
 sequence discovery and atomic merge/recovery RPCs, load
 [`exercise-merge-contract.md`](exercise-merge-contract.md).
 
@@ -278,7 +278,7 @@ LWW stays per row; there are no per-field clocks.
 `UPDATE_REQUIRED: …` before it touches any row. The cutoff is compatibility
 enforcement, not authorization; auth and OAuth denial are unchanged. The app
 client (`apps/mobile/src/auth/supabase.ts`) and the import CLI send
-protocol 6.
+protocol 7.
 
 **Batch building.** The client takes dirty rows layer by layer up to the cap,
 so no child ships without its parent: each FK target of a batched row is in an

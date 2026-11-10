@@ -4,6 +4,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Card, Icon, IconButton, ListRow, Sheet, uiSpace } from '@/components/ui';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
+import { formatLocalDateTime } from '@/src/utils/local-time';
 
 import { formatDateTimeStamp, SessionSummaryLine } from './session-summary-line';
 import type { SessionListItem } from './types';
@@ -34,6 +35,7 @@ export function ActiveSessionRow({
   const resolvedDateFormat = dateFormat ?? listPreferences.dateFormat;
   const [menuVisible, setMenuVisible] = useState(false);
   const closeMenu = () => setMenuVisible(false);
+  const workoutLabel = [formatLocalDateTime(Date.parse(session.startedAt), resolvedDateFormat), session.gymName].filter(Boolean).join(', ');
 
   // The alert opens over the sheet; either answer closes both.
   const confirmDelete = () => {
@@ -64,7 +66,7 @@ export function ActiveSessionRow({
           leading={<Icon colorRole="ink" name="set-current" size="sm" />}
           meta={
             <IconButton
-              accessibilityLabel="Review and complete active session"
+              accessibilityLabel={`Review and complete active session, ${workoutLabel}`}
               name="check"
               onPress={onComplete}
               testID="complete-active-session-button"
@@ -72,7 +74,7 @@ export function ActiveSessionRow({
           }
           trailing={
             <IconButton
-              accessibilityLabel="Open active session actions"
+              accessibilityLabel={`Open active session actions, ${workoutLabel}`}
               name="more-vertical"
               onPress={() => setMenuVisible(true)}
               tone="muted"
@@ -80,7 +82,7 @@ export function ActiveSessionRow({
             />
           }>
           <Pressable
-            accessibilityLabel="Resume active session"
+            accessibilityLabel={`Resume active session, ${workoutLabel}`}
             accessibilityRole="button"
             onPress={onResume}
             style={styles.summary}

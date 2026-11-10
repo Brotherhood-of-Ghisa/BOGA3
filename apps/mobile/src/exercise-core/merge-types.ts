@@ -4,6 +4,7 @@ export type MergeWireEntity = {
   id: string;
   client_updated_at_ms: number;
   fields: Record<string, MergeValue>;
+  lifecycle_action?: { id: string; base_revision: number };
 };
 export const MERGE_ENTITY_TYPES = ['session_exercises', 'exercise_sets', 'session_exercise_tags'] as const;
 export function mergeBlockId(entity: MergeWireEntity): string | null {
@@ -18,4 +19,5 @@ export type MergeReviewItem = {
   id: string; type: string; entityId: string; blockId: string; sessionId: string; exerciseName: string;
   current: Record<string, MergeValue> | null; saved: Record<string, MergeValue> | null;
   token: string; invalid: boolean; sessionStartedAt?: number;
+  notice?: string | null;
 };

@@ -14,7 +14,7 @@ export function writeMergeLocal(tx: Transaction, input: MergeLocalWrite): void {
     target: [exerciseMergeLocal.ownerUserId, exerciseMergeLocal.id], set: values,
   }).run();
 }
-export function readMergeLocal<T>(database: Pick<LocalDatabase, 'select'>, owner: string, id: string): T | null {
+export function readMergeLocal<T>(database: Pick<LocalDatabase, 'select'> | Transaction, owner: string, id: string): T | null {
   const row = database.select().from(exerciseMergeLocal).where(and(
     eq(exerciseMergeLocal.ownerUserId, owner), eq(exerciseMergeLocal.id, id),
   )).get();

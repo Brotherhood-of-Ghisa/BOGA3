@@ -165,10 +165,39 @@ describe('Sessions over real data', () => {
   it('routes completion through the session cleanup flow instead of completing directly', async () => {
     await openSessions();
 
-    fireEvent.press(screen.getByLabelText('Review and complete active session'));
+    fireEvent.press(screen.getByLabelText(/^Review and complete active session,/));
 
     expect(mockDismissTo).toHaveBeenCalledWith('/train');
     expect(await loadSessionSnapshotById(ACTIVE)).toMatchObject({ status: 'active', completedAt: null });
+  });
+
+  it('shows both independently active workouts and discards only the selected one', async () => {
+    await openSessions(async () => {
+      localDataClient().prepare("insert into sessions(id,status,started_at,created_at,updated_at) values('chat-active','active',1,1,9999999999999)").run();
+    });
+    const app = screen.getByTestId(`active-session-row-${ACTIVE}`);
+    const chat = screen.getByTestId('active-session-row-chat-active');
+    const appResume = within(app).getByTestId('resume-active-session-button');
+    const chatResume = within(chat).getByTestId('resume-active-session-button');
+    expect(appResume.props.accessibilityLabel).not.toBe(chatResume.props.accessibilityLabel);
+    fireEvent.press(within(chat).getByTestId('active-session-menu-button'));
+    fireEvent.press(screen.getByTestId('discard-active-session-button'));
+    const buttons = (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2] as AlertButton[];
+    await act(async () => buttons.find(button => button.text === 'Discard')?.onPress?.());
+    await waitForGone(() => screen.queryByTestId('active-session-row-chat-active'));
+    expect(screen.getByTestId(`active-session-row-${ACTIVE}`)).toBeTruthy();
+  });
+
+  it('refreshes instead of discarding when chat finishes the workout while its confirmation is open', async () => {
+    await openSessions();
+    fireEvent.press(screen.getByTestId('active-session-menu-button'));
+    fireEvent.press(screen.getByTestId('discard-active-session-button'));
+    localDataClient().prepare("update sessions set merge_revision=1,status='completed',completed_at=started_at+60000,duration_sec=60 where id=?").run(ACTIVE);
+    const buttons = (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2] as AlertButton[];
+    await act(async () => buttons.find(button => button.text === 'Discard')?.onPress?.());
+    expect(await screen.findByText('This workout changed elsewhere. Review its current state before trying again.')).toBeTruthy();
+    expect((await loadSessionSnapshotById(ACTIVE))?.deletedAt).toBeNull();
+    expect(screen.queryByTestId(`active-session-row-${ACTIVE}`)).toBeNull();
   });
 
   it('opens a completed History row in Summary', async () => {

@@ -9,8 +9,9 @@ import { clearProvenanceClaimsInTransaction } from '@/src/data/session-drafts';
 import {
   deleteMergeLocal, listMergeLocal, preserveMergeEntity, readMergeLocal, writeMergeLocal,
 } from '@/src/data/exercise-merge-store';
-import { exerciseMergeLocal, exerciseSets, sessionExercises, sessionExerciseTags } from '@/src/data/schema';
+import { exerciseMergeLocal, exerciseSets, sessionExercises, sessionExerciseTags, sessions } from '@/src/data/schema';
 import { MERGE_ENTITY_TYPES, mergeBlockId, type MergeReviewItem, type MergeWireEntity } from '@/src/exercise-core/merge-types';
+import { clearWorkoutLifecycle, pendingWorkoutLifecycles, sameWorkoutHeader, type PendingWorkoutLifecycle } from './workout-lifecycle';
 
 type MergeAdapter = {
   toWire: (row: Record<string, unknown>, type: string) => MergeWireEntity;
@@ -32,6 +33,9 @@ export async function mergeRpc<T>(name: string, args: Record<string, unknown>, e
 }
 
 export function mergePullCanApply(tx: Transaction, entity: MergeWireEntity, existing?: Record<string, unknown>): boolean {
+  if (entity.type === 'sessions') {
+    return Number(entity.fields.merge_revision ?? 0) === Number(existing?.mergeRevision ?? 0);
+  }
   const blockId = mergeBlockId(entity);
   if (!blockId) return true;
   const incoming = Number(entity.fields.merge_revision ?? 0);
@@ -139,16 +143,41 @@ function restoreUniqueOrder(rows: Chosen[], parentKey: string): void {
   }
 }
 
-function installSnapshot(database: LocalDatabase, owner: string, stage: Stage, adapter: MergeAdapter): number {
+function installSessionRows(input: {
+  tx: Transaction; owner: string; rows: MergeWireEntity[]; adapter: MergeAdapter;
+  acknowledged: Map<string, PendingWorkoutLifecycle>;
+}): number {
+  const { tx, owner, rows, adapter, acknowledged } = input;
+  let applied = 0;
+  for (const incoming of rows) {
+    const local = tx.select().from(sessions).where(eq(sessions.id, incoming.id)).get();
+    const advanced = Number(incoming.fields.merge_revision ?? 0) > (local?.mergeRevision ?? 0);
+    if (advanced && local?.localDirty) {
+      const saved = adapter.toWire(local, 'sessions');
+      const domainKeys = Object.keys(saved.fields).filter(key => !['merge_revision', 'created_at', 'updated_at'].includes(key));
+      const pending = acknowledged.get(incoming.id);
+      if (!(pending && sameWorkoutHeader(pending.entity, saved)) &&
+          domainKeys.some(key => saved.fields[key] !== incoming.fields[key])) preserveMergeEntity(tx, owner, saved);
+    }
+    applied += adapter.apply(tx, [incoming], advanced);
+    if (acknowledged.has(incoming.id)) clearWorkoutLifecycle(tx, owner, incoming.id);
+  }
+  return applied;
+}
+
+function installSnapshot(database: LocalDatabase, owner: string, stage: Stage, adapter: MergeAdapter,
+  acknowledged: Map<string, PendingWorkoutLifecycle>): number {
   let applied = 0;
   database.transaction(tx => {
     const rows = listMergeLocal(tx, owner, 'stage').filter(row => row.id !== 'stage')
       .sort((a, b) => Number(a.id.slice(6)) - Number(b.id.slice(6)))
       .flatMap(row => JSON.parse(row.payload) as MergeWireEntity[]);
     const blocks = rows.filter(row => row.type === 'session_exercises');
-    const sessionIds = [...new Set(blocks.map(row => String(row.fields.session_id)))];
+    const sessionRows = rows.filter(row => row.type === 'sessions');
+    const sessionIds = [...new Set([...sessionRows.map(row => row.id), ...blocks.map(row => String(row.fields.session_id))])];
     repairRoutineUseClaimsInTransaction(tx, rows);
-    applied += adapter.apply(tx, rows.filter(row => !(MERGE_ENTITY_TYPES as readonly string[]).includes(row.type)));
+    applied += adapter.apply(tx, rows.filter(row => row.type !== 'sessions' && !(MERGE_ENTITY_TYPES as readonly string[]).includes(row.type)));
+    applied += installSessionRows({ tx, owner, rows: sessionRows, adapter, acknowledged });
     const live = rows.filter(row => !row.fields.deleted_at);
     clearProvenanceClaimsInTransaction(tx, {
       blocks: new Set(live.filter(row => row.type === 'session_exercises' && row.fields.source_plan_exercise_id && !row.fields.source_plan_use_id)
@@ -161,6 +190,10 @@ function installSnapshot(database: LocalDatabase, owner: string, stage: Stage, a
       .where(inArray(sessionExercises.sessionId, sessionIds)).all() : [];
     const blockIds = [...new Set([...blocks.map(row => row.id), ...localBlocks.map(row => row.id)])];
     const revisions = new Map(blocks.map(row => [row.id, Number(row.fields.merge_revision ?? 0)]));
+    const sessionRevisions = new Map(sessionRows.map(row => [row.id, Number(row.fields.merge_revision ?? 0)]));
+    for (const block of localBlocks) {
+      revisions.set(block.id, Math.max(revisions.get(block.id) ?? 0, sessionRevisions.get(block.sessionId) ?? 0));
+    }
     const oldSets = blockIds.length ? tx.select().from(exerciseSets).where(inArray(exerciseSets.sessionExerciseId, blockIds)).all() : [];
     const oldTags = blockIds.length ? tx.select().from(sessionExerciseTags).where(inArray(sessionExerciseTags.sessionExerciseId, blockIds)).all() : [];
     const choose = (type: string, local: LocalRow[]) => chooseGraphRows({
@@ -193,7 +226,11 @@ function installSnapshot(database: LocalDatabase, owner: string, stage: Stage, a
 }
 
 export async function uploadMergePending(database: LocalDatabase, owner: string): Promise<void> {
-  for (const entry of listMergeLocal(database, owner, 'pending')) {
+  const rank = (entry: { payload: string }) => {
+    const entity = JSON.parse(entry.payload) as MergeWireEntity;
+    return entity.type === 'sessions' ? 0 : entity.type === 'session_exercises' ? 1 : 2;
+  };
+  for (const entry of listMergeLocal(database, owner, 'pending').sort((a, b) => rank(a) - rank(b))) {
     const entity = JSON.parse(entry.payload) as MergeWireEntity;
     await mergeRpc<string>('exercise_merge_save_conflict', {
       p_type: entity.type, p_row: { ...entity.fields, id: entity.id, client_updated_at_ms: entity.client_updated_at_ms },
@@ -231,13 +268,27 @@ export async function syncExerciseMerges(input: {
   if (receipt && (!Number.isSafeInteger(receipt.sequence) || receipt.id !== operation?.id)) {
     throw new Error('Invalid merge operation response.');
   }
-  const targetSequence = Math.max(remoteSequence, receipt?.sequence ?? 0);
+  const acknowledged = new Map<string, PendingWorkoutLifecycle>();
+  let targetSequence = Math.max(remoteSequence, receipt?.sequence ?? 0);
+  for (const pending of pendingWorkoutLifecycles(database, owner)) {
+    const status = await mergeRpc<{ id: string; sequence: number; sessionId: string;
+      workoutRevision: number; matchesInput: boolean } | null>('exercise_merge_status', {
+      p_id: pending.action.id, p_row: { ...pending.entity.fields, id: pending.entity.id },
+    }, owner);
+    if (!status) continue;
+    if (status.id !== pending.action.id || status.sessionId !== pending.entity.id ||
+        !Number.isSafeInteger(status.sequence) || status.sequence < 1 ||
+        !Number.isSafeInteger(status.workoutRevision) || status.workoutRevision <= pending.action.base_revision ||
+        status.matchesInput !== true) throw new Error('Invalid workout lifecycle receipt.');
+    acknowledged.set(status.sessionId, pending);
+    targetSequence = Math.max(targetSequence, status.sequence);
+  }
   let changed = 0;
   if (targetSequence > sequence) {
     try {
       const stage = await stageSnapshot(database, owner, sequence);
       if (stage.sequence < targetSequence) throw new Error('MERGE_STALE: history snapshot changed.');
-      changed = installSnapshot(database, owner, stage, adapter);
+      changed = installSnapshot(database, owner, stage, adapter, acknowledged);
     } catch (error) {
       if (error instanceof Error && error.message.includes('MERGE_STALE')) {
         database.transaction(tx => clearStage(tx, owner));

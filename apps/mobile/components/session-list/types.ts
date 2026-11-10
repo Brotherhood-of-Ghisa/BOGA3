@@ -3,6 +3,7 @@ import type { SessionPersonalRecord } from '@/src/progress-summary';
 
 export type SessionListItem = {
   id: string;
+  mergeRevision?: number;
   startedAt: string;
   status: 'active' | 'completed';
   completedAt: string | null;
@@ -21,7 +22,7 @@ export type SessionListDataClient = {
   loadSessions(input: { showDeletedSessions: boolean }): Promise<SessionListItem[]>;
   startSession(): Promise<void>;
   completeActiveSession(sessionId: string): Promise<void>;
-  discardActiveSession(sessionId: string): Promise<void>;
+  discardActiveSession(sessionId: string, expectedRevision?: number): Promise<void>;
 };
 
 export const DEFAULT_SESSION_LIST_ITEMS: SessionListItem[] = [

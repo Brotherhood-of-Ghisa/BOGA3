@@ -164,7 +164,7 @@ reject missing entities or forward references.
 | 5 | `exercise_sets`, assignments, private bodyweight readings |
 
 Migration `0028_true_outlaw_kid` resets `pull_cursor` to `{}`; replay is LWW
-idempotent. Header `x-boga-sync-protocol: 6` gates the changed projections;
+idempotent. Header `x-boga-sync-protocol: 7` gates the changed projections;
 older builds halt with `UPDATE_REQUIRED`. Deploy only in the operator-agreed
 coordinated backend/app release once the new build is available.
 

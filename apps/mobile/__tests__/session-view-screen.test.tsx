@@ -825,7 +825,7 @@ describe('Session view', () => {
 
   it('shows a retryable error when the draft read fails (a failed read)', async () => {
     await seed();
-    jest.spyOn(sessionDrafts, 'loadLatestSessionDraftSnapshot').mockRejectedValueOnce(new Error('disk'));
+    jest.spyOn(sessionDrafts, 'loadSessionSnapshotById').mockRejectedValueOnce(new Error('disk'));
     renderWithTheme(<SessionViewScreen {...ON_TAB} sessionId={SESSION} />);
 
     fireEvent.press(await screen.findByTestId('session-view-retry'));

@@ -8,16 +8,19 @@ assert_status 403 'workout permission defaults off independently of plan access'
 agent_post 'workouts/start' '{}' "${RUN_TAG}-workout-denied"
 assert_status 403 'plan access cannot start a workout'
 
-# No app enablement ships until the mobile compatibility fence. This fixture is service-only.
+# The owner app controls this permission; OAuth clients cannot grant themselves access.
 WORKOUT_GRANT="$(fetch_grant_granted_at)"
-run_psql "insert into public.agent_workout_permissions(owner_user_id,client_id,workout_logging_enabled,granted_at)
-  values('${USER_A_UUID}','${AGENT_CLIENT_ID}',true,'${WORKOUT_GRANT}');" >/dev/null
 public_request GET 'agent_workout_permissions?select=client_id' "${AGENT_ACCESS_TOKEN}"
-assert_non_2xx 'OAuth cannot inspect or edit workout permissions'
+assert_status 200 'OAuth permission query stays RLS filtered'
+[[ "${RESPONSE_BODY}" == '[]' ]] || fail 'OAuth inspected workout permissions'
+public_request POST 'agent_workout_permissions' "${AGENT_ACCESS_TOKEN}" \
+  "$(jq -nc --arg owner "${USER_A_UUID}" --arg cid "${AGENT_CLIENT_ID}" --arg at "${WORKOUT_GRANT}" \
+    '{owner_user_id:$owner,client_id:$cid,workout_logging_enabled:true,granted_at:$at}')"
+assert_non_2xx 'OAuth cannot enable its workout permission'
 public_request POST 'agent_workout_permissions' "${APP_ACCESS_TOKEN}" \
   "$(jq -nc --arg owner "${USER_A_UUID}" --arg cid "${AGENT_CLIENT_ID}" --arg at "${WORKOUT_GRANT}" \
     '{owner_user_id:$owner,client_id:$cid,workout_logging_enabled:true,granted_at:$at}')"
-assert_non_2xx 'app workout enablement is withheld until safe handoff'
+assert_status 201 'owner app enables independent workout logging'
 
 # Older switches updating their grant cannot re-enable an unrelated workout grant.
 run_psql "update public.agent_workout_permissions set granted_at='2000-01-01' where owner_user_id='${USER_A_UUID}';
@@ -33,7 +36,7 @@ if [[ "${WORKOUT_ACTIVE_IDS}" != '[]' ]]; then
   agent_post 'workouts/start' '{}' "${RUN_TAG}-workout-existing"
   assert_status 409 'start requires an explicit choice when another workout is active'
 fi
-run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}';
+run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on';
   update app_public.sessions set status='completed' where owner_user_id='${USER_A_UUID}'
     and id in(select json_array_elements_text('${WORKOUT_ACTIVE_IDS}'::json)); commit;" >/dev/null
 
@@ -42,7 +45,7 @@ agent_post 'workouts/start' "${WORKOUT_START_BODY}" "${RUN_TAG}-workout-start"
 assert_status 200 'start workout'
 WORKOUT_ID="$(jq -er '.data.session_id' <<<"${RESPONSE_BODY}")"
 WORKOUT_REV="$(jq -er '.data.revision' <<<"${RESPONSE_BODY}")"
-run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}';
+run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on';
   insert into app_public.session_plans(owner_user_id,id,title,created_at,updated_at,client_updated_at_ms)
     values('${USER_A_UUID}','agent-api-${RUN_TAG}-workout-source','Scope boundary',${NOW_MS},${NOW_MS},${NOW_MS});
   update app_public.sessions set source_plan_id='agent-api-${RUN_TAG}-workout-source'
@@ -53,7 +56,7 @@ jq -e '.error.code=="WORKOUT_REQUIRES_APP"' <<<"${RESPONSE_BODY}" >/dev/null || 
 agent_get "workouts/active?session_id=${WORKOUT_ID}"
 assert_status 200 'plan-backed workout remains discoverable'
 jq -e '.data.workout.requires_app' <<<"${RESPONSE_BODY}" >/dev/null || fail 'plan-backed recovery omitted the app handoff'
-run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}';
+run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on';
   update app_public.sessions set source_plan_id=null where owner_user_id='${USER_A_UUID}' and id='${WORKOUT_ID}'; commit;" >/dev/null
 agent_get "workouts/active?session_id=${WORKOUT_ID}"
 WORKOUT_REV="$(jq -er '.data.workout.revision' <<<"${RESPONSE_BODY}")"
@@ -203,7 +206,7 @@ if [[ "$(run_psql "select status from app_public.sessions where owner_user_id='$
 fi
 rm -rf "${WORKOUT_RACE_DIR}"
 
-run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}';
+run_psql "begin; set local request.jwt.claim.sub='${USER_A_UUID}'; set local boga.exercise_merge_internal='on';
   update public.agent_workout_permissions set workout_logging_enabled=false where owner_user_id='${USER_A_UUID}';
   update app_public.sessions set status='active' where owner_user_id='${USER_A_UUID}'
     and id in(select json_array_elements_text('${WORKOUT_ACTIVE_IDS}'::json)); commit;" >/dev/null

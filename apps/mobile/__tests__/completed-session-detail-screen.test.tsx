@@ -12,6 +12,7 @@ import { BackHandler, StyleSheet } from 'react-native';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { setAccountLocalPreferenceAccount, setAccountLocalPreferences } from '@/src/preferences/account-local';
 import { ActiveSessionConflictError, SessionUnavailableError } from '@/src/data/session-drafts';
+import { WorkoutLifecycleChanged } from '@/src/data/session-edit-baseline';
 import { subscribeOpenedWorkout } from '@/components/navigation/use-open-main-tab';
 
 import CompletedSessionDetailRoute, {
@@ -507,6 +508,24 @@ describe('CompletedSessionDetailScreenShell', () => {
     fireEvent.press(screen.getByTestId('completed-session-detail-options-button'));
     return screen.getByTestId('completed-session-detail-options-sheet');
   };
+
+  it.each(['resume', 'delete'] as const)('reloads a stale completed %s action before another explicit attempt', async action => {
+    const loadCompletedSession = jest.fn().mockResolvedValueOnce({ ...COMPLETED_SESSION_DETAIL_FIXTURE, mergeRevision: 1 })
+      .mockResolvedValue({ ...COMPLETED_SESSION_DETAIL_FIXTURE, mergeRevision: 2 });
+    const write = jest.fn().mockRejectedValueOnce(new WorkoutLifecycleChanged()).mockResolvedValue({ sessionId: COMPLETED_SESSION_DETAIL_FIXTURE.id });
+    await renderDetail(detailClient({ loadCompletedSession,
+      ...(action === 'resume' ? { resumeCompletedSession: write } : { setCompletedSessionDeletedState: write }) }));
+    openSessionOptions();
+    fireEvent.press(screen.getByTestId(`completed-session-detail-${action}-button`));
+    await screen.findByText('This workout changed elsewhere. Review its current state before trying again.');
+    await waitFor(() => expect(loadCompletedSession).toHaveBeenCalledTimes(2));
+    await screen.findByTestId('completed-session-detail-screen');
+    openSessionOptions();
+    fireEvent.press(screen.getByTestId(`completed-session-detail-${action}-button`));
+    await waitFor(() => expect(write).toHaveBeenCalledTimes(2));
+    expect(write.mock.calls[0]).toEqual(action === 'resume' ? [COMPLETED_SESSION_DETAIL_FIXTURE.id, 1] : [COMPLETED_SESSION_DETAIL_FIXTURE.id, true, 1]);
+    expect(write.mock.calls[1]).toEqual(action === 'resume' ? [COMPLETED_SESSION_DETAIL_FIXTURE.id, 2] : [COMPLETED_SESSION_DETAIL_FIXTURE.id, true, 2]);
+  });
 
   it('suppresses Resume, Delete and Edit while a resume write is pending and navigates only after success', async () => {
     let resolve!: (result: { sessionId: string }) => void;

@@ -8,7 +8,7 @@ export type SessionEntryResult = {
 export type PlannedSessionMaterializer = () => Promise<{ sessionId: string }>;
 
 export type SessionEntryCoordinator = {
-  resumeCompletedSession: (sessionId: string) => Promise<SessionEntryResult>;
+  resumeCompletedSession: (sessionId: string, expectedRevision?: number) => Promise<SessionEntryResult>;
   startEmptyOrResume: () => Promise<SessionEntryResult>;
   startPlannedOrResume: (
     materialize: PlannedSessionMaterializer,
@@ -16,7 +16,7 @@ export type SessionEntryCoordinator = {
 };
 
 export type SessionEntryDependencies = {
-  reopenCompletedSession: (sessionId: string) => Promise<{ sessionId: string }>;
+  reopenCompletedSession: (sessionId: string, options?: { expectedRevision: number }) => Promise<{ sessionId: string }>;
   loadActiveSessionId: () => Promise<string | null>;
   createEmptySession: () => Promise<{ sessionId: string }>;
 };
@@ -61,12 +61,13 @@ export function createSessionEntryCoordinator(
   };
 
   return {
-    resumeCompletedSession: (sessionId) => {
+    resumeCompletedSession: (sessionId, expectedRevision) => {
       const previous = inFlight;
       return track((async () => {
         // Resume must recheck its own target after a pending Start, never inherit that workout's success.
         if (previous) await previous.catch(() => undefined);
-        await dependencies.reopenCompletedSession(sessionId);
+        if (expectedRevision === undefined) await dependencies.reopenCompletedSession(sessionId);
+        else await dependencies.reopenCompletedSession(sessionId, { expectedRevision });
         return { kind: 'resumed', sessionId };
       })());
     },
@@ -76,7 +77,7 @@ export function createSessionEntryCoordinator(
 }
 
 /** The id of the one active (non-deleted) session, if there is one. */
-export const loadActiveSessionId = (): Promise<string | null> => findActiveSessionId();
+export const loadActiveSessionId = (preferredId?: string | null): Promise<string | null> => findActiveSessionId(preferredId);
 
 export const DEFAULT_SESSION_ENTRY_COORDINATOR = createSessionEntryCoordinator({
   reopenCompletedSession: reopenCompletedSessionDraft,

@@ -339,7 +339,9 @@ only and ignores the rest. Keeping a stored value when a key is omitted is per
 column — only a `_fields ? '<key>'` branch or a `coalesce` does, which a new
 column needs so an older writer cannot clear it.
 Server-first additions must also keep unknown entity types out of old-reader
-pulls. The kg-only rename and protocol-6 Routine layer shift require coordinated cutovers.
+pulls. The kg-only rename, Routine layer shift and protocol-7 workout lifecycle fence
+require coordinated cutovers. For workout session epochs and recovery, load
+[the agent workout contract](tech/agent-workout-contract.md).
 
 The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, in the backend gate)
 introspects migrated local Postgres and checks the FK order in

@@ -52,7 +52,7 @@ protected reparenting are refused; ordinary current-context soft deletes remain 
 
 ## Protected history sync
 
-Authenticated sync now requires `x-boga-sync-protocol: 6`. Group representation remains protocol 4.
+Authenticated sync now requires `x-boga-sync-protocol: 7`. Group representation remains protocol 4.
 Old sync clients receive UPDATE_REQUIRED before revised behavior.
 Coordinate activation with app distribution: the server accepts one sync version.
 This code change does not deploy the migration or authorize activation.
@@ -66,6 +66,8 @@ Their original editor clock precedes LWW clamping, so lost-acknowledgement retri
 `sync_pull` includes committed `merge_sequence` and `merge_conflict_count`.
 Sequence discovery avoids the ordinary timestamp cursor's commit-order race.
 A known uncertain-operation receipt also triggers discovery before convergence.
+For session lifecycle receipts, empty/absent offline graphs and editor baselines,
+load [the workout handoff contract](agent-workout-contract.md).
 
 The client stages an exhaustive, token-fenced snapshot of affected sessions and required ancestors
 in durable pages, including Routine use ancestors before performed rows. Same-slot use repair commits with snapshot installation; losing work survives. Repeated uses never clear ordinary provenance. A changed token restarts staging; interruption resumes from its last page.

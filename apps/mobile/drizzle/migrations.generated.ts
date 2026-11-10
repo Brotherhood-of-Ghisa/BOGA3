@@ -181,6 +181,12 @@ export const generatedMigrationBundle = {
     tag: "0028_true_outlaw_kid",
     breakpoints: true,
   },
+  {
+    idx: 29,
+    when: 1794322745670,
+    tag: "0029_tough_zombie",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -951,6 +957,7 @@ ALTER TABLE \`session_plans\` ADD \`is_routine\` integer NOT NULL DEFAULT 0 CONS
 --> statement-breakpoint
 UPDATE sync_runtime_state SET pull_cursor = '{}';
 `,
+  m0029: `ALTER TABLE \`sessions\` ADD \`merge_revision\` integer DEFAULT 0 NOT NULL;`,
   },
 } as const;
 

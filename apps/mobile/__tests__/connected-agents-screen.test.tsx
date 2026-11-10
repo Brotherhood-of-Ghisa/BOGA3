@@ -6,6 +6,7 @@ const mockRevokeConnectedAgent = jest.fn();
 const mockSetAgentPlanPermission = jest.fn();
 const mockSetAgentPlanEditEnabled = jest.fn();
 const mockAlert = jest.fn();
+const mockSetAgentWorkoutLoggingEnabled = jest.fn();
 
 jest.mock('@/src/auth', () => ({
   useAuth: () => mockUseAuth(),
@@ -14,6 +15,7 @@ jest.mock('@/src/auth', () => ({
 jest.mock('@/src/auth/connected-agents', () => ({
   listConnectedAgents: (...args: unknown[]) => mockListConnectedAgents(...args),
   revokeConnectedAgent: (...args: unknown[]) => mockRevokeConnectedAgent(...args),
+  setAgentWorkoutLoggingEnabled: (...args: unknown[]) => mockSetAgentWorkoutLoggingEnabled(...args),
   setAgentPlanPermission: (...args: unknown[]) => mockSetAgentPlanPermission(...args),
   setAgentPlanEditEnabled: (...args: unknown[]) => mockSetAgentPlanEditEnabled(...args),
 }));
@@ -41,6 +43,7 @@ const agent = {
   name: 'Coach Agent',
   planAccessEnabled: false,
   planEditEnabled: false,
+        workoutLoggingEnabled: false,
   scopes: ['openid', 'profile'],
 };
 
@@ -52,7 +55,33 @@ describe('Connected agents screen', () => {
     mockRevokeConnectedAgent.mockResolvedValue(undefined);
     mockSetAgentPlanPermission.mockResolvedValue(undefined);
     mockSetAgentPlanEditEnabled.mockResolvedValue(undefined);
+    mockSetAgentWorkoutLoggingEnabled.mockResolvedValue(undefined);
     jest.spyOn(Alert, 'alert').mockImplementation((...args: unknown[]) => mockAlert(...args));
+  });
+
+  it('confirms the independent workout grant and leaves plan permissions unchanged', async () => {
+    renderWithTheme(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+    expect(screen.getByLabelText('Allow workout logging')).toBeTruthy();
+    await act(async () => fireEvent.press(screen.getByTestId('connected-agent-workout-logging-client-a')));
+    expect(mockSetAgentWorkoutLoggingEnabled).toHaveBeenCalledWith('client-a', true, agent.grantedAt);
+    expect(screen.getByTestId('connected-agent-workout-logging-client-a').props.accessibilityState).toEqual({ checked: true });
+    expect(screen.getByTestId('connected-agent-plan-access-client-a').props.accessibilityState).toEqual({ checked: false });
+    expect(mockSetAgentPlanPermission).not.toHaveBeenCalled();
+    expect(mockSetAgentPlanEditEnabled).not.toHaveBeenCalled();
+  });
+
+  it('marks an unconfirmed workout save unavailable and reloads its actual value before allowing another change', async () => {
+    mockSetAgentWorkoutLoggingEnabled.mockRejectedValueOnce(new Error('Lost response'));
+    mockListConnectedAgents.mockResolvedValueOnce([agent]).mockResolvedValueOnce([{ ...agent, workoutLoggingEnabled: true }]);
+    renderWithTheme(<ConnectedAgentsScreen />);
+    await screen.findByTestId('connected-agent-client-a');
+    await act(async () => fireEvent.press(screen.getByTestId('connected-agent-workout-logging-client-a')));
+    expect(screen.getByTestId('connected-agent-workout-logging-client-a').props.accessibilityState)
+      .toEqual({ checked: false, disabled: true });
+    expect(screen.getByText('Could not confirm workout logging access. Reload to check.')).toBeTruthy();
+    await act(async () => fireEvent.press(screen.getByLabelText('Retry loading connected agents')));
+    expect(screen.getByTestId('connected-agent-workout-logging-client-a').props.accessibilityState).toEqual({ checked: true });
   });
 
   it('shows agent name, read-only access, grant time, and last access', async () => {
@@ -144,7 +173,8 @@ describe('Connected agents screen', () => {
     expect(String(disclosure.props.children)).toMatch(/create new plans and programmes/);
     expect(String(disclosure.props.children)).toMatch(/add, edit, delete or restore exercises and their muscles/);
     expect(String(disclosure.props.children)).toMatch(/recalculate your past figures/);
-    expect(String(disclosure.props.children)).toMatch(/never start a workout or change your logged sets/);
+    expect(String(disclosure.props.children)).toMatch(/This setting does not allow workout logging/);
+    expect(String(disclosure.props.children)).toContain('set weekly muscle targets');
     expect(String(disclosure.props.children)).not.toMatch(/never edit or delete plans/);
 
     expect(
@@ -153,7 +183,7 @@ describe('Connected agents screen', () => {
     const editDisclosure = screen.getByTestId('connected-agent-plan-edit-disclosure-client-a');
     expect(String(editDisclosure.props.children)).toContain('Coach Agent');
     expect(String(editDisclosure.props.children)).toMatch(/edit pending session plans and training programmes/);
-    expect(String(editDisclosure.props.children)).toMatch(/never edit workouts in progress or change logged workout history/);
+    expect(String(editDisclosure.props.children)).toMatch(/This setting does not allow workout logging/);
   });
 
   it('enables plan access optimistically and persists it for the live grant', async () => {
@@ -265,6 +295,7 @@ describe('Connected agents screen', () => {
       name: 'Coach B',
       planAccessEnabled: false,
       planEditEnabled: false,
+        workoutLoggingEnabled: false,
       scopes: ['openid'],
     };
     mockListConnectedAgents.mockResolvedValue([agent, agentB]);
@@ -343,6 +374,7 @@ describe('Connected agents screen', () => {
       name: 'Coach B',
       planAccessEnabled: false,
       planEditEnabled: false,
+        workoutLoggingEnabled: false,
       scopes: ['openid'],
     };
     mockListConnectedAgents.mockResolvedValue([agent, agentB]);

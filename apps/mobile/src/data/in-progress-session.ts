@@ -6,9 +6,8 @@ import { gyms, sessions } from './schema';
 type ReadTx = Pick<Transaction, 'select'>;
 
 /**
- * The workout in progress: the most recent active, non-deleted session — the
- * one the recorder opens. Should sync leave a second active row, only this one
- * is read.
+ * The default/analytics selection: the most recent active, non-deleted session.
+ * Train can retain another explicitly opened active workout independently.
  */
 export const selectInProgressSessionRow = (
   database: ReadTx
