@@ -52,4 +52,4 @@ cardio summary.
 Why: the coach should factor cardio into advice without counting a gym session twice.
 Code: `supabase/functions/agent-api/activities.ts`;
 `supabase/migrations/20261110213906_health_activities.sql`.
-Pending: The app does not import activities yet: `apps/mobile` has no health-store reader.
+Code: the phone import in `apps/mobile/src/health-import/`.
