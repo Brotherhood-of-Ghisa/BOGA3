@@ -96,24 +96,28 @@ run_cow_stream_final_cases() {
 }
 
 run_cow_stream_lock_case() {
-  local group="$1" template="$2" secret="$3" id holder holder_pid claim deadline log_dir
+  local group="$1" template="$2" secret="$3" id holder holder_pid backend_pid claim deadline log_dir
   id="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
   cow_worker_fixture "${template}" "${id}" 81
-  run_psql "update app_public.group_cows set available_at=clock_timestamp() where id='${id}';" >/dev/null
   holder="cow-row-lock-${RUN_TAG}"; log_dir="$(mktemp -d)"
   (run_psql_once "select set_config('application_name','${holder}',false); begin;
     select id from app_public.groups where id='${group}' for update;
-    select pg_sleep(2);
-    select pg_advisory_xact_lock(hashtextextended('group-cow:'||'${group}',0)); commit;") >"${log_dir}/holder" 2>&1 & holder_pid=$!
+    select pg_sleep(30); rollback;") >"${log_dir}/holder" 2>&1 & holder_pid=$!
   deadline=$((SECONDS+10))
   until [[ "$(run_psql "select exists(select 1 from pg_stat_activity where application_name='${holder}' and wait_event='PgSleep');")" == t ]]; do
     [[ ${SECONDS} -lt ${deadline} ]] || { wait "${holder_pid}" || true; fail 'management lock fixture did not start'; }
     sleep 0.02
   done
-  claim="$(run_psql 'select app_public.group_cow_eval_claim(20);')"
-  wait "${holder_pid}" || fail 'CoW worker inverted the management lock order'
+  backend_pid="$(run_psql "select pid from pg_stat_activity where application_name='${holder}' and wait_event='PgSleep';")"
+  [[ -n "${backend_pid}" ]] || fail 'CoW lock holder ended before the probe'
+  # Background pg_net workers may claim eligible work: expose it only inside
+  # the held lock, and assert before releasing, never in an unlocked window.
+  run_psql "update app_public.group_cows set available_at=clock_timestamp() where id='${id}';" >/dev/null
+  claim="$(run_psql "set statement_timeout='5s'; select app_public.group_cow_eval_claim(20);")"
   [[ "$(jq --arg c "${id}" 'all(.jobs[];.cow_id!=$c)' <<<"${claim}")" == true ]] || fail 'claim took the fence before a locked group row'
   [[ "$(cow_stream_events "${id}")" == '' ]] || fail 'skipped claim emitted start'
+  run_psql "select pg_terminate_backend(${backend_pid});" >/dev/null
+  wait "${holder_pid}" || true
   cow_run "${id}" "${secret}"
   [[ "$(cow_stream_events "${id}")" == started,ended,results ]] || fail 'claim failed after management released the row'
   rm -rf "${log_dir}"

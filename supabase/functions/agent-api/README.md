@@ -1,7 +1,6 @@
-# BoGa3 read-only agent API v1
+# BoGa3 agent API v1
 
-This Edge Function is the authenticated data boundary for the BoGa Virtual
-Coach. Public deployment prefix:
+Authenticated Virtual Coach boundary. Public deployment prefix:
 
 ```text
 https://<project>.supabase.co/functions/v1/agent-api
@@ -11,8 +10,11 @@ Every route below validates the bearer token live with Supabase Auth, requires
 its OAuth `client_id` and an active matching grant, derives the owner from the
 validated subject, and performs an explicit owner-filtered read. The read routes
 accept `GET` only; the write routes accept `POST` (`PUT` for muscle targets)
-and require a current-grant plan permission. GET bodies and caller identity
+and require their current-grant permission. GET bodies and caller identity
 fields (`user_id`, `userId`, `owner_user_id`) are rejected.
+
+For active workout reads/writes and staged enablement, load
+[workout logging](../../../docs/specs/tech/agent-workout-contract.md).
 
 Success envelope:
 
