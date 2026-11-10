@@ -7,11 +7,12 @@
 
 ## Objective and scope
 
-Deliver the dedicated Injury Management screen in Profile / Settings for
-athletes to view active and resolved injuries, log a new injury or tweak,
-record pain check-ins, update lifecycle states, and resolve injuries.
-Follow milestone D1 and D2. This task does not touch live session execution
-or exercise replacement in active workouts.
+Deliver the dedicated Injury Management screen in Profile / Settings as well
+as in-session modal launch affordances for athletes to view active and resolved
+injuries, log a new injury or tweak, record pain check-ins, update lifecycle
+states, and resolve injuries. Follow milestone D1 and D2. This task delivers
+the UI surfaces and editor sheet; in-workout warning banners and exercise
+substitutions follow in T03.
 
 ## Baseline to verify
 
@@ -24,7 +25,11 @@ form components (`components/ui/form-field.tsx`, `form-section.tsx`). Inspect
 ## Open — resolve before coding
 
 - Screen navigation structure: dedicated route `app/injuries.tsx` and modal
-  editor `app/injury-editor.tsx` (or sheet).
+  editor `app/injury-editor.tsx` (or sheet component reusable from both Profile
+  and in-session trigger sites).
+- In-session launch points: ensure the editor sheet can be triggered directly
+  with pre-filled muscle context from live workout exercise headers or skip
+  prompts.
 - Input interaction design:
   - Search-as-you-type using `ANATOMY_ALIASES` with muscle group fallback.
   - Interactive body mesh tap selector to pick anatomy and side visually.
@@ -38,13 +43,15 @@ form components (`components/ui/form-field.tsx`, `form-section.tsx`). Inspect
 
 1. Implement `app/injuries.tsx` showing active injuries, severity badges, and
    resolved history.
-2. Implement injury creation/editing form with alias search, side selection,
-   pain rating slider, and optional notes/contraindications.
-3. Mobile repository `apps/mobile/src/data/injuries.ts` with local SQLite CRUD
+2. Implement injury creation/editing modal sheet with alias search, side
+   selection, pain rating slider, and optional notes/contraindications.
+3. Expose reusable modal triggers so the live session recorder can open the
+   injury editor with pre-filled anatomical context.
+4. Mobile repository `apps/mobile/src/data/injuries.ts` with local SQLite CRUD
    operations, dirty-flag marking, and reactive queries.
-4. Component and unit tests covering validation, state transitions, and
+5. Component and unit tests covering validation, state transitions, and
    repository persistence.
-5. Maestro verification flow for injury creation, update, and resolution.
+6. Maestro verification flow for injury creation, update, and resolution.
 
 ## Gates
 

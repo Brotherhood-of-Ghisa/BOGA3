@@ -24,13 +24,15 @@ physical limitations when generating session plans.
   - Owner-private sync boundary mirroring the privacy standards established for
     bodyweight in `docs/specs/tech/bodyweight-load-contract.md` (strictly
     private; never leaked to groups, social feeds, or leaderboards).
-  - Mobile UI in Profile/Settings to log, update, check in on, and resolve
-    injuries.
-  - Live workout warnings: contextual alerts on exercises stressing injured
-    muscles/sides, with 1-tap movement substitutions and early-stop / skip
-    reasons.
-  - Set-level pain/discomfort notation and `'rehab'` set type protection
-    ensuring rehab volume does not corrupt working set volume or 1RM/PR curves
+  - Mobile UI in Profile/Settings and session recorder entry points (exercise
+    menu, skip prompts) to log, update, check in on, and resolve injuries.
+  - Live workout warnings: tiered contextual alerts (`acute` banners with 1-tap
+    movement substitutions and session-level dismissal; subtle badges for
+    `managing`/`monitoring`) and discomfort skip reasons with 1-tap logging
+    prompts.
+  - Set-level `'rehab'` effort classification
+    (`apps/mobile/src/exercise-calculations/effort-policy.ts`) ensuring rehab
+    volume does not corrupt working set volume or 1RM/PR curves
     (`docs/specs/tech/training-metrics-contract.md`).
   - 3D/2D muscle heatmap visual status overlay (`muscle-body-mesh`) and tissue
     reloading analytics (weekly working sets on recovering muscles).
@@ -77,29 +79,50 @@ leaderboards.
 ### D3. In-workout contextual guidance and non-destructive substitution
 
 When an athlete views an exercise in an active workout that involves an
-actively injured muscle/side (`acute` or `managing`), a non-blocking warning
-banner indicates the flare-up and pain triggers. A 1-tap "Swap" modal suggests
-exercises sharing the primary movement pattern that spare the affected tissue.
-Skipping or aborting an exercise provides a 1-tap reason: "Discomfort / Injury
-flare-up".
+actively injured muscle/side:
+1. `acute`: displays a prominent, dismissible warning banner highlighting the
+   flare-up and pain triggers, with a 1-tap "Swap" modal. Tapping dismiss
+   provides "Dismiss for this session" so lifters are not nagged across
+   subsequent sets of that exercise.
+2. `managing` or `monitoring`: displays a subtle indicator badge on the
+   exercise header without disruptive banner overlays, avoiding alert fatigue
+   during long-term rehabilitation.
+3. Substitution logic provides curated replacement mappings for major compound
+   lifts (Squat, Bench, Deadlift, Overhead Press) and primary-muscle
+   alternatives with joint-friendly / equipment filters (e.g. barbell →
+   dumbbell/machine/bodyweight), leaving final exercise selection in the
+   athlete's control.
+4. Abort / skip reason: selecting "Discomfort / Injury flare-up" offers a 1-tap
+   follow-up prompt to log a new injury or record a flare-up check-in.
 
 ### D4. Metric and PR integrity protection
 
-A new set classification (`setType: 'rehab'`) and optional discomfort tag
-(`painScore: 0..10`) prevent rehabilitation work from degrading historical
-performance curves:
-1. Rehab sets do not register as failed attempts on historical 1RM curves.
-2. Rehab sets are tracked separately from primary working volume in muscle
-   report targets.
-3. Workout execution audit records and performed history remain intact.
+A new set effort classification (`setType: 'rehab'`) added to `EFFORT_CHOICES`
+in `apps/mobile/src/exercise-calculations/effort-policy.ts` and `set.eligibility`
+in `docs/product/set.md`:
+1. In `set.eligibility`, `'rehab'` defaults to `working: no`, `volume: no` for
+   personal, group, and coaching calculations (identical to `technique` and
+   `cooldown`).
+2. Rehab sets do not register as failed attempts on historical 1RM curves and
+   never qualify for personal records or estimated 1RM calculations
+   (`docs/specs/tech/training-metrics-contract.md`).
+3. Rehab sets do not count toward primary working set targets in muscle report
+   analytics, but can be inspected under dedicated recovery filtering.
+4. Workout execution audit records and performed history remain intact.
+5. In-workout set rows avoid high-friction per-set 0–10 sliders; numerical pain
+   scores (0–10) are captured during injury check-ins and lifecycle status
+   updates.
 
 ### D5. Heatmap overlay and tissue load management
 
 The 3D/2D muscle mesh projection (`muscle-body-projection.ts`) supports visual
 injury badges and highlighted contours on affected muscles and sides.
 Progress/Recovery views gain a "Tissue Reloading" card showing accumulated
-weekly volume (working sets) on the injured structure to prevent premature
-volume spikes.
+weekly volume (working sets and rehab sets) on the injured structure.
+A caution indicator alerts the athlete when weekly sets on an injured muscle
+spike >30% over the 4-week pre-injury baseline average, gated by an absolute
+volume floor (minimum $\ge 6$ sets) to prevent false alarms on trivial volume
+increments (e.g. 1 set to 2 sets).
 
 ### D6. AI Virtual Coach and MCP integration
 
@@ -118,6 +141,17 @@ and flags contraindications.
 - `INVALID_ANATOMY_REFERENCE` (400)
 - `INJURY_PERMISSION_REQUIRED` (403)
 
+### D8. Product facts to graduate
+
+Implementation PRs graduate durable rules into `docs/product/`:
+- `set.eligibility`: `'rehab'` effort choice behavior (`working: no`,
+  `volume: no` across personal, group, and coaching defaults).
+- `injury.lifecycle`: definitions and state transitions for `acute`,
+  `managing`, `monitoring`, and `resolved`.
+- `injury.privacy`: strict owner isolation and zero-group-disclosure contract.
+- `injury.reload-threshold`: 4-week baseline average and absolute set floor
+  rules for tissue reload caution warnings.
+
 ## Task breakdown
 
 One card = one session = one worktree = one implementation PR. Merge this
@@ -128,10 +162,10 @@ also deletes this milestone. Durable rules graduate to their owning docs.
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
 | [M42-T01](../tasks/M42-T01-Injury_contract_and_sync_schema.md) | Author technical contract, Postgres migration, mobile Drizzle schema, and Sync v2 topo ordering | none | planned |
-| [M42-T02](../tasks/M42-T02-Mobile_injury_management_ui.md) | Profile/Settings injury dashboard: log, check-in, edit, and resolve active injuries | T01 | planned |
-| [M42-T03](../tasks/M42-T03-Live_workout_warnings_and_substitutions.md) | In-workout injury warning banners, 1-tap exercise substitutions, and abort reasons | T01, T02 | planned |
-| [M42-T04](../tasks/M42-T04-Set_rehab_tagging_and_metric_protection.md) | Set-level rehab/pain tagging, 1RM/PR exclusion rules, and volume calculation updates | T01 | planned |
-| [M42-T05](../tasks/M42-T05-Heatmap_injury_overlay_and_reload_analytics.md) | 3D muscle mesh injury visualization and tissue reload volume tracking | T01, T02, T04 | planned |
+| [M42-T02](../tasks/M42-T02-Mobile_injury_management_ui.md) | Profile/Settings and in-session injury entry points: log, check-in, edit, and resolve active injuries | T01 | planned |
+| [M42-T03](../tasks/M42-T03-Live_workout_warnings_and_substitutions.md) | Tiered live workout warnings, session dismissal, curated substitutions, and abort reasons | T01, T02 | planned |
+| [M42-T04](../tasks/M42-T04-Set_rehab_tagging_and_metric_protection.md) | Set-level 'rehab' effort choice, 1RM/PR exclusion rules, and volume calculation updates | T01 | planned |
+| [M42-T05](../tasks/M42-T05-Heatmap_injury_overlay_and_reload_analytics.md) | 3D muscle mesh injury visualization and tissue reload volume tracking with set-floor gating | T01, T02, T04 | planned |
 | [M42-T06](../tasks/M42-T06-MCP_coach_tools_and_agent_api.md) | Edge API routes and MCP tools for active injury reads, logging, and plan checks | T01 | planned |
 | [M42-T07](../tasks/M42-T07-Milestone_closeout_and_spec_graduation.md) | Quality gates (coverage, complexity, deps), spec graduation, and milestone closeout | T03, T05, T06 | planned |
 

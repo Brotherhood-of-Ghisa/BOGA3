@@ -7,11 +7,11 @@
 
 ## Objective and scope
 
-Provide real-time injury awareness during active workouts by displaying
-non-blocking warning banners on exercises that stress injured muscles/sides,
-enabling 1-tap movement pattern substitutions, and offering 1-tap abort
-reasons when exercises are skipped. Follow milestone D1 and D3. This task
-does not modify set-level metric calculations or PR history.
+Provide real-time injury awareness during active workouts by displaying tiered,
+non-blocking alerts on exercises that stress injured muscles/sides, session-level
+dismissal to avoid alert fatigue, curated movement substitutions, and 1-tap
+abort reasons with injury logging prompts. Follow milestone D1 and D3. This
+task does not modify set-level metric calculations or PR history.
 
 ## Baseline to verify
 
@@ -24,28 +24,41 @@ Review `exercise_muscle_mappings` queries in `apps/mobile/src/exercise-catalog/`
 ## Open — resolve before coding
 
 - Matching heuristic: when does an exercise trigger a warning?
-  - Exercise primary or secondary muscle matches active injury `muscle_group_id`
-    AND injury status is `acute` or `managing`.
+  - Exercise primary or secondary muscle matches active injury `muscle_group_id`.
   - Side matching: unilateral exercise side matches injury side, or bilateral
     exercise involves an injured side.
-- Warning presentation: compact, dismissible alert chip/banner above set entry
-  stating the active injury label, days since onset, and pain triggers.
-- Substitution logic: filter exercises by matching primary muscle while
-  excluding the aggravated movement or equipment (e.g. Barbell Back Squat → Box
-  Squat or Leg Press; Barbell Bench Press → Neutral-Grip DB Press).
-- Abort / skip reason: when skipping an exercise, provide a 1-tap reason:
-  "Discomfort / Injury flare-up".
+- Tiered presentation and dismissal:
+  - `acute`: prominent warning banner above set entry stating the injury label,
+    days since onset, and pain triggers. Tapping dismiss offers "Dismiss for
+    this session" to prevent repeated alerts across remaining sets.
+  - `managing` or `monitoring`: compact indicator badge on exercise header
+    without intrusive banners to avoid alert fatigue during long rehab cycles.
+- Curated substitution logic:
+  - Curated replacement catalog for major compound movements (e.g. Barbell Back
+    Squat → Box Squat / Leg Press; Barbell Bench Press → Neutral-Grip DB Press;
+    Deadlift → Trap Bar / Romanian Deadlift).
+  - General fallback: filter exercises by matching primary muscle while
+    offering equipment/joint-friendly alternatives (machines, dumbbells),
+    leaving final selection in the athlete's control.
+- In-session entry points and skip reasons:
+  - Exercise card kebab menu includes "Report Discomfort / Injury" launching
+    the injury modal from T02.
+  - When skipping an exercise, provide 1-tap reason "Discomfort / Injury flare-up"
+    with an immediate prompt to log or check in on the injury.
 
 ## Deliverables and acceptance
 
 1. Hook in session recorder resolving active injury warnings for all exercises
    in the active session without blocking main thread rendering.
-2. Subtle in-workout warning banner rendered on affected exercise cards.
-3. Substitution sheet suggesting alternative exercises that spare the affected
-   muscle/side, swapping the block in the active session graph safely.
-4. Skip/Abort dialog option recording discomfort as the skip reason.
-5. Unit and component tests proving warning triggers, side awareness, and safe
-   block replacement.
+2. Tiered in-workout UI: prominent warning banner for `acute` injuries (with
+   "Dismiss for this session") and subtle header badges for `managing` status.
+3. Substitution sheet suggesting curated and muscle-matching alternative
+   exercises, swapping the block in the active session graph safely.
+4. Skip/Abort dialog option recording discomfort as the skip reason with 1-tap
+   launch of the injury check-in sheet.
+5. In-session exercise kebab menu affordance to report discomfort/injury.
+6. Unit and component tests proving warning triggers, side awareness, session
+   dismissal state, and safe block replacement.
 
 ## Gates
 

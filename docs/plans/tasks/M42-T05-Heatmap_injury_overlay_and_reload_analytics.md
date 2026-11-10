@@ -27,10 +27,12 @@ conventions in `components/ui/tokens.ts`.
   - Distinguish `acute` (high vigilance highlight) from `managing` /
     `monitoring` (subtle badge or contour).
 - Tissue Reload card in Progress:
-  - Weekly working sets and tonnage accumulated on the injured muscle group.
-  - Recovery trend comparing current weekly sets to pre-injury baseline average.
-  - Caution indicator if weekly set volume spikes >30% week-over-week during
-    active rehab.
+  - Weekly working sets and rehab volume accumulated on the injured muscle group.
+  - Recovery trend comparing current weekly sets to 4-week pre-injury baseline
+    average.
+  - Caution indicator: alerts if weekly set volume spikes >30% over the 4-week
+    pre-injury baseline average, gated by an absolute volume floor (minimum $\ge 6$
+    sets) to prevent false alerts on trivial volume changes.
 
 ## Deliverables and acceptance
 
