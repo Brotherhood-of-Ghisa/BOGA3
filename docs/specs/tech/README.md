@@ -23,6 +23,9 @@ Current docs:
   planning and programmes: data model, schema, 16-entity Sync v2 expansion,
   materialization algorithms, block lifecycle, agent write permissions/API, and
   MCP tools.
+- `health-activities-contract.md`: imported health-app activities — the
+  owner-private table, the app's write RPC, the strength-overlap rule and the
+  coach's reads.
 - `group-competition-contract.md`: group competition representation —
   metric/unit meaning, the public boundary and disclosure, witness history and
   the protocol-4 server surface.

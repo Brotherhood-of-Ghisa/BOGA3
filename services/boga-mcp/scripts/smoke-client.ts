@@ -18,6 +18,9 @@ const smokeMuscleId = process.env.BOGA_MCP_SMOKE_MUSCLE_ID?.trim() ?? '';
 // Seeded beside it with report_group `mcp_smoke_group` and tracked 0.
 const smokeGroupedMuscleId = process.env.BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID?.trim() ?? '';
 const skipReads = process.env.BOGA_MCP_SMOKE_SKIP_READS === '1';
+// Seeded locally: `<prefix>-run` (running) and `<prefix>-lift` (a strength
+// workout inside the seeded session).
+const activityPrefix = process.env.BOGA_MCP_SMOKE_ACTIVITY_PREFIX?.trim() ?? '';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -87,6 +90,7 @@ try {
     'get_active_workout',
     'get_exercise_context',
     'get_exercise_history',
+    'get_recent_activities',
     'get_recent_workouts',
     'get_training_profile',
     'get_training_status',
@@ -182,6 +186,33 @@ try {
     )
   ) {
     throw new Error('Training status did not return the bounded shape with the test exercise as a favourite.');
+  }
+  const cardio = trainingStatus.cardio;
+  if (!isObject(cardio) || !isObject(cardio.this_week) || !Array.isArray(cardio.last_4_weeks)
+    || typeof cardio.overlapping_excluded !== 'number' || typeof cardio.complete !== 'boolean') {
+    throw new Error('Training status did not return the cardio summary.');
+  }
+
+  if (activityPrefix) {
+    const listed = structured(
+      await client.callTool({ arguments: { limit: 50 }, name: 'get_recent_activities' }),
+      'get_recent_activities',
+    );
+    const activities = (Array.isArray(listed.activities) ? listed.activities : []).filter(isObject);
+    const run = activities.find((activity) => activity.external_id === `${activityPrefix}-run`);
+    const lift = activities.find((activity) => activity.external_id === `${activityPrefix}-lift`);
+    if (
+      !run || run.activity_type !== 'running' || run.overlaps_logged_session !== false || run.distance_m !== 800
+      || !lift || lift.overlaps_logged_session !== true || lift.overlapping_session_id !== expectedSessionId
+    ) {
+      throw new Error('Recent activities did not return the seeded run and the strength workout flagged as the session.');
+    }
+    const weeks = [cardio.this_week, ...cardio.last_4_weeks].filter(isObject);
+    const runs = weeks.flatMap((week) => (Array.isArray(week.by_type) ? week.by_type : []).filter(isObject))
+      .filter((entry) => entry.activity_type === 'running');
+    if (runs.length === 0 || cardio.overlapping_excluded < 1) {
+      throw new Error('The cardio summary did not count the run and exclude the overlapping strength workout.');
+    }
   }
 
   // Drain exact exercise history across pages
@@ -592,5 +623,5 @@ try {
   await client.close();
 }
 
-console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-two tools discovered and reads/denials verified');
+console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-three tools discovered and reads/denials verified');
 

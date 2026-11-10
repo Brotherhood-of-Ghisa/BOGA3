@@ -1,5 +1,10 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.98.0';
 
+import {
+  ACTIVE_SESSION_MAX_MS, ACTIVITY_COLUMNS, ActivityQueryError, activityCursorFrom, buildCardioSummary, cardioReadStart,
+  overlapReadWindows,
+  parseActivityRange, projectActivity, type ActivityRow, type OverlapSessionRow,
+} from './activities.ts';
 import { summarizeVolume } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations/records.ts';
 import { isSessionSetType } from '../../../apps/mobile/src/data/set-types.ts';
@@ -21,7 +26,7 @@ import {
   asMuscleReportRows, buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, STATUS_READ_DAYS, statusReadComplete,
   trainingStatusWindow,
   type StatusBlockRow, type StatusDefinitionRow, type StatusMappingRow, type StatusMuscleRow,
-  type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining,
+  type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining, type TrainingStatusWindow,
 } from './training-status.ts';
 import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
@@ -356,6 +361,7 @@ const routeToolName = (path: string, method: string): string => {
   if (method === 'POST' && /^\/v1\/agent\/exercises\/[^/]+$/.test(path)) return 'update_exercise';
   if (path === '/v1/agent/workouts/recent') return 'get_recent_workouts';
   if (path === '/v1/agent/training-status') return 'get_training_status';
+  if (path === '/v1/agent/activities') return 'get_recent_activities';
   if (path === '/v1/agent/muscle-targets') return 'set_muscle_targets';
   if (path === '/v1/agent/session-plans') {
     return method === 'POST' ? 'create_session_plan' : 'get_upcoming_session_plans';
@@ -1823,6 +1829,106 @@ const loadFavouriteHistory = async (
   return { training: { sessions, blocks, sets: sets.rows }, truncated };
 };
 
+const DEFAULT_ACTIVITY_LIMIT = 20;
+const MAX_ACTIVITY_LIMIT = 50;
+const STATUS_MAX_ACTIVITIES = 500;
+const MAX_OVERLAP_SESSIONS = 500;
+
+const asActivityQuery = <T>(read: () => T, code = 'INVALID_ARGUMENT'): T => {
+  try {
+    return read();
+  } catch (error) {
+    if (error instanceof ActivityQueryError) throw new ApiError(400, code, error.message);
+    throw error;
+  }
+};
+
+/**
+ * The owner's completed and active sessions that share time with any
+ * strength activity in `rows` (`overlapReadWindows`): the ones such an
+ * activity may duplicate. `truncated` when the read hit its cap, so a flag may
+ * be missing. Every clause value is a number the server computed.
+ */
+const loadActivityOverlaps = async (
+  client: SupabaseClient, userId: string, rows: readonly ActivityRow[],
+): Promise<{ rows: OverlapSessionRow[]; truncated: boolean }> => {
+  const windows = overlapReadWindows(rows);
+  if (windows.length === 0) return { rows: [], truncated: false };
+  const clauses = windows.map(({ fromMs, toMs }) =>
+    `and(started_at.lt.${toMs},or(completed_at.gt.${fromMs},and(status.eq.active,started_at.gt.${fromMs - ACTIVE_SESSION_MAX_MS})))`);
+  const { data, error } = await client.schema('app_public').from('sessions')
+    .select('id,status,started_at,completed_at').eq('owner_user_id', userId).is('deleted_at', null)
+    .or(clauses.join(','))
+    .order('started_at', { ascending: false }).order('id').limit(MAX_OVERLAP_SESSIONS + 1)
+    .returns<OverlapSessionRow[]>();
+  throwDatabaseError(error);
+  return { rows: (data ?? []).slice(0, MAX_OVERLAP_SESSIONS), truncated: (data?.length ?? 0) > MAX_OVERLAP_SESSIONS };
+};
+
+const getRecentActivities = async (
+  client: SupabaseClient,
+  userId: string,
+  url: URL,
+): Promise<JsonObject> => {
+  rejectUnexpectedQuery(url, new Set(['from', 'to', 'limit', 'cursor']));
+  const limit = parseBoundedInteger(
+    url.searchParams.get('limit'), DEFAULT_ACTIVITY_LIMIT, 1, MAX_ACTIVITY_LIMIT, 'limit',
+  );
+  const range = asActivityQuery(() => parseActivityRange(url.searchParams.get('from'), url.searchParams.get('to')));
+  const rawCursor = decodeCursor(url.searchParams.get('cursor'), 'activity');
+  const cursor = rawCursor ? asActivityQuery(() => activityCursorFrom(rawCursor), 'INVALID_CURSOR') : null;
+
+  let query = client.schema('app_public').from('health_activities').select(ACTIVITY_COLUMNS)
+    .eq('user_id', userId)
+    .order('started_at', { ascending: false }).order('source').order('external_id')
+    .limit(limit + 1);
+  if (range.from !== null) query = query.gte('started_at', range.from);
+  if (range.to !== null) query = query.lt('started_at', range.to);
+  if (cursor) {
+    const at = postgrestQuote(cursor.started_at);
+    const source = postgrestQuote(cursor.source);
+    const externalId = postgrestQuote(cursor.external_id);
+    query = query.or(
+      `started_at.lt.${at},and(started_at.eq.${at},or(source.gt.${source},and(source.eq.${source},external_id.gt.${externalId})))`,
+    );
+  }
+  const { data, error } = await query.returns<ActivityRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  const page = rows.slice(0, limit);
+  const overlaps = await loadActivityOverlaps(client, userId, page);
+  const nowMs = Date.now();
+  const last = page[page.length - 1];
+  return {
+    activities: page.map((row) => projectActivity(row, overlaps.rows, nowMs)),
+    overlap_complete: !overlaps.truncated,
+    next_cursor: rows.length > limit && last
+      ? encodeCursor({ kind: 'activity', started_at: last.started_at, source: last.source, external_id: last.external_id })
+      : null,
+  };
+};
+
+/** The status's `cardio`: the activities since the oldest listed week, flagged against the sessions they overlap. */
+const loadStatusCardio = async (
+  client: SupabaseClient, userId: string, now: Date, window: TrainingStatusWindow, timeZone: string,
+): Promise<JsonObject> => {
+  // The window's dates carry the profile's wall clock; a day's margin each side
+  // covers any zone offset, and the builder keeps only the listed weeks.
+  const readFrom = new Date(cardioReadStart(window).getTime() - DAY_MS);
+  const readTo = new Date(window.plan.week.end.getTime() + DAY_MS);
+  const { data, error } = await client.schema('app_public').from('health_activities').select(ACTIVITY_COLUMNS)
+    .eq('user_id', userId).gte('started_at', readFrom.toISOString()).lt('started_at', readTo.toISOString())
+    .order('started_at', { ascending: false }).order('source').order('external_id')
+    .limit(STATUS_MAX_ACTIVITIES + 1).returns<ActivityRow[]>();
+  throwDatabaseError(error);
+  const rows = (data ?? []).slice(0, STATUS_MAX_ACTIVITIES);
+  const overlaps = await loadActivityOverlaps(client, userId, rows);
+  return buildCardioSummary({
+    rows, sessions: overlaps.rows, window, timeZone, nowMs: now.getTime(),
+    complete: (data?.length ?? 0) <= STATUS_MAX_ACTIVITIES && !overlaps.truncated,
+  });
+};
+
 const getTrainingStatus = async (
   client: SupabaseClient,
   userId: string,
@@ -1867,10 +1973,11 @@ const getTrainingStatus = async (
   const training: StatusTraining = { sessions, blocks: blocks.rows, sets: sets.rows };
   const window = trainingStatusWindow(now, timeZone);
   const favourites = rankFavouriteExercises(training, definitions, bodyweightCalculationsEnabled, window, timeZone);
-  const history = await loadFavouriteHistory(
-    client, userId, favourites.map((favourite) => favourite.exerciseId), bodyweightCalculationsEnabled,
-  );
-  return buildTrainingStatus({
+  const [history, cardio] = await Promise.all([
+    loadFavouriteHistory(client, userId, favourites.map((favourite) => favourite.exerciseId), bodyweightCalculationsEnabled),
+    loadStatusCardio(client, userId, now, window, timeZone),
+  ]);
+  const status = buildTrainingStatus({
     now, timeZone,
     settings: settings.data,
     muscleRows: muscles.data ?? [],
@@ -1887,6 +1994,7 @@ const getTrainingStatus = async (
       truncatedReads: [blocks, sets, mappings],
     }),
   });
+  return { ...status, cardio };
 };
 
 const getWorkoutDetail = async (
@@ -2962,6 +3070,9 @@ const dispatchAgentRequest = async (
   if (path === '/v1/agent/muscles') {
     rejectUnexpectedQuery(url, new Set());
     return listMuscles(client, agent.userId);
+  }
+  if (path === '/v1/agent/activities') {
+    return getRecentActivities(client, agent.userId, url);
   }
 
   const bodyweightCalculationsEnabled = await loadBodyweightCalculationsEnabled(client, agent.userId);

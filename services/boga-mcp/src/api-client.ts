@@ -193,6 +193,13 @@ export class BogaAgentApi {
     return this.#getObject('v1/agent/training-status', accessToken);
   }
 
+  async getRecentActivities(
+    accessToken: string,
+    input: { cursor?: string; from?: string; limit?: number; to?: string },
+  ): Promise<Record<string, unknown>> {
+    return this.#getObject('v1/agent/activities', accessToken, input);
+  }
+
   async setMuscleTargets(
     accessToken: string,
     input: MuscleTargetFields & { idempotency_key: string },

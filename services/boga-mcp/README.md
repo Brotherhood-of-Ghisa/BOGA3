@@ -1,8 +1,8 @@
 # BoGa MCP Virtual Coach
 
 `services/boga-mcp` is the public, authenticated MCP resource server for the
-BoGa Virtual Coach. It exposes twenty-two tools over stateless Streamable HTTP
-(ten read-only tools and twelve mutations) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
+BoGa Virtual Coach. It exposes twenty-three tools over stateless Streamable HTTP
+(eleven read-only tools and twelve mutations) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
 Supabase data credentials, SQL, or service-role key.
 
 ## Public endpoints
@@ -29,14 +29,18 @@ and does not offer server-sent event sessions.
 
 ## Tool surface
 
-Ten read-only tools:
+Eleven read-only tools:
 - `get_training_status` — one bounded check-in: per tracked muscle, sets on the
   three recovery days, today, this week and the four weeks before, with its
   weekly target and last trained date (Today's Plan's counting and order, under
   the coaching working-set rule, completed workouts only); the
   top ten exercises of the last 28 days with best 1RM in that window and the 28
   days before and the last record date; the target mode, default and
-  `revision`. Days are the profile `time_zone`'s.
+  `revision`; weekly `cardio` from imported health activities. Days are the
+  profile `time_zone`'s.
+- `get_recent_activities` — workouts imported from the person's health app,
+  newest first, flagging strength workouts that overlap a logged session
+  ([health activities](../../docs/specs/tech/health-activities-contract.md)).
 - `get_training_profile` — training preferences, equipment, gyms.
 - `list_muscles` — the muscle ids exercise mappings name, each with the
   person's `report_group` and `tracked` setup.

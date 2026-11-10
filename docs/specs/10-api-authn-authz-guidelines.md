@@ -114,6 +114,12 @@ Live OAuth grant validation, non-member/nonexistent equivalence, read-only route
 direct-table denial and existing MCP tools remain enforced. Full response
 semantics live in [`agent-api/README.md`](../../supabase/functions/agent-api/README.md#optional-bodyweight-calculation-response).
 
+Imported health activities follow the same boundary: OAuth tokens read them
+only through `agent-api` under the base read grant ([[agents.health-activities]]),
+and only the owner's app session writes them, through a `SECURITY DEFINER` RPC
+that rejects OAuth `client_id`s. When changing either path, load
+[`tech/health-activities-contract.md`](tech/health-activities-contract.md).
+
 The base OAuth grant stays read-only. A coaching client may read the upcoming
 plan queue, create new plans/programmes, edit exercises and set weekly muscle
 targets only while an
