@@ -32,8 +32,9 @@ sequence discovery and atomic merge/recovery RPCs, load
   `(owner_user_id, id)`, so cross-owner references cannot exist.
 - **Timestamps are `bigint` epoch ms.** The only `timestamptz` is the
   server-set `server_received_at`, the pull cursor axis.
-- **Minimal server validation.** The client is the only writer, so the server
-  validates nothing it could not itself cause:
+- **Minimal sync validation.** App sync payloads mirror the client schema.
+  Dedicated agent operations validate their own inputs separately; when changing
+  workout writes, load [their contract](agent-workout-contract.md).
   - No CHECK constraints on enum text, numeric ranges or text content, except
     `exercise_definitions_load_input_mode_valid` (`total_load |
     per_side_load`; analytics read it, so both stores reject invalid values)
@@ -155,7 +156,7 @@ sync RPCs (rule 13 of `docs/specs/10-api-authn-authz-guidelines.md`).
 
 The sync RPCs are `security invoker`, so these `authenticated` policies govern
 RPC writes and direct access alike. No `service_role` or RPC-owner policy is
-needed; `service_role` bypasses RLS and is for ops scripts only.
+needed; `service_role` bypasses RLS and stays in server API/ops code.
 
 `owner_user_id` is immutable: a BEFORE UPDATE trigger
 (`app_public.enforce_owner_user_id_immutable()`) refuses any change to it and

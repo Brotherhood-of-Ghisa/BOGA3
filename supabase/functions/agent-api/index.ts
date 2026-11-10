@@ -27,6 +27,7 @@ import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
   type ExerciseLoadRow, type SessionWeightRow, type EnteredSetRow,
 } from './training-metrics.ts';
+import { normalizeWorkoutInput, WorkoutInputError, type WorkoutOperation } from './workout-input.ts';
 
 const API_VERSION = 'v1';
 const DEFAULT_EXERCISE_LIMIT = 20;
@@ -151,6 +152,7 @@ const writeRateWindows = new Map<string, RateWindow>();
 // use up a coach's plan-writing allowance (and the reverse).
 const exerciseWriteRateWindows = new Map<string, RateWindow>();
 const muscleTargetsWriteRateWindows = new Map<string, RateWindow>();
+const workoutWriteRateWindows = new Map<string, RateWindow>();
 
 const getRequiredEnv = (name: string): string => {
   const value = Deno.env.get(name)?.trim();
@@ -340,6 +342,9 @@ const canonicalAgentPath = (url: URL): string => {
 };
 
 const routeToolName = (path: string, method: string): string => {
+  if (path === '/v1/agent/workouts/active') return 'get_active_workout';
+  const workoutOperation = workoutOperationFor(path);
+  if (workoutOperation) return workoutOperation;
   if (path === '/v1/agent/session') return 'mcp_session';
   if (path === '/v1/agent/profile') return 'get_training_profile';
   if (path === '/v1/agent/exercises') {
@@ -2149,6 +2154,89 @@ const sha256Hex = async (value: string): Promise<string> => {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
+const workoutOperationFor = (path: string): WorkoutOperation | null => {
+  const operations: Record<string, WorkoutOperation> = {
+    '/v1/agent/workouts/start': 'start_workout',
+    '/v1/agent/workouts/log-sets': 'log_sets',
+    '/v1/agent/workouts/update-set': 'update_set',
+    '/v1/agent/workouts/delete-set': 'delete_set',
+    '/v1/agent/workouts/finish': 'finish_workout',
+  };
+  return operations[path] ?? null;
+};
+
+const throwWorkoutError = (error: { message?: string } | null): void => {
+  if (!error) return;
+  const errors: Record<string, [number, string]> = {
+    WORKOUT_PERMISSION_REQUIRED: [403, 'Workout logging is not enabled for this coach.'],
+    NOT_FOUND: [404, 'Workout, exercise block or set not found.'],
+    FOREIGN_RESOURCE_REFERENCE: [400, 'Use an exercise or gym from the person\'s current library.'],
+    ACTIVE_WORKOUT_CONFLICT: [409, 'A server-visible workout is already active. Read active workouts and choose one explicitly.'],
+    WORKOUT_NOT_ACTIVE: [409, 'This workout is finished or deleted. Read its current state before continuing.'],
+    WORKOUT_REQUIRES_APP: [409, 'This workout contains authored-plan work. Continue it in BoGa; chat logging supports ad-hoc workouts.'],
+    AMBIGUOUS_EXERCISE_BLOCK: [409, 'This exercise appears more than once. Read the workout and choose a session_exercise_id.'],
+    REVISION_CONFLICT: [409, 'The workout changed. Read its current state and confirm the intended change before retrying with a fresh key.'],
+    IDEMPOTENCY_CONFLICT: [409, 'This key already names a different operation payload.'],
+    INVALID_ARGUMENT: [400, 'The workout request is invalid.'],
+  };
+  for (const [code, [status, message]] of Object.entries(errors)) {
+    if (error.message?.startsWith(code)) throw new ApiError(status, code, message);
+  }
+  throwDatabaseError(error);
+};
+
+const projectWorkoutTimes = (result: JsonObject): JsonObject => {
+  const header = (row: JsonObject): JsonObject => {
+    const projected = { ...row };
+    for (const key of ['started_at', 'completed_at', 'deleted_at']) {
+      if (key in projected) projected[key] = toIsoTimestamp(projected[key] as number | null);
+    }
+    return projected;
+  };
+  return {
+    ...header(result),
+    ...(result.workout ? { workout: header(result.workout as JsonObject) } : {}),
+    ...(Array.isArray(result.workouts) ? { workouts: result.workouts.map(row => header(row as JsonObject)) } : {}),
+  };
+};
+
+const workoutRequest = async (
+  client: SupabaseClient, agent: AuthenticatedAgent, request: Request, operation: WorkoutOperation | null,
+): Promise<JsonObject> => {
+  const identity = { p_owner: agent.userId, p_client_id: agent.clientId, p_granted_at: agent.grantedAt };
+  let rpc: string;
+  let args: JsonObject;
+  if (operation) {
+    if (request.method !== 'POST') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use POST.');
+    enforceRateLimit(workoutWriteRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
+    const idempotencyKey = readIdempotencyKey(request);
+    let input: JsonObject;
+    try {
+      input = normalizeWorkoutInput(operation, await readJsonBody(request));
+    } catch (error) {
+      if (error instanceof WorkoutInputError) throw new ApiError(400, 'INVALID_ARGUMENT', error.message);
+      throw error;
+    }
+    rpc = 'agent_workout_mutate';
+    args = { p_operation: operation, p_input: input, p_idempotency_key: idempotencyKey,
+      p_payload_sha256: await sha256Hex(JSON.stringify(input)) };
+  } else {
+    if (request.method !== 'GET') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET.');
+    const url = new URL(request.url);
+    rejectUnexpectedQuery(url, new Set(['session_id', 'cursor', 'limit', 'revision']));
+    rpc = 'agent_workout_read';
+    args = {
+      p_session_id: parseOptionalText(url.searchParams.get('session_id'), 200, 'session_id'),
+      p_after: parseOptionalText(url.searchParams.get('cursor'), 202, 'cursor'),
+      p_limit: parseBoundedInteger(url.searchParams.get('limit'), 50, 1, 100, 'limit'),
+      p_revision: parseOptionalText(url.searchParams.get('revision'), 32, 'revision'),
+    };
+  }
+  const { data, error } = await client.schema('app_public').rpc(rpc, { ...identity, ...args });
+  throwWorkoutError(error);
+  return projectWorkoutTimes(data as JsonObject);
+};
+
 const readIdempotencyKey = (request: Request): string => {
   const key = (request.headers.get('idempotency-key') ?? '').trim();
   if (key.length < 1 || key.length > MAX_IDEMPOTENCY_KEY_LENGTH || !/^[\x21-\x7e]+$/.test(key)) {
@@ -2820,6 +2908,11 @@ const dispatchAgentRequest = async (
       expires_at: agent.expiresAt,
       scopes: agent.scopes,
     };
+  }
+
+  const workoutOperation = workoutOperationFor(path);
+  if (path === '/v1/agent/workouts/active' || workoutOperation) {
+    return workoutRequest(client, agent, request, workoutOperation);
   }
 
   if (path === '/v1/agent/session-plans') {

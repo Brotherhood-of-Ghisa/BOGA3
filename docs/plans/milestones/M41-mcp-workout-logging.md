@@ -1,6 +1,6 @@
 # M41 — Conversational workout logging through MCP
 
-- Status: `planned`
+- Status: `in_progress`
 - Created: 2026-11-10
 - Planning baseline: `cbaa180e210a1466c6d524cde09b041e85b2b4a3` on `origin/main`
 - Format: repository milestone and cards explicitly requested by the operator;
@@ -84,7 +84,7 @@ also deletes this milestone. Durable rules graduate to their owning docs.
 
 | Task | Summary | Depends on | Status |
 | --- | --- | --- | --- |
-| [M41-T01](../tasks/M41-T01-Agent_workout_API.md) | Permission, atomic logging API and compatibility contract | none | planned |
+| M41-T01 | Permission, atomic logging API and compatibility contract | none | completed |
 | [M41-T02](../tasks/M41-T02_Mobile_workout_handoff.md) | Permission UI and safe app/chat/offline coexistence | T01 | planned |
 | [M41-T03](../tasks/M41-T03_MCP_workout_tools.md) | MCP tools and complete conversational-flow proof | T01, T02 | planned |
 

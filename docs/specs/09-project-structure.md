@@ -32,7 +32,7 @@ Define the canonical repository structure, path ownership, and placement convent
       scripts/                   # Mobile/maestro helper scripts
       artifacts/maestro/         # Maestro output artifacts, runtime state, and logs
   services/
-    boga-mcp/                    # Public read-only MCP protocol/API adapter
+    boga-mcp/                    # Public MCP protocol/API adapter
   supabase/                      # Supabase backend root (local runtime + backend assets)
     config.toml.template         # Checked-in Supabase local config template
     config.toml                  # Generated per-worktree local config (gitignored)
@@ -135,7 +135,7 @@ Define the canonical repository structure, path ownership, and placement convent
   - owns cross-workspace MCP/consent test wrappers and the real OAuth-to-MCP
     smoke harness.
 - `supabase/functions/agent-api/`
-  - owns the authenticated, read-only BoGa3 agent HTTP API. This is the only
+  - owns the authenticated BoGa3 agent HTTP API. This is the only
     service-role data boundary in the Virtual Coach flow; every query derives
     and filters by the validated OAuth subject.
 - `supabase/functions/group-eval/`

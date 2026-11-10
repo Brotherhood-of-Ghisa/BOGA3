@@ -27,6 +27,13 @@ choosing the smallest protection. For UI changes, load
 
 ## Open — resolve before coding
 
+T01 contract: `docs/specs/tech/agent-workout-contract.md`. Use an independent
+`agent_workout_permissions` row, no dependence on the plan switches. Extend
+factor-one revision recovery to sessions, empty workouts and absent offline
+blocks; preserve dirty lifecycle input before forcing canonical snapshots.
+Agent API mutations use opaque whole-graph revision tokens. Permission table
+app privileges remain withheld until this task's safety work is green.
+
 - Implement T01's compatibility contract: define what an older supported app
   may push, how stale snapshots are detected/rebased/rejected, and how the
   user recovers from a real conflict without losing acknowledged work.

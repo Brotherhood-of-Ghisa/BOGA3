@@ -125,7 +125,9 @@ programmes require a separate grant ([[agents.write-access]] records their
 implementation status) and specify `403 PLAN_EDIT_PERMISSION_REQUIRED` if
 disabled. Agent writes go through service-role-only atomic RPCs. Exercise and
 weekly target writes check revisions; plan edits check graph versions. Agent
-writes never touch performed sessions, session exercises or sets. Details in
+writes outside the separate logging permission never touch performed rows. For
+workout authority and staged handoff, load [agent workout logging](tech/agent-workout-contract.md)
+([[agents.write-access]]). Details for other writes in
 [`session-planning-contract.md`](tech/session-planning-contract.md) §6 and the
 [agent API contract](../../supabase/functions/agent-api/README.md#exercise-editing)
 and [`#muscle-targets`](../../supabase/functions/agent-api/README.md#muscle-targets).

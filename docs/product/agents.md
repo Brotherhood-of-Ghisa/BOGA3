@@ -2,18 +2,21 @@
 
 ### agents.write-access · definition · accepted
 
-A connected coaching agent reads training data, muscle setup included. Two
-per-agent switches govern changes: **Allow this coach to make changes**
-(`plan_access_enabled`, default off; on for agents that already had plan
-creation) lets it read upcoming and unscheduled plans, create plans and
-programmes, and create, edit (name, load mode, bodyweight contribution,
-[[gym.split]], [[timer.rest-default]], muscles), soft delete and restore
-exercises. It also allows changes to weekly muscle targets.
-**Allow this coach to edit plans** (`plan_edit_enabled`, default off) lets it
-mutate or delete pending authored plans and programmes via atomic versioned
-RPCs. A coach never mutates performed workouts, cards, sets, or muscle setup.
+A connected coach reads training data, muscle setup included. Independent
+per-agent switches bind changes to the current OAuth grant; all default off
+(existing plan-creation grants retain main-switch access):
 
-Why: separate switches isolate edit blast radius while preserving user workout history.
+| Switch | Authority |
+| --- | --- |
+| Make changes (`plan_access_enabled`) | Read upcoming/unscheduled plans; create plans/programmes; create, edit, delete/restore exercises; change weekly muscle targets |
+| Edit plans (`plan_edit_enabled`) | Mutate/delete pending authored plans/programmes |
+| Log workouts (`workout_logging_enabled`) | Discover active workouts; start/finish ad-hoc workouts; log, correct/remove their sets |
+
+Logging does not require either plan switch. It cannot edit completed history,
+mutate plan-backed workouts or change muscle setup; plan-backed work continues in the app. Offline use remains available;
+chat sees only synced server state.
+
+Why: each write surface needs explicit authority; handoff must preserve acknowledged work.
 Approved 2026-10-22.
 Code: `loadPlanPermission` in `supabase/functions/agent-api/index.ts`; the edit switch in
 `apps/mobile/app/connected-agents.tsx`; edit RPCs in
@@ -23,3 +26,7 @@ has no plan or programme edit routes and does not call those RPCs.
 `services/boga-mcp/src/tools.ts` does not expose the corresponding edits.
 The main switch's disclosure in `apps/mobile/app/connected-agents.tsx` omits
 weekly muscle target changes.
+Pending: Workout RPCs and API routes exist, but app permission enablement is
+withheld until safe mobile handoff; MCP logging tools are not exposed.
+Code: `supabase/functions/agent-api/workout-input.ts`;
+`supabase/migrations/20261110141726_agent_workout_logging.sql`.

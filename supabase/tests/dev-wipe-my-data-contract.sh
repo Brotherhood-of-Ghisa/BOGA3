@@ -197,6 +197,7 @@ run_psql_sql "
     set constraints all deferred;
     delete from public.agent_plan_write_receipts where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from public.agent_plan_permissions where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from public.agent_workout_permissions where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_exercise_tags    where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_sets            where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.session_exercises        where owner_user_id = '${USER_A_UUID}'::uuid;
@@ -310,6 +311,8 @@ run_psql_sql "
     insert into app_public.gyms
       (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid, '${B_GYM}', 'B Gym', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+    insert into public.agent_workout_permissions(owner_user_id,client_id,workout_logging_enabled,granted_at)
+    values('${USER_A_UUID}','wipe-workout',true,now());
   commit;
 " >/dev/null
 
@@ -325,10 +328,12 @@ deleted="$(run_psql_sql "
   commit;
 " | grep -E '^[0-9]+$' | head -n1)"
 
-if [[ "${deleted}" != "16" ]]; then
-  fail "scenario 3 expected 16 rows deleted, got '${deleted}'"
+if [[ "${deleted}" != "17" ]]; then
+  fail "scenario 3 expected 17 rows deleted (including workout permission), got '${deleted}'"
 fi
-pass "scenario 3: helper returned rows_deleted = 16"
+pass "scenario 3: helper returned rows_deleted = 17"
+[[ "$(run_psql "select count(*) from public.agent_workout_permissions where owner_user_id='${USER_A_UUID}';")" == 0 ]] ||
+  fail 'developer wipe retained workout authority'
 
 remaining_a="$(run_psql "
   select

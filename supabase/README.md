@@ -285,6 +285,8 @@ The base OAuth grant stays read-only. The two `POST` routes and the
 `public.agent_plan_permissions` (enabled by the person per client on the
 Connected Agents screen); otherwise they return `403 PLAN_PERMISSION_REQUIRED`.
 The exercise write routes (`POST /v1/agent/exercises…`) need the same row.
+For workout logging routes, their independent permission and staged handoff
+requirements, load [agent workout logging](../docs/specs/tech/agent-workout-contract.md).
 Agent writes run through the service-role-only
 `app_public.agent_create_session_plan` / `agent_create_training_programme` RPCs,
 which create the whole graph atomically with `pending` blocks, record
