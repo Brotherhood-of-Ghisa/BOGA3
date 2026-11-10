@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
-import { ActionButton, Card, FigureText, Icon, ListRow, ScreenScroll, uiSpace, useUiText } from '@/components/ui';
+import { ActionButton, CompactCard, FigureText, Icon, ScreenScroll, uiGeometry, uiSpace, useUiText } from '@/components/ui';
 import { GroupInlineError, GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
 import { CoWPreview } from '@/components/groups/cow-preview';
@@ -21,8 +21,8 @@ const cursor = (page: CoWListWire) => page.next_cursor;
 const hasMore = (page: CoWListWire) => page.next_cursor !== null;
 const itemKey = (cow: CoWDefinitionWire) => cow.cow_id;
 
-/** CoW browser shared by the Groups tab and the standalone preview destination. */
-export function GroupCoWsPage({ userId, groupId, cowId = null, metric = null, embedded = false }: {
+/** Current preview, next-week summary and one link per past CoW; shared by both browser entries. */
+export function GroupCoWsPage({ userId, groupId, metric = null, embedded = false }: {
   userId: string; groupId: string; cowId?: string | null; metric?: string | null; embedded?: boolean;
 }) {
   const text = useUiText();
@@ -51,8 +51,13 @@ export function GroupCoWsPage({ userId, groupId, cowId = null, metric = null, em
   const shown = summary.data?.result;
   const currentId = summary.data?.selection === 'current' ? shown?.cow.cow_id : null;
   const next = cows.items.find(cow => cow.state === 'scheduled');
-  const past = cows.items.filter(cow => cow.state !== 'scheduled' && cow.state !== 'active' && cow.cow_id !== currentId);
-  const name = (cow: CoWDefinitionWire) => catalogue.data?.exercises.find(exercise => exercise.group_exercise_id === cow.group_exercise_id)?.name ?? (catalogue.data ? 'Exercise unavailable' : 'CoW');
+  const history = cows.items.filter(cow => cow.state !== 'scheduled' && cow.state !== 'active' && cow.cow_id !== currentId);
+  // A stored summary can arrive before the history page; its identity occupies one archive slot.
+  if (summary.data?.selection === 'previous_final' && shown && !history.some(cow => cow.cow_id === shown.cow.cow_id)) history.push(shown.cow);
+  const past = [...new Map(history.map(cow => [cow.cow_id, cow])).values()].sort((a, b) => b.starts_at_us - a.starts_at_us);
+  const name = (cow: CoWDefinitionWire) => catalogue.data?.exercises.find(exercise => exercise.group_exercise_id === cow.group_exercise_id)?.name
+    ?? (shown?.cow.group_exercise_id === cow.group_exercise_id ? shown.exercise?.name : null)
+    ?? (catalogue.data ? 'Exercise unavailable' : 'CoW');
   const open = (cow: CoWDefinitionWire, selected = metric) => router.push(coWStandingsHref(groupId, cow.cow_id, coWMetric(selected, cow.metrics)));
   const preview = shown ? <CoWPreview key={`${shown.cow.cow_id}:${metric}`} result={shown} userId={userId} dateFormat={dateFormat}
     initialMetric={metric} testID="cows-preview" onOpen={selected => open(shown.cow, selected)} browseLabel="Full standings" onBrowse={selected => open(shown.cow, selected)} /> : null;
@@ -66,7 +71,6 @@ export function GroupCoWsPage({ userId, groupId, cowId = null, metric = null, em
       : <GroupMissingDataState error={pickInlineError(summary.error)} offline={summary.offline} onRetry={() => void summary.refresh()} testIDPrefix="cows-current" />}
     <CoWNextSection calendar={calendar} cows={cows} next={next} manager={manager} groupId={groupId} name={name} open={open} dateFormat={dateFormat} />
     <Text allowFontScaling={false} style={text.label}>Past CoWs</Text>
-    {summary.data?.selection === 'previous_final' && shown && (!cowId || cowId === shown.cow.cow_id) ? preview : null}
     <CoWPastSection cows={cows} past={past} name={name} open={open} dateFormat={dateFormat} />
     {!group.data && error ? <GroupStateView title="Couldn't load CoWs" actionLabel="Retry" onAction={() => void refresh()} testID="cows-unavailable" /> : null}
   </ScreenScroll>;
@@ -84,16 +88,11 @@ function CoWNextSection({ calendar, cows, next, manager, groupId, name, open, da
   const zone = next?.time_zone ?? calendar.firstPage?.time_zone;
   return <>
     <Text allowFontScaling={false} style={text.label}>Next week</Text>
-    {week ? <Text allowFontScaling={false} style={[text.meta, { textAlign: 'right' }]} accessibilityLabel={`${coWAccessibleDates(week, dateFormat)} · ${zone ?? ''}`}><FigureText>{`${coWDateRange(week, dateFormat)} · ${zone ?? ''}`}</FigureText></Text> : null}
-    {cows.firstPage ? next ? <Card><ListRow density="list" onPress={() => open(next)} accessibilityLabel={`${name(next)}, ${coWStatus(next)}`}
-      meta={<Text allowFontScaling={false} style={[text.meta, { textAlign: 'right' }]} accessibilityLabel={coWAccessibleDates(next.week_start, dateFormat)}><FigureText>{coWDateRange(next.week_start, dateFormat)}</FigureText></Text>}
-      testID="cows-next" trailing={<Icon name="chevron-right" colorRole="inkMuted" size="sm" />}>
-      <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong}>{name(next)}</Text>
-      <Text allowFontScaling={false} style={text.meta}>{coWStatus(next)}</Text>
-    </ListRow></Card>
+    {!next && week ? <Text allowFontScaling={false} style={[text.meta, { textAlign: 'right' }]} accessibilityLabel={`${coWAccessibleDates(week, dateFormat)} · ${zone ?? ''}`}><FigureText>{`${coWDateRange(week, dateFormat)} · ${zone ?? ''}`}</FigureText></Text> : null}
+    {cows.firstPage ? next ? <CoWSummaryCard cow={next} name={name(next)} open={open} dateFormat={dateFormat} showZone testID="cows-next" />
       : <Text allowFontScaling={false} style={text.meta}>Nothing scheduled</Text>
       : <GroupMissingDataState error={pickInlineError(cows.error)} offline={cows.offline} onRetry={() => void cows.refresh()} testIDPrefix="cows-list" />}
-    {manager && cows.firstPage ? <ActionButton variant="outline" label={next ? 'Edit next CoW' : 'Schedule next CoW'}
+    {manager && cows.firstPage ? <ActionButton variant="text" label={next ? 'Edit next CoW' : 'Schedule next CoW'}
       testID="cows-schedule" onPress={() => router.push(coWScheduleHref(groupId, next?.cow_id))} /> : null}
   </>;
 }
@@ -103,14 +102,35 @@ function CoWPastSection({ cows, past, name, open, dateFormat }: {
   name: (cow: CoWDefinitionWire) => string; open: (cow: CoWDefinitionWire) => void; dateFormat: ExerciseDateFormat;
 }) {
   const text = useUiText();
-  return cows.firstPage ? <View style={{ gap: uiSpace.sm }}>{past.map(cow => <Card key={cow.cow_id}><ListRow density="list" accessibilityLabel={`${name(cow)}, ${coWStatus(cow)}`}
-      onPress={() => open(cow)} testID={`cows-past-${cow.cow_id}`} trailing={<Icon name="chevron-right" colorRole="inkMuted" size="sm" />}
-      meta={<Text allowFontScaling={false} style={[text.meta, { textAlign: 'right' }]} accessibilityLabel={coWAccessibleDates(cow.week_start, dateFormat)}><FigureText>{coWDateRange(cow.week_start, dateFormat)}</FigureText></Text>}>
-      <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong}>{name(cow)}</Text>
-      <Text allowFontScaling={false} style={text.meta}>{coWStatus(cow)}</Text>
-    </ListRow></Card>)}
+  return cows.firstPage || past.length > 0 ? <View style={{ gap: uiSpace.sm }}>{past.map(cow =>
+    <CoWSummaryCard key={cow.cow_id} cow={cow} name={name(cow)} open={open} dateFormat={dateFormat} testID={`cows-past-${cow.cow_id}`} />)}
       {past.length === 0 ? <Text allowFontScaling={false} style={text.meta}>No past CoWs</Text> : null}
-      {cows.hasMore ? <ActionButton label={cows.loadingMore ? 'Loading…' : 'More CoWs'} variant="outline" onPress={() => void cows.loadMore()} testID="cows-more" /> : null}
+      {cows.hasMore ? <ActionButton label={cows.loadingMore ? 'Loading…' : 'More CoWs'} disabled={cows.loadingMore} variant="text" onPress={() => void cows.loadMore()} testID="cows-more" /> : null}
       {cows.loadMoreError ? <GroupInlineError error={cows.loadMoreError} onRetry={() => void cows.loadMore()} testID="cows-more-error" /> : null}
     </View> : null;
+}
+
+
+/** A single accessible destination; summary metadata never adds another action. */
+function CoWSummaryCard({ cow, name, open, dateFormat, showZone = false, testID }: {
+  cow: CoWDefinitionWire; name: string; open: (cow: CoWDefinitionWire) => void;
+  dateFormat: ExerciseDateFormat; showZone?: boolean; testID: string;
+}) {
+  const text = useUiText();
+  const dates = coWAccessibleDates(cow.week_start, dateFormat);
+  return <CompactCard onPress={() => open(cow)} accessibilityLabel={`${name}, ${dates}, ${coWStatus(cow)}${showZone ? `, ${cow.time_zone}` : ''}`} testID={testID}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm, minHeight: uiGeometry.tapTarget }}>
+      <View style={{ flex: 1, gap: uiSpace.xs }}>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: uiSpace.xs }}>
+          <Text allowFontScaling={false} style={[text.bodyStrong, { flexShrink: 1 }]}>{name}</Text>
+          <Text allowFontScaling={false} style={[text.meta, { marginLeft: 'auto', textAlign: 'right' }]}><FigureText>{coWDateRange(cow.week_start, dateFormat)}</FigureText></Text>
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', flexWrap: 'wrap', gap: uiSpace.xs }}>
+          <Text allowFontScaling={false} style={text.meta}>{coWStatus(cow)}</Text>
+          {showZone ? <Text allowFontScaling={false} style={[text.meta, { marginLeft: 'auto', textAlign: 'right' }]}>{cow.time_zone}</Text> : null}
+        </View>
+      </View>
+      <Icon name="chevron-right" colorRole="inkMuted" size="sm" />
+    </View>
+  </CompactCard>;
 }

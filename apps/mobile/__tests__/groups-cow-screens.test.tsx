@@ -29,6 +29,7 @@ jest.mock('@/components/groups/cow-time-zone', () =>
 import * as groupApi from '@/src/groups/api';
 import { GroupApiError } from '@/src/groups/api';
 import type { CoWDefinitionWire, CoWResultWire } from '@/src/groups/cow-wire';
+import { coWDateRange } from '@/src/groups/cow-presentation';
 import { createCoWId } from '@/src/groups/cow-draft';
 import { ChoiceRow } from '@/components/ui';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
@@ -196,6 +197,74 @@ it('browses current, next and past with archived names retained, and management 
   expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows/past?metric=e1rm');
   fireEvent.press(screen.getByTestId('cows-schedule')); expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows/schedule?cowId=next');
   expect(screen.getByText('Full standings')).toBeTruthy();
+});
+it('renders a previous-final fallback exactly once, without a podium or second standings link', async () => {
+  const value = summary(); value.selection = 'previous_final'; value.result.cow = past();
+  api.getCoWSummary.mockResolvedValue(value);
+  api.listCoWs.mockResolvedValue({ cows: [scheduled(), past()], next_cursor: null });
+  mockParams = { groupId: 'g1', cowId: 'past', metric: 'volume' };
+  renderWithTheme(<CoWsRoute />);
+  const card = await screen.findByTestId('cows-past-past');
+  await screen.findByText('No CoW this week');
+  expect(screen.getAllByTestId('cows-past-past')).toHaveLength(1);
+  expect(screen.queryByTestId('cows-preview')).toBeNull();
+  expect(screen.queryByText('Full standings')).toBeNull();
+  expect(card.props.accessibilityRole).toBe('link');
+  expect(card.props.accessibilityLabel).toContain('19-10-2026 – 25-10-2026');
+  fireEvent.press(card);
+  expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows/past?metric=volume');
+  const next = screen.getByTestId('cows-next');
+  expect(within(next).getByText(scheduled().time_zone)).toBeTruthy();
+  expect(screen.getAllByText(coWDateRange(scheduled().week_start, 'DD-MM-YYYY'))).toHaveLength(1);
+});
+it('keeps the stored exercise name when the archive and catalogue cannot load', async () => {
+  const value = summary(); value.selection = 'previous_final'; value.result.cow = past();
+  api.getCoWSummary.mockResolvedValue(value);
+  api.listCoWs.mockRejectedValue(new GroupApiError('INTERNAL', 'history failed'));
+  api.listCompetitionExercises.mockRejectedValue(new GroupApiError('INTERNAL', 'catalogue failed'));
+  renderWithTheme(<CoWsRoute />);
+  const card = await screen.findByTestId('cows-past-past');
+  expect(within(card).getByText('Pull-up')).toBeTruthy();
+  expect(screen.queryByText('No past CoWs')).toBeNull();
+});
+it('inserts a summary-only past CoW chronologically and merges its history page without duplicates', async () => {
+  const value = summary(); value.selection = 'previous_final'; value.result.cow = past();
+  api.getCoWSummary.mockResolvedValue(value);
+  const older = { ...past(), cow_id: 'older', week_start: '2026-10-12', starts_at_us: past().starts_at_us - 7 * 86400 * 1000000 };
+  api.listCoWs.mockImplementation(async (_g, before) => before
+    ? { cows: [past(), older], next_cursor: null }
+    : { cows: [scheduled(), older], next_cursor: 'older' });
+  renderWithTheme(<CoWsRoute />);
+  await screen.findByTestId('cows-past-past');
+  expect(screen.queryByText('No past CoWs')).toBeNull();
+  await screen.findByTestId('cows-past-older');
+  const order = () => screen.getAllByTestId(/^cows-past-/).map(card => card.props.testID);
+  expect(order()).toEqual(['cows-past-past', 'cows-past-older']);
+  fireEvent.press(await screen.findByTestId('cows-more'));
+  await waitForGone(() => screen.queryByTestId('cows-more'));
+  expect(order()).toEqual(['cows-past-past', 'cows-past-older']);
+});
+it.each(['finalizing', 'unavailable', 'cancelled'] as const)('retains %s history as a single navigable summary', async state => {
+  api.getCoWSummary.mockResolvedValue({ ...summary(), selection: 'none', result: null });
+  api.listCoWs.mockResolvedValue({ cows: [{ ...past(), state }], next_cursor: null });
+  renderWithTheme(<CoWsRoute />);
+  const card = await screen.findByTestId('cows-past-past');
+  expect(within(card).getByText({ finalizing: 'Finalizing', unavailable: 'Unavailable', cancelled: 'Cancelled' }[state])).toBeTruthy();
+  fireEvent.press(card);
+  expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows/past?metric=e1rm');
+});
+it('retains archive summaries and retries a failed history page in place', async () => {
+  let failedPage = false;
+  api.listCoWs.mockImplementation(async (_g, before) => {
+    if (!before) return { cows: [past()], next_cursor: 'older' };
+    if (!failedPage) { failedPage = true; throw new GroupApiError('INTERNAL', 'failed page'); }
+    return { cows: [past(), { ...past(), cow_id: 'older', week_start: '2026-10-12', starts_at_us: past().starts_at_us - 7 * 86400 * 1000000 }], next_cursor: null };
+  });
+  renderWithTheme(<CoWsRoute />);
+  fireEvent.press(await screen.findByTestId('cows-more'));
+  fireEvent.press(await screen.findByTestId('cows-more-error-retry'));
+  await screen.findByTestId('cows-past-older');
+  expect(screen.getAllByTestId('cows-past-past')).toHaveLength(1);
 });
 it('members browse without management controls', async () => {
   api.getGroup.mockResolvedValue({ ...competitionGroupDetail, group: { ...competitionGroupDetail.group, my_role: 'member' } });
@@ -457,7 +526,10 @@ it('keeps the published upcoming zone after the group calendar changes', async (
   api.listCoWs.mockResolvedValue({ cows: [{ ...scheduled(), time_zone: 'America/New_York' }], next_cursor: null });
   api.getCoWCalendar.mockResolvedValue({ time_zone: 'Pacific/Auckland', revision: 2, next_week_start: '2026-11-09' });
   renderWithTheme(<CoWsRoute />); await screen.findByTestId('cows-next');
-  expect(screen.getByText('2–8 Nov 2026 · America/New_York')).toBeTruthy();
+  const next = screen.getByTestId('cows-next');
+  expect(within(next).getByText('America/New_York')).toBeTruthy();
+  expect(screen.getAllByText('2–8 Nov 2026')).toHaveLength(1);
+  expect(next.props.accessibilityLabel).toContain('America/New_York');
   expect(screen.queryByText(/Pacific\/Auckland/)).toBeNull();
 });
 
