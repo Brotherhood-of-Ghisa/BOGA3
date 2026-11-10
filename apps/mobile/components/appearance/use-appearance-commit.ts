@@ -29,10 +29,17 @@ export type CommitFailure = {
 // - The choice shows before its save returns. A failed save is logged, shows
 //   the stored choice again (another page may have saved meanwhile) and sets
 //   `saveError`.
+// - `applying` is true from a commit until the app is drawn in the stored
+//   choice: while a save is on its way, then until the theme provider's
+//   repaint (a transition, `theme-context.tsx`) has committed it. Both sides
+//   are read through the same parser, so they compare equal once it lands,
+//   whichever page saved.
 export function useAppearanceCommit() {
   const [appearance, setAppearance] = useStoredAppearance();
   const inUse = useAppTheme().appearance;
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(0);
+  const applying = saving > 0 || JSON.stringify(appearance) !== JSON.stringify(inUse);
 
   const commit = async (part: Partial<AppearanceChoice>, failure: CommitFailure): Promise<CommitOutcome> => {
     setSaveError(null);
@@ -44,6 +51,7 @@ export function useAppearanceCommit() {
     );
     if (unchanged && !storedChoiceUnusable()) return 'unchanged';
     setAppearance({ ...intended, ...part });
+    setSaving((count) => count + 1);
     try {
       await saveAppearancePart(part);
     } catch (error) {
@@ -56,9 +64,11 @@ export function useAppearanceCommit() {
       setAppearance(readStoredAppearance(inUse));
       setSaveError(failure.message);
       return 'failed';
+    } finally {
+      setSaving((count) => count - 1);
     }
     return 'saved';
   };
 
-  return { appearance, setAppearance, saveError, commit };
+  return { appearance, setAppearance, saveError, commit, applying };
 }

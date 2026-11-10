@@ -53,6 +53,7 @@ and executable examples, load `docs/specs/08-ux-delivery-standard.md` and
 | A compact board with a shared header, optional columns and footer | `ListCard` / `ListCardHeader` (`list-card.tsx`); standalone or embedded, action limited to its board region |
 | A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`); `compact` shares the list/table content rhythm and preserves full control targets |
 | A picker or menu: row actions, options, a choice of one value, a short form | `Sheet` (`sheet.tsx`) |
+| A title switching sibling pages | `HeaderTitleMenu` (`header-title-menu.tsx`) |
 | A sub-page over the current screen: a browser, an editor, a preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
 | The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action; `variant="link"` for a heading's link | `ActionButton` (`action-button.tsx`) |
 | A line of words with figures in it (`2 exercises · 3 sets`) | `FigureText` (`figure-text.tsx`) |
@@ -185,7 +186,7 @@ folder rather than re-implementing its row, card or sheet.
 | `sync-status/` | `SyncStatusPanel` (Settings → Data & sync), with `ExerciseMergeReviewScreen` (its Review changes page) for current/saved changes and uncertain operation recovery and the snapshot hook behind its Settings row's status |
 | `settings/` | The home rows' status strings, the sub page screens (`SubPage`), Everything else, Data & sync's `BackupPanel` |
 | `more/` | More's connected-agent read for `Connect an AI` |
-| `appearance/` | Settings' Appearance: the preview, preset, background and text rows, hue ring; launcher reconciliation and the shared figure's calendar hook implement [[appearance.november]] |
+| `appearance/` | Settings' Appearance pages; launcher reconciliation and the shared figure's calendar hook implement [[appearance.november]] |
 | `notifications/` | Settings' Notifications page and the group mute row; server-confirmed state comes from `src/notifications` |
 | `preferences/` | Settings editors (rest timer, effort, Progress); full muscle setup/target pages and their numeric fields |
 | `profile/` | the Profile cards and their panel and form hooks |

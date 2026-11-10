@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { FigureText, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
+import type { CustomPart } from '@/components/ui/theme-custom';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 
@@ -99,7 +100,111 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
   );
 }
 
+type Role = keyof UiRoles;
+
+// One sample of a role in the use the app gives it: a fill, text (`Aa`) or a
+// hairline, on a ground. A `context` sample is another part's role, shown
+// for comparison (the ramp's empty cell beside its steps).
+type Sample = { label: string; context?: true } & (
+  | { kind: 'fill'; role: Role }
+  | { kind: 'text' | 'line'; role: Role; ground: Role }
+);
+
+// Every role a custom part moves (`generateCustomRoles`), each drawn as the
+// app uses it and named by that use. Primary text is also the text on a
+// chart cell and an edited row, so it is shown there.
+export const SPOTLIGHT: Record<CustomPart, readonly Sample[]> = {
+  background: [
+    { kind: 'fill', role: 'paper', label: 'Page' },
+    { kind: 'fill', role: 'surface', label: 'Card' },
+    { kind: 'line', role: 'rule', ground: 'surface', label: 'Border' },
+    { kind: 'line', role: 'ruleSoft', ground: 'surface', label: 'Divider' },
+    { kind: 'fill', role: 'viz0', label: 'Empty' },
+  ],
+  ink: [
+    { kind: 'text', role: 'ink', ground: 'paper', label: 'Page' },
+    { kind: 'text', role: 'ink', ground: 'surface', label: 'Card' },
+    { kind: 'text', role: 'ink', ground: 'accentWash', label: 'Editing' },
+    { kind: 'text', role: 'ink', ground: 'viz4', label: 'Chart' },
+    // A light page dims behind a sheet with `ink`.
+    { kind: 'fill', role: 'scrim', label: 'Backdrop' },
+  ],
+  text: [
+    { kind: 'text', role: 'inkMuted', ground: 'paper', label: 'Page' },
+    { kind: 'text', role: 'inkMuted', ground: 'surface', label: 'Muted' },
+    { kind: 'text', role: 'inkFaint', ground: 'surface', label: 'Faint' },
+    { kind: 'text', role: 'inkGhost', ground: 'surface', label: 'Ghost' },
+  ],
+  accent: [
+    { kind: 'text', role: 'onAccent', ground: 'accent', label: 'Button' },
+    { kind: 'text', role: 'accent', ground: 'surface', label: 'Text' },
+    { kind: 'text', role: 'accent', ground: 'accentWash', label: 'Editing' },
+  ],
+  record: [
+    { kind: 'text', role: 'record', ground: 'surface', label: 'Text' },
+    { kind: 'text', role: 'record', ground: 'recordWash', label: 'Band' },
+    { kind: 'line', role: 'recordRule', ground: 'recordWash', label: 'Band line' },
+  ],
+  viz: [
+    { kind: 'fill', role: 'viz0', label: 'Empty', context: true },
+    { kind: 'fill', role: 'viz1', label: '1' },
+    { kind: 'fill', role: 'viz2', label: '2' },
+    { kind: 'fill', role: 'viz3', label: '3' },
+    { kind: 'fill', role: 'viz4', label: '4' },
+  ],
+};
+
+// The part being edited, alone: each role it moves as a tile on the theme's
+// page, named by its use. Drawn above the whole mock on the part's page.
+export function PartSpotlight({ part, roles, testID }: { part: CustomPart; roles: UiRoles; testID: string }) {
+  const type = useUiText();
+  return (
+    <View
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.page, styles.spotlight, { backgroundColor: roles.paper, borderColor: roles.rule }]}
+      testID={testID}>
+      {SPOTLIGHT[part].map((sample, index) => (
+        <View key={index} style={styles.sample}>
+          <View
+            style={[styles.tile, { backgroundColor: roles[sample.kind === 'fill' ? sample.role : sample.ground], borderColor: roles.rule }]}
+            testID={`${testID}-${index}`}>
+            {sample.kind === 'text' ? (
+              <Text allowFontScaling={false} style={[type.title, { color: roles[sample.role] }]}>
+                Aa
+              </Text>
+            ) : null}
+            {sample.kind === 'line' ? <View style={[styles.line, { backgroundColor: roles[sample.role] }]} /> : null}
+          </View>
+          <Text allowFontScaling={false} numberOfLines={1} style={[type.meta, { color: roles.inkMuted }]}>
+            {sample.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  spotlight: {
+    flexDirection: 'row',
+  },
+  sample: {
+    flex: 1,
+    alignItems: 'center',
+    gap: uiSpace.xs,
+  },
+  tile: {
+    alignSelf: 'stretch',
+    height: uiGeometry.tapTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: uiBorder.width,
+    borderRadius: uiGeometry.radius.control,
+  },
+  line: {
+    alignSelf: 'stretch',
+    height: uiBorder.width,
+  },
   page: {
     gap: uiSpace.md,
     padding: uiSpace.md,

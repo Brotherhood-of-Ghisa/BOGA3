@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
@@ -18,10 +18,18 @@ export type SliderRowProps = {
   // VoiceOver step. A touch that turns into a page scroll reports nothing.
   onChangeEnd: (value: number) => void;
   divider?: boolean;
+  // A track painted in these colours, left to right, in place of the plain
+  // track and its fill: a hue picker's colours.
+  trackColours?: readonly string[];
+  // Drawn in place of the value (a swatch of the colour chosen); VoiceOver
+  // still hears `format`.
+  trailing?: ReactNode;
   testID: string;
 };
 
 const TRACK = 4;
+// A painted track is tall enough to read its colours.
+const PAINTED_TRACK = 16;
 const THUMB = 24;
 // Wide enough for `300%` or `White`, so every track in a section is one length.
 const VALUE_WIDTH = 52;
@@ -38,8 +46,8 @@ export function pointToValue(x: number, width: number, max: number): number {
   return Math.round((Math.min(width, Math.max(0, x)) / width) * max);
 }
 
-/** A Settings row for a whole number from 0 to `max`: the label, then a track to drag or tap and the value beside it. Reports every move, so the caller can repaint a preview live, and the value it is let go at. */
-export function SliderRow({ label, value, max, format, onChange, onChangeEnd, divider = false, testID }: SliderRowProps) {
+/** A Settings row for a whole number from 0 to `max`: the label, then a track to drag or tap and the value beside it (or `trailing`). Reports every move, so the caller can repaint a preview live, and the value it is let go at. */
+export function SliderRow({ label, value, max, format, onChange, onChangeEnd, divider = false, trackColours, trailing, testID }: SliderRowProps) {
   const styles = useStyles();
   const textRoles = useUiText();
   const textTones = useUiTextTone();
@@ -84,15 +92,27 @@ export function SliderRow({ label, value, max, format, onChange, onChangeEnd, di
             onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
             style={styles.hit}
             testID={`${testID}-track`}>
-            <View style={styles.track}>
-              <View style={[styles.fill, { width: `${share * 100}%` }]} />
-            </View>
+            {trackColours ? (
+              <View style={[styles.track, styles.painted]} testID={`${testID}-paint`}>
+                {trackColours.map((colour, index) => (
+                  <View key={index} style={[styles.paint, { backgroundColor: colour }]} />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.track}>
+                <View style={[styles.fill, { width: `${share * 100}%` }]} />
+              </View>
+            )}
             <View style={[styles.thumb, { left: share * width - THUMB / 2 }]} />
           </View>
         </GestureDetector>
-        <Text allowFontScaling={false} style={[textRoles.meta, textTones.muted, styles.value]} testID={`${testID}-value`}>
-          {format(value)}
-        </Text>
+        {trailing !== undefined ? (
+          <View style={styles.trailing}>{trailing}</View>
+        ) : (
+          <Text allowFontScaling={false} style={[textRoles.meta, textTones.muted, styles.value]} testID={`${testID}-value`}>
+            {format(value)}
+          </Text>
+        )}
       </View>
     </ListRow>
   );
@@ -119,6 +139,14 @@ const useStyles = makeStyles((roles) => ({
     height: TRACK,
     backgroundColor: roles.ink,
   },
+  painted: {
+    flexDirection: 'row',
+    height: PAINTED_TRACK,
+    borderRadius: PAINTED_TRACK / 2,
+  },
+  paint: {
+    flex: 1,
+  },
   // Depth is a rule plus a ground change, never a shadow.
   thumb: {
     position: 'absolute',
@@ -132,5 +160,9 @@ const useStyles = makeStyles((roles) => ({
   value: {
     width: VALUE_WIDTH,
     textAlign: 'right',
+  },
+  trailing: {
+    width: VALUE_WIDTH,
+    alignItems: 'flex-end',
   },
 }));
