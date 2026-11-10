@@ -11,6 +11,10 @@ import {
   ExerciseEditError, normalizeExerciseCreate, normalizeExerciseRevision, normalizeExerciseUpdate,
 } from './exercise-edit.ts';
 import {
+  normalizePlanMutation, normalizeProgrammeMutation, PlanEditError,
+  type PlanMutation, type ProgrammeMutation,
+} from './plan-edit.ts';
+import {
   GymBucketError, gymBucketFromCursor, gymBucketFromParam, rankGymBuckets,
   type GymBucketRank,
 } from './gym-buckets.ts';
@@ -60,7 +64,7 @@ const ISO_DATE_MAX_MS = 8_640_000_000_000_000;
 
 const CORS_HEADERS = {
   'access-control-allow-headers': 'authorization, content-type, x-request-id, idempotency-key',
-  'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+  'access-control-allow-methods': 'GET, POST, PUT, PATCH, OPTIONS',
   'access-control-allow-origin': '*',
 };
 
@@ -360,7 +364,10 @@ const routeToolName = (path: string, method: string): string => {
   if (path === '/v1/agent/session-plans') {
     return method === 'POST' ? 'create_session_plan' : 'get_upcoming_session_plans';
   }
+  if (method === 'PATCH' && /^\/v1\/agent\/session-plans\/[^/]+$/.test(path)) return 'patch_session_plan';
   if (path === '/v1/agent/programmes') return 'create_training_programme';
+  if (method === 'PATCH' && /^\/v1\/agent\/programmes\/[^/]+$/.test(path)) return 'patch_training_programme';
+  if (/^\/v1\/agent\/programmes\/[^/]+$/.test(path)) return 'get_programme_detail';
   if (/^\/v1\/agent\/exercises\/[^/]+\/context$/.test(path)) {
     return 'get_exercise_context';
   }
@@ -2126,25 +2133,32 @@ const readJsonBody = async (request: Request): Promise<JsonObject> => {
 const loadPlanPermission = async (
   client: SupabaseClient,
   agent: AuthenticatedAgent,
+  requireEdit = false,
 ): Promise<void> => {
   const { data, error } = await client
     .from('agent_plan_permissions')
-    .select('plan_access_enabled,granted_at')
+    .select('plan_access_enabled,plan_edit_enabled,granted_at')
     .eq('owner_user_id', agent.userId)
     .eq('client_id', agent.clientId)
-    .maybeSingle<{ granted_at: string | null; plan_access_enabled: boolean }>();
+    .maybeSingle<{ granted_at: string | null; plan_access_enabled: boolean; plan_edit_enabled: boolean }>();
   throwDatabaseError(error);
   const liveGrant = Date.parse(agent.grantedAt);
   const storedGrant = typeof data?.granted_at === 'string' ? Date.parse(data.granted_at) : Number.NaN;
-  const allowed = data?.plan_access_enabled === true
-    && Number.isFinite(liveGrant)
+  const grantValid = Number.isFinite(liveGrant)
     && Number.isFinite(storedGrant)
     && liveGrant === storedGrant;
-  if (!allowed) {
+  if (!grantValid || data?.plan_access_enabled !== true) {
     throw new ApiError(
       403,
       'PLAN_PERMISSION_REQUIRED',
       'Write access is not enabled for this coach. The person can turn it on in BoGa under Connected Agents.',
+    );
+  }
+  if (requireEdit && data?.plan_edit_enabled !== true) {
+    throw new ApiError(
+      403,
+      'PLAN_EDIT_PERMISSION_REQUIRED',
+      'Plan edit access is not enabled for this coach. The person can turn it on in BoGa under Connected Agents.',
     );
   }
 };
@@ -2387,6 +2401,44 @@ const throwPlanWriteError = (error: { message?: string } | null): void => {
   throwDatabaseError(error);
 };
 
+const throwPlanEditError = (error: { message?: string } | null): void => {
+  if (!error) return;
+  const message = error.message ?? '';
+  if (message.includes('PLAN_CONCURRENT_MODIFICATION')) {
+    throw new ApiError(
+      409,
+      'PLAN_CONCURRENT_MODIFICATION',
+      'The plan or programme has been modified since it was read. Read the latest state and retry.',
+    );
+  }
+  if (message.includes('IDEMPOTENCY_CONFLICT')) {
+    throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This idempotency key was used with a different payload.');
+  }
+  if (message.includes('IMMUTABLE_BLOCK_MUTATION')) {
+    throw new ApiError(
+      400,
+      'IMMUTABLE_BLOCK_MUTATION',
+      'Cannot modify or delete an already attached or resolved block.',
+    );
+  }
+  if (message.includes('FOREIGN_RESOURCE_REFERENCE')) {
+    throw new ApiError(
+      400,
+      'FOREIGN_RESOURCE_REFERENCE',
+      'A referenced exercise, gym, or plan is not available.',
+    );
+  }
+  if (message.includes('INVALID_ARGUMENT')) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'The request could not be accepted.');
+  }
+  throwDatabaseError(error);
+};
+
+const formatGraphVersion = (value: unknown): string | null => {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  return value.replace(/\+00:?00$/, 'Z');
+};
+
 const parseOptionalBoolean = (raw: string | null, fallback: boolean, label: string): boolean => {
   if (raw === null || raw === '') return fallback;
   if (raw === 'true' || raw === '1') return true;
@@ -2395,6 +2447,7 @@ const parseOptionalBoolean = (raw: string | null, fallback: boolean, label: stri
 };
 
 type PlanRow = {
+  graph_version?: string | null;
   gym_id: string | null;
   id: string;
   programme_id: string | null;
@@ -2681,7 +2734,7 @@ const getUpcomingSessionPlans = async (
   let query = client
     .schema('app_public')
     .from('session_plans')
-    .select('id,title,scheduled_for,gym_id,provenance,programme_id,programme_order_index')
+    .select('id,title,scheduled_for,gym_id,provenance,programme_id,programme_order_index,graph_version')
     .eq('owner_user_id', agent.userId)
     .eq('is_routine', false)
     .is('deleted_at', null)
@@ -2838,6 +2891,7 @@ const getUpcomingSessionPlans = async (
         (block) => block.progress_status === 'pending' && !attachedBlockIds.has(block.id),
       ) ?? null;
       const blocksTruncated = planBlocks.length > MAX_PLAN_BLOCKS;
+      const planVersion = formatGraphVersion(plan.graph_version);
       return {
         id: plan.id,
         title: plan.title,
@@ -2850,6 +2904,8 @@ const getUpcomingSessionPlans = async (
         programme_order_index: plan.programme_order_index,
         progress,
         next_block_id: nextBlock?.id ?? null,
+        version: planVersion,
+        version_token: planVersion,
         exercises: planBlocks.slice(0, MAX_PLAN_BLOCKS).map((block) => {
           const blockSets = setsByBlock.get(block.id) ?? [];
           return {
@@ -2879,6 +2935,404 @@ const getUpcomingSessionPlans = async (
         id: page[page.length - 1].id,
       })
       : null,
+  };
+};
+
+const decodeProgrammeId = (raw: string): string => {
+  let programmeId: string;
+  try {
+    programmeId = decodeURIComponent(raw);
+  } catch {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'programme_id is invalid.');
+  }
+  if (programmeId.length < 1 || programmeId.length > 200) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'programme_id is invalid.');
+  }
+  return programmeId;
+};
+
+const decodePlanId = (raw: string): string => {
+  let planId: string;
+  try {
+    planId = decodeURIComponent(raw);
+  } catch {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'plan_id is invalid.');
+  }
+  if (planId.length < 1 || planId.length > 200) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'plan_id is invalid.');
+  }
+  return planId;
+};
+
+const getProgrammeDetail = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  programmeId: string,
+): Promise<JsonObject> => {
+  const { data: programme, error: progError } = await client
+    .schema('app_public')
+    .from('training_programmes')
+    .select('id,name,description,graph_version')
+    .eq('owner_user_id', agent.userId)
+    .eq('id', programmeId)
+    .is('deleted_at', null)
+    .maybeSingle<{ id: string; name: string; description: string | null; graph_version: string | null }>();
+  throwDatabaseError(progError);
+  if (!programme) {
+    throw new ApiError(404, 'NOT_FOUND', 'Programme not found.');
+  }
+
+  const { data: plansData, error: plansError } = await client
+    .schema('app_public')
+    .from('session_plans')
+    .select('id,title,scheduled_for,gym_id,provenance,programme_id,programme_order_index,graph_version')
+    .eq('owner_user_id', agent.userId)
+    .eq('programme_id', programmeId)
+    .is('deleted_at', null)
+    .order('programme_order_index', { ascending: true })
+    .order('id', { ascending: true })
+    .returns<PlanRow[]>();
+  throwDatabaseError(plansError);
+  const planRows = plansData ?? [];
+  const planIds = planRows.map((p) => p.id);
+
+  const blocks: PlanBlockRow[] = [];
+  for (const ids of chunk(planIds, 25)) {
+    let from = 0;
+    const batchPage = 500;
+    while (true) {
+      const { data: batch, error: blockError } = await client
+        .schema('app_public')
+        .from('session_plan_exercises')
+        .select('id,session_plan_id,exercise_definition_id,order_index,name,progress_status,resolved_at')
+        .eq('owner_user_id', agent.userId)
+        .is('deleted_at', null)
+        .in('session_plan_id', ids)
+        .order('order_index')
+        .order('id')
+        .range(from, from + batchPage - 1)
+        .returns<PlanBlockRow[]>();
+      throwDatabaseError(blockError);
+      const batchRows = batch ?? [];
+      blocks.push(...batchRows);
+      if (batchRows.length < batchPage) break;
+      from += batchPage;
+    }
+  }
+
+  const blockIds = blocks.map((row) => row.id);
+  const sets: PlanSetRow[] = [];
+  for (const ids of chunk(blockIds, 50)) {
+    let from = 0;
+    const batchPage = 500;
+    while (true) {
+      const { data: batch, error: setError } = await client
+        .schema('app_public')
+        .from('session_plan_sets')
+        .select('id,session_plan_exercise_id,order_index,target_weight_value,target_reps,target_set_type')
+        .eq('owner_user_id', agent.userId)
+        .is('deleted_at', null)
+        .in('session_plan_exercise_id', ids)
+        .order('order_index')
+        .order('id')
+        .range(from, from + batchPage - 1)
+        .returns<PlanSetRow[]>();
+      throwDatabaseError(setError);
+      const batchRows = batch ?? [];
+      sets.push(...batchRows);
+      if (batchRows.length < batchPage) break;
+      from += batchPage;
+    }
+  }
+
+  const attachedBlockIds = new Set<string>();
+  for (const ids of chunk(blockIds, 50)) {
+    const { data: cards, error: cardError } = await client
+      .schema('app_public')
+      .from('session_exercises')
+      .select('source_plan_exercise_id,session_id')
+      .eq('owner_user_id', agent.userId)
+      .is('deleted_at', null)
+      .is('source_plan_use_id', null)
+      .in('source_plan_exercise_id', ids)
+      .limit(1000)
+      .returns<Array<{ source_plan_exercise_id: string | null; session_id: string }>>();
+    throwDatabaseError(cardError);
+    const candidateCards = (cards ?? []).filter(
+      (c): c is { source_plan_exercise_id: string; session_id: string } =>
+        typeof c.source_plan_exercise_id === 'string' && typeof c.session_id === 'string',
+    );
+    if (candidateCards.length > 0) {
+      const sessionIds = uniqueStrings(candidateCards.map((c) => c.session_id), 100);
+      const { data: activeSessions, error: activeSessionsError } = await client
+        .schema('app_public')
+        .from('sessions')
+        .select('id')
+        .eq('owner_user_id', agent.userId)
+        .is('deleted_at', null)
+        .in('id', sessionIds)
+        .limit(100)
+        .returns<Array<{ id: string }>>();
+      throwDatabaseError(activeSessionsError);
+      const validSessionIds = new Set((activeSessions ?? []).map((s) => s.id));
+      for (const card of candidateCards) {
+        if (validSessionIds.has(card.session_id)) {
+          attachedBlockIds.add(card.source_plan_exercise_id);
+        }
+      }
+    }
+  }
+
+  const gymById = await loadGymNames(client, agent.userId, uniqueStrings(planRows.map((row) => row.gym_id), 50));
+
+  const blocksByPlan = new Map<string, PlanBlockRow[]>();
+  for (const block of blocks) {
+    const bucket = blocksByPlan.get(block.session_plan_id) ?? [];
+    bucket.push(block);
+    blocksByPlan.set(block.session_plan_id, bucket);
+  }
+  const setsByBlock = new Map<string, PlanSetRow[]>();
+  for (const set of sets) {
+    const bucket = setsByBlock.get(set.session_plan_exercise_id) ?? [];
+    bucket.push(set);
+    setsByBlock.set(set.session_plan_exercise_id, bucket);
+  }
+
+  const projectedPlans = planRows.map((plan) => {
+    const planBlocks = blocksByPlan.get(plan.id) ?? [];
+    let pendingCount = 0;
+    let attachedCount = 0;
+    let completedCount = 0;
+    let skippedCount = 0;
+    for (const block of planBlocks) {
+      if (block.progress_status === 'completed') completedCount += 1;
+      else if (block.progress_status === 'skipped') skippedCount += 1;
+      else if (attachedBlockIds.has(block.id)) attachedCount += 1;
+      else pendingCount += 1;
+    }
+    const unresolved = pendingCount + attachedCount;
+    const progress = unresolved === 0 && completedCount + skippedCount > 0
+      ? 'completed'
+      : attachedCount + completedCount + skippedCount > 0 ? 'in_progress' : 'planned';
+    const nextBlock = planBlocks.find(
+      (block) => block.progress_status === 'pending' && !attachedBlockIds.has(block.id),
+    ) ?? null;
+    const planVersion = formatGraphVersion(plan.graph_version);
+    return {
+      id: plan.id,
+      title: plan.title,
+      scheduled_for: toIsoTimestamp(plan.scheduled_for),
+      gym: plan.gym_id
+        ? { id: plan.gym_id, name: gymById.get(plan.gym_id) ?? null }
+        : null,
+      provenance: plan.provenance,
+      programme_id: plan.programme_id,
+      programme_order_index: plan.programme_order_index,
+      progress,
+      next_block_id: nextBlock?.id ?? null,
+      version: planVersion,
+      version_token: planVersion,
+      exercises: planBlocks.slice(0, MAX_PLAN_BLOCKS).map((block) => {
+        const blockSets = setsByBlock.get(block.id) ?? [];
+        return {
+          id: block.id,
+          exercise_definition_id: block.exercise_definition_id,
+          name: block.name,
+          order_index: block.order_index,
+          progress_status: block.progress_status,
+          resolved_at: toIsoTimestamp(block.resolved_at),
+          sets: blockSets.slice(0, MAX_PLAN_SETS).map((set) => ({
+            id: set.id,
+            order_index: set.order_index,
+            target_weight_value: set.target_weight_value,
+            target_reps: set.target_reps,
+            target_set_type: set.target_set_type,
+          })),
+          truncated: blockSets.length > MAX_PLAN_SETS,
+        };
+      }),
+      truncated: planBlocks.length > MAX_PLAN_BLOCKS,
+    };
+  });
+
+  const progVersion = formatGraphVersion(programme.graph_version);
+  return {
+    id: programme.id,
+    name: programme.name,
+    description: programme.description,
+    version: progVersion,
+    version_token: progVersion,
+    plans: projectedPlans,
+  };
+};
+
+const mutateSessionPlan = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+  planId: string,
+  body: JsonObject,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  let mutation: PlanMutation;
+  try {
+    mutation = normalizePlanMutation(body);
+  } catch (error) {
+    if (error instanceof PlanEditError) {
+      throw new ApiError(400, 'INVALID_ARGUMENT', error.message);
+    }
+    throw error;
+  }
+
+  let rpcName: string;
+  let rpcArgs: Record<string, unknown>;
+  const payloadSha = await sha256Hex(JSON.stringify({ plan_id: planId, ...mutation }));
+
+  switch (mutation.kind) {
+    case 'update_plan_meta':
+      rpcName = 'agent_update_plan_meta';
+      rpcArgs = {
+        p_plan_id: planId,
+        p_base_version: mutation.base_version,
+        p_patch: mutation.patch,
+      };
+      break;
+    case 'insert_plan_block':
+      rpcName = 'agent_insert_plan_block';
+      rpcArgs = {
+        p_plan_id: planId,
+        p_base_version: mutation.base_version,
+        p_block: mutation.block,
+      };
+      break;
+    case 'update_plan_block':
+      rpcName = 'agent_update_plan_block';
+      rpcArgs = {
+        p_plan_id: planId,
+        p_exercise_id: mutation.exercise_id,
+        p_base_version: mutation.base_version,
+        p_block: mutation.block,
+      };
+      break;
+    case 'reorder_plan_blocks':
+      rpcName = 'agent_reorder_plan_blocks';
+      rpcArgs = {
+        p_plan_id: planId,
+        p_base_version: mutation.base_version,
+        p_exercise_ids: mutation.exercise_ids,
+      };
+      break;
+    case 'reorder_block_sets':
+      rpcName = 'agent_reorder_block_sets';
+      rpcArgs = {
+        p_plan_id: planId,
+        p_exercise_id: mutation.exercise_id,
+        p_base_version: mutation.base_version,
+        p_set_ids: mutation.set_ids,
+      };
+      break;
+    case 'tombstone_plan_block':
+      rpcName = 'agent_tombstone_plan_block';
+      rpcArgs = {
+        p_plan_id: planId,
+        p_exercise_id: mutation.exercise_id,
+        p_base_version: mutation.base_version,
+      };
+      break;
+    case 'tombstone_plan':
+      rpcName = 'agent_tombstone_plan';
+      rpcArgs = {
+        p_plan_id: planId,
+        p_base_version: mutation.base_version,
+      };
+      break;
+  }
+
+  const { data, error } = await client.schema('app_public').rpc(rpcName, {
+    p_owner: agent.userId,
+    p_client_id: agent.clientId,
+    p_idempotency_key: idempotencyKey,
+    p_payload_sha256: payloadSha,
+    ...rpcArgs,
+  });
+  throwPlanEditError(error);
+  const result = data as JsonObject;
+  const version = typeof result?.version === 'string' ? result.version : null;
+  return {
+    ...result,
+    ...(version ? { version_token: version } : {}),
+  };
+};
+
+const mutateTrainingProgramme = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+  programmeId: string,
+  body: JsonObject,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  let mutation: ProgrammeMutation;
+  try {
+    mutation = normalizeProgrammeMutation(body);
+  } catch (error) {
+    if (error instanceof PlanEditError) {
+      throw new ApiError(400, 'INVALID_ARGUMENT', error.message);
+    }
+    throw error;
+  }
+
+  let rpcName: string;
+  let rpcArgs: Record<string, unknown>;
+  const payloadSha = await sha256Hex(JSON.stringify({ programme_id: programmeId, ...mutation }));
+
+  switch (mutation.kind) {
+    case 'update_programme_meta':
+      rpcName = 'agent_update_programme_meta';
+      rpcArgs = {
+        p_programme_id: programmeId,
+        p_base_version: mutation.base_version,
+        p_patch: mutation.patch,
+      };
+      break;
+    case 'reorder_programme_plans':
+      rpcName = 'agent_reorder_programme_plans';
+      rpcArgs = {
+        p_programme_id: programmeId,
+        p_base_version: mutation.base_version,
+        p_plan_ids: mutation.plan_ids,
+      };
+      break;
+    case 'detach_programme_plan':
+      rpcName = 'agent_detach_programme_plan';
+      rpcArgs = {
+        p_programme_id: programmeId,
+        p_plan_id: mutation.plan_id,
+        p_base_version: mutation.base_version,
+      };
+      break;
+    case 'tombstone_programme':
+      rpcName = 'agent_tombstone_programme';
+      rpcArgs = {
+        p_programme_id: programmeId,
+        p_base_version: mutation.base_version,
+      };
+      break;
+  }
+
+  const { data, error } = await client.schema('app_public').rpc(rpcName, {
+    p_owner: agent.userId,
+    p_client_id: agent.clientId,
+    p_idempotency_key: idempotencyKey,
+    p_payload_sha256: payloadSha,
+    ...rpcArgs,
+  });
+  throwPlanEditError(error);
+  const result = data as JsonObject;
+  const version = typeof result?.version === 'string' ? result.version : null;
+  return {
+    ...result,
+    ...(version ? { version_token: version } : {}),
   };
 };
 
@@ -2920,21 +3374,48 @@ const dispatchAgentRequest = async (
     if (method !== 'GET' && method !== 'POST') {
       throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET or POST.');
     }
-    enforceWriteRateLimit(agent);
     await loadPlanPermission(client, agent);
     if (method === 'GET') {
       return getUpcomingSessionPlans(client, agent, url);
     }
+    enforceWriteRateLimit(agent);
     return createSessionPlan(client, agent, request, await readJsonBody(request));
+  }
+
+  const planMatch = /^\/v1\/agent\/session-plans\/([^/]+)$/.exec(path);
+  if (planMatch) {
+    if (method !== 'PATCH') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use PATCH.');
+    }
+    await loadPlanPermission(client, agent, true);
+    enforceWriteRateLimit(agent);
+    const planId = decodePlanId(planMatch[1]);
+    return mutateSessionPlan(client, agent, request, planId, await readJsonBody(request));
   }
 
   if (path === '/v1/agent/programmes') {
     if (method !== 'POST') {
       throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use POST.');
     }
-    enforceWriteRateLimit(agent);
     await loadPlanPermission(client, agent);
+    enforceWriteRateLimit(agent);
     return createTrainingProgramme(client, agent, request, await readJsonBody(request));
+  }
+
+  const programmeMatch = /^\/v1\/agent\/programmes\/([^/]+)$/.exec(path);
+  if (programmeMatch) {
+    if (method !== 'GET' && method !== 'PATCH') {
+      throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET or PATCH.');
+    }
+    const programmeId = decodeProgrammeId(programmeMatch[1]);
+    if (method === 'GET') {
+      rejectUnexpectedQuery(url, new Set());
+      await loadPlanPermission(client, agent, false);
+      return getProgrammeDetail(client, agent, programmeId);
+    }
+    await loadPlanPermission(client, agent, true);
+    enforceWriteRateLimit(agent);
+    return mutateTrainingProgramme(client, agent, request, programmeId, await readJsonBody(request));
   }
 
   if (path === '/v1/agent/muscle-targets') {
@@ -3040,8 +3521,8 @@ const handleRequest = async (request: Request): Promise<Response> => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
-  if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'PUT') {
-    return errorResponse(requestId, new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET, POST or PUT.'));
+  if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'PUT' && request.method !== 'PATCH') {
+    return errorResponse(requestId, new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET, POST, PUT or PATCH.'));
   }
 
   const startedAt = performance.now();

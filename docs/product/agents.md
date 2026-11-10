@@ -24,9 +24,7 @@ Approved 2026-11-10.
 Code: `loadPlanPermission` in `supabase/functions/agent-api/index.ts`; the edit switch in
 `apps/mobile/app/connected-agents.tsx`; edit RPCs in
 `supabase/migrations/20261024140000_agent_plan_programme_mutation_rpcs.sql`.
-Pending: The edit switch saves the grant, but `supabase/functions/agent-api/index.ts`
-has no plan or programme edit routes and does not call those RPCs.
-`services/boga-mcp/src/tools.ts` does not expose the corresponding edits.
+Pending: `services/boga-mcp/src/tools.ts` does not expose the corresponding edits.
 Code: the independent app grant and handoff live in
 `apps/mobile/src/auth/connected-agents.ts` and
 `supabase/migrations/20261110145636_workout_handoff.sql`.

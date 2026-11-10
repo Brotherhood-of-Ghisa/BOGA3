@@ -1,6 +1,6 @@
 # M38-T03 — Agent API edit endpoints and validation
 
-- Status: `planned`
+- Status: `completed`
 - Depends on: `M38-T02-Service_role_atomic_mutation_RPCs`
 - Milestone: `docs/plans/milestones/M38-agent-programme-and-plan-edits.md`
 - Areas: backend; UI impact: no

@@ -281,6 +281,30 @@ agent_put() {
   rm -f "${response_file}"
 }
 
+agent_patch() {
+  local route="$1"
+  local body="$2"
+  local idempotency_key="${3:-}"
+  local token="${4:-${AGENT_ACCESS_TOKEN}}"
+  local response_file
+  response_file="$(mktemp)"
+  local -a request_args=(
+    --silent
+    --show-error
+    -X PATCH
+    -H "Accept: application/json"
+    -H "Authorization: Bearer ${token}"
+    -H "Content-Type: application/json"
+    -o "${response_file}"
+    -w "%{http_code}"
+  )
+  [[ -n "${idempotency_key}" ]] && request_args+=(-H "Idempotency-Key: ${idempotency_key}")
+  request_args+=(--data "${body}")
+  RESPONSE_STATUS="$(curl "${request_args[@]}" "${AGENT_API_BASE}/${route}")"
+  RESPONSE_BODY="$(cat "${response_file}")"
+  rm -f "${response_file}"
+}
+
 # PostgREST against the default `public` schema (permission/receipt tables).
 public_request() {
   local method="$1"
@@ -1419,7 +1443,7 @@ rpc_expect_error() {
   local sql="$2"
   local context="$3"
   local out
-  out="$(docker exec -i "${DB_CONTAINER}" psql -U postgres -Atq -c "${sql}" 2>&1 || true)"
+  out="$(docker exec "${DB_CONTAINER}" psql -U postgres -Atq -c "${sql}" 2>&1 || true)"
   if [[ "${out}" != *"${expected_err}"* ]]; then
     fail "${context}: expected error containing '${expected_err}', got: ${out}"
   fi
@@ -1848,7 +1872,7 @@ run_psql "
 V_RACE_BASE="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${V_RACE_PLAN}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
 
 # Conn 1 locks row in transaction and sleeps 1s
-docker exec -i "${DB_CONTAINER}" psql -U postgres -c "
+docker exec "${DB_CONTAINER}" psql -U postgres -c "
   begin;
   select app_public.agent_update_plan_meta(
     '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-race-1', '${MUT_HASH_1}',
@@ -1861,7 +1885,7 @@ CONN1_PID=$!
 sleep 0.2
 
 # Conn 2 concurrently calls with same base version V but different receipt key
-CONN2_OUT="$(docker exec -i "${DB_CONTAINER}" psql -U postgres -Atq -c "
+CONN2_OUT="$(docker exec "${DB_CONTAINER}" psql -U postgres -Atq -c "
   select app_public.agent_update_plan_meta(
     '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-race-2', '${MUT_HASH_2}',
     '${V_RACE_PLAN}', '${V_RACE_BASE}', '{\"title\": \"Race Loser 2\"}'::jsonb
@@ -1890,7 +1914,7 @@ run_psql "
 V_ATTACH_BASE="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_RACE_ATTACH}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
 
 # Conn 1: Sync materialization attaches session_exercises referencing BLOCK_RACE_ATTACH under transaction
-docker exec -i "${DB_CONTAINER}" psql -U postgres -c "
+docker exec "${DB_CONTAINER}" psql -U postgres -c "
   begin;
   insert into app_public.session_exercises (
     owner_user_id, id, session_id, exercise_definition_id, source_plan_exercise_id,
@@ -1906,7 +1930,7 @@ CONN1_ATTACH_PID=$!
 sleep 0.2
 
 # Conn 2: Agent tries to update block name while sync attachment is in flight
-CONN2_ATTACH_OUT="$(docker exec -i "${DB_CONTAINER}" psql -U postgres -Atq -c "
+CONN2_ATTACH_OUT="$(docker exec "${DB_CONTAINER}" psql -U postgres -Atq -c "
   select app_public.agent_update_plan_block(
     '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-race-attach', '${MUT_HASH_1}',
     '${PLAN_RACE_ATTACH}', '${BLOCK_RACE_ATTACH}', '${V_ATTACH_BASE}',
@@ -1937,7 +1961,7 @@ run_psql "
 V_EDIT_BASE="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_RACE_EDIT}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
 
 # Conn 1: Sync updates pending session_plan_exercises row directly under transaction (holding coordinate lock)
-docker exec -i "${DB_CONTAINER}" psql -U postgres -c "
+docker exec "${DB_CONTAINER}" psql -U postgres -c "
   begin;
   select set_config('request.jwt.claim.sub', '${USER_A_UUID}', true);
   update app_public.session_plan_exercises
@@ -1952,7 +1976,7 @@ CONN1_EDIT_PID=$!
 sleep 0.2
 
 # Conn 2: Agent tries to update block with stale base version while sync edit is in flight
-CONN2_EDIT_OUT="$(docker exec -i "${DB_CONTAINER}" psql -U postgres -Atq -c "
+CONN2_EDIT_OUT="$(docker exec "${DB_CONTAINER}" psql -U postgres -Atq -c "
   select app_public.agent_update_plan_block(
     '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-race-edit', '${MUT_HASH_1}',
     '${PLAN_RACE_EDIT}', '${BLOCK_RACE_EDIT}', '${V_EDIT_BASE}',
@@ -1988,7 +2012,7 @@ run_psql "
 V_INVERT_BASE="$(run_psql "select to_char(app_public.agent_plan_graph_version('${USER_A_UUID}'::uuid, '${PLAN_RACE_INVERT}') at time zone 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"');")"
 
 # Conn 1 starts transaction at t0: now() is frozen at t0. Sleeps 0.8s before executing its update.
-docker exec -i "${DB_CONTAINER}" psql -U postgres -c "
+docker exec "${DB_CONTAINER}" psql -U postgres -c "
   begin;
   select set_config('request.jwt.claim.sub', '${USER_A_UUID}', true);
   select pg_sleep(0.8);
@@ -2017,7 +2041,7 @@ V_AGENT_V1="$(printf '%s' "${AGENT_MUT_OUT}" | jq -r '.version')"
 wait "${CONN1_INVERT_PID}"
 
 # Conn 3: Agent attempts block mutation with base version V1 (believing plan has not changed since t1)
-CONN3_INVERT_OUT="$(docker exec -i "${DB_CONTAINER}" psql -U postgres -Atq -c "
+CONN3_INVERT_OUT="$(docker exec "${DB_CONTAINER}" psql -U postgres -Atq -c "
   select app_public.agent_update_plan_block(
     '${USER_A_UUID}'::uuid, '${AGENT_CLIENT_ID}', '${MUT_KEY_BASE}-invert-stale', '${MUT_HASH_2}',
     '${PLAN_RACE_INVERT}', '${BLOCK_RACE_INVERT}', '${V_AGENT_V1}',
@@ -2030,6 +2054,312 @@ if [[ "${CONN3_INVERT_OUT}" != *"PLAN_CONCURRENT_MODIFICATION"* ]]; then
 fi
 [[ "$(run_psql "select name from app_public.session_plan_exercises where id = '${BLOCK_RACE_INVERT}';")" == "Phone Inversion Block" ]] ||
   fail "commit-order inversion race: phone inversion child block update was not preserved"
+
+echo "[agent-api-test] letting the per-minute request windows reset before the edit endpoints block"
+sleep 61
+echo "[agent-api-test] verifying HTTP agent plan and programme edit endpoints and permission gate"
+
+# 1. Create a dedicated session plan via HTTP to test edits
+HTTP_PLAN_KEY="agent-api-${RUN_TAG}-http-edit-plan"
+HTTP_PLAN_BODY="$(jq -nc --arg gym "${GYM_A}" --arg ex "${EXERCISE_A}" --argjson now "${NOW_MS}" '
+  {title:"HTTP Edit Plan",gym_id:$gym,scheduled_for:($now + 86400000),
+   exercises:[{exercise_definition_id:$ex,name:"Bench Block 1",sets:[{target_reps:8,target_weight_value:"80"}]}]}')"
+agent_post "session-plans" "${HTTP_PLAN_BODY}" "${HTTP_PLAN_KEY}"
+assert_status "200" "create plan for http edits"
+HTTP_PLAN_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.plan_id')"
+
+# Browser CORS preflight for PATCH
+CORS_PREFLIGHT_RESP="$(curl -s -D - -o /dev/null -X OPTIONS "${AGENT_API_BASE}/session-plans/${HTTP_PLAN_ID}" \
+  -H "Origin: https://app.example.com" \
+  -H "Access-Control-Request-Method: PATCH")"
+echo "${CORS_PREFLIGHT_RESP}" | grep -qi "HTTP/[12].* 20[04]" || fail "OPTIONS preflight did not return 2xx (200 or 204)"
+echo "${CORS_PREFLIGHT_RESP}" | grep -qi "access-control-allow-methods:.*PATCH" || fail "OPTIONS preflight response missing PATCH in access-control-allow-methods"
+
+EDGE_CONTAINER="${DB_CONTAINER/supabase_db_/supabase_edge_runtime_}"
+EDGE_IP="$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "${EDGE_CONTAINER}" 2>/dev/null || true)"
+if [[ -n "${EDGE_IP}" ]]; then
+  EDGE_PREFLIGHT_RESP="$(curl -s -D - -o /dev/null -X OPTIONS "http://${EDGE_IP}:8081/agent-api/v1/agent/session-plans/${HTTP_PLAN_ID}" \
+    -H "Origin: https://app.example.com" \
+    -H "Access-Control-Request-Method: PATCH" 2>/dev/null || true)"
+  if [[ -n "${EDGE_PREFLIGHT_RESP}" ]]; then
+    echo "${EDGE_PREFLIGHT_RESP}" | grep -qi "HTTP/[12].* 204" || fail "direct edge runtime OPTIONS preflight did not return 204"
+    echo "${EDGE_PREFLIGHT_RESP}" | grep -qi "access-control-allow-methods:.*PATCH" || fail "direct edge runtime response missing PATCH in access-control-allow-methods"
+  fi
+fi
+
+# Verify GET /v1/agent/session-plans returns graph version tokens
+agent_get "session-plans"
+assert_status "200" "get session-plans includes version tokens"
+V_PLAN_TOKEN="$(printf '%s' "${RESPONSE_BODY}" | jq -er --arg p "${HTTP_PLAN_ID}" '.data.plans[] | select(.id == $p) | .version_token')"
+V_PLAN_VER="$(printf '%s' "${RESPONSE_BODY}" | jq -er --arg p "${HTTP_PLAN_ID}" '.data.plans[] | select(.id == $p) | .version')"
+[[ -n "${V_PLAN_TOKEN}" && -n "${V_PLAN_VER}" ]] || fail "session plan missing version_token or version"
+
+# 2. Permission gate: plan_edit_enabled = false rejects PATCH with 403 PLAN_EDIT_PERMISSION_REQUIRED
+run_psql "update public.agent_plan_permissions
+  set plan_edit_enabled = false
+  where owner_user_id = '${USER_A_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';" >/dev/null
+
+HTTP_PATCH_BODY_1="$(jq -nc --arg ver "${V_PLAN_TOKEN}" '{operation:"update_plan_meta",base_version:$ver,title:"Denied Plan Title"}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${HTTP_PATCH_BODY_1}" "agent-api-${RUN_TAG}-perm-gate"
+assert_status "403" "patch plan rejected when plan_edit_enabled=false"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_EDIT_PERMISSION_REQUIRED" ]] ||
+  fail "disabled edit permission did not return PLAN_EDIT_PERMISSION_REQUIRED"
+
+# Re-enable edit permission
+run_psql "update public.agent_plan_permissions
+  set plan_edit_enabled = true
+  where owner_user_id = '${USER_A_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';" >/dev/null
+
+# 3. Optimistic concurrency: stale base_version rejected with 409 PLAN_CONCURRENT_MODIFICATION
+STALE_BODY="$(jq -nc '{operation:"update_plan_meta",base_version:"2020-01-01T00:00:00.000000Z",title:"Stale Edit"}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${STALE_BODY}" "agent-api-${RUN_TAG}-stale-patch"
+assert_status "409" "stale base_version rejects concurrent modification"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_CONCURRENT_MODIFICATION" ]] ||
+  fail "stale base_version did not return PLAN_CONCURRENT_MODIFICATION"
+
+# 4. Valid update_plan_meta: succeeds and returns new version
+HTTP_PATCH_META_KEY="agent-api-${RUN_TAG}-patch-meta-1"
+VALID_META_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN}" '{operation:"update_plan_meta",base_version:$ver,title:"Updated Plan Title"}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${VALID_META_BODY}" "${HTTP_PATCH_META_KEY}"
+assert_status "200" "valid update_plan_meta PATCH"
+V_PLAN_TOKEN_2="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+[[ "${V_PLAN_TOKEN_2}" != "${V_PLAN_TOKEN}" ]] || fail "version_token did not advance after meta update"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.idempotent_replay')" == "false" ]] || fail "first patch was marked as replay"
+
+# Idempotency replay with exact same payload and key: returns 200 with idempotent_replay: true
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${VALID_META_BODY}" "${HTTP_PATCH_META_KEY}"
+assert_status "200" "idempotent replay for plan patch"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.idempotent_replay')" == "true" ]] || fail "idempotent replay not indicated"
+
+# Idempotency conflict: same key with different payload returns 409 IDEMPOTENCY_CONFLICT
+CONFLICT_PATCH_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN}" '{operation:"update_plan_meta",base_version:$ver,title:"Conflicting Plan Title"}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${CONFLICT_PATCH_BODY}" "${HTTP_PATCH_META_KEY}"
+assert_status "409" "idempotency conflict for plan patch"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IDEMPOTENCY_CONFLICT" ]] ||
+  fail "differing payload on same idempotency key did not return IDEMPOTENCY_CONFLICT"
+
+# 5. Insert plan block via PATCH
+HTTP_INS_KEY="agent-api-${RUN_TAG}-ins-blk"
+INS_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN_2}" --arg ex "${EXERCISE_A2}" '
+  {operation:"insert_plan_block",base_version:$ver,
+   block:{exercise_id:$ex,name:"Incline Dumbbell Press",sets:[{target_reps:10,target_weight_value:"30"}]}}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${INS_BODY}" "${HTTP_INS_KEY}"
+assert_status "200" "insert_plan_block via PATCH"
+NEW_BLOCK_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.exercise_id')"
+V_PLAN_TOKEN_3="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+[[ -n "${NEW_BLOCK_ID}" ]] || fail "insert_plan_block did not return exercise_id"
+
+# 6. Update plan block via PATCH
+HTTP_UPD_BLK_KEY="agent-api-${RUN_TAG}-upd-blk"
+UPD_BLK_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN_3}" --arg blk "${NEW_BLOCK_ID}" '
+  {operation:"update_plan_block",base_version:$ver,exercise_id:$blk,
+   name:"Updated Incline Press",sets:[{target_reps:12,target_weight_value:"32.5"}]}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${UPD_BLK_BODY}" "${HTTP_UPD_BLK_KEY}"
+assert_status "200" "update_plan_block via PATCH"
+V_PLAN_TOKEN_4="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+
+# Update plan block: clear exercise definition link (exercise_definition_id: null)
+HTTP_CLEAR_DEF_KEY="agent-api-${RUN_TAG}-clear-def"
+CLEAR_DEF_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN_4}" --arg blk "${NEW_BLOCK_ID}" '
+  {operation:"update_plan_block",base_version:$ver,exercise_id:$blk,exercise_definition_id:null}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${CLEAR_DEF_BODY}" "${HTTP_CLEAR_DEF_KEY}"
+assert_status "200" "update_plan_block clear exercise_definition_id via PATCH"
+V_PLAN_TOKEN_4="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+[[ "$(run_psql "select exercise_definition_id is null from app_public.session_plan_exercises where id = '${NEW_BLOCK_ID}';")" == "t" ]] ||
+  fail "update_plan_block with exercise_definition_id: null did not clear definition link in db"
+
+# 7. Reorder sets and blocks via PATCH
+INITIAL_BLOCK_ID="$(run_psql "select id from app_public.session_plan_exercises where session_plan_id = '${HTTP_PLAN_ID}' and id != '${NEW_BLOCK_ID}' and deleted_at is null;")"
+HTTP_REORD_BLK_KEY="agent-api-${RUN_TAG}-reord-blk"
+REORD_BLK_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN_4}" --arg b1 "${NEW_BLOCK_ID}" --arg b2 "${INITIAL_BLOCK_ID}" '
+  {operation:"reorder_plan_blocks",base_version:$ver,exercise_ids:[$b1,$b2]}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${REORD_BLK_BODY}" "${HTTP_REORD_BLK_KEY}"
+assert_status "200" "reorder_plan_blocks via PATCH"
+V_PLAN_TOKEN_5="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+[[ "$(run_psql "select order_index from app_public.session_plan_exercises where id = '${NEW_BLOCK_ID}';")" == "0" ]] ||
+  fail "reorder_plan_blocks did not place new block at order_index 0"
+
+# 8. Immutable block mutation rejection
+ATTACH_SESS_HTTP="agent-api-${RUN_TAG}-http-attach-sess"
+ATTACH_CARD_HTTP="agent-api-${RUN_TAG}-http-attach-card"
+run_psql "
+  insert into app_public.sessions (id, owner_user_id, status, started_at, created_at, updated_at, client_updated_at_ms)
+  values ('${ATTACH_SESS_HTTP}', '${USER_A_UUID}'::uuid, 'active', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+  insert into app_public.session_exercises (id, owner_user_id, session_id, exercise_definition_id, order_index, name, source_plan_exercise_id, created_at, updated_at, client_updated_at_ms)
+  values ('${ATTACH_CARD_HTTP}', '${USER_A_UUID}'::uuid, '${ATTACH_SESS_HTTP}', '${EXERCISE_A}', 0, 'Attached Card', '${NEW_BLOCK_ID}', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+" >/dev/null
+
+IMMUT_PATCH_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN_5}" --arg blk "${NEW_BLOCK_ID}" '
+  {operation:"update_plan_block",base_version:$ver,exercise_id:$blk,name:"Illegal Edit While Active"}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${IMMUT_PATCH_BODY}" "agent-api-${RUN_TAG}-immut-blk"
+assert_status "400" "immutable block edit rejected"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IMMUTABLE_BLOCK_MUTATION" ]] ||
+  fail "active session block edit did not return IMMUTABLE_BLOCK_MUTATION"
+
+run_psql "
+  delete from app_public.session_exercises where id = '${ATTACH_CARD_HTTP}';
+  delete from app_public.sessions where id = '${ATTACH_SESS_HTTP}';
+" >/dev/null
+
+# 9. Tombstone block via PATCH
+HTTP_DEL_BLK_KEY="agent-api-${RUN_TAG}-del-blk"
+DEL_BLK_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN_5}" --arg blk "${NEW_BLOCK_ID}" '
+  {operation:"tombstone_plan_block",base_version:$ver,exercise_id:$blk}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${DEL_BLK_BODY}" "${HTTP_DEL_BLK_KEY}"
+assert_status "200" "tombstone_plan_block via PATCH"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.deleted')" == "true" ]] || fail "tombstone block response missing deleted: true"
+V_PLAN_TOKEN_6="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+
+# 10. Tombstone plan via PATCH
+HTTP_DEL_PLAN_KEY="agent-api-${RUN_TAG}-del-plan"
+DEL_PLAN_BODY="$(jq -nc --arg ver "${V_PLAN_TOKEN_6}" '
+  {operation:"tombstone_plan",base_version:$ver}')"
+agent_patch "session-plans/${HTTP_PLAN_ID}" "${DEL_PLAN_BODY}" "${HTTP_DEL_PLAN_KEY}"
+assert_status "200" "tombstone_plan via PATCH"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.deleted')" == "true" ]] || fail "tombstone plan response missing deleted: true"
+[[ "$(run_psql "select deleted_at is not null from app_public.session_plans where id = '${HTTP_PLAN_ID}';")" == "t" ]] ||
+  fail "plan was not tombstoned in db"
+
+# 11. Training programme operations: create programme with 3 plans
+HTTP_PROG_KEY="agent-api-${RUN_TAG}-http-prog"
+HTTP_PROG_BODY="$(jq -nc --arg gym "${GYM_A}" --arg ex "${EXERCISE_A}" --argjson now "${NOW_MS}" '
+  {name:"HTTP Coaching Programme",description:"Initial Programme Description",
+   plans:[
+     {title:"Prog Plan A",gym_id:$gym,scheduled_for:($now + 86400000),exercises:[{exercise_definition_id:$ex,name:"A",sets:[{target_reps:5}]}]},
+     {title:"Prog Plan B",gym_id:$gym,scheduled_for:($now + 172800000),exercises:[{exercise_definition_id:$ex,name:"B",sets:[{target_reps:5}]}]},
+     {title:"Prog Plan C",gym_id:$gym,scheduled_for:($now + 259200000),exercises:[{exercise_definition_id:$ex,name:"C",sets:[{target_reps:5}]}]}
+   ]}')"
+agent_post "programmes" "${HTTP_PROG_BODY}" "${HTTP_PROG_KEY}"
+assert_status "200" "create programme with 3 plans"
+HTTP_PROG_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.programme_id')"
+
+# GET /v1/agent/programmes/:programmeId
+agent_get "programmes/${HTTP_PROG_ID}"
+assert_status "200" "get programme detail"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+  .data.name == "HTTP Coaching Programme"
+  and .data.description == "Initial Programme Description"
+  and .data.version_token != null
+  and (.data.plans | length) == 3
+  and .data.plans[0].version_token != null
+  and .data.programme == null
+' >/dev/null || fail "get programme detail response missing expected fields or duplicate programme object present"
+PROG_DETAIL_BYTES=$(printf '%s' "${RESPONSE_BODY}" | wc -c)
+[[ "${PROG_DETAIL_BYTES}" -lt 262144 ]] || fail "programme detail exceeded 256 KiB budget: ${PROG_DETAIL_BYTES} bytes"
+V_PROG_TOKEN="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+HTTP_PLAN_A_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.plans[0].id')"
+HTTP_PLAN_B_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.plans[1].id')"
+HTTP_PLAN_C_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.plans[2].id')"
+
+# Cross-target idempotency conflict: reusing the same idempotency key across different plans returns 409 IDEMPOTENCY_CONFLICT
+CROSS_IDEM_KEY="agent-api-${RUN_TAG}-cross-target-idem"
+V_PLAN_A_TOKEN="$(run_psql "select coalesce(graph_version::text, updated_at::text) from app_public.session_plans where id = '${HTTP_PLAN_A_ID}';")"
+V_PLAN_B_TOKEN="$(run_psql "select coalesce(graph_version::text, updated_at::text) from app_public.session_plans where id = '${HTTP_PLAN_B_ID}';")"
+CROSS_PAYLOAD_A="$(jq -nc --arg ver "${V_PLAN_A_TOKEN}" '{operation:"update_plan_meta",base_version:$ver,title:"Cross Target Title"}')"
+agent_patch "session-plans/${HTTP_PLAN_A_ID}" "${CROSS_PAYLOAD_A}" "${CROSS_IDEM_KEY}"
+assert_status "200" "patch plan A with cross-target idempotency key"
+
+CROSS_PAYLOAD_B="$(jq -nc --arg ver "${V_PLAN_B_TOKEN}" '{operation:"update_plan_meta",base_version:$ver,title:"Cross Target Title"}')"
+agent_patch "session-plans/${HTTP_PLAN_B_ID}" "${CROSS_PAYLOAD_B}" "${CROSS_IDEM_KEY}"
+assert_status "409" "reusing idempotency key on plan B returns 409 conflict"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IDEMPOTENCY_CONFLICT" ]] ||
+  fail "reusing idempotency key across targets did not return IDEMPOTENCY_CONFLICT"
+
+# Re-read programme version since updating child plan advanced the programme's graph version
+agent_get "programmes/${HTTP_PROG_ID}"
+assert_status "200" "get updated programme detail"
+V_PROG_TOKEN="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+
+# GET non-existent programme returns 404
+agent_get "programmes/agent-api-${RUN_TAG}-missing-prog"
+assert_status "404" "missing programme returns 404"
+
+# PATCH programme permission check
+run_psql "update public.agent_plan_permissions
+  set plan_edit_enabled = false
+  where owner_user_id = '${USER_A_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';" >/dev/null
+PROG_PATCH_DENIED="$(jq -nc --arg ver "${V_PROG_TOKEN}" '{operation:"update_programme_meta",base_version:$ver,name:"Denied Prog"}')"
+agent_patch "programmes/${HTTP_PROG_ID}" "${PROG_PATCH_DENIED}" "agent-api-${RUN_TAG}-prog-perm-gate"
+assert_status "403" "patch programme rejected when plan_edit_enabled=false"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_EDIT_PERMISSION_REQUIRED" ]] ||
+  fail "disabled edit permission did not return PLAN_EDIT_PERMISSION_REQUIRED on programme PATCH"
+
+run_psql "update public.agent_plan_permissions
+  set plan_edit_enabled = true
+  where owner_user_id = '${USER_A_UUID}'::uuid and client_id = '${AGENT_CLIENT_ID}';" >/dev/null
+
+# PATCH programme: update_programme_meta
+HTTP_PROG_META_KEY="agent-api-${RUN_TAG}-prog-meta"
+PROG_META_BODY="$(jq -nc --arg ver "${V_PROG_TOKEN}" '
+  {operation:"update_programme_meta",base_version:$ver,name:"Renamed HTTP Programme",description:"New Description"}')"
+agent_patch "programmes/${HTTP_PROG_ID}" "${PROG_META_BODY}" "${HTTP_PROG_META_KEY}"
+assert_status "200" "update_programme_meta via PATCH"
+V_PROG_TOKEN_2="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+[[ "${V_PROG_TOKEN_2}" != "${V_PROG_TOKEN}" ]] || fail "programme version_token did not advance"
+
+# PATCH programme: reorder_programme_plans
+HTTP_PROG_REORD_KEY="agent-api-${RUN_TAG}-prog-reord"
+PROG_REORD_BODY="$(jq -nc --arg ver "${V_PROG_TOKEN_2}" --arg a "${HTTP_PLAN_A_ID}" --arg b "${HTTP_PLAN_B_ID}" --arg c "${HTTP_PLAN_C_ID}" '
+  {operation:"reorder_programme_plans",base_version:$ver,plan_ids:[$c,$a,$b]}')"
+agent_patch "programmes/${HTTP_PROG_ID}" "${PROG_REORD_BODY}" "${HTTP_PROG_REORD_KEY}"
+assert_status "200" "reorder_programme_plans via PATCH"
+V_PROG_TOKEN_3="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+[[ "$(run_psql "select programme_order_index from app_public.session_plans where id = '${HTTP_PLAN_C_ID}';")" == "0" ]] ||
+  fail "reorder_programme_plans did not set plan C to index 0"
+
+# PATCH programme: detach_programme_plan
+HTTP_PROG_DETACH_KEY="agent-api-${RUN_TAG}-prog-detach"
+PROG_DETACH_BODY="$(jq -nc --arg ver "${V_PROG_TOKEN_3}" --arg c "${HTTP_PLAN_C_ID}" '
+  {operation:"detach_programme_plan",base_version:$ver,plan_id:$c}')"
+agent_patch "programmes/${HTTP_PROG_ID}" "${PROG_DETACH_BODY}" "${HTTP_PROG_DETACH_KEY}"
+assert_status "200" "detach_programme_plan via PATCH"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.detached')" == "true" ]] || fail "detach response missing detached: true"
+V_PROG_TOKEN_4="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.version_token')"
+[[ "$(run_psql "select programme_id is null from app_public.session_plans where id = '${HTTP_PLAN_C_ID}';")" == "t" ]] ||
+  fail "detached plan still points to programme"
+
+# Detach when only 2 plans remain rejects with 400 INVALID_ARGUMENT
+DETACH_INVALID_BODY="$(jq -nc --arg ver "${V_PROG_TOKEN_4}" --arg a "${HTTP_PLAN_A_ID}" '
+  {operation:"detach_programme_plan",base_version:$ver,plan_id:$a}')"
+agent_patch "programmes/${HTTP_PROG_ID}" "${DETACH_INVALID_BODY}" "agent-api-${RUN_TAG}-prog-detach-min"
+assert_status "400" "detach rejected when <2 plans remain"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INVALID_ARGUMENT" ]] ||
+  fail "detaching below minimum plans did not return INVALID_ARGUMENT"
+
+# PATCH programme: tombstone_programme
+HTTP_PROG_DEL_KEY="agent-api-${RUN_TAG}-prog-del"
+PROG_DEL_BODY="$(jq -nc --arg ver "${V_PROG_TOKEN_4}" '
+  {operation:"tombstone_programme",base_version:$ver}')"
+agent_patch "programmes/${HTTP_PROG_ID}" "${PROG_DEL_BODY}" "${HTTP_PROG_DEL_KEY}"
+assert_status "200" "tombstone_programme via PATCH"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.deleted')" == "true" ]] || fail "tombstone programme response missing deleted: true"
+[[ "$(run_psql "select deleted_at is not null from app_public.training_programmes where id = '${HTTP_PROG_ID}';")" == "t" ]] ||
+  fail "programme was not tombstoned in db"
+
+# Programme detail response size regression: multiweek programme fits comfortably within MAX_RESPONSE_BYTES (256 KiB)
+HTTP_LARGE_PROG_KEY="agent-api-${RUN_TAG}-large-prog"
+HTTP_LARGE_PROG_BODY="$(jq -nc --arg gym "${GYM_A}" --arg ex "${EXERCISE_A}" --argjson now "${NOW_MS}" '
+  {name:"Multiweek Heavy Programme",description:"10 week progression",
+   plans:[range(10) | {
+     title: ("Week Plan " + (. | tostring)),
+     gym_id: $gym,
+     scheduled_for: ($now + (. * 86400000)),
+     exercises: [range(4) | {
+       exercise_definition_id: $ex,
+       name: ("Exercise Block " + (. | tostring)),
+       sets: [range(4) | {target_reps: (8 + .), target_weight_value: "80"}]
+     }]
+   }]}')"
+agent_post "programmes" "${HTTP_LARGE_PROG_BODY}" "${HTTP_LARGE_PROG_KEY}"
+assert_status "200" "create multiweek programme"
+LARGE_PROG_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.programme_id')"
+
+agent_get "programmes/${LARGE_PROG_ID}"
+assert_status "200" "get multiweek programme detail"
+LARGE_PROG_BYTES=$(printf '%s' "${RESPONSE_BODY}" | wc -c)
+[[ "${LARGE_PROG_BYTES}" -lt 262144 ]] || fail "multiweek programme detail exceeded 256 KiB budget: ${LARGE_PROG_BYTES} bytes"
+printf '%s' "${RESPONSE_BODY}" | jq -e '(.data.plans | length) == 10 and .data.programme == null' >/dev/null ||
+  fail "multiweek programme detail did not return 10 plans or contained duplicated programme"
 
 
 echo "[agent-api-test] verifying the muscle list and the exercise catalog view"

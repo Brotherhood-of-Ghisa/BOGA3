@@ -9,8 +9,8 @@ https://<project>.supabase.co/functions/v1/agent-api
 Every route below validates the bearer token live with Supabase Auth, requires
 its OAuth `client_id` and an active matching grant, derives the owner from the
 validated subject, and performs an explicit owner-filtered read. The read routes
-accept `GET` only; the write routes accept `POST` (`PUT` for muscle targets)
-and require their current-grant permission. GET bodies and caller identity
+accept `GET` only; the write routes accept `POST` (`PUT` for muscle targets, `PATCH`
+for plan mutations) and require their current-grant permission. GET bodies and caller identity
 fields (`user_id`, `userId`, `owner_user_id`) are rejected.
 
 For active workout reads/writes and staged enablement, load
@@ -73,9 +73,7 @@ returns no user or account fields.
 }
 ```
 
-Gyms are capped at 50 and derived equipment values are capped by bounded
-history reads. Email, username, billing, auth, and account administration are
-excluded.
+Gyms are capped at 50; account admin is excluded.
 
 ## Exercise search
 
@@ -198,11 +196,8 @@ nonexistent exercise produce the same `404` envelope.
 Personal-record and volume calculations import the canonical mobile domain
 calculation module and read [working sets only](#working-sets-only)
 ([[set.eligibility]]), so the warm-up above is listed but feeds no figure.
-`gym_usage`, on every exercise, counts the sessions holding a working set per
-gym (up to 50, most recent first) and with no gym; `complete` is false when the
-history read was bounded. BoGa has no
-canonical user-authored note field or failed-set meaning, so those fields are
-reported unavailable.
+`gym_usage` counts working-set sessions per gym (up to 50) and no gym;
+`complete` is false when bounded. Unauthored notes and failed sets report unavailable.
 
 ## Exercise history
 
@@ -212,12 +207,9 @@ Keyset-paginated performed set history for one exercise owned by the user,
 ordered in reverse chronological completed-session order by
 `(session_completed_at, session_id, exercise_order, set_order)`. Query
 parameters: `limit` (`1..100`, default `20`), opaque `cursor`, and `gym_bucket`
-(see [gym buckets](#gym-buckets)). Drains to exhaustion when analyzing complete
-training history. Paging never partitions by gym: a page is one page of sets
-across every gym, and a split exercise's sets each carry their own `gym` (`null`
-for a session with no gym), as a workout does — group by it before comparing.
-`gym_bucket` filters the stream to one gym, and only then does the cursor pin
-it and `exercise.gym` name it.
+(see [gym buckets](#gym-buckets)). Drains to exhaustion. Sets each carry their
+own `gym` (`null` for no gym); `gym_bucket` filters the stream to one gym and pins
+the cursor.
 
 ```json
 {
@@ -497,50 +489,58 @@ persisted.
 
 ## Plan permission and write routes
 
-The base OAuth grant is read-only. Reading the upcoming plan queue, creating
-plans/programmes, editing exercises and setting muscle targets additionally
-require a current-grant row in `public.agent_plan_permissions`
-(`plan_access_enabled = true` and `granted_at` equal to the live OAuth grant
-timestamp). A missing, false or grant-mismatched row returns `403
-PLAN_PERMISSION_REQUIRED` before any referenced resource is resolved. The person
-enables it per client on the Connected Agents screen for these plan, exercise
-and target routes ([[agents.write-access]]); base OAuth consent is read-only.
+The base OAuth grant is read-only. Reading upcoming plans, creating plans or programmes,
+editing exercises and setting muscle targets additionally require a current-grant row in
+`public.agent_plan_permissions` (`plan_access_enabled = true` and matching `granted_at`).
+Missing or mismatched rows return `403 PLAN_PERMISSION_REQUIRED`. Mutating plans or
+programmes (`PATCH`) additionally requires `plan_edit_enabled = true`
+(`403 PLAN_EDIT_PERMISSION_REQUIRED`). Enabled per client on Connected Agents ([[agents.write-access]]).
 
-### `GET /v1/agent/session-plans`
+### `GET /v1/agent/session-plans` and `GET /v1/agent/programmes/{id}`
 
-`limit` is optional integer `1..50`, default `20`; `cursor` is opaque;
-`include_unscheduled` is optional `true`/`false` (default `false`). Only the
-owner's non-deleted plans are returned, ordered by scheduled time then ID, with
-null-scheduled plans last. Each plan carries its provenance, derived `progress`
-(`planned | in_progress | completed`), `next_block_id`, and bounded exercise/set
-snapshots.
+`GET /v1/agent/session-plans`: `limit` optional integer `1..50` (default `20`),
+`cursor` opaque, `include_unscheduled` boolean (default `false`). Returns the owner's
+non-deleted plans ordered by scheduled time then ID. Each plan carries provenance, derived
+`progress` (`planned | in_progress | completed`), `next_block_id`, optimistic locking
+`version_token`, and bounded exercise/set snapshots.
+
+`GET /v1/agent/programmes/{id}`: returns programme metadata, `version_token`, and child
+`plans` (each with `version_token` and bounded exercises/sets). Missing programme produces `404`.
 
 ### `POST /v1/agent/session-plans` and `POST /v1/agent/programmes`
 
-Both require an `Idempotency-Key` header (1..128 characters) and a strict JSON
-body. A plan body is `{title, gym_id?, scheduled_for?, exercises:[{exercise_definition_id?,
-name, sets:[{target_reps, target_weight_value?, target_set_type?}]}]}`; a
-programme body is `{name, description?, plans:[<plan>...]}` with 2..50 plans,
-1..30 blocks per plan and 1..30 sets per block. Referenced exercise and gym IDs
-must be owned; a foreign or nonexistent ID returns `400
-FOREIGN_RESOURCE_REFERENCE`.
+Both require `Idempotency-Key` (1..128 characters) and strict JSON body. Plan body:
+`{title, gym_id?, scheduled_for?, exercises:[{exercise_definition_id?, name, sets:[{target_reps, target_weight_value?, target_set_type?}]}]}`.
+Programme body: `{name, description?, plans:[<plan>...]}` (2..50 plans, 1..30 blocks/plan, 1..30
+sets/block). Referenced exercise/gym IDs must be owned (`400 FOREIGN_RESOURCE_REFERENCE`).
 
-Each call creates the whole graph in one transaction with `provenance = 'agent'`
-and `pending` blocks; a child failure rolls back every row, receipt included.
-Replaying the same key and payload returns the original IDs
-(`idempotent_replay: true`); the same key with another payload returns `409
-IDEMPOTENCY_CONFLICT`. No performed session, exercise or set row is ever
-created, and the agent cannot attach, complete, skip or edit a plan.
+Each creates the whole graph in one transaction with `provenance = 'agent'` and `pending` blocks;
+child failure rolls back every row. Replaying key and payload returns cached IDs
+(`idempotent_replay: true`); differing payload returns `409 IDEMPOTENCY_CONFLICT`. No performed
+session or set is created; agents cannot attach, complete, or skip plans.
 
-```json
-{
-  "plan_id": "uuid",
-  "programme_id": null,
-  "exercise_ids": ["uuid"],
-  "set_ids": ["uuid"],
-  "idempotent_replay": false
-}
-```
+### `PATCH /v1/agent/session-plans/{id}` and `PATCH /v1/agent/programmes/{id}`
+
+Both require `Idempotency-Key` and `plan_edit_enabled = true` ([[agents.write-access]]).
+Replaying key and payload returns cached receipt; reusing the key across different targets or with
+differing payloads returns `409 IDEMPOTENCY_CONFLICT`. All mutations require `base_version`; a stale
+version returns `409 PLAN_CONCURRENT_MODIFICATION`.
+
+Plan mutations (`PATCH /v1/agent/session-plans/{id}`):
+- `update_plan_meta`: `{base_version, patch: {title?, gym_id?, scheduled_for?}}`.
+- `insert_plan_block`: `{base_version, block: {name?, exercise_definition_id?, sets}}`.
+- `update_plan_block`: `{base_version, exercise_id, block: {name?, exercise_definition_id?, sets?}}`.
+  Setting `exercise_definition_id: null` unlinks definition while preserving block. Mutating an active block returns `400 IMMUTABLE_BLOCK_MUTATION`.
+- `reorder_plan_blocks`: `{base_version, exercise_ids: ["id", ...]}`.
+- `reorder_block_sets`: `{base_version, exercise_id, set_ids: ["id", ...]}`.
+- `tombstone_plan_block`: `{base_version, exercise_id}` (or `{deleted: true}`).
+- `tombstone_plan`: `{base_version}` (or `{deleted: true}`).
+
+Programme mutations (`PATCH /v1/agent/programmes/{id}`):
+- `update_programme_meta`: `{base_version, patch: {name?, description?}}`.
+- `reorder_programme_plans`: `{base_version, plan_ids: ["id", ...]}`.
+- `detach_programme_plan`: `{base_version, plan_id}` (rejects `400` if <2 plans remain).
+- `tombstone_programme`: `{base_version}` (or `{deleted: true}`).
 
 ## Exercise editing
 
@@ -574,18 +574,16 @@ change re-scores linked group exercises. The response is the RPC result
 
 ## Status contract
 
-- `400` invalid/unknown argument (`VALIDATION_ERROR` for targets), identity input, cursor, or foreign/nonexistent resource reference.
+- `400` invalid argument, cursor, foreign reference, or active block edit (`IMMUTABLE_BLOCK_MUTATION`).
 - `401` missing, invalid, expired, normal-app, or revoked authorization.
-- `403` write access missing, disabled or bound to a stale grant.
-- `404` unknown route or inaccessible/nonexistent exercise.
-- `405` unsupported method for the route (`PUT` only for muscle targets).
-- `409` idempotency conflict, stale revision, or edit of a deleted exercise.
-- `413` the request body exceeds its bound, or the generated response exceeds its 256 KiB safety bound.
+- `403` write access missing, disabled or bound to a stale grant (`PLAN_PERMISSION_REQUIRED`, `PLAN_EDIT_PERMISSION_REQUIRED`).
+- `404` unknown route or nonexistent resource.
+- `405` unsupported method (`GET, POST, PUT, PATCH`).
+- `409` idempotency conflict, stale version (`PLAN_CONCURRENT_MODIFICATION`), or deleted exercise.
+- `413` request body exceeds bound or response exceeds 256 KiB safety bound.
 - `429` request rate exceeded.
 - `500` internal/database failure with no sensitive detail.
-- `503` `UPSTREAM_UNAVAILABLE` with `Retry-After`: Supabase Auth could not
-  check the token (unreachable, timeout, `408`/`429` or `5xx` from `getUser` or
-  the grants endpoint). Only a `4xx` rejection from Auth is a `401`.
+- `503` `UPSTREAM_UNAVAILABLE` with `Retry-After`: Supabase Auth unavailable.
 
 `./boga test agent-api` runs the real OAuth/RLS contract and
 `./boga test mcp-smoke` the real MCP-to-API path.
