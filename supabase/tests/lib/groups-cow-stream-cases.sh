@@ -71,7 +71,7 @@ run_cow_stream_final_cases() {
     and e.kind='cow' and e.payload->>'event' in ('results','unavailable');")" == 0 ]] || fail 'uncertainty emitted a terminal event'
   items='[]'
   while true; do
-    rpc "${OWNER_TOKEN}" group_competition_stream_v3 "$(jq -nc --arg g "${group}" --arg b "${before}" '{p_group_id:$g,p_limit:50,p_before:(if $b=="" then null else $b end)}')"
+    rpc "${OWNER_TOKEN}" group_competition_stream_v4 "$(jq -nc --arg g "${group}" --arg b "${before}" '{p_group_id:$g,p_limit:50,p_before:(if $b=="" then null else $b end)}')"
     expect_ok 'final CoW Stream'; page="${BODY}"
     node_guard="$(printf '%s' "${BODY}" | node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e '
       import {isCompetitionStreamWire} from "./apps/mobile/src/groups/competition-reader-guards.ts";
