@@ -13,18 +13,18 @@ const renderCard=(item: CompetitionEventWire,props: Partial<Parameters<typeof Gr
 };
 it('shows original normalized units and the set with its one status, without raw load, bodyweight or dependency pins', () => {
   const card=renderCard(competitionEvent);
-  expect(card).toHaveTextContent('1RM 145.7 %BW',{ exact: false });
+  expect(card).toHaveTextContent('1RM 45.7 %BW',{ exact: false });
   expect(screen.getByTestId('group-metric-stream-event1-set')).toHaveTextContent('5 reps');
   expect(screen.getByTestId('group-metric-stream-event1-certification')).toHaveTextContent('Not certified');
   expect(card).not.toHaveTextContent(/As logged|Uncertified/);
-  expect(card.props.accessibilityLabel).toContain('1RM 145.7 %BW');
+  expect(card.props.accessibilityLabel).toContain('1RM 45.7 %BW');
   expect(card.props.accessibilityLabel).not.toMatch(/kg|bodyweight reading|fingerprint|digest/);
   fireEvent.press(card);
   expect(mockPush).toHaveBeenCalledWith('/group/g1/leaderboards/ge1/history?metric=e1rm&scope=all');
 });
 it.each([
   ['e1rm','kg',120,'1RM 120.0'],['volume','kg_reps',600,'Volume 600.0'],
-  ['volume','percent_bw_reps',620,'Volume 620.0 %BW·reps'],
+  ['volume','percent_bw_reps',620,'Volume 620.0 %BW'],
 ] as const)('keeps %s original unit %s', (metric,unit,value,line) => {
   const card=renderCard({ ...competitionEvent,metric,values: [{ ...competitionEvent.values[0],metric,unit,value }] });
   expect(card).toHaveTextContent(line,{ exact: false });
@@ -72,7 +72,7 @@ it('shows one status per set however many boards the record took, and the set fr
   { record: { performance: ordinarySet,previous: [],group_record_metrics: ['e1rm','volume'] } });
   expect(screen.getAllByTestId('group-metric-stream-event1-certification')).toHaveLength(1);
   expect(screen.getByTestId('group-metric-stream-event1-set')).toHaveTextContent('120.0 × 5');
-  expect(screen.getByTestId('group-metric-stream-event1')).toHaveTextContent('Volume 650.0 %BW·reps',{ exact: false });
+  expect(screen.getByTestId('group-metric-stream-event1')).toHaveTextContent('Volume 650.0 %BW',{ exact: false });
 });
 it('says an ended certification and leaves a record with no current context without a status', () => {
   const metric=competitionEvent.record_context!.metrics[0];

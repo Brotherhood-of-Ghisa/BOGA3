@@ -2,8 +2,8 @@ import type { ExerciseDateFormat } from '../preferences/model';
 import { formatOneRepMax, formatVolume } from '../exercise-calculations/format';
 import { formatCalendarWeek, formatCalendarWeekHeading, formatCompactDateRange } from '../utils/local-time';
 import type { CoWMetric } from './cow-scoring';
-import type { CoWDefinitionWire, CoWRankingWire, CoWResultWire } from './cow-wire';
-import { COMPETITION_UNIT_LABELS } from './competition-view-model';
+import type { CoWDefinitionWire, CoWRankingWire, CoWRowWire, CoWResultWire } from './cow-wire';
+import { COMPETITION_UNIT_LABELS, competitionDisplayValue } from './competition-view-model';
 
 export const COW_METRIC_LABELS: Record<CoWMetric, string> = { e1rm: '1RM', improvement: 'Improvement', volume: 'Volume' };
 export const COW_FORM_LABELS: Record<CoWMetric, string> = { e1rm: 'Highest 1RM', improvement: '1RM improvement (%)', volume: 'Total Volume' };
@@ -32,4 +32,11 @@ export function coWFigure(value: number, metric: CoWMetric): string {
   if (metric === 'e1rm') return formatOneRepMax(value);
   const magnitude = formatOneRepMax(Math.abs(value));
   return `${Number(magnitude) === 0 ? '' : value > 0 ? '+' : '−'}${magnitude}%`;
+}
+
+export function coWRowFigure(row: CoWRowWire, ranking: Pick<CoWRankingWire, 'metric' | 'unit'>): string {
+  if (row.state === 'unranked') return 'Not ranked';
+  if (row.value === null) return 'Unavailable';
+  const value = competitionDisplayValue({ ...row, metric: ranking.metric, unit: ranking.unit ?? '' });
+  return value === null || !Number.isFinite(value) ? 'Unavailable' : coWFigure(value, ranking.metric);
 }

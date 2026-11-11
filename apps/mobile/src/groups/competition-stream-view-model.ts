@@ -3,8 +3,8 @@ import { formatBoardDate } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
 import { buildCompetitionSession } from './competition-session-view-model';
 import { sessionRecordCertificationStatus, setCertification } from './competition-session-records-view-model';
-import { describeCompetitionEvent, formatCompetitionFigure, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
-import type { CompetitionEventWire, CompetitionStreamItemWire, CompetitionHistoryValueWire, CompetitionHistoricalMetric,
+import { describeCompetitionEvent, formatCompetitionHistoricalFigure, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
+import type { CompetitionEventWire, CompetitionStreamItemWire, CompetitionHistoricalMetric,
   CompetitionStreamRecordWire, CompetitionStreamSharedExerciseWire, CoWStreamItemWire } from './competition-wire';
 import { formatMemberName, formatMembershipSentence, formatSessionStatusLabel, formatSetCount,
   formatExerciseCount, formatStreamStartedAt, type RecordCertificationStatus, type StreamMembershipViewModel } from './stream-view-model';
@@ -106,8 +106,7 @@ export function buildCompetitionEventCard(event: CompetitionEventWire,userId: st
 export type StreamRecordMetric = { metric: CompetitionHistoricalMetric; label: string; value: string };
 export type StreamPreviousRecord = { metric: CompetitionHistoricalMetric; label: string; value: string; holder: string; set: string | null };
 
-const figure = (value: CompetitionHistoryValueWire): string => value.unavailable || value.value === null ? 'Score unavailable'
-  : formatCompetitionFigure(value.value,value.unit);
+const figure = formatCompetitionHistoricalFigure;
 const e1rmFirst = (a: { metric: string },b: { metric: string }) => (a.metric === 'e1rm' ? 0 : 1) - (b.metric === 'e1rm' ? 0 : 1);
 
 /**

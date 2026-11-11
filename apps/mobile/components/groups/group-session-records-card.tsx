@@ -62,7 +62,7 @@ function RecordRow({ row, ...rest }: { row: SessionRecordRow } & Omit<CardProps,
         <View style={styles.rowBody}>
           <View style={styles.titleLine}>
             <Text allowFontScaling={false} numberOfLines={1} style={[text.bodyStrong, styles.title]}>{row.title}</Text>
-            <Text allowFontScaling={false} style={[scoreStyle(row.value, 'base'), scoreHasFigure(row.value) ? tone.record : null]} testID={`${testID}-value`}>{row.value}</Text>
+            <Text allowFontScaling={false} style={[scoreStyle(row.value, 'base'), scoreHasFigure(row.value) ? tone.record : null]} testID={`${testID}-value`}><FigureText figureStyle={[scoreStyle(row.value, 'base'), scoreHasFigure(row.value) ? tone.record : null]}>{row.value}</FigureText></Text>
           </View>
           <Text allowFontScaling={false} style={text.meta} testID={`${testID}-detail`}><FigureText>{row.detail}</FigureText></Text>
         </View>

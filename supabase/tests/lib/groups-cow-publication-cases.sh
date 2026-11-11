@@ -61,6 +61,11 @@ run_cow_publication_cases() {
   check 'owner wins Volume independently' '.rankings[0].entries[0].member.user_id==$u' --arg u "${OWNER_UID}"
   rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${g}" --arg c "${c}" '{p_group_id:$g,p_cow_id:$c,p_metric:"e1rm"}')"
   check 'bodyweight 1RM uses the normal group units' '.rankings[0].unit=="percent_bw" and [.rankings[0].entries[].value]==[160,150]'
+  check 'legacy CoW rows keep their exact shape' 'all(.rankings[0].entries[];has("added_e1rm_percent_bw")|not)'
+  GROUP_ADDED_LOAD_DISPLAY=1 rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${g}" --arg c "${c}" '{p_group_id:$g,p_cow_id:$c,p_metric:"e1rm"}')"
+  expect_ok 'added CoW display'
+  check 'added CoW display preserves order and stored total values' \
+    '[.rankings[0].entries[].value]==[160,150] and [.rankings[0].entries[].added_e1rm_percent_bw]==[60,50]'
   check 'member wins 1RM independently' '.rankings[0].entries[0].member.user_id==$u' --arg u "${MEMBER_UID}"
   rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${g}" --arg c "${c}" '{p_group_id:$g,p_cow_id:$c,p_metric:"improvement"}')"
   check 'improvement compares normalized baseline and weekly 1RM' '.rankings[0].unit=="percent" and (.rankings[0].entries[0].value-20|fabs)<0.000000001 and .rankings[0].entries[0].member.user_id==$u' --arg u "${OWNER_UID}"
@@ -92,6 +97,12 @@ run_cow_publication_cases() {
   push "${OWNER_TOKEN}" 'post-cutoff edit cannot rerank final' "$(e_set "cow-pub-o1-${RUN_TAG}" "cow-pub-owblock-${RUN_TAG}" 0 1 1 '' "${CUAM}" null)"
   eval_drain "${secret}"; expect_ok 'worker after cutoff edit'
   [[ "$(run_psql "select final_rankings::text from app_public.group_cows where id='${c}';")" == "${saved}" ]] || fail 'stored final reranked'
+  [[ "$(run_psql "begin;
+    set local request.headers='{\"x-boga-group-added-load\":\"1\"}';
+    update app_public.group_exercises set bodyweight_contribution=0.7 where id='${e}';
+    select bool_and((row_json->>'added_e1rm_percent_bw')::numeric=(row_json->>'value')::numeric-100)
+    from app_public.group_cows c cross join lateral app_public.group_cow_result_rows(c,'e1rm') r where c.id='${c}';
+    rollback;")" == t ]] || fail 'frozen CoW display read the current contribution'
   rpc "${OWNER_TOKEN}" group_cow_summary "$(jq -nc --arg g "${g}" '{p_group_id:$g}')"
   check 'exactly last-week stored final is the fallback' '.selection=="previous_final" and .result.cow.state=="final" and .result.state=="ready"'
   run_cow_previous_summary_cases "${g}" "${c}"

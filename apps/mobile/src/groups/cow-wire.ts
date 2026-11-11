@@ -1,5 +1,6 @@
 import type { CoWMetric } from './cow-scoring.ts';
 import { competitionUnit } from './competition-contract.ts';
+import { isAddedOneRepMaxDisplay } from './competition-set-display.ts';
 import { isCompetitionExerciseWire } from './competition-wire-guards.ts';
 
 import type { CoWCalendarWire, CoWDefinitionWire, CoWWriteWire, CoWListWire, CoWRowWire, CoWRankingWire, CoWResultWire, CoWSummaryWire } from './competition-wire.ts';
@@ -44,8 +45,10 @@ export const isCoWListWire = (value: unknown): value is CoWListWire =>
 
 
 
-function isCoWRow(value: unknown, metric: CoWMetric): value is CoWRowWire {
-  if (!record(value) || !exact(value, ['rank', 'member', 'former', 'value', 'state']) ||
+function isCoWRow(value: unknown, metric: CoWMetric, normalized: boolean): value is CoWRowWire {
+  if (!record(value) || !exact(value, ['rank', 'member', 'former', 'value', 'state',
+    ...(Object.hasOwn(value, 'added_e1rm_percent_bw') ? ['added_e1rm_percent_bw'] : [])]) ||
+    !isAddedOneRepMaxDisplay(value, normalized && metric === 'e1rm') ||
     !record(value.member) || !exact(value.member, ['user_id', 'username']) || !identity(value.member.user_id) ||
     value.member.username !== null && typeof value.member.username !== 'string' || typeof value.former !== 'boolean') return false;
   if (value.state === 'unranked') return value.rank === null && value.value === null;
@@ -62,7 +65,7 @@ function isCoWRanking(value: unknown, result: CoWResultWire): value is CoWRankin
   const metric = value.metric as CoWMetric;
   const unit = result.normalized === null ? null : metric === 'improvement' ? 'percent'
     : competitionUnit(metric, result.normalized);
-  if (value.unit !== unit || !value.entries.every(row => isCoWRow(row, metric))) return false;
+  if (value.unit !== unit || !value.entries.every(row => isCoWRow(row, metric, result.normalized === true))) return false;
   const rows = value.entries as CoWRowWire[];
   const ranks = rows.flatMap(row => row.rank === null ? [] : [row.rank]);
   return new Set(rows.map(row => row.member.user_id)).size === rows.length &&
@@ -112,7 +115,7 @@ export function isCoWSummaryWire(value: unknown): value is CoWSummaryWire {
 /** The read alias is group-scoped; the stored key also pins the server's selection and publication. */
 export function coWSummaryCacheKey(value: CoWSummaryWire, previous = false): string {
   const result = value.result;
-  return `${previous ? 'cow-previous-summary' : 'cow-summary'}:v7:${value.group_id}:${value.week_start ?? 'unset'}:${value.calendar_revision}:` +
+  return `${previous ? 'cow-previous-summary' : 'cow-summary'}:v8:${value.group_id}:${value.week_start ?? 'unset'}:${value.calendar_revision}:` +
     `${result?.cow.cow_id ?? 'none'}:${result?.cow.revision ?? 0}:${result?.publication_id ?? 'pending'}:` +
     `${result?.exercise?.rules.rules_revision ?? 0}:${result?.bodyweight_calculations_enabled ?? 'unset'}`;
 }

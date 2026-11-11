@@ -27,18 +27,9 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
         numberOfLines={1}
         style={[text.figure, row.done ? (row.weightRecord ? tone.record : null) : tone.faint, styles.weightReps]}
         testID={`${testID}-values`}>
-        {percentageMetrics ? row.weightReps.replace(' %BW', '') : row.weightReps}
+        {percentageMetrics ? row.weightReps.replace(' %BW', '%') : row.weightReps}
       </Text>
-      {!hideDerivedMetrics ? percentageMetrics ? <>
-        <Text allowFontScaling={false} numberOfLines={1}
-          accessibilityLabel={`1RM ${row.oneRepMax}`}
-          style={[text.figureSmall, row.done ? (row.oneRepMaxRecord ? tone.record : tone.ink) : tone.faint, styles.metric, styles.oneRepMax]}
-          testID={`${testID}-1rm`}>{row.oneRepMax.replace(' %BW', '')}</Text>
-        <Text allowFontScaling={false} numberOfLines={1}
-          accessibilityLabel={`Vol ${row.volume}`}
-          style={[text.figureSmall, row.done ? tone.ink : tone.faint, styles.metric, styles.volume]}
-          testID={`${testID}-vol`}>{row.volume.replace(' %BW·reps', '')}</Text>
-      </> : <>
+      {!hideDerivedMetrics ? <>
       <View style={[styles.metricColumn, styles.oneRepMaxColumn]} testID={`${testID}-1rm-column`}>
         <Stat
           emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}
@@ -46,17 +37,19 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
           layout="inline"
           state={state}
           testID={`${testID}-1rm`}
-          value={row.oneRepMax}
+          value={percentageMetrics ? row.oneRepMax.replace(' %BW', '%') : row.oneRepMax}
+          spokenValue={row.oneRepMax}
           valueWidth="hug"
         />
       </View>
-      <View style={[styles.metricColumn, styles.volumeColumn]} testID={`${testID}-vol-column`}>
+      <View style={[styles.metricColumn, styles.volumeColumn, percentageMetrics && styles.percentageVolumeColumn]} testID={`${testID}-vol-column`}>
         <Stat
           label="Vol"
           layout="inline"
           state={state}
           testID={`${testID}-vol`}
-          value={row.volume}
+          value={percentageMetrics ? row.volume.replace(' %BW', '%') : row.volume}
+          spokenValue={row.volume}
           valueWidth="hug"
         />
       </View>
@@ -68,7 +61,6 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
 const styles = StyleSheet.create({
   percentageRow: {
     gap: uiSpace.xs,
-    paddingVertical: uiSpace.xs,
   },
   setRow: {
     flexDirection: 'row',
@@ -77,9 +69,6 @@ const styles = StyleSheet.create({
   },
   effortColumn: {
     width: uiGeometry.tapTarget,
-  },
-  metric: {
-    textAlign: 'right',
   },
   // 1RM and VOL as two fixed columns: each value right-aligned
   // in its column, its legend a fixed gap to its left, so a legend reads with
@@ -90,8 +79,7 @@ const styles = StyleSheet.create({
   // As wide as the old legend-plus-value pair, so weight × reps keeps its room.
   oneRepMaxColumn: { width: uiGeometry.metricValueWidth + uiSpace.xl + uiSpace.sm },
   volumeColumn: { width: uiGeometry.metricValueWidth + uiSpace.xl },
-  oneRepMax: { width: uiGeometry.metricValueWidth + uiSpace.sm },
-  volume: { width: uiGeometry.metricValueWidth + uiSpace.xl },
+  percentageVolumeColumn: { width: uiGeometry.metricValueWidth + uiSpace.xl + uiSpace.lg },
   weightReps: {
     flex: 1,
     minWidth: 0,

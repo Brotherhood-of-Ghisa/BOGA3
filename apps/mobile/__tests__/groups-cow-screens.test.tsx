@@ -117,7 +117,7 @@ it('uses existing units, independent top-three metrics and exact identity on nav
   expect(screen.getByTestId('preview-open').props.accessibilityLabel).toContain('26-10-2026');
   expect(screen.getByTestId('preview-open').props.accessibilityLabel).toContain('Live');
   expect(screen.getByText('1RM %BW')).toBeTruthy(); expect(screen.getByText('You')).toBeTruthy(); expect(screen.getByText('Jules (former)')).toBeTruthy();
-  fireEvent.press(screen.getByTestId('preview-metric-volume')); expect(screen.getByText('Volume %BW·reps')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('preview-metric-volume')); expect(screen.getByText('Volume %BW')).toBeTruthy();
   expect(screen.getByText('1800')).toBeTruthy(); expect(onOpen).not.toHaveBeenCalled();
   fireEvent.press(screen.getByTestId('preview-browse')); expect(onBrowse).toHaveBeenCalledWith('volume');
   fireEvent.press(screen.getByTestId('preview-open')); expect(onOpen).toHaveBeenCalledWith('volume');

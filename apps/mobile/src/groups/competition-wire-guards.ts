@@ -1,4 +1,4 @@
-import { isNormalizedSetMetrics } from './competition-set-display.ts';
+import { isAddedOneRepMaxDisplay, isNormalizedSetMetrics } from './competition-set-display.ts';
 
 // Closed protocol-4 schemas prevent cache/history fields from smuggling kg/B.
 import { isCompetitionMetric, isCompetitionValue, validateCompetitionRules } from './competition-contract.ts';
@@ -43,7 +43,10 @@ export function isCompetitionCertificationWire(value: unknown): value is Competi
       value.ended_at_ms >= value.certified_at_ms && ['withdrawn','cancelled','voided'].includes(String(value.end_reason)));
 }
 function row(value: unknown, board: CompetitionBoardWire, normalized: boolean): boolean {
-  if (!exact(value, ['metric','value','unit','rank','member','former','performance','write_token','certification'])) return false;
+  const display = record(value) && Object.hasOwn(value, 'added_e1rm_percent_bw');
+  if (!exact(value, ['metric','value','unit','rank','member','former','performance','write_token','certification',
+    ...(display ? ['added_e1rm_percent_bw'] : [])]) ||
+    !isAddedOneRepMaxDisplay(value, normalized && board.metric === 'e1rm')) return false;
   const score = { metric: value.metric, value: value.value, unit: value.unit };
   return value.metric === board.metric && isCompetitionValue(score, normalized) && integer(value.rank) && value.rank > 0 &&
     member(value.member) && typeof value.former === 'boolean' && id(value.write_token) &&

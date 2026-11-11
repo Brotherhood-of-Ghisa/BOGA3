@@ -2,7 +2,7 @@ import type { CoWMetric } from './cow-scoring.ts';
 import type { LoadInputMode } from '../exercise-core/index.ts';
 import type { CompetitionMetric, CompetitionValue } from './competition-contract.ts';
 import type { GroupMemberRef } from './types.ts';
-import type { NormalizedSetMetrics } from './competition-set-display.ts';
+import type { AddedOneRepMaxDisplay, NormalizedSetMetrics } from './competition-set-display.ts';
 
 export type CompetitionRulesWire = {
   bodyweight_calculations_enabled: boolean;
@@ -35,7 +35,7 @@ export type CompetitionCertificationWire = {
   ended_at_ms: number | null;
   end_reason: 'withdrawn' | 'cancelled' | 'voided' | null;
 };
-export type CompetitionBoardRowWire = CompetitionValue & {
+export type CompetitionBoardRowWire = CompetitionValue & AddedOneRepMaxDisplay & {
   rank: number;
   member: GroupMemberRef;
   former: boolean;
@@ -80,7 +80,7 @@ export type CompetitionRevisionWire = {
   reason: 'initial' | 'activation' | 'rules_change'; legacy: boolean;
   published_at_ms: number | null; retired_at_ms: number | null;
 };
-export type CompetitionHistoryValueWire = {
+export type CompetitionHistoryValueWire = AddedOneRepMaxDisplay & {
   role: 'record' | 'leader' | 'previous' | 'before' | 'after';
   metric: CompetitionHistoricalMetric; unit: string;
   value: number | null; unavailable: boolean; member: GroupMemberRef | null;
@@ -212,7 +212,7 @@ export type CoWDefinitionWire = {
 export type CoWWriteWire = { cow: CoWDefinitionWire };
 export type CoWListWire = { cows: CoWDefinitionWire[]; next_cursor: string | null };
 
-export type CoWRowWire = { rank: number | null; member: GroupMemberRef; former: boolean;
+export type CoWRowWire = AddedOneRepMaxDisplay & { rank: number | null; member: GroupMemberRef; former: boolean;
   value: number | null; state: 'ranked' | 'unranked' | 'unavailable' };
 export type CoWRankingWire = { metric: CoWMetric; unit: CompetitionValue['unit'] | 'percent' | null;
   entries: CoWRowWire[]; entry_count: number; next_cursor: string | null };
