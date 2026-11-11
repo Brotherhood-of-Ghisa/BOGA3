@@ -10,7 +10,7 @@ import {
   type MuscleHistoryMetric,
 } from '@/components/stats/history-view';
 import type { WeekSetExerciseLink } from '@/components/stats/week-set-list';
-import { MusclePeriodDetail } from '@/components/stats/muscle-period-detail';
+import { HistoryPeriodDetail } from '@/components/stats/history-period-detail';
 import { setPeriodBounds, type SetPeriod } from '@/components/stats/week-sets';
 import { parseHistoryJump } from '@/components/session-list/history-jump';
 import { useHistoryNavigation } from '@/components/stats/use-history-navigation';
@@ -94,16 +94,16 @@ const withChoices = (subject: HistorySubject | null, gym: { gymId: string | null
  * The metric Progress was showing, carried over by its link. An absent or
  * unknown value opens the page on Volume, as a direct link always has.
  */
-export const resolveHistoryMetric = (value: string | string[] | undefined): ProgressMetric | null => {
+export const resolveHistoryMetric = (value: string | string[] | undefined): CalendarHeatmapMetric | null => {
   const param = firstRouteParam(value);
-  const entry = (Object.entries(PROGRESS_HISTORY_METRIC_PARAMS) as [ProgressMetric, string][])
+  const entry = (Object.entries(PROGRESS_HISTORY_METRIC_PARAMS) as [CalendarHeatmapMetric, string][])
     .find(([, name]) => name === param);
   return entry ? entry[0] : null;
 };
 
 // The metrics a history link can carry: a muscle's, which an exercise shares.
 const isProgressMetric = (metric: CalendarHeatmapMetric): metric is ProgressMetric =>
-  metric in PROGRESS_HISTORY_METRIC_PARAMS;
+  metric === 'totalVolume' || metric === 'workingSetCount';
 
 /** A muscle the exercise counts towards, as the ⋮ offers its history. */
 type HistoryMuscleLink = { id: string; name: string; role: 'primary' | 'secondary' };
@@ -131,7 +131,7 @@ function MuscleHistoryFilters({ gym, metric, subject, onChangeSets, onChangeVolu
 
 const invalidDetailPeriod = (subject: HistorySubject | null, period: SetPeriod | null | undefined, lookbackWeeks: number): boolean => {
   if (period === undefined) return false;
-  if (period === null || subject?.kind !== 'muscle') return true;
+  if (period === null || !subject) return true;
   const bounds = setPeriodBounds(period);
   const history = historyWeekBounds(lookbackWeeks);
   return bounds.start < history.start || bounds.start >= history.end;
@@ -139,7 +139,7 @@ const invalidDetailPeriod = (subject: HistorySubject | null, period: SetPeriod |
 
 // The page's ⋮ offers applicable week, muscle and exercise-chart actions.
 // With no applicable action, hide the button rather than opening an empty sheet.
-function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, muscle, detailPeriod }: {
+function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, detailPeriod }: {
   title: string;
   /** A muscle page's title switches between the user's muscles. */
   titleSwitch?: { muscles: readonly HistoryTitleMuscle[]; currentId: string; onChoose: (muscleGroupId: string) => void };
@@ -149,7 +149,6 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenHistory?: () => void;
   onOpenCurve?: () => void;
-  muscle: boolean;
   detailPeriod?: SetPeriod | null;
 }) {
   const [optionsVisible, setOptionsVisible] = useState(false);
@@ -209,7 +208,7 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
         {sessionsWeek ? (
           <ListRow
             description={sessionsWeek.label}
-            label={muscle ? 'View sets' : 'View sessions'}
+            label="View sets"
             leading={<Icon colorRole="inkMuted" name="list" size="md" />}
             onPress={openWeek}
             testID="progress-history-view-sessions"
@@ -235,11 +234,11 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
 export type ProgressHistoryScreenProps = {
   subject: HistorySubject | null;
   /** The metric the link opens on; Volume without one. */
-  initialMetric?: ProgressMetric | null;
+  initialMetric?: CalendarHeatmapMetric | null;
   initialView?: HeatmapView | null;
   /** Optional determinism seam: anchors the heatmap window. Defaults to today. */
   todayDateKey?: string;
-  /** Present only on the muscle's pushed day/week detail; null is a malformed period. */
+  /** Present on a pushed day/week detail; null is a malformed period. */
   detailPeriod?: SetPeriod | null;
 };
 
@@ -249,8 +248,8 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   const catalog = useExerciseCatalog();
   const revision = useBodyWeightContextRevision();
   const [entryView, setEntryView] = useState<HeatmapView | null>(initialView ?? null);
-  const [muscleMetric, setMuscleMetric] = useState<MuscleHistoryMetric>(initialMetric ?? 'totalVolume');
-  const [exerciseMetric, setExerciseMetric] = useState<CalendarHeatmapMetric>(initialMetric ?? 'totalVolume');
+  const [metric, setMetric] = useState<CalendarHeatmapMetric>(initialMetric ?? 'totalVolume');
+  const muscleMetric = isProgressMetric(metric) ? metric : 'totalVolume';
   // The Timeline's focused week, reported by the chart: the ⋮ opens its sessions.
   const [focusedWeek, setFocusedWeek] = useState<FocusedTimelineWeek | null>(null);
   // The gym and, on a muscle, secondary sets ([[muscle.secondary-filter]]):
@@ -264,6 +263,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   } : routeSubject, chosenGym, chosenSecondary, chosenSecondaryVolume),
   [routeSubject, chosenGym, chosenSecondary, chosenSecondaryVolume, values.progressCountSecondary, values.muscleVolumePrimaryOnly]);
   const gymId = subject?.gymId;
+  const shownMetric = subject?.kind === 'muscle' ? muscleMetric : metric;
 
   // The catalogue is the one name source for both kinds, and it is already
   // loaded by boot. Until it is, the page keeps its declared title; once it is
@@ -307,7 +307,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     || invalidDetailPeriod(subject, detailPeriod, values.historyLookbackWeeks);
   // A subject that no longer exists is never read for.
   const history = useHistory(unavailable ? null : subject, values.historyLookbackWeeks, revision, accountRevision);
-  const { openDay, openWeek, openSession } = useHistoryNavigation(subject, muscleMetric, accountRevision);
+  const { openDay, openWeek, openSession } = useHistoryNavigation(subject, shownMetric, accountRevision);
   // A muscle's week list links each card's exercise to its own history, on
   // the metric shown here; one the catalogue no longer holds has no page.
   const exerciseLink = useMemo<WeekSetExerciseLink | undefined>(() => {
@@ -322,7 +322,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   // (Volume or Sets); 1RM and top weight are exercise-only, so it opens on Volume.
   const openMuscle = (muscleGroupId: string) => router.push(progressHistoryHref(
     { muscleGroupId, gymId },
-    isProgressMetric(exerciseMetric) ? exerciseMetric : undefined
+    isProgressMetric(metric) ? metric : undefined
   ));
 
   if (unavailable) {
@@ -349,6 +349,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   };
   const muscleFilters = subject.kind === 'muscle' ? <MuscleHistoryFilters gym={gym} metric={muscleMetric} subject={subject}
     onChangeSets={setChosenSecondary} onChangeVolume={setChosenSecondaryVolume} /> : null;
+  const filters = muscleFilters ?? <GymPicker {...gym} size="compact" testID="stats-exercise-history-gym" />;
   const shared = {
     dailyMetrics: history.daily,
     errorMessage: history.error,
@@ -390,7 +391,6 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         titleSwitch={titleSwitch}
         week={focusedWeek}
         detailPeriod={detailPeriod}
-        muscle={subject.kind === 'muscle'}
       />
       {/* The view selector writes a preference; this is the only screen that
           now offers it, so a failed save says so here, with its Retry. */}
@@ -406,27 +406,12 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
           />
         </View>
       ) : null}
-      {subject.kind === 'muscle' && detailPeriod ? <MusclePeriodDetail subject={subject} period={detailPeriod}
-        metric={muscleMetric} onSelectMetric={setMuscleMetric} filters={muscleFilters} onOpenSession={openSession}
-        exerciseLink={exerciseLink} accountRevision={accountRevision} revision={revision} lookbackWeeks={values.historyLookbackWeeks} /> : subject.kind === 'muscle' ? (
-        <HistoryView
-          {...shared}
-          kind="muscle"
-          filters={muscleFilters}
-          metric={muscleMetric}
-          metricOptions={MUSCLE_HISTORY_METRIC_OPTIONS}
-          muscleTargets={muscleTargets}
-          onSelectMetric={setMuscleMetric}
-        />
-      ) : (
-        <HistoryView
-          {...shared}
-          kind="exercise"
-          filters={<GymPicker {...gym} size="compact" testID="stats-exercise-history-gym" />}
-          metric={exerciseMetric}
-          metricOptions={EXERCISE_HISTORY_METRIC_OPTIONS}
-          onSelectMetric={setExerciseMetric}
-        />
+      {detailPeriod ? <HistoryPeriodDetail subject={subject} period={detailPeriod}
+        metric={shownMetric} onSelectMetric={setMetric} filters={filters} onOpenSession={openSession}
+        exerciseLink={exerciseLink} accountRevision={accountRevision} revision={revision} lookbackWeeks={values.historyLookbackWeeks} /> : (
+        <HistoryView {...shared} kind={subject.kind} filters={filters} metric={shownMetric}
+          metricOptions={subject.kind === 'muscle' ? MUSCLE_HISTORY_METRIC_OPTIONS : EXERCISE_HISTORY_METRIC_OPTIONS}
+          muscleTargets={muscleTargets} onSelectMetric={setMetric} />
       )}
     </Screen>
   );

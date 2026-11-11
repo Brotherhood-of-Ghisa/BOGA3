@@ -26,18 +26,15 @@ interface Props {
   onOpenDay?: (day: DayCell) => void;
   /** Opens a Week tile's sessions. */
   onOpenWeek?: (weekStartDateKey: string) => void;
-  /** A muscle's tiles open scoped cards instead of the general sessions. */
-  opensSets?: boolean;
 }
 
-type Openers = Pick<Props, 'onOpenDay' | 'onOpenWeek' | 'opensSets'>;
+type Openers = Pick<Props, 'onOpenDay' | 'onOpenWeek'>;
 
-const dayHint = (day: DayCell) => day.sessionIds.length === 1 ? 'Opens the session' : "Opens the day's sessions";
 // A day opens by its sessions.
 const dayOpener = (day: DayCell, onOpenDay: Props['onOpenDay']) =>
   onOpenDay && day.sessionIds.length > 0 ? () => onOpenDay(day) : undefined;
 
-function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, gap, onOpenDay, onOpenWeek, opensSets }: {
+function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, gap, onOpenDay, onOpenWeek }: {
   row: CalendarWeek; monthKey: string;
   data: HeatmapData; metricLabel: string; formatValue: Props['formatValue']; testID: string; gap: number;
 } & Openers) {
@@ -54,14 +51,14 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
         current={!!day.day?.isToday}
         metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
         onPress={dayOpener(day.day, onOpenDay)}
-        accessibilityHint={opensSets ? "Opens the day's contributing sets" : dayHint(day.day)}
+        accessibilityHint="Opens the day's sets"
         testID={`${testID}-cell-${day.dateKey}`} />
         : <View key={day.dateKey} style={styles.blankTile} testID={`${testID}-empty-${monthKey}-${day.dateKey}`} />)}
       {week ? <CalendarTile weekly cell={week} dateLabel={`Week of ${formatCalendarDate(row.weekStartDateKey, dateFormat)}`} future={row.weekStartDateKey > data.todayDateKey}
         current={!!week.isCurrentWeek}
         metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
         onPress={onOpenWeek && week.hasTraining ? () => onOpenWeek(row.weekStartDateKey) : undefined}
-        accessibilityHint={opensSets ? "Opens the week's contributing sets" : "Opens the week's sessions"}
+        accessibilityHint="Opens the week's sets"
         testID={`${testID}-week-${monthKey}-${row.weekStartDateKey}`} />
         : <View style={[styles.blankTile, heatmapStyles.weekColumn]} testID={`${testID}-empty-week-${monthKey}-${row.weekStartDateKey}`} />}
     </View>
@@ -90,7 +87,7 @@ function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<t
   </View>;
 }
 
-export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, header, onOpenDay, onOpenWeek, opensSets }: Props) {
+export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, header, onOpenDay, onOpenWeek }: Props) {
   const styles = useStyles();
   const [width, setWidth] = useState(0);
   const gap = Math.max(0, Math.min(uiSpace.xs, (width - uiSpace.sm * 3 - ROW_LABEL_GUTTER - HEADERS.length * uiGeometry.tapTarget) / (HEADERS.length - 1)));
@@ -102,7 +99,7 @@ export function DailyHeatmap({ data, testIDPrefix, metricLabel, formatValue, hea
       data={months}
       keyExtractor={month => month.key}
       renderItem={({ item }) => <Month month={item} data={data}
-        metricLabel={metricLabel} formatValue={formatValue} testID={testID} gap={gap} onOpenDay={onOpenDay} onOpenWeek={onOpenWeek} opensSets={opensSets} />}
+        metricLabel={metricLabel} formatValue={formatValue} testID={testID} gap={gap} onOpenDay={onOpenDay} onOpenWeek={onOpenWeek} />}
       initialNumToRender={2}
       maxToRenderPerBatch={2}
       windowSize={3}

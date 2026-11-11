@@ -69,8 +69,8 @@ export function TodayCoWCard({ resource, previous, dateFormat, userId, onEarlier
   if (data && !result) return null;
   return <Card testID="today-cow-card">
     <View style={styles.content} testID={prefix}>
-      {offline && result ? <GroupOfflineBanner lastUpdatedAtMs={lastUpdatedAtMs} /> : null}
-      {inlineError && result ? <GroupInlineError error={inlineError} onRetry={onRetry} testID={`${prefix}-error`} /> : null}
+      {offline && result && <GroupOfflineBanner lastUpdatedAtMs={lastUpdatedAtMs} />}
+      {inlineError && result && <GroupInlineError error={inlineError} onRetry={onRetry} testID={`${prefix}-error`} />}
       <View style={styles.heading}>
         <View style={styles.title}><CompactHeader label={title} accessibilityRole="header" /></View>
         <WeekStepper label={result ? coWDateRange(result.cow.week_start, dateFormat, true) : '—'}

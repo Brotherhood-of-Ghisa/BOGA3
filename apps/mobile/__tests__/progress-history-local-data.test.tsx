@@ -65,7 +65,7 @@ import * as sessionEntry from '@/src/session-entry/coordinator';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
 import { seedStandardCatalogFixture } from '@/src/maestro/standard-catalog-fixture';
 import { ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
-import { muscleHistoryDetailHref, progressHistoryHref } from '@/src/navigation/routes';
+import { historyDetailHref, progressHistoryHref } from '@/src/navigation/routes';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds, historyWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
@@ -238,10 +238,8 @@ describe('The history page over real data', () => {
     expect(renderedDailySample(subject).filter(tile => tile.day?.hasTraining).map(tile => [tile.dateKey, tile.day?.value]))
       .toEqual([[localDateKey(new Date()), 1]]);
     fireEvent.press(screen.getByTestId(`stats-${subject}-history-heatmap-cell-${localDateKey(new Date())}`));
-    if (subject === 'muscle') {
-      expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&day=${localDateKey(new Date())}`));
-      expect(mockDismissTo).not.toHaveBeenCalled();
-    } else await waitFor(() => expect(mockDismissTo).toHaveBeenLastCalledWith('/train'));
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&day=${localDateKey(new Date())}`));
+    expect(mockDismissTo).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -256,14 +254,13 @@ describe('The history page over real data', () => {
     await completeSessionDraft('history_pulldown_in_progress', { completedAt: new Date(), now: new Date() });
 
     fireEvent.press(screen.getByTestId(`stats-${subject}-history-heatmap-cell-${localDateKey(new Date())}`));
-    if (subject === 'muscle') expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&day=${localDateKey(new Date())}`));
-    else await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith('/completed-session/history_pulldown_in_progress'));
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&day=${localDateKey(new Date())}`));
   });
 
   it.each([
     ['exercise', { exerciseDefinitionId: PULLDOWN }],
     ['muscle', { muscleGroupId: 'back_lats' }],
-  ] as const)('opens Sessions for a %s Grid day containing both completed and active workouts', async (subject, params) => {
+  ] as const)('opens sets for a %s Grid day containing both completed and active workouts', async (subject, params) => {
     await loadMaestroFixture('exercise-block-history');
     await logPulldown(1 / 24);
     await startPulldown(8);
@@ -274,32 +271,32 @@ describe('The history page over real data', () => {
     expect(renderedDailySample(subject).find(tile => tile.dateKey === today)?.day?.sessionIds).toHaveLength(2);
 
     fireEvent.press(screen.getByTestId(`stats-${subject}-history-heatmap-cell-${today}`));
-    expect(mockPush).toHaveBeenLastCalledWith(subject === 'muscle'
-      ? expect.stringContaining(`&day=${today}`) : `/sessions?day=${today}`);
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&day=${today}`));
   });
 
-  it('opens Sessions at the day when the active-workout lookup fails', async () => {
+  it('opens day sets without querying active-workout navigation', async () => {
     await loadMaestroFixture('exercise-block-history');
     await startPulldown(8);
     act(() => updatePreferences({ heatmapView: 'daily', progressCountSecondary: true }));
     await openHistory({ exerciseDefinitionId: PULLDOWN });
     await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
-    jest.spyOn(sessionEntry, 'loadActiveSessionId').mockRejectedValueOnce(Error('DB busy'));
+    const lookup = jest.spyOn(sessionEntry, 'loadActiveSessionId').mockRejectedValueOnce(Error('DB busy'));
     const today = localDateKey(new Date());
 
     fireEvent.press(screen.getByTestId(`stats-exercise-history-heatmap-cell-${today}`));
-    await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith(`/sessions?day=${today}`));
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&day=${today}`));
+    expect(lookup).not.toHaveBeenCalled();
   });
 
   it.each(['unmount', 'account change', 'blur'] as const)('ignores an active-workout lookup that finishes after %s', async exit => {
     await loadMaestroFixture('exercise-block-history');
     await startPulldown(8);
     act(() => updatePreferences({ heatmapView: 'daily', progressCountSecondary: true }));
-    await openHistory({ exerciseDefinitionId: PULLDOWN });
-    await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
+    await openHistory({ exerciseDefinitionId: PULLDOWN, day: localDateKey(new Date()) });
+    const card = await screen.findByTestId('exercise-period-detail-sets-card-history_pulldown_in_progress_pulldown');
     const pending = deferred<string | null>();
     const lookup = jest.spyOn(sessionEntry, 'loadActiveSessionId').mockReturnValueOnce(pending.promise);
-    fireEvent.press(screen.getByTestId(`stats-exercise-history-heatmap-cell-${localDateKey(new Date())}`));
+    fireEvent.press(card);
     expect(lookup).toHaveBeenCalledTimes(1);
     if (exit === 'unmount') screen.unmount();
     else if (exit === 'account change') act(() => setAccountLocalPreferenceAccount('B', true));
@@ -410,7 +407,7 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId('stats-exercise-history-heatmap')).toBeTruthy();
   });
 
-  it('opens the saved Timeline with the focused week\'s sets, whose cards and the ⋮\'s View sessions navigate', async () => {
+  it('opens the saved Timeline with the focused week\'s sets, whose cards and the ⋮\'s View sets navigate', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ heatmapView: 'timeline' }));
     await openHistory({ exerciseDefinitionId: SQUAT });
@@ -423,12 +420,12 @@ describe('The history page over real data', () => {
     // An exercise's own cards link to no other exercise.
     expect(screen.queryAllByTestId(/^stats-exercise-history-week-sets-card-[^-]+-exercise$/)).toEqual([]);
     fireEvent.press(cards[0]);
-    expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//));
+    await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//)));
     // The header's ⋮ opens the focused week's sessions — as a Weekly row does.
     expect(screen.queryByTestId('progress-history-view-sessions')).toBeNull();
     fireEvent.press(screen.getByTestId('progress-history-options-button'));
     fireEvent.press(screen.getByTestId('progress-history-view-sessions'));
-    expect(mockPush).toHaveBeenLastCalledWith(`/sessions?week=${localDateKey(calendarWeekBounds(1).start)}`);
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&week=${localDateKey(calendarWeekBounds(1).start)}`));
 
     await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-view-chip-daily')); });
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
@@ -495,7 +492,7 @@ describe('The history page over real data', () => {
     expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref(squat, 'workingSetCount'));
 
     fireEvent.press(screen.getAllByTestId(/^stats-muscle-history-week-sets-card-[^-]+$/)[0]);
-    expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//));
+    await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//)));
   });
 
   it('opens in the saved Weekly view without a banner, and again on the next visit', async () => {
@@ -528,17 +525,17 @@ describe('The history page over real data', () => {
     const single = days.find(day => day.sessionIds?.length === 1)!;
     expect(single.sessionIds).toHaveLength(1);
     fireEvent.press(screen.getByTestId(`stats-exercise-history-heatmap-cell-${single.dateKey}`));
-    await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith(`/completed-session/${single.sessionIds![0]}`));
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&day=${single.dateKey}`));
     const several = days.find(day => (day.sessionIds?.length ?? 0) > 1)!;
     expect(several.sessionIds!.length).toBeGreaterThan(1);
     fireEvent.press(screen.getByTestId(`stats-exercise-history-heatmap-cell-${several.dateKey}`));
-    expect(mockPush).toHaveBeenLastCalledWith(`/sessions?day=${several.dateKey}`);
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&day=${several.dateKey}`));
 
     await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-view-chip-weekly')); });
     const current = localDateKey(calendarWeekBounds(1).start);
     const row = screen.getByTestId(`stats-exercise-history-heatmap-cell-${current}`);
     fireEvent.press(row);
-    expect(mockPush).toHaveBeenLastCalledWith(`/sessions?week=${current}`);
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&week=${current}`));
     expect(row.props.accessibilityState?.selected).toBeFalsy();
     expect(screen.queryByTestId('stats-exercise-history-week-banner')).toBeNull();
     expect(screen.queryByText(/Tap a week/)).toBeNull();
@@ -795,7 +792,7 @@ describe('Muscle day/week details over real data', () => {
     expect(screen.getByTestId(`${detailCardId('detail-one')}-contribution`)).toHaveTextContent('Primary · 2 sets');
     expect(screen.queryByTestId(detailCardId('detail-two')) !== null).toBe('week' in period);
     fireEvent.press(screen.getByTestId(detailCardId('detail-one')));
-    expect(mockPush).toHaveBeenLastCalledWith('/completed-session/detail-one');
+    await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith('/completed-session/detail-one'));
     fireEvent.press(screen.getByTestId(`${detailCardId('detail-one')}-exercise`));
     expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref({ exerciseDefinitionId: SQUAT, gymId: null }, 'workingSetCount'));
   });
@@ -806,14 +803,14 @@ describe('Muscle day/week details over real data', () => {
     const subject = { muscleGroupId: 'quads', gymId: null, countSecondary: true, countSecondaryVolume: false };
     await openHistory({ muscleGroupId: 'quads', metric: 'sets', gymId: 'no-gym', secondary: 'shown', secondaryVolume: 'hidden' });
     const tile = await screen.findByTestId('stats-muscle-history-heatmap-cell-2026-10-02');
-    expect(tile).toHaveProp('accessibilityHint', "Opens the day's contributing sets");
+    expect(tile).toHaveProp('accessibilityHint', "Opens the day's sets");
     fireEvent.press(tile);
-    expect(mockPush).toHaveBeenLastCalledWith(muscleHistoryDetailHref(subject, { day: '2026-10-02' }, 'workingSetCount'));
+    expect(mockPush).toHaveBeenLastCalledWith(historyDetailHref(subject, { day: '2026-10-02' }, 'workingSetCount'));
     fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-week-2026-09-2026-09-28'));
-    expect(mockPush).toHaveBeenLastCalledWith(muscleHistoryDetailHref(subject, { week: '2026-09-28' }, 'workingSetCount'));
+    expect(mockPush).toHaveBeenLastCalledWith(historyDetailHref(subject, { week: '2026-09-28' }, 'workingSetCount'));
     await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-weekly')); });
     fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-09-28'));
-    expect(mockPush).toHaveBeenLastCalledWith(muscleHistoryDetailHref(subject, { week: '2026-09-28' }, 'workingSetCount'));
+    expect(mockPush).toHaveBeenLastCalledWith(historyDetailHref(subject, { week: '2026-09-28' }, 'workingSetCount'));
   });
 
   it('filters Sets and Volume independently, including volume-only effort rows', async () => {
@@ -894,10 +891,11 @@ describe('Muscle day/week details over real data', () => {
     expect(screen.getByTestId('muscle-period-detail-total')).toHaveProp('accessibilityLabel', '2 Sets');
   });
 
-  it('keeps a current day with only an active workout empty under completed-only list scope', async () => {
+  it('shows performed sets from the current active workout', async () => {
     await startPulldown(0);
     await openHistory({ muscleGroupId: 'back_lats', metric: 'sets', day: localDateKey(new Date()) });
-    expect(await screen.findByTestId('muscle-period-detail-sets-empty')).toHaveTextContent('No sets this day');
+    await screen.findByTestId('muscle-period-detail-sets-card-history_pulldown_in_progress_pulldown');
+    expect(screen.queryByTestId('muscle-period-detail-sets-empty')).toBeNull();
     expect(mockDismissTo).not.toHaveBeenCalled();
   });
 });

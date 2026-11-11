@@ -1,7 +1,7 @@
 import type { Href } from 'expo-router';
 
-import type { HeatmapView, ProgressMetric } from '@/src/preferences/model';
-import { ACTIVE_WORKOUT_HREF } from './active-session-entry';
+import type { HeatmapView } from '@/src/preferences/model';
+import type { CalendarHeatmapMetric } from '@/src/data/muscle-analytics';
 import { encodeGymRouteParam } from '@/src/utils/gym-scope-route';
 
 export const SIGN_IN_ROUTE = '/sign-in';
@@ -56,9 +56,11 @@ export const rmCurveHref = (exerciseDefinitionId: string): Href =>
   `/rm-curve?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}` as Href;
 
 /** `?metric=` on the history page: Progress's Sets / Volume choice, carried over. */
-export const PROGRESS_HISTORY_METRIC_PARAMS: Record<ProgressMetric, string> = {
+export const PROGRESS_HISTORY_METRIC_PARAMS: Record<CalendarHeatmapMetric, string> = {
   totalVolume: 'volume',
   workingSetCount: 'sets',
+  estimatedRM1: '1rm',
+  highestWeight: 'weight',
 };
 
 /** `?secondary=` on a muscle's history: Progress counted primary work only ([[muscle.secondary-filter]]). */
@@ -71,7 +73,7 @@ export const PROGRESS_HISTORY_PRIMARY_ONLY_PARAM = 'hidden';
  */
 export const progressHistoryHref = (
   subject: ({ muscleGroupId: string; countSecondary?: boolean; countSecondaryVolume?: boolean } | { exerciseDefinitionId: string }) & { gymId?: string | null },
-  metric?: ProgressMetric,
+  metric?: CalendarHeatmapMetric,
   view?: HeatmapView
 ): Href => {
   const id = 'muscleGroupId' in subject
@@ -86,33 +88,17 @@ export const progressHistoryHref = (
   return `${PROGRESS_HISTORY_ROUTE}?${id}${carried}${gym === undefined ? '' : `&gymId=${encodeURIComponent(gym)}`}${secondary}${volume}${view ? `&view=${view}` : ''}` as Href;
 };
 
-/** The same muscle's contributing sets, bounded to the tapped local day or week. */
-export const muscleHistoryDetailHref = (
-  subject: { muscleGroupId: string; gymId?: string | null; countSecondary?: boolean; countSecondaryVolume?: boolean },
+/** The same subject's sets, bounded to the tapped local day or week. */
+export const historyDetailHref = (
+  subject: Parameters<typeof progressHistoryHref>[0],
   period: { day: string } | { week: string },
-  metric: ProgressMetric,
+  metric: CalendarHeatmapMetric,
 ): Href => `${progressHistoryHref(subject, metric)}&${'day' in period
   ? `day=${encodeURIComponent(period.day)}` : `week=${encodeURIComponent(period.week)}`}` as Href;
 
 /** One completed session's view. */
 export const completedSessionHref = (sessionId: string): Href =>
   `/completed-session/${encodeURIComponent(sessionId)}` as Href;
-
-/** Sessions, opened at the local week that holds `dateKey` (`YYYY-MM-DD`). */
-export const sessionsWeekHref = (dateKey: string): Href =>
-  `/sessions?week=${encodeURIComponent(dateKey)}` as Href;
-
-/** Sessions, opened at the local day `dateKey` (`YYYY-MM-DD`). */
-export const sessionsDayHref = (dateKey: string): Href =>
-  `/sessions?day=${encodeURIComponent(dateKey)}` as Href;
-
-/** Where a history day leads (the workout in progress lives on Train); null for a day without a session. */
-export const historyDayHref = (dateKey: string, sessionIds: readonly string[], activeSessionId: string | null = null): Href | null => {
-  if (sessionIds.length === 0) return null;
-  if (sessionIds.length > 1) return sessionsDayHref(dateKey);
-  return sessionIds[0] === activeSessionId ? ACTIVE_WORKOUT_HREF : completedSessionHref(sessionIds[0]);
-};
-
 
 /** A member's session as their group sees it. */
 export const groupSessionHref = (memberUserId: string, sessionId: string, groupId: string): Href =>
