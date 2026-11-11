@@ -62,7 +62,9 @@ export function TodayCoWCard({ resource, previous, dateFormat, userId, onEarlier
   const title = previous || data?.selection === 'previous_final' ? 'Last Week CoW' : 'Current CoW';
   const inlineError = pickInlineError(error);
   const ranking = result ? todayCoWRanking(result) : undefined;
-  const status = result ? (previous ? 'Last week · Final' : coWStatus(result.cow, result.state)) : null;
+  // Last week's winners stand only once its result is a ready final; until then its own state shows.
+  const settled = result !== null && result.state === 'ready' && (!previous || result.cow.state === 'final');
+  const status = result ? (previous && settled ? 'Last week · Final' : coWStatus(result.cow, result.state)) : null;
   // Confirmed absence takes no space.
   if (data && !result) return null;
   return <Card testID="today-cow-card">
@@ -84,9 +86,9 @@ export function TodayCoWCard({ resource, previous, dateFormat, userId, onEarlier
           <Text allowFontScaling={false} style={text.meta}>{status}</Text>
           <Icon name="chevron-right" colorRole="inkMuted" size="sm" />
         </Pressable>
-        {result.state === 'ready' && ranking ? <CoWRows ranking={ranking} userId={userId} testID={`${prefix}-rows`} />
+        {settled && ranking ? <CoWRows ranking={ranking} userId={userId} testID={`${prefix}-rows`} />
           : <Text allowFontScaling={false} style={text.meta} testID={`${prefix}-state`}>
-            {result.state === 'unavailable' ? 'Group comparisons unavailable' : result.state === 'ready' ? 'Unavailable' : coWStatus(result.cow, result.state)}
+            {result.state === 'unavailable' ? 'Group comparisons unavailable' : settled ? 'Unavailable' : coWStatus(result.cow, result.state)}
           </Text>}
       </> : <GroupMissingDataState error={inlineError} offline={offline} onRetry={onRetry} testIDPrefix={prefix} />}
     </View>

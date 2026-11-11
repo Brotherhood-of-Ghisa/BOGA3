@@ -797,6 +797,17 @@ it.each(['finalizing', 'unavailable', 'empty'] as const)('Today keeps last week 
   else expect(await screen.findByTestId('today-cow-previous-state')).toHaveTextContent(state === 'finalizing' ? 'Finalizing' : 'Group comparisons unavailable');
 });
 
+it('Today shows a ready but unsealed last week as its own state, never a final podium', async () => {
+  const previous = previousCowSummary();
+  previous.result!.cow.state = 'finalizing';
+  api.getPreviousCoWSummary.mockResolvedValue(previous);
+  api.getCoWSummary.mockResolvedValue({ ...summary(), selection: 'none', result: null });
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  expect(await screen.findByTestId('today-cow-previous-state')).toHaveTextContent('Finalizing');
+  expect(screen.queryByText('Last week · Final')).toBeNull();
+  expect(screen.queryByTestId('today-cow-previous-rows')).toBeNull();
+});
+
 it('Today does not relabel a legacy fallback as current, and has no other week to step to', async () => {
   api.getCoWSummary.mockResolvedValue({ ...previousCowSummary(), selection: 'previous_final' });
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
