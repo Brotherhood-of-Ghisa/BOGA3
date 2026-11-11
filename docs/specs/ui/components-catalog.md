@@ -28,7 +28,7 @@ For a new block or derivative, follow the selection and review workflow in
 | CompactCard / CompactHeader | `compact-card.tsx`: fixed compact Card and shared label/metadata header; Stream and CoW | Embedded summaries reuse only the header inside their existing container; Card accessibility actions retain nested record callbacks |
 | ListCard / ListCardHeader | `list-card.tsx` and compact `list-row.tsx`; GroupHomeBoard and Today's weekly board | Passive rows and a whole-board action differ from independent row controls |
 | SortableTable family | `stats/stats-table.tsx`: StatsTable, compact StatsTableRow/Name/Disclosure and comparison columns; Muscle list/contributors | Keep sorting with its current owner, separate history/disclosure targets and responsive stacking |
-| SummaryTile | `summary-tile.tsx`: shared header and existing metric content; At a glance's Group stats | Both Sets/PRs remain visible; period controls stay outside and metric controls govern the board/chart |
+| SummaryTile | `summary-tile.tsx`: shared header and existing metric content; At a glance's Group stats | Both Sets/GR remain visible; period controls stay outside and metric controls govern the board/chart |
 
 ### Promoted templates
 

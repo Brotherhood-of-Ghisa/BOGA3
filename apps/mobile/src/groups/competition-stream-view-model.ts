@@ -4,7 +4,7 @@ import { isCompetitionMetric } from './competition-contract';
 import { buildCompetitionSession } from './competition-session-view-model';
 import { sessionRecordCertificationStatus, setCertification } from './competition-session-records-view-model';
 import { describeCompetitionEvent, formatCompetitionHistoricalFigure, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
-import type { CompetitionEventWire, CompetitionStreamItemWire, CompetitionHistoricalMetric,
+import type { CompetitionEventWire, CompetitionStreamItemWire, CompetitionHistoryValueWire, CompetitionHistoricalMetric,
   CompetitionStreamRecordWire, CompetitionStreamSharedExerciseWire, CoWStreamItemWire } from './competition-wire';
 import { formatMemberName, formatMembershipSentence, formatSessionStatusLabel, formatSetCount,
   formatExerciseCount, formatStreamStartedAt, type RecordCertificationStatus, type StreamMembershipViewModel } from './stream-view-model';
