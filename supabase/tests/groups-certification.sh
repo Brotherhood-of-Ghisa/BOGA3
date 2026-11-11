@@ -1115,28 +1115,29 @@ pass "exercise merges preserve links and same-mode witnesses; failed correction 
 
 # Stream v4: each record names the boards it took #1 on (its group records);
 # a new best that took none is the member's PR. Its own comparison, so the
-# boards earlier steps left behind cannot move the #1.
+# boards earlier steps left behind cannot move the #1 (R has left by now,
+# so the admin lifts second).
 GX="$(gx "${OWNER_TOKEN}" "${GID}" "Squat")"
-DAQ="${T}-dAq"; DRQ="${T}-dRq"
+DAQ="${T}-dAq"; DMQ="${T}-dMq"
 def "${ATHLETE_TOKEN}" "${DAQ}" total_load
 link "${ATHLETE_TOKEN}" "${DAQ}"
-def "${RIVAL_TOKEN}" "${DRQ}" total_load
-link "${RIVAL_TOKEN}" "${DRQ}"
+def "${ADMIN_TOKEN}" "${DMQ}" total_load
+link "${ADMIN_TOKEN}" "${DMQ}"
 next_session_at
 sess "${ATHLETE_TOKEN}" "${T}-q1s" completed "${DAQ}" "q1:100:1"
 drain "squat #1"
 next_session_at
-sess "${RIVAL_TOKEN}" "${T}-q2s" completed "${DRQ}" "q2:90:1"
-drain "rival first squat, below #1"
+sess "${ADMIN_TOKEN}" "${T}-q2s" completed "${DMQ}" "q2:90:1"
+drain "a second member's first squat, below #1"
 next_session_at
-sess "${RIVAL_TOKEN}" "${T}-q3s" completed "${DRQ}" "q3:95:1"
-drain "rival new best, below #1"
+sess "${ADMIN_TOKEN}" "${T}-q3s" completed "${DMQ}" "q3:95:1"
+drain "their new best, still below #1"
 expect_sql "v4 setup: q1 took #1 on both boards; q2 and q3 are records that took none (stored flags)" \
   "select string_agg(replace(e.set_id, '${T}-', '') || ':' || (b->>'metric') || ':' || coalesce(b->>'group_record','false'), ',' order by e.set_id, b->>'metric')
      from app_public.group_events e, jsonb_array_elements(e.payload->'boards') b
     where e.group_exercise_id = '${GX}' and e.kind = 'record';" \
   "q1:e1rm:true,q1:volume:true,q2:e1rm:false,q2:volume:false,q3:e1rm:false,q3:volume:false"
-stream_v4 "${RIVAL_TOKEN}"
+stream_v4 "${ADMIN_TOKEN}"
 V4_PAGE="${BODY}"
 check_args "v4: the group's first #1 names both boards" --arg s "${T}-q1" \
   "${RECORDS}"' | length == 1 and .[0].record.group_record_metrics == ["e1rm","volume"]'
@@ -1147,7 +1148,7 @@ check "v4: only record items carry GR boards, each one of the record's own board
   'all(.items[]; if (.kind == "competition" and .event.kind == "record") then
      (.record.group_record_metrics - [.event.values[] | select(.role == "record") | .metric]) == []
    else (.record? // {} | has("group_record_metrics") | not) end)'
-rpc "${RIVAL_TOKEN}" group_competition_stream_v3 "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
+rpc "${ADMIN_TOKEN}" group_competition_stream_v3 "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
 expect_ok "group_competition_stream_v3"
 [[ "$(jq -c 'del(.items[].record.group_record_metrics?)' <<<"${V4_PAGE}")" == "$(jq -c '.' <<<"${BODY}")" ]] \
   || fail "v4 is v3 plus GR boards, nothing else"

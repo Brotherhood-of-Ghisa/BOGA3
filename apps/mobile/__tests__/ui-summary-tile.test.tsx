@@ -29,6 +29,15 @@ it.each([0, 6, 123456])('keeps both WeekFigure metrics, existing comparison bars
   expect(screen.getByTestId('group-week-totals-sets-value')).toHaveStyle(textRoles.figureHero);
 });
 
+it('ends the gallery page with the latest sessions, following the metric chip', () => {
+  render(<SummaryGallery review />);
+  expect(screen.getAllByTestId(/^group-latest-session-gallery-s\d$/)).toHaveLength(5);
+  expect(screen.getByTestId('group-latest-session-gallery-s0-value')).toHaveTextContent('12 sets');
+  fireEvent.press(screen.getByTestId('groups-filter-metric'));
+  expect(screen.getByTestId('group-latest-session-gallery-s0-value')).toHaveTextContent('1 GR');
+  expect(screen.getByTestId('group-latest-session-gallery-s1-value')).toHaveTextContent('0 GR');
+});
+
 it('keeps the page metric scoped to the board/chart and the period scoped to the whole page', () => {
   render(<SummaryGallery review />);
   const totals = screen.getByTestId('group-week-totals-card');

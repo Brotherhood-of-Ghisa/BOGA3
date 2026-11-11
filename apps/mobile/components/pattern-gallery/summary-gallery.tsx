@@ -5,6 +5,7 @@ import { GroupGlancePage } from '@/components/groups/group-glance-page';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
 import { GroupApiError } from '@/src/groups/api';
 import type { GroupHomeMetric } from '@/src/groups/home-periods';
+import { galleryStreamItems } from './fixtures';
 import { SUMMARY_NOW, SUMMARY_STATES, summarySeries, type SummaryState } from './summary-fixtures';
 
 type SummaryGalleryProps = { initialState?: string; initialLong?: boolean; review?: boolean; children?: ReactNode };
@@ -29,7 +30,8 @@ export function SummaryGallery({ initialState, initialLong = false, review = fal
       offset={offset} onOffsetChange={setOffset} series={summarySeries(state === 'held' ? 0 : offset, state, long)}
       held={state === 'held' ? { period: 'week', offset: 0 } : null} offline={offline}
       error={state === 'error' ? new GroupApiError('INTERNAL', 'Please try again.') : null}
-      onRetry={() => { setState('ready'); setAction('Retry'); }} style={styles.reference} />
+      onRetry={() => { setState('ready'); setAction('Retry'); }} style={styles.reference}
+      streamItems={galleryStreamItems(long)} onOpenSession={(_member, session) => setAction(`Session · ${session}`)} />
     {action ? <Notice live message={action} testID="ui-gallery-summary-action" /> : null}
   </Screen>;
 }

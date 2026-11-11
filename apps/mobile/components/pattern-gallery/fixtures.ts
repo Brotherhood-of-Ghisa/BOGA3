@@ -1,4 +1,4 @@
-import type { CompetitionBoardRowWire, CompetitionEventWire, CompetitionExerciseWire } from '@/src/groups/competition-wire';
+import type { CompetitionBoardRowWire, CompetitionEventWire, CompetitionExerciseWire, CompetitionStreamItemWire } from '@/src/groups/competition-wire';
 import type { CoWResultWire, CoWSummaryWire } from '@/src/groups/cow-wire';
 import type { CompetitionSessionCard } from '@/src/groups/competition-stream-view-model';
 
@@ -72,3 +72,27 @@ export function galleryCow(state: GalleryState, long: boolean): CoWResultWire {
   if (state === 'empty') result.rankings.forEach(ranking => { ranking.entries = []; ranking.entry_count = 0; });
   return result;
 }
+
+/** At a glance's Latest sessions: five completed sessions, the first and third taking a group record. */
+export const galleryStreamItems = (long: boolean): CompetitionStreamItemWire[] => {
+  const names = long ? ['Contessa Serbelloni Mazzanti Vien dal Mare', 'me', 'Sam', 'Jules', 'Luca'] : ['Marco', 'me', 'Sam', 'Jules', 'Luca'];
+  const day = 86_400_000;
+  const start = new Date(2026, 9, 30, 9).getTime();
+  return names.flatMap((name, index) => {
+    const sessionId = `gallery-s${index}`;
+    const member = { user_id: name === 'me' ? 'me' : `u${index}`, username: name };
+    const session: CompetitionStreamItemWire = { kind: 'session', key: `${member.user_id}:${sessionId}`, sort_at_ms: start - index * day,
+      groups: [{ group_id: 'g1', name: 'Crew' }],
+      session: { member, session_id: sessionId, gym_name: null, status: 'completed', started_at_ms: start - index * day,
+        completed_at_ms: start - index * day + 3_600_000, duration_sec: 3_600,
+        exercises: [{ session_exercise_id: `${sessionId}-se`, exercise_definition_id: 'd1', load_input_mode: 'total_load', name: 'Bench press',
+          machine_name: null, order_index: 0, visibility: 'ordinary',
+          sets: Array.from({ length: 12 + index * 3 }, (_, set) => ({ set_id: `${sessionId}-${set}`, order_index: set, reps_value: '5',
+            set_type: null, performance_status: null, weight_value: '100' })) }] } };
+    if (index % 2 === 1) return [session];
+    const record: CompetitionStreamItemWire = { kind: 'competition', key: `gallery-gr-${index}`, sort_at_ms: start - index * day,
+      event: { ...competitionEvent, event_id: `gallery-gr-${index}`, session_id: sessionId },
+      record: { performance: null, previous: [], group_record_metrics: ['e1rm'] } };
+    return [record, session];
+  });
+};
