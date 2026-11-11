@@ -300,7 +300,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   const muscleTargets = useMemo(
     () => subject?.kind === 'muscle' ? { muscleIds: [subject.id],
       weeklyTarget: muscleWeeklyTarget(values, subject.id) } : undefined,
-    [subject, values, catalog.muscleGroups]
+    [subject, values]
   );
   const unavailable = !subject || (catalog.status === 'ready' && name === null)
     || invalidDetailPeriod(subject, detailPeriod, values.historyLookbackWeeks);
