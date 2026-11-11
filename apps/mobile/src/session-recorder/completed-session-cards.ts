@@ -38,10 +38,12 @@ export const loadSessionRecordBaselines = async (
  * ([[set.row-figures]], `training-metrics-contract.md` §3). Empty for a
  * session that is not completed.
  */
-export const loadCompletedSessionCards = async (sessionId: string): Promise<CompletedSessionDetailCard[]> => {
+export const loadCompletedSessionCards = async (sessionId: string, includeInProgress = false): Promise<CompletedSessionDetailCard[]> => {
   const graph = await loadSessionSnapshotById(sessionId);
-  if (!graph || graph.status !== 'completed') return [];
+  if (!graph || (graph.status !== 'completed' && !(includeInProgress && graph.status === 'active'))) return [];
   const exercises = toCompletedSessionDetailExercises(graph.exercises);
+  // Performed active sets have figures, but cannot earn completed-history PRs.
+  if (graph.status !== 'completed') return buildCompletedSessionDetailModel(exercises, new Map()).cards;
   const definitionIds = [...new Set(exercises.flatMap((exercise) => exercise.exerciseDefinitionId ? [exercise.exerciseDefinitionId] : []))];
   // Records are optional enrichment, as on View Session: a failed read shows
   // the cards without them rather than no cards.

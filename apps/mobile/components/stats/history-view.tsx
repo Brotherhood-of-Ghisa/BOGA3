@@ -95,7 +95,6 @@ const sameFocusedWeek = (left: FocusedTimelineWeek | null, right: FocusedTimelin
     && left.label === right.label && left.hasTraining === right.hasTraining);
 
 function HistoryHeatmap({
-  kind,
   dailyMetrics,
   metric,
   metricLabel,
@@ -110,7 +109,6 @@ function HistoryHeatmap({
   timeline,
   onFocusWeek,
 }: {
-  kind: HistoryKind;
   dailyMetrics: DailyEffortMetrics[];
   metric: CalendarHeatmapMetric;
   metricLabel: string;
@@ -186,7 +184,6 @@ function HistoryHeatmap({
   const dailyHeatmap = useMemo(
     () => (
       <DailyHeatmap
-        opensSets={kind === 'muscle'}
         data={data}
         testIDPrefix={testIDPrefix}
         metricLabel={metricLabel}
@@ -196,7 +193,7 @@ function HistoryHeatmap({
         onOpenWeek={onOpenWeek}
       />
     ),
-    [data, formatDailyValue, metricLabel, testIDPrefix, status, onOpenDay, onOpenWeek, kind]
+    [data, formatDailyValue, metricLabel, testIDPrefix, status, onOpenDay, onOpenWeek]
   );
   const weeklyHeatmap = useMemo(
     () => (
@@ -369,7 +366,6 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
       {!!errorMessage || firstLoad ? (
         <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>{status}</ScrollView>
       ) : <HistoryHeatmap
-        kind={kind}
         dailyMetrics={dailyMetrics}
         lookbackWeeks={lookbackWeeks}
         muscleTargets={muscleTargets}

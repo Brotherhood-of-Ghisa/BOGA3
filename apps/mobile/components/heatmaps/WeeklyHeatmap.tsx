@@ -156,7 +156,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
     </View>
   </View>;
   return onPress
-    ? <Pressable accessibilityRole="button" accessibilityHint="Opens the week's sessions" onPress={onPress} {...shared}
+    ? <Pressable accessibilityRole="button" accessibilityHint="Opens the week's sets" onPress={onPress} {...shared}
       style={({ pressed }) => [styles.week, pressed ? heatmapStyles.pressed : null]}>{content}</Pressable>
     : <View accessible accessibilityRole="text" {...shared}>{content}</View>;
 }

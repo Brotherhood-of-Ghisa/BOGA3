@@ -8,20 +8,21 @@ import { formatCalendarWeekHeading, formatCompactDate } from '@/src/utils/local-
 import { formatVolume, formatWholeSetCount } from '@/src/exercise-calculations/format';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 
-import { MUSCLE_HISTORY_METRIC_OPTIONS, type MuscleHistoryMetric } from './history-view';
+import type { CalendarHeatmapMetric } from '@/src/data';
+import { EXERCISE_HISTORY_METRIC_OPTIONS, MUSCLE_HISTORY_METRIC_OPTIONS } from './history-view';
 import type { HistorySubject } from './use-history';
 import { WeekSetList, type WeekSetExerciseLink } from './week-set-list';
 import { usePeriodSets, type SetPeriod } from './week-sets';
 
 // The day/week drill-down reuses Timeline's exercise cards. Each card opens
-// its full session; its progress action opens the exercise. Only the selected
-// metric's contributing sets appear, under the inherited muscle/gym/role scope.
-export function MusclePeriodDetail({ subject, period, metric, onSelectMetric, filters, onOpenSession,
+// its workout; its progress action opens the exercise. Muscle detail limits rows
+// to metric contributors; exercise detail keeps every performed set at the gym.
+export function HistoryPeriodDetail({ subject, period, metric, onSelectMetric, filters, onOpenSession,
   exerciseLink, accountRevision, revision, lookbackWeeks }: {
-  subject: Extract<HistorySubject, { kind: 'muscle' }>;
+  subject: HistorySubject;
   period: SetPeriod;
-  metric: MuscleHistoryMetric;
-  onSelectMetric: (metric: MuscleHistoryMetric) => void;
+  metric: CalendarHeatmapMetric;
+  onSelectMetric: (metric: CalendarHeatmapMetric) => void;
   filters: ReactNode;
   onOpenSession: (sessionId: string) => void;
   exerciseLink?: WeekSetExerciseLink;
@@ -37,8 +38,12 @@ export function MusclePeriodDetail({ subject, period, metric, onSelectMetric, fi
     if (visited.current) setRefresh(value => value + 1);
     visited.current = true;
   }, []));
-  const sets = usePeriodSets({ muscleGroupIds: [subject.id], gymId: subject.gymId,
-    countSecondary: subject.countSecondary, countSecondaryVolume: subject.countSecondaryVolume, metric },
+  const muscleMetric = metric === 'totalVolume' ? 'totalVolume' as const : 'workingSetCount' as const;
+  const target = subject.kind === 'muscle'
+    ? { muscleGroupIds: [subject.id], gymId: subject.gymId, countSecondary: subject.countSecondary,
+      countSecondaryVolume: subject.countSecondaryVolume, metric: muscleMetric }
+    : { exerciseDefinitionId: subject.id, gymId: subject.gymId };
+  const sets = usePeriodSets({ ...target, includeInProgress: true },
   period, refresh + revision, accountRevision, lookbackWeeks);
   // A focus refresh must not shrink the scroll content before Back settles.
   const groups = sets.sameScope ? sets.groups : [];
@@ -48,25 +53,27 @@ export function MusclePeriodDetail({ subject, period, metric, onSelectMetric, fi
   const label = metric === 'totalVolume' ? 'Volume' : value === '1' ? 'Set' : 'Sets';
   const heading = period.dayKey ? formatCompactDate(new Date(`${period.dayKey}T12:00:00`), dateFormat)
     : formatCalendarWeekHeading(period.weekKey, dateFormat);
-  return <View style={styles.body} testID="muscle-period-detail">
+  const testID = `${subject.kind}-period-detail`;
+  return <View style={styles.body} testID={testID}>
     <View style={styles.controls}>
-      <ToggleChip accessibilityLabel="Effort metric" onChange={onSelectMetric} options={MUSCLE_HISTORY_METRIC_OPTIONS}
-        testID="muscle-period-detail-metric" value={metric} />
+      <ToggleChip accessibilityLabel="Effort metric" onChange={onSelectMetric}
+        options={subject.kind === 'muscle' ? MUSCLE_HISTORY_METRIC_OPTIONS : EXERCISE_HISTORY_METRIC_OPTIONS}
+        testID={`${testID}-metric`} value={metric} />
       {filters}
     </View>
-    <ScreenScroll testID="muscle-period-detail-scroll">
+    <ScreenScroll testID={`${testID}-scroll`}>
       <View style={styles.heading}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={[text.title, styles.date]} testID="muscle-period-detail-date">
+        <Text allowFontScaling={false} accessibilityRole="header" style={[text.title, styles.date]} testID={`${testID}-date`}>
           <FigureText strong>{heading}</FigureText>
         </Text>
-        {!sets.loading && !sets.error ? <View style={styles.total} accessibilityLabel={`${value} ${label}`} testID="muscle-period-detail-total">
+        {subject.kind === 'muscle' && !sets.loading && !sets.error ? <View style={styles.total} accessibilityLabel={`${value} ${label}`} testID={`${testID}-total`}>
           <Text allowFontScaling={false} style={text.figure}>{value}</Text>
           <Text allowFontScaling={false} style={text.label}>{label}</Text>
         </View> : null}
       </View>
-      <WeekSetList {...sets} groups={groups} contributionMetric={metric} exerciseLink={exerciseLink}
+      <WeekSetList {...sets} groups={groups} contributionMetric={subject.kind === 'muscle' ? muscleMetric : undefined} exerciseLink={exerciseLink}
         onOpenSession={onOpenSession} onRetry={() => setRefresh(value => value + 1)} period={period.dayKey ? 'day' : 'week'}
-        testID="muscle-period-detail-sets" />
+        testID={`${testID}-sets`} />
     </ScreenScroll>
   </View>;
 }

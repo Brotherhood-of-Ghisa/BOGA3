@@ -228,7 +228,9 @@ describe('resolveHistoryMetric', () => {
     expect(resolveHistoryMetric('volume')).toBe('totalVolume');
     // Progress's link is the only producer: anything else opens on Volume.
     expect(resolveHistoryMetric(undefined)).toBeNull();
-    expect(resolveHistoryMetric('1rm')).toBeNull();
+    expect(resolveHistoryMetric('1rm')).toBe('estimatedRM1');
+    expect(resolveHistoryMetric('weight')).toBe('highestWeight');
+    expect(resolveHistoryMetric('unknown')).toBeNull();
     expect(String(progressHistoryHref({ muscleGroupId: 'front_delts' }))).not.toMatch(/metric=/);
   });
 });
