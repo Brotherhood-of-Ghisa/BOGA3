@@ -11,7 +11,7 @@ const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const row = formatSetRow({ id: 'set', weight: 60, reps: 8, setType: null, done: true });
 
-it('keeps each percentage set on one line with the unit beside its Weight', () => {
+it('keeps percentage figures and units in aligned columns without truncation', () => {
   const normalized = { ...row, weightReps: '100.0 %BW × 8', oneRepMax: '127.7 %BW', volume: '800.0 %BW·reps' };
   renderWithTheme(<ExerciseSetsCard name="Bodyweight Bulgarian Split Squat" count="2 sets" percentageMetrics testID="card" rows={[
     normalized, { ...normalized, id: 'next', weightReps: '125.0 %BW × 999', oneRepMax: '1234.5 %BW', volume: '123456.7 %BW·reps' },
@@ -21,12 +21,12 @@ it('keeps each percentage set on one line with the unit beside its Weight', () =
   expect(screen.queryByTestId('card-columns')).toBeNull();
   expect(screen.queryByText(/Weight|1RM|Vol/)).toBeNull();
 
-  for (const [index, values] of [['100.0 %BW × 8', '127.7', '800.0'], ['125.0 %BW × 999', '1234.5', '123456.7']].entries()) {
+  for (const [index, values] of [['100.0 %BW × 8', '127.7 %BW', '800.0 %BW·reps'], ['125.0 %BW × 999', '1234.5 %BW', '123456.7 %BW·reps']].entries()) {
     const id = `card-set-${index + 1}`;
     expect(screen.getByTestId(id)).toHaveStyle({ flexDirection: 'row', paddingVertical: uiSpace.xs });
     for (const [column, text] of [['values', values[0]], ['1rm', values[1]], ['vol', values[2]]]) {
       expect(screen.getByTestId(`${id}-${column}`)).toHaveTextContent(text, { exact: true });
-      expect(screen.getByTestId(`${id}-${column}`)).toHaveProp('numberOfLines', 1);
+      expect(screen.getByTestId(`${id}-${column}`).props.numberOfLines).toBeUndefined();
     }
   }
   expect(screen.getByTestId('card-set-2-values')).toHaveProp('accessibilityLabel', '125.0 %BW × 999');

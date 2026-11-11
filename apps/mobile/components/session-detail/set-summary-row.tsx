@@ -24,20 +24,20 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
       <Text
         allowFontScaling={false}
         accessibilityLabel={percentageMetrics ? row.weightReps : undefined}
-        numberOfLines={1}
+        numberOfLines={percentageMetrics ? undefined : 1}
         style={[text.figure, row.done ? (row.weightRecord ? tone.record : null) : tone.faint, styles.weightReps]}
         testID={`${testID}-values`}>
         {row.weightReps}
       </Text>
       {!hideDerivedMetrics ? percentageMetrics ? <>
-        <Text allowFontScaling={false} numberOfLines={1}
+        <Text allowFontScaling={false}
           accessibilityLabel={`1RM ${row.oneRepMax}`}
           style={[text.figureSmall, row.done ? (row.oneRepMaxRecord ? tone.record : tone.ink) : tone.faint, styles.metric, styles.oneRepMax]}
-          testID={`${testID}-1rm`}>{row.oneRepMax.replace(' %BW', '')}</Text>
-        <Text allowFontScaling={false} numberOfLines={1}
+          testID={`${testID}-1rm`}>{row.oneRepMax}</Text>
+        <Text allowFontScaling={false}
           accessibilityLabel={`Vol ${row.volume}`}
           style={[text.figureSmall, row.done ? tone.ink : tone.faint, styles.metric, styles.volume]}
-          testID={`${testID}-vol`}>{row.volume.replace(' %BW·reps', '')}</Text>
+          testID={`${testID}-vol`}>{row.volume}</Text>
       </> : <>
       <View style={[styles.metricColumn, styles.oneRepMaxColumn]} testID={`${testID}-1rm-column`}>
         <Stat
@@ -90,8 +90,8 @@ const styles = StyleSheet.create({
   // As wide as the old legend-plus-value pair, so weight × reps keeps its room.
   oneRepMaxColumn: { width: uiGeometry.metricValueWidth + uiSpace.xl },
   volumeColumn: { width: uiGeometry.metricValueWidth + uiSpace.xl },
-  oneRepMax: { width: uiGeometry.metricValueWidth + uiSpace.sm },
-  volume: { width: uiGeometry.metricValueWidth + uiSpace.xl },
+  oneRepMax: { width: uiGeometry.metricValueWidth + uiSpace.xxl },
+  volume: { width: uiGeometry.metricValueWidth + uiSpace.xl * 3 },
   weightReps: {
     flex: 1,
     minWidth: 0,
