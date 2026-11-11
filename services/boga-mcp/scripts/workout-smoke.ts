@@ -40,7 +40,11 @@ async function workoutFlow(): Promise<void> {
   const client = await connect();
   const headers = await call(client, 'get_active_workout', {});
   if (!Array.isArray(headers.workouts) || headers.workouts.length !== 0 || headers.visibility !== 'server_synced_only') {
-    throw new Error('Local fixture already has active work; refusing to replace it.');
+    // The smoke owns its fixture (user_g), so active work here is residue of an
+    // interrupted smoke run or another suite signing in as it: fail, never clear.
+    throw new Error('Local fixture already has active work; refusing to replace it. ' +
+      'Only mcp-smoke may use user_g (scripts/tests/mcp-smoke-fixture-user.test.sh); ' +
+      'after an interrupted run, `./boga db reset` clears it.');
   }
   const started = await call(client, 'start_workout', { idempotency_key: key('start'), gym_id: required('BOGA_MCP_SMOKE_GYM_ID') });
   const sessionId = String(started.session_id);

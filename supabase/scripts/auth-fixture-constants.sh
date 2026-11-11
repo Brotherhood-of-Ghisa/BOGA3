@@ -34,3 +34,13 @@ export USER_E_PASSWORD="ScaffoldingUserE!234"
 
 export USER_F_EMAIL="user_f.local@example.test"
 export USER_F_PASSWORD="ScaffoldingUserF!234"
+
+# MCP smoke (scripts/smoke-boga-mcp.sh, the mcp-smoke lane): user_g is the
+# account the smoke seeds, connects an agent to and logs a workout for. It
+# asserts account-wide state (no active workout before it starts one, agent
+# plan and audit counts), and the backend gate runs it after the user_a sync
+# and contract suites without a reset, so it must not share their user.
+# Dedicated to that smoke (scripts/tests/mcp-smoke-fixture-user.test.sh). No
+# fixture key.
+export USER_G_EMAIL="user_g.local@example.test"
+export USER_G_PASSWORD="ScaffoldingUserG!234"

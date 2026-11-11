@@ -102,6 +102,7 @@ sign in on the app's auth screen as a **development account**.
 | **Rich History** | `history@dev.local` / `dev123` | Manual testing with imported GymBook history, four recent weeks, and the `Dev crew` group it owns | No |
 | Fixture `user_a` | `user_a.local@example.test` / `ScaffoldingUserA!234` | Integration-test fixture (primary owner) | **Yes — reset / mutated / wiped every run** |
 | Fixture `user_b` | `user_b.local@example.test` / `ScaffoldingUserB!234` | Integration-test fixture (cross-user denial) | **Yes** |
+| Fixture `user_g` | `user_g.local@example.test` / `ScaffoldingUserG!234` | `mcp-smoke`'s own account (no other suite signs in as it) | **Yes** |
 | `service_role_helper` | no login | Service-role setup fixture | Yes |
 | `anonymous` | no login | Guest-path placeholder fixture | Yes |
 

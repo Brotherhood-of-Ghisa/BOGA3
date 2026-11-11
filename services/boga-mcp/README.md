@@ -237,6 +237,13 @@ rejected token is challenged, discovers and invokes every tool with the
 refreshed token, verifies fixture IDs, and cleans up. See
 `RUNBOOK.md` for the supplied-token form.
 
+It runs as its own fixture user, `user_g`
+(`supabase/scripts/auth-fixture-constants.sh`), never a shared one: it checks
+account-wide state (no active workout before it starts one, agent plan and
+audit counts), and the backend gate runs it after the `user_a` sync and
+contract suites without a reset. `scripts/tests/mcp-smoke-fixture-user.test.sh`
+(`meta-tests`) fails if any other suite signs in as `user_g`.
+
 ### Reproducible walkthrough and evidence
 
 After an authorized deployment and the client's catalogue refresh/new-action
