@@ -20,6 +20,8 @@ export type StatProps = {
   // Pre-formatted by the caller: no thousands separators, no unit suffix
   // (`design-language.md` §6).
   value: string;
+  // Full reading when the visible value abbreviates a unit.
+  spokenValue?: string;
   // `stacked`: label above value (summary card, records panel). `inline`: a
   // mini legend left of a fixed-width, right-aligned value (the set row).
   layout?: StatLayout;
@@ -55,6 +57,7 @@ export function Stat({
   label,
   spokenLabel = label,
   value,
+  spokenValue = value,
   layout = 'stacked',
   rank = 'primary',
   state = 'realised',
@@ -109,7 +112,7 @@ export function Stat({
 
   if (layout === 'inline') {
     return (
-      <View accessibilityLabel={`${spokenLabel} ${value}`} accessible style={[styles.inline, valueWidth === 'hug' ? styles.inlineHug : null]} testID={testID}>
+      <View accessibilityLabel={`${spokenLabel} ${spokenValue}`} accessible style={[styles.inline, valueWidth === 'hug' ? styles.inlineHug : null]} testID={testID}>
         <Text allowFontScaling={false} style={legendStyle}>{label}</Text>
         <Text allowFontScaling={false} numberOfLines={1} style={[valueStyle, valueWidth === 'fixed' ? styles.inlineValue : styles.inlineValueHug]}>
           {kind === 'figure' && value.includes('%BW') ? <FigureText figureStyle={valueStyle}>{value}</FigureText> : value}
@@ -120,7 +123,7 @@ export function Stat({
 
   return (
     <View
-      accessibilityLabel={`${spokenLabel} ${value}`}
+      accessibilityLabel={`${spokenLabel} ${spokenValue}`}
       accessible
       style={align === 'end' ? styles.stackedEnd : null}
       testID={testID}>

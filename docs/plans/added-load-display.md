@@ -9,13 +9,15 @@ Stream and history screenshots, retaining the current typography and layout.
   set Weight show added load as %BW; Volume remains total work, with %BW as its visible unit.
 - Names remain the exercise's name, without a generated `(% BW)` suffix.
 - Units use the existing small-label typography beside their figures, including
-  group summaries, full sessions, boards, history, records, certification and CoW.
+  group summaries, boards, history, records, certification and CoW. Full-session
+  rows follow the existing inline presentation with compact `%` suffixes.
 - Valid added zero displays numerically. Absent projections stay unavailable.
 - Published scores, ranks, eligibility, witnesses, Volume and CoW improvement
   arithmetic do not change. Reader projections use original historical rules and
   frozen CoW scoring context, without disclosing private absolute values.
 - Existing set-card, board-row and record-sheet patterns are reused. Normalized
-  set rows retain one compact line, with units in shared column headings.
+  set rows retain one compact line with existing inline metric labels and `%`
+  beside their values, without column headings.
 
 ## Verification
 

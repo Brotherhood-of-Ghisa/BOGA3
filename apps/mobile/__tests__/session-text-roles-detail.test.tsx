@@ -83,13 +83,13 @@ describe('Exercise cards', () => {
   it('draws a %BW row\'s 1RM and Vol in figureSmall: ink, record, or faint when planned', () => {
     const percentage = { ...row, weightReps: '100.0 %BW × 8', oneRepMax: '27.7 %BW', volume: '800.0 %BW' };
     const { rerender } = renderWithTheme(<SetSummaryRow percentageMetrics row={{ ...percentage, oneRepMaxRecord: true }} testID="row" />);
-    expect(style(screen.getByText('27.7'))).toMatchObject({ ...FIGURE_SMALL, ...RECORD });
-    expect(style(screen.getByText('800.0'))).toMatchObject({ ...FIGURE_SMALL, color: roles.ink });
+    expect(style(screen.getByText('27.7%'))).toMatchObject({ ...FIGURE_SMALL, ...RECORD });
+    expect(style(screen.getByText('800.0%'))).toMatchObject({ ...FIGURE_SMALL, color: roles.ink });
     rerender(<SetSummaryRow percentageMetrics row={{ ...percentage, oneRepMaxRecord: false }} testID="row" />);
-    expect(style(screen.getByText('27.7'))).toMatchObject({ ...FIGURE_SMALL, color: roles.ink });
+    expect(style(screen.getByText('27.7%'))).toMatchObject({ ...FIGURE_SMALL, color: roles.ink });
     rerender(<SetSummaryRow percentageMetrics row={{ ...percentage, done: false }} testID="row" />);
-    expect(style(screen.getByText('27.7'))).toMatchObject({ ...FIGURE_SMALL, color: roles.inkFaint });
-    expect(style(screen.getByText('800.0'))).toMatchObject({ ...FIGURE_SMALL, color: roles.inkFaint });
+    expect(style(screen.getByText('27.7%'))).toMatchObject({ ...FIGURE_SMALL, color: roles.inkFaint });
+    expect(style(screen.getByText('800.0%'))).toMatchObject({ ...FIGURE_SMALL, color: roles.inkFaint });
   });
 
   it('labels the session times faint, their values in body with figures', () => {
