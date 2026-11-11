@@ -31,7 +31,7 @@ export function GroupSessionRecordsCard({ rows, ...rest }: CardProps) {
   if (rows.length === 0) return null;
   return (
     <View style={styles.card} testID="group-session-records">
-      <View style={styles.header}>
+      <View accessible accessibilityLabel={`Group records, ${rows.length}`} style={styles.header}>
         <Text allowFontScaling={false} style={[text.label, tone.record]}>GR</Text>
         <Text allowFontScaling={false} style={[text.figureSmall, tone.record]} testID="group-session-records-count">{rows.length}</Text>
       </View>
@@ -54,7 +54,7 @@ function RecordRow({ row, ...rest }: { row: SessionRecordRow } & Omit<CardProps,
     <View style={styles.row} testID={testID}>
       <Pressable
         accessibilityHint="Opens the leaderboard"
-        accessibilityLabel={`${row.title}, ${row.value}, ${row.detail}`}
+        accessibilityLabel={`${row.title}, ${row.value}, ${row.spokenDetail}`}
         accessibilityRole="link"
         onPress={() => router.push(row.boardHref as Href)}
         style={({ pressed }) => [styles.link, pressed ? styles.pressed : null]}

@@ -34,6 +34,8 @@ export type SessionRecordRow = {
   title: string;
   value: string;
   detail: string;
+  /** `detail` as a screen reader says it: `Group record`, not `GR`. */
+  spokenDetail: string;
   boardHref: string;
   /** Null for a board the current rules no longer have (a historic Weight record). */
   certification: SessionRecordCertification | null;
@@ -136,6 +138,7 @@ export function buildSessionRecordRows({ records, places, groupId, userId }: {
           title: `${exercise.name} · ${HISTORICAL_METRIC_LABELS[board.metric]}`,
           value: recordValue(record, board.metric),
           detail: [GROUP_RECORD_LABEL, place?.figure ?? null, passedBy].filter(Boolean).join(' · '),
+          spokenDetail: ['Group record', place?.figure ?? null, passedBy].filter(Boolean).join(', '),
           boardHref: `/group/${encodeURIComponent(groupId)}/leaderboards/${encodeURIComponent(exercise.group_exercise_id)}${metricQuery}`,
           certification: recordCertification(record.event, board.metric),
         },

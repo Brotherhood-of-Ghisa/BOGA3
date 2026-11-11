@@ -173,9 +173,12 @@ describe('board history item', () => {
 describe('session records card', () => {
   it('titles a record in the strong body face and draws its detail figures in Plex Mono', () => {
     renderWithTheme(<GroupSessionRecordsCard groupId="g" myRole="member" onChanged={jest.fn(async () => {})} online
-      rows={[{ key: 'r', setId: 's', title: 'Bench Press · 1RM', value: '120.0', detail: 'Group record · 1st',
-        boardHref: '/b', certification: null }]} userId="me" />);
+      rows={[{ key: 'r', setId: 's', title: 'Bench Press · 1RM', value: '120.0', detail: 'GR · 1st',
+        spokenDetail: 'Group record, 1st', boardHref: '/b', certification: null }]} userId="me" />);
     const row = screen.getByTestId('group-session-record-r');
+    // GR is drawn; a screen reader hears the words.
+    expect(screen.getByTestId('group-session-record-r-link').props.accessibilityLabel).toBe('Bench Press · 1RM, 120.0, Group record, 1st');
+    expect(screen.getByLabelText('Group records, 1')).toBeTruthy();
     expect(part(row, 'Bench Press · 1RM')).toHaveStyle({ fontFamily: BODY, fontWeight: '600', fontSize: uiTypography.size.base });
     expect(screen.getByTestId('group-session-record-r-value')).toHaveStyle({ fontFamily: FIGURE, color: themeRoles.record });
     expect(part(screen.getByTestId('group-session-record-r-detail'), '1')).toHaveStyle({ fontFamily: FIGURE });

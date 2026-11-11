@@ -67,7 +67,7 @@ const PERIOD_NOUN: Record<GroupHomePeriod, string> = { week: 'weeks' };
 
 const METRIC_OPTIONS = [
   { value: 'sets' as const, label: GROUP_HOME_METRIC_LABELS.sets },
-  { value: 'prs' as const, label: GROUP_HOME_METRIC_LABELS.prs },
+  { value: 'prs' as const, label: GROUP_HOME_METRIC_LABELS.prs, spokenLabel: 'Group records' },
 ];
 
 /**

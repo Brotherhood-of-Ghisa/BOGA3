@@ -82,7 +82,7 @@ test('one row per #1 board, frozen value, passed-by note, board link and certifi
     boardHref: '/group/g%201/leaderboards/ge-bench?metric=e1rm&scope=all' });
   expect(rm.certification).toEqual({ exercise, eligible: true, target: { metric: 'e1rm', member: alex, former: false,
     write_token: 'tok-1rm', certification: null, performance: { set_id: 'b-2' } } });
-  expect(volume).toMatchObject({ title: 'Bench · Volume', value: '220.0', detail: 'GR · 110.0 × 2 · since passed by sam' });
+  expect(volume).toMatchObject({ title: 'Bench · Volume', value: '220.0', detail: 'GR · 110.0 × 2 · since passed by sam', spokenDetail: 'Group record, 110.0 × 2, since passed by sam' });
   expect(volume.certification?.eligible).toBe(false);
   const [, passedByMe] = buildSessionRecordRows({ records: [record({ boards: [{ metric: 'e1rm', leader: alex, leads: true },
     { metric: 'volume', leader: { user_id: ME, username: 'dino' }, leads: false }] })], places, groupId: 'g', userId: ME });
