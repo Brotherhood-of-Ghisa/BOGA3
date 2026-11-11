@@ -38,9 +38,7 @@ sequence discovery and atomic merge/recovery RPCs, load
   - No CHECK constraints on enum text, numeric ranges or text content, except
     `exercise_definitions_load_input_mode_valid` (`total_load |
     per_side_load`; analytics read it, so both stores reject invalid values)
-    and `user_settings_muscle_target_overrides_valid`,
-    `user_settings_muscle_targets_valid` and `user_settings_combined_muscles_valid`
-    (the shapes the app checks before writing). The Routine standalone CHECK protects provenance.
+    and the three `user_settings_*_valid` JSON-shape checks. The Routine standalone CHECK protects provenance.
   - Domain columns are nullable wherever the client may write NULL; only the
     PK, `owner_user_id` and `client_updated_at_ms` are NOT NULL.
   - Provenance guards and merge revision fences add to structural triggers; group triggers: "Out of scope".
@@ -113,9 +111,8 @@ listed here:
   `rest_timer_sec: null` clears it.
 - **`user_settings`** is a singleton whose client id is `settings`. The
   client enforces the singleton; the server mirrors LWW. Its muscle
-  targets, combined-muscle definitions and independent Sets/Volume choices keep
-  their value when a push or pull omits or nulls them; `muscle_target_overrides`,
-  `muscle_targets` and `combined_muscles` are `jsonb` sent as JSON text.
+  targets, combined muscles and Sets/Volume choices keep their value when a
+  push or pull omits or nulls them; their `jsonb` columns travel as JSON text.
 - **`exercise_group_links`** is the member's own data, not a group table. Only
   the member's client writes it; server code (the group evaluator included)
   only reads it. Its id must stay `<group_id>:<exercise_definition_id>`: a local

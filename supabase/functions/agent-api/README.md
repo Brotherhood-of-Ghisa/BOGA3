@@ -110,9 +110,8 @@ Only owner rows are returned, soft-deleted ones only with `include_deleted`.
 Cursor ordering is stable by name then ID. `revision` is the definition's LWW
 stamp, quoted by every exercise edit.
 `GET /v1/agent/muscles` lists the owner's live muscles (`id`, `name`,
-`family`, plus the owner's setup as the app reads it: `report_group`, the key
-of the combined muscle the entry is a member of or `null` for its own, and
-`tracked`, a boolean) and `combined_muscles` (`key`, `name`, `family`);
+`family`, `report_group`: its combined muscle's key or `null`, and `tracked`)
+and `combined_muscles` (`key`, `name`, `family`);
 exercise writes must name these ids, never a combined muscle's key.
 
 ## Exercise context
@@ -388,11 +387,9 @@ muscle read hit its cap: 200 sessions, 1000 rows per chunk, or 500 muscles.
 (`single` | `per_muscle`), `overrides` (`{muscle_id: n | null}`, null clears).
 Targets are positive whole numbers, ids muscles the user's setup reports (`400
 VALIDATION_ERROR` naming the id; [[muscle.weekly-targets]]); a stale revision
-is `409 REVISION_CONFLICT`. The reported ids are read as the app reads them
-(`muscle-targets.ts`); `agent_set_muscle_targets` merges into the single
-`muscle_targets` map (a row with none starts from the legacy targets the
-status shows), keeps the count-secondary switch and combined muscles, and
-stamps the row past the wall clock so devices pull it. While `uploaded` is
+is `409 REVISION_CONFLICT`. `agent_set_muscle_targets` merges into
+`muscle_targets` (seeded from the legacy targets the status shows), keeps
+other columns, and stamps the row past the wall clock so devices pull it. While `uploaded` is
 false it builds on app defaults (first writer wins). It returns `overrides`,
 `targets`, `idempotent_replay`.
 
