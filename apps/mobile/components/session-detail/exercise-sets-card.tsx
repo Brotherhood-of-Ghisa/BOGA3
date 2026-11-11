@@ -73,8 +73,8 @@ export function ExerciseSetsCard({
   const content = (
     <>
       <View style={styles.header}>
-        <Text allowFontScaling={false} ellipsizeMode={percentageMetrics ? 'middle' : 'tail'} numberOfLines={1} style={[text.title, styles.name]}>
-          <FigureText strong>{`${name}${percentageMetrics ? ' (% BW)' : ''}`}</FigureText>
+        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.title, styles.name]}>
+          <FigureText strong>{name}</FigureText>
         </Text>
         <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, styles.count, countMuted ? tone.faint : null]} testID={`${testID}-count`}>
           <FigureText>{count}</FigureText>

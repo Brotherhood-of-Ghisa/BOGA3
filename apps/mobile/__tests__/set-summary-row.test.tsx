@@ -11,33 +11,30 @@ const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const row = formatSetRow({ id: 'set', weight: 60, reps: 8, setType: null, done: true });
 
-it('keeps each percentage set on one line with the unit only in the exercise heading', () => {
-  const normalized = { ...row, weightReps: '100.0 %BW × 8', oneRepMax: '127.7 %BW', volume: '800.0 %BW·reps' };
+it('uses the ordinary inline row layout for BW values with visible % and no column headings', () => {
+  const normalized = { ...row, weightReps: '0.0 %BW × 8', oneRepMax: '27.7 %BW', volume: '800.0 %BW' };
   renderWithTheme(<ExerciseSetsCard name="Bodyweight Bulgarian Split Squat" count="2 sets" percentageMetrics testID="card" rows={[
-    normalized, { ...normalized, id: 'next', weightReps: '125.0 %BW × 999', oneRepMax: '1234.5 %BW', volume: '123456.7 %BW·reps' },
+    normalized, { ...normalized, id: 'next', weightReps: '10.5 %BW × 5', oneRepMax: '28.8 %BW', volume: '552.5 %BW' },
   ]} />);
-
-  expect(screen.getByText('Bodyweight Bulgarian Split Squat (% BW)')).toHaveProp('ellipsizeMode', 'middle');
-  expect(screen.queryByTestId('card-columns')).toBeNull();
-  expect(screen.queryByText(/Weight|1RM|Vol/)).toBeNull();
-
-  for (const [index, values] of [['100.0 × 8', '127.7', '800.0'], ['125.0 × 999', '1234.5', '123456.7']].entries()) {
-    const id = `card-set-${index + 1}`;
-    expect(screen.getByTestId(id)).toHaveStyle({ flexDirection: 'row', paddingVertical: uiSpace.xs });
-    for (const [column, text] of [['values', values[0]], ['1rm', values[1]], ['vol', values[2]]]) {
-      expect(screen.getByTestId(`${id}-${column}`)).toHaveTextContent(text, { exact: true });
-      expect(screen.getByTestId(`${id}-${column}`)).toHaveProp('numberOfLines', 1);
-    }
+  expect(screen.getByText('Bodyweight Bulgarian Split Squat')).toHaveProp('ellipsizeMode', 'tail');
+  expect(screen.queryByText(/\(% BW\)/)).toBeNull();
+  for (const heading of ['Weight %BW', '1RM %BW', 'Vol %BW']) {
+    expect(screen.queryByText(heading)).toBeNull();
   }
-  expect(screen.getByTestId('card-set-2-values')).toHaveProp('accessibilityLabel', '125.0 %BW × 999');
-  expect(screen.getByLabelText('1RM 1234.5 %BW')).toBeTruthy();
-  expect(screen.getByLabelText('Vol 123456.7 %BW·reps')).toBeTruthy();
+  expect(screen.getByTestId('card-set-1-values')).toHaveTextContent('0.0% × 8');
+  expect(screen.getByTestId('card-set-2-values')).toHaveTextContent('10.5% × 5');
+  expect(screen.getByLabelText('10.5 %BW × 5')).toBeTruthy();
+  expect(screen.getByLabelText('1RM 28.8 %BW')).toHaveTextContent(/28\.8%/);
+  expect(screen.getByLabelText('Vol 552.5 %BW')).toHaveTextContent(/552\.5%/);
+  expect(screen.queryByText(/·reps/)).toBeNull();
+  expect(screen.getAllByText('1RM')).toHaveLength(2);
+  expect(screen.getAllByText('Vol')).toHaveLength(2);
 });
 
 it('keeps ordinary rows compact with inline metrics', () => {
   renderWithTheme(<ExerciseSetsCard name="Bench Press" count="1 set" rows={[row]} testID="ordinary-card" rowTestID={() => 'ordinary'} />);
   expect(screen.getByText('Bench Press')).toHaveProp('ellipsizeMode', 'tail');
-  expect(screen.queryByText(/% BW/)).toBeNull();
+  expect(screen.queryByText(/%/)).toBeNull();
   expect(screen.getByTestId('ordinary')).toHaveStyle({ flexDirection: 'row', alignItems: 'baseline' });
   expect(screen.getByTestId('ordinary-1rm')).toHaveStyle({ flexDirection: 'row' });
   expect(screen.getByTestId('ordinary-vol')).toHaveStyle({ flexDirection: 'row' });
@@ -56,20 +53,20 @@ it('retains reps-only context when normalized metrics are undisclosed', () => {
   renderWithTheme(<ExerciseSetsCard name="Pull-Up" count="1 set" rows={[{ ...row, weightReps: '8 reps' }]}
     percentageMetrics hideDerivedMetrics testID="private" />);
   expect(screen.getByText('8 reps')).toBeTruthy();
-  expect(screen.getByText('Pull-Up (% BW)')).toBeTruthy();
-  expect(screen.queryByTestId('private-columns')).toBeNull();
+  expect(screen.getByText('Pull-Up')).toBeTruthy();
+  expect(screen.queryByText('Weight %BW')).toBeNull();
   expect(screen.queryByTestId('private-set-1-1rm')).toBeNull();
   expect(screen.queryByTestId('private-set-1-vol')).toBeNull();
 });
 
 it('preserves unavailable figures and record/planned emphasis in percentage columns', () => {
-  const metrics = { ...row, oneRepMax: '127.7 %BW', volume: '800.0 %BW·reps', oneRepMaxRecord: true };
+  const metrics = { ...row, oneRepMax: '27.7 %BW', volume: '800.0 %BW', oneRepMaxRecord: true };
   const rendered = renderWithTheme(<SetSummaryRow row={metrics} percentageMetrics testID="state" />);
-  expect(screen.getByTestId('state-1rm')).toHaveStyle({ color: roles.record });
+  expect(screen.getByText('27.7%')).toHaveStyle({ color: roles.record });
   rendered.rerender(<SetSummaryRow row={{ ...metrics, done: false }} percentageMetrics testID="state" />);
-  expect(screen.getByTestId('state-1rm')).toHaveStyle({ color: roles.inkFaint });
-  expect(screen.getByTestId('state-vol')).toHaveStyle({ color: roles.inkFaint });
+  expect(screen.getByText('27.7%')).toHaveStyle({ color: roles.inkFaint });
+  expect(screen.getByText('800.0%')).toHaveStyle({ color: roles.inkFaint });
   rendered.rerender(<SetSummaryRow row={{ ...metrics, oneRepMax: '—', volume: '—', oneRepMaxRecord: false }} percentageMetrics testID="state" />);
-  expect(screen.getByLabelText('1RM —')).toHaveTextContent('—');
-  expect(screen.getByLabelText('Vol —')).toHaveTextContent('—');
+  expect(screen.getByLabelText('1RM —')).toBeTruthy();
+  expect(screen.getByLabelText('Vol —')).toBeTruthy();
 });

@@ -255,6 +255,7 @@ describe('request-scoped protocol-4 API', () => {
     expect(rpc).toHaveBeenCalledWith(`group_competition_${name}`,expect.any(Object));
     expect(setHeader).toHaveBeenCalledWith('x-boga-group-contract','4');
     expect(setHeader).toHaveBeenCalledWith('x-boga-group-set-metrics','1');
+    expect(setHeader).toHaveBeenCalledWith('x-boga-group-added-load','1');
     respond({ ...payload, body_weight_kg: 80 }); await expect(call()).rejects.toMatchObject({ code: 'INTERNAL' });
     respond({ ...payload, contract_version: 3 }); await expect(call()).rejects.toMatchObject({ code: 'INTERNAL' });
   });

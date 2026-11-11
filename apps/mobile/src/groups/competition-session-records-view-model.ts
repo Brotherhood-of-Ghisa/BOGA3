@@ -8,7 +8,7 @@ import type { RecordLine } from '@/src/session-insights/record-band';
 import { formatBoardDate, YOU_LABEL } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
 import type { CompetitionSessionExerciseCard } from './competition-session-view-model';
-import { formatCompetitionFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
+import { formatCompetitionHistoricalFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
 import type { CompetitionCertificationWire, CompetitionEventWire, CompetitionExerciseWire, CompetitionHistoricalMetric,
   CompetitionSessionRecordWire, CompetitionSessionWire } from './competition-wire';
 import type { MetricCertificationTarget } from './metric-record-sheet-view-model';
@@ -86,7 +86,7 @@ export function sessionSetPlaces(cards: readonly CompetitionSessionExerciseCard[
 const recordValue = (record: CompetitionSessionRecordWire, metric: CompetitionHistoricalMetric): string => {
   const value = record.event.values.find(entry => entry.role === 'record' && entry.metric === metric);
   if (!value || value.unavailable || value.value === null) return 'Score unavailable';
-  return formatCompetitionFigure(value.value, value.unit);
+  return formatCompetitionHistoricalFigure(value);
 };
 
 /** What certifying one metric of a record event needs; null when the current rules have no such board. */

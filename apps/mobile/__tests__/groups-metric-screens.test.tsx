@@ -100,14 +100,14 @@ const settleReads=()=>act(async()=>{});
 it('shows normalized 1RM and Volume with explicit units and independent Certified/All controls',async()=>{
   mockParams={ ...mockParams,scope: 'certified' };
   render(<GroupBoardRoute />);await settleReads();
-  expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('145.7 %BW');
+  expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('45.7 %BW');
   expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm',certified: true }));
   expect(screen.queryByTestId('group-board-rules')).toBeNull();
   expect(screen.queryByText(/Rules \d|contribution|Bodyweight scoring|Scores use|Ineligible/)).toBeNull();
   api.getCompetitionBoard.mockResolvedValue({ ...board,metric: 'volume',certified: false,
     entries: [{ ...uncertifiedRow,metric: 'volume',unit: 'percent_bw_reps',value: 650 }] });
   fireEvent.press(screen.getByTestId('group-board-metric-volume'));await settleReads();
-  expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('650.0 %BW·reps');
+  expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('650.0 %BW');
   fireEvent.press(screen.getByTestId('group-board-scope-all'));await settleReads();
   expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'volume',certified: false }));
 });
@@ -168,7 +168,7 @@ it('history: one row of three tap-to-cycle filters on the current rules, with no
   fireEvent.press(screen.getByTestId('group-history-view'));await settleReads();
   expect(screen.getByTestId('group-history-view')).toHaveTextContent('Scores');
   expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm',certified: false }));
-  expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('145.7 %BW');
+  expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('45.7 %BW');
   fireEvent.press(screen.getByTestId('group-history-view'));await settleReads();
   expect(screen.getByTestId('group-history-view')).toHaveTextContent('History');
 });
@@ -180,7 +180,7 @@ it('history: a deep link with an unknown metric opens the comparison default',as
 });
 it('labels podiums with normalized units',()=>{
   const cards=buildCompetitionPodiums({ contract_version: 4,certified: true,podiums: [{ exercise,board }] },'me', 'DD-MM-YYYY');
-  expect(cards[0].accessibilityLabel).toMatch(/1RM %BW.*145.7 %BW/);
+  expect(cards[0].accessibilityLabel).toMatch(/1RM %BW.*45.7 %BW/);
   expect(cards[0].viewLabel).toBe('Certified · 1RM %BW');
 });
 it('reopens the closed cached stream offline without private context',async()=>{
@@ -189,11 +189,11 @@ it('reopens the closed cached stream offline without private context',async()=>{
     record_context: { ...competitionEvent.record_context!,exercise } };
   api.getCompetitionStream.mockResolvedValue({ contract_version: 4,items: [{ kind: 'competition',key: 'metric-record',sort_at_ms: 2000,event }],next_cursor: null,has_more: false });
   const first=render(<GroupsTabRoute />);
-  expect(await screen.findByTestId('group-metric-stream-metric-record')).toHaveTextContent(/1RM.*145.7 %BW/);
+  expect(await screen.findByTestId('group-metric-stream-metric-record')).toHaveTextContent(/1RM.*45.7 %BW/);
   fireEvent.press(screen.getByTestId('group-metric-stream-metric-record'));
   expect(await screen.findByTestId('group-metric-record-set')).toHaveTextContent('5 reps');first.unmount();
   mockInitialOnline=false;api.getCompetitionStream.mockRejectedValue(new GroupApiError('NETWORK','Offline'));
   render(<GroupsTabRoute />);
-  expect(await screen.findByTestId('group-metric-stream-metric-record')).toHaveTextContent(/145.7 %BW/);
+  expect(await screen.findByTestId('group-metric-stream-metric-record')).toHaveTextContent(/45.7 %BW/);
   expect(await screen.findByTestId('groups-offline-banner')).toHaveTextContent(/Offline/);
 });

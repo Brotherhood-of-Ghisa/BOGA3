@@ -19,7 +19,7 @@ it.each([
 it('keeps attained %BW distinct from signed improvement and preserves numeric zero', () => {
   expect(coWMetricHeading({ metric: 'e1rm', unit: 'percent_bw' })).toBe('1RM %BW');
   expect(coWMetricHeading({ metric: 'improvement', unit: 'percent' })).toBe('Improvement %');
-  expect(coWMetricHeading({ metric: 'volume', unit: 'percent_bw_reps' })).toBe('Volume %BW·reps');
+  expect(coWMetricHeading({ metric: 'volume', unit: 'percent_bw_reps' })).toBe('Volume %BW');
   expect(coWMetricHeading({ metric: 'volume', unit: 'kg_reps' })).toBe('Volume');
   expect(coWFigure(-5.019, 'improvement')).toBe('−5.0%');
   expect(coWFigure(20, 'improvement')).toBe('+20.0%');

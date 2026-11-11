@@ -25,3 +25,17 @@ when bodyweight contributes (`docs/specs/tech/bodyweight-load-contract.md`).
 Why: a single is a measured max; estimating above it would invent strength.
 Code: `estimateOneRepMax` in `apps/mobile/src/exercise-calculations/index.ts`; `formatOneRepMax` in `apps/mobile/src/exercise-calculations/format.ts`.
 Signature: `48.8`, `53.8`, `0.075`
+
+### 1rm.added-load-display · presentation · accepted
+
+Logged-set, record and competition 1RM figures describe estimated added load
+after subtracting the exercise's bodyweight contribution. Personal figures use entered weight units;
+normalized group figures use percent of bodyweight and never disclose absolute
+weight. Normalized group history uses its original contribution, and CoW uses
+its frozen context.
+A valid added zero is numeric. Volume still includes bodyweight work; CoW
+improvement keeps its existing calculation. The experimental RM curve retains
+its distinct analytical Load coordinate (`docs/specs/tech/bodyweight-load-contract.md` §11).
+
+Why: 1RM and logged Weight describe additional load consistently across views.
+Code: `apps/mobile/src/exercise-calculations/load-metrics.ts`; `apps/mobile/src/groups/competition-view-model.ts`; `apps/mobile/src/groups/cow-presentation.ts`.

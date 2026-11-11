@@ -335,6 +335,30 @@ check 'full session redacts normalized sets, retains unrelated ordinary context 
    and (.session|has("volume_kg_reps")|not)'
 check 'legacy clients keep the original exact set shape' \
   'all(.session.exercises[].sets[];has("normalized_metrics")|not)'
+GROUP_ADDED_LOAD_DISPLAY=1 rpc "${OWNER_TOKEN}" group_competition_board "$(jq -nc --arg g "${GID}" --arg x "${GX}" \
+  '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false}')"; expect_ok 'added 1RM board'; assert_wire isCompetitionBoardWire
+check 'added 1RM keeps the total score and subtracts the published contribution once' \
+  '(.entries|length)>0 and all(.entries[];(.added_e1rm_percent_bw-(.value-100)|fabs)<0.000000001)'
+GROUP_ADDED_LOAD_DISPLAY=1 rpc "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
+  '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok 'added 1RM session'; assert_wire isCompetitionSessionDetailWire
+check 'session display exposes added 1RM separately from unchanged total Volume' \
+  '(.session.exercises[]|select(.name=="Pull-up").sets[0].normalized_metrics|
+    (.added_e1rm_percent_bw-(.e1rm_percent_bw-100)|fabs)<0.000000001 and .volume_percent_bw_reps>500)'
+GROUP_ADDED_LOAD_DISPLAY=1 rpc "${OWNER_TOKEN}" group_competition_history "$(jq -nc --arg g "${GID}" --arg x "${GX}" --argjson r "${REVISION}" \
+  '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false,p_revision:$r}')"; expect_ok 'added history'; assert_wire isCompetitionHistoryWire
+check 'every available normalized 1RM history figure carries its added projection' \
+  'all(.events[].values[]|select(.metric=="e1rm" and .unit=="percent_bw" and .value!=null);has("added_e1rm_percent_bw"))'
+expect_sql 'historic display uses the holder revision after current rules change' "begin;
+  set local request.headers='{\"x-boga-group-added-load\":\"1\"}';
+  update app_public.group_exercises set bodyweight_contribution=0.7 where id='${GX}';
+  select (app_public.group_competition_history_display(
+    jsonb_build_object('metric','e1rm','unit','percent_bw','value',128.3,'rules_revision',${REVISION}),true,'previous','e1rm',
+    jsonb_populate_record(null::app_public.group_events,jsonb_build_object('group_exercise_id','${GX}','rules_revision',${REVISION}+1)))
+    ->>'added_e1rm_percent_bw')::numeric=28.3;
+  rollback;" t
+expect_sql 'valid added zero and partial contributions stay numeric' "set request.headers='{\"x-boga-group-added-load\":\"1\"}';
+  select (app_public.group_competition_added_e1rm_json('e1rm','percent_bw','100',1)->>'added_e1rm_percent_bw')::numeric=0
+    and (app_public.group_competition_added_e1rm_json('e1rm','percent_bw','98.3',0.7)->>'added_e1rm_percent_bw')::numeric=28.3;" t
 rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
   '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_ok 'normalized display'; assert_wire isCompetitionSessionDetailWire
 check 'normalized set shows the published Volume and additional load percentages only' \

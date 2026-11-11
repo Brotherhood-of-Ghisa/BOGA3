@@ -156,7 +156,7 @@ export function GroupPodiumCard({ card, onPress }: { card: PodiumCardViewModel; 
                 {row.memberLabel}
               </Text>
               <Text allowFontScaling={false} style={scoreStyle(row.valueLabel, 'base')}>
-                {row.valueLabel}
+                <FigureText figureStyle={scoreStyle(row.valueLabel, 'base')}>{row.valueLabel}</FigureText>
               </Text>
               <Text allowFontScaling={false} style={[text.figureSmall, styles.date]}>
                 {row.dateLabel}

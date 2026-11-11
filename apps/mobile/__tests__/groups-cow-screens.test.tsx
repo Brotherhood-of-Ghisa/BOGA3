@@ -117,7 +117,7 @@ it('uses existing units, independent top-three metrics and exact identity on nav
   expect(screen.getByTestId('preview-open').props.accessibilityLabel).toContain('26-10-2026');
   expect(screen.getByTestId('preview-open').props.accessibilityLabel).toContain('Live');
   expect(screen.getByText('1RM %BW')).toBeTruthy(); expect(screen.getByText('You')).toBeTruthy(); expect(screen.getByText('Jules (former)')).toBeTruthy();
-  fireEvent.press(screen.getByTestId('preview-metric-volume')); expect(screen.getByText('Volume %BW·reps')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('preview-metric-volume')); expect(screen.getByText('Volume %BW')).toBeTruthy();
   expect(screen.getByText('1800')).toBeTruthy(); expect(onOpen).not.toHaveBeenCalled();
   fireEvent.press(screen.getByTestId('preview-browse')); expect(onBrowse).toHaveBeenCalledWith('volume');
   fireEvent.press(screen.getByTestId('preview-open')); expect(onOpen).toHaveBeenCalledWith('volume');
@@ -717,6 +717,7 @@ it('Today shows the current exercise and every enabled metric, then last week’
   previous.result!.exercise = { ...previous.result!.exercise!, name: 'Single-Arm Incline Dumbbell Bench Press' };
   previous.result!.rankings[0].entries[0].member.username = 'Contessa Serbelloni Mazzanti Vien dal Mare';
   previous.result!.rankings[1].entries = [{ ...previous.result!.rankings[0].entries[0], value: 1800 }];
+  delete previous.result!.rankings[1].entries[0].added_e1rm_percent_bw;
   api.getPreviousCoWSummary.mockResolvedValue(previous);
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   await screen.findByText('1RM · Volume · Improvement');
