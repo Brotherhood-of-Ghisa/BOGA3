@@ -46,7 +46,14 @@ async function workoutFlow(): Promise<void> {
       'Only mcp-smoke may use user_g (scripts/tests/mcp-smoke-fixture-user.test.sh); ' +
       'after an interrupted run, `./boga db reset` clears it.');
   }
-  const started = await call(client, 'start_workout', { idempotency_key: key('start'), gym_id: required('BOGA_MCP_SMOKE_GYM_ID') });
+  // Keep live training present while exercising the full incremental dated flow.
+  // Both fixture sessions are removed by the owning smoke's cleanup.
+  await call(client, 'start_workout', { idempotency_key: key('start'), gym_id: required('BOGA_MCP_SMOKE_GYM_ID') });
+  const historicalEnd = new Date(Date.now() - 3600000).toISOString();
+  const historicalStart = new Date(Date.parse(historicalEnd) - 3600000).toISOString();
+  const started = await call(client, 'create_workout', { idempotency_key: key('dated-create'),
+    gym_id: required('BOGA_MCP_SMOKE_GYM_ID'), started_at: historicalStart, completed_at: historicalEnd });
+  if (started.status !== 'completed') throw new Error('Dated creation did not create completed history.');
   const sessionId = String(started.session_id);
   const firstInput = { session_id: sessionId, expected_revision: started.revision, exercise_id: exerciseId,
     sets: [{ weight_kg: '80', reps: 8, set_type: 'rir_2' }], idempotency_key: key('first') };
@@ -85,7 +92,8 @@ async function workoutFlow(): Promise<void> {
   const finishInput = { session_id: sessionId, expected_revision: page1.workout.revision, idempotency_key: key('finish') };
   const finished = await call(fresh, 'finish_workout', finishInput);
   const finishReplay = await call(fresh, 'finish_workout', finishInput);
-  if (finished.status !== 'completed' || typeof finished.completed_at !== 'string' ||
+  if (finished.status !== 'completed' || finished.started_at !== historicalStart || finished.completed_at !== historicalEnd ||
+    finished.duration_seconds !== 3600 || !object(finished.control) || finished.control.can_edit !== false ||
     finishReplay.completed_at !== finished.completed_at || finishReplay.idempotent_replay !== true) throw new Error('Finish did not persist once.');
   await deny(fresh, 'log_sets', { ...firstInput, expected_revision: finished.revision, idempotency_key: key('too-late') }, 'WORKOUT_NOT_ACTIVE');
 }

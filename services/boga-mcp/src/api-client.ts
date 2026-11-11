@@ -175,7 +175,7 @@ export class BogaAgentApi {
 
   async writeWorkout(
     accessToken: string,
-    operation: 'start' | 'log-sets' | 'update-set' | 'delete-set' | 'finish',
+    operation: 'create' | 'start' | 'log-sets' | 'update-set' | 'delete-set' | 'finish',
     input: Record<string, unknown> & { idempotency_key: string },
   ): Promise<Record<string, unknown>> {
     const { idempotency_key, ...body } = input;

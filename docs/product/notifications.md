@@ -29,6 +29,8 @@ Code: `apps/mobile/src/notifications/lifecycle.ts`; `supabase/migrations/2026101
 A recipient gets at most two logical notifications for the same lifter's
 workout. Sharing through several groups does not multiply that recipient's
 alerts; each summary contains only information from groups they can access.
+Dated MCP entry waits for control release before the app can confirm its final
+graph; the original completion instant still sets its freshness deadline.
 Achievements during training are collected for the completion summary, not
 sent as separate alerts.
 

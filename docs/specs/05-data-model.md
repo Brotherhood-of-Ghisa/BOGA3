@@ -33,7 +33,9 @@ changes recalculate derived history without touching raw sets.
 
 ## Scope classification
 
-Session control columns are **in sync scope** but server-written;
+Session control columns are **in sync scope** but server-written; they also
+protect completed history while a dated MCP entry remains open. No new lifecycle
+status or per-set performance timestamp is stored;
 pending handoffs use non-sync recovery storage. Load
 [`tech/agent-workout-contract.md`](tech/agent-workout-contract.md) when changing control.
 
@@ -322,12 +324,9 @@ reservations. Their identity and conflict rules live in
 
 ## Sync impact gate (mandatory)
 
-Update this file in the same task/session that changes a schema entity, an
-ownership classification, a sync-scope boundary or an identity invariant. EVERY
-such change MUST record one explicit decision — `in sync scope` (with
-contract/mapping plus implementation and tests) or `out of sync scope` (with
-rationale and guardrails). Never leave a data-model element with undefined sync
-behaviour.
+Schema, ownership, sync-boundary and identity changes update this file in the
+same task. Classify each element `in sync scope` (contract, implementation and
+tests) or `out of sync scope` (rationale and guardrails).
 
 ## Client schema drift rule (Sync v2)
 

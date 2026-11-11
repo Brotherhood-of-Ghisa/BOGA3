@@ -5,6 +5,7 @@ import { Notice } from '@/components/ui/notice';
 import type { ConnectedAgent } from '@/src/auth/connected-agents';
 
 type SessionOptionsSheetProps = {
+  completed?: boolean;
   visible: boolean;
   onDismiss: () => void;
   onAbandon: () => void;
@@ -17,7 +18,7 @@ type SessionOptionsSheetProps = {
 };
 
 // The session ⋮: Session vs history, then Abandon session.
-export function SessionOptionsSheet({ visible, onDismiss, onAbandon, onCompare, control }: SessionOptionsSheetProps) {
+export function SessionOptionsSheet({ visible, onDismiss, onAbandon, onCompare, control, completed }: SessionOptionsSheetProps) {
   const choosing = control?.choices !== null && control?.choices !== undefined;
   return (
     <Sheet
@@ -47,7 +48,7 @@ export function SessionOptionsSheet({ visible, onDismiss, onAbandon, onCompare, 
         onPress={control.onControl}
         testID="session-view-control-action"
       /> : null}
-      <ListRow
+      {!completed ? <ListRow
         disabled={control?.aiControlled || control?.pending || control?.busy}
         divider
         label="Abandon session"
@@ -56,7 +57,7 @@ export function SessionOptionsSheet({ visible, onDismiss, onAbandon, onCompare, 
         testID="session-view-abandon"
         tone="danger"
         trailing={control?.aiControlled || control?.pending ? <Icon name="lock" size="sm" colorRole="inkMuted" /> : undefined}
-      />
+      /> : null}
       </>}
       {control?.notice ? <Notice live message={control.notice} testID="session-control-notice" tone="danger" /> : null}
     </Sheet>

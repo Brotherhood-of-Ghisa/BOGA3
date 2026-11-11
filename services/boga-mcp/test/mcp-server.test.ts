@@ -229,7 +229,7 @@ afterEach(async () => {
 });
 
 describe('BoGa MCP server', () => {
-  it('discovers exactly twenty-three tools with correct annotations', async () => {
+  it('discovers exactly twenty-four tools with correct annotations', async () => {
     const running = await startMcp();
     active.push(running);
     const result = await running.client.listTools();
@@ -238,6 +238,7 @@ describe('BoGa MCP server', () => {
       'create_exercise',
       'create_session_plan',
       'create_training_programme',
+      'create_workout',
       'delete_exercise',
       'delete_set',
       'finish_workout',
@@ -310,7 +311,7 @@ describe('BoGa MCP server', () => {
       rows: [{ type: 'set', id: 'set-a', weight_kg: '80', reps: '8' }], next_cursor: 's:next' };
     const mutation = { session_id: 'workout/a', revision: graph, status: 'active', idempotent_replay: false,
       session_exercise_id: 'block-a', set_ids: ['set-a'], control: { owner: 'mcp', client_id: 'coach', can_edit: true } };
-    const running = await startMcp({ ...Object.fromEntries(['start', 'log-sets', 'update-set', 'delete-set', 'finish']
+    const running = await startMcp({ ...Object.fromEntries(['create', 'start', 'log-sets', 'update-set', 'delete-set', 'finish']
       .map(operation => [`/functions/v1/agent-api/v1/agent/workouts/${operation}`, envelopeResponse(mutation)])),
       '/functions/v1/agent-api/v1/agent/workouts/active': envelopeResponse(snapshot) });
     active.push(running);
@@ -324,6 +325,7 @@ describe('BoGa MCP server', () => {
     const common = { session_id: 'workout/a', expected_revision: graph };
     const set = { weight_kg: '80', reps: 8, set_type: 'rir_2' };
     const writes: Array<[string, string, Record<string, unknown>]> = [
+      ['create_workout', 'create', { started_at: '2026-10-25T01:30:00+01:00', completed_at: '2026-10-25T01:30:00Z' }],
       ['start_workout', 'start', { gym_id: null }],
       ['log_sets', 'log-sets', { ...common, exercise_id: 'exercise-a', sets: [set] }],
       ['log_sets', 'log-sets', { ...common, session_exercise_id: 'block-a', sets: [set, set] }],
@@ -346,6 +348,8 @@ describe('BoGa MCP server', () => {
   it.each([
     ['start_workout', { idempotency_key: 'key', owner_user_id: 'another' }],
     ['start_workout', { idempotency_key: 'bad\nheader' }],
+    ['create_workout', { idempotency_key: 'key', started_at: 1, completed_at: '2026-10-25T01:30:00Z' }],
+    ['create_workout', { idempotency_key: 'key', started_at: '2026-10-25T01:30:00Z' }],
     ['log_sets', { sets: [{ weight_kg: '80', reps: 8 }] }],
     ['log_sets', { exercise_id: 'e', session_exercise_id: 'b', sets: [{ weight_kg: '80', reps: 8 }] }],
     ['log_sets', { exercise_id: 'e', sets: [] }],
@@ -363,7 +367,7 @@ describe('BoGa MCP server', () => {
     ['get_active_workout', { owner_user_id: 'another' }],
   ])('rejects invalid %s input without a workout API request', async (name, patch) => {
     const running = await startMcp(); active.push(running);
-    const input = name === 'start_workout' || name === 'get_active_workout' ? patch : {
+    const input = name === 'create_workout' || name === 'start_workout' || name === 'get_active_workout' ? patch : {
       session_id: 's', expected_revision: 'a'.repeat(32), idempotency_key: 'key', ...patch,
     };
     const result = await running.client.callTool({ name, arguments: input });

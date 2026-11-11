@@ -193,6 +193,30 @@ async function activeWorkout() {
   return c;
 }
 
+it('restores incrementally entered dated history with its control, dates and fenced set graph', async () => {
+  const c = await chain();
+  const end = Date.now() - 3600000, start = end - 3600000;
+  const created = await workoutWrite('create_workout', { started_at: start, completed_at: end, gym_id: null });
+  const logged = await workoutWrite('log_sets', { session_id: created.session_id, expected_revision: created.revision,
+    exercise_id: c.source, sets: [{ weight_kg: '80', reps: 8, set_type: null }] });
+  const snapshot = await rpc<{ rows: Entity[] }>('exercise_merge_snapshot', { p_after: 0 });
+  const local = createInMemoryDatabase();
+  try {
+    local.database.transaction(tx => {
+      for (const incoming of snapshot.rows) applyPullPage(tx as unknown as Transaction,
+        [incoming as WireEntity], incoming.type as EntityTableName, true);
+    });
+    expect(local.client.pragma('foreign_key_check')).toEqual([]);
+    expect(local.client.prepare('select status, started_at, completed_at, duration_sec, logging_client_id, merge_revision from sessions where id=?').get(created.session_id))
+      .toEqual({ status: 'completed', started_at: start, completed_at: end, duration_sec: 3600, logging_client_id: workoutClient, merge_revision: 2 });
+    expect(local.client.prepare('select weight_value, merge_revision from exercise_sets where id=?').get(logged.set_ids[0]))
+      .toEqual({ weight_value: '80', merge_revision: 2 });
+  } finally { local.close(); }
+  await workoutWrite('finish_workout', { session_id: created.session_id, expected_revision: logged.revision });
+  expect(await row('sessions', created.session_id)).toMatchObject({ status: 'completed', started_at: start,
+    completed_at: end, duration_sec: 3600, logging_client_id: null, merge_revision: 3 });
+});
+
 it('fences a chat-finished session and every set before LWW, even against a future-clock stale phone graph', async () => {
   const c = await activeWorkout();
   let state = await workoutState(c.session);

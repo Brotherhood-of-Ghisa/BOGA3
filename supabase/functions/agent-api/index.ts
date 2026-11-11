@@ -2264,6 +2264,7 @@ const sha256Hex = async (value: string): Promise<string> => {
 
 const workoutOperationFor = (path: string): WorkoutOperation | null => {
   const operations: Record<string, WorkoutOperation> = {
+    '/v1/agent/workouts/create': 'create_workout',
     '/v1/agent/workouts/start': 'start_workout',
     '/v1/agent/workouts/log-sets': 'log_sets',
     '/v1/agent/workouts/update-set': 'update_set',
@@ -2277,7 +2278,7 @@ const throwWorkoutError = (error: { message?: string } | null): void => {
   if (!error) return;
   const errors: Record<string, [number, string]> = {
     WORKOUT_PERMISSION_REQUIRED: [403, 'Workout logging is not enabled for this coach.'],
-    WORKOUT_CONTROL_REQUIRED: [409, 'You no longer control this session. Read get_active_workout for its current controller. The person must choose Let AI log this session in BoGa to give you control; do not retry writes or reclaim it automatically.'],
+    WORKOUT_CONTROL_REQUIRED: [409, 'You no longer control this session. Read get_active_workout for its current controller. For an active workout the person may choose Let AI log this session in BoGa. Released or taken-over completed history must be edited in BoGa. Do not retry writes or reclaim control automatically.'],
     NOT_FOUND: [404, 'Workout, exercise block or set not found.'],
     FOREIGN_RESOURCE_REFERENCE: [400, 'Use an exercise or gym from the person\'s current library.'],
     ACTIVE_WORKOUT_CONFLICT: [409, 'A server-visible workout is already active. Read active workouts and choose one explicitly.'],

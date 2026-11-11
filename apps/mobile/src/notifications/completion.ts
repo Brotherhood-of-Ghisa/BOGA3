@@ -14,7 +14,7 @@ let cursor: string | null = null;
 export const readCompletedNotificationGraphs = (database: LocalDatabase, serialize: Serialize, sessionIds: string[]): CompletionEntity[][] =>
   database.transaction(tx => {
     if (sessionIds.length === 0) return [];
-    const completed = tx.select().from(sessions).where(and(eq(sessions.status, 'completed'), isNull(sessions.deletedAt),
+    const completed = tx.select().from(sessions).where(and(eq(sessions.status, 'completed'), isNull(sessions.deletedAt), isNull(sessions.loggingClientId),
       inArray(sessions.id, sessionIds))).all();
     return completed.flatMap(session => {
       const exercises = tx.select().from(sessionExercises).where(eq(sessionExercises.sessionId, session.id)).all();
