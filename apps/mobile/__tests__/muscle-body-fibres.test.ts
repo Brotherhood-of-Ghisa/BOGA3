@@ -1,9 +1,10 @@
+import { BROAD_COMBINED_MUSCLES } from '@/src/data/combined-muscles';
 import { isModelFibre, MUSCLE_BODY_FASCICLES, type MuscleBodyFibreSelection, type TriangleFibreSegment } from '@/components/stats/muscle-body-fibres';
 import { MUSCLE_BODY_MESH, type MuscleBodyMesh } from '@/components/stats/muscle-body-mesh';
 import { MUSCLE_MAP_REFERENCE } from '@/components/stats/muscle-map-reference';
 import { hitTestProjectedMuscle, selectMuscleFibres } from '@/components/stats/muscle-body-projection';
 import { projectMuscleBody } from './helpers/muscle-body-palette';
-import { buildMuscleReportAssignment } from '@/src/data/muscle-report-presets';
+import { buildMuscleReportAssignment } from '@/src/data/combined-muscles';
 import { broadMuscleRows } from './helpers/broad-muscle-report';
 
 const options = { angleDeg: 0, width: 280, height: 280, scores: new Map<string, number | null>() };
@@ -41,10 +42,10 @@ describe('reported muscle fibre selection', () => {
   });
 
   it('merges tracked anatomy through Broad and Custom, and honours disabled members and aliases', () => {
-    const report = buildMuscleReportAssignment(broadMuscleRows([], ['serratus_anterior']));
-    expect(selectMuscleFibres('chest', report)).toEqual(selectMuscleFibres('chest'));
+    const report = buildMuscleReportAssignment(broadMuscleRows([], ['serratus_anterior']), BROAD_COMBINED_MUSCLES);
+    expect(selectMuscleFibres('cm_chest', report)).toEqual(selectMuscleFibres('chest'));
     const backIds = ['back_lats', 'back_upper', 'traps_upper', 'traps_lower'];
-    expect(selectMuscleFibres('back_lats', report)).toEqual(
+    expect(selectMuscleFibres('cm_back', report)).toEqual(
       combine(backIds.map(id => selectMuscleFibres(id))));
     expect(selectMuscleFibres('serratus_anterior', report)).toEqual(empty);
     for (const [legacy, canonical] of [['front_delts', 'delts_front'], ['side_delts', 'delts_lateral'], ['rear_delts', 'delts_rear']]) {
@@ -53,11 +54,11 @@ describe('reported muscle fibre selection', () => {
     const rows = broadMuscleRows().map(row => ({ ...row,
       reportGroup: ['biceps', 'brachialis'].includes(row.id) ? 'biceps' : null,
     }));
-    const custom = buildMuscleReportAssignment(rows);
+    const custom = buildMuscleReportAssignment(rows, null);
     const id = custom.get('biceps')!.muscle.id;
     expect(selectMuscleFibres(id, custom)).toEqual(combine(['biceps', 'brachialis'].map(member => selectMuscleFibres(member))));
-    const disabled = buildMuscleReportAssignment(broadMuscleRows(['chest']));
-    expect(selectMuscleFibres('chest', disabled)).toEqual(empty);
+    const disabled = buildMuscleReportAssignment(broadMuscleRows(['chest']), BROAD_COMBINED_MUSCLES);
+    expect(selectMuscleFibres('cm_chest', disabled)).toEqual(empty);
   });
 
   it('returns no invented fibres for no selection, unknown/custom IDs or missing assets', () => {

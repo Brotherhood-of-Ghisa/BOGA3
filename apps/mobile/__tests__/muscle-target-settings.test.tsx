@@ -89,11 +89,12 @@ it('draws a muscle target row: the name as an option, a blank showing the defaul
   expect(screen.getByTestId('settings-muscle-target-chest-error')).toHaveStyle({ ...META, color: roles.danger });
 });
 
-it('names the breakdown the targets apply to under the default', async () => {
+it('lists a combined muscle under its key, with no note about a breakdown', async () => {
+  await act(async () => { await setup.applyBroadTemplate(); });
   render(<TargetsRoute />);
-  expect(await screen.findByText('Per-muscle targets apply to the detailed breakdown')).toBeOnTheScreen();
-  await act(async () => { await setup.setMuscleReportPreset('broad'); });
-  expect(await screen.findByText('Per-muscle targets apply to the broad breakdown')).toBeOnTheScreen();
+  await screen.findByTestId('settings-muscle-target-cm_chest');
+  expect(screen.getByText('Chest')).toBeOnTheScreen();
+  expect(screen.queryByText(/apply to the/)).toBeNull();
 });
 
 it('clearing the default target commits the standard default, which the blank field shows', async () => {
@@ -115,7 +116,7 @@ it('lists only enabled muscles, including custom muscles, and restores hidden ov
   await setup.listMuscleReportRows();
   await setup.setMuscleTracked(['chest'], false);
   localDatabase().insert(muscleGroups).values({ id: 'custom-neck', displayName: 'Neck', familyName: 'Back', sortOrder: 99, isEditable: 1 }).run();
-  updatePreferences({ muscleTargetMode: 'per-muscle', muscleTargetOverrides: { detailed: { chest: 14 } } });
+  updatePreferences({ muscleTargetMode: 'per-muscle', muscleTargetOverrides: { chest: 14 } });
   render(<TargetsRoute />);
   await screen.findByTestId('settings-muscle-target-custom-neck');
   expect(screen.queryByTestId('settings-muscle-target-chest')).toBeNull();
@@ -124,7 +125,7 @@ it('lists only enabled muscles, including custom muscles, and restores hidden ov
   expect(await screen.findByTestId('settings-muscle-target-chest')).toHaveProp('value', '14');
   await act(async () => { await setup.setMuscleTracked(['chest'], false); });
   await waitForGone(() => screen.queryByTestId('settings-muscle-target-chest'));
-  expect(values().muscleTargetOverrides.detailed?.chest).toBe(14);
+  expect(values().muscleTargetOverrides.chest).toBe(14);
 });
 
 it.each([['targets', TargetsRoute, 'settings-muscle-target-solo-muscle'], ['enablement', EnabledRoute, 'settings-track-solo-muscle']] as const)(
@@ -132,7 +133,7 @@ it.each([['targets', TargetsRoute, 'settings-muscle-target-solo-muscle'], ['enab
     await setup.listMuscleReportRows();
     localDatabase().insert(muscleGroups).values({ id: 'solo-muscle', displayName: 'Solo', familyName: 'Solo family', sortOrder: 99, isEditable: 1 }).run();
     const rows = await setup.listMuscleReportRows();
-    const sections = setup.buildSettingsMuscleSections(rows);
+    const sections = setup.buildSettingsMuscleSections(rows, null);
     const many = sections.find(section => section.muscles.length >= 2)!;
     render(<Route />);
     await screen.findByTestId(rowId);
@@ -140,8 +141,8 @@ it.each([['targets', TargetsRoute, 'settings-muscle-target-solo-muscle'], ['enab
     expect(within(screen.getByTestId(`settings-muscles-family-${many.family}`)).getByRole('header')).toHaveTextContent(many.family);
   });
 
-it('inherits the live default, preserves independent breakdown maps and clears one override by blanking it', async () => {
-  updatePreferences({ muscleTargetMode: 'per-muscle', muscleTargetOverrides: { detailed: { chest: 12 }, broad: { chest: 18 } } });
+it('inherits the live default, keeps one map across setups and clears one override by blanking it', async () => {
+  updatePreferences({ muscleTargetMode: 'per-muscle', muscleTargetOverrides: { chest: 12, cm_chest: 18 } });
   render(<TargetsRoute />);
   await screen.findByTestId('settings-muscle-target-chest');
   expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('value', '12');
@@ -152,13 +153,14 @@ it('inherits the live default, preserves independent breakdown maps and clears o
   edit('settings-muscle-target-chest', '');
   expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('value', '');
   expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('placeholder', '9');
-  expect(values().muscleTargetOverrides).toEqual({ detailed: { calves: 6 }, broad: { chest: 18 } });
-  await act(async () => { await setup.setMuscleReportPreset('broad'); });
-  await waitFor(() => expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('value', '18'));
+  expect(values().muscleTargetOverrides).toEqual({ calves: 6, cm_chest: 18 });
+  await act(async () => { await setup.applyBroadTemplate(); });
+  await waitFor(() => expect(screen.getByTestId('settings-muscle-target-cm_chest')).toHaveProp('value', '18'));
+  expect(screen.queryByTestId('settings-muscle-target-chest')).toBeNull();
   expect(screen.queryByTestId('settings-muscle-target-serratus_anterior')).toBeNull();
-  edit('settings-muscle-target-chest', '');
-  expect(values().muscleTargetOverrides.broad).toEqual({});
-  await act(async () => { await setup.setMuscleReportPreset('detailed'); });
+  edit('settings-muscle-target-cm_chest', '');
+  expect(values().muscleTargetOverrides).toEqual({ calves: 6 });
+  await act(async () => { await setup.clearCombinedMuscles(); });
   await waitFor(() => expect(screen.getByTestId('settings-muscle-target-calves')).toHaveProp('value', '6'));
 });
 
@@ -170,7 +172,7 @@ it.each(['0', '-1', '1.5', 'bad', '9007199254740992'])('keeps invalid target dra
   expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('value', draft);
   expect(values().muscleTargetOverrides).toEqual({});
   edit('settings-muscle-target-chest', '12');
-  expect(values().muscleTargetOverrides.detailed?.chest).toBe(12);
+  expect(values().muscleTargetOverrides.chest).toBe(12);
 });
 
 it('retains and retries failed saves, then clears drafts on account change', async () => {
@@ -187,7 +189,7 @@ it('retains and retries failed saves, then clears drafts on account change', asy
   write.mockRestore();
   fireEvent.press(screen.getByText('Retry'));
   await waitForGone(() => screen.queryByTestId('settings-muscle-preferences-error'));
-  expect(values().muscleTargetOverrides.detailed?.chest).toBe(12);
+  expect(values().muscleTargetOverrides.chest).toBe(12);
   edit('settings-muscle-target-chest', 'bad');
   await act(async () => { setAccountLocalPreferenceAccount('B', true); await ensureAccountLocalPreferencesLoaded(); });
   await screen.findByTestId('settings-muscle-target-chest');
@@ -215,7 +217,7 @@ it('shows the default with a usable empty state when no muscles are enabled', as
 });
 
 it('reports a load failure and retries without replacing the full page', async () => {
-  const load = jest.spyOn(setup, 'listMuscleReportRows').mockRejectedValueOnce(Error('read failed'));
+  const load = jest.spyOn(setup, 'readMuscleSetup').mockRejectedValueOnce(Error('read failed'));
   render(<MusclesRoute />);
   await screen.findByTestId('settings-muscles-error');
   fireEvent.press(screen.getByTestId('settings-enabled-muscles-row'));
@@ -227,15 +229,14 @@ it('reports a load failure and retries without replacing the full page', async (
 });
 
 it('keeps Custom reporting unchanged until a preset is explicitly selected', async () => {
-  await setup.listMuscleReportRows();
-  localDatabase().update(muscleGroups).set({ reportGroup: 'chest' }).where(eq(muscleGroups.id, 'biceps')).run();
+  await setup.createCombinedMuscle({ name: 'Arms', family: 'Arms', memberIds: ['biceps', 'triceps'] });
   render(<MusclesRoute />);
   expect(await screen.findByTestId('settings-muscle-custom')).toHaveProp('accessibilityLabel', 'Grouping: Custom');
   expect(screen.getByTestId('settings-muscle-preset-detailed')).toHaveProp('accessibilityState', { selected: false });
   expect(screen.getByTestId('settings-muscle-preset-broad')).toHaveProp('accessibilityState', { selected: false });
   fireEvent.press(screen.getByTestId('settings-enabled-muscles-row'));
   expect(mockPush).toHaveBeenLastCalledWith('/settings-enabled-muscles');
-  expect(setup.deriveMuscleReportPreset(await setup.listMuscleReportRows())).toBe('custom');
+  expect(setup.deriveMuscleReportPreset(await setup.readMuscleSetup())).toBe('custom');
   fireEvent.press(screen.getByTestId('settings-muscle-preset-detailed'));
   await waitForGone(() => screen.queryByTestId('settings-muscle-custom'));
   expect(screen.getByTestId('settings-enabled-muscles-row')).toBeTruthy();
@@ -257,15 +258,15 @@ it('retains the displayed preset on a failed database write and retries that cho
 });
 
 it('ignores a late setup read from the previous account', async () => {
-  const actual = await setup.listMuscleReportRows();
-  let resolve!: (rows: typeof actual) => void;
+  const actual = await setup.readMuscleSetup();
+  let resolve!: (setup: typeof actual) => void;
   const stale = new Promise<typeof actual>(yes => { resolve = yes; });
-  const read = jest.spyOn(setup, 'listMuscleReportRows').mockReturnValueOnce(stale);
+  const read = jest.spyOn(setup, 'readMuscleSetup').mockReturnValueOnce(stale);
   render(<TargetsRoute />);
   await act(async () => { await Promise.resolve(); });
   await act(async () => { setAccountLocalPreferenceAccount('B', true); await ensureAccountLocalPreferencesLoaded(); });
   await screen.findByTestId('settings-muscle-target-chest');
-  await act(async () => { resolve([{ ...actual[0], id: 'old-account', displayName: 'Previous account' }]); });
+  await act(async () => { resolve({ definitions: [], rows: [{ ...actual.rows[0], id: 'old-account', displayName: 'Previous account' }] }); });
   expect(screen.queryByTestId('settings-muscle-target-old-account')).toBeNull();
   expect(screen.getByTestId('settings-muscle-target-chest')).toHaveProp('value', '');
   read.mockRestore();
@@ -273,7 +274,7 @@ it('ignores a late setup read from the previous account', async () => {
 
 it.each(['detailed', 'broad'] as const)('keeps enablement counts and navigation independent of the %s breakdown', async preset => {
   const rows = await setup.listMuscleReportRows();
-  await setup.setMuscleReportPreset(preset);
+  await (preset === 'broad' ? setup.applyBroadTemplate() : setup.clearCombinedMuscles());
   await setup.setMuscleTracked(['serratus_anterior'], false);
   const page = render(<MusclesRoute />);
   const label = `Enabled muscles, ${rows.length - 1} / ${rows.length}`;
@@ -287,7 +288,7 @@ it.each(['detailed', 'broad'] as const)('keeps enablement counts and navigation 
   expect(screen.getByTestId('settings-track-chest')).toHaveProp('accessibilityState', { checked: true });
   fireEvent.press(screen.getByTestId('settings-track-serratus_anterior'));
   await waitFor(() => expect(screen.getByTestId('settings-track-serratus_anterior')).toHaveProp('accessibilityState', { checked: true }));
-  expect(setup.deriveMuscleReportPreset(await setup.listMuscleReportRows())).toBe(preset);
+  expect(setup.deriveMuscleReportPreset(await setup.readMuscleSetup())).toBe(preset);
   enabledPage.unmount();
   render(<MusclesRoute />);
   await screen.findByLabelText(`Enabled muscles, ${rows.length} / ${rows.length}`);

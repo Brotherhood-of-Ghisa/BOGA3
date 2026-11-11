@@ -113,10 +113,10 @@ const responses: Record<string, Record<string, unknown>> = {
   '/functions/v1/agent-api/v1/agent/muscle-targets': {
     idempotent_replay: false,
     overrides: { chest_sternal: 14 },
-    scope: 'broad',
     targets: { default_weekly_sets: 10, mode: 'per_muscle', revision: 1_730_000_000_001, uploaded: true },
   },
   '/functions/v1/agent-api/v1/agent/muscles': {
+    combined_muscles: [],
     muscles: [{ family: 'chest', id: 'chest_sternal', name: 'Chest', report_group: null, tracked: true }],
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a': {

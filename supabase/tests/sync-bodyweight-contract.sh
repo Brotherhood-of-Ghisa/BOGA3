@@ -30,6 +30,8 @@ BW_BODY="$(jq -nc --arg reading "${BW_ID}" --arg session "${BW_SESSION_ID}" \
     {type: "user_settings", id: "settings", client_updated_at_ms: $ts,
      fields: {bodyweight_calculations_enabled: true, weekly_working_set_target: 10, muscle_target_mode: "per_muscle",
               muscle_target_overrides: "{\"broad\": {\"chest\": 12}}", count_secondary_muscles: false, volume_primary_only: true,
+              muscle_targets: "{\"cm_chest\": 12}",
+              combined_muscles: "[{\"key\": \"cm_chest\", \"name\": \"Chest\", \"family\": \"Chest\"}]",
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "body_weight_measurements", id: $reading, client_updated_at_ms: $ts,
      fields: {weight_kg: 79.83225712, measured_at: $ts, created_at: $ts, updated_at: $ts, deleted_at: null}},
@@ -131,14 +133,16 @@ bw_push_settings() {
       fields: ({bodyweight_calculations_enabled: true, created_at: $at, updated_at: $at, deleted_at: null} + $extra)}]}')"
 }
 bw_targets_unchanged() {
-  user_select user_settings "id=eq.settings&select=bodyweight_calculations_enabled,weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,volume_primary_only" "${USER_A_TOKEN}"
+  user_select user_settings "id=eq.settings&select=bodyweight_calculations_enabled,weekly_working_set_target,muscle_target_mode,muscle_target_overrides,muscle_targets,combined_muscles,count_secondary_muscles,volume_primary_only" "${USER_A_TOKEN}"
   assert_json_expr '.[0] == {bodyweight_calculations_enabled: true, weekly_working_set_target: 10,
-    muscle_target_mode: "per_muscle", muscle_target_overrides: {broad: {chest: 12}}, count_secondary_muscles: false, volume_primary_only: true}' "$1"
+    muscle_target_mode: "per_muscle", muscle_target_overrides: {broad: {chest: 12}}, muscle_targets: {cm_chest: 12},
+    combined_muscles: [{key: "cm_chest", name: "Chest", family: "Chest"}],
+    count_secondary_muscles: false, volume_primary_only: true}' "$1"
 }
 bw_push_settings "$((BASE_MS + 300))" '{}'
 assert_status 200 "old-shape settings push"
 bw_targets_unchanged "a push without the target keys keeps the stored targets"
-bw_push_settings "$((BASE_MS + 310))" '{"weekly_working_set_target": null, "muscle_target_mode": null, "muscle_target_overrides": null, "count_secondary_muscles": null, "volume_primary_only": null}'
+bw_push_settings "$((BASE_MS + 310))" '{"weekly_working_set_target": null, "muscle_target_mode": null, "muscle_target_overrides": null, "muscle_targets": null, "combined_muscles": null, "count_secondary_muscles": null, "volume_primary_only": null}'
 assert_status 200 "null-target settings push"
 bw_targets_unchanged "a push with null targets keeps the stored targets"
 for bw_invalid in '{"broad": {"chest": 0}}' '{"broad": {"chest": 1.5}}' '{"region": {"chest": 8}}' \
@@ -146,16 +150,29 @@ for bw_invalid in '{"broad": {"chest": 0}}' '{"broad": {"chest": 1.5}}' '{"regio
   bw_push_settings "$((BASE_MS + 320))" "$(jq -nc --arg overrides "${bw_invalid}" '{muscle_target_overrides: $overrides}')"
   assert_non_2xx "invalid overrides ${bw_invalid} rejected"
 done
+# The single map and the combined-muscle definitions take the shapes the app validates.
+for bw_invalid in '{"chest": 0}' '{"chest": 1.5}' '{"chest": "8"}' '{" ": 8}' '{"detailed": {"chest": 8}}' '[]' '{broken'; do
+  bw_push_settings "$((BASE_MS + 321))" "$(jq -nc --arg targets "${bw_invalid}" '{muscle_targets: $targets}')"
+  assert_non_2xx "invalid target map ${bw_invalid} rejected"
+done
+for bw_invalid in '{}' '[1]' '[{"key": "chest", "name": "Chest", "family": "Chest"}]' \
+  '[{"key": "cm_Chest", "name": "Chest", "family": "Chest"}]' '[{"key": "cm_chest", "name": " ", "family": "Chest"}]' \
+  '[{"key": "cm_chest", "name": "Chest"}]' '[{"key": "cm_chest", "name": "Chest", "family": ""}]' \
+  "[{\"key\": \"cm_chest\", \"name\": \"$(printf 'x%.0s' {1..61})\", \"family\": \"Chest\"}]" \
+  '[{"key": "cm_chest", "name": "Chest", "family": "Chest"}, {"key": "cm_chest", "name": "Pecs", "family": "Chest"}]'; do
+  bw_push_settings "$((BASE_MS + 322))" "$(jq -nc --arg definitions "${bw_invalid}" '{combined_muscles: $definitions}')"
+  assert_non_2xx "invalid combined muscles ${bw_invalid} rejected"
+done
 bw_targets_unchanged "a rejected push leaves the stored targets"
 # The largest target the app accepts (a safe integer) is stored, not rejected.
 bw_push_settings "$((BASE_MS + 325))" '{"weekly_working_set_target": 9007199254740991}'
 assert_status 200 "settings push with the largest safe target"
 user_select user_settings "id=eq.settings&select=weekly_working_set_target" "${USER_A_TOKEN}"
 assert_json_expr '.[0].weekly_working_set_target == 9007199254740991' "the largest safe target round-trips"
-bw_push_settings "$((BASE_MS + 330))" '{"weekly_working_set_target": 14, "muscle_target_mode": "single", "muscle_target_overrides": "{}", "count_secondary_muscles": true}'
+bw_push_settings "$((BASE_MS + 330))" '{"weekly_working_set_target": 14, "muscle_target_mode": "single", "muscle_target_overrides": "{}", "muscle_targets": "{}", "combined_muscles": "[]", "count_secondary_muscles": true}'
 assert_status 200 "settings push with new targets"
-user_select user_settings "id=eq.settings&select=weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,volume_primary_only" "${USER_A_TOKEN}"
-assert_json_expr '.[0] == {weekly_working_set_target: 14, muscle_target_mode: "single", muscle_target_overrides: {}, count_secondary_muscles: true, volume_primary_only: true}' \
+user_select user_settings "id=eq.settings&select=weekly_working_set_target,muscle_target_mode,muscle_target_overrides,muscle_targets,combined_muscles,count_secondary_muscles,volume_primary_only" "${USER_A_TOKEN}"
+assert_json_expr '.[0] == {weekly_working_set_target: 14, muscle_target_mode: "single", muscle_target_overrides: {}, muscle_targets: {}, combined_muscles: [], count_secondary_muscles: true, volume_primary_only: true}' \
   "a newer push replaces the targets"
 bw_push_settings "$((BASE_MS + 335))" '{"volume_primary_only": false}'
 assert_status 200 "independent Volume settings push"

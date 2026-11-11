@@ -25,7 +25,6 @@ import {
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import type { CalendarHeatmapMetric } from '@/src/data';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import { deriveMuscleReportPreset } from '@/src/data/muscle-report-settings';
 import { muscleWeeklyTarget } from '@/src/preferences/muscle-targets';
 import {
   PROGRESS_HISTORY_METRIC_PARAMS, PROGRESS_HISTORY_PRIMARY_ONLY_PARAM, exerciseHistoryHref, progressHistoryHref, rmCurveHref,
@@ -300,7 +299,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   // Stable, so the muscle window is not rebuilt on every render of the page.
   const muscleTargets = useMemo(
     () => subject?.kind === 'muscle' ? { muscleIds: [subject.id],
-      weeklyTarget: muscleWeeklyTarget(values, deriveMuscleReportPreset(catalog.muscleGroups), subject.id) } : undefined,
+      weeklyTarget: muscleWeeklyTarget(values, subject.id) } : undefined,
     [subject, values, catalog.muscleGroups]
   );
   const unavailable = !subject || (catalog.status === 'ready' && name === null)

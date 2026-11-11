@@ -88,16 +88,18 @@ const settingsRow = () => database.select().from(userSettings).where(eq(userSett
 const serverRow = (row: Record<string, unknown> | null) =>
   mockSelectSettings.mockResolvedValue({ data: row, error: null });
 
-// The server row as a direct read returns it (jsonb overrides), and as the sync
-// wire carries it (JSON text).
+// The server row as a direct read returns it (jsonb target map), and as the
+// sync wire carries it (JSON text). Its legacy per-setup map is already gone,
+// so the combined-muscle migration has nothing to do.
 const A_TARGETS = {
   weekly_working_set_target: 11,
   muscle_target_mode: 'per_muscle',
-  muscle_target_overrides: { detailed: { chest: 14 } },
+  muscle_target_overrides: null,
+  muscle_targets: { chest: 14 },
   count_secondary_muscles: false,
   volume_primary_only: false,
 };
-const A_WIRE = { ...A_TARGETS, muscle_target_overrides: JSON.stringify(A_TARGETS.muscle_target_overrides) };
+const A_WIRE = { ...A_TARGETS, muscle_targets: JSON.stringify(A_TARGETS.muscle_targets) };
 
 const settingsWire = (ms: number, fields: Record<string, unknown>): WireEntity => ({
   type: 'user_settings',
@@ -109,7 +111,7 @@ const settingsWire = (ms: number, fields: Record<string, unknown>): WireEntity =
 const storeKvTargets = () => {
   Storage.setItemSync(preferenceKey(profile, 'weeklyWorkingSetTarget'), '6');
   Storage.setItemSync(preferenceKey(profile, 'muscleTargetMode'), 'per-muscle');
-  Storage.setItemSync(preferenceKey(profile, 'muscleTargetOverrides'), JSON.stringify({ broad: { back: 9 } }));
+  Storage.setItemSync(preferenceKey(profile, 'muscleTargetOverrides'), JSON.stringify({ cm_back: 9 }));
 };
 
 beforeEach(async () => {
@@ -187,7 +189,7 @@ describe('upload once', () => {
     expect(upload[0].fields).toMatchObject({
       weekly_working_set_target: 6,
       muscle_target_mode: 'per_muscle',
-      muscle_target_overrides: JSON.stringify({ broad: { back: 9 } }),
+      muscle_targets: JSON.stringify({ cm_back: 9 }),
       count_secondary_muscles: false,
     });
     expect(kv('weeklyWorkingSetTarget')).toBeNull();
@@ -196,19 +198,19 @@ describe('upload once', () => {
     expect(Storage.getItemSync(syncedTargetsAdoptedKey(profile))).toBe('true');
     // The values now come from the row and are unchanged.
     expect(values()).toMatchObject({ weeklyWorkingSetTarget: 6, muscleTargetMode: 'per-muscle',
-      muscleTargetOverrides: { broad: { back: 9 } }, progressCountSecondary: false });
+      muscleTargetOverrides: { cm_back: 9 }, progressCountSecondary: false });
 
     // Checked once per account: a later cycle never asks again.
     await runSyncCycle();
     expect(mockSelectSettings).toHaveBeenCalledTimes(1);
   });
 
-  it('fills a target the first device never stored with its default', async () => {
+  it('fills a target the first device never stored with its default, leaving the target map unwritten', async () => {
     Storage.setItemSync(preferenceKey(profile, 'weeklyWorkingSetTarget'), '10');
     await signIn();
     await runSyncCycle();
     expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({
-      weekly_working_set_target: 10, muscle_target_mode: 'single', muscle_target_overrides: '{}',
+      weekly_working_set_target: 10, muscle_target_mode: 'single', muscle_targets: null,
       count_secondary_muscles: true,
     });
   });
@@ -243,8 +245,8 @@ describe('upload once', () => {
     expect(kv('weeklyWorkingSetTarget')).toBeNull();
     expect(kv('muscleTargetMode')).toBeNull();
     expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, muscleTargetMode: 'per-muscle',
-      muscleTargetOverrides: { detailed: { chest: 14 } }, progressCountSecondary: false });
-    expect(muscleWeeklyTarget(values(), 'detailed', 'chest')).toBe(14);
+      muscleTargetOverrides: { chest: 14 }, progressCountSecondary: false });
+    expect(muscleWeeklyTarget(values(), 'chest')).toBe(14);
   });
 
   it('adopts server targets an older app pulled without the columns, without pushing over them', async () => {
@@ -260,7 +262,7 @@ describe('upload once', () => {
     expect(pushed.filter(entity => entity.type === 'user_settings')).toEqual([]);
     expect(settingsRow()).toMatchObject({ weeklyWorkingSetTarget: 11, muscleTargetMode: 'per_muscle',
       countSecondaryMuscles: false, localDirty: false, localUpdatedAtMs: 500 });
-    expect(JSON.parse(settingsRow()!.muscleTargetOverrides!)).toEqual({ detailed: { chest: 14 } });
+    expect(JSON.parse(settingsRow()!.muscleTargets!)).toEqual({ chest: 14 });
     expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, progressCountSecondary: false });
     expect(kv('weeklyWorkingSetTarget')).toBeNull();
   });
@@ -307,7 +309,7 @@ describe('upload once', () => {
     await runSyncCycle();
 
     expect(pushed.filter(entity => entity.type === 'user_settings')).toEqual([]);
-    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, muscleTargetOverrides: { detailed: { chest: 14 } } });
+    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 11, muscleTargetOverrides: { chest: 14 } });
     expect(kv('weeklyWorkingSetTarget')).toBeNull();
   });
 
@@ -332,7 +334,7 @@ describe('pulled settings', () => {
   it('waits for full-row pull before completing newer incomplete settings without reverting bodyweight', async () => {
     Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
     database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 8, muscleTargetMode: 'single',
-      muscleTargetOverrides: '{}', countSecondaryMuscles: true, volumePrimaryOnly: null,
+      muscleTargets: '{}', countSecondaryMuscles: true, volumePrimaryOnly: null,
       bodyweightCalculationsEnabled: false, localDirty: false, localUpdatedAtMs: 500 }).run();
     serverRow({ ...A_TARGETS, weekly_working_set_target: 12, volume_primary_only: null, client_updated_at_ms: 700 });
     await signIn();
@@ -356,7 +358,7 @@ describe('pulled settings', () => {
   it('adopts a newer direct server read instead of re-stamping a clean stale pull over it', async () => {
     Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
     database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 8, muscleTargetMode: 'single',
-      muscleTargetOverrides: '{}', countSecondaryMuscles: true, volumePrimaryOnly: null,
+      muscleTargets: '{}', countSecondaryMuscles: true, volumePrimaryOnly: null,
       localDirty: false, localUpdatedAtMs: 500 }).run();
     serverRow({ ...A_TARGETS, weekly_working_set_target: 12, volume_primary_only: true, client_updated_at_ms: 700 });
     await signIn();
@@ -370,7 +372,7 @@ describe('pulled settings', () => {
   it('keeps unknown Volume null during a pre-adoption Sets edit, then discovers the other device choice', async () => {
     Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
     database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 11, muscleTargetMode: 'single',
-      muscleTargetOverrides: '{}', countSecondaryMuscles: true, volumePrimaryOnly: null,
+      muscleTargets: '{}', countSecondaryMuscles: true, volumePrimaryOnly: null,
       localDirty: false, localUpdatedAtMs: 500 }).run();
     serverRow({ ...A_TARGETS, muscle_target_mode: 'single', muscle_target_overrides: {},
       volume_primary_only: true, client_updated_at_ms: 700 });
@@ -422,10 +424,10 @@ describe('pulled settings', () => {
     await signIn();
     await runSyncCycle();
     expect(values()).toMatchObject({ weeklyWorkingSetTarget: 12, muscleTargetMode: 'per-muscle',
-      muscleTargetOverrides: { broad: { back: 9 } }, progressCountSecondary: false, muscleVolumePrimaryOnly: false });
+      muscleTargetOverrides: { cm_back: 9 }, progressCountSecondary: false, muscleVolumePrimaryOnly: false });
     expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({
       weekly_working_set_target: 12, muscle_target_mode: 'per_muscle',
-      muscle_target_overrides: '{"broad":{"back":9}}', count_secondary_muscles: false, volume_primary_only: false,
+      muscle_targets: '{"cm_back":9}', count_secondary_muscles: false, volume_primary_only: false,
       bodyweight_calculations_enabled: true,
     });
   });
@@ -433,7 +435,7 @@ describe('pulled settings', () => {
   it('keeps offline target edits when an upgrade projects Volume at the original server edit clock', async () => {
     Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
     database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 12, muscleTargetMode: 'per_muscle',
-      muscleTargetOverrides: '{"broad":{"back":17}}', countSecondaryMuscles: null,
+      muscleTargets: '{"cm_back":17}', countSecondaryMuscles: null,
       localDirty: true, localUpdatedAtMs: 500 }).run();
     serverRow({ ...A_TARGETS, count_secondary_muscles: null });
     // A schema/default upgrade must not advance the edit clock past offline edits.
@@ -442,17 +444,17 @@ describe('pulled settings', () => {
     await runSyncCycle();
     expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({
       weekly_working_set_target: 12, muscle_target_mode: 'per_muscle',
-      muscle_target_overrides: '{"broad":{"back":17}}', count_secondary_muscles: true, volume_primary_only: false,
+      muscle_targets: '{"cm_back":17}', count_secondary_muscles: true, volume_primary_only: false,
     });
-    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 12, muscleTargetOverrides: { broad: { back: 17 } },
+    expect(values()).toMatchObject({ weeklyWorkingSetTarget: 12, muscleTargetOverrides: { cm_back: 17 },
       progressCountSecondary: true, muscleVolumePrimaryOnly: false });
   });
 
   it.each([true, false])('upgrades an already-adopted legacy Sets choice %s without coupling Volume', async legacy => {
     Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
     database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 11, muscleTargetMode: 'single',
-      muscleTargetOverrides: '{}', countSecondaryMuscles: legacy, localUpdatedAtMs: 500 }).run();
-    serverRow({ ...A_TARGETS, muscle_target_mode: 'single', muscle_target_overrides: {}, count_secondary_muscles: legacy,
+      muscleTargets: '{}', countSecondaryMuscles: legacy, localUpdatedAtMs: 500 }).run();
+    serverRow({ ...A_TARGETS, muscle_target_mode: 'single', muscle_targets: {}, count_secondary_muscles: legacy,
       volume_primary_only: null });
     await signIn();
     await runSyncCycle();
@@ -489,28 +491,28 @@ describe('pulled settings', () => {
     Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
     Storage.setItemSync(syncedMuscleVolumeAdoptedKey(profile), 'true');
     await signIn();
-    expect(muscleWeeklyTarget(values(), 'detailed', 'chest')).toBe(8);
+    expect(muscleWeeklyTarget(values(), 'chest')).toBe(8);
 
     pullPage = [settingsWire(700, A_WIRE)];
     await runSyncCycle();
-    expect(muscleWeeklyTarget(values(), 'detailed', 'chest')).toBe(14);
+    expect(muscleWeeklyTarget(values(), 'chest')).toBe(14);
     expect(values().progressCountSecondary).toBe(false);
 
     // A pull that leaves the map unchanged keeps its object, so nothing republishes
     // for it, even when the server's jsonb text orders the keys differently.
     pullPage = [settingsWire(720, { ...A_WIRE,
-      muscle_target_overrides: JSON.stringify({ detailed: { chest: 14, back: 9 }, broad: { quads: 8 } }) })];
+      muscle_targets: JSON.stringify({ chest: 14, back: 9, cm_quads: 8 }) })];
     await runSyncCycle();
     const overrides = values().muscleTargetOverrides;
     pullPage = [settingsWire(750, { ...A_WIRE, bodyweight_calculations_enabled: true,
-      muscle_target_overrides: JSON.stringify({ broad: { quads: 8 }, detailed: { back: 9, chest: 14 } }) })];
+      muscle_targets: JSON.stringify({ cm_quads: 8, back: 9, chest: 14 }) })];
     await runSyncCycle();
     expect(values().muscleTargetOverrides).toBe(overrides);
 
     pullPage = [settingsWire(800, { ...A_WIRE, weekly_working_set_target: 12, muscle_target_mode: 'single',
       count_secondary_muscles: true })];
     await runSyncCycle();
-    expect(muscleWeeklyTarget(values(), 'detailed', 'chest')).toBe(12);
+    expect(muscleWeeklyTarget(values(), 'chest')).toBe(12);
     expect(values().progressCountSecondary).toBe(true);
   });
 
@@ -529,20 +531,94 @@ describe('pulled settings', () => {
   it('keeps local targets when a pull omits the keys or carries null', () => {
     database.insert(userSettings).values({
       id: 'settings', weeklyWorkingSetTarget: 11, muscleTargetMode: 'per_muscle',
-      muscleTargetOverrides: '{"broad":{"back":9}}', countSecondaryMuscles: false, localUpdatedAtMs: 100,
+      muscleTargetOverrides: '{"broad":{"back":9}}', muscleTargets: '{"cm_back":9}', combinedMuscles: '[]',
+      countSecondaryMuscles: false, localUpdatedAtMs: 100,
     }).run();
     database.transaction(tx => applyPullPage(tx as Transaction, [settingsWire(200, {})], 'user_settings'));
     expect(settingsRow()).toMatchObject({ weeklyWorkingSetTarget: 11, muscleTargetMode: 'per_muscle',
       muscleTargetOverrides: '{"broad":{"back":9}}', countSecondaryMuscles: false, localUpdatedAtMs: 200 });
     database.transaction(tx => applyPullPage(tx as Transaction, [settingsWire(300, {
-      weekly_working_set_target: null, muscle_target_mode: null, muscle_target_overrides: null,
-      count_secondary_muscles: null, bodyweight_calculations_enabled: true })], 'user_settings'));
+      weekly_working_set_target: null, muscle_target_mode: null, muscle_target_overrides: null, muscle_targets: null,
+      combined_muscles: null, count_secondary_muscles: null, bodyweight_calculations_enabled: true })], 'user_settings'));
     expect(settingsRow()).toMatchObject({ weeklyWorkingSetTarget: 11, muscleTargetMode: 'per_muscle',
+      muscleTargets: '{"cm_back":9}', combinedMuscles: '[]',
       countSecondaryMuscles: false, bodyweightCalculationsEnabled: true, localUpdatedAtMs: 300 });
     // The row still serializes the four keys for push.
     expect(entityToWire(settingsRow() as never, 'user_settings').fields).toMatchObject({
       weekly_working_set_target: 11, muscle_target_mode: 'per_muscle',
-      muscle_target_overrides: '{"broad":{"back":9}}', count_secondary_muscles: false,
+      muscle_target_overrides: '{"broad":{"back":9}}', muscle_targets: '{"cm_back":9}', combined_muscles: '[]',
+      count_secondary_muscles: false,
     });
+  });
+});
+
+describe('the one-time combined-muscle migration ([[muscle.report-groups]])', () => {
+  const LEGACY_SERVER = { ...A_TARGETS, muscle_target_overrides: { broad: { chest: 12 }, detailed: { chest: 30 } },
+    muscle_targets: null, client_updated_at_ms: 500 };
+  const LEGACY_WIRE = { ...LEGACY_SERVER, muscle_target_overrides: JSON.stringify(LEGACY_SERVER.muscle_target_overrides),
+    muscle_targets: null, combined_muscles: null };
+  const muscleWire = (id: string, familyName: string, reportGroup: string | null): WireEntity => ({
+    type: 'muscle_groups', id, client_updated_at_ms: 500,
+    fields: { display_name: id, family_name: familyName, sort_order: 0, is_editable: 0, report_group: reportGroup, tracked: 1,
+      created_at: 500, updated_at: 500, deleted_at: null } as WireEntity['fields'],
+  });
+  const adopted = () => {
+    Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
+    Storage.setItemSync(syncedMuscleVolumeAdoptedKey(profile), 'true');
+  };
+
+  it('stores a pulled legacy Broad setup as combined muscles and its Broad targets as the one map, then pushes them', async () => {
+    adopted();
+    await signIn();
+    pullPage = [settingsWire(500, LEGACY_WIRE), muscleWire('chest', 'Chest', 'chest'),
+      muscleWire('serratus_anterior', 'Chest', 'chest'), muscleWire('rotator_cuff', 'Shoulders', null)];
+    serverRow(LEGACY_SERVER);
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+
+    const settings = pushed.find(entity => entity.type === 'user_settings')!;
+    expect(JSON.parse(settings.fields.combined_muscles as string)).toEqual([{ key: 'cm_chest', name: 'Chest', family: 'Chest' }]);
+    expect(JSON.parse(settings.fields.muscle_targets as string)).toEqual({ cm_chest: 12 });
+    expect(pushed.filter(entity => entity.type === 'muscle_groups').map(entity => [entity.id, entity.fields.report_group]).sort())
+      .toEqual([['chest', 'cm_chest'], ['serratus_anterior', 'cm_chest']]);
+    expect(values().muscleTargetOverrides).toEqual({ cm_chest: 12 });
+
+    // Once stored, a later cycle leaves the setup alone.
+    pushed = [];
+    await runSyncCycle();
+    expect(pushed).toEqual([]);
+  });
+
+  it('adopts another device\'s migration instead of writing its own', async () => {
+    adopted();
+    await signIn();
+    pullPage = [settingsWire(600, { ...LEGACY_WIRE, muscle_targets: '{"cm_chest":15}',
+      combined_muscles: JSON.stringify([{ key: 'cm_chest', name: 'Pecs', family: 'Chest' }]) }),
+    muscleWire('chest', 'Chest', 'cm_chest'), muscleWire('serratus_anterior', 'Chest', 'cm_chest')];
+    serverRow({ ...LEGACY_SERVER, muscle_targets: { cm_chest: 15 }, client_updated_at_ms: 600 });
+
+    await runSyncCycle();
+
+    expect(pushed).toEqual([]);
+    expect(values().muscleTargetOverrides).toEqual({ cm_chest: 15 });
+    expect(JSON.parse(settingsRow()!.combinedMuscles!)).toEqual([{ key: 'cm_chest', name: 'Pecs', family: 'Chest' }]);
+  });
+
+  it('logs a failed migration and retries it next cycle without failing sync', async () => {
+    adopted();
+    await signIn();
+    pullPage = [settingsWire(500, LEGACY_WIRE), muscleWire('chest', 'Chest', 'chest')];
+    serverRow(LEGACY_SERVER);
+    const settingsData = jest.requireActual<typeof import('@/src/data/muscle-report-settings')>('@/src/data/muscle-report-settings');
+    const migrate = jest.spyOn(settingsData, 'migrateLegacyMuscleSetup').mockRejectedValueOnce(new Error('disk full'));
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+    expect(mockLogEvent).toHaveBeenCalledWith(expect.objectContaining({ event: 'sync.combined_muscles_migration_failed',
+      context: { error: 'disk full' } }));
+    expect(settingsRow()?.combinedMuscles).toBeNull();
+
+    migrate.mockRestore();
+    await runSyncCycle();
+    expect(JSON.parse(settingsRow()!.combinedMuscles!)).toEqual([{ key: 'cm_chest', name: 'Chest', family: 'Chest' }]);
   });
 });

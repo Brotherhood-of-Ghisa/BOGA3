@@ -193,6 +193,12 @@ export const generatedMigrationBundle = {
     tag: "0030_panoramic_doomsday",
     breakpoints: true,
   },
+  {
+    idx: 31,
+    when: 1794438485979,
+    tag: "0031_user_settings_combined_muscles",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -966,6 +972,13 @@ UPDATE sync_runtime_state SET pull_cursor = '{}';
   m0029: `ALTER TABLE \`sessions\` ADD \`merge_revision\` integer DEFAULT 0 NOT NULL;`,
   m0030: `ALTER TABLE \`sessions\` ADD \`logging_client_id\` text;--> statement-breakpoint
 ALTER TABLE \`sessions\` ADD \`logging_granted_at\` text;`,
+  m0031: `ALTER TABLE \`user_settings\` ADD \`muscle_targets\` text;--> statement-breakpoint
+ALTER TABLE \`user_settings\` ADD \`combined_muscles\` text;--> statement-breakpoint
+-- Re-pull every row once: a row an older build pulled reached this device
+-- without the new columns, and the combined-muscle migration must see another
+-- device's definitions before it writes its own.
+UPDATE sync_runtime_state SET pull_cursor = '{}';
+`,
   },
 } as const;
 

@@ -10,6 +10,9 @@ import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations
 import { isSessionSetType } from '../../../apps/mobile/src/data/set-types.ts';
 import { isRestTimerSec } from '../../../apps/mobile/src/exercise-core/rest-timer.ts';
 import {
+  parseStoredCombinedMuscles, resolveCombinedMuscleSetup,
+} from '../../../apps/mobile/src/data/combined-muscles.ts';
+import {
   AUTH_RETRY_AFTER_SECONDS, authUpstreamFetch, isTokenRejection,
 } from './auth-upstream.ts';
 import {
@@ -20,11 +23,11 @@ import {
   type GymBucketRank,
 } from './gym-buckets.ts';
 import {
-  checkOverrideIds, muscleTargetScope, MuscleTargetsError, normalizeMuscleTargetsWrite,
+  checkOverrideIds, MuscleTargetsError, normalizeMuscleTargetsWrite, reportedMuscleIds,
 } from './muscle-targets.ts';
 import {
   asMuscleReportRows, buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, STATUS_READ_DAYS, statusReadComplete,
-  trainingStatusWindow,
+  statusSettings, trainingStatusWindow,
   type StatusBlockRow, type StatusDefinitionRow, type StatusMappingRow, type StatusMuscleRow,
   type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining, type TrainingStatusWindow,
 } from './training-status.ts';
@@ -783,31 +786,49 @@ const projectCatalogExercises = async (
   }));
 };
 
+/** The settings singleton's target and combined-muscle columns, null with no live row. */
+const readMuscleSetupSettings = async (client: SupabaseClient, userId: string): Promise<StatusSettingsRow | null> => {
+  const { data, error } = await client.schema('app_public').from('user_settings')
+    .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,muscle_targets,combined_muscles,count_secondary_muscles,volume_primary_only,client_updated_at_ms')
+    .eq('owner_user_id', userId).eq('id', 'settings').is('deleted_at', null).maybeSingle<StatusSettingsRow>();
+  throwDatabaseError(error);
+  return data;
+};
+
 /**
  * The owner's muscle taxonomy: the ids an exercise's muscles must name. Each
- * entry carries the user's setup: the `report_group` key it reports under
- * (null = the entry is its own muscle) and whether that muscle is `tracked`.
+ * entry carries the user's setup as the app reads it: `report_group`, the key
+ * of the combined muscle it is a member of (null = the entry is its own
+ * muscle), and whether it is `tracked`. `combined_muscles` lists each combined
+ * muscle's key, name and family.
  */
 const listMuscles = async (client: SupabaseClient, userId: string): Promise<JsonObject> => {
-  const { data, error } = await client
-    .schema('app_public')
-    .from('muscle_groups')
-    .select('id,display_name,family_name,sort_order,report_group,tracked')
-    .eq('owner_user_id', userId)
-    .is('deleted_at', null)
-    .order('sort_order')
-    .order('id')
-    .limit(500)
-    .returns<Array<MuscleGroupRow & { sort_order: number; report_group: string | null; tracked: number }>>();
+  const [{ data, error }, settings] = await Promise.all([
+    client
+      .schema('app_public')
+      .from('muscle_groups')
+      .select('id,display_name,family_name,sort_order,report_group,tracked')
+      .eq('owner_user_id', userId)
+      .is('deleted_at', null)
+      .order('sort_order')
+      .order('id')
+      .limit(500)
+      .returns<StatusMuscleRow[]>(),
+    readMuscleSetupSettings(client, userId),
+  ]);
   throwDatabaseError(error);
+  const setup = resolveCombinedMuscleSetup(
+    asMuscleReportRows(data ?? []), parseStoredCombinedMuscles(settings?.combined_muscles ?? null));
+  const reportGroups = new Map(setup.rows.map((row) => [row.id, row.reportGroup]));
   return {
     muscles: (data ?? []).map((row) => ({
       id: row.id,
       name: row.display_name,
       family: row.family_name,
-      report_group: row.report_group,
-      tracked: row.tracked !== 0,
+      report_group: reportGroups.get(row.id) ?? null,
+      tracked: row.tracked !== 0 && row.tracked !== false,
     })),
+    combined_muscles: setup.definitions,
   };
 };
 
@@ -1941,7 +1962,7 @@ const getTrainingStatus = async (
     client.schema('app_public').from('user_profiles').select('time_zone').eq('id', userId)
       .maybeSingle<{ time_zone: string | null }>(),
     client.schema('app_public').from('user_settings')
-      .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,volume_primary_only,client_updated_at_ms')
+      .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,muscle_targets,combined_muscles,count_secondary_muscles,volume_primary_only,client_updated_at_ms')
       .eq('owner_user_id', userId).eq('id', 'settings').is('deleted_at', null).maybeSingle<StatusSettingsRow>(),
     client.schema('app_public').from('muscle_groups')
       .select('id,display_name,family_name,sort_order,report_group,tracked').eq('owner_user_id', userId)
@@ -2631,9 +2652,10 @@ const throwMuscleTargetsWriteError = (error: { message?: string } | null): void 
 };
 
 /**
- * Sets the weekly targets on the settings row. Overrides land in the scope of
- * the setup the user reports under now, derived as the app derives it; the RPC
- * merges them and keeps the other scopes.
+ * Sets the weekly targets on the settings row. Overrides name muscles the
+ * user's setup reports now, read as the app reads it; the RPC merges them into
+ * the single target map. A row with no map yet starts from the legacy targets
+ * the status shows (`statusSettings`), so the coach builds on what it read.
  */
 const setMuscleTargets = async (
   client: SupabaseClient,
@@ -2649,12 +2671,17 @@ const setMuscleTargets = async (
     if (error instanceof MuscleTargetsError) throw new ApiError(400, 'VALIDATION_ERROR', error.message);
     throw error;
   }
-  const { data: muscles, error: musclesError } = await client.schema('app_public').from('muscle_groups')
-    .select('id,display_name,family_name,sort_order,report_group,tracked').eq('owner_user_id', agent.userId)
-    .is('deleted_at', null).order('sort_order').order('id').limit(STATUS_MAX_MUSCLES)
-    .returns<StatusMuscleRow[]>();
+  const [{ data: muscles, error: musclesError }, settings] = await Promise.all([
+    client.schema('app_public').from('muscle_groups')
+      .select('id,display_name,family_name,sort_order,report_group,tracked').eq('owner_user_id', agent.userId)
+      .is('deleted_at', null).order('sort_order').order('id').limit(STATUS_MAX_MUSCLES)
+      .returns<StatusMuscleRow[]>(),
+    readMuscleSetupSettings(client, agent.userId),
+  ]);
   throwDatabaseError(musclesError);
-  const { scope, reportedIds } = muscleTargetScope(asMuscleReportRows(muscles ?? []));
+  const muscleRows = asMuscleReportRows(muscles ?? []);
+  const current = statusSettings(settings, muscleRows);
+  const reportedIds = reportedMuscleIds(muscleRows, current.combinedMuscles);
   try {
     checkOverrideIds(write.changes, reportedIds);
   } catch (error) {
@@ -2667,7 +2694,7 @@ const setMuscleTargets = async (
     p_idempotency_key: idempotencyKey,
     p_payload_sha256: await sha256Hex(JSON.stringify(write)),
     p_expected_revision: write.expected_revision,
-    p_scope: scope,
+    p_base_targets: current.preferences.muscleTargetOverrides,
     p_changes: write.changes,
   });
   throwMuscleTargetsWriteError(error);

@@ -28,7 +28,7 @@ import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 
 const roles = rolesFor(DEFAULT_APPEARANCE);
 import * as exerciseCatalogData from '@/src/data/exercise-catalog';
-import { setMuscleReportPreset, setMuscleTracked } from '@/src/data/muscle-report-settings';
+import { applyBroadTemplate, clearCombinedMuscles, setMuscleTracked } from '@/src/data/muscle-report-settings';
 import type { Transaction } from '@/src/data/clock';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { refreshAccountLocalSyncedPreferences, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
@@ -230,19 +230,19 @@ describe('Today: the Plan page over real data', () => {
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 1 }]);
     await renderToday();
     expect(text('today-plan-group-Arms-total')).toHaveTextContent('2 sets');
-    await act(() => setMuscleReportPreset('broad'));
+    await act(() => applyBroadTemplate());
     await waitForGone(() => screen.queryByTestId('today-plan-muscle-brachialis'));
     expect(text('today-plan-group-Arms-total')).toHaveTextContent('1 set');
     expect(text('today-plan-group-Arms').props.accessibilityLabel).toContain('Arms, 1.5 sets this week');
     expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('1');
-    expect(text('today-plan-muscle-biceps-week')).toHaveTextContent('1/8');
+    expect(text('today-plan-muscle-cm_biceps-week')).toHaveTextContent('1/8');
 
     await act(() => setMuscleTracked(['triceps'], false));
-    await waitForGone(() => screen.queryByTestId('today-plan-muscle-triceps'));
+    await waitForGone(() => screen.queryByTestId('today-plan-muscle-cm_triceps'));
     expect(text('today-plan-group-Arms-total')).toHaveTextContent('1 set');
     expect(text('today-plan-group-Arms').props.accessibilityLabel).toContain('Arms, 1 set this week');
     expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('1');
-    await act(() => setMuscleReportPreset('detailed'));
+    await act(() => clearCombinedMuscles());
     await waitFor(() => expect(text('today-plan-muscle-brachialis-week')).toHaveTextContent('½/8'));
     expect(text('today-plan-group-Arms').props.accessibilityLabel).toContain('Arms, 1.5 sets this week');
     expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('1');
@@ -404,7 +404,7 @@ describe('Today: the Plan page over real data', () => {
     localDatabase().transaction(tx => applyPullPage(tx as Transaction, [{
       type: 'user_settings', id: 'settings', client_updated_at_ms: Date.now(),
       fields: { bodyweight_calculations_enabled: false, weekly_working_set_target: 10, muscle_target_mode: 'per_muscle',
-        muscle_target_overrides: '{"detailed":{"chest":12}}', count_secondary_muscles: false,
+        muscle_targets: '{"chest":12}', count_secondary_muscles: false,
         created_at: 1, updated_at: 1, deleted_at: null },
     }], 'user_settings'));
     await act(() => refreshAccountLocalSyncedPreferences());
@@ -452,19 +452,20 @@ describe('Today: the Plan page over real data', () => {
     await renderToday();
     expect(within(text('today-plan-muscle-chest')).getByText('Pectoralis')).toBeTruthy();
 
-    await act(() => setMuscleReportPreset('broad'));
-    await waitFor(() => expect(within(text('today-plan-muscle-chest')).getByText('Chest')).toBeTruthy());
+    await act(() => applyBroadTemplate());
+    await waitFor(() => expect(within(text('today-plan-muscle-cm_chest')).getByText('Chest')).toBeTruthy());
+    expect(screen.queryByTestId('today-plan-muscle-chest')).toBeNull();
     expect(screen.queryByTestId('today-plan-muscle-serratus_anterior')).toBeNull();
-    expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/8');
+    expect(text('today-plan-muscle-cm_chest-week')).toHaveTextContent('2/8');
 
     await act(() => setMuscleTracked(['chest', 'serratus_anterior'], false));
-    await waitForGone(() => screen.queryByTestId('today-plan-muscle-chest'));
+    await waitForGone(() => screen.queryByTestId('today-plan-muscle-cm_chest'));
   });
 
   it("measures each muscle against its own target in Per muscle mode ([[muscle.weekly-targets]])", async () => {
     await bootLocalApp();
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 2 }]);
-    act(() => updatePreferences({ weeklyWorkingSetTarget: 10, muscleTargetMode: 'per-muscle', muscleTargetOverrides: { detailed: { chest: 2 } } }));
+    act(() => updatePreferences({ weeklyWorkingSetTarget: 10, muscleTargetMode: 'per-muscle', muscleTargetOverrides: { chest: 2 } }));
     await renderToday();
 
     expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/2');
@@ -472,13 +473,13 @@ describe('Today: the Plan page over real data', () => {
     expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('0/10');
 
     // A target changed while Today shows reads again.
-    act(() => updatePreferences({ muscleTargetOverrides: { detailed: { chest: 4, triceps: 3 } } }));
+    act(() => updatePreferences({ muscleTargetOverrides: { chest: 4, triceps: 3 } }));
     await waitFor(() => expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/4'));
     expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('0/3');
   });
 
   it('reports a failed catalogue in Per muscle mode, and Retry loads it again (a failed catalogue read)', async () => {
-    act(() => updatePreferences({ muscleTargetMode: 'per-muscle', muscleTargetOverrides: { detailed: { chest: 2 } } }));
+    act(() => updatePreferences({ muscleTargetMode: 'per-muscle', muscleTargetOverrides: { chest: 2 } }));
     const groups = jest.spyOn(exerciseCatalogData, 'listExerciseCatalogMuscleGroups').mockRejectedValueOnce(new Error('database is locked'));
     renderWithTheme(<TodayScreen groupState={signedOut} now={clock} />);
 

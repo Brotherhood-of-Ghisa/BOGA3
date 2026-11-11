@@ -50,19 +50,25 @@ export const writeBodyweightCalculationsEnabled = async (enabled: boolean): Prom
  * The synced weekly muscle targets and muscle-counting choices as stored on the
  * settings row ([[muscle.weekly-targets]]). Null until this device uploads or
  * adopts them; the mode is the wire value (`single` | `per_muscle`) and the
- * overrides are JSON text. Readers validate every value. `src/preferences/synced.ts`
+ * target maps are JSON text. Readers validate every value. `src/preferences/synced.ts`
  * declares the same shape, since it may not import this layer.
  */
 export type StoredMuscleTargetSettings = {
   weeklyWorkingSetTarget: number | null;
   muscleTargetMode: string | null;
+  /** The legacy per-setup map; read only to migrate it. */
   muscleTargetOverrides: string | null;
+  muscleTargets?: string | null;
   countSecondaryMuscles: boolean | null;
   volumePrimaryOnly?: boolean | null;
 };
 export type MuscleTargetSettingsWrite = {
-  [K in Exclude<keyof StoredMuscleTargetSettings, 'volumePrimaryOnly'>]-?: NonNullable<StoredMuscleTargetSettings[K]>
-} & { volumePrimaryOnly: boolean | null };
+  weeklyWorkingSetTarget: number;
+  muscleTargetMode: string;
+  muscleTargets: string | null;
+  countSecondaryMuscles: boolean;
+  volumePrimaryOnly: boolean | null;
+};
 
 export type MuscleTargetSettingsSnapshot = {
   values: StoredMuscleTargetSettings;
@@ -90,6 +96,7 @@ export const readMuscleTargetSettingsSnapshot = async (
     weeklyWorkingSetTarget: userSettings.weeklyWorkingSetTarget,
     muscleTargetMode: userSettings.muscleTargetMode,
     muscleTargetOverrides: userSettings.muscleTargetOverrides,
+    muscleTargets: userSettings.muscleTargets,
     countSecondaryMuscles: userSettings.countSecondaryMuscles,
     volumePrimaryOnly: userSettings.volumePrimaryOnly,
     localDirty: userSettings.localDirty,

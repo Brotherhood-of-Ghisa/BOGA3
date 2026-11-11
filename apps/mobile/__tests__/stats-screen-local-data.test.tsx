@@ -250,7 +250,7 @@ describe('Stats over real data', () => {
     await act(async () => updatePreferences({ weeklyWorkingSetTarget: 4 }));
     expect(scores().get('back_lats')).toBe(-.75);
     await act(async () => updatePreferences({ muscleTargetMode: 'per-muscle',
-      muscleTargetOverrides: { detailed: { back_lats: 1 }, broad: { back_lats: 99 } } }));
+      muscleTargetOverrides: { back_lats: 1, cm_back: 99 } }));
     expect(scores().get('back_lats')).toBe(0);
     chooseFilter('metric', 'Volume');
     expect(change()).toHaveTextContent(/^\+100%$/);

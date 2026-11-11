@@ -2,12 +2,12 @@ import { useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
 import { ActionButton, ChoiceRow, FormSection, Notice, ScreenScroll, SegmentRow, SwitchRow, ValueRow,
   uiSpace, useUiText } from '@/components/ui';
-import { buildSettingsMuscleSections, deriveMuscleReportPreset, setMuscleReportPreset, setMuscleTracked,
-  type SettingsMuscleSection } from '@/src/data/muscle-report-settings';
+import { applyBroadTemplate, buildSettingsMuscleSections, clearCombinedMuscles, deriveMuscleReportPreset, setMuscleTracked,
+  type MuscleReportPreset, type SettingsMuscleSection } from '@/src/data/muscle-report-settings';
 import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
 import { useAccountLocalPreferenceState, updatePreferences } from '@/src/preferences/hooks';
 import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES } from '@/src/preferences/model';
-import { withMuscleTarget, type MuscleTargetScope } from '@/src/preferences/muscle-targets';
+import { withMuscleTarget } from '@/src/preferences/muscle-targets';
 import { getAccountLocalPreferenceAccountRevision, getAccountLocalPreferenceState } from '@/src/preferences/account-local';
 import { MuscleTargetField } from './muscle-target-field';
 import { useMuscleSetup } from './use-muscle-setup';
@@ -15,6 +15,7 @@ import { useMuscleSetup } from './use-muscle-setup';
 type Page = 'muscles' | 'targets' | 'enabled';
 type Preferences = ReturnType<typeof useAccountLocalPreferenceState>;
 type Setup = ReturnType<typeof useMuscleSetup>;
+type Breakdown = MuscleReportPreset | 'custom';
 const TARGET_MODE_OPTIONS = [{ value: 'single', label: 'Single' }, { value: 'per-muscle', label: 'Per muscle' }] as const;
 const PRESET_OPTIONS = [{ value: 'detailed', label: 'Detailed' }, { value: 'broad', label: 'Broad' }] as const;
 
@@ -27,9 +28,10 @@ export function MuscleSettingsPage({ page }: { page: Page }) {
 function MusclePageBody({ page, preferences }: { page: Page; preferences: Preferences }) {
   const setup = useMuscleSetup(preferences.accountRevision);
   const text = useUiText();
-  const scope = setup.rows ? deriveMuscleReportPreset(setup.rows) : null;
-  const sections = setup.rows ? buildSettingsMuscleSections(page === 'enabled'
-    ? setup.rows.map(row => ({ ...row, reportGroup: null })) : setup.rows) : [];
+  const scope = setup.rows && setup.definitions
+    ? deriveMuscleReportPreset({ rows: setup.rows, definitions: setup.definitions }) : null;
+  const sections = setup.rows && setup.definitions ? buildSettingsMuscleSections(page === 'enabled'
+    ? setup.rows.map(row => ({ ...row, reportGroup: null })) : setup.rows, setup.definitions) : [];
   return <ScreenScroll automaticallyAdjustKeyboardInsets contentContainerStyle={styles.content}
     contentInsetAdjustmentBehavior="automatic" keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled"
     testID={`settings-${page === 'muscles' ? 'muscles' : page === 'targets' ? 'muscle-targets' : 'enabled-muscles'}-screen`}>
@@ -39,7 +41,7 @@ function MusclePageBody({ page, preferences }: { page: Page; preferences: Prefer
       icon="warning" live message={setup.error} testID="settings-muscles-error" tone="danger" /> : null}
     {page === 'muscles' ? <MuscleChoices preferences={preferences} scope={scope} setup={setup} sections={sections} /> : null}
     {!setup.rows && !setup.error ? <Text allowFontScaling={false} style={text.meta}>Loading muscles…</Text> : null}
-    {page === 'targets' && scope ? <TargetSections preferences={preferences} scope={scope} sections={sections} /> : null}
+    {page === 'targets' && scope ? <TargetSections preferences={preferences} sections={sections} /> : null}
     {page === 'enabled' ? sections.map(section => <FormSection key={section.family} testID={`settings-muscles-family-${section.family}`} title={section.showHeader ? section.family : undefined}>
       {section.muscles.map((muscle, index) => <SwitchRow key={muscle.id} density="list" disabled={setup.busy} divider={index > 0} label={muscle.label}
         testID={`settings-track-${muscle.id}`} value={muscle.tracked}
@@ -60,16 +62,15 @@ function DefaultTarget({ preferences, divider = false }: { preferences: Preferen
 }
 
 function MuscleChoices({ preferences, scope, setup, sections }: {
-  preferences: Preferences; scope: MuscleTargetScope | null; setup: Setup; sections: SettingsMuscleSection[];
+  preferences: Preferences; scope: Breakdown | null; setup: Setup; sections: SettingsMuscleSection[];
 }) {
   const router = useRouter();
   const current = { ...preferences.values, ...preferences.pending };
   const muscles = sections.flatMap(section => section.muscles);
   const enabled = muscles.filter(muscle => muscle.tracked);
-  const overrides = scope ? current.muscleTargetOverrides[scope] : undefined;
   const entries = setup.rows ?? [];
   const trackedEntries = entries.filter(row => row.tracked === true || row.tracked === 1);
-  const custom = enabled.filter(muscle => overrides && Object.hasOwn(overrides, muscle.id)).length;
+  const custom = enabled.filter(muscle => Object.hasOwn(current.muscleTargetOverrides, muscle.id)).length;
   const enabledStatus = setup.rows ? `${trackedEntries.length} / ${entries.length}` : 'Loading…';
   return <>
     <FormSection title="Weekly targets">
@@ -81,8 +82,8 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
         testID="settings-muscle-targets-row" value={`${custom} custom`} /> : null}
     </FormSection>
     <FormSection title="Muscle breakdown">
-      <SegmentRow<MuscleTargetScope> disabled={!scope || setup.busy} label="Breakdown"
-        onChange={next => { if (next !== 'custom') void setup.change(() => setMuscleReportPreset(next)); }}
+      <SegmentRow<Breakdown> disabled={!scope || setup.busy} label="Breakdown"
+        onChange={next => { if (next !== 'custom') void setup.change(next === 'broad' ? applyBroadTemplate : clearCombinedMuscles); }}
         options={PRESET_OPTIONS} testIDPrefix="settings-muscle-preset" value={scope ?? 'detailed'} />
       {scope === 'custom' ? <ValueRow divider label="Grouping" testID="settings-muscle-custom" value="Custom" /> : null}
       <ChoiceRow accessibilityLabel={`Enabled muscles, ${enabledStatus}`} divider label="Enabled muscles"
@@ -91,7 +92,7 @@ function MuscleChoices({ preferences, scope, setup, sections }: {
   </>;
 }
 
-function TargetSections({ preferences, scope, sections }: { preferences: Preferences; scope: MuscleTargetScope; sections: SettingsMuscleSection[] }) {
+function TargetSections({ preferences, sections }: { preferences: Preferences; sections: SettingsMuscleSection[] }) {
   const current = { ...preferences.values, ...preferences.pending };
   const text = useUiText();
   const enabled = sections.map(section => {
@@ -103,17 +104,17 @@ function TargetSections({ preferences, scope, sections }: { preferences: Prefere
     // Read pending edits too, so adjacent commits never lose an earlier change.
     const latest = getAccountLocalPreferenceState();
     updatePreferences({ muscleTargetOverrides: withMuscleTarget(
-      latest.pending.muscleTargetOverrides ?? latest.values.muscleTargetOverrides, scope, id, target) });
+      latest.pending.muscleTargetOverrides ?? latest.values.muscleTargetOverrides, id, target) });
   };
   return <>
-    <FormSection footnote={`Per-muscle targets apply to the ${scope} breakdown`} title="Default">
+    <FormSection title="Default">
       <DefaultTarget preferences={preferences} />
     </FormSection>
     {enabled.map(section => <FormSection key={section.family} testID={`settings-muscles-family-${section.family}`} title={section.showHeader ? section.family : undefined}>
-      {section.muscles.map((muscle, index) => <MuscleTargetField key={`${scope}:${muscle.id}`} blank={undefined}
+      {section.muscles.map((muscle, index) => <MuscleTargetField key={muscle.id} blank={undefined}
         divider={index > 0} label={muscle.label} placeholder={current.weeklyWorkingSetTarget}
         testID={`settings-muscle-target-${muscle.id}`}
-        value={Object.hasOwn(current.muscleTargetOverrides[scope] ?? {}, muscle.id) ? current.muscleTargetOverrides[scope]![muscle.id] : undefined}
+        value={Object.hasOwn(current.muscleTargetOverrides, muscle.id) ? current.muscleTargetOverrides[muscle.id] : undefined}
         onCommit={target => save(muscle.id, target)} />)}
     </FormSection>)}
     {enabled.length === 0 ? <Text allowFontScaling={false} style={text.meta} testID="settings-muscle-targets-empty">No muscles enabled.</Text> : null}

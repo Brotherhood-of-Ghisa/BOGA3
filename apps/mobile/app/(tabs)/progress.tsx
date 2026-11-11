@@ -30,7 +30,6 @@ import type { ExerciseAggregate } from '@/src/data/exercise-catalog-stats';
 import { useAuth } from '@/src/auth';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { effectiveMuscleTargetOverrides } from '@/src/preferences/muscle-targets';
-import { deriveMuscleReportPreset } from '@/src/data/muscle-report-setup';
 import type { MuscleSetTargets } from '@/components/stats/muscle-body-projection';
 import type { HeatmapView, ProgressExerciseMetric, ProgressMetric, ProgressMuscleLayout } from '@/src/preferences/model';
 import {
@@ -636,7 +635,7 @@ function StatsContent() {
       lastCompletedAt: thisPeriod.lastCompletedAtById.get(item.id) ?? null,
     })), [catalog.exercises, thisPeriod, lastPeriod]);
   const muscleReport = catalog.muscleSetup?.assignment ?? NO_MUSCLE_REPORT;
-  const weeklyTargets = effectiveMuscleTargetOverrides(values, deriveMuscleReportPreset(catalog.muscleGroups));
+  const weeklyTargets = effectiveMuscleTargetOverrides(values);
   const muscleFamilyCounts = useMemo(
     () => catalog.status === 'ready' && catalog.muscleSetup
       ? countFamilyMuscles(catalog.muscleSetup.muscles.map(muscle => muscle.familyName)) : undefined,

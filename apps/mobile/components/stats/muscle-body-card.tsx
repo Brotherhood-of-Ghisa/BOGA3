@@ -415,7 +415,7 @@ export function MuscleBodyCard({
 
   const selectWithAutoOrientation = (targetId: string) => {
     onSelect(targetId);
-    const targetOrientation = canonicalOrientationForMuscle(targetId);
+    const targetOrientation = canonicalOrientationForMuscle(targetId, report);
     if (targetOrientation !== orientation) {
       setDragOffsetDeg(0);
       setBaseAngleDeg(targetOrientation === 'front' ? 0 : 180);

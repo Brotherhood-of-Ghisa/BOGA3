@@ -39,6 +39,7 @@ type ServerSettingsRow = {
   weekly_working_set_target: number | null;
   muscle_target_mode: string | null;
   muscle_target_overrides: unknown;
+  muscle_targets?: unknown;
   count_secondary_muscles: boolean | null;
   volume_primary_only?: boolean | null;
   client_updated_at_ms?: number;
@@ -46,14 +47,21 @@ type ServerSettingsRow = {
 
 type ServerSettingsSnapshot = { values: StoredMuscleTargetSettings; revision: number };
 
-const hasCompleteSettings = (stored: StoredMuscleTargetSettings | null): boolean =>
-  Object.keys(syncedPreferencesFromStored(stored)).length === syncedPreferenceFields.length;
+// The single target map is migrated from the legacy per-setup map by the
+// combined-muscle migration (`migrateLegacyMuscleSetup`), never initialized here.
+const adoptedFields = syncedPreferenceFields.filter((field) => field !== 'muscleTargetOverrides');
+const hasCompleteSettings = (stored: StoredMuscleTargetSettings | null): boolean => {
+  const values = syncedPreferencesFromStored(stored);
+  return adoptedFields.every((field) => values[field] !== undefined);
+};
+const jsonText = (value: unknown): string | null =>
+  value === null || value === undefined ? null : JSON.stringify(value);
 
 const fromServerRow = (row: ServerSettingsRow | null): ServerSettingsSnapshot | null => row && ({ values: {
   weeklyWorkingSetTarget: row.weekly_working_set_target,
   muscleTargetMode: row.muscle_target_mode,
-  muscleTargetOverrides: row.muscle_target_overrides === null || row.muscle_target_overrides === undefined
-    ? null : JSON.stringify(row.muscle_target_overrides),
+  muscleTargetOverrides: jsonText(row.muscle_target_overrides),
+  muscleTargets: jsonText(row.muscle_targets),
   countSecondaryMuscles: row.count_secondary_muscles,
   volumePrimaryOnly: row.volume_primary_only ?? null,
 }, revision: Number(row.client_updated_at_ms ?? 0) });
@@ -64,7 +72,7 @@ const readServerSettings = async (userId: string): Promise<ServerSettingsSnapsho
   const session = (await client.auth.getSession()).data.session;
   if (session?.user.id !== userId) return undefined;
   const { data, error } = await client.schema('app_public').from('user_settings')
-    .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,volume_primary_only,client_updated_at_ms')
+    .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,muscle_targets,count_secondary_muscles,volume_primary_only,client_updated_at_ms')
     .eq('id', 'settings')
     .maybeSingle()
     .setHeader('Authorization', 'Bearer ' + session.access_token);
@@ -93,13 +101,18 @@ const adoptOrUpload = async (profile: `account:${string}`, userId: string,
   // Completing preferences writes the whole row with a new clock. Wait for
   // ordinary pull to catch the rest of a newer row (such as bodyweight) first.
   if (!localWins && server && (!snapshot || server.revision > snapshot.localUpdatedAtMs)) return false;
-  const base = pickSyncedPreferences(readScopedPreferences(profile).values);
+  const scoped = readScopedPreferences(profile);
+  const base = pickSyncedPreferences(scoped.values);
   if (hasLegacyImplicitSecondarySets(remote) && !hasLegacyMuscleCountingProfile(profile)) base.progressCountSecondary = true;
   const first = syncedPreferencesFromStored(localWins ? remote : local);
   const last = syncedPreferencesFromStored(localWins ? local : remote);
   const complete = storedFromSyncedPreferences({
     ...base, ...first, ...last,
   });
+  // Only a map this device stored or some side already holds is written;
+  // otherwise a legacy per-setup map waits for its migration.
+  if (last.muscleTargetOverrides === undefined && first.muscleTargetOverrides === undefined
+    && scoped.valid.muscleTargetOverrides === undefined) complete.muscleTargets = null;
   await writeMuscleTargetSettings(complete);
   return true;
 };

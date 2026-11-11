@@ -9,8 +9,8 @@ muscle counts for each day and the week; other family figures deduplicate.
 Neither sum is a physical-session total.
 
 Volume shares its base equally among Primaries, plus a shared ½ pool among
-included Secondaries. Allocation precedes filtering and Broad grouping; hidden
-entries never redistribute shares. Merged muscles sum surviving Volume, including
+included Secondaries. Allocation precedes filtering and combining; hidden
+entries never redistribute shares. Combined muscles sum surviving Volume, including
 mixed roles. Absent pools remain unused. Stabilizers and stored weights add
 nothing. Exercise figures are unchanged.
 
@@ -51,18 +51,22 @@ Code: `apps/mobile/src/preferences/`; `collectMuscleSetContributions` in
 
 ### muscle.report-groups · definition · accepted
 
-Settings → Muscles offers **Detailed** (default: one muscle per
-anatomy entry) or **Broad**, per account, synced. Enabled muscles is always
-available, with individual anatomy switches and their enabled/total count,
-regardless of breakdown. A preset changes merging, never a switch; merges
-matching neither read `Custom`. Broad merges entries (first listed is the anchor);
-Other entries and custom muscles stay their own.
-A merged muscle counts its tracked entries as [[muscle.set-count]] says; untracked entries' work still drops. Each muscle stays in one family.
+Each muscle (catalogue entry or custom) is Off, On on its own, or in one
+**combined muscle**, per account, synced. A combined muscle has a name and one
+family; only that family's muscles join it, one member is enough, and a member
+of another family reads as its own muscle. It reports under its own id, never an
+entry's. Detailed is no combined muscles; "Start from Broad" replaces them with
+the Broad template's 11, leaving Off muscles out. Deleting one returns its
+members to their own muscles. A combined muscle counts its tracked members as
+[[muscle.set-count]] says; untracked members' work still drops.
+Accounts set up before combined muscles read their Broad choice as the template's
+combined muscles until a device stores it (once: after its first sync or setup change); older
+app builds then see those members as their own muscles.
 The separate `Group by muscle family` switch arranges reported muscles in
-Progress and Recovery; it never exposes anatomy inside a merged muscle.
+Progress and Recovery; it never exposes anatomy inside a combined muscle.
 
-Why: a simpler view.
-Code: `BROAD_MUSCLE_PRESET` in `apps/mobile/src/data/muscle-report-presets.ts`; `deriveMuscleReportPreset` in `apps/mobile/src/data/muscle-report-setup.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/components/preferences/muscle-settings.tsx`.
+Why: users merge what they train together, without a fixed preset.
+Code: `apps/mobile/src/data/combined-muscles.ts`; `apps/mobile/src/data/muscle-report-setup.ts`; `apps/mobile/src/data/muscle-report-settings.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`.
 
 ### muscle.weekly-targets · definition · accepted
 
@@ -70,24 +74,28 @@ Weekly working-set targets repeat until changed, per account, synced: a
 change reaches every signed-in device on its next sync. On upgrade the first
 device to sync uploads its targets (of two at once, the later wins); a device
 finding them adopts them, replacing its own. Single uses the default for
-every muscle; Per muscle uses an override or the live default. Broad and
-Detailed remember separate overrides; Custom setups keep their own. Mode changes and disabling a muscle retain its overrides.
-Targets list only enabled reported muscles, including custom muscles. Clearing
-an override restores inheritance; targets are positive whole numbers.
+every muscle; Per muscle uses an override or the live default. Overrides are
+one map by reported muscle, kept across setup changes, so a combined muscle has
+its own target and its members keep theirs for when they are on their own.
+Older per-setup overrides migrate once: the setup the account was in keeps its
+targets, Broad ones moving to their combined muscle. Mode changes and disabling
+a muscle retain its overrides. Targets list only enabled reported muscles,
+including custom muscles. Clearing an override restores inheritance; targets
+are positive whole numbers.
 
 History Sets target grading and Today's Plan week column use the effective
 target of each reported muscle, scaled to the period.
 Counting is unchanged.
 
 Why: individual training goals without losing a shared fallback.
-Code: `apps/mobile/src/preferences/muscle-targets.ts`; `deriveRecoveryRows` in `apps/mobile/src/today-plan/calculations.ts`; `apps/mobile/src/sync/muscle-target-adoption.ts`.
+Code: `apps/mobile/src/preferences/muscle-targets.ts`; `legacyMuscleTargets` in `apps/mobile/src/data/combined-muscles.ts`; `deriveRecoveryRows` in `apps/mobile/src/today-plan/calculations.ts`; `apps/mobile/src/sync/muscle-target-adoption.ts`.
 
 ### muscle.no-breakdown · presentation · accepted
 
 Every screen, the exercise editor and search show only the user's muscles, never
 an entry inside its muscle. An exercise mapped to two entries of one muscle shows
-it once, labelled by the strongest role. Adding a muscle maps its anchor, or a tracked
-entry when the anchor is untracked. Changing a role or removing it rewrites
+it once, labelled by the strongest role. Adding a muscle maps its first tracked
+member by sort order. Changing a role or removing it rewrites
 tracked entries of the muscle. Mappings to untracked muscles are hidden and kept.
 
 Why: a merged entry is gone, and an edit never deletes what the user cannot see.

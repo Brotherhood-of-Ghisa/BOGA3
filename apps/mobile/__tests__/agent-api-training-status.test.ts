@@ -12,8 +12,7 @@ import {
   type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining, type TrainingStatusInput,
 } from '../../../supabase/functions/agent-api/training-status.ts';
 import { createStatsRepository, type StatsAggregationInput } from '@/src/data/stats';
-import { buildMuscleReportAssignment } from '@/src/data/muscle-report-presets';
-import { deriveMuscleReportPreset } from '@/src/data/muscle-report-setup';
+import { BROAD_COMBINED_MUSCLES, buildMuscleReportAssignment, legacyMuscleTargets } from '@/src/data/combined-muscles';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { effectiveMuscleTargetOverrides } from '@/src/preferences/muscle-targets';
 import { createTodayPlanRepository } from '@/src/today-plan/repository';
@@ -173,7 +172,8 @@ describe('training status: muscles', () => {
   it('sums allocated co-primary shares when the reporting setup merges them', () => {
     const result = status({
       timeZone: 'UTC',
-      muscleRows: [muscleRow('chest', 0, { report_group: 'chest' }), muscleRow('serratus_anterior', 1, { report_group: 'chest' })],
+      muscleRows: [muscleRow('chest', 0, { report_group: 'chest', family_name: 'Chest' }),
+        muscleRow('serratus_anterior', 1, { report_group: 'chest', family_name: 'Chest' })],
       mappings: [
         { exercise_definition_id: 'bench', muscle_group_id: 'chest', role: 'primary' },
         { exercise_definition_id: 'bench', muscle_group_id: 'serratus_anterior', role: 'primary' },
@@ -181,8 +181,27 @@ describe('training status: muscles', () => {
       training: training([benchSession('dips', daysAgo(1), 3)]),
     });
     expect(result.muscles).toHaveLength(1);
-    expect(result.muscles[0]).toMatchObject({ id: 'chest', week_sets: 3,
+    expect(result.muscles[0]).toMatchObject({ id: 'cm_chest', name: 'Chest', week_sets: 3,
       recovery_days: [{ sets: null }, { sets: null }, { sets: 3 }] });
+  });
+
+  it('reads stored combined muscles and their single target map, keeping a member of another family its own', () => {
+    const settings: StatusSettingsRow = {
+      weekly_working_set_target: 10, muscle_target_mode: 'per_muscle',
+      muscle_target_overrides: { detailed: { chest: 40 } }, muscle_targets: { cm_push: 7 },
+      combined_muscles: [{ key: 'cm_push', name: 'Push', family: 'F' }],
+      count_secondary_muscles: false, client_updated_at_ms: 9,
+    };
+    const result = status({
+      timeZone: 'UTC', settings,
+      muscleRows: [muscleRow('chest', 0, { report_group: 'cm_push' }), muscleRow('triceps', 1, { report_group: 'cm_push' }),
+        muscleRow('biceps', 2, { report_group: 'cm_push', family_name: 'Arms' })],
+      training: training([benchSession('s', daysAgo(1))]),
+    });
+    expect(result.muscle_setup).toBe('combined');
+    expect(result.muscles.map((muscle) => muscle.id).sort()).toEqual(['biceps', 'cm_push']);
+    expect(result.muscles.find((muscle) => muscle.id === 'cm_push')).toMatchObject({ name: 'Push', weekly_target: 7, week_sets: 2 });
+    expect(result.muscles.find((muscle) => muscle.id === 'biceps')).toMatchObject({ weekly_target: 10 });
   });
 
   it('reads nothing older than 56 local days', () => {
@@ -345,7 +364,9 @@ const reportRowsOf = (rows: readonly StatusMuscleRow[]) => rows.map((row) => ({
 }));
 
 /** The app's stats repository over the same rows, as its store holds them. */
-const appStatsOf = ({ rows, mappings, training: rowsTraining }: ParityFixture) => {
+const combinedOf = (settings?: StatusSettingsRow) => (settings?.combined_muscles ?? null) as typeof BROAD_COMBINED_MUSCLES | null;
+
+const appStatsOf = ({ rows, mappings, training: rowsTraining }: ParityFixture, settings?: StatusSettingsRow) => {
   const reportRows = reportRowsOf(rows);
   const input: StatsAggregationInput = {
     sessions: rowsTraining.sessions.map((session) => ({ id: session.id, completedAt: new Date(session.completed_at) })),
@@ -359,7 +380,7 @@ const appStatsOf = ({ rows, mappings, training: rowsTraining }: ParityFixture) =
       role: mapping.role as 'primary' | 'secondary',
     })),
     muscleGroups: reportRows.map(({ id, displayName, familyName, sortOrder }) => ({ id, displayName, familyName, sortOrder })),
-    muscleReport: buildMuscleReportAssignment(reportRows),
+    muscleReport: buildMuscleReportAssignment(reportRows, combinedOf(settings)),
   };
   return createStatsRepository({
     loadAggregationInput: async ({ start, end }) => ({
@@ -369,9 +390,13 @@ const appStatsOf = ({ rows, mappings, training: rowsTraining }: ParityFixture) =
   } as Parameters<typeof createStatsRepository>[0]);
 };
 
-/** Today's Plan at NOW with what `useTodayPlan` passes: the default, the setup scope's overrides and the switch. */
+/**
+ * Today's Plan at NOW with what `useTodayPlan` passes: the default, the
+ * target map (the stored one, else what the app's migration makes of the
+ * legacy per-setup map) and the switch.
+ */
 const todayPlanOf = (fixture: ParityFixture, settings: StatusSettingsRow) => {
-  const stats = appStatsOf(fixture);
+  const stats = appStatsOf(fixture, settings);
   const repository = createTodayPlanRepository({
     computeMuscleDailySets: stats.computeMuscleDailySets,
     planQueries: { listUpcomingPlans: async () => [], loadPlanDetail: async () => null },
@@ -380,11 +405,12 @@ const todayPlanOf = (fixture: ParityFixture, settings: StatusSettingsRow) => {
   const preferences = {
     weeklyWorkingSetTarget: settings.weekly_working_set_target!,
     muscleTargetMode: settings.muscle_target_mode === 'per_muscle' ? 'per-muscle' as const : 'single' as const,
-    muscleTargetOverrides: settings.muscle_target_overrides as Record<string, Record<string, number>>,
+    muscleTargetOverrides: (settings.muscle_targets as Record<string, number> | undefined)
+      ?? legacyMuscleTargets(settings.muscle_target_overrides, reportRowsOf(fixture.rows), combinedOf(settings)),
   };
   return repository.loadTodayPlan(NOW, {
     weeklyTarget: preferences.weeklyWorkingSetTarget, countSecondary: settings.count_secondary_muscles!,
-    overrides: { ...effectiveMuscleTargetOverrides(preferences, deriveMuscleReportPreset(reportRowsOf(fixture.rows))) },
+    overrides: { ...effectiveMuscleTargetOverrides(preferences) },
   });
 };
 
@@ -434,14 +460,15 @@ describe('training status: parity with Today\'s Plan', () => {
       timeZone: 'Europe/London', settings: settingsRow(countSecondary), muscleRows: rows, mappings, training: rowsTraining,
       definitions: definitionsOf(definition('bench'), definition('dip'), definition('raise'), definition('hang')),
     });
-    expect(result.muscle_setup).toBe('broad');
+    expect(result.muscle_setup).toBe('combined');
     expect(planRowsOf(result)).toEqual(plan.muscles);
     expect(result.muscles.map((muscle) => muscle.recovery_days.map((day) => day.date)))
       .toEqual(result.muscles.map(() => ['2026-10-25', '2026-10-26', '2026-10-27']));
     // The fixture exercises what parity must cover: a merged muscle, a half set and an override.
     expect(plan.muscles.length).toBeGreaterThan(2);
     expect(plan.muscles.some((row) => !Number.isInteger(row.weekSets))).toBe(countSecondary);
-    expect(plan.muscles.find((row) => row.muscleGroupId === 'chest')?.target).toBe(12);
+    // The legacy Broad override for Chest's anchor reads as the combined muscle's.
+    expect(plan.muscles.find((row) => row.muscleGroupId === 'cm_chest')?.target).toBe(12);
   });
 });
 

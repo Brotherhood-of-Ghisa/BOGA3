@@ -15,7 +15,7 @@ import {
 import { validateExerciseCore } from '@/src/exercise-core';
 import { isRestTimerSec, validateExerciseRestTimerSec, type ExerciseRestTimerValidation } from '@/src/exercise-core/rest-timer';
 
-import { isUntrackedEntry, muscleIdOfEntry, reportedMappings } from './muscle-setup';
+import { isUntrackedEntry, muscleIdOfEntry, reportedMappings, writableEntryOf } from './muscle-setup';
 
 export type EditableSecondaryMuscleRow = { rowId: string; muscleGroupId: string };
 
@@ -203,7 +203,7 @@ const keptMapping = ({ muscleGroupId, weight, role }: SavedMapping): EditorMappi
 /**
  * The mappings Save writes for the chosen muscles, given the mappings the form
  * opened with ([[muscle.no-breakdown]]). A muscle the exercise did not map
- * gets one mapping to its anchor, or a tracked entry if the anchor is hidden.
+ * gets one mapping to its first tracked entry by sort order (`writableEntryOf`).
  * A muscle that keeps
  * the strongest role it opened with keeps each mapping's role; one whose
  * role changed has every mapping to its entries rewritten to the new role. A
@@ -225,9 +225,7 @@ export const resolveEditorMappings = (
   for (const muscle of chosen) {
     const entries = openedByMuscle.get(muscle.muscleGroupId) ?? [];
     if (entries.length === 0) {
-      const entryId = isUntrackedEntry(assignment, muscle.muscleGroupId)
-        ? [...assignment].find(([, entry]) => entry.tracked && entry.muscle.id === muscle.muscleGroupId)?.[0]
-        : muscle.muscleGroupId;
+      const entryId = writableEntryOf(assignment, muscle.muscleGroupId);
       if (entryId) byEntry.set(entryId, { ...muscle, muscleGroupId: entryId });
       continue;
     }

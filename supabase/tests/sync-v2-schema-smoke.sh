@@ -333,12 +333,12 @@ for entity in "${ENTITIES[@]}"; do
   elif [[ "${entity}" == "session_plans" ]]; then
     expected="session_plans_routine_standalone"
   elif [[ "${entity}" == "user_settings" ]]; then
-    expected="user_settings_muscle_target_overrides_valid"
+    expected="user_settings_combined_muscles_valid,user_settings_muscle_target_overrides_valid,user_settings_muscle_targets_valid"
   fi
   if [[ "${names}" != "${expected}" ]]; then
     fail "app_public.${entity} CHECK constraints '${names}'; expected '${expected}' per docs/specs/tech/sync-v2-server-contract.md (Ground rules)"
   fi
 done
-pass "only the load-input-mode , target-overrides and standalone-Routine CHECKs are present across v2 entity tables"
+pass "only the load-input-mode, settings-shape and standalone-Routine CHECKs are present across v2 entity tables"
 
 echo "[sync-v2-smoke] all assertions passed"
