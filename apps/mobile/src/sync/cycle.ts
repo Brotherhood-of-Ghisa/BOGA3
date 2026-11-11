@@ -55,7 +55,7 @@ import {
   type QuarantineWriteResult,
 } from '@/src/sync/quarantine';
 import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
-import { recordLayerTypes, resetLayersWithChangedTypes } from '@/src/sync/pull-layer-types';
+import { recordLayerTypes, resetLayersMissingTypes } from '@/src/sync/pull-layer-types';
 
 // -----------------------------------------------------------------------------
 // Tunables
@@ -1602,15 +1602,15 @@ const logPullLayersReset = (layers: number[]): void => {
 
 /**
  * Restarts the pull of every layer whose stored cursor was advanced by a build
- * that applied a different set of entity types there, so rows of a type an
- * older build skipped arrive now. Other layers keep their cursors; rows, dirty
+ * that did not apply one of this build's entity types there, so rows of a type
+ * an older build skipped arrive now. Other layers keep their cursors; rows, dirty
  * bits and the bootstrap flag are untouched. Returns the layers reset.
  */
-export const resetPullCursorsForChangedLayerTypes = (database: LocalDatabase): number[] => {
+export const resetPullCursorsForNewLayerTypes = (database: LocalDatabase): number[] => {
   const reset = database.transaction((tx) => {
     const transaction = tx as Transaction;
     const state = readRawCursorState(transaction);
-    const layers = resetLayersWithChangedTypes(state);
+    const layers = resetLayersMissingTypes(state);
     if (layers.length > 0) writeRawCursorState(transaction, state);
     return layers;
   });
@@ -2135,9 +2135,6 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
     const userId = await getSignedInUserId();
     if (userId) {
       await ensureLocalDataOwnedBy(database, userId);
-      // Before the first pull leg: re-pull any layer this build applies more
-      // (or other) entity types on than the build that advanced its cursor.
-      resetPullCursorsForChangedLayerTypes(database);
     }
 
     // First-sign-in bootstrap: seed the starter catalog iff the server holds
@@ -2145,6 +2142,11 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
     // it has completed for this device-account. Runs before the convergence
     // loop so a fresh account has its seeded rows ready to push in the same call.
     await runBootstrapper(database);
+
+    // Before the first pull leg: re-pull any layer on which this build applies
+    // a type the build that advanced its cursor did not. After the bootstrapper,
+    // whose from-scratch pull records this build's lists itself.
+    if (userId) resetPullCursorsForNewLayerTypes(database);
 
     // Apply any pending catalog-bundle migrations, then bring the applied-
     // generation marker up to the current generation. Runs after the

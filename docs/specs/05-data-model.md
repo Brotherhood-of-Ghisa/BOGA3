@@ -163,9 +163,9 @@ Three paths use it (`apps/mobile/src/sync/account-wipe.ts`,
 - **The developer reset** ("Reset local data and re-seed") wipes, keeps the
   owner, and re-seeds the starter catalog; the next cycle re-pulls the rest.
 
-Pull cursors reset with the rows: kept, they skip older server rows, so a
-child could arrive without its parent (a local FK failure on every retry). Wipes run under the sync cycle's lock, never between
-two pull pages.
+A wipe resets the cursors: kept over an emptied or foreign store they skip
+older server rows, so a child arrives without its parent (an FK failure on
+every retry). Wipes run under the cycle's lock, never between pages.
 
 ## Local sync bookkeeping (Sync v2)
 

@@ -41,8 +41,10 @@ const writeTypeLists = (state: CursorState, lists: Record<string, unknown>): voi
   }
 };
 
-const sameTypes = (stored: unknown, current: readonly string[]): boolean =>
-  Array.isArray(stored) && JSON.stringify(sortedTypes(stored.map(String))) === JSON.stringify(sortedTypes(current));
+// True when every type this build applies was applied when the cursor moved.
+// A build that applies fewer types (a downgrade) would skip what it re-pulled.
+const coversTypes = (stored: unknown, current: readonly string[]): boolean =>
+  Array.isArray(stored) && current.every((type) => stored.includes(type));
 
 /** Records, beside a layer's cursor, the types this build applies on that layer. Mutates `state`. */
 export const recordLayerTypes = (state: CursorState, layer: number, layers: Layers = TOPO_LAYERS): void => {
@@ -52,18 +54,18 @@ export const recordLayerTypes = (state: CursorState, layer: number, layers: Laye
 };
 
 /**
- * Drops every stored cursor whose layer was drained with a different set of
- * types than this build applies there (a stored list, else the legacy one), so
- * that layer re-pulls from the start. Layers with no stored cursor already pull
- * from the start. Mutates `state` and returns the layers it reset, ascending.
+ * Drops every stored cursor whose layer was drained without a type this build
+ * applies there (per its stored list, else the legacy one), so that layer
+ * re-pulls from the start. Layers with no stored cursor already pull from the
+ * start. Mutates `state` and returns the layers it reset, ascending.
  */
-export const resetLayersWithChangedTypes = (state: CursorState, layers: Layers = TOPO_LAYERS): number[] => {
+export const resetLayersMissingTypes = (state: CursorState, layers: Layers = TOPO_LAYERS): number[] => {
   const lists = readTypeLists(state);
   const reset: number[] = [];
   for (const key of Object.keys(state).filter((k) => /^\d+$/.test(k))) {
     const layer = Number(key);
     const stored = key in lists ? lists[key] : LEGACY_LAYER_TYPES[layer] ?? [];
-    if (!sameTypes(stored, layers[layer] ?? [])) {
+    if (!coversTypes(stored, layers[layer] ?? [])) {
       delete state[key];
       delete lists[key];
       reset.push(layer);

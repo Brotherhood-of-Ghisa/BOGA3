@@ -328,11 +328,11 @@ only after its page commits, so an aborted drain resumes where it stopped; push
 never moves one.
 
 **Unknown types.** A build skips pulled rows of types it does not apply on
-that layer and still advances the cursor. Beside each cursor it stores those
-types (`layer_types`; none stored means the frozen list in
+that layer and still advances the cursor. Beside each cursor it stores the
+types it applies there (`layer_types`; none stored means the frozen list in
 `apps/mobile/src/sync/pull-layer-types.ts`). A signed-in cycle first drops each
-cursor whose list differs from the build's, so only that layer re-pulls; LWW
-keeps held rows unchanged and clean.
+cursor whose list lacks a type the build applies; only that layer re-pulls,
+and LWW keeps held rows clean.
 
 ## First sign-in
 

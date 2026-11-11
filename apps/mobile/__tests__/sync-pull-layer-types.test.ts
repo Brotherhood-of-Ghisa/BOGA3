@@ -20,15 +20,24 @@ import { getSignedInUserId } from '@/src/auth/session-user';
 import type { LocalDatabase } from '@/src/data/bootstrap';
 import { __resetClockForTests, PRIMARY_RUNTIME_STATE_ID, type Transaction } from '@/src/data/clock';
 import { hasSyncHistory, stampLocalDataOwner, wipeLocalDatabaseRows } from '@/src/data/local-wipe';
-import { gyms, syncRuntimeState, trainingProgrammes } from '@/src/data/schema';
+import {
+  bodyWeightMeasurements,
+  exerciseDefinitions,
+  exerciseSets,
+  gyms,
+  sessionExercises,
+  sessions,
+  syncRuntimeState,
+  trainingProgrammes,
+} from '@/src/data/schema';
 import { __resetAuthRequiredSignalForTests } from '@/src/sync/auth-required-signal';
 import { __resetCycleErrorSignalForTests } from '@/src/sync/cycle-error-signal';
-import { runSyncCycle, writeCursorAndPendingMoves, type WireEntity } from '@/src/sync/cycle';
+import { entityToWire, runSyncCycle, writeCursorAndPendingMoves, type WireEntity } from '@/src/sync/cycle';
 import {
   LAYER_TYPES_KEY,
   LEGACY_LAYER_TYPES,
   recordLayerTypes,
-  resetLayersWithChangedTypes,
+  resetLayersMissingTypes,
 } from '@/src/sync/pull-layer-types';
 import { TOPO_LAYERS } from '@/src/sync/topo-order';
 
@@ -179,10 +188,17 @@ describe('layer type lists (pure)', () => {
   const withType = (layer: number, type: string) =>
     TOPO_LAYERS.map((types, index) => (index === layer ? [...types, type] : types));
 
-  it('the legacy list is the current topology, so this release re-pulls nothing', () => {
-    expect(LEGACY_LAYER_TYPES.map((types) => [...types].sort())).toEqual(TOPO_LAYERS.map((types) => [...types].sort()));
+  // LEGACY_LAYER_TYPES is what builds before the lists applied: frozen at the
+  // seventeen types. When a table is added, extend TOPO_LAYERS only — editing
+  // the legacy list would silently skip the re-pull that delivers the new rows.
+  it('the legacy list is the frozen seventeen, all still applied on their layers', () => {
+    expect(LEGACY_LAYER_TYPES.flat()).toHaveLength(17);
+    LEGACY_LAYER_TYPES.forEach((types, layer) => expect(TOPO_LAYERS[layer]).toEqual(expect.arrayContaining([...types])));
+  });
+
+  it('a legacy cursor without a list is not reset while the build applies no new type', () => {
     const state = { '0': cursor(0, 'a'), '5': cursor(5, 'a') };
-    expect(resetLayersWithChangedTypes(state)).toEqual([]);
+    expect(resetLayersMissingTypes(state, LEGACY_LAYER_TYPES)).toEqual([]);
     expect(state).toEqual({ '0': cursor(0, 'a'), '5': cursor(5, 'a') });
   });
 
@@ -191,37 +207,42 @@ describe('layer type lists (pure)', () => {
     const state: Record<string, unknown> = { '0': cursor(0, 'a'), '1': cursor(1, 'a'), '3': cursor(3, 'a'), provisional_moves: [{ id: 'm' }] };
     recordLayerTypes(state, 1);
 
-    expect(resetLayersWithChangedTypes(state, upgraded)).toEqual([1]);
+    expect(resetLayersMissingTypes(state, upgraded)).toEqual([1]);
     expect(state).toEqual({ '0': cursor(0, 'a'), '3': cursor(3, 'a'), provisional_moves: [{ id: 'm' }] });
     // The emptied list map is dropped, so a store whose only cursor was reset holds no stray key.
     expect(LAYER_TYPES_KEY in state).toBe(false);
 
     recordLayerTypes(state, 1, upgraded);
     expect((state[LAYER_TYPES_KEY] as Record<string, string[]>)['1']).toEqual([...upgraded[1]].sort());
-    expect(resetLayersWithChangedTypes(state, upgraded)).toEqual([]);
+    expect(resetLayersMissingTypes(state, upgraded)).toEqual([]);
   });
 
   it('a new layer resets nothing: it has no stored cursor and pulls from the start', () => {
     const upgraded = [...TOPO_LAYERS, ['training_notes']];
     const state: Record<string, unknown> = { '0': cursor(0, 'a'), '5': cursor(5, 'a') };
-    expect(resetLayersWithChangedTypes(state, upgraded)).toEqual([]);
+    expect(resetLayersMissingTypes(state, upgraded)).toEqual([]);
     expect(state).toEqual({ '0': cursor(0, 'a'), '5': cursor(5, 'a') });
   });
 
-  it('resets a layer a newer build drained with a type this build lacks, or whose list is unreadable', () => {
+  it('keeps a layer a newer build drained with an extra type (a downgrade would skip it anyway), resets an unreadable list', () => {
+    const newer = [...TOPO_LAYERS[1], 'training_notes'].sort();
     const state: Record<string, unknown> = {
       '1': cursor(1, 'a'),
       '2': cursor(2, 'a'),
       '4': cursor(4, 'a'),
-      [LAYER_TYPES_KEY]: { '1': [...TOPO_LAYERS[1], 'training_notes'], '2': 'garbage', '4': currentList(4) },
+      [LAYER_TYPES_KEY]: { '1': newer, '2': 'garbage', '4': currentList(4) },
     };
-    expect(resetLayersWithChangedTypes(state)).toEqual([1, 2]);
-    expect(state).toEqual({ '4': cursor(4, 'a'), [LAYER_TYPES_KEY]: { '4': currentList(4) } });
+    expect(resetLayersMissingTypes(state)).toEqual([2]);
+    expect(state).toEqual({ '1': cursor(1, 'a'), '4': cursor(4, 'a'), [LAYER_TYPES_KEY]: { '1': newer, '4': currentList(4) } });
+
+    // The older build's next cursor write records its own list, so upgrading again re-pulls the layer.
+    recordLayerTypes(state, 1);
+    expect(resetLayersMissingTypes(state, withType(1, 'training_notes'))).toEqual([1]);
   });
 
-  it('compares lists as sets, ignoring order', () => {
+  it('compares lists ignoring order', () => {
     const state: Record<string, unknown> = { '0': cursor(0, 'a'), [LAYER_TYPES_KEY]: { '0': [...TOPO_LAYERS[0]].reverse() } };
-    expect(resetLayersWithChangedTypes(state)).toEqual([]);
+    expect(resetLayersMissingTypes(state)).toEqual([]);
   });
 });
 
@@ -285,6 +306,43 @@ describe('sync cycle with entity types this build does not know', () => {
     await expect(runSyncCycle()).resolves.toBe('converged');
     expect(firstPullOf(0)).toEqual(cursor(0, 'end'));
     expect(resetEvents()).toHaveLength(0);
+  });
+
+  it('replays an ordered table and a tombstone as no-ops while the skipped root rows arrive', async () => {
+    markSignedInAndBootstrapped();
+    database.insert(exerciseDefinitions).values({ id: 'def-1', name: 'Bench' }).run();
+    database.insert(sessions).values({ id: 's-1', startedAt: new Date(1_000), status: 'completed', localUpdatedAtMs: 100 }).run();
+    database.insert(sessionExercises).values({
+      id: 'se-1', sessionId: 's-1', exerciseDefinitionId: 'def-1', name: 'Bench', orderIndex: 0, localUpdatedAtMs: 100,
+    }).run();
+    database.insert(exerciseSets).values([
+      { id: 'set-1', sessionExerciseId: 'se-1', orderIndex: 0, weightValue: '60', repsValue: '5', localUpdatedAtMs: 100 },
+      { id: 'set-2', sessionExerciseId: 'se-1', orderIndex: 1, weightValue: '62', repsValue: '5', localUpdatedAtMs: 110 },
+      { id: 'set-gone', sessionExerciseId: 'se-1', orderIndex: 2, weightValue: '70', repsValue: '1',
+        deletedAt: new Date(2_000), localUpdatedAtMs: 120 },
+    ]).run();
+    database.insert(bodyWeightMeasurements).values({ id: 'bw-1', weightKg: 80, measuredAt: new Date(3_000), localUpdatedAtMs: 130 }).run();
+    const setsBefore = database.select().from(exerciseSets).all();
+    const serverRows = [
+      ...setsBefore.map((row) => entityToWire(row as never, 'exercise_sets')),
+      entityToWire(database.select().from(bodyWeightMeasurements).get() as never, 'body_weight_measurements'),
+    ];
+    // The old build never held the measurement: it skipped body_weight_measurements on layer 5.
+    database.delete(bodyWeightMeasurements).run();
+    writeState({
+      '5': cursor(5, 'old'),
+      [LAYER_TYPES_KEY]: { '5': TOPO_LAYERS[5].filter((type) => type !== 'body_weight_measurements') },
+    });
+    serve({ 5: serverRows });
+
+    await expect(runSyncCycle()).resolves.toBe('converged');
+
+    expect(firstPullOf(5)).toBeNull();
+    expect(database.select().from(exerciseSets).all()).toEqual(setsBefore);
+    expect(database.select().from(bodyWeightMeasurements).get()).toEqual(
+      expect.objectContaining({ id: 'bw-1', weightKg: 80, localDirty: false, localUpdatedAtMs: 130 }),
+    );
+    expect(pushedIds.filter((id) => id.startsWith('set-') || id === 'bw-1')).toEqual([]);
   });
 
   it('keeps a legacy cursor stored without a type list, then records the lists', async () => {
