@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { getCompetitionStream } from '@/src/groups/api';
 import type { CompetitionStreamItemWire, CompetitionStreamWire } from '@/src/groups/competition-wire';
-import { completedSessionsFromStream, type GroupWeekLatestSession } from '@/src/groups/week-summary-view-model';
+import { completedSessionsFromStream, type GroupRecentSession } from '@/src/groups/week-summary-view-model';
 
 /** One page of a group's stream, newest first; the default reads it online. */
 export type GroupStreamPageLoader = (groupId: string, before: string | null) => Promise<CompetitionStreamWire>;
@@ -13,18 +13,18 @@ const MAX_PAGES = 2;
 
 export type GroupRecentSessions = {
   /** The completed sessions read, newest first; empty until read. */
-  sessions: GroupWeekLatestSession[];
+  sessions: GroupRecentSession[];
   failed: boolean;
 };
 
 // `failedWith`: the week read a failure happened under; only a newer one tries again.
 // `loadedFor`: how many sessions the last good read was for (0: none yet).
-type State = { key: string; sessions: GroupWeekLatestSession[]; loadedFor: number; failed: boolean; failedWith?: unknown };
+type State = { key: string; sessions: GroupRecentSession[]; loadedFor: number; failed: boolean; failedWith?: unknown };
 
 /**
- * The group's latest completed sessions for Today's group card, read online
- * from its stream when the card has room for more than the week summary
- * carries (`wanted` above zero). A newer latest session (`latestSessionId`)
+ * The group's latest `wanted` completed sessions, read online from its stream
+ * (none when `wanted` is zero): Today's group card and At a glance draw them,
+ * with their GRs and PRs. A newer latest session (`latestSessionId`)
  * or another group reads again, so the card never misses what was shared since.
  * A failed read is tried again when the group's week is read again
  * (`refreshedWith` changes: Retry, pull to refresh, refocus).
@@ -56,8 +56,7 @@ export function useGroupRecentSessions(
           const result = await loadPage(groupId, cursor);
           items = [...items, ...result.items];
           cursor = result.next_cursor;
-          // The latest summary session is shown already; one more than wanted covers it.
-          if (completedSessionsFromStream(items).length > wanted || !result.has_more || cursor === null) break;
+          if (completedSessionsFromStream(items).length >= wanted || !result.has_more || cursor === null) break;
         }
       } catch {
         if (!cancelled) setState({ key, sessions: [], loadedFor: 0, failed: true, failedWith: refreshedWith });

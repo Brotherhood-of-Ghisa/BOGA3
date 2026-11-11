@@ -132,7 +132,7 @@ competitive. Every group RPC requires the `x-boga-group-contract: 4` header
 (`UPDATE_REQUIRED` otherwise). The legacy kg and protocol-3 RPCs are gone; their
 stored rows remain history.
 
-**Week summary and period totals.** The client supplies local windows; the server never guesses a time zone.
+**Week summary and period totals.** Windows are client-local; the server never guesses a zone.
 Both count, over completed, untombstoned
 sessions shared to the group by current members and started in a window,
 their performed, live, working facts whose rows still exist (trailing the
@@ -145,11 +145,12 @@ totals (At a glance): 1–12 windows of ≤ 32 days, in order, unranked.
 
 **Record stream** (`group_competition_stream_v2`) adds each record's
 `record`: its set, and per board taken the previous #1 (holder and set, or
-the lifter's own prior value).
+the lifter's own prior value); `_v4` adds `group_record_metrics`: boards
+taken #1 (`GR`), the rest PRs (`apps/mobile/src/groups/record-boards.ts`).
 
 **Session records** (`group_competition_session_records`) sit beside the
-session detail, not in it: exact readers reject a new key. One shared session's
-non-voided records that took #1 in the group, as stream events whose `record`
+session detail (exact readers reject new keys). One shared session's
+non-voided group records, as stream events whose `record`
 values are those boards, each with the All board's current leader (`leads`
 while its own set holds #1; no leader for an earlier revision). The app shows
 them once the session completes (a provisional record can still move), and

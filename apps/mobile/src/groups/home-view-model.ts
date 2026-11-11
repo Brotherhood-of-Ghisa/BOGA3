@@ -17,13 +17,13 @@ import {
 /** A metric's own name, as the selector and the chart heading say it. */
 export const GROUP_HOME_METRIC_LABELS: Record<GroupHomeMetric, string> = {
   sets: 'Sets',
-  prs: 'PRs',
+  prs: 'GR',
 };
 
 /** The board column's micro-label. */
 export const GROUP_HOME_METRIC_COLUMN: Record<GroupHomeMetric, string> = {
   sets: 'Sets',
-  prs: 'PRs',
+  prs: 'GR',
 };
 
 export const GROUP_HOME_METRIC_UNIT: Record<GroupHomeMetric, string> = {
@@ -99,7 +99,7 @@ export const buildGroupHomeBoard = ({
     rows,
     me: mine ? { rankLabel: formatOrdinal(mine.rank), valueLabel: formatGroupHomeMetric(mine.value) } : null,
     accessibilityLabel: [
-      `Top ${rows.length} by ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`,
+      `Top ${rows.length} by ${GROUP_HOME_METRIC_UNIT[metric]}`,
       ...rows.map((row) => `${row.rank}, ${row.name}, ${row.valueLabel} ${unit}`),
       mine ? `You, ${formatOrdinal(mine.rank)}, ${formatGroupHomeMetric(mine.value)} ${unit}` : null,
     ]

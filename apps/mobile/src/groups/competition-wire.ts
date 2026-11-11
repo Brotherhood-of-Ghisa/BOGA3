@@ -131,6 +131,8 @@ export type CompetitionSessionRecordsWire = {
 export type CompetitionStreamRecordWire = {
   performance: CompetitionPerformanceWire | null;
   previous: { value: CompetitionHistoryValueWire; performance: CompetitionPerformanceWire | null }[];
+  /** The boards this set took #1 on: its group records. Its other boards are the member's own new bests (PRs). */
+  group_record_metrics: CompetitionHistoricalMetric[];
 };
 export type GroupSharedExerciseDetailsWire = {
   group_exercise_id: string | null;
@@ -178,7 +180,7 @@ export type GroupSharedExerciseDeleteWire = {
 };
 export type CompetitionStreamItemWire =
   | { kind: 'competition'; key: string; sort_at_ms: number; event: CompetitionEventWire;
-      /** Record events only, from group_competition_stream_v2; absent in a payload cached from the first reader. */
+      /** Record events only (group_competition_stream_v4); absent from the first reader, which the app no longer calls. */
       record?: CompetitionStreamRecordWire }
   | { kind: 'session'; key: string; sort_at_ms: number; groups: { group_id: string; name: string }[]; session: CompetitionSessionWire }
   | { kind: 'membership'; key: string; sort_at_ms: number; event: 'joined' | 'left' | 'removed';

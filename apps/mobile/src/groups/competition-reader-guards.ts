@@ -148,7 +148,10 @@ const performedSet = (v: unknown) => v === null ||
 function streamRecord(v: unknown, event: CompetitionEventWire): boolean {
   const normalized = event.visibility === 'normalized';
   const visibility = (set: unknown) => (set as { visibility: string }).visibility;
-  return exact(v,['performance','previous']) && event.kind === 'record' && performedSet(v.performance) &&
+  const recordMetrics = event.values.filter(value => value.role === 'record').map(value => value.metric);
+  return exact(v,['performance','previous','group_record_metrics']) && event.kind === 'record' && performedSet(v.performance) &&
+    Array.isArray(v.group_record_metrics) && new Set(v.group_record_metrics).size === v.group_record_metrics.length &&
+    v.group_record_metrics.every(metric => historicalMetric(metric) && recordMetrics.includes(metric)) &&
     (v.performance === null || visibility(v.performance) === event.visibility) &&
     arrayOf(v.previous,p => exact(p,['value','performance']) && performedSet(p.performance) &&
       (p.value as { role?: unknown }).role === 'previous' &&

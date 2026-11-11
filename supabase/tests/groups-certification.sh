@@ -328,6 +328,10 @@ stream_v2() {
   rpc "$1" group_competition_stream_v2 "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
   expect_ok "group_competition_stream_v2"
 }
+stream_v4() {
+  rpc "$1" group_competition_stream_v4 "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
+  expect_ok "group_competition_stream_v4"
+}
 # jq: the stream's record items for set $s.
 RECORDS='[.items[] | select(.kind == "competition" and .event.kind == "record" and .event.set_id == $s)]'
 
@@ -1108,6 +1112,48 @@ certify_set "${CERTIFIER_TOKEN}" "${ATHLETE_UID}" merge-set MERGE_FRESH
 expect_sql "new post-merge root observations stay valid" "select bool_and(app_public.group_metric_certification_mode_matches(c)) from app_public.group_metric_certifications c where set_id='${T}-merge-set' and ended_at is null;" "t"
 expect_sql "merge created no witnesses" "select count(distinct coalesce(witness_certification_id,id)) from app_public.group_metric_certifications where set_id='${T}-merge-set';" "2"
 pass "exercise merges preserve links and same-mode witnesses; failed correction is terminal; fresh observations remain valid"
+
+# Stream v4: each record names the boards it took #1 on (its group records);
+# a new best that took none is the member's PR. Its own comparison, so the
+# boards earlier steps left behind cannot move the #1 (R has left by now,
+# so the admin lifts second).
+GX="$(gx "${OWNER_TOKEN}" "${GID}" "Squat")"
+DAQ="${T}-dAq"; DMQ="${T}-dMq"
+def "${ATHLETE_TOKEN}" "${DAQ}" total_load
+link "${ATHLETE_TOKEN}" "${DAQ}"
+def "${ADMIN_TOKEN}" "${DMQ}" total_load
+link "${ADMIN_TOKEN}" "${DMQ}"
+next_session_at
+sess "${ATHLETE_TOKEN}" "${T}-q1s" completed "${DAQ}" "q1:100:1"
+drain "squat #1"
+next_session_at
+sess "${ADMIN_TOKEN}" "${T}-q2s" completed "${DMQ}" "q2:90:1"
+drain "a second member's first squat, below #1"
+next_session_at
+sess "${ADMIN_TOKEN}" "${T}-q3s" completed "${DMQ}" "q3:95:1"
+drain "their new best, still below #1"
+expect_sql "v4 setup: q1 took #1 on both boards; q2 and q3 are records that took none (stored flags)" \
+  "select string_agg(replace(e.set_id, '${T}-', '') || ':' || (b->>'metric') || ':' || coalesce(b->>'group_record','false'), ',' order by e.set_id, b->>'metric')
+     from app_public.group_events e, jsonb_array_elements(e.payload->'boards') b
+    where e.group_exercise_id = '${GX}' and e.kind = 'record';" \
+  "q1:e1rm:true,q1:volume:true,q2:e1rm:false,q2:volume:false,q3:e1rm:false,q3:volume:false"
+stream_v4 "${ADMIN_TOKEN}"
+V4_PAGE="${BODY}"
+check_args "v4: the group's first #1 names both boards" --arg s "${T}-q1" \
+  "${RECORDS}"' | length == 1 and .[0].record.group_record_metrics == ["e1rm","volume"]'
+check_args "v4: a new best below #1 lists its boards and names no GR board" --arg s "${T}-q3" \
+  "${RECORDS}"' | length == 1 and .[0].record.group_record_metrics == []
+   and ([.[0].event.values[] | select(.role == "record") | .metric] | sort) == ["e1rm","volume"]'
+check "v4: only record items carry GR boards, each one of the record's own boards" \
+  'all(.items[]; if (.kind == "competition" and .event.kind == "record") then
+     (.record.group_record_metrics - [.event.values[] | select(.role == "record") | .metric]) == []
+   else (.record? // {} | has("group_record_metrics") | not) end)'
+rpc "${ADMIN_TOKEN}" group_competition_stream_v3 "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
+expect_ok "group_competition_stream_v3"
+[[ "$(jq -c 'del(.items[].record.group_record_metrics?)' <<<"${V4_PAGE}")" == "$(jq -c '.' <<<"${BODY}")" ]] \
+  || fail "v4 is v3 plus GR boards, nothing else"
+check "v3: unchanged for installed builds (no GR boards)" 'all(.items[]; .record? // {} | has("group_record_metrics") | not)'
+pass "stream v4 names each record's #1 boards; a new best below #1 has none"
 
 COMPLETED=1
 echo "[${LANE_LABEL}] passed (run ${RUN_TAG})"

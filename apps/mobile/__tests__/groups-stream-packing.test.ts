@@ -1,7 +1,8 @@
 /**
  * The stream as drawn (`buildCompetitionStreamModels`): a session carries the
- * group records it took, so one session is one card; linking is left out
- * until the debug drawer asks for it.
+ * records it took, so one session is one card — its group records (GR) as
+ * lines, its other new bests (PRs) as a count; linking is left out until the
+ * debug drawer asks for it.
  */
 import {
   buildCompetitionStreamModels,
@@ -39,6 +40,19 @@ const eventItem = (
   key,
   sort_at_ms: 1500,
   event: { ...competitionEvent, event_id: key, ...overrides },
+});
+
+/** A stream record item that beat the member's best on 1RM and Weight, taking #1 on `groupRecords`. */
+const recordItem = (key: string, groupRecords: ('e1rm' | 'weight' | 'volume')[], overrides: Partial<CompetitionEventWire> = {}): CompetitionStreamItemWire => ({
+  kind: 'competition',
+  key,
+  sort_at_ms: 1500,
+  event: { ...competitionEvent, event_id: key, session_id: 's-1',
+    values: [
+      { role: 'record', metric: 'e1rm', unit: 'kg', value: 120, unavailable: false, member: null },
+      { role: 'record', metric: 'weight', unit: 'kg', value: 110, unavailable: false, member: null },
+    ], ...overrides },
+  record: { performance: null, previous: [], group_record_metrics: groupRecords },
 });
 
 const sessions = (models: ReturnType<typeof buildCompetitionStreamModels>): CompetitionSessionCard[] =>
@@ -101,5 +115,40 @@ describe('the stream as drawn', () => {
 
     expect(sessions(models)[0]?.records.map((line) => line.certified)).toEqual([true]);
     expect(models.map((model) => model.kind)).toEqual(['competition', 'session']);
+  });
+
+  it('lines up only the GR boards of a session, and counts the rest as PRs, a board once each', () => {
+    const models = buildCompetitionStreamModels([
+      recordItem('both', ['e1rm']),
+      recordItem('pr-only', []),
+      recordItem('two', ['e1rm', 'weight']),
+      sessionItem('s-1'),
+    ], undefined, 'DD-MM-YYYY');
+
+    expect(models).toHaveLength(1);
+    const [card] = sessions(models);
+    expect(card?.records.map((line) => [line.key, line.value])).toEqual([['both', '1RM 120.0'], ['two', '1RM 120.0 · Weight 110.0']]);
+    expect(card?.groupRecordCount).toBe(3);
+    // `both`'s Weight and `pr-only`'s two boards.
+    expect(card?.personalRecordCount).toBe(3);
+  });
+
+  it('counts neither a GR nor a PR for a Volume board, as the session view shows none', () => {
+    const models = buildCompetitionStreamModels([
+      recordItem('volume', ['volume'], { values: [{ role: 'record', metric: 'volume', unit: 'kg_reps', value: 900, unavailable: false, member: null }] }),
+      sessionItem('s-1'),
+    ], undefined, 'DD-MM-YYYY');
+    expect(sessions(models)[0]).toMatchObject({ records: [], groupRecordCount: 0, personalRecordCount: 0 });
+  });
+
+  it('draws a record outside the page’s sessions only while it took #1, and never counts a voided one', () => {
+    const models = buildCompetitionStreamModels([
+      recordItem('alone-gr', ['e1rm'], { session_id: 's-missing' }),
+      recordItem('alone-pr', [], { session_id: 's-missing' }),
+      recordItem('voided-pr', [], { voided: true }),
+      sessionItem('s-1'),
+    ], undefined, 'DD-MM-YYYY');
+    expect(models.map((model) => model.key)).toEqual(['alone-gr', 'friend-1:s-1']);
+    expect(sessions(models)[0]).toMatchObject({ groupRecordCount: 0, personalRecordCount: 0 });
   });
 });

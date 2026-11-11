@@ -34,12 +34,15 @@ it('renders the actual Stream presenters and reports their existing callbacks', 
 
 it('renders embedded current/past semantics without replacing production read hooks', () => {
   const current = render(<CompactGallery initialSample="embedded" />);
-  fireEvent.press(screen.getByTestId('today-cow-current'));
+  fireEvent.press(screen.getByTestId('today-cow-current-open'));
   expect(screen.getByTestId('ui-gallery-action')).toHaveTextContent('Current CoW');
+  fireEvent.press(screen.getByTestId('today-cow-week-earlier'));
+  expect(screen.getByTestId('ui-gallery-action')).toHaveTextContent('Last week CoW');
   current.unmount();
   render(<CompactGallery initialSample="embedded" initialState="past" />);
-  expect(screen.getByTestId('today-cow-previous').props.onPress).toBeUndefined();
-  expect(screen.getByTestId('today-cow-winner-e1rm')).toBeTruthy();
+  expect(screen.getByText('Last Week CoW')).toBeTruthy();
+  expect(screen.getByTestId('today-cow-week-earlier')).toBeDisabled();
+  expect(screen.getByTestId('today-cow-previous-rows')).toBeTruthy();
 });
 
 it('recovers a failed embedded read through the real retry presenter', () => {

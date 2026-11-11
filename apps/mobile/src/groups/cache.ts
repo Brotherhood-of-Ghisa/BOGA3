@@ -20,7 +20,7 @@ export type GroupCacheDatabase = BaseSQLiteDatabase<'sync', unknown, typeof sche
 export const groupCacheKeys = {
   mine: 'groups:v8:mine',
   group: (groupId: string) => `group:v8:${groupId}`,
-  stream: (groupId: string) => `stream:v8:${groupId}:cow-events-v1`,
+  stream: (groupId: string) => `stream:v8:${groupId}:group-records-v1`,
   session: (groupId: string, memberUserId: string, sessionId: string) => `session:v8:${groupId}:${memberUserId}:${sessionId}`,
   /** Versioned comparison catalogue; v1 cache entries are not reused. */
   groupExercises: (groupId: string) => `group-exercises:v8:${groupId}`,
@@ -201,7 +201,7 @@ export const subscribeCompetitionCache = (listener: () => void): (() => void) =>
 export const evictObsoleteGroupCache = (database: GroupCacheDatabase,userId: string): void => {
   database.delete(groupCache).where(and(eq(groupCache.userId,userId),notLike(groupCache.cacheKey,'%:v8:%'))).run();
   database.delete(groupCache).where(and(eq(groupCache.userId,userId),like(groupCache.cacheKey,'stream:v8:%'),
-    notLike(groupCache.cacheKey,'%:cow-events-v1'))).run();
+    notLike(groupCache.cacheKey,'%:group-records-v1'))).run();
 };
 
 export function invalidateCompetitionMemory(userId: string): void {
