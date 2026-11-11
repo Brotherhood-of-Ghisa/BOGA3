@@ -2,12 +2,13 @@ import React from 'react';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react-native';
 
 import { WEEK_SETS_LOADING_DELAY_MS, WeekSetList } from '@/components/stats/week-set-list';
-import { exerciseWeekBlocks, formatWeekDay, muscleWeekBlocks, useWeekSets, weekSetGroups, type WeekSetsTarget } from '@/components/stats/week-sets';
+import { exerciseWeekBlocks, formatWeekDay, muscleWeekBlocks, setPeriodBounds, usePeriodSets, useWeekSets, weekSetGroups, type WeekSetsTarget } from '@/components/stats/week-sets';
 import type { CompletedSessionDetailCard } from '@/src/session-recorder/completed-session-detail-model';
 import type { ExerciseHistorySessionEntry, MuscleSetContribution } from '@/src/data';
 import { seedTodayProgressFixture } from '@/src/maestro/today-progress-fixture';
 import { localWeekBounds } from '@/src/utils/calendar-weeks';
 import * as sessionFacts from '@/src/data/exercise-session-facts';
+import * as statsRepository from '@/src/data/stats';
 
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 import { and, eq, gte, lt } from 'drizzle-orm';
@@ -48,7 +49,7 @@ describe('week blocks and groups', () => {
     const groups = weekSetGroups(blocks, new Map([['s1', [card('se1', 'Bench Press', band)]], ['s0', [card('se0', 'Incline Press')]]]));
     // Newest first.
     expect(groups.map(group => [group.key, group.title, group.detail, group.record, group.exerciseDefinitionId])).toEqual([
-      ['se1', 'Bench Press', '07-10-2026', band, 'bench'],
+      ['se1', 'Bench Press', '07-10-2026', [], 'bench'],
       ['se0', 'Incline Press', '05-10-2026', [], 'bench'],
     ]);
   });
@@ -82,6 +83,26 @@ describe('week blocks and groups', () => {
 
   it('bounds a week from its local Monday to the next, exclusive', () => {
     expect(localWeekBounds('2026-10-05')).toEqual({ start: new Date(2026, 9, 5), end: new Date(2026, 9, 12) });
+  });
+
+  it.each([['2026-03-29', 23], ['2026-10-25', 25]])('bounds local day %s across the clock change', (dayKey, hours) => {
+    const { start, end } = setPeriodBounds({ weekKey: 'unused', dayKey: String(dayKey) });
+    expect(start.getHours()).toBe(0);
+    expect(end.getHours()).toBe(0);
+    expect((end.getTime() - start.getTime()) / 3_600_000).toBe(hours);
+  });
+
+  it('keeps only contributing rows and their record bands, with secondary half-credit', () => {
+    const row = (id: string) => ({ id, typeLabel: 'RIR 2', weightReps: '80.0 × 5', oneRepMax: '93.3', volume: '400', done: true,
+      oneRepMaxRecord: false, weightRecord: false });
+    const blocks = muscleWeekBlocks([contribution({ setId: 'a', setIdentity: 'a', role: 'secondary', roleWeight: 0.5 }),
+      contribution({ setId: 'b', setIdentity: 'b', role: 'secondary', roleWeight: 0.5 })], 'YYYY-MM-DD');
+    const band = (key: string) => ({ key, label: 'Record', set: null, spoken: 'Record' });
+    const [group] = weekSetGroups(blocks, new Map([['s1', [{ ...card('se1', 'Bench'), rows: [row('a'), row('warm'), row('b')],
+      record: [band('a'), band('warm'), band('volume')] }]]]));
+    expect(group.rows.map(row => row.id)).toEqual(['a', 'b']);
+    expect(group.record.map(line => line.key)).toEqual(['a']);
+    expect(group.contribution).toEqual({ sets: 1, volume: 1000 });
   });
 });
 
@@ -158,6 +179,33 @@ describe('useWeekSets over local data', () => {
     await waitFor(() => expect(result.current.groups).toHaveLength(3));
     expect(result.current.error).toBeNull();
     expect(result.current.groups.flatMap(group => group.record)).toEqual([]);
+  });
+
+  it('retains scroll content on focus refresh, but never presents an old metric or account as current', async () => {
+    await seed();
+    type Scope = { revision: number; metric: 'workingSetCount' | 'totalVolume'; account: number };
+    const { result, rerender } = renderHook(({ revision, metric, account }: Scope) =>
+      usePeriodSets({ muscleGroupIds: ['chest'], metric }, { weekKey: '2026-10-05' }, revision, account),
+    { initialProps: { revision: 0, metric: 'workingSetCount', account: 0 } as Scope });
+    await waitFor(() => expect(result.current.groups).toHaveLength(3));
+    const shown = result.current.groups;
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const read = statsRepository.computeSelectedMuscleDailyEffort;
+    jest.spyOn(statsRepository, 'computeSelectedMuscleDailyEffort').mockImplementationOnce(async options => {
+      await pending;
+      return read(options);
+    });
+    rerender({ revision: 1, metric: 'workingSetCount', account: 0 });
+    expect(result.current).toMatchObject({ loading: true, sameScope: true, groups: shown });
+    rerender({ revision: 2, metric: 'totalVolume', account: 0 });
+    expect(result.current.sameScope).toBe(false);
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { release(); });
+    expect(result.current).toMatchObject({ sameScope: true, loading: false });
+    rerender({ revision: 2, metric: 'totalVolume', account: 1 });
+    expect(result.current).toMatchObject({ groups: [], sameScope: false, loading: true });
+    await waitFor(() => expect(result.current.loading).toBe(false));
   });
 });
 

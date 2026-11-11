@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   // As wide as the old legend-plus-value pair, so weight × reps keeps its room.
-  oneRepMaxColumn: { width: uiGeometry.metricValueWidth + uiSpace.xl },
+  oneRepMaxColumn: { width: uiGeometry.metricValueWidth + uiSpace.xl + uiSpace.sm },
   volumeColumn: { width: uiGeometry.metricValueWidth + uiSpace.xl },
   oneRepMax: { width: uiGeometry.metricValueWidth + uiSpace.sm },
   volume: { width: uiGeometry.metricValueWidth + uiSpace.xl },

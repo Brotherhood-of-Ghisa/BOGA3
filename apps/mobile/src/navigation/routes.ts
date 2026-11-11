@@ -86,6 +86,14 @@ export const progressHistoryHref = (
   return `${PROGRESS_HISTORY_ROUTE}?${id}${carried}${gym === undefined ? '' : `&gymId=${encodeURIComponent(gym)}`}${secondary}${volume}${view ? `&view=${view}` : ''}` as Href;
 };
 
+/** The same muscle's contributing sets, bounded to the tapped local day or week. */
+export const muscleHistoryDetailHref = (
+  subject: { muscleGroupId: string; gymId?: string | null; countSecondary?: boolean; countSecondaryVolume?: boolean },
+  period: { day: string } | { week: string },
+  metric: ProgressMetric,
+): Href => `${progressHistoryHref(subject, metric)}&${'day' in period
+  ? `day=${encodeURIComponent(period.day)}` : `week=${encodeURIComponent(period.week)}`}` as Href;
+
 /** One completed session's view. */
 export const completedSessionHref = (sessionId: string): Href =>
   `/completed-session/${encodeURIComponent(sessionId)}` as Href;
