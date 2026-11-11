@@ -245,6 +245,9 @@ function GroupsTabContent({ userId }: { userId: string }) {
         period={period}
         refreshControl={refreshControl}
         series={glance.series}
+        streamItems={stream.items}
+        onOpenSession={(memberUserId, sessionId) =>
+          router.push(`/group-session/${memberUserId}/${sessionId}?groupId=${encodeURIComponent(selectedGroupId ?? '')}`)}
         style={frameStyle(frame)}
       />
     ),

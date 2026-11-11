@@ -1,106 +1,109 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
-import { CompactHeader, FigureText, Icon, ListRow, makeStyles, uiBorder, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { Card, CompactHeader, FigureText, Icon, IconButton, makeStyles, uiGeometry, uiSpace, useUiText } from '@/components/ui';
+import { CoWRows } from '@/components/groups/cow-preview';
 import { GroupInlineError, GroupMissingDataState, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
-import { formatBoardMemberLabel } from '@/src/groups/board-view-model';
-import { COW_METRIC_LABELS, coWAccessibleDates, coWDateRange, coWStatus } from '@/src/groups/cow-presentation';
-import type { CoWResultWire, CoWSummaryWire } from '@/src/groups/cow-wire';
+import { coWAccessibleDates, coWDateRange, coWStatus } from '@/src/groups/cow-presentation';
+import type { CoWMetric } from '@/src/groups/cow-scoring';
+import type { CoWRankingWire, CoWResultWire, CoWSummaryWire } from '@/src/groups/cow-wire';
 import { useCoWSummary } from '@/src/groups/use-cow-summary';
 import type { GroupResourceState } from '@/src/groups/use-group-resource';
 import { coWsHref } from '@/src/navigation/routes';
 import { useDateFormat } from '@/src/preferences/hooks';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 
-/** Rank-one identity survives figure redaction; never promote a visible runner-up. */
-function WinnerRows({ result }: { result: CoWResultWire }) {
-  const styles = useStyles();
-  const text = useUiText();
-  const tone = useUiTextTone();
-  if (result.cow.state !== 'final' || result.state !== 'ready') {
-    return <Text allowFontScaling={false} style={text.meta}>{coWStatus(result.cow, result.state)}</Text>;
-  }
-  return result.cow.metrics.map(metric => {
-    const ranking = result.rankings.find(row => row.metric === metric);
-    const winner = ranking?.entries.find(row => row.rank === 1);
-    const name = winner ? formatBoardMemberLabel(winner.member, winner.former, null)
-      : !ranking ? 'Unavailable' : 'No qualifying results';
-    const suffix = `[${COW_METRIC_LABELS[metric]}]`;
-    return <View key={metric} accessible accessibilityLabel={`${name} ${suffix}`} style={styles.winner}
-      testID={`today-cow-winner-${metric}`}>
-      <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.meta, tone.ink, styles.name]}
-        testID={`today-cow-winner-${metric}-name`}>{name}</Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.ink, styles.metric]}><FigureText>{suffix}</FigureText></Text>
-    </View>;
-  });
-}
+/** Today ranks by 1RM; a CoW without it shows its first metric. */
+export const todayCoWRanking = (result: CoWResultWire): CoWRankingWire | undefined =>
+  result.rankings.find(ranking => ranking.metric === 'e1rm') ?? result.rankings.find(ranking => ranking.metric === result.cow.metrics[0]);
 
-type SectionProps = {
+type CardProps = {
   resource: GroupResourceState<CoWSummaryWire>;
+  /** Shows last week's CoW; the title and testIDs follow. */
   previous: boolean;
   dateFormat: ExerciseDateFormat;
-  onOpen: (result: CoWResultWire) => void;
+  userId: string;
+  /** Present while the other week can be shown: `‹` steps to last week, `›` back to this one. */
+  onEarlier?: () => void;
+  onLater?: () => void;
+  onOpen: (result: CoWResultWire, metric: CoWMetric) => void;
   onRetry: () => void;
 };
 
-export function TodayCoWSummarySection({ resource, previous, dateFormat, onOpen, onRetry }: SectionProps) {
-  const styles = useStyles();
-  const { data, offline, error, lastUpdatedAtMs } = resource;
-  const prefix = previous ? 'today-cow-previous' : 'today-cow-current';
-  const result = data?.result;
-  if (data && (!result || !previous && data.selection !== 'current')) return null;
-  const title = previous ? 'Last Week CoW' : 'Current CoW';
-  const exercise = result?.exercise?.name ?? 'Exercise unavailable';
-  const metrics = result?.cow.metrics.map(metric => COW_METRIC_LABELS[metric]).join(' · ');
-  const inlineError = pickInlineError(error);
-  const label = result ? `${title}, ${exercise}, ${metrics}, ${coWAccessibleDates(result.cow.week_start, dateFormat)}` : title;
-  return <>
-    {offline && result ? <GroupOfflineBanner lastUpdatedAtMs={lastUpdatedAtMs} /> : null}
-    {inlineError && result ? <GroupInlineError error={inlineError} onRetry={onRetry} testID={`${prefix}-error`} /> : null}
-    <ListRow density="list" divider accessibilityLabel={!previous ? label : undefined}
-    accessibilityHint={!previous && result ? 'Opens this challenge in the group' : undefined}
-    onPress={!previous && result ? () => onOpen(result) : undefined}
-    testID={prefix}>
-    <View style={styles.content}>
-      <View style={styles.heading}>
-        <CompactHeader label={title} accessibilityRole="header"
-          metadata={result ? coWDateRange(result.cow.week_start, dateFormat, true) : undefined}
-          metadataAccessibilityLabel={result ? coWAccessibleDates(result.cow.week_start, dateFormat) : undefined} />
-      </View>
-      {result ? <SummaryResult result={result} previous={previous} prefix={prefix} />
-        : <GroupMissingDataState error={inlineError} offline={offline} onRetry={onRetry} testIDPrefix={prefix} />}
-    </View>
-    </ListRow>
-  </>;
-}
-
-function SummaryResult({ result, previous, prefix }: { result: CoWResultWire; previous: boolean; prefix: string }) {
+function WeekStepper({ label, accessibilityLabel, onEarlier, onLater, testID }: {
+  label: string; accessibilityLabel: string; onEarlier?: () => void; onLater?: () => void; testID: string;
+}) {
   const styles = useStyles();
   const text = useUiText();
-  const tone = useUiTextTone();
-  const exercise = result.exercise?.name ?? 'Exercise unavailable';
-  const metrics = result.cow.metrics.map(metric => COW_METRIC_LABELS[metric]).join(' · ');
-  return <>
-    <View style={styles.exerciseRow}>
-      <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={[text.bodyStrong, styles.name]}
-        accessibilityLabel={exercise} testID={`${prefix}-exercise`}>{exercise}</Text>
-      {!previous ? <Icon name="chevron-right" colorRole="inkMuted" size="sm" /> : null}
-    </View>
-    {previous ? <WinnerRows result={result} /> : <Text allowFontScaling={false} style={[text.meta, tone.ink]}>
-      <FigureText>{metrics}</FigureText>
-    </Text>}
-  </>;
+  return <View style={styles.stepper}>
+    <IconButton accessibilityLabel="Last week's CoW" disabled={!onEarlier} name="chevron-left" onPress={() => onEarlier?.()}
+      testID={`${testID}-earlier`} tone="muted" />
+    <Text allowFontScaling={false} numberOfLines={1} accessibilityLabel={accessibilityLabel} style={text.meta} testID={`${testID}-dates`}>
+      <FigureText>{label}</FigureText>
+    </Text>
+    <IconButton accessibilityLabel="This week's CoW" disabled={!onLater} name="chevron-right" onPress={() => onLater?.()}
+      testID={`${testID}-later`} tone="muted" />
+  </View>;
 }
 
-/** Today's compact summaries sit above its unchanged weekly board, inside the same card. */
-export function TodayCoWSummaries({ groupId, userId }: { groupId: string; userId: string }) {
+/**
+ * One CoW in its own card: the title and week between `‹ ›`, the exercise
+ * (opening that CoW), then its 1RM podium as the summary carries it — server
+ * places and figures only, never a runner-up promoted over a redacted rank one.
+ */
+export function TodayCoWCard({ resource, previous, dateFormat, userId, onEarlier, onLater, onOpen, onRetry }: CardProps) {
   const styles = useStyles();
+  const text = useUiText();
+  const { data, offline, error, lastUpdatedAtMs } = resource;
+  const prefix = previous ? 'today-cow-previous' : 'today-cow-current';
+  const result = data?.result ?? null;
+  const title = previous || data?.selection === 'previous_final' ? 'Last Week CoW' : 'Current CoW';
+  const inlineError = pickInlineError(error);
+  const ranking = result ? todayCoWRanking(result) : undefined;
+  const status = result ? (previous ? 'Last week · Final' : coWStatus(result.cow, result.state)) : null;
+  // Confirmed absence takes no space.
+  if (data && !result) return null;
+  return <Card testID="today-cow-card">
+    <View style={styles.content} testID={prefix}>
+      {offline && result ? <GroupOfflineBanner lastUpdatedAtMs={lastUpdatedAtMs} /> : null}
+      {inlineError && result ? <GroupInlineError error={inlineError} onRetry={onRetry} testID={`${prefix}-error`} /> : null}
+      <View style={styles.heading}>
+        <View style={styles.title}><CompactHeader label={title} accessibilityRole="header" /></View>
+        <WeekStepper label={result ? coWDateRange(result.cow.week_start, dateFormat, true) : '—'}
+          accessibilityLabel={result ? coWAccessibleDates(result.cow.week_start, dateFormat) : 'Dates unavailable'}
+          onEarlier={onEarlier} onLater={onLater} testID="today-cow-week" />
+      </View>
+      {result ? <>
+        <Pressable accessibilityRole="button" accessibilityHint="Opens this challenge in the group"
+          accessibilityLabel={`${title}, ${result.exercise?.name ?? 'Exercise unavailable'}, ${coWAccessibleDates(result.cow.week_start, dateFormat)}, ${status}`}
+          onPress={() => onOpen(result, ranking?.metric ?? result.cow.metrics[0])} style={styles.open} testID={`${prefix}-open`}>
+          <Text allowFontScaling={false} numberOfLines={1} ellipsizeMode="tail" style={[text.bodyStrong, styles.name]}
+            testID={`${prefix}-exercise`}>{result.exercise?.name ?? 'Exercise unavailable'}</Text>
+          <Text allowFontScaling={false} style={text.meta}>{status}</Text>
+          <Icon name="chevron-right" colorRole="inkMuted" size="sm" />
+        </Pressable>
+        {result.state === 'ready' && ranking ? <CoWRows ranking={ranking} userId={userId} testID={`${prefix}-rows`} />
+          : <Text allowFontScaling={false} style={text.meta} testID={`${prefix}-state`}>
+            {result.state === 'unavailable' ? 'Group comparisons unavailable' : result.state === 'ready' ? 'Unavailable' : coWStatus(result.cow, result.state)}
+          </Text>}
+      </> : <GroupMissingDataState error={inlineError} offline={offline} onRetry={onRetry} testIDPrefix={prefix} />}
+    </View>
+  </Card>;
+}
+
+/**
+ * Today's CoW card: this week's CoW, and last week's behind `‹`. Each week is
+ * its own cached summary read; last week's shows only while both reads agree
+ * on the week and calendar. Confirmed absence in both weeks takes no space.
+ */
+export function TodayCoWSummaries({ groupId, userId }: { groupId: string; userId: string }) {
   const router = useRouter();
   const dateFormat = useDateFormat();
   const current = useCoWSummary(groupId, userId);
   const previous = useCoWSummary(groupId, userId, true);
+  const [picked, setPicked] = useState<'current' | 'previous'>('current');
   const refreshCurrent = current.refresh;
   const refreshPrevious = previous.refresh;
   const retry = useCallback(() => { void Promise.all([refreshCurrent(), refreshPrevious()]); }, [refreshCurrent, refreshPrevious]);
@@ -108,21 +111,25 @@ export function TodayCoWSummaries({ groupId, userId }: { groupId: string; userId
     current.data.calendar_revision !== previous.data.calendar_revision);
   useEffect(() => { if (mismatch) retry(); }, [mismatch, retry]);
   if (current.lostAccess || previous.lostAccess) return null;
-  if (current.data?.selection === 'none' && previous.data?.selection === 'none') return null;
-  const open = (result: CoWResultWire) => router.push(coWsHref(groupId, result.cow.cow_id, result.cow.metrics[0]));
-  return <View style={styles.sections} testID="today-cow-summaries">
-    <TodayCoWSummarySection resource={current} previous={false} dateFormat={dateFormat} onOpen={open} onRetry={retry} />
-    <TodayCoWSummarySection resource={{ ...previous, data: !mismatch ? previous.data : null }}
-      previous dateFormat={dateFormat} onOpen={open} onRetry={retry} />
-  </View>;
+  const currentNone = current.data?.selection === 'none';
+  const previousNone = previous.data?.selection === 'none';
+  if (currentNone && previousNone) return null;
+  // A current read that is itself last week's final (a legacy fallback) has no other week to step to.
+  const steps = current.data?.selection !== 'previous_final' && !previousNone;
+  const showPrevious = steps && (picked === 'previous' || currentNone);
+  const open = (result: CoWResultWire, metric: CoWMetric) => router.push(coWsHref(groupId, result.cow.cow_id, metric));
+  return showPrevious
+    ? <TodayCoWCard resource={{ ...previous, data: !mismatch ? previous.data : null }} previous dateFormat={dateFormat} userId={userId}
+      onLater={currentNone ? undefined : () => setPicked('current')} onOpen={open} onRetry={retry} />
+    : <TodayCoWCard resource={current} previous={false} dateFormat={dateFormat} userId={userId}
+      onEarlier={steps ? () => setPicked('previous') : undefined} onOpen={open} onRetry={retry} />;
 }
 
-const useStyles = makeStyles((roles) => ({
-  sections: { borderBottomWidth: uiBorder.width, borderBottomColor: roles.ruleSoft },
-  content: { paddingVertical: uiSpace.sm },
-  heading: { marginBottom: uiSpace.xs },
-  exerciseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
-  winner: { flexDirection: 'row', alignItems: 'baseline', gap: uiSpace.xs, maxWidth: '100%' },
-  name: { flexShrink: 1, minWidth: 0 },
-  metric: { flexShrink: 0 },
+const useStyles = makeStyles(() => ({
+  content: { paddingHorizontal: uiSpace.md, paddingVertical: uiSpace.sm, gap: uiSpace.xs },
+  heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
+  title: { flexShrink: 1 },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  open: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm, minHeight: uiGeometry.tapTarget },
+  name: { flex: 1, minWidth: 0 },
 }));

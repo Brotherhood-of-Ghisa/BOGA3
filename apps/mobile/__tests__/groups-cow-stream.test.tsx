@@ -7,7 +7,8 @@ import { buildCoWStreamCard } from '@/src/groups/cow-stream-view-model';
 import { buildCompetitionStreamModels } from '@/src/groups/competition-stream-view-model';
 import type { CoWStreamEvent, CompetitionStreamWire } from '@/src/groups/competition-wire';
 import { compareStreamOrder, mergeStreamPages } from '@/src/groups/use-group-stream';
-import { groupCacheKeys, readGroupCache, writeGroupCache, observeGroupCompetitionPolicy } from '@/src/groups/cache';
+import { evictObsoleteGroupCache, groupCacheKeys, readGroupCache, writeGroupCache, observeGroupCompetitionPolicy } from '@/src/groups/cache';
+import { groupCache } from '@/src/data/schema';
 import { cowStreamItem } from './helpers/cow-fixtures';
 import { competitionSession } from './helpers/competition-fixtures';
 import { createInMemoryDatabase } from './helpers/in-memory-db';
@@ -111,6 +112,19 @@ it('versions cached event payloads and isolates account/group, including foreign
     const foreign=stream(); (foreign.items[0] as ReturnType<typeof cowStreamItem>).definition.group_id='g2';
     expect(() => writeGroupCache(db.database,{ cacheKey: key,userId: 'u1',payload: foreign,fetchedAtMs: 1 })).toThrow('Unsafe group cache payload.');
     expect(readGroupCache(db.database,'stream:v7:g1','u1')).toBeNull();
+  } finally { db.close(); }
+});
+
+it('drops a stream page cached before records named their GR boards, keeping the current one', () => {
+  const db=createInMemoryDatabase();
+  try {
+    const current=groupCacheKeys.stream('g1');
+    expect(current).toBe('stream:v7:g1:group-records-v1');
+    writeGroupCache(db.database,{ cacheKey: current,userId: 'u1',payload: stream(),fetchedAtMs: 1 });
+    db.database.insert(groupCache).values({ cacheKey: 'stream:v7:g1:cow-events-v1',userId: 'u1',payloadJson: JSON.stringify(stream()),fetchedAtMs: 1 }).run();
+    evictObsoleteGroupCache(db.database,'u1');
+    const keys=db.database.select().from(groupCache).all().map(row => row.cacheKey);
+    expect(keys).toEqual([current]);
   } finally { db.close(); }
 });
 

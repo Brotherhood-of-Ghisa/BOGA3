@@ -32,7 +32,7 @@ export function GroupSessionRecordsCard({ rows, ...rest }: CardProps) {
   return (
     <View style={styles.card} testID="group-session-records">
       <View style={styles.header}>
-        <Text allowFontScaling={false} style={[text.label, tone.record]}>Group records</Text>
+        <Text allowFontScaling={false} style={[text.label, tone.record]}>GR</Text>
         <Text allowFontScaling={false} style={[text.figureSmall, tone.record]} testID="group-session-records-count">{rows.length}</Text>
       </View>
       {rows.map(row => <RecordRow key={row.key} row={row} {...rest} />)}

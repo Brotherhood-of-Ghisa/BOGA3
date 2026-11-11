@@ -33,6 +33,15 @@ run_cow_stream_management_cases() {
   cursor="$(jq -r '.next_cursor' <<<"${BODY}")"
   rpc "${OWNER_TOKEN}" group_competition_stream_v3 "$(jq -nc --arg g "${group}" --arg c "${cursor}" '{p_group_id:$g,p_before:$c}')"
   expect_error VALIDATION 'v2 cursor cannot enter v3'
+  # v4 is v3 with GR boards: v3's own cursors, access and protocol checks.
+  rpc "${OWNER_TOKEN}" group_competition_stream_v4 "$(jq -nc --arg g "${group}" '{p_group_id:$g,p_limit:1}')"
+  expect_ok 'v4 first page'; cursor="$(jq -r '.next_cursor' <<<"${BODY}")"
+  rpc "${OWNER_TOKEN}" group_competition_stream_v4 "$(jq -nc --arg g "${group}" --arg c "${cursor}" '{p_group_id:$g,p_before:$c}')"
+  expect_ok 'v4 pages with its own cursor'
+  rpc "${ANON_KEY}" group_competition_stream_v4 "$(jq -nc --arg g "${group}" '{p_group_id:$g}')"
+  expect_error AUTH_REQUIRED 'anonymous v4 stream'
+  rpc "${OUTSIDER_TOKEN}" group_competition_stream_v4 "$(jq -nc --arg g "${group}" '{p_group_id:$g}')"
+  expect_error NOT_FOUND 'outsider v4 stream'
   rpc "${ANON_KEY}" group_competition_stream_v3 "$(jq -nc --arg g "${group}" '{p_group_id:$g}')"
   expect_error AUTH_REQUIRED 'anonymous CoW stream'
   token="$(mint_token "${OWNER_TOKEN}" cow-stream)"

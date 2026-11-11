@@ -111,7 +111,7 @@ describe('buildStreamRecordSheet', () => {
   it('names me, shows the set from the record stream and orders 1RM before Volume', () => {
     const event = { ...competitionEvent, member: { user_id: 'me', username: 'Me' }, sort_at_ms: Date.UTC(2026, 9, 6, 12),
       values: [{ ...competitionEvent.values[0], metric: 'volume' as const, unit: 'percent_bw_reps', value: 650 }, competitionEvent.values[0]] };
-    const model = buildStreamRecordSheet(event, { performance: ordinary, previous: [] }, 'me', 'DD-MM-YYYY');
+    const model = buildStreamRecordSheet(event, { performance: ordinary, previous: [], group_record_metrics: ['e1rm', 'volume'] }, 'me', 'DD-MM-YYYY');
     expect(model.who).toMatch(/^You · /);
     expect(model.set).toBe('120.0 × 5');
     expect(model.metrics.map(entry => [entry.label, entry.value])).toEqual([['1RM', '145.7 %BW'], ['Volume', '650.0 %BW·reps']]);
@@ -133,7 +133,8 @@ describe('buildStreamRecordSheet', () => {
     const record = { performance: null, previous: [
       { value: { role: 'previous' as const, metric: 'volume' as const, unit: 'kg_reps', value: 500, unavailable: false, member: { user_id: 'me', username: 'Me' } }, performance: null },
       { value: { role: 'previous' as const, metric: 'e1rm' as const, unit: 'kg', value: 110, unavailable: false, member: { user_id: 'sam', username: 'Sam' } },
-        performance: { ...ordinary, weight_value: '100', reps: 3, source_load_input_mode: 'per_side_load' as const } }] };
+        performance: { ...ordinary, weight_value: '100', reps: 3, source_load_input_mode: 'per_side_load' as const } }],
+      group_record_metrics: ['e1rm' as const, 'volume' as const] };
     const model = buildStreamRecordSheet(competitionEvent, record, 'me', 'DD-MM-YYYY');
     expect(model.set).toBe('5 reps');
     expect(model.previous).toEqual([

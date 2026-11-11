@@ -1,15 +1,12 @@
 /**
  * The record line under a session summary on Today's cards:
  * one PR names itself, more than one is only counted. A session's PRs are one
- * per record kind (`training-metrics-contract.md` §3); a group session's are
- * its group records, one per board taken, counted as the session view shows
- * them (no Volume board; `groups-contract.md`).
+ * per record kind (`training-metrics-contract.md` §3).
  */
 
 export type RecordNoun = { one: string; many: string };
 
 export const PERSONAL_RECORD_NOUN: RecordNoun = { one: 'PR', many: 'PRs' };
-export const GROUP_RECORD_NOUN: RecordNoun = { one: 'group record', many: 'group records' };
 
 export type SessionRecordLine =
   /** `Bench Press 1RM 102.5` in `record`, then ` · PR`. */

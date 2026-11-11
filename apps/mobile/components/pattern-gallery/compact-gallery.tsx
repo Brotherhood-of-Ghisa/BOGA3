@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Card, CompactCard, Notice, ScreenScroll, SegmentedControl, SwitchRow, ToggleChip, uiSpace, useUiText } from '@/components/ui';
+import { CompactCard, Notice, ScreenScroll, SegmentedControl, SwitchRow, ToggleChip, uiSpace, useUiText } from '@/components/ui';
 import { CoWPreview, CoWResultHeading } from '@/components/groups/cow-preview';
 import { GroupMetricStreamCard } from '@/components/groups/group-metric-stream-card';
 import { GroupStreamSessionCard } from '@/components/groups/stream-session-card';
-import { TodayCoWSummarySection } from '@/components/today/group-cow-summary';
+import { TodayCoWCard } from '@/components/today/group-cow-summary';
 import { GroupApiError } from '@/src/groups/api';
 import type { GroupResourceState } from '@/src/groups/use-group-resource';
 import type { CoWResultWire, CoWSummaryWire } from '@/src/groups/cow-wire';
@@ -54,10 +54,11 @@ export function CompactGallery({ initialSample, initialState, initialLong = fals
       <CompactCard><CoWResultHeading result={galleryCow('past', long)} previous today dateFormat="DD-MM-YYYY" /></CompactCard>
     </> : sample === 'cow' ? <CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" previous={state === 'past'}
       onOpen={metric => setAction(`CoW · ${metric}`)} onBrowse={metric => setAction(`Standings · ${metric}`)} testID="gallery-cow" />
-      : <Card testID="gallery-embedded-card">
-        <TodayCoWSummarySection resource={resource} previous={state === 'past'} dateFormat="DD-MM-YYYY"
+      : <View testID="gallery-embedded-card">
+        <TodayCoWCard resource={resource} previous={state === 'past'} dateFormat="DD-MM-YYYY" userId="u1"
+          onEarlier={state === 'past' ? undefined : () => setAction('Last week CoW')} onLater={state === 'past' ? () => setAction('This week CoW') : undefined}
           onOpen={() => setAction('Current CoW')} onRetry={retry} />
-      </Card>}
+      </View>}
     {sample === 'embedded' && state === 'absent' ? <Text allowFontScaling={false} style={text.meta} testID="gallery-absent">No CoW summary</Text> : null}
     {action ? <Notice live message={action} testID="ui-gallery-action" /> : null}
   </ScreenScroll>;

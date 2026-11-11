@@ -30,7 +30,8 @@ export function GroupWeekTotalsFigures({ current, previous, offset }: GroupWeekT
       />
       <WeekFigure
         current={current.prs}
-        label="PRs"
+        label="GR"
+        spokenLabel="Group records"
         previous={previous.prs}
         previousWeek={previousWeek}
         record

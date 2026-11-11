@@ -638,10 +638,10 @@ describe('Groups tab', () => {
     expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
     expect(screen.queryByTestId('groups-filter-period')).toBeNull();
 
-    // The metric pill cycles Sets -> PRs (no Volume), and the board follows it.
+    // The metric pill cycles Sets -> GR (no Volume), and the board follows it.
     fireEvent.press(screen.getByTestId('groups-filter-metric'));
-    expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('PRs');
-    expect(within(screen.getByTestId('group-home-board')).getByText('PRs')).toBeTruthy();
+    expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('GR');
+    expect(within(screen.getByTestId('group-home-board')).getByText('GR')).toBeTruthy();
     expect(screen.getByTestId(`group-home-board-row-${USER_ID}-value`)).toHaveTextContent('3');
     fireEvent.press(screen.getByTestId('groups-filter-metric'));
     expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
@@ -943,9 +943,9 @@ describe("Friend's session view", () => {
     expect(screen.queryByText(/kg·reps/)).toBeNull();
     expect(rm.getByText('Bench · 1RM')).toBeTruthy();
     expect(rm.getByText('119.6')).toBeTruthy();
-    expect(rm.getByText('#1 in group · 102.5 × 5 · since passed by sam')).toBeTruthy();
+    expect(rm.getByText('GR · 102.5 × 5 · since passed by sam')).toBeTruthy();
     expect(rm.getByText('Not certified')).toBeTruthy();
-    expect(screen.getByText('#1 in group · 1RM')).toBeTruthy();
+    expect(screen.getByText('GR · 1RM')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-link'));
     expect(mockPush).toHaveBeenCalledWith('/group/group-a/leaderboards/ge-bench?metric=e1rm&scope=all');
@@ -1037,7 +1037,7 @@ describe("Friend's session view", () => {
     expect(mockPush).not.toHaveBeenCalled();
     await waitFor(() => expect(api.getCompetitionSessionRecords).toHaveBeenCalled());
     expect(screen.queryByTestId('group-session-records')).toBeNull();
-    expect(screen.queryByText(/#1 in group/)).toBeNull();
+    expect(screen.queryByText(/GR/)).toBeNull();
   });
 
   it('marks an active session In progress with its elapsed Duration, and pull-to-refresh updates it', async () => {

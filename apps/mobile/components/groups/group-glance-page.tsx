@@ -1,10 +1,12 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { useEffect, useState, type ReactElement } from 'react';
-import { ScrollView, StyleSheet, Text, View, type RefreshControlProps, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type RefreshControlProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { FigureText } from '@/components/ui/figure-text';
 import { SummaryTile } from '@/components/ui/summary-tile';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
 import type { GroupApiError } from '@/src/groups/api';
 import {
@@ -15,7 +17,9 @@ import {
   type GroupHomePeriod,
   type GroupHomeWindow,
 } from '@/src/groups/home-periods';
+import type { CompetitionStreamItemWire } from '@/src/groups/competition-wire';
 import type { GroupGlanceHeld } from '@/src/groups/use-group-glance';
+import { buildLatestSessionRows, type LatestSessionRowViewModel } from '@/src/groups/week-summary-view-model';
 import {
   buildGroupHomeBoard,
   buildGroupRankSeries,
@@ -50,6 +54,9 @@ export type GroupGlancePageProps = {
   /** The page scrolls under the pinned controls, pulled to refresh. */
   refreshControl?: ReactElement<RefreshControlProps>;
   style?: StyleProp<ViewStyle>;
+  /** The group's loaded stream: its latest completed sessions head the last card, whatever the period. */
+  streamItems?: CompetitionStreamItemWire[];
+  onOpenSession?: (memberUserId: string, sessionId: string) => void;
   error: GroupApiError | null;
   offline: boolean;
   onRetry: () => void;
@@ -105,6 +112,8 @@ export function GroupGlancePage({
   onRetry,
   refreshControl,
   style,
+  streamItems = [],
+  onOpenSession,
 }: GroupGlancePageProps) {
   const dateFormat = useDateFormat();
   const faded = useHoldFade(held !== null);
@@ -154,6 +163,7 @@ export function GroupGlancePage({
         ) : (
           <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-glance" />
         )}
+        <LatestSessionsCard rows={buildLatestSessionRows(streamItems, metric, myUserId, dateFormat)} onOpenSession={onOpenSession} />
       </ScrollView>
     </View>
   );
@@ -219,6 +229,51 @@ function GlanceCards({
   );
 }
 
+/** The last card: the group's latest sessions, one row each — who, when, and the chosen metric's figure. */
+function LatestSessionsCard({ rows, onOpenSession }: {
+  rows: LatestSessionRowViewModel[]; onOpenSession?: (memberUserId: string, sessionId: string) => void;
+}) {
+  const text = useUiText();
+  const tone = useUiTextTone();
+  const themed = useLatestStyles();
+  if (rows.length === 0) return null;
+  return (
+    <Card testID="group-latest-sessions-card">
+      <View style={styles.card}>
+        <CardTitle testID="group-latest-sessions-title" title="Latest sessions" />
+        <View>
+          {rows.map((row, index) => (
+            <Pressable
+              accessibilityHint={onOpenSession ? 'Opens their session' : undefined}
+              accessibilityLabel={row.accessibilityLabel}
+              accessibilityRole={onOpenSession ? 'button' : undefined}
+              disabled={!onOpenSession}
+              key={row.sessionId}
+              onPress={() => onOpenSession?.(row.memberUserId, row.sessionId)}
+              style={[styles.latestRow, index > 0 ? themed.divider : null]}
+              testID={`group-latest-session-${row.sessionId}`}>
+              <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.bodyStrong, styles.latestName]}>
+                {row.name}
+              </Text>
+              <Text allowFontScaling={false} numberOfLines={1} style={text.meta}>
+                <FigureText>{row.when}</FigureText>
+              </Text>
+              <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.ink, styles.latestValue, row.record ? tone.record : null]}
+                testID={`group-latest-session-${row.sessionId}-value`}>
+                <FigureText figureStyle={row.record ? tone.record : undefined}>{row.value}</FigureText>
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+const useLatestStyles = makeStyles((roles) => ({
+  divider: { borderTopWidth: 1, borderTopColor: roles.ruleSoft },
+}));
+
 /** A card's heading, as Today's cards head theirs: an ink micro-label at the card's top. */
 function CardTitle({ title, testID }: { title: string; testID: string }) {
   const text = useUiText();
@@ -250,6 +305,20 @@ const styles = StyleSheet.create({
   metric: {
     flex: 0,
     minWidth: 72,
+  },
+  latestRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: uiSpace.sm,
+    paddingVertical: uiSpace.sm,
+  },
+  latestName: {
+    flex: 1,
+    minWidth: 0,
+  },
+  latestValue: {
+    minWidth: 56,
+    textAlign: 'right',
   },
   // A held read under a new period label: faded until the read in view lands.
   held: {

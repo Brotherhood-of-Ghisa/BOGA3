@@ -25,7 +25,7 @@ it.each([0, 6, 123456])('keeps both WeekFigure metrics, existing comparison bars
   render(<SummaryTile title="Group stats" metrics={<GroupWeekTotalsFigures current={{ sets: current, prs: current }} previous={{ sets: 152, prs: 4 }} offset={0} />} />);
   for (const metric of ['sets', 'prs']) expect(screen.getByTestId(`group-week-totals-${metric}-value`)).toHaveTextContent(String(current));
   expect(screen.getByTestId('group-week-totals-sets-previous')).toHaveTextContent('vs 152 last wk');
-  expect(screen.getByTestId('group-week-totals-prs').props.accessibilityLabel).toBe(`PRs ${current}, vs 4 last week`);
+  expect(screen.getByTestId('group-week-totals-prs').props.accessibilityLabel).toBe(`Group records ${current}, vs 4 last week`);
   expect(screen.getByTestId('group-week-totals-sets-value')).toHaveStyle(textRoles.figureHero);
 });
 
@@ -34,7 +34,7 @@ it('keeps the page metric scoped to the board/chart and the period scoped to the
   const totals = screen.getByTestId('group-week-totals-card');
   const before = within(totals).getByTestId('group-week-totals-sets-value').props.children;
   fireEvent.press(screen.getByTestId('groups-filter-metric'));
-  expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('PRs');
+  expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('GR');
   expect(within(totals).getByTestId('group-week-totals-sets-value').props.children).toBe(before);
   expect(within(totals).getByTestId('group-week-totals-prs-value')).toHaveTextContent('6');
   fireEvent.press(screen.getByTestId('group-home-period-earlier'));

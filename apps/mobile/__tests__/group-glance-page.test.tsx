@@ -26,6 +26,7 @@ import {
 import type { GroupGlanceHeld } from '@/src/groups/use-group-glance';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 import { renderWithTheme, rolesFor } from './helpers/theme';
+import { competitionEvent, competitionSession } from './helpers/competition-fixtures';
 
 const themeRoles = rolesFor(DEFAULT_APPEARANCE);
 
@@ -135,7 +136,7 @@ describe('At a glance: the board', () => {
   it('ranks by PRs when the screen says so: I lead, with no closing line', () => {
     renderPage({ metric: 'prs' });
 
-    expect(within(byId('group-home-board')).getByText('PRs')).toBeTruthy();
+    expect(within(byId('group-home-board')).getByText('GR')).toBeTruthy();
     expect(boardValues()).toEqual(['4', '2', '1', '0', '0']);
     expect(byId(`group-home-board-row-${ME}`)).toBeTruthy();
     expect(screen.queryByTestId('group-home-board-me')).toBeNull();
@@ -325,7 +326,7 @@ describe('At a glance: the group total', () => {
     renderPage({ offset: -2, series });
 
     expect(byId('group-week-totals-sets-previous')).toHaveTextContent('vs 80 wk before');
-    expect(byId('group-week-totals-prs').props.accessibilityLabel).toBe('PRs 7, vs 9 the week before');
+    expect(byId('group-week-totals-prs').props.accessibilityLabel).toBe('Group records 7, vs 9 the week before');
   });
 });
 
@@ -367,4 +368,52 @@ describe('At a glance: text roles', () => {
   });
 
 
+});
+
+describe('At a glance: the latest sessions', () => {
+  const session = (sessionId: string, userId: string, startedAtMs: number) => ({
+    kind: 'session' as const, key: sessionId, sort_at_ms: startedAtMs, groups: [{ group_id: 'g1', name: 'Crew' }],
+    session: { ...competitionSession.session, session_id: sessionId, member: { user_id: userId, username: userId }, started_at_ms: startedAtMs },
+  });
+  const groupRecord = (sessionId: string) => ({
+    kind: 'competition' as const, key: `gr-${sessionId}`, sort_at_ms: 1,
+    event: { ...competitionEvent, event_id: `gr-${sessionId}`, session_id: sessionId },
+    record: { performance: null, previous: [], group_record_metrics: ['e1rm' as const] },
+  });
+  const items = [
+    ...['s1', 's2', 's3', 's4', 's5', 's6'].map((id, index) => session(id, index === 1 ? ME : `m${index}`, NOW.getTime() - index * 86_400_000)),
+    groupRecord('s1'),
+  ];
+  const renderWithStream = (metric: GroupHomeMetric, onOpenSession = jest.fn()) => renderWithTheme(
+    <GroupGlancePage error={null} metric={metric} myUserId={ME} now={NOW} offline={false} offset={0} onMetricChange={jest.fn()}
+      onOffsetChange={jest.fn()} onRetry={jest.fn()} period="week" series={seriesFor('week', groupRankSeriesEnd(0))}
+      streamItems={items} onOpenSession={onOpenSession} />,
+  );
+
+  it('ends the page with the five latest sessions, whatever the period, each opening its session', () => {
+    const onOpenSession = jest.fn();
+    renderWithStream('sets', onOpenSession);
+    const card = within(byId('group-latest-sessions-card'));
+    expect(card.getByTestId('group-latest-sessions-title')).toHaveTextContent('Latest sessions');
+    expect(card.getAllByTestId(/^group-latest-session-[^-]+$/).map((row) => row.props.testID))
+      .toEqual(['s1', 's2', 's3', 's4', 's5'].map((id) => `group-latest-session-${id}`));
+    expect(byId('group-latest-session-s2')).toHaveTextContent(/^You/);
+    expect(byId('group-latest-session-s1-value')).toHaveTextContent('1 set');
+    fireEvent.press(byId('group-latest-session-s2'));
+    expect(onOpenSession).toHaveBeenCalledWith(ME, 's2');
+  });
+
+  it('shows each session’s GR count for the GR metric, in the record colour above zero', () => {
+    renderWithStream('prs');
+    expect(byId('group-latest-session-s1-value')).toHaveTextContent('1 GR');
+    expect(byId('group-latest-session-s1-value')).toHaveStyle({ color: themeRoles.record });
+    expect(byId('group-latest-session-s2-value')).toHaveTextContent('0 GR');
+    expect(byId('group-latest-session-s2-value')).not.toHaveStyle({ color: themeRoles.record });
+    expect(byId('group-latest-session-s1').props.accessibilityLabel).toMatch(/1 group record$/);
+  });
+
+  it('draws no card while the stream holds no completed session', () => {
+    renderPage();
+    expect(screen.queryByTestId('group-latest-sessions-card')).toBeNull();
+  });
 });

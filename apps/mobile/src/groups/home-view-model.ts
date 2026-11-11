@@ -17,13 +17,13 @@ import {
 /** A metric's own name, as the selector and the chart heading say it. */
 export const GROUP_HOME_METRIC_LABELS: Record<GroupHomeMetric, string> = {
   sets: 'Sets',
-  prs: 'PRs',
+  prs: 'GR',
 };
 
 /** The board column's micro-label. */
 export const GROUP_HOME_METRIC_COLUMN: Record<GroupHomeMetric, string> = {
   sets: 'Sets',
-  prs: 'PRs',
+  prs: 'GR',
 };
 
 export const GROUP_HOME_METRIC_UNIT: Record<GroupHomeMetric, string> = {

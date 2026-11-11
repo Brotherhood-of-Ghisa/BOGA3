@@ -38,7 +38,7 @@ const records = { contract_version: 4, group_id: 'g', member_user_id: 'u1', sess
   records: [{ event, boards: [{ metric: 'e1rm', leader: { user_id: 'u2', username: 'Rival' }, leads: false }] }] };
 const previousHolder = { user_id: 'u2', username: 'Rival' };
 const recordDetail = { performance, previous: [{ value: { ...historicalValue, role: 'previous', value: 120, member: previousHolder },
-  performance: null }] };
+  performance: null }], group_record_metrics: ['e1rm'] };
 const sharedExerciseDetails = {
   group_exercise_id: 'ge',
   group_exercise_name: 'Pull-up',
@@ -164,13 +164,19 @@ test('group-bound sessions keep ordinary context while rejecting normalized kg a
   expect(guards.isCompetitionStreamWire({ ...stream, items: [{ kind: 'future', key: 'k' }] })).toBe(false);
 });
 
-test('a record stream item carries its set and previous #1, exactly, or nothing (a payload cached from the first reader)', () => {
+test('a record stream item carries its set, previous #1 and GR boards, exactly, or nothing (the first reader)', () => {
   const item = stream.items[0];
   const withRecord = (record: unknown) => guards.isCompetitionStreamWire({ ...stream, items: [{ ...item, record }] });
   expect(withRecord(recordDetail)).toBe(true);
   expect(guards.isCompetitionStreamWire({ ...stream, items: [{ kind: 'competition', key: 'ev', sort_at_ms: 100, event }] })).toBe(true);
-  expect(withRecord({ performance: null, previous: [] })).toBe(true);
+  expect(withRecord({ performance: null, previous: [], group_record_metrics: [] })).toBe(true);
   expect(withRecord({ ...recordDetail, extra: 1 })).toBe(false);
+  // GR boards: only the boards the record lists, each once; a reader without them (v2/v3) never passes.
+  expect(withRecord({ performance: null, previous: [] })).toBe(false);
+  expect(withRecord({ ...recordDetail, group_record_metrics: ['volume'] })).toBe(false);
+  expect(withRecord({ ...recordDetail, group_record_metrics: ['e1rm', 'e1rm'] })).toBe(false);
+  expect(withRecord({ ...recordDetail, group_record_metrics: ['bench'] })).toBe(false);
+  expect(withRecord({ ...recordDetail, group_record_metrics: 'e1rm' })).toBe(false);
   expect(withRecord({ ...recordDetail, performance: { ...performance, visibility: 'ordinary', weight_value: '100' } })).toBe(false);
   expect(withRecord({ ...recordDetail, performance: { ...performance, weight_value: '100' } })).toBe(false);
   expect(withRecord({ ...recordDetail, previous: [{ ...recordDetail.previous[0], value: historicalValue }] })).toBe(false);
@@ -183,9 +189,9 @@ test('a record stream item carries its set and previous #1, exactly, or nothing 
   // An ordinary record may show an ordinary holder's kg, and a normalized holder only normalized units.
   const ordinaryItem = { ...item, event: { ...event, visibility: 'ordinary' } };
   const ordinaryPrevious = { value: { ...normalizedPrevious.value, unit: 'kg' }, performance: { ...performance, set_id: 'set0', visibility: 'ordinary', weight_value: '100' } };
-  expect(guards.isCompetitionStreamWire({ ...stream, items: [{ ...ordinaryItem, record: { performance: null, previous: [ordinaryPrevious] } }] })).toBe(true);
+  expect(guards.isCompetitionStreamWire({ ...stream, items: [{ ...ordinaryItem, record: { performance: null, previous: [ordinaryPrevious], group_record_metrics: [] } }] })).toBe(true);
   expect(guards.isCompetitionStreamWire({ ...stream, items: [{ ...ordinaryItem, record: { performance: null,
-    previous: [{ ...ordinaryPrevious, performance: { ...performance, set_id: 'set0' } }] } }] })).toBe(false);
+    previous: [{ ...ordinaryPrevious, performance: { ...performance, set_id: 'set0' } }], group_record_metrics: [] } }] })).toBe(false);
 });
 test('session records name only this session\'s records, one board each, never a leading board without a leader', () => {
   const record = records.records[0];
@@ -238,7 +244,7 @@ describe('request-scoped protocol-4 API', () => {
     ['podiums',() => api.getCompetitionPodiums('g'),podiums],
     ['revisions',() => api.getCompetitionRevisions('g','ge'),{ contract_version: 4, exercise, revisions: [revision] }],
     ['history',() => api.getCompetitionHistory({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm',certified: false }),history],
-    ['stream_v3',() => api.getCompetitionStream('g'),stream],
+    ['stream_v4',() => api.getCompetitionStream('g'),stream],
     ['session_detail',() => api.getCompetitionSession('g','u1','s'),detail],
     ['session_records',() => api.getCompetitionSessionRecords('g','u1','s'),records],
     ['week_summary',() => api.getCompetitionWeek('g',0,1000),week],

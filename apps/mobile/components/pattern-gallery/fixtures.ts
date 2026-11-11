@@ -39,6 +39,7 @@ export const gallerySession: CompetitionSessionCard = {
   isTrainingNow: true, statusLabel: 'Training now', startedAtLabel: 'Today · 11:30', gymName: 'Iron Works',
   groupNames: ['Iron Wednesdays'], setsLabel: '18 sets', exercisesLabel: '4 exercises',
   records: [{ key: 'record', exercise: 'Bench press', value: '1RM 102.5', certified: false, accessibilityLabel: 'Bench press, 1RM 102.5' }],
+  groupRecordCount: 1, personalRecordCount: 2,
 };
 competitionEvent.sort_at_ms = new Date(2026, 9, 30, 11).getTime();
 
