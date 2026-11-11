@@ -110,7 +110,7 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, grouped, onPress }: {
       accessibilityLabel={recoveryRowLabel(row, days, dateFormat)}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.muscleRow, pressed ? styles.pressed : null]}
+      style={styles.muscleRow}
       testID={testID}>
       <Text allowFontScaling={false} style={[text.body, styles.nameCell, grouped ? styles.childName : null]}>
         {row.name}
@@ -156,7 +156,7 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
           else next.add(section.name);
           return next;
         })}
-        style={({ pressed }) => [styles.groupHeader, pressed ? styles.pressed : null]}>
+        style={styles.groupHeader}>
         <Text allowFontScaling={false} style={[text.label, tone.ink, styles.nameCell]}>{section.name}</Text>
         {section.days.map((count, index) => <DayCell aggregate count={count} edge={index === 0 ? 'start' : undefined}
           key={plan.recoveryDays[index].getTime()} testID={`${testID}-day-${index}`} weekStart={index === weekStartIndex} />)}
@@ -217,7 +217,8 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
         <Text allowFontScaling={false} style={[...label, styles.weekCell]}>Target</Text>
         {grouped ? <View style={styles.chevronGutter} /> : null}
       </View>
-      <ScrollView alwaysBounceVertical={false} nestedScrollEnabled showsVerticalScrollIndicator={false} style={styles.fillRows} testID="today-plan-recovery-rows">
+      <ScrollView alwaysBounceVertical={false} contentContainerStyle={styles.rowsContent} nestedScrollEnabled
+        showsVerticalScrollIndicator={false} style={styles.fillRows} testID="today-plan-recovery-rows">
         <RecoveryRows grouped={grouped} key={`${accountRevision}-${grouped}`} onOpenMuscle={onOpenMuscle}
           plan={plan} weekStartIndex={weekStartIndex} />
       </ScrollView>
@@ -265,7 +266,7 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
         `${session.exerciseCount} ${session.exerciseCount === 1 ? 'exercise' : 'exercises'}`, targetSets(session.setCount), ...session.muscles].join(', ')}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.plannedRow, pressed ? styles.pressed : null]}
+      style={styles.plannedRow}
       testID={testID}>
       <View style={styles.plannedWhen}>
         <Text allowFontScaling={false} style={text.bodyStrong} testID={`${testID}-day`}>{day}</Text>
@@ -345,6 +346,7 @@ const WEEK_WIDTH = 64;
 const ROW_HEIGHT = 32;
 const MARK = 8;
 const PLANNED_WHEN_WIDTH = 52;
+const GROUP_BLEED = uiSpace.sm;
 
 const useMarkStyles = makeStyles((roles) => ({
   trained: { backgroundColor: roles.ink },
@@ -365,10 +367,14 @@ const useStyles = makeStyles((roles) => ({
     minHeight: 0,
   },
   // A fixed row height, so the rows that show are exactly `VISIBLE_MUSCLE_ROWS * ROW_HEIGHT`.
+  // The scroller reaches into the card's side padding, so a group header's wash
+  // can too (a clipped scroller would cut it); the rows' own width is unchanged.
   fillRows: {
     flexShrink: 1,
     maxHeight: VISIBLE_MUSCLE_ROWS * ROW_HEIGHT,
+    marginHorizontal: -GROUP_BLEED,
   },
+  rowsContent: { paddingHorizontal: GROUP_BLEED },
   card: {
     paddingHorizontal: uiSpace.md,
     paddingBottom: uiSpace.md,
@@ -389,6 +395,7 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'center',
     gap: uiSpace.xs,
   },
+  // Rows take no pressed fill: a tap goes straight to its destination.
   muscleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -402,9 +409,12 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'center',
     gap: uiSpace.xs,
     minHeight: ROW_HEIGHT,
+    // The wash insets its name and chevron from its edges without moving a column;
+    // the band itself separates the groups, so no hairline.
+    marginHorizontal: -GROUP_BLEED,
+    paddingHorizontal: GROUP_BLEED,
+    borderRadius: uiGeometry.radius.card,
     backgroundColor: roles.accentWash,
-    borderTopWidth: 1,
-    borderTopColor: roles.ruleSoft,
   },
   childName: { paddingLeft: uiSpace.md },
   childConnector: {
@@ -417,9 +427,6 @@ const useStyles = makeStyles((roles) => ({
     borderRadius: uiGeometry.radius.control,
   },
   chevronGutter: { width: uiIconSize.sm },
-  pressed: {
-    backgroundColor: roles.paper,
-  },
   // Gutters either side of the day grid keep it clear of the name and the target.
   nameCell: {
     flex: 1,

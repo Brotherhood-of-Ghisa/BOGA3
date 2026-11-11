@@ -120,6 +120,16 @@ afterEach(() => {
   closeLocalData();
 });
 
+// Holding a row down shows no pressed fill: it keeps its resting background until the tap lands.
+const expectNoPressedFill = (testID: string, resting: object) => {
+  const touch = { timestamp: 0, touches: [], changedTouches: [], pageX: 0, pageY: 0, locationX: 0, locationY: 0 };
+  const event = { nativeEvent: touch, persist: () => undefined, currentTarget: { measure: () => undefined } };
+  act(() => fireEvent(text(testID), 'responderGrant', event));
+  expect(text(testID)).toHaveStyle(resting);
+  expect(text(testID)).not.toHaveStyle({ backgroundColor: rolesFor(DEFAULT_APPEARANCE).paper });
+  act(() => fireEvent(text(testID), 'responderTerminate', event));
+};
+
 describe('Today: the Plan page over real data', () => {
   it('groups reported muscles by the saved family setting, sums before flooring, and toggles only that header', async () => {
     await bootLocalApp();
@@ -141,6 +151,12 @@ describe('Today: the Plan page over real data', () => {
     expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('3');
     expect(text('today-plan-group-Arms-today')).toHaveTextContent('0');
     expect(arms).toHaveStyle({ backgroundColor: roles.accentWash });
+    // The wash reaches into the card padding, insetting its text without moving a column.
+    expect(arms).toHaveStyle({ marginHorizontal: -uiSpace.sm, paddingHorizontal: uiSpace.sm });
+    expect(arms).not.toHaveStyle({ borderTopWidth: 1 });
+    expect(text('today-plan-recovery-rows')).toHaveStyle({ marginHorizontal: -uiSpace.sm });
+    expectNoPressedFill('today-plan-group-Arms', { backgroundColor: roles.accentWash });
+    expectNoPressedFill('today-plan-muscle-biceps', { borderTopColor: roles.ruleSoft });
     expect(text('today-plan-group-Arms-day-2')).toHaveStyle({ backgroundColor: roles.accent });
     expect(within(text('today-plan-group-Arms-day-2')).getByText('3')).toHaveStyle({ color: roles.onAccent });
     expect(text('today-plan-group-Arms-day-0')).toHaveStyle({ backgroundColor: roles.surface, borderColor: roles.accent, borderWidth: 1 });
@@ -512,6 +528,7 @@ describe('Today: the Plan page over real data', () => {
     expect(text(`today-plan-next-${sunday}-figures`)).toHaveTextContent('2 ex · 6 target sets');
     expect(text(`today-plan-next-${sunday}-muscles`)).toHaveTextContent('Glute Max · Quads · Pectoralis');
 
+    expectNoPressedFill(`today-plan-next-${sunday}`, { borderTopColor: rolesFor(DEFAULT_APPEARANCE).ruleSoft });
     fireEvent.press(text(`today-plan-next-${sunday}`));
     expect(mockPush).toHaveBeenCalledWith(`/session-plan/${sunday}`);
   });
