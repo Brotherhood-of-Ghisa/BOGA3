@@ -3,7 +3,7 @@
 # run-meta-tests.sh — infra-free self-tests for the repo meta-tooling
 # (gen-docs.sh, test-for.sh), the lane-timing store, the
 # Supabase container resolver,
-# the Maestro fixture-user and
+# the Maestro and MCP-smoke fixture-user and
 # flow-has-a-lane rules, and
 # the worktree lifecycle (temp git repos + stub gh/docker), Android
 # launchers (stub adb/Expo/JDK), the Android Maestro runtime (stub
@@ -29,6 +29,7 @@ TESTS=(
   "full-sweep.test.sh"
   "ios-release.test.sh"
   "maestro-fixture-users.test.sh"
+  "mcp-smoke-fixture-user.test.sh"
   "maestro-flow-lanes.test.sh"
   "maestro-testids.test.sh"
   "supabase-cli-version.test.sh"

@@ -218,11 +218,12 @@ if [[ -n "${BOGA_MCP_SMOKE_ACCESS_TOKEN:-}" ]]; then
     fail "provided tokens require BOGA_MCP_SMOKE_EXERCISE_ID, SESSION_ID, and EXERCISE_QUERY"
   USER_UUID=""
 else
+  # user_g is this smoke's own fixture (auth-fixture-constants.sh): its checks
+  # are account-wide, so no other suite may sign in as it.
   USER_UUID="$(run_psql "
-    select subject_uuid from public.dev_fixture_principals
-    where fixture_key = '${USER_A_FIXTURE_KEY}';
+    select id from auth.users where email = '${USER_G_EMAIL}';
   ")"
-  [[ -n "${USER_UUID}" ]] || fail "local user A fixture is missing"
+  [[ -n "${USER_UUID}" ]] || fail "local user_g fixture (${USER_G_EMAIL}) is missing"
   GYM_ID="mcp-smoke-${RUN_TAG}-gym"
   EXERCISE_ID="mcp-smoke-${RUN_TAG}-exercise"
   SESSION_ID="mcp-smoke-${RUN_TAG}-session"
@@ -241,7 +242,7 @@ else
   run_psql "
     begin;
       set constraints all deferred;
-      -- The owner's identity lets a re-run update user A's existing settings row.
+      -- The owner's identity lets a re-run update user_g's existing settings row.
       select set_config('request.jwt.claims', json_build_object('sub', '${USER_UUID}', 'role', 'authenticated')::text, true);
       insert into app_public.gyms
         (owner_user_id,id,name,created_at,updated_at,client_updated_at_ms)
@@ -343,8 +344,8 @@ if [[ -n "${USER_UUID}" ]]; then
     cd "${REPO_ROOT}/apps/agent-auth-web"
     BOGA_LOCAL_SUPABASE_URL="${API_URL}" \
     BOGA_LOCAL_SUPABASE_PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-${ANON_KEY}}" \
-    BOGA_LOCAL_OAUTH_EMAIL="${USER_A_EMAIL}" \
-    BOGA_LOCAL_OAUTH_PASSWORD="${USER_A_PASSWORD}" \
+    BOGA_LOCAL_OAUTH_EMAIL="${USER_G_EMAIL}" \
+    BOGA_LOCAL_OAUTH_PASSWORD="${USER_G_PASSWORD}" \
     BOGA_LOCAL_OAUTH_CLIENT_NAME="BoGa MCP smoke ${RUN_TAG}" \
     BOGA_LOCAL_OAUTH_MCP_URL="${MCP_URL}" \
       npx tsx scripts/mint-local-oauth.ts

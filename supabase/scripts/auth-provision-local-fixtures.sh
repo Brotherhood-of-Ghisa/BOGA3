@@ -29,7 +29,7 @@ echo "[supabase] provisioning local auth fixtures (controlled users only)"
   --password "${USER_D_PASSWORD}" \
   --email-confirm true
 
-for fixture in E F; do
+for fixture in E F G; do
   email_var="USER_${fixture}_EMAIL"
   password_var="USER_${fixture}_PASSWORD"
   "${SCRIPT_DIR}/auth-provision-user.sh" \
