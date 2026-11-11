@@ -12,9 +12,10 @@
 #   1. the smoke signs in as USER_G only (no other USER_*_EMAIL/PASSWORD);
 #   2. USER_G is defined in auth-fixture-constants.sh and provisioned by
 #      auth-provision-local-fixtures.sh;
-#   3. no other test, suite, flow or script references USER_G or its email.
+#   3. no other file outside the docs references USER_G or its email.
 #
-# Infra-free: greps files only. Part of the `meta-tests` lane (and CI).
+# A grep check: an email assembled at runtime (`user_${x}.local@...`) passes
+# it. Infra-free: greps files only. Part of the `meta-tests` lane (and CI).
 # Self-tests the rule on synthetic trees first, then checks the real repo.
 
 set -euo pipefail
@@ -28,9 +29,6 @@ SMOKE_REL="scripts/smoke-boga-mcp.sh"
 CONSTANTS_REL="supabase/scripts/auth-fixture-constants.sh"
 PROVISION_REL="supabase/scripts/auth-provision-local-fixtures.sh"
 THIS_REL="scripts/tests/mcp-smoke-fixture-user.test.sh"
-# Where another flow could sign in as a fixture user.
-SEARCH_DIRS=(scripts supabase/scripts supabase/tests apps/mobile/__tests__
-  apps/mobile/.maestro apps/mobile/scripts services apps/agent-auth-web)
 
 # check_tree <root>: exits non-zero on the first violation. Run it in a subshell.
 check_tree() {
@@ -40,6 +38,9 @@ check_tree() {
   users="$(grep -oE 'USER_[A-Z0-9]+_(EMAIL|PASSWORD|FIXTURE_KEY)' "${smoke}" | sort -u | tr '\n' ' ')"
   [[ "${users}" == "USER_G_EMAIL USER_G_PASSWORD " ]] \
     || fail "${SMOKE_REL} must sign in as USER_G only (found: ${users:-none})"
+  # ...and through the constants only: no hard-coded fixture or dev account.
+  ! grep -qE '[A-Za-z0-9._-]+@(example\.test|dev\.local)' "${smoke}" \
+    || fail "${SMOKE_REL} hard-codes an account email; use USER_G_EMAIL"
 
   email="$(sed -nE 's/^export USER_G_EMAIL="([^"]+)"$/\1/p' "${constants}")"
   [[ -n "${email}" ]] || fail "USER_G_EMAIL is not defined in ${CONSTANTS_REL}"
@@ -48,12 +49,15 @@ check_tree() {
     || grep -qE '^for fixture in( [A-Z])* G( [A-Z])*; do$' "${root}/${PROVISION_REL}" \
     || fail "${PROVISION_REL} does not provision USER_G"
 
-  local dir others=""
-  for dir in "${SEARCH_DIRS[@]}"; do
-    [[ -d "${root}/${dir}" ]] || continue
-    others+="$(grep -rlE "USER_G_|${email//./\\.}" --exclude-dir=node_modules "${root}/${dir}" 2>/dev/null || true)"$'\n'
-  done
-  others="$(printf '%s\n' "${others}" | grep . | sed "s#^${root}/##" \
+  # Every tracked or untracked (not ignored) file outside the docs: a file in
+  # any directory could sign in as user_g. Docs may name it.
+  local pattern="USER_G_|${email//./\\.}" others
+  if git -C "${root}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    others="$(git -C "${root}" grep --untracked -lE "${pattern}" -- . ':!*.md' ':!docs/**' || true)"
+  else
+    others="$(cd "${root}" && grep -rlE "${pattern}" --exclude='*.md' --exclude-dir=docs . | sed 's#^\./##' || true)"
+  fi
+  others="$(printf '%s\n' "${others}" | grep . \
     | grep -vxF -e "${SMOKE_REL}" -e "${CONSTANTS_REL}" -e "${PROVISION_REL}" -e "${THIS_REL}" | sort -u || true)"
   [[ -z "${others}" ]] \
     || fail "USER_G is dedicated to ${SMOKE_REL}; also used by: ${others//$'\n'/ } — add a new fixture in ${CONSTANTS_REL}"
@@ -100,6 +104,20 @@ expect_check fail "another suite signs in as USER_G" "${TMP}/reused-var"
 make_tree "${TMP}/reused-email" "${SMOKE_OK}"
 printf "const creds = { email: 'g@x.test' };\n" >"${TMP}/reused-email/supabase/tests/other.ts"
 expect_check fail "another suite hardcodes USER_G's email" "${TMP}/reused-email"
+
+make_tree "${TMP}/hardcoded" "${SMOKE_OK} OTHER=user_a.local@example.test"
+expect_check fail "smoke hard-codes another account's email" "${TMP}/hardcoded"
+
+make_tree "${TMP}/anywhere" "${SMOKE_OK}"
+mkdir -p "${TMP}/anywhere/apps/mobile/src"
+printf 'login("${USER_G_EMAIL}")\n' >"${TMP}/anywhere/apps/mobile/src/new-suite.sh"
+expect_check fail "a file in an unlisted directory signs in as USER_G" "${TMP}/anywhere"
+
+make_tree "${TMP}/docs-ok" "${SMOKE_OK}"
+mkdir -p "${TMP}/docs-ok/docs"
+printf 'user_g is g@x.test\n' >"${TMP}/docs-ok/docs/runbook.md"
+printf 'user_g is g@x.test\n' >"${TMP}/docs-ok/README.md"
+expect_check pass "docs may name USER_G" "${TMP}/docs-ok"
 
 make_tree "${TMP}/unprovisioned" "${SMOKE_OK}"
 printf 'for fixture in E F; do\n  :\ndone\n' >"${TMP}/unprovisioned/${PROVISION_REL}"
