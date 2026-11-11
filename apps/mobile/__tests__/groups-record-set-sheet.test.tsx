@@ -78,7 +78,7 @@ it('lists every record metric, 1RM first, under one certification for the set',a
   await openRecord();
   const metrics=sheet().getAllByTestId(/^group-metric-record-(e1rm|volume)$/).map(node=>node.props.testID);
   expect(metrics).toEqual(['group-metric-record-e1rm','group-metric-record-volume']);
-  expect(screen.getByTestId('group-metric-record-volume-value')).toHaveTextContent('650.0 %BW·reps');
+  expect(screen.getByTestId('group-metric-record-volume-value')).toHaveTextContent('650.0 %BW');
   expect(sheet().getAllByTestId('group-metric-record-status')).toHaveLength(1);
   expect(sheet().getAllByTestId('group-metric-record-certify')).toHaveLength(1);
   fireEvent.press(screen.getByTestId('group-metric-record-certify'));

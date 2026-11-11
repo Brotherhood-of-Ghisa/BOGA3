@@ -25,17 +25,20 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
         allowFontScaling={false}
         accessibilityLabel={percentageMetrics ? row.weightReps : undefined}
         numberOfLines={1}
-        style={[text.figure, row.done ? (row.weightRecord ? tone.record : null) : tone.faint, styles.weightReps,
-          percentageMetrics && styles.percentageWeightReps]}
+        style={[text.figure, row.done ? (row.weightRecord ? tone.record : null) : tone.faint, styles.weightReps]}
         testID={`${testID}-values`}>
-        {percentageMetrics ? <FigureText figureStyle={row.done && row.weightRecord ? tone.record : undefined}>{row.weightReps}</FigureText> : row.weightReps}
+        {percentageMetrics ? row.weightReps.replace(' %BW', '') : row.weightReps}
       </Text>
-      {!hideDerivedMetrics ? percentageMetrics ? <View style={styles.percentageMetrics}>
-        <Stat label="1RM" value={row.oneRepMax} layout="inline" state={state}
-          emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'} valueWidth="hug" testID={`${testID}-1rm`} />
-        <Stat label="Vol" value={row.volume} layout="inline" state={state}
-          valueWidth="hug" testID={`${testID}-vol`} />
-      </View> : <>
+      {!hideDerivedMetrics ? percentageMetrics ? <>
+        <Text allowFontScaling={false} numberOfLines={1}
+          accessibilityLabel={`1RM ${row.oneRepMax}`}
+          style={[text.figureSmall, row.done ? (row.oneRepMaxRecord ? tone.record : tone.ink) : tone.faint, styles.metric, styles.oneRepMax]}
+          testID={`${testID}-1rm`}>{row.oneRepMax.replace(' %BW', '')}</Text>
+        <Text allowFontScaling={false} numberOfLines={1}
+          accessibilityLabel={`Vol ${row.volume}`}
+          style={[text.figureSmall, row.done ? tone.ink : tone.faint, styles.metric, styles.volume]}
+          testID={`${testID}-vol`}>{row.volume.replace(' %BW', '')}</Text>
+      </> : <>
       <View style={[styles.metricColumn, styles.oneRepMaxColumn]} testID={`${testID}-1rm-column`}>
         <Stat
           emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}
@@ -62,11 +65,21 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
   );
 }
 
+/** Shared unit headings keep the normalized rows compact without repeating labels. */
+export function SetSummaryHeader() {
+  const text = useUiText();
+  return <View style={[styles.setRow, styles.percentageRow]}>
+    <View style={styles.effortColumn} />
+    <Text allowFontScaling={false} style={[text.label, styles.weightReps]}>Weight %BW</Text>
+    <Text allowFontScaling={false} style={[text.label, styles.metric, styles.oneRepMax]}>1RM %BW</Text>
+    <Text allowFontScaling={false} style={[text.label, styles.metric, styles.volume]}>Vol %BW</Text>
+  </View>;
+}
+
 const styles = StyleSheet.create({
   percentageRow: {
     gap: uiSpace.xs,
     paddingVertical: uiSpace.xs,
-    flexWrap: 'wrap',
   },
   setRow: {
     flexDirection: 'row',
@@ -76,8 +89,9 @@ const styles = StyleSheet.create({
   effortColumn: {
     width: uiGeometry.tapTarget,
   },
-  percentageMetrics: { alignItems: 'flex-end', marginLeft: 'auto', maxWidth: '100%' },
-  percentageWeightReps: { minWidth: uiGeometry.tapTarget * 2 + uiSpace.lg },
+  metric: { textAlign: 'right' },
+  oneRepMax: { width: uiGeometry.metricValueWidth + uiSpace.xl },
+  volume: { width: uiGeometry.metricValueWidth + uiSpace.xl },
   // 1RM and VOL as two fixed columns: each value right-aligned
   // in its column, its legend a fixed gap to its left, so a legend reads with
   // its own value and not the next column's.

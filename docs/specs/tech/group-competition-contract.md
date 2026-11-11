@@ -84,7 +84,7 @@ performed-set and certification shapes. Unknown nested fields fail decoding.
 Normalized performed-set context contains source/session/set identity, reps,
 performed state, source distribution, achieved instant and ordering. Opt-in
 `x-boga-group-set-metrics: 1` responses add an exact nullable
-`normalized_metrics` object, shown as `%BW` (load, 1RM) and `%BW·reps` (Volume)
+`normalized_metrics` object, shown as `%BW` for load, 1RM and Volume
 and never mixed into absolute totals; absent capability
 keeps legacy shapes. Updated clients accept both exact shapes and evict prior
 cache generations. Its fields are `added_load_percent_bw`, `e1rm_percent_bw` and

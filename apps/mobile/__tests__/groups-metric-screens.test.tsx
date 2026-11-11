@@ -107,7 +107,7 @@ it('shows normalized 1RM and Volume with explicit units and independent Certifie
   api.getCompetitionBoard.mockResolvedValue({ ...board,metric: 'volume',certified: false,
     entries: [{ ...uncertifiedRow,metric: 'volume',unit: 'percent_bw_reps',value: 650 }] });
   fireEvent.press(screen.getByTestId('group-board-metric-volume'));await settleReads();
-  expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('650.0 %BW·reps');
+  expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('650.0 %BW');
   fireEvent.press(screen.getByTestId('group-board-scope-all'));await settleReads();
   expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'volume',certified: false }));
 });

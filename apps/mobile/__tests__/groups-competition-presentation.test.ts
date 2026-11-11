@@ -5,14 +5,14 @@ import { buildStreamRecordSheet } from '@/src/groups/competition-stream-view-mod
 import { competitionBoard,competitionCertification,competitionEvent,competitionExercise,competitionRow,competitionSession } from './helpers/competition-fixtures';
 
 test.each([
-  ['volume','kg_reps',125.5,'125.5'],['volume','percent_bw_reps',611.111111,'611.1 %BW·reps'],
+  ['volume','kg_reps',125.5,'125.5'],['volume','percent_bw_reps',611.111111,'611.1 %BW'],
   ['e1rm','kg',125.5,'125.5'],['e1rm','percent_bw',145.728,'45.7 %BW'],
 ] as const)('formats %s from wire unit %s while preserving the server value', (metric,unit,value,expected) => {
   const score={ metric,unit,value, ...(unit === 'percent_bw' ? { added_e1rm_percent_bw: value - 100 } : {}) };expect(formatCompetitionValue(score)).toBe(expected);expect(score.value).toBe(value);
 });
 test.each([
   ['kg', 'Weight 125.5'], ['kg_reps', 'Weight 125.5'],
-  ['percent_bw', 'Weight 125.5 %BW'], ['percent_bw_reps', 'Weight 125.5 %BW·reps'],
+  ['percent_bw', 'Weight 125.5 %BW'], ['percent_bw_reps', 'Weight 125.5 %BW'],
 ])('formats historical %s without changing its wire unit', (unit, expected) => {
   const value = { ...competitionEvent.values[0], metric: 'weight' as const, unit, value: 125.5 };
   expect(formatCompetitionHistoricalValue(value)).toBe(expected);
@@ -41,7 +41,7 @@ test('normalized rows and accessibility contain reps and percentages without an 
 test('Off and c=0 use ordinary units independently of a saved positive contribution', () => {
   expect(competitionViewLabel('volume',{ ...competitionExercise.rules,bodyweight_calculations_enabled: false })).toBe('Volume');
   expect(competitionViewLabel('e1rm',{ ...competitionExercise.rules,bodyweight_contribution: 0 })).toBe('1RM');
-  expect(competitionViewLabel('volume',competitionExercise.rules)).toBe('Volume %BW·reps');
+  expect(competitionViewLabel('volume',competitionExercise.rules)).toBe('Volume %BW');
   expect(competitionLinkExercise(competitionExercise)).toEqual({ group_exercise_id: 'ge1',name: 'Pull-up',source_exercise_id: null,
     archived_at_ms: null,load_input_mode: 'total_load' });
 });
@@ -114,7 +114,7 @@ describe('buildStreamRecordSheet', () => {
     const model = buildStreamRecordSheet(event, { performance: ordinary, previous: [] }, 'me', 'DD-MM-YYYY');
     expect(model.who).toMatch(/^You · /);
     expect(model.set).toBe('120.0 × 5');
-    expect(model.metrics.map(entry => [entry.label, entry.value])).toEqual([['1RM', '45.7 %BW'], ['Volume', '650.0 %BW·reps']]);
+    expect(model.metrics.map(entry => [entry.label, entry.value])).toEqual([['1RM', '45.7 %BW'], ['Volume', '650.0 %BW']]);
     expect(model.previous).toEqual([]);
   });
   it('certifies the set once, through the certified row, else the first certifiable (1RM first)', () => {
@@ -165,7 +165,7 @@ test.each([
     sets: exercise.sets.map(set => ({ ...set, normalized_metrics: metrics })) }] };
   const model = buildCompetitionSession(session);
   expect(model).toMatchObject({ volume: '—', setCount: 1, cards: [{ hideDerivedMetrics: false, percentageMetrics: true,
-    rows: [{ weightReps: `${total} %BW × 5`, oneRepMax: '45.7 %BW', volume: `${volume}.0 %BW·reps` }] }] });
+    rows: [{ weightReps: `${total} %BW × 5`, oneRepMax: '45.7 %BW', volume: `${volume}.0 %BW` }] }] });
   // Other group performance labels keep their existing additional-load display.
   expect(formatCompetitionPerformance({ ...competitionRow.performance, visibility: 'normalized', normalized_metrics: metrics }))
     .toBe(`${added}.0 %BW × 5`);

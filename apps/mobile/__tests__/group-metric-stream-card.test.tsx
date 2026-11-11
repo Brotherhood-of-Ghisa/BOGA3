@@ -24,7 +24,7 @@ it('shows original normalized units and the set with its one status, without raw
 });
 it.each([
   ['e1rm','kg',120,'1RM 120.0'],['volume','kg_reps',600,'Volume 600.0'],
-  ['volume','percent_bw_reps',620,'Volume 620.0 %BW·reps'],
+  ['volume','percent_bw_reps',620,'Volume 620.0 %BW'],
 ] as const)('keeps %s original unit %s', (metric,unit,value,line) => {
   const card=renderCard({ ...competitionEvent,metric,values: [{ ...competitionEvent.values[0],metric,unit,value }] });
   expect(card).toHaveTextContent(line,{ exact: false });
@@ -72,7 +72,7 @@ it('shows one status per set however many boards the record took, and the set fr
   { record: { performance: ordinarySet,previous: [] } });
   expect(screen.getAllByTestId('group-metric-stream-event1-certification')).toHaveLength(1);
   expect(screen.getByTestId('group-metric-stream-event1-set')).toHaveTextContent('120.0 × 5');
-  expect(screen.getByTestId('group-metric-stream-event1')).toHaveTextContent('Volume 650.0 %BW·reps',{ exact: false });
+  expect(screen.getByTestId('group-metric-stream-event1')).toHaveTextContent('Volume 650.0 %BW',{ exact: false });
 });
 it('says an ended certification and leaves a record with no current context without a status', () => {
   const metric=competitionEvent.record_context!.metrics[0];
