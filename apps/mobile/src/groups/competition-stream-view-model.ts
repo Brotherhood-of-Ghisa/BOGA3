@@ -3,7 +3,7 @@ import { formatBoardDate } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
 import { buildCompetitionSession } from './competition-session-view-model';
 import { sessionRecordCertificationStatus, setCertification } from './competition-session-records-view-model';
-import { describeCompetitionEvent, formatCompetitionFigure, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
+import { describeCompetitionEvent, historicalFigure, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
 import type { CompetitionEventWire, CompetitionStreamItemWire, CompetitionHistoryValueWire, CompetitionHistoricalMetric,
   CompetitionStreamRecordWire, CompetitionStreamSharedExerciseWire, CoWStreamItemWire } from './competition-wire';
 import { formatMemberName, formatMembershipSentence, formatSessionStatusLabel, formatSetCount,
@@ -94,7 +94,7 @@ export type StreamRecordMetric = { metric: CompetitionHistoricalMetric; label: s
 export type StreamPreviousRecord = { metric: CompetitionHistoricalMetric; label: string; value: string; holder: string; set: string | null };
 
 const figure = (value: CompetitionHistoryValueWire): string => value.unavailable || value.value === null ? 'Score unavailable'
-  : formatCompetitionFigure(value.value,value.unit);
+  : historicalFigure(value);
 const e1rmFirst = (a: { metric: string },b: { metric: string }) => (a.metric === 'e1rm' ? 0 : 1) - (b.metric === 'e1rm' ? 0 : 1);
 
 /**

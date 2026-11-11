@@ -117,7 +117,7 @@ rpc_with_contract() {
 # Opt-in display projection; rpc keeps exercising the legacy response shape.
 rpc_display() {
   http_call -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer $1" \
-    -H 'x-boga-group-contract: 4' -H 'x-boga-group-set-metrics: 1' \
+    -H 'x-boga-group-contract: 4' -H 'x-boga-group-set-metrics: 1' -H "${4:-x-boga-group-added-1rm: 1}" \
     -H 'Content-Type: application/json' -H 'Content-Profile: app_public' \
     --data "$3" "${API_URL}/rest/v1/rpc/$2"
 }
@@ -340,7 +340,7 @@ rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g 
 check 'normalized set shows the published Volume and additional load percentages only' \
   '(.session.exercises[]|select(.name=="Pull-up").sets[0].normalized_metrics|
     ((.added_load_percent_bw-22.22222222222222|fabs)<0.000000001) and
-    ((.volume_percent_bw_reps-611.1111111111111|fabs)<0.000000001) and .e1rm_percent_bw>100)
+    ((.volume_percent_bw_reps-611.1111111111111|fabs)<0.000000001) and .e1rm_percent_bw>100 and ((.e1rm_percent_bw-.e1rm_added_load_percent_bw-100|fabs)<0.000000001))
    and all(.session.exercises[]|select(.visibility=="ordinary").sets[];has("normalized_metrics")|not)
    and ([paths|select(.[-1]|IN("weight_kg","body_weight_kg","reading_pin","body_weight_measurement_id","fingerprint"))]|length==0)'
 rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${NEVER_UID}" --arg s "${T}-NEVER" \
@@ -353,6 +353,12 @@ check 'board detail uses the same normalized set display' \
 rpc_display "${OWNER_TOKEN}" group_competition_stream_v2 "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"; expect_ok 'stream display'; assert_wire isCompetitionStreamWire
 check 'stream record projections contain no private absolute inputs' \
   '([paths|select(.[-1]|IN("body_weight_kg","body_weight_measurement_id","reading_pin","fingerprint"))]|length==0)'
+rpc_display "${OWNER_TOKEN}" group_competition_board "$(jq -nc --arg g "${GID}" --arg x "${GX}" '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false}')"
+expect_ok 'added 1RM board'; assert_wire isCompetitionBoardWire
+check 'display subtracts contribution while preserving positive total scores and places' 'all(.entries[];(.value-.display_value-100|fabs)<0.000000001 and .rank>0)'
+rpc_display "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')" 'x-boga-group-added-1rm: 0'
+expect_ok 'older set-metrics client'
+check 'older set-metrics capability retains its exact shape' 'all(.session.exercises[].sets[]|select(.normalized_metrics!=null);.normalized_metrics|has("e1rm_added_load_percent_bw")|not)'
 rpc_display "${OUTSIDER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
   '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_error NOT_FOUND 'opt-in does not bypass membership'
 expect_sql 'ambiguous multi-group display is omitted' "select app_public.group_competition_set_display(array['${GID}'::uuid,'${GID}'::uuid],'${ATHLETE_UID}','${T}-ATHLETE-set') is null;" t
@@ -373,6 +379,32 @@ next_cuam; push "${ATHLETE_TOKEN}" 'remove temporary warm-up' \
   "$(e_set "${T}-warm-display" "${T}-ATHLETE-se" 2 0 5 '' "${CUAM}" "${CUAM}" warm_up)"
 drain 'remove display fixture'
 expect_sql 'empty request headers keep the legacy display shape' "select set_config('request.headers','',false) is not null and not app_public.group_competition_set_display_enabled();" t
+# Exercise both previous-leader branches on retained real event rows. Rollback
+# keeps these synthetic history records out of the later count/witness fixtures.
+BODY="$(run_psql "begin; set local session_replication_role=replica;
+  select set_config('request.headers','{\"x-boga-group-added-1rm\":\"1\"}',true);
+  insert into app_public.group_events(id,group_id,kind,member_user_id,session_id,sort_at_ms,group_exercise_id,set_id,
+    metric,certified,payload,rules_revision,contract_version,reason)
+  select ('00000000-1111-4111-8111-00000000000'||i)::uuid,'${GID}','record','${ATHLETE_UID}','${T}-ATHLETE',${START},'${GX}','${T}-ATHLETE-set',
+    null,null,jsonb_build_object('boards',jsonb_build_array(jsonb_build_object('metric','e1rm','unit','percent_bw',
+      'value',128.3,'previous_value',125,'group_record',true))),${REVISION},2,null from generate_series(1,2) i;
+  insert into app_public.group_events(group_id,kind,member_user_id,sort_at_ms,group_exercise_id,metric,certified,
+    payload,rules_revision,contract_version,reason,related_event_id)
+  values('${GID}','lead_change','${ATHLETE_UID}',${START},'${GX}','e1rm',false,
+    jsonb_build_object('previous',jsonb_build_object('member_user_id','${RIVAL_UID}','value',125,'unit','percent_bw'),
+      'leader',jsonb_build_object('member_user_id','${ATHLETE_UID}','value',128.3,'unit','percent_bw')),
+    ${REVISION},2,'record','00000000-1111-4111-8111-000000000001');
+  update app_public.group_exercises set bodyweight_contribution=0.7 where id='${GX}';
+  select jsonb_build_object('leader',app_public.group_competition_stream_record(a),
+    'self',app_public.group_competition_stream_record(b),'event',app_public.group_competition_event_json(a))
+    from app_public.group_events a cross join app_public.group_events b
+    where a.id='00000000-1111-4111-8111-000000000001' and b.id='00000000-1111-4111-8111-000000000002'; rollback;" | tail -1)"
+check 'previous leader and self-best projections retain original contribution after rules change' \
+  '(.leader.previous|length)==1 and (.self.previous|length)==1 and
+    .leader.previous[0].value.display_value==25 and .self.previous[0].value.display_value==25 and
+    .event.values[0].display_value==28.3'
+expect_sql 'legacy capability omits added 1RM' "select app_public.group_added_1rm_display('e1rm','percent_bw',128.3,1)='{}'::jsonb;" t
+expect_sql 'display helper is not a client RPC' "select has_function_privilege('authenticated','app_public.group_added_1rm_display(text,text,numeric,numeric)','execute');" f
 expect_sql 'display helpers remain private' "select has_function_privilege('authenticated','app_public.group_competition_set_display(uuid[],uuid,text)','execute');" f
 rpc "${OWNER_TOKEN}" group_competition_week_summary "$(jq -nc --arg g "${GID}" --argjson s "$((START-1000))" --argjson e "$((START+86400000))" \
   '{p_group_id:$g,p_window_start_ms:$s,p_window_end_ms:$e}')"; expect_ok week; assert_wire isCompetitionWeekSummaryWire
@@ -503,7 +535,19 @@ reading() { next_cuam; push "${ATHLETE_TOKEN}" "$1" "$(e_reading "$2" "$3" "$4" 
 MAIN_READING="${T}-ATHLETE-reading"
 pair
 for enabled in false true; do policy "${enabled}"; drain 'rule-only switch'; retained "switch ${enabled}"; done
-for c in 0 0.5 1; do update_rules "${c}"; drain contribution; retained "contribution ${c}"; done
+for c in 0 0.5 1; do
+  update_rules "${c}"; drain contribution; retained "contribution ${c}"
+  rpc_display "${OWNER_TOKEN}" group_competition_board "$(jq -nc --arg g "${GID}" --arg x "${GX}" '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false}')"
+  expect_ok 'contribution-aware added 1RM'; assert_wire isCompetitionBoardWire
+  if [[ "${c}" != 0 ]]; then
+    check 'fractional contribution is subtracted once' 'all(.entries[];(.value-.display_value-100*$c|fabs)<0.000000001)' --argjson c "${c}"
+  else
+    check 'ordinary scores have no added percentage projection' 'all(.entries[];has("display_value")|not)'
+  fi
+  rpc_display "${OWNER_TOKEN}" group_competition_history "$(jq -nc --arg g "${GID}" --arg x "${GX}" --argjson r "${REVISION}" '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"e1rm",p_certified:false,p_revision:$r}')"
+  expect_ok 'original contribution history'; assert_wire isCompetitionHistoryWire
+  check 'historical 1RM keeps the original contribution after live settings change' 'all(.events[].values[]|select(.metric=="e1rm" and .unit=="percent_bw" and .value!=null);(.value-.display_value-100|fabs)<0.000000001)'
+done
 for mode in per_side_load total_load; do update_rules 1 "${mode}"; drain 'target distribution'; retained "target ${mode}"; done
 next_cuam; push "${ATHLETE_TOKEN}" 'private contribution and a no-op source mode preserve the witness' \
   "$(e_def "${T}-ATHLETE-def" 'Pull-up' "${CUAM}" total_load | jq '.fields.bodyweight_contribution=0.25')"

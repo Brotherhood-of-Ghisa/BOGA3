@@ -13,11 +13,11 @@ const renderCard=(item: CompetitionEventWire,props: Partial<Parameters<typeof Gr
 };
 it('shows original normalized units and the set with its one status, without raw load, bodyweight or dependency pins', () => {
   const card=renderCard(competitionEvent);
-  expect(card).toHaveTextContent('1RM 145.7 %BW',{ exact: false });
+  expect(card).toHaveTextContent('1RM 45.7 %BW',{ exact: false });
   expect(screen.getByTestId('group-metric-stream-event1-set')).toHaveTextContent('5 reps');
   expect(screen.getByTestId('group-metric-stream-event1-certification')).toHaveTextContent('Not certified');
   expect(card).not.toHaveTextContent(/As logged|Uncertified/);
-  expect(card.props.accessibilityLabel).toContain('1RM 145.7 %BW');
+  expect(card.props.accessibilityLabel).toContain('1RM 45.7 %BW');
   expect(card.props.accessibilityLabel).not.toMatch(/kg|bodyweight reading|fingerprint|digest/);
   fireEvent.press(card);
   expect(mockPush).toHaveBeenCalledWith('/group/g1/leaderboards/ge1/history?metric=e1rm&scope=all');

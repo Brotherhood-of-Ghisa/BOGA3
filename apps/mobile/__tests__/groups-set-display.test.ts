@@ -3,7 +3,7 @@ import { isCompetitionPerformanceWire } from '@/src/groups/competition-wire-guar
 import { isCompetitionSessionDetailWire } from '@/src/groups/competition-reader-guards';
 import { competitionRow, competitionSession } from './helpers/competition-fixtures';
 
-const metrics = { added_load_percent_bw: 25, e1rm_percent_bw: 145.7, volume_percent_bw_reps: 625 };
+const metrics = { added_load_percent_bw: 25, e1rm_percent_bw: 145.7, e1rm_added_load_percent_bw: 45.7, volume_percent_bw_reps: 625 };
 const sessionWith = (value: unknown) => ({ ...competitionSession, session: { ...competitionSession.session,
   exercises: competitionSession.session.exercises.map(exercise => ({ ...exercise,
     sets: exercise.sets.map(set => ({ ...set, normalized_metrics: value })) })) } });

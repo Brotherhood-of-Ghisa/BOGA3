@@ -98,7 +98,7 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   expect(detail.session.exercises[0].visibility).toBe('normalized');
   expect(detail.session.exercises[0].sets[0]).not.toHaveProperty('weight_value');
   expect(detail.session.exercises[0].sets[0]).toMatchObject({ normalized_metrics: {
-    added_load_percent_bw: 25, volume_percent_bw_reps: 625, e1rm_percent_bw: rm.entries[0].value,
+    added_load_percent_bw: 25, volume_percent_bw_reps: 625, e1rm_percent_bw: rm.entries[0].value, e1rm_added_load_percent_bw: rm.entries[0].display_value,
   } });
   expect(board.entries[0].performance).toMatchObject({ normalized_metrics: {
     added_load_percent_bw: 25, volume_percent_bw_reps: 625,

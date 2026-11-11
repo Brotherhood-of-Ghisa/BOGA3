@@ -1,8 +1,9 @@
+import { competitionDisplayValue } from './competition-set-display';
 import type { ExerciseDateFormat } from '../preferences/model';
 import { formatOneRepMax, formatVolume } from '../exercise-calculations/format';
 import { formatCalendarWeek, formatCalendarWeekHeading, formatCompactDateRange } from '../utils/local-time';
 import type { CoWMetric } from './cow-scoring';
-import type { CoWDefinitionWire, CoWRankingWire, CoWResultWire } from './cow-wire';
+import type { CoWDefinitionWire, CoWRankingWire, CoWResultWire, CoWRowWire } from './cow-wire';
 import { COMPETITION_UNIT_LABELS } from './competition-view-model';
 
 export const COW_METRIC_LABELS: Record<CoWMetric, string> = { e1rm: '1RM', improvement: 'Improvement', volume: 'Volume' };
@@ -27,7 +28,10 @@ export function coWMetricHeading(ranking: Pick<CoWRankingWire, 'metric' | 'unit'
   const unit = ranking.unit === 'percent' ? '%' : ranking.unit ? COMPETITION_UNIT_LABELS[ranking.unit] : '';
   return [COW_METRIC_LABELS[ranking.metric], unit].filter(Boolean).join(' ');
 }
-export function coWFigure(value: number, metric: CoWMetric): string {
+export function coWFigure(row: Pick<CoWRowWire, 'value' | 'display_value'>, ranking: Pick<CoWRankingWire, 'metric' | 'unit'>): string {
+  const { metric } = ranking;
+  const value = competitionDisplayValue({ ...row, ...ranking });
+  if (value === null) return 'Unavailable';
   if (metric === 'volume') return formatVolume(value);
   if (metric === 'e1rm') return formatOneRepMax(value);
   const magnitude = formatOneRepMax(Math.abs(value));

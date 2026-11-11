@@ -13,7 +13,7 @@ function details(item: CoWStreamItemWire, userId: string | null): string[] {
   if (item.result) return item.result.state === 'unavailable' ? ['Group comparisons unavailable'] : item.result.rankings.map(ranking => {
     const winner=ranking.entries[0];
     const outcome=!winner ? 'No qualifying results' : `${formatBoardMemberLabel(winner.member,winner.former,userId)} · ${
-      winner.value === null ? 'Unavailable' : coWFigure(winner.value,ranking.metric)}`;
+      winner.value === null ? 'Unavailable' : coWFigure(winner,ranking)}`;
     return `${coWMetricHeading(ranking)} · ${outcome}`;
   });
   const before=item.previous, after=item.definition;

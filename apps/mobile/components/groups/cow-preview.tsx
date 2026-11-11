@@ -27,7 +27,7 @@ export function CoWRows({ ranking, userId, testID }: { ranking: CoWRankingWire; 
         {formatBoardMemberLabel(row.member, row.former, userId)}
       </Text>
       <Text allowFontScaling={false} style={[text.figure, styles.figure]}>
-        {row.state === 'unranked' ? 'Not ranked' : row.value === null ? 'Unavailable' : coWFigure(row.value, ranking.metric)}
+        {row.state === 'unranked' ? 'Not ranked' : row.value === null ? 'Unavailable' : coWFigure(row, ranking)}
       </Text>
     </View>)}
     {ranking.entries.length === 0 ? <Text allowFontScaling={false} style={[text.meta, styles.empty]}>No qualifying results</Text> : null}

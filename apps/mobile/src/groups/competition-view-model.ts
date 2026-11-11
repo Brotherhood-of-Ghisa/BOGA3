@@ -1,3 +1,4 @@
+import { competitionDisplayValue } from './competition-set-display';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 // Presentation preserves server values, ordering, units and public disclosure.
 import { formatWeight } from '@/src/exercise-calculations/format';
@@ -24,9 +25,10 @@ export function competitionViewLabel(metric: CompetitionMetric,rules: Competitio
   return withUnit(COMPETITION_LABELS[metric], COMPETITION_UNIT_LABELS[competitionUnit(metric,
     rules.bodyweight_calculations_enabled && rules.bodyweight_contribution > 0)]);
 }
-export function formatCompetitionValue(score: Pick<CompetitionValue,'metric'|'unit'|'value'>): string {
+export function formatCompetitionValue(score: Pick<CompetitionValue,'metric'|'unit'|'value'> & { display_value?: number | null }): string {
   if (!Number.isFinite(score.value) || score.value <= 0) return 'Score unavailable';
-  return formatCompetitionFigure(score.value,score.unit);
+  const value = competitionDisplayValue(score);
+  return value === null ? 'Score unavailable' : formatCompetitionFigure(value,score.unit);
 }
 export function formatCompetitionPerformance(performance: CompetitionPerformanceWire): string {
   if (performance.visibility === 'normalized') return formatSetFigure(performance);
@@ -86,15 +88,20 @@ export function describeCompetitionEvent(event: CompetitionEventWire,userId: str
   if (event.kind === 'link' || event.kind === 'unlink') return `${who} ${event.kind === 'link' ? 'linked' : 'unlinked'} an exercise to ${event.group_exercise.name}.`;
   const value=event.values.find(row => row.role === (event.kind === 'lead_change' ? 'leader' : 'record'));
   const figure=value?.value !== null && value?.value !== undefined && !value.unavailable
-    ? formatCompetitionFigure(value.value,value.unit) : 'Score unavailable';
+    ? historicalFigure(value) : 'Score unavailable';
   const label=value ? HISTORICAL_METRIC_LABELS[value.metric] : event.metric ? HISTORICAL_METRIC_LABELS[event.metric] : 'Score';
   const holder=value?.member?.user_id === userId ? 'You' : value?.member ? formatMemberName(value.member.username) : who;
   return event.kind === 'lead_change' ? `${holder} · #1 ${label} · ${figure}.` : `${who} · ${label} ${figure}${event.reps === null ? '' : ` · ${event.reps} reps`}.`;
 }
 
+export function historicalFigure(value: CompetitionHistoryValueWire): string {
+  const display = competitionDisplayValue(value);
+  return value.unavailable || display === null ? 'Score unavailable' : formatCompetitionFigure(display,value.unit);
+}
+
 export function formatCompetitionHistoricalValue(value: CompetitionHistoryValueWire): string {
   if (value.unavailable || value.value === null) return 'Score unavailable';
-  return `${HISTORICAL_METRIC_LABELS[value.metric]} ${formatCompetitionFigure(value.value,value.unit)}`;
+  return `${HISTORICAL_METRIC_LABELS[value.metric]} ${historicalFigure(value)}`;
 }
 
 /** Linking consumes public catalogue identity; it never copies personal settings. */

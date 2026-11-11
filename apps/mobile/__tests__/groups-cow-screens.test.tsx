@@ -58,9 +58,9 @@ const current = (): CoWResultWire => {
   const result = cowResult();
   result.rankings[0].entry_count = 3;
   result.rankings[0].entries = [
-    { rank: 1, member: { user_id: 'u2', username: 'Alex' }, former: false, state: 'ranked', value: 150 },
-    { rank: 2, member: { user_id: 'u1', username: 'Me' }, former: false, state: 'ranked', value: 140 },
-    { rank: 3, member: { user_id: 'u3', username: 'Jules' }, former: true, state: 'ranked', value: 130 },
+    { rank: 1, member: { user_id: 'u2', username: 'Alex' }, former: false, state: 'ranked', value: 150, display_value: 50 },
+    { rank: 2, member: { user_id: 'u1', username: 'Me' }, former: false, state: 'ranked', value: 140, display_value: 40 },
+    { rank: 3, member: { user_id: 'u3', username: 'Jules' }, former: true, state: 'ranked', value: 130, display_value: 30 },
   ];
   result.rankings[1] = { ...result.rankings[1], entry_count: 1, entries: [{ rank: 1, member: { user_id: 'u3', username: 'Jules' }, former: false, state: 'ranked', value: 1800 }] };
   result.rankings[2] = { ...result.rankings[2], entry_count: 1, entries: [{ rank: 1, member: { user_id: 'u2', username: 'Alex' }, former: false, state: 'ranked', value: -5 }] };
@@ -716,7 +716,8 @@ it('Today shows the current exercise and every enabled metric, then last week’
   const previous = previousCowSummary();
   previous.result!.exercise = { ...previous.result!.exercise!, name: 'Single-Arm Incline Dumbbell Bench Press' };
   previous.result!.rankings[0].entries[0].member.username = 'Contessa Serbelloni Mazzanti Vien dal Mare';
-  previous.result!.rankings[1].entries = [{ ...previous.result!.rankings[0].entries[0], value: 1800 }];
+  const { display_value: _displayValue, ...volumeWinner } = previous.result!.rankings[0].entries[0];
+  previous.result!.rankings[1].entries = [{ ...volumeWinner, value: 1800 }];
   api.getPreviousCoWSummary.mockResolvedValue(previous);
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   await screen.findByText('1RM · Volume · Improvement');
@@ -758,7 +759,7 @@ it('Today retains the public winner identity when its figure is redacted and nev
   const previous = previousCowSummary();
   const ranking = previous.result!.rankings[0];
   ranking.entries = [
-    { ...ranking.entries[0], member: { user_id: 'u1', username: 'Contessa Serbelloni Mazzanti Vien dal Mare' }, state: 'unavailable', value: null },
+    { ...ranking.entries[0], member: { user_id: 'u1', username: 'Contessa Serbelloni Mazzanti Vien dal Mare' }, state: 'unavailable', value: null, display_value: null },
     { ...ranking.entries[0], rank: 2, member: { user_id: 'u2', username: 'Runner up' } },
   ];
   ranking.entry_count = 2;

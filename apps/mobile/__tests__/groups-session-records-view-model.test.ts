@@ -141,3 +141,13 @@ test('Duration: the session own duration once completed, else the time since it 
   expect(formatGroupSessionDuration(session({ status: 'active', completed_at_ms: null, duration_sec: null }), STARTED + 32 * 60_000)).toBe('32m');
   expect(formatGroupSessionDuration(session({ status: 'active' }), STARTED - 1000)).toBe('0m');
 });
+
+
+test.each([[128.3,28.3,'28.3'],[100,0,'0.0']])('normalized session record %s uses its added 1RM projection', (value,display_value,expected) => {
+  const source=record();
+  source.event.visibility='normalized';
+  source.event.values=[{ ...source.event.values[0],unit: 'percent_bw',value,display_value }];
+  const [row]=buildSessionRecordRows({ records: [source],places,groupId: 'g',userId: ME });
+  expect(row.value).toBe(`${expected} %BW`);
+  expect(source.event.values[0].value).toBe(value);
+});

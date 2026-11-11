@@ -61,6 +61,10 @@ run_cow_publication_cases() {
   check 'owner wins Volume independently' '.rankings[0].entries[0].member.user_id==$u' --arg u "${OWNER_UID}"
   rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${g}" --arg c "${c}" '{p_group_id:$g,p_cow_id:$c,p_metric:"e1rm"}')"
   check 'bodyweight 1RM uses the normal group units' '.rankings[0].unit=="percent_bw" and [.rankings[0].entries[].value]==[160,150]'
+  check 'legacy CoW responses omit the new display field' 'all(.rankings[0].entries[];has("display_value")|not)'
+  http_call -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${OWNER_TOKEN}" -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-group-added-1rm: 1' -H 'Content-Type: application/json' -H 'Content-Profile: app_public' --data "$(jq -nc --arg g "${g}" --arg c "${c}" '{p_group_id:$g,p_cow_id:$c,p_metric:"e1rm"}')" "${API_URL}/rest/v1/rpc/group_cow_results"
+  expect_ok 'added live CoW 1RM'
+  check 'CoW presentation preserves total scores and ranks' '[.rankings[0].entries[].value]==[160,150] and [.rankings[0].entries[].display_value]==[60,50]'
   check 'member wins 1RM independently' '.rankings[0].entries[0].member.user_id==$u' --arg u "${MEMBER_UID}"
   rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${g}" --arg c "${c}" '{p_group_id:$g,p_cow_id:$c,p_metric:"improvement"}')"
   check 'improvement compares normalized baseline and weekly 1RM' '.rankings[0].unit=="percent" and (.rankings[0].entries[0].value-20|fabs)<0.000000001 and .rankings[0].entries[0].member.user_id==$u' --arg u "${OWNER_UID}"
@@ -88,6 +92,11 @@ run_cow_publication_cases() {
     sleep 0.1
   done
   saved="$(run_psql "select final_rankings::text from app_public.group_cows where id='${c}';")"
+  BODY="$(run_psql "begin; set local session_replication_role=replica;
+    select set_config('request.headers','{\"x-boga-group-added-1rm\":\"1\"}',true);
+    update app_public.group_exercises set bodyweight_contribution=0.7 where id='${e}';
+    select app_public.group_cow_public_result(c,array['e1rm'],null,20) from app_public.group_cows c where id='${c}'; rollback;" | tail -1)"
+  check 'frozen CoW display uses its start contribution after current rules change' '[.rankings[0].entries[].display_value]==[60,50]'
   next_cuam
   push "${OWNER_TOKEN}" 'post-cutoff edit cannot rerank final' "$(e_set "cow-pub-o1-${RUN_TAG}" "cow-pub-owblock-${RUN_TAG}" 0 1 1 '' "${CUAM}" null)"
   eval_drain "${secret}"; expect_ok 'worker after cutoff edit'

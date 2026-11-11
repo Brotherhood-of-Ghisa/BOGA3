@@ -35,6 +35,7 @@ New comparisons default to 1RM. The cutover turned a legacy Weight default
 into Volume on a new revision; an existing 1RM default stayed 1RM. Retired
 rule defaults and their historic Weight values stay unchanged.
 
+1RM presentation follows [[1rm.bodyweight-display]]; scoring values retain the table above.
 Public labels are Volume / 1RM; unit labels follow [[copy.no-weight-unit]]. There is no
 raw Weight, reps board or absolute bodyweight alternative in protocol 4. Raw
 workout values stay kg; percentages never replace them or occupy a kg field.
@@ -85,7 +86,7 @@ performed state, source distribution, achieved instant and ordering. Opt-in
 `normalized_metrics` object, shown as `%BW` (load, 1RM) and `%BW·reps` (Volume)
 and never mixed into absolute totals; absent capability
 keeps legacy shapes. Updated clients accept both exact shapes and evict prior
-cache generations. Its fields are `added_load_percent_bw`, `e1rm_percent_bw` and
+cache generations. Its base fields are `added_load_percent_bw`, `e1rm_percent_bw` and
 `volume_percent_bw_reps`, nullable finite nonnegative numbers. The private display
 helper reads current published per-set scores, including nonworking projections;
 it neither resolves readings nor changes scores, rules versions or audits.
@@ -101,6 +102,17 @@ private pins stay server-side. A score's `write_token` is random, server-issued
 and fenced by revision/source generation, never the reading-dependent hash.
 Old fingerprint fields cannot be renamed into this token without changing their
 origin. Cursor/token expiry or mismatch must reject a stale write.
+
+The additive `x-boga-group-added-1rm: 1` capability supplies `display_value`
+only on normalized 1RM board/history/CoW values, plus
+`e1rm_added_load_percent_bw` in normalized set metrics. The server subtracts
+100 times the scoring contribution, floored at zero for cancellation: current
+boards/sets use their published revision; historical values and previous leaders
+use their event revision; CoWs use their pinned start context. Missing context
+supplies null. These are presentation projections under [[1rm.bodyweight-display]],
+with unchanged scores/audits and no private-reading lookup. Older clients retain
+exact original shapes. Updated clients retire version-7 group caches and show
+unavailable when a server lacks the added 1RM projection.
 
 Group session rows implement [[set.row-figures]] with public Volume divided by
 reps; unit labels follow [[copy.no-weight-unit]]. Other performance labels retain additional load.

@@ -33,7 +33,7 @@ it.each([
   respond(data);
   expect(await invoke()).toEqual(data);
   expect(mockRpc).toHaveBeenCalledWith(name, args);
-  expect(mockHeader.mock.calls).toEqual([['x-boga-group-contract', '4'], ['x-boga-group-set-metrics', '1']]);
+  expect(mockHeader.mock.calls).toEqual([['x-boga-group-contract', '4'], ['x-boga-group-set-metrics', '1'], ['x-boga-group-added-1rm', '1']]);
 });
 
 it('passes opaque paging and retry identities unchanged; createGroup supplies its creator device zone', async () => {

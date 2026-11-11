@@ -14,7 +14,7 @@ it('accepts normalized rows, signed improvement, missing metrics and suppressed 
   expect(isCoWResultWire(result)).toBe(true);
   result.rankings[2].entries = [{ rank: 1, member: { user_id: 'u2', username: null }, former: true, value: -5, state: 'ranked' }];
   expect(isCoWResultWire(result)).toBe(true);
-  result.rankings[0].entries[0] = { ...result.rankings[0].entries[0], value: null, state: 'unavailable' };
+  result.rankings[0].entries[0] = { ...result.rankings[0].entries[0], value: null, display_value: null, state: 'unavailable' };
   expect(isCoWResultWire(result)).toBe(true);
   result.rankings[0].entries[0] = { ...result.rankings[0].entries[0], rank: null, state: 'unranked' };
   expect(isCoWResultWire(result)).toBe(true);
@@ -67,7 +67,7 @@ it('binds the summary to account, group, week, revision and publication; full re
   writeGroupCache(fixture.database, { cacheKey: alias, userId: 'u1', payload: newer, fetchedAtMs: fetchedAtMs + 1 });
   expect(readGroupCache(fixture.database, alias, 'u1')?.payload).toEqual(newer);
   expect(fixture.database.select().from(groupCache).all().filter(row => row.cacheKey.startsWith('cow-summary:'))).toHaveLength(1);
-  expect(() => writeGroupCache(fixture.database, { cacheKey: 'cow-results:v7:g1', userId: 'u1', payload: cowResult(), fetchedAtMs })).toThrow();
+  expect(() => writeGroupCache(fixture.database, { cacheKey: 'cow-results:v8:g1', userId: 'u1', payload: cowResult(), fetchedAtMs })).toThrow();
   evictGroup(fixture.database, 'g1');
   expect(readGroupCache(fixture.database, alias, 'u1')).toBeNull();
 });
@@ -88,6 +88,7 @@ it('marks absolute aggregate projections so a newly normalized session retires t
   const payload = cowSummary(); const result = payload.result!;
   result.normalized = false; result.bodyweight_calculations_enabled = false;
   result.exercise = { ...result.exercise!, rules: { ...result.exercise!.rules, bodyweight_calculations_enabled: false } };
+  delete result.rankings[0].entries[0].display_value;
   result.rankings[0].unit = 'kg'; result.rankings[1].unit = 'kg_reps';
   const alias = groupCacheKeys.cowSummary('g1');
   writeGroupCache(fixture.database, { cacheKey: alias, userId: 'u1', payload, fetchedAtMs: Date.now() });
@@ -136,6 +137,7 @@ it('retires a previous-week absolute total when current disclosure becomes norma
   const payload = previousCowSummary(); const result = payload.result!;
   result.normalized = false; result.bodyweight_calculations_enabled = false;
   result.exercise = { ...result.exercise!, rules: { ...result.exercise!.rules, bodyweight_calculations_enabled: false } };
+  delete result.rankings[0].entries[0].display_value;
   result.rankings[0].unit = 'kg'; result.rankings[1].unit = 'kg_reps';
   const alias = groupCacheKeys.cowSummary('g1', true);
   writeGroupCache(fixture.database, { cacheKey: alias, userId: 'u1', payload, fetchedAtMs: Date.now() });

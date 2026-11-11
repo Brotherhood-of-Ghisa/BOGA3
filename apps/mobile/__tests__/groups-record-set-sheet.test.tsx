@@ -28,6 +28,7 @@ import { groupCacheKeys,writeGroupCache } from '@/src/groups/cache';
 import { setLastViewedGroupId } from '@/src/groups';
 import GroupsTabRoute from '../app/(tabs)/groups';
 import GroupBoardRoute from '../app/group/[groupId]/leaderboards/[exerciseId]/index';
+const { display_value: _displayValue, ...ordinaryHistoryValue } = competitionEvent.values[0];
 const api=groupsApi as jest.Mocked<typeof groupsApi>;
 const page=(event: CompetitionEventWire=competitionEvent)=>({ contract_version: 4 as const,
   items: [{ kind: 'competition' as const,key: event.event_id,sort_at_ms: event.sort_at_ms,event }],next_cursor: null,has_more: false });
@@ -55,7 +56,7 @@ const sheet=()=>within(screen.getByTestId('group-metric-record-sheet'));
 it('shows the new record, its set and both links, with no explanatory or rules text',async()=>{
   await openRecord();
   expect(sheet().getByText('New record')).toBeTruthy();
-  expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('145.7 %BW');
+  expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('45.7 %BW');
   expect(screen.getByTestId('group-metric-record-set')).toHaveTextContent('5 reps');
   expect(screen.getByTestId('group-metric-record-who')).toHaveTextContent(/^Friend · /);
   expect(screen.getByTestId('group-metric-record-status')).toHaveTextContent('Not certified');
@@ -71,7 +72,7 @@ it('shows the new record, its set and both links, with no explanatory or rules t
 it('lists every record metric, 1RM first, under one certification for the set',async()=>{
   const context=competitionEvent.record_context!;
   api.getCompetitionStream.mockResolvedValue(page({ ...competitionEvent,
-    values: [{ ...competitionEvent.values[0],metric: 'volume',unit: 'percent_bw_reps',value: 650 },competitionEvent.values[0]],
+    values: [{ ...ordinaryHistoryValue,metric: 'volume',unit: 'percent_bw_reps',value: 650 },competitionEvent.values[0]],
     record_context: { ...context,metrics: [{ ...context.metrics[0],metric: 'volume',write_token: 'volume-token' },...context.metrics] } }));
   await openRecord();
   const metrics=sheet().getAllByTestId(/^group-metric-record-(e1rm|volume)$/).map(node=>node.props.testID);
@@ -86,7 +87,7 @@ it('lists every record metric, 1RM first, under one certification for the set',a
 it('shows the set as logged and the group previous #1 from the record stream',async()=>{
   const ordinary={ visibility: 'ordinary' as const,session_id: 's1',session_exercise_id: 'se1',exercise_definition_id: 'd1',set_id: 'set1',
     reps: 5,performance_status: null,source_load_input_mode: 'total_load' as const,achieved_at_ms: 1,exercise_order_index: 0,set_order_index: 0,weight_value: '120' };
-  const event={ ...competitionEvent,visibility: 'ordinary' as const,values: [{ ...competitionEvent.values[0],unit: 'kg',value: 140 }] };
+  const event={ ...competitionEvent,visibility: 'ordinary' as const,values: [{ ...ordinaryHistoryValue,unit: 'kg',value: 140 }] };
   api.getCompetitionStream.mockResolvedValue({ contract_version: 4,next_cursor: null,has_more: false,items: [{ kind: 'competition',
     key: event.event_id,sort_at_ms: event.sort_at_ms,event,record: { performance: ordinary,previous: [{
       value: { role: 'previous',metric: 'e1rm',unit: 'kg',value: 130,unavailable: false,member: { user_id: 'sam',username: 'Sam' } },
@@ -97,7 +98,7 @@ it('shows the set as logged and the group previous #1 from the record stream',as
 });
 it('keeps historical kg values distinct from the current normalized standard',async()=>{
   api.getCompetitionStream.mockResolvedValue(page({ ...competitionEvent,representation_version: 3,visibility: 'ordinary',rules_revision: 1,
-    values: [{ ...competitionEvent.values[0],unit: 'kg',value: 112.5 }] }));
+    values: [{ ...ordinaryHistoryValue,unit: 'kg',value: 112.5 }] }));
   await openRecord();expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('112.5');
   fireEvent.press(screen.getByTestId('group-metric-record-certify'));
   await waitFor(()=>expect(api.certifyCompetition).toHaveBeenCalledWith(expect.objectContaining({ revision: 2,token: competitionRow.write_token })));
@@ -125,7 +126,7 @@ it.each(['self','former','ineligible','archive','voided','rebuild'])('keeps %s s
 });
 it('keeps an event with no current context readable without a certification control',async()=>{
   api.getCompetitionStream.mockResolvedValue(page({ ...competitionEvent,record_context: null,reps: null }));await openRecord();
-  expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('145.7 %BW');
+  expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('45.7 %BW');
   expect(screen.queryByTestId('group-metric-record-set')).toBeNull();
   expect(screen.queryByTestId('group-metric-record-status')).toBeNull();
 });

@@ -11,7 +11,7 @@ export const competitionExercise: CompetitionExerciseWire = { group_exercise_id:
     bodyweight_contribution: 1,load_input_mode: 'total_load',default_metric: 'e1rm',rules_revision: 2 } };
 export const competitionCertification: CompetitionCertificationWire = { certification_id: 'cert',metric: 'e1rm',
   certified_by: { user_id: 'me',username: 'Me' },certified_at_ms: 1_000,observed_rules_revision: 1,ended_at_ms: null,end_reason: null };
-export const competitionRow: CompetitionBoardRowWire = { metric: 'e1rm',value: 145.7281316,unit: 'percent_bw',rank: 1,
+export const competitionRow: CompetitionBoardRowWire = { metric: 'e1rm',value: 145.7281316,display_value: 45.7281316,unit: 'percent_bw',rank: 1,
   member: { user_id: 'other',username: 'Friend' },former: false,write_token: 'server-random-token',certification: null,
   performance: { visibility: 'normalized',session_id: 's1',session_exercise_id: 'se1',exercise_definition_id: 'ed1',
     set_id: 'set1',reps: 5,performance_status: null,source_load_input_mode: 'total_load',achieved_at_ms: 2_000,
@@ -44,7 +44,7 @@ export const competitionEvent: CompetitionEventWire = {
   group_exercise: { group_exercise_id: 'ge1',name: 'Pull-up' },rules_revision: 2,representation_version: 4,
   visibility: 'normalized',sort_at_ms: 2000,member: competitionRow.member,metric: 'e1rm',certified: false,
   reason: null,related_event_id: null,session_id: 's1',set_id: 'set1',reps: 5,provisional: false,voided: false,
-  values: [{ role: 'record',metric: 'e1rm',unit: 'percent_bw',value: competitionRow.value,unavailable: false,member: competitionRow.member }],
+  values: [{ role: 'record',metric: 'e1rm',unit: 'percent_bw',value: competitionRow.value,display_value: competitionRow.display_value,unavailable: false,member: competitionRow.member }],
   record_context: { exercise: competitionExercise,former: false,
     metrics: [{ metric: 'e1rm',write_token: competitionRow.write_token,eligible: true,certification: null }] },
 };

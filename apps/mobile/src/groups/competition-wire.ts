@@ -36,6 +36,7 @@ export type CompetitionCertificationWire = {
   end_reason: 'withdrawn' | 'cancelled' | 'voided' | null;
 };
 export type CompetitionBoardRowWire = CompetitionValue & {
+  display_value?: number | null;
   rank: number;
   member: GroupMemberRef;
   former: boolean;
@@ -83,7 +84,7 @@ export type CompetitionRevisionWire = {
 export type CompetitionHistoryValueWire = {
   role: 'record' | 'leader' | 'previous' | 'before' | 'after';
   metric: CompetitionHistoricalMetric; unit: string;
-  value: number | null; unavailable: boolean; member: GroupMemberRef | null;
+  value: number | null; unavailable: boolean; member: GroupMemberRef | null; display_value?: number | null;
 };
 export type CompetitionRecordContextWire = {
   exercise: CompetitionExerciseWire; former: boolean;
@@ -211,7 +212,7 @@ export type CoWWriteWire = { cow: CoWDefinitionWire };
 export type CoWListWire = { cows: CoWDefinitionWire[]; next_cursor: string | null };
 
 export type CoWRowWire = { rank: number | null; member: GroupMemberRef; former: boolean;
-  value: number | null; state: 'ranked' | 'unranked' | 'unavailable' };
+  value: number | null; display_value?: number | null; state: 'ranked' | 'unranked' | 'unavailable' };
 export type CoWRankingWire = { metric: CoWMetric; unit: CompetitionValue['unit'] | 'percent' | null;
   entries: CoWRowWire[]; entry_count: number; next_cursor: string | null };
 export type CoWResultWire = { cow: CoWDefinitionWire; exercise: CompetitionExerciseWire | null;

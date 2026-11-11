@@ -6,6 +6,7 @@ import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/
 import { competitionGroup, competitionGroupDetail, competitionExercise, competitionSession, competitionStream,
   competitionWeek, competitionBoard,competitionEvent } from './helpers/competition-fixtures';
 
+const { display_value: _displayValue, ...ordinaryCompetitionRow } = competitionBoard.entries[0];
 let fixture: InMemoryDatabaseFixture;
 const put = (key: string,payload: unknown,userId = 'u1',fetchedAtMs = 1000) =>
   writeGroupCache(fixture.database,{ cacheKey: key,payload,userId,fetchedAtMs });
@@ -17,10 +18,10 @@ const periodTotals = (groupId: string) => ({ contract_version: 4,group_id: group
 beforeEach(() => { fixture=createInMemoryDatabase(); });
 afterEach(() => fixture.close());
 
-it('uses generation seven and binds sessions to the authorized group', () => {
+it('uses generation eight and binds sessions to the authorized group', () => {
   expect(groupCacheKeys).toBe(competitionCacheKeys);
-  expect(groupCacheKeys.mine).toBe('groups:v7:mine');
-  expect(groupCacheKeys.session('g1','other','s1')).toBe('session:v7:g1:other:s1');
+  expect(groupCacheKeys.mine).toBe('groups:v8:mine');
+  expect(groupCacheKeys.session('g1','other','s1')).toBe('session:v8:g1:other:s1');
   expect(groupCacheKeys.session('g2','other','s1')).not.toBe(groupCacheKeys.session('g1','other','s1'));
   expect(groupCacheKeys).not.toHaveProperty('streamAll');
 });
@@ -52,12 +53,12 @@ it.each([
   expect(readGroupCache(fixture.database,key,'u1')).toBeNull();
 });
 it('keeps podiums under the All scope only', () => {
-  expect(groupCacheKeys.boards('g1')).toBe('boards:v7:g1:all');
+  expect(groupCacheKeys.boards('g1')).toBe('boards:v8:g1:all');
   const certified={ contract_version: 4,certified: true,podiums: [] };
   expect(() => put(groupCacheKeys.boards('g1'),certified)).toThrow('Unsafe group cache payload.');
   // The key podiums used before they read All is never read again.
-  raw('boards:v7:g1',{ ...certified,certified: false });
-  expect(readGroupCache(fixture.database,'boards:v7:g1','u1')).toBeNull();
+  raw('boards:v8:g1',{ ...certified,certified: false });
+  expect(readGroupCache(fixture.database,'boards:v8:g1','u1')).toBeNull();
 });
 it('upserts owner and fetch time without exposing the earlier account', () => {
   put(groupCacheKeys.mine,{ groups: [competitionGroup] });
@@ -115,7 +116,7 @@ it('access loss drops group projections and every session join; local links rema
   put(groupCacheKeys.glance('g10','week',0),periodTotals('g10'));
   put(groupCacheKeys.boards('g1'),{ contract_version: 4,certified: false,podiums: [] });
   // Certified podiums cached before the page read All.
-  raw('boards:v7:g1',{ contract_version: 4,certified: true,podiums: [] });
+  raw('boards:v8:g1',{ contract_version: 4,certified: true,podiums: [] });
   put(groupCacheKeys.mine,{ groups: [competitionGroup] });
   evictGroup(fixture.database,'g1');
   // Every At a glance entry of g1 goes; g10's (a longer id with the same prefix) stays.
@@ -157,7 +158,7 @@ it('matching standards from a second reader do not repeatedly evict compatible p
 
 it.each(['catalogue','board','record'])('zero-contribution %s does not infer global Off in an On group',reader=>{
   const zero={ ...competitionExercise,rules: { ...competitionExercise.rules,bodyweight_contribution: 0,bodyweight_calculations_enabled: false } };
-  const ordinaryBoard={ ...competitionBoard,rules: zero.rules,entries: [{ ...competitionBoard.entries[0],unit: 'kg',
+  const ordinaryBoard={ ...competitionBoard,rules: zero.rules,entries: [{ ...ordinaryCompetitionRow,unit: 'kg',
     performance: { ...competitionBoard.entries[0].performance,visibility: 'ordinary',weight_value: '20' } }] };
   const key=reader==='catalogue'?groupCacheKeys.groupExercises('g1'):reader==='board'?groupCacheKeys.boards('g1'):groupCacheKeys.stream('g1');
   const projection=reader==='catalogue'?{ contract_version: 4,exercises: [zero] }
@@ -205,7 +206,7 @@ it('new normalized source evidence retires another ordinary session despite unch
 });
 it('online-only absolute boards keep the disclosure flag until projection retirement',()=>{
   const absolute={ ...competitionBoard,rules: { ...competitionBoard.rules,bodyweight_calculations_enabled: false },entries: [{
-    ...competitionBoard.entries[0],unit: 'kg',performance: { ...competitionBoard.entries[0].performance,visibility: 'ordinary',weight_value: '20' }
+    ...ordinaryCompetitionRow,unit: 'kg',performance: { ...competitionBoard.entries[0].performance,visibility: 'ordinary',weight_value: '20' }
   }] };
   observeGroupCompetitionPolicy(fixture.database,'g1','u1',absolute);
   const epoch=getCompetitionCacheGeneration('u1');
@@ -218,7 +219,7 @@ it('online-only absolute boards keep the disclosure flag until projection retire
 
 it('round-trips safe normalized projections and rejects a private nested counterpart', () => {
   const exercise = competitionSession.session.exercises[0];
-  const metrics = { added_load_percent_bw: 25, e1rm_percent_bw: 145.7, volume_percent_bw_reps: 625 };
+  const metrics = { added_load_percent_bw: 25, e1rm_percent_bw: 145.7, e1rm_added_load_percent_bw: 45.7, volume_percent_bw_reps: 625 };
   const payload = { ...competitionSession, session: { ...competitionSession.session, exercises: [{ ...exercise,
     visibility: 'normalized' as const, sets: exercise.sets.map(set => ({ ...set, normalized_metrics: metrics })) }] } };
   const key = groupCacheKeys.session('g1', 'other', 's1');

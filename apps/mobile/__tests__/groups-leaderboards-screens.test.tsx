@@ -98,6 +98,7 @@ import { renderWithTheme, rolesFor } from './helpers/theme';
 
 const roles = rolesFor(DEFAULT_APPEARANCE);
 
+const { display_value: _displayValue, ...ordinaryCompetitionRow } = competitionRow;
 const api = groupsApi as jest.Mocked<typeof groupsApi>;
 
 type TestNode = typeof screen.UNSAFE_root;
@@ -129,7 +130,7 @@ const detail: GroupGetResult = {
 };
 
 const row=(rank: number,userId: string,username: string,overrides: Partial<CompetitionBoardRowWire>={}): CompetitionBoardRowWire=>({
-  ...competitionRow,rank,member: { user_id: userId,username },value: 150-rank*5,unit: 'kg',
+  ...ordinaryCompetitionRow,rank,member: { user_id: userId,username },value: 150-rank*5,unit: 'kg',
   performance: { ...competitionRow.performance,visibility: 'ordinary',weight_value: String(140-rank*5),reps: 2,
     achieved_at_ms: SEP_10,session_id: `s-${userId}`,set_id: `set-${userId}` },...overrides } as CompetitionBoardRowWire);
 const boardPage=(rows: CompetitionBoardRowWire[],overrides: Partial<CompetitionBoardWire>={}): CompetitionBoardWire=>({

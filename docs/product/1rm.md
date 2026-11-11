@@ -25,3 +25,15 @@ when bodyweight contributes (`docs/specs/tech/bodyweight-load-contract.md`).
 Why: a single is a measured max; estimating above it would invent strength.
 Code: `estimateOneRepMax` in `apps/mobile/src/exercise-calculations/index.ts`; `formatOneRepMax` in `apps/mobile/src/exercise-calculations/format.ts`.
 Signature: `48.8`, `53.8`, `0.075`
+
+### 1rm.bodyweight-display · presentation · accepted
+
+Normalized group 1RM is shown as additional load above the exercise's
+bodyweight contribution, expressed as a percentage of bodyweight. Each result
+uses its scoring contribution, including historical records and final CoWs.
+Known zero stays numeric. Rankings, record eligibility, Volume and improvement
+continue to use their existing scores. Already-added set details keep their
+meaning; personal 1RM keeps its existing added-load display.
+
+Why: the figure should state the extra load a lifter could add.
+Code: `apps/mobile/src/groups/competition-set-display.ts`.

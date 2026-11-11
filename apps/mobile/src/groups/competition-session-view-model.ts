@@ -38,7 +38,7 @@ export function buildCompetitionSession(session: CompetitionSessionWire) {
       return [{ ...row, weightReps: exercise.visibility === 'ordinary' ? row.weightReps
         : loadPercent === null ? `${reps} reps`
           : `${figure(loadPercent, 'percent_bw')} × ${reps}`,
-        ...(metrics ? { oneRepMax: figure(metrics.e1rm_percent_bw, 'percent_bw'),
+        ...(metrics ? { oneRepMax: figure(metrics.e1rm_added_load_percent_bw, 'percent_bw'),
           volume: figure(metrics.volume_percent_bw_reps, 'percent_bw_reps') } : {}),
         working: isWorkingSetType(set.set_type) }];
     });

@@ -1,5 +1,5 @@
 import { isCoWStreamItemWire } from './cow-stream-wire.ts';
-import { isNormalizedSetMetrics } from './competition-set-display.ts';
+import { hasValidAddedOneRepMax, isNormalizedSetMetrics } from './competition-set-display.ts';
 
 // Exact schemas are a privacy boundary, including every nested history/session.
 import { isCompetitionMetric } from './competition-contract.ts';
@@ -61,7 +61,9 @@ export function isCompetitionRevisionWire(v: unknown): v is CompetitionRevisionW
     historicalMetric(v.rules.default_metric) && (v.representation_version !== 4 || isCompetitionMetric(v.rules.default_metric));
 }
 function historyValue(v: unknown, normalized: boolean): boolean {
-  if (!exact(v,['role','metric','unit','value','unavailable','member']) ||
+  const fields = ['role','metric','unit','value','unavailable','member'];
+  if (v !== null && typeof v === 'object' && Object.hasOwn(v, 'display_value')) fields.push('display_value');
+  if (!exact(v,fields) || !hasValidAddedOneRepMax(v,v.metric,v.unit) ||
     !['record','leader','previous','before','after'].includes(String(v.role)) || !historicalMetric(v.metric) || !id(v.unit) ||
     typeof v.unavailable !== 'boolean' || !(v.member === null || member(v.member))) return false;
   return v.unavailable ? v.value === null : typeof v.value === 'number' && Number.isFinite(v.value) && v.value > 0 &&

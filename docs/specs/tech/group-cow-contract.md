@@ -167,7 +167,8 @@ an empty private identity requests conservative member-wide suppression rather
 than guessing today's graph. Metadata enrichment alone never revises a receipt.
 
 `apps/mobile/src/groups/cow-wire.ts` owns exact public result/calendar shapes;
-`api.ts` remains the sole group RPC caller. Full metric pages stay online, with
+`api.ts` remains the sole group RPC caller. The added 1RM capability projects [[1rm.bodyweight-display]] from the retained
+start context, without rewriting finals or improvement scores. Full metric pages stay online, with
 opaque cursors bound to group, CoW/revision, metric and publication. Disclosure
 keeps original places and supplies unavailable rows without unsafe values.
 The bounded summary supplies all enabled metric podiums, displayed identity,

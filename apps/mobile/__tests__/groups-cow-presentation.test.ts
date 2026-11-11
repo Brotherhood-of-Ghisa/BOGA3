@@ -21,11 +21,11 @@ it('keeps attained %BW distinct from signed improvement and preserves numeric ze
   expect(coWMetricHeading({ metric: 'improvement', unit: 'percent' })).toBe('Improvement %');
   expect(coWMetricHeading({ metric: 'volume', unit: 'percent_bw_reps' })).toBe('Volume %BW·reps');
   expect(coWMetricHeading({ metric: 'volume', unit: 'kg_reps' })).toBe('Volume');
-  expect(coWFigure(-5.019, 'improvement')).toBe('−5.0%');
-  expect(coWFigure(20, 'improvement')).toBe('+20.0%');
-  expect(coWFigure(-0.001, 'improvement')).toBe('0.0%');
-  expect(coWFigure(120, 'e1rm')).toBe('120.0');
-  expect(coWFigure(1520.4, 'volume')).toBe('1520');
+  expect(coWFigure({ value: -5.019 }, { metric: 'improvement', unit: 'percent' })).toBe('−5.0%');
+  expect(coWFigure({ value: 20 }, { metric: 'improvement', unit: 'percent' })).toBe('+20.0%');
+  expect(coWFigure({ value: -0.001 }, { metric: 'improvement', unit: 'percent' })).toBe('0.0%');
+  expect(coWFigure({ value: 120 }, { metric: 'e1rm', unit: 'kg' })).toBe('120.0');
+  expect(coWFigure({ value: 1520.4 }, { metric: 'volume', unit: 'kg_reps' })).toBe('1520');
 });
 it('uses only enabled metrics and never upgrades Finalizing by elapsed time', () => {
   expect(coWMetric('improvement', ['volume', 'e1rm'])).toBe('volume');
