@@ -148,7 +148,7 @@ Current auth posture for backend/API work:
 
 ## Auth provisioning (controlled users, no self-signup)
 
-Provision deterministic local auth fixtures (`user_a`, `user_b`) after local reset:
+Provision deterministic local auth fixtures (`user_a`…`user_g`, listed in `supabase/scripts/auth-fixture-constants.sh`) after local reset:
 
 ```bash
 ./supabase/scripts/auth-provision-local-fixtures.sh

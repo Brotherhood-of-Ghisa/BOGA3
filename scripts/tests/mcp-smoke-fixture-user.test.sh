@@ -38,9 +38,12 @@ check_tree() {
   users="$(grep -oE 'USER_[A-Z0-9]+_(EMAIL|PASSWORD|FIXTURE_KEY)' "${smoke}" | sort -u | tr '\n' ' ')"
   [[ "${users}" == "USER_G_EMAIL USER_G_PASSWORD " ]] \
     || fail "${SMOKE_REL} must sign in as USER_G only (found: ${users:-none})"
-  # ...and through the constants only: no hard-coded fixture or dev account.
+  # ...and through the constants only: no hard-coded account email, and no
+  # fixture-key lookup (user_g has no key; a key names another fixture).
   ! grep -qE '[A-Za-z0-9._-]+@(example\.test|dev\.local)' "${smoke}" \
     || fail "${SMOKE_REL} hard-codes an account email; use USER_G_EMAIL"
+  ! grep -qE 'fixture_key|dev_fixture_principals' "${smoke}" \
+    || fail "${SMOKE_REL} looks a user up by fixture key; look up USER_G_EMAIL in auth.users"
 
   email="$(sed -nE 's/^export USER_G_EMAIL="([^"]+)"$/\1/p' "${constants}")"
   [[ -n "${email}" ]] || fail "USER_G_EMAIL is not defined in ${CONSTANTS_REL}"
@@ -49,11 +52,11 @@ check_tree() {
     || grep -qE '^for fixture in( [A-Z])* G( [A-Z])*; do$' "${root}/${PROVISION_REL}" \
     || fail "${PROVISION_REL} does not provision USER_G"
 
-  # Every tracked or untracked (not ignored) file outside the docs: a file in
-  # any directory could sign in as user_g. Docs may name it.
+  # Every tracked file outside the docs (a file in any directory could sign in
+  # as user_g; docs may name it). Untracked scratch files are not the repo's.
   local pattern="USER_G_|${email//./\\.}" others
   if git -C "${root}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    others="$(git -C "${root}" grep --untracked -lE "${pattern}" -- . ':!*.md' ':!docs/**' || true)"
+    others="$(git -C "${root}" grep -lE "${pattern}" -- . ':!*.md' ':!docs/**' || true)"
   else
     others="$(cd "${root}" && grep -rlE "${pattern}" --exclude='*.md' --exclude-dir=docs . | sed 's#^\./##' || true)"
   fi
@@ -107,6 +110,9 @@ expect_check fail "another suite hardcodes USER_G's email" "${TMP}/reused-email"
 
 make_tree "${TMP}/hardcoded" "${SMOKE_OK} OTHER=user_a.local@example.test"
 expect_check fail "smoke hard-codes another account's email" "${TMP}/hardcoded"
+
+make_tree "${TMP}/keyed" "${SMOKE_OK} UUID=\"\$(psql -c \"select subject_uuid from public.dev_fixture_principals where fixture_key = 'user_a'\")\""
+expect_check fail "smoke looks up another fixture by key" "${TMP}/keyed"
 
 make_tree "${TMP}/anywhere" "${SMOKE_OK}"
 mkdir -p "${TMP}/anywhere/apps/mobile/src"
