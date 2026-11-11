@@ -64,9 +64,13 @@ export const runHealthImport = async (run: HealthImportRun): Promise<HealthImpor
   for (const batch of chunks(upserts, IMPORT_BATCH_SIZE)) {
     if (!(await apply({ upserts: batch, deletes: [] }))) return { status: 'stale' };
   }
-  // iOS reports denied read access as no workouts at all, so an empty backfill
-  // proves nothing is gone: it never prunes the account's server rows.
-  if (saved === null && upserts.length > 0) {
+  // iOS reports denied read access as no workouts at all. An empty backfill
+  // therefore proves nothing: it prunes nothing and keeps no anchor, so once
+  // access is allowed the next import backfills the 90 days again.
+  if (saved === null && upserts.length === 0 && changes.deletedIds.length === 0) {
+    return { status: 'imported', backfill: true, ...totals };
+  }
+  if (saved === null) {
     const complete = { upserts: [], deletes: [], completeSince: since.toISOString(), completeIds: upserts.map((row) => row.external_id) };
     if (!(await apply(complete))) return { status: 'stale' };
   }

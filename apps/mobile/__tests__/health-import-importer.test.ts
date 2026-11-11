@@ -72,13 +72,19 @@ it('skips a workout that starts before the backfill window', async () => {
   expect(server.calls[1].completeIds).toEqual(['new']);
 });
 
-it('never prunes after a backfill that read nothing: iOS shows denied access as no workouts', async () => {
+it('a backfill that read nothing prunes nothing and keeps no anchor, so allowing access later still backfills', async () => {
   const { store, server, run } = setup();
   store.queue({ workouts: [], deletedIds: [], newAnchor: 'anchor-1' });
 
   await expect(run()).resolves.toEqual({ status: 'imported', backfill: true, upserted: 0, deleted: 0, pruned: 0 });
   expect(server.calls).toEqual([]);
-  expect(healthImportStore.readAnchor('user-a')?.anchor).toBe('anchor-1');
+  expect(healthImportStore.readAnchor('user-a')).toBeNull();
+
+  // Access allowed in iOS Settings: the next import is a full 90-day backfill.
+  store.queue({ workouts: [healthWorkout('a')], deletedIds: [], newAnchor: 'anchor-2' });
+  await expect(run()).resolves.toMatchObject({ backfill: true, upserted: 1, pruned: 1 });
+  expect(store.reads.map((read) => read.anchor)).toEqual([null, null]);
+  expect(healthImportStore.readAnchor('user-a')?.anchor).toBe('anchor-2');
 });
 
 it('keeps the old anchor when an upload fails, so the next import re-sends the same changes', async () => {
