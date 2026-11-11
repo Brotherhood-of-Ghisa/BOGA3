@@ -4,8 +4,8 @@
  *
  * A build applies only the types it knows on each layer and still advances the
  * layer's cursor, so it never loops on rows it cannot hold. With each cursor it
- * stores the types it applied there; a build whose list for a layer differs
- * re-pulls just that layer from the start, and last-write-wins makes the replay
+ * stores the types it applied there; a build that applies a type a layer's
+ * list lacks re-pulls just that layer from the start, and last-write-wins makes the replay
  * a no-op for rows already held. A cursor stored without a list (every build
  * before the lists existed) counts as the frozen legacy list, so the release
  * that adds the lists causes no re-pull.
