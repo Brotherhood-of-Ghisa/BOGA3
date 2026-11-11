@@ -495,13 +495,13 @@ describe('ProgressHistoryScreen', () => {
     fireEvent.press(screen.getByTestId('progress-history-options-button'));
     // The sheet is titled with the subject; the row names the week it opens.
     expect(screen.getByTestId('progress-history-options-sheet')).toHaveTextContent(/^Side delts/);
-    expect(screen.getByTestId('progress-history-view-sessions')).toHaveTextContent(/View sessions.*01-06-2026 – 07-06-2026/);
+    expect(screen.getByTestId('progress-history-view-sessions')).toHaveTextContent(/View sets.*01-06-2026 – 07-06-2026/);
     // A muscle's own page links to no other muscle.
     expect(screen.queryByTestId(/^progress-history-muscle-/)).toBeNull();
     expect(screen.queryByTestId('progress-history-rm-curve')).toBeNull();
     expect(screen.queryByTestId('progress-history-exercise-history')).toBeNull();
     fireEvent.press(screen.getByTestId('progress-history-view-sessions'));
-    expect(mockPush).toHaveBeenLastCalledWith('/sessions?week=2026-06-01');
+    expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/progress-history\?muscleGroupId=front_delts&metric=volume.*&week=2026-06-01$/));
     // Closed by the choice it answered.
     expect(screen.queryByTestId('progress-history-view-sessions')).toBeNull();
   });

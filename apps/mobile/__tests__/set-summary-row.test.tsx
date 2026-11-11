@@ -47,7 +47,7 @@ it('sets 1RM and Vol in two equal fixed columns, each legend hugging its right-a
   renderWithTheme(<SetSummaryRow row={row} testID="cols" />);
   const oneRepMaxColumn = screen.getByTestId('cols-1rm-column');
   const volumeColumn = screen.getByTestId('cols-vol-column');
-  expect(oneRepMaxColumn).toHaveStyle({ width: uiGeometry.metricValueWidth + uiSpace.xl, alignItems: 'flex-end' });
+  expect(oneRepMaxColumn).toHaveStyle({ width: uiGeometry.metricValueWidth + uiSpace.xl + uiSpace.sm, alignItems: 'flex-end' });
   expect(volumeColumn).toHaveStyle({ width: uiGeometry.metricValueWidth + uiSpace.xl, alignItems: 'flex-end' });
   expect(screen.getByText(row.oneRepMax)).not.toHaveStyle({ width: uiGeometry.metricValueWidth });
 });

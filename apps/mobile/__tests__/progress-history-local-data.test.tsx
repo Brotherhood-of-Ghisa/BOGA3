@@ -32,6 +32,7 @@ let mockSearchParams: Record<string, string | string[]> = {};
 const mockPush = jest.fn();
 const mockDismissTo = jest.fn();
 const mockFocusCleanups = new Set<() => void>();
+const mockFocusCallbacks = new Set<() => void | (() => void)>();
 
 jest.mock('expo-router', () => ({
   // The native header, as the route declares it: its rendered title and items
@@ -47,9 +48,10 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, dismissTo: mockDismissTo }),
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => {
+      mockFocusCallbacks.add(callback);
       const cleanup = callback();
       if (cleanup) mockFocusCleanups.add(cleanup);
-      return () => { if (cleanup) { mockFocusCleanups.delete(cleanup); cleanup(); } };
+      return () => { mockFocusCallbacks.delete(callback); if (cleanup) { mockFocusCleanups.delete(cleanup); cleanup(); } };
     }, [callback]);
   },
 }));
@@ -61,8 +63,9 @@ import { loadExerciseSessionFacts } from '@/src/data/exercise-session-facts';
 import * as statsRepository from '@/src/data/stats';
 import * as sessionEntry from '@/src/session-entry/coordinator';
 import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-history-fixture';
+import { seedStandardCatalogFixture } from '@/src/maestro/standard-catalog-fixture';
 import { ensureAccountLocalPreferencesLoaded, setAccountLocalPreferenceAccount } from '@/src/preferences/account-local';
-import { progressHistoryHref } from '@/src/navigation/routes';
+import { muscleHistoryDetailHref, progressHistoryHref } from '@/src/navigation/routes';
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds, historyWeekBounds, localDateKey } from '@/src/utils/calendar-weeks';
 import { completeSessionDraft, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
@@ -235,8 +238,10 @@ describe('The history page over real data', () => {
     expect(renderedDailySample(subject).filter(tile => tile.day?.hasTraining).map(tile => [tile.dateKey, tile.day?.value]))
       .toEqual([[localDateKey(new Date()), 1]]);
     fireEvent.press(screen.getByTestId(`stats-${subject}-history-heatmap-cell-${localDateKey(new Date())}`));
-    // The workout in progress lives on Train.
-    await waitFor(() => expect(mockDismissTo).toHaveBeenLastCalledWith('/train'));
+    if (subject === 'muscle') {
+      expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&day=${localDateKey(new Date())}`));
+      expect(mockDismissTo).not.toHaveBeenCalled();
+    } else await waitFor(() => expect(mockDismissTo).toHaveBeenLastCalledWith('/train'));
   });
 
   it.each([
@@ -251,7 +256,8 @@ describe('The history page over real data', () => {
     await completeSessionDraft('history_pulldown_in_progress', { completedAt: new Date(), now: new Date() });
 
     fireEvent.press(screen.getByTestId(`stats-${subject}-history-heatmap-cell-${localDateKey(new Date())}`));
-    await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith('/completed-session/history_pulldown_in_progress'));
+    if (subject === 'muscle') expect(mockPush).toHaveBeenLastCalledWith(expect.stringContaining(`&day=${localDateKey(new Date())}`));
+    else await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith('/completed-session/history_pulldown_in_progress'));
   });
 
   it.each([
@@ -268,7 +274,8 @@ describe('The history page over real data', () => {
     expect(renderedDailySample(subject).find(tile => tile.dateKey === today)?.day?.sessionIds).toHaveLength(2);
 
     fireEvent.press(screen.getByTestId(`stats-${subject}-history-heatmap-cell-${today}`));
-    expect(mockPush).toHaveBeenLastCalledWith(`/sessions?day=${today}`);
+    expect(mockPush).toHaveBeenLastCalledWith(subject === 'muscle'
+      ? expect.stringContaining(`&day=${today}`) : `/sessions?day=${today}`);
   });
 
   it('opens Sessions at the day when the active-workout lookup fails', async () => {
@@ -751,5 +758,146 @@ describe('The history page over real data', () => {
 
     await waitFor(() => expect(screen.getByTestId('progress-history-unavailable')).toBeTruthy());
     expect(read).not.toHaveBeenCalled();
+  });
+});
+
+// A day contains both contributing and unrelated exercises, and mixed effort rows.
+const logDetailSession = async (id: string, day: number) => {
+  const completedAt = new Date(2026, 9, day, 12);
+  const startedAt = new Date(2026, 9, day, 11);
+  await persistSessionDraftSnapshot({ sessionId: id, gymId: null, startedAt, exercises: [
+    { id: `${id}-squat`, exerciseDefinitionId: SQUAT, name: 'Barbell Back Squat', sets:
+      (['rir_2', 'warm_up', 'rir_2', 'technique'] as const).map((setType, index) => ({ id: `${id}-set-${index}`,
+        weightValue: '40', repsValue: '10', setType, performanceStatus: null })) },
+    { id: `${id}-bench`, exerciseDefinitionId: EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId, name: 'Barbell Bench Press',
+      sets: [{ id: `${id}-bench-set`, weightValue: '20', repsValue: '10', setType: 'rir_2', performanceStatus: null }] },
+  ] }, { now: completedAt });
+  await completeSessionDraft(id, { completedAt, now: completedAt });
+};
+
+const detailCardId = (sessionId: string) => `muscle-period-detail-sets-card-${sessionId}-squat`;
+const detailRows = (sessionId: string) => within(screen.getByTestId(detailCardId(sessionId))).getAllByTestId(/-set-\d+$/);
+
+describe('Muscle day/week details over real data', () => {
+  beforeEach(async () => {
+    await seedStandardCatalogFixture();
+    await logDetailSession('detail-one', 2);
+    await logDetailSession('detail-two', 3);
+  });
+
+  it.each<Record<string, string>>([{ day: '2026-10-02' }, { week: '2026-09-28' }])('shows contributing rows and opens the correct full session for %j', async period => {
+    await openHistory({ muscleGroupId: 'quads', metric: 'sets', secondary: 'shown', secondaryVolume: 'hidden', gymId: 'no-gym', ...period });
+    await screen.findByTestId(detailCardId('detail-one'));
+    expect(detailRows('detail-one')).toHaveLength(2);
+    expect(screen.queryByText('Barbell Bench Press')).toBeNull();
+    expect(screen.queryByText('Warm-up')).toBeNull();
+    expect(screen.getByTestId('muscle-period-detail-total')).toHaveProp('accessibilityLabel', `${'day' in period ? 2 : 4} Sets`);
+    expect(screen.getByTestId(`${detailCardId('detail-one')}-contribution`)).toHaveTextContent('Primary · 2 sets');
+    expect(screen.queryByTestId(detailCardId('detail-two')) !== null).toBe('week' in period);
+    fireEvent.press(screen.getByTestId(detailCardId('detail-one')));
+    expect(mockPush).toHaveBeenLastCalledWith('/completed-session/detail-one');
+    fireEvent.press(screen.getByTestId(`${detailCardId('detail-one')}-exercise`));
+    expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref({ exerciseDefinitionId: SQUAT, gymId: null }, 'workingSetCount'));
+  });
+
+  it('keeps single-session calendar days scoped, and carries all filters for day and week tiles', async () => {
+    jest.setSystemTime(new Date(2026, 9, 4, 12));
+    act(() => updatePreferences({ heatmapView: 'daily' }));
+    const subject = { muscleGroupId: 'quads', gymId: null, countSecondary: true, countSecondaryVolume: false };
+    await openHistory({ muscleGroupId: 'quads', metric: 'sets', gymId: 'no-gym', secondary: 'shown', secondaryVolume: 'hidden' });
+    const tile = await screen.findByTestId('stats-muscle-history-heatmap-cell-2026-10-02');
+    expect(tile).toHaveProp('accessibilityHint', "Opens the day's contributing sets");
+    fireEvent.press(tile);
+    expect(mockPush).toHaveBeenLastCalledWith(muscleHistoryDetailHref(subject, { day: '2026-10-02' }, 'workingSetCount'));
+    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-week-2026-09-2026-09-28'));
+    expect(mockPush).toHaveBeenLastCalledWith(muscleHistoryDetailHref(subject, { week: '2026-09-28' }, 'workingSetCount'));
+    await act(async () => { fireEvent.press(screen.getByTestId('stats-muscle-history-view-chip-weekly')); });
+    fireEvent.press(screen.getByTestId('stats-muscle-history-heatmap-cell-2026-09-28'));
+    expect(mockPush).toHaveBeenLastCalledWith(muscleHistoryDetailHref(subject, { week: '2026-09-28' }, 'workingSetCount'));
+  });
+
+  it('filters Sets and Volume independently, including volume-only effort rows', async () => {
+    act(() => updatePreferences({ workingSetEfforts: ['rir_2'], volumeEfforts: ['technique'] }));
+    await openHistory({ muscleGroupId: 'quads', metric: 'sets', day: '2026-10-02' });
+    await screen.findByTestId(detailCardId('detail-one'));
+    expect(detailRows('detail-one')).toHaveLength(2);
+    await act(async () => { fireEvent.press(screen.getByTestId('muscle-period-detail-metric')); });
+    await waitFor(() => expect(screen.getByTestId(`${detailCardId('detail-one')}-contribution`)).toHaveTextContent(/volume/));
+    expect(detailRows('detail-one')).toHaveLength(1);
+    expect(screen.getByText('Technique')).toBeTruthy();
+  });
+
+  it('refreshes the detail after returning from a session edit', async () => {
+    await openHistory({ muscleGroupId: 'quads', metric: 'sets', day: '2026-10-02' });
+    await screen.findByTestId(detailCardId('detail-one'));
+    expect(detailRows('detail-one')).toHaveLength(2);
+    localDataClient().prepare("UPDATE exercise_sets SET set_type = 'warm_up' WHERE id = 'detail-one-set-0'").run();
+    await act(async () => { for (const callback of mockFocusCallbacks) callback(); });
+    await waitFor(() => expect(screen.getByTestId(`${detailCardId('detail-one')}-contribution`)).toHaveTextContent('Primary · 1 set'));
+    expect(detailRows('detail-one')).toHaveLength(1);
+  });
+
+  it('shows secondary half-credit and applies its metric-specific switch', async () => {
+    localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'secondary' WHERE muscle_group_id = 'quads'").run();
+    await openHistory({ muscleGroupId: 'quads', metric: 'sets', secondary: 'shown', secondaryVolume: 'hidden', day: '2026-10-02' });
+    await screen.findByTestId(detailCardId('detail-one'));
+    expect(detailRows('detail-one')).toHaveLength(2);
+    expect(screen.getByTestId('muscle-period-detail-total')).toHaveProp('accessibilityLabel', '1 Set');
+    expect(screen.getByTestId(`${detailCardId('detail-one')}-contribution`)).toHaveTextContent('Secondary · 1 set');
+    fireEvent.press(screen.getByTestId(SECONDARY_CHIP));
+    expect(await screen.findByTestId('muscle-period-detail-sets-empty')).toHaveTextContent('No sets this day');
+    await act(async () => { fireEvent.press(screen.getByTestId('muscle-period-detail-metric')); });
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', { checked: true });
+    fireEvent.press(screen.getByTestId(SECONDARY_CHIP));
+    await screen.findByTestId(detailCardId('detail-one'));
+    expect(detailRows('detail-one')).toHaveLength(2);
+  });
+
+  it('preserves an overflowing block as unavailable in the period total beside finite blocks', async () => {
+    const completedAt = new Date(2026, 9, 2, 15);
+    await persistSessionDraftSnapshot({ sessionId: 'detail-overflow', gymId: null, startedAt: new Date(2026, 9, 2, 14),
+      exercises: [{ id: 'detail-overflow-squat', exerciseDefinitionId: SQUAT, name: 'Barbell Back Squat',
+        sets: Array.from({ length: 50 }, (_, index) => ({ id: `overflow-${index}`, weightValue: `1${'0'.repeat(306)}`,
+          repsValue: '100', setType: 'rir_2' as const, performanceStatus: null })) }] }, { now: completedAt });
+    await completeSessionDraft('detail-overflow', { completedAt, now: completedAt });
+    await openHistory({ muscleGroupId: 'quads', metric: 'volume', week: '2026-09-28' });
+    await screen.findByTestId(detailCardId('detail-two'));
+    expect(screen.getByTestId(`${detailCardId('detail-overflow')}-contribution`)).toHaveTextContent(/— volume/);
+    expect(screen.getByTestId('muscle-period-detail-total')).toHaveProp('accessibilityLabel', '— Volume');
+  });
+
+  it('rejects old deep links and invalidates a detail when its History look-back shrinks', async () => {
+    jest.setSystemTime(new Date(2026, 10, 11, 12));
+    act(() => updatePreferences({ historyLookbackWeeks: 8 }));
+    await openHistory({ muscleGroupId: 'quads', metric: 'sets', day: '2026-10-02' });
+    await screen.findByTestId(detailCardId('detail-one'));
+    act(() => updatePreferences({ historyLookbackWeeks: 2 }));
+    expect(await screen.findByTestId('progress-history-unavailable')).toBeTruthy();
+    expect(screen.queryByTestId('muscle-period-detail')).toBeNull();
+  });
+
+  it.each<Record<string, string>>([
+    { day: '2026-02-30' }, { day: '' }, { day: '2026-10-02', week: '2026-09-28' }, { day: '2020-01-01' },
+  ])('rejects malformed or ambiguous detail periods %j', async period => {
+    await openHistory({ muscleGroupId: 'quads', ...period });
+    expect(screen.getByTestId('progress-history-unavailable')).toBeTruthy();
+    expect(screen.queryByTestId('muscle-period-detail')).toBeNull();
+  });
+
+  it('retries failed detail reads without showing a fabricated zero total', async () => {
+    jest.spyOn(statsRepository, 'computeSelectedMuscleDailyEffort').mockRejectedValueOnce(new Error('Read failed'));
+    await openHistory({ muscleGroupId: 'quads', metric: 'sets', day: '2026-10-02' });
+    expect(await screen.findByTestId('muscle-period-detail-sets-error')).toHaveTextContent(/Read failed/);
+    expect(screen.queryByTestId('muscle-period-detail-total')).toBeNull();
+    fireEvent.press(screen.getByTestId('muscle-period-detail-sets-retry'));
+    await screen.findByTestId(detailCardId('detail-one'));
+    expect(screen.getByTestId('muscle-period-detail-total')).toHaveProp('accessibilityLabel', '2 Sets');
+  });
+
+  it('keeps a current day with only an active workout empty under completed-only list scope', async () => {
+    await startPulldown(0);
+    await openHistory({ muscleGroupId: 'back_lats', metric: 'sets', day: localDateKey(new Date()) });
+    expect(await screen.findByTestId('muscle-period-detail-sets-empty')).toHaveTextContent('No sets this day');
+    expect(mockDismissTo).not.toHaveBeenCalled();
   });
 });
