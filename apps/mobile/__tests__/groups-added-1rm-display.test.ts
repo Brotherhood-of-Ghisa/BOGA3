@@ -39,11 +39,23 @@ it('frozen CoW projection ignores current exercise rules, preserves numeric zero
   expect(coWFigure(ranking.entries[0],ranking)).toBe('0.0');
   expect(coWFigure({ value: 20 },{ metric: 'improvement',unit: 'percent' })).toBe('+20.0%');
 });
-it('shared session 1RM shows zero from the safe projection while set load and Volume retain their metrics', () => {
+it('shared session Weight and 1RM show numeric zero while Volume retains total work', () => {
   const session=competitionSession.session;
   const exercise=session.exercises[0];
   const metrics={ added_load_percent_bw: 0,e1rm_percent_bw: 100,e1rm_added_load_percent_bw: 0,volume_percent_bw_reps: 100 };
   const model=buildCompetitionSession({ ...session,exercises: [{ ...exercise,visibility: 'normalized',
     sets: [{ ...exercise.sets[0],reps_value: '1',normalized_metrics: metrics }] }] });
-  expect(model.cards[0].rows[0]).toMatchObject({ oneRepMax: '0.0 %BW',weightReps: '100.0 %BW × 1',volume: '100.0 %BW·reps' });
+  expect(model.cards[0].rows[0]).toMatchObject({ oneRepMax: '0.0 %BW',weightReps: '0.0 %BW × 1',volume: '100.0 %BW·reps' });
+});
+
+it('unweighted shared pull-up sets show 0.0 × 8, 0.0 × 7 and 0.0 × 7', () => {
+  const session=competitionSession.session;
+  const exercise=session.exercises[0];
+  const sets=[8,7,7].map((reps,index) => ({ ...exercise.sets[0],set_id: `pull-${index}`,order_index: index,reps_value: String(reps),
+    normalized_metrics: { added_load_percent_bw: 0,e1rm_percent_bw: index === 0 ? 127.7 : 124,
+      e1rm_added_load_percent_bw: index === 0 ? 27.7 : 24,volume_percent_bw_reps: index === 0 ? 800 : 700 } }));
+  const model=buildCompetitionSession({ ...session,exercises: [{ ...exercise,visibility: 'normalized',sets }] });
+  expect(model.cards[0].rows.map(row => row.weightReps)).toEqual(['0.0 %BW × 8','0.0 %BW × 7','0.0 %BW × 7']);
+  expect(model.cards[0].rows.map(row => row.oneRepMax)).toEqual(['27.7 %BW','24.0 %BW','24.0 %BW']);
+  expect(model.cards[0].rows.map(row => row.volume)).toEqual(['800.0 %BW·reps','700.0 %BW·reps','700.0 %BW·reps']);
 });

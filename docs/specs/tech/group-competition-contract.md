@@ -114,8 +114,8 @@ with unchanged scores/audits and no private-reading lookup. Older clients retain
 exact original shapes. Updated clients retire version-7 group caches and show
 unavailable when a server lacks the added 1RM projection.
 
-Group session rows implement [[set.row-figures]] with public Volume divided by
-reps; unit labels follow [[copy.no-weight-unit]]. Other performance labels retain additional load.
+Group session rows implement [[set.row-figures]] with the existing
+`added_load_percent_bw` projection; unit labels follow [[copy.no-weight-unit]].
 
 All group routes must obey disclosure selected by the current authorized
 group/comparison state, including old history, retired/archived revisions and

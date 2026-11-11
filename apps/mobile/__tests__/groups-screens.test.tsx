@@ -911,7 +911,7 @@ describe("Friend's session view", () => {
     expect(screen.getByTestId('group-session-volume').props.accessibilityLabel).toBe('Volume —');
   });
 
-  it('shows normalized total load, 1RM and Volume under one exercise unit label without absolute values or a mixed total', async () => {
+  it('shows normalized additional load, 1RM and Volume under one exercise unit label without absolute values or a mixed total', async () => {
     const safe = sessionDetail();
     api.getCompetitionSession.mockResolvedValue({ ...safe, session: { ...safe.session, exercises: safe.session.exercises.map(exercise => ({
       ...exercise, visibility: 'normalized', sets: exercise.sets.map(set => ({ set_id: set.set_id, order_index: set.order_index,
@@ -919,8 +919,8 @@ describe("Friend's session view", () => {
         normalized_metrics: { added_load_percent_bw: 25, e1rm_percent_bw: 145.7, e1rm_added_load_percent_bw: 45.7, volume_percent_bw_reps: 625 } })) })) } });
     render(<GroupSessionRoute />);
     const row = await screen.findByTestId('group-session-set-row-set-2');
-    expect(within(row).getByTestId('group-session-set-row-set-2-values')).toHaveTextContent('125.0 × 5');
-    expect(within(row).getByTestId('group-session-set-row-set-2-values')).toHaveProp('accessibilityLabel', '125.0 %BW × 5');
+    expect(within(row).getByTestId('group-session-set-row-set-2-values')).toHaveTextContent('25.0 × 5');
+    expect(within(row).getByTestId('group-session-set-row-set-2-values')).toHaveProp('accessibilityLabel', '25.0 %BW × 5');
     expect(within(screen.getByTestId('group-session-exercise-ex-1')).getByText('Bench Press (% BW)')).toBeTruthy();
     expect(screen.queryByTestId('group-session-exercise-ex-1-columns')).toBeNull();
     expect(within(row).getByTestId('group-session-set-row-set-2-1rm').props.accessibilityLabel).toBe('1RM 45.7 %BW');

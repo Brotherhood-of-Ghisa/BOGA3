@@ -31,8 +31,7 @@ export function buildCompetitionSession(session: CompetitionSessionWire) {
       }
       const row=formatSetRow({ id: set.set_id,weight,reps,setType: set.set_type,done: true,loadContext });
       const metrics = exercise.visibility === 'normalized' && 'normalized_metrics' in set ? set.normalized_metrics : null;
-      // Public Volume already includes the group's bodyweight contribution and both sides.
-      const loadPercent = metrics?.volume_percent_bw_reps == null ? null : metrics.volume_percent_bw_reps / reps;
+      const loadPercent = metrics?.added_load_percent_bw ?? null;
       const figure = (value: number | null | undefined, unit: string) => value === null || value === undefined
         ? '—' : formatCompetitionFigure(value, unit);
       return [{ ...row, weightReps: exercise.visibility === 'ordinary' ? row.weightReps

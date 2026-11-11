@@ -154,27 +154,26 @@ describe('buildStreamRecordSheet', () => {
 
 
 test.each([
-  ['total_load', 0, 500, '100.0'],
-  ['total_load', 25, 625, '125.0'],
-  ['total_load', 25, 275, '55.0'],
-  ['per_side_load', 25, 625, '125.0'],
-] as const)('normalized %s session sets show total load from public Volume (%s added, %s volume)', (load_input_mode, added, volume, total) => {
+  ['total_load', 0, 500, '0.0'],
+  ['total_load', 25, 625, '25.0'],
+  ['total_load', 25, 275, '25.0'],
+  ['per_side_load', 25, 625, '25.0'],
+] as const)('normalized %s session sets show additional load without changing Volume (%s added, %s volume)', (load_input_mode, added, volume, weight) => {
   const metrics = { added_load_percent_bw: added, e1rm_percent_bw: 145.728, e1rm_added_load_percent_bw: 45.728, volume_percent_bw_reps: volume };
   const exercise = competitionSession.session.exercises[0];
   const session = { ...competitionSession.session, exercises: [{ ...exercise, load_input_mode, visibility: 'normalized' as const,
     sets: exercise.sets.map(set => ({ ...set, normalized_metrics: metrics })) }] };
   const model = buildCompetitionSession(session);
   expect(model).toMatchObject({ volume: '—', setCount: 1, cards: [{ hideDerivedMetrics: false, percentageMetrics: true,
-    rows: [{ weightReps: `${total} %BW × 5`, oneRepMax: '45.7 %BW', volume: `${volume}.0 %BW·reps` }] }] });
-  // Other group performance labels keep their existing additional-load display.
+    rows: [{ weightReps: `${weight} %BW × 5`, oneRepMax: '45.7 %BW', volume: `${volume}.0 %BW·reps` }] }] });
   expect(formatCompetitionPerformance({ ...competitionRow.performance, visibility: 'normalized', normalized_metrics: metrics }))
-    .toBe(`${added}.0 %BW × 5`);
+    .toBe(`${weight} %BW × 5`);
 });
 
-test('normalized session load needs public Volume, never assumes a 100 percent contribution', () => {
+test('normalized session Weight uses the additional-load projection independently of Volume and contribution', () => {
   const exercise = competitionSession.session.exercises[0];
-  for (const [volume, reps, expected] of [[null, '5', '5 reps'], [0, '5', '0.0 %BW × 5'], [811.599, '8', '101.4 %BW × 8']] as const) {
-    const metrics = { added_load_percent_bw: null, e1rm_percent_bw: 145.728, e1rm_added_load_percent_bw: 45.728, volume_percent_bw_reps: volume };
+  for (const [added, volume, reps, expected] of [[null, 625, '5', '5 reps'], [0, null, '5', '0.0 %BW × 5'], [1.4499, 811.599, '8', '1.4 %BW × 8']] as const) {
+    const metrics = { added_load_percent_bw: added, e1rm_percent_bw: 145.728, e1rm_added_load_percent_bw: 45.728, volume_percent_bw_reps: volume };
     const session = { ...competitionSession.session, exercises: [{ ...exercise, visibility: 'normalized' as const,
       sets: exercise.sets.map(set => ({ ...set, reps_value: reps, normalized_metrics: metrics })) }] };
     expect(buildCompetitionSession(session).cards[0].rows[0]).toMatchObject({

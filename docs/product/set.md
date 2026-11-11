@@ -59,9 +59,9 @@ which sets can be records, never what a row shows. The only highlights on a set
 list are the session's record sets (`docs/specs/tech/training-metrics-contract.md`
 §3). The group session view highlights instead the set that took #1 on a group
 1RM board: one `#1 in group` band per set.
-In a shared group session, normalized Weight is effective total load as `%BW`;
+In a shared group session, normalized Weight is additional load as `%BW`;
 ordinary and personal Weight retain their existing meaning.
 
 Why: the row is a record of what was lifted; eligibility decides what counts,
 not what is shown.
-Code: `calculateSetMetrics` in `apps/mobile/src/exercise-calculations/load-metrics.ts`; record band words in `apps/mobile/src/session-insights/record-band.ts`; the group band in `buildSessionRecordBands`, `apps/mobile/src/groups/competition-session-records-view-model.ts`.
+Code: `calculateSetMetrics` in `apps/mobile/src/exercise-calculations/load-metrics.ts`; normalized group rows in `buildCompetitionSession`, `apps/mobile/src/groups/competition-session-view-model.ts`; record band words in `apps/mobile/src/session-insights/record-band.ts`; the group band in `buildSessionRecordBands`, `apps/mobile/src/groups/competition-session-records-view-model.ts`.
