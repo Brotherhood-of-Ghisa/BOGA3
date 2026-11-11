@@ -109,7 +109,8 @@ the only code that touches it; Android and web report the store unsupported.
   Background delivery is not used.
 - **Anchor.** The store's change-feed anchor and the backfill start are kept
   device-local for one account (`src/health-import/storage.ts`). Without one
-  the import backfills 90 days and closes with `p_complete_ids`; with one it
+  the import backfills 90 days and closes with `p_complete_ids` (not after a
+  backfill that read nothing: iOS reports denied access as no workouts); with one it
   sends only changes: deletions, then upserts, in batches of 500. The anchor
   advances only after every call succeeded, so a failure re-sends the same
   changes next time. Signing out, switching account or turning the switch off

@@ -41,7 +41,7 @@ export const fakeHealthStore = (supported = true) => {
     adapter,
     reads,
     queue: (next: HealthWorkoutChanges | Error) => { queue.push(next); },
-    failAuthorization: (error: Error) => { authorizationError = error; },
+    failAuthorization: (error: Error | null) => { authorizationError = error; },
     get authorizations() { return authorizations; },
   };
 };

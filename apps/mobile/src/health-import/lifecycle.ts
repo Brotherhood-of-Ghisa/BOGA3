@@ -19,19 +19,22 @@ export type HealthImportSnapshot = {
   signedIn: boolean;
   enabled: boolean;
   busy: boolean;
-  /** The last import's failure, until the next import succeeds; never a fake success. */
+  /** The permission sheet is open or the first import is starting: the switch waits. */
+  enabling: boolean;
+  /** The last import's or enable's failure, until the next one succeeds; never a fake success. */
   error: string | null;
-  lastImportedAt: string | null;
 };
 
 const initial = (): HealthImportSnapshot => ({
-  supported: false, signedIn: false, enabled: false, busy: false, error: null, lastImportedAt: null,
+  supported: false, signedIn: false, enabled: false, busy: false, enabling: false, error: null,
 });
 let state = initial();
 let deps: { api: HealthImportApi; store: HealthImportStore; now: () => Date } = {
   api: healthImportApi, store: healthImportStore, now: () => new Date(),
 };
 let accountRevision = 0;
+/** Bumped by every turn on or off, so a run started before it can neither write nor report. */
+let switchGeneration = 0;
 let currentUserId: string | null = null;
 let inFlight: Promise<void> | null = null;
 let rerunQueued = false;
@@ -50,6 +53,7 @@ export const subscribeHealthImport = (listener: () => void): (() => void) => {
 const failureMessage = (error: unknown): string => {
   if (error instanceof HealthImportError && error.code === 'READ_FAILED') return 'Apple Health could not be read.';
   if (error instanceof HealthImportError && error.code === 'INVALID_WORKOUT') return 'A workout could not be imported.';
+  if (error instanceof HealthImportError && error.code === 'AUTH_REQUIRED') return 'Sign in again to send workouts.';
   return 'Workouts could not be sent.';
 };
 
@@ -66,8 +70,9 @@ const syncAccount = (): void => {
     supported: adapter.supported,
     signedIn: userId !== null,
     enabled: userId !== null && deps.store.readEnabled(userId),
+    busy: false,
+    enabling: false,
     error: null,
-    lastImportedAt: null,
   });
 };
 
@@ -76,17 +81,18 @@ const importOnce = async (): Promise<void> => {
   const adapter = getHealthStoreAdapter();
   if (userId === null || !adapter.supported || !deps.store.readEnabled(userId)) return;
   const revision = accountRevision;
-  const isCurrent = () => revision === accountRevision && deps.store.readEnabled(userId);
+  const generation = switchGeneration;
+  const isCurrent = () => revision === accountRevision && generation === switchGeneration && deps.store.readEnabled(userId);
   publish({ busy: true });
   try {
     const outcome = await runHealthImport({ userId, adapter, api: deps.api, store: deps.store, now: deps.now(), isCurrent });
     if (outcome.status === 'imported' && isCurrent()) {
-      publish({ error: null, lastImportedAt: deps.now().toISOString() });
+      publish({ error: null });
       void logEvent({ level: 'info', event: 'health_import.completed', userId,
         context: { backfill: outcome.backfill, upserted: outcome.upserted, deleted: outcome.deleted, pruned: outcome.pruned } });
     }
   } catch (error) {
-    if (revision !== accountRevision) return;
+    if (!isCurrent()) return;
     publish({ error: failureMessage(error) });
     void logEvent({ level: 'warn', event: 'health_import.failed', userId,
       message: error instanceof Error ? error.message : String(error),
@@ -117,18 +123,24 @@ export const enableHealthImport = async (): Promise<void> => {
   syncAccount();
   const userId = currentUserId;
   const adapter = getHealthStoreAdapter();
-  if (userId === null || !adapter.supported) return;
+  if (userId === null || !adapter.supported || state.enabling) return;
+  const revision = accountRevision;
+  switchGeneration += 1;
+  const generation = switchGeneration;
+  publish({ enabling: true, error: null });
   try {
     await adapter.requestAuthorization();
   } catch (error) {
-    publish({ error: 'Apple Health could not be opened.' });
+    if (revision === accountRevision && generation === switchGeneration) {
+      publish({ enabling: false, error: 'Apple Health could not be opened.' });
+    }
     void logEvent({ level: 'warn', event: 'health_import.authorization_failed', userId,
       message: error instanceof Error ? error.message : String(error) });
     return;
   }
-  if (userId !== currentUserId) return;
+  if (revision !== accountRevision || generation !== switchGeneration) return;
   deps.store.writeEnabled(userId, true);
-  publish({ enabled: true, error: null });
+  publish({ enabled: true, enabling: false });
   await importHealthActivitiesNow();
 };
 
@@ -136,10 +148,11 @@ export const enableHealthImport = async (): Promise<void> => {
 export const disableHealthImport = (): void => {
   syncAccount();
   if (currentUserId === null) return;
+  switchGeneration += 1;
   deps.store.writeEnabled(currentUserId, false);
   deps.store.clearAnchor();
   rerunQueued = false;
-  publish({ enabled: false, error: null });
+  publish({ enabled: false, enabling: false, error: null });
 };
 
 let stopLifecycle: (() => void) | null = null;
@@ -151,8 +164,9 @@ export const startHealthImportLifecycle = (): (() => void) => {
     syncAccount();
     if (currentUserId !== null && currentUserId !== before) void importHealthActivitiesNow();
   });
+  // A foreground while an import runs (the launch's own 'active') adds nothing new to read.
   const appState = AppState.addEventListener('change', (next) => {
-    if (next === 'active') void importHealthActivitiesNow();
+    if (next === 'active' && !inFlight) void importHealthActivitiesNow();
   });
   void importHealthActivitiesNow();
   stopLifecycle = () => { stopAuth(); appState.remove(); stopLifecycle = null; };
@@ -167,6 +181,7 @@ export const __resetHealthImportForTests = (): void => {
   state = initial();
   deps = { api: healthImportApi, store: healthImportStore, now: () => new Date() };
   accountRevision = 0;
+  switchGeneration = 0;
   currentUserId = null;
   inFlight = null;
   rerunQueued = false;

@@ -73,7 +73,7 @@ it('enabling shows the permission sheet, then backfills, and the switch stays on
 
   expect(store.authorizations).toBe(1);
   expect(server.calls.at(-1)).toMatchObject({ completeIds: ['a'] });
-  expect(getHealthImportSnapshot()).toMatchObject({ enabled: true, busy: false, error: null, lastImportedAt: NOW.toISOString() });
+  expect(getHealthImportSnapshot()).toMatchObject({ enabled: true, enabling: false, busy: false, error: null });
   expect(healthImportStore.readEnabled('user-a')).toBe(true);
   expect(mockLog).toHaveBeenCalledWith(expect.objectContaining({ event: 'health_import.completed' }));
 });
@@ -122,12 +122,13 @@ it('shows a failure until the next import succeeds, and never claims success', a
   startHealthImportLifecycle();
   await settle();
 
-  expect(getHealthImportSnapshot()).toMatchObject({ error: 'Workouts could not be sent.', lastImportedAt: null, busy: false });
+  expect(getHealthImportSnapshot()).toMatchObject({ error: 'Workouts could not be sent.', busy: false });
   expect(mockLog).toHaveBeenCalledWith(expect.objectContaining({ event: 'health_import.failed', message: 'timeout' }));
   expect(healthImportStore.readAnchor('user-a')?.anchor).toBe('anchor-1');
 
   await importHealthActivitiesNow();
-  expect(getHealthImportSnapshot()).toMatchObject({ error: null, lastImportedAt: NOW.toISOString() });
+  expect(getHealthImportSnapshot()).toMatchObject({ error: null });
+  expect(healthImportStore.readAnchor('user-a')?.anchor).not.toBe('anchor-1');
 });
 
 it('names a store read failure', async () => {
@@ -223,6 +224,98 @@ it('does nothing where Apple Health is unavailable', async () => {
   await enableHealthImport();
   expect(getHealthImportSnapshot()).toMatchObject({ supported: false, enabled: false });
   expect(store.authorizations).toBe(0);
+});
+
+it('names an expired session apart from a network failure', async () => {
+  const { store, server } = setup();
+  healthImportStore.writeEnabled('user-a', true);
+  store.queue({ workouts: [healthWorkout('a')], deletedIds: [], newAnchor: 'x' });
+  const { HealthImportError } = jest.requireActual('@/src/health-import/mapping') as typeof import('@/src/health-import/mapping');
+  server.failNext(new HealthImportError('AUTH_REQUIRED', 'AUTH_REQUIRED: sign in to import activities'));
+  startHealthImportLifecycle();
+  await settle();
+  expect(getHealthImportSnapshot().error).toBe('Sign in again to send workouts.');
+  expect(mockLog).toHaveBeenCalledWith(expect.objectContaining({ event: 'health_import.failed', context: { code: 'AUTH_REQUIRED' } }));
+});
+
+it('turning on again after a failed permission sheet shows the sheet again', async () => {
+  const { store } = setup();
+  store.failAuthorization(new Error('restricted'));
+  startHealthImportLifecycle();
+  await enableHealthImport();
+  expect(getHealthImportSnapshot()).toMatchObject({ enabled: false, enabling: false, error: 'Apple Health could not be opened.' });
+
+  store.failAuthorization(null);
+  await enableHealthImport();
+  expect(store.authorizations).toBe(2);
+  expect(getHealthImportSnapshot()).toMatchObject({ enabled: true, error: null });
+});
+
+it('ignores a second turn-on while the permission sheet is open', async () => {
+  const { store } = setup();
+  startHealthImportLifecycle();
+  const first = enableHealthImport();
+  expect(getHealthImportSnapshot().enabling).toBe(true);
+  await enableHealthImport();
+  await first;
+  expect(store.authorizations).toBe(1);
+});
+
+it('off then on mid-import makes the running import stale, so the next one backfills afresh', async () => {
+  const { store, server } = setup();
+  healthImportStore.writeEnabled('user-a', true);
+  healthImportStore.writeAnchor('user-a', 'anchor-1', SINCE);
+  store.queue({ workouts: [healthWorkout('a')], deletedIds: [], newAnchor: 'anchor-2' });
+  const apply = server.api.apply;
+  let toggled = false;
+  server.api.apply = async (input) => {
+    if (!toggled) {
+      toggled = true;
+      disableHealthImport();
+      healthImportStore.writeEnabled('user-a', true);
+    }
+    return apply(input);
+  };
+  startHealthImportLifecycle();
+  await settle();
+  // The call already under way finishes; the stale run then saves no anchor and reports nothing.
+  expect(server.calls).toHaveLength(1);
+  expect(healthImportStore.readAnchor('user-a')).toBeNull();
+  expect(getHealthImportSnapshot().error).toBeNull();
+
+  await importHealthActivitiesNow();
+  expect(store.reads.at(-1)?.anchor).toBeNull();
+});
+
+it('shows no failure from an import the person turned off while it ran', async () => {
+  const { store } = setup();
+  healthImportStore.writeEnabled('user-a', true);
+  let reject: (error: Error) => void = () => undefined;
+  store.adapter.readWorkoutChanges = () => new Promise((_resolve, fail) => { reject = fail; });
+  startHealthImportLifecycle();
+  disableHealthImport();
+  reject(new Error('late failure'));
+  await settle();
+  expect(getHealthImportSnapshot()).toMatchObject({ enabled: false, error: null });
+});
+
+it('clears busy when the account changes mid-import', async () => {
+  const { store } = setup();
+  healthImportStore.writeEnabled('user-a', true);
+  store.adapter.readWorkoutChanges = () => new Promise(() => undefined);
+  startHealthImportLifecycle();
+  expect(getHealthImportSnapshot().busy).toBe(true);
+  signInAs('user-b');
+  expect(getHealthImportSnapshot().busy).toBe(false);
+});
+
+it('a foreground during a running import does not queue another', async () => {
+  const { store } = setup();
+  healthImportStore.writeEnabled('user-a', true);
+  startHealthImportLifecycle();
+  appStateListener?.('active');
+  await settle();
+  expect(store.reads).toHaveLength(1);
 });
 
 it('stops listening when stopped', () => {

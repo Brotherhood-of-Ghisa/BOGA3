@@ -9,7 +9,7 @@ import { AppleHealthSection } from '@/components/settings/apple-health-section';
 import type { HealthImportSnapshot } from '@/src/health-import';
 
 const mockState: { snapshot: HealthImportSnapshot } = {
-  snapshot: { supported: true, signedIn: true, enabled: false, busy: false, error: null, lastImportedAt: null },
+  snapshot: { supported: true, signedIn: true, enabled: false, busy: false, enabling: false, error: null },
 };
 const mockEnable = jest.fn(async () => undefined);
 const mockDisable = jest.fn();
@@ -22,7 +22,7 @@ jest.mock('@/src/health-import', () => ({
 }));
 
 const show = (snapshot: Partial<HealthImportSnapshot>) => {
-  mockState.snapshot = { supported: true, signedIn: true, enabled: false, busy: false, error: null, lastImportedAt: null, ...snapshot };
+  mockState.snapshot = { supported: true, signedIn: true, enabled: false, busy: false, enabling: false, error: null, ...snapshot };
   return render(<AppleHealthSection />);
 };
 
@@ -52,6 +52,20 @@ it('shows an import failure with Retry, which imports again', () => {
   expect(screen.getByText('Workouts could not be sent.')).toBeTruthy();
   fireEvent.press(screen.getByText('Retry'));
   expect(mockImportNow).toHaveBeenCalledTimes(1);
+});
+
+it('retries turning on when the permission sheet failed, since nothing is enabled to import', () => {
+  show({ enabled: false, error: 'Apple Health could not be opened.' });
+  fireEvent.press(screen.getByText('Retry'));
+  expect(mockEnable).toHaveBeenCalledTimes(1);
+  expect(mockImportNow).not.toHaveBeenCalled();
+});
+
+it('holds the switch while the permission sheet is open', () => {
+  show({ enabling: true });
+  expect(screen.getByTestId('settings-apple-health')).toHaveProp('accessibilityState', { checked: false, disabled: true });
+  fireEvent.press(screen.getByTestId('settings-apple-health'));
+  expect(mockEnable).not.toHaveBeenCalled();
 });
 
 it('shows no failure notice without an error', () => {

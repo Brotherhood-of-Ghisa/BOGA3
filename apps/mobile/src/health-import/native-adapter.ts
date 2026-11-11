@@ -50,9 +50,25 @@ const toHealthWorkout = async (healthKit: HealthKit, workout: WorkoutProxy): Pro
   };
 };
 
+/** Heart-rate statistics read concurrently, this many at a time. */
+const STATISTICS_BATCH = 16;
+
+/**
+ * False rather than a crash when the binary lacks the native module (a dev
+ * client built before it was added): the import is optional, the app is not.
+ */
+const healthDataAvailable = (): boolean => {
+  try {
+    return loadHealthKit().isHealthDataAvailable();
+  } catch (error) {
+    console.warn('[health-import] HealthKit is unavailable in this build', error);
+    return false;
+  }
+};
+
 const iosAdapter: HealthStoreAdapter = {
   get supported() {
-    return loadHealthKit().isHealthDataAvailable();
+    return healthDataAvailable();
   },
   requestAuthorization: async () => {
     await loadHealthKit().requestAuthorization({ toRead: READ_TYPES });
@@ -65,7 +81,10 @@ const iosAdapter: HealthStoreAdapter = {
       ...(anchor !== null ? { anchor } : {}),
     });
     const workouts: HealthWorkout[] = [];
-    for (const workout of response.workouts) workouts.push(await toHealthWorkout(healthKit, workout));
+    for (let index = 0; index < response.workouts.length; index += STATISTICS_BATCH) {
+      const batch = response.workouts.slice(index, index + STATISTICS_BATCH);
+      workouts.push(...await Promise.all(batch.map((workout) => toHealthWorkout(healthKit, workout))));
+    }
     return {
       workouts,
       deletedIds: response.deletedSamples.map((sample) => sample.uuid),

@@ -33,8 +33,8 @@ const chunks = <T>(values: readonly T[], size: number): T[][] => {
 /**
  * One import: read the store's changes since the saved anchor (or the last
  * `BACKFILL_DAYS` without one), upload deletions then upserts in batches, and
- * on a fresh backfill close with the complete id list so the server drops what
- * the store no longer has. The anchor advances only after every call
+ * on a fresh backfill that read any workout close with the complete id list so
+ * the server drops what the store no longer has. The anchor advances only after every call
  * succeeded, so a failure re-reads the same changes next time; the server's
  * upsert makes that repeat harmless. Every failure throws.
  */
@@ -64,7 +64,9 @@ export const runHealthImport = async (run: HealthImportRun): Promise<HealthImpor
   for (const batch of chunks(upserts, IMPORT_BATCH_SIZE)) {
     if (!(await apply({ upserts: batch, deletes: [] }))) return { status: 'stale' };
   }
-  if (saved === null) {
+  // iOS reports denied read access as no workouts at all, so an empty backfill
+  // proves nothing is gone: it never prunes the account's server rows.
+  if (saved === null && upserts.length > 0) {
     const complete = { upserts: [], deletes: [], completeSince: since.toISOString(), completeIds: upserts.map((row) => row.external_id) };
     if (!(await apply(complete))) return { status: 'stale' };
   }

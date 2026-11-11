@@ -30,7 +30,10 @@ export const healthImportApi: HealthImportApi = {
       p_deletes: deletes,
       ...(completeSince !== undefined ? { p_complete_since: completeSince, p_complete_ids: completeIds ?? [] } : {}),
     });
-    if (error) throw new HealthImportError('UPLOAD_FAILED', error.message);
+    if (error) {
+      const code = /^(AUTH_REQUIRED|AGENT_FORBIDDEN)\b/.test(error.message) ? 'AUTH_REQUIRED' : 'UPLOAD_FAILED';
+      throw new HealthImportError(code, error.message);
+    }
     if (!isResult(data)) throw new HealthImportError('UPLOAD_FAILED', 'The server returned an unexpected import result.');
     return data;
   },

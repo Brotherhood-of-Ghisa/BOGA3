@@ -62,10 +62,23 @@ it('splits a large backfill into batches under the server cap', async () => {
 
 it('skips a workout that starts before the backfill window', async () => {
   const { store, server, run } = setup();
-  store.queue({ workouts: [healthWorkout('old', { startDate: new Date(SINCE.getTime() - 1), endDate: SINCE })], deletedIds: [], newAnchor: 'x' });
+  store.queue({
+    workouts: [healthWorkout('old', { startDate: new Date(SINCE.getTime() - 1), endDate: SINCE }), healthWorkout('new')],
+    deletedIds: [], newAnchor: 'x',
+  });
 
   await run();
-  expect(server.calls).toEqual([{ upserts: [], deletes: [], completeSince: SINCE.toISOString(), completeIds: [] }]);
+  expect(server.calls.map((call) => call.upserts.map((row) => row.external_id))).toEqual([['new'], []]);
+  expect(server.calls[1].completeIds).toEqual(['new']);
+});
+
+it('never prunes after a backfill that read nothing: iOS shows denied access as no workouts', async () => {
+  const { store, server, run } = setup();
+  store.queue({ workouts: [], deletedIds: [], newAnchor: 'anchor-1' });
+
+  await expect(run()).resolves.toEqual({ status: 'imported', backfill: true, upserted: 0, deleted: 0, pruned: 0 });
+  expect(server.calls).toEqual([]);
+  expect(healthImportStore.readAnchor('user-a')?.anchor).toBe('anchor-1');
 });
 
 it('keeps the old anchor when an upload fails, so the next import re-sends the same changes', async () => {

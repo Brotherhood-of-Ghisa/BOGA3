@@ -101,6 +101,15 @@ describe('on iOS', () => {
   });
 });
 
+it('reports unsupported, not a crash, when the binary lacks the native module', () => {
+  Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true });
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  mockKit.isHealthDataAvailable.mockImplementationOnce(() => { throw new Error('NitroModules are not available'); });
+  expect(loadAdapter().supported).toBe(false);
+  expect(warn).toHaveBeenCalled();
+  warn.mockRestore();
+});
+
 it('is unsupported off iOS and never loads HealthKit', async () => {
   Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true });
   const adapter = loadAdapter();
