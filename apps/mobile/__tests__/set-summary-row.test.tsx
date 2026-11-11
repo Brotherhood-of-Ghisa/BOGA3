@@ -11,17 +11,17 @@ const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const row = formatSetRow({ id: 'set', weight: 60, reps: 8, setType: null, done: true });
 
-it('keeps each percentage set on one line with the unit only in the exercise heading', () => {
+it('keeps each percentage set on one line with the unit beside its Weight', () => {
   const normalized = { ...row, weightReps: '100.0 %BW × 8', oneRepMax: '127.7 %BW', volume: '800.0 %BW·reps' };
   renderWithTheme(<ExerciseSetsCard name="Bodyweight Bulgarian Split Squat" count="2 sets" percentageMetrics testID="card" rows={[
     normalized, { ...normalized, id: 'next', weightReps: '125.0 %BW × 999', oneRepMax: '1234.5 %BW', volume: '123456.7 %BW·reps' },
   ]} />);
 
-  expect(screen.getByText('Bodyweight Bulgarian Split Squat (% BW)')).toHaveProp('ellipsizeMode', 'middle');
+  expect(screen.getByText('Bodyweight Bulgarian Split Squat')).toHaveProp('ellipsizeMode', 'tail');
   expect(screen.queryByTestId('card-columns')).toBeNull();
   expect(screen.queryByText(/Weight|1RM|Vol/)).toBeNull();
 
-  for (const [index, values] of [['100.0 × 8', '127.7', '800.0'], ['125.0 × 999', '1234.5', '123456.7']].entries()) {
+  for (const [index, values] of [['100.0 %BW × 8', '127.7', '800.0'], ['125.0 %BW × 999', '1234.5', '123456.7']].entries()) {
     const id = `card-set-${index + 1}`;
     expect(screen.getByTestId(id)).toHaveStyle({ flexDirection: 'row', paddingVertical: uiSpace.xs });
     for (const [column, text] of [['values', values[0]], ['1rm', values[1]], ['vol', values[2]]]) {
@@ -56,7 +56,7 @@ it('retains reps-only context when normalized metrics are undisclosed', () => {
   renderWithTheme(<ExerciseSetsCard name="Pull-Up" count="1 set" rows={[{ ...row, weightReps: '8 reps' }]}
     percentageMetrics hideDerivedMetrics testID="private" />);
   expect(screen.getByText('8 reps')).toBeTruthy();
-  expect(screen.getByText('Pull-Up (% BW)')).toBeTruthy();
+  expect(screen.getByText('Pull-Up')).toBeTruthy();
   expect(screen.queryByTestId('private-columns')).toBeNull();
   expect(screen.queryByTestId('private-set-1-1rm')).toBeNull();
   expect(screen.queryByTestId('private-set-1-vol')).toBeNull();

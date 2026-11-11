@@ -46,8 +46,6 @@ values, wire units and coaching/import payloads stay unchanged.
 Today's weekly box and pace chart may show Volume in metric tonnes: `Tons`
 in the weekly heading, `t` beside chart figures, spoken as tonnes. Display
 tonnes rounded to one decimal place with trailing zeros removed.
-Shared group-session cards may use `(% BW)` once in the exercise heading
-instead of visible per-set units; spoken units remain complete.
 
 Code: `apps/mobile/src/groups/competition-view-model.ts` and mobile label components.
 

@@ -27,7 +27,7 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
         numberOfLines={1}
         style={[text.figure, row.done ? (row.weightRecord ? tone.record : null) : tone.faint, styles.weightReps]}
         testID={`${testID}-values`}>
-        {percentageMetrics ? row.weightReps.replace(' %BW', '') : row.weightReps}
+        {row.weightReps}
       </Text>
       {!hideDerivedMetrics ? percentageMetrics ? <>
         <Text allowFontScaling={false} numberOfLines={1}

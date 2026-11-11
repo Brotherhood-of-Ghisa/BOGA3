@@ -59,9 +59,10 @@ which sets can be records, never what a row shows. The only highlights on a set
 list are the session's record sets (`docs/specs/tech/training-metrics-contract.md`
 §3). The group session view highlights instead the set that took #1 on a group
 1RM board: one `#1 in group` band per set.
-In a shared group session, normalized Weight is additional load as `%BW`;
-ordinary and personal Weight retain their existing meaning.
+In a shared group session, normalized Weight is additional load as `%BW`,
+with the unit beside each set’s Weight and only the name in the exercise heading.
+Ordinary and personal Weight retain their existing meaning.
 
 Why: the row is a record of what was lifted; eligibility decides what counts,
 not what is shown.
-Code: `calculateSetMetrics` in `apps/mobile/src/exercise-calculations/load-metrics.ts`; normalized group rows in `buildCompetitionSession`, `apps/mobile/src/groups/competition-session-view-model.ts`; record band words in `apps/mobile/src/session-insights/record-band.ts`; the group band in `buildSessionRecordBands`, `apps/mobile/src/groups/competition-session-records-view-model.ts`.
+Code: `calculateSetMetrics` in `apps/mobile/src/exercise-calculations/load-metrics.ts`; normalized group rows in `buildCompetitionSession`, `apps/mobile/src/groups/competition-session-view-model.ts`, displayed by `apps/mobile/components/session-detail/exercise-sets-card.tsx` and `apps/mobile/components/session-detail/set-summary-row.tsx`; record band words in `apps/mobile/src/session-insights/record-band.ts`; the group band in `buildSessionRecordBands`, `apps/mobile/src/groups/competition-session-records-view-model.ts`.
