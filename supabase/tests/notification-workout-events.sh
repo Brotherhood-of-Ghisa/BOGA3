@@ -465,6 +465,15 @@ for bad in "$(jq 'map(select(.type!="exercise_sets"))' <<<"${MANIFEST}")" \
     "$(jq '.[0].id="extra-row"' <<<"${MANIFEST}")"; do
   confirm "${B_TOKEN}" "${SESSION}" "${bad}"; check 'inexact graph remains pending' '.confirmed==false'
 done
+# A completed MCP entry is visible history, but cannot seal a partial graph.
+run_psql "begin; set local request.jwt.claim.sub='${B_UID}'; set local boga.exercise_merge_internal='on'; set local boga.workout_control_write='on';
+  update app_public.sessions set logging_client_id='dated-entry-probe',logging_granted_at=now()::text
+    where owner_user_id='${B_UID}' and id='${SESSION}'; commit;" >/dev/null
+MANIFEST_CONTROLLED="$(manifest "${B_UID}" "${SESSION}")"
+confirm "${B_TOKEN}" "${SESSION}" "${MANIFEST_CONTROLLED}"; check 'MCP-controlled completed graph remains unconfirmed' '.confirmed==false'
+run_psql "begin; set local request.jwt.claim.sub='${B_UID}'; set local boga.exercise_merge_internal='on'; set local boga.workout_control_write='on';
+  update app_public.sessions set logging_client_id=null,logging_granted_at=null
+    where owner_user_id='${B_UID}' and id='${SESSION}'; commit;" >/dev/null
 confirm "${B_TOKEN}" "${SESSION}" "${MANIFEST}"; check 'exact graph confirmed' '.confirmed==true'
 assert_sql 'pending evaluator is not zero achievements' "select not app_public.notification_workout_ready('${B_UID}','${SESSION}');"
 drain_eval

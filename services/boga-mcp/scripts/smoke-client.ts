@@ -84,6 +84,7 @@ try {
     'create_exercise',
     'create_session_plan',
     'create_training_programme',
+    'create_workout',
     'delete_exercise',
     'delete_set',
     'finish_workout',
@@ -623,5 +624,5 @@ try {
   await client.close();
 }
 
-console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-three tools discovered and reads/denials verified');
+console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-four tools discovered and reads/denials verified');
 

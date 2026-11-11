@@ -36,6 +36,28 @@ const deny = async (client: Client, name: string, args: Record<string, unknown>,
 };
 const key = (intent: string): string => `workout-smoke-${Date.now()}-${intent}`;
 
+async function datedWorkoutFlow(client: Client): Promise<void> {
+  const end = new Date(Date.now() - 3600000).toISOString();
+  const start = new Date(Date.parse(end) - 3600000).toISOString();
+  const input = { started_at: start, completed_at: end, idempotency_key: key('dated-create') };
+  const created = await call(client, 'create_workout', input);
+  const replay = await call(client, 'create_workout', input);
+  if (created.status !== 'completed' || replay.session_id !== created.session_id || replay.idempotent_replay !== true) {
+    throw new Error('Dated creation lost lifecycle or retry identity.');
+  }
+  const logged = await call(client, 'log_sets', { session_id: created.session_id, expected_revision: created.revision,
+    exercise_id: exerciseId, sets: [{ weight_kg: '60', reps: 8 }], idempotency_key: key('dated-log') });
+  const fresh = await connect();
+  const read = await call(fresh, 'get_active_workout', { session_id: created.session_id });
+  if (!object(read.workout) || !object(read.workout.control) || read.workout.control.can_edit !== true) {
+    throw new Error('Fresh MCP client could not resume dated entry.');
+  }
+  const finished = await call(fresh, 'finish_workout', { session_id: created.session_id, expected_revision: logged.revision,
+    idempotency_key: key('dated-finish') });
+  if (finished.started_at !== start || finished.completed_at !== end || finished.duration_seconds !== 3600 ||
+    !object(finished.control) || finished.control.can_edit !== false) throw new Error('Dated finish changed dates or retained editing control.');
+}
+
 async function workoutFlow(): Promise<void> {
   const client = await connect();
   const headers = await call(client, 'get_active_workout', {});
@@ -48,6 +70,7 @@ async function workoutFlow(): Promise<void> {
   }
   const started = await call(client, 'start_workout', { idempotency_key: key('start'), gym_id: required('BOGA_MCP_SMOKE_GYM_ID') });
   const sessionId = String(started.session_id);
+  await datedWorkoutFlow(client);
   const firstInput = { session_id: sessionId, expected_revision: started.revision, exercise_id: exerciseId,
     sets: [{ weight_kg: '80', reps: 8, set_type: 'rir_2' }], idempotency_key: key('first') };
   const first = await call(client, 'log_sets', firstInput);

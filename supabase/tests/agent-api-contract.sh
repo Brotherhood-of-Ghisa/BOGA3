@@ -345,7 +345,7 @@ cleanup() {
           and request_id like 'agent-api-${RUN_TAG}-%';
       delete from app_public.sessions s where s.owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
         and s.id in(select result_ids->>'session_id' from public.agent_plan_write_receipts
-          where owner_user_id=s.owner_user_id and operation='start_workout');
+          where owner_user_id=s.owner_user_id and operation in ('start_workout','create_workout'));
       delete from public.agent_plan_write_receipts
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from public.agent_workout_permissions

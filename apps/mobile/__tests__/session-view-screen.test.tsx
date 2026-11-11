@@ -265,6 +265,27 @@ describe('Session view', () => {
     await renderReady();
   };
 
+  it('keeps dated MCP history read only, exposes takeover and lets Done leave without saving', async () => {
+    await loadMaestroFixture('session-view-ai');
+    await bootLocalApp();
+    localDatabase().update(sessions).set({ status: 'completed', completedAt: new Date(), durationSec: 3600 })
+      .where(eq(sessions.id, SESSION)).run();
+    const before = sessionRow(SESSION);
+    await renderReady();
+    fireEvent.press(await screen.findByTestId('session-view-ai-control'));
+    expect(await screen.findByTestId('session-view-control-action')).toHaveTextContent('Take over logging');
+    expect(screen.queryByTestId('session-view-abandon')).toBeNull();
+    fireEvent(screen.getByTestId('session-view-options-sheet'), 'accessibilityEscape');
+    expect(screen.getByTestId('session-view-start-time')).toHaveProp('editable', false);
+    expect(screen.getByTestId('session-view-end-time')).toHaveProp('editable', false);
+    expect(screen.queryByTestId('session-view-add-exercise')).toBeNull();
+    expect(screen.getByTestId('session-view-summary-gym-button')).toBeDisabled();
+    mockCanGoBack.mockReturnValue(false);
+    fireEvent.press(screen.getByTestId('session-view-done-button'));
+    expect(sessionRow(SESSION)).toEqual(before);
+    expect(mockReplace).toHaveBeenCalledWith(`/completed-session/${SESSION}`);
+  });
+
   it('shows an MCP-owned workout without editing entry points, with a working timer and locked Abandon', async () => {
     await loadMaestroFixture('session-view-ai');
     await bootLocalApp();

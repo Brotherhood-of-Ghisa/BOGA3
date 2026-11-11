@@ -21,15 +21,19 @@ both plan switches; failed reads or unconfirmed saves display unavailable
 until a reload confirms the value. Code integration does not authorize hosted
 migration, activation or deployment.
 
+Dated tool exposure follows deployment of compatible completed-history control UI.
+Older clients remain blocked by server guards but cannot offer completed takeover.
+
 ## HTTP operations
 
 All paths have prefix `/v1/agent`. Responses retain the standard agent API
-envelope and no-store/audit behavior. Request timestamps are not accepted;
-server time starts and finishes an ad-hoc workout. Response times are ISO 8601.
+envelope and no-store/audit behavior. Live start/finish use server time. Dated creation accepts explicit start/end
+instants; audit and sync clocks remain current server time. Response times are ISO 8601.
 
 | Method/path | Input | Result |
 | --- | --- | --- |
 | GET `/workouts/active` | optional `session_id`, `limit` (1–100, default 50), `cursor`, `revision` | active headers, or one selected workout's lifecycle, graph revision and page of raw exercise/set rows |
+| POST `/workouts/create` | required `started_at`, `completed_at`; optional `gym_id` | empty completed workout, fixed duration, MCP control and revision |
 | POST `/workouts/start` | optional `gym_id` | stable `session_id`, revision and active status |
 | POST `/workouts/log-sets` | `session_id`, `expected_revision`, exactly one of `exercise_id`/`session_exercise_id`, `sets` | block ID, inserted set IDs and new revision |
 | POST `/workouts/update-set` | `session_id`, `expected_revision`, `set_id`, `set` | corrected set ID and new revision |
@@ -51,6 +55,13 @@ the caller must read and choose a persisted ID. It never implicitly resumes,
 merges or finishes another session. Each ID remains independently discoverable.
 Empty workouts may finish, with no metric footprint under [[set.eligibility]].
 
+Dated inputs are ISO 8601 with explicit zones, canonicalized to epoch ms before
+hashing. Require start ≤ end ≤ now, reject impossible calendar dates and duration
+over the stored integer range. Creation is allowed alongside live workouts.
+Completed rows retain control while `log_sets`/`update_set`/`delete_set` record
+incremental history. `finish_workout` releases control and preserves start, end
+and duration. Keep the returned ID: active discovery excludes completed rows.
+
 Selecting a workout returns its current lifecycle even after completion or
 deletion. Raw rows are bounded, ordered by opaque cursor key (exercise rows,
 then set rows, each by stable ID), with `order_index` for presentation order.
@@ -64,8 +75,8 @@ Active reads return raw drafts too; they do not publish new derived metrics.
 All operations share the existing per-owner history advisory lock, before
 tuple locks; sync, direct domain writes and exercise merges use the same lock.
 The opaque graph revision fingerprints session, block, set, tag and linked
-definition content, including tombstones. Every non-start write compares it
-before mutation. A finished/deleted session is `409 WORKOUT_NOT_ACTIVE`;
+definition content, including tombstones. Every non-creation write compares it
+before mutation. A deleted or released completed session is `409 WORKOUT_NOT_ACTIVE`;
 foreign/missing IDs are indistinguishable (`404 NOT_FOUND`, or
 `400 FOREIGN_RESOURCE_REFERENCE` for catalogue references).
 
@@ -88,29 +99,32 @@ the workout has since changed; read again for current state. Another intentional
 identical set uses a fresh key and current revision. A stale request uses a
 fresh key only after reading and confirming its intended change.
 
-Writes stamp beyond the graph's clocks. Finish updates the session last, stores
+Writes stamp beyond the graph's clocks. Live finish updates the session last, stores
 one server completion instant and `max(0, floor((end-start)/1000))`, and retains
 the existing group and notification triggers. A chat finish alone does not
 fabricate the app's exact-graph completion-notification confirmation; that
-remains the normal post-convergence app path.
+remains the normal post-convergence app path. Both the server proof and mobile
+graph selection exclude MCP-controlled completed sessions until release.
 
 ## Mobile handoff
 
 ### Exclusive session control
 
 `sessions.logging_client_id` and `logging_granted_at` are server-maintained,
-nullable sync columns. Null means human control; an MCP start binds both to
+nullable sync columns. Null means human control; MCP start and dated creation bind both to
 the caller and its live grant. Ordinary phone inserts remain human-controlled.
 Sync projects these columns but ignores incoming assignments. A separate graph
 trigger enforces the control boundary even for privileged merge/recovery
-writers; it does not trust the generic merge-internal flag. MCP completion
-releases control so completed-history editing remains available in the app.
+writers; it does not trust the generic merge-internal flag. MCP finish releases control so completed-history editing remains available in
+the app. A completed dated row may retain control until that explicit finish.
 
 The app-only `workout_set_control` RPC uses the owner lock, an immutable action
 ID and the loaded session epoch. Human-to-MCP assignment checks and locks the
 selected client's live consent and independent logging permission, rejects
 plan-backed workouts and unresolved saved input, and fences the whole graph.
-Takeover needs no remaining agent permission. Both directions preserve all
+Takeover needs no remaining agent permission and includes completed controlled
+rows. Assignment to MCP remains active-only; released completed history cannot
+be reclaimed. Both directions preserve all
 workout/block/set IDs. An old receipt reports current control without reapplying
 its transfer; a changed payload under its ID fails. Reauthorization never
 revives control bound to an earlier grant.
@@ -118,7 +132,7 @@ revives control bound to an earlier grant.
 The app converges sync before transferring and again before unlocking. It
 persists an unconfirmed request in account-private control storage, keeps
 editing locked across restart, and retries the same operation. A clean newer
-terminal epoch makes an old pending active-session handoff obsolete. A stale
+terminal epoch without an MCP controller makes an old pending handoff obsolete. A stale
 editor arriving after a known AI-control fence preserves only its actual
 changes at the original epoch for review. Recovery Apply remains locked until
 human takeover; explicitly declining saved input remains available.
@@ -128,12 +142,14 @@ session. It opens the existing Session sheet, which offers Take over logging;
 human control offers Let AI log this session and an authorised-client chooser
 when needed. Add exercise, gym/set editing, Finish and Abandon stay locked;
 the device-local timer remains independent. There is no persistent status
-banner. Unavailable or unconfirmed transfers never imply a successful grant.
+banner. Completed controlled history exposes the same robot/takeover sheet,
+locks its date fields and permits Done to leave without saving. Unavailable or unconfirmed transfers never imply a successful grant.
 
 Every active-header/selected MCP read and mutation reports `control` with
 `owner`, `client_id` and Boolean `can_edit`. A displaced client's next write
-or active-session receipt replay returns `409 WORKOUT_CONTROL_REQUIRED` with
-handoff guidance. No tool can claim control. This is notification on the next
+or still-controlled-session receipt replay returns `409 WORKOUT_CONTROL_REQUIRED` with
+handoff guidance. Released completed receipts remain recoverable with current `can_edit: false`;
+replay never grants control. No tool can claim control. This is notification on the next
 workout call; the stateless MCP transport provides no unsolicited push channel.
 
 ### Revision and recovery protection

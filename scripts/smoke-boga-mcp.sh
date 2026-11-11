@@ -44,7 +44,7 @@ cleanup() {
         set local boga.exercise_merge_internal = 'on';
         create temp table smoke_workout_ids on commit drop as
           select result_ids->>'session_id' as id from public.agent_plan_write_receipts
-          where owner_user_id='${USER_UUID}'::uuid and client_id='${AGENT_CLIENT_ID}' and operation='start_workout'
+          where owner_user_id='${USER_UUID}'::uuid and client_id='${AGENT_CLIENT_ID}' and operation in ('start_workout','create_workout')
           union select id from app_public.sessions where owner_user_id='${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from public.exercise_merge_contexts where user_id='${USER_UUID}'::uuid and operation_id in
           (select id from public.exercise_merge_operations where user_id='${USER_UUID}'::uuid and session_id in (select id from smoke_workout_ids));

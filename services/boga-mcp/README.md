@@ -1,8 +1,8 @@
 # BoGa MCP Virtual Coach
 
 `services/boga-mcp` is the public, authenticated MCP resource server for the
-BoGa Virtual Coach. It exposes twenty-three tools over stateless Streamable HTTP
-(eleven read-only tools and twelve mutations) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
+BoGa Virtual Coach. It exposes twenty-four tools over stateless Streamable HTTP
+(eleven read-only tools and thirteen mutations) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
 Supabase data credentials, SQL, or service-role key.
 
 ## Public endpoints
@@ -83,18 +83,21 @@ their next sync. `expected_revision` is `targets.revision` from
 app's defaults. Rules and errors: the
 [agent API contract](../../supabase/functions/agent-api/README.md#muscle-targets).
 
-Five workout mutations, under the independent logging grant of
+Six workout mutations, under the independent logging grant of
 [[agents.write-access]] (neither plan switch grants it):
 
 | Tool | Input beyond `idempotency_key` |
 | --- | --- |
+| `create_workout` | required `started_at`/`completed_at` ISO instants with explicit zones; optional `gym_id`; creates editable completed history |
 | `start_workout` | optional `gym_id`; server-time start, refuses an existing active workout |
 | `log_sets` | `session_id`, `expected_revision`, exactly one `exercise_id`/`session_exercise_id`, 1–30 performed `sets` |
 | `update_set` | `session_id`, `expected_revision`, `set_id`, replacement performed `set` |
 | `delete_set` | `session_id`, `expected_revision`, `set_id`; soft deletion |
-| `finish_workout` | `session_id`, `expected_revision`; one server completion instant/duration |
+| `finish_workout` | `session_id`, `expected_revision`; server completion instant/duration for live training; releases dated-entry control with its times unchanged |
 
-Corrections, removal and finish carry destructive hints; start/log are additive.
+Corrections, removal and finish carry destructive hints; create/start/log are additive.
+Dated sessions remain completed and do not occupy live training. Add/correct sets incrementally, resume by `session_id` through `get_active_workout`, then call `finish_workout` when entry is done. Released history continues in BoGa.
+
 All writes are idempotent by their required printable ASCII operation key
 (1–128 characters, no whitespace). Strict nested schemas reject identity,
 plan targets and unsupported fields. The adapter forwards raw structured
