@@ -25,6 +25,7 @@ import {
   buildGroupRankSeries,
   buildGroupWeekTotals,
   GROUP_HOME_METRIC_LABELS,
+  GROUP_HOME_METRIC_UNIT,
 } from '@/src/groups/home-view-model';
 
 import { GroupCycleButton } from './group-cycle-button';
@@ -95,7 +96,9 @@ function useHoldFade(holding: boolean): boolean {
  * before; `Top brothers`, the period's top five by the chosen metric; and
  * `Rankings over time`, every member's place over six periods with the
  * selected one fourth where later periods allow. A column tap selects its
- * period, as the stepper does, and every card follows.
+ * period, as the stepper does, and every card follows. Last, `Latest
+ * sessions` lists the group's newest sessions in the loaded stream (up to
+ * five), whatever the period.
  */
 export function GroupGlancePage({
   myUserId,
@@ -217,7 +220,7 @@ function GlanceCards({
         <View style={styles.card}>
           <CardTitle testID="group-position-title" title="Rankings over time" />
           <GroupRankChart
-            accessibilityLabel={`Place over ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} by ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`}
+            accessibilityLabel={`Place over ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} by ${GROUP_HOME_METRIC_UNIT[metric]}`}
             columnLabels={rankSeries.periods.map((entry) => groupHomeColumnLabel(figures.period, entry.window, dateFormat))}
             onSelect={(index) => onOffsetChange(Math.min(0, figures.offset - (last - index)))}
             selectedIndex={selectedIndex}

@@ -114,11 +114,11 @@ export const historyDayHref = (dateKey: string, sessionIds: readonly string[], a
 };
 
 
-/** CoW links carry public identity and one opening metric, never a score/context. */
 /** A member's session as their group sees it. */
 export const groupSessionHref = (memberUserId: string, sessionId: string, groupId: string): Href =>
   `/group-session/${memberUserId}/${sessionId}?groupId=${encodeURIComponent(groupId)}` as Href;
 
+/** CoW links carry public identity and one opening metric, never a score/context. */
 export const coWsHref = (groupId: string, cowId?: string, metric?: string): Href => {
   const query = [cowId ? `cowId=${encodeURIComponent(cowId)}` : null, metric ? `metric=${encodeURIComponent(metric)}` : null].filter(Boolean).join('&');
   return `/group/${encodeURIComponent(groupId)}/cows${query ? `?${query}` : ''}` as Href;

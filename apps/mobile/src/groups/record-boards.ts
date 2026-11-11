@@ -11,6 +11,8 @@ export type RecordBoards = { groupRecords: CompetitionHistoryValueWire[]; person
  * The event's shown `record` boards, GR where the stream's record names the
  * board, else PR. Without a `record` (the first reader, which the app no
  * longer calls) the boards are unknown and all read as GR, as they always did.
+ * Provisional records split too: a live session's stream card counts them, as
+ * it always listed them; Today's rows draw completed sessions only.
  */
 export function splitRecordBoards(event: CompetitionEventWire, record: Pick<CompetitionStreamRecordWire, 'group_record_metrics'> | undefined): RecordBoards {
   const boards = event.values.filter(value => value.role === 'record' && SHOWN_BOARD(value.metric));

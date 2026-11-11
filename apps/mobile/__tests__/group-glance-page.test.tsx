@@ -137,6 +137,8 @@ describe('At a glance: the board', () => {
     renderPage({ metric: 'prs' });
 
     expect(within(byId('group-home-board')).getByText('GR')).toBeTruthy();
+    // The column says GR; a screen reader hears the words.
+    expect(byId('group-home-board').props.accessibilityLabel).toMatch(/^Top 5 by group records/);
     expect(boardValues()).toEqual(['4', '2', '1', '0', '0']);
     expect(byId(`group-home-board-row-${ME}`)).toBeTruthy();
     expect(screen.queryByTestId('group-home-board-me')).toBeNull();

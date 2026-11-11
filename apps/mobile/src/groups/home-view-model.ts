@@ -99,7 +99,7 @@ export const buildGroupHomeBoard = ({
     rows,
     me: mine ? { rankLabel: formatOrdinal(mine.rank), valueLabel: formatGroupHomeMetric(mine.value) } : null,
     accessibilityLabel: [
-      `Top ${rows.length} by ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`,
+      `Top ${rows.length} by ${GROUP_HOME_METRIC_UNIT[metric]}`,
       ...rows.map((row) => `${row.rank}, ${row.name}, ${row.valueLabel} ${unit}`),
       mine ? `You, ${formatOrdinal(mine.rank)}, ${formatGroupHomeMetric(mine.value)} ${unit}` : null,
     ]

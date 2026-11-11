@@ -851,6 +851,7 @@ it('Today uses no summary space when both weeks are confirmed absent', async () 
   api.getCoWSummary.mockResolvedValue(absent);
   api.getPreviousCoWSummary.mockResolvedValue(absent);
   const view = renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
-  await waitForGone(() => screen.queryByTestId('today-cow-summaries'));
+  await waitFor(() => expect(api.getPreviousCoWSummary).toHaveBeenCalled());
+  await waitForGone(() => screen.queryByTestId('today-cow-card'));
   expect(view.toJSON()).toBeNull();
 });
