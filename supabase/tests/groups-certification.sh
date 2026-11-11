@@ -1114,19 +1114,33 @@ expect_sql "merge created no witnesses" "select count(distinct coalesce(witness_
 pass "exercise merges preserve links and same-mode witnesses; failed correction is terminal; fresh observations remain valid"
 
 # Stream v4: each record names the boards it took #1 on (its group records);
-# a new best that took none is the member's PR. Last, so no earlier step sees r2.
+# a new best that took none is the member's PR. Its own comparison, so the
+# boards earlier steps left behind cannot move the #1.
+GX="$(gx "${OWNER_TOKEN}" "${GID}" "Squat")"
+DAQ="${T}-dAq"; DRQ="${T}-dRq"
+def "${ATHLETE_TOKEN}" "${DAQ}" total_load
+link "${ATHLETE_TOKEN}" "${DAQ}"
+def "${RIVAL_TOKEN}" "${DRQ}" total_load
+link "${RIVAL_TOKEN}" "${DRQ}"
 next_session_at
-sess "${RIVAL_TOKEN}" "${T}-r2s" completed "${DR}" "r2:96:1"
-drain "rival new best below #1"
-expect_sql "v4 setup: r2 is a record that took no #1 (stored flags)" \
-  "select bool_and(not coalesce((b->>'group_record')::boolean,false)) and count(*) = 2
+sess "${ATHLETE_TOKEN}" "${T}-q1s" completed "${DAQ}" "q1:100:1"
+drain "squat #1"
+next_session_at
+sess "${RIVAL_TOKEN}" "${T}-q2s" completed "${DRQ}" "q2:90:1"
+drain "rival first squat, below #1"
+next_session_at
+sess "${RIVAL_TOKEN}" "${T}-q3s" completed "${DRQ}" "q3:95:1"
+drain "rival new best, below #1"
+expect_sql "v4 setup: q1 took #1 on both boards; q2 and q3 are records that took none (stored flags)" \
+  "select string_agg(replace(e.set_id, '${T}-', '') || ':' || (b->>'metric') || ':' || coalesce(b->>'group_record','false'), ',' order by e.set_id, b->>'metric')
      from app_public.group_events e, jsonb_array_elements(e.payload->'boards') b
-    where e.group_exercise_id = '${GX}' and e.kind = 'record' and e.set_id = '${T}-r2';" "t"
+    where e.group_exercise_id = '${GX}' and e.kind = 'record';" \
+  "q1:e1rm:true,q1:volume:true,q2:e1rm:false,q2:volume:false,q3:e1rm:false,q3:volume:false"
 stream_v4 "${RIVAL_TOKEN}"
 V4_PAGE="${BODY}"
-check_args "v4: the group's first #1 names both boards" --arg s "${T}-a1" \
+check_args "v4: the group's first #1 names both boards" --arg s "${T}-q1" \
   "${RECORDS}"' | length == 1 and .[0].record.group_record_metrics == ["e1rm","volume"]'
-check_args "v4: a new best below #1 lists its boards and names no GR board" --arg s "${T}-r2" \
+check_args "v4: a new best below #1 lists its boards and names no GR board" --arg s "${T}-q3" \
   "${RECORDS}"' | length == 1 and .[0].record.group_record_metrics == []
    and ([.[0].event.values[] | select(.role == "record") | .metric] | sort) == ["e1rm","volume"]'
 check "v4: only record items carry GR boards, each one of the record's own boards" \

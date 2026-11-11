@@ -1,3 +1,4 @@
+import { groupSessionHref } from '@/src/navigation/routes';
 import { getCompetitionPodiums } from '@/src/groups/api';
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
@@ -230,8 +231,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
       </View>
     ),
     // Its stepper and metric stay put; the cards scroll under them.
-    glance: (frame) => (
-      <GroupGlancePage
+    glance: (frame) => <GroupGlancePage
         error={pickInlineError(mine.error, glance.resource.error)}
         held={glance.held}
         metric={metric}
@@ -246,11 +246,9 @@ function GroupsTabContent({ userId }: { userId: string }) {
         refreshControl={refreshControl}
         series={glance.series}
         streamItems={stream.items}
-        onOpenSession={(memberUserId, sessionId) =>
-          router.push(`/group-session/${memberUserId}/${sessionId}?groupId=${encodeURIComponent(selectedGroupId ?? '')}`)}
+        onOpenSession={(member, session) => router.push(groupSessionHref(member, session, selectedGroupId ?? ''))}
         style={frameStyle(frame)}
-      />
-    ),
+      />,
     cows: (frame) => (
       <View style={frameStyle(frame)}>
         {segment === 'cows' ? <GroupCoWsPage key={`${userId}:${selectedGroupId}`} userId={userId} groupId={selectedGroupId} embedded /> : null}
@@ -372,7 +370,7 @@ function GroupsStreamPage({ stream, inlineError, offline, onRefresh, onOpenSessi
       contentContainerStyle={styles.pageContent}
       emptyState={emptyState}
       onPressSession={(card) =>
-        onOpenSession(`/group-session/${card.memberUserId}/${card.sessionId}?groupId=${encodeURIComponent(card.groupId)}`)
+        onOpenSession(groupSessionHref(card.memberUserId, card.sessionId, card.groupId))
       }
       onRefresh={onRefresh}
       showGroupNames={false}

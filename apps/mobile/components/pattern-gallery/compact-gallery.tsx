@@ -54,14 +54,21 @@ export function CompactGallery({ initialSample, initialState, initialLong = fals
       <CompactCard><CoWResultHeading result={galleryCow('past', long)} previous today dateFormat="DD-MM-YYYY" /></CompactCard>
     </> : sample === 'cow' ? <CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" previous={state === 'past'}
       onOpen={metric => setAction(`CoW · ${metric}`)} onBrowse={metric => setAction(`Standings · ${metric}`)} testID="gallery-cow" />
-      : <View testID="gallery-embedded-card">
-        <TodayCoWCard resource={resource} previous={state === 'past'} dateFormat="DD-MM-YYYY" userId="u1"
-          onEarlier={state === 'past' ? undefined : () => setAction('Last week CoW')} onLater={state === 'past' ? () => setAction('This week CoW') : undefined}
-          onOpen={() => setAction('Current CoW')} onRetry={retry} />
-      </View>}
+      : <EmbeddedCoW resource={resource} past={state === 'past'} onAction={setAction} onRetry={retry} />}
     {sample === 'embedded' && state === 'absent' ? <Text allowFontScaling={false} style={text.meta} testID="gallery-absent">No CoW summary</Text> : null}
     {action ? <Notice live message={action} testID="ui-gallery-action" /> : null}
   </ScreenScroll>;
+}
+
+/** Today's CoW card on its gallery state: last week steps forward, this week back. */
+function EmbeddedCoW({ resource, past, onAction, onRetry }: {
+  resource: GroupResourceState<CoWSummaryWire>; past: boolean; onAction: (action: string) => void; onRetry: () => void;
+}) {
+  const step = past ? { onLater: () => onAction('This week CoW') } : { onEarlier: () => onAction('Last week CoW') };
+  return <View testID="gallery-embedded-card">
+    <TodayCoWCard resource={resource} previous={past} dateFormat="DD-MM-YYYY" userId="u1" {...step}
+      onOpen={() => onAction('Current CoW')} onRetry={onRetry} />
+  </View>;
 }
 
 function galleryResource(state: GalleryState, result: CoWResultWire): GroupResourceState<CoWSummaryWire> {
