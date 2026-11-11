@@ -242,9 +242,9 @@ Applies to every lane that hits a running stack rather than a mocked client.
   `public.dev_fixture_principals` holds at least `anonymous`, `user_a`, `user_b`,
   provisioned with the known credentials.
 - **Data-shape contract:** baseline rows must exist, but **extra rows are
-  allowed**. A suite must not assume empty tables beyond the baseline (one
-  whose checks span an account, like `mcp-smoke`, owns its fixture user) and
-  uses per-run unique IDs, so repeated runs in one slot cannot collide.
+  allowed**. A suite must not assume empty tables beyond the baseline and must
+  use per-run unique IDs, so repeated runs in one slot cannot collide. One
+  whose checks span an account (like `mcp-smoke`) owns its fixture user.
 - **Parallel runs:** runtime ownership covers setup, test bodies and teardown;
   competing commands refuse before mutation. For ownership or interruption
   failures, load `12-worktree-config-and-isolation.md`, "Runtime ownership".
