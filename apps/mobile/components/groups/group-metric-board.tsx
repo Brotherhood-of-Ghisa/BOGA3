@@ -3,7 +3,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Text, FlatList, RefreshControl, View } from 'react-native';
 
-import { ActionButton, SegmentedControl, uiSpace, useUiText } from '@/components/ui';
+import { ActionButton, FigureText, SegmentedControl, uiSpace, useUiText } from '@/components/ui';
 import { getGroup, groupCacheKeys, useGroupOnlinePages, useGroupResource, type GroupBoardScope, type GroupGetResult } from '@/src/groups';
 import { getCompetitionBoard } from '@/src/groups/api';
 import { GROUP_COMPETITION_METRICS as GROUP_METRICS,isCompetitionMetric as isGroupMetric,type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
@@ -73,7 +73,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const header = <View style={groupScreenStyles.header}>
     <Stack.Screen options={{ title: exercise.name }} />
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: uiSpace.md }}>
-      <Text allowFontScaling={false} style={[text.title, { flex: 1 }]}>{competitionViewLabel(metric,exercise.rules)}</Text>
+      <Text allowFontScaling={false} style={[text.title, { flex: 1 }]}><FigureText>{competitionViewLabel(metric,exercise.rules)}</FigureText></Text>
       <ActionButton label="History" variant="text" testID="group-board-history-button" onPress={() => router.push(
         `/group/${groupId}/leaderboards/${exerciseId}/history?metric=${metric}&scope=${scope}`)} />
     </View>

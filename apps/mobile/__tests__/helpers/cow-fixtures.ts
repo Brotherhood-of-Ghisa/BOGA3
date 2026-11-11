@@ -7,7 +7,8 @@ export const cowResult = (): CoWResultWire => ({
     starts_at_us: 1792972800000000, ends_at_us: 1793577600000000, metrics: ['e1rm', 'volume', 'improvement'], revision: 1, state: 'active' },
   exercise: competitionExercise, bodyweight_calculations_enabled: true, state: 'ready', normalized: true, publication_id: 'publication1',
   rankings: [
-    { metric: 'e1rm', unit: 'percent_bw', entries: [{ rank: 1, member: { user_id: 'u1', username: 'Me' }, former: false, value: 150, state: 'ranked' }], entry_count: 1, next_cursor: null },
+    { metric: 'e1rm', unit: 'percent_bw', entries: [{ rank: 1, member: { user_id: 'u1', username: 'Me' }, former: false, value: 150,
+      added_e1rm_percent_bw: 50, state: 'ranked' }], entry_count: 1, next_cursor: null },
     { metric: 'volume', unit: 'percent_bw_reps', entries: [], entry_count: 1, next_cursor: null },
     { metric: 'improvement', unit: 'percent', entries: [], entry_count: 1, next_cursor: null },
   ],

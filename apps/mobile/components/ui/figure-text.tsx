@@ -6,7 +6,7 @@ import { uiTextEmphasis, useUiText } from '@/components/ui/text-roles';
 // A run of digits, with the separators a figure carries inside it (`102.5`,
 // `10:05`, `1,250`, `12-10-2026`). A run that starts a capitalised
 // name (`1RM`) is part of that word, not a figure.
-const FIGURE_RUN = /(\d+(?:[.,:-]\d+)*(?![\dA-Z]))/;
+const FIGURE_RUN = /(%BW(?:·reps)?|\d+(?:[.,:-]\d+)*(?![\dA-Z]))/;
 
 /**
  * A line of words with figures in it (`2 exercises · 3 sets`, `Started 10:05`):
@@ -26,8 +26,13 @@ export function FigureText({
   figureStyle?: StyleProp<TextStyle>;
 }) {
   const textRoles = useUiText();
-  return children.split(FIGURE_RUN).map((part, index) =>
-    index % 2 === 1 ? (
+  const line = children.replace(/ (?=%BW)/g, '\u00a0');
+  return line.split(FIGURE_RUN).map((part, index) =>
+    part.startsWith('%BW') ? (
+      <Text allowFontScaling={false} key={index} style={[textRoles.label, { color: undefined, textTransform: 'none' }]}>
+        {part}
+      </Text>
+    ) : index % 2 === 1 ? (
       <Text allowFontScaling={false} key={index} style={[textRoles.inlineFigure, strong ? uiTextEmphasis.strong : null, figureStyle]}>
         {part}
       </Text>

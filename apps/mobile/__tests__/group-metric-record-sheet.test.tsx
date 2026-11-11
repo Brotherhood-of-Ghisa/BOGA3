@@ -50,7 +50,7 @@ const deferred = <T,>(): Deferred<T> => {
 
 const EXERCISE: CompetitionExerciseWire = { ...competitionExercise,group_exercise_id: 'pull' };
 const PERFORMANCE = { ...competitionRow.performance,session_id: 'session',set_id: 'set',achieved_at_ms: SEP_10 };
-const ROW: CompetitionBoardRowWire = { ...competitionRow,value: 23.3,member: { user_id: 'dave',username: 'Dave' },
+const ROW: CompetitionBoardRowWire = { ...competitionRow,value: 123.3,added_e1rm_percent_bw: 23.3,member: { user_id: 'dave',username: 'Dave' },
   performance: PERFORMANCE,write_token: 'pin-1' };
 const certification = (over: Partial<CompetitionCertificationWire> = {}): CompetitionCertificationWire => ({
   ...competitionCertification,certification_id: 'cert-1',observed_rules_revision: 2,
@@ -108,7 +108,7 @@ describe('what the sheet shows', () => {
   it('keeps the historic stream score visible while certifying with its current rule token', async () => {
     mockCertify.mockResolvedValue({ contract_version: 4, certification: certification() });
     render(<GroupMetricStreamRecordSheet record={{ ...competitionEvent,group: { group_id: 'group',name: 'Lifters' },
-      member: ROW.member,set_id: 'set',values: [{ ...competitionEvent.values[0],value: 23.3 }],
+      member: ROW.member,set_id: 'set',values: [{ ...competitionEvent.values[0],value: 123.3,added_e1rm_percent_bw: 23.3 }],
       record_context: { exercise: EXERCISE,former: false,metrics: [{ metric: 'e1rm',write_token: 'current-pin',eligible: true,certification: null }] }
     }} userId={ME} myRole="member" onClose={onClose} onChanged={onChanged} />);
     expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('23.3 %BW');

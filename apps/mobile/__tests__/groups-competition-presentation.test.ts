@@ -6,9 +6,9 @@ import { competitionBoard,competitionCertification,competitionEvent,competitionE
 
 test.each([
   ['volume','kg_reps',125.5,'125.5'],['volume','percent_bw_reps',611.111111,'611.1 %BW·reps'],
-  ['e1rm','kg',125.5,'125.5'],['e1rm','percent_bw',145.728,'145.7 %BW'],
+  ['e1rm','kg',125.5,'125.5'],['e1rm','percent_bw',145.728,'45.7 %BW'],
 ] as const)('formats %s from wire unit %s while preserving the server value', (metric,unit,value,expected) => {
-  const score={ metric,unit,value };expect(formatCompetitionValue(score)).toBe(expected);expect(score.value).toBe(value);
+  const score={ metric,unit,value, ...(unit === 'percent_bw' ? { added_e1rm_percent_bw: value - 100 } : {}) };expect(formatCompetitionValue(score)).toBe(expected);expect(score.value).toBe(value);
 });
 test.each([
   ['kg', 'Weight 125.5'], ['kg_reps', 'Weight 125.5'],
@@ -32,8 +32,8 @@ test.each([0,-1,NaN,Infinity])('invalid score %s uses generic unavailable copy',
 });
 test('normalized rows and accessibility contain reps and percentages without an absolute counterpart', () => {
   const row=buildCompetitionRow(competitionRow,'all','me','DD-MM-YYYY');
-  expect(row.valueLabel).toBe('145.7 %BW');expect(row.detailLabel).toBe('5 reps');
-  expect(row.accessibilityLabel).toContain('145.7 %BW, 5 reps');expect(row.accessibilityLabel).not.toMatch(/kg|reading|bodyweight.*\d/i);
+  expect(row.valueLabel).toBe('45.7 %BW');expect(row.detailLabel).toBe('5 reps');
+  expect(row.accessibilityLabel).toContain('45.7 %BW, 5 reps');expect(row.accessibilityLabel).not.toMatch(/kg|reading|bodyweight.*\d/i);
   const poisoned={ ...competitionRow.performance };
   Object.defineProperty(poisoned,'weight_value',{ get: () => { throw new Error('private load accessed'); } });
   expect(formatCompetitionPerformance(poisoned)).toBe('5 reps');
@@ -48,7 +48,7 @@ test('Off and c=0 use ordinary units independently of a saved positive contribut
 test('podiums preserve server order, unit and default metric; rebuilding has no stale figures', () => {
   const payload={ contract_version: 4 as const,certified: false,podiums: [{ exercise: competitionExercise,board: competitionBoard }] };
   expect(buildCompetitionPodiums(payload,'me', 'DD-MM-YYYY')[0].viewLabel).toContain('All · 1RM %BW');
-  expect(buildCompetitionPodiums(payload,'me', 'DD-MM-YYYY')[0].rows[0].valueLabel).toBe('145.7 %BW');
+  expect(buildCompetitionPodiums(payload,'me', 'DD-MM-YYYY')[0].rows[0].valueLabel).toBe('45.7 %BW');
   // The newest set on the podium dates the card for the Recent order.
   const later=competitionBoard.entries[0].performance.achieved_at_ms+1;
   const two={ ...payload,podiums: [{ exercise: competitionExercise,board: { ...competitionBoard,entries: [competitionBoard.entries[0],
@@ -114,7 +114,7 @@ describe('buildStreamRecordSheet', () => {
     const model = buildStreamRecordSheet(event, { performance: ordinary, previous: [] }, 'me', 'DD-MM-YYYY');
     expect(model.who).toMatch(/^You · /);
     expect(model.set).toBe('120.0 × 5');
-    expect(model.metrics.map(entry => [entry.label, entry.value])).toEqual([['1RM', '145.7 %BW'], ['Volume', '650.0 %BW·reps']]);
+    expect(model.metrics.map(entry => [entry.label, entry.value])).toEqual([['1RM', '45.7 %BW'], ['Volume', '650.0 %BW·reps']]);
     expect(model.previous).toEqual([]);
   });
   it('certifies the set once, through the certified row, else the first certifiable (1RM first)', () => {
@@ -154,31 +154,31 @@ describe('buildStreamRecordSheet', () => {
 
 
 test.each([
-  ['total_load', 0, 500, '100.0'],
-  ['total_load', 25, 625, '125.0'],
-  ['total_load', 25, 275, '55.0'],
-  ['per_side_load', 25, 625, '125.0'],
-] as const)('normalized %s session sets show total load from public Volume (%s added, %s volume)', (load_input_mode, added, volume, total) => {
-  const metrics = { added_load_percent_bw: added, e1rm_percent_bw: 145.728, volume_percent_bw_reps: volume };
+  ['total_load', 0, 500, '0.0'],
+  ['total_load', 25, 625, '25.0'],
+  ['total_load', 25, 275, '25.0'],
+  ['per_side_load', 25, 625, '25.0'],
+] as const)('normalized %s session sets show public added load independently of Volume (%s added, %s volume)', (load_input_mode, added, volume, total) => {
+  const metrics = { added_load_percent_bw: added, e1rm_percent_bw: 145.728, added_e1rm_percent_bw: 45.728, volume_percent_bw_reps: volume };
   const exercise = competitionSession.session.exercises[0];
   const session = { ...competitionSession.session, exercises: [{ ...exercise, load_input_mode, visibility: 'normalized' as const,
     sets: exercise.sets.map(set => ({ ...set, normalized_metrics: metrics })) }] };
   const model = buildCompetitionSession(session);
   expect(model).toMatchObject({ volume: '—', setCount: 1, cards: [{ hideDerivedMetrics: false, percentageMetrics: true,
-    rows: [{ weightReps: `${total} %BW × 5`, oneRepMax: '145.7 %BW', volume: `${volume}.0 %BW·reps` }] }] });
+    rows: [{ weightReps: `${total} %BW × 5`, oneRepMax: '45.7 %BW', volume: `${volume}.0 %BW·reps` }] }] });
   // Other group performance labels keep their existing additional-load display.
   expect(formatCompetitionPerformance({ ...competitionRow.performance, visibility: 'normalized', normalized_metrics: metrics }))
     .toBe(`${added}.0 %BW × 5`);
 });
 
-test('normalized session load needs public Volume, never assumes a 100 percent contribution', () => {
+test('normalized session load never reconstructs unavailable added load from total Volume', () => {
   const exercise = competitionSession.session.exercises[0];
-  for (const [volume, reps, expected] of [[null, '5', '5 reps'], [0, '5', '0.0 %BW × 5'], [811.599, '8', '101.4 %BW × 8']] as const) {
-    const metrics = { added_load_percent_bw: null, e1rm_percent_bw: 145.728, volume_percent_bw_reps: volume };
+  for (const [volume, reps, expected] of [[null, '5', '5 reps'], [0, '5', '5 reps'], [811.599, '8', '8 reps']] as const) {
+    const metrics = { added_load_percent_bw: null, e1rm_percent_bw: 145.728, added_e1rm_percent_bw: 45.728, volume_percent_bw_reps: volume };
     const session = { ...competitionSession.session, exercises: [{ ...exercise, visibility: 'normalized' as const,
       sets: exercise.sets.map(set => ({ ...set, reps_value: reps, normalized_metrics: metrics })) }] };
     expect(buildCompetitionSession(session).cards[0].rows[0]).toMatchObject({
-      weightReps: expected, oneRepMax: '145.7 %BW',
+      weightReps: expected, oneRepMax: '45.7 %BW',
     });
     expect(metrics.volume_percent_bw_reps).toBe(volume);
   }

@@ -4,6 +4,7 @@ import { formatWeight } from '@/src/exercise-calculations/format';
 import { formatBoardDate, formatBoardMemberLabel, formatOrdinal,
   type BoardRowViewModel, type GroupBoardScope, type PodiumCardViewModel } from './board-view-model';
 import { competitionUnit, type CompetitionMetric, type CompetitionValue } from './competition-contract';
+import type { AddedOneRepMaxDisplay } from './competition-set-display';
 import type { CompetitionBoardRowWire, CompetitionEventWire,CompetitionHistoryValueWire, CompetitionExerciseWire,
   CompetitionHistoricalMetric, CompetitionPerformanceWire, CompetitionPodiumsWire, CompetitionRulesWire } from './competition-wire';
 import { formatMemberName, formatMetricFigure } from './stream-view-model';
@@ -24,9 +25,13 @@ export function competitionViewLabel(metric: CompetitionMetric,rules: Competitio
   return withUnit(COMPETITION_LABELS[metric], COMPETITION_UNIT_LABELS[competitionUnit(metric,
     rules.bodyweight_calculations_enabled && rules.bodyweight_contribution > 0)]);
 }
-export function formatCompetitionValue(score: Pick<CompetitionValue,'metric'|'unit'|'value'>): string {
+export function competitionDisplayValue(score: { metric: string; unit: string; value: number | null } & AddedOneRepMaxDisplay): number | null {
+  return score.metric === 'e1rm' && score.unit === 'percent_bw' ? score.added_e1rm_percent_bw ?? null : score.value;
+}
+export function formatCompetitionValue(score: Pick<CompetitionValue,'metric'|'unit'|'value'> & AddedOneRepMaxDisplay): string {
   if (!Number.isFinite(score.value) || score.value <= 0) return 'Score unavailable';
-  return formatCompetitionFigure(score.value,score.unit);
+  const value = competitionDisplayValue(score);
+  return value === null || !Number.isFinite(value) ? 'Score unavailable' : formatCompetitionFigure(value,score.unit);
 }
 export function formatCompetitionPerformance(performance: CompetitionPerformanceWire): string {
   if (performance.visibility === 'normalized') return formatSetFigure(performance);
@@ -85,16 +90,21 @@ export function describeCompetitionEvent(event: CompetitionEventWire,userId: str
   const who=event.member?.user_id === userId ? 'You' : formatMemberName(event.member?.username ?? null);
   if (event.kind === 'link' || event.kind === 'unlink') return `${who} ${event.kind === 'link' ? 'linked' : 'unlinked'} an exercise to ${event.group_exercise.name}.`;
   const value=event.values.find(row => row.role === (event.kind === 'lead_change' ? 'leader' : 'record'));
-  const figure=value?.value !== null && value?.value !== undefined && !value.unavailable
-    ? formatCompetitionFigure(value.value,value.unit) : 'Score unavailable';
+  const figure=value ? formatCompetitionHistoricalFigure(value) : 'Score unavailable';
   const label=value ? HISTORICAL_METRIC_LABELS[value.metric] : event.metric ? HISTORICAL_METRIC_LABELS[event.metric] : 'Score';
   const holder=value?.member?.user_id === userId ? 'You' : value?.member ? formatMemberName(value.member.username) : who;
   return event.kind === 'lead_change' ? `${holder} · #1 ${label} · ${figure}.` : `${who} · ${label} ${figure}${event.reps === null ? '' : ` · ${event.reps} reps`}.`;
 }
 
 export function formatCompetitionHistoricalValue(value: CompetitionHistoryValueWire): string {
-  if (value.unavailable || value.value === null) return 'Score unavailable';
-  return `${HISTORICAL_METRIC_LABELS[value.metric]} ${formatCompetitionFigure(value.value,value.unit)}`;
+  const figure = formatCompetitionHistoricalFigure(value);
+  return figure === 'Score unavailable' ? figure : `${HISTORICAL_METRIC_LABELS[value.metric]} ${figure}`;
+}
+
+export function formatCompetitionHistoricalFigure(value: CompetitionHistoryValueWire): string {
+  const display = competitionDisplayValue(value);
+  return value.unavailable || value.value === null || display === null || !Number.isFinite(display)
+    ? 'Score unavailable' : formatCompetitionFigure(display,value.unit);
 }
 
 /** Linking consumes public catalogue identity; it never copies personal settings. */

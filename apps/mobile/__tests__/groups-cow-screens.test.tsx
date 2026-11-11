@@ -717,6 +717,7 @@ it('Today shows the current exercise and every enabled metric, then last week’
   previous.result!.exercise = { ...previous.result!.exercise!, name: 'Single-Arm Incline Dumbbell Bench Press' };
   previous.result!.rankings[0].entries[0].member.username = 'Contessa Serbelloni Mazzanti Vien dal Mare';
   previous.result!.rankings[1].entries = [{ ...previous.result!.rankings[0].entries[0], value: 1800 }];
+  delete previous.result!.rankings[1].entries[0].added_e1rm_percent_bw;
   api.getPreviousCoWSummary.mockResolvedValue(previous);
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   await screen.findByText('1RM · Volume · Improvement');

@@ -132,7 +132,7 @@ describe('metric stream card', () => {
     expect(part(set, '5')).toHaveStyle({ fontFamily: FIGURE });
     const detail = screen.getByTestId('group-metric-stream-event1-detail-0');
     expect(detail).toHaveStyle({ fontFamily: BODY });
-    expect(part(detail, '145.7')).toHaveStyle({ fontFamily: FIGURE });
+    expect(part(detail, '45.7')).toHaveStyle({ fontFamily: FIGURE });
   });
 
   it('mutes an unavailable score', () => {

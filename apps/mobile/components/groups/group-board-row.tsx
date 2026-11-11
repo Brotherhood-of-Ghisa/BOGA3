@@ -20,6 +20,7 @@ type GroupBoardRowProps = {
  * value in Plex Mono, the member ("You", "(former)") with the 1RM's set below
  * it, the date, and on All the certification mark (a check, or a ring and
  * "uncertified"). My row sits on `paper` and reads "You".
+ * Percentage rows let date/certification wrap to keep the added-load set readable.
  * The whole row opens the row detail sheet (E2).
  */
 export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps) {
@@ -28,6 +29,7 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
   const scoreStyle = useScoreStyle();
   const cardListItemStyles = useCardListItemStyles();
   const testID = `group-board-row-${row.rank}`;
+  const percentageValue = row.valueLabel.includes('%BW') || row.detailLabel?.includes('%BW');
   return (
     <View style={[cardListItemStyles(index, count), row.isMe ? styles.mine : null]}>
       <ListRow
@@ -41,11 +43,11 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
           </Text>
         }
         meta={
-          <View style={styles.meta}>
+          <View style={[styles.meta, percentageValue ? styles.percentageMeta : null]}>
             <Text allowFontScaling={false} style={scoreStyle(row.valueLabel, 'base')} testID={`${testID}-value`}>
-              {row.valueLabel}
+              <FigureText figureStyle={scoreStyle(row.valueLabel, 'base')}>{row.valueLabel}</FigureText>
             </Text>
-            <View style={styles.dateLine}>
+            <View style={[styles.dateLine, percentageValue ? styles.percentageDateLine : null]}>
               <Text allowFontScaling={false} style={text.figureSmall} testID={`${testID}-date`}>
                 {row.dateLabel}
               </Text>
@@ -102,4 +104,6 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'center',
     gap: uiSpace.sm,
   },
+  percentageMeta: { maxWidth: '50%' },
+  percentageDateLine: { flexWrap: 'wrap', justifyContent: 'flex-end' },
 }));

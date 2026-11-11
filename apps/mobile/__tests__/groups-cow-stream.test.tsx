@@ -67,7 +67,7 @@ it('keeps independent winners, empty metrics and suppressed original winners dis
   const item=cowStreamItem('results');
   const model=buildCoWStreamCard(item,'u1','DD-MM-YYYY');
   expect(model.details[0]).toContain('You');
-  expect(model.details[0]).toContain('150.0');
+  expect(model.details[0]).toContain('50.0');
   expect(model.details[1]).toContain('No qualifying results');
   item.result!.rankings[0].entries[0]={ ...item.result!.rankings[0].entries[0],value: null,state: 'unavailable' };
   expect(isCoWStreamItemWire(item)).toBe(true);
@@ -110,7 +110,7 @@ it('versions cached event payloads and isolates account/group, including foreign
     expect(readGroupCache(db.database,groupCacheKeys.stream('g2'),'u1')).toBeNull();
     const foreign=stream(); (foreign.items[0] as ReturnType<typeof cowStreamItem>).definition.group_id='g2';
     expect(() => writeGroupCache(db.database,{ cacheKey: key,userId: 'u1',payload: foreign,fetchedAtMs: 1 })).toThrow('Unsafe group cache payload.');
-    expect(readGroupCache(db.database,'stream:v7:g1','u1')).toBeNull();
+    expect(readGroupCache(db.database,'stream:v8:g1','u1')).toBeNull();
   } finally { db.close(); }
 });
 
@@ -120,6 +120,7 @@ it('retires an absolute cached CoW event when a newly normalized source is obser
     const item=cowStreamItem('results'); const result=item.result!;
     result.normalized=false; result.bodyweight_calculations_enabled=false;
     result.exercise={ ...result.exercise!,rules: { ...result.exercise!.rules,bodyweight_calculations_enabled: false } };
+    delete result.rankings[0].entries[0].added_e1rm_percent_bw;
     result.rankings[0].unit='kg'; result.rankings[1].unit='kg_reps';
     const key=groupCacheKeys.stream('g1');
     writeGroupCache(db.database,{ cacheKey: key,userId: 'u1',payload: { ...stream(),items: [item] },fetchedAtMs: 1 });

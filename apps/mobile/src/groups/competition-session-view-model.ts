@@ -31,14 +31,13 @@ export function buildCompetitionSession(session: CompetitionSessionWire) {
       }
       const row=formatSetRow({ id: set.set_id,weight,reps,setType: set.set_type,done: true,loadContext });
       const metrics = exercise.visibility === 'normalized' && 'normalized_metrics' in set ? set.normalized_metrics : null;
-      // Public Volume already includes the group's bodyweight contribution and both sides.
-      const loadPercent = metrics?.volume_percent_bw_reps == null ? null : metrics.volume_percent_bw_reps / reps;
+      const loadPercent = metrics?.added_load_percent_bw;
       const figure = (value: number | null | undefined, unit: string) => value === null || value === undefined
         ? '—' : formatCompetitionFigure(value, unit);
       return [{ ...row, weightReps: exercise.visibility === 'ordinary' ? row.weightReps
-        : loadPercent === null ? `${reps} reps`
+        : loadPercent == null ? `${reps} reps`
           : `${figure(loadPercent, 'percent_bw')} × ${reps}`,
-        ...(metrics ? { oneRepMax: figure(metrics.e1rm_percent_bw, 'percent_bw'),
+        ...(metrics ? { oneRepMax: figure(metrics.added_e1rm_percent_bw, 'percent_bw'),
           volume: figure(metrics.volume_percent_bw_reps, 'percent_bw_reps') } : {}),
         working: isWorkingSetType(set.set_type) }];
     });

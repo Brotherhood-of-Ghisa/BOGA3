@@ -2,6 +2,7 @@ import { Text, View, type TextStyle } from 'react-native';
 
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
+import { FigureText } from '@/components/ui/figure-text';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type StatLayout = 'stacked' | 'inline';
@@ -111,7 +112,7 @@ export function Stat({
       <View accessibilityLabel={`${spokenLabel} ${value}`} accessible style={[styles.inline, valueWidth === 'hug' ? styles.inlineHug : null]} testID={testID}>
         <Text allowFontScaling={false} style={legendStyle}>{label}</Text>
         <Text allowFontScaling={false} numberOfLines={1} style={[valueStyle, valueWidth === 'fixed' ? styles.inlineValue : styles.inlineValueHug]}>
-          {value}
+          {kind === 'figure' && value.includes('%BW') ? <FigureText figureStyle={valueStyle}>{value}</FigureText> : value}
         </Text>
       </View>
     );
@@ -125,7 +126,7 @@ export function Stat({
       testID={testID}>
       <Text allowFontScaling={false} style={legendStyle}>{label}</Text>
       <Text allowFontScaling={false} numberOfLines={1} style={valueStyle}>
-        {value}
+        {kind === 'figure' && value.includes('%BW') ? <FigureText figureStyle={valueStyle}>{value}</FigureText> : value}
       </Text>
     </View>
   );

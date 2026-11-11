@@ -128,8 +128,10 @@ const detail: GroupGetResult = {
   members: [{ user_id: USER_ID, username: 'me', role: 'member' }],
 };
 
+const ordinaryCompetitionRow = { ...competitionRow };
+delete ordinaryCompetitionRow.added_e1rm_percent_bw;
 const row=(rank: number,userId: string,username: string,overrides: Partial<CompetitionBoardRowWire>={}): CompetitionBoardRowWire=>({
-  ...competitionRow,rank,member: { user_id: userId,username },value: 150-rank*5,unit: 'kg',
+  ...ordinaryCompetitionRow,rank,member: { user_id: userId,username },value: 150-rank*5,unit: 'kg',
   performance: { ...competitionRow.performance,visibility: 'ordinary',weight_value: String(140-rank*5),reps: 2,
     achieved_at_ms: SEP_10,session_id: `s-${userId}`,set_id: `set-${userId}` },...overrides } as CompetitionBoardRowWire);
 const boardPage=(rows: CompetitionBoardRowWire[],overrides: Partial<CompetitionBoardWire>={}): CompetitionBoardWire=>({

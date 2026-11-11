@@ -89,7 +89,7 @@ function CoWEditorFields({ model, groupId, editing, picker, setPicker, onSave, o
         accessibilityState={{ checked: model.draft.metrics.includes(metric), disabled }} disabled={disabled}
         onPress={() => model.toggleMetric(metric)} style={[styles.checkRow, index > 0 ? styles.divider : null]} testID={`cow-form-metric-${metric}`}>
         <View style={[styles.box, model.draft.metrics.includes(metric) ? styles.checked : null]}>{model.draft.metrics.includes(metric) ? <Icon name="check" colorRole="onInk" size="sm" /> : null}</View>
-        <Text allowFontScaling={false} style={[text.body, styles.name]}>{COW_FORM_LABELS[metric]}{metric === 'e1rm' && chosen?.rules.bodyweight_calculations_enabled && chosen.rules.bodyweight_contribution > 0 ? ' (%BW)' : ''}</Text>
+        <Text allowFontScaling={false} style={[text.body, styles.name]}><FigureText>{`${COW_FORM_LABELS[metric]}${metric === 'e1rm' && chosen?.rules.bodyweight_calculations_enabled && chosen.rules.bodyweight_contribution > 0 ? ' %BW' : ''}`}</FigureText></Text>
       </Pressable>)}
     </FormSection>
     {model.message ? <GroupWriteNotice message={model.message} tone="error" testID="cow-form-message" /> : null}

@@ -40,6 +40,8 @@ raw Weight, reps board or absolute bodyweight alternative in protocol 4. Raw
 workout values stay kg; percentages never replace them or occupy a kg field.
 The normalized numerator uses `estimatedTotalOneRepMaxKg`, not the personal
 added-load display `estimatedOneRepMaxKg` after subtracting the bodyweight part.
+Stored scores and ordering retain that numerator. Public 1RM display follows
+[[1rm.added-load-display]] through the opt-in reader projection below.
 
 `scoreCompetitionPerformance` uses the existing parser/load/Wathan kernel.
 For every score, source per-side external kg is doubled once; normalized
@@ -102,8 +104,17 @@ and fenced by revision/source generation, never the reading-dependent hash.
 Old fingerprint fields cannot be renamed into this token without changing their
 origin. Cursor/token expiry or mismatch must reject a stale write.
 
-Group session rows implement [[set.row-figures]] with public Volume divided by
-reps; unit labels follow [[copy.no-weight-unit]]. Other performance labels retain additional load.
+`x-boga-group-added-load: 1` adds nullable `added_e1rm_percent_bw` to normalized
+1RM board rows, historical values, set metrics and CoW rows. It subtracts the
+original rules revision's contribution (a holder's own revision where present),
+or CoW's frozen start contribution, without rewriting scores, rankings or audits.
+Legacy requests keep their exact shapes. Updated readers accept both and show
+unavailable when this projection is absent; zero remains numeric. Disposable
+cache generation 8 retires earlier displays.
+
+Group session rows implement [[set.row-figures]] with public added-load Weight
+and the added 1RM projection; Volume remains total work. Unit labels follow
+[[copy.no-weight-unit]].
 
 All group routes must obey disclosure selected by the current authorized
 group/comparison state, including old history, retired/archived revisions and

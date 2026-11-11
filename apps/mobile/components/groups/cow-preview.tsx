@@ -5,7 +5,7 @@ import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { CoWMetric } from '@/src/groups/cow-scoring';
 import type { CoWRankingWire, CoWResultWire } from '@/src/groups/cow-wire';
 import { formatBoardMemberLabel } from '@/src/groups/board-view-model';
-import { COW_METRIC_LABELS, coWAccessibleDates, coWDateRange, coWFigure, coWMetric, coWMetricHeading, coWStatus } from '@/src/groups/cow-presentation';
+import { COW_METRIC_LABELS, coWAccessibleDates, coWDateRange, coWRowFigure, coWMetric, coWMetricHeading, coWStatus } from '@/src/groups/cow-presentation';
 
 export function CoWMetricTabs({ metrics, metric, onChange, testID }: {
   metrics: CoWMetric[]; metric: CoWMetric; onChange: (metric: CoWMetric) => void; testID: string;
@@ -27,7 +27,7 @@ export function CoWRows({ ranking, userId, testID }: { ranking: CoWRankingWire; 
         {formatBoardMemberLabel(row.member, row.former, userId)}
       </Text>
       <Text allowFontScaling={false} style={[text.figure, styles.figure]}>
-        {row.state === 'unranked' ? 'Not ranked' : row.value === null ? 'Unavailable' : coWFigure(row.value, ranking.metric)}
+        {coWRowFigure(row, ranking)}
       </Text>
     </View>)}
     {ranking.entries.length === 0 ? <Text allowFontScaling={false} style={[text.meta, styles.empty]}>No qualifying results</Text> : null}
