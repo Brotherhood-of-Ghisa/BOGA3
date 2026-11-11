@@ -166,7 +166,9 @@ export default ({ config }: { config: ExpoConfig }) => ({
             {
                 NSHealthShareUsageDescription:
                     "Allow Boga3 to read your workouts so your coach can include them in its advice.",
-                NSHealthUpdateUsageDescription: false,
+                // App Store validation requires this for the SDK's write APIs, even with read-only authorization.
+                NSHealthUpdateUsageDescription:
+                    "Boga3 reads workouts for coaching advice and does not write or update Apple Health data.",
                 background: false
             }
         ],

@@ -97,8 +97,8 @@ ordering, paging and `cardio`; `./boga test mcp-smoke` the MCP-to-API path.
 ## Phone import
 
 iOS reads Apple Health through `@kingstinct/react-native-healthkit` (config
-plugin in `apps/mobile/app.config.ts`: read-only usage string, no write string,
-no background-delivery entitlement). `src/health-import/native-adapter.ts` is
+plugin in `apps/mobile/app.config.ts`: both usage strings for SDK validation,
+read-only authorization, no background-delivery entitlement). `src/health-import/native-adapter.ts` is
 the only code that touches it; Android and web report the store unsupported.
 
 - **Switch.** Data & sync's `Apple Health` row is the account's choice on this
