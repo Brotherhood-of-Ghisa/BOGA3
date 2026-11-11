@@ -52,8 +52,7 @@ sequence discovery and atomic merge/recovery RPCs, load
 - **Typed columns only.** No `extras jsonb` blob anywhere: schema, wire or
   drift checker.
 - **Tombstones keep the full row.** A delete sets `deleted_at` and clears
-  nothing else. `deleted_at IS NOT NULL` is the only tombstone marker; there is
-  no `deleted` boolean.
+  nothing else. `deleted_at IS NOT NULL` is the only tombstone marker.
 - **Future-clock clamp.** `sync_push` stores
   `least(client_updated_at_ms, now_ms + 5 min)`, so a fast-clock client cannot
   write an unbeatable LWW value. The clamp is silent: an NTP glitch is no
@@ -77,10 +76,8 @@ Deletion is `deleted_at` going non-null; undelete is the same id with
 
 ### Migration-in-flight contract
 
-Normal migrations are additive. Destructive changes and projection shifts need
-a coordinated `UPDATE_REQUIRED` cutover with the operator. Protocol 6's
-Routine reuse and layer shift are prepared for a later backend/app release;
-implementation does not authorize deployment.
+Normal migrations are additive, new entities included. Other changes need a
+coordinated `UPDATE_REQUIRED` cutover with the operator ("Adding an entity").
 
 ## Universal columns, index and triggers
 
@@ -154,19 +151,17 @@ for `authenticated`). It also has one restrictive policy,
 restrictive policy keeps OAuth agent tokens out of both the tables and the
 sync RPCs (rule 13 of `docs/specs/10-api-authn-authz-guidelines.md`).
 
-The sync RPCs are `security invoker`, so these `authenticated` policies govern
-RPC writes and direct access alike. No `service_role` or RPC-owner policy is
-needed; `service_role` bypasses RLS and stays in server API/ops code.
+The `security invoker` sync RPCs fall under these policies too; `service_role`
+bypasses RLS and stays in server API/ops code.
 
 `owner_user_id` is immutable: a BEFORE UPDATE trigger
 (`app_public.enforce_owner_user_id_immutable()`) refuses any change to it and
-refuses a NULL `auth.uid()`. It uses `IS DISTINCT FROM`, so NULL cannot slip
-through. It is an authorization boundary, not validation, and the only Sync v2 trigger
-that inspects row content.
+refuses a NULL `auth.uid()` (`IS DISTINCT FROM`, so NULL cannot slip through).
+It is an authorization boundary, not validation.
 
-The drift checker hashes each policy body and immutable-owner trigger against `apps/mobile/scripts/check-sync-schema-drift.fixtures.json`. A
-regression such as `owner_user_id = auth.uid()` turning into `true` fails the
-backend gate.
+The drift checker hashes each policy body and immutable-owner trigger against
+`apps/mobile/scripts/check-sync-schema-drift.fixtures.json`, so a loosened
+policy fails the backend gate.
 
 ## Topological layers
 
@@ -186,9 +181,15 @@ Any order within a layer is safe because no FK joins two tables in one layer
 and every FK points to a strictly earlier layer (or is a self-edge). The drift
 checker asserts both against the live FK graph, and that every entity sits in
 exactly one layer. Adding an entity or FK means updating
-`topo-order.ts` and the `sync_pull` layer mapping together. Protocol 6
-moves the performed chain below Routine uses; an upgraded client resets `pull_cursor`
-(`docs/specs/tech/session-planning-contract.md`).
+`topo-order.ts` and the `sync_pull` layer mapping together.
+
+**Adding an entity** ships server-first with no protocol bump ("Unknown
+types"): in an existing layer, which upgraded builds re-pull once, or a new last
+layer. Keep it out of `exercise_merge_snapshot`: old builds fail on its unknown
+rows. An `UPDATE_REQUIRED` cutover is still needed to rename or remove a
+column, move a table between layers (protocol 6;
+`docs/specs/tech/session-planning-contract.md`), add an FK old builds' rows
+would violate, or send values old builds misread.
 
 ## Drift checker
 
@@ -234,7 +235,7 @@ Push requests and pull responses carry rows in one shape:
 }
 ```
 
-- `type` is one of the seventeen entity table names.
+- `type` is an entity table name (unknown ones: "Unknown types").
 - `id` is client-assigned (a ULID, or a slug for seeds) and stable forever.
 - `client_updated_at_ms` comes from the clock-monotonicity guard.
 - `fields` holds every typed column of the entity, keyed by its snake_case
@@ -259,9 +260,8 @@ SQLSTATE `P0001` with the token as message prefix (any FK failure becomes
 ## `sync_push`
 
 **Request:** `{"entities": Entity[]}`, with 1 to 200 entities. Longer dirty
-streams go up in sequential batches. `anon` may execute the RPC only so that an
-unauthenticated call reaches the function's own `auth.uid()` check and returns
-`AUTH_REQUIRED` instead of a PostgREST 42501.
+streams go up in sequential batches. `anon` may execute it only so an
+unauthenticated call gets `AUTH_REQUIRED`, not PostgREST's 42501.
 
 **Atomicity.** Entities may arrive in any order, but the batch must be closed
 under FKs: every parent is in the batch or already on the server. The RPC runs
@@ -325,8 +325,14 @@ the cursor where it was.
 
 **Cursors.** One per layer (`sync_runtime_state.pull_cursor`), each moving
 only after its page commits, so an aborted drain resumes where it stopped; push
-never moves one. A single cursor could not land parents first; per-table
-cursors add nothing, since no FK joins two tables in a layer.
+never moves one.
+
+**Unknown types.** A build skips pulled rows of types it does not apply on
+that layer and still advances the cursor. Beside each cursor it stores those
+types (`layer_types`; none stored means the frozen list in
+`apps/mobile/src/sync/pull-layer-types.ts`). A signed-in cycle first drops each
+cursor whose list differs from the build's, so only that layer re-pulls; LWW
+keeps held rows unchanged and clean.
 
 ## First sign-in
 
@@ -334,9 +340,8 @@ The first cycle is an ordinary one: null cursors pull everything, dirty rows
 push, LWW reconciles; no modal.
 `bootstrap_completed_at` is set the first time all six layers drain to
 `has_more = false` in one cycle. It gates cold-start UX only; the protocol
-never branches on it. The local store must hold only the signed-in account's
-rows; the wipe that ensures this is owned by `docs/specs/05-data-model.md`
-("Sign-out / account-switch wipe").
+never branches on it. Only the signed-in account's rows may be local (the wipe:
+`docs/specs/05-data-model.md`, "Sign-out / account-switch wipe").
 
 ## The cycle
 
@@ -352,11 +357,10 @@ Guarantees:
   re-running from the same state reaches the same end state.
 - Batch N's ack is applied before batch N+1 is built; otherwise N+1 would
   re-send the same rows.
-- **There is no round cap and no cycle deadline.** Convergence and the
-  client's per-request timeout (`INTERNAL`) are the only bounds: a round cap
-  would report a non-converging spin as converged, hiding bugs and truncating legitimate
-  update streams. A cycle resumes from persisted state, so a long one may span
-  scheduler ticks.
+- **No round cap and no cycle deadline.** Only convergence and the per-request
+  timeout (`INTERNAL`) bound a cycle: a cap would report a non-converging spin
+  as converged. A cycle resumes from persisted state, so it may span scheduler
+  ticks.
 
 ## Dirty-bit lifecycle
 
@@ -375,9 +379,8 @@ The two local-only columns are defined in `docs/specs/05-data-model.md`
 Every repository write sets the dirty bit in the same transaction as the row;
 there is no "mark dirty later" path.
 
-**Push-in-flight race.** At send time the cycle records each row's
-`local_updated_at_ms`. On the ack it clears `local_dirty` only for rows whose
-value is unchanged (table above).
+**Push-in-flight race.** The cycle records each row's `local_updated_at_ms` at
+send time; the ack clears only rows still holding it.
 
 ## Clock-monotonicity guard
 
@@ -390,9 +393,8 @@ LWW rejects. The counter is device-global and survives every wipe.
 
 ## Client-enforced constraints
 
-The server enforces only the PK and the FKs. The invariants below belong to
-the client. A duplicate that reaches the server is a client bug the protocol
-does not reject.
+Beyond the constraints above, these invariants belong to the client; a
+duplicate reaching the server is a client bug it does not reject.
 
 1. Active `session_exercises` never share `(session_id, order_index)`.
 2. Active `exercise_sets` never share `(session_exercise_id, order_index)`.

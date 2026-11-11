@@ -156,16 +156,15 @@ Three paths use it (`apps/mobile/src/sync/account-wipe.ts`,
   expired, then a sign-in as someone else. An unowned
   store that never synced is simply stamped; one that *has* synced (written
   before the owner was recorded) is wiped when nothing waits to push, and
-  otherwise kept with every pull cursor reset
+  otherwise kept with cursors reset
   (`sync.local_store_unowned_wipe` / `sync.local_store_unowned_repull`). While
   the store belongs to another account the first-sync gate is up, whatever the
   bootstrap flag says.
 - **The developer reset** ("Reset local data and re-seed") wipes, keeps the
   owner, and re-seeds the starter catalog; the next cycle re-pulls the rest.
 
-Pull cursors reset with the rows: kept over an emptied or foreign store they
-skip older server rows, so a child can arrive without its parent (a local FK
-failure on every retry). Wipes run under the sync cycle's lock, never between
+Pull cursors reset with the rows: kept, they skip older server rows, so a
+child could arrive without its parent (a local FK failure on every retry). Wipes run under the sync cycle's lock, never between
 two pull pages.
 
 ## Local sync bookkeeping (Sync v2)
@@ -341,18 +340,18 @@ compatible additive column keeps the protocol version: `sync_push` reads named k
 only and ignores the rest. Keeping a stored value when a key is omitted is per
 column — only a `_fields ? '<key>'` branch or a `coalesce` does, which a new
 column needs so an older writer cannot clear it.
-Server-first additions must also keep unknown entity types out of old-reader
-pulls. The kg-only rename, Routine layer shift and protocol-7 workout lifecycle fence
-require coordinated cutovers. For workout session epochs and recovery, load
+A new entity table is server-first too: old builds skip unknown types and the
+first build that knows one re-pulls its layer. What still needs a coordinated
+cutover (as the kg-only rename, Routine layer shift and protocol-7 workout
+fence did): `tech/sync-v2-server-contract.md`, "Adding an entity". For workout session epochs and recovery, load
 [the agent workout contract](tech/agent-workout-contract.md).
 
 The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, in the backend gate)
 introspects migrated local Postgres and checks the FK order in
 `apps/mobile/src/sync/topo-order.ts`. Schema or order drift blocks merging.
 
-The rule does NOT apply to any `out of sync scope` local table above: no
-server counterpart, and the checker introspects only the seventeen
-`app_public.<entity>` mirror tables. Nor does it apply to the two local-only
+The rule does NOT apply to any `out of sync scope` local table above (no
+server counterpart; the checker introspects only the mirror tables). Nor does it apply to the two local-only
 bookkeeping columns, listed under `exemptions.local_only_columns` in
 `apps/mobile/src/data/schema/sync-extras.json`. Nor does it assert indexes:
 every entity table carries a nullable `deleted_at` and an unchecked

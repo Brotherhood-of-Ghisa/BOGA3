@@ -55,6 +55,7 @@ import {
   type QuarantineWriteResult,
 } from '@/src/sync/quarantine';
 import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
+import { recordLayerTypes, resetLayersWithChangedTypes } from '@/src/sync/pull-layer-types';
 
 // -----------------------------------------------------------------------------
 // Tunables
@@ -1556,6 +1557,7 @@ export const writeCursorAndPendingMoves = (
 ): void => {
   const state = readRawCursorState(tx);
   state[String(layer)] = cursor;
+  recordLayerTypes(state, layer);
   if (pendingMoves !== undefined) {
     if (pendingMoves.length > 0) {
       state.provisional_moves = pendingMoves;
@@ -1563,6 +1565,10 @@ export const writeCursorAndPendingMoves = (
       delete state.provisional_moves;
     }
   }
+  writeRawCursorState(tx, state);
+};
+
+const writeRawCursorState = (tx: Transaction, state: Record<string, unknown>): void => {
   tx.insert(schema.syncRuntimeState)
     .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: state as never })
     .onConflictDoUpdate({
@@ -1576,14 +1582,40 @@ const clearPersistedPendingMoves = (tx: Transaction): void => {
   const state = readRawCursorState(tx);
   if ('provisional_moves' in state) {
     delete state.provisional_moves;
-    tx.insert(schema.syncRuntimeState)
-      .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: state as never })
-      .onConflictDoUpdate({
-        target: schema.syncRuntimeState.id,
-        set: { pullCursor: state as never },
-      })
-      .run();
+    writeRawCursorState(tx, state);
   }
+};
+
+const logPullLayersReset = (layers: number[]): void => {
+  try {
+    void logEvent({
+      level: 'info',
+      source: 'database',
+      event: 'sync.pull_layers_reset',
+      message: 'Pull restarted for layers whose known entity types changed since their cursor was stored.',
+      context: { operation: 'pull_layer_types_reset', layers },
+    }).catch(() => undefined);
+  } catch {
+    // Logging must never fail the cycle.
+  }
+};
+
+/**
+ * Restarts the pull of every layer whose stored cursor was advanced by a build
+ * that applied a different set of entity types there, so rows of a type an
+ * older build skipped arrive now. Other layers keep their cursors; rows, dirty
+ * bits and the bootstrap flag are untouched. Returns the layers reset.
+ */
+export const resetPullCursorsForChangedLayerTypes = (database: LocalDatabase): number[] => {
+  const reset = database.transaction((tx) => {
+    const transaction = tx as Transaction;
+    const state = readRawCursorState(transaction);
+    const layers = resetLayersWithChangedTypes(state);
+    if (layers.length > 0) writeRawCursorState(transaction, state);
+    return layers;
+  });
+  if (reset.length > 0) logPullLayersReset(reset);
+  return reset;
 };
 
 // -----------------------------------------------------------------------------
@@ -2103,6 +2135,9 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
     const userId = await getSignedInUserId();
     if (userId) {
       await ensureLocalDataOwnedBy(database, userId);
+      // Before the first pull leg: re-pull any layer this build applies more
+      // (or other) entity types on than the build that advanced its cursor.
+      resetPullCursorsForChangedLayerTypes(database);
     }
 
     // First-sign-in bootstrap: seed the starter catalog iff the server holds
