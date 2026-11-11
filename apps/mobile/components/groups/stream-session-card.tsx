@@ -5,6 +5,7 @@ import type {
   CompetitionSessionCard as StreamSessionCardViewModel,
   CompetitionSessionRecordLine,
 } from '@/src/groups/competition-stream-view-model';
+import { formatGroupRecordCount, formatPersonalRecordCount, spokenGroupRecordCount } from '@/src/groups/record-boards';
 
 type GroupStreamSessionCardProps = {
   card: StreamSessionCardViewModel;
@@ -15,7 +16,7 @@ type GroupStreamSessionCardProps = {
   onPressRecord?: (key: string) => void;
 };
 
-/** One group record the session took, under its figures. */
+/** One group record (GR) the session took, under its figures. */
 function RecordLine({ line, onPress, testID }: { line: CompetitionSessionRecordLine; onPress?: () => void; testID: string }) {
   const styles = useStyles();
   const text = useUiText();
@@ -56,7 +57,8 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressR
   return (
     <CompactCard
       accessibilityLabel={[card.memberName, card.statusLabel, context, card.setsLabel, card.exercisesLabel,
-        records.length > 0 ? `${records.length} group record${records.length === 1 ? '' : 's'}` : null].filter(Boolean).join(', ')}
+        card.personalRecordCount > 0 ? formatPersonalRecordCount(card.personalRecordCount) : null,
+        card.groupRecordCount > 0 ? spokenGroupRecordCount(card.groupRecordCount) : null].filter(Boolean).join(', ')}
       onPress={() => onPress(card)}
       accessibilityActions={onPressRecord ? records.map(line => ({ name: `record-${line.key}`, label: `Open ${line.accessibilityLabel}` })) : undefined}
       onAccessibilityAction={onPressRecord ? event => {
@@ -71,7 +73,16 @@ export function GroupStreamSessionCard({ card, showGroupNames, onPress, onPressR
         {card.memberName}
       </Text>
       <Text allowFontScaling={false} style={[text.meta, tone.ink]} testID={`${testID}-metrics`}>
-        <FigureText>{`${card.setsLabel} · ${card.exercisesLabel}`}</FigureText>
+        <FigureText>{[card.setsLabel, card.exercisesLabel,
+          card.personalRecordCount > 0 ? formatPersonalRecordCount(card.personalRecordCount) : null].filter(Boolean).join(' · ')}</FigureText>
+        {card.groupRecordCount > 0 ? (
+          <>
+            <Text allowFontScaling={false} style={tone.faint}> · </Text>
+            <Text allowFontScaling={false} style={[tone.record, uiTextEmphasis.strong]} testID={`${testID}-group-records`}>
+              <FigureText figureStyle={tone.record}>{formatGroupRecordCount(card.groupRecordCount)}</FigureText>
+            </Text>
+          </>
+        ) : null}
       </Text>
       {records.length > 0 ? (
         <View style={styles.records} testID={`${testID}-records`}>

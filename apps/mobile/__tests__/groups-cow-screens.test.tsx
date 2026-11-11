@@ -712,50 +712,55 @@ it('has no calendar setup controls in the CoW browser', async () => {
 });
 
 
-it('Today shows the current exercise and every enabled metric, then last week’s single-line winners', async () => {
-  const previous = previousCowSummary();
-  previous.result!.exercise = { ...previous.result!.exercise!, name: 'Single-Arm Incline Dumbbell Bench Press' };
-  previous.result!.rankings[0].entries[0].member.username = 'Contessa Serbelloni Mazzanti Vien dal Mare';
-  previous.result!.rankings[1].entries = [{ ...previous.result!.rankings[0].entries[0], value: 1800 }];
-  delete previous.result!.rankings[1].entries[0].added_e1rm_percent_bw;
-  api.getPreviousCoWSummary.mockResolvedValue(previous);
+it('Today shows this week’s CoW in its own card, ranked by 1RM alone, opening that CoW', async () => {
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
-  await screen.findByText('1RM · Volume · Improvement');
-  const currentSection = screen.getByTestId('today-cow-current');
-  expect(within(currentSection).getByText('Current CoW')).toBeTruthy();
-  expect(within(currentSection).getByText('1RM · Volume · Improvement')).toBeTruthy();
-  expect(within(currentSection).queryByText('Alex')).toBeNull();
-  expect(within(currentSection).queryByTestId('today-cow-metric-e1rm')).toBeNull();
-  const winner = await screen.findByTestId('today-cow-winner-e1rm');
-  expect(winner.props.accessibilityLabel).toBe('Contessa Serbelloni Mazzanti Vien dal Mare [1RM]');
-  expect(screen.getByTestId('today-cow-winner-e1rm-name').props.numberOfLines).toBe(1);
-  expect(screen.getByTestId('today-cow-winner-e1rm-name').props.ellipsizeMode).toBe('tail');
-  expect(screen.getByTestId('today-cow-previous-exercise').props.numberOfLines).toBe(1);
-  expect(screen.getByText('[Volume]')).toBeTruthy();
-  expect(screen.getByText('[Improvement]')).toBeTruthy();
-  fireEvent.press(currentSection);
+  await screen.findByTestId('today-cow-current-rows');
+  const card = screen.getByTestId('today-cow-current');
+  expect(within(card).getByText('Current CoW')).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
+  expect(screen.getByTestId('today-cow-week-dates')).toHaveTextContent('26 Oct – 1 Nov 26');
+  expect(screen.getByTestId('today-cow-current-exercise')).toHaveStyle(uiText.bodyStrong);
+  expect(screen.getByTestId('today-cow-current-exercise').props.numberOfLines).toBe(1);
+  const rows = within(screen.getByTestId('today-cow-current-rows'));
+  expect(rows.getByText('Alex')).toBeTruthy(); expect(rows.getByText('You')).toBeTruthy();
+  expect(rows.getByTestId('today-cow-current-rows-u3')).toBeTruthy();
+  // 1RM only: no metric tabs, no Volume or Improvement places.
+  expect(screen.queryByTestId('today-cow-metric-volume')).toBeNull();
+  expect(screen.queryByText('1,800')).toBeNull();
+  // No previous-week step until last week has a CoW; the later step is off on this week.
+  expect(screen.getByTestId('today-cow-week-later')).toBeDisabled();
+  fireEvent.press(screen.getByTestId('today-cow-current-open'));
   expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows?cowId=cow1&metric=e1rm');
 });
 
-it('Today shares uppercase headings, right-aligned date rows and compact text between current and past blocks', async () => {
+it('Today steps to last week’s final 1RM standings behind ‹ and back with ›', async () => {
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
-  await screen.findByText('1RM · Volume · Improvement');
-  await screen.findByTestId('today-cow-winner-e1rm');
-  for (const [prefix, title, date] of [
-    ['today-cow-current', 'Current CoW', '26 Oct – 1 Nov 26'],
-    ['today-cow-previous', 'Last Week CoW', '19 – 25 Oct 26'],
-  ]) {
-    const section = within(screen.getByTestId(prefix));
-    const heading = section.getByText(title);
-    const range = section.getByText(date);
-    expect(heading).toHaveStyle({ ...uiText.label, ...uiTextTone.ink });
-    expect(range).toHaveStyle({ ...uiText.meta, textAlign: 'right', marginLeft: 'auto' });
-    expect(section.getByTestId(`${prefix}-exercise`)).toHaveStyle(uiText.bodyStrong);
-  }
-  expect(screen.getByTestId('today-cow-winner-e1rm-name')).toHaveStyle({ ...uiText.meta, ...uiTextTone.ink });
+  await screen.findByTestId('today-cow-current-rows');
+  await waitFor(() => expect(screen.getByTestId('today-cow-week-earlier')).not.toBeDisabled());
+  fireEvent.press(screen.getByTestId('today-cow-week-earlier'));
+  const card = screen.getByTestId('today-cow-previous');
+  expect(within(card).getByText('Last Week CoW')).toBeTruthy();
+  expect(within(card).getByText('Last week · Final')).toBeTruthy();
+  expect(screen.getByTestId('today-cow-week-dates')).toHaveTextContent('19 – 25 Oct 26');
+  expect(within(screen.getByTestId('today-cow-previous-rows')).getByText('You')).toBeTruthy();
+  expect(screen.getByTestId('today-cow-week-earlier')).toBeDisabled();
+  fireEvent.press(screen.getByTestId('today-cow-previous-open'));
+  expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows?cowId=previous-cow&metric=e1rm');
+  fireEvent.press(screen.getByTestId('today-cow-week-later'));
+  expect(screen.getByTestId('today-cow-current')).toBeTruthy();
 });
 
-it('Today retains the public winner identity when its figure is redacted and never promotes a runner-up', async () => {
+it('Today ranks a CoW without 1RM by its first metric', async () => {
+  const result = current();
+  result.cow.metrics = ['volume', 'improvement'];
+  result.rankings = result.rankings.filter(ranking => ranking.metric !== 'e1rm');
+  api.getCoWSummary.mockResolvedValue({ ...summary(), result });
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  expect(within(await screen.findByTestId('today-cow-current-rows')).getByText('Jules')).toBeTruthy();
+  fireEvent.press(screen.getByTestId('today-cow-current-open'));
+  expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows?cowId=cow1&metric=volume');
+});
+
+it('Today keeps a redacted rank one in place and never promotes the runner-up', async () => {
   const previous = previousCowSummary();
   const ranking = previous.result!.rankings[0];
   ranking.entries = [
@@ -765,8 +770,13 @@ it('Today retains the public winner identity when its figure is redacted and nev
   ranking.entry_count = 2;
   api.getPreviousCoWSummary.mockResolvedValue(previous);
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
-  expect((await screen.findByTestId('today-cow-winner-e1rm')).props.accessibilityLabel).toBe('Contessa Serbelloni Mazzanti Vien dal Mare [1RM]');
-  expect(screen.queryByText('Runner up')).toBeNull();
+  await screen.findByTestId('today-cow-current-rows');
+  await waitFor(() => expect(screen.getByTestId('today-cow-week-earlier')).not.toBeDisabled());
+  fireEvent.press(screen.getByTestId('today-cow-week-earlier'));
+  const rows = within(screen.getByTestId('today-cow-previous-rows'));
+  expect(rows.getByText('Unavailable')).toBeTruthy();
+  expect(rows.getByTestId('today-cow-previous-rows-u1')).toHaveTextContent(/^1/);
+  expect(rows.getByTestId('today-cow-previous-rows-u2')).toHaveTextContent(/^2/);
 });
 
 it.each(['finalizing', 'unavailable', 'empty'] as const)('Today keeps last week %s distinct without declaring a winner', async state => {
@@ -778,19 +788,32 @@ it.each(['finalizing', 'unavailable', 'empty'] as const)('Today keeps last week 
     if (state === 'finalizing') previous.result!.publication_id = null;
   }
   api.getPreviousCoWSummary.mockResolvedValue(previous);
+  api.getCoWSummary.mockResolvedValue({ ...summary(), selection: 'none', result: null });
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
-  const lastWeek = await screen.findByText('Last Week CoW');
-  expect(lastWeek).toBeTruthy();
-  if (state === 'empty') expect((await screen.findByTestId('today-cow-winner-e1rm')).props.accessibilityLabel).toBe('No qualifying results [1RM]');
-  else expect(await screen.findByText(state === 'finalizing' ? 'Finalizing' : 'Unavailable')).toBeTruthy();
+  // No CoW this week: the card opens on last week's, with nowhere later to step.
+  expect(await screen.findByText('Last Week CoW')).toBeTruthy();
+  expect(screen.getByTestId('today-cow-week-later')).toBeDisabled();
+  if (state === 'empty') expect(await screen.findByText('No qualifying results')).toBeTruthy();
+  else expect(await screen.findByTestId('today-cow-previous-state')).toHaveTextContent(state === 'finalizing' ? 'Finalizing' : 'Group comparisons unavailable');
 });
 
-it('Today does not relabel a legacy fallback as current', async () => {
+it('Today shows a ready but unsealed last week as its own state, never a final podium', async () => {
   const previous = previousCowSummary();
-  api.getCoWSummary.mockResolvedValue({ ...previous, selection: 'previous_final' });
+  previous.result!.cow.state = 'finalizing';
+  api.getPreviousCoWSummary.mockResolvedValue(previous);
+  api.getCoWSummary.mockResolvedValue({ ...summary(), selection: 'none', result: null });
+  renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
+  expect(await screen.findByTestId('today-cow-previous-state')).toHaveTextContent('Finalizing');
+  expect(screen.queryByText('Last week · Final')).toBeNull();
+  expect(screen.queryByTestId('today-cow-previous-rows')).toBeNull();
+});
+
+it('Today does not relabel a legacy fallback as current, and has no other week to step to', async () => {
+  api.getCoWSummary.mockResolvedValue({ ...previousCowSummary(), selection: 'previous_final' });
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   expect(await screen.findByText('Last Week CoW')).toBeTruthy();
   expect(screen.queryByText('Current CoW')).toBeNull();
+  expect(screen.getByTestId('today-cow-week-earlier')).toBeDisabled();
 });
 
 it('Today exposes a retry for read failure and refreshes both week resources', async () => {
@@ -799,7 +822,7 @@ it('Today exposes a retry for read failure and refreshes both week resources', a
   const retry = await screen.findByTestId('today-cow-current-error-state-retry');
   api.getCoWSummary.mockResolvedValue(summary());
   fireEvent.press(retry);
-  expect(await screen.findByText('1RM · Volume · Improvement')).toBeTruthy();
+  expect(await screen.findByTestId('today-cow-current-rows')).toBeTruthy();
   expect(api.getPreviousCoWSummary.mock.calls.length).toBeGreaterThan(1);
 });
 
@@ -807,16 +830,20 @@ it('Today suppresses a previous result from a different calendar revision until 
   const previous = previousCowSummary();
   api.getPreviousCoWSummary.mockResolvedValueOnce({ ...previous, calendar_revision: 2 }).mockResolvedValue(previous);
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
-  expect(await screen.findByTestId('today-cow-winner-e1rm')).toBeTruthy();
-  expect(api.getPreviousCoWSummary.mock.calls.length).toBeGreaterThan(1);
+  await screen.findByTestId('today-cow-current-rows');
+  await waitFor(() => expect(api.getPreviousCoWSummary.mock.calls.length).toBeGreaterThan(1));
+  await waitFor(() => expect(screen.getByTestId('today-cow-week-earlier')).not.toBeDisabled());
+  fireEvent.press(screen.getByTestId('today-cow-week-earlier'));
+  expect(await screen.findByTestId('today-cow-previous-rows')).toBeTruthy();
 });
 
-
-it('Today keeps readable previous winners when the independent current read fails', async () => {
+it('Today keeps last week readable when the independent current read fails', async () => {
   api.getCoWSummary.mockRejectedValue(new GroupApiError('INTERNAL', 'failed'));
   renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
   expect(await screen.findByTestId('today-cow-current-error-state')).toBeTruthy();
-  expect(await screen.findByTestId('today-cow-winner-e1rm')).toBeTruthy();
+  await waitFor(() => expect(screen.getByTestId('today-cow-week-earlier')).not.toBeDisabled());
+  fireEvent.press(screen.getByTestId('today-cow-week-earlier'));
+  expect(await screen.findByTestId('today-cow-previous-rows')).toBeTruthy();
 });
 
 it('Today uses no summary space when both weeks are confirmed absent', async () => {
@@ -824,6 +851,7 @@ it('Today uses no summary space when both weeks are confirmed absent', async () 
   api.getCoWSummary.mockResolvedValue(absent);
   api.getPreviousCoWSummary.mockResolvedValue(absent);
   const view = renderWithTheme(<TodayCoWSummaries groupId="g1" userId="u1" />);
-  await waitForGone(() => screen.queryByTestId('today-cow-summaries'));
+  await waitFor(() => expect(api.getPreviousCoWSummary).toHaveBeenCalled());
+  await waitForGone(() => screen.queryByTestId('today-cow-card'));
   expect(view.toJSON()).toBeNull();
 });

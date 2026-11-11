@@ -8,7 +8,8 @@ import {
   GROUP_SESSIONS_SHOWN,
   buildGroupSessions,
   buildWeekBoard,
-  buildGroupRecordLine,
+  buildGroupRecordLines,
+  buildLatestSessionRows,
   completedSessionsFromStream,
   formatTrainingStart,
   groupRecordBoards,
@@ -141,12 +142,12 @@ describe('buildGroupSessions', () => {
       live: true,
       gym: 'Iron Works',
       figures: '3 exercises · 7 sets so far',
-      record: null,
+      groupRecords: [],
       accessibilityLabel: 'maria, training now, Started 07:40, at Iron Works, 3 exercises · 7 sets so far',
     }]);
   });
 
-  it("draws a completed session by its start in Today's format, naming one group record", () => {
+  it("draws a completed session by its start in Today's format, naming each GR", () => {
     const { recent } = buildGroupSessions(
       {
         training_now: [],
@@ -166,9 +167,19 @@ describe('buildGroupSessions', () => {
       live: false,
       gym: 'Iron Works',
       figures: '4 exercises · 18 sets',
-      record: { kind: 'one', lead: 'Deadlift 1RM 213.3', note: 'group record' },
-      accessibilityLabel: 'dave, completed session on 16-10-2026 06:10, at Iron Works, 4 exercises · 18 sets, Deadlift 1RM 213.3 · group record',
+      groupRecords: [{ key: competitionEvent.event_id, exercise: 'Deadlift', value: '1RM 213.3' }],
+      accessibilityLabel: 'dave, completed session on 16-10-2026 06:10, at Iron Works, 4 exercises · 18 sets, group record, Deadlift 1RM 213.3',
     }]);
+  });
+
+  it('draws the latest session from the stream when loaded, so its PRs are counted', () => {
+    const latest = completed({ group_records: [record('Deadlift', [{ metric: 'e1rm', value: 213.3, unit: 'kg' }])] });
+    const fromSummary = buildGroupSessions({ training_now: [], latest_completed: latest }, [], ME, NOW, 'DD-MM-YYYY');
+    expect(fromSummary.recent[0].figures).toBe('4 exercises · 18 sets');
+    const fromStream = buildGroupSessions({ training_now: [], latest_completed: latest }, [{ ...latest, personalRecords: 2 }], ME, NOW, 'DD-MM-YYYY');
+    expect(fromStream.recent.map((row) => [row.sessionId, row.figures])).toEqual([['dave-done', '4 exercises · 18 sets · 2 PRs']]);
+    expect(buildGroupSessions({ training_now: [], latest_completed: null }, [{ ...latest, group_records: [], personalRecords: 1 }], ME, NOW, 'DD-MM-YYYY')
+      .recent[0]).toMatchObject({ figures: '4 exercises · 18 sets · 1 PR', groupRecords: [] });
   });
 
   it('shows four in all, live first, then the latest completed and the stream, each session once', () => {
@@ -178,7 +189,7 @@ describe('buildGroupSessions', () => {
       completed({ session_id: 'older-1', gym_name: null }),
       completed({ session_id: 'older-2' }),
       completed({ session_id: 'older-3' }),
-    ];
+    ].map((session) => ({ ...session, personalRecords: 0 }));
     const sessions = buildGroupSessions(
       { training_now: [training('maria'), training(ME)], latest_completed: completed() },
       stream,
@@ -228,36 +239,29 @@ describe('formatting', () => {
     expect(formatTrainingStart(local(2026, 10, 15, 23, 10), NOW, 'DD-MM-YYYY')).toBe('Started 15 Oct 26 23:10');
   });
 
-  it('names one group record and only counts several, one per board taken', () => {
-    expect(buildGroupRecordLine([])).toBeNull();
+  it('names every GR, one line per record set, its boards joined', () => {
+    expect(buildGroupRecordLines([])).toEqual([]);
     // A record that took no listed board (no `record` value) adds nothing.
-    expect(buildGroupRecordLine([record('Squat', [])])).toBeNull();
-    expect(buildGroupRecordLine([record('Bench', [{ metric: 'weight', value: 100, unit: 'kg' }])])).toEqual({
-      kind: 'one',
-      lead: 'Bench Weight 100.0',
-      note: 'group record',
-    });
-    expect(buildGroupRecordLine([record('Squat', []), record('Bench', [{ metric: 'e1rm', value: 120, unit: 'kg' }])]))
-      .toEqual({ kind: 'one', lead: 'Bench 1RM 120.0', note: 'group record' });
-    // One set #1 on Weight and on 1RM is two group records.
-    expect(buildGroupRecordLine([record('Deadlift', [{ metric: 'weight', value: 200, unit: 'kg' }, { metric: 'e1rm', value: 213.3, unit: 'kg' }])]))
-      .toEqual({ kind: 'many', count: '2 group records' });
+    expect(buildGroupRecordLines([record('Squat', [])])).toEqual([]);
+    const bench = { ...record('Bench', [{ metric: 'e1rm', value: 120, unit: 'kg' }]), event_id: 'bench' };
+    const deadlift = { ...record('Deadlift', [{ metric: 'weight', value: 200, unit: 'kg' }, { metric: 'e1rm', value: 213.3, unit: 'kg' }]), event_id: 'deadlift' };
+    expect(buildGroupRecordLines([bench, deadlift])).toEqual([
+      { key: 'bench', exercise: 'Bench', value: '1RM 120.0' },
+      { key: 'deadlift', exercise: 'Deadlift', value: 'Weight 200.0 · 1RM 213.3' },
+    ]);
   });
 
-  it('counts the boards the session view shows: no Volume, no provisional or voided record', () => {
-    // A record that took 1RM and Volume is one group record here and one row
-    // on the session's Group records card, which never shows Volume.
-    expect(buildGroupRecordLine([record('Squat', [{ metric: 'e1rm', value: 150, unit: 'kg' }, { metric: 'volume', value: 2400, unit: 'kg' }])]))
-      .toEqual({ kind: 'one', lead: 'Squat 1RM 150.0', note: 'group record' });
-    // A Volume-only record shows nowhere on the session, so it does not count.
-    expect(buildGroupRecordLine([record('Bench', [{ metric: 'volume', value: 2400, unit: 'kg' }])])).toBeNull();
-    // A provisional or voided record can still move or is gone: the session
-    // view hides both, so neither counts.
-    expect(buildGroupRecordLine([
-      record('Bench', [{ metric: 'e1rm', value: 120, unit: 'kg' }]),
+  it('lists the boards the session view shows: no Volume, no provisional or voided record', () => {
+    // A record that took 1RM and Volume shows its 1RM only, as the session's GR card does.
+    expect(buildGroupRecordLines([record('Squat', [{ metric: 'e1rm', value: 150, unit: 'kg' }, { metric: 'volume', value: 2400, unit: 'kg' }])]))
+      .toEqual([{ key: competitionEvent.event_id, exercise: 'Squat', value: '1RM 150.0' }]);
+    // A Volume-only record shows nowhere on the session.
+    expect(buildGroupRecordLines([record('Bench', [{ metric: 'volume', value: 2400, unit: 'kg' }])])).toEqual([]);
+    // A provisional or voided record can still move or is gone: neither shows.
+    expect(buildGroupRecordLines([
       { ...record('Squat', [{ metric: 'e1rm', value: 150, unit: 'kg' }]), provisional: true },
       { ...record('Deadlift', [{ metric: 'e1rm', value: 200, unit: 'kg' }]), voided: true },
-    ])).toEqual({ kind: 'one', lead: 'Bench 1RM 120.0', note: 'group record' });
+    ])).toEqual([]);
   });
 
   it('counts only record values, not the leader or previous holders an event may carry', () => {
@@ -273,13 +277,19 @@ describe('formatting', () => {
 });
 
 describe('completedSessionsFromStream', () => {
-  const session = (sessionId: string, status: 'completed' | 'active' | 'draft' = 'completed') => ({
+  const session = (sessionId: string, status: 'completed' | 'active' | 'draft' = 'completed', startedAtMs = 1) => ({
     kind: 'session' as const, key: sessionId, sort_at_ms: 1, groups: [{ group_id: 'g1', name: 'Crew' }],
-    session: { ...competitionSession.session, session_id: sessionId, status },
+    session: { ...competitionSession.session, session_id: sessionId, status, started_at_ms: startedAtMs },
   });
-  const recordFor = (sessionId: string | null, overrides: Partial<CompetitionEventWire> = {}) => ({
+  // A record that beat the member's best on 1RM and on Weight; `groupRecords` names the boards it took #1 on.
+  const recordFor = (sessionId: string | null, overrides: Partial<CompetitionEventWire> = {}, groupRecords: CompetitionHistoricalMetric[] = ['e1rm']) => ({
     kind: 'competition' as const, key: `record-${sessionId}-${overrides.event_id ?? ''}`, sort_at_ms: 1,
-    event: { ...competitionEvent, session_id: sessionId, ...overrides },
+    event: { ...competitionEvent, session_id: sessionId,
+      values: [
+        { role: 'record' as const, metric: 'e1rm' as const, unit: 'kg', value: 120, unavailable: false, member: null },
+        { role: 'record' as const, metric: 'weight' as const, unit: 'kg', value: 110, unavailable: false, member: null },
+      ], ...overrides },
+    record: { performance: null, previous: [], group_record_metrics: groupRecords },
   });
 
   it('keeps completed sessions in stream order, counted as the stream card counts them, with their live group records', () => {
@@ -297,6 +307,55 @@ describe('completedSessionsFromStream', () => {
     expect(sessions.map((entry) => entry.session_id)).toEqual(['s2', 's1']);
     expect(sessions[0]).toMatchObject({ working_sets: 1, exercise_count: 1, duration_sec: 2_600, gym_name: 'Gym' });
     expect(sessions[0].group_records.map((event) => event.event_id)).toEqual(['kept']);
-    expect(sessions[1].group_records).toEqual([]);
+    expect(sessions[1]).toMatchObject({ group_records: [], personalRecords: 0 });
+  });
+
+  it('keeps only the boards a record took #1 on as GRs, and counts its other new bests as PRs', () => {
+    const [mixed] = completedSessionsFromStream([
+      session('s1'),
+      recordFor('s1', { event_id: 'gr-and-pr' }, ['e1rm']),
+      recordFor('s1', { event_id: 'pr-only' }, []),
+      // Volume is not shown, so a Volume new best is neither a GR nor a PR.
+      recordFor('s1', { event_id: 'volume', values: [{ role: 'record', metric: 'volume', unit: 'kg_reps', value: 900, unavailable: false, member: null }] }, ['volume']),
+    ]);
+    expect(mixed.group_records.map((event) => [event.event_id, event.values.map((value) => value.metric)])).toEqual([['gr-and-pr', ['e1rm']]]);
+    expect(buildGroupRecordLines(mixed.group_records)).toEqual([{ key: 'gr-and-pr', exercise: competitionEvent.group_exercise.name, value: '1RM 120.0' }]);
+    // `gr-and-pr`'s Weight and both of `pr-only`'s boards.
+    expect(mixed.personalRecords).toBe(3);
+  });
+});
+
+describe('buildLatestSessionRows', () => {
+  const session = (sessionId: string, member: string, startedAtMs: number) => ({
+    kind: 'session' as const, key: sessionId, sort_at_ms: startedAtMs, groups: [{ group_id: 'g1', name: 'Crew' }],
+    session: { ...competitionSession.session, session_id: sessionId, member: { user_id: member, username: member }, started_at_ms: startedAtMs },
+  });
+  const gr = (sessionId: string) => ({
+    kind: 'competition' as const, key: `record-${sessionId}`, sort_at_ms: 1,
+    event: { ...competitionEvent, event_id: `record-${sessionId}`, session_id: sessionId,
+      values: [{ role: 'record' as const, metric: 'e1rm' as const, unit: 'kg', value: 120, unavailable: false, member: null }] },
+    record: { performance: null, previous: [], group_record_metrics: ['e1rm' as const] },
+  });
+  const items = [
+    ...['a', 'b', 'c', 'd', 'e', 'f'].map((id, index) => session(id, id === 'b' ? ME : `m-${id}`, local(2026, 11, 10 - index, 9))),
+    gr('a'),
+  ];
+
+  it('lists the five latest completed sessions with their sets', () => {
+    const rows = buildLatestSessionRows(items, 'sets', ME, 'DD-MM-YYYY');
+    expect(rows.map((row) => [row.sessionId, row.name, row.when, row.value, row.record])).toEqual([
+      ['a', 'm-a', '10 Nov 26', '1 set', false],
+      ['b', 'You', '9 Nov 26', '1 set', false],
+      ['c', 'm-c', '8 Nov 26', '1 set', false],
+      ['d', 'm-d', '7 Nov 26', '1 set', false],
+      ['e', 'm-e', '6 Nov 26', '1 set', false],
+    ]);
+    expect(rows[0].accessibilityLabel).toBe('m-a, 10-11-2026 09:00, 1 set');
+  });
+
+  it('shows the GR count for the GR metric, in the record colour only above zero', () => {
+    const rows = buildLatestSessionRows(items, 'prs', ME, 'DD-MM-YYYY');
+    expect(rows.slice(0, 2).map((row) => [row.value, row.record])).toEqual([['1 GR', true], ['0 GR', false]]);
+    expect(rows[0].accessibilityLabel).toBe('m-a, 10-11-2026 09:00, 1 group record');
   });
 });

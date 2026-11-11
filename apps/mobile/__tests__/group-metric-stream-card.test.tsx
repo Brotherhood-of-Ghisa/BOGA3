@@ -69,7 +69,7 @@ it('shows one status per set however many boards the record took, and the set fr
   const metric=competitionEvent.record_context!.metrics[0];
   renderCard({ ...competitionEvent,values: [...competitionEvent.values,{ ...competitionEvent.values[0],metric: 'volume',unit: 'percent_bw_reps',value: 650 }],
     record_context: { ...competitionEvent.record_context!,metrics: [metric,{ ...metric,metric: 'volume',write_token: 'v' }] } },
-  { record: { performance: ordinarySet,previous: [] } });
+  { record: { performance: ordinarySet,previous: [],group_record_metrics: ['e1rm','volume'] } });
   expect(screen.getAllByTestId('group-metric-stream-event1-certification')).toHaveLength(1);
   expect(screen.getByTestId('group-metric-stream-event1-set')).toHaveTextContent('120.0 × 5');
   expect(screen.getByTestId('group-metric-stream-event1')).toHaveTextContent('Volume 650.0 %BW',{ exact: false });

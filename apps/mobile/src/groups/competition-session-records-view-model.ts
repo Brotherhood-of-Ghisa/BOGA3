@@ -15,7 +15,7 @@ import type { MetricCertificationTarget } from './metric-record-sheet-view-model
 import { formatMemberName } from './stream-view-model';
 import type { GroupMemberRef } from './types';
 
-export const GROUP_RECORD_LABEL = '#1 in group';
+export const GROUP_RECORD_LABEL = 'GR';
 export const GROUP_VIEW_LABEL = 'group view';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
@@ -34,6 +34,8 @@ export type SessionRecordRow = {
   title: string;
   value: string;
   detail: string;
+  /** `detail` as a screen reader says it: `Group record`, not `GR`. */
+  spokenDetail: string;
   boardHref: string;
   /** Null for a board the current rules no longer have (a historic Weight record). */
   certification: SessionRecordCertification | null;
@@ -136,6 +138,7 @@ export function buildSessionRecordRows({ records, places, groupId, userId }: {
           title: `${exercise.name} · ${HISTORICAL_METRIC_LABELS[board.metric]}`,
           value: recordValue(record, board.metric),
           detail: [GROUP_RECORD_LABEL, place?.figure ?? null, passedBy].filter(Boolean).join(' · '),
+          spokenDetail: ['Group record', place?.figure ?? null, passedBy].filter(Boolean).join(', '),
           boardHref: `/group/${encodeURIComponent(groupId)}/leaderboards/${encodeURIComponent(exercise.group_exercise_id)}${metricQuery}`,
           certification: recordCertification(record.event, board.metric),
         },
@@ -158,7 +161,7 @@ export function buildSessionRecordBands(records: readonly CompetitionSessionReco
       key: record.event.event_id,
       label: `${GROUP_RECORD_LABEL} · ${labels.join(' + ')}`,
       set: place.figure,
-      spoken: `${GROUP_RECORD_LABEL} on ${labels.join(' and ')}, ${place.figure}`,
+      spoken: `Group record on ${labels.join(' and ')}, ${place.figure}`,
     };
     bands.set(place.cardId, [...(bands.get(place.cardId) ?? []), line]);
   }

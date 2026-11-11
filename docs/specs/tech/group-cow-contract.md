@@ -182,9 +182,10 @@ next selection edge, including offline; a rollover triggers a fresh read.
 ## Mobile reads and writes
 
 Group management uses `components/groups/cow-group-preview.tsx` for independent
-metric podiums. Today uses `components/today/group-cow-summary.tsx`: current
-exercise/metrics link to that challenge, and each previous-week winner follows
-its original rank with its metric. Its separate `group_cow_previous_summary`
+metric podiums. Today uses `components/today/group-cow-summary.tsx`: one CoW
+card under the week board, this week's exercise (linking to that challenge) and
+its 1RM podium (else its first metric's), with `‹ ›` around the dates stepping
+to last week's CoW and back. Its separate `group_cow_previous_summary`
 reader selects exactly the previous group week, retaining finalizing/unavailable
 states; only ready finals supply winners. Suppressed rank one never promotes
 another member. Both views have separate scoped, expiring summary cache aliases;
@@ -285,10 +286,11 @@ invented history. Started/Ended use stored boundaries, finals their publication
 time. CoW keys are twenty-digit padded ledger sequences, preserving causal
 order inside a display millisecond under the existing SQL/client sort.
 
-The app opts into `group_competition_stream_v3`; older readers stay unchanged.
+The app opts into `group_competition_stream_v4` (v3 plus each record's #1
+boards, `groups-contract.md`); older readers stay unchanged.
 Its opaque cursor has a distinct binding. The new page projects final winners
 through the existing CoW reader, checking current disclosure every time.
-Stream cache keys add `cow-events-v1`; nested results observe current policy
+Stream cache keys add a reader suffix (`group-records-v1`); nested results observe current policy
 and participate in account-wide projection retirement. Cards link the exact
 challenge, including cancelled definitions, rather than the current summary.
 

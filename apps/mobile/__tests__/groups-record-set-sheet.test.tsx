@@ -92,7 +92,7 @@ it('shows the set as logged and the group previous #1 from the record stream',as
   api.getCompetitionStream.mockResolvedValue({ contract_version: 4,next_cursor: null,has_more: false,items: [{ kind: 'competition',
     key: event.event_id,sort_at_ms: event.sort_at_ms,event,record: { performance: ordinary,previous: [{
       value: { role: 'previous',metric: 'e1rm',unit: 'kg',value: 130,unavailable: false,member: { user_id: 'sam',username: 'Sam' } },
-      performance: { ...ordinary,set_id: 'set0',weight_value: '110' } }] } }] });
+      performance: { ...ordinary,set_id: 'set0',weight_value: '110' } }],group_record_metrics: ['e1rm'] } }] });
   await openRecord();
   expect(screen.getByTestId('group-metric-record-set')).toHaveTextContent('120.0 × 5');
   expect(screen.getByTestId('group-metric-record-previous-e1rm')).toHaveTextContent(/1RM.*130\.0.*Sam · 110\.0 × 5/);

@@ -186,7 +186,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/group/<groupId>/members` | `/groups` | after a successful leave (`dismissTo('/groups')`); the screen's focus refresh drops the group from the chips |
 | `/groups` | `/group/<groupId>/leaderboards/<exerciseId>` | a podium card on the Leaderboards page (`push`, no query: opens on All) |
 | `…/leaderboards/<exerciseId>` | `…/history?metric=&scope=` | the header `History`, passing the current toggles and rules revision |
-| `/groups`, `/today`, a board | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | a stream session card, Today's one-member training-now row or completed session, or the row detail sheet's `View full session` (`push`). Every full-session exit carries `groupId` |
+| `/groups`, `/today`, a board | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | a stream session card, a Today session row, a latest-sessions row, the row sheet's `View full session` (`push`). Every full-session exit carries `groupId` |
 | `/today` | `/groups?groupId=<groupId>`, `/group/mine` | The board card's group name, the week board and the `<n> training now` row, carrying Today's selected group; `Find a group` when there is none. Picking a chip changes the selection Today shares with `/groups`; it does not navigate |
 | `/today`, `/group/<groupId>` | `/group/<groupId>/cows?cowId=…&metric=…` | preview header pushes the browser carrying the displayed CoW/metric; in-card switching never navigates |
 | CoWs tab/browser or Stream lifecycle card | CoW standings or schedule | Stream opens its exact challenge; admins schedule/edit next week. Save/cancel returns `back()` |

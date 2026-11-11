@@ -58,7 +58,7 @@ row's real 1RM and Volume describe that row only; [[set.eligibility]] decides
 which sets can be records, never what a row shows. The only highlights on a set
 list are the session's record sets (`docs/specs/tech/training-metrics-contract.md`
 §3). The group session view highlights instead the set that took #1 on a group
-1RM board: one `#1 in group` band per set.
+1RM board: one `GR` band per set.
 In a shared group session, normalized Weight is added load as `%BW`;
 ordinary and personal Weight retain their existing meaning.
 

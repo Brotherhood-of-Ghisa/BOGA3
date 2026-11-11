@@ -174,8 +174,8 @@ sets. There are three kinds:
 - **A session's PRs** are one per record kind each exercise took, so one
   exercise adds up to three (1RM, Weight and Volume). Every screen that counts
   a session's PRs, or PRs over a period, counts these
-  (`sessionRecordKinds`). A group session's count is its group records, one
-  per board taken (`tech/groups-contract.md`).
+  (`sessionRecordKinds`). A group session counts boards taken #1 as `GR`,
+  other new bests as PRs (`tech/groups-contract.md`).
 - **The record set of a session** is the one set the share image lists for an
   exercise. Among the session's working sets of the exercise,
   across every block, it is the highest 1RM that beats the 1RM record. When no
