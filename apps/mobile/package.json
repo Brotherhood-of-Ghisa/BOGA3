@@ -17,7 +17,7 @@
     "typecheck": "npm run router:types && tsc --noEmit",
     "test": "jest",
     "test:sync": "jest __tests__/sync",
-    "test:sync:infra": "EXPO_PUBLIC_USE_RN_FETCH=1 jest --runInBand --runTestsByPath __tests__/sync/drift-check.test.ts __tests__/sync/exercise-merge-live.test.ts __tests__/sync/cycle-round-trip.test.ts __tests__/sync/cycle-multidevice-lww.test.ts __tests__/sync/block-attachment-arbitration-cycle.test.ts __tests__/sync/auth-required-envelope.test.ts __tests__/sync/update-softdelete-roundtrip.test.ts __tests__/sync/future-clock-clamp.test.ts __tests__/sync/cycle-fresh-device-and-account-switch.test.ts __tests__/sync/muscle-targets-live.test.ts --testPathIgnorePatterns=/node_modules/",
+    "test:sync:infra": "EXPO_PUBLIC_USE_RN_FETCH=1 jest --runInBand --runTestsByPath __tests__/sync/drift-check.test.ts __tests__/sync/exercise-merge-live.test.ts __tests__/sync/cycle-round-trip.test.ts __tests__/sync/cycle-multidevice-lww.test.ts __tests__/sync/block-attachment-arbitration-cycle.test.ts __tests__/sync/auth-required-envelope.test.ts __tests__/sync/update-softdelete-roundtrip.test.ts __tests__/sync/future-clock-clamp.test.ts __tests__/sync/cycle-fresh-device-and-account-switch.test.ts __tests__/sync/muscle-targets-live.test.ts __tests__/sync/health-import-live.test.ts --testPathIgnorePatterns=/node_modules/",
     "test:groups:competition-live": "EXPO_PUBLIC_USE_RN_FETCH=1 jest --runInBand --runTestsByPath __tests__/groups-competition-api-live.test.ts --testPathIgnorePatterns=/node_modules/",
     "test:groups:live": "EXPO_PUBLIC_USE_RN_FETCH=1 jest --runInBand --runTestsByPath __tests__/groups-api-live.test.ts --testPathIgnorePatterns=/node_modules/",
     "test:handles": "jest --detectOpenHandles --silent",
@@ -46,6 +46,7 @@
     "@expo-google-fonts/archivo": "^0.4.2",
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
     "@expo-google-fonts/source-sans-3": "^0.4.1",
+    "@kingstinct/react-native-healthkit": "^16.2.0",
     "@react-native-community/datetimepicker": "^9.2.1",
     "@react-native-community/netinfo": "12.0.1",
     "@supabase/supabase-js": "^2.98.0",
@@ -77,6 +78,7 @@
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
     "react-native-gesture-handler": "~3.3.0",
+    "react-native-nitro-modules": "^0.37.2",
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "~5.11.1",
     "react-native-screens": "~4.30.1",
@@ -108,5 +110,16 @@
     "tsx": "^4.22.3",
     "typescript": "~6.0.3"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "autolinking": {
+      "android": {
+        "exclude": [
+          "@kingstinct/react-native-healthkit",
+          "@react-native-healthkit/core",
+          "react-native-nitro-modules"
+        ]
+      }
+    }
+  }
 }

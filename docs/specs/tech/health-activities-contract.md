@@ -1,7 +1,7 @@
 # Health activities contract
 
 > **Owns:** imported health-app activities: the server table, the app's write
-> RPC, the strength-overlap rule and the coach's reads. **Not here:** what the
+> RPC, the strength-overlap rule, the coach's reads and the phone import. **Not here:** what the
 > coach may read → [[agents.health-activities]]; agent auth and envelopes →
 > `supabase/functions/agent-api/README.md`. **Load when:** changing
 > `app_public.health_activities`, `health_activities_apply`, the activities
@@ -93,3 +93,33 @@ its cap.
 range and cursor parsing and the weekly buckets. `./boga test agent-api` proves
 the RPC (idempotency, rejection, delete, prune), RLS, OAuth denial, ownership,
 ordering, paging and `cardio`; `./boga test mcp-smoke` the MCP-to-API path.
+
+## Phone import
+
+iOS reads Apple Health through `@kingstinct/react-native-healthkit` (config
+plugin in `apps/mobile/app.config.ts`: read-only usage string, no write string,
+no background-delivery entitlement). `src/health-import/native-adapter.ts` is
+the only code that touches it; Android and web report the store unsupported.
+
+- **Switch.** Data & sync's `Apple Health` row is the account's choice on this
+  phone. Turning it on shows the permission sheet, then imports. iOS never says
+  whether reading was allowed, so the row shows the choice, never a verified
+  connection. Turning it off stops imports and keeps imported rows.
+- **When.** Once after turning on, and on every app foreground while on.
+  Background delivery is not used.
+- **Anchor.** The store's change-feed anchor and the backfill start are kept
+  device-local for one account (`src/health-import/storage.ts`). Without one
+  the import backfills 90 days and closes with `p_complete_ids`. A backfill
+  that read nothing prunes nothing and keeps no anchor (iOS reports denied
+  access as no workouts), so the next import backfills again; with one it
+  sends only changes: deletions, then upserts, in batches of 500. The anchor
+  advances only after every call succeeded, so a failure re-sends the same
+  changes next time. Signing out, switching account or turning the switch off
+  discards it, so the next import is a fresh backfill.
+- **Failures** throw from the importer and stay on the row as a `Notice` with
+  Retry until an import succeeds; a workout in an unknown unit stops the batch
+  rather than being guessed or dropped.
+
+Jest covers the mapping, importer, storage, lifecycle and adapter with the
+store faked (`apps/mobile/__tests__/health-import-*.test.ts`). The simulator
+holds no watch workouts: real Apple Health reads are verified on a device.
