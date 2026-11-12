@@ -33,9 +33,8 @@ function delta(current: CompetitionHistoryValueWire | undefined, previous: Compe
 /**
  * Why an All board's #1 moved when no record explains it. `link` is the
  * publisher's reason for a link, an unlink and a retarget alike; `void` is a
- * corrected record: the leader
- * linking passes the old holder; anyone else's unlink, and a corrected
- * record (`void`), only hand #1 on.
+ * corrected record. Only the leader linking passes the old holder; anyone
+ * else's unlink, and a correction, only hand #1 on.
  */
 function allBoardLeadChange({ reason, actor, holder, previous, kept, nameOf, passedName }: {
   reason: string | null; actor: Member; holder: Member; previous: Member; kept: boolean;
@@ -86,7 +85,7 @@ function entryFor(item: CompetitionRecordsHistoryItemWire, metric: CompetitionMe
 
 /**
  * The records log, newest first: one entry per new best (All, with the #1
- * changes links and corrections make) or new #1 (Certified), and a divider
+ * changes links, unlinks and corrections make) or new #1 (Certified), and a divider
  * at each rules change. Entries between two dividers share one card; entries
  * under earlier rules are marked to dim.
  */

@@ -137,7 +137,8 @@ export type CompetitionStreamRecordWire = {
 /**
  * One records-log entry. `record`: a new personal best on the board's metric,
  * with its stream record and the member's previous best (null for a first
- * entry). `lead_change`: a Certified board's new #1. `rules_change`: a divider.
+ * entry). `lead_change`: a new #1 (Certified), or one a link, unlink or
+ * correction made (All). `rules_change`: a divider.
  */
 export type CompetitionRecordsHistoryItemWire = {
   event: CompetitionEventWire;

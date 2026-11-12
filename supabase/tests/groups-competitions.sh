@@ -1474,6 +1474,8 @@ pass 'marker-write isolation, legacy fallback/import safety and populated genera
 # A #1 a link makes writes no record (R5): the records log still shows it.
 # The athlete records first; the rival's bigger set predates its link, so the
 # link takes #1; the rival's unlink then hands #1 back to the athlete.
+# GID is now the source-mode group, which only the athlete had joined.
+rpc "${RIVAL_TOKEN}" group_join "$(jq -nc --arg c "${MODE_INVITE2}" '{p_code:$c}')"; expect_ok 'records log: rival joins'
 LINK_GX="$(comparison 'Records log link' 0 e1rm)"; LT="rl-${RUN_TAG}"; LINK_AT="$(now_ms)"
 next_cuam; push "${ATHLETE_TOKEN}" 'records log: athlete best' "$(e_def "${LT}-a-def" 'Log link' "${CUAM}")" \
   "$(e_link "${LT}-a-def" "${GID}" "${LINK_GX}" "${CUAM}")" \
