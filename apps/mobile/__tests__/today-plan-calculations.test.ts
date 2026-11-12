@@ -72,10 +72,32 @@ describe('deriveRecoveryRows', () => {
     expect(rows.find((row) => row.muscleGroupId === 'chest')?.weekSets).toBe(14);
   });
 
-  it('puts the least trained over the recovery days first, then the fewest this week, then muscle order', () => {
+  it('puts muscles under their target first, then the fewest sets this week, then the fewest recent, then muscle order', () => {
     const rows = deriveRecoveryRows(daily, window, TARGETS);
-    // biceps 0 (week 6) · calves 1.5 · chest 4 (week 14) and back 4 (week 14) by order · quads 9.
-    expect(rows.map((row) => row.muscleGroupId)).toEqual(['biceps', 'calves', 'chest', 'back', 'quads']);
+    // Under 8: calves 1.5 · biceps 6. At or over: quads 9 · chest 14 and back 14 (recent 4 each) by order.
+    expect(rows.map((row) => row.muscleGroupId)).toEqual(['calves', 'biceps', 'quads', 'chest', 'back']);
+  });
+
+  it('judges each muscle against its own target', () => {
+    // Chest's 14 is under its 20; quads' 9 is over the default 8.
+    const rows = deriveRecoveryRows(daily, window, { weeklyTarget: 8, overrides: { chest: 20 } });
+    expect(rows.map((row) => row.muscleGroupId)).toEqual(['calves', 'biceps', 'chest', 'quads', 'back']);
+  });
+
+  it('counts a muscle at exactly its target as reached', () => {
+    // Biceps' 6 meets its 6, so it follows chest's 14 of 20.
+    const rows = deriveRecoveryRows(daily, window, { weeklyTarget: 8, overrides: { biceps: 6, chest: 20 } });
+    expect(rows.map((row) => row.muscleGroupId)).toEqual(['calves', 'chest', 'biceps', 'quads', 'back']);
+  });
+
+  it('breaks a tie in weekly sets by the fewest over the recovery days', () => {
+    // Both 6 this week: biceps' all on Tuesday, triceps' on Friday, a recovery day.
+    const rows = deriveRecoveryRows({
+      muscles: [muscle('triceps', 1), muscle('biceps', 2)],
+      sets: { triceps: { '2026-10-30': 6 }, biceps: { '2026-10-27': 6 } },
+      sessionDays: [],
+    }, window, TARGETS);
+    expect(rows.map((row) => row.muscleGroupId)).toEqual(['biceps', 'triceps']);
   });
 
   it('shows an untrained muscle with every day blank', () => {
@@ -83,11 +105,11 @@ describe('deriveRecoveryRows', () => {
     expect(rows).toEqual([{ muscleGroupId: 'core', name: 'Core', familyName: 'F', days: [null, null, null], today: null, weekSets: 0, target: 8 }]);
   });
 
-  it("carries today's sets so far in their own column, outside the order", () => {
-    // Today's 20 calves sets would make it the most trained; it stays second.
+  it("carries today's sets so far in their own column and counts them toward the order", () => {
+    // Today's 20 calves sets take it past its target, so it moves to the end.
     const withToday = { ...daily, sets: { ...daily.sets, calves: { ...daily.sets.calves, '2026-10-31': 20 } } };
     const rows = deriveRecoveryRows(withToday, window, TARGETS);
-    expect(rows.map((row) => row.muscleGroupId)).toEqual(['biceps', 'calves', 'chest', 'back', 'quads']);
+    expect(rows.map((row) => row.muscleGroupId)).toEqual(['biceps', 'quads', 'chest', 'back', 'calves']);
     expect(rows.find((row) => row.muscleGroupId === 'calves')?.today).toBe(20);
     expect(rows.find((row) => row.muscleGroupId === 'calves')?.days).toEqual([null, 1.5, null]);
     expect(rows.find((row) => row.muscleGroupId === 'chest')?.today).toBeNull();

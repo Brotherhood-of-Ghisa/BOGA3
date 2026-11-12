@@ -79,8 +79,8 @@ longer reach current ones. Mode changes and disabling retain overrides. Targets 
 Clearing an override restores inheritance; targets are positive
 whole numbers.
 
-History Sets target grading and Today's Plan week column use each reported
-muscle's effective target, scaled to the period.
+History Sets grading, Today's week column and Recovery order use each
+reported muscle's effective target, scaled to the period.
 
 Why: individual training goals without losing a shared fallback.
 Code: `apps/mobile/src/preferences/muscle-targets.ts`; `legacyMuscleTargets` in `apps/mobile/src/data/combined-muscles.ts`; `deriveRecoveryRows` in `apps/mobile/src/today-plan/calculations.ts`; `apps/mobile/src/sync/muscle-target-adoption.ts`.

@@ -39,7 +39,7 @@ export type RecoveryRow = {
   familyName: string;
   /** Sets on each recovery day, oldest first; null for a day without any. */
   days: (number | null)[];
-  /** Sets so far today; null for none. Not part of the row's order. */
+  /** Sets so far today; null for none. Counted in `weekSets`, and so in the order. */
   today: number | null;
   /** Sets this calendar week, today included. */
   weekSets: number;
@@ -53,9 +53,10 @@ export type RecoveryTargets = { weeklyTarget: number; overrides: Readonly<Record
 const sumDays = (byDay: Record<string, number>, keys: string[]) => sumNumbers(keys.map(key => byDay[key] ?? 0));
 
 /**
- * One row per muscle, least trained over the recovery days first (today's
- * sets so far leave the order alone, so it holds still mid-workout), then fewest
- * sets this week, then the muscles' own order.
+ * One row per muscle: those still under their weekly target first, then those
+ * at or over it. Within each, fewest sets this week first (today's included, so
+ * rows move as a workout is logged), then fewest over the recovery days, then
+ * the muscles' own order.
  */
 export const deriveRecoveryRows = (daily: MuscleDailySets, window: TodayPlanWindow, targets: RecoveryTargets): RecoveryRow[] => {
   const recoveryKeys = window.recoveryDays.map(localDateKey);
@@ -78,7 +79,9 @@ export const deriveRecoveryRows = (daily: MuscleDailySets, window: TodayPlanWind
       },
     };
   });
-  rows.sort((left, right) => left.recent - right.recent || left.row.weekSets - right.row.weekSets || left.order - right.order);
+  const reached = ({ row }: (typeof rows)[number]) => Number(row.weekSets >= row.target);
+  rows.sort((left, right) => reached(left) - reached(right) || left.row.weekSets - right.row.weekSets
+    || left.recent - right.recent || left.order - right.order);
   return rows.map(({ row }) => row);
 };
 
