@@ -150,7 +150,7 @@ PK `(owner_user_id, client_id, operation, idempotency_key)`, with
 
 ## 3. Sync v2 Topology and Layer Migration
 
-Sync v2 mirrors seventeen entities. `apps/mobile/src/sync/topo-order.ts`
+Sync v2 mirrors eighteen entities. `apps/mobile/src/sync/topo-order.ts`
 and the server pull mapping define six FK-safe layers; strict drift checks
 reject missing entities or forward references.
 
