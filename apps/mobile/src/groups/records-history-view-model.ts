@@ -45,8 +45,11 @@ function entryFor(item: CompetitionRecordsHistoryItemWire, metric: CompetitionMe
     const holder = leader?.member ?? event.member;
     const kept = previous?.member?.user_id === holder?.user_id;
     const passed = previous?.member && !kept ? passedName(previous.member) : null;
+    // On All, a #1 no record explains: linked earlier sets, or a fallback after a correction.
+    const cause = event.reason === 'link' ? 'linked sets' : event.reason === 'void' ? 'record corrected' : null;
     return { ...base, mark: 'lead', title: kept ? `${nameOf(holder)} · #1` : `${nameOf(holder)} took #1`,
-      figure: leader ? formatCompetitionHistoricalFigure(leader) : 'Score unavailable', detail: passed ?? '' };
+      figure: leader ? formatCompetitionHistoricalFigure(leader) : 'Score unavailable',
+      detail: [cause, passed].filter(Boolean).join(' · ') };
   }
   const value = event.values.find(entry => entry.role === 'record' && entry.metric === metric);
   const lead = record?.group_record_metrics.includes(metric) ?? false;
@@ -61,9 +64,10 @@ function entryFor(item: CompetitionRecordsHistoryItemWire, metric: CompetitionMe
 }
 
 /**
- * The records log, newest first: one entry per new best (All) or new #1
- * (Certified), and a divider at each rules change. Entries between two
- * dividers share one card; entries under earlier rules are marked to dim.
+ * The records log, newest first: one entry per new best (All, with the #1
+ * changes links and corrections make) or new #1 (Certified), and a divider
+ * at each rules change. Entries between two dividers share one card; entries
+ * under earlier rules are marked to dim.
  */
 export function buildRecordsLog(items: readonly CompetitionRecordsHistoryItemWire[], { metric, userId, currentRevision, dateFormat }: {
   metric: CompetitionMetric; userId: string | null; currentRevision: number; dateFormat: ExerciseDateFormat;

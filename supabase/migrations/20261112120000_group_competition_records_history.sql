@@ -3,8 +3,9 @@
 -- All sets: every new personal best on the board's metric (a `record` event
 -- listing that board), with the set as performed, the group's previous #1
 -- (the stream record's shape) and the member's own previous best on the
--- metric. Certified: the board's lead changes to a new leader (an emptied
--- board is no #1). Both include each rules change
+-- metric, plus the #1 changes no record explains (a link brought earlier sets
+-- in, or a void fell back to the next best). Certified: the board's lead
+-- changes to a new leader (an emptied board is no #1). Both include each rules change
 -- and span every rules revision, so a rules edit no longer empties the log;
 -- every figure stays as it was scored under its own revision. Voided records
 -- are left out, as is protocol-3 history (group_competition_history keeps it).
@@ -60,8 +61,8 @@ begin
           and exists(select 1 from jsonb_array_elements(coalesce(e.payload->'boards','[]'::jsonb)) b
             where jsonb_typeof(b)='object' and b->>'metric'=p_metric)
           and not exists(select 1 from app_public.group_events v where v.kind='record_voided' and v.related_event_id=e.id))
-        or (p_certified and e.kind='lead_change' and e.certified and e.metric=p_metric
-          and jsonb_typeof(e.payload->'leader')='object'))
+        or (e.kind='lead_change' and e.certified=p_certified and e.metric=p_metric
+          and jsonb_typeof(e.payload->'leader')='object' and (p_certified or e.reason in ('link','void'))))
       and (_cursor is null or e.seq<(_cursor->>'seq')::bigint)
     order by e.seq desc limit p_limit+1)
   select coalesce(jsonb_agg(app_public.group_competition_records_history_item(e,p_metric) order by p.seq desc)

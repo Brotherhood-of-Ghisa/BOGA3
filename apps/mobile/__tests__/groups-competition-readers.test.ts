@@ -344,10 +344,14 @@ describe('records history decoder', () => {
     expect(guards.isCompetitionRecordsHistoryWire(log(false, [recordItem, rulesItem,
       { ...recordItem, event: { ...event, event_id: 'old', rules_revision: 1 }, previous_best: null }]))).toBe(true);
     expect(guards.isCompetitionRecordsHistoryWire(log(true, [leadItem, rulesItem]))).toBe(true);
+    for (const reason of ['link', 'void']) {
+      expect(guards.isCompetitionRecordsHistoryWire(log(false, [{ ...leadItem, event: { ...leadItem.event, certified: false, reason } }]))).toBe(true);
+    }
   });
   it.each([
     ['a record on the Certified log', log(true, [recordItem])],
-    ['a lead change on the All log', log(false, [leadItem])],
+    ['a Certified lead change on the All log', log(false, [leadItem])],
+    ['an All lead change a record explains', log(false, [{ ...leadItem, event: { ...leadItem.event, certified: false, reason: 'record' } }])],
     ['a Certified lead change without a leader', log(true, [{ ...leadItem, event: { ...leadItem.event, values: [] } }])],
     ['a voided record', log(false, [{ ...recordItem, event: { ...event, voided: true } }])],
     ['a record without its stream record', log(false, [{ ...recordItem, record: null }])],

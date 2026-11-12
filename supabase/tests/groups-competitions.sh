@@ -326,14 +326,18 @@ records_history() {
     --argjson l "${4:-50}" --arg b "${5:-}" '{p_group_id:$g,p_group_exercise_id:$x,p_metric:$m,p_certified:$c,p_limit:$l,p_before:($b|select(.!="")//null)}')"
 }
 for metric in volume e1rm; do
+  LINK_LEADS="$(run_psql "select count(*) from app_public.group_events where group_exercise_id='${GX}' and kind='lead_change'
+    and contract_version=2 and not certified and metric='${metric}' and reason in ('link','void') and jsonb_typeof(payload->'leader')='object';")"
   records_history "${GX}" "${metric}" false; expect_ok "records history ${metric}"; assert_wire isCompetitionRecordsHistoryWire
-  check 'records log: earlier-rules records and the rules change, newest first, no kg' \
+  check 'records log: earlier-rules records, link/void #1 changes and the rules change, newest first, no kg' \
     '(.items|map(.event.sequence)) as $s | $s==($s|sort|reverse)
-     and any(.items[];.event.kind=="rules_change") and all(.items[];.event.kind=="rules_change" or .event.kind=="record")
+     and ([.items[]|select(.event.kind=="lead_change")]|length)==$links
+     and any(.items[];.event.kind=="rules_change") and all(.items[];.event.kind=="rules_change" or .event.kind=="record"
+       or (.event.kind=="lead_change" and (.event.certified|not) and (.event.reason=="link" or .event.reason=="void")))
      and ([.items[]|select(.event.kind=="record")|.event.member.user_id]|index($a)!=null and index($r)!=null)
      and all(.items[]|select(.event.kind=="record");.event.rules_revision<$rev and .record!=null)
      and all(.items[]|[.event.values[],.previous_best//empty][];.value==null or (.unit=="percent_bw" or .unit=="percent_bw_reps"))' \
-    --arg a "${ATHLETE_UID}" --arg r "${RIVAL_UID}" --argjson rev "${REVISION}"
+    --arg a "${ATHLETE_UID}" --arg r "${RIVAL_UID}" --argjson rev "${REVISION}" --argjson links "${LINK_LEADS}"
 done
 records_history "${GX}" e1rm true; expect_ok 'certified records history'; assert_wire isCompetitionRecordsHistoryWire
 check 'Certified log holds only Certified lead changes and rules changes' \

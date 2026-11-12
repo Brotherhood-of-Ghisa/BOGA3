@@ -228,7 +228,8 @@ contain no absolute volume field that could recover a redacted contribution.
 event sequence, over every protocol-4 revision (protocol-3 history stays with
 `group_competition_history`): All lists non-voided `record` events naming the
 board's metric, each with its stream record and the member's previous best on
-that metric; Certified lists Certified lead changes that have a leader. Both
+that metric, plus All lead changes a link or void made (no record explains
+them); Certified lists Certified lead changes that have a leader. Both
 include rules changes. The cursor binds group, exercise, metric and scope;
 disclosure is the stream's own helpers.
 
