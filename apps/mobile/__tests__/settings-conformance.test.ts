@@ -33,8 +33,8 @@ const NOT_SETTINGS_CONTENT = /^components\/(ui|navigation)\//;
 const VOCABULARY = new Set([
   'FormSection', 'FormError', 'SwitchRow', 'SegmentRow', 'SliderRow', 'RadioRow', 'CheckRow', 'InputRow', 'FormField',
   'ValueRow', 'ChoiceRow', 'ActionRow', 'ActionButton', 'Information', 'Notice', 'StatePanel', 'Screen', 'ScreenScroll', 'FigureText',
-  // Header chrome: a title that switches between sibling pages.
-  'HeaderTitleMenu',
+  // Header chrome: a title that switches between sibling pages, an icon action (`+`).
+  'HeaderTitleMenu', 'IconButton',
 ]);
 // Controls and tap targets that would make a row or a destination by hand.
 const RAW_REACT_NATIVE = new Set([

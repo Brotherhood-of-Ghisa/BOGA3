@@ -13,9 +13,6 @@ import {
   type MuscleReportRow,
 } from './combined-muscles.ts';
 
-/** What the interim Breakdown switch reads: no combined muscles, or exactly the Broad template. */
-export type MuscleReportPreset = 'detailed' | 'broad';
-
 /** One muscle the settings screen lists: the entries it covers and whether any still counts. */
 export type SettingsMuscle = { id: string; label: string; family: string; entryIds: string[]; tracked: boolean };
 
@@ -149,21 +146,6 @@ export const applyBroadTemplate = (setup: MuscleSetupChange): MuscleSetupChange 
     return reportGroup === row.reportGroup ? null : { reportGroup };
   }),
 });
-
-const sameDefinitions = (left: readonly CombinedMuscle[], right: readonly CombinedMuscle[]): boolean =>
-  left.length === right.length && left.every((muscle, index) =>
-    muscle.key === right[index].key && muscle.name === right[index].name && muscle.family === right[index].family);
-
-/**
- * The interim Breakdown switch's reading of a resolved setup: Detailed with no
- * members, Broad when it is what "Start from Broad" writes, else `custom`.
- * Tracking never changes it.
- */
-export const deriveMuscleReportPreset = (setup: MuscleSetupChange): MuscleReportPreset | 'custom' => {
-  if (setup.rows.every((row) => row.reportGroup === null)) return 'detailed';
-  const broad = setup.rows.every((row) => row.reportGroup === broadTemplateKeyOf(row.id));
-  return broad && sameDefinitions(setup.definitions, BROAD_COMBINED_MUSCLES) ? 'broad' : 'custom';
-};
 
 /** The user's muscles in display order, in their family sections. `stored` as `buildMuscleReportAssignment` takes it. */
 export const buildSettingsMuscleSections = (

@@ -8,7 +8,7 @@ appId: com.dinoderek.mobile
 #      bootstrapper (seed → push → pull) and lifts the first-sync gate on its
 #      own;
 #   2. a reading entered on the device, and the muscle setup chosen in
-#      Settings → Progress → Muscles (Broad, Calves switched off), are pushed:
+#      Settings → Muscles (Start from Broad, Calves switched Off), are pushed:
 #      Settings' Pending changes reaches 0;
 #   3. after a full wipe (clearState) and a fresh sign-in, the bootstrapper
 #      pulls instead of re-seeding: the reading is back, and the account still
@@ -19,7 +19,7 @@ appId: com.dinoderek.mobile
 #      on-device expo-sqlite against a real server, and the root stack's
 #      access switch from the gate to the app;
 #   2. a write on the device reaching the server through the scheduler's own
-#      cycle (nothing taps Refresh), from a real sheet and switch;
+#      cycle (nothing taps Refresh), from a real sheet and settings rows;
 #   3. clearState wipes SQLite; clearKeychain drops the SecureStore session
 #      to simulate a fresh device. Reinstall alone preserves iOS Keychain data.
 # Jest counterpart: __tests__/sync/cycle-round-trip.test.ts (live server:
@@ -157,44 +157,32 @@ appId: com.dinoderek.mobile
     notVisible: { id: "weight-entry-sheet" }
     timeout: 15000
 
-# Detailed enablement plus Broad reporting: writes remain synced muscle rows.
-- openLink: "boga3://settings-muscles"
+# Calves and Tibialis Off, then Start from Broad: writes remain synced muscle
+# rows and the synced combined-muscle definitions.
+- openLink: "boga3://settings-muscle?id=calves"
 - extendedWaitUntil:
-    visible: { id: "settings-muscles-screen" }
+    visible: { id: "settings-muscle-off" }
     timeout: 15000
-- tapOn: { id: "settings-muscle-preset-detailed" }
+- tapOn: { id: "settings-muscle-off" }
 - extendedWaitUntil:
-    visible: { id: "settings-muscle-preset-detailed", selected: true }
+    visible: { id: "settings-muscle-off", checked: true }
     timeout: 15000
-- tapOn: { id: "settings-enabled-muscles-row" }
+- openLink: "boga3://settings-muscle?id=tibialis_anterior"
 - extendedWaitUntil:
-    visible: { id: "settings-enabled-muscles-screen" }
+    visible: { id: "settings-muscle-off" }
     timeout: 15000
-# Final two-row card: Calves is fully visible clear of native chrome at the
-# scroll end, but cannot reach the centre (the end-of-content exception).
-- scrollUntilVisible:
-    element: { id: "settings-track-calves" }
-    direction: DOWN
-    timeout: 15000
-- tapOn: { id: "settings-track-calves" }
+- tapOn: { id: "settings-muscle-off" }
 - extendedWaitUntil:
-    visible: { id: "settings-track-calves", checked: false }
+    visible: { id: "settings-muscle-off", checked: true }
     timeout: 15000
-# Last row: fully visible clear of chrome, but cannot reach viewport centre.
-- scrollUntilVisible:
-    element: { id: "settings-track-tibialis_anterior" }
-    direction: DOWN
-- tapOn: { id: "settings-track-tibialis_anterior" }
+- openLink: "boga3://settings-combined-muscles"
 - extendedWaitUntil:
-    visible: { id: "settings-track-tibialis_anterior", checked: false }
+    visible: { id: "settings-combined-muscles-broad" }
     timeout: 15000
-- tapOn: "Back"
+- tapOn: { id: "settings-combined-muscles-broad" }
+- tapOn: "Start from Broad"
 - extendedWaitUntil:
-    visible: { id: "settings-enabled-muscles-row" }
-    timeout: 15000
-- tapOn: { id: "settings-muscle-preset-broad" }
-- extendedWaitUntil:
-    visible: { id: "settings-muscle-preset-broad", selected: true }
+    visible: { id: "settings-combined-cm_chest" }
     timeout: 15000
 - takeScreenshot: "18a-first-run-roundtrip-muscles-broad"
 
@@ -286,28 +274,25 @@ appId: com.dinoderek.mobile
     visible: { id: "body-weight-reading-.*", text: "Edit 80, .*" }
     timeout: 30000
 - takeScreenshot: "19-first-run-roundtrip-reading-restored"
-# Restored reporting is Broad; inspect preserved entry enablement on its page.
-- openLink: "boga3://settings-muscles"
+# Restored reporting is Broad's combined muscles; Calves and Tibialis stay Off.
+- openLink: "boga3://settings-combined-muscles"
 - extendedWaitUntil:
-    visible: { id: "settings-muscle-preset-broad", selected: true }
+    visible: { id: "settings-combined-cm_chest" }
     timeout: 15000
-- assertVisible: { id: "settings-enabled-muscles-row" }
-- openLink: "boga3://settings-enabled-muscles"
+- openLink: "boga3://settings-muscle-list"
 - extendedWaitUntil:
-    visible: { id: "settings-enabled-muscles-screen" }
+    visible: { id: "settings-muscle-list-screen" }
     timeout: 15000
-# Final two-row card: Calves is fully visible clear of native chrome at the
-# scroll end, but cannot reach the centre (the end-of-content exception).
+# The last family's rows sit at the scroll end and cannot reach the centre.
 - scrollUntilVisible:
-    element: { id: "settings-track-calves" }
+    element: { id: "settings-muscle-calves" }
     direction: DOWN
     timeout: 15000
-- assertVisible: { id: "settings-track-calves", checked: false }
-# Last row; fully visible is sufficient and clear of the native header.
+- assertVisible: { id: "settings-muscle-calves", text: "Calves, Off" }
 - scrollUntilVisible:
-    element: { id: "settings-track-tibialis_anterior" }
+    element: { id: "settings-muscle-tibialis_anterior" }
     direction: DOWN
-- assertVisible: { id: "settings-track-tibialis_anterior", checked: false }
+- assertVisible: { id: "settings-muscle-tibialis_anterior", text: "Tibialis Anterior, Off" }
 - takeScreenshot: "20-first-run-roundtrip-muscles-restored"
 
 # === 4. Native destructive merge and stale-edit recovery ===

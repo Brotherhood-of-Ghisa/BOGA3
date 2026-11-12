@@ -16,7 +16,10 @@ export const SETTINGS_SUB_PAGES = {
   progress: '/settings-progress',
   muscles: '/settings-muscles',
   muscleTargets: '/settings-muscle-targets',
-  enabledMuscles: '/settings-enabled-muscles',
+  muscleList: '/settings-muscle-list',
+  muscle: '/settings-muscle',
+  combinedMuscles: '/settings-combined-muscles',
+  combinedMuscle: '/settings-combined-muscle',
   effort: '/settings-effort',
   appearance: '/settings-appearance',
   notifications: '/settings-notifications',
@@ -24,6 +27,26 @@ export const SETTINGS_SUB_PAGES = {
   dataSync: '/settings-data-sync',
   reviewChanges: '/settings-review-changes',
 } as const;
+
+/** One muscle's page in Settings → Muscles: Off, On or a combined muscle ([[muscle.report-groups]]). */
+export const settingsMuscleHref = (muscleId: string): Href =>
+  `${SETTINGS_SUB_PAGES.muscle}?id=${encodeURIComponent(muscleId)}` as Href;
+
+/**
+ * The combined-muscle editor: an existing one by `key`, or a new one, its
+ * family and first member chosen already when opened from a muscle's page.
+ */
+export const settingsCombinedMuscleHref = (
+  target: { key: string } | { family?: string; memberId?: string } = {},
+): Href => {
+  const params = 'key' in target
+    ? [`key=${encodeURIComponent(target.key)}`]
+    : [
+      target.family ? `family=${encodeURIComponent(target.family)}` : null,
+      target.memberId ? `member=${encodeURIComponent(target.memberId)}` : null,
+    ].filter(Boolean);
+  return `${SETTINGS_SUB_PAGES.combinedMuscle}${params.length > 0 ? `?${params.join('&')}` : ''}` as Href;
+};
 
 /** The Link screen for one of my exercises (E0.3). */
 export const exerciseLinkHref = (exerciseDefinitionId: string): Href =>

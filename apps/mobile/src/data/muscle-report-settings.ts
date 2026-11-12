@@ -38,9 +38,7 @@ import { USER_SETTINGS_ID } from './user-settings';
 export {
   buildSettingsMuscleSections,
   CombinedMuscleError,
-  deriveMuscleReportPreset,
   type CombinedMuscleDraft,
-  type MuscleReportPreset,
   type MuscleSetupChange,
   type MuscleState,
   type SettingsMuscle,

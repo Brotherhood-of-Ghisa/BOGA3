@@ -86,7 +86,11 @@ export function RootStack() {
         <Stack.Screen name="settings-progress" options={{ title: 'Progress' }} />
         <Stack.Screen name="settings-muscles" options={{ title: 'Muscles' }} />
         <Stack.Screen name="settings-muscle-targets" options={{ title: 'Per muscle targets' }} />
-        <Stack.Screen name="settings-enabled-muscles" options={{ title: 'Enabled muscles' }} />
+        <Stack.Screen name="settings-muscle-list" options={{ title: 'Muscles' }} />
+        {/* The muscle's page and the editor replace these titles with a name once loaded. */}
+        <Stack.Screen name="settings-muscle" options={{ title: 'Muscle' }} />
+        <Stack.Screen name="settings-combined-muscles" options={{ title: 'Combined muscles' }} />
+        <Stack.Screen name="settings-combined-muscle" options={{ title: 'Combined muscle' }} />
         <Stack.Screen name="settings-effort" options={{ title: 'Effort' }} />
         <Stack.Screen name="settings-appearance" options={{ title: 'Appearance' }} />
         <Stack.Screen name="settings-notifications" options={{ title: 'Notifications' }} />
