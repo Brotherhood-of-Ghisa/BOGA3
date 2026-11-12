@@ -8,7 +8,6 @@ import {
   buildMuscleReportAssignment,
   isCombinedMuscleKey,
   isCombinedMuscleName,
-  isTrackedRow,
   type CombinedMuscle,
   type CombinedMuscleSetup,
   type MuscleReportRow,
@@ -139,13 +138,14 @@ export const clearCombinedMuscles = (setup: MuscleSetupChange): MuscleSetupChang
 
 /**
  * "Start from Broad": replaces every combined muscle with the Broad template's
- * 11. Tracked catalogue entries join their template muscle; Off entries and
- * entries in no template muscle stay out.
+ * 11. Each catalogue entry joins its template muscle with its tracking
+ * unchanged, so an Off entry switched back on rejoins it; entries in no
+ * template muscle stay their own.
  */
 export const applyBroadTemplate = (setup: MuscleSetupChange): MuscleSetupChange => ({
   definitions: BROAD_COMBINED_MUSCLES.map((muscle) => ({ ...muscle })),
   rows: withRows(setup, (row) => {
-    const reportGroup = isTrackedRow(row) ? broadTemplateKeyOf(row.id) : null;
+    const reportGroup = broadTemplateKeyOf(row.id);
     return reportGroup === row.reportGroup ? null : { reportGroup };
   }),
 });
@@ -156,15 +156,12 @@ const sameDefinitions = (left: readonly CombinedMuscle[], right: readonly Combin
 
 /**
  * The interim Breakdown switch's reading of a resolved setup: Detailed with no
- * members, Broad when it is what "Start from Broad" writes (an Off entry may
- * keep its template key), else `custom`.
+ * members, Broad when it is what "Start from Broad" writes, else `custom`.
+ * Tracking never changes it.
  */
 export const deriveMuscleReportPreset = (setup: MuscleSetupChange): MuscleReportPreset | 'custom' => {
   if (setup.rows.every((row) => row.reportGroup === null)) return 'detailed';
-  const broad = setup.rows.every((row) => {
-    const key = broadTemplateKeyOf(row.id);
-    return row.reportGroup === key || (row.reportGroup === null && (key === null || !isTrackedRow(row)));
-  });
+  const broad = setup.rows.every((row) => row.reportGroup === broadTemplateKeyOf(row.id));
   return broad && sameDefinitions(setup.definitions, BROAD_COMBINED_MUSCLES) ? 'broad' : 'custom';
 };
 

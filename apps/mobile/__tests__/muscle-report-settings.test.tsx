@@ -79,14 +79,26 @@ describe('Start from Broad and Detailed', () => {
     expect(invalidateExerciseCatalogCache).toHaveBeenCalledTimes(1);
   });
 
-  it('replaces every other combined muscle, and leaves Off entries out', async () => {
+  it('replaces every other combined muscle, keeping each entry\'s tracking so an Off one rejoins when switched on', async () => {
     const key = await createCombinedMuscle({ name: 'Arms', family: 'Arms', memberIds: ['biceps', 'triceps', 'forearms_grip'] });
     await setMuscleState(['calves'], { kind: 'off' });
     await applyBroadTemplate();
     expect(definitions().map((muscle: { key: string }) => muscle.key)).not.toContain(key);
     expect(stored().get('forearms_grip')).toMatchObject({ reportGroup: null, tracked: 1 });
-    expect(stored().get('calves')).toMatchObject({ reportGroup: null, tracked: 0 });
-    expect(stored().get('tibialis_anterior')).toMatchObject({ reportGroup: 'cm_calves', tracked: 1 });
+    expect(stored().get('calves')).toMatchObject({ reportGroup: 'cm_calves', tracked: 0 });
+    await setMuscleTracked(['calves'], true);
+    expect(stored().get('calves')).toMatchObject({ reportGroup: 'cm_calves', tracked: 1 });
+    expect(deriveMuscleReportPreset(await readMuscleSetup())).toBe('broad');
+  });
+
+  it('writes the definitions only when they change, whatever spacing the stored text has', async () => {
+    await applyBroadTemplate();
+    // As a pull stores the server's jsonb text.
+    localDatabase().update(userSettings).set({ combinedMuscles: JSON.stringify(BROAD_COMBINED_MUSCLES, null, 1) }).run();
+    cleanAll();
+    await setMuscleTracked(['calves'], false);
+    expect(settings()?.localDirty).toBe(false);
+    expect(stored().get('calves')?.localDirty).toBe(true);
   });
 
   it('clears every combined muscle for Detailed, keeping tracking', async () => {

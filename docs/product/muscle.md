@@ -56,7 +56,7 @@ muscle**, and On or Off, per account, synced. A combined muscle has a name and o
 family; only that family's muscles join, one is enough, and a member of another
 family reads as its own muscle. It reports under its own key, never an entry's
 id. Detailed has none; "Start from Broad" replaces them with the Broad
-template's 11, Off muscles left out. Deleting one returns its members to their
+template's 11, tracking unchanged. Deleting one returns its members to their
 own muscles. A Broad
 choice made before combined muscles reads as the template until a device stores
 it, once; older builds then show those members as their own. `Group by muscle

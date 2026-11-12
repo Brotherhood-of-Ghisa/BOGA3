@@ -143,7 +143,8 @@ const writeSetupChange = (tx: Tx, change: (setup: MuscleSetupChange) => MuscleSe
     count += 1;
   }
   const combinedMuscles = JSON.stringify(next.definitions);
-  if (settings?.combinedMuscles !== combinedMuscles) {
+  // Compared parsed: a pulled row holds the server's jsonb text, spaced differently.
+  if (storedDefinitions === null || JSON.stringify(storedDefinitions) !== combinedMuscles) {
     const legacyTargets = settings?.muscleTargets == null ? settings?.muscleTargetOverrides ?? null : null;
     writeSettingsColumns(tx, {
       combinedMuscles,
