@@ -56,6 +56,7 @@ import {
   type QuarantineWriteResult,
 } from '@/src/sync/quarantine';
 import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
+import { recordLayerTypes, resetLayersMissingTypes } from '@/src/sync/pull-layer-types';
 
 // -----------------------------------------------------------------------------
 // Tunables
@@ -1500,7 +1501,7 @@ export const applyPullPage = (
 // Pull cursor persistence
 // -----------------------------------------------------------------------------
 
-const applyMergeRows = (tx: Transaction, rows: MergeWireEntity[], force = false): number => {
+export const applyMergeRows = (tx: Transaction, rows: MergeWireEntity[], force = false): number => {
   if (rows.some(row => !ENTITY_ORDER.includes(row.type as EntityTableName))) {
     throw new Error('Invalid exercise history entity.');
   }
@@ -1561,6 +1562,7 @@ export const writeCursorAndPendingMoves = (
 ): void => {
   const state = readRawCursorState(tx);
   state[String(layer)] = cursor;
+  recordLayerTypes(state, layer);
   if (pendingMoves !== undefined) {
     if (pendingMoves.length > 0) {
       state.provisional_moves = pendingMoves;
@@ -1568,6 +1570,10 @@ export const writeCursorAndPendingMoves = (
       delete state.provisional_moves;
     }
   }
+  writeRawCursorState(tx, state);
+};
+
+const writeRawCursorState = (tx: Transaction, state: Record<string, unknown>): void => {
   tx.insert(schema.syncRuntimeState)
     .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: state as never })
     .onConflictDoUpdate({
@@ -1581,14 +1587,40 @@ const clearPersistedPendingMoves = (tx: Transaction): void => {
   const state = readRawCursorState(tx);
   if ('provisional_moves' in state) {
     delete state.provisional_moves;
-    tx.insert(schema.syncRuntimeState)
-      .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: state as never })
-      .onConflictDoUpdate({
-        target: schema.syncRuntimeState.id,
-        set: { pullCursor: state as never },
-      })
-      .run();
+    writeRawCursorState(tx, state);
   }
+};
+
+const logPullLayersReset = (layers: number[]): void => {
+  try {
+    void logEvent({
+      level: 'info',
+      source: 'database',
+      event: 'sync.pull_layers_reset',
+      message: 'Pull restarted for layers whose known entity types changed since their cursor was stored.',
+      context: { operation: 'pull_layer_types_reset', layers },
+    }).catch(() => undefined);
+  } catch {
+    // Logging must never fail the cycle.
+  }
+};
+
+/**
+ * Restarts the pull of every layer whose stored cursor was advanced by a build
+ * that did not apply one of this build's entity types there, so rows of a type
+ * an older build skipped arrive now. Other layers keep their cursors; rows, dirty
+ * bits and the bootstrap flag are untouched. Returns the layers reset.
+ */
+export const resetPullCursorsForNewLayerTypes = (database: LocalDatabase): number[] => {
+  const reset = database.transaction((tx) => {
+    const transaction = tx as Transaction;
+    const state = readRawCursorState(transaction);
+    const layers = resetLayersMissingTypes(state);
+    if (layers.length > 0) writeRawCursorState(transaction, state);
+    return layers;
+  });
+  if (reset.length > 0) logPullLayersReset(reset);
+  return reset;
 };
 
 // -----------------------------------------------------------------------------
@@ -2115,6 +2147,11 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
     // it has completed for this device-account. Runs before the convergence
     // loop so a fresh account has its seeded rows ready to push in the same call.
     await runBootstrapper(database);
+
+    // Before the first pull leg: re-pull any layer on which this build applies
+    // a type the build that advanced its cursor did not. After the bootstrapper,
+    // whose from-scratch pull records this build's lists itself.
+    if (userId) resetPullCursorsForNewLayerTypes(database);
 
     // Apply any pending catalog-bundle migrations, then bring the applied-
     // generation marker up to the current generation. Runs after the

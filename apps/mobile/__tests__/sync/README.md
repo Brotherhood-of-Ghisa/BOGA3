@@ -15,7 +15,9 @@
   - the full sync cycle converging local and server state over a real
     push → server-side LWW → pull → local LWW loop,
   - per-layer cursor protocol (snapshot pull, paginated drain, layer→type
-    partition, tombstones, empty-page echo, same-ms tiebreak, limit/layer bounds),
+    partition, tombstones, empty-page echo, same-ms tiebreak, limit/layer bounds,
+    unknown entity types skipped with the cursor advancing, and a layer
+    re-pulled once when the build's types for it change),
   - dirty-bit ordering and idempotency behavior (v2 has no outbox),
   - already-logged-in journey and logged-out-then-login journey both converging,
   - auth missing/expired (AUTH_REQUIRED): unauthenticated cycle is a clean no-op,
@@ -70,6 +72,7 @@
   `apps/mobile/__tests__/sync-cycle-*.test.ts` family
   (`-convergence`, `-pull`, `-push`, `-race`, `-request-timeout`, `-wire`),
   `sync-cycle-push-preflight.test.ts`, `sync-cycle-quarantine.test.ts`,
+  `sync-pull-layer-types.test.ts`,
   `sync-bootstrapper.test.ts`, `sync-account-ownership.test.ts`,
   `local-wipe.test.ts`, `sync-status-composer.test.ts`,
   `sync-gate-decision.test.ts`, `settings-profile-navigation.test.tsx`, and the
