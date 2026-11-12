@@ -286,11 +286,11 @@ invented history. Started/Ended use stored boundaries, finals their publication
 time. CoW keys are twenty-digit padded ledger sequences, preserving causal
 order inside a display millisecond under the existing SQL/client sort.
 
-The app opts into `group_competition_stream_v4` (v3 plus each record's #1
-boards, `groups-contract.md`); older readers stay unchanged.
+The app opts into `group_competition_stream_v5` (v3 plus each record's #1
+boards and each withdrawal's record, `groups-contract.md`); older readers stay unchanged.
 Its opaque cursor has a distinct binding. The new page projects final winners
 through the existing CoW reader, checking current disclosure every time.
-Stream cache keys add a reader suffix (`group-records-v1`); nested results observe current policy
+Stream cache keys add a reader suffix (`withdrawn-records-v1`); nested results observe current policy
 and participate in account-wide projection retirement. Cards link the exact
 challenge, including cancelled definitions, rather than the current summary.
 

@@ -374,7 +374,7 @@ rpc_display "${OWNER_TOKEN}" group_competition_board "$(jq -nc --arg g "${GID}" 
   '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"volume",p_certified:false}')"; expect_ok 'board display'; assert_wire isCompetitionBoardWire
 check 'board detail uses the same normalized set display' \
   'all(.entries[];.performance.normalized_metrics.added_load_percent_bw>0 and (.performance|has("weight_value")|not))'
-rpc_display "${OWNER_TOKEN}" group_competition_stream_v4 "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"; expect_ok 'stream display'; assert_wire isCompetitionStreamWire
+rpc_display "${OWNER_TOKEN}" group_competition_stream_v5 "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"; expect_ok 'stream display'; assert_wire isCompetitionStreamWire
 check 'stream record projections contain no private absolute inputs' \
   '([paths|select(.[-1]|IN("body_weight_kg","body_weight_measurement_id","reading_pin","fingerprint"))]|length==0)'
 rpc_display "${OUTSIDER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
@@ -439,9 +439,9 @@ rpc "${OWNER_TOKEN}" group_competition_stream "$(jq -nc --arg g "${GID}" '{p_gro
 expect_ok 'stream with shared exercise'; assert_wire isCompetitionStreamWire
 check 'stream contains shared exercise item' 'any(.items[];.kind=="shared_exercise" and .id==$id and .exercise.name=="Shared Paused Bench")' --arg id "${SHARED_EX_ID}"
 
-rpc_display "${OWNER_TOKEN}" group_competition_stream_v4 "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"
-expect_ok 'stream v4 with shared exercise'; assert_wire isCompetitionStreamWire
-check 'stream v4 contains shared exercise item' 'any(.items[];.kind=="shared_exercise" and .id==$id and .exercise.name=="Shared Paused Bench")' --arg id "${SHARED_EX_ID}"
+rpc_display "${OWNER_TOKEN}" group_competition_stream_v5 "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"
+expect_ok 'stream v5 with shared exercise'; assert_wire isCompetitionStreamWire
+check 'stream v5 contains shared exercise item' 'any(.items[];.kind=="shared_exercise" and .id==$id and .exercise.name=="Shared Paused Bench")' --arg id "${SHARED_EX_ID}"
 
 rpc "${OWNER_TOKEN}" group_shared_exercise_delete "$(jq -nc --arg g "${GID}" --arg s "${SHARED_EX_ID}" '{p_group_id:$g,p_shared_exercise_id:$s}')"
 expect_ok 'delete shared exercise'; assert_wire isGroupSharedExerciseDeleteWire

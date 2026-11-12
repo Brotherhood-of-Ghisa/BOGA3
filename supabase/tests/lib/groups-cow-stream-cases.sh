@@ -42,6 +42,15 @@ run_cow_stream_management_cases() {
   expect_error AUTH_REQUIRED 'anonymous v4 stream'
   rpc "${OUTSIDER_TOKEN}" group_competition_stream_v4 "$(jq -nc --arg g "${group}" '{p_group_id:$g}')"
   expect_error NOT_FOUND 'outsider v4 stream'
+  # v5 is v4 with withdrawn records: v4's (so v3's) cursors and access.
+  rpc "${OWNER_TOKEN}" group_competition_stream_v5 "$(jq -nc --arg g "${group}" '{p_group_id:$g,p_limit:1}')"
+  expect_ok 'v5 first page'; cursor="$(jq -r '.next_cursor' <<<"${BODY}")"
+  rpc "${OWNER_TOKEN}" group_competition_stream_v5 "$(jq -nc --arg g "${group}" --arg c "${cursor}" '{p_group_id:$g,p_before:$c}')"
+  expect_ok 'v5 pages with its own cursor'
+  rpc "${ANON_KEY}" group_competition_stream_v5 "$(jq -nc --arg g "${group}" '{p_group_id:$g}')"
+  expect_error AUTH_REQUIRED 'anonymous v5 stream'
+  rpc "${OUTSIDER_TOKEN}" group_competition_stream_v5 "$(jq -nc --arg g "${group}" '{p_group_id:$g}')"
+  expect_error NOT_FOUND 'outsider v5 stream'
   rpc "${ANON_KEY}" group_competition_stream_v3 "$(jq -nc --arg g "${group}" '{p_group_id:$g}')"
   expect_error AUTH_REQUIRED 'anonymous CoW stream'
   token="$(mint_token "${OWNER_TOKEN}" cow-stream)"
@@ -71,7 +80,7 @@ run_cow_stream_final_cases() {
     and e.kind='cow' and e.payload->>'event' in ('results','unavailable');")" == 0 ]] || fail 'uncertainty emitted a terminal event'
   items='[]'
   while true; do
-    rpc "${OWNER_TOKEN}" group_competition_stream_v4 "$(jq -nc --arg g "${group}" --arg b "${before}" '{p_group_id:$g,p_limit:50,p_before:(if $b=="" then null else $b end)}')"
+    rpc "${OWNER_TOKEN}" group_competition_stream_v5 "$(jq -nc --arg g "${group}" --arg b "${before}" '{p_group_id:$g,p_limit:50,p_before:(if $b=="" then null else $b end)}')"
     expect_ok 'final CoW Stream'; page="${BODY}"
     node_guard="$(printf '%s' "${BODY}" | node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e '
       import {isCompetitionStreamWire} from "./apps/mobile/src/groups/competition-reader-guards.ts";
