@@ -270,7 +270,7 @@ describe('Today: the Plan page over real data', () => {
     expect(within(text('today-plan-week-card')).getByText('Plan')).toBeTruthy();
   });
 
-  it("shows each muscle's sets on the last three days, today and this week against the target, least trained first", async () => {
+  it("shows each muscle's sets on the last three days, today and this week against the target, under target first", async () => {
     await bootLocalApp();
     // Monday is this week but no recovery day; Thursday and Friday are; Saturday is today.
     await logSession('mon', local(2026, 10, 26, 9), [{ ...BENCH, count: 4 }]);
