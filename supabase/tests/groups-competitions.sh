@@ -1471,5 +1471,34 @@ expect_sql 'populated migration preserves every old score/certification field' "
   from mode_migration_audit; rollback;" t
 pass 'marker-write isolation, legacy fallback/import safety and populated generation-zero migration'
 
+# A #1 a link makes writes no record (R5): the records log still shows it.
+# The athlete records first; the rival's bigger set predates its link, so the
+# link takes #1; the rival's unlink then hands #1 back to the athlete.
+LINK_GX="$(comparison 'Records log link' 0 e1rm)"; LT="rl-${RUN_TAG}"; LINK_AT="$(now_ms)"
+next_cuam; push "${ATHLETE_TOKEN}" 'records log: athlete best' "$(e_def "${LT}-a-def" 'Log link' "${CUAM}")" \
+  "$(e_link "${LT}-a-def" "${GID}" "${LINK_GX}" "${CUAM}")" \
+  "$(e_session "${LT}-a" "${LINK_AT}" completed "$((LINK_AT+30000))" 30 null "${CUAM}")" \
+  "$(e_se "${LT}-a-se" "${LT}-a" "${LT}-a-def" 0 'Log link' "${CUAM}")" \
+  "$(e_set "${LT}-a-set" "${LT}-a-se" 0 50 5 '' "${CUAM}" null)"
+next_cuam; push "${RIVAL_TOKEN}" 'records log: rival set before its link' "$(e_def "${LT}-r-def" 'Log link' "${CUAM}")" \
+  "$(e_session "${LT}-r" "${LINK_AT}" completed "$((LINK_AT+30000))" 30 null "${CUAM}")" \
+  "$(e_se "${LT}-r-se" "${LT}-r" "${LT}-r-def" 0 'Log link' "${CUAM}")" \
+  "$(e_set "${LT}-r-set" "${LT}-r-se" 0 80 5 '' "${CUAM}" null)"
+drain 'records log: sets'
+next_cuam; push "${RIVAL_TOKEN}" 'records log: rival links' "$(e_link "${LT}-r-def" "${GID}" "${LINK_GX}" "${CUAM}")"
+drain 'records log: link'
+records_history "${LINK_GX}" e1rm false; expect_ok 'records log after a link'; assert_wire isCompetitionRecordsHistoryWire
+check 'a link #1 is listed with the linking member as holder' \
+  'any(.items[];.event.kind=="lead_change" and .event.reason=="link" and .event.member.user_id==$r
+     and any(.event.values[];.role=="leader" and .member.user_id==$r))
+   and any(.items[];.event.kind=="record" and .event.member.user_id==$a)' --arg a "${ATHLETE_UID}" --arg r "${RIVAL_UID}"
+next_cuam; push "${RIVAL_TOKEN}" 'records log: rival unlinks' "$(e_link "${LT}-r-def" "${GID}" "${LINK_GX}" "${CUAM}" "${CUAM}")"
+drain 'records log: unlink'
+records_history "${LINK_GX}" e1rm false; expect_ok 'records log after an unlink'; assert_wire isCompetitionRecordsHistoryWire
+check 'an unlink hands #1 back: the unlinking member acts, the other member leads' \
+  '.items[0].event.kind=="lead_change" and .items[0].event.reason=="link" and .items[0].event.member.user_id==$r
+   and any(.items[0].event.values[];.role=="leader" and .member.user_id==$a)' --arg a "${ATHLETE_UID}" --arg r "${RIVAL_UID}"
+pass 'records log lists the #1 changes links and unlinks make'
+
 COMPLETED=1
 pass "group competition vectors passed (run ${RUN_TAG})"

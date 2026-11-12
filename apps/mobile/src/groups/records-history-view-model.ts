@@ -30,6 +30,24 @@ function delta(current: CompetitionHistoryValueWire | undefined, previous: Compe
   return `+${formatCompetitionFigure(now - before, current.unit)} on best`;
 }
 
+/**
+ * Why an All board's #1 moved when no record explains it. `link` is the
+ * publisher's reason for a link, an unlink and a retarget alike: the leader
+ * linking passes the old holder; anyone else's unlink, and a corrected
+ * record (`void`), only hand #1 on.
+ */
+function allBoardLeadChange({ reason, actor, holder, previous, kept, nameOf, passedName }: {
+  reason: string | null; actor: Member; holder: Member; previous: Member; kept: boolean;
+  nameOf: (member: Member) => string; passedName: (member: Member) => string;
+}): (string | null)[] {
+  if (reason === 'void') return ['record corrected'];
+  if (actor && actor.user_id !== holder?.user_id) {
+    const name = nameOf(actor);
+    return [`${name === 'You' ? 'you' : name} unlinked`];
+  }
+  return ['linked sets', previous && !kept ? passedName(previous) : null];
+}
+
 function entryFor(item: CompetitionRecordsHistoryItemWire, metric: CompetitionMetric, userId: string | null,
   currentRevision: number, dateFormat: ExerciseDateFormat): Omit<RecordsLogEntry, 'index' | 'count'> {
   const { event, record } = item;
@@ -44,12 +62,11 @@ function entryFor(item: CompetitionRecordsHistoryItemWire, metric: CompetitionMe
     const previous = event.values.find(value => value.role === 'previous');
     const holder = leader?.member ?? event.member;
     const kept = previous?.member?.user_id === holder?.user_id;
-    const passed = previous?.member && !kept ? passedName(previous.member) : null;
-    // On All, a #1 no record explains: linked earlier sets, or a fallback after a correction.
-    const cause = event.reason === 'link' ? 'linked sets' : event.reason === 'void' ? 'record corrected' : null;
+    const detail = event.certified ? [previous?.member && !kept ? passedName(previous.member) : null]
+      : allBoardLeadChange({ reason: event.reason, actor: event.member, holder, previous: previous?.member, kept, nameOf, passedName });
     return { ...base, mark: 'lead', title: kept ? `${nameOf(holder)} · #1` : `${nameOf(holder)} took #1`,
       figure: leader ? formatCompetitionHistoricalFigure(leader) : 'Score unavailable',
-      detail: [cause, passed].filter(Boolean).join(' · ') };
+      detail: detail.filter(Boolean).join(' · ') };
   }
   const value = event.values.find(entry => entry.role === 'record' && entry.metric === metric);
   const lead = record?.group_record_metrics.includes(metric) ?? false;

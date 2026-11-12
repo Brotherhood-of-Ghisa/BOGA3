@@ -42,11 +42,18 @@ describe('records log', () => {
       values: [kg('leader', 130, sam), kg('previous', 125, sam)] }) };
     expect(entries([kept])[0]).toMatchObject({ title: 'Sam · #1', detail: '' });
   });
-  it('an All #1 from linked sets or a corrected record says so', () => {
-    const lead = (reason: string) => ({ event: event({ kind: 'lead_change', certified: false, reason, member: sam,
-      values: [kg('leader', 130, sam), kg('previous', 120, me)] }), record: null, previous_best: null });
-    expect(entries([lead('link')])[0]).toMatchObject({ mark: 'lead', title: 'Sam took #1', detail: 'linked sets · passed you' });
-    expect(entries([lead('void')])[0]).toMatchObject({ title: 'Sam took #1', detail: 'record corrected · passed you' });
+  it('an All #1 no record explains names its cause: a link passes, an unlink or correction only hands on', () => {
+    const lead = (reason: string, actor: typeof me) => ({ event: event({ kind: 'lead_change', certified: false, reason, member: actor,
+      values: [kg('leader', 130, sam), kg('previous', 140, me)] }), record: null, previous_best: null });
+    expect(entries([lead('link', sam)])[0]).toMatchObject({ mark: 'lead', title: 'Sam took #1', detail: 'linked sets · passed you' });
+    expect(entries([lead('link', me)])[0]).toMatchObject({ title: 'Sam took #1', detail: 'you unlinked' });
+    expect(entries([{ ...lead('link', { user_id: 'kim', username: 'Kim' }) }])[0].detail).toBe('Kim unlinked');
+    expect(entries([lead('void', me)])[0]).toMatchObject({ title: 'Sam took #1', detail: 'record corrected' });
+  });
+  it('a Certified #1 never names an All cause', () => {
+    const lead = { event: event({ kind: 'lead_change', certified: true, reason: 'link', member: me,
+      values: [kg('leader', 130, sam), kg('previous', 120, me)] }), record: null, previous_best: null };
+    expect(entries([lead])[0].detail).toBe('passed you');
   });
   it('splits entries into one card per run between rules changes, dimming earlier rules', () => {
     const rules = { event: event({ kind: 'rules_change', event_id: 'rc', values: [], sort_at_ms: Date.UTC(2026, 10, 3) }), record: null, previous_best: null };
