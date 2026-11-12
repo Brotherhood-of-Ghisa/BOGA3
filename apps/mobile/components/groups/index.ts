@@ -3,7 +3,6 @@ export { FriendSessionContent } from './friend-session-content';
 export { GroupSessionHeaderTitle } from './group-session-header-title';
 export { GroupSessionRecordsCard } from './group-session-records-card';
 export { GroupActionSheet, type GroupActionSheetItem } from './group-action-sheet';
-export { GroupBoardHistoryItem } from './group-board-history-item';
 export { GroupBoardRow } from './group-board-row';
 export { GroupCertificationStatus } from './certification-status';
 export { GroupExercisePickSheet, type GroupExercisePickTarget } from './group-exercise-pick-sheet';

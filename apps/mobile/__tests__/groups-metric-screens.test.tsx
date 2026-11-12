@@ -36,7 +36,9 @@ jest.mock('expo-router', () => ({
   useFocusEffect: (callback: () => void | (() => void)) => {
     mockReact.useEffect(() => callback(), [callback]);
   },
-  Stack: { Screen: ({ options }: { options?: { title?: string } }) => { void options; return null; } },
+  // The header's title and right button render in place, so tests can read and press them.
+  Stack: { Screen: ({ options }: { options?: { headerTitle?: () => mockReact.ReactNode; headerRight?: () => mockReact.ReactNode } }) =>
+    mockReact.createElement(mockReact.Fragment, null, options?.headerTitle?.() ?? null, options?.headerRight?.() ?? null) },
 }));
 
 const mockUseAuth = jest.fn();
@@ -52,6 +54,7 @@ jest.mock('@/src/groups/api', () => ({
   getCompetitionBoard: jest.fn(),
   getCompetitionRevisions: jest.fn(),
   getCompetitionHistory: jest.fn(),
+  getCompetitionRecordsHistory: jest.fn(),
   certifyCompetition: jest.fn(),
   getCompetitionCertification: jest.fn(),
   endCompetitionCertification: jest.fn(),
@@ -60,7 +63,7 @@ jest.mock('@/src/groups/api', () => ({
 import * as groupsApi from '@/src/groups/api';
 import { GroupApiError } from '@/src/groups/api';
 import { buildCompetitionPodiums } from '@/src/groups/competition-view-model';
-import type { CompetitionExerciseWire,CompetitionHistoryWire } from '@/src/groups/competition-wire';
+import type { CompetitionEventWire,CompetitionExerciseWire,CompetitionHistoryWire,CompetitionRecordsHistoryItemWire,CompetitionRecordsHistoryWire } from '@/src/groups/competition-wire';
 import { competitionExercise,competitionRow,competitionBoard,competitionCertification,competitionEvent } from './helpers/competition-fixtures';
 import { GroupMetricRecordSheet } from '@/components/groups/group-metric-record-sheet';
 import GroupsTabRoute from '../app/(tabs)/groups';
@@ -78,6 +81,25 @@ const history: CompetitionHistoryWire = { contract_version: 4,exercise,metric: '
     bodyweight_contribution: 1,load_input_mode: 'total_load',default_metric: 'e1rm' },
     published_at_ms: 2000,retired_at_ms: null,reason: 'rules_change',legacy: false },
   events: [{ ...competitionEvent,kind: 'rules_change',event_id: 'change',sequence: 3,values: [],record_context: null }],next_cursor: null };
+const member = (user_id: string, username: string) => ({ user_id,username });
+const pct = (role: 'record' | 'previous' | 'leader', value: number, who: { user_id: string; username: string }) =>
+  ({ role,metric: 'e1rm' as const,unit: 'percent_bw',value,added_e1rm_percent_bw: value - 100,unavailable: false,member: who });
+const recordItem = (id: string, sequence: number, who: { user_id: string; username: string }, value: number,
+  { lead = false, previousBest = null as number | null, passed = null as { user_id: string; username: string } | null, revision = 2 } = {}): CompetitionRecordsHistoryItemWire => {
+  const event: CompetitionEventWire = { ...competitionEvent,event_id: id,sequence,member: who,rules_revision: revision,
+    sort_at_ms: Date.UTC(2026,10,sequence),values: [pct('record',value,who)] };
+  return { event,previous_best: previousBest === null ? null : pct('previous',previousBest,who),
+    record: { performance: competitionRow.performance,group_record_metrics: lead ? ['e1rm'] : [],
+      previous: passed ? [{ value: pct('previous',value - 5,passed),performance: null }] : [] } };
+};
+const rulesItem: CompetitionRecordsHistoryItemWire = { record: null,previous_best: null,
+  event: { ...competitionEvent,kind: 'rules_change',event_id: 'change',sequence: 3,member: null,metric: null,
+    sort_at_ms: Date.UTC(2026,10,3),values: [],record_context: null } };
+const recordsLog: CompetitionRecordsHistoryWire = { contract_version: 4,exercise,metric: 'e1rm',certified: false,next_cursor: null,items: [
+  recordItem('took',6,member('me','Me'),216,{ lead: true,passed: member('other','Duca') }),
+  recordItem('raised',5,member('other','Duca'),200.3,{ previousBest: 196.2 }),
+  rulesItem,
+  recordItem('first',2,member('rival','Jem'),170.1,{ revision: 1 })] };
 const previous = { ...history.revision,rules_revision: 1,representation_version: 3 as const,legacy: true,
   retired_at_ms: 2000,rules: { ...history.revision.rules,bodyweight_calculations_enabled: false,
     bodyweight_contribution: 0,default_metric: 'weight' as const } };
@@ -90,6 +112,7 @@ beforeEach(() => {
   api.getCompetitionBoard.mockResolvedValue(board);
   api.getCompetitionRevisions.mockResolvedValue({ contract_version: 4,exercise,revisions: [history.revision,previous] });
   api.getCompetitionHistory.mockResolvedValue(history);
+  api.getCompetitionRecordsHistory.mockResolvedValue(recordsLog);
   api.certifyCompetition.mockResolvedValue({ contract_version: 4,certification: certificate,created: true });
   api.getCompetitionCertification.mockResolvedValue({ contract_version: 4,certification: certificate });
   api.getCompetitionStream.mockResolvedValue({ contract_version: 4,items: [],next_cursor: null,has_more: false });
@@ -106,9 +129,14 @@ it('shows normalized 1RM and Volume with explicit units and independent Certifie
   expect(screen.queryByText(/Rules \d|contribution|Bodyweight scoring|Scores use|Ineligible/)).toBeNull();
   api.getCompetitionBoard.mockResolvedValue({ ...board,metric: 'volume',certified: false,
     entries: [{ ...uncertifiedRow,metric: 'volume',unit: 'percent_bw_reps',value: 650 }] });
-  fireEvent.press(screen.getByTestId('group-board-metric-volume'));await settleReads();
+  expect(screen.getByTestId('group-board-title-view')).toHaveTextContent('1RM %BW leaderboard');
+  expect(screen.getByTestId('group-board-scope')).toHaveTextContent('Certified');
+  fireEvent.press(screen.getByTestId('group-board-metric'));await settleReads();
+  expect(screen.getByTestId('group-board-metric')).toHaveTextContent('Volume');
+  expect(screen.getByTestId('group-board-title-view')).toHaveTextContent('Volume %BW leaderboard');
   expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('650.0 %BW');
-  fireEvent.press(screen.getByTestId('group-board-scope-all'));await settleReads();
+  fireEvent.press(screen.getByTestId('group-board-scope'));await settleReads();
+  expect(screen.getByTestId('group-board-scope')).toHaveTextContent('All sets');
   expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'volume',certified: false }));
 });
 it('hides rows while a new revision rebuilds',async()=>{
@@ -141,42 +169,49 @@ it('holds a stale-input refusal for explicit review',async()=>{
   expect(await screen.findByTestId('group-metric-record-notice')).toHaveTextContent(/The score changed/);
   expect(screen.getByTestId('group-metric-record-certify')).toBeDisabled();expect(api.certifyCompetition).toHaveBeenCalledTimes(1);
 });
-it('history: one row of three tap-to-cycle filters on the current rules, with no rules text',async()=>{
-  mockParams={ ...mockParams,scope: 'certified' };
+it('board options: History keeps the view; Exercise rules only for owners and admins',async()=>{
+  render(<GroupBoardRoute />);await settleReads();
+  fireEvent.press(screen.getByTestId('group-board-options-button'));
+  expect(screen.queryByTestId('group-board-rules-button')).toBeNull();
+  fireEvent.press(screen.getByTestId('group-board-history-button'));
+  expect(mockRouter.push).toHaveBeenLastCalledWith('/group/group/leaderboards/pull/history?metric=e1rm&scope=all');
+  const admin={ group_id: 'group',name: 'Crew',description: null,member_count: 2,my_role: 'admin' as const,bodyweight_calculations_enabled: true };
+  api.getGroup.mockResolvedValue({ group: admin,members: [] });
+  render(<GroupBoardRoute />);await settleReads();
+  fireEvent.press(screen.getAllByTestId('group-board-options-button').at(-1)!);
+  fireEvent.press(screen.getByTestId('group-board-rules-button'));
+  expect(mockRouter.push).toHaveBeenLastCalledWith('/group/group/exercises/pull/edit');
+});
+it('history: a records log across rules revisions, with two cycle filters',async()=>{
   render(<GroupBoardHistoryRoute />);
-  expect(await screen.findByTestId('group-board-history-item-3-sentence')).toHaveTextContent('Group rules changed.');
-  expect(api.getCompetitionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm',certified: true }));
-  expect(api.getCompetitionHistory.mock.calls.at(-1)?.[0].revision).toBeUndefined();
-  expect(api.getCompetitionRevisions).not.toHaveBeenCalled();
-  expect(screen.queryByTestId('group-history-revision-row')).toBeNull();
-  expect(screen.queryByText(/Rules \d|contribution|original unit|Recalculation/)).toBeNull();
-  expect(screen.getByTestId('group-history-metric')).toHaveTextContent('1RM');
-  expect(screen.getByTestId('group-history-scope')).toHaveTextContent('Certified');
-  expect(screen.getByTestId('group-history-view')).toHaveTextContent('History');
-  api.getCompetitionHistory.mockResolvedValue({ ...history,metric: 'volume' });
+  expect(await screen.findByTestId('group-board-history-item-took')).toBeTruthy();
+  expect(api.getCompetitionRecordsHistory).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm',certified: false }));
+  expect(screen.getByTestId('group-history-title-view')).toHaveTextContent('1RM %BW history');
+  expect(screen.getByTestId('group-board-history-item-took-lead')).toBeTruthy();
+  expect(screen.getByTestId('group-board-history-item-took')).toHaveProp('accessibilityLabel',
+    expect.stringMatching(/^New number one, You took #1, 116.0 %BW, 5 reps · passed Duca, 06-11-2026$/));
+  expect(screen.getByTestId('group-board-history-item-raised-best')).toBeTruthy();
+  expect(screen.getByTestId('group-board-history-item-raised-detail')).toHaveTextContent('5 reps · +4.1 %BW on best');
+  expect(screen.getByTestId('group-board-history-item-change')).toHaveProp('accessibilityLabel','Rules changed · 03-11-2026');
+  expect(screen.getByTestId('group-board-history-item-first')).toHaveProp('accessibilityLabel',expect.stringMatching(/first entry.*earlier rules$/));
+  expect(screen.queryByTestId('group-history-view')).toBeNull();
+  api.getCompetitionRecordsHistory.mockResolvedValue({ ...recordsLog,metric: 'volume',items: [] });
   fireEvent.press(screen.getByTestId('group-history-metric'));await settleReads();
   expect(screen.getByTestId('group-history-metric')).toHaveTextContent('Volume');
-  expect(api.getCompetitionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'volume',certified: true }));
-  expect(mockRouter.setParams).toHaveBeenLastCalledWith({ metric: 'volume',scope: 'certified' });
-  api.getCompetitionHistory.mockResolvedValue({ ...history,metric: 'volume',certified: false });
+  expect(api.getCompetitionRecordsHistory).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'volume',certified: false }));
+  expect(mockRouter.setParams).toHaveBeenLastCalledWith({ metric: 'volume',scope: 'all' });
+  expect(screen.getByTestId('group-board-history-empty')).toHaveTextContent('No records yet');
+  api.getCompetitionRecordsHistory.mockResolvedValue({ ...recordsLog,metric: 'volume',certified: true,items: [] });
   fireEvent.press(screen.getByTestId('group-history-scope'));await settleReads();
-  expect(screen.getByTestId('group-history-scope')).toHaveTextContent('All');
-  expect(api.getCompetitionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'volume',certified: false }));
-  api.getCompetitionHistory.mockResolvedValue({ ...history,metric: 'e1rm',certified: false });
-  fireEvent.press(screen.getByTestId('group-history-metric'));await settleReads();
-  expect(screen.getByTestId('group-history-metric')).toHaveTextContent('1RM');
-  fireEvent.press(screen.getByTestId('group-history-view'));await settleReads();
-  expect(screen.getByTestId('group-history-view')).toHaveTextContent('Scores');
-  expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm',certified: false }));
-  expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('45.7 %BW');
-  fireEvent.press(screen.getByTestId('group-history-view'));await settleReads();
-  expect(screen.getByTestId('group-history-view')).toHaveTextContent('History');
+  expect(screen.getByTestId('group-history-scope')).toHaveTextContent('Certified');
+  expect(api.getCompetitionRecordsHistory).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'volume',certified: true }));
+  expect(screen.getByTestId('group-board-history-empty')).toHaveTextContent('No certified #1 yet');
 });
 it('history: a deep link with an unknown metric opens the comparison default',async()=>{
   mockParams={ groupId: 'group',exerciseId: 'pull',metric: 'weight',scope: 'all' };
   render(<GroupBoardHistoryRoute />);await settleReads();
-  expect(api.getCompetitionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm',certified: false }));
-  expect(screen.getByTestId('group-history-scope')).toHaveTextContent('All');
+  expect(api.getCompetitionRecordsHistory).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm',certified: false }));
+  expect(screen.getByTestId('group-history-scope')).toHaveTextContent('All sets');
 });
 it('labels podiums with normalized units',()=>{
   const cards=buildCompetitionPodiums({ contract_version: 4,certified: true,podiums: [{ exercise,board }] },'me', 'DD-MM-YYYY');

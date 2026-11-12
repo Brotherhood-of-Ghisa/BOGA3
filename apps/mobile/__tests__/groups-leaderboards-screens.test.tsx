@@ -48,9 +48,10 @@ jest.mock('expo-router', () => ({
     mockReact.useEffect(() => callback(), [callback]);
   },
   Stack: {
-    Screen: ({ options }: { options?: { title?: string } }) => {
+    Screen: ({ options }: { options?: { title?: string; headerRight?: () => mockReact.ReactNode } }) => {
       mockScreenTitle = options?.title ?? null;
-      return null;
+      // The header's button renders in place, so tests can press it.
+      return options?.headerRight?.() ?? null;
     },
   },
 }));
@@ -71,6 +72,7 @@ jest.mock('@/src/groups/api', () => {
   getCompetitionBoard: jest.fn(),
   getCompetitionRevisions: jest.fn(),
   getCompetitionHistory: jest.fn(),
+  getCompetitionRecordsHistory: jest.fn(),
   };
 });
 
@@ -83,7 +85,7 @@ import {
   writeGroupCache,
   type GroupGetResult,
 } from '@/src/groups';
-import type { CompetitionExerciseWire,CompetitionBoardRowWire,CompetitionBoardWire,CompetitionHistoryWire } from '@/src/groups/competition-wire';
+import type { CompetitionExerciseWire,CompetitionBoardRowWire,CompetitionBoardWire,CompetitionHistoryWire,CompetitionRecordsHistoryWire } from '@/src/groups/competition-wire';
 import { competitionExercise,competitionRow,competitionBoard,competitionCertification,competitionEvent } from './helpers/competition-fixtures';
 import * as groupsApi from '@/src/groups/api';
 
@@ -143,6 +145,8 @@ const METRIC_PODIUMS={ contract_version: 4 as const,certified: false,podiums: [
 const revision={ rules_revision: 2,representation_version: 4 as const,rules: { bodyweight_calculations_enabled: false,
   bodyweight_contribution: 0,load_input_mode: 'total_load' as const,default_metric: 'e1rm' as const },
   reason: 'initial' as const,legacy: false,published_at_ms: SEP_10,retired_at_ms: null };
+const recordsPage=(overrides: Partial<CompetitionRecordsHistoryWire>={}): CompetitionRecordsHistoryWire=>({ contract_version: 4,
+  exercise: BENCH,metric: 'e1rm',certified: false,items: [],next_cursor: null,...overrides });
 const historyPage=(overrides: Partial<CompetitionHistoryWire>={}): CompetitionHistoryWire=>({ contract_version: 4,
   exercise: BENCH,revision,metric: 'e1rm',certified: true,events: [],next_cursor: null,...overrides });
 const seedCache = (cacheKey: string, payload: unknown) =>
@@ -180,6 +184,7 @@ beforeEach(() => {
   api.getCompetitionPodiums.mockResolvedValue(METRIC_PODIUMS);
   api.getCompetitionBoard.mockResolvedValue(boardPage([]));
   api.getCompetitionHistory.mockResolvedValue(historyPage());
+  api.getCompetitionRecordsHistory.mockResolvedValue(recordsPage());
   api.getCompetitionRevisions.mockResolvedValue({ contract_version: 4,exercise: BENCH,revisions: [revision] });
 });
 
@@ -378,13 +383,14 @@ describe('Full board (E1.2)', () => {
     expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'e1rm', certified: false }));
 
     api.getCompetitionBoard.mockResolvedValue(boardPage([{ ...row(1,'u1','Dave'),metric: 'volume',unit: 'kg_reps',value: 270 }],{ metric: 'volume',certified: false }));
-    fireEvent.press(screen.getByTestId('group-board-metric-volume'));
+    fireEvent.press(screen.getByTestId('group-board-metric'));
     await waitFor(() =>
       expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'volume', certified: false, cursor: null })),
     );
     expect(await screen.findByTestId('group-board-row-1-value')).toHaveTextContent('270.0');
     expect(screen.getByTestId('group-board-row-1-detail')).toHaveTextContent('Weight 135.0 × 2');
 
+    fireEvent.press(screen.getByTestId('group-board-options-button'));
     fireEvent.press(screen.getByTestId('group-board-history-button'));
     expect(mockRouter.push).toHaveBeenCalledWith(
       `/group/${GROUP_ID}/leaderboards/${EXERCISE_ID}/history?metric=volume&scope=all`,
@@ -458,11 +464,11 @@ describe('Full board (E1.2)', () => {
     api.getCompetitionBoard.mockRejectedValue(new GroupApiError('NETWORK', 'Network request failed.'));
     openBoard();
     expect(await screen.findByTestId('group-board-offline-empty-state')).toBeTruthy();
-    await screen.findByTestId('group-board-scope-all');
+    await screen.findByTestId('group-board-scope');
     await waitFor(() => expect(api.getCompetitionBoard).toHaveBeenCalled());
     const calls = api.getCompetitionBoard.mock.calls.length;
 
-    fireEvent.press(screen.getByTestId('group-board-scope-all'));
+    fireEvent.press(screen.getByTestId('group-board-scope'));
     expect(await screen.findByTestId('group-board-offline-empty-state')).toBeTruthy();
     expect(api.getCompetitionBoard).toHaveBeenCalledTimes(calls);
   });
@@ -490,26 +496,31 @@ describe('Full board (E1.2)', () => {
 describe('Competition history',()=>{
   const openHistory=()=>{mockParams={ groupId: GROUP_ID,exerciseId: EXERCISE_ID,scope: 'all' };renderWithTheme(<GroupBoardHistoryRoute />);};
   it('keeps original units and pages with the opaque history cursor',async()=>{
-    const event={ ...competitionEvent,kind: 'lead_change' as const,event_id: 'lc2',sequence: 12,sort_at_ms: SEP_10,
+    const value={ role: 'record' as const,metric: 'e1rm' as const,unit: 'kg',value: 142.5,unavailable: false,member: { user_id: 'u1',username: 'Dave' } };
+    const event={ ...competitionEvent,event_id: 'r2',sequence: 12,sort_at_ms: SEP_10,member: value.member,
       group: { group_id: GROUP_ID,name: 'Garage Gym' },group_exercise: { group_exercise_id: EXERCISE_ID,name: 'Bench Press' },
-      visibility: 'ordinary' as const,record_context: null,values: [{ role: 'leader' as const,metric: 'e1rm' as const,
-        unit: 'kg',value: 142.5,unavailable: false,member: { user_id: 'u1',username: 'Dave' } }] };
-    api.getCompetitionHistory.mockResolvedValueOnce(historyPage({ events: [event],next_cursor: 'older-events' }))
-      .mockResolvedValueOnce(historyPage({ events: [{ ...event,event_id: 'lc1',sequence: 7,
-        values: [{ ...event.values[0],value: 138,member: { user_id: 'u2',username: 'Sam' } }] }] }));
-    openHistory();expect(await screen.findByTestId('group-board-history-item-12-sentence')).toHaveTextContent('Dave · #1 1RM · 142.5.');
-    expect(screen.getByTestId('group-board-history-item-12-date')).toHaveTextContent('10-09-2026');
+      visibility: 'ordinary' as const,record_context: null,values: [value] };
+    const performance={ ...competitionRow.performance,visibility: 'ordinary' as const,weight_value: '120',reps: 6 };
+    api.getCompetitionRecordsHistory.mockResolvedValueOnce(recordsPage({ next_cursor: 'older-events',items: [{ event,
+      previous_best: { ...value,role: 'previous',value: 138 },record: { performance,previous: [],group_record_metrics: [] } }] }))
+      .mockResolvedValueOnce(recordsPage({ items: [{ event: { ...event,event_id: 'r1',sequence: 7,member: { user_id: 'u2',username: 'Sam' },
+        values: [{ ...value,value: 138,member: { user_id: 'u2',username: 'Sam' } }] },previous_best: null,
+        record: { performance: null,previous: [],group_record_metrics: ['e1rm'] } }] }));
+    openHistory();expect(await screen.findByTestId('group-board-history-item-r2-figure')).toHaveTextContent('142.5');
+    expect(screen.getByTestId('group-board-history-item-r2-detail')).toHaveTextContent('120.0 × 6 · +4.5 on best');
+    expect(screen.getByTestId('group-board-history-item-r2')).toHaveProp('accessibilityLabel',expect.stringMatching(/^New best, Dave, .*10-09-2026$/));
     await act(async()=>fireEvent(screen.getByTestId('group-board-history-list'),'onEndReached'));
-    expect(api.getCompetitionHistory).toHaveBeenLastCalledWith(expect.objectContaining({ before: 'older-events' }));
-    expect(await screen.findByTestId('group-board-history-item-7-sentence')).toHaveTextContent('Sam · #1 1RM · 138.0.');
+    expect(api.getCompetitionRecordsHistory).toHaveBeenLastCalledWith(expect.objectContaining({ before: 'older-events' }));
+    expect(await screen.findByTestId('group-board-history-item-r1-lead')).toBeTruthy();
+    expect(screen.getByTestId('group-board-history-item-r1')).toHaveProp('accessibilityLabel',expect.stringMatching(/^New number one, Sam took #1, 138.0, 5 reps, 10-09-2026$/));
     expect(cacheKeys()).toEqual([groupCacheKeys.groupExercises(GROUP_ID)]);
   });
   it('shows empty history for the selected metric and scope',async()=>{
-    openHistory();expect(await screen.findByTestId('group-board-history-empty')).toHaveTextContent('No history for this view yet');
-    expect(api.getCompetitionHistory).toHaveBeenCalledWith(expect.objectContaining({ metric: 'e1rm',certified: false }));
+    openHistory();expect(await screen.findByTestId('group-board-history-empty')).toHaveTextContent('No records yet');
+    expect(api.getCompetitionRecordsHistory).toHaveBeenCalledWith(expect.objectContaining({ metric: 'e1rm',certified: false }));
   });
   it('shows lost access when membership ends',async()=>{
-    api.getCompetitionHistory.mockRejectedValue(new GroupApiError('NOT_FOUND','group not found'));
+    api.getCompetitionRecordsHistory.mockRejectedValue(new GroupApiError('NOT_FOUND','group not found'));
     api.listCompetitionExercises.mockRejectedValue(new GroupApiError('NOT_FOUND','group not found'));openHistory();
     expect(await screen.findByTestId('group-board-history-lost-access')).toBeTruthy();
   });

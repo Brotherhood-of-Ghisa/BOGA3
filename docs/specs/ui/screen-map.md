@@ -90,8 +90,8 @@ the tab bar (`TabOwnedPage`), owned by More.
 | `/group/[groupId]/invite` | Owner/admin invite: the code, its `boga3://` link, Share, Regenerate | `group/[groupId]/invite.tsx` |
 | `/group/[groupId]/exercises/new` | Owner/admin add a group exercise, `From catalogue` or `Custom` | `group/[groupId]/exercises/new.tsx` |
 | `/group/[groupId]/exercises/[exerciseId]/edit` | Owner/admin rename a group exercise or change its weight entry | `group/[groupId]/exercises/[exerciseId]/edit.tsx` |
-| `/group/[groupId]/leaderboards/[exerciseId]` | A group exercise's full board: `Volume` \| `1RM` × `Certified` \| `All`, ranked rows, row detail sheet with certification actions | `group/[groupId]/leaderboards/[exerciseId]/index.tsx` |
-| `/group/[groupId]/leaderboards/[exerciseId]/history` | That board's lead changes under the current rules, newest first, below one row of tap-to-cycle filters: metric, `Certified` \| `All`, `History` \| `Scores` | `group/[groupId]/leaderboards/[exerciseId]/history.tsx` |
+| `/group/[groupId]/leaderboards/[exerciseId]` | A group exercise's full board, titled `<exercise>` over `<metric> leaderboard`: one row of tap-to-cycle filters (metric, `All sets` \| `Certified`), ranked rows, row detail sheet with certification actions; the header's options menu opens History and, for owners/admins, Exercise rules | `group/[groupId]/leaderboards/[exerciseId]/index.tsx` |
+| `/group/[groupId]/leaderboards/[exerciseId]/history` | That board's records log across every rules revision, newest first, below the same two filters: All lists each new best (★ when it took #1, ↑ a member's own best), Certified each new #1; a rules change is a divider and older entries are dimmed | `group/[groupId]/leaderboards/[exerciseId]/history.tsx` |
 | `/group-session/[memberId]/[sessionId]` | A member's shared session as the group sees it, drawn with View Session's cards, View Session's facts card (an `In progress` mark while it runs), its #1 group 1RM records (row → leaderboard); my own adds a full-session action | `group-session/[memberId]/[sessionId].tsx` |
 
 ## Dev-only routes

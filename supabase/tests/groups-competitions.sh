@@ -275,7 +275,7 @@ expect_sql 'private helpers are not callable by clients/service' \
   "select bool_and(not has_function_privilege('authenticated',p.oid,'execute') and not has_function_privilege('service_role',p.oid,'execute'))
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='app_public' and
       p.proname in ('group_competition_event_json','group_competition_history_value','group_competition_session_json',
-        'group_competition_session_record_boards');" t
+        'group_competition_session_record_boards','group_competition_records_history_item');" t
 pass 'contract header, private helper/direct table and app authorization denial'
 
 # Protocol 4 is the only group representation: no old public RPC (legacy kg
@@ -318,6 +318,35 @@ for metric in volume e1rm; do
     '{p_group_id:$g,p_group_exercise_id:$x,p_metric:$m,p_certified:false,p_revision:$r}')"; expect_ok history; assert_wire isCompetitionHistoryWire
   check 'enabled historical absolute scores unavailable' 'all(.events[].values[]; .value==null or (.unit=="percent_bw" or .unit=="percent_bw_reps"))'
 done
+# The records log spans every rules revision: the fixture's records predate
+# the bodyweight rules change, which stays in the log as a divider. Old kg
+# figures stay hidden while the group's bodyweight calculations are on.
+records_history() {
+  rpc "${OWNER_TOKEN}" group_competition_records_history "$(jq -nc --arg g "${GID}" --arg x "$1" --arg m "$2" --argjson c "$3" \
+    --argjson l "${4:-50}" --arg b "${5:-}" '{p_group_id:$g,p_group_exercise_id:$x,p_metric:$m,p_certified:$c,p_limit:$l,p_before:($b|select(.!="")//null)}')"
+}
+for metric in volume e1rm; do
+  records_history "${GX}" "${metric}" false; expect_ok "records history ${metric}"; assert_wire isCompetitionRecordsHistoryWire
+  check 'records log: earlier-rules records and the rules change, newest first, no kg' \
+    '(.items|map(.event.sequence)) as $s | $s==($s|sort|reverse)
+     and any(.items[];.event.kind=="rules_change") and all(.items[];.event.kind=="rules_change" or .event.kind=="record")
+     and ([.items[]|select(.event.kind=="record")|.event.member.user_id]|index($a)!=null and index($r)!=null)
+     and all(.items[]|select(.event.kind=="record");.event.rules_revision<$rev and .record!=null)
+     and all(.items[]|[.event.values[],.previous_best//empty][];.value==null or (.unit=="percent_bw" or .unit=="percent_bw_reps"))' \
+    --arg a "${ATHLETE_UID}" --arg r "${RIVAL_UID}" --argjson rev "${REVISION}"
+done
+records_history "${GX}" e1rm true; expect_ok 'certified records history'; assert_wire isCompetitionRecordsHistoryWire
+check 'Certified log holds only Certified lead changes and rules changes' \
+  'all(.items[];.event.kind=="rules_change" or (.event.kind=="lead_change" and .event.certified))'
+records_history "${GX}" volume false 1; expect_ok 'records history first page'; assert_wire isCompetitionRecordsHistoryWire
+RECORDS_CURSOR="$(jq -er .next_cursor <<<"${BODY}")"; RECORDS_FIRST="$(jq -er '.items[0].event.sequence' <<<"${BODY}")"
+records_history "${GX}" volume false 1 "${RECORDS_CURSOR}"; expect_ok 'records history next page'
+check 'the cursor pages to older entries' '.items[0].event.sequence<$first' --argjson first "${RECORDS_FIRST}"
+records_history "${GX}" e1rm false 1 "${RECORDS_CURSOR}"; expect_error VALIDATION 'records cursor from another view'
+records_history "${GX}" weight false; expect_error VALIDATION 'records history historical metric'
+rpc "${OUTSIDER_TOKEN}" group_competition_records_history "$(jq -nc --arg g "${GID}" --arg x "${GX}" \
+  '{p_group_id:$g,p_group_exercise_id:$x,p_metric:"volume",p_certified:false}')"; expect_error NOT_FOUND 'outsider records history'
+pass 'records log across rules revisions, Certified lead changes, cursor and privacy'
 for group in "\"${GID}\"" null; do
   rpc "${OWNER_TOKEN}" group_competition_stream "{\"p_group_id\":${group},\"p_limit\":50}"; expect_ok stream; assert_wire isCompetitionStreamWire
   check 'enabled stream has no private reading/hash/audit and normalized sessions have no kg' \
@@ -1192,6 +1221,10 @@ expect_sql 'kernel refresh creates no performed record or correction for the unc
 expect_sql 'genuine decrease voids the old record without creating an improvement' "select
   count(*) filter(where kind='record')=1 and count(*) filter(where kind='record_voided')=1
   from app_public.group_events where group_exercise_id='${GX}' and member_user_id='${RIVAL_UID}';" t
+VOIDED_RECORD="$(run_psql "select related_event_id from app_public.group_events
+  where group_exercise_id='${GX}' and member_user_id='${RIVAL_UID}' and kind='record_voided';")"
+records_history "${GX}" volume false; expect_ok 'records history after a void'; assert_wire isCompetitionRecordsHistoryWire
+check 'a voided record leaves the records log' 'all(.items[];.event.event_id!=$v)' --arg v "${VOIDED_RECORD}"
 run_psql "select app_public.group_metric_enqueue_isolated('${GID}','${GX}','session',null);" >/dev/null
 drain 'activity after total-load rules upgrade'
 [[ "$(run_psql "${RECORD_AUDIT_SQL}")" == "${TOTAL_RECORD_AUDIT}" ]] || fail 'later activity voided a historical total-load record'

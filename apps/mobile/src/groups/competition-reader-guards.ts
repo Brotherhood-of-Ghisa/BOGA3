@@ -6,7 +6,7 @@ import { isCompetitionMetric } from './competition-contract.ts';
 import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionPerformanceWire, isCompetitionExerciseWire } from './competition-wire-guards.ts';
 import type { CompetitionCertifyResultWire, CompetitionCertificationResultWire, CompetitionEventWire,
   CompetitionExerciseListWire, CompetitionExerciseWriteWire, CompetitionHistoryWire,
-  CompetitionPodiumsWire, CompetitionRevisionWire, CompetitionRevisionsWire, CompetitionSessionDetailWire,
+  CompetitionPodiumsWire, CompetitionRecordsHistoryWire, CompetitionRevisionWire, CompetitionRevisionsWire, CompetitionSessionDetailWire,
   CompetitionPeriodTotalsWire, CompetitionSessionRecordsWire, CompetitionSessionWire, CompetitionStreamWire, CompetitionWeekSummaryWire,
   GroupSharedExerciseDeleteWire, GroupSharedExerciseItemWire, GroupSharedExercisesListWire, GroupSharedExerciseWriteWire } from './competition-wire.ts';
 
@@ -157,6 +157,27 @@ function streamRecord(v: unknown, event: CompetitionEventWire): boolean {
       (p.value as { role?: unknown }).role === 'previous' &&
       historyValue(p.value,normalized || (p.performance !== null && visibility(p.performance) === 'normalized')) &&
       (!normalized || p.performance === null || visibility(p.performance) === 'normalized'));
+}
+// Records log: a record lists the board's metric and is never voided; a lead
+// change belongs to the Certified log only; a rules change carries nothing else.
+function recordsHistoryItem(v: unknown, log: { exercise: string; metric: string; certified: boolean }): boolean {
+  if (!exact(v,['event','record','previous_best']) || !isCompetitionEventWire(v.event) ||
+    v.event.group_exercise.group_exercise_id !== log.exercise) return false;
+  const event = v.event;
+  if (event.kind === 'rules_change') return v.record === null && v.previous_best === null;
+  if (event.kind === 'lead_change') return log.certified && event.certified === true && event.metric === log.metric &&
+    v.record === null && v.previous_best === null;
+  return event.kind === 'record' && !log.certified && !event.voided && streamRecord(v.record,event) &&
+    event.values.some(value => value.role === 'record' && value.metric === log.metric) &&
+    (v.previous_best === null || historyValue(v.previous_best,event.visibility === 'normalized') &&
+      (v.previous_best as { role: string; metric: string }).role === 'previous' &&
+      (v.previous_best as { metric: string }).metric === log.metric);
+}
+export function isCompetitionRecordsHistoryWire(v: unknown): v is CompetitionRecordsHistoryWire {
+  if (!exact(v,['contract_version','exercise','metric','certified','items','next_cursor']) || v.contract_version !== 4 ||
+    !isCompetitionExerciseWire(v.exercise) || !isCompetitionMetric(v.metric) || typeof v.certified !== 'boolean') return false;
+  const log = { exercise: v.exercise.group_exercise_id, metric: v.metric, certified: v.certified };
+  return arrayOf(v.items,item => recordsHistoryItem(item,log)) && nullableText(v.next_cursor);
 }
 function sharedExerciseMapping(v: unknown): boolean {
   return exact(v,['muscle_group_id','weight','role']) && id(v.muscle_group_id) &&
