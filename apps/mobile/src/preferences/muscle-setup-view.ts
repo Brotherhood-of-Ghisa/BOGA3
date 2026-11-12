@@ -100,16 +100,17 @@ export type CombinedMuscleChecklistRow = { id: string; label: string; checked: b
 
 /**
  * The editor's Muscles checklist for `family`: each entry, ticked or not, and
- * the combined muscle it is On in now when that is another one (ticking moves it).
+ * the combined muscle an unticked one is On in now when that is another one (ticking moves it).
  */
 export const buildCombinedMuscleChecklist = (
   { rows, definitions }: MuscleSetupChange, family: string, ticked: ReadonlySet<string>, key: string | null,
 ): CombinedMuscleChecklistRow[] =>
   rowsOfFamily(rows, family).map((row) => {
     const choice = muscleChoiceOf(row);
-    const other = typeof choice === 'object' && choice.key !== key
+    const checked = ticked.has(row.id);
+    const other = !checked && typeof choice === 'object' && choice.key !== key
       ? definitions.find((muscle) => muscle.key === choice.key)?.name ?? null : null;
-    return { id: row.id, label: row.displayName, checked: ticked.has(row.id), elsewhere: other };
+    return { id: row.id, label: row.displayName, checked, elsewhere: other };
   });
 
 /** Save needs a name and at least one ticked muscle. */

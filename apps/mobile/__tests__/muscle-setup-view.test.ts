@@ -48,6 +48,8 @@ describe('the muscle setup as Settings shows it', () => {
       { id: 'forearms', label: 'FOREARMS', checked: false, elsewhere: 'Guns' },
     ]);
     expect(buildCombinedMuscleChecklist({ rows, definitions }, 'Arms', new Set(), null)[0].elsewhere).toBe('Arms');
+    expect(buildCombinedMuscleChecklist({ rows, definitions }, 'Arms', new Set(['forearms']), 'cm_arms')[2])
+      .toMatchObject({ checked: true, elsewhere: null });
   });
 
   it('saves with a name and a muscle', () => {

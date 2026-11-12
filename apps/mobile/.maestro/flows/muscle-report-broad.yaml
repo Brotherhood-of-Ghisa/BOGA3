@@ -105,11 +105,12 @@ appId: com.dinoderek.mobile
     visible: { id: "settings-muscle-off" }
     timeout: 15000
 - tapOn: { id: "settings-muscle-off" }
-- extendedWaitUntil:
-    visible: { id: "settings-muscle-off", checked: true }
-    timeout: 15000
 - takeScreenshot: "muscles-one-muscle-page"
 - tapOn: { id: "BackButton" }
+# iOS does not expose a radio row's checked state; the list's value is the proof.
+- extendedWaitUntil:
+    visible: { id: "settings-muscle-calves", text: "Calves, Off" }
+    timeout: 15000
 - scrollUntilVisible:
     element: { id: "settings-muscle-tibialis_anterior" }
     direction: DOWN
@@ -118,12 +119,9 @@ appId: com.dinoderek.mobile
     visible: { id: "settings-muscle-off" }
     timeout: 15000
 - tapOn: { id: "settings-muscle-off" }
-- extendedWaitUntil:
-    visible: { id: "settings-muscle-off", checked: true }
-    timeout: 15000
 - tapOn: { id: "BackButton" }
 - extendedWaitUntil:
-    visible: { id: "settings-muscle-calves", text: "Calves, Off" }
+    visible: { id: "settings-muscle-tibialis_anterior", text: "Tibialis Anterior, Off" }
     timeout: 15000
 - takeScreenshot: "muscles-list-page"
 - tapOn: { id: "BackButton" }
@@ -296,8 +294,10 @@ appId: com.dinoderek.mobile
     visible: { id: "settings-muscle-on" }
     timeout: 15000
 - tapOn: { id: "settings-muscle-on" }
-- extendedWaitUntil:
-    visible: { id: "settings-muscle-combine-cm_calves", checked: true }
+- openLink: "boga3://settings-muscle-list"
+- scrollUntilVisible:
+    element: { id: "settings-muscle-calves", text: "Calves, Calves" }
+    direction: DOWN
     timeout: 15000
 - openLink: "boga3://progress?breakdown=muscle"
 - extendedWaitUntil:

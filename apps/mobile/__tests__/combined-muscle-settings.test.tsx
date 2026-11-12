@@ -185,6 +185,7 @@ describe('the combined-muscle editor', () => {
     expect(within(screen.getByTestId('settings-combined-muscle-member-back_lats')).getByText('in Wings'))
       .toHaveStyle({ fontFamily: uiFonts.body.family, color: roles.inkMuted });
     fireEvent.press(screen.getByTestId('settings-combined-muscle-member-back_lats'));
+    expect(screen.queryByText('in Wings')).toBeNull();
     fireEvent.changeText(screen.getByTestId('settings-combined-muscle-name'), 'Traps');
     fireEvent.press(screen.getByTestId('settings-combined-muscle-save'));
     await waitFor(() => expect(mockBack).toHaveBeenCalled());
