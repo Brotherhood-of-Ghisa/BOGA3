@@ -61,7 +61,9 @@ function Editor({ loaded, setup, target }: { loaded: MuscleSetupChange; setup: M
   const remove = (key: string, label: string) => Alert.alert(`Delete ${label}?`, undefined, [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Delete', style: 'destructive', onPress: () => {
-      void setup.change(() => deleteCombinedMuscle(key), { retry: false }).then(done => { if (done) { setDeleted(true); router.back(); } });
+      // Leaving before the write: a re-read landing mid-delete must not show the page as missing.
+      setDeleted(true);
+      void setup.change(() => deleteCombinedMuscle(key), { retry: false }).then(done => { if (done) router.back(); else setDeleted(false); });
     } },
   ]);
   return <>

@@ -24,8 +24,8 @@ export function CombinedMusclesPage() {
         { text: 'Start from Broad', style: 'destructive', onPress: () => { void setup.change(applyBroadTemplate); } },
       ]);
       return <>
-        <Stack.Screen options={{ headerRight: () => <IconButton accessibilityLabel="New combined muscle" name="plus"
-          nativeHeader onPress={create} testID="settings-combined-muscles-add" /> }} />
+        <Stack.Screen options={{ headerRight: () => <IconButton accessibilityLabel="New combined muscle" disabled={!loaded || setup.busy}
+          name="plus" nativeHeader onPress={create} testID="settings-combined-muscles-add" /> }} />
         {sections.map(section => <FormSection key={section.family} testID={`settings-combined-family-${section.family}`} title={section.family}>
           {section.muscles.map((muscle, index) => <ChoiceRow key={muscle.key}
             accessibilityLabel={muscle.members ? `${muscle.name}, ${muscle.members}` : muscle.name}

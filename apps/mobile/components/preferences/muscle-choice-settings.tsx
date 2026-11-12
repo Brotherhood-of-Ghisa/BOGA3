@@ -27,7 +27,7 @@ function MuscleChoices({ loaded, muscleId, setup }: { loaded: MuscleSetupChange;
   const row = loaded.rows.find(candidate => candidate.id === muscleId);
   if (!row) return <Text allowFontScaling={false} style={text.meta} testID="settings-muscle-missing">No such muscle.</Text>;
   const current = muscleChoiceOf(row);
-  const choose = (next: MuscleChoice) => { void setup.change(() => writeChoice(row, next)); };
+  const choose = (next: MuscleChoice) => { if (muscleChoiceWrite(row, next)) void setup.change(() => writeChoice(row, next)); };
   const combined = combinedMusclesOfFamily(loaded, row.familyName);
   return <>
     <Stack.Screen options={{ title: row.displayName }} />

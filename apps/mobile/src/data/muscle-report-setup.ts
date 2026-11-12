@@ -62,7 +62,7 @@ export const setMuscleState = (
   return { definitions: setup.definitions, rows: withRows(setup, (row) => (ids.has(row.id) ? columns : null)) };
 };
 
-/** The Enabled switch: tracking only, so a combined muscle switched back on keeps its members. */
+/** Off / On as tracking only: an Off member keeps its combined muscle, so switched back On it rejoins. */
 export const setMuscleTracked = (
   setup: MuscleSetupChange, entryIds: readonly string[], tracked: boolean,
 ): MuscleSetupChange => {

@@ -93,6 +93,14 @@ describe('one muscle', () => {
     expect(await row('triceps')).toMatchObject({ reportGroup: null, tracked: 1 });
   });
 
+  it('writes nothing when the current choice is tapped again', async () => {
+    await renderPage(<MuscleChoicePage muscleId="calves" />, 'settings-muscle-on');
+    const write = jest.spyOn(localDatabase(), 'transaction');
+    fireEvent.press(screen.getByTestId('settings-muscle-on'));
+    expect(write).not.toHaveBeenCalled();
+    expect(screen.getByTestId('settings-muscle-off')).toBeEnabled();
+  });
+
   it('opens a new combined muscle of its family with it ticked', async () => {
     await renderPage(<MuscleChoicePage muscleId="back_lats" />, 'settings-muscle-new-combined');
     expect(screen.getByText('Combine into')).toBeOnTheScreen();
