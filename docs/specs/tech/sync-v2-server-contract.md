@@ -7,8 +7,8 @@
 > `docs/specs/10-api-authn-authz-guidelines.md`. **Load when:** changing the
 > server sync schema, the sync RPCs, or `apps/mobile/src/sync/**`.
 
-Invariants and reasons live here; the code is the how (fix the doc when they
-disagree):
+Invariants and reasons live here; the code is the how (fix the doc on
+disagreement):
 `supabase/migrations/20260525120000_sync_v2_clean_room.sql`, the sync RPC
 migrations, `apps/mobile/src/sync/` and
 `apps/mobile/scripts/check-sync-schema-drift.ts`.
@@ -132,7 +132,7 @@ listed here:
 
 ## Deferrable foreign keys
 
-All twenty-two cross-entity FKs
+All twenty-three cross-entity FKs
 are `DEFERRABLE INITIALLY DEFERRED`, so the checks run at COMMIT. A push may
 write a child before its parent in one transaction, and any unsatisfied FK at
 COMMIT rolls back the whole batch. The migrations define names, targets and delete actions, checked by
@@ -170,7 +170,7 @@ Push batching and pull draining both use the layering in
 | Layer | Tables |
 | --- | --- |
 | 0 | `gyms`, `exercise_definitions`, `muscle_groups`, `user_settings`, `training_programmes` |
-| 1 | `session_plans`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `exercise_group_links` |
+| 1 | `session_plans`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `exercise_group_links`, `training_notes` |
 | 2 | `session_plan_exercises`, `session_plan_uses` |
 | 3 | `sessions`, `session_plan_sets` |
 | 4 | `session_exercises` |

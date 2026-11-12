@@ -171,6 +171,7 @@ FK_EDGES=(
   "sessions|source_plan_id|session_plans"
   "session_exercises|source_plan_exercise_id|session_plan_exercises"
   "exercise_sets|source_plan_set_id|session_plan_sets"
+  "training_notes|exercise_definition_id|exercise_definitions"
 )
 
 # Per-layer expected type set per the server contract's topological layers.
@@ -366,7 +367,7 @@ pass "FK closure — ten FK-bearing entity types partition exactly across layers
 echo "[sync-v2-pull-fk-closure] step 3 — partition assertion on the full layer response (no filter)"
 ALL_LAYER_TYPES=(
   '["gyms","exercise_definitions","muscle_groups","training_programmes"]'
-  '["session_plans","exercise_muscle_mappings","exercise_tag_definitions","exercise_group_links"]'
+  '["session_plans","exercise_muscle_mappings","exercise_tag_definitions","exercise_group_links","training_notes"]'
   '["session_plan_exercises","session_plan_uses"]'
   '["sessions","session_plan_sets"]'
   '["session_exercises"]'

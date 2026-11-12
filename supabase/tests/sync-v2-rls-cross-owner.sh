@@ -4,7 +4,7 @@
 #
 # Sets up rows for two fixture users (A and B), then with user A's JWT
 # exercises SELECT / INSERT / UPDATE / DELETE against user B's rows on every
-# one of the seventeen v2 entity tables. All four operations must either:
+# one of the eighteen v2 entity tables. All four operations must either:
 #
 #   - return zero rows (SELECT, UPDATE, DELETE under PostgREST + RLS),
 #   - or fail with an RLS-deny status / response shape (INSERT with a
@@ -88,6 +88,7 @@ ENTITIES=(
   session_plan_exercises
   session_plan_sets
   session_plan_uses
+  training_notes
 )
 
 # -----------------------------------------------------------------------------
@@ -183,9 +184,11 @@ SP_ID="rls-${RUN_TAG}-bsp"
 SPE_ID="rls-${RUN_TAG}-bspe"
 SPS_ID="rls-${RUN_TAG}-bsps"
 SPU_ID="rls-${RUN_TAG}-bspu"
+NOTE_ID="rls-${RUN_TAG}-bnote"
 
 cleanup_rows() {
   run_psql_sql "
+    delete from app_public.training_notes           where id = '${NOTE_ID}';
     delete from app_public.session_plan_uses        where id = '${SPU_ID}';
     delete from app_public.session_plan_sets        where id = '${SPS_ID}';
     delete from app_public.session_plan_exercises   where id = '${SPE_ID}';
@@ -327,6 +330,10 @@ run_psql_sql "
     insert into app_public.session_plan_uses
       (owner_user_id,id,session_plan_id,slot_index,kind,skipped_at,created_at,updated_at,client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid,'${SPU_ID}','${SP_ID}',1,'skip',${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
+
+    insert into app_public.training_notes
+      (owner_user_id,id,exercise_definition_id,body,noted_on,source,created_at,updated_at,client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid,'${NOTE_ID}','${EDEF_ID}','B note','2026-11-12','app',${NOW_MS},${NOW_MS},${NOW_MS});
   commit;
 " >/dev/null
 
@@ -473,6 +480,13 @@ insert_payload_for() {
         '{owner_user_id: $owner, id: $id, session_plan_id: $sp, slot_index: 2, kind: "skip", skipped_at: $ts,
           client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
       ;;
+    training_notes)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --arg edef "${EDEF_ID}" --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, exercise_definition_id: $edef, body: "Injected",
+          noted_on: "2026-11-12", source: "app",
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
     session_plan_sets)
       jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
         --arg spe "${SPE_ID}" --argjson ts "${NOW_MS}" \
@@ -502,6 +516,7 @@ target_row_id_for() {
     session_plan_exercises)   echo "${SPE_ID}" ;;
     session_plan_sets)        echo "${SPS_ID}" ;;
     session_plan_uses)        echo "${SPU_ID}" ;;
+    training_notes)           echo "${NOTE_ID}" ;;
   esac
 }
 

@@ -36,13 +36,14 @@ import {
   sessions,
   syncQuarantine,
   syncRuntimeState,
+  trainingNotes,
   trainingProgrammes,
   userSettings,
 } from './schema';
 import { smokeRecords } from './schema/smoke';
 
 /**
- * The sixteen synced, per-account entity tables, child before parent so foreign
+ * The eighteen synced, per-account entity tables, child before parent so foreign
  * keys stay satisfied even where a cascade is missing (`exercise_group_links`
  * has a `no action` FK into `exercise_definitions`). Each carries `local_dirty`.
  * The session planning tables sit after the performed rows that hold their source
@@ -63,6 +64,7 @@ const SYNCED_ENTITY_TABLES = [
   exerciseTagDefinitions,
   exerciseMuscleMappings,
   exerciseGroupLinks,
+  trainingNotes,
   exerciseDefinitions,
   muscleGroups,
   userSettings,

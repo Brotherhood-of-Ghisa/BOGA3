@@ -4,7 +4,7 @@
 // A type added to a layer re-pulls only that layer once (pull-layer-types.ts).
 export const TOPO_LAYERS: readonly (readonly string[])[] = [
   ['gyms', 'exercise_definitions', 'muscle_groups', 'user_settings', 'training_programmes'], // Layer 0
-  ['session_plans', 'exercise_muscle_mappings', 'exercise_tag_definitions', 'exercise_group_links'], // Layer 1
+  ['session_plans', 'exercise_muscle_mappings', 'exercise_tag_definitions', 'exercise_group_links', 'training_notes'], // Layer 1
   ['session_plan_exercises', 'session_plan_uses'], // Layer 2
   ['sessions', 'session_plan_sets'], // Layer 3
   ['session_exercises'], // Layer 4
