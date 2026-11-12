@@ -81,6 +81,7 @@ describe('main tab model', () => {
     expect(resolveMainTab(['(tabs)', 'stats-history'])).toBe('progress');
     expect(resolveMainTab(['(tabs)', 'exercise-catalog'])).toBe('more');
     expect(resolveMainTab(['(tabs)', 'settings'])).toBe('more');
+    expect(resolveMainTab(['notes'])).toBe('more');
   });
 
   it('returns no selection for an unknown route instead of guessing', () => {

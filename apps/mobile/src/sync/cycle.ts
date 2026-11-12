@@ -606,6 +606,10 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
   ],
+  training_notes: [
+    SC('exercise_definition_id', 'exerciseDefinitionId'), SC('body', 'body'), SC('noted_on', 'notedOn'),
+    SC('source', 'source'), TS('created_at', 'createdAt'), TS('updated_at', 'updatedAt'), TS('deleted_at', 'deletedAt'),
+  ],
   training_programmes: [
     SC('name', 'name'),
     SC('description', 'description'),
@@ -769,6 +773,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
 const ENTITY_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   user_settings: schema.userSettings,
   body_weight_measurements: schema.bodyWeightMeasurements,
+  training_notes: schema.trainingNotes,
   training_programmes: schema.trainingProgrammes,
   session_plans: schema.sessionPlans,
   session_plan_uses: schema.sessionPlanUses,

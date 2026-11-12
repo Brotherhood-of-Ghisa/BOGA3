@@ -26,6 +26,11 @@ import {
   checkOverrideIds, MuscleTargetsError, normalizeMuscleTargetsWrite, reportedMuscleIds,
 } from './muscle-targets.ts';
 import {
+  DEFAULT_NOTE_LIMIT, EMBEDDED_NOTE_LIMIT, MAX_NOTE_LIMIT, NOTE_COLUMNS, NoteInputError, normalizeNoteAdd,
+  normalizeNoteRemove, noteCursorFrom, noteCursorOf, noteExerciseIds, noteKeysetFilter, noteToday, parseNoteExerciseFilter,
+  parseNoteRange, projectNote, statusNotesFrom, type NoteRow,
+} from './notes.ts';
+import {
   asMuscleReportRows, buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, STATUS_READ_DAYS, statusReadComplete,
   statusSettings, trainingStatusWindow,
   type StatusBlockRow, type StatusDefinitionRow, type StatusMappingRow, type StatusMuscleRow,
@@ -161,6 +166,7 @@ const writeRateWindows = new Map<string, RateWindow>();
 const exerciseWriteRateWindows = new Map<string, RateWindow>();
 const muscleTargetsWriteRateWindows = new Map<string, RateWindow>();
 const workoutWriteRateWindows = new Map<string, RateWindow>();
+const noteWriteRateWindows = new Map<string, RateWindow>();
 
 const getRequiredEnv = (name: string): string => {
   const value = Deno.env.get(name)?.trim();
@@ -366,6 +372,8 @@ const routeToolName = (path: string, method: string): string => {
   if (path === '/v1/agent/training-status') return 'get_training_status';
   if (path === '/v1/agent/activities') return 'get_recent_activities';
   if (path === '/v1/agent/muscle-targets') return 'set_muscle_targets';
+  if (path === '/v1/agent/notes') return method === 'POST' ? 'add_note' : 'list_notes';
+  if (method === 'POST' && NOTE_REMOVE_PATH.test(path)) return 'remove_note';
   if (path === '/v1/agent/session-plans') {
     return method === 'POST' ? 'create_session_plan' : 'get_upcoming_session_plans';
   }
@@ -1219,12 +1227,13 @@ const getExerciseContext = async (
   const historyTruncated = (blocks?.length ?? 0) > MAX_CONTEXT_BLOCKS;
   const boundedBlocks = (blocks ?? []).slice(0, MAX_CONTEXT_BLOCKS);
 
-  const [sessions, setResult, mappings, equipmentByExercise] = await Promise.all([
+  const [sessions, setResult, mappings, equipmentByExercise, notes] = await Promise.all([
     loadSessionsById(client, userId, boundedBlocks.map((row) => row.session_id),
       bodyweightCalculationsEnabled && definition.bodyweight_contribution > 0),
     loadSetsByBlock(client, userId, boundedBlocks.map((row) => row.id)),
     loadMappings(client, userId, [exerciseId]),
     loadEquipmentByExercise(client, userId, [exerciseId]),
+    loadExerciseNotes(client, userId, exerciseId),
   ]);
   const completedSessions = sessions
     .filter((row): row is SessionRow & { completed_at: number } => row.completed_at !== null)
@@ -1370,8 +1379,8 @@ const getExerciseContext = async (
     last_performed_at: bucketRows.length > 0
       ? toIsoTimestamp(bucketRows[0].session.completed_at)
       : null,
-    training_notes: [],
-    unavailable_fields: ['failed_set_semantics', 'user_authored_training_notes'],
+    ...notes,
+    unavailable_fields: ['failed_set_semantics'],
     history_truncated: historyIncomplete,
   };
 };
@@ -1950,6 +1959,167 @@ const loadStatusCardio = async (
   });
 };
 
+const NOTE_REMOVE_PATH = /^\/v1\/agent\/notes\/([^/]+)\/remove$/;
+
+const asNoteInput = <T>(read: () => T, code = 'INVALID_ARGUMENT'): T => {
+  try {
+    return read();
+  } catch (error) {
+    if (error instanceof NoteInputError) throw new ApiError(400, code, error.message);
+    throw error;
+  }
+};
+
+/** The profile's zone, as the training status reads it. */
+const loadProfileTimeZone = async (client: SupabaseClient, userId: string): Promise<string> => {
+  const { data, error } = await client.schema('app_public').from('user_profiles').select('time_zone').eq('id', userId)
+    .maybeSingle<{ time_zone: string | null }>();
+  throwDatabaseError(error);
+  return resolveStatusTimeZone(data?.time_zone);
+};
+
+/**
+ * Live notes in list order, one more than `limit` so the caller can tell a
+ * cut. Rows without a date or creation time are malformed (the app writes
+ * both) and are not read.
+ */
+const notesQuery = (client: SupabaseClient, userId: string, limit: number) =>
+  client.schema('app_public').from('training_notes').select(NOTE_COLUMNS)
+    .eq('owner_user_id', userId).is('deleted_at', null)
+    .not('noted_on', 'is', null).not('created_at', 'is', null).not('body', 'is', null)
+    .order('noted_on', { ascending: false }).order('created_at', { ascending: false }).order('id', { ascending: false })
+    .limit(limit + 1);
+
+/** The page's notes projected, each exercise named even when it was deleted. */
+const projectNotes = async (client: SupabaseClient, userId: string, rows: readonly NoteRow[]): Promise<JsonObject[]> => {
+  const ids = noteExerciseIds(rows);
+  const names = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data, error } = await client.schema('app_public').from('exercise_definitions').select('id,name')
+      .eq('owner_user_id', userId).in('id', ids).returns<Array<{ id: string; name: string }>>();
+    throwDatabaseError(error);
+    for (const row of data ?? []) names.set(row.id, row.name);
+  }
+  return rows.map((row) => projectNote(row, names));
+};
+
+const listNotes = async (client: SupabaseClient, userId: string, url: URL): Promise<JsonObject> => {
+  rejectUnexpectedQuery(url, new Set(['exercise_id', 'from', 'to', 'limit', 'cursor']));
+  const limit = parseBoundedInteger(url.searchParams.get('limit'), DEFAULT_NOTE_LIMIT, 1, MAX_NOTE_LIMIT, 'limit');
+  const exerciseId = asNoteInput(() => parseNoteExerciseFilter(url.searchParams.get('exercise_id')));
+  const range = asNoteInput(() => parseNoteRange(url.searchParams.get('from'), url.searchParams.get('to')));
+  const rawCursor = decodeCursor(url.searchParams.get('cursor'), 'note');
+  const cursor = rawCursor ? asNoteInput(() => noteCursorFrom(rawCursor), 'INVALID_CURSOR') : null;
+  let query = notesQuery(client, userId, limit);
+  if (exerciseId !== null) query = query.eq('exercise_definition_id', exerciseId);
+  if (range.from !== null) query = query.gte('noted_on', range.from);
+  if (range.to !== null) query = query.lte('noted_on', range.to);
+  if (cursor) query = query.or(noteKeysetFilter(cursor));
+  const { data, error } = await query.returns<NoteRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  const page = rows.slice(0, limit);
+  const last = page[page.length - 1];
+  return {
+    notes: await projectNotes(client, userId, page),
+    next_cursor: rows.length > limit && last ? encodeCursor(noteCursorOf(last)) : null,
+  };
+};
+
+/** One exercise's newest notes for its context. */
+const loadExerciseNotes = async (client: SupabaseClient, userId: string, exerciseId: string): Promise<JsonObject> => {
+  const { data, error } = await notesQuery(client, userId, EMBEDDED_NOTE_LIMIT)
+    .eq('exercise_definition_id', exerciseId).returns<NoteRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  return {
+    training_notes: await projectNotes(client, userId, rows.slice(0, EMBEDDED_NOTE_LIMIT)),
+    training_notes_truncated: rows.length > EMBEDDED_NOTE_LIMIT,
+  };
+};
+
+/** The status's general notes (no exercise) dated within its 56 days. */
+const loadStatusNotes = async (
+  client: SupabaseClient, userId: string, window: TrainingStatusWindow,
+): Promise<JsonObject> => {
+  const from = statusNotesFrom(window);
+  const { data, error } = await notesQuery(client, userId, EMBEDDED_NOTE_LIMIT)
+    .is('exercise_definition_id', null).gte('noted_on', from).returns<NoteRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  return {
+    from,
+    notes: await projectNotes(client, userId, rows.slice(0, EMBEDDED_NOTE_LIMIT)),
+    complete: rows.length <= EMBEDDED_NOTE_LIMIT,
+  };
+};
+
+/**
+ * The note RPCs' errors. `NOT_FOUND` from `add_note` is its exercise, a
+ * reference like a plan's (`400`); from `remove_note` it is the note itself.
+ */
+const throwNoteWriteError = (error: { message?: string } | null, operation: 'add' | 'remove'): void => {
+  if (!error) return;
+  const message = error.message ?? '';
+  if (message.includes('IDEMPOTENCY_CONFLICT')) {
+    throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This idempotency key was used with a different payload.');
+  }
+  if (message.includes('EXERCISE_DELETED')) {
+    throw new ApiError(409, 'EXERCISE_DELETED', 'The exercise is deleted. Restore it before adding a note to it.');
+  }
+  if (message.includes('NOT_FOUND') && operation === 'add') {
+    throw new ApiError(400, 'FOREIGN_RESOURCE_REFERENCE', 'exercise_id is not one of the person’s exercises. Use search_exercises.');
+  }
+  if (message.includes('NOT_FOUND')) throw new ApiError(404, 'NOT_FOUND', 'Note not found.');
+  if (message.includes('INVALID_ARGUMENT')) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'The request could not be accepted.');
+  }
+  throwDatabaseError(error);
+};
+
+/** `add_note` and `remove_note`; the receipt makes a retry with the same key and body replay the first result. */
+const writeNote = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+  noteId: string | null,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  const body = await readJsonBody(request);
+  const identity = { p_owner: agent.userId, p_client_id: agent.clientId, p_idempotency_key: idempotencyKey };
+  if (noteId !== null) {
+    const remove = asNoteInput(() => normalizeNoteRemove(body, noteId));
+    const { data, error } = await client.schema('app_public').rpc('agent_remove_note', {
+      ...identity, p_payload_sha256: await sha256Hex(JSON.stringify(remove)), p_note_id: remove.note_id,
+    });
+    throwNoteWriteError(error, 'remove');
+    return data as JsonObject;
+  }
+  const today = noteToday(new Date(), await loadProfileTimeZone(client, agent.userId));
+  const add = asNoteInput(() => normalizeNoteAdd(body, today));
+  const { data, error } = await client.schema('app_public').rpc('agent_add_note', {
+    ...identity, p_payload_sha256: await sha256Hex(JSON.stringify(add.hashed)), p_note: add.note,
+  });
+  throwNoteWriteError(error, 'add');
+  const result = data as JsonObject;
+  const note = result.note as JsonObject | undefined;
+  // The RPC stores `created_at` as epoch ms; the API speaks ISO 8601.
+  return note && typeof note.created_at === 'number'
+    ? { ...result, note: { ...note, created_at: new Date(note.created_at).toISOString() } }
+    : result;
+};
+
+/** The note id of a `POST /v1/agent/notes/{id}/remove` path, or null for another path. */
+const noteRemoveId = (path: string): string | null => {
+  const match = NOTE_REMOVE_PATH.exec(path);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'note_id is invalid.');
+  }
+};
+
 const getTrainingStatus = async (
   client: SupabaseClient,
   userId: string,
@@ -1994,9 +2164,10 @@ const getTrainingStatus = async (
   const training: StatusTraining = { sessions, blocks: blocks.rows, sets: sets.rows };
   const window = trainingStatusWindow(now, timeZone);
   const favourites = rankFavouriteExercises(training, definitions, bodyweightCalculationsEnabled, window, timeZone);
-  const [history, cardio] = await Promise.all([
+  const [history, cardio, notes] = await Promise.all([
     loadFavouriteHistory(client, userId, favourites.map((favourite) => favourite.exerciseId), bodyweightCalculationsEnabled),
     loadStatusCardio(client, userId, now, window, timeZone),
+    loadStatusNotes(client, userId, window),
   ]);
   const status = buildTrainingStatus({
     now, timeZone,
@@ -2015,7 +2186,7 @@ const getTrainingStatus = async (
       truncatedReads: [blocks, sets, mappings],
     }),
   });
-  return { ...status, cardio };
+  return { ...status, cardio, general_notes: notes };
 };
 
 const getWorkoutDetail = async (
@@ -3082,6 +3253,13 @@ const dispatchAgentRequest = async (
     return setMuscleTargets(client, agent, request, await readJsonBody(request));
   }
 
+  const removeNoteId = method === 'POST' ? noteRemoveId(path) : null;
+  if ((path === '/v1/agent/notes' && method === 'POST') || removeNoteId !== null) {
+    enforceRateLimit(noteWriteRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
+    await loadPlanPermission(client, agent);
+    return writeNote(client, agent, request, removeNoteId);
+  }
+
   if (method === 'POST') {
     const exerciseWrite = exerciseWriteFor(path);
     if (exerciseWrite) {
@@ -3101,6 +3279,9 @@ const dispatchAgentRequest = async (
   }
   if (path === '/v1/agent/activities') {
     return getRecentActivities(client, agent.userId, url);
+  }
+  if (path === '/v1/agent/notes') {
+    return listNotes(client, agent.userId, url);
   }
 
   const bodyweightCalculationsEnabled = await loadBodyweightCalculationsEnabled(client, agent.userId);

@@ -153,6 +153,9 @@ cleanup() {
             and oauth_client_id = '${AGENT_CLIENT_ID}';
         delete from app_public.health_activities
           where user_id = '${USER_UUID}'::uuid and external_id like 'mcp-smoke-${RUN_TAG}-%';
+        delete from app_public.training_notes
+          where owner_user_id = '${USER_UUID}'::uuid
+            and (id like 'mcp-smoke-${RUN_TAG}-%' or body like 'MCP Smoke ${RUN_TAG} %');
         delete from app_public.exercise_sets
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.session_exercises
@@ -235,6 +238,8 @@ else
   SET_ID="mcp-smoke-${RUN_TAG}-set"
   # Imported health activities: a run, and a watch strength workout inside the session.
   ACTIVITY_PREFIX="mcp-smoke-${RUN_TAG}-activity"
+  # Training notes: one general, one on the exercise, and a removed one no read returns.
+  NOTE_PREFIX="mcp-smoke-${RUN_TAG}-note"
   EXPECT_BODYWEIGHT=1
   EXERCISE_QUERY="MCP Smoke ${RUN_TAG}"
   NOW_MS="$(($(date +%s) * 1000))"
@@ -305,6 +310,15 @@ else
          to_timestamp($((NOW_MS - 300000)) / 1000.0),to_timestamp($((NOW_MS - 60000)) / 1000.0),240,800,60),
         ('${USER_UUID}'::uuid,'apple_health','${ACTIVITY_PREFIX}-lift','traditional_strength_training',
          to_timestamp($((NOW_MS - 880000)) / 1000.0),to_timestamp($((NOW_MS - 620000)) / 1000.0),260,null,40);
+      insert into app_public.training_notes
+        (owner_user_id,id,exercise_definition_id,body,noted_on,source,created_at,updated_at,deleted_at,client_updated_at_ms)
+      values
+        ('${USER_UUID}'::uuid,'${NOTE_PREFIX}-general',null,'MCP Smoke ${RUN_TAG} general note',
+         to_char(now() - interval '2 days','YYYY-MM-DD'),'app',${NOW_MS},${NOW_MS},null,${NOW_MS}),
+        ('${USER_UUID}'::uuid,'${NOTE_PREFIX}-exercise','${EXERCISE_ID}','MCP Smoke ${RUN_TAG} exercise note',
+         to_char(now() - interval '2 days','YYYY-MM-DD'),'app',${NOW_MS},${NOW_MS},null,${NOW_MS}),
+        ('${USER_UUID}'::uuid,'${NOTE_PREFIX}-removed','${EXERCISE_ID}','MCP Smoke ${RUN_TAG} removed note',
+         to_char(now() - interval '2 days','YYYY-MM-DD'),'app',${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
       -- Pre-existing sentinel plan to prove smoke cleanup does not delete unrelated user plans
       insert into app_public.session_plans
         (owner_user_id,id,title,provenance,created_at,updated_at,client_updated_at_ms)
@@ -372,6 +386,7 @@ BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
 BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
 BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
 BOGA_MCP_SMOKE_ACTIVITY_PREFIX="${ACTIVITY_PREFIX:-}" \
+BOGA_MCP_SMOKE_NOTE_PREFIX="${NOTE_PREFIX:-}" \
 BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
 BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
   npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
@@ -405,6 +420,7 @@ if [[ -n "${USER_UUID}" ]]; then
   BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
   BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_ACTIVITY_PREFIX="${ACTIVITY_PREFIX:-}" \
+  BOGA_MCP_SMOKE_NOTE_PREFIX="${NOTE_PREFIX:-}" \
   BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_PLAN_ENABLED="1" \
     npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
@@ -427,6 +443,7 @@ if [[ -n "${USER_UUID}" ]]; then
     where owner_user_id = '${USER_UUID}'::uuid and source_plan_id is not null;
   ")"
   [[ "${PERFORMED_WITH_PROVENANCE}" == "0" ]] || fail "agent plan creation wrote performed source_plan_id rows"
+
 
   echo "[boga-mcp-smoke] verifying metadata-only audit records"
   AUDIT_COUNT="$(run_psql "
@@ -451,6 +468,7 @@ if [[ -n "${USER_UUID}" ]]; then
   BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
   BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_ACTIVITY_PREFIX="${ACTIVITY_PREFIX:-}" \
+  BOGA_MCP_SMOKE_NOTE_PREFIX="${NOTE_PREFIX:-}" \
   BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
     npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client

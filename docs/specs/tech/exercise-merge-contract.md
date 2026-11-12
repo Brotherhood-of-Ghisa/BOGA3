@@ -12,7 +12,7 @@ Writers must echo the revision their editor loaded, including graph rewrites, re
 An importer starts at zero; it must never attach today's revision to an older package.
 
 `public.exercise_merge_operations`, `public.exercise_merge_contexts` and
-`public.exercise_merge_conflicts` are **out of the seventeen-table mirror**.
+`public.exercise_merge_conflicts` are **out of the eighteen-table mirror**.
 They are owner-private server control/recovery storage, reached only through authenticated app RPCs.
 No direct table grants; RLS enabled; OAuth `client_id` requests denied.
 Receipts keep input hashes and counts, contexts keep immutable conversion factors, and unresolved
@@ -78,6 +78,7 @@ Builds before this rule throw on an unknown snapshot type, so a new table stays 
 `exercise_merge_snapshot` until the oldest supported build skips them. Until then its rows reach
 clients only through `sync_pull`: a merge that repoints them must raise their
 `client_updated_at_ms` so the re-pull applies.
+Training notes are such a table ([`training-notes-contract.md`](training-notes-contract.md)).
 One SQLite transaction preserves stale dirty rows, replaces the complete canonical context,
 and restores valid unsent additions with collision-safe slots.
 Edits made while fetching are captured again at apply time. Future-clock stale rows are still fenced.

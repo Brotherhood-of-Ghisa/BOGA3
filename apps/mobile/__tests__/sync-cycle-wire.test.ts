@@ -36,6 +36,7 @@ afterEach(() => {
 const TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   user_settings: schema.userSettings,
   body_weight_measurements: schema.bodyWeightMeasurements,
+  training_notes: schema.trainingNotes,
   training_programmes: schema.trainingProgrammes,
   session_plans: schema.sessionPlans,
   session_plan_exercises: schema.sessionPlanExercises,
@@ -79,6 +80,13 @@ const SAMPLE_ROWS: Record<EntityTableName, Record<string, unknown>> = {
     createdAt: new Date('2026-05-29T08:00:00.000Z'),
     updatedAt: new Date('2026-05-29T08:30:00.000Z'),
     deletedAt: new Date('2026-05-29T10:00:00.000Z'),
+  },
+  training_notes: {
+    id: 'note-wire', exerciseDefinitionId: 'def-1', body: 'From today I squat to a bench', notedOn: '2026-05-28',
+    source: 'agent',
+    createdAt: new Date('2026-05-29T08:00:00.000Z'),
+    updatedAt: new Date('2026-05-29T08:30:00.000Z'),
+    deletedAt: null,
   },
   training_programmes: {
     id: 'tp-wire',
@@ -275,6 +283,21 @@ describe('entityToWire / wireToEntity round-trip', () => {
     // after the round-trip (timestamps compared as epoch ms).
     const roundTripWire = entityToWire(landed, type);
     expect(roundTripWire.fields).toEqual(wire.fields);
+  });
+
+  it('emits the training note columns, with a general note carrying a null exercise', () => {
+    database.insert(schema.trainingNotes).values({
+      id: 'note-general', body: 'Shoulder sore: no pressing', notedOn: '2026-05-01',
+      createdAt: new Date(1000), updatedAt: new Date(2000), localDirty: true, localUpdatedAtMs: 3000,
+    }).run();
+    const row = database.select().from(schema.trainingNotes).where(eq(schema.trainingNotes.id, 'note-general')).get();
+    expect(entityToWire(row as Record<string, unknown>, 'training_notes')).toEqual({
+      type: 'training_notes', id: 'note-general', client_updated_at_ms: 3000,
+      fields: {
+        exercise_definition_id: null, body: 'Shoulder sore: no pressing', noted_on: '2026-05-01', source: 'app',
+        created_at: 1000, updated_at: 2000, deleted_at: null,
+      },
+    });
   });
 
   it('emits the four gym coordinate columns on the wire', () => {

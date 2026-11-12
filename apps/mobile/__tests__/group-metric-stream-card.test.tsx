@@ -29,13 +29,40 @@ it.each([
   const card=renderCard({ ...competitionEvent,metric,values: [{ ...competitionEvent.values[0],metric,unit,value }] });
   expect(card).toHaveTextContent(line,{ exact: false });
 });
-it.each(['record_voided','record'] as const)('uses generic ended copy for %s and never reads the private cause', kind => {
-  const event={ ...competitionEvent,kind,voided: true };
+const withdrawal=(): CompetitionEventWire => {
+  const event={ ...competitionEvent,event_id: 'w1',kind: 'record_voided' as const,sort_at_ms: Date.UTC(2026,10,11,9),
+    related_event_id: 'event1',metric: null,values: [],record_context: null,reps: null };
   Object.defineProperty(event,'reason',{ get: () => { throw new Error('private cause read'); } });
+  return event;
+};
+const withdrawnRecord={ event: { ...competitionEvent,voided: true,sort_at_ms: Date.UTC(2026,10,10,8),
+  member: { user_id: 'u2',username: 'GoldmanBoyo' },
+  values: [{ ...competitionEvent.values[0],unit: 'kg',value: 116 },{ ...competitionEvent.values[0],metric: 'volume' as const,unit: 'kg_reps',value: 580 }] },
+  record: { performance: ordinarySet,previous: [],group_record_metrics: ['e1rm' as const] } };
+it('shows a withdrawn GR as its GR card, dated at withdrawal, without a certification or the private cause', () => {
+  const card=renderCard(withdrawal(),{ withdrawn: withdrawnRecord });
+  expect(screen.getByTestId('group-metric-stream-w1-label')).toHaveTextContent('GoldmanBoyo · GR withdrawn');
+  expect(screen.getByTestId('group-metric-stream-w1-context')).toHaveTextContent('Pull-up');
+  expect(screen.getByTestId('group-metric-stream-w1-set')).toHaveTextContent('120.0 × 5');
+  expect(screen.getByTestId('group-metric-stream-w1-date')).toHaveTextContent('11-11-2026');
+  expect(card).toHaveTextContent('1RM 116.0',{ exact: false });
+  expect(card).not.toHaveTextContent(/Volume|Certif|Score unavailable/);
+  expect(screen.queryByTestId('group-metric-stream-w1-certification')).toBeNull();
+  expect(card.props.accessibilityLabel).toBe('GoldmanBoyo · GR withdrawn, Pull-up, 120.0 × 5, 1RM 116.0, 11-11-2026');
+  fireEvent.press(card);
+  expect(mockPush).toHaveBeenCalledWith('/group/g1/leaderboards/ge1/history?metric=e1rm&scope=all');
+});
+it('names you on your own withdrawn GR', () => {
+  renderCard(withdrawal(),{ withdrawn: { ...withdrawnRecord,event: { ...withdrawnRecord.event,member: { user_id: 'me',username: 'Me' } } } });
+  expect(screen.getByTestId('group-metric-stream-w1-label')).toHaveTextContent('You · GR withdrawn');
+});
+it.each([
+  ['a withdrawal without its record',withdrawal()],
+  ['a withdrawn record',{ ...competitionEvent,voided: true }],
+])('labels %s withdrawn, with no figures', (_name,event) => {
   const card=renderCard(event);
-  expect(card).toHaveTextContent('Certification ended',{ exact: false });
-  expect(card).toHaveTextContent('Score unavailable',{ exact: false });
-  expect(card).not.toHaveTextContent('145.7',{ exact: false });
+  expect(screen.getByTestId(`group-metric-stream-${event.event_id}-label`)).toHaveTextContent('Friend · GR withdrawn');
+  expect(card).not.toHaveTextContent(/45\.7|Score unavailable|Certif/);
 });
 it('labels absent score as unavailable rather than zero', () => {
   const card=renderCard({ ...competitionEvent,values: [{ ...competitionEvent.values[0],value: null,unavailable: true }] });

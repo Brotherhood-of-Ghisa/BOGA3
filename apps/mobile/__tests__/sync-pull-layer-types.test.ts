@@ -105,7 +105,7 @@ const programmeEntity = (id: string, ms: number): WireEntity => ({
 
 /** A row of a table no build knows yet: what a server-first release sends old builds. */
 const unknownEntity = (id: string, ms: number): WireEntity => ({
-  type: 'training_notes' as WireEntity['type'],
+  type: 'future_widgets' as WireEntity['type'],
   id,
   client_updated_at_ms: ms,
   fields: { exercise_definition_id: 'def-1', body: 'Brace harder', deleted_at: null },
@@ -202,8 +202,14 @@ describe('layer type lists (pure)', () => {
     expect(state).toEqual({ '0': cursor(0, 'a'), '5': cursor(5, 'a') });
   });
 
+  it('a cursor drained before training notes re-pulls layer 1 only', () => {
+    const state: Record<string, unknown> = { '0': cursor(0, 'a'), '1': cursor(1, 'a'), '5': cursor(5, 'a') };
+    expect(resetLayersMissingTypes(state)).toEqual([1]);
+    expect(state).toEqual({ '0': cursor(0, 'a'), '5': cursor(5, 'a') });
+  });
+
   it('a new type in an existing layer resets only that layer, keeping other cursors and pending moves', () => {
-    const upgraded = withType(1, 'training_notes');
+    const upgraded = withType(1, 'future_widgets');
     const state: Record<string, unknown> = { '0': cursor(0, 'a'), '1': cursor(1, 'a'), '3': cursor(3, 'a'), provisional_moves: [{ id: 'm' }] };
     recordLayerTypes(state, 1);
 
@@ -218,14 +224,14 @@ describe('layer type lists (pure)', () => {
   });
 
   it('a new layer resets nothing: it has no stored cursor and pulls from the start', () => {
-    const upgraded = [...TOPO_LAYERS, ['training_notes']];
+    const upgraded = [...TOPO_LAYERS, ['future_widgets']];
     const state: Record<string, unknown> = { '0': cursor(0, 'a'), '5': cursor(5, 'a') };
     expect(resetLayersMissingTypes(state, upgraded)).toEqual([]);
     expect(state).toEqual({ '0': cursor(0, 'a'), '5': cursor(5, 'a') });
   });
 
   it('keeps a layer a newer build drained with an extra type (a downgrade would skip it anyway), resets an unreadable list', () => {
-    const newer = [...TOPO_LAYERS[1], 'training_notes'].sort();
+    const newer = [...TOPO_LAYERS[1], 'future_widgets'].sort();
     const state: Record<string, unknown> = {
       '1': cursor(1, 'a'),
       '2': cursor(2, 'a'),
@@ -237,7 +243,7 @@ describe('layer type lists (pure)', () => {
 
     // The older build's next cursor write records its own list, so upgrading again re-pulls the layer.
     recordLayerTypes(state, 1);
-    expect(resetLayersMissingTypes(state, withType(1, 'training_notes'))).toEqual([1]);
+    expect(resetLayersMissingTypes(state, withType(1, 'future_widgets'))).toEqual([1]);
   });
 
   it('compares lists ignoring order', () => {

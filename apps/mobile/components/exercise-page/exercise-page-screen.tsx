@@ -33,7 +33,7 @@ import { resolveRestTimerSec } from '@/src/exercise-core/rest-timer';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
 import { sessionExerciseHref } from '@/src/navigation/active-session-entry';
-import { exerciseHistoryHref, exerciseLinkHref, progressHistoryHref } from '@/src/navigation/routes';
+import { exerciseHistoryHref, exerciseLinkHref, notesHref, progressHistoryHref } from '@/src/navigation/routes';
 import { loadOwnBookGymId } from '@/src/data/exercise-session-facts';
 import { exerciseHistoryOpeningGym } from '@/src/session-recorder/exercise-history-view';
 import {
@@ -417,6 +417,16 @@ export function ExercisePageScreen({
     );
   };
 
+  // This exercise's notes. Pending edits are written first, as for Link.
+  const onOpenNotes = () => {
+    setOpenSheet('none');
+    if (!exercise) return;
+    const { exerciseDefinitionId } = exercise;
+    void draft.flush().then((saved) => {
+      if (saved) router.push(notesHref(exerciseDefinitionId));
+    });
+  };
+
   /**
    * Exercise history, opened on the gym [[gym.view-filter]] names
    * (`exerciseHistoryOpeningGym`). Pending edits are written first, so a
@@ -603,6 +613,7 @@ export function ExercisePageScreen({
             : undefined
         }
         onOpenHistory={onOpenHistory}
+        onOpenNotes={onOpenNotes}
         onRemove={onRemove}
         onSwap={() => setOpenSheet('swap')}
         visible={openSheet === 'options'}

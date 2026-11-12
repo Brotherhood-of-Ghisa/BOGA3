@@ -182,6 +182,16 @@ export function isCompetitionRecordsHistoryWire(v: unknown): v is CompetitionRec
   const log = { exercise: v.exercise.group_exercise_id, metric: v.metric, certified: v.certified };
   return arrayOf(v.items,item => recordsHistoryItem(item,log)) && nullableText(v.next_cursor);
 }
+// The record a withdrawal names: that member's record on that exercise, voided, with its own stream record.
+function streamWithdrawn(v: unknown, event: CompetitionEventWire): boolean {
+  if (event.kind !== 'record_voided') return false;
+  if (v === null) return true;
+  if (!exact(v,['event','record']) || !isCompetitionEventWire(v.event)) return false;
+  const record = v.event;
+  return record.kind === 'record' && record.voided && record.event_id === event.related_event_id &&
+    record.group.group_id === event.group.group_id && record.group_exercise.group_exercise_id === event.group_exercise.group_exercise_id &&
+    record.member?.user_id === event.member?.user_id && streamRecord(v.record,record);
+}
 function sharedExerciseMapping(v: unknown): boolean {
   return exact(v,['muscle_group_id','weight','role']) && id(v.muscle_group_id) &&
     typeof v.weight === 'number' && Number.isFinite(v.weight) && v.weight > 0 &&
@@ -215,10 +225,13 @@ export function isGroupSharedExerciseDeleteWire(v: unknown): v is GroupSharedExe
 }
 function streamItem(v: unknown): boolean {
   if (v && typeof v === 'object' && 'kind' in v && v.kind === 'cow') return isCoWStreamItemWire(v);
+  // A withdrawal always carries its record (v5): a page without it fails rather than hiding the card.
   if (exact(v,['kind','key','sort_at_ms','event']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
-    isCompetitionEventWire(v.event) && v.event.event_id === v.key;
+    isCompetitionEventWire(v.event) && v.event.event_id === v.key && v.event.kind !== 'record_voided';
   if (exact(v,['kind','key','sort_at_ms','event','record']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
     isCompetitionEventWire(v.event) && v.event.event_id === v.key && streamRecord(v.record,v.event);
+  if (exact(v,['kind','key','sort_at_ms','event','withdrawn']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
+    isCompetitionEventWire(v.event) && v.event.event_id === v.key && streamWithdrawn(v.withdrawn,v.event);
   if (exact(v,['kind','key','sort_at_ms','groups','session']) && v.kind === 'session') return id(v.key) && integer(v.sort_at_ms) &&
     Array.isArray(v.groups) && v.groups.length > 0 && v.groups.every(group) && isCompetitionSessionWire(v.session);
   if (exact(v,['kind','key','sort_at_ms','id','group_id','shared_by','exercise']) && v.kind === 'shared_exercise') {

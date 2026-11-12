@@ -90,6 +90,9 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
   exercise_group_links: [
     { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: true },
   ],
+  training_notes: [
+    { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: false },
+  ],
   session_exercises: [
     { parentIdField: 'source_plan_use_id', parentType: 'session_plan_uses', required: false },
     { parentIdField: 'session_id', parentType: 'sessions', required: true },
@@ -119,6 +122,7 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
 const PARENT_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   user_settings: schema.userSettings,
   body_weight_measurements: schema.bodyWeightMeasurements,
+  training_notes: schema.trainingNotes,
   training_programmes: schema.trainingProgrammes,
   session_plans: schema.sessionPlans,
   session_plan_uses: schema.sessionPlanUses,
