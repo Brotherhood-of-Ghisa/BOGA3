@@ -49,6 +49,20 @@ const availableBlocks = async (graph: PlanGraph): Promise<AvailableBlock[]> => {
   );
 };
 
+/**
+ * Whether a plan has at least one pending block with an exercise definition
+ * available to be started, matching materialization eligibility.
+ */
+export const isPlanEligibleToStart = async (planId: string): Promise<boolean> => {
+  const graph = await planStore.loadPlanGraph(planId);
+  if (!graph) return false;
+  if (graph.plan.isRoutine) return true;
+  const samePlanSession = await planStore.findActiveSessionIdBySourcePlan(planId);
+  if (samePlanSession) return true;
+  const blocks = await availableBlocks(graph);
+  return blocks.length > 0;
+};
+
 export const startSessionPlan = async (planId: string, now: Date = new Date()): Promise<StartSessionPlanResult> => {
   const graph = await planStore.loadPlanGraph(planId);
   if (!graph) {

@@ -45,6 +45,7 @@ jest.mock('@/components/session-view/session-view-screen', () => {
 });
 
 import TrainRoute, { TrainScreen, type TrainPlanningState } from '../app/(tabs)/train';
+import { planRepository, startSessionPlan } from '@/src/session-planner';
 import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
@@ -547,5 +548,149 @@ describe('Train launch states', () => {
     });
     expect(accentButtons()).toEqual(['train-start-empty-button']);
     expect(discWidth()).toBeGreaterThan(compact);
+  });
+
+  it('selects the first scheduled plan eligible to start, skipping earlier plans with only unmapped blocks', async () => {
+    await seed();
+    await planRepository.createPlan(
+      {
+        title: 'Unmapped Earlier Plan',
+        gymId: null,
+        scheduledFor: new Date(2026, 9, 10, 8),
+        exercises: [
+          {
+            exerciseDefinitionId: null,
+            name: 'Mystery Exercise',
+            sets: [{ targetWeightText: '50', targetRepsText: '10', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 1, 8),
+    );
+    await planRepository.createPlan(
+      {
+        title: 'Valid Later Plan',
+        gymId: null,
+        scheduledFor: new Date(2026, 9, 11, 8),
+        exercises: [
+          {
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Barbell Bench Press',
+            sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 1, 9),
+    );
+
+    renderWithTheme(<TrainRoute />);
+    await checked();
+
+    await waitFor(() => {
+      expect(screen.getByText('Valid Later Plan')).toBeTruthy();
+    });
+    expect(screen.queryByText('Unmapped Earlier Plan')).toBeNull();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('train-start-planned-button'));
+    });
+
+    await waitFor(() => {
+      expect(shownWorkout()).toContain('tab workout');
+    });
+  });
+
+  it('shows the planner link when only unmapped plans are scheduled', async () => {
+    await seed();
+    await planRepository.createPlan(
+      {
+        title: 'Only Unmapped Plan',
+        gymId: null,
+        scheduledFor: new Date(2026, 9, 10, 8),
+        exercises: [
+          {
+            exerciseDefinitionId: null,
+            name: 'Mystery Exercise',
+            sets: [{ targetWeightText: '50', targetRepsText: '10', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 1, 8),
+    );
+
+    renderWithTheme(<TrainRoute />);
+    await checked();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('train-manage-planning-button')).toHaveTextContent('Plan a workout');
+    });
+    expect(screen.queryByTestId('train-start-planned-button')).toBeNull();
+  });
+
+  it('refreshes planning state when an active workout ends in place without changing focus', async () => {
+    await seed();
+    const plan1 = await planRepository.createPlan(
+      {
+        title: 'First Plan',
+        gymId: null,
+        scheduledFor: new Date(2026, 9, 10, 8),
+        exercises: [
+          {
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Barbell Bench Press',
+            sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 1, 8),
+    );
+    await planRepository.createPlan(
+      {
+        title: 'Second Plan',
+        gymId: null,
+        scheduledFor: new Date(2026, 9, 11, 8),
+        exercises: [
+          {
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Barbell Bench Press',
+            sets: [{ targetWeightText: '80', targetRepsText: '8', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 1, 9),
+    );
+
+    if (plan1.status !== 'saved') throw new Error('Expected saved');
+    const plan1Id = plan1.id;
+
+    const startResult = await startSessionPlan(plan1Id);
+    expect(startResult.status).toBe('started');
+    if (startResult.status !== 'started') throw new Error('Expected started');
+    const sessionId = startResult.sessionId;
+
+    renderWithTheme(<TrainRoute />);
+    await waitFor(() => {
+      expect(shownWorkout()).toBe(`tab workout ${sessionId}`);
+    });
+
+    // Complete first plan session and block in SQLite
+    localDataClient()
+      .prepare("UPDATE sessions SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(sessionId);
+    localDataClient()
+      .prepare("UPDATE session_plan_exercises SET progress_status = 'completed', resolved_at = CURRENT_TIMESTAMP WHERE session_plan_id = ?")
+      .run(plan1Id);
+
+    // End shown workout in place via onEnded('now') without changing focus
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('train-workout-abandon'));
+    });
+
+    // The disc returns and planning refreshes to Second Plan
+    await waitFor(() => {
+      expect(screen.getByTestId('train-start-empty-button')).toBeTruthy();
+      expect(screen.getByText('Second Plan')).toBeTruthy();
+    });
+    expect(screen.queryByText('First Plan')).toBeNull();
   });
 });
