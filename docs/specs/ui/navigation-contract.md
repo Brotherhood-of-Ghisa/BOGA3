@@ -171,7 +171,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`dismissTo`) |
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
 | `/more` | `/exercise-catalog`, `/gyms`, `/notes`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
-| `/exercise-catalog`, `/settings`, `/notes`, `/exercise-history`, `/session/<id>` | a tab | `MainTabBar` (unanimated `dismissTo`: the tabs below are reused) |
+| `/exercise-catalog`, `/settings`, `/notes` (all notes), `/exercise-history`, `/session/<id>` | a tab | `MainTabBar` (unanimated `dismissTo`, reusing the tabs) |
 | `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
 | `/settings`, `/settings-muscles`, `/settings-appearance`, `/settings-data-sync` | `/profile`, `/body-weight`, `/theme-custom`, `/settings-*` | rows (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never from workouts |
 | `/settings-everything-else` | `/dev-logs` | `View logs` (`push`), only under `isDevMode()` |

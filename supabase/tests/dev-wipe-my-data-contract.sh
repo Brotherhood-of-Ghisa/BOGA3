@@ -82,7 +82,7 @@ RUN_TAG="$(date +%s)-$$-${RANDOM}"
 RUN_TAG="$(printf '%s' "${RUN_TAG}" | tr -c 'a-zA-Z0-9-' '-')"
 NOW_MS="$(($(date +%s) * 1000))"
 
-# IDs for user A's full sixteen-table FK chain (deleted by the helper) plus a
+# IDs for user A's FK chain and a general training note (deleted by the helper) plus a
 # single user B gym that must survive (owner-scoping check).
 A_BW="dw-${RUN_TAG}-abw"
 A_NOTE="dw-${RUN_TAG}-anote"
@@ -183,7 +183,7 @@ pass "scenario 2: unset app.env raises FORBIDDEN_ENV"
 # ---------------------------------------------------------------------------
 # Scenario 3: owner-scoped wipe under a non-production env.
 #
-# Seed user A's full sixteen-table FK chain plus one user B gym, then call the
+# Seed user A's FK chain and a general training note plus one user B gym, then call the
 # helper as user A with app.env='local'. Assert: the return count equals A's
 # sixteen rows, all of A's rows are gone, and B's gym survives.
 # ---------------------------------------------------------------------------
@@ -338,7 +338,7 @@ deleted="$(run_psql_sql "
 if [[ "${deleted}" != "18" ]]; then
   fail "scenario 3 expected 18 rows deleted (including workout permission), got '${deleted}'"
 fi
-pass "scenario 3: helper returned rows_deleted = 17"
+pass "scenario 3: helper returned rows_deleted = 18"
 [[ "$(run_psql "select count(*) from public.agent_workout_permissions where owner_user_id='${USER_A_UUID}';")" == 0 ]] ||
   fail 'developer wipe retained workout authority'
 

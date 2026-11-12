@@ -417,13 +417,6 @@ export function ExercisePageScreen({
     );
   };
 
-  /**
-   * Exercise history, opened on the gym [[gym.view-filter]] names
-   * (`exerciseHistoryOpeningGym`). Pending edits are written first, so a
-   * completed session being edited lists as it reads; a failed save stays on
-   * the page with its save error, as Link does. A failed read says so rather
-   * than opening on the wrong gym.
-   */
   // This exercise's notes. Pending edits are written first, as for Link.
   const onOpenNotes = () => {
     setOpenSheet('none');
@@ -434,6 +427,13 @@ export function ExercisePageScreen({
     });
   };
 
+  /**
+   * Exercise history, opened on the gym [[gym.view-filter]] names
+   * (`exerciseHistoryOpeningGym`). Pending edits are written first, so a
+   * completed session being edited lists as it reads; a failed save stays on
+   * the page with its save error, as Link does. A failed read says so rather
+   * than opening on the wrong gym.
+   */
   const onOpenHistory = () => {
     setOpenSheet('none');
     if (!exercise) return;
