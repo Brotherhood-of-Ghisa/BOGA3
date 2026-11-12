@@ -27,7 +27,7 @@ appId: com.dinoderek.mobile
 #      and the keyboard for the muscle search;
 #   2. the completed-session route pushed over the stack on the same rows;
 #   3. the keyboard, and the editor sheet's panels;
-#   4. the model's gesture-handler tap on the native SVG (Jest has no layout
+#   4. the model's gesture-handler tap on the native GL view (Jest has no layout
 #      and mocks the gesture);
 #   5. the editor's delete Alert and its return, the other way.
 # Jest counterpart: __tests__/muscle-report-settings.test.tsx (writes, dirty

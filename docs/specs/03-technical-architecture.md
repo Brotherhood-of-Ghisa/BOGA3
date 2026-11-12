@@ -14,12 +14,13 @@
 
 ## Decision register
 
-Decisions are adopted unless marked otherwise. **Source** names the owner; load linked specs when changing it.
+**Source** names each decision’s owner; load linked specs when changing it.
 
 | Decision | Why | Source |
 | --- | --- | --- |
-| `Expo + React Native + TypeScript` with `Expo Router` file-based routing on the UI side, and `SQLite` + Drizzle ORM | One codebase for a phone-first app, with predictable, offline-first storage. | `apps/mobile/package.json`, `apps/mobile/app/`, `apps/mobile/src/data/schema/`, `apps/mobile/drizzle/` |
-| iOS takes the UIKit scene lifecycle natively from Expo SDK 58; no `expo-build-properties` opt-in | iOS 27 requires it, and SDK 58 owns the scene delegate and single-window manifest by default. | `apps/mobile/app.config.ts` |
+| `Expo + React Native + TypeScript` with `Expo Router` file-based routing on the UI side, and `SQLite` + Drizzle ORM | Shared phone UI and offline storage. | `apps/mobile/package.json`, `apps/mobile/app/`, `apps/mobile/src/data/schema/`, `apps/mobile/drizzle/` |
+| iOS takes the UIKit scene lifecycle natively from Expo SDK 58; no `expo-build-properties` opt-in | Required by iOS 27; Expo owns the scene delegate and single-window manifest. | `apps/mobile/app.config.ts` |
+| Muscle wires and patches share coarse meshes in Expo GL | Reliable occlusion. | `apps/mobile/components/stats/muscle-wireframe-renderer.ts`, `apps/mobile/components/stats/muscle-anatomy-meshes.md` |
 | Root route access (sign-in / first-sync block / app) is enforced by the navigator: one `Stack.Protected` group per level, never unmounting the root navigator to gate | Unmounting the root navigator reverts the route, so a `<Redirect>` guard looped on sign-in and sign-out; `Stack.Protected` drops the old level's routes and lands on the first one still declared. | `apps/mobile/components/navigation/root-stack.tsx`, `apps/mobile/src/navigation/root-route-access.ts`, `docs/specs/ui/navigation-contract.md` |
 | Continuous local autosave is a domain/data-layer contract, with RN lifecycle events mapped to flush triggers through adapters; timing constants live in code and tests | Persistence is verifiable without a screen, and per-feature tuning does not move the architecture. | `apps/mobile/src/session-recorder/draft-autosave.ts` |
 | Session completion persists `completedAt` and a materialized `durationSec`, and logged session exercises persist a canonical `exercise_definition_id` beside display name/origin metadata | Keeps completion reads and sorts deterministic, and gives history, grouping and per-exercise lookups a stable identity. | `apps/mobile/src/data/schema/sessions.ts`, `apps/mobile/src/data/schema/session-exercises.ts` |
