@@ -796,3 +796,47 @@ it('restores a merged Routine workout with its use ancestor and unchanged author
   } finally { local.close(); }
   expect(await row('session_plan_sets', target)).toEqual(authored);
 });
+
+it('moves the source exercise’s notes to the destination, raising their clock past every device stamp', async () => {
+  const c = await chain();
+  const stamp = Date.now();
+  const note = (id: string, exercise: string | null, deleted: number | null = null): Entity => ({
+    type: 'training_notes', id, client_updated_at_ms: stamp, fields: {
+      exercise_definition_id: exercise, body: 'Bench touch', noted_on: '2026-11-12', source: 'app', ...times(stamp), deleted_at: deleted,
+    },
+  });
+  const [moved, removed, general, other] = ['-note', '-note-removed', '-note-general', '-note-other'].map(suffix => c.id + suffix);
+  await push([note(moved, c.source), note(removed, c.source, stamp), note(general, null), note(other, c.destination)]);
+  await merge(c);
+
+  const after = await row('training_notes', moved);
+  expect(after).toMatchObject({ exercise_definition_id: c.destination, body: 'Bench touch', deleted_at: null });
+  expect(Number(after!.client_updated_at_ms)).toBeGreaterThan(stamp);
+  // A removed note moves too, staying removed; notes on other exercises or none are untouched.
+  expect(await row('training_notes', removed)).toMatchObject({ exercise_definition_id: c.destination, deleted_at: stamp });
+  expect(await row('training_notes', general)).toMatchObject({ exercise_definition_id: null, client_updated_at_ms: stamp });
+  expect(await row('training_notes', other)).toMatchObject({ exercise_definition_id: c.destination, client_updated_at_ms: stamp });
+
+  // A device holding the note on the source applies the move from the ordinary layer-1 pull.
+  const local = createInMemoryDatabase({ foreignKeys: true });
+  try {
+    local.client.prepare("insert into exercise_definitions (id,name) values (?, 'Source'), (?, 'Destination')").run(c.source, c.destination);
+    local.client.prepare("insert into training_notes (id,exercise_definition_id,body,noted_on,local_updated_at_ms) values (?,?,'Bench touch','2026-11-12',?)")
+      .run(moved, c.source, stamp);
+    const pulled: WireEntity[] = [];
+    for (let cursor: unknown = null; ;) {
+      const page = await rpc<{ entities: WireEntity[]; next_cursor: unknown; has_more: boolean }>(
+        'sync_pull', { layer: 1, cursor, limit: 200 });
+      pulled.push(...page.entities);
+      if (!page.has_more) break;
+      cursor = page.next_cursor;
+    }
+    const notes = pulled.filter(entity => entity.type === 'training_notes' && entity.id === moved);
+    expect(notes).toHaveLength(1);
+    local.database.transaction(tx => applyPullPage(tx as Transaction, notes, 'training_notes' as EntityTableName));
+    expect(local.client.prepare('select exercise_definition_id from training_notes where id=?').get(moved))
+      .toEqual({ exercise_definition_id: c.destination });
+  } finally {
+    local.close();
+  }
+});

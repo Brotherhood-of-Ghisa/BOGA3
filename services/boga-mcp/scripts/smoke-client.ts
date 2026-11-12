@@ -21,6 +21,9 @@ const skipReads = process.env.BOGA_MCP_SMOKE_SKIP_READS === '1';
 // Seeded locally: `<prefix>-run` (running) and `<prefix>-lift` (a strength
 // workout inside the seeded session).
 const activityPrefix = process.env.BOGA_MCP_SMOKE_ACTIVITY_PREFIX?.trim() ?? '';
+// Seeded locally: `<prefix>-general` (no exercise) and `<prefix>-exercise` (on
+// the seeded exercise), both dated two days ago.
+const notePrefix = process.env.BOGA_MCP_SMOKE_NOTE_PREFIX?.trim() ?? '';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -81,6 +84,7 @@ try {
   const tools = await client.listTools();
   const names = tools.tools.map((tool) => tool.name).sort();
   const expectedNames = [
+    'add_note',
     'create_exercise',
     'create_session_plan',
     'create_training_programme',
@@ -98,7 +102,9 @@ try {
     'get_upcoming_session_plans',
     'get_workout_detail',
     'list_muscles',
+    'list_notes',
     'log_sets',
+    'remove_note',
     'restore_exercise',
     'search_exercises',
     'set_muscle_targets',
@@ -213,6 +219,34 @@ try {
       .filter((entry) => entry.activity_type === 'running');
     if (runs.length === 0 || cardio.overlapping_excluded < 1) {
       throw new Error('The cardio summary did not count the run and exclude the overlapping strength workout.');
+    }
+  }
+
+  if (notePrefix) {
+    const listedNotes = structured(
+      await client.callTool({ arguments: { limit: 50 }, name: 'list_notes' }),
+      'list_notes',
+    );
+    const notes = (Array.isArray(listedNotes.notes) ? listedNotes.notes : []).filter(isObject);
+    const general = notes.find((note) => note.id === `${notePrefix}-general`);
+    const onExercise = notes.find((note) => note.id === `${notePrefix}-exercise`);
+    if (
+      !general || general.exercise_id !== null || general.source !== 'app'
+      || typeof general.noted_on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(general.noted_on)
+      || !onExercise || onExercise.exercise_id !== expectedExerciseId || onExercise.exercise_name !== exerciseQuery
+      || notes.some((note) => note.id === `${notePrefix}-removed`)
+    ) {
+      throw new Error('list_notes did not return the seeded general and exercise notes, or listed a removed one.');
+    }
+    const contextNotes = (Array.isArray(context.training_notes) ? context.training_notes : []).filter(isObject);
+    if (contextNotes.map((note) => note.id).join() !== `${notePrefix}-exercise` || context.training_notes_truncated !== false) {
+      throw new Error('Exercise context did not return exactly the exercise’s own note.');
+    }
+    const statusNotes = isObject(trainingStatus.general_notes) ? trainingStatus.general_notes : {};
+    const statusList = (Array.isArray(statusNotes.notes) ? statusNotes.notes : []).filter(isObject);
+    if (!statusList.some((note) => note.id === `${notePrefix}-general`)
+      || statusList.some((note) => note.id === `${notePrefix}-exercise`) || typeof statusNotes.complete !== 'boolean') {
+      throw new Error('Training status did not return the general note without the exercise note.');
     }
   }
 
@@ -628,5 +662,5 @@ try {
   await client.close();
 }
 
-console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-four tools discovered and reads/denials verified');
+console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-seven tools discovered and reads/denials verified');
 

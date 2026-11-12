@@ -200,6 +200,33 @@ export class BogaAgentApi {
     return this.#getObject('v1/agent/activities', accessToken, input);
   }
 
+  async listNotes(
+    accessToken: string,
+    input: { cursor?: string; exercise_id?: string; from?: string; limit?: number; to?: string },
+  ): Promise<Record<string, unknown>> {
+    return this.#getObject('v1/agent/notes', accessToken, input);
+  }
+
+  async addNote(
+    accessToken: string,
+    input: { body: string; exercise_id?: string | null; idempotency_key: string; noted_on?: string },
+  ): Promise<Record<string, unknown>> {
+    const { idempotency_key, ...body } = input;
+    return this.#postObject('v1/agent/notes', accessToken, idempotency_key, body);
+  }
+
+  async removeNote(
+    accessToken: string,
+    input: { idempotency_key: string; note_id: string },
+  ): Promise<Record<string, unknown>> {
+    return this.#postObject(
+      `v1/agent/notes/${encodeURIComponent(input.note_id)}/remove`,
+      accessToken,
+      input.idempotency_key,
+      {},
+    );
+  }
+
   async setMuscleTargets(
     accessToken: string,
     input: MuscleTargetFields & { idempotency_key: string },

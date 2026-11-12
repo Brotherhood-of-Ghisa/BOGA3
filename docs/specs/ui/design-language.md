@@ -304,8 +304,7 @@ additionally render faded ([[set.row-figures]], §6).
   differ only in hue, so neither shouts. **Colour is never the only channel:**
   the figure still says `+3`, `−12%`, `0`, `new` or `—`. One rule, every
   change figure — `changeToneColourIn` (`components/ui/change-tone.ts`) is where
-  it lives, and no screen picks a delta colour of its own. 3D muscle fills
-  follow [[comparison.colour-scale]].
+  it lives, and no screen picks a delta colour of its own. 3D muscles follow [[comparison.colour-scale]].
 - **No `k` compaction.** `123456`, not `123k`: a six-digit volume fits a Plex
   Mono column.
 - **No unit suffix inside an input.** The unit belongs in the field label.

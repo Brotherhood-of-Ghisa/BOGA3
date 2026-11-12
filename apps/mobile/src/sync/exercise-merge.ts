@@ -11,6 +11,7 @@ import {
 } from '@/src/data/exercise-merge-store';
 import { exerciseMergeLocal, exerciseSets, sessionExercises, sessionExerciseTags, sessions } from '@/src/data/schema';
 import { MERGE_ENTITY_TYPES, mergeBlockId, type MergeReviewItem, type MergeWireEntity } from '@/src/exercise-core/merge-types';
+import { isEntityTableName } from './topo-order';
 import { clearWorkoutLifecycle, pendingWorkoutLifecycles, sameWorkoutHeader, type PendingWorkoutLifecycle } from './workout-lifecycle';
 
 type MergeAdapter = {
@@ -175,7 +176,9 @@ function installSnapshot(database: LocalDatabase, owner: string, stage: Stage, a
   database.transaction(tx => {
     const rows = listMergeLocal(tx, owner, 'stage').filter(row => row.id !== 'stage')
       .sort((a, b) => Number(a.id.slice(6)) - Number(b.id.slice(6)))
-      .flatMap(row => JSON.parse(row.payload) as MergeWireEntity[]);
+      .flatMap(row => JSON.parse(row.payload) as MergeWireEntity[])
+      // Rows of a type this build does not know are skipped; they still counted toward paging.
+      .filter(row => isEntityTableName(row.type));
     const blocks = rows.filter(row => row.type === 'session_exercises');
     const sessionRows = rows.filter(row => row.type === 'sessions');
     const sessionIds = [...new Set([...sessionRows.map(row => row.id), ...blocks.map(row => String(row.fields.session_id))])];
@@ -243,16 +246,20 @@ export async function uploadMergePending(database: LocalDatabase, owner: string)
   }
 }
 
+const REVIEW_TYPES: readonly string[] = ['sessions', ...MERGE_ENTITY_TYPES];
+
 export async function refreshMergeReview(database: LocalDatabase, owner: string): Promise<MergeReviewItem[]> {
   const items: MergeReviewItem[] = [];
   let offset = 0;
   for (;;) {
     const page = await mergeRpc<{ items: MergeReviewItem[]; hasMore: boolean }>('exercise_merge_review', { p_offset: offset }, owner);
     if (!page || !Array.isArray(page.items) || typeof page.hasMore !== 'boolean' ||
-        page.items.some(item => !item || typeof item.id !== 'string' || typeof item.token !== 'string')) {
+        page.items.some(item => !item || typeof item.id !== 'string' || typeof item.token !== 'string' ||
+          typeof item.type !== 'string')) {
       throw new Error('Invalid saved changes response.');
     }
-    items.push(...page.items);
+    // Only types this build can show; the offset still advances past the rest.
+    items.push(...page.items.filter(item => REVIEW_TYPES.includes(item.type)));
     offset += page.items.length;
     if (!page.hasMore) break;
     if (!page.items.length) throw new Error('Saved changes could not be loaded.');

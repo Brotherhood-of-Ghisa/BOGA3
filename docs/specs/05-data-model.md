@@ -45,14 +45,14 @@ round-trip and the drift checker ignores it.
 
 | Table group | Scope | Owning path |
 | --- | --- | --- |
-| The seventeen user-owned entities (`apps/mobile/src/sync/topo-order.ts` names all seventeen with their FK layers) | **in** — mirrored 1:1; the user's backup/restore scope | `apps/mobile/src/data/schema/`, `supabase/migrations/` |
+| The eighteen user-owned entities (`apps/mobile/src/sync/topo-order.ts` names them with their FK layers; training notes: [`tech/training-notes-contract.md`](tech/training-notes-contract.md)) | **in** — mirrored 1:1; the user's backup/restore scope | `apps/mobile/src/data/schema/`, `supabase/migrations/` |
 | Device-local browsing and Progress preferences (key-value, not SQL tables) | out — device choices | `apps/mobile/src/preferences/` |
 | The three `exercise_session_facts*` tables | out — derived, rebuildable local facts | `apps/mobile/src/data/schema/exercise-session-facts.ts` |
 | `group_cache` | out — disposable cache of server group-RPC results, readable only by the signed-in `user_id` | `apps/mobile/src/data/schema/group-cache.ts` |
 | `sync_runtime_state`, plus the two local-only columns on each entity table | out — local sync bookkeeping | `apps/mobile/src/data/schema/sync-runtime-state.ts` |
 | `sync_quarantine` | out — local push-side quarantine | `apps/mobile/src/data/schema/sync-quarantine.ts` |
 | `smoke_records` | out — test scaffolding | `apps/mobile/src/data/schema/smoke.ts` |
-| `app_public.user_profiles` (`training_unit`, `time_zone` included) | out — auth/profile layer, explicitly outside the seventeen-table mirror | `supabase/migrations/` |
+| `app_public.user_profiles` (`training_unit`, `time_zone` included) | out — auth/profile layer, outside the mirror | `supabase/migrations/` |
 | `public.app_logs` | out — operational diagnostics. Authenticated clients **insert only**; client `SELECT`/`UPDATE`/`DELETE` are intentionally unavailable and rows are read through operator tooling | `supabase/migrations/` |
 | `public.agent_access_audit`, `public.agent_plan_permissions`, `public.agent_workout_permissions`, `public.agent_plan_write_receipts` | out — control/security metadata: audit is service-insert only; permissions are per-client current-grant controls; receipts keep hashes and result IDs/tokens, service-role only | `supabase/migrations/` |
 | `app_public.health_activities` | out — imported health-app summaries (the health store is the device copy), written only by an owner RPC ([`tech/health-activities-contract.md`](tech/health-activities-contract.md)) | `supabase/migrations/` |
@@ -137,7 +137,7 @@ mix values.
 The local store holds one account's data; `sync_runtime_state.account_user_id`
 records which (null on a fresh or signed-out store). One complete wipe,
 `wipeLocalDatabaseRows` (`apps/mobile/src/data/local-wipe.ts`), empties it in
-one transaction — the seventeen entity tables child before parent, `group_cache`,
+one transaction — the eighteen entity tables child before parent, `group_cache`,
 `sync_quarantine`, then the three facts tables last, after the raw deletes have
 fired their triggers — resets `bootstrap_completed_at`, `pull_cursor` and
 `applied_seed_migration_app_version`, sets `account_user_id`, keeps
@@ -156,21 +156,20 @@ Three paths use it (`apps/mobile/src/sync/account-wipe.ts`,
   expired, then a sign-in as someone else. An unowned
   store that never synced is simply stamped; one that *has* synced (written
   before the owner was recorded) is wiped when nothing waits to push, and
-  otherwise kept with every pull cursor reset
+  otherwise kept with cursors reset
   (`sync.local_store_unowned_wipe` / `sync.local_store_unowned_repull`). While
   the store belongs to another account the first-sync gate is up, whatever the
   bootstrap flag says.
 - **The developer reset** ("Reset local data and re-seed") wipes, keeps the
   owner, and re-seeds the starter catalog; the next cycle re-pulls the rest.
 
-Pull cursors reset with the rows: kept over an emptied or foreign store they
-skip older server rows, so a child can arrive without its parent (a local FK
-failure on every retry). Wipes run under the sync cycle's lock, never between
-two pull pages.
+A wipe resets the cursors: kept over an emptied or foreign store they skip
+older server rows, so a child arrives without its parent (an FK failure on
+every retry). Wipes run under the cycle's lock, never between pages.
 
 ## Local sync bookkeeping (Sync v2)
 
-Per-row sync state is two local-only columns on each of the seventeen user-owned
+Per-row sync state is two local-only columns on each of the eighteen user-owned
 entity tables — `local_dirty` (1 iff the row needs pushing) and
 `local_updated_at_ms` (the monotonic client timestamp, sent as
 `client_updated_at_ms`). Neither crosses the wire, and there is no outbox or
@@ -201,7 +200,7 @@ one local orphan cannot wedge the backlog.
    `tech/sync-v2-server-contract.md`, "LWW and undelete", included).
 5. Diagnostic log rows are write-only from authenticated clients, read through
    backend operator tooling.
-6. All seventeen mirror tables use composite primary key `(owner_user_id, id)` —
+6. All eighteen mirror tables use composite primary key `(owner_user_id, id)` —
    **owner-first**. The order is load-bearing: the canonical pull query
    (`where owner_user_id = … order by server_received_at`) leads with the PK
    column and the per-layer cursor depends on it. Every user owns their own
@@ -314,7 +313,7 @@ the data-model-level invariants.
 
 ### Entity coverage (Sync v2)
 
-All seventeen entities use typed-envelope LWW upserts. Deletion sets
+All eighteen entities use typed-envelope LWW upserts. Deletion sets
 `deleted_at`; undelete clears it on the same row. Reorder, complete and attach
 are ordinary field changes. The envelope and error tokens belong to
 `tech/sync-v2-server-contract.md`.
@@ -332,7 +331,7 @@ tests) or `out of sync scope` (rationale and guardrails).
 
 ## Client schema drift rule (Sync v2)
 
-Modifying any file under `apps/mobile/src/data/schema/` for the seventeen
+Modifying any file under `apps/mobile/src/data/schema/` for the eighteen
 user-owned entities to add a domain column requires a paired server migration
 under `supabase/migrations/` that adds the matching `app_public.<entity>`
 column with a compatible Postgres type, **and the server migration must be
@@ -343,23 +342,23 @@ compatible additive column keeps the protocol version: `sync_push` reads named k
 only and ignores the rest. Keeping a stored value when a key is omitted is per
 column — only a `_fields ? '<key>'` branch or a `coalesce` does, which a new
 column needs so an older writer cannot clear it.
-Server-first additions must also keep unknown entity types out of old-reader
-pulls. The kg-only rename, Routine layer shift and protocol-7 workout lifecycle fence
-require coordinated cutovers. For workout session epochs and recovery, load
+A new entity table is server-first too: builds skip unknown entity types on
+every RPC that returns entities, and the first build that knows one re-pulls its
+layer. Cutovers (the kg-only rename, Routine layer shift, protocol-7 workout
+fence) and the merge-snapshot exception: `tech/sync-v2-server-contract.md`,
+"Adding an entity". For workout session epochs and recovery, load
 [the agent workout contract](tech/agent-workout-contract.md).
 
 The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, in the backend gate)
 introspects migrated local Postgres and checks the FK order in
 `apps/mobile/src/sync/topo-order.ts`. Schema or order drift blocks merging.
 
-The rule does NOT apply to any `out of sync scope` local table above: no
-server counterpart, and the checker introspects only the seventeen
-`app_public.<entity>` mirror tables. Nor does it apply to the two local-only
+The rule does NOT apply to any `out of sync scope` local table above (no
+server counterpart; the checker introspects only the mirror tables). Nor does it apply to the two local-only
 bookkeeping columns, listed under `exemptions.local_only_columns` in
-`apps/mobile/src/data/schema/sync-extras.json`. Nor does it assert indexes:
-every entity table carries a nullable `deleted_at` and an unchecked
-`<table>_deleted_at_idx` on both sides — add it by hand with each new entity
-table.
+`apps/mobile/src/data/schema/sync-extras.json`. Nor does it assert the
+`<table>_deleted_at_idx` every entity table carries on both sides: add it by
+hand.
 
 Adding a value to an existing column (a new enum literal) is out of scope: the
 server stores arbitrary text (`tech/sync-v2-server-contract.md`, "Ground

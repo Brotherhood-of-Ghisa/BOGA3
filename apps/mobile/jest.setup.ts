@@ -57,6 +57,9 @@ afterEach(() => {
 // that loads reanimated (the root layout does) uses the library's own mock.
 jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
 
+// Jest has no native GL surface. Tests can drive onContextCreate with a recorded context.
+jest.mock('expo-gl', () => ({ GLView: require('react-native').View }));
+
 // The timer store is exercised without retaining native audio or screen locks.
 // Its native adapter suite unmocks this boundary and checks the Expo calls.
 jest.mock('@/src/session-recorder/repeating-timer-native', () => ({

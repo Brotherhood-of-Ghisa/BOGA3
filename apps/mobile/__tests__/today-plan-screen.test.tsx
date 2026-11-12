@@ -270,7 +270,7 @@ describe('Today: the Plan page over real data', () => {
     expect(within(text('today-plan-week-card')).getByText('Plan')).toBeTruthy();
   });
 
-  it("shows each muscle's sets on the last three days, today and this week against the target, least trained first", async () => {
+  it("shows each muscle's sets on the last three days, today and this week against the target, under target first", async () => {
     await bootLocalApp();
     // Monday is this week but no recovery day; Thursday and Friday are; Saturday is today.
     await logSession('mon', local(2026, 10, 26, 9), [{ ...BENCH, count: 4 }]);
@@ -296,7 +296,7 @@ describe('Today: the Plan page over real data', () => {
     expect(text('today-plan-muscle-quads-day-1')).toHaveTextContent('3');
 
     const order = muscleRows();
-    // Untrained first, then chest's two recent sets, then squat's two primaries (three each).
+    // Under 8: the untrained first, then chest's 6; squat's two primaries reach 8 and come last.
     expect(order.slice(-2).sort()).toEqual(['glutes_max', 'quads']);
     expect(order.indexOf('chest')).toBeLessThan(order.indexOf('quads'));
     expect(order.indexOf('triceps')).toBeLessThan(order.indexOf('chest'));

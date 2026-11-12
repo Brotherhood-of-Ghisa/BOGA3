@@ -19,3 +19,4 @@ facts as needed. Authoring: load `docs/procedures/product-facts-authoring.md`.
 | `timer.md` | rest timer rules |
 | `agents.md` | what a coaching agent (MCP) may read or change |
 | `planner.md` | session plans, programmes, block completion or consumption |
+| `notes.md` | training notes, in the app or through a coaching agent |

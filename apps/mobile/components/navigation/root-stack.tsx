@@ -60,6 +60,8 @@ export function RootStack() {
         {/* More's destinations that keep the tab bar (`TabOwnedPage`). */}
         <Stack.Screen name="exercise-catalog" options={{ title: 'Exercises' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        {/* All notes keep the tab bar; one exercise's replaces this title with `<name> notes`. */}
+        <Stack.Screen name="notes" options={{ title: 'Notes' }} />
         {/* The subject's name replaces this title once it resolves. */}
         <Stack.Screen name="progress-history" options={{ title: 'History' }} />
         <Stack.Screen name="rm-curve" options={{ title: 'RM curve' }} />

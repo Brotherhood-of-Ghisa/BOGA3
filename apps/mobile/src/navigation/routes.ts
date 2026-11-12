@@ -10,6 +10,10 @@ export const PLANNER_ROUTE = '/planner';
 // The Gyms screen, from the session view's gym sheet (`Manage gyms`) and More.
 export const GYMS_ROUTE = '/gyms';
 export const BODY_WEIGHT_ROUTE = '/body-weight';
+// Training notes: all of them (More), or one exercise's (the exercise page's ⋮).
+export const NOTES_ROUTE = '/notes';
+export const notesHref = (exerciseDefinitionId?: string | null): Href =>
+  (exerciseDefinitionId ? `${NOTES_ROUTE}?exerciseId=${encodeURIComponent(exerciseDefinitionId)}` : NOTES_ROUTE) as Href;
 
 export const plannerHref = (): Href => PLANNER_ROUTE as Href;
 

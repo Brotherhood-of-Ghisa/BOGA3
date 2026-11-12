@@ -63,7 +63,7 @@ describe('More screen', () => {
         .findAll((node) => typeof node.props.testID === 'string' && node.props.testID.endsWith('-row'), { deep: true })
         .map((node) => node.props.testID)
         .filter((id, index, ids) => ids.indexOf(id) === index);
-    expect(rowsOf('more-group-1')).toEqual(['more-planner-row', 'more-exercises-row', 'more-gyms-row']);
+    expect(rowsOf('more-group-1')).toEqual(['more-planner-row', 'more-exercises-row', 'more-gyms-row', 'more-notes-row']);
     expect(rowsOf('more-group-2')).toEqual(['more-connect-ai-row', 'more-settings-row']);
     expect(screen.queryByText('More')).toBeNull();
     expect(screen.queryByRole('header')).toBeNull();
@@ -73,6 +73,7 @@ describe('More screen', () => {
   it.each([
     ['more-planner-row', '/planner'],
     ['more-gyms-row', '/gyms'],
+    ['more-notes-row', '/notes'],
     ['more-exercises-row', '/exercise-catalog'],
     ['more-settings-row', '/settings'],
   ])('opens %s at its route', async (testID, route) => {

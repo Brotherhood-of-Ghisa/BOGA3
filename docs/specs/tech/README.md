@@ -26,6 +26,8 @@ Current docs:
 - `health-activities-contract.md`: imported health-app activities — the
   owner-private table, the app's write RPC, the strength-overlap rule and the
   coach's reads.
+- `training-notes-contract.md`: dated training notes — the synced table, soft
+  delete, merge move and the coach's note tools.
 - `group-competition-contract.md`: group competition representation —
   metric/unit meaning, the public boundary and disclosure, witness history and
   the protocol-4 server surface.
