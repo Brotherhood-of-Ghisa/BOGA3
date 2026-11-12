@@ -138,6 +138,11 @@ describe('legacy weekly targets', () => {
     expect(legacyMuscleTargets(JSON.stringify(overrides), seeds(), null)).toEqual({ chest: 20, calves: 5 });
   });
 
+  it('read rows another device already migrated to combined keys as the Broad setup', () => {
+    expect(legacyMuscleTargets(overrides, seeds(broadTemplateKeyOf), BROAD_COMBINED_MUSCLES))
+      .toEqual({ cm_chest: 12, cm_back: 9, spinal_erectors: 4 });
+  });
+
   it('keep an anchor id its own when its Broad muscle is not in effect', () => {
     const custom = seeds((id) => (id === 'back_upper' ? 'back' : null));
     expect(legacyMuscleTargets({ custom: { chest: 3, back_lats: 6 } }, custom, null)).toEqual({ chest: 3, cm_back: 6 });

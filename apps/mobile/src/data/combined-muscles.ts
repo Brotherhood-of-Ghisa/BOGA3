@@ -164,9 +164,11 @@ const isPositiveSafeInteger = (value: unknown): value is number =>
 
 const legacyScopeOf = (rows: readonly MuscleReportRow[]): 'detailed' | 'broad' | 'custom' => {
   if (rows.every((row) => row.reportGroup === null)) return 'detailed';
+  // A row may hold a bare Broad key (not yet migrated) or its combined key (migrated on another device).
   return rows.every((row) => {
     const key = broadTemplateKeyOf(row.id);
-    return row.reportGroup === null ? key === null : key === broadCombinedMuscleKey(row.reportGroup);
+    if (row.reportGroup === null) return key === null;
+    return key === row.reportGroup || key === broadCombinedMuscleKey(row.reportGroup);
   }) ? 'broad' : 'custom';
 };
 
