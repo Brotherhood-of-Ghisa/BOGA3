@@ -184,8 +184,8 @@ exactly one layer. Adding an entity or FK means updating
 
 **Adding an entity** ships server-first with no protocol bump ("Unknown
 types"): in an existing layer, which upgraded builds re-pull once, or a new last
-layer. Keep it out of `exercise_merge_snapshot`: old builds fail on its unknown
-rows. An `UPDATE_REQUIRED` cutover is still needed to rename or remove a
+layer. Keep it out of `exercise_merge_snapshot` until every supported build
+skips them (`exercise-merge-contract.md`). An `UPDATE_REQUIRED` cutover is still needed to rename or remove a
 column, move a table between layers (protocol 6;
 `docs/specs/tech/session-planning-contract.md`), add an FK old builds' rows
 would violate, or send values old builds misread.
@@ -235,8 +235,8 @@ Push requests and pull responses carry rows in one shape:
 ```
 
 - `type` is an entity table name (unknown ones: "Unknown types").
-- `id` is client-assigned (a ULID, or a slug for seeds) and stable forever.
-- `client_updated_at_ms` comes from the clock-monotonicity guard.
+- `id` is client-assigned (a ULID, or a seed slug), stable forever.
+- `client_updated_at_ms` comes from the monotonic clock guard.
 - `fields` holds every typed column of the entity, keyed by its snake_case
   server column name, with JSON null for null values. `deleted_at` is an
   ordinary LWW field.
@@ -326,8 +326,8 @@ the cursor where it was.
 only after its page commits, so an aborted drain resumes where it stopped; push
 never moves one.
 
-**Unknown types.** A build skips pulled rows of types it does not apply on
-that layer and still advances the cursor. Beside each cursor it stores the
+**Unknown types.** Builds skip unknown entity types on every RPC that returns
+entities; pull skips types its layer lacks and still advances the cursor. Beside each cursor it stores the
 types it applies there (`layer_types`; none stored means the frozen list in
 `apps/mobile/src/sync/pull-layer-types.ts`). A signed-in cycle first drops each
 cursor whose list lacks a type the build applies; only that layer re-pulls,

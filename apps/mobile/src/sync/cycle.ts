@@ -1501,7 +1501,7 @@ export const applyPullPage = (
 // Pull cursor persistence
 // -----------------------------------------------------------------------------
 
-const applyMergeRows = (tx: Transaction, rows: MergeWireEntity[], force = false): number => {
+export const applyMergeRows = (tx: Transaction, rows: MergeWireEntity[], force = false): number => {
   if (rows.some(row => !ENTITY_ORDER.includes(row.type as EntityTableName))) {
     throw new Error('Invalid exercise history entity.');
   }

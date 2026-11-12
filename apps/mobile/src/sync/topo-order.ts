@@ -12,3 +12,8 @@ export const TOPO_LAYERS: readonly (readonly string[])[] = [
 ] as const;
 
 export type EntityTableName = (typeof TOPO_LAYERS)[number][number];
+
+const ENTITY_TABLE_NAMES: ReadonlySet<string> = new Set(TOPO_LAYERS.flat());
+
+/** Whether this build knows `type`. Rows of other types, from any RPC, are skipped, never thrown on. */
+export const isEntityTableName = (type: string): type is EntityTableName => ENTITY_TABLE_NAMES.has(type);

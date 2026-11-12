@@ -342,10 +342,11 @@ compatible additive column keeps the protocol version: `sync_push` reads named k
 only and ignores the rest. Keeping a stored value when a key is omitted is per
 column — only a `_fields ? '<key>'` branch or a `coalesce` does, which a new
 column needs so an older writer cannot clear it.
-A new entity table is server-first too: old builds skip unknown types and the
-first build that knows one re-pulls its layer. What still needs a coordinated
-cutover (as the kg-only rename, Routine layer shift and protocol-7 workout
-fence did): `tech/sync-v2-server-contract.md`, "Adding an entity". For workout session epochs and recovery, load
+A new entity table is server-first too: builds skip unknown entity types on
+every RPC that returns entities, and the first build that knows one re-pulls its
+layer. Cutovers (the kg-only rename, Routine layer shift, protocol-7 workout
+fence) and the merge-snapshot exception: `tech/sync-v2-server-contract.md`,
+"Adding an entity". For workout session epochs and recovery, load
 [the agent workout contract](tech/agent-workout-contract.md).
 
 The drift checker (`apps/mobile/scripts/check-sync-schema-drift.ts`, in the backend gate)
@@ -355,10 +356,9 @@ introspects migrated local Postgres and checks the FK order in
 The rule does NOT apply to any `out of sync scope` local table above (no
 server counterpart; the checker introspects only the mirror tables). Nor does it apply to the two local-only
 bookkeeping columns, listed under `exemptions.local_only_columns` in
-`apps/mobile/src/data/schema/sync-extras.json`. Nor does it assert indexes:
-every entity table carries a nullable `deleted_at` and an unchecked
-`<table>_deleted_at_idx` on both sides — add it by hand with each new entity
-table.
+`apps/mobile/src/data/schema/sync-extras.json`. Nor does it assert the
+`<table>_deleted_at_idx` every entity table carries on both sides: add it by
+hand.
 
 Adding a value to an existing column (a new enum literal) is out of scope: the
 server stores arbitrary text (`tech/sync-v2-server-contract.md`, "Ground

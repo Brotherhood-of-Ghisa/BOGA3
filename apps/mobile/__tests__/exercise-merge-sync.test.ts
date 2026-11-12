@@ -2,7 +2,7 @@ import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
 import { eq } from 'drizzle-orm';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
-import { applyPullPage, entityToWire, runSyncCycle, selectPushBatch, type WireEntity } from '@/src/sync/cycle';
+import { applyMergeRows, applyPullPage, entityToWire, runSyncCycle, selectPushBatch, type WireEntity } from '@/src/sync/cycle';
 import { syncExerciseMerges, validateMergeOutcomes } from '@/src/sync/exercise-merge';
 import { guardSessionMergeEdit, listMergeLocal, readMergeLocal, writeMergeLocal } from '@/src/data/exercise-merge-store';
 import { exerciseDefinitions, exerciseSessionFacts, exerciseSessionFactsStale, exerciseSets, gyms, sessionExercises, sessionPlans, sessionPlanExercises, sessionPlanSets, sessionPlanUses, sessions, syncRuntimeState } from '@/src/data/schema';
@@ -627,4 +627,73 @@ it('atomically repairs a missed slot winner while installing merge ancestors, pr
   expect(readMergeLocal(database, owner, 'stage')).toBeNull();
   await sync();
   expect(database.select().from(sessionPlanUses).all()).toHaveLength(2);
+});
+
+describe('entity types this build does not know', () => {
+  // The production adapter: it rejects any row type outside the topology.
+  const realAdapter = { ...adapter, apply: applyMergeRows };
+  const unknownRow = (id: string): MergeWireEntity => ({
+    type: 'training_notes', id, client_updated_at_ms: 200, fields: { exercise_definition_id: 'b', body: 'Brace', deleted_at: null },
+  });
+  const servePages = (pages: MergeWireEntity[][]) => {
+    const offsets = pages.map((_page, index) => pages.slice(0, index).reduce((total, page) => total + page.length, 0));
+    mockRpc.mockImplementation(async (name: string, args: { p_offset?: number } = {}) => {
+      if (name === 'exercise_merge_snapshot') {
+        const offset = args.p_offset ?? 0;
+        const index = offsets.indexOf(offset);
+        const rows = index < 0 ? [] : pages[index];
+        return { data: { sequence: 1, token: 'token', rows, nextOffset: offset + rows.length, hasMore: index >= 0 && index < pages.length - 1 }, error: null };
+      }
+      if (name === 'exercise_merge_review') return { data: { items: [], hasMore: false }, error: null };
+      throw new Error('Unexpected RPC ' + name);
+    });
+  };
+  const syncReal = (conflictCount = 0) => syncExerciseMerges({ database, owner, remoteSequence: 1, conflictCount, adapter: realAdapter });
+
+  it('skips unknown rows in a snapshot page; paging and install complete and known rows apply', async () => {
+    const [block, set] = canonical();
+    servePages([[unknownRow('note-1'), block], [set, unknownRow('note-2')]]);
+    await syncReal();
+    expect(database.select().from(sessionExercises).get()).toMatchObject({ exerciseDefinitionId: 'b', mergeRevision: 1 });
+    expect(database.select().from(exerciseSets).get()).toMatchObject({ weightValue: '20', mergeRevision: 1 });
+    expect(readMergeLocal(database, owner, 'sequence')).toBe(1);
+    expect(readMergeLocal(database, owner, 'stage')).toBeNull();
+  });
+
+  it('a page made only of unknown rows still advances the snapshot', async () => {
+    servePages([[unknownRow('note-1'), unknownRow('note-2')], canonical()]);
+    await syncReal();
+    expect(mockRpc.mock.calls.filter(([name]) => name === 'exercise_merge_snapshot').map(([, args]) => args.p_offset)).toEqual([0, 2]);
+    expect(database.select().from(exerciseSets).get()?.weightValue).toBe('20');
+    expect(readMergeLocal(database, owner, 'sequence')).toBe(1);
+  });
+
+  it('still rejects a malformed row, whatever its type', async () => {
+    const malformed = { ...unknownRow('note-1'), id: undefined } as unknown as MergeWireEntity;
+    servePages([[malformed, ...canonical()]]);
+    await expect(syncReal()).rejects.toThrow('Invalid exercise history row.');
+    expect(readMergeLocal(database, owner, 'sequence')).toBeNull();
+  });
+
+  it('keeps only review items of types this build can show, paging past the rest', async () => {
+    servePages([[]]);
+    const item = (id: string, type: string) => ({ id, type, token: 't-' + id, entityId: id, blockId: 'block', sessionId: 'session',
+      exerciseName: 'A', current: null, saved: null, invalid: false });
+    const offsets: number[] = [];
+    const pages = mockRpc.getMockImplementation()!;
+    mockRpc.mockImplementation(async (name: string, args: { p_offset?: number } = {}) => {
+      if (name !== 'exercise_merge_review') return pages(name, args);
+      offsets.push(args.p_offset ?? 0);
+      return (args.p_offset ?? 0) === 0
+        ? { data: { items: [item('n', 'training_notes'), item('s', 'exercise_sets')], hasMore: true }, error: null }
+        : { data: { items: [item('t', 'session_exercise_tags')], hasMore: false }, error: null };
+    });
+    await syncReal(2);
+    expect(offsets).toEqual([0, 2]);
+    expect((readMergeLocal<{ id: string }[]>(database, owner, 'conflicts') ?? []).map(entry => entry.id)).toEqual(['s', 't']);
+
+    mockRpc.mockImplementation(async (name: string, args: { p_offset?: number } = {}) => name === 'exercise_merge_review'
+      ? { data: { items: [{ ...item('x', 'sessions'), type: 7 }], hasMore: false }, error: null } : pages(name, args));
+    await expect(syncReal(1)).rejects.toThrow('Invalid saved changes response.');
+  });
 });
