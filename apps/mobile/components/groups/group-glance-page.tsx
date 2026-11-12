@@ -209,7 +209,7 @@ function GlanceCards({
   return (
     <View
       accessibilityState={{ busy: held !== null }}
-      style={[styles.sections, faded ? styles.held : null]}
+      style={[styles.figures, faded ? styles.held : null]}
       testID="group-glance-figures">
       <SummaryTile testID="group-week-totals-card" title="Group stats" titleTestID="group-week-totals-title"
         metrics={<GroupWeekTotalsFigures current={totals.current} offset={figuresOffset} previous={totals.previous} />} />
@@ -295,6 +295,12 @@ const styles = StyleSheet.create({
   sections: {
     gap: uiSpace.md,
     paddingBottom: uiSpace.lg,
+  },
+  // The figure cards sit inside the scroll's column: the same gap between
+  // them, but no bottom padding of their own, so the gap to the next card
+  // matches every other one.
+  figures: {
+    gap: uiSpace.md,
   },
   controls: {
     flexDirection: 'row',

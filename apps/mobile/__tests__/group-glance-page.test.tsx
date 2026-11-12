@@ -122,6 +122,18 @@ describe('At a glance: the board', () => {
     fireEvent.press(byId('groups-filter-metric'));
     expect(onMetricChange).toHaveBeenCalledWith('prs');
   });
+  it('spaces every card alike: the figure cards nest in the scroll column with its gap and no padding of their own', () => {
+    renderPage();
+
+    const column = StyleSheet.flatten(byId('groups-glance-scroll').props.contentContainerStyle);
+    const figures = StyleSheet.flatten(byId('group-glance-figures').props.style);
+    expect(figures.gap).toBe(column.gap);
+    // Padding here would widen the gap before the latest-sessions card.
+    expect(figures).not.toHaveProperty('paddingBottom');
+    expect(figures).not.toHaveProperty('padding');
+    expect(figures).not.toHaveProperty('paddingVertical');
+  });
+
   it('opens on this week by sets: the top five, and my place on its own line', () => {
     renderPage();
 
