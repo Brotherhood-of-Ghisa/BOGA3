@@ -35,7 +35,7 @@ export function MuscleBodyCanvas({ frame, onError }: { readonly frame: Wireframe
 
   return (
     <GLView accessible={false} msaaSamples={4} onContextCreate={onContextCreate}
-      pointerEvents="none" style={styles.canvas} testID="stats-muscle-body-wireframe" />
+      pointerEvents="none" style={styles.canvas} testID={`stats-muscle-body-${frame.overlay === 'wireframe' ? 'wireframe' : 'patches'}`} />
   );
 }
 

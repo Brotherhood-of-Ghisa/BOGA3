@@ -12,13 +12,15 @@ it('pins the body, all 25 catalogue groups and official source hashes', () => {
   expect(Object.keys(MUSCLE_ANATOMY).sort()).toEqual(asset.catalog.map(row => row.id).sort());
   expect(asset.catalog).toHaveLength(25);
   expect(manifest.sources.models.FJ1486.sha256).toBe('be5f40b153fd6ce0c8c274eb4c26be8d1a29b4bbe75dd0e4a0dfe5c4d251fa03');
-  expect(createHash('sha256').update(JSON.stringify(MUSCLE_ANATOMY.brachialis.parts)).digest('hex'))
-    .toBe('0c9dd4c17c0102113511f6d476df0cd455a652d0109620d7b6a9adc6d5bbfea1');
-  expect(MUSCLE_ANATOMY.brachialis.parts[0].faces).toHaveLength(1746);
+  expect(MUSCLE_ANATOMY.brachialis.parts[0].faces).toHaveLength(208);
+  expect(Object.values(MUSCLE_ANATOMY).reduce((n, mesh) => n + mesh.parts.reduce((m, p) => m + p.faces.length, 0), 0)).toBe(13688);
+  const points = MUSCLE_ANATOMY.brachialis.parts.flatMap(part => part.vertices);
+  expect([Math.min, Math.max].map(fn => [0, 1, 2].map(k => fn(...points.map(p => p[k])))))
+    .toEqual([[.2957708, .2091256, -.0192148], [.3732923, .432759, .0142339]]);
 });
 
 function validatePart(part: AnatomyPart) {
-  const edges = new Map<string, number>();
+  const edges = new Map<string, number>(), winding = new Map<string, number>();
   let volume = 0, collapsed = 0;
   for (const point of part.vertices) if (point.length !== 3 || !point.every(Number.isFinite)) throw new Error(`${part.id}: invalid vertex`);
   for (const face of part.faces) {
@@ -30,18 +32,19 @@ function validatePart(part: AnatomyPart) {
     volume += a[0]*(b[1]*c[2]-b[2]*c[1])+a[1]*(b[2]*c[0]-b[0]*c[2])+a[2]*(b[0]*c[1]-b[1]*c[0]);
     for (const [x, y] of [[face[0], face[1]], [face[1], face[2]], [face[2], face[0]]]) {
       const key = [x, y].sort((a,b) => a-b).join(','); edges.set(key, (edges.get(key) ?? 0) + 1);
+      winding.set(key, (winding.get(key) ?? 0) + (x < y ? 1 : -1));
     }
   }
-  return { volume, collapsed, exceptionalEdges: [...edges.values()].filter(count => count !== 2) };
+  return { volume, collapsed, exceptionalEdges: [...edges.values()].filter(count => count !== 2), inconsistentWinding: [...winding.values()].filter(n => n !== 0) };
 }
 
 it('keeps finite outward triangle surfaces with no new holes or nonmanifold edges', () => {
   for (const mesh of Object.values(MUSCLE_ANATOMY)) for (const part of mesh.parts) {
     const result = validatePart(part);
     expect(result.volume).toBeGreaterThan(0);
-    expect(result.collapsed).toBe(part.id === 'FJ1521' ? 5 : 0);
-    // These five collapsed triangles and ten shared edges are present in the pinned trapezius source, retained without destructive welding.
-    expect(result.exceptionalEdges).toEqual(part.id === 'FJ1521' ? Array(10).fill(4) : []);
+    expect(result.collapsed).toBe(0);
+    expect(result.exceptionalEdges).toEqual([]);
+    expect(result.inconsistentWinding).toEqual([]);
   }
 });
 
@@ -54,6 +57,22 @@ it('uses three separate closed spinal columns per side, and marks surface approx
     expect(validatePart(part).exceptionalEdges).toEqual([]);
   }
   expect(Object.entries(MUSCLE_ANATOMY).filter(([,mesh]) => mesh.kind === 'surface').map(([id]) => id).sort()).toEqual(['abs_rectus', 'back_lats']);
+});
+
+it('uses well-shaped coarse brachialis triangles and explicitly marks the grouped forearm approximation', () => {
+  const qualities = MUSCLE_ANATOMY.brachialis.parts.flatMap(part => part.faces.map(face => {
+    const [a,b,c] = face.map(i => part.vertices[i]);
+    const u = b.map((v,k) => v-a[k]), v = c.map((n,k) => n-a[k]);
+    const area2 = Math.hypot(u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]);
+    const squaredEdges = [u,v,c.map((n,k) => n-b[k])].flat().reduce((n,x) => n+x*x,0);
+    return 2*Math.sqrt(3)*area2/squaredEdges;
+  })).sort((a,b) => a-b);
+  expect(qualities[Math.floor(qualities.length/2)]).toBeGreaterThan(.5);
+  const forearms = MUSCLE_ANATOMY.forearms_grip;
+  expect(forearms.kind).toBe('envelope');
+  expect(forearms.parts[0].id).toBe('forearm-group-envelope');
+  expect(forearms.parts[0].faces).toHaveLength(192);
+  expect(forearms.parts.filter(p => p.id.includes('-distal-'))).toHaveLength(19);
 });
 
 const insideTriangle = (x: number, y: number, points: readonly (readonly number[])[]) => {

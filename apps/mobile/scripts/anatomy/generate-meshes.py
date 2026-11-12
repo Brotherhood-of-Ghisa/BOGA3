@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 import pymeshlab
 from mesh_fitting import forearm_fitter, erector_envelopes, surface_envelopes
+from coarse_meshes import coarse_muscles
 
 folder = Path(__file__).resolve().parent
 mobile = folder.parents[1]
@@ -249,6 +250,7 @@ for item in catalog:
     print(key, sum(len(p['faces']) for p in parts), 'faces', flush=True)
 
 
+assets = coarse_muscles(assets, body, manifest)
 payload = {'schemaVersion': 1, 'bodyMeshSha256': manifest['bodyMeshSha256'], 'catalog': [{'id': x['id'], 'label': x['label'], 'family': x['family']} for x in catalog], 'muscles': assets}
 output = mobile / 'components/stats/muscle-anatomy-meshes.json'
 encoded = json.dumps(payload, separators=(',', ':')) + '\n'

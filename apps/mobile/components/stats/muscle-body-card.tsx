@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Svg, { Path } from 'react-native-svg';
 
 import {
   Card,
@@ -29,9 +28,7 @@ import {
   buildThemeShadePalette,
   canonicalOrientationForMuscle,
   computeMuscleScores,
-  hitTestProjectedMuscle,
   normaliseBodyAngle,
-  projectMuscleBody,
   type BodyOrientation,
   type MuscleOverlayStyle,
   type MuscleSetTargets,
@@ -64,8 +61,6 @@ const PAN_ACTIVATION_X = 8;
 const PAN_FAIL_Y = 12;
 const DEGREES_PER_POINT = 0.85;
 const ACCESSIBILITY_ANGLE_STEP = 30;
-const FACET_STROKE_WIDTH = 0.35;
-const CONTOUR_STROKE_WIDTH = 1.5;
 
 const LEGACY_REVERSE_ALIASES: Readonly<Record<string, readonly string[]>> = {
   delts_front: ['delts_front', 'front_delts'],
@@ -122,10 +117,10 @@ function MuscleBodyHeader({
           value={orientation}
         />
         <FilterChip
-          accessibilityHint="Switches between wireframe and contour views"
-          accessibilityLabel={`Muscle overlay: ${overlay === 'contour' ? 'Contour' : 'Wireframe'}`}
+          accessibilityHint="Switches between wireframe and filled patch views"
+          accessibilityLabel={`Muscle overlay: ${overlay === 'contour' ? 'Patches' : 'Wireframe'}`}
           accessibilityRole="button"
-          label={overlay === 'contour' ? 'Contour' : 'Wireframe'}
+          label={overlay === 'contour' ? 'Patches' : 'Wireframe'}
           on={false}
           onPress={() => onOverlayChange(overlay === 'contour' ? 'wireframe' : 'contour')}
           size="compact"
@@ -259,22 +254,6 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
   );
 }
 
-type SvgProps = {
-  readonly projected: ReturnType<typeof projectMuscleBody>;
-  readonly viewportWidth: number;
-};
-
-function MuscleBodySvg({ projected, viewportWidth }: SvgProps) {
-  return (
-    <Svg height={VIEWPORT_HEIGHT} pointerEvents="none" testID="stats-muscle-body-svg" width={viewportWidth}>
-      {projected.batches.map(batch => <Path d={batch.d} fill={batch.fill} key={batch.key} stroke={batch.fill}
-        strokeLinejoin="round" strokeWidth={FACET_STROKE_WIDTH} />)}
-      {projected.contour ? <Path d={projected.contour.d} fill="none" stroke={projected.contour.stroke}
-        strokeLinecap="round" strokeLinejoin="round" strokeWidth={CONTOUR_STROKE_WIDTH} testID="stats-muscle-body-contour" /> : null}
-    </Svg>
-  );
-}
-
 type ComparisonSectionProps = {
   readonly selectedMuscle: ProgressMuscleComparison;
   readonly metric: ProgressMetric;
@@ -313,7 +292,8 @@ function MuscleBodyComparison({ selectedMuscle, metric, viewportWidth }: Compari
  * supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
  * and selects a reported muscle group on tap. Wireframe uses depth-tested mesh
  * edges on an opaque grey body; selected anatomy reveals above the body with
- * a distinct colour and light fill. Contour retains the existing shaded view.
+ * a distinct colour and light fill. Filled patches share the coarse anatomy,
+ * camera, focus and hit testing; switching view changes only its material.
  * Decoration follows [[appearance.november]] without changing hit testing.
  */
 export function MuscleBodyCard({
@@ -347,7 +327,7 @@ export function MuscleBodyCard({
 
   const [focus, setFocus] = useState(false);
   // Leave room for Progress controls, comparison and the tab bar on compact phones.
-  const viewportHeight = overlay === 'wireframe' ? Math.min(420, Math.max(VIEWPORT_HEIGHT, windowHeight - 440)) : VIEWPORT_HEIGHT;
+  const viewportHeight = Math.min(420, Math.max(VIEWPORT_HEIGHT, windowHeight - 440));
   const angleDeg = normaliseBodyAngle(baseAngleDeg + dragOffsetDeg);
 
   const viewportWidth =
@@ -361,11 +341,8 @@ export function MuscleBodyCard({
   const selectedMeshes = useMemo(() => selectMuscleMeshes(selectedId, report, focus), [selectedId, report, focus]);
   const camera = useMemo(() => wireframeCamera({ angle: angleDeg, width: viewportWidth, height: viewportHeight,
     selected: selectedMeshes, focus }), [angleDeg, viewportWidth, viewportHeight, selectedMeshes, focus]);
-  const wireframe = useMemo(() => ({ camera, selected: selectedMeshes, scores, report, palette, roles, november }),
-    [camera, selectedMeshes, scores, report, palette, roles, november]);
-  const projected = useMemo(() => overlay === 'contour' ? projectMuscleBody({ angleDeg, width: viewportWidth,
-    height: VIEWPORT_HEIGHT, scores, selectedId, report, palette, november, overlay: 'contour' }) : null,
-    [angleDeg, viewportWidth, scores, selectedId, report, palette, november, overlay]);
+  const wireframe = useMemo(() => ({ overlay, camera, selected: selectedMeshes, scores, report, palette, roles, november }),
+    [overlay, camera, selectedMeshes, scores, report, palette, roles, november]);
 
   const selectedMuscle = useMemo(
     () => (selectedId ? muscles.find(row => row.muscleGroupId === selectedId) ?? null : null),
@@ -400,8 +377,7 @@ export function MuscleBodyCard({
 
   const handleTapPoint = (x: number, y: number) => {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-    const hit = overlay === 'wireframe' ? hitWireframe({ point: [x, y], camera, selected: selectedMeshes, selectedId, report })
-      : projected ? hitTestProjectedMuscle(projected, x, y) : null;
+    const hit = hitWireframe({ point: [x, y], camera, selected: selectedMeshes, selectedId, report });
     if (hit) {
       onSelect(resolveDatasetMuscleId(hit, muscles));
     }
@@ -449,9 +425,9 @@ export function MuscleBodyCard({
         selectedMuscle={selectedMuscle}
       />
       <View>
-        {overlay === 'wireframe' && canvasFailed ? (
+        {canvasFailed ? (
           <View style={[styles.viewport, { height: viewportHeight }]} testID="stats-muscle-body-viewport">
-            <StatePanel kind="error" title="Wireframe unavailable" testID="stats-muscle-wireframe-error"
+            <StatePanel kind="error" title="Muscle model unavailable" testID="stats-muscle-wireframe-error"
               action={{ label: 'Retry', testID: 'stats-muscle-wireframe-retry', onPress: () => setCanvasFailed(false) }} />
           </View>
         ) : <GestureDetector gesture={gesture}>
@@ -479,18 +455,17 @@ export function MuscleBodyCard({
             }}
             style={[styles.viewport, { height: viewportHeight }]}
             testID="stats-muscle-body-viewport">
-            {overlay === 'wireframe' ? <MuscleBodyCanvas frame={wireframe} onError={() => setCanvasFailed(true)} />
-              : projected ? <MuscleBodySvg projected={projected} viewportWidth={viewportWidth} /> : null}
+            <MuscleBodyCanvas frame={wireframe} onError={() => setCanvasFailed(true)} />
           </View>
         </GestureDetector>}
-        {overlay === 'wireframe' && !canvasFailed && selectedMeshes.length > 0 ? <View style={styles.viewerActions}>
+        {!canvasFailed && selectedMeshes.length > 0 ? <View style={styles.viewerActions}>
           <FilterChip label={focus ? 'Whole body' : 'Focus'} on={focus} size="compact"
             accessibilityLabel={focus ? 'Show whole body' : 'Focus selected muscle'} accessibilityRole="button"
             onPress={() => setFocus(value => !value)} testID="stats-muscle-body-focus" />
         </View> : null}
         <View style={styles.information}>
           <Information title="About the muscle model" testIDPrefix="stats-muscle-body"
-            body="Wireframe lines are triangle edges. Selected anatomy reveals through the grey body; covered edges stay hidden. Anatomical shapes are visually fitted. Spinal erectors are smoothed column envelopes; Abs and Lats use body-surface approximations."
+            body="Wireframe lines are triangle edges. Both views share the same coarse muscle surfaces. Selected anatomy reveals through the body; covered edges stay hidden. Shapes are visually fitted: Forearms use an outer group envelope with hand tendons; spinal erectors use smoothed columns; Abs and Lats use body-surface approximations."
             sections={[[ 'Anatomical source', 'BodyParts3D © The Database Center for Life Science, CC BY 4.0. Adapted by pose alignment, forearm/hand fitting, bilateral mirroring and simplified surface envelopes. Source and licence: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html' ]]} />
         </View>
       </View>

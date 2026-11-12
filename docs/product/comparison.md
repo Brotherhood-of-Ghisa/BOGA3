@@ -70,7 +70,8 @@ middle-to-weak losses; displayed −100% neutral while scaling losses. Filters
 may rescale Volume; rotation/selection cannot. Unchanged middle;
 empty/unavailable neutral; `new`/overflow strongest, outside extrema.
 Strong darkens in light mode, lightens in dark. Wireframe colours edges on opaque
-grey; Contour colours fills. Selection has its own colour and Now/Prev/Change;
+grey; Patches colours fills. Both reveal the same selected muscle surface.
+Selection has its own colour and Now/Prev/Change;
 no legend.
 
 History legends precede charts: muscle Sets `% of target`, capped at the

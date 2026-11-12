@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Path } from 'react-native-svg';
+import type { WireframeFrame } from '@/components/stats/muscle-wireframe-renderer';
 
 import { hexToLch } from '@/components/ui/lch';
 import { generateRoles } from '@/components/ui/theme';
@@ -21,6 +21,12 @@ import {
 } from '@/components/stats/muscle-body-projection';
 import { projectMuscleBody, testPalette, testRoles } from './helpers/muscle-body-palette';
 import type { ProgressComparisons, ProgressMuscleComparison } from '@/src/data';
+
+jest.mock('@/components/stats/muscle-body-canvas', () => ({
+  MuscleBodyCanvas: ({ frame }: { frame: WireframeFrame }) => require('react').createElement(require('react-native').View,
+    { frame, pointerEvents: 'none', testID: `stats-muscle-body-${frame.overlay === 'wireframe' ? 'wireframe' : 'patches'}` }),
+}));
+const patchFrame = (): WireframeFrame => screen.getByTestId('stats-muscle-body-patches').props.frame;
 
 // This launch's moustache: the tests run in light mode.
 const MOUSTACHE_FILL = testPalette.moustache;
@@ -371,21 +377,19 @@ describe('November face decoration', () => {
     const onSelect = jest.fn();
     render(<MuscleBodyCard defaultOverlay="contour" metric="workingSetCount" muscles={[makeMuscle('chest', 'Chest', 8)]}
       selectedId="chest" onSelect={onSelect} />);
-    const moustache = () => screen.UNSAFE_getAllByType(Path).filter(path => path.props.fill === MOUSTACHE_FILL);
     const viewport = screen.getByTestId('stats-muscle-body-viewport');
-    expect(moustache().length).toBeGreaterThan(0);
+    expect(patchFrame().november).toBe(true);
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^8$/);
-    const front = moustache().map(path => path.props.d);
+    const front = patchFrame().camera;
     fireEvent(viewport, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
-    expect(moustache().map(path => path.props.d)).not.toEqual(front);
+    expect(patchFrame().camera).not.toEqual(front);
     fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
-    expect(moustache()).toEqual([]);
+    expect(patchFrame().camera.cos).toBeCloseTo(-1);
     fireEvent.press(screen.getByTestId('stats-muscle-body-angle-front'));
-    expect(moustache().length).toBeGreaterThan(0);
-    const figure = screen.UNSAFE_getAllByType(Path).filter(path => path.props.fill !== MOUSTACHE_FILL).map(path => path.props.d);
+    const selected = patchFrame().selected;
     act(() => { jest.advanceTimersByTime(1000); });
-    expect(moustache()).toEqual([]);
-    expect(screen.UNSAFE_getAllByType(Path).filter(path => path.props.fill !== MOUSTACHE_FILL).map(path => path.props.d)).toEqual(figure);
+    expect(patchFrame().november).toBe(false);
+    expect(patchFrame().selected).toBe(selected);
     expect(viewport.props.accessibilityValue).toEqual({ text: 'Front view, 0 degrees' });
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^8$/);
     fireEvent.press(screen.getByTestId('stats-muscle-body-target-chest'));
@@ -400,16 +404,15 @@ describe('MuscleBodyCard', () => {
     makeMuscle('quads', 'Quads', 4, 1600),
   ];
 
-  it('repaints SVG target shades when targets or periods change and keeps untrained muscles neutral', () => {
+  it('passes updated target scores to native patches when targets or periods change and keeps untrained muscles neutral', () => {
     const rows = [comparedMuscle('chest', 2, 8, 'workingSetCount'),
       comparedMuscle('biceps', 0, 8, 'workingSetCount'), comparedMuscle('quads', 8, 0, 'workingSetCount')];
     const props = { muscles: rows, metric: 'workingSetCount' as const, selectedId: null, onSelect: jest.fn() };
     const view = render(<MuscleBodyCard defaultOverlay="contour" {...props} setTargets={SET_TARGETS} />);
     fireEvent(screen.getByTestId('stats-muscle-body-viewport'), 'layout', { nativeEvent: { layout: { width: 280, height: 280 } } });
-    const fills = () => screen.getByTestId('stats-muscle-body-svg').findAllByType(Path)
-      .filter(path => path.props.fill).map(path => path.props.fill);
-    const expectedFills = (chest: number | null, biceps: number | null, quads: number) => projectMuscleBody({ angleDeg: 0, width: 280, height: 280,
-      scores: new Map([['chest', chest], ['biceps', biceps], ['quads', quads]]) }).batches.map(batch => batch.fill);
+    const fills = () => patchFrame().scores;
+    const expectedFills = (chest: number | null, biceps: number | null, quads: number) =>
+      new Map([['chest', chest], ['biceps', biceps], ['quads', quads]]);
     expect(fills()).toEqual(expectedFills(-.5, null, 1));
     view.rerender(<MuscleBodyCard defaultOverlay="contour" {...props} setTargets={{ ...SET_TARGETS, weeklyTarget: 4 }} />);
     expect(fills()).toEqual(expectedFills(0, null, 1));
@@ -456,8 +459,8 @@ describe('MuscleBodyCard', () => {
 
     const viewport = screen.getByTestId('stats-muscle-body-viewport');
     expect(viewport.props.accessibilityValue).toEqual({ text: 'Front view, 0 degrees' });
-    expect(screen.UNSAFE_getAllByType(Path).length).toBeGreaterThan(10);
-    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+    expect(patchFrame().overlay).toBe('contour');
+    expect(screen.queryByTestId('stats-muscle-body-svg')).toBeNull();
 
     // Rotate via accessibility actions (30° steps).
     fireEvent(viewport, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
@@ -477,7 +480,7 @@ describe('MuscleBodyCard', () => {
     const projected = projectMuscleBody({
       angleDeg: 0,
       width: 280,
-      height: 280,
+      height: patchFrame().camera.height,
       scores: computeMuscleScores(muscles, 'workingSetCount'),
     });
     const chestTri = projected.triangles.filter(t => t.muscleGroupId === 'chest').at(-1)!;
@@ -519,8 +522,8 @@ describe('MuscleBodyCard', () => {
       />
     );
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Chest');
-    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeTruthy();
-    expect(screen.getByTestId('stats-muscle-body-svg').props.pointerEvents).toBe('none');
+    expect(patchFrame().selected.length).toBeGreaterThan(0);
+    expect(screen.getByTestId('stats-muscle-body-patches').props.pointerEvents).toBe('none');
     expect(
       screen.getByLabelText('Select Chest. Now 8, previous 0, change +8. working sets.').props.accessibilityState
     ).toEqual({
@@ -554,7 +557,7 @@ describe('MuscleBodyCard', () => {
     fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
     fireEvent.press(screen.getByLabelText('About the muscle model'));
     expect(screen.getByText(/Wireframe lines are triangle edges/)).toBeTruthy();
-    expect(screen.getByText(/Spinal erectors are smoothed column envelopes/)).toBeTruthy();
+    expect(screen.getByText(/spinal erectors use smoothed columns/)).toBeTruthy();
     expect(screen.getByText(/BodyParts3D.*CC BY 4.0/)).toBeTruthy();
     fireEvent(screen.getByTestId('stats-muscle-body-help'), 'accessibilityEscape');
     expect(screen.queryByTestId('stats-muscle-body-help')).toBeNull();
@@ -635,7 +638,7 @@ describe('MuscleBodyCard', () => {
     const projected = projectMuscleBody({
       angleDeg: 0,
       width: 280,
-      height: 280,
+      height: screen.getByTestId('stats-muscle-body-wireframe').props.frame.camera.height,
       scores: computeMuscleScores(muscles, 'workingSetCount'),
     });
     const chestTri = projected.triangles.filter(t => t.muscleGroupId === 'chest').at(-1)!;
@@ -685,8 +688,8 @@ describe('MuscleBodyCard', () => {
     );
 
     const toggle = screen.getByTestId('stats-muscle-body-overlay-toggle');
-    expect(toggle).toHaveTextContent('Contour');
-    expect(screen.getByTestId('stats-muscle-body-contour')).toBeTruthy();
+    expect(toggle).toHaveTextContent('Patches');
+    expect(screen.getByTestId('stats-muscle-body-patches')).toBeTruthy();
 
     fireEvent.press(toggle);
     expect(onOverlayChange).toHaveBeenCalledWith('wireframe');
@@ -702,7 +705,7 @@ describe('MuscleBodyCard', () => {
       />
     );
     expect(toggle).toHaveTextContent('Wireframe');
-    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+    expect(screen.queryByTestId('stats-muscle-body-svg')).toBeNull();
   });
 
   it('correctly occludes sloping faces and excludes hidden forearm edge at 48 degrees', () => {
@@ -771,22 +774,23 @@ describe('MuscleBodyCard', () => {
     expect(projected.contour!.d).not.toContain('M167.7 140L112.3 140');
   });
 
-  it('toggles between wireframe and contour overlay and hides contour when muscle is on the far side', () => {
+  it('toggles between wireframe and patches and keeps selected anatomy revealed from the back', () => {
     const rows = [makeMuscle('chest', 'Chest', 8), makeMuscle('back_lats', 'Lats', 6)];
     render(<MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} defaultOverlay="wireframe" />);
 
     const toggle = screen.getByTestId('stats-muscle-body-overlay-toggle');
     expect(toggle).toHaveTextContent('Wireframe');
-    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+    expect(screen.queryByTestId('stats-muscle-body-svg')).toBeNull();
     expect(screen.getByTestId('stats-muscle-body-wireframe')).toBeTruthy();
 
     fireEvent.press(toggle);
-    expect(toggle).toHaveTextContent('Contour');
-    expect(screen.getByTestId('stats-muscle-body-contour')).toBeTruthy();
+    expect(toggle).toHaveTextContent('Patches');
+    expect(screen.getByTestId('stats-muscle-body-patches')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-body-wireframe')).toBeNull();
 
     fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
-    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
+    expect(patchFrame().selected.length).toBeGreaterThan(0);
+    expect(patchFrame().camera.cos).toBeCloseTo(-1);
 
     fireEvent.press(toggle);
     expect(toggle).toHaveTextContent('Wireframe');

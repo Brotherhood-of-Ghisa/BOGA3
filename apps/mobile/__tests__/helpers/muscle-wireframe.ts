@@ -5,7 +5,7 @@ import { testPalette, testRoles } from './muscle-body-palette';
 
 export function wireframeFixture(overrides: Partial<WireframeFrame> = {}): WireframeFrame {
   const selected = overrides.selected ?? selectMuscleMeshes('brachialis');
-  return { selected, camera: wireframeCamera({ angle: 0, width: 280, height: 420, selected, focus: false }),
+  return { overlay: 'wireframe', selected, camera: wireframeCamera({ angle: 0, width: 280, height: 420, selected, focus: false }),
     scores: new Map([['chest', .5]]), palette: testPalette, roles: testRoles, november: false, ...overrides };
 }
 

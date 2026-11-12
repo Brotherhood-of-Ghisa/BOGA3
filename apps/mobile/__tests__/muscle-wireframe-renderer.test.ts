@@ -38,6 +38,44 @@ it('keeps static GPU geometry across rotation and releases replaced selections a
   expect(gl.endFrameEXP).toHaveBeenCalledTimes(4);
 });
 
+it('shares selection buffers and camera between coarse wires and opaque filled patches', () => {
+  const { context, gl } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
+  const frame = wireframeFixture(); renderer.draw(frame);
+  const uploads = gl.bufferData.mock.calls.length;
+  gl.uniform1f.mockClear();
+  renderer.draw({ ...frame, overlay: 'contour' });
+  expect(gl.bufferData).toHaveBeenCalledTimes(uploads);
+  expect(gl.uniform1f).toHaveBeenCalledWith('fillAlpha', 1);
+  expect(gl.uniform1f.mock.calls.filter(call => call[0] === 'wireWidth').every(call => call[1] === 0)).toBe(true);
+  expect(gl.uniform1f).not.toHaveBeenCalledWith('fillAlpha', .18);
+  expect(gl.uniform2f).toHaveBeenLastCalledWith('viewport', frame.camera.width, frame.camera.height);
+  expect(gl.uniform3fv).toHaveBeenLastCalledWith('wireColour', colourVector(frame.roles.accent));
+  renderer.dispose();
+});
+
+it('masks covered body wires before drawing them and enables depth writes before clearing selection depth', () => {
+  const { context, gl, calls } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
+  renderer.draw(wireframeFixture());
+  const mask = calls.findIndex(c => c.name === 'uniform1f' && c.args[0] === 'reveal' && c.args[1] === 1);
+  const firstWire = calls.findIndex(c => c.name === 'uniform1f' && c.args[0] === 'wireWidth' && Number(c.args[1]) > 0);
+  expect(mask).toBeGreaterThan(0); expect(mask).toBeLessThan(firstWire);
+  const clear = calls.findIndex(c => c.name === 'clear' && c.args[0] === gl.DEPTH_BUFFER_BIT);
+  expect(calls[clear-1]).toEqual({ name: 'depthMask', args: [true] });
+  renderer.dispose();
+});
+
+it('fills patches with the reported activity scale and leaves untracked body regions neutral', () => {
+  const { context, gl } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
+  const muscle = { id: 'cm_arm', displayName: 'Arms', familyName: 'Arms', sortOrder: 0 };
+  const frame = wireframeFixture({ overlay: 'contour', selected: [], scores: new Map([['cm_arm', .5]]),
+    report: new Map([['biceps', { muscle, tracked: true }], ['chest', { muscle, tracked: false }]]) });
+  renderer.draw(frame);
+  const fills = gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillLow').map(call => call[1]);
+  expect(fills[BODY_WIRE_INSTANCES.findIndex(m => m.group === 'biceps')]).toEqual(colourVector(buildMuscleShadeRamp(.5, frame.palette)[0]));
+  expect(fills[BODY_WIRE_INSTANCES.findIndex(m => m.group === 'chest')]).toEqual(colourVector(frame.palette.neutral[0]));
+  renderer.dispose();
+});
+
 it('repaints live theme colours without rebuilding geometry and preserves the seasonal decoration', () => {
   const { context, gl } = recordingGL();
   const renderer = createMuscleWireframeRenderer(context);

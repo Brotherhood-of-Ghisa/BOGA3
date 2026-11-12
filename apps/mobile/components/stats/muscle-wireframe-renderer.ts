@@ -4,10 +4,11 @@ import type { UiRoles } from '@/components/ui/theme';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { MuscleBodyMaterialId } from './muscle-body-mesh';
 import { NOVEMBER_MOUSTACHE_MESH } from './muscle-body-moustache';
-import { buildMuscleShadeRamp, reportedMaterial, type ThemeShadePalette } from './muscle-body-projection';
+import { buildMuscleShadeRamp, reportedMaterial, type MuscleOverlayStyle, type ThemeShadePalette } from './muscle-body-projection';
 import { BODY_WIRE_INSTANCES, wireframeVertices, type AnatomyInstance, type WireframeCamera } from './muscle-wireframe-scene';
 
 export type WireframeFrame = {
+  readonly overlay: MuscleOverlayStyle;
   readonly camera: WireframeCamera;
   readonly selected: readonly AnatomyInstance[];
   readonly scores: ReadonlyMap<string, number | null>;
@@ -25,12 +26,14 @@ uniform vec2 rotation;
 uniform vec2 centre;
 uniform vec2 viewport;
 uniform float scale;
+uniform float reveal;
 varying vec3 bary;
 varying float lighting;
 void main() {
   vec3 p = vec3(position.x*rotation.x+position.z*rotation.y, position.y, -position.x*rotation.y+position.z*rotation.x);
   vec3 n = vec3(normal.x*rotation.x+normal.z*rotation.y, normal.y, -normal.x*rotation.y+normal.z*rotation.x);
   gl_Position=vec4((p.xy-centre)*scale*2.0/viewport, -p.z/2.0, 1.0);
+  gl_Position.z=mix(gl_Position.z,-.99,reveal);
   lighting=clamp(.25+.60*max(0.0,dot(n,vec3(.34,.52,.78)))+.12*max(0.0,dot(n,vec3(-.48,-.28,.42))),0.0,1.0);
   bary=barycentric;
 }`;
@@ -44,8 +47,8 @@ uniform vec3 wireColour;
 uniform float fillAlpha;
 uniform float wireWidth;
 void main() {
-  vec3 a=smoothstep(vec3(0.0),fwidth(bary)*wireWidth,bary);
-  float edge=1.0-min(min(a.x,a.y),a.z);
+  vec3 a=smoothstep(vec3(0.0),fwidth(bary)*max(wireWidth,.001),bary);
+  float edge=wireWidth>0.0 ? 1.0-min(min(a.x,a.y),a.z) : 0.0;
   gl_FragColor=vec4(mix(mix(fillLow,fillHigh,lighting),wireColour,edge),mix(fillAlpha,1.0,edge));
 }`;
 
@@ -84,6 +87,10 @@ function frameColours(frame: WireframeFrame) {
   const paper = hexToLch(frame.roles.paper).lightness, ink = hexToLch(frame.roles.ink).lightness;
   const dark = paper < ink;
   const grey = (amount: number) => lchToHex({ lightness: paper + (ink - paper) * amount, chroma: 0, hue: 0 });
+  const ramps = BODY_WIRE_INSTANCES.map(mesh => {
+    const reported = reportedMaterial(mesh.group as MuscleBodyMaterialId, frame.report);
+    return buildMuscleShadeRamp(reported === 'neutral' ? null : frame.scores.get(reported) ?? null, frame.palette);
+  });
   return {
     low: grey(dark ? .12 : .40), high: grey(dark ? .30 : .15),
     body: BODY_WIRE_INSTANCES.map(mesh => {
@@ -92,6 +99,7 @@ function frameColours(frame: WireframeFrame) {
       const score = frame.scores.get(reported) ?? null;
       return reported === 'neutral' || score === null ? frame.roles.inkMuted : buildMuscleShadeRamp(score, frame.palette)[6];
     }),
+    ramps,
   };
 }
 
@@ -114,7 +122,7 @@ export function createMuscleWireframeRenderer(gl: ExpoWebGLRenderingContext): Mu
     moustache = upload([{ part: { id: 'moustache', vertices: NOVEMBER_MOUSTACHE_MESH.vertices, faces: NOVEMBER_MOUSTACHE_MESH.faces }, group: 'neutral', side: 1 }], 'moustache');
   } catch (error) { dispose(); throw error; }
   const attributes = ['position', 'normal', 'barycentric'].map(name => gl.getAttribLocation(program, name));
-  const uniforms = Object.fromEntries(['rotation', 'centre', 'viewport', 'scale', 'fillLow', 'fillHigh', 'wireColour', 'fillAlpha', 'wireWidth'].map(name => [name, gl.getUniformLocation(program, name)]));
+  const uniforms = Object.fromEntries(['rotation', 'centre', 'viewport', 'scale', 'reveal', 'fillLow', 'fillHigh', 'wireColour', 'fillAlpha', 'wireWidth'].map(name => [name, gl.getUniformLocation(program, name)]));
   const colour = (name: string, hex: string) => gl.uniform3fv(uniforms[name], colourVector(hex));
   const paint = (mesh: MeshBuffer) => {
     gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buffer);
@@ -129,6 +137,7 @@ export function createMuscleWireframeRenderer(gl: ExpoWebGLRenderingContext): Mu
     draw(frame) {
       if (disposed || frame.camera.width <= 0 || frame.camera.height <= 0) return;
       const { camera, selected, roles, palette } = frame;
+      const wires = frame.overlay === 'wireframe';
       if (!previousStyle || ['roles', 'palette', 'scores', 'report', 'selected'].some(key => frame[key as keyof WireframeFrame] !== previousStyle?.[key as keyof WireframeFrame])) {
         colours = frameColours(frame); previousStyle = frame;
       }
@@ -145,21 +154,35 @@ export function createMuscleWireframeRenderer(gl: ExpoWebGLRenderingContext): Mu
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK); gl.disable(gl.BLEND);
       gl.uniform2f(uniforms.rotation, camera.cos, camera.sin); gl.uniform2f(uniforms.centre, camera.centreX, camera.centreY);
       gl.uniform2f(uniforms.viewport, camera.width, camera.height); gl.uniform1f(uniforms.scale, camera.scale);
-      colour('fillLow', colours.low); colour('fillHigh', colours.high);
-      gl.uniform1f(uniforms.fillAlpha, 1); gl.uniform1f(uniforms.wireWidth, .65 * ratio);
-      body.forEach((mesh, i) => { colour('wireColour', colours.body[i]); paint(mesh); });
+      gl.uniform1f(uniforms.reveal, 0); gl.uniform1f(uniforms.fillAlpha, 1); gl.uniform1f(uniforms.wireWidth, 0);
+      body.forEach((mesh, i) => {
+        const ramp = colours.ramps[i];
+        colour('fillLow', wires ? colours.low : ramp[0]); colour('fillHigh', wires ? colours.high : ramp[ramp.length - 1]);
+        paint(mesh);
+      });
       if (frame.november) {
         colour('fillLow', palette.moustache); colour('fillHigh', palette.moustache); colour('wireColour', palette.moustache); paint(moustache);
       }
+      if (wires) {
+        // Mask body wires under the revealed selection, while retaining the opaque grey fill.
+        if (selection) {
+          gl.colorMask(false, false, false, false); gl.uniform1f(uniforms.reveal, 1); paint(selection);
+          gl.colorMask(true, true, true, true); gl.uniform1f(uniforms.reveal, 0);
+        }
+        gl.depthMask(false); gl.enable(gl.BLEND);
+        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.uniform1f(uniforms.fillAlpha, 0); gl.uniform1f(uniforms.wireWidth, .65 * ratio);
+        body.forEach((mesh, i) => { colour('wireColour', colours.body[i]); paint(mesh); });
+      }
       if (selection) {
         // Clear only depth: reveal over the opaque body, then hide covered selected wires with a depth prepass.
-        gl.clear(gl.DEPTH_BUFFER_BIT); gl.colorMask(false, false, false, false); paint(selection);
+        gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT); gl.colorMask(false, false, false, false); paint(selection);
         gl.colorMask(true, true, true, true); gl.depthMask(false); gl.enable(gl.BLEND);
         gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         colour('fillLow', roles.accent); colour('fillHigh', roles.accent); colour('wireColour', roles.accent);
-        gl.uniform1f(uniforms.fillAlpha, .18); gl.uniform1f(uniforms.wireWidth, 1.05 * ratio); paint(selection);
-        gl.depthMask(true);
+        gl.uniform1f(uniforms.fillAlpha, wires ? .18 : 1); gl.uniform1f(uniforms.wireWidth, wires ? 1.05 * ratio : 0); paint(selection);
       }
+      gl.depthMask(true);
       gl.flush(); gl.endFrameEXP();
     },
   };

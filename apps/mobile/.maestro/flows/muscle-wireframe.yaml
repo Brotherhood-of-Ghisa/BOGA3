@@ -1,10 +1,10 @@
 appId: com.dinoderek.mobile
 ---
-# Proves: the native GL wireframe presents whole-body and selected deep anatomy,
+# Proves: native GL wires and filled patches share coarse selected deep anatomy,
 # and composes with the muscle picker, focus and rotation gestures. Screenshots
 # are inspected for body occlusion, the one-hand outline and spinal columns.
 # Why device: shader compilation, depth-tested pixels and native gesture-handler
-# composition are unavailable behind the Jest native boundary.
+# composition and a material switch are unavailable behind the Jest native boundary.
 # Jest counterpart: muscle-wireframe-scene, muscle-wireframe-renderer,
 # muscle-anatomy-meshes, muscle-body-canvas and muscle-body-wireframe tests.
 - openLink: "boga3://maestro-harness?reset=data&fixture=muscle-report&teleport=today"
@@ -23,6 +23,7 @@ appId: com.dinoderek.mobile
 - scrollUntilVisible:
     element: { id: "settings-muscle-view-3d" }
     direction: DOWN
+    centerElement: true
 - tapOn: { id: "settings-muscle-view-3d" }
 - openLink: "boga3://progress?breakdown=muscle"
 - extendedWaitUntil:
@@ -30,6 +31,7 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - assertNotVisible: { id: "stats-muscle-wireframe-error" }
 - takeScreenshot: "wireframe-01-whole-body"
+# The fixed picker header covers rows after Maestro's centering swipe; use their first unobscured position.
 - tapOn: { id: "stats-muscle-body-picker-trigger" }
 - scrollUntilVisible:
     element: { id: "stats-muscle-picker-row-brachialis" }
@@ -37,6 +39,17 @@ appId: com.dinoderek.mobile
 - tapOn: { id: "stats-muscle-picker-row-brachialis" }
 - assertVisible: { id: "stats-muscle-body-selected", text: "Brachialis" }
 - takeScreenshot: "wireframe-02-brachialis"
+- tapOn: { id: "stats-muscle-body-focus" }
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
+- assertVisible: { id: "stats-muscle-body-focus", text: "Show whole body" }
+- takeScreenshot: "patches-01-brachialis-focus"
+- tapOn: { id: "stats-muscle-body-angle-back" }
+- takeScreenshot: "patches-02-brachialis-back"
+- assertNotVisible: { id: "stats-muscle-wireframe-error" }
+- tapOn: { id: "stats-muscle-body-angle-front" }
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- tapOn: { id: "stats-muscle-body-focus" }
 - tapOn: { id: "stats-muscle-body-picker-trigger" }
 - scrollUntilVisible:
     element: { id: "stats-muscle-picker-row-forearms_grip" }
@@ -44,12 +57,20 @@ appId: com.dinoderek.mobile
 - tapOn: { id: "stats-muscle-picker-row-forearms_grip" }
 - tapOn: { id: "stats-muscle-body-focus" }
 - takeScreenshot: "wireframe-03-forearm-hand-focus"
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
+- takeScreenshot: "patches-03-forearm-hand-focus"
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
 - tapOn: { id: "stats-muscle-body-picker-trigger" }
 - scrollUntilVisible:
     element: { id: "stats-muscle-picker-row-spinal_erectors" }
     direction: DOWN
 - tapOn: { id: "stats-muscle-picker-row-spinal_erectors" }
 - takeScreenshot: "wireframe-04-spinal-focus"
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
+- takeScreenshot: "patches-04-spinal-focus"
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
 - assertNotVisible: { id: "stats-muscle-wireframe-error" }
 
 - swipe:

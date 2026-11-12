@@ -41,7 +41,7 @@ it('defaults to native wireframe, preserves rotation and focus, and updates the 
   expect(view.getByTestId('stats-muscle-body-comparison')).toBeTruthy();
 });
 
-it('keeps Retry accessible outside the adjustable viewport, and preserves picker and Contour after GL failure', () => {
+it('keeps Retry accessible outside the adjustable viewport and preserves the picker and patch toggle after GL failure', () => {
   createRenderer.mockImplementation(() => { throw new Error('native context failure'); });
   const view = renderWithTheme(<MuscleBodyCard muscles={muscles} metric="workingSetCount" selectedId="brachialis" onSelect={jest.fn()} />);
   fireEvent(view.getByTestId('stats-muscle-body-wireframe'), 'contextCreate', recordingGL().context);
@@ -52,8 +52,31 @@ it('keeps Retry accessible outside the adjustable viewport, and preserves picker
   fireEvent.press(retry);
   expect(view.getByTestId('stats-muscle-body-wireframe')).toBeTruthy();
   fireEvent.press(view.getByTestId('stats-muscle-body-overlay-toggle'));
-  expect(view.getByTestId('stats-muscle-body-svg')).toBeTruthy();
+  expect(view.getByTestId('stats-muscle-body-patches')).toBeTruthy();
   expect(view.getByTestId('stats-muscle-body-picker-trigger')).toBeTruthy();
+});
+
+it('keeps the selected coarse geometry, focused camera, native context and hit testing when switching to patches', () => {
+  const renderer = { draw: jest.fn(), dispose: jest.fn() }; createRenderer.mockReturnValue(renderer);
+  const onSelect = jest.fn();
+  const view = renderWithTheme(<MuscleBodyCard muscles={muscles} metric="workingSetCount" selectedId="brachialis" onSelect={onSelect} />);
+  fireEvent(view.getByTestId('stats-muscle-body-wireframe'), 'contextCreate', recordingGL().context);
+  fireEvent.press(view.getByTestId('stats-muscle-body-focus'));
+  act(() => { jest.advanceTimersByTime(20); });
+  const before = renderer.draw.mock.calls.at(-1)![0];
+  fireEvent.press(view.getByTestId('stats-muscle-body-overlay-toggle'));
+  act(() => { jest.advanceTimersByTime(20); });
+  const after = renderer.draw.mock.calls.at(-1)![0];
+  expect(after.overlay).toBe('contour'); expect(after.selected).toBe(before.selected); expect(after.camera).toBe(before.camera);
+  expect(view.getByTestId('stats-muscle-body-patches')).toBeTruthy();
+  expect(view.getByTestId('stats-muscle-body-focus')).toHaveTextContent('Whole body');
+  expect(createRenderer).toHaveBeenCalledTimes(1);
+  const centre = [0, 1, 2].map(k => after.selected[0].part.vertices.reduce((n: number,p: number[]) => n+p[k],0)/after.selected[0].part.vertices.length);
+  const [x,y] = projectWireframePoint(centre as [number,number,number], after.camera);
+  const viewport = view.getByTestId('stats-muscle-body-viewport');
+  const tap = viewport.props.gesture.gestures.find((g: { type: string }) => g.type === 'tap');
+  tap.handlers.onEnd({ x, y });
+  expect(onSelect).toHaveBeenCalledWith('brachialis');
 });
 
 it('uses the wireframe camera for taps, ignores invalid coordinates, and keeps custom selections without fake geometry', () => {

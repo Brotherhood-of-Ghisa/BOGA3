@@ -2,22 +2,25 @@
 
 Load when changing the native muscle geometry or its offline generation.
 The runtime asset is `muscle-anatomy-meshes.json`; the opaque body remains
-`muscle-body-mesh.json`. The renderer consumes triangles, never fibre guides.
+`muscle-body-mesh.json`. Wire and filled patch materials share coarse triangles,
+never fibre guides. Switching material retains selection, camera and focus.
 
 The pinned BodyParts3D 4.0 OBJ components are © The Database Center for Life
 Science, licensed under [CC BY 4.0](https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html).
 `apps/mobile/scripts/anatomy/mesh-source.json` owns source IDs, SHA-256 hashes,
 registration landmarks and derivation descriptions. Adaptations include pose
-registration, bilateral mirroring, topology-preserving reduction and fitting.
+registration, bilateral mirroring, isotropic remeshing, reduction and fitting.
 The on-demand model information carries the attribution in the app.
 
-These are visually fitted training illustrations. Brachialis retains the full
-source surface. Forearm muscles and tendons fit the avatar's wrist and hand
-cross-sections so they share its hand outline. Spinal erectors use three paired,
+These are visually fitted training illustrations. Coarse brachialis retains the
+full fitted source bounds. Forearms use one outer group envelope with 19 retained
+distal tendon components per side, constrained to the avatar's wrist and hand
+cross-sections. This group approximation does not expose individual proximal
+forearm muscle surfaces. Spinal erectors use three paired,
 smoothed closed column envelopes derived from source sections, not individual
 anatomical fibres. Abs and Lats are closed envelopes of the labelled body surface;
 they do not claim complete atlas anatomy. The asset marks these as `surface`,
-spinal columns as `envelope`, and source components as `atlas`.
+forearms and spinal columns as `envelope`, and source components as `atlas`.
 
 To rebuild from pinned sources, from the repository root:
 
@@ -29,10 +32,14 @@ uv run --python 3.13 --with-requirements apps/mobile/scripts/anatomy/requirement
 ```
 
 Downloads stay in gitignored artifacts and never ship. The generator verifies
-source hashes and the target body hash. Per-component reduction retains connected
-components, topology, bounds and volume within its checked tolerance. Derived
-columns are closed manifold surfaces; the source trapezius retains ten shared
-nonmanifold edges and five collapsed triangles (which render no pixels). `apps/mobile/__tests__/muscle-anatomy-meshes.test.ts` guards
-coverage, topology, the unchanged brachialis surface and the fitted hand outline
-through eight rotations. Runtime selection and activity follow the report mapping
-and [[comparison.colour-scale]].
+source hashes and the target body hash. `apps/mobile/scripts/anatomy/coarse_meshes.py`
+remeshes registered surfaces offline: coarse target edge .035, surface-distance
+tolerance .003, six iterations, with a denser fallback where needed. Bounds are
+restored before checking final volume (within 15% for atlas-derived parts);
+the hand is constrained after fitting. Tiny source trapezius defects are repaired.
+The asset contains 13,688 triangles before bilateral mirroring, versus 51,696
+before remeshing. Display parts have paired edges, consistent winding and no
+collapsed triangles. `apps/mobile/__tests__/muscle-anatomy-meshes.test.ts` guards
+coverage, topology, full brachialis bounds, triangle quality and the hand outline
+through eight rotations. Runtime activity follows the report mapping and
+[[comparison.colour-scale]].

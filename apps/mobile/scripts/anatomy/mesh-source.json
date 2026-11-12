@@ -684,5 +684,9 @@
       "FJ1544",
       "FJ1543"
     ]
+  },
+  "displayDerivations": {
+    "coarseMeshes": "Isotropic remeshing of registered source components; bound/volume checks and trapezius repair. The same coarse surfaces serve wire and filled patch materials.",
+    "forearms_grip": "Outer group envelope through proximal forearm, with 19 fitted distal tendon components per side; grouped approximation, not individual proximal muscle surfaces."
   }
 }
