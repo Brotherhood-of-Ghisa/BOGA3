@@ -1,4 +1,4 @@
-import { useIsFocused } from 'expo-router';
+import { useIsFocused, useRouter, type Href } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ import {
   type SessionEntryCoordinator,
   type SessionEntryResult,
 } from '@/src/session-entry';
+import { planQueries, startSessionPlan } from '@/src/session-planner';
 
 export type TrainPlanningState =
   | { status: 'unavailable' }
@@ -337,9 +338,75 @@ function TrainPlanning({
   );
 }
 
+export function useTrainPlanningState({
+  isFocused = true,
+}: {
+  isFocused?: boolean;
+} = {}): TrainPlanningState {
+  const router = useRouter();
+  const [state, setState] = useState<TrainPlanningState>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!isFocused) return;
+    let cancelled = false;
+
+    planQueries
+      .listUpcomingPlans()
+      .then((upcoming) => {
+        if (cancelled) return;
+        const pending = upcoming.filter((plan) => plan.progress !== 'completed');
+        if (pending.length === 0) {
+          setState({
+            status: 'empty',
+            openManager: () => router.push('/planner' as Href),
+          });
+          return;
+        }
+
+        const nextPlan = pending[0];
+        const counts = nextPlan.blockCounts;
+        const totalBlocks = counts.pending + counts.attached + counts.completed + counts.skipped;
+        const detail = `${totalBlocks} ${totalBlocks === 1 ? 'exercise' : 'exercises'}`;
+
+        setState({
+          status: 'ready',
+          title: nextPlan.title,
+          detail,
+          materialize: async () => {
+            const result = await startSessionPlan(nextPlan.id);
+            if (result.status === 'started' || result.status === 'already-active') {
+              return { sessionId: result.sessionId };
+            }
+            throw new Error('Unable to start plan');
+          },
+          openManager: () => router.push('/planner' as Href),
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setState({
+          status: 'error',
+          message: "Couldn't load your plans.",
+          retry: () => {
+            setState({ status: 'loading' });
+            setAttempt((prev) => prev + 1);
+          },
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt, isFocused, router]);
+
+  return state;
+}
+
 export default function TrainRoute() {
   const isFocused = useIsFocused();
-  return <TrainScreen isFocused={isFocused} />;
+  const planningState = useTrainPlanningState({ isFocused });
+  return <TrainScreen isFocused={isFocused} planningState={planningState} />;
 }
 
 const styles = StyleSheet.create({

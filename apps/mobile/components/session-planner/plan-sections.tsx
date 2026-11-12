@@ -173,7 +173,15 @@ export type PlanSectionsState = {
 };
 
 /** The reusable-intent section stays visible across empty, loading and failed reads. */
-export function RoutinePlanSection({ state, onOpenPlan }: { state: PlanSectionsState; onOpenPlan: (id: string) => void }) {
+export function RoutinePlanSection({
+  state,
+  onOpenPlan,
+  testID = 'sessions-plan-section-routines',
+}: {
+  state: PlanSectionsState;
+  onOpenPlan: (id: string) => void;
+  testID?: string;
+}) {
   return <PlanSection
     emptyMessage="No routines yet."
     errorMessage={state.loadErrorMessage}
@@ -182,7 +190,7 @@ export function RoutinePlanSection({ state, onOpenPlan }: { state: PlanSectionsS
     onOpenPlan={onOpenPlan}
     onRetry={() => void state.reload()}
     plans={state.routines}
-    testID="sessions-plan-section-routines"
+    testID={testID}
   />;
 }
 

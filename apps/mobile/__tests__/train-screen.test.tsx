@@ -24,9 +24,13 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule()
 );
 
+const mockDismissTo = jest.fn();
+const mockPush = jest.fn();
+const mockRouter = { dismissTo: mockDismissTo, push: mockPush };
+
 jest.mock('expo-router', () => ({
   useIsFocused: () => true,
-  useRouter: () => ({ dismissTo: jest.fn() }),
+  useRouter: () => mockRouter,
 }));
 
 jest.mock('@/components/session-view/session-view-screen', () => {
@@ -51,6 +55,7 @@ import * as sessionDrafts from '@/src/data/session-drafts';
 import * as sessionList from '@/src/data/session-list';
 import { listSessionListBuckets, setSessionDeletedState } from '@/src/data/session-list';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
+import { createDrizzleSessionPlanStore } from '@/src/data/session-plan-store';
 import type { SessionEntryCoordinator } from '@/src/session-entry';
 import {
   bootLocalApp,
@@ -74,6 +79,15 @@ const openTrain = async (fixture?: 'session-view') => {
   await seed(fixture);
   renderWithTheme(<TrainRoute />);
   await checked();
+  if (!fixture) {
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('train-manage-planning-button') ||
+          screen.queryByTestId('train-planning-section') ||
+          screen.queryByTestId('train-planning-error'),
+      ).toBeTruthy();
+    });
+  }
 };
 
 // The workout Train shows in place of its disc, as `<placement> workout <id>`.
@@ -131,6 +145,8 @@ const renderWithPlan = async (planningState: TrainPlanningState, sessionEntry?: 
 
 beforeEach(() => {
   resetLocalData();
+  mockDismissTo.mockClear();
+  mockPush.mockClear();
 });
 
 afterEach(() => {
@@ -146,8 +162,10 @@ describe('Train over real data', () => {
     expect(screen.getByRole('button', { name: 'Start workout' })).toBe(screen.getByTestId('train-start-empty-button'));
     expect(screen.getByTestId('train-start-empty-button')).toHaveTextContent('Start');
     expect(screen.queryByTestId('train-planning-section')).toBeNull();
-    expect(screen.queryByTestId('train-manage-planning-button')).toBeNull();
-    expect(screen.queryByText('Watch this space 👀')).toBeNull();
+    expect(screen.getByTestId('train-manage-planning-button')).toHaveTextContent('Plan a workout');
+
+    fireEvent.press(screen.getByTestId('train-manage-planning-button'));
+    expect(mockPush).toHaveBeenCalledWith('/planner');
   });
 
   it('checks for a workout with one row, never the whole session history', async () => {
@@ -373,6 +391,41 @@ describe('Train over real data', () => {
     expect(await activeSessionId()).toBe('planned-session');
   });
 
+  it('loads upcoming plan from database on TrainRoute, displaying 1-tap start and linking manage planning to /planner', async () => {
+    await seed();
+    const store = createDrizzleSessionPlanStore();
+    await store.savePlanGraph(
+      {
+        title: 'Heavy Deadlift Day',
+        gymId: null,
+        scheduledFor: new Date(2026, 10, 5, 10),
+        exercises: [
+          {
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Bench Press',
+            sets: [{ targetWeightValue: '100', targetReps: 5, targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 10, 4, 10),
+    );
+
+    renderWithTheme(<TrainRoute />);
+    await checked();
+    await waitFor(() => {
+      expect(screen.queryByTestId('train-planned-session-card')).toBeTruthy();
+    });
+
+    expect(screen.getByTestId('train-planned-session-card')).toHaveTextContent('Heavy Deadlift Day1 exerciseStart');
+    expect(screen.getByTestId('train-start-planned-button')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('train-manage-planning-button'));
+    expect(mockPush).toHaveBeenCalledWith('/planner');
+
+    fireEvent.press(screen.getByTestId('train-start-planned-button'));
+    await waitFor(() => expect(shownWorkout()).not.toBeNull());
+  });
+
   it('keeps a failed planned launch inline, leaving empty training usable (a failed plan write)', async () => {
     await seed();
     await renderWithPlan(readyPlan({ materialize: jest.fn().mockRejectedValue(new Error('stale plan')) }));
@@ -489,6 +542,9 @@ describe('Train launch states', () => {
 
     renderWithTheme(<TrainRoute />);
     await checked();
+    await waitFor(() => {
+      expect(screen.queryByTestId('train-manage-planning-button')).toBeTruthy();
+    });
     expect(accentButtons()).toEqual(['train-start-empty-button']);
     expect(discWidth()).toBeGreaterThan(compact);
   });

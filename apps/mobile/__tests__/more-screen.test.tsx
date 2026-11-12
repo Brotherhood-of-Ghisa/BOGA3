@@ -63,7 +63,7 @@ describe('More screen', () => {
         .findAll((node) => typeof node.props.testID === 'string' && node.props.testID.endsWith('-row'), { deep: true })
         .map((node) => node.props.testID)
         .filter((id, index, ids) => ids.indexOf(id) === index);
-    expect(rowsOf('more-group-1')).toEqual(['more-exercises-row', 'more-gyms-row']);
+    expect(rowsOf('more-group-1')).toEqual(['more-planner-row', 'more-exercises-row', 'more-gyms-row']);
     expect(rowsOf('more-group-2')).toEqual(['more-connect-ai-row', 'more-settings-row']);
     expect(screen.queryByText('More')).toBeNull();
     expect(screen.queryByRole('header')).toBeNull();
@@ -71,6 +71,7 @@ describe('More screen', () => {
   });
 
   it.each([
+    ['more-planner-row', '/planner'],
     ['more-gyms-row', '/gyms'],
     ['more-exercises-row', '/exercise-catalog'],
     ['more-settings-row', '/settings'],
@@ -83,10 +84,11 @@ describe('More screen', () => {
     expect(mockPush).toHaveBeenCalledWith(route);
   });
 
-  it('names Exercises and Settings by their labels alone', async () => {
+  it('names Planner, Exercises and Settings by their labels alone', async () => {
     renderWithTheme(<MoreScreen />);
     await waitFor(() => expect(mockListConnectedAgents).toHaveBeenCalled());
 
+    expect(screen.getByTestId('more-planner-row').props.accessibilityLabel).toBe('Planner');
     expect(screen.getByTestId('more-exercises-row').props.accessibilityLabel).toBe('Exercises');
     expect(screen.getByTestId('more-settings-row').props.accessibilityLabel).toBe('Settings');
   });
