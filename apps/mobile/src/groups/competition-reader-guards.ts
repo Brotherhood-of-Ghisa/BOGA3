@@ -160,7 +160,7 @@ function streamRecord(v: unknown, event: CompetitionEventWire): boolean {
 }
 // Records log: a record lists the board's metric and is never voided; a lead
 // change has a leader and matches the log's scope (on All, only the #1 changes
-// a link or void made); a rules change carries nothing else.
+// a link, unlink or void made); a rules change carries nothing else.
 function recordsHistoryItem(v: unknown, log: { exercise: string; metric: string; certified: boolean }): boolean {
   if (!exact(v,['event','record','previous_best']) || !isCompetitionEventWire(v.event) ||
     v.event.group_exercise.group_exercise_id !== log.exercise) return false;

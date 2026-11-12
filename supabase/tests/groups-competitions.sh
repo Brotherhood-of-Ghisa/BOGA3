@@ -1491,7 +1491,8 @@ records_history "${LINK_GX}" e1rm false; expect_ok 'records log after a link'; a
 check 'a link #1 is listed with the linking member as holder' \
   'any(.items[];.event.kind=="lead_change" and .event.reason=="link" and .event.member.user_id==$r
      and any(.event.values[];.role=="leader" and .member.user_id==$r))
-   and any(.items[];.event.kind=="record" and .event.member.user_id==$a)' --arg a "${ATHLETE_UID}" --arg r "${RIVAL_UID}"
+   and any(.items[];.event.kind=="record" and .event.member.user_id==$a)
+   and ([.items[]|select(.event.kind=="record" and .event.member.user_id==$r)]|length)==0' --arg a "${ATHLETE_UID}" --arg r "${RIVAL_UID}"
 next_cuam; push "${RIVAL_TOKEN}" 'records log: rival unlinks' "$(e_link "${LT}-r-def" "${GID}" "${LINK_GX}" "${CUAM}" "${CUAM}")"
 drain 'records log: unlink'
 records_history "${LINK_GX}" e1rm false; expect_ok 'records log after an unlink'; assert_wire isCompetitionRecordsHistoryWire

@@ -32,7 +32,8 @@ function delta(current: CompetitionHistoryValueWire | undefined, previous: Compe
 
 /**
  * Why an All board's #1 moved when no record explains it. `link` is the
- * publisher's reason for a link, an unlink and a retarget alike: the leader
+ * publisher's reason for a link, an unlink and a retarget alike; `void` is a
+ * corrected record: the leader
  * linking passes the old holder; anyone else's unlink, and a corrected
  * record (`void`), only hand #1 on.
  */
@@ -62,7 +63,10 @@ function entryFor(item: CompetitionRecordsHistoryItemWire, metric: CompetitionMe
     const previous = event.values.find(value => value.role === 'previous');
     const holder = leader?.member ?? event.member;
     const kept = previous?.member?.user_id === holder?.user_id;
-    const detail = event.certified ? [previous?.member && !kept ? passedName(previous.member) : null]
+    // Only the member whose change it was can have passed anyone: a holder who
+    // lost #1 (ended certification, unlink, correction) hands it on.
+    const detail = event.certified
+      ? [previous?.member && !kept && event.member?.user_id === holder?.user_id ? passedName(previous.member) : null]
       : allBoardLeadChange({ reason: event.reason, actor: event.member, holder, previous: previous?.member, kept, nameOf, passedName });
     return { ...base, mark: 'lead', title: kept ? `${nameOf(holder)} · #1` : `${nameOf(holder)} took #1`,
       figure: leader ? formatCompetitionHistoricalFigure(leader) : 'Score unavailable',

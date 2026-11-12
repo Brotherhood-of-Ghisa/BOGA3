@@ -35,7 +35,7 @@ describe('records log', () => {
     expect(row).toMatchObject({ figure: 'Score unavailable', date: '12-11-2026 · Session in progress' });
   });
   it('a Certified lead change names the new holder and who they passed', () => {
-    const lead = { event: event({ kind: 'lead_change', certified: true, member: null,
+    const lead = { event: event({ kind: 'lead_change', certified: true, member: sam,
       values: [kg('leader', 130, sam), kg('previous', 120, me)] }), record: null, previous_best: null };
     expect(entries([lead])[0]).toMatchObject({ mark: 'lead', title: 'Sam took #1', figure: '130.0', detail: 'passed you' });
     const kept = { ...lead, event: event({ kind: 'lead_change', certified: true, member: null,
@@ -50,10 +50,12 @@ describe('records log', () => {
     expect(entries([{ ...lead('link', { user_id: 'kim', username: 'Kim' }) }])[0].detail).toBe('Kim unlinked');
     expect(entries([lead('void', me)])[0]).toMatchObject({ title: 'Sam took #1', detail: 'record corrected' });
   });
-  it('a Certified #1 never names an All cause', () => {
-    const lead = { event: event({ kind: 'lead_change', certified: true, reason: 'link', member: me,
-      values: [kg('leader', 130, sam), kg('previous', 120, me)] }), record: null, previous_best: null };
-    expect(entries([lead])[0].detail).toBe('passed you');
+  it('a Certified #1 names no All cause, and passes only when the new holder made the change', () => {
+    const lead = (reason: string, actor: typeof me, leader: number, previous: number) => ({ event: event({ kind: 'lead_change',
+      certified: true, reason, member: actor, values: [kg('leader', leader, sam), kg('previous', previous, me)] }), record: null, previous_best: null });
+    expect(entries([lead('certification', sam, 130, 120)])[0]).toMatchObject({ title: 'Sam took #1', detail: 'passed you' });
+    expect(entries([lead('certification', me, 110, 120)])[0]).toMatchObject({ title: 'Sam took #1', detail: '' });
+    expect(entries([lead('link', me, 110, 120)])[0].detail).toBe('');
   });
   it('splits entries into one card per run between rules changes, dimming earlier rules', () => {
     const rules = { event: event({ kind: 'rules_change', event_id: 'rc', values: [], sort_at_ms: Date.UTC(2026, 10, 3) }), record: null, previous_best: null };

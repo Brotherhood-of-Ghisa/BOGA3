@@ -4,7 +4,8 @@
 -- listing that board), with the set as performed, the group's previous #1
 -- (the stream record's shape) and the member's own previous best on the
 -- metric, plus the #1 changes no record explains (a link brought earlier sets
--- in, or a void fell back to the next best). Certified: the board's lead
+-- in, an unlink took them out, or a void fell back to the next best; the
+-- publisher's 'link' reason covers link, unlink and retarget). Certified: the board's lead
 -- changes to a new leader (an emptied board is no #1). Both include each rules change
 -- and span every rules revision, so a rules edit no longer empties the log;
 -- every figure stays as it was scored under its own revision. Voided records
