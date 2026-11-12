@@ -19,7 +19,7 @@ type Target = { combinedKey: string | null; family: string | null; memberId: str
  * tick, Off ones noted; a muscle in another combined muscle names it, and
  * ticking moves it (a new member joins On, an existing one keeps its state).
  * `Add combined muscle` / `Save` needs a name and one muscle and goes back;
- * an existing one can be deleted, its members back On on their own.
+ * an existing one can be deleted, its members back to their own muscles.
  */
 export function CombinedMuscleEditorPage(target: Target) {
   return <MuscleSetupShell testID="settings-combined-muscle-screen">
@@ -33,7 +33,10 @@ function Editor({ loaded, setup, target }: { loaded: MuscleSetupChange; setup: M
   const router = useRouter();
   const text = useUiText();
   const [draft, setDraft] = useState<Draft>({});
+  // Set once a delete is saved: the page is leaving, so it never reads as missing.
+  const [deleted, setDeleted] = useState(false);
   const existing = target.combinedKey ? loaded.definitions.find(muscle => muscle.key === target.combinedKey) ?? null : null;
+  if (deleted) return null;
   if (target.combinedKey && !existing) {
     return <Text allowFontScaling={false} style={text.meta} testID="settings-combined-muscle-missing">No such combined muscle.</Text>;
   }
@@ -58,7 +61,7 @@ function Editor({ loaded, setup, target }: { loaded: MuscleSetupChange; setup: M
   const remove = (key: string, label: string) => Alert.alert(`Delete ${label}?`, undefined, [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Delete', style: 'destructive', onPress: () => {
-      void setup.change(() => deleteCombinedMuscle(key), { retry: false }).then(done => { if (done) router.back(); });
+      void setup.change(() => deleteCombinedMuscle(key), { retry: false }).then(done => { if (done) { setDeleted(true); router.back(); } });
     } },
   ]);
   return <>

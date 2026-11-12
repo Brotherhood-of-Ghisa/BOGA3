@@ -36,7 +36,7 @@ export function CombinedMusclesPage() {
           ? <Text allowFontScaling={false} style={text.meta} testID="settings-combined-muscles-empty">No combined muscles.</Text> : null}
         {loaded ? <FormSection>
           <ActionRow disabled={setup.busy} icon="plus" label="New combined muscle" onPress={create} testID="settings-combined-muscles-new" />
-          <ActionRow disabled={setup.busy} divider kind="act" label="Start from Broad…" onPress={startFromBroad}
+          <ActionRow disabled={setup.busy} divider kind="danger" label="Start from Broad…" onPress={startFromBroad}
             testID="settings-combined-muscles-broad" />
         </FormSection> : null}
       </>;
