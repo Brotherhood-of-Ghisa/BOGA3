@@ -127,8 +127,13 @@ describe('one muscle', () => {
 
 describe('Combined muscles', () => {
   it('shows the empty state, then each by family with its members, opening the editor', async () => {
-    await renderPage(<CombinedMusclesPage />, 'settings-combined-muscles-empty');
+    render(<CombinedMusclesPage />);
+    const headerAdd = () => (mockScreenOptions.mock.calls.at(-1)?.[0] as { headerRight: () => ReactElement }).headerRight();
+    // Before the setup is read the header + waits.
+    expect(headerAdd().props).toMatchObject({ testID: 'settings-combined-muscles-add', disabled: true });
+    await screen.findByTestId('settings-combined-muscles-empty');
     expect(screen.getByText('No combined muscles.')).toBeOnTheScreen();
+    expect(headerAdd().props.disabled).toBe(false);
     fireEvent.press(screen.getByTestId('settings-combined-muscles-new'));
     expect(mockPush).toHaveBeenLastCalledWith('/settings-combined-muscle');
     const options = mockScreenOptions.mock.calls.at(-1)?.[0] as { headerRight: () => ReactElement };
@@ -236,6 +241,24 @@ describe('the combined-muscle editor', () => {
     expect(await row('biceps')).toMatchObject({ reportGroup: key, tracked: 0 });
     expect(await row('triceps')).toMatchObject({ reportGroup: key, tracked: 0 });
     expect((await setup.readMuscleSetup()).definitions[0].name).toBe('Guns');
+  });
+
+  it('never reads as missing while a delete saves, and stays with the error when it fails', async () => {
+    const key = await setup.createCombinedMuscle({ name: 'Arms', family: 'Arms', memberIds: ['biceps'] });
+    jest.spyOn(Alert, 'alert');
+    await renderPage(<CombinedMuscleEditorPage combinedKey={key} family={null} memberId={null} />, 'settings-combined-muscle-delete');
+    jest.spyOn(setup, 'deleteCombinedMuscle').mockRejectedValueOnce(Error('disk full'));
+    fireEvent.press(screen.getByTestId('settings-combined-muscle-delete'));
+    confirmAlert('Delete');
+    expect(await screen.findByTestId('settings-muscles-error')).toHaveTextContent(/Couldn’t save the change/);
+    expect(screen.getByTestId('settings-combined-muscle-name')).toHaveProp('value', 'Arms');
+    expect(mockBack).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByTestId('settings-combined-muscle-delete'));
+    confirmAlert('Delete');
+    expect(screen.queryByTestId('settings-combined-muscle-missing')).toBeNull();
+    await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    expect(screen.queryByTestId('settings-combined-muscle-missing')).toBeNull();
+    expect((await setup.readMuscleSetup()).definitions).toEqual([]);
   });
 
   it('shows a rule the save breaks and stays, without a Retry that would save twice', async () => {
