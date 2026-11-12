@@ -124,7 +124,7 @@ describe('the stream as drawn', () => {
   });
 
   it('draws a withdrawal only when the record it withdrew was a GR', () => {
-    const withdrawal = (key: string, withdrawn: CompetitionStreamWithdrawnWire | null): CompetitionStreamItemWire => ({
+    const withdrawal = (key: string, withdrawn: CompetitionStreamWithdrawnWire | null): Extract<CompetitionStreamItemWire, { kind: 'competition' }> => ({
       kind: 'competition', key, sort_at_ms: 3000,
       event: { ...competitionEvent, event_id: key, kind: 'record_voided', related_event_id: `${key}-record`, values: [], record_context: null },
       withdrawn,
