@@ -208,6 +208,7 @@ describe('domain schema and runtime migrations', () => {
       'm0029',
       'm0030',
       'm0031',
+      'm0032',
     ]);
   });
 
