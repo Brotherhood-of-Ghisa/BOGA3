@@ -176,7 +176,8 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
 }
 
 // Each muscle's sets on the last three days, today so far, and this week
-// against its weekly Target ([[muscle.weekly-targets]]), least trained first.
+// against its weekly Target ([[muscle.weekly-targets]]): under target first,
+// then fewest this week.
 // Settings' family grouping adds initially expanded sections over the same
 // reported muscles, preserving recovery order within each. Family tiles sum
 // unrounded daily child contributions, including numeric zeros, and stay when
@@ -337,7 +338,7 @@ export function TodayPlanCards({ now, ...props }: TodayPlanCardsProps & { now: D
   );
 }
 
-// The least trained rows that show before the rest scroll,
+// The first rows (under target, fewest this week) that show before the rest scroll,
 // leaving the plan card room below; a phone too short for both scrolls the page.
 export const VISIBLE_MUSCLE_ROWS = 10;
 const DAY_CELL = 26;
