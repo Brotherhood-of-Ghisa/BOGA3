@@ -238,7 +238,7 @@ describe('domain schema and runtime migrations', () => {
     const { m0031, ...earlier } = localRuntimeMigrations.migrations;
     const client = new Database(':memory:');
     for (const migration of Object.values(earlier)) client.exec(migration);
-    client.exec("insert into user_settings (id, muscle_target_overrides) values ('settings', '{\"detailed\":{\"chest\":9}}')");
+    client.exec("insert into user_settings (id, muscle_target_overrides, local_updated_at_ms) values ('settings', '{\"detailed\":{\"chest\":9}}', 700)");
     client.exec("insert into sync_runtime_state (id, pull_cursor) values ('primary', '{\"0\":\"cursor\"}')");
     client.exec(m0031);
     // Null until a device writes them: readers take the legacy setup and targets meanwhile.
@@ -246,6 +246,8 @@ describe('domain schema and runtime migrations', () => {
       .toEqual({ muscle_target_overrides: '{"detailed":{"chest":9}}', muscle_targets: null, combined_muscles: null });
     // A row an older build pulled lacked the columns, so the next cycle pulls everything again.
     expect(client.prepare('select pull_cursor from sync_runtime_state').get()).toEqual({ pull_cursor: '{}' });
+    // A clean settings row loses its stamp so the re-pull replaces it; a dirty one would keep its edit.
+    expect(client.prepare('select local_updated_at_ms from user_settings').get()).toEqual({ local_updated_at_ms: 0 });
     client.close();
   });
 

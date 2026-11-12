@@ -257,6 +257,17 @@ describe('the one-time migration of a legacy account', () => {
     expect(await migrateLegacyMuscleSetup()).toBe(false);
   });
 
+  it('leaves combined keys whose definitions have not arrived alone, refusing a setup write until they do', async () => {
+    await listMuscleReportRows();
+    localDataClient().prepare("UPDATE muscle_groups SET report_group = 'cm_chest' WHERE id IN ('chest', 'serratus_anterior')").run();
+    legacyTargets({ broad: { chest: 15 } });
+    cleanAll();
+    expect(await migrateLegacyMuscleSetup()).toBe(false);
+    await expect(setMuscleTracked(['calves'], false)).rejects.toThrow(/still syncing/);
+    expect(membersOf('cm_chest')).toEqual(['chest', 'serratus_anterior']);
+    expect(settings()).toMatchObject({ combinedMuscles: null, muscleTargets: null, localDirty: false });
+  });
+
   it('migrates on the first setup write too, never overwriting a target map already stored', async () => {
     await listMuscleReportRows();
     legacyBroad();
@@ -266,7 +277,7 @@ describe('the one-time migration of a legacy account', () => {
     expect(stored().get('calves')).toMatchObject({ reportGroup: 'cm_calves', tracked: 0 });
     expect(JSON.parse(settings()!.muscleTargets!)).toEqual({ cm_chest: 15 });
 
-    localDatabase().update(userSettings).set({ combinedMuscles: null, muscleTargets: '{"chest":3}' }).run();
+    localDatabase().update(userSettings).set({ muscleTargets: '{"chest":3}' }).run();
     await clearCombinedMuscles();
     expect(JSON.parse(settings()!.muscleTargets!)).toEqual({ chest: 3 });
   });

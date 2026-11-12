@@ -20,6 +20,7 @@ import {
   type MuscleReportRow,
 } from './combined-muscles';
 import {
+  CombinedMuscleError,
   applyBroadTemplate as applyBroadTemplateTo,
   clearCombinedMuscles as clearCombinedMusclesOf,
   deleteCombinedMuscle as deleteCombinedMuscleOf,
@@ -93,6 +94,10 @@ export const readMuscleSetup = async (): Promise<MuscleSetupChange> => {
   return { definitions, rows };
 };
 
+/** True when a row already holds a combined key: the account was migrated, on this device or another. */
+const hasCombinedKeys = (rows: readonly MuscleReportRow[]): boolean =>
+  rows.some((row) => row.reportGroup?.startsWith(COMBINED_MUSCLE_KEY_PREFIX) === true);
+
 const writeSettingsColumns = (
   tx: Tx, columns: { combinedMuscles: string; muscleTargets?: string }, now: Date,
 ): void => {
@@ -120,6 +125,10 @@ const writeSetupChange = (tx: Tx, change: (setup: MuscleSetupChange) => MuscleSe
   const stored = selectRows(tx);
   const settings = selectSetupSettings(tx);
   const storedDefinitions = parseStoredCombinedMuscles(settings?.combinedMuscles ?? null);
+  if (storedDefinitions === null && hasCombinedKeys(stored)) {
+    // Another device migrated this account; its definitions have not arrived yet.
+    throw new CombinedMuscleError('Your muscle setup is still syncing. Try again in a moment.');
+  }
   const next = change(resolveCombinedMuscleSetup(stored, storedDefinitions));
   const storedById = new Map(stored.map((row) => [row.id, row]));
   let count = 0;
@@ -168,8 +177,10 @@ export const migrateLegacyMuscleSetup = async (): Promise<boolean> => {
   const database = await bootstrapLocalDataLayer();
   const settings = selectSetupSettings(database);
   if (settings?.combinedMuscles != null) return false;
-  const hasLegacyKeys = selectRows(database).some((row) => row.reportGroup !== null);
-  if (!hasLegacyKeys && settings?.muscleTargetOverrides == null) return false;
+  const rows = selectRows(database);
+  // Combined keys with no definitions: another device migrated, and the pull has not brought its row yet.
+  if (hasCombinedKeys(rows)) return false;
+  if (!rows.some((row) => row.reportGroup !== null) && settings?.muscleTargetOverrides == null) return false;
   return (await applySetupChange((setup) => setup)) > 0;
 };
 

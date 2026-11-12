@@ -604,6 +604,34 @@ describe('the one-time combined-muscle migration ([[muscle.report-groups]])', ()
     expect(JSON.parse(settingsRow()!.combinedMuscles!)).toEqual([{ key: 'cm_chest', name: 'Pecs', family: 'Chest' }]);
   });
 
+  it('never migrates combined keys whose definitions an older build pulled without the column', async () => {
+    adopted();
+    // The older build stored the migrated row at the server's stamp without the new
+    // columns, so its replay is a no-op; the members' keys arrived in full.
+    database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 11, muscleTargetMode: 'per_muscle',
+      muscleTargetOverrides: '{"broad":{"chest":12}}', countSecondaryMuscles: false, volumePrimaryOnly: false,
+      localDirty: false, localUpdatedAtMs: 600 }).run();
+    await signIn();
+    pullPage = [settingsWire(600, { ...LEGACY_WIRE, muscle_targets: '{"cm_chest":15}',
+      combined_muscles: JSON.stringify([{ key: 'cm_chest', name: 'Pecs', family: 'Chest' }]) }),
+    muscleWire('chest', 'Chest', 'cm_chest'), muscleWire('serratus_anterior', 'Chest', 'cm_chest')];
+    serverRow({ ...LEGACY_SERVER, muscle_targets: { cm_chest: 15 }, client_updated_at_ms: 600 });
+
+    await runSyncCycle();
+
+    expect(pushed).toEqual([]);
+    expect(settingsRow()?.combinedMuscles).toBeNull();
+
+    // Local migration m0031 zeroes the clean row's stamp, so the re-pull applies it.
+    database.update(userSettings).set({ localUpdatedAtMs: 0 }).run();
+    pullPage = [settingsWire(600, { ...LEGACY_WIRE, muscle_targets: '{"cm_chest":15}',
+      combined_muscles: JSON.stringify([{ key: 'cm_chest', name: 'Pecs', family: 'Chest' }]) })];
+    await runSyncCycle();
+    expect(pushed).toEqual([]);
+    expect(JSON.parse(settingsRow()!.combinedMuscles!)).toEqual([{ key: 'cm_chest', name: 'Pecs', family: 'Chest' }]);
+    expect(values().muscleTargetOverrides).toEqual({ cm_chest: 15 });
+  });
+
   it('logs a failed migration and retries it next cycle without failing sync', async () => {
     adopted();
     await signIn();

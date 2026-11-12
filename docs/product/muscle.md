@@ -51,8 +51,8 @@ Code: `apps/mobile/src/preferences/`; `collectMuscleSetContributions` in
 
 ### muscle.report-groups · definition · accepted
 
-Each muscle (catalogue entry or custom) is Off, On on its own, or in one
-**combined muscle**, per account, synced. A combined muscle has a name and one
+Each muscle (catalogue entry or custom) is on its own or in one **combined
+muscle**, and On or Off, per account, synced. A combined muscle has a name and one
 family; only that family's muscles join, one is enough, and a member of another
 family reads as its own muscle. It reports under its own key, never an entry's
 id. Detailed has none; "Start from Broad" replaces them with the Broad
@@ -64,18 +64,19 @@ family` arranges reported muscles in Progress and Recovery, never exposing
 anatomy inside a combined muscle.
 
 Why: users merge what they train together, without a fixed preset.
+Pending: Settings still offers only Detailed and Broad; naming, editing and deleting combined muscles come with the new Muscles screens (`apps/mobile/components/preferences/muscle-settings.tsx`).
 Code: `apps/mobile/src/data/combined-muscles.ts`; `apps/mobile/src/data/muscle-report-setup.ts`; `apps/mobile/src/data/muscle-report-settings.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`.
 
 ### muscle.weekly-targets · definition · accepted
 
-Weekly working-set targets repeat until changed, per account, synced to every
-signed-in device on its next sync. On upgrade the first device to sync uploads
-its targets (of two at once, the later wins); a device finding them adopts
+Weekly working-set targets repeat until changed, per account, synced on each
+device's next sync. On upgrade the first device to sync uploads
+its targets (the later of two wins); a device finding them adopts
 them. Single uses the default for every muscle; Per muscle uses an override or
 the live default. Overrides are one map by reported muscle, kept across setup
 changes. Older per-setup overrides migrate once: the account's setup keeps its
-own, Broad ones moving to their combined muscle. Mode changes and disabling a
-muscle retain overrides. Targets list only enabled reported muscles.
+own, Broad ones moving to their combined muscle; older builds' later edits no
+longer reach current ones. Mode changes and disabling retain overrides. Targets list only enabled reported muscles.
 Clearing an override restores inheritance; targets are positive
 whole numbers.
 

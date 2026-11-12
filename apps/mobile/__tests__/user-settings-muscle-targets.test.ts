@@ -67,6 +67,14 @@ describe('settings row', () => {
     expect(row()!.localUpdatedAtMs).toBeGreaterThan(before);
   });
 
+  it('keeps legacy per-setup targets under the first target map a row stores', async () => {
+    localDatabase().insert(userSettings).values({ id: 'settings', muscleTargetOverrides: '{"detailed":{"chest":9,"calves":4}}' }).run();
+    await writeMuscleTargetSettings({ ...TARGETS, muscleTargets: '{"chest":12}' });
+    expect(JSON.parse(row()!.muscleTargets!)).toEqual({ chest: 12, calves: 4 });
+    await writeMuscleTargetSettings({ ...TARGETS, muscleTargets: '{"quads":3}' });
+    expect(JSON.parse(row()!.muscleTargets!)).toEqual({ quads: 3 });
+  });
+
   it('adopts server values without dirtying the row or moving its LWW stamp', async () => {
     expect(await adoptMuscleTargetSettings(READ)).toBe(false);
     localDatabase().insert(userSettings).values({ id: 'settings', localDirty: false, localUpdatedAtMs: 500 }).run();
