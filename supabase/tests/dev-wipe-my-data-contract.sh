@@ -105,10 +105,12 @@ A_TP="dw-${RUN_TAG}-atp"
 A_SP="dw-${RUN_TAG}-asp"
 A_SPE="dw-${RUN_TAG}-aspe"
 A_SPS="dw-${RUN_TAG}-asps"
+A_INJ="dw-${RUN_TAG}-ainj"
 B_GYM="dw-${RUN_TAG}-bgym"
 
 cleanup_rows() {
   run_psql_sql "
+    delete from app_public.injuries                 where id in ('${A_INJ}');
     delete from app_public.session_exercise_tags    where id in ('${A_SXTAG}');
     delete from app_public.exercise_sets            where id in ('${A_SET}');
     delete from app_public.session_exercises        where id in ('${A_SX}');
@@ -209,6 +211,7 @@ run_psql_sql "
     delete from app_public.session_plans            where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.training_programmes      where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_muscle_mappings where owner_user_id = '${USER_A_UUID}'::uuid;
+    delete from app_public.injuries                 where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.muscle_groups            where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_tag_definitions where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.body_weight_measurements where owner_user_id = '${USER_A_UUID}'::uuid;
@@ -315,6 +318,10 @@ run_psql_sql "
     values ('${USER_A_UUID}'::uuid, '${A_EGL}', '${A_EDEF}', '${A_GRP}', 'dw-gex',
             ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
+    insert into app_public.injuries
+      (owner_user_id, id, muscle_group_id, side, status, pain_score, label, started_at, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${A_INJ}', '${A_MG}', 'left', 'acute', 5, 'A Injury', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
     insert into app_public.gyms
       (owner_user_id, id, name, created_at, updated_at, client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid, '${B_GYM}', 'B Gym', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
@@ -335,10 +342,10 @@ deleted="$(run_psql_sql "
   commit;
 " | grep -E '^[0-9]+$' | head -n1)"
 
-if [[ "${deleted}" != "18" ]]; then
-  fail "scenario 3 expected 18 rows deleted (including workout permission), got '${deleted}'"
+if [[ "${deleted}" != "19" ]]; then
+  fail "scenario 3 expected 19 rows deleted (including workout permission), got '${deleted}'"
 fi
-pass "scenario 3: helper returned rows_deleted = 18"
+pass "scenario 3: helper returned rows_deleted = 19"
 [[ "$(run_psql "select count(*) from public.agent_workout_permissions where owner_user_id='${USER_A_UUID}';")" == 0 ]] ||
   fail 'developer wipe retained workout authority'
 
@@ -360,6 +367,7 @@ remaining_a="$(run_psql "
   + (select count(*) from app_public.body_weight_measurements where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_BW}')
   + (select count(*) from app_public.training_notes           where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_NOTE}')
   + (select count(*) from app_public.user_settings           where owner_user_id = '${USER_A_UUID}'::uuid)
+  + (select count(*) from app_public.injuries                where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_INJ}')
   + (select count(*) from app_public.exercise_group_links     where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_EGL}');
 ")"
 if [[ "${remaining_a}" != "0" ]]; then

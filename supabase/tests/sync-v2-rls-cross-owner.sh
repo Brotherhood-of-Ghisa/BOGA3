@@ -88,7 +88,9 @@ ENTITIES=(
   session_plan_exercises
   session_plan_sets
   session_plan_uses
+  session_plan_uses
   training_notes
+  injuries
 )
 
 # -----------------------------------------------------------------------------
@@ -185,10 +187,12 @@ SPE_ID="rls-${RUN_TAG}-bspe"
 SPS_ID="rls-${RUN_TAG}-bsps"
 SPU_ID="rls-${RUN_TAG}-bspu"
 NOTE_ID="rls-${RUN_TAG}-bnote"
+INJURY_ID="rls-${RUN_TAG}-binjury"
 
 cleanup_rows() {
   run_psql_sql "
     delete from app_public.training_notes           where id = '${NOTE_ID}';
+    delete from app_public.injuries                 where id = '${INJURY_ID}';
     delete from app_public.session_plan_uses        where id = '${SPU_ID}';
     delete from app_public.session_plan_sets        where id = '${SPS_ID}';
     delete from app_public.session_plan_exercises   where id = '${SPE_ID}';
@@ -334,6 +338,12 @@ run_psql_sql "
     insert into app_public.training_notes
       (owner_user_id,id,exercise_definition_id,body,noted_on,source,created_at,updated_at,client_updated_at_ms)
     values ('${USER_B_UUID}'::uuid,'${NOTE_ID}','${EDEF_ID}','B note','2026-11-12','app',${NOW_MS},${NOW_MS},${NOW_MS});
+
+    insert into app_public.injuries
+      (owner_user_id, id, muscle_group_id, side, status, pain_score, label,
+       started_at, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_B_UUID}'::uuid, '${INJURY_ID}', '${MG_ID}', 'left', 'acute',
+            7, 'B Injury', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
   commit;
 " >/dev/null
 
@@ -494,6 +504,13 @@ insert_payload_for() {
           order_index: 0, target_reps: 8,
           client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
       ;;
+    injuries)
+      jq -nc --arg owner "${USER_B_UUID}" --arg id "rls-inject-${RUN_TAG}-$1" \
+        --arg mg "${MG_ID}" --argjson ts "${NOW_MS}" \
+        '{owner_user_id: $owner, id: $id, muscle_group_id: $mg, side: "left", status: "acute",
+          pain_score: 5, label: "Injected", started_at: $ts,
+          client_updated_at_ms: $ts, created_at: $ts, updated_at: $ts}'
+      ;;
   esac
 }
 
@@ -517,6 +534,7 @@ target_row_id_for() {
     session_plan_sets)        echo "${SPS_ID}" ;;
     session_plan_uses)        echo "${SPU_ID}" ;;
     training_notes)           echo "${NOTE_ID}" ;;
+    injuries)                 echo "${INJURY_ID}" ;;
   esac
 }
 

@@ -1,6 +1,6 @@
 # M42-T01 — Injury contract, data model, and Sync v2 schema
 
-- Status: `planned`
+- Status: `completed`
 - Depends on: none
 - Milestone: [M42](../milestones/M42-injury-and-discomfort-tracking.md)
 - Areas: docs, backend, mobile data; UI impact: no

@@ -69,6 +69,7 @@ import { createBootstrapMockState, createClientMockState } from '../helpers/sync
 import {
   createAuthedTestClient,
   readSyncTestEndpoint,
+  resetFixtureServerRows,
   SYNC_RPC_SCHEMA,
   type AuthedTestClient,
 } from './helpers/sync-test-endpoint';
@@ -290,7 +291,10 @@ describe('sync cycle multi-device LWW against a live endpoint', () => {
   }, 60_000);
 
   afterAll(async () => {
-    await authed?.teardown();
+    if (authed) {
+      await resetFixtureServerRows(config, authed.userId);
+      await authed.teardown();
+    }
   });
 
   beforeEach(() => {

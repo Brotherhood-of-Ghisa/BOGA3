@@ -145,8 +145,9 @@ describe('domain schema and runtime migrations', () => {
     // m0026 adds synced muscle targets; m0027 separates the Volume choice; m0028 adds reusable plan uses;
     // m0029 extends the revision fence to the session lifecycle; m0030 mirrors server-owned logging control;
     // m0031 adds combined muscles and the single target map, and re-pulls every row once;
-    // m0032 adds training notes.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(33);
+    // m0031 adds combined muscles and the single target map, and re-pulls every row once;
+    // m0032 adds training notes; m0033 adds injuries schema.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(34);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -209,7 +210,18 @@ describe('domain schema and runtime migrations', () => {
       'm0030',
       'm0031',
       'm0032',
+      'm0033',
     ]);
+  });
+
+  it('creates the synced injuries table and resets pull cursor in m0033', () => {
+    expect(localRuntimeMigrations.migrations.m0033).toContain('CREATE TABLE `injuries`');
+    expect(localRuntimeMigrations.migrations.m0033).toContain(
+      'FOREIGN KEY (`muscle_group_id`) REFERENCES `muscle_groups`(`id`)'
+    );
+    expect(localRuntimeMigrations.migrations.m0033).toContain(
+      'UPDATE sync_runtime_state SET pull_cursor = \'{}\';'
+    );
   });
 
   it('adds the nullable synced muscle targets to the settings row in m0026', () => {
@@ -501,7 +513,7 @@ describe('muscle_groups is created by the squashed baseline and only gains colum
       const statements = sql
         .split('--> statement-breakpoint')
         .map((chunk) => chunk.trim())
-        .filter((chunk) => chunk.includes('muscle_groups'));
+        .filter((chunk) => /TABLE\s+`?(__new_)?muscle_groups`?/i.test(chunk));
       for (const statement of statements) {
         expect(statement).toMatch(/^ALTER TABLE `muscle_groups` ADD `[a-z_]+` /);
       }
