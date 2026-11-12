@@ -114,10 +114,3 @@ export type PodiumCardViewModel = {
   accessibilityLabel: string;
 };
 
-// ---- History (E1.3) ---------------------------------------------------------------------
-
-export type BoardHistoryItemViewModel = {
-  key: string;
-  dateLabel: string;
-  sentence: string;
-};

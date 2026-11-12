@@ -10,6 +10,8 @@ Screen, sheet, card and section titles stand alone: no descriptive line beneath.
 - **Good:** `06-10-2026 · 52 min` under a session title.
 - **Kept:** `<group> · group view` identifies otherwise-unknown ownership
   above group session titles (decided 2026-10-08).
+- **Kept:** group board and records-log headers name the exercise, then the
+  view beneath (`1RM leaderboard`, `Volume history`) (decided 2026-11-12).
 
 ### copy.no-inline-explanation · principle · accepted
 

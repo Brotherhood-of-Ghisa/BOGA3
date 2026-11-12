@@ -342,7 +342,7 @@ proposals, disputes, native notification integration.
 | P2, P4, D17 | Sets count only through a link (one per exercise per group); links are retroactive, offline, inactive while away |
 | P3, D9, D13 | Group exercises only in picker search, the Link screen and the group page |
 | P5, D10, D14 | Group page: header, Exercises, Members via count; Groups screen: one group's Stream · At a glance · Leaderboards |
-| P6–P9, D11, D12 | Volume/1RM × Certified/All boards (open on All: [[groups.certification]]); one row per member; history is lead changes |
+| P6–P9, D11, D12 | Volume/1RM × Certified/All boards (open on All: [[groups.certification]]); one row per member; history logs new bests |
 | P10–P13, D3–D5 | Certification lifecycle: [[groups.certification]] |
 | P14–P17, D1, D2, D15, D16 | Records (first set too, provisional while active), one card per set; links make none; a voided GR shows once, at withdrawal (`· GR withdrawn`) |
 | P18 | Certify and admin actions need a connection |

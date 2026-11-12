@@ -91,8 +91,8 @@ the tab bar (`TabOwnedPage`), owned by More.
 | `/group/[groupId]/invite` | Owner/admin invite: the code, its `boga3://` link, Share, Regenerate | `group/[groupId]/invite.tsx` |
 | `/group/[groupId]/exercises/new` | Owner/admin add a group exercise, `From catalogue` or `Custom` | `group/[groupId]/exercises/new.tsx` |
 | `/group/[groupId]/exercises/[exerciseId]/edit` | Owner/admin rename a group exercise or change its weight entry | `group/[groupId]/exercises/[exerciseId]/edit.tsx` |
-| `/group/[groupId]/leaderboards/[exerciseId]` | A group exercise's full board: `Volume` \| `1RM` × `Certified` \| `All`, ranked rows, row detail sheet with certification actions | `group/[groupId]/leaderboards/[exerciseId]/index.tsx` |
-| `/group/[groupId]/leaderboards/[exerciseId]/history` | That board's lead changes under the current rules, newest first, below one row of tap-to-cycle filters: metric, `Certified` \| `All`, `History` \| `Scores` | `group/[groupId]/leaderboards/[exerciseId]/history.tsx` |
+| `/group/[groupId]/leaderboards/[exerciseId]` | A group exercise's full board: tap-to-cycle metric and sets filters, ranked rows, row detail sheet; options menu: History, Exercise rules (admins) | `group/[groupId]/leaderboards/[exerciseId]/index.tsx` |
+| `/group/[groupId]/leaderboards/[exerciseId]/history` | That board's records log, newest first, same filters: new bests and linked #1s (Certified: new #1s); rules changes divide, older entries dimmed | `group/[groupId]/leaderboards/[exerciseId]/history.tsx` |
 | `/group-session/[memberId]/[sessionId]` | A member's shared session as the group sees it, drawn with View Session's cards, View Session's facts card (an `In progress` mark while it runs), its #1 group 1RM records (row → leaderboard); my own adds a full-session action | `group-session/[memberId]/[sessionId].tsx` |
 
 ## Dev-only routes

@@ -9,8 +9,8 @@ import { screen, within } from '@testing-library/react-native';
 import type { ReactTestInstance } from 'react-test-renderer';
 
 import { GroupCertificationStatus } from '@/components/groups/certification-status';
-import { GroupBoardHistoryItem } from '@/components/groups/group-board-history-item';
 import { GroupBoardRow } from '@/components/groups/group-board-row';
+import { GroupRecordsLogRow } from '@/components/groups/group-records-log-row';
 import { GroupPodiumCard } from '@/components/groups/group-leaderboards-page';
 import { GroupMetricStreamCard } from '@/components/groups/group-metric-stream-card';
 import { GroupMetricStreamRecordSheet } from '@/components/groups/group-metric-stream-record-sheet';
@@ -163,10 +163,12 @@ describe('stream record sheet', () => {
   });
 });
 
-describe('board history item', () => {
-  it('dates a lead change in quiet figures at the small size', () => {
-    renderWithTheme(<GroupBoardHistoryItem count={1} index={0} item={{ key: 'h', dateLabel: '12-10-2026', sentence: 'Sam took the lead' }} testID="h" />);
-    expect(screen.getByTestId('h-date')).toHaveStyle({ fontFamily: FIGURE, fontSize: uiTypography.size.sm });
+describe('records log row', () => {
+  it('draws the figure, set and date in Plex Mono, the date at the small size', () => {
+    renderWithTheme(<GroupRecordsLogRow row={{ kind: 'entry', key: 'h', mark: 'best', title: 'Sam', figure: '120.0',
+      detail: '100.0 × 5 · +2.5 on best', date: '12-10-2026', earlierRules: false, index: 0, count: 1 }} testID="h" />);
+    expect(screen.getByTestId('h-figure')).toHaveStyle({ fontFamily: FIGURE });
+    expect(screen.getByTestId('h-detail')).toHaveStyle({ fontFamily: FIGURE, fontSize: uiTypography.size.sm });
   });
 });
 

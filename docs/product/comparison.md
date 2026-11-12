@@ -7,6 +7,7 @@
 | Set/session count (Progress, Today pace) | the signed difference, never a percentage | `+4`, `−3`, `0` |
 | Volume (Progress tables, Today pace) | the rounded percentage of the earlier period's Volume | `+12%`, `−5%`, `0%`; `new` when the earlier period is 0; `—` when both are 0 |
 | 1RM (Progress exercise table) | the signed difference in kg, in 1RM's format | `+4.7`, `−5.0`, `0`; `new` without an earlier estimate, `—` without a current one |
+| Group records log, vs the member's previous best | the signed gain in the board's unit | `+4.1 on best` |
 
 More is better; zero is unsigned; colour never replaces the sign.
 
