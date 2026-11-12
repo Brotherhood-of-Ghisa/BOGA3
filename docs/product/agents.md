@@ -7,7 +7,7 @@ current OAuth grant and default off (existing plan grants retain main access):
 
 | Switch | Authority |
 | --- | --- |
-| Make changes (`plan_access_enabled`) | Read/create plans/programmes; manage exercises; set weekly targets |
+| Make changes (`plan_access_enabled`) | Read/create plans/programmes; manage exercises; set targets; notes ([[notes.agent-access]]) |
 | Edit plans (`plan_edit_enabled`) | Mutate/delete pending plans/programmes |
 | Log workouts (`workout_logging_enabled`) | Read/start/create/log/edit/finish controlled ad-hoc workouts |
 

@@ -71,6 +71,13 @@ describe('addTrainingNote', () => {
     expect(mockFixture.database.select().from(trainingNotes).all()).toHaveLength(0);
   });
 
+  it('refuses a note on a deleted exercise', async () => {
+    mockFixture.database.update(exerciseDefinitions).set({ deletedAt: NOW }).where(eq(exerciseDefinitions.id, 'squat')).run();
+    await expect(addTrainingNote({ body: 'ok', notedOn: '2026-11-12', exerciseId: 'squat', now: NOW }))
+      .rejects.toThrow('This exercise is deleted. Restore it to add notes.');
+    expect(mockFixture.database.select().from(trainingNotes).all()).toHaveLength(0);
+  });
+
   it('accepts exactly the longest body', async () => {
     await expect(addTrainingNote({ body: 'x'.repeat(TRAINING_NOTE_MAX_LENGTH), notedOn: '2026-11-12', now: NOW }))
       .resolves.toMatchObject({ notedOn: '2026-11-12' });

@@ -94,7 +94,7 @@ export const listTrainingNotes = async (options: { exerciseId?: string } = {}): 
   return readTrainingNotes(database, options.exerciseId);
 };
 
-/** Saves a new app note; a named exercise must exist on this device. */
+/** Saves a new app note; a named exercise must exist on this device and not be deleted. */
 export const addTrainingNote = async (input: TrainingNoteInput): Promise<TrainingNoteView> => {
   const now = input.now ?? new Date();
   const value = validateTrainingNoteInput(input, now);
@@ -103,9 +103,11 @@ export const addTrainingNote = async (input: TrainingNoteInput): Promise<Trainin
   const saved = database.transaction((tx) => {
     let exerciseName: string | null = null;
     if (exerciseId) {
-      const exercise = tx.select({ name: exerciseDefinitions.name }).from(exerciseDefinitions)
-        .where(eq(exerciseDefinitions.id, exerciseId)).get();
+      const exercise = tx.select({ name: exerciseDefinitions.name, deletedAt: exerciseDefinitions.deletedAt })
+        .from(exerciseDefinitions).where(eq(exerciseDefinitions.id, exerciseId)).get();
       if (!exercise) throw new TrainingNoteInputError('This exercise is no longer available.');
+      // Matches the agent API ([[notes.definition]]): a deleted exercise keeps its notes but takes no new ones.
+      if (exercise.deletedAt) throw new TrainingNoteInputError('This exercise is deleted. Restore it to add notes.');
       exerciseName = exercise.name;
     }
     const id = newNoteId(now);

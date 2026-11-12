@@ -8,8 +8,8 @@ one exercise. It carries the date it applies from: today by default, earlier
 if chosen, never later. Notes are added and removed only; to change one, remove
 it and add another. Removal is a soft delete: the note leaves every list in the
 app and every coach read, and the stored row stays so a restore can come later.
-Lists show newest applies-from date first, then newest added. A note on an
-exercise that is later deleted stays, shown with that exercise's name; merging
+Lists show newest applies-from date first, then newest added. A deleted exercise
+takes no new notes (restore it first) but keeps its notes, shown with its name; merging
 an exercise moves its notes to the exercise it merges into.
 
 Why: context like "from today I squat to a bench" must reach every device and every coach, not one tool's memory.
