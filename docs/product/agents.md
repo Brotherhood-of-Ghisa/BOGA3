@@ -7,11 +7,11 @@ current OAuth grant and default off (existing plan grants retain main access):
 
 | Switch | Authority |
 | --- | --- |
-| Make changes (`plan_access_enabled`) | Read/create plans/programmes; manage exercises; set targets; notes ([[notes.agent-access]]) |
+| Make changes (`plan_access_enabled`) | Read/create plans/programmes; edit exercises; set targets; notes ([[notes.agent-access]]) |
 | Edit plans (`plan_edit_enabled`) | Mutate/delete pending plans/programmes |
 | Log workouts (`workout_logging_enabled`) | Read/start/create/log/edit/finish controlled ad-hoc workouts |
 
-Logging needs neither plan switch. One writer controls each workout: human or
+Logging needs neither switch. One writer controls each workout: human or
 one grant-bound MCP client. MCP creation retains control; app creation is human.
 Handoff preserves IDs; takeover revokes MCP editing. MCP control locks app edits,
 leaving the timer usable. Dated creation takes start/end, stays completed and
