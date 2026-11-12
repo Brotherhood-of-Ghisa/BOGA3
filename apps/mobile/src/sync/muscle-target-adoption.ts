@@ -22,6 +22,7 @@ import {
   writeMuscleTargetSettings,
   type StoredMuscleTargetSettings,
 } from '@/src/data/user-settings';
+import { legacyTargetsForLocalSetup } from '@/src/data/muscle-report-settings';
 import { logEvent } from '@/src/logging/logEvent';
 import { drainAccountLocalSyncedWrites, refreshAccountLocalSyncedPreferences } from '@/src/preferences/account-local';
 import { hasLegacyMuscleCountingProfile, preferenceKey, readScopedPreferences } from '@/src/preferences/storage';
@@ -80,6 +81,18 @@ const readServerSettings = async (userId: string): Promise<ServerSettingsSnapsho
   return fromServerRow(data as ServerSettingsRow | null);
 };
 
+/** The raw kv target map when it holds an older build's per-setup shape, else null. */
+const readLegacyKvTargets = (profile: `account:${string}`): Record<string, unknown> | null => {
+  try {
+    const raw: unknown = JSON.parse(Storage.getItemSync(preferenceKey(profile, 'muscleTargetOverrides')) ?? 'null');
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    return Object.keys(raw).some((scope) => ['detailed', 'broad', 'custom'].includes(scope))
+      ? raw as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+};
+
 const dropKvCopy = (profile: `account:${string}`): void => {
   for (const field of syncedPreferenceFields) Storage.removeItemSync(preferenceKey(profile, field));
   Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
@@ -109,10 +122,14 @@ const adoptOrUpload = async (profile: `account:${string}`, userId: string,
   const complete = storedFromSyncedPreferences({
     ...base, ...first, ...last,
   });
-  // Only a map this device stored or some side already holds is written;
-  // otherwise a legacy per-setup map waits for its migration.
+  // Only a map this device stored or some side already holds is written. An
+  // older build kept per-setup targets in kv: read them for this device's setup.
+  // Otherwise a legacy per-setup map on the row waits for its migration.
   if (last.muscleTargetOverrides === undefined && first.muscleTargetOverrides === undefined
-    && scoped.valid.muscleTargetOverrides === undefined) complete.muscleTargets = null;
+    && scoped.valid.muscleTargetOverrides === undefined) {
+    const kvLegacy = readLegacyKvTargets(profile);
+    complete.muscleTargets = kvLegacy === null ? null : JSON.stringify(await legacyTargetsForLocalSetup(kvLegacy));
+  }
   await writeMuscleTargetSettings(complete);
   return true;
 };

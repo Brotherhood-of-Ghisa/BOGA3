@@ -205,6 +205,19 @@ describe('upload once', () => {
     expect(mockSelectSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('uploads an older build\'s per-setup kv targets as the single map for this device\'s setup', async () => {
+    Storage.setItemSync(preferenceKey(profile, 'weeklyWorkingSetTarget'), '10');
+    Storage.setItemSync(preferenceKey(profile, 'muscleTargetMode'), 'per-muscle');
+    Storage.setItemSync(preferenceKey(profile, 'muscleTargetOverrides'), JSON.stringify({ detailed: { chest: 12 }, broad: { chest: 3 } }));
+    await signIn();
+    // Read as the flat map, the older shape is invalid, so the screens show no targets yet.
+    expect(values().muscleTargetOverrides).toEqual({});
+    await runSyncCycle();
+    expect(pushed.find(entity => entity.type === 'user_settings')?.fields).toMatchObject({ muscle_targets: '{"chest":12}' });
+    expect(values().muscleTargetOverrides).toEqual({ chest: 12 });
+    expect(kv('muscleTargetOverrides')).toBeNull();
+  });
+
   it('fills a target the first device never stored with its default, leaving the target map unwritten', async () => {
     Storage.setItemSync(preferenceKey(profile, 'weeklyWorkingSetTarget'), '10');
     await signIn();
@@ -621,6 +634,7 @@ describe('the one-time combined-muscle migration ([[muscle.report-groups]])', ()
 
     expect(pushed).toEqual([]);
     expect(settingsRow()?.combinedMuscles).toBeNull();
+    expect(mockLogEvent).toHaveBeenCalledWith(expect.objectContaining({ event: 'sync.combined_muscles_awaiting_definitions' }));
 
     // Local migration m0031 zeroes the clean row's stamp, so the re-pull applies it.
     database.update(userSettings).set({ localUpdatedAtMs: 0 }).run();

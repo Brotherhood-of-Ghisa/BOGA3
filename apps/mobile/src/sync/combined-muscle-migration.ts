@@ -4,7 +4,7 @@
 // and its legacy per-setup targets as one map. The pull runs first so a
 // device that upgrades late finds another device's migration instead of
 // replacing it (the local schema migration re-pulls every row once).
-import { migrateLegacyMuscleSetup } from '@/src/data/muscle-report-settings';
+import { awaitsCombinedMuscleDefinitions, migrateLegacyMuscleSetup } from '@/src/data/muscle-report-settings';
 import { logEvent } from '@/src/logging/logEvent';
 import { refreshAccountLocalSyncedPreferences } from '@/src/preferences/account-local';
 
@@ -12,6 +12,13 @@ import { refreshAccountLocalSyncedPreferences } from '@/src/preferences/account-
 export const migrateLegacyMuscleSetupLogged = async (): Promise<void> => {
   try {
     if (await migrateLegacyMuscleSetup()) await refreshAccountLocalSyncedPreferences();
+    else if (await awaitsCombinedMuscleDefinitions()) {
+      // Setup writes are refused meanwhile; a lasting state means the settings row never reached the server.
+      void logEvent({
+        level: 'warn', source: 'sync', event: 'sync.combined_muscles_awaiting_definitions',
+        message: 'Combined-muscle keys are on this device but their definitions have not been pulled yet.',
+      }).catch(() => undefined);
+    }
   } catch (error) {
     void logEvent({
       level: 'warn', source: 'sync', event: 'sync.combined_muscles_migration_failed',

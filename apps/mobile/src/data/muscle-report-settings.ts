@@ -184,6 +184,21 @@ export const migrateLegacyMuscleSetup = async (): Promise<boolean> => {
   return (await applySetupChange((setup) => setup)) > 0;
 };
 
+/**
+ * A legacy per-setup target map (as an older build kept it in kv) read as
+ * the single map for the setup this device's rows spell out.
+ */
+export const legacyTargetsForLocalSetup = async (legacyOverrides: unknown): Promise<Record<string, number>> => {
+  const database = await bootstrapLocalDataLayer();
+  return legacyMuscleTargets(legacyOverrides, selectRows(database), selectStoredCombinedMuscles(database));
+};
+
+/** True while this device holds combined keys whose definitions have not been pulled yet. */
+export const awaitsCombinedMuscleDefinitions = async (): Promise<boolean> => {
+  const database = await bootstrapLocalDataLayer();
+  return selectSetupSettings(database)?.combinedMuscles == null && hasCombinedKeys(selectRows(database));
+};
+
 /** A new combined-muscle key: the prefix and random hex, never an entry id. */
 export const newCombinedMuscleKey = (): string =>
   `${COMBINED_MUSCLE_KEY_PREFIX}${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`;
