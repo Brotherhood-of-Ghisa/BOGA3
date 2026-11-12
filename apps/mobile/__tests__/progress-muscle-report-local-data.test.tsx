@@ -47,7 +47,7 @@ import { __resetAccountLocalPreferencesForTests, ensureAccountLocalPreferencesLo
 import { updatePreferences } from '@/src/preferences/hooks';
 import { calendarWeekBounds } from '@/src/utils/calendar-weeks';
 import { computeMuscleScores } from '@/components/stats/muscle-body-projection';
-import { projectMuscleBody } from './helpers/muscle-body-palette';
+import { BODY_WIRE_INSTANCES, hitWireframe, projectWireframePoint, wireframeCamera } from '@/components/stats/muscle-wireframe-scene';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { chooseBroadLocally } from './helpers/broad-muscle-report';
 import { closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';
@@ -183,14 +183,17 @@ describe('Progress muscle list under Broad', () => {
 // A tap on the rendered 3D body, on the facet of one anatomy entry seen from behind.
 const tapEntryOnBody = async (entry: string) => {
   const viewport = screen.getByTestId('stats-muscle-body-viewport');
-  fireEvent(viewport, 'layout', { nativeEvent: { layout: { width: 280, height: 280 } } });
+  fireEvent(viewport, 'layout', { nativeEvent: { layout: { width: 280, height: 420 } } });
   fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
-  const detailed = projectMuscleBody({ angleDeg: 180, width: 280, height: 280, scores: new Map() });
-  const facet = detailed.triangles.filter(tri => tri.muscleGroupId === entry).at(-1)!;
+  const camera = wireframeCamera({ angle: 180, width: 280, height: 420, selected: [], focus: false });
+  const mesh = BODY_WIRE_INSTANCES.find(mesh => mesh.group === entry)!;
+  const point = mesh.part.faces.map(face => {
+    const centre = [0, 1, 2].map(axis => face.slice(0, 3).reduce((n, i) => n + mesh.part.vertices[i][axis], 0) / 3);
+    return projectWireframePoint(centre as [number, number, number], camera).slice(0, 2) as [number, number];
+  }).find(point => hitWireframe({ point, camera, selected: [], selectedId: null }) === entry)!;
+  expect(point).toBeDefined();
   const tap = viewport.props.gesture.gestures.find((gesture: { type: string }) => gesture.type === 'tap');
-  await act(async () => {
-    tap.handlers.onEnd({ x: (facet.x0 + facet.x1 + facet.x2) / 3, y: (facet.y0 + facet.y1 + facet.y2) / 3 });
-  });
+  await act(async () => { tap.handlers.onEnd({ x: point[0], y: point[1] }); });
 };
 
 describe('The 3D body on the Progress screens under Broad', () => {

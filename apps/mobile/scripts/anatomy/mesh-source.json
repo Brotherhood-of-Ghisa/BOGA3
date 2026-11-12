@@ -1,0 +1,688 @@
+{
+  "schemaVersion": 1,
+  "bodyMeshSha256": "ecb9032f3fae6d8e7818ae5a923d906ee47921eb5ff2a2cf6201f44c4521da09",
+  "sources": {
+    "url": "https://dbarchive.biosciencedbc.jp/data/bodyparts3d/LATEST/isa_BP3D_4.0_obj_99.zip",
+    "version": "BodyParts3D 4.0, 99% polygon reduction",
+    "attribution": "BodyParts3D, \u00a9 The Database Center for Life Science licensed under CC Attribution 4.0 International",
+    "licenseUrl": "https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html",
+    "models": {
+      "FJ1394": {
+        "name": "lateral head of right gastrocnemius",
+        "sha256": "621dc10e974bcc1c53a8843bf1db3a1c322c8327d279010c58533bd28952bf08",
+        "bytes": 201640
+      },
+      "FJ1395": {
+        "name": "long head of right biceps femoris",
+        "sha256": "0c22806bfd2a0f8745023a7d438250411f9d013f3d966c5c75335f5b57f8e142",
+        "bytes": 341489
+      },
+      "FJ1397": {
+        "name": "medial head of right gastrocnemius",
+        "sha256": "d7f3aa44801171baade1a59c40a8f8bda72097bec07047f93f24ebaac4546cb4",
+        "bytes": 260975
+      },
+      "FJ1401": {
+        "name": "right adductor brevis",
+        "sha256": "388e7598162d73b22c18d198b9fa4abb5359eb95ffbbfbf0941740df85e0a4f6",
+        "bytes": 109236
+      },
+      "FJ1402": {
+        "name": "right adductor longus",
+        "sha256": "f5165be945dbae2a81a1261b5f5c169c9ba677e80c70af263a08efc2f57f3f53",
+        "bytes": 174040
+      },
+      "FJ1403": {
+        "name": "right adductor magnus",
+        "sha256": "e9a3ed2907b10d8f4d93c78f04eb0c4b3b96a44230958b90979a0d7142695fdd",
+        "bytes": 478061
+      },
+      "FJ1418": {
+        "name": "muscle organ",
+        "sha256": "e576dd907b8bb9b373beda7ba9cb14cce4c958def4b782ad6563b6e2fbe71d46",
+        "bytes": 197385
+      },
+      "FJ1419": {
+        "name": "right gluteus medius",
+        "sha256": "e2e06899b8a61640b32086432ec4b577b2bf2db6f044d469c01bdceb38bd3831",
+        "bytes": 246651
+      },
+      "FJ1420": {
+        "name": "right gluteus minimus",
+        "sha256": "61ebd1c4cd97adb69324aa74325c05425dbf37f83862a34c6a2f7400c3c017cd",
+        "bytes": 321500
+      },
+      "FJ1421": {
+        "name": "right gracilis",
+        "sha256": "82d12d8359e66303a7e5a21c2b9b24b26d33b8bbeab55f8f97c87881e25e5fa7",
+        "bytes": 227763
+      },
+      "FJ1422": {
+        "name": "right iliacus",
+        "sha256": "e7201ed4264a06a3689592625a20abcc9aed26435f0797a1e8e41b68335d1e24",
+        "bytes": 238318
+      },
+      "FJ1427": {
+        "name": "right pectineus",
+        "sha256": "8dfb6a8868ddbf1e72679a821fb79ed49573ed6ceab40108bd0d5b8c109171ba",
+        "bytes": 97969
+      },
+      "FJ1431": {
+        "name": "right psoas major",
+        "sha256": "b66009da13d6241d66de3c0242288abfe0c90ce1c76b38000f9a92b02e2f1e0f",
+        "bytes": 379043
+      },
+      "FJ1433": {
+        "name": "right rectus femoris",
+        "sha256": "a5f75907d784dd2a44d7efa96cb31009aba2afe43465336b105561751b19f8ef",
+        "bytes": 389745
+      },
+      "FJ1435": {
+        "name": "right semimembranosus",
+        "sha256": "1fdce0f7db538e4731207af06a293e41037c2474192f61ca2cb5b0d663b16894",
+        "bytes": 307942
+      },
+      "FJ1436": {
+        "name": "right semitendinosus",
+        "sha256": "a9351992df5093e761784b73ca3f4a7d09d0c997e3cef2f840a45b863eb7097d",
+        "bytes": 195220
+      },
+      "FJ1437": {
+        "name": "right soleus",
+        "sha256": "c9c62b720ffe375a8eddf390608684a796f1ea54880a5c34fa440404addc399e",
+        "bytes": 307036
+      },
+      "FJ1439": {
+        "name": "muscle organ",
+        "sha256": "b03d2f54644969d153d3dfe4025ee629858e72c1e5ee3b0e7d5f16f54dc505b3",
+        "bytes": 213354
+      },
+      "FJ1441": {
+        "name": "right vastus intermedius",
+        "sha256": "c609da3e64f0fc6c295b66b575503e61cacc8bfd9a5e5ec9b79e4eb476da5bab",
+        "bytes": 305079
+      },
+      "FJ1442": {
+        "name": "right vastus lateralis",
+        "sha256": "f67be78d7d0ddc6e78c0683ce4bd5be7492e4137f8661bc54039cbf535a88880",
+        "bytes": 464679
+      },
+      "FJ1443": {
+        "name": "right vastus medialis",
+        "sha256": "5bdb79f52849241e20ff2280332f20efd38f1b4bda1fb1337e10a5c3e466002b",
+        "bytes": 317804
+      },
+      "FJ1444": {
+        "name": "short head of right biceps femoris",
+        "sha256": "c071097501796cee5ff2a011b3d84c7bea4cb153241fce0f8b0a73d070bd990f",
+        "bytes": 124350
+      },
+      "FJ1446": {
+        "name": "zone of muscle organ",
+        "sha256": "7a0d77a63b06d4212998bec86f84853287c3a21696ec7afc92c7767c987a726d",
+        "bytes": 105002
+      },
+      "FJ1447": {
+        "name": "clavicular part of pectoralis major",
+        "sha256": "e239a63adf99dfc094ece7efcd91ec7cd9ac802e9d7581141b311a7842fbbbe6",
+        "bytes": 141480
+      },
+      "FJ1452": {
+        "name": "muscle organ",
+        "sha256": "8fb254f196b1e249b1aea667d195f00c355f901f5fa89e37f586a8316c2fcdcd",
+        "bytes": 8308376
+      },
+      "FJ1459": {
+        "name": "right serratus anterior",
+        "sha256": "33f4ae8c7a84785e2bc5f4f21432d13de0805e485a29f3e6762bac6f85cb61d5",
+        "bytes": 3600341
+      },
+      "FJ1464": {
+        "name": "zone of muscle organ",
+        "sha256": "f446df845d19385cdbd5b86457c8690981cbc914f8f9595b50bdc4a44505aab7",
+        "bytes": 556794
+      },
+      "FJ1467": {
+        "name": "zone of muscle organ",
+        "sha256": "2f69f1a13c836539abca85d9b77f55f96319ad3fdd75c62f498eabe49b266bfe",
+        "bytes": 92591
+      },
+      "FJ1468": {
+        "name": "zone of muscle organ",
+        "sha256": "09eebb4a8d72c91936b0bfde7f35829a58f56103ac158f559186698458bcc616",
+        "bytes": 223657
+      },
+      "FJ1472": {
+        "name": "right extensor carpi ulnaris (component FJ1472)",
+        "sha256": "f6aadd5b1df9440ec0c4fabf21641f72447d5190bcaf58f357e8b5a76b3f5889",
+        "bytes": 248132
+      },
+      "FJ1473": {
+        "name": "humeral head of right flexor carpi ulnaris",
+        "sha256": "ccab7efb32e7b3cfc21039a138811f2972df5f2d91d23bbdbe63f13354774795",
+        "bytes": 196103
+      },
+      "FJ1474": {
+        "name": "humeral head of right pronator teres",
+        "sha256": "589e18d8dd9eac471404fae1035b01476ed0021af1cb2822c8c759164a2a45ba",
+        "bytes": 151318
+      },
+      "FJ1475": {
+        "name": "right flexor digitorum superficialis (component FJ1475)",
+        "sha256": "9b3877dcb9838ac4e37f2a1fbf0542fca888a32650285bb07278d6ba9fa968e1",
+        "bytes": 664548
+      },
+      "FJ1477": {
+        "name": "lateral head of right triceps brachii",
+        "sha256": "1d1c3b42eec0dffe696bd25cffa81784c87c15f16c9605050fdf1cb2f47698dd",
+        "bytes": 182250
+      },
+      "FJ1478": {
+        "name": "long head of right biceps brachii",
+        "sha256": "2442d2b5ac30c5da42e72eeff83d143df51c7617001cbc6552096a504f29bc07",
+        "bytes": 105386
+      },
+      "FJ1479": {
+        "name": "long head of right triceps brachii",
+        "sha256": "acc48f746bd07a117357a9c49a1a9850c96b85d7c63cf90a662a45717875a315",
+        "bytes": 113287
+      },
+      "FJ1480": {
+        "name": "medial head of right triceps brachii",
+        "sha256": "1ea653667afa5ff0bf0e01d71ac648819655241c130e8dd1778ed2f9561c34c5",
+        "bytes": 61608
+      },
+      "FJ1484": {
+        "name": "right abductor pollicis longus",
+        "sha256": "35a1077de93e2bdcaaa68e688f4f31a371c3c61e35d629314507e549e5241d14",
+        "bytes": 143120
+      },
+      "FJ1486": {
+        "name": "right brachialis",
+        "sha256": "be5f40b153fd6ce0c8c274eb4c26be8d1a29b4bbe75dd0e4a0dfe5c4d251fa03",
+        "bytes": 127901
+      },
+      "FJ1487": {
+        "name": "right brachioradialis",
+        "sha256": "0ff651a5417f240c6a5205bef5218336a61fe3474752cca1b483d02aae0b92ad",
+        "bytes": 359055
+      },
+      "FJ1489": {
+        "name": "right extensor carpi radialis brevis",
+        "sha256": "31ccd9ec738252ec2eae88cf68068679d0663425c98b8d90dcbca18b3cbd1988",
+        "bytes": 158039
+      },
+      "FJ1490": {
+        "name": "right extensor carpi radialis longus",
+        "sha256": "8b6ec821491a2eafaee8c813cfad4532beae94c354595cc3e922d8cdbb36fb32",
+        "bytes": 179061
+      },
+      "FJ1491": {
+        "name": "right extensor digiti minimi",
+        "sha256": "2717a761854ba7fe50d12f5ec4eca0f0728795777ae9a7ec87e019f01e3b8267",
+        "bytes": 102700
+      },
+      "FJ1492": {
+        "name": "right extensor digitorum",
+        "sha256": "31f528b3ba6a8fb26177c9f1455692be3acfbb173b4c4cbf9dc3d597acb5c5ff",
+        "bytes": 342296
+      },
+      "FJ1493": {
+        "name": "right extensor indicis",
+        "sha256": "b23d7087dbe581fa03e316dfed18f73ba4ccb54b16091d442ac057f9aa9c7b60",
+        "bytes": 62068
+      },
+      "FJ1494": {
+        "name": "right extensor pollicis brevis",
+        "sha256": "61cfb7481e1f7dea291cf59208719b08c27191156e38ffd25e744918836d957b",
+        "bytes": 79961
+      },
+      "FJ1495": {
+        "name": "right extensor pollicis longus",
+        "sha256": "99a201417061edb3b2adc54fcd2b41eefa81c0e9e31027b43c41c328d1ade4f5",
+        "bytes": 110183
+      },
+      "FJ1496": {
+        "name": "right flexor carpi radialis",
+        "sha256": "8e83c638e2353bb8ba65547f4b846d89a1f393c4761806faf8e09970c9b6b6bf",
+        "bytes": 82751
+      },
+      "FJ1497": {
+        "name": "right flexor digitorum profundus",
+        "sha256": "e62f8adfa454bee523974952500aa32a16f086b249a434b4bbeabc333878ac39",
+        "bytes": 392489
+      },
+      "FJ1498": {
+        "name": "right flexor pollicis longus",
+        "sha256": "e0fc87382350f38acb2a5197e83dabb450ba6d823222388c8e169e30c0bbfb94",
+        "bytes": 151641
+      },
+      "FJ1499": {
+        "name": "right flexor digitorum superficialis (component FJ1499)",
+        "sha256": "7f148f7db90d9723dcfe6742c55afc2100b712c00992d83356373ca27a2b0dc0",
+        "bytes": 63323
+      },
+      "FJ1500": {
+        "name": "right infraspinatus",
+        "sha256": "28f61376a3a88a28d14c44e1c20e9b7a34129772c130afa003daceac801455b1",
+        "bytes": 69844
+      },
+      "FJ1502": {
+        "name": "right palmaris longus",
+        "sha256": "2e033c8fbc77aa1922179eeae6d90075df9360d00882beb9b45b148074f91f8a",
+        "bytes": 435055
+      },
+      "FJ1503": {
+        "name": "right pronator quadratus",
+        "sha256": "04adea4b7060a08c9d734ea78156525b3d3983fc1da0601ac151198985e78cfd",
+        "bytes": 192602
+      },
+      "FJ1504": {
+        "name": "right subscapularis",
+        "sha256": "fdcbfd01f93e2d24bd73f5cb259a311c9f9e90de08c41573439844eef5f605dd",
+        "bytes": 231733
+      },
+      "FJ1505": {
+        "name": "right supinator",
+        "sha256": "83c5940f2c6516ecf5b0eb69de5dc0a056177b29f7bc046b94cc20c85460ae46",
+        "bytes": 241649
+      },
+      "FJ1506": {
+        "name": "right supraspinatus",
+        "sha256": "793771eceb64385269ddeeb09245e8c53b67499194f6fa98049b5e17aafa8e0c",
+        "bytes": 76172
+      },
+      "FJ1508": {
+        "name": "right teres minor",
+        "sha256": "f56e595b86cea659891664706cd4443acddd8dc69e4e5bb3855445eef302641a",
+        "bytes": 38012
+      },
+      "FJ1512": {
+        "name": "short head of right biceps brachii",
+        "sha256": "2173b7cce29f11036907b80e068e9bd6c16f22359d6e7994af9684454b99b4d5",
+        "bytes": 161507
+      },
+      "FJ1513": {
+        "name": "zone of muscle organ",
+        "sha256": "ef8308c92fd0d01d8c0d7ffd9238305eefc2f28710d7bb58f451512abdc08e99",
+        "bytes": 157136
+      },
+      "FJ1516": {
+        "name": "ulnar head of right pronator teres",
+        "sha256": "62058afdb37b3637c21f7ad15fe681acced1e36c986190a692f1733cb0a79760",
+        "bytes": 77585
+      },
+      "FJ1517": {
+        "name": "right extensor carpi ulnaris (component FJ1517)",
+        "sha256": "e6a4cec704d3601a33704b40ee1f3f7bce484017dd563d1f4d2da43331b3ffce",
+        "bytes": 102287
+      },
+      "FJ1518": {
+        "name": "ulnar head of right flexor carpi ulnaris",
+        "sha256": "22abf242ce9d43dd9c6e02ef297b8e5982227a7ec1c7ead965674b92b476bad2",
+        "bytes": 149622
+      },
+      "FJ1520": {
+        "name": "ascending part of trapezius",
+        "sha256": "6bb3d13198991bda4d0aae27561976b9ba53b0d21d817f180098307c7b99deb1",
+        "bytes": 812371
+      },
+      "FJ1521": {
+        "name": "descending part of trapezius",
+        "sha256": "19bd9d1cbbb84e10826eb770068f6e271cd79dde960bca62ac71da24120fc354",
+        "bytes": 537515
+      },
+      "FJ1526": {
+        "name": "right iliocostalis cervicis",
+        "sha256": "0d2b4b780dd191b9e6518dc3a71ad8c032da0db3631a2a582969faf7dfdbb96b",
+        "bytes": 237546
+      },
+      "FJ1527": {
+        "name": "right iliocostalis lumborum",
+        "sha256": "8a15295f08faac150ee5f16fe1035398dcfa60d3cba8b42b504b53764032b718",
+        "bytes": 1189971
+      },
+      "FJ1528": {
+        "name": "right iliocostalis thoracis",
+        "sha256": "0ee5ad819949cd4197dd96b00373547b42f7e1831b2add6baea4baf3661f38fa",
+        "bytes": 618808
+      },
+      "FJ1533": {
+        "name": "right longissimus capitis",
+        "sha256": "845e65ab735bc49c5026fab485f8dd2eb9624ac7c2519927578d7d7508e644cd",
+        "bytes": 179817
+      },
+      "FJ1534": {
+        "name": "right longissimus cervicis",
+        "sha256": "d89596561e6d76dc5d5e6895711d598201056b1c7a834ee0c593702ef9382608",
+        "bytes": 229177
+      },
+      "FJ1535": {
+        "name": "right longissimus thoracis",
+        "sha256": "b555761d298a4bea88a05d2067b0cfff507522546bfc0dcb9b3bad576a3449fa",
+        "bytes": 1319188
+      },
+      "FJ1536": {
+        "name": "right rhomboid major",
+        "sha256": "81b84d6d2e7c859004ee2d71f8fef2768ec422fbace3967d54e3f3b2965bdb89",
+        "bytes": 549548
+      },
+      "FJ1537": {
+        "name": "right rhomboid minor",
+        "sha256": "acbd2dcd51879085bb2ec7d12b45c0ba2514ce3a2a1bb680bcf78732a1f688ff",
+        "bytes": 157909
+      },
+      "FJ1543": {
+        "name": "spinalis (atlas component FJ1543)",
+        "sha256": "3dc2e6367ead09b94da4551212a36692ecf56586be7c27d8b5e834d4c32e1fcb",
+        "bytes": 103745
+      },
+      "FJ1544": {
+        "name": "right spinalis thoracis",
+        "sha256": "d269ffdde57349435a3cfcc3c53c3b2532acf4ddaabfc7fdc8b0e3df66b15232",
+        "bytes": 598901
+      },
+      "FJ1554": {
+        "name": "zone of muscle organ",
+        "sha256": "f7683d77a5bfe9ac6d07fdc913c46cf41db20298c087e71df73fab18192e90a4",
+        "bytes": 351869
+      },
+      "FJ2810": {
+        "name": "skin (registration reference only)",
+        "sha256": "682f402206f15592acdeaae8ffb6b34c3e5c3267fa4685e63d2e4920ef2a80e0",
+        "bytes": 14465502
+      },
+      "FJ3349": {
+        "name": "right radius (registration reference only)",
+        "sha256": "0f824e639b13ea02959734a0d9bd8d7ca67d0b51f531a138d769e1d3b22e0c98",
+        "bytes": 42701
+      },
+      "FJ3365": {
+        "name": "right femur (registration reference only)",
+        "sha256": "5eff0f92905dd45bd0e79b1de0144dc15988c73c683468163255ba1452d58037",
+        "bytes": 192114
+      },
+      "FJ3368": {
+        "name": "right humerus",
+        "sha256": "85f5445a11ecb029b027db0b9b34933982836d442b19ff531d1ca35a3bc3a237",
+        "bytes": 256564
+      },
+      "FJ3387": {
+        "name": "right tibia",
+        "sha256": "01879d7310938e82eecc02e1115332497e94085ff5cc1fa8eeee47ad1f5d3578",
+        "bytes": 100137
+      }
+    },
+    "verified": "2026-11-12"
+  },
+  "registration": {
+    "FJ3368": {
+      "sourceProximal": [
+        -166.8530178571429,
+        -76.73058482142858,
+        1332.4723214285711
+      ],
+      "sourceDistal": [
+        -202.1946902654867,
+        -70.74229911504425,
+        1033.577256637168
+      ],
+      "targetProximal": [
+        0.247,
+        0.54,
+        -0.015
+      ],
+      "targetDistal": [
+        0.348,
+        0.245,
+        0.0
+      ],
+      "uniformScale": 0.001036987605516159,
+      "method": "Bone end-centroid registration to manually chosen BoGa joint centres; mirrored to opposite side; not anatomically validated."
+    },
+    "FJ3387": {
+      "sourceProximal": [
+        -74.14274418604654,
+        -81.95677906976745,
+        372.33160465116276
+      ],
+      "sourceDistal": [
+        -52.30955116279071,
+        -80.85893488372092,
+        -2.2837638139534886
+      ],
+      "targetProximal": [
+        0.14861197174530216,
+        -0.423,
+        -0.009628178368121444
+      ],
+      "targetDistal": [
+        0.20199614727224702,
+        -0.876,
+        -0.05126610850908306
+      ],
+      "uniformScale": 0.0012205941277634732,
+      "method": "Bone end-centroid registration to body-derived lower-leg pose landmarks; mirrored to opposite side; not anatomically validated.",
+      "targetMethod": "Centres of positive-x body cross-section bounds at the knee/ankle heights; visual alignment, not clinically identified tibial landmarks."
+    },
+    "FJ3349": {
+      "sourceProximal": [
+        -232.25445,
+        -76.89364,
+        1033.6430000000003
+      ],
+      "sourceDistal": [
+        -274.32699999999994,
+        -116.87174999999998,
+        806.7007499999999
+      ],
+      "targetProximal": [
+        0.34640000000000004,
+        0.245,
+        0.005400000000000002
+      ],
+      "targetDistal": [
+        0.42715000000000003,
+        0.026,
+        0.08165
+      ],
+      "uniformScale": 0.001048264635178171,
+      "method": "Bone end-centroid registration to avatar cross-section pose landmarks; mirrored; provisional."
+    },
+    "FJ3365": {
+      "sourceProximal": [
+        -86.89577088607597,
+        -78.51239240506325,
+        827.9942151898737
+      ],
+      "sourceDistal": [
+        -67.46908481012657,
+        -77.0266417721519,
+        372.9637468354431
+      ],
+      "targetProximal": [
+        0.1048,
+        -0.06,
+        0.015000000000000006
+      ],
+      "targetDistal": [
+        0.1486,
+        -0.423,
+        -0.009600000000000001
+      ],
+      "uniformScale": 0.0008046144310178007,
+      "method": "Bone end-centroid registration to avatar cross-section pose landmarks; mirrored; provisional."
+    },
+    "torso": {
+      "method": "Atlas skin cross-section registration to the avatar, with piecewise vertical pose landmarks; provisional visual deformation, not measured anatomy.",
+      "sourceHeights": [
+        700.0,
+        735.0,
+        834.0,
+        950.0,
+        1100.0,
+        1250.0,
+        1332.0,
+        1400.0,
+        1500.0
+      ],
+      "targetHeights": [
+        -0.19,
+        -0.15,
+        -0.06,
+        0.08,
+        0.27,
+        0.445,
+        0.54,
+        0.65,
+        0.8
+      ],
+      "reference": "FJ2810",
+      "targetMeshSha256": "ecb9032f3fae6d8e7818ae5a923d906ee47921eb5ff2a2cf6201f44c4521da09"
+    }
+  },
+  "groups": {
+    "chest": [
+      "FJ1447",
+      "FJ1464",
+      "FJ1446"
+    ],
+    "serratus_anterior": [
+      "FJ1459"
+    ],
+    "delts_front": [
+      "FJ1468"
+    ],
+    "delts_lateral": [
+      "FJ1467"
+    ],
+    "delts_rear": [
+      "FJ1513"
+    ],
+    "rotator_cuff": [
+      "FJ1506",
+      "FJ1500",
+      "FJ1508",
+      "FJ1504"
+    ],
+    "back_upper": [
+      "FJ1554",
+      "FJ1536",
+      "FJ1537"
+    ],
+    "traps_upper": [
+      "FJ1521"
+    ],
+    "traps_lower": [
+      "FJ1520"
+    ],
+    "biceps": [
+      "FJ1512",
+      "FJ1478"
+    ],
+    "brachialis": [
+      "FJ1486"
+    ],
+    "triceps": [
+      "FJ1480",
+      "FJ1477",
+      "FJ1479"
+    ],
+    "forearms_grip": [
+      "FJ1497",
+      "FJ1498",
+      "FJ1503",
+      "FJ1505",
+      "FJ1484",
+      "FJ1494",
+      "FJ1495",
+      "FJ1493",
+      "FJ1496",
+      "FJ1502",
+      "FJ1475",
+      "FJ1499",
+      "FJ1487",
+      "FJ1490",
+      "FJ1489",
+      "FJ1492",
+      "FJ1491",
+      "FJ1472",
+      "FJ1517",
+      "FJ1474",
+      "FJ1516",
+      "FJ1473",
+      "FJ1518"
+    ],
+    "abs_obliques": [
+      "FJ1452"
+    ],
+    "quads": [
+      "FJ1433",
+      "FJ1441",
+      "FJ1442",
+      "FJ1443"
+    ],
+    "hamstrings": [
+      "FJ1435",
+      "FJ1444",
+      "FJ1436",
+      "FJ1395"
+    ],
+    "glutes_max": [
+      "FJ1418"
+    ],
+    "hip_abductors": [
+      "FJ1419",
+      "FJ1420"
+    ],
+    "adductors": [
+      "FJ1401",
+      "FJ1403",
+      "FJ1402",
+      "FJ1421",
+      "FJ1427"
+    ],
+    "hip_flexors": [
+      "FJ1431",
+      "FJ1422"
+    ],
+    "calves": [
+      "FJ1394",
+      "FJ1397",
+      "FJ1437"
+    ],
+    "tibialis_anterior": [
+      "FJ1439"
+    ],
+    "spinal_erectors": [
+      "FJ1527",
+      "FJ1528",
+      "FJ1526",
+      "FJ1535",
+      "FJ1534",
+      "FJ1533",
+      "FJ1544",
+      "FJ1543"
+    ]
+  },
+  "surfaceRegions": [
+    "abs_rectus",
+    "back_lats"
+  ],
+  "derivedErectors": {
+    "iliocostalis": [
+      "FJ1527",
+      "FJ1528",
+      "FJ1526"
+    ],
+    "longissimus": [
+      "FJ1535",
+      "FJ1534",
+      "FJ1533"
+    ],
+    "spinalis": [
+      "FJ1544",
+      "FJ1543"
+    ]
+  }
+}

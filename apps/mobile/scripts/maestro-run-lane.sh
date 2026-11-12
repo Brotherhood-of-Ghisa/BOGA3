@@ -109,7 +109,7 @@ case "$lane" in
   # the completion screen's native share sheet, an exercise created through
   # the catalogue's editor sheet, the session plan, and the user's muscle setup
   # (Broad, a Track switch) read across Progress, the 3D body, a completed
-  # session and the catalogue. They share ONE provisioned simulator + Metro
+  # session and the catalogue, plus native muscle wireframe rendering. They share ONE provisioned simulator + Metro
   # (maestro-ios-run-flows.sh), because a lane of their own would pay the
   # provision/launch/teardown overhead again; each resets its own data in-flow
   # through the maestro-harness deep link, so a `data` reset is enough.
@@ -121,7 +121,8 @@ case "$lane" in
       --scenario "Session completion share" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml" \
       --scenario "Session plan" --flow "$APP_DIR/.maestro/flows/session-plan.yaml" \
-      --scenario "Muscle report" --flow "$APP_DIR/.maestro/flows/muscle-report-broad.yaml"
+      --scenario "Muscle report" --flow "$APP_DIR/.maestro/flows/muscle-report-broad.yaml" \
+      --scenario "Muscle wireframe" --flow "$APP_DIR/.maestro/flows/muscle-wireframe.yaml"
     ;;
 
   # The Android data smoke shares the data-runtime-smoke, exercise-catalogue

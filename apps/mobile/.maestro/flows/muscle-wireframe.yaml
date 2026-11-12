@@ -1,0 +1,60 @@
+appId: com.dinoderek.mobile
+---
+# Proves: the native GL wireframe presents whole-body and selected deep anatomy,
+# and composes with the muscle picker, focus and rotation gestures. Screenshots
+# are inspected for body occlusion, the one-hand outline and spinal columns.
+# Why device: shader compilation, depth-tested pixels and native gesture-handler
+# composition are unavailable behind the Jest native boundary.
+# Jest counterpart: muscle-wireframe-scene, muscle-wireframe-renderer,
+# muscle-anatomy-meshes, muscle-body-canvas and muscle-body-wireframe tests.
+- openLink: "boga3://maestro-harness?reset=data&fixture=muscle-report&teleport=today"
+- extendedWaitUntil:
+    visible: "You|You have changed the icon.*"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: "You have changed the icon.*"
+    commands:
+      - tapOn: "OK"
+- extendedWaitUntil:
+    visible: { id: "today-screen" }
+    timeout: 30000
+- openLink: "boga3://settings-progress"
+- scrollUntilVisible:
+    element: { id: "settings-muscle-view-3d" }
+    direction: DOWN
+- tapOn: { id: "settings-muscle-view-3d" }
+- openLink: "boga3://progress?breakdown=muscle"
+- extendedWaitUntil:
+    visible: { id: "stats-muscle-body-viewport" }
+    timeout: 20000
+- assertNotVisible: { id: "stats-muscle-wireframe-error" }
+- takeScreenshot: "wireframe-01-whole-body"
+- tapOn: { id: "stats-muscle-body-picker-trigger" }
+- scrollUntilVisible:
+    element: { id: "stats-muscle-picker-row-brachialis" }
+    direction: DOWN
+- tapOn: { id: "stats-muscle-picker-row-brachialis" }
+- assertVisible: { id: "stats-muscle-body-selected", text: "Brachialis" }
+- takeScreenshot: "wireframe-02-brachialis"
+- tapOn: { id: "stats-muscle-body-picker-trigger" }
+- scrollUntilVisible:
+    element: { id: "stats-muscle-picker-row-forearms_grip" }
+    direction: DOWN
+- tapOn: { id: "stats-muscle-picker-row-forearms_grip" }
+- tapOn: { id: "stats-muscle-body-focus" }
+- takeScreenshot: "wireframe-03-forearm-hand-focus"
+- tapOn: { id: "stats-muscle-body-picker-trigger" }
+- scrollUntilVisible:
+    element: { id: "stats-muscle-picker-row-spinal_erectors" }
+    direction: DOWN
+- tapOn: { id: "stats-muscle-picker-row-spinal_erectors" }
+- takeScreenshot: "wireframe-04-spinal-focus"
+- assertNotVisible: { id: "stats-muscle-wireframe-error" }
+
+- swipe:
+    from: { id: "stats-muscle-body-viewport" }
+    direction: LEFT
+    duration: 500
+- takeScreenshot: "wireframe-05-rotated"
+- assertNotVisible: { id: "stats-muscle-wireframe-error" }

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Path, Use } from 'react-native-svg';
+import { Path } from 'react-native-svg';
 
 import { hexToLch } from '@/components/ui/lch';
 import { generateRoles } from '@/components/ui/theme';
@@ -27,14 +27,6 @@ const MOUSTACHE_FILL = testPalette.moustache;
 
 beforeEach(() => { jest.useFakeTimers({ now: new Date(2026, 9, 20) }); });
 afterEach(() => { jest.useRealTimers(); });
-
-const fibreDefinitionD = (testID: string): string => {
-  const href = screen.getByTestId(testID).props.href.replace(/^#/, '');
-  const definition = screen.UNSAFE_getAllByType(Path).find(path => path.props.id === href);
-  expect(definition).toBeDefined();
-  expect(definition!.props.d).toMatch(/^M/);
-  return definition!.props.d;
-};
 
 const makeMuscle = (
   muscleGroupId: string,
@@ -217,19 +209,15 @@ describe('buildThemeShadePalette', () => {
     }
   });
 
-  it('keeps the light figure as shipped, and draws the dark one dark, with a pale moustache and relief edge', () => {
+  it('keeps the light figure as shipped, and draws the dark one dark, with a pale moustache', () => {
     const light = buildThemeShadePalette(testRoles, 'light');
     expect(light.moustache).toBe('#393938');
-    expect(light.relief).toEqual({ highlight: testRoles.onInk, shade: testRoles.inkMuted });
     const roles = generateRoles(themePresets[0].seeds, 'dark');
     const dark = buildThemeShadePalette(roles, 'dark');
     const middle = hexToLch(dark.neutral[Math.floor(SHADE_STEPS / 2)]).lightness;
     expect(middle).toBeLessThan(40);
-    // The moustache and the relief's light edge stand off the dark figure; its shade sits below it.
+    // The moustache stands off the dark figure.
     expect(hexToLch(dark.moustache).lightness - middle).toBeGreaterThan(40);
-    expect(dark.relief).toEqual({ highlight: roles.ink, shade: roles.paper });
-    expect(hexToLch(dark.relief.highlight).lightness).toBeGreaterThan(middle);
-    expect(hexToLch(dark.relief.shade).lightness).toBeLessThan(middle);
   });
 });
 
@@ -336,13 +324,8 @@ describe('projectMuscleBody & hitTestProjectedMuscle', () => {
     // At 180° (back view), posterior muscles (`back_lats`, `glutes_max`) are frontmost.
     const back = projectMuscleBody({ angleDeg: 180, width, height, scores, selectedId: 'back_lats' });
     expect(back.batches.some(b => b.selected)).toBe(true);
-    expect(back.fibres.surface.startsWith('M')).toBe(true);
-    expect(front.fibres).toEqual({ surface: '', deep: '' });
 
     // Selection is surfaced even when the owning anatomy faces away.
-    const chestFromBack = projectMuscleBody({ angleDeg: 180, width, height, scores, selectedId: 'chest' });
-    expect(chestFromBack.fibres.surface.startsWith('M')).toBe(true);
-    expect(chestFromBack.fibres.anatomicalParts?.[0].d.startsWith('M')).toBe(true);
 
     const latsTri = back.triangles.filter(t => t.muscleGroupId === 'back_lats').at(-1)!;
     const latsCx = (latsTri.x0 + latsTri.x1 + latsTri.x2) / 3;
@@ -352,7 +335,6 @@ describe('projectMuscleBody & hitTestProjectedMuscle', () => {
     expect(projectMuscleBody({ angleDeg: 0, width: 0, height: 280, scores })).toEqual({
       triangles: [],
       batches: [],
-      fibres: { surface: '', deep: '' },
     });
   });
 });
@@ -365,7 +347,6 @@ describe('November face decoration', () => {
     const november = projectMuscleBody({ ...options, november: true });
     expect(november.triangles).toEqual(ordinary.triangles);
     expect(november.batches.slice(0, ordinary.batches.length)).toEqual(ordinary.batches);
-    expect(november.fibres).toEqual(ordinary.fibres);
     for (const triangle of ordinary.triangles.filter((_, index) => index % 37 === 0)) {
       const x = (triangle.x0 + triangle.x1 + triangle.x2) / 3;
       const y = (triangle.y0 + triangle.y1 + triangle.y2) / 3;
@@ -388,7 +369,7 @@ describe('November face decoration', () => {
   it('uses the device calendar through restoration, while preserving rotation and controls', () => {
     jest.setSystemTime(new Date(2026, 10, 30, 23, 59, 59));
     const onSelect = jest.fn();
-    render(<MuscleBodyCard metric="workingSetCount" muscles={[makeMuscle('chest', 'Chest', 8)]}
+    render(<MuscleBodyCard defaultOverlay="contour" metric="workingSetCount" muscles={[makeMuscle('chest', 'Chest', 8)]}
       selectedId="chest" onSelect={onSelect} />);
     const moustache = () => screen.UNSAFE_getAllByType(Path).filter(path => path.props.fill === MOUSTACHE_FILL);
     const viewport = screen.getByTestId('stats-muscle-body-viewport');
@@ -401,10 +382,10 @@ describe('November face decoration', () => {
     expect(moustache()).toEqual([]);
     fireEvent.press(screen.getByTestId('stats-muscle-body-angle-front'));
     expect(moustache().length).toBeGreaterThan(0);
-    const fibres = fibreDefinitionD('stats-muscle-body-fibres-surface-shade');
+    const figure = screen.UNSAFE_getAllByType(Path).filter(path => path.props.fill !== MOUSTACHE_FILL).map(path => path.props.d);
     act(() => { jest.advanceTimersByTime(1000); });
     expect(moustache()).toEqual([]);
-    expect(fibreDefinitionD('stats-muscle-body-fibres-surface-shade')).toBe(fibres);
+    expect(screen.UNSAFE_getAllByType(Path).filter(path => path.props.fill !== MOUSTACHE_FILL).map(path => path.props.d)).toEqual(figure);
     expect(viewport.props.accessibilityValue).toEqual({ text: 'Front view, 0 degrees' });
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^8$/);
     fireEvent.press(screen.getByTestId('stats-muscle-body-target-chest'));
@@ -423,32 +404,32 @@ describe('MuscleBodyCard', () => {
     const rows = [comparedMuscle('chest', 2, 8, 'workingSetCount'),
       comparedMuscle('biceps', 0, 8, 'workingSetCount'), comparedMuscle('quads', 8, 0, 'workingSetCount')];
     const props = { muscles: rows, metric: 'workingSetCount' as const, selectedId: null, onSelect: jest.fn() };
-    const view = render(<MuscleBodyCard {...props} setTargets={SET_TARGETS} />);
+    const view = render(<MuscleBodyCard defaultOverlay="contour" {...props} setTargets={SET_TARGETS} />);
     fireEvent(screen.getByTestId('stats-muscle-body-viewport'), 'layout', { nativeEvent: { layout: { width: 280, height: 280 } } });
     const fills = () => screen.getByTestId('stats-muscle-body-svg').findAllByType(Path)
       .filter(path => path.props.fill).map(path => path.props.fill);
     const expectedFills = (chest: number | null, biceps: number | null, quads: number) => projectMuscleBody({ angleDeg: 0, width: 280, height: 280,
       scores: new Map([['chest', chest], ['biceps', biceps], ['quads', quads]]) }).batches.map(batch => batch.fill);
     expect(fills()).toEqual(expectedFills(-.5, null, 1));
-    view.rerender(<MuscleBodyCard {...props} setTargets={{ ...SET_TARGETS, weeklyTarget: 4 }} />);
+    view.rerender(<MuscleBodyCard defaultOverlay="contour" {...props} setTargets={{ ...SET_TARGETS, weeklyTarget: 4 }} />);
     expect(fills()).toEqual(expectedFills(0, null, 1));
-    view.rerender(<MuscleBodyCard {...props} setTargets={{ weeklyTarget: 4, weeks: 4 }} />);
+    view.rerender(<MuscleBodyCard defaultOverlay="contour" {...props} setTargets={{ weeklyTarget: 4, weeks: 4 }} />);
     expect(fills()).toEqual(expectedFills(-.75, null, 0));
     const volumeProps = { ...props, metric: 'totalVolume' as const,
       muscles: [comparedMuscle('chest', 0, 1000), comparedMuscle('biceps', 500, 1000), comparedMuscle('quads', 1000, 1000)] };
-    view.rerender(<MuscleBodyCard {...volumeProps} setTargets={SET_TARGETS} />);
+    view.rerender(<MuscleBodyCard defaultOverlay="contour" {...volumeProps} setTargets={SET_TARGETS} />);
     expect(fills()).toEqual(expectedFills(null, -.5, 0));
     const volumeFills = fills();
-    view.rerender(<MuscleBodyCard {...volumeProps} setTargets={{ weeklyTarget: 100, weeks: 4 }} />);
+    view.rerender(<MuscleBodyCard defaultOverlay="contour" {...volumeProps} setTargets={{ weeklyTarget: 100, weeks: 4 }} />);
     expect(fills()).toEqual(volumeFills);
-    view.rerender(<MuscleBodyCard {...volumeProps} selectedId="chest" setTargets={SET_TARGETS} />);
+    view.rerender(<MuscleBodyCard defaultOverlay="contour" {...volumeProps} selectedId="chest" setTargets={SET_TARGETS} />);
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^0$/);
     expect(screen.getByTestId('stats-muscle-body-comparison-previous')).toHaveTextContent(/^1000$/);
     expect(screen.getByTestId('stats-muscle-body-comparison-change')).toHaveTextContent(/^−100%$/);
   });
 
   it('omits the legend and keeps the selected muscle’s signed comparison', () => {
-    render(<MuscleBodyCard metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={jest.fn()} />);
+    render(<MuscleBodyCard defaultOverlay="contour" metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={jest.fn()} />);
     expect(screen.queryByTestId('stats-muscle-body-legend')).toBeNull();
     expect(screen.queryByText('Decrease')).toBeNull();
     expect(screen.queryByText('Unchanged')).toBeNull();
@@ -465,7 +446,7 @@ describe('MuscleBodyCard', () => {
   it('switches orientation via Front/Back control and accessibility actions, and selects muscles via both touch hit-testing and accessible buttons', () => {
     const onSelect = jest.fn();
     const view = render(
-      <MuscleBodyCard
+      <MuscleBodyCard defaultOverlay="contour"
         metric="workingSetCount"
         muscles={muscles}
         onSelect={onSelect}
@@ -530,7 +511,7 @@ describe('MuscleBodyCard', () => {
     expect(onSelect).toHaveBeenCalledWith('back_lats');
 
     view.rerender(
-      <MuscleBodyCard
+      <MuscleBodyCard defaultOverlay="contour"
         metric="workingSetCount"
         muscles={muscles}
         onSelect={onSelect}
@@ -538,15 +519,7 @@ describe('MuscleBodyCard', () => {
       />
     );
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Chest');
-    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
-    expect(screen.getByTestId('stats-muscle-body-fibres-surface-shade').props.strokeWidth).toBe(0.9);
-    expect(screen.getByTestId('stats-muscle-body-fibres-anatomy-FJ1456-shade').props.strokeOpacity).toBe(0.70);
-    const highlight = screen.UNSAFE_getAllByType(Use).find(path => path.props.testID === 'stats-muscle-body-fibres-surface-highlight')!;
-    expect(highlight.props).toMatchObject({ stroke: testRoles.onInk, strokeWidth: 1.1,
-      strokeOpacity: 0.95, translateX: 0.45, translateY: -0.45, strokeLinecap: 'round', strokeLinejoin: 'round' });
-    expect(screen.UNSAFE_getAllByType(Use).find(path => path.props.testID === 'stats-muscle-body-fibres-surface-shade')!.props).toMatchObject({
-      stroke: testRoles.inkMuted, strokeOpacity: 0.72, fill: 'transparent', strokeLinecap: 'round', strokeLinejoin: 'round',
-    });
+    expect(screen.queryByTestId('stats-muscle-body-contour')).toBeTruthy();
     expect(screen.getByTestId('stats-muscle-body-svg').props.pointerEvents).toBe('none');
     expect(
       screen.getByLabelText('Select Chest. Now 8, previous 0, change +8. working sets.').props.accessibilityState
@@ -573,85 +546,27 @@ describe('MuscleBodyCard', () => {
     expect(viewport.props.accessibilityValue).toEqual({ text: 'Back view, 180 degrees' });
   });
 
-  it('paints each forearm component highlight then shade, preserving fibre separations at overlaps', () => {
-    render(<MuscleBodyCard metric="workingSetCount" muscles={[makeMuscle('forearms_grip', 'Forearms', 8)]}
-      selectedId="forearms_grip" onSelect={jest.fn()} />);
-    const paths = screen.UNSAFE_getAllByType(Use).filter(path => path.props.testID?.startsWith('stats-muscle-body-fibres-anatomy-'));
-    const parts = ['FJ1497', 'FJ1498', 'FJ1503', 'FJ1505', 'FJ1484', 'FJ1494', 'FJ1495', 'FJ1493', 'FJ1496', 'FJ1502', 'FJ1475', 'FJ1499', 'FJ1487', 'FJ1490', 'FJ1489', 'FJ1492', 'FJ1491', 'FJ1472', 'FJ1517', 'FJ1474', 'FJ1516', 'FJ1473', 'FJ1518'];
-    expect(paths.map(path => path.props.testID)).toEqual(parts.flatMap(id => [
-      `stats-muscle-body-fibres-anatomy-${id}-highlight`, `stats-muscle-body-fibres-anatomy-${id}-shade`,
-    ]));
-    expect(new Set(paths.map(path => path.props.testID)).size).toBe(46);
-    expect(paths.every(path => path.props.fill === 'transparent')).toBe(true);
-    expect(paths[0].props.href).toBe(paths[1].props.href);
-    expect(paths[0].props.href).not.toBe(paths[2].props.href);
-    const definitions = screen.UNSAFE_getAllByType(Path).filter(path => path.props.id);
-    expect(definitions).toHaveLength(23);
-    expect(new Set(paths.map(path => path.props.href)).size).toBe(23);
-    for (const path of paths) expect(fibreDefinitionD(path.props.testID)).not.toBe('');
-    expect(screen.queryByTestId('stats-muscle-body-fibres-deep-shade')).toBeNull();
-  });
 
-  it('explains schematic depth on demand without changing selection or rotation', () => {
+  it('explains mesh geometry on demand without changing selection or rotation', () => {
     const onSelect = jest.fn();
-    render(<MuscleBodyCard metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={onSelect} />);
+    render(<MuscleBodyCard defaultOverlay="contour" metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={onSelect} />);
     const viewport = screen.getByTestId('stats-muscle-body-viewport');
     fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
-    const before = fibreDefinitionD('stats-muscle-body-fibres-surface-shade');
-    expect(screen.queryByTestId('stats-muscle-body-help')).toBeNull();
     fireEvent.press(screen.getByLabelText('About the muscle model'));
-    expect(screen.getByText(/Fibre directions are schematic, not measured anatomy/)).toBeTruthy();
+    expect(screen.getByText(/Wireframe lines are triangle edges/)).toBeTruthy();
+    expect(screen.getByText(/Spinal erectors are smoothed column envelopes/)).toBeTruthy();
     expect(screen.getByText(/BodyParts3D.*CC BY 4.0/)).toBeTruthy();
-    expect(screen.getByText(/pose alignment, bilateral mirroring and schematic fibre generation/)).toBeTruthy();
     fireEvent(screen.getByTestId('stats-muscle-body-help'), 'accessibilityEscape');
     expect(screen.queryByTestId('stats-muscle-body-help')).toBeNull();
     expect(viewport.props.accessibilityValue.text).toBe('Back view, 180 degrees');
-    expect(fibreDefinitionD('stats-muscle-body-fibres-surface-shade')).toBe(before);
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('scopes fibre definitions to each mounted card', () => {
-    const rows = [makeMuscle('chest', 'Chest', 8)];
-    render(<>
-      <MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} />
-      <MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} />
-    </>);
-    const definitions = screen.UNSAFE_getAllByType(Path).filter(path => path.props.id);
-    expect(definitions).toHaveLength(4);
-    expect(new Set(definitions.map(path => path.props.id)).size).toBe(4);
-    const references = screen.UNSAFE_getAllByType(Use).map(path => path.props.href.replace(/^#/, ''));
-    for (const definition of definitions) {
-      expect(references.filter(id => id === definition.props.id)).toHaveLength(2);
-      expect(definition.props.stroke).toBeUndefined();
-      expect(definition.props.fill).toBeUndefined();
-    }
-  });
-
-  it('replaces referenced fibre definitions when selection changes', () => {
-    const rows = [makeMuscle('forearms_grip', 'Forearms', 8), makeMuscle('chest', 'Chest', 8)];
-    const view = render(<MuscleBodyCard metric="workingSetCount" muscles={rows}
-      selectedId="forearms_grip" onSelect={jest.fn()} />);
-    const oldIds = screen.UNSAFE_getAllByType(Path).filter(path => path.props.id).map(path => path.props.id);
-    expect(oldIds).toHaveLength(23);
-    view.rerender(<MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} />);
-    const definitions = screen.UNSAFE_getAllByType(Path).filter(path => path.props.id);
-    expect(definitions).toHaveLength(2);
-    expect(definitions.every(path => !oldIds.includes(path.props.id))).toBe(true);
-    expect(fibreDefinitionD('stats-muscle-body-fibres-surface-shade')).not.toBe('');
-    expect(fibreDefinitionD('stats-muscle-body-fibres-anatomy-FJ1456-shade')).not.toBe('');
-    expect(screen.queryByTestId('stats-muscle-body-fibres-anatomy-FJ1497-shade')).toBeNull();
-    view.rerender(<MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId={null} onSelect={jest.fn()} />);
-    expect(screen.UNSAFE_getAllByType(Path).filter(path => path.props.id)).toEqual([]);
-    expect(screen.UNSAFE_queryAllByType(Use)).toEqual([]);
-  });
-
-  it('retains figures and controls for geometry-free muscles without fibres', () => {
-    render(<MuscleBodyCard metric="workingSetCount" muscles={[makeMuscle('custom', 'Custom', 3)]}
+  it('retains figures and controls for geometry-free muscles', () => {
+    render(<MuscleBodyCard defaultOverlay="contour" metric="workingSetCount" muscles={[makeMuscle('custom', 'Custom', 3)]}
       selectedId="custom" onSelect={jest.fn()} />);
     expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Custom');
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent('3');
-    expect(screen.queryByTestId('stats-muscle-body-fibres-surface-shade')).toBeNull();
-    expect(screen.queryByTestId('stats-muscle-body-fibres-deep-shade')).toBeNull();
     expect(screen.getByTestId('stats-muscle-body-picker-trigger')).toBeTruthy();
   });
 
@@ -774,7 +689,7 @@ describe('MuscleBodyCard', () => {
     expect(screen.getByTestId('stats-muscle-body-contour')).toBeTruthy();
 
     fireEvent.press(toggle);
-    expect(onOverlayChange).toHaveBeenCalledWith('fibres');
+    expect(onOverlayChange).toHaveBeenCalledWith('wireframe');
 
     rerender(
       <MuscleBodyCard
@@ -782,11 +697,11 @@ describe('MuscleBodyCard', () => {
         muscles={rows}
         onOverlayChange={onOverlayChange}
         onSelect={jest.fn()}
-        overlay="fibres"
+        overlay="wireframe"
         selectedId="chest"
       />
     );
-    expect(toggle).toHaveTextContent('Fibres');
+    expect(toggle).toHaveTextContent('Wireframe');
     expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
   });
 
@@ -856,25 +771,25 @@ describe('MuscleBodyCard', () => {
     expect(projected.contour!.d).not.toContain('M167.7 140L112.3 140');
   });
 
-  it('toggles between fibres and contour overlay and hides contour when muscle is on the far side', () => {
+  it('toggles between wireframe and contour overlay and hides contour when muscle is on the far side', () => {
     const rows = [makeMuscle('chest', 'Chest', 8), makeMuscle('back_lats', 'Lats', 6)];
-    render(<MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} defaultOverlay="fibres" />);
+    render(<MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} defaultOverlay="wireframe" />);
 
     const toggle = screen.getByTestId('stats-muscle-body-overlay-toggle');
-    expect(toggle).toHaveTextContent('Fibres');
+    expect(toggle).toHaveTextContent('Wireframe');
     expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
-    expect(screen.getByTestId('stats-muscle-body-fibres-surface-highlight')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-body-wireframe')).toBeTruthy();
 
     fireEvent.press(toggle);
     expect(toggle).toHaveTextContent('Contour');
     expect(screen.getByTestId('stats-muscle-body-contour')).toBeTruthy();
-    expect(screen.queryByTestId('stats-muscle-body-fibres-surface-highlight')).toBeNull();
+    expect(screen.queryByTestId('stats-muscle-body-wireframe')).toBeNull();
 
     fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
     expect(screen.queryByTestId('stats-muscle-body-contour')).toBeNull();
 
     fireEvent.press(toggle);
-    expect(toggle).toHaveTextContent('Fibres');
+    expect(toggle).toHaveTextContent('Wireframe');
   });
 
 });
