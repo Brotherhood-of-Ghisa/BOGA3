@@ -159,13 +159,15 @@ function streamRecord(v: unknown, event: CompetitionEventWire): boolean {
       (!normalized || p.performance === null || visibility(p.performance) === 'normalized'));
 }
 // Records log: a record lists the board's metric and is never voided; a lead
-// change belongs to the Certified log only; a rules change carries nothing else.
+// change (to a new leader) belongs to the Certified log only; a rules change
+// carries nothing else.
 function recordsHistoryItem(v: unknown, log: { exercise: string; metric: string; certified: boolean }): boolean {
   if (!exact(v,['event','record','previous_best']) || !isCompetitionEventWire(v.event) ||
     v.event.group_exercise.group_exercise_id !== log.exercise) return false;
   const event = v.event;
   if (event.kind === 'rules_change') return v.record === null && v.previous_best === null;
   if (event.kind === 'lead_change') return log.certified && event.certified === true && event.metric === log.metric &&
+    event.values.some(value => value.role === 'leader') &&
     v.record === null && v.previous_best === null;
   return event.kind === 'record' && !log.certified && !event.voided && streamRecord(v.record,event) &&
     event.values.some(value => value.role === 'record' && value.metric === log.metric) &&

@@ -26,7 +26,7 @@ type Member = { user_id: string; username: string | null } | null | undefined;
 function delta(current: CompetitionHistoryValueWire | undefined, previous: CompetitionHistoryValueWire | null): string | null {
   if (!current || !previous || current.unit !== previous.unit || current.unavailable || previous.unavailable) return null;
   const now = competitionDisplayValue(current), before = competitionDisplayValue(previous);
-  if (now === null || before === null || !Number.isFinite(now - before)) return null;
+  if (now === null || before === null || !Number.isFinite(now - before) || now - before <= 0) return null;
   return `+${formatCompetitionFigure(now - before, current.unit)} on best`;
 }
 
@@ -34,6 +34,8 @@ function entryFor(item: CompetitionRecordsHistoryItemWire, metric: CompetitionMe
   currentRevision: number, dateFormat: ExerciseDateFormat): Omit<RecordsLogEntry, 'index' | 'count'> {
   const { event, record } = item;
   const nameOf = (member: Member) => member?.user_id === userId ? 'You' : formatMemberName(member?.username ?? null);
+  // Mid-phrase, `you` stays lower case: `passed you`.
+  const passedName = (member: Member) => `passed ${member?.user_id === userId ? 'you' : nameOf(member)}`;
   const date = event.provisional ? `${formatBoardDate(event.sort_at_ms, dateFormat)} · Session in progress`
     : formatBoardDate(event.sort_at_ms, dateFormat);
   const base = { kind: 'entry' as const, key: event.event_id, date, earlierRules: event.rules_revision < currentRevision };
@@ -41,8 +43,9 @@ function entryFor(item: CompetitionRecordsHistoryItemWire, metric: CompetitionMe
     const leader = event.values.find(value => value.role === 'leader');
     const previous = event.values.find(value => value.role === 'previous');
     const holder = leader?.member ?? event.member;
-    const passed = previous?.member && previous.member.user_id !== holder?.user_id ? `passed ${nameOf(previous.member)}` : null;
-    return { ...base, mark: 'lead', title: `${nameOf(holder)} took #1`,
+    const kept = previous?.member?.user_id === holder?.user_id;
+    const passed = previous?.member && !kept ? passedName(previous.member) : null;
+    return { ...base, mark: 'lead', title: kept ? `${nameOf(holder)} · #1` : `${nameOf(holder)} took #1`,
       figure: leader ? formatCompetitionHistoricalFigure(leader) : 'Score unavailable', detail: passed ?? '' };
   }
   const value = event.values.find(entry => entry.role === 'record' && entry.metric === metric);
@@ -50,7 +53,7 @@ function entryFor(item: CompetitionRecordsHistoryItemWire, metric: CompetitionMe
   const previousHolder = record?.previous.find(entry => entry.value.metric === metric)?.value.member;
   const tookFromOther = lead && previousHolder?.user_id !== event.member?.user_id;
   const name = nameOf(event.member);
-  const beat = tookFromOther ? (previousHolder ? `passed ${nameOf(previousHolder)}` : null)
+  const beat = tookFromOther ? (previousHolder ? passedName(previousHolder) : null)
     : item.previous_best ? delta(value, item.previous_best) : 'first entry';
   return { ...base, mark: lead ? 'lead' : 'best', title: tookFromOther ? `${name} took #1` : lead ? `${name} · #1` : name,
     figure: value ? formatCompetitionHistoricalFigure(value) : 'Score unavailable',

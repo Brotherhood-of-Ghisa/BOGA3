@@ -43,3 +43,5 @@ export { GroupStreamSessionCard } from './stream-session-card';
 export { usePullToRefresh } from './use-pull-to-refresh';
 export { UsernameGate, useUsernameGate, type UsernameGateState, type UsernameGateStatus } from './username-gate';
 export { GroupWriteNotice } from './write-notice';
+export { GroupBoardTitle } from './group-board-title';
+export { GroupRecordsLogRow } from './group-records-log-row';

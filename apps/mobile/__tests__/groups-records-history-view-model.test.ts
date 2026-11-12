@@ -25,9 +25,10 @@ describe('records log', () => {
     expect(entries([record({}, true)])[0]).toMatchObject({ title: 'You took #1', detail: '100.0 × 5' });
     expect(entries([record()])[0]).toMatchObject({ mark: 'best', title: 'You', detail: '100.0 × 5 · first entry' });
   });
-  it('draws no gain across units or from an unavailable figure', () => {
+  it('draws no gain across units, from an unavailable figure or without a gain', () => {
     expect(entries([record({ previous_best: { ...kg('previous', 1), unit: 'percent_bw' } })])[0].detail).toBe('100.0 × 5');
     expect(entries([record({ previous_best: { ...kg('previous', 1), value: null, unavailable: true } })])[0].detail).toBe('100.0 × 5');
+    expect(entries([record({ previous_best: kg('previous', 120) })])[0].detail).toBe('100.0 × 5');
   });
   it('marks an in-progress session and an unavailable figure', () => {
     const [row] = entries([record({ event: event({ provisional: true, values: [] }) })]);
@@ -36,7 +37,10 @@ describe('records log', () => {
   it('a Certified lead change names the new holder and who they passed', () => {
     const lead = { event: event({ kind: 'lead_change', certified: true, member: null,
       values: [kg('leader', 130, sam), kg('previous', 120, me)] }), record: null, previous_best: null };
-    expect(entries([lead])[0]).toMatchObject({ mark: 'lead', title: 'Sam took #1', figure: '130.0', detail: 'passed You' });
+    expect(entries([lead])[0]).toMatchObject({ mark: 'lead', title: 'Sam took #1', figure: '130.0', detail: 'passed you' });
+    const kept = { ...lead, event: event({ kind: 'lead_change', certified: true, member: null,
+      values: [kg('leader', 130, sam), kg('previous', 125, sam)] }) };
+    expect(entries([kept])[0]).toMatchObject({ title: 'Sam · #1', detail: '' });
   });
   it('splits entries into one card per run between rules changes, dimming earlier rules', () => {
     const rules = { event: event({ kind: 'rules_change', event_id: 'rc', values: [], sort_at_ms: Date.UTC(2026, 10, 3) }), record: null, previous_best: null };

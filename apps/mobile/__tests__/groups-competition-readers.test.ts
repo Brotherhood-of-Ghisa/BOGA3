@@ -348,6 +348,7 @@ describe('records history decoder', () => {
   it.each([
     ['a record on the Certified log', log(true, [recordItem])],
     ['a lead change on the All log', log(false, [leadItem])],
+    ['a Certified lead change without a leader', log(true, [{ ...leadItem, event: { ...leadItem.event, values: [] } }])],
     ['a voided record', log(false, [{ ...recordItem, event: { ...event, voided: true } }])],
     ['a record without its stream record', log(false, [{ ...recordItem, record: null }])],
     ['a record not on this metric', log(false, [{ ...recordItem, event: { ...event, values: [{ ...historicalValue, metric: 'volume', unit: 'percent_bw_reps' }] },

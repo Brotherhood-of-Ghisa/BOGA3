@@ -224,6 +224,14 @@ Historical values preserve original units and carry `unavailable` with null
 value when current disclosure suppresses them. Full-session and week totals
 contain no absolute volume field that could recover a redacted contribution.
 
+`group_competition_records_history` is a board's records log, newest first by
+event sequence, over every protocol-4 revision (protocol-3 history stays with
+`group_competition_history`): All lists non-voided `record` events naming the
+board's metric, each with its stream record and the member's previous best on
+that metric; Certified lists Certified lead changes that have a leader. Both
+include rules changes. The cursor binds group, exercise, metric and scope;
+disclosure is the stream's own helpers.
+
 Kernel upgrades rescore live comparisons silently, preserving immutable record
 and certification audits and advancing private record baselines. Personal facts,
 evaluator rules and coaching revisions must advance; device cache generation 7

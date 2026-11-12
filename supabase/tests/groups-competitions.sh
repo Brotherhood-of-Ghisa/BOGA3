@@ -822,6 +822,9 @@ run_psql "alter table app_public.group_metric_board_entries drop constraint cp_p
 next_cuam; push "${ATHLETE_TOKEN}" 'restore raw reps before retry' "$(e_set "${T}-ATHLETE-set" "${T}-ATHLETE-se" 0 '' 5 '' "${CUAM}" null rir_0)"
 drain retry
 board e1rm true; check 'retried publication includes committed witness' 'any(.entries[];.certification.certification_id==$c)' --arg c "${RIVAL_NEW_CERT}"
+records_history "${GX}" e1rm true; expect_ok 'certified records history after a witness'; assert_wire isCompetitionRecordsHistoryWire
+check 'Certified log holds the new Certified #1 with its leader' \
+  'any(.items[];.event.kind=="lead_change" and .event.certified and any(.event.values[];.role=="leader"))'
 expect_sql 'publication log contains only sanitized identifiers/SQLSTATE' "select bool_and(
   (select array_agg(k order by k) from jsonb_object_keys(context) k)=array['group_exercise_id','group_id','job_id','kind','sqlstate'])
   from public.app_logs where event='group.eval_failed' and context->>'group_exercise_id'='${GX}';" t
