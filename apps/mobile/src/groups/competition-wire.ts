@@ -134,6 +134,8 @@ export type CompetitionStreamRecordWire = {
   /** The boards this set took #1 on: its group records. Its other boards are the member's own new bests (PRs). */
   group_record_metrics: CompetitionHistoricalMetric[];
 };
+/** The record a `record_voided` event withdrew, as the stream showed it; null when the record is gone. */
+export type CompetitionStreamWithdrawnWire = { event: CompetitionEventWire; record: CompetitionStreamRecordWire };
 export type GroupSharedExerciseDetailsWire = {
   group_exercise_id: string | null;
   group_exercise_name: string | null;
@@ -180,8 +182,10 @@ export type GroupSharedExerciseDeleteWire = {
 };
 export type CompetitionStreamItemWire =
   | { kind: 'competition'; key: string; sort_at_ms: number; event: CompetitionEventWire;
-      /** Record events only (group_competition_stream_v4); absent from the first reader, which the app no longer calls. */
-      record?: CompetitionStreamRecordWire }
+      /** Record events only (group_competition_stream_v4 onwards). */
+      record?: CompetitionStreamRecordWire;
+      /** `record_voided` events only (group_competition_stream_v5). */
+      withdrawn?: CompetitionStreamWithdrawnWire | null }
   | { kind: 'session'; key: string; sort_at_ms: number; groups: { group_id: string; name: string }[]; session: CompetitionSessionWire }
   | { kind: 'membership'; key: string; sort_at_ms: number; event: 'joined' | 'left' | 'removed';
       group: { group_id: string; name: string }; member: GroupMemberRef }

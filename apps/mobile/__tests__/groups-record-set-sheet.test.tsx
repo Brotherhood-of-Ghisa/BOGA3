@@ -116,14 +116,20 @@ it('certifies from the stream sheet and refreshes the selected group',async()=>{
   await waitFor(()=>expect(api.getCompetitionStream.mock.calls.length).toBeGreaterThan(reads));
   expect(api.certifyCompetition).toHaveBeenCalledTimes(1);
 });
-it.each(['self','former','ineligible','archive','voided','rebuild'])('keeps %s stream performances read-only',async(kind)=>{
+it.each(['self','former','ineligible','archive','rebuild'])('keeps %s stream performances read-only',async(kind)=>{
   const context=competitionEvent.record_context!;
   api.getCompetitionStream.mockResolvedValue(page({ ...competitionEvent,member: kind==='self'?{ user_id: 'me',username: 'Me' }:competitionEvent.member,
     voided: kind==='voided',record_context: { ...context,former: kind==='former',
       exercise: { ...context.exercise,archived_at_ms: kind==='archive'?3000:null,rebuilding: kind==='rebuild',published_revision: kind==='rebuild'?1:context.exercise.published_revision },
       metrics: context.metrics.map(metric=>({ ...metric,eligible: kind!=='ineligible' })) } }));
   await openRecord();expect(screen.queryByTestId('group-metric-record-certify')).toBeNull();
-  if(kind==='voided') expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('Score unavailable');
+});
+it('keeps an open sheet read-only once a refresh finds its record withdrawn',async()=>{
+  await openRecord();api.getCompetitionStream.mockResolvedValue(page({ ...competitionEvent,voided: true }));
+  await act(async()=>screen.getByTestId('groups-stream-list').props.refreshControl.props.onRefresh());
+  expect(screen.getByTestId('group-metric-record-e1rm-value')).toHaveTextContent('Score unavailable');
+  expect(screen.queryByTestId('group-metric-record-certify')).toBeNull();
+  expect(screen.queryByTestId('group-metric-stream-event1')).toBeNull();
 });
 it('keeps an event with no current context readable without a certification control',async()=>{
   api.getCompetitionStream.mockResolvedValue(page({ ...competitionEvent,record_context: null,reps: null }));await openRecord();

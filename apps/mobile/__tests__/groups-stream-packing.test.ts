@@ -9,7 +9,7 @@ import {
   DEFAULT_HIDDEN_STREAM_EVENT_KINDS,
   type CompetitionSessionCard,
 } from '@/src/groups/competition-stream-view-model';
-import type { CompetitionEventWire, CompetitionStreamItemWire } from '@/src/groups/competition-wire';
+import type { CompetitionEventWire, CompetitionStreamItemWire, CompetitionStreamWithdrawnWire } from '@/src/groups/competition-wire';
 
 import { competitionEvent } from './helpers/competition-fixtures';
 
@@ -99,7 +99,7 @@ describe('the stream as drawn', () => {
     expect(models).toHaveLength(1);
   });
 
-  it('marks a certified record, and reads a voided one as its own card', () => {
+  it('marks a certified record, and drops a withdrawn one from its session and the stream', () => {
     const certified = eventItem('r-1', {
       session_id: 's-1',
       record_context: {
@@ -114,7 +114,42 @@ describe('the stream as drawn', () => {
     const models = buildCompetitionStreamModels([certified, voided, sessionItem('s-1')], undefined, 'DD-MM-YYYY');
 
     expect(sessions(models)[0]?.records.map((line) => line.certified)).toEqual([true]);
-    expect(models.map((model) => model.kind)).toEqual(['competition', 'session']);
+    expect(models.map((model) => model.kind)).toEqual(['session']);
+    expect(sessions(models)[0]?.groupRecordCount).toBe(1);
+  });
+
+  it('never draws a withdrawn record in its own place, even with no session on the page', () => {
+    const models = buildCompetitionStreamModels([recordItem('gr', ['e1rm'], { voided: true })], undefined, 'DD-MM-YYYY');
+    expect(models).toEqual([]);
+  });
+
+  it('draws a withdrawal only when the record it withdrew was a GR', () => {
+    const withdrawal = (key: string, withdrawn: CompetitionStreamWithdrawnWire | null): CompetitionStreamItemWire => ({
+      kind: 'competition', key, sort_at_ms: 3000,
+      event: { ...competitionEvent, event_id: key, kind: 'record_voided', related_event_id: `${key}-record`, values: [], record_context: null },
+      withdrawn,
+    });
+    const withdrawnRecord = (key: string, groupRecords: ('e1rm' | 'volume')[]): CompetitionStreamWithdrawnWire => {
+      const item = recordItem(`${key}-record`, groupRecords, { voided: true });
+      if (item.kind !== 'competition' || !item.record) throw new Error('record fixture');
+      return { event: item.event, record: item.record };
+    };
+    const models = buildCompetitionStreamModels([
+      withdrawal('gr', withdrawnRecord('gr', ['e1rm'])),
+      withdrawal('pr', withdrawnRecord('pr', [])),
+      withdrawal('gone', null),
+      { ...withdrawal('legacy', null), withdrawn: undefined },
+    ], undefined, 'DD-MM-YYYY');
+    expect(models.map((model) => model.key)).toEqual(['gr']);
+  });
+
+  it('hides withdrawals when the drawer switches them off', () => {
+    const models = buildCompetitionStreamModels([{
+      kind: 'competition', key: 'w', sort_at_ms: 3000,
+      event: { ...competitionEvent, event_id: 'w', kind: 'record_voided', values: [], record_context: null },
+      withdrawn: null,
+    }], ['record_voided'], 'DD-MM-YYYY');
+    expect(models).toEqual([]);
   });
 
   it('lines up only the GR boards of a session, and counts the rest as PRs, a board once each', () => {

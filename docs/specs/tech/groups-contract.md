@@ -144,17 +144,16 @@ training now is an active session written within 2 h (latest
 totals (At a glance): 1–12 windows of ≤ 32 days, in order, unranked.
 
 **Record stream** (`group_competition_stream_v2`) adds each record's
-`record`: its set, and per board taken the previous #1 (holder and set, or
-the lifter's own prior value); `_v4` adds `group_record_metrics`: boards
-taken #1 (`GR`), the rest PRs (`apps/mobile/src/groups/record-boards.ts`).
+`record`: its set, and per board the previous #1 (holder and set, or own
+prior value); `_v4` adds `group_record_metrics`: boards
+taken #1 (`GR`), the rest PRs (`apps/mobile/src/groups/record-boards.ts`);
+`_v5` gives each withdrawal its voided record (`withdrawn`, or null).
 
-**Session records** (`group_competition_session_records`) sit beside the
-session detail (exact readers reject new keys). One shared session's
-non-voided group records, as stream events whose `record`
-values are those boards, each with the All board's current leader (`leads`
-while its own set holds #1; no leader for an earlier revision). The app shows
-them once the session completes (a provisional record can still move), and
-no Volume board: groups are dropping that metric.
+**Session records** (`group_competition_session_records`, beside the session
+detail): one shared session's non-voided group records, as stream events whose
+`record` values are those boards, each with the All board's current leader
+(`leads` while its own set holds #1; none for an earlier revision). The app
+shows them once the session completes, and no Volume board (being dropped).
 
 ## Device-computed card metrics
 
@@ -345,7 +344,7 @@ proposals, disputes, native notification integration.
 | P5, D10, D14 | Group page: header, Exercises, Members via count; Groups screen: one group's Stream · At a glance · Leaderboards |
 | P6–P9, D11, D12 | Volume/1RM × Certified/All boards (open on All: [[groups.certification]]); one row per member; history is lead changes |
 | P10–P13, D3–D5 | Certification lifecycle: [[groups.certification]] |
-| P14–P17, D1, D2, D15, D16 | Records (first set too, provisional while active), one card per set; links make none; voided cards stay |
+| P14–P17, D1, D2, D15, D16 | Records (first set too, provisional while active), one card per set; links make none; a voided GR shows once, at withdrawal (`· GR withdrawn`) |
 | P18 | Certify and admin actions need a connection |
 | D6 | Ordinary 1RM converts across load modes; Volume stays total (competition contract §1) |
 | E0–E0.4 | Linking: picker search, pick sheet, Link screen, group-page link/unlink |

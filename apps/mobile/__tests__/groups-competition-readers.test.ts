@@ -193,6 +193,27 @@ test('a record stream item carries its set, previous #1 and GR boards, exactly, 
   expect(guards.isCompetitionStreamWire({ ...stream, items: [{ ...ordinaryItem, record: { performance: null,
     previous: [{ ...ordinaryPrevious, performance: { ...performance, set_id: 'set0' } }], group_record_metrics: [] } }] })).toBe(false);
 });
+test('a withdrawal carries the voided record it withdrew, exactly, or null when the record is gone', () => {
+  const withdrawal = { ...event, event_id: 'void', kind: 'record_voided', related_event_id: 'ev', values: [], record_context: null };
+  const withdrawnRecord = { ...event, voided: true };
+  const withItem = (patch: Record<string, unknown>) => guards.isCompetitionStreamWire({ ...stream,
+    items: [{ kind: 'competition', key: 'void', sort_at_ms: 300, event: withdrawal, ...patch }] });
+  expect(withItem({ withdrawn: { event: withdrawnRecord, record: recordDetail } })).toBe(true);
+  expect(withItem({ withdrawn: null })).toBe(true);
+  // A v4 page carries no withdrawn record.
+  expect(withItem({})).toBe(true);
+  expect(withItem({ withdrawn: { event: withdrawnRecord, record: recordDetail, extra: 1 } })).toBe(false);
+  expect(withItem({ withdrawn: { event: withdrawnRecord } })).toBe(false);
+  // Only the voided record of the same member, exercise and group that the withdrawal names.
+  expect(withItem({ withdrawn: { event: event, record: recordDetail } })).toBe(false);
+  expect(withItem({ withdrawn: { event: { ...withdrawnRecord, event_id: 'other' }, record: recordDetail } })).toBe(false);
+  expect(withItem({ withdrawn: { event: { ...withdrawnRecord, member: { user_id: 'u2', username: 'Rival' } }, record: recordDetail } })).toBe(false);
+  expect(withItem({ withdrawn: { event: { ...withdrawnRecord, group_exercise: { group_exercise_id: 'ge2', name: 'Row' } }, record: recordDetail } })).toBe(false);
+  expect(withItem({ withdrawn: { event: { ...withdrawnRecord, kind: 'lead_change' }, record: recordDetail } })).toBe(false);
+  expect(withItem({ withdrawn: { event: withdrawnRecord, record: { ...recordDetail, group_record_metrics: ['volume'] } } })).toBe(false);
+  // Only a withdrawal carries one.
+  expect(guards.isCompetitionStreamWire({ ...stream, items: [{ ...stream.items[0], withdrawn: null }] })).toBe(false);
+});
 test('session records name only this session\'s records, one board each, never a leading board without a leader', () => {
   const record = records.records[0];
   const variant = (patch: Record<string, unknown>) => ({ ...records, records: [{ ...record, ...patch }] });
@@ -244,7 +265,7 @@ describe('request-scoped protocol-4 API', () => {
     ['podiums',() => api.getCompetitionPodiums('g'),podiums],
     ['revisions',() => api.getCompetitionRevisions('g','ge'),{ contract_version: 4, exercise, revisions: [revision] }],
     ['history',() => api.getCompetitionHistory({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm',certified: false }),history],
-    ['stream_v4',() => api.getCompetitionStream('g'),stream],
+    ['stream_v5',() => api.getCompetitionStream('g'),stream],
     ['session_detail',() => api.getCompetitionSession('g','u1','s'),detail],
     ['session_records',() => api.getCompetitionSessionRecords('g','u1','s'),records],
     ['week_summary',() => api.getCompetitionWeek('g',0,1000),week],
