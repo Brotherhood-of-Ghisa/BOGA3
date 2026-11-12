@@ -71,3 +71,8 @@ export {
   type NewSyncRuntimeState,
   type SyncRuntimeState,
 } from './sync-runtime-state';
+export {
+  injuries,
+  type Injury,
+  type NewInjury,
+} from './injuries';

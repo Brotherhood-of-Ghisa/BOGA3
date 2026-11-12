@@ -28,6 +28,7 @@ Current docs:
   coach's reads.
 - `training-notes-contract.md`: dated training notes — the synced table, soft
   delete, merge move and the coach's note tools.
+- `injury-contract.md`: injury lifecycle tracking, anatomical linkage, owner-private privacy boundaries, and Sync v2 schema.
 - `group-competition-contract.md`: group competition representation —
   metric/unit meaning, the public boundary and disclosure, witness history and
   the protocol-4 server surface.
