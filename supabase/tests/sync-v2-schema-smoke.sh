@@ -6,14 +6,14 @@
 # migration in supabase/migrations/<ts>_sync_v2_clean_room.sql produced exactly
 # the shape docs/specs/tech/sync-v2-server-contract.md Part A prescribes:
 #
-#   - All seventeen v2 entity tables exist in app_public.
+#   - All eighteen v2 entity tables exist in app_public.
 #   - Every v1 sync server object name is absent from information_schema /
 #     pg_catalog.
 #   - RLS is enabled on every entity table and the four named policies are
 #     present.
 #   - Each entity carries the two universal triggers
 #     (<table>_touch_server_received_at, <table>_owner_user_id_immutable).
-#   - The twenty-two cross-entity FKs are present with condeferrable=true,
+#   - The twenty-three cross-entity FKs are present with condeferrable=true,
 #     condeferred=true, and the expected on-delete actions.
 #   - Only the load-input-mode CHECK exists; all other entity CHECKs are absent.
 #
@@ -111,6 +111,7 @@ ENTITIES=(
   session_plan_exercises
   session_plan_sets
   session_plan_uses
+  training_notes
 )
 
 for entity in "${ENTITIES[@]}"; do
@@ -124,7 +125,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "expected app_public.${entity} to exist (got count=${count})"
   fi
 done
-pass "all seventeen v2 entity tables present"
+pass "all eighteen v2 entity tables present"
 
 # -----------------------------------------------------------------------------
 # 2. Every v1 sync server object name is absent.
@@ -226,7 +227,7 @@ done
 pass "both universal triggers present on every entity table"
 
 # -----------------------------------------------------------------------------
-# 5. The twenty-two deferrable composite FKs.
+# 5. The twenty-three deferrable composite FKs.
 #
 # Map: <constraint_name>|<expected_confdeltype>
 #   confdeltype values: 'a' = no action, 'c' = cascade, 'n' = set null,
@@ -249,6 +250,7 @@ pass "both universal triggers present on every entity table"
 #   session_plan_exercises_session_plan_fk           on delete cascade    -> c
 #   session_plan_exercises_exercise_definition_fk    on delete set null   -> n
 #   session_plan_sets_session_plan_exercise_fk       on delete cascade    -> c
+#   training_notes_exercise_definition_fk            on delete cascade    -> c
 #   sessions_source_plan_fk                          on delete set null   -> n
 #   session_exercises_source_plan_exercise_fk        on delete set null   -> n
 #   exercise_sets_source_plan_set_fk                 on delete set null   -> n
@@ -277,6 +279,7 @@ FK_EXPECTATIONS=(
   "session_plan_exercises|session_plan_exercises_session_plan_fk|c"
   "session_plan_exercises|session_plan_exercises_exercise_definition_fk|n"
   "session_plan_sets|session_plan_sets_session_plan_exercise_fk|c"
+  "training_notes|training_notes_exercise_definition_fk|c"
 )
 
 for spec in "${FK_EXPECTATIONS[@]}"; do
@@ -311,7 +314,7 @@ for spec in "${FK_EXPECTATIONS[@]}"; do
     fail "${fk_name}: expected confdeltype=${expected_delete}, got '${confdeltype}'"
   fi
 done
-pass "twenty-two composite FKs present with condeferrable=t, condeferred=t, expected on-delete actions"
+pass "twenty-three composite FKs present with condeferrable=t, condeferred=t, expected on-delete actions"
 
 # -----------------------------------------------------------------------------
 # 6. Only the load-input-mode CHECK is allowed (contract, "Ground rules").

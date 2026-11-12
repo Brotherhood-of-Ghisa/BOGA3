@@ -633,7 +633,7 @@ describe('entity types this build does not know', () => {
   // The production adapter: it rejects any row type outside the topology.
   const realAdapter = { ...adapter, apply: applyMergeRows };
   const unknownRow = (id: string): MergeWireEntity => ({
-    type: 'training_notes', id, client_updated_at_ms: 200, fields: { exercise_definition_id: 'b', body: 'Brace', deleted_at: null },
+    type: 'future_widgets', id, client_updated_at_ms: 200, fields: { exercise_definition_id: 'b', body: 'Brace', deleted_at: null },
   });
   const servePages = (pages: MergeWireEntity[][]) => {
     const offsets = pages.map((_page, index) => pages.slice(0, index).reduce((total, page) => total + page.length, 0));
@@ -685,7 +685,7 @@ describe('entity types this build does not know', () => {
       if (name !== 'exercise_merge_review') return pages(name, args);
       offsets.push(args.p_offset ?? 0);
       return (args.p_offset ?? 0) === 0
-        ? { data: { items: [item('n', 'training_notes'), item('s', 'exercise_sets')], hasMore: true }, error: null }
+        ? { data: { items: [item('n', 'future_widgets'), item('s', 'exercise_sets')], hasMore: true }, error: null }
         : { data: { items: [item('t', 'session_exercise_tags')], hasMore: false }, error: null };
     });
     await syncReal(2);
