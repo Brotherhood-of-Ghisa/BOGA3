@@ -150,10 +150,10 @@ taken #1 (`GR`), the rest PRs (`apps/mobile/src/groups/record-boards.ts`);
 `_v5` gives each withdrawal its voided record (`withdrawn`, or null).
 
 **Session records** (`group_competition_session_records`, beside the session
-detail): one shared session's non-voided group records, as stream events whose
+detail; exact readers reject new keys): one shared session's non-voided group records, as stream events whose
 `record` values are those boards, each with the All board's current leader
 (`leads` while its own set holds #1; none for an earlier revision). The app
-shows them once the session completes, and no Volume board (being dropped).
+shows them once the session completes; no Volume board (being dropped).
 
 ## Device-computed card metrics
 

@@ -200,8 +200,8 @@ test('a withdrawal carries the voided record it withdrew, exactly, or null when 
     items: [{ kind: 'competition', key: 'void', sort_at_ms: 300, event: withdrawal, ...patch }] });
   expect(withItem({ withdrawn: { event: withdrawnRecord, record: recordDetail } })).toBe(true);
   expect(withItem({ withdrawn: null })).toBe(true);
-  // A v4 page carries no withdrawn record.
-  expect(withItem({})).toBe(true);
+  // The app reads v5: a withdrawal without its record (a v4 page) fails to decode.
+  expect(withItem({})).toBe(false);
   expect(withItem({ withdrawn: { event: withdrawnRecord, record: recordDetail, extra: 1 } })).toBe(false);
   expect(withItem({ withdrawn: { event: withdrawnRecord } })).toBe(false);
   // Only the voided record of the same member, exercise and group that the withdrawal names.

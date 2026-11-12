@@ -201,8 +201,9 @@ export function isGroupSharedExerciseDeleteWire(v: unknown): v is GroupSharedExe
 }
 function streamItem(v: unknown): boolean {
   if (v && typeof v === 'object' && 'kind' in v && v.kind === 'cow') return isCoWStreamItemWire(v);
+  // A withdrawal always carries its record (v5): a page without it fails rather than hiding the card.
   if (exact(v,['kind','key','sort_at_ms','event']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
-    isCompetitionEventWire(v.event) && v.event.event_id === v.key;
+    isCompetitionEventWire(v.event) && v.event.event_id === v.key && v.event.kind !== 'record_voided';
   if (exact(v,['kind','key','sort_at_ms','event','record']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
     isCompetitionEventWire(v.event) && v.event.event_id === v.key && streamRecord(v.record,v.event);
   if (exact(v,['kind','key','sort_at_ms','event','withdrawn']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
