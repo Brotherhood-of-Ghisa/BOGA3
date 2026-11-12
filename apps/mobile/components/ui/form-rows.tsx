@@ -55,17 +55,20 @@ type ChoiceFlagProps = {
 };
 
 export type RadioRowProps = ChoiceFlagProps & {
+  // A second line under the label (a combined muscle's members).
+  description?: string;
   // Detail at the row's end (a theme's swatch).
   meta?: ReactNode;
 };
 
 /** The one chosen option among several, inline in its own section: a radio glyph, the label, optional detail. */
-export function RadioRow({ label, checked, meta, onPress, divider = false, disabled, accessibilityLabel, testID }: RadioRowProps) {
+export function RadioRow({ label, description, checked, meta, onPress, divider = false, disabled, accessibilityLabel, testID }: RadioRowProps) {
   return (
     <ListRow
-      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityLabel={accessibilityLabel ?? (description ? `${label}, ${description}` : label)}
       checked={checked}
       density="list"
+      description={description}
       disabled={disabled}
       divider={divider}
       label={label}
@@ -77,19 +80,25 @@ export function RadioRow({ label, checked, meta, onPress, divider = false, disab
   );
 }
 
-export type CheckRowProps = ChoiceFlagProps;
+export type CheckRowProps = ChoiceFlagProps & {
+  // A short note at the row's end, muted (`in Back`: where the option is now).
+  note?: string;
+};
 
 /** One of several options that can each be on: the label, and a check at the row's end while chosen. */
-export function CheckRow({ label, checked, onPress, divider = false, disabled, accessibilityLabel, testID }: CheckRowProps) {
+export function CheckRow({ label, note, checked, onPress, divider = false, disabled, accessibilityLabel, testID }: CheckRowProps) {
+  const textRoles = useUiText();
+  const textTones = useUiTextTone();
   return (
     <ListRow
-      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityLabel={accessibilityLabel ?? (note ? `${label}, ${note}` : label)}
       accessibilityRole="checkbox"
       checked={checked}
       density="list"
       disabled={disabled}
       divider={divider}
       label={label}
+      meta={note ? <Text allowFontScaling={false} numberOfLines={1} style={[textRoles.meta, textTones.muted]}>{note}</Text> : undefined}
       onPress={onPress}
       testID={testID}
       trailing={checked ? <Icon colorRole={disabled ? 'inkGhost' : 'accent'} name="check" size="md" /> : null}

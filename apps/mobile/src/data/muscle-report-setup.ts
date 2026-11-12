@@ -13,9 +13,6 @@ import {
   type MuscleReportRow,
 } from './combined-muscles.ts';
 
-/** What the interim Breakdown switch reads: no combined muscles, or exactly the Broad template. */
-export type MuscleReportPreset = 'detailed' | 'broad';
-
 /** One muscle the settings screen lists: the entries it covers and whether any still counts. */
 export type SettingsMuscle = { id: string; label: string; family: string; entryIds: string[]; tracked: boolean };
 
@@ -65,7 +62,7 @@ export const setMuscleState = (
   return { definitions: setup.definitions, rows: withRows(setup, (row) => (ids.has(row.id) ? columns : null)) };
 };
 
-/** The Enabled switch: tracking only, so a combined muscle switched back on keeps its members. */
+/** Off / On as tracking only: an Off member keeps its combined muscle, so switched back On it rejoins. */
 export const setMuscleTracked = (
   setup: MuscleSetupChange, entryIds: readonly string[], tracked: boolean,
 ): MuscleSetupChange => {
@@ -82,11 +79,15 @@ export type CombinedMuscleDraft = {
   name: string;
   /** Required to create; an existing combined muscle keeps its family. */
   family?: string;
-  /** Every member after the save; at least one. Members dropped go back to their own muscle. */
+  /** Every member after the save, Off ones included; at least one. Members dropped go back to their own muscle. */
   memberIds: readonly string[];
 };
 
-/** Creates or edits one combined muscle: its name and exactly its members, all switched on. */
+/**
+ * Creates or edits one combined muscle: its name and exactly its members. A
+ * member already in it keeps its tracking (Off keeps membership); a new one
+ * joins On.
+ */
 export const saveCombinedMuscle = (setup: MuscleSetupChange, draft: CombinedMuscleDraft): MuscleSetupChange => {
   const name = draft.name.trim();
   if (!isCombinedMuscleName(name)) fail('A combined muscle needs a name of at most 60 characters.');
@@ -104,7 +105,7 @@ export const saveCombinedMuscle = (setup: MuscleSetupChange, draft: CombinedMusc
   return {
     definitions,
     rows: withRows(setup, (row) => {
-      if (ids.has(row.id)) return { tracked: 1, reportGroup: draft.key };
+      if (ids.has(row.id)) return row.reportGroup === draft.key ? null : { tracked: 1, reportGroup: draft.key };
       return row.reportGroup === draft.key ? { reportGroup: null } : null;
     }),
   };
@@ -149,21 +150,6 @@ export const applyBroadTemplate = (setup: MuscleSetupChange): MuscleSetupChange 
     return reportGroup === row.reportGroup ? null : { reportGroup };
   }),
 });
-
-const sameDefinitions = (left: readonly CombinedMuscle[], right: readonly CombinedMuscle[]): boolean =>
-  left.length === right.length && left.every((muscle, index) =>
-    muscle.key === right[index].key && muscle.name === right[index].name && muscle.family === right[index].family);
-
-/**
- * The interim Breakdown switch's reading of a resolved setup: Detailed with no
- * members, Broad when it is what "Start from Broad" writes, else `custom`.
- * Tracking never changes it.
- */
-export const deriveMuscleReportPreset = (setup: MuscleSetupChange): MuscleReportPreset | 'custom' => {
-  if (setup.rows.every((row) => row.reportGroup === null)) return 'detailed';
-  const broad = setup.rows.every((row) => row.reportGroup === broadTemplateKeyOf(row.id));
-  return broad && sameDefinitions(setup.definitions, BROAD_COMBINED_MUSCLES) ? 'broad' : 'custom';
-};
 
 /** The user's muscles in display order, in their family sections. `stored` as `buildMuscleReportAssignment` takes it. */
 export const buildSettingsMuscleSections = (

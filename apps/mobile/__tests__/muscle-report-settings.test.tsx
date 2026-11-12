@@ -20,7 +20,6 @@ import {
   CombinedMuscleError,
   createCombinedMuscle,
   deleteCombinedMuscle,
-  deriveMuscleReportPreset,
   listMuscleReportRows,
   migrateLegacyMuscleSetup,
   newCombinedMuscleKey,
@@ -88,7 +87,7 @@ describe('Start from Broad and Detailed', () => {
     expect(stored().get('calves')).toMatchObject({ reportGroup: 'cm_calves', tracked: 0 });
     await setMuscleTracked(['calves'], true);
     expect(stored().get('calves')).toMatchObject({ reportGroup: 'cm_calves', tracked: 1 });
-    expect(deriveMuscleReportPreset(await readMuscleSetup())).toBe('broad');
+    expect((await readMuscleSetup()).definitions).toEqual(BROAD_COMBINED_MUSCLES);
   });
 
   it('writes the definitions only when they change, whatever spacing the stored text has', async () => {
@@ -171,6 +170,14 @@ describe('combined muscles', () => {
     expect(await readCombinedMuscleDefinitions()).toEqual([{ key, name: 'Upper back', family: 'Back' }]);
   });
 
+  it('keeps an existing member\'s tracking on an edit; a new member joins On', async () => {
+    const key = await createCombinedMuscle({ name: 'Back', family: 'Back', memberIds: ['back_lats', 'back_upper'] });
+    await setMuscleTracked(['back_upper', 'traps_upper'], false);
+    await updateCombinedMuscle({ key, name: 'Back', memberIds: ['back_lats', 'back_upper', 'traps_upper'] });
+    expect(stored().get('back_upper')).toMatchObject({ reportGroup: key, tracked: 0 });
+    expect(stored().get('traps_upper')).toMatchObject({ reportGroup: key, tracked: 1 });
+  });
+
   it('renames without touching members, Off ones included', async () => {
     const key = await createCombinedMuscle({ name: 'Back', family: 'Back', memberIds: ['back_lats', 'back_upper'] });
     await setMuscleTracked(['back_upper'], false);
@@ -226,7 +233,6 @@ describe('the one-time migration of a legacy account', () => {
     const setup = await readMuscleSetup();
     expect(setup.definitions).toEqual(BROAD_COMBINED_MUSCLES);
     expect(setup.rows.find(row => row.id === 'adductors')?.reportGroup).toBe('cm_quads');
-    expect(deriveMuscleReportPreset(setup)).toBe('broad');
     expect(await readCombinedMuscleDefinitions()).toBeNull();
   });
 
@@ -296,25 +302,6 @@ describe('the one-time migration of a legacy account', () => {
 });
 
 describe('the setup screens read', () => {
-  it('reads Detailed, Broad and neither', async () => {
-    expect(deriveMuscleReportPreset(await readMuscleSetup())).toBe('detailed');
-    expect(deriveMuscleReportPreset({ rows: [], definitions: [] })).toBe('detailed');
-    await applyBroadTemplate();
-    const broad = await readMuscleSetup();
-    expect(deriveMuscleReportPreset(broad)).toBe('broad');
-    expect(deriveMuscleReportPreset({ ...broad, rows: broad.rows.map(row => row.id === 'chest' ? { ...row, reportGroup: null } : row) }))
-      .toBe('custom');
-    await renameCombinedMuscle('cm_chest', 'Pecs');
-    expect(deriveMuscleReportPreset(await readMuscleSetup())).toBe('custom');
-  });
-
-  it('keeps Broad when a Track switch changes', async () => {
-    await applyBroadTemplate();
-    await setMuscleTracked(['forearms_grip'], false);
-    await setMuscleTracked(['calves', 'tibialis_anterior'], false);
-    expect(deriveMuscleReportPreset(await readMuscleSetup())).toBe('broad');
-  });
-
   it('lists the muscles in family sections that show a header only above two or more', async () => {
     await applyBroadTemplate();
     const setup = await readMuscleSetup();

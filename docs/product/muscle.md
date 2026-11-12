@@ -51,21 +51,20 @@ Code: `apps/mobile/src/preferences/`; `collectMuscleSetContributions` in
 
 ### muscle.report-groups · definition · accepted
 
-Each muscle (catalogue entry or custom) is on its own or in one **combined
-muscle**, and On or Off, per account, synced. A combined muscle has a name and one
-family; only that family's muscles join, one is enough, and a member of another
-family reads as its own muscle. It reports under its own key, never an entry's
-id. Detailed has none; "Start from Broad" replaces them with the Broad
-template's 11, tracking unchanged. Deleting one returns its members to their
-own muscles. A Broad
+Each muscle (catalogue entry or custom) is On, Off, or in one **combined
+muscle**, per account, synced. A combined muscle has a name and one family,
+fixed at creation; only its family's muscles join, one is enough; another
+family's member reads as its own muscle. It reports under its own key, never
+an entry's id. Off keeps membership; On restores it. "Start from Broad"
+replaces every combined muscle with the Broad template's 11, tracking
+unchanged; deleting one returns its members to their own muscles. A Broad
 choice made before combined muscles reads as the template until a device stores
 it, once; older builds then show those members as their own. `Group by muscle
 family` arranges reported muscles in Progress and Recovery, never exposing
 anatomy inside a combined muscle.
 
 Why: users merge what they train together, without a fixed preset.
-Pending: Settings still offers only Detailed and Broad; naming, editing and deleting combined muscles come with the new Muscles screens (`apps/mobile/components/preferences/muscle-settings.tsx`).
-Code: `apps/mobile/src/data/combined-muscles.ts`; `apps/mobile/src/data/muscle-report-setup.ts`; `apps/mobile/src/data/muscle-report-settings.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`.
+Code: `apps/mobile/src/data/combined-muscles.ts`; `apps/mobile/src/data/muscle-report-setup.ts`; `apps/mobile/src/data/muscle-report-settings.ts`; `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`; `apps/mobile/src/preferences/muscle-setup-view.ts`.
 
 ### muscle.weekly-targets · definition · accepted
 
@@ -89,7 +88,7 @@ Code: `apps/mobile/src/preferences/muscle-targets.ts`; `legacyMuscleTargets` in 
 ### muscle.no-breakdown · presentation · accepted
 
 Every screen, the exercise editor and search show only the user's muscles, never
-an entry inside its muscle. An exercise mapped to two entries of one muscle shows
+an entry inside its muscle, except Settings → Muscles, where the setup is made. An exercise mapped to two entries of one muscle shows
 it once, labelled by the strongest role. Adding a muscle maps its first tracked
 member by sort order. Changing a role or removing it rewrites
 tracked entries of the muscle. Mappings to untracked muscles are hidden and kept.

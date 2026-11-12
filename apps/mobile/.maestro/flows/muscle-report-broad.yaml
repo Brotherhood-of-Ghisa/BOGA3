@@ -4,8 +4,9 @@ appId: com.dinoderek.mobile
 #
 # Proves, over one fixture session (Lat Pulldown, Barbell Back Squat, Standing
 # Calf Raise) and the device's own muscle rows ([[muscle.report-groups]]):
-#   1. Settings → Muscles writes detailed enablement (Calves and Tibialis
-#      off) and then Broad's combined muscles from full stack pages, and
+#   1. Settings → Muscles turns Calves and Tibialis Off from the muscle list
+#      and each muscle's page, then Starts from Broad (confirmed in an Alert)
+#      on Combined muscles, all from full stack pages, and
 #      Progress, already mounted, shows the user's muscles on return under
 #      their combined keys: Chest and Back; no Serratus, Lats, Upper back or
 #      Calves row; Chest, now one muscle, loses its family header
@@ -16,10 +17,11 @@ appId: com.dinoderek.mobile
 #      once, with Biceps and no Upper back among the secondaries;
 #   4. the 3D body: a tap on the abdomen selects Core, the muscle Abs and
 #      Obliques merge into;
-#   5. Detailed with Calves back on restores every entry's row and header
-#      ([[muscle.report-groups]]: Detailed is today's figures).
+#   5. deleting Chest and Back in their editor restores those entries' rows
+#      and header, and Calves turned back On rejoins its combined muscle
+#      ([[muscle.report-groups]]: Off keeps the membership).
 # Why device:
-#   1. real stack pages, segmented controls and switches writing the on-device
+#   1. real stack pages, radio rows and a native Alert writing the on-device
 #      expo-sqlite, read back by a screen already mounted in the stack
 #      (focus refresh and the catalogue invalidation on the native runtime),
 #      and the keyboard for the muscle search;
@@ -27,9 +29,9 @@ appId: com.dinoderek.mobile
 #   3. the keyboard, and the editor sheet's panels;
 #   4. the model's gesture-handler tap on the native SVG (Jest has no layout
 #      and mocks the gesture);
-#   5. the same stack pages and screen return, the other way.
+#   5. the editor's delete Alert and its return, the other way.
 # Jest counterpart: __tests__/muscle-report-settings.test.tsx (writes, dirty
-#   flags, derived preset, Track), __tests__/muscle-report.test.ts (the
+#   flags, Track), __tests__/combined-muscle-settings.test.tsx (the pages), __tests__/muscle-report.test.ts (the
 #   transform), __tests__/progress-muscle-report-local-data.test.tsx (Progress,
 #   history, Filters, figures), __tests__/muscle-body-3d.test.tsx (shading, hit
 #   test, merged selection), __tests__/completed-session-local-data.test.tsx and
@@ -38,8 +40,8 @@ appId: com.dinoderek.mobile
 #   __tests__/exercise-catalog-search.test.ts (editor, search),
 #   __tests__/groups-link-view-model.test.ts (group searches).
 #
-# `reset=data` re-seeds the catalogue, so every run starts on Detailed with
-# every muscle tracked; the Progress view (List / 3D) is a preference that
+# `reset=data` re-seeds the catalogue, so every run starts with no combined
+# muscles and every muscle On; the Progress view (List / 3D) is a preference that
 # survives the reset, so it is set explicitly.
 - retry:
     maxRetries: 3
@@ -50,7 +52,7 @@ appId: com.dinoderek.mobile
             id: "today-screen"
           timeout: 30000
 
-# --- Setup: the List view; the catalogue's rows are Detailed after the reset ---
+# --- Setup: the List view; no combined muscles after the reset ---
 - openLink: "boga3://settings-progress"
 - scrollUntilVisible:
     element:
@@ -73,7 +75,7 @@ appId: com.dinoderek.mobile
           id: "stats-metric-chip"
 - assertVisible: { id: "stats-muscle-block-serratus_anterior" }
 
-# --- 1. Full pages: enabled muscles, native target keyboard, and Broad -----
+# --- 1. Full pages: muscles Off, native target keyboard, and Broad ---------
 # Added device proof: Jest cannot establish UIKit stack return, number-pad
 # occlusion or lower-row scroll reachability. Target values/inheritance and
 # enabled-only filtering are asserted over real data by muscle-target-settings.
@@ -89,36 +91,42 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "settings-muscles-screen" }
     timeout: 15000
-- tapOn: { id: "settings-muscle-preset-detailed" }
+- tapOn: { id: "settings-muscle-list-row" }
 - extendedWaitUntil:
-    visible: { id: "settings-muscle-preset-detailed", selected: true }
+    visible: { id: "settings-muscle-list-screen" }
     timeout: 15000
-- tapOn: { id: "settings-enabled-muscles-row" }
-- extendedWaitUntil:
-    visible: { id: "settings-enabled-muscles-screen" }
-    timeout: 15000
-# Final two-row card: Calves is fully visible clear of native chrome at the
-# scroll end, but cannot reach the centre (the end-of-content exception).
+# Lower Legs is the last family: its rows are fully visible clear of native
+# chrome at the scroll end, but cannot reach the centre (end-of-content).
 - scrollUntilVisible:
-    element: { id: "settings-track-calves" }
+    element: { id: "settings-muscle-calves" }
     direction: DOWN
-- tapOn: { id: "settings-track-calves" }
+- tapOn: { id: "settings-muscle-calves" }
 - extendedWaitUntil:
-    visible: { id: "settings-track-calves", checked: false }
+    visible: { id: "settings-muscle-off" }
     timeout: 15000
-# Tibialis is the final row: its first fully visible position clears chrome;
-# it cannot reach the viewport centre at the end of the scroll content.
+- tapOn: { id: "settings-muscle-off" }
+- takeScreenshot: "muscles-one-muscle-page"
+- tapOn: { id: "BackButton" }
+# iOS does not expose a radio row's checked state; the list's value is the proof.
+- extendedWaitUntil:
+    visible: { id: "settings-muscle-calves", text: "Calves, Off" }
+    timeout: 15000
 - scrollUntilVisible:
-    element: { id: "settings-track-tibialis_anterior" }
+    element: { id: "settings-muscle-tibialis_anterior" }
     direction: DOWN
-- tapOn: { id: "settings-track-tibialis_anterior" }
+- tapOn: { id: "settings-muscle-tibialis_anterior" }
 - extendedWaitUntil:
-    visible: { id: "settings-track-tibialis_anterior", checked: false }
+    visible: { id: "settings-muscle-off" }
     timeout: 15000
-- takeScreenshot: "muscles-enabled-page"
-- tapOn: "Back"
+- tapOn: { id: "settings-muscle-off" }
+- tapOn: { id: "BackButton" }
 - extendedWaitUntil:
-    visible: { id: "settings-enabled-muscles-row" }
+    visible: { id: "settings-muscle-tibialis_anterior", text: "Tibialis Anterior, Off" }
+    timeout: 15000
+- takeScreenshot: "muscles-list-page"
+- tapOn: { id: "BackButton" }
+- extendedWaitUntil:
+    visible: { id: "settings-muscle-list-row" }
     timeout: 15000
 - tapOn: { id: "settings-muscle-target-mode-per-muscle" }
 - tapOn: { id: "settings-muscle-targets-row" }
@@ -144,11 +152,20 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: { id: "settings-muscle-targets-row" }
     timeout: 15000
-- tapOn: { id: "settings-muscle-preset-broad" }
+- tapOn: { id: "settings-combined-muscles-row" }
 - extendedWaitUntil:
-    visible: { id: "settings-muscle-preset-broad", selected: true }
+    visible: { id: "settings-combined-muscles-broad" }
     timeout: 15000
-- assertVisible: { id: "settings-enabled-muscles-row" }
+- tapOn: { id: "settings-combined-muscles-broad" }
+- tapOn: "Start from Broad"
+- extendedWaitUntil:
+    visible: { id: "settings-combined-cm_chest" }
+    timeout: 15000
+- takeScreenshot: "muscles-combined-page"
+- tapOn: { id: "BackButton" }
+- extendedWaitUntil:
+    visible: { id: "settings-combined-muscles-row", text: "Combined muscles, 11" }
+    timeout: 15000
 - takeScreenshot: "muscles-settings-page"
 - openLink: "boga3://progress?breakdown=muscle"
 # Chest merges Serratus, so it is one muscle and its family has no header.
@@ -246,45 +263,41 @@ appId: com.dinoderek.mobile
     timeout: 10000
 - takeScreenshot: "muscle-report-07-broad-3d"
 
-# --- 5. Detailed, Calves on: every entry's row is back ---------------------
+# --- 5. Chest and Back deleted, Calves back On ------------------------------
 - openLink: "boga3://settings-progress"
 - scrollUntilVisible:
     element:
       id: "settings-muscle-view-list"
     direction: DOWN
 - tapOn: { id: "settings-muscle-view-list" }
-- openLink: "boga3://settings-muscles"
+- openLink: "boga3://settings-combined-muscle?key=cm_chest"
 - extendedWaitUntil:
-    visible: { id: "settings-muscle-preset-detailed" }
+    visible: { id: "settings-combined-muscle-delete" }
     timeout: 15000
-- tapOn: { id: "settings-muscle-preset-detailed" }
+- tapOn: { id: "settings-combined-muscle-delete" }
+- tapOn: "Delete"
 - extendedWaitUntil:
-    visible: { id: "settings-muscle-preset-detailed", selected: true }
+    notVisible: { id: "settings-combined-muscle-screen" }
     timeout: 15000
-- tapOn: { id: "settings-enabled-muscles-row" }
-- extendedWaitUntil:
-    visible: { id: "settings-track-back_upper" }
-    timeout: 15000
-# Final two-row card: Calves is fully visible clear of native chrome at the
-# scroll end, but cannot reach the centre (the end-of-content exception).
+- openLink: "boga3://settings-combined-muscle?key=cm_back"
 - scrollUntilVisible:
-    element: { id: "settings-track-calves" }
+    element: { id: "settings-combined-muscle-delete" }
     direction: DOWN
-- tapOn: { id: "settings-track-calves" }
+- tapOn: { id: "settings-combined-muscle-delete" }
+- tapOn: "Delete"
 - extendedWaitUntil:
-    visible: { id: "settings-track-calves", checked: true }
+    notVisible: { id: "settings-combined-muscle-screen" }
     timeout: 15000
-# Final row, fully visible clear of chrome; see the end-of-content rule above.
+# Off kept Calves in its combined muscle: On returns it there.
+- openLink: "boga3://settings-muscle?id=calves"
+- extendedWaitUntil:
+    visible: { id: "settings-muscle-on" }
+    timeout: 15000
+- tapOn: { id: "settings-muscle-on" }
+- openLink: "boga3://settings-muscle-list"
 - scrollUntilVisible:
-    element: { id: "settings-track-tibialis_anterior" }
+    element: { id: "settings-muscle-calves", text: "Calves, Calves" }
     direction: DOWN
-- tapOn: { id: "settings-track-tibialis_anterior" }
-- extendedWaitUntil:
-    visible: { id: "settings-track-tibialis_anterior", checked: true }
-    timeout: 15000
-- tapOn: "Back"
-- extendedWaitUntil:
-    visible: { id: "settings-enabled-muscles-row" }
     timeout: 15000
 - openLink: "boga3://progress?breakdown=muscle"
 - extendedWaitUntil:
@@ -301,9 +314,9 @@ appId: com.dinoderek.mobile
 - eraseText
 - inputText: "calves"
 - extendedWaitUntil:
-    visible: { id: "stats-muscle-block-calves" }
+    visible: { id: "stats-muscle-block-cm_calves" }
     timeout: 10000
-- takeScreenshot: "muscle-report-08-detailed-restored"
+- takeScreenshot: "muscle-report-08-entries-restored"
 - tapOn: { id: "stats-muscle-search-input" }
 - eraseText
 - hideKeyboard

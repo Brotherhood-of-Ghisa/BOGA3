@@ -63,6 +63,8 @@ export function FormError({ message, testID }: { message?: string | null; testID
 export type ChoiceRowProps = {
   ref?: ComponentProps<typeof ListRow>['ref'];
   label: string;
+  // A second line under the label (a combined muscle's members).
+  description?: string;
   // The current choice, muted at the row's end; `placeholder` (faint) until one is made.
   value?: string | null;
   placeholder?: string;
@@ -76,7 +78,7 @@ export type ChoiceRowProps = {
 };
 
 /** A field whose value is chosen elsewhere (a picker sheet, a page): label, value, chevron. */
-export function ChoiceRow({ label, value, placeholder, icon, onPress, divider = false, disabled, accessibilityLabel, testID, ref }: ChoiceRowProps) {
+export function ChoiceRow({ label, description, value, placeholder, icon, onPress, divider = false, disabled, accessibilityLabel, testID, ref }: ChoiceRowProps) {
   const styles = useStyles();
   const textRoles = useUiText();
   const textTones = useUiTextTone();
@@ -84,8 +86,9 @@ export function ChoiceRow({ label, value, placeholder, icon, onPress, divider = 
   return (
     <ListRow
       ref={ref}
-      accessibilityLabel={accessibilityLabel ?? `${label}: ${shown ?? placeholder ?? 'none'}`}
+      accessibilityLabel={accessibilityLabel ?? `${description ? `${label}, ${description}` : label}: ${shown ?? placeholder ?? 'none'}`}
       density="list"
+      description={description}
       disabled={disabled}
       divider={divider}
       label={label}

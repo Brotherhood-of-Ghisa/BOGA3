@@ -38,9 +38,7 @@ import { USER_SETTINGS_ID } from './user-settings';
 export {
   buildSettingsMuscleSections,
   CombinedMuscleError,
-  deriveMuscleReportPreset,
   type CombinedMuscleDraft,
-  type MuscleReportPreset,
   type MuscleSetupChange,
   type MuscleState,
   type SettingsMuscle,
@@ -209,7 +207,7 @@ export const setMuscleState = async (entryIds: readonly string[], state: MuscleS
   await applySetupChange((setup) => setMuscleStateOf(setup, entryIds, state));
 };
 
-/** A muscle's Enabled switch: every entry it covers takes the same value; membership stays. */
+/** Off / On for the listed entries: tracking only, membership stays. */
 export const setMuscleTracked = async (entryIds: readonly string[], tracked: boolean): Promise<void> => {
   await applySetupChange((setup) => setMuscleTrackedOf(setup, entryIds, tracked));
 };
