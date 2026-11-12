@@ -12,7 +12,14 @@ export const userSettings = sqliteTable(
     // a device uploads or adopts them; preference writes set them together.
     weeklyWorkingSetTarget: integer('weekly_working_set_target'),
     muscleTargetMode: text('muscle_target_mode'),
+    // Legacy per-setup overrides; read only to migrate them into `muscleTargets`.
     muscleTargetOverrides: text('muscle_target_overrides'),
+    // One JSON map, reported muscle id to weekly target ([[muscle.weekly-targets]]).
+    muscleTargets: text('muscle_targets'),
+    // The user's combined-muscle definitions, a JSON list of {key, name, family}
+    // ([[muscle.report-groups]]). Null until a device writes them: the legacy
+    // Broad keys on `muscle_groups.report_group` are read instead.
+    combinedMuscles: text('combined_muscles'),
     countSecondaryMuscles: integer('count_secondary_muscles', { mode: 'boolean' }),
     volumePrimaryOnly: integer('volume_primary_only', { mode: 'boolean' }),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),

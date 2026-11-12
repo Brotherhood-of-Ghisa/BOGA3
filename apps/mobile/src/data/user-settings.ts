@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, isNull } from 'drizzle-orm';
 
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
 import { getPersonalMuscleCounting } from '@/src/config/personal-muscles';
@@ -6,7 +6,8 @@ import { getPersonalMuscleCounting } from '@/src/config/personal-muscles';
 import { bootstrapLocalDataLayer } from './bootstrap';
 import { nowMonotonic, type Transaction } from './clock';
 import { readLocalDataOwner } from './local-wipe';
-import { userSettings } from './schema';
+import { legacyMuscleTargets, parseStoredCombinedMuscles } from './combined-muscles';
+import { muscleGroups, userSettings } from './schema';
 
 export const USER_SETTINGS_ID = 'settings';
 
@@ -50,19 +51,25 @@ export const writeBodyweightCalculationsEnabled = async (enabled: boolean): Prom
  * The synced weekly muscle targets and muscle-counting choices as stored on the
  * settings row ([[muscle.weekly-targets]]). Null until this device uploads or
  * adopts them; the mode is the wire value (`single` | `per_muscle`) and the
- * overrides are JSON text. Readers validate every value. `src/preferences/synced.ts`
+ * target maps are JSON text. Readers validate every value. `src/preferences/synced.ts`
  * declares the same shape, since it may not import this layer.
  */
 export type StoredMuscleTargetSettings = {
   weeklyWorkingSetTarget: number | null;
   muscleTargetMode: string | null;
+  /** The legacy per-setup map; read only to migrate it. */
   muscleTargetOverrides: string | null;
+  muscleTargets?: string | null;
   countSecondaryMuscles: boolean | null;
   volumePrimaryOnly?: boolean | null;
 };
 export type MuscleTargetSettingsWrite = {
-  [K in Exclude<keyof StoredMuscleTargetSettings, 'volumePrimaryOnly'>]-?: NonNullable<StoredMuscleTargetSettings[K]>
-} & { volumePrimaryOnly: boolean | null };
+  weeklyWorkingSetTarget: number;
+  muscleTargetMode: string;
+  muscleTargets: string | null;
+  countSecondaryMuscles: boolean;
+  volumePrimaryOnly: boolean | null;
+};
 
 export type MuscleTargetSettingsSnapshot = {
   values: StoredMuscleTargetSettings;
@@ -90,6 +97,7 @@ export const readMuscleTargetSettingsSnapshot = async (
     weeklyWorkingSetTarget: userSettings.weeklyWorkingSetTarget,
     muscleTargetMode: userSettings.muscleTargetMode,
     muscleTargetOverrides: userSettings.muscleTargetOverrides,
+    muscleTargets: userSettings.muscleTargets,
     countSecondaryMuscles: userSettings.countSecondaryMuscles,
     volumePrimaryOnly: userSettings.volumePrimaryOnly,
     localDirty: userSettings.localDirty,
@@ -104,6 +112,26 @@ export const readMuscleTargetSettingsSnapshot = async (
 };
 
 /**
+ * The first target map a row stores: a target edit made before the
+ * combined-muscle migration ran keeps the account's legacy per-setup targets
+ * underneath it ([[muscle.weekly-targets]]), so none is lost.
+ */
+const withLegacyTargets = (
+  tx: Transaction,
+  existing: { muscleTargets: string | null; muscleTargetOverrides: string | null; combinedMuscles: string | null } | undefined,
+  next: string | null,
+): string | null => {
+  if (next === null || !existing || existing.muscleTargets !== null || existing.muscleTargetOverrides === null) return next;
+  const rows = tx.select({
+    id: muscleGroups.id, displayName: muscleGroups.displayName, familyName: muscleGroups.familyName,
+    sortOrder: muscleGroups.sortOrder, reportGroup: muscleGroups.reportGroup, tracked: muscleGroups.tracked,
+  }).from(muscleGroups).where(isNull(muscleGroups.deletedAt)).all();
+  const legacy = legacyMuscleTargets(existing.muscleTargetOverrides, rows,
+    parseStoredCombinedMuscles(existing.combinedMuscles));
+  return JSON.stringify({ ...legacy, ...JSON.parse(next) as Record<string, number> });
+};
+
+/**
  * A device edit: the values are written together and pushed as one LWW
  * row. Unlike the read, neither write checks the store's owner: like every
  * local write, one landing before the cycle's ownership wipe goes with it.
@@ -112,12 +140,16 @@ export const writeMuscleTargetSettings = async (values: MuscleTargetSettingsWrit
   const db = await bootstrapLocalDataLayer();
   const now = new Date();
   db.transaction(tx => {
-    const existing = tx.select({ id: userSettings.id })
+    const existing = tx.select({
+      id: userSettings.id, muscleTargets: userSettings.muscleTargets,
+      muscleTargetOverrides: userSettings.muscleTargetOverrides, combinedMuscles: userSettings.combinedMuscles,
+    })
       .from(userSettings)
       .where(eq(userSettings.id, USER_SETTINGS_ID))
       .get();
     const common = {
       ...values,
+      muscleTargets: withLegacyTargets(tx as Transaction, existing, values.muscleTargets),
       deletedAt: null,
       updatedAt: now,
       localDirty: true,

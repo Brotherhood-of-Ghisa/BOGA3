@@ -7,11 +7,8 @@ import {
   type MuscleAnalyticsInput,
   type MuscleReportAssignment,
 } from '@/src/data/muscle-analytics';
-import {
-  BROAD_MUSCLE_PRESET,
-  buildMuscleReportAssignment,
-  type MuscleReportRow,
-} from '@/src/data/muscle-report-presets';
+import { buildMuscleReportAssignment, type MuscleReportRow } from '@/src/data/combined-muscles';
+import { BROAD_MUSCLE_PRESET } from '@/src/data/muscle-report-presets';
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { aggregateStats } from '@/src/data/stats';
 
@@ -24,7 +21,11 @@ const detailedRows = (): MuscleReportRow[] =>
 /** Entries a user who chose Broad has also switched off; the preset itself never writes `tracked`. */
 const SWITCHED_OFF = ['rotator_cuff', 'forearms_grip', 'spinal_erectors'];
 
-/** The rows after choosing Broad and switching off `SWITCHED_OFF`. */
+/**
+ * The rows of an account that chose Broad before combined muscles and switched
+ * off `SWITCHED_OFF`: legacy Broad keys and no stored definitions, which every
+ * reader takes as the Broad template's combined muscles.
+ */
 const broadRows = (): MuscleReportRow[] => {
   const groupOf = new Map(BROAD_MUSCLE_PRESET.muscles.flatMap((muscle) =>
     muscle.entries.map((entry) => [entry, muscle.key] as const)));
@@ -35,11 +36,11 @@ const broadRows = (): MuscleReportRow[] => {
   }));
 };
 
-/** The id a Broad muscle takes: its anchor entry's. */
+/** The id a Broad muscle takes: its combined key. */
 const broadId = (key: string): string => {
   const muscle = BROAD_MUSCLE_PRESET.muscles.find((candidate) => candidate.key === key);
   if (!muscle) throw new Error(`No Broad muscle ${key}`);
-  return muscle.anchor;
+  return `cm_${muscle.key}`;
 };
 
 const SESSION_AT = new Date('2026-05-20T10:00:00.000Z');
@@ -67,7 +68,7 @@ const SQUAT: Mapping[] = [
 ];
 
 const reported = (input: MuscleAnalyticsInput, rows: MuscleReportRow[]) =>
-  applyMuscleReport(input, buildMuscleReportAssignment(rows));
+  applyMuscleReport(input, buildMuscleReportAssignment(rows, null));
 
 const statsByMuscle = (input: MuscleAnalyticsInput) =>
   new Map(aggregateStats(input).muscleFamilies.flatMap((family) => family.muscles)
@@ -146,13 +147,14 @@ describe('Broad', () => {
       'Chest', 'Front Delts', 'Lateral Delts', 'Rear Delts', 'Back', 'Biceps', 'Triceps', 'Core',
       'Quads', 'Glutes & Hams', 'Calves',
     ]);
-    // A merged muscle sorts where its anchor entry sorts.
+    // A combined muscle sorts where its first tracked member sorts (Hamstrings before Glute Max).
     const glutes = muscleGroups.find((muscle) => muscle.id === GLUTES_HAMS);
-    expect(glutes?.sortOrder).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.find((seed) => seed.id === 'glutes_max')?.sortOrder);
+    expect(glutes?.sortOrder).toBe(SYSTEM_MUSCLE_GROUP_SEEDS.find((seed) => seed.id === 'hamstrings')?.sortOrder);
     // No entry id survives as a muscle: nothing is broken into its entries.
     expect(muscleGroups.map((muscle) => muscle.id)).not.toContain('serratus_anterior');
-    // A merged muscle keeps its anchor entry's id, so it keeps that id when the preset flips.
-    expect(muscleGroups.map((muscle) => muscle.id)).toEqual(expect.arrayContaining(['back_lats', 'glutes_max', 'chest']));
+    // A combined muscle's id is its key, never an entry's.
+    expect(muscleGroups.map((muscle) => muscle.id)).toEqual(expect.arrayContaining(['cm_back', 'cm_glutes_hams', 'cm_chest']));
+    expect(muscleGroups.map((muscle) => muscle.id)).not.toContain('back_lats');
   });
 
   it('does not let a custom row join a group by carrying its key', () => {
@@ -290,7 +292,7 @@ describe('with the secondary filter', () => {
   it('filters secondary mappings first, then groups', () => {
     const rows = broadRows();
     const input = inputFor(SQUAT, SYSTEM_MUSCLE_GROUP_SEEDS);
-    const primaryOnly = applyMuscleReport(withoutSecondaryMappings(input), buildMuscleReportAssignment(rows));
+    const primaryOnly = applyMuscleReport(withoutSecondaryMappings(input), buildMuscleReportAssignment(rows, null));
 
     expect(primaryOnly.muscleMappings).toEqual([
       { exerciseDefinitionId: 'squat', muscleGroupId: broadId('quads'), role: 'primary', allocation: { primary: 1, secondary: 0 } },
@@ -305,7 +307,7 @@ describe('with the secondary filter', () => {
       { exerciseDefinitionId: 'squat', muscleGroupId: 'glutes_max', role: 'secondary' },
       { exerciseDefinitionId: 'squat', muscleGroupId: 'hip_abductors', role: 'secondary' },
     ], SYSTEM_MUSCLE_GROUP_SEEDS);
-    const assignment = buildMuscleReportAssignment(broadRows());
+    const assignment = buildMuscleReportAssignment(broadRows(), null);
     expect(applyMuscleReport(withoutSecondaryMappings(input), assignment).muscleMappings).toEqual([]);
     expect(applyMuscleReport(input, assignment).muscleMappings).toHaveLength(1);
   });
@@ -319,7 +321,7 @@ describe('buildMuscleReportAssignment', () => {
       { id: 'c', displayName: 'C', familyName: 'F', sortOrder: 3, reportGroup: null, tracked: true },
       { id: 'd', displayName: 'D', familyName: 'F', sortOrder: 4, reportGroup: null, tracked: 1 },
     ];
-    const assignment = buildMuscleReportAssignment(rows);
+    const assignment = buildMuscleReportAssignment(rows, null);
     expect([...assignment.values()].map((entry) => entry.tracked)).toEqual([false, false, true, true]);
     expect(assignment.get('a')?.muscle.id).toBe('a');
   });
@@ -329,7 +331,7 @@ describe('buildMuscleReportAssignment', () => {
       { id: 'adductors', displayName: 'Adductors', familyName: 'Legs', sortOrder: 17, reportGroup: 'quads', tracked: 1 },
       { id: 'hip_flexors', displayName: 'Hip flexors', familyName: 'Legs', sortOrder: 17, reportGroup: 'quads', tracked: 1 },
     ];
-    expect(buildMuscleReportAssignment(rows).get('hip_flexors')?.muscle)
-      .toEqual({ id: 'quads', displayName: 'Quads', familyName: 'Legs', sortOrder: 17 });
+    expect(buildMuscleReportAssignment(rows, null).get('hip_flexors')?.muscle)
+      .toEqual({ id: 'cm_quads', displayName: 'Quads', familyName: 'Legs', sortOrder: 17 });
   });
 });

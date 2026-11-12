@@ -472,7 +472,7 @@ run_psql "
       ('${USER_A_UUID}'::uuid,'${MUSCLE_A}','Pectorals','chest',0,0,
        null,1,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_A_UUID}'::uuid,'${MUSCLE_A2}','Triceps','arms',1,0,
-       'arms',0,${NOW_MS},${NOW_MS},${NOW_MS}),
+       'cm_arms',0,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_B_UUID}'::uuid,'${MUSCLE_B}','User B Muscle','arms',0,0,
        null,1,${NOW_MS},${NOW_MS},${NOW_MS});
     insert into app_public.exercise_muscle_mappings
@@ -2046,8 +2046,9 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_
 ' >/dev/null || fail "muscle list is not the owner taxonomy"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_A2}" '
   (.data.muscles[] | select(.id == $a) | {report_group, tracked}) == {report_group: null, tracked: true}
-  and (.data.muscles[] | select(.id == $a2) | {report_group, tracked}) == {report_group: "arms", tracked: false}
-' >/dev/null || fail "muscle list does not carry each entry's report group and tracked state"
+  and (.data.muscles[] | select(.id == $a2) | {report_group, tracked}) == {report_group: null, tracked: false}
+  and .data.combined_muscles == []
+' >/dev/null || fail "muscle list does not read a key with no stored combined muscle as the entry's own"
 agent_get "exercises?query=Agent%20A%20Bench"
 assert_status "200" "catalog view"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg ex "${EXERCISE_A}" --argjson rev "${NOW_MS}" '
@@ -2500,20 +2501,30 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
 
 echo "[agent-api-test] verifying the coach sets weekly muscle targets"
 TARGETS_KEY="agent-api-${RUN_TAG}-targets"
-# Another scope's override and independent counting choices already on the row:
-# a target-only write keeps all three.
+# Another muscle's override, a legacy per-setup map, a combined muscle and
+# independent counting choices already on the row: a target-only write keeps all.
 update_training_fixture "insert into app_public.user_settings
     (owner_user_id, id, created_at, updated_at, client_updated_at_ms, weekly_working_set_target,
-     muscle_target_mode, muscle_target_overrides, count_secondary_muscles, volume_primary_only)
+     muscle_target_mode, muscle_target_overrides, muscle_targets, combined_muscles,
+     count_secondary_muscles, volume_primary_only)
   values ('${USER_A_UUID}'::uuid, 'settings', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, 6, 'single',
-     '{\"detailed\":{\"agent-api-keep\":3},\"broad\":{\"agent-api-keep\":3}}'::jsonb, false, true)
+     '{\"detailed\":{\"agent-api-legacy\":3}}'::jsonb, '{\"agent-api-keep\":3}'::jsonb,
+     '[{\"key\":\"cm_arms\",\"name\":\"Arms\",\"family\":\"arms\"}]'::jsonb, false, true)
   on conflict (owner_user_id, id) do update set
     weekly_working_set_target = excluded.weekly_working_set_target,
     muscle_target_mode = excluded.muscle_target_mode,
     muscle_target_overrides = excluded.muscle_target_overrides,
+    muscle_targets = excluded.muscle_targets,
+    combined_muscles = excluded.combined_muscles,
     count_secondary_muscles = excluded.count_secondary_muscles,
     volume_primary_only = excluded.volume_primary_only,
     deleted_at = null, client_updated_at_ms = excluded.client_updated_at_ms;" >/dev/null
+agent_get "muscles"
+assert_status "200" "muscle list with a stored combined muscle"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg a2 "${MUSCLE_A2}" '
+  (.data.muscles[] | select(.id == $a2) | .report_group) == "cm_arms"
+  and .data.combined_muscles == [{key: "cm_arms", name: "Arms", family: "arms"}]
+' >/dev/null || fail "muscle list does not carry the stored combined muscles and their members"
 agent_get "training-status"
 assert_status "200" "training status before the coach sets targets"
 printf '%s' "${RESPONSE_BODY}" | jq -e --argjson rev "${NOW_MS}" '
@@ -2526,25 +2537,24 @@ TARGETS_BODY="$(jq -nc --argjson rev "${TARGETS_REVISION}" --arg m "${MUSCLE_A}"
 TARGETS_BEFORE_MS="$(node -e 'process.stdout.write(String(Date.now()))')"
 agent_put "muscle-targets" "${TARGETS_BODY}" "${TARGETS_KEY}"
 assert_status "200" "coach sets muscle targets"
-TARGETS_SCOPE="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.scope')"
 TARGETS_NEW_REVISION="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.targets.revision')"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" '
   .data.targets.default_weekly_sets == 11 and .data.targets.mode == "per_muscle"
-  and .data.targets.uploaded == true and .data.overrides[$m] == 14 and .data.idempotent_replay == false
-  and (.data.scope == "detailed" or .data.scope == "broad" or .data.scope == "custom")
+  and .data.targets.uploaded == true and .data.overrides[$m] == 14 and .data.overrides["agent-api-keep"] == 3
+  and .data.idempotent_replay == false and (.data | has("scope") | not)
 ' >/dev/null || fail "muscle targets response is wrong"
 [[ "${TARGETS_NEW_REVISION}" -ge "${TARGETS_BEFORE_MS}" ]] ||
   fail "the targets write was not stamped with the server's now"
 [[ "$(run_psql "select weekly_working_set_target || ',' || muscle_target_mode || ',' || client_updated_at_ms
-    || ',' || (muscle_target_overrides -> '${TARGETS_SCOPE}' ->> '${MUSCLE_A}') || ',' || count_secondary_muscles || ',' || volume_primary_only
+    || ',' || (muscle_targets ->> '${MUSCLE_A}') || ',' || count_secondary_muscles || ',' || volume_primary_only
   from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
   "11,per_muscle,${TARGETS_NEW_REVISION},14,false,true" ]] ||
   fail "the settings row did not take the coach's targets and stamp"
-OTHER_SCOPE="broad"
-[[ "${TARGETS_SCOPE}" != "broad" ]] || OTHER_SCOPE="detailed"
-[[ "$(run_psql "select muscle_target_overrides -> '${OTHER_SCOPE}' ->> 'agent-api-keep'
-  from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == "3" ]] ||
-  fail "the write dropped another scope's override"
+[[ "$(run_psql "select (muscle_targets ->> 'agent-api-keep') || ',' || muscle_target_overrides::text
+    || ',' || jsonb_array_length(combined_muscles)
+  from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
+  '3,{"detailed": {"agent-api-legacy": 3}},1' ]] ||
+  fail "the write dropped another muscle's override, the legacy map or the combined muscles"
 
 echo "[agent-api-test] verifying the targets reach the app through sync_pull and the status"
 TARGETS_CURSOR_AT="$(run_psql "select to_char((server_received_at - interval '1 second') at time zone 'UTC',
@@ -2553,11 +2563,12 @@ TARGETS_CURSOR_AT="$(run_psql "select to_char((server_received_at - interval '1 
 app_public_request POST "rpc/sync_pull" "${APP_ACCESS_TOKEN}" "$(jq -nc --arg at "${TARGETS_CURSOR_AT}" \
   '{layer:0,limit:200,cursor:{server_received_at:$at,owner_user_id:"00000000-0000-0000-0000-000000000000",type:"gyms",id:""}}')"
 assert_status "200" "sync pull after the coach sets targets"
-printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" --arg scope "${TARGETS_SCOPE}" --argjson rev "${TARGETS_NEW_REVISION}" '
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" --argjson rev "${TARGETS_NEW_REVISION}" '
   [.entities[] | select(.type == "user_settings")] | length == 1
   and (.[0].client_updated_at_ms == $rev)
   and (.[0].fields.weekly_working_set_target == 11 and .[0].fields.muscle_target_mode == "per_muscle")
-  and ((.[0].fields.muscle_target_overrides | fromjson)[$scope][$m] == 14)
+  and ((.[0].fields.muscle_targets | fromjson)[$m] == 14)
+  and ((.[0].fields.combined_muscles | fromjson)[0].key == "cm_arms")
 ' >/dev/null || fail "sync_pull did not return the coach's targets"
 agent_get "training-status"
 assert_status "200" "training status after the coach sets targets"
@@ -2623,7 +2634,7 @@ assert_status "200" "null clears an override"
 CLEARED_BODY="${RESPONSE_BODY}"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" '(.data.overrides | has($m) | not) and .data.targets.default_weekly_sets == 11' >/dev/null ||
   fail "clearing an override changed more than that override"
-[[ "$(run_psql "select coalesce(muscle_target_overrides -> '${TARGETS_SCOPE}' ->> '${MUSCLE_A}', 'cleared')
+[[ "$(run_psql "select coalesce(muscle_targets ->> '${MUSCLE_A}', 'cleared')
   from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == "cleared" ]] ||
   fail "the override was not cleared on the row"
 agent_put "muscle-targets" '{"default_weekly_sets":9}' "${TARGETS_KEY}-no-revision"
@@ -2647,13 +2658,13 @@ assert_defaults_after_first_write() {
   local label="$1"
   local secondary="${2:-false}"
   [[ "$(run_psql "select weekly_working_set_target || ',' || muscle_target_mode || ',' || count_secondary_muscles || ',' || volume_primary_only
-      || ',' || muscle_target_overrides::text || ',' || coalesce(deleted_at::text, 'live')
+      || ',' || muscle_targets::text || ',' || coalesce(deleted_at::text, 'live')
     from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
     "8,per_muscle,${secondary},false,{},live" ]] || fail "${label}: the first write did not build on the app defaults"
 }
 update_training_fixture "update app_public.user_settings
   set weekly_working_set_target = null, muscle_target_mode = null, muscle_target_overrides = null,
-      count_secondary_muscles = null, volume_primary_only = null, client_updated_at_ms = ${NOW_MS}
+      muscle_targets = null, count_secondary_muscles = null, volume_primary_only = null, client_updated_at_ms = ${NOW_MS}
   where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
 agent_get "training-status"
 printf '%s' "${RESPONSE_BODY}" | jq -e --argjson rev "${NOW_MS}" \
@@ -2666,9 +2677,34 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '.data.targets.uploaded == true and .data
   >/dev/null || fail "the first write did not return the defaults it built on"
 assert_defaults_after_first_write "legacy null targets" true
 
+echo "[agent-api-test] verifying a coach write on a legacy per-setup map builds on the targets the status shows"
+# An older build's row: no single map yet. The rows here spell out no preset
+# (one entry carries a key), so the legacy custom map is the one in force.
+update_training_fixture "update app_public.user_settings
+  set weekly_working_set_target = 6, muscle_target_mode = 'per_muscle', muscle_targets = null, combined_muscles = null,
+      muscle_target_overrides = '{\"custom\":{\"${MUSCLE_A}\":5},\"detailed\":{\"${MUSCLE_A}\":40}}'::jsonb,
+      client_updated_at_ms = ${NOW_MS}
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
+agent_get "training-status"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" '
+  (.data.muscles[] | select(.id == $m) | .weekly_target) == 5 and .data.muscle_setup == "detailed"
+' >/dev/null || fail "training status did not read the legacy map for the setup the rows spell out"
+agent_put "muscle-targets" "$(jq -nc --argjson rev "${NOW_MS}" '{default_weekly_sets:7,expected_revision:$rev}')" "${TARGETS_KEY}-legacy"
+assert_status "200" "write over a legacy per-setup map"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" '.data.overrides == {($m): 5}' >/dev/null ||
+  fail "the write did not build its map on the legacy targets"
+[[ "$(run_psql "select muscle_targets::text || ',' || (muscle_target_overrides -> 'detailed' ->> '${MUSCLE_A}')
+  from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
+  "{\"${MUSCLE_A}\": 5},40" ]] || fail "the legacy write did not store the single map, or changed the legacy one"
+update_training_fixture "update app_public.user_settings
+  set weekly_working_set_target = null, muscle_target_mode = null, muscle_target_overrides = null,
+      muscle_targets = null, count_secondary_muscles = null, volume_primary_only = null, client_updated_at_ms = ${NOW_MS}
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
+
 update_training_fixture "update app_public.user_settings
   set weekly_working_set_target = 6, muscle_target_mode = 'single',
       muscle_target_overrides = '{\"broad\":{\"agent-api-stale\":3}}'::jsonb,
+      muscle_targets = '{\"agent-api-stale\":3}'::jsonb,
       count_secondary_muscles = false, deleted_at = ${NOW_MS}
   where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
 agent_put "muscle-targets" "$(jq -nc '{mode:"per_muscle",expected_revision:0}')" "${TARGETS_KEY}-deleted"

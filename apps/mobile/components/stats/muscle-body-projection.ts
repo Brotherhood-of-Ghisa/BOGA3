@@ -1,6 +1,7 @@
 import { hexToLch, lchToHex, type Lch } from '@/components/ui/lch';
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
 import type { ProgressMuscleComparison } from '@/src/data';
+import { isCombinedMuscleKey } from '@/src/data/combined-muscles';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
 import { muscleTargetAttainment } from '@/src/preferences/targets';
@@ -45,7 +46,8 @@ export type ProjectedTriangle = {
   readonly x2: number;
   readonly y2: number;
   readonly depth: number;
-  readonly muscleGroupId: MuscleBodyMaterialId;
+  /** The reported muscle: an anatomy entry, a combined muscle's key, or `neutral`. */
+  readonly muscleGroupId: string;
   readonly fill: string;
   readonly selected: boolean;
   readonly v0: number;
@@ -117,9 +119,15 @@ const POSTERIOR_MUSCLES = new Set<string>([
   'calves',
 ]);
 
-/** Which canonical side of the body best showcases the given muscle group. */
-export function canonicalOrientationForMuscle(muscleId: string): BodyOrientation {
-  return POSTERIOR_MUSCLES.has(canonicalMuscleId(muscleId)) ? 'back' : 'front';
+/**
+ * Which canonical side of the body best showcases the given muscle: for a
+ * combined muscle, the side of its first tracked member under `report`.
+ */
+export function canonicalOrientationForMuscle(muscleId: string, report?: MuscleReportAssignment): BodyOrientation {
+  const member = report && isCombinedMuscleKey(muscleId)
+    ? [...report].find(([, { muscle, tracked }]) => tracked && muscle.id === muscleId)?.[0]
+    : undefined;
+  return POSTERIOR_MUSCLES.has(canonicalMuscleId(member ?? muscleId)) ? 'back' : 'front';
 }
 
 const canonicalMuscleId = (id: string): string => LEGACY_MUSCLE_ALIASES[id] ?? id;
@@ -167,7 +175,8 @@ export function computeMuscleScores(
   let largestLoss = 0;
   for (const row of muscles) {
     const id = canonicalMuscleId(row.muscleGroupId);
-    if (!BODY_MUSCLE_IDS.has(id) || (id !== row.muscleGroupId && ids.has(id))) continue;
+    // A combined muscle shades the mesh of every member it reports.
+    if (!(BODY_MUSCLE_IDS.has(id) || isCombinedMuscleKey(id)) || (id !== row.muscleGroupId && ids.has(id))) continue;
     const change = metric === 'workingSetCount' ? muscleSetScore(row, setTargets) : muscleVolumeChange(row);
     changes.set(id, change);
     if (metric === 'totalVolume' && change !== null && Number.isFinite(change)) {
@@ -261,10 +270,10 @@ const computeLightStep = (nx: number, ny: number, nz: number): number => {
  */
 const reportedMaterial = (
   entry: MuscleBodyMaterialId, report: MuscleReportAssignment | undefined
-): MuscleBodyMaterialId => {
+): string => {
   const assigned = entry === 'neutral' ? undefined : report?.get(entry);
   if (!assigned) return entry;
-  return assigned.tracked ? assigned.muscle.id as MuscleBodyMaterialId : 'neutral';
+  return assigned.tracked ? assigned.muscle.id : 'neutral';
 };
 
 type ProjectionContext = {
@@ -277,7 +286,7 @@ type ProjectionContext = {
 };
 
 const resolveFaceFill = (
-  materialId: MuscleBodyMaterialId,
+  materialId: string,
   step: number,
   ctx: ProjectionContext
 ): string => {
@@ -734,7 +743,7 @@ export function hitTestProjectedMuscle(
   projected: ProjectedMuscleBody,
   x: number,
   y: number
-): Exclude<MuscleBodyMaterialId, 'neutral'> | null {
+): string | null {
   for (let i = projected.triangles.length - 1; i >= 0; i -= 1) {
     const tri = projected.triangles[i];
     if (pointInTriangle(x, y, tri)) {

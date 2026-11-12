@@ -6,6 +6,7 @@ import {
   type ExerciseCatalogExercise,
   type ExerciseCatalogMuscleGroup,
 } from '@/src/data/exercise-catalog';
+import { readCombinedMuscleDefinitions } from '@/src/data/muscle-report-settings';
 
 import { subscribeToExerciseCatalogInvalidation } from './invalidation';
 import { buildMuscleSetup, EMPTY_MUSCLE_SETUP, type MuscleSetup } from './muscle-setup';
@@ -74,12 +75,13 @@ const reload = async (): Promise<void> => {
   });
 
   try {
-    const [loadedExercises, loadedMuscleGroups] = await Promise.all([
+    const [loadedExercises, loadedMuscleGroups, combinedMuscles] = await Promise.all([
       listExerciseCatalogExercises({ includeDeleted: true }),
       listExerciseCatalogMuscleGroups(),
+      readCombinedMuscleDefinitions(),
     ]);
     const muscleGroupsById = indexExerciseCatalogMuscleGroupsById(loadedMuscleGroups);
-    const muscleSetup = buildMuscleSetup(loadedMuscleGroups);
+    const muscleSetup = buildMuscleSetup(loadedMuscleGroups, combinedMuscles);
     setSnapshot({
       status: 'ready',
       exercises: buildIndexedExercises(loadedExercises, muscleSetup),

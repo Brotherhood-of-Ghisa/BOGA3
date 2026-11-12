@@ -250,7 +250,7 @@ for entity in "${ENTITIES[@]}"; do
   elif [[ "${entity}" == "session_plans" ]]; then
     expected="session_plans_routine_standalone"
   elif [[ "${entity}" == "user_settings" ]]; then
-    expected="user_settings_muscle_target_overrides_valid"
+    expected="user_settings_combined_muscles_valid,user_settings_muscle_target_overrides_valid,user_settings_muscle_targets_valid"
   fi
   if [[ "${names}" != "${expected}" ]]; then
     fail "${entity}: CHECK constraints '${names}'; expected '${expected}'"

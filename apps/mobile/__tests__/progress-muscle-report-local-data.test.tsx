@@ -58,7 +58,9 @@ const BENCH = EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId;
 const ENTRIES_OF_BROAD = ['serratus_anterior', 'back_upper', 'traps_upper', 'traps_lower', 'brachialis', 'abs_obliques',
   'adductors', 'hip_flexors', 'hamstrings', 'hip_abductors', 'tibialis_anterior'];
 const UNTRACKED = ['rotator_cuff', 'forearms_grip', 'spinal_erectors'];
-const TRACKED_BROAD = ['chest', 'delts_front', 'delts_lateral', 'delts_rear', 'back_lats', 'biceps', 'triceps', 'abs_rectus', 'quads', 'glutes_max'];
+// Broad's combined muscles report under their keys, never an entry id.
+const TRACKED_BROAD = ['cm_chest', 'cm_front_delts', 'cm_lateral_delts', 'cm_rear_delts', 'cm_back', 'cm_biceps', 'cm_triceps',
+  'cm_core', 'cm_quads', 'cm_glutes_hams'];
 
 const choose = async (setup: 'broad' | 'detailed') => {
   await loadMaestroFixture('exercise-block-history');
@@ -101,7 +103,7 @@ describe('Progress muscle list under Broad', () => {
     await renderProgress('muscle');
     await waitFor(() => expect(muscleBlocks().length).toBeGreaterThan(0));
     expect([...muscleBlocks()].sort()).toEqual([...TRACKED_BROAD].sort());
-    for (const hidden of [...ENTRIES_OF_BROAD, ...UNTRACKED, 'calves']) {
+    for (const hidden of [...ENTRIES_OF_BROAD, ...UNTRACKED, 'chest', 'back_lats', 'calves', 'cm_calves']) {
       expect(screen.queryByTestId(`stats-muscle-block-${hidden}`)).toBeNull();
     }
     expect(screen.getByLabelText('Open Back history')).toBeTruthy();
@@ -115,17 +117,17 @@ describe('Progress muscle list under Broad', () => {
     await act(async () => invalidateExerciseCatalogCache());
     await renderProgress('muscle');
     await waitFor(() => expect(muscleBlocks().length).toBe(14));
-    expect(muscleBlocks()).toEqual(expect.arrayContaining(['rotator_cuff', 'forearms_grip', 'spinal_erectors', 'calves']));
+    expect(muscleBlocks()).toEqual(expect.arrayContaining(['rotator_cuff', 'forearms_grip', 'spinal_erectors', 'cm_calves']));
     expect(muscleBlocks()).not.toContain('serratus_anterior');
   });
 
   it('retains each Broad muscle’s original shares without reallocating hidden work', async () => {
     await choose('broad');
     await renderProgress('muscle');
-    await waitFor(() => expect(now('quads')).toBeGreaterThan(0));
+    await waitFor(() => expect(now('cm_quads')).toBeGreaterThan(0));
     // 7 squat sets: Quads counts its Primary 7 alone; Glutes & Hams' Secondary 3.5 shows as 3.
-    expect(now('quads')).toBe(7);
-    expect(now('glutes_max')).toBe(3);
+    expect(now('cm_quads')).toBe(7);
+    expect(now('cm_glutes_hams')).toBe(3);
   });
 
   it('shows a family header only above two or more muscles and lists headerless muscles first', async () => {
@@ -135,10 +137,10 @@ describe('Progress muscle list under Broad', () => {
     expect(familyHeaders('stats-family-header-')).toEqual(['Shoulders', 'Arms', 'Legs']);
     // Within a section the rows follow the figures; the sections follow the family order.
     const blocks = muscleBlocks();
-    expect(blocks.slice(0, 3)).toEqual(['chest', 'back_lats', 'abs_rectus']);
-    expect(new Set(blocks.slice(3, 6))).toEqual(new Set(['delts_front', 'delts_lateral', 'delts_rear']));
-    expect(new Set(blocks.slice(6, 8))).toEqual(new Set(['biceps', 'triceps']));
-    expect(new Set(blocks.slice(8))).toEqual(new Set(['quads', 'glutes_max']));
+    expect(blocks.slice(0, 3)).toEqual(['cm_chest', 'cm_back', 'cm_core']);
+    expect(new Set(blocks.slice(3, 6))).toEqual(new Set(['cm_front_delts', 'cm_lateral_delts', 'cm_rear_delts']));
+    expect(new Set(blocks.slice(6, 8))).toEqual(new Set(['cm_biceps', 'cm_triceps']));
+    expect(new Set(blocks.slice(8))).toEqual(new Set(['cm_quads', 'cm_glutes_hams']));
   });
 
   it('keeps every entry and every family header under Detailed', async () => {
@@ -158,17 +160,17 @@ describe('Progress muscle list under Broad', () => {
     expect([...targets].sort()).toEqual([...TRACKED_BROAD].sort());
   });
 
-  it('uses Broad target overrides for the merged muscle and the live default in Single mode', async () => {
+  it('uses the combined muscle\'s own target, not a member\'s, and the live default in Single mode', async () => {
     await choose('broad');
     act(() => updatePreferences({ progressMuscleLayout: '3d', weeklyWorkingSetTarget: 14,
-      muscleTargetMode: 'per-muscle', muscleTargetOverrides: { detailed: { quads: 100 }, broad: { quads: 7 } } }));
+      muscleTargetMode: 'per-muscle', muscleTargetOverrides: { quads: 100, cm_quads: 7 } }));
     await renderProgress('muscle');
     await screen.findByTestId('stats-muscle-body-card');
     const score = () => {
       const { muscles, metric, setTargets } = screen.UNSAFE_getByType(MuscleBodyCard).props;
-      return computeMuscleScores(muscles, metric, setTargets).get('quads');
+      return computeMuscleScores(muscles, metric, setTargets).get('cm_quads');
     };
-    fireEvent.press(screen.getByTestId('stats-muscle-body-target-quads'));
+    fireEvent.press(screen.getByTestId('stats-muscle-body-target-cm_quads'));
     expect(screen.getByTestId('stats-muscle-body-comparison-now')).toHaveTextContent(/^7$/);
     expect(score()).toBe(1);
     act(() => updatePreferences({ muscleTargetMode: 'single' }));
@@ -266,13 +268,13 @@ describe('Muscle history under Broad', () => {
   it('opens on a merged muscle under its name and counts its entries together', async () => {
     await choose('broad');
     // The squat's Quads primary and Adductors secondary are one muscle: each set counts once, as Primary.
-    const broadQuads = await history(['quads']);
+    const broadQuads = await history(['cm_quads']);
     const squatSets = broadQuads.daily.reduce((sum, day) => sum + day.workingSetCount, 0);
     expect(squatSets).toBeGreaterThan(0);
-    await open({ muscleGroupId: 'glutes_max' });
+    await open({ muscleGroupId: 'cm_glutes_hams' });
     await waitFor(() => expect(mockScreenOptions.title).toBe('Glutes & Hams'));
     await waitForGone(() => screen.queryByTestId('stats-muscle-history-loading'));
-    const hams = await history(['glutes_max']);
+    const hams = await history(['cm_glutes_hams']);
     expect(hams.daily.reduce((sum, day) => sum + day.workingSetCount, 0)).toBeCloseTo(squatSets / 2, 10);
   });
 
@@ -282,16 +284,16 @@ describe('Muscle history under Broad', () => {
     // The squat also trains Upper back: the muscle's only tracked entry.
     localDataClient().prepare("INSERT INTO exercise_muscle_mappings (id, exercise_definition_id, muscle_group_id, weight, role) VALUES ('squat_upper_back', ?, 'back_upper', 1, 'primary')").run(SQUAT);
     await act(async () => invalidateExerciseCatalogCache());
-    await open({ muscleGroupId: 'back_lats' });
+    await open({ muscleGroupId: 'cm_back' });
     await waitFor(() => expect(mockScreenOptions.title).toBe('Back'));
     expect(screen.queryByTestId('progress-history-unavailable')).toBeNull();
-    const back = await history(['back_lats']);
+    const back = await history(['cm_back']);
     expect(back.daily.reduce((sum, day) => sum + day.workingSetCount, 0)).toBeGreaterThan(0);
   });
 
   it('adds Broad entry shares on the same days as Detailed', async () => {
     await choose('broad');
-    const broad = await history(['quads']);
+    const broad = await history(['cm_quads']);
     localDataClient().prepare('UPDATE muscle_groups SET report_group = NULL, tracked = 1').run();
     const detailed = await history(['quads']);
     // Broad Quads counts at its strongest role: Adductors' Secondary adds nothing.
@@ -301,7 +303,7 @@ describe('Muscle history under Broad', () => {
     }
   });
 
-  it.each(['serratus_anterior', 'back_upper', 'forearms_grip', 'calves'])(
+  it.each(['serratus_anterior', 'back_upper', 'back_lats', 'forearms_grip', 'calves', 'cm_calves'])(
     'has no history page for %s, which the user does not have', async entry => {
       await choose('broad');
       const read = jest.spyOn(statsRepository, 'computeSelectedMuscleHistoryEffort');
@@ -316,6 +318,6 @@ describe('Muscle history under Broad', () => {
     await waitFor(() => expect(mockScreenOptions.title).toMatch(/Squat/));
     fireEvent.press(screen.getByTestId('progress-history-options-button'));
     const links = screen.getAllByTestId(/^progress-history-muscle-/).map(row => String(row.props.testID).replace('progress-history-muscle-', ''));
-    expect(links).toEqual(['quads', 'glutes_max']);
+    expect(links).toEqual(['cm_quads', 'cm_glutes_hams']);
   });
 });

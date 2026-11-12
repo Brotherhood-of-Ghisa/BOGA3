@@ -4,9 +4,10 @@ appId: com.dinoderek.mobile
 #
 # Proves, over one fixture session (Lat Pulldown, Barbell Back Squat, Standing
 # Calf Raise) and the device's own muscle rows ([[muscle.report-groups]]):
-#   1. Settings → Muscles writes Broad and detailed enablement (Calves
-#      and Tibialis off) from full stack pages, and Progress, already mounted, shows the user's
-#      muscles on return: Chest and Back; no Serratus, Lats, Upper back or
+#   1. Settings → Muscles writes detailed enablement (Calves and Tibialis
+#      off) and then Broad's combined muscles from full stack pages, and
+#      Progress, already mounted, shows the user's muscles on return under
+#      their combined keys: Chest and Back; no Serratus, Lats, Upper back or
 #      Calves row; Chest, now one muscle, loses its family header
 #      ([[muscle.no-breakdown]], [[muscle.untracked]]);
 #   2. the completed session's muscle breakdown reports the same muscles;
@@ -154,7 +155,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: { id: "stats-muscle-block-serratus_anterior" }
     timeout: 15000
-- assertVisible: { id: "stats-muscle-block-chest" }
+- assertVisible: { id: "stats-muscle-block-cm_chest" }
 - assertNotVisible: { id: "stats-family-header-chest" }
 - takeScreenshot: "muscle-report-03-broad-progress"
 # Rows below the fold are not in the hierarchy, so the keyboard search brings
@@ -163,7 +164,7 @@ appId: com.dinoderek.mobile
 - eraseText
 - inputText: "back"
 - extendedWaitUntil:
-    visible: { id: "stats-muscle-history-back_lats", text: ".*Back.*" }
+    visible: { id: "stats-muscle-history-cm_back", text: ".*Back.*" }
     timeout: 10000
 - assertNotVisible: { id: "stats-muscle-block-back_upper" }
 - tapOn: { id: "stats-muscle-search-input" }
@@ -188,11 +189,12 @@ appId: com.dinoderek.mobile
     visible: { id: "session-completion-muscle-table" }
     timeout: 15000
 - scrollUntilVisible:
-    element: { id: "session-completion-muscle-back_lats", text: "Back, .*" }
+    element: { id: "session-completion-muscle-cm_back", text: "Back, .*" }
     direction: DOWN
 - scrollUntilVisible:
-    element: { id: "session-completion-muscle-quads" }
+    element: { id: "session-completion-muscle-cm_quads" }
     direction: DOWN
+- assertNotVisible: { id: "session-completion-muscle-back_lats" }
 - assertNotVisible: { id: "session-completion-muscle-back_upper" }
 - assertNotVisible: { id: "session-completion-muscle-adductors" }
 - assertNotVisible: { id: "session-completion-muscle-calves" }

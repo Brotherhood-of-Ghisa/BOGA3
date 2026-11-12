@@ -27,7 +27,7 @@ const ENTRIES = [
   { id: 'forearms_grip', displayName: 'Forearms', familyName: 'Arms', sortOrder: 70 },
 ];
 
-/** The user's entry rows after choosing Broad: each member holds its muscle's key. */
+/** An account that chose Broad before combined muscles: legacy keys, no stored definitions (read as the template). */
 const broadRows = ENTRIES.map((entry) => {
   const muscle = BROAD_MUSCLE_PRESET.muscles.find((candidate) => candidate.entries.includes(entry.id));
   return { ...entry, reportGroup: muscle?.key ?? null, tracked: 1 };
@@ -73,7 +73,7 @@ const sessionOf = (sessionId: string, day: string, exercises: ReturnType<typeof 
 });
 
 const catalogFor = (rows: typeof broadRows) =>
-  sessionMuscleCatalogOfExercises(catalogExercises, ENTRIES, buildMuscleSetup(rows).assignment);
+  sessionMuscleCatalogOfExercises(catalogExercises, ENTRIES, buildMuscleSetup(rows, null).assignment);
 
 describe('completed-session muscle breakdown under Broad', () => {
   const summarize = (rows: typeof broadRows, exercises = [row('squat', 3, 0), row('rdl', 3, 1)]) =>
@@ -87,8 +87,8 @@ describe('completed-session muscle breakdown under Broad', () => {
       ({ id, displayName, primarySetCount, secondarySetCount, weightedSetCount }))).toEqual([
       // RDL's two Primaries make one Glutes & Hams set; squat's Glutes adds ½ there.
       // Quads already has the squat's Primary, so its Adductors Secondary adds nothing.
-      { id: 'glutes_max', displayName: 'Glutes & Hams', primarySetCount: 3, secondarySetCount: 3, weightedSetCount: 4.5 },
-      { id: 'quads', displayName: 'Quads', primarySetCount: 3, secondarySetCount: 0, weightedSetCount: 3 },
+      { id: 'cm_glutes_hams', displayName: 'Glutes & Hams', primarySetCount: 3, secondarySetCount: 3, weightedSetCount: 4.5 },
+      { id: 'cm_quads', displayName: 'Quads', primarySetCount: 3, secondarySetCount: 0, weightedSetCount: 3 },
     ]);
     expect(summary.muscles.map((muscle) => muscle.displayName).sort()).toEqual(['Glutes & Hams', 'Quads']);
   });
@@ -118,7 +118,7 @@ describe('completed-session muscle breakdown under Broad', () => {
       { muscleGroupId: 'chest', role: 'primary' },
       { muscleGroupId: 'serratus_anterior', role: 'primary' },
     ]);
-    const catalog = sessionMuscleCatalogOfExercises([pushUp], ENTRIES, buildMuscleSetup(broadRows).assignment);
+    const catalog = sessionMuscleCatalogOfExercises([pushUp], ENTRIES, buildMuscleSetup(broadRows, null).assignment);
     const summary = summarizeCurrentSessionMuscleLoad({
       sessionId: 's', sessionAt: DAY, exercises: [row('push-up', 1, 0)], ...catalog,
     });
@@ -126,7 +126,7 @@ describe('completed-session muscle breakdown under Broad', () => {
     const rows = buildSessionBreakdownMuscleRows({
       muscleSummary: summary, personalRecords: [record as never], muscleMappings: catalog.muscleMappings,
     });
-    expect(rows).toEqual([expect.objectContaining({ id: 'chest', displayName: 'Chest', recordCount: 1 })]);
+    expect(rows).toEqual([expect.objectContaining({ id: 'cm_chest', displayName: 'Chest', recordCount: 1 })]);
   });
 });
 
