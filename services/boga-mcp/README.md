@@ -43,7 +43,8 @@ Eleven read-only tools:
   ([health activities](../../docs/specs/tech/health-activities-contract.md)).
 - `get_training_profile` — training preferences, equipment, gyms.
 - `list_muscles` — the muscle ids exercise mappings name, each with the
-  person's `report_group` and `tracked` setup.
+  person's `report_group` (combined muscle key) and `tracked` setup, plus the
+  person's `combined_muscles`.
 - `search_exercises` — database-side filter by name, muscle, equipment; each
   exercise carries `split_by_gym`, `rest_timer_sec`, `deleted` and its
   `revision`.

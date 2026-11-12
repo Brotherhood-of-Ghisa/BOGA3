@@ -256,7 +256,7 @@ else
         (owner_user_id,id,display_name,family_name,sort_order,is_editable,report_group,tracked,
          created_at,updated_at,client_updated_at_ms)
       values
-        ('${USER_UUID}'::uuid,'${GROUPED_MUSCLE_ID}','MCP Smoke Grouped Muscle','chest',0,0,'mcp_smoke_group',0,
+        ('${USER_UUID}'::uuid,'${GROUPED_MUSCLE_ID}','MCP Smoke Grouped Muscle','chest',0,0,'cm_mcp_smoke',0,
          ${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.exercise_definitions
         (owner_user_id,id,name,load_input_mode,bodyweight_contribution,created_at,updated_at,client_updated_at_ms)
@@ -276,10 +276,12 @@ else
       -- A device has uploaded the person's targets (the coach cannot write before).
       insert into app_public.user_settings
         (owner_user_id,id,bodyweight_calculations_enabled,weekly_working_set_target,muscle_target_mode,
-         muscle_target_overrides,count_secondary_muscles,created_at,updated_at,client_updated_at_ms)
-      values ('${USER_UUID}'::uuid,'settings',true,8,'single','{}'::jsonb,true,${NOW_MS},${NOW_MS},${NOW_MS})
+         muscle_targets,combined_muscles,count_secondary_muscles,created_at,updated_at,client_updated_at_ms)
+      values ('${USER_UUID}'::uuid,'settings',true,8,'single','{}'::jsonb,
+        '[{\"key\":\"cm_mcp_smoke\",\"name\":\"MCP Smoke\",\"family\":\"chest\"}]'::jsonb,true,${NOW_MS},${NOW_MS},${NOW_MS})
       on conflict(owner_user_id,id) do update set bodyweight_calculations_enabled=true,
-        weekly_working_set_target=8,muscle_target_mode='single',muscle_target_overrides='{}'::jsonb,
+        weekly_working_set_target=8,muscle_target_mode='single',muscle_targets='{}'::jsonb,
+        combined_muscles=excluded.combined_muscles,
         count_secondary_muscles=true,
         deleted_at=null,updated_at=excluded.updated_at,client_updated_at_ms=excluded.client_updated_at_ms;
       insert into app_public.session_exercises

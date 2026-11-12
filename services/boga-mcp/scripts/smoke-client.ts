@@ -15,7 +15,7 @@ const exerciseQuery = required('BOGA_MCP_SMOKE_EXERCISE_QUERY');
 // Set only for the seeded local fixture: exercise writes never run against a
 // supplied (possibly hosted) token.
 const smokeMuscleId = process.env.BOGA_MCP_SMOKE_MUSCLE_ID?.trim() ?? '';
-// Seeded beside it with report_group `mcp_smoke_group` and tracked 0.
+// Seeded beside it as a member of the combined muscle `cm_mcp_smoke`, tracked 0.
 const smokeGroupedMuscleId = process.env.BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID?.trim() ?? '';
 const skipReads = process.env.BOGA_MCP_SMOKE_SKIP_READS === '1';
 // Seeded locally: `<prefix>-run` (running) and `<prefix>-lift` (a strength
@@ -455,8 +455,12 @@ try {
       }
       if (smokeGroupedMuscleId) {
         const grouped = muscleList.find((m) => isObject(m) && m.id === smokeGroupedMuscleId);
-        if (!isObject(grouped) || grouped.report_group !== 'mcp_smoke_group' || grouped.tracked !== false) {
-          throw new Error('list_muscles did not return the stored report_group and tracked = false of the grouped muscle.');
+        if (!isObject(grouped) || grouped.report_group !== 'cm_mcp_smoke' || grouped.tracked !== false) {
+          throw new Error('list_muscles did not return the combined muscle and tracked = false of the grouped muscle.');
+        }
+        const combined = isObject(muscles) && Array.isArray(muscles.combined_muscles) ? muscles.combined_muscles : [];
+        if (!combined.some((m) => isObject(m) && m.key === 'cm_mcp_smoke' && m.name === 'MCP Smoke')) {
+          throw new Error('list_muscles did not return the stored combined muscle definitions.');
         }
       }
 

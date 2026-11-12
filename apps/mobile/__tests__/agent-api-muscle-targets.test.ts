@@ -1,8 +1,8 @@
 /**
  * Outcome: a coach can only set weekly muscle targets the app's own settings
  * could hold — positive whole numbers, a known mode, muscle ids the user's
- * setup reports — and each override lands in the scope the setup derives to
- * (detailed, broad or custom), exactly as the app derives it.
+ * setup reports, as the app reads it (a combined muscle by its key) — into
+ * the one target map.
  *
  * The Edge Function (`supabase/functions/agent-api`) applies these pure rules
  * before any database call; the backend `agent-api` lane proves the SQL merge,
@@ -11,11 +11,12 @@
 
 import {
   checkOverrideIds,
-  muscleTargetScope,
   MuscleTargetsError,
   normalizeMuscleTargetsWrite,
+  reportedMuscleIds,
 } from '../../../supabase/functions/agent-api/muscle-targets.ts';
-import { BROAD_MUSCLE_PRESET, type MuscleReportRow } from '../src/data/muscle-report-presets';
+import { BROAD_COMBINED_MUSCLES, type MuscleReportRow } from '../src/data/combined-muscles';
+import { BROAD_MUSCLE_PRESET } from '../src/data/muscle-report-presets';
 
 const rejection = (read: () => unknown): string => {
   try {
@@ -76,40 +77,39 @@ describe('normalizeMuscleTargetsWrite', () => {
   });
 });
 
-const row = (id: string, reportGroup: string | null, tracked: number | boolean = true, sortOrder = 0): MuscleReportRow => ({
-  id, displayName: id, familyName: 'Family', sortOrder, reportGroup, tracked,
-});
+const row = (id: string, reportGroup: string | null, tracked: number | boolean = true, sortOrder = 0,
+  familyName = 'Family'): MuscleReportRow => ({ id, displayName: id, familyName, sortOrder, reportGroup, tracked });
 
 const broadEntries = BROAD_MUSCLE_PRESET.muscles[0];
+const broadRow = (entry: string, key: string | null, tracked: number | boolean = true) =>
+  row(entry, key, tracked, 0, BROAD_MUSCLE_PRESET.muscles.find((muscle) => muscle.entries.includes(entry))?.family);
 
-describe('muscleTargetScope', () => {
-  it('is detailed when no row merges, listing every tracked entry', () => {
-    const { scope, reportedIds } = muscleTargetScope([row('chest', null), row('lats', null), row('calves', null, false)]);
-    expect(scope).toBe('detailed');
-    expect([...reportedIds].sort()).toEqual(['chest', 'lats']);
+describe('reportedMuscleIds', () => {
+  it('lists every tracked entry when nothing is combined', () => {
+    expect([...reportedMuscleIds([row('chest', null), row('lats', null), row('calves', null, false)], [])].sort())
+      .toEqual(['chest', 'lats']);
   });
 
-  it('is broad when the rows spell out the Broad table, naming each muscle by its anchor', () => {
-    const rows = BROAD_MUSCLE_PRESET.muscles.flatMap((muscle) => muscle.entries.map((entry) => row(entry, muscle.key)));
-    const { scope, reportedIds } = muscleTargetScope(rows);
-    expect(scope).toBe('broad');
-    expect(reportedIds).toEqual(new Set(BROAD_MUSCLE_PRESET.muscles.map((muscle) => muscle.anchor)));
+  it('names each combined muscle by its key, never an entry id', () => {
+    const rows = BROAD_MUSCLE_PRESET.muscles.flatMap((muscle) => muscle.entries.map((entry) => broadRow(entry, `cm_${muscle.key}`)));
+    expect(reportedMuscleIds(rows, BROAD_COMBINED_MUSCLES)).toEqual(new Set(BROAD_COMBINED_MUSCLES.map((muscle) => muscle.key)));
   });
 
-  it('keeps a Broad muscle while any of its entries is tracked', () => {
+  it('reads legacy Broad keys with no stored definitions as the template', () => {
+    const rows = BROAD_MUSCLE_PRESET.muscles.flatMap((muscle) => muscle.entries.map((entry) => broadRow(entry, muscle.key)));
+    expect(reportedMuscleIds(rows, null)).toEqual(new Set(BROAD_COMBINED_MUSCLES.map((muscle) => muscle.key)));
+  });
+
+  it('keeps a combined muscle while any of its members is tracked', () => {
     const [first, ...rest] = broadEntries.entries;
-    const rows = [row(first, broadEntries.key, false), ...rest.map((entry) => row(entry, broadEntries.key))];
-    const { reportedIds } = muscleTargetScope(rows);
-    expect(reportedIds.has(broadEntries.anchor)).toBe(rest.length > 0);
-  });
-
-  it('is custom when the rows match neither preset', () => {
-    expect(muscleTargetScope([row('chest', 'no-such-group'), row('lats', null)]).scope).toBe('custom');
+    const key = `cm_${broadEntries.key}`;
+    const rows = [broadRow(first, key, false), ...rest.map((entry) => broadRow(entry, key))];
+    expect(reportedMuscleIds(rows, BROAD_COMBINED_MUSCLES).has(key)).toBe(rest.length > 0);
   });
 
   it('reads tracked as the app does: 1 and true count, 0 and false do not', () => {
-    const { reportedIds } = muscleTargetScope([row('a', null, 1), row('b', null, 0), row('c', null, true), row('d', null, false)]);
-    expect([...reportedIds].sort()).toEqual(['a', 'c']);
+    expect([...reportedMuscleIds([row('a', null, 1), row('b', null, 0), row('c', null, true), row('d', null, false)], null)].sort())
+      .toEqual(['a', 'c']);
   });
 });
 

@@ -1,3 +1,4 @@
+import { BROAD_COMBINED_MUSCLES } from '@/src/data/combined-muscles';
 import {
   buildExerciseCatalogSearchText,
   exerciseSearchTextMatches,
@@ -82,8 +83,8 @@ describe('exercise catalog search', () => {
 });
 
 describe("exercise search in the user's muscles ([[muscle.no-breakdown]])", () => {
-  const broad = buildMuscleSetup(broadMuscleRows());
-  const detailed = buildMuscleSetup(detailedMuscleRows());
+  const broad = buildMuscleSetup(broadMuscleRows(), BROAD_COMBINED_MUSCLES);
+  const detailed = buildMuscleSetup(detailedMuscleRows(), null);
   const exercisePrimaryFor = (muscleGroupId: string): ExerciseCatalogExercise => ({
     id: `exercise-${muscleGroupId}`,
     name: 'Exercise',

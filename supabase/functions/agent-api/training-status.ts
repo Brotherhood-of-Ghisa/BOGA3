@@ -8,8 +8,9 @@ import {
   applyMuscleReport, type MuscleAnalyticsInput, type MuscleContributionRole,
 } from '../../../apps/mobile/src/data/muscle-analytics.ts';
 import { aggregateMuscleDailySets } from '../../../apps/mobile/src/data/muscle-daily-sets.ts';
-import { buildMuscleReportAssignment, type MuscleReportRow } from '../../../apps/mobile/src/data/muscle-report-presets.ts';
-import { deriveMuscleReportPreset } from '../../../apps/mobile/src/data/muscle-report-setup.ts';
+import {
+  buildMuscleReportAssignment, legacyMuscleTargets, parseStoredCombinedMuscles, type MuscleReportRow,
+} from '../../../apps/mobile/src/data/combined-muscles.ts';
 import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations/records.ts';
 import type { SessionSetPerformanceStatus } from '../../../apps/mobile/src/exercise-calculations/set-semantics.ts';
 import { DEFAULT_ACCOUNT_LOCAL_PREFERENCES } from '../../../apps/mobile/src/preferences/model.ts';
@@ -46,6 +47,8 @@ export type StatusSettingsRow = {
   weekly_working_set_target: number | null;
   muscle_target_mode: string | null;
   muscle_target_overrides: unknown;
+  muscle_targets?: unknown;
+  combined_muscles?: unknown;
   count_secondary_muscles: boolean | null;
   volume_primary_only?: boolean | null;
   client_updated_at_ms: number;
@@ -114,15 +117,29 @@ export const trainingStatusWindow = (now: Date, timeZone: string) => {
 export type TrainingStatusWindow = ReturnType<typeof trainingStatusWindow>;
 
 /**
- * The targets and independent counting choices: the synced columns read
- * through the app's own guards, an invalid or null column taking the app's
- * default. `revision` is the settings row's LWW stamp (0 with no row).
+ * The single target map: the stored one, else the legacy per-setup map read
+ * for the setup `muscleRows` spell out, as the app migrates it; null when the
+ * row holds neither.
  */
-export const statusSettings = (row: StatusSettingsRow | null) => {
+const storedMuscleTargets = (row: StatusSettingsRow, muscleRows: readonly MuscleReportRow[]): string | null => {
+  if (row.muscle_targets != null) return JSON.stringify(row.muscle_targets);
+  if (row.muscle_target_overrides == null) return null;
+  return JSON.stringify(legacyMuscleTargets(
+    row.muscle_target_overrides, muscleRows, parseStoredCombinedMuscles(row.combined_muscles ?? null)));
+};
+
+/**
+ * The targets, combined-muscle definitions and independent counting choices:
+ * the synced columns read through the app's own guards, an invalid or null
+ * column taking the app's default. `revision` is the settings row's LWW stamp
+ * (0 with no row).
+ */
+export const statusSettings = (row: StatusSettingsRow | null, muscleRows: readonly MuscleReportRow[] = []) => {
   const stored = row === null ? null : {
     weeklyWorkingSetTarget: row.weekly_working_set_target === null ? null : Number(row.weekly_working_set_target),
     muscleTargetMode: row.muscle_target_mode,
     muscleTargetOverrides: row.muscle_target_overrides == null ? null : JSON.stringify(row.muscle_target_overrides),
+    muscleTargets: storedMuscleTargets(row, muscleRows),
     countSecondaryMuscles: row.count_secondary_muscles,
     volumePrimaryOnly: row.volume_primary_only,
   };
@@ -137,6 +154,7 @@ export const statusSettings = (row: StatusSettingsRow | null) => {
     countSecondary: synced.progressCountSecondary ?? (hasLegacyImplicitSecondarySets(stored) || values.progressCountSecondary),
     volumePrimaryOnly: values.muscleVolumePrimaryOnly,
     uploaded: synced.weeklyWorkingSetTarget !== undefined,
+    combinedMuscles: parseStoredCombinedMuscles(row?.combined_muscles ?? null),
     revision: row === null ? 0 : Number(row.client_updated_at_ms),
   };
 };
@@ -197,12 +215,14 @@ export const deriveStatusMuscles = (
   input: MuscleAnalyticsInput, muscleRows: readonly MuscleReportRow[], settings: StatusSettings,
   window: TrainingStatusWindow,
 ) => {
-  const setup = deriveMuscleReportPreset(muscleRows);
+  const assignment = buildMuscleReportAssignment(muscleRows, settings.combinedMuscles);
+  // `combined` once any entry reports under a combined muscle, else every entry is its own muscle.
+  const setup = [...assignment].some(([entryId, { muscle }]) => muscle.id !== entryId) ? 'combined' : 'detailed';
   const counted = { ...input, countSecondarySets: settings.countSecondary, countSecondaryVolume: !settings.volumePrimaryOnly };
-  const daily = aggregateMuscleDailySets(applyMuscleReport(counted, buildMuscleReportAssignment(muscleRows)));
+  const daily = aggregateMuscleDailySets(applyMuscleReport(counted, assignment));
   const rows = deriveRecoveryRows(daily, window.plan, {
     weeklyTarget: settings.preferences.weeklyWorkingSetTarget,
-    overrides: effectiveMuscleTargetOverrides(settings.preferences, setup),
+    overrides: effectiveMuscleTargetOverrides(settings.preferences),
   });
   const familyById = new Map(daily.muscles.map((muscle) => [muscle.id, muscle.familyName]));
   const muscles = rows.map((row) => {
@@ -361,8 +381,8 @@ export const statusReadComplete = (read: {
 
 export const buildTrainingStatus = (input: TrainingStatusInput) => {
   const window = trainingStatusWindow(input.now, input.timeZone);
-  const settings = statusSettings(input.settings);
   const muscleRows = asMuscleReportRows(input.muscleRows);
+  const settings = statusSettings(input.settings, muscleRows);
   const { setup, muscles } = deriveStatusMuscles(
     statusMuscleInput(input.training, input.mappings, muscleRows, window, input.timeZone), muscleRows, settings, window,
   );

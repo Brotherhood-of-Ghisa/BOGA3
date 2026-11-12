@@ -1,22 +1,20 @@
-import type { MuscleReportAssignment, ReportedMuscle } from './muscle-analytics.ts';
-
-/** One muscle of the Broad preset: the anatomy entries it merges and where an editor writes to. */
+/** One muscle of the Broad template: the anatomy entries it merges. */
 export type BroadMuscle = {
-  /** Stable key stored in `muscle_groups.report_group` on every member entry. */
+  /** The legacy `muscle_groups.report_group` key; its combined key is `cm_<key>`. */
   key: string;
   label: string;
   family: string;
-  /** The entry an editor adds a mapping to for this muscle; it is also a member. */
+  /** The entry legacy weekly targets were keyed by for this muscle; it is also a member. */
   anchor: string;
   entries: readonly string[];
 };
 
 /**
- * The Broad preset ([[muscle.report-groups]]): 11 muscles over catalogue entry
- * ids, each in its family. Detailed is every entry its own muscle and needs no
- * table. Choosing a preset writes only `report_group` on the user's rows; entries
- * in no muscle (Rotator Cuff, Forearms, Spinal Erectors, custom muscles) stay
- * their own.
+ * The Broad template ([[muscle.report-groups]]): 11 muscles over catalogue
+ * entry ids, each in its family. It seeds "Start from Broad" and reads the
+ * Broad keys accounts stored before combined muscles (`combined-muscles.ts`);
+ * entries in no muscle (Rotator Cuff, Forearms, Spinal Erectors, custom
+ * muscles) stay their own.
  */
 export const BROAD_MUSCLE_PRESET: { muscles: readonly BroadMuscle[] } = {
   muscles: [
@@ -38,40 +36,4 @@ export const BROAD_MUSCLE_PRESET: { muscles: readonly BroadMuscle[] } = {
     },
     { key: 'calves', label: 'Calves', family: 'Lower Legs', anchor: 'calves', entries: ['calves', 'tibialis_anterior'] },
   ],
-};
-
-/** A user's `muscle_groups` row as the setup reads it: `tracked` is 0/1 locally, a boolean from the agent API. */
-export type MuscleReportRow = ReportedMuscle & { reportGroup: string | null; tracked: number | boolean };
-
-/**
- * Reads the user's rows into a `MuscleReportAssignment`. A row whose
- * `reportGroup` names the Broad muscle it is a member of reports under it: the
- * muscle takes the anchor entry's id (so a muscle keeps its id when the preset
- * flips and an editor writes to it directly), the preset's label and family, and
- * sorts where its anchor sorts, else its first member. Any other row, including
- * a custom muscle or a group key this build does not know, is its own muscle.
- */
-export const buildMuscleReportAssignment = (rows: readonly MuscleReportRow[]): MuscleReportAssignment => {
-  const broadByKey = new Map(BROAD_MUSCLE_PRESET.muscles.map((muscle) => [muscle.key, muscle]));
-  const broadOf = (row: MuscleReportRow): BroadMuscle | undefined => {
-    const broad = row.reportGroup === null ? undefined : broadByKey.get(row.reportGroup);
-    return broad?.entries.includes(row.id) ? broad : undefined;
-  };
-  const sortOrderByKey = new Map<string, number>();
-  for (const row of rows) {
-    const broad = broadOf(row);
-    if (!broad) continue;
-    if (!sortOrderByKey.has(broad.key) || row.id === broad.anchor) sortOrderByKey.set(broad.key, row.sortOrder);
-  }
-
-  return new Map(rows.map((row) => {
-    const broad = broadOf(row);
-    const muscle: ReportedMuscle = broad
-      ? {
-        id: broad.anchor, displayName: broad.label, familyName: broad.family,
-        sortOrder: sortOrderByKey.get(broad.key) ?? row.sortOrder,
-      }
-      : { id: row.id, displayName: row.displayName, familyName: row.familyName, sortOrder: row.sortOrder };
-    return [row.id, { muscle, tracked: row.tracked === true || row.tracked === 1 }];
-  }));
 };

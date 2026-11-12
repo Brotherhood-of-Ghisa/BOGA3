@@ -509,7 +509,7 @@ describe('ProgressHistoryScreen', () => {
   });
 
   it('makes a muscle page\'s title a switch between the user\'s muscles, in Progress\'s family sections, in place', async () => {
-    const setup = buildMuscleSetup(mockCatalog.muscleGroups);
+    const setup = buildMuscleSetup(mockCatalog.muscleGroups, null);
     Object.assign(mockCatalog, { muscleSetup: setup });
     mockPush.mockClear();
     try {
@@ -536,7 +536,7 @@ describe('ProgressHistoryScreen', () => {
   });
 
   it('draws an exercise page\'s title in the same role, with no muscle switch', async () => {
-    Object.assign(mockCatalog, { muscleSetup: buildMuscleSetup(mockCatalog.muscleGroups) });
+    Object.assign(mockCatalog, { muscleSetup: buildMuscleSetup(mockCatalog.muscleGroups, null) });
     try {
       renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'exercise', id: 'ex1' }} todayDateKey="2026-06-05" />);
       await waitForGone(() => screen.queryByTestId('stats-exercise-history-loading'));
@@ -743,7 +743,7 @@ describe('ProgressHistoryScreen', () => {
 
   it('grades a muscle page’s Sets against the saved weekly target for that one muscle', async () => {
     await act(async () => { updatePreferences({ weeklyWorkingSetTarget: 8, muscleTargetMode: 'per-muscle',
-      muscleTargetOverrides: { detailed: { front_delts: 4 }, broad: { front_delts: 16 } } }); });
+      muscleTargetOverrides: { front_delts: 4, cm_front_delts: 16 } }); });
     renderWithTheme(<ProgressHistoryScreen subject={{ kind: 'muscle', id: 'front_delts' }} todayDateKey="2026-06-05" />);
     await waitFor(() => expect(screen.getByText('% of max')).toBeTruthy());
     expect(stats.computeSelectedMuscleHistoryEffort).toHaveBeenCalledWith(

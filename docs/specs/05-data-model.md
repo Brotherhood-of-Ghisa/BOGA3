@@ -297,13 +297,15 @@ the data-model-level invariants.
    name only for an unlinked legacy row, which stays isolated and reports no
    history. The session-share PNG is not a database or sync entity.
 10. **A user's muscle setup is `in sync scope`:** `muscle_groups.report_group`
-   (the key of the muscle an entry reports under; null = itself) and `tracked`
-   (default 1). Null and 1 mean per-entry reporting: no backfill. Catalogue
-   seeding and bundle migrations never write either.
+   (a `user_settings.combined_muscles` key; null = itself) and `tracked`
+   (default 1). Seeding never writes either. Null definitions read legacy Broad
+   keys as the template until a one-time migration stores them; m0031 re-pulls
+   first ([[muscle.report-groups]]).
 11. `exercise_definitions.rest_timer_sec` is `in sync scope`, unchecked
    ([[timer.rest-default]]).
 12. `user_settings` weekly muscle targets (`weekly_working_set_target`,
-   `muscle_target_mode`, `muscle_target_overrides`) and counting choices
+   `muscle_target_mode`, `muscle_targets`; legacy `muscle_target_overrides`
+   only migrates) and counting choices
    (`count_secondary_muscles`, `volume_primary_only`) are `in sync scope`
    ([[muscle.weekly-targets]], [[muscle.secondary-filter]]). Targets stay null
    until uploaded. Writes preserve omitted/null choices; after a wipe, edits

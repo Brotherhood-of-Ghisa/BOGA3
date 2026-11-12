@@ -1,3 +1,4 @@
+import { BROAD_COMBINED_MUSCLES } from '@/src/data/combined-muscles';
 // Progress reads the user's muscles ([[muscle.report-groups]]): the data path, the
 // 3D body and the helpers the screens share.
 import {
@@ -10,7 +11,7 @@ import {
 } from '@/components/stats/progress-tables';
 import type { ExerciseCatalogExercise, ExerciseCatalogMuscleGroup } from '@/src/data/exercise-catalog';
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
-import { buildMuscleReportAssignment } from '@/src/data/muscle-report-presets';
+import { buildMuscleReportAssignment } from '@/src/data/combined-muscles';
 import type { ProgressMuscleComparison } from '@/src/data/progress-comparisons';
 import { createStatsRepository, type StatsAggregationInput, type StatsStore } from '@/src/data/stats';
 import {
@@ -34,7 +35,8 @@ const exercise = (mappings: [string, 'primary' | 'secondary' | 'stabilizer'][]):
 });
 
 describe('3D body under the user’s muscles', () => {
-  const scores = new Map([['back_lats', 1], ['chest', -1]]);
+  // Scores are keyed by reported id: entries under Detailed, combined keys under Broad.
+  const scores = new Map([['back_lats', 1], ['chest', -1], ['cm_back', 1], ['cm_chest', -1]]);
   const project = (report?: typeof BROAD, angleDeg = 180) =>
     projectMuscleBody({ angleDeg, width: 300, height: 560, scores, report });
   const palette = testPalette;
@@ -44,7 +46,7 @@ describe('3D body under the user’s muscles', () => {
     const broad = project(BROAD);
     const memberTriangles = detailed.triangles.filter(tri => ['back_lats', ...MERGED_BACK].includes(tri.muscleGroupId));
     expect(MERGED_BACK.every(id => detailed.triangles.some(tri => tri.muscleGroupId === id))).toBe(true);
-    const back = broad.triangles.filter(tri => tri.muscleGroupId === 'back_lats');
+    const back = broad.triangles.filter(tri => tri.muscleGroupId === 'cm_back');
     expect(back).toHaveLength(memberTriangles.length);
     expect(new Set(back.map(tri => tri.fill)).size).toBeLessThanOrEqual(12);
     expect(back.every(tri => buildMuscleShadeRamp(1, palette).includes(tri.fill))).toBe(true);
@@ -65,7 +67,7 @@ describe('3D body under the user’s muscles', () => {
     };
     for (const entry of MERGED_BACK) {
       const { x, y } = centreOf(entry, detailed);
-      expect(hitTestProjectedMuscle(broad, x, y)).toBe('back_lats');
+      expect(hitTestProjectedMuscle(broad, x, y)).toBe('cm_back');
     }
     const erectors = centreOf('spinal_erectors', detailed);
     expect(hitTestProjectedMuscle(broad, erectors.x, erectors.y)).toBeNull();
@@ -78,14 +80,14 @@ describe('3D body under the user’s muscles', () => {
   });
 
   it('marks a muscle selected across all its member meshes', () => {
-    const selected = projectMuscleBody({ angleDeg: 180, width: 300, height: 560, scores, report: BROAD, selectedId: 'back_lats' });
-    const back = selected.triangles.filter(tri => tri.muscleGroupId === 'back_lats');
+    const selected = projectMuscleBody({ angleDeg: 180, width: 300, height: 560, scores, report: BROAD, selectedId: 'cm_back' });
+    const back = selected.triangles.filter(tri => tri.muscleGroupId === 'cm_back');
     expect(back.length).toBeGreaterThan(0);
     expect(back.every(tri => tri.selected)).toBe(true);
   });
 
   it('is unchanged under Detailed', () => {
-    const detailedReport = buildMuscleReportAssignment(broadMuscleRows().map(row => ({ ...row, reportGroup: null, tracked: 1 })));
+    const detailedReport = buildMuscleReportAssignment(broadMuscleRows().map(row => ({ ...row, reportGroup: null, tracked: 1 })), BROAD_COMBINED_MUSCLES);
     expect(project(detailedReport)).toEqual(project(undefined));
     expect(MUSCLE_BODY_MESH.materials).toContain('serratus_anterior');
   });
@@ -93,7 +95,7 @@ describe('3D body under the user’s muscles', () => {
 
 describe('the user’s muscles in catalogue helpers', () => {
   it('reads Detailed rows as every entry its own tracked muscle', () => {
-    const detailed = buildMuscleSetup(SYSTEM_MUSCLE_GROUP_SEEDS.map(seed => ({ ...seed, reportGroup: null, tracked: 1 }))).assignment;
+    const detailed = buildMuscleSetup(SYSTEM_MUSCLE_GROUP_SEEDS.map(seed => ({ ...seed, reportGroup: null, tracked: 1 })), null).assignment;
     expect(reportedExerciseMuscles(exercise([['quads', 'primary'], ['adductors', 'secondary']]), detailed)).toEqual([
       { muscleGroupId: 'quads', role: 'primary' }, { muscleGroupId: 'adductors', role: 'secondary' }]);
     expect(reportedMuscleName(EMPTY_MUSCLE_SETUP, catalogById, 'adductors')).toBe(catalogById.adductors.displayName);
@@ -101,27 +103,28 @@ describe('the user’s muscles in catalogue helpers', () => {
 
   it('shows Quads once at the strongest role and hides untracked mappings', () => {
     const squat = exercise([['adductors', 'secondary'], ['quads', 'primary'], ['hip_flexors', 'secondary'], ['forearms_grip', 'secondary']]);
-    expect(reportedExerciseMuscles(squat, BROAD)).toEqual([{ muscleGroupId: 'quads', role: 'primary' }]);
+    expect(reportedExerciseMuscles(squat, BROAD)).toEqual([{ muscleGroupId: 'cm_quads', role: 'primary' }]);
     const entryFirst = exercise([['hamstrings', 'primary'], ['glutes_max', 'secondary']]);
-    expect(reportedExerciseMuscles(entryFirst, BROAD)).toEqual([{ muscleGroupId: 'glutes_max', role: 'primary' }]);
+    expect(reportedExerciseMuscles(entryFirst, BROAD)).toEqual([{ muscleGroupId: 'cm_glutes_hams', role: 'primary' }]);
   });
 
   it('names only a muscle the user has', () => {
-    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'back_lats')).toBe('Back');
+    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'cm_back')).toBe('Back');
+    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'back_lats')).toBeNull();
     expect(reportedMuscleName(BROAD_SETUP, catalogById, 'back_upper')).toBeNull();
     expect(reportedMuscleName(BROAD_SETUP, catalogById, 'forearms_grip')).toBeNull();
     expect(reportedMuscleName(BROAD_SETUP, catalogById, 'calves')).toBeNull();
-    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'glutes_max')).toBe('Glutes & Hams');
+    expect(reportedMuscleName(BROAD_SETUP, catalogById, 'cm_glutes_hams')).toBe('Glutes & Hams');
     expect(reportedMuscleName(BROAD_SETUP, catalogById, 'unknown')).toBeNull();
   });
 
   it('keeps a merged muscle while any entry is tracked, even with its anchor entry switched off', () => {
     const lonelyAnchor = broadMuscleSetup([], ['back_lats']);
-    expect(reportedMuscleName(lonelyAnchor, catalogById, 'back_lats')).toBe('Back');
+    expect(reportedMuscleName(lonelyAnchor, catalogById, 'cm_back')).toBe('Back');
     expect(reportedMuscleName(lonelyAnchor, catalogById, 'back_upper')).toBeNull();
-    expect(reportedMuscleName(broadMuscleSetup(['back_lats']), catalogById, 'back_lats')).toBeNull();
+    expect(reportedMuscleName(broadMuscleSetup(['back_lats']), catalogById, 'cm_back')).toBeNull();
     const pullup = exercise([['back_upper', 'primary']]);
-    expect(reportedExerciseMuscles(pullup, lonelyAnchor.assignment)).toEqual([{ muscleGroupId: 'back_lats', role: 'primary' }]);
+    expect(reportedExerciseMuscles(pullup, lonelyAnchor.assignment)).toEqual([{ muscleGroupId: 'cm_back', role: 'primary' }]);
   });
 
   it('places an exercise under its primary tracked muscle’s family, else Other', () => {
@@ -187,7 +190,7 @@ describe('Progress reads under the user’s muscles', () => {
     // Calves is switched off in this setup, so Broad's other ten remain.
     expect(muscles).toHaveLength(10);
     expect(muscles.map(row => row.muscleGroupId)).not.toContain('calves');
-    const back = muscles.find(row => row.muscleGroupId === 'back_lats')!;
+    const back = muscles.find(row => row.muscleGroupId === 'cm_back')!;
     expect(back.displayName).toBe('Back');
     expect(back.current.workingSetCount).toBe(1);
     expect(back.exercises.map(entry => [entry.exerciseDefinitionId, entry.role])).toEqual([['row', 'primary']]);
@@ -205,11 +208,11 @@ describe('Progress reads under the user’s muscles', () => {
   it('reads a muscle’s history across its entries', async () => {
     const { repo } = repository();
     const daily = await repo.computeSelectedMuscleHistoryEffort({
-      start: new Date('2026-10-01T00:00:00Z'), end: NOW, muscleGroupIds: ['back_lats'], timeZone: 'UTC',
+      start: new Date('2026-10-01T00:00:00Z'), end: NOW, muscleGroupIds: ['cm_back'], timeZone: 'UTC',
     });
     expect(daily.daily.map(day => [day.dateKey, day.workingSetCount])).toEqual([['2026-10-13', 1]]);
     const noSecondary = await repo.computeSelectedMuscleHistoryEffort({
-      start: new Date('2026-10-01T00:00:00Z'), end: NOW, muscleGroupIds: ['back_lats'], timeZone: 'UTC', countSecondary: false,
+      start: new Date('2026-10-01T00:00:00Z'), end: NOW, muscleGroupIds: ['cm_back'], timeZone: 'UTC', countSecondary: false,
     });
     expect(noSecondary.daily.map(day => day.workingSetCount)).toEqual([1]);
   });

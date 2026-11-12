@@ -110,9 +110,9 @@ Only owner rows are returned, soft-deleted ones only with `include_deleted`.
 Cursor ordering is stable by name then ID. `revision` is the definition's LWW
 stamp, quoted by every exercise edit.
 `GET /v1/agent/muscles` lists the owner's live muscles (`id`, `name`,
-`family`, plus the owner's setup: `report_group`, the key of the muscle the
-entry reports under or `null` for its own, and `tracked`, a boolean);
-exercise writes must name these ids, never a `report_group`.
+`family`, `report_group`: its combined muscle's key or `null`, and `tracked`)
+and `combined_muscles` (`key`, `name`, `family`);
+exercise writes must name these ids, never a combined muscle's key.
 
 ## Exercise context
 
@@ -355,9 +355,9 @@ returns one bounded object; days and Monday-start weeks are the profile
 {
   "metric_revision": "working_sets_v10", "as_of": "2026-10-28T12:00:00.000Z",
   "time_zone": "Europe/London", "today": "2026-10-28", "week_start": "2026-10-26",
-  "muscle_setup": "broad", "counts_secondary_sets": true, "volume_primary_only": false,
+  "muscle_setup": "combined", "counts_secondary_sets": true, "volume_primary_only": false,
   "targets": { "mode": "per_muscle", "default_weekly_sets": 8, "uploaded": true, "revision": 1761650000000 },
-  "muscles": [{ "id": "chest", "name": "Chest", "family": "Chest", "weekly_target": 12,
+  "muscles": [{ "id": "cm_chest", "name": "Chest", "family": "Chest", "weekly_target": 12,
     "week_sets": 6.5, "recovery_days": [{ "date": "2026-10-25", "sets": null }],
     "today_sets": null, "last_trained_on": "2026-10-27",
     "weekly_sets_last_4_weeks": [{ "week_start": "2026-09-28", "sets": 10 }] }],
@@ -387,12 +387,11 @@ muscle read hit its cap: 200 sessions, 1000 rows per chunk, or 500 muscles.
 (`single` | `per_muscle`), `overrides` (`{muscle_id: n | null}`, null clears).
 Targets are positive whole numbers, ids muscles the user's setup reports (`400
 VALIDATION_ERROR` naming the id; [[muscle.weekly-targets]]); a stale revision
-is `409 REVISION_CONFLICT`. The setup scope is derived as the app does
-(`muscle-targets.ts`); `agent_set_muscle_targets` merges into it, keeps the
-other scopes and the count-secondary switch, and stamps the row past the wall
-clock so devices pull it. While `uploaded` is false it builds on app defaults
-(first writer wins). It returns `scope`, `overrides`, `targets`,
-`idempotent_replay`.
+is `409 REVISION_CONFLICT`. `agent_set_muscle_targets` merges into
+`muscle_targets` (seeded from the legacy targets the status shows), keeps
+other columns, and stamps the row past the wall clock so devices pull it. While `uploaded` is
+false it builds on app defaults (first writer wins). It returns `overrides`,
+`targets`, `idempotent_replay`.
 
 ## Working sets only
 

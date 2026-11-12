@@ -63,8 +63,9 @@ import { Storage } from 'expo-sqlite/kv-store';
 import { getSignedInUserId } from '@/src/auth/session-user';
 import { __resetClockForTests, PRIMARY_RUNTIME_STATE_ID } from '@/src/data/clock';
 import { CURRENT_APP_VERSION, SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
-import { deriveMuscleReportPreset, listMuscleReportRows } from '@/src/data/muscle-report-settings';
-import { muscleGroups, syncRuntimeState } from '@/src/data/schema';
+import { readMuscleSetup } from '@/src/data/muscle-report-settings';
+import { eq } from 'drizzle-orm';
+import { muscleGroups, syncRuntimeState, userSettings } from '@/src/data/schema';
 import {
   __resetAccountLocalPreferencesForTests,
   drainAccountLocalSyncedWrites,
@@ -88,6 +89,8 @@ type ServerSettings = {
   weekly_working_set_target: number | null;
   muscle_target_mode: string | null;
   muscle_target_overrides: unknown;
+  muscle_targets: unknown;
+  combined_muscles: unknown;
   count_secondary_muscles: boolean | null;
   volume_primary_only: boolean | null;
   client_updated_at_ms: number;
@@ -158,10 +161,9 @@ const kvTargets = () => Object.fromEntries(syncedPreferenceFields.map((field) =>
 /** Each muscle's target on Today's Plan, read as `useTodayPlan` reads it on the device in hand. */
 const todayPlanTargets = async (): Promise<Record<string, number>> => {
   const values = preferences();
-  const setup = deriveMuscleReportPreset(await listMuscleReportRows());
   const plan = await loadTodayPlan(new Date(), {
     weeklyTarget: values.weeklyWorkingSetTarget,
-    overrides: effectiveMuscleTargetOverrides(values, setup),
+    overrides: effectiveMuscleTargetOverrides(values),
     countSecondary: values.progressCountSecondary,
   });
   return Object.fromEntries(plan.muscles.map((muscle) => [muscle.muscleGroupId, muscle.target]));
@@ -170,7 +172,7 @@ const todayPlanTargets = async (): Promise<Record<string, number>> => {
 const serverSettings = async (): Promise<ServerSettings | null> => {
   const { data, error } = await createLocalServiceRoleClient(config).schema(SYNC_RPC_SCHEMA)
     .from('user_settings')
-    .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,volume_primary_only,client_updated_at_ms,deleted_at')
+    .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,muscle_targets,combined_muscles,count_secondary_muscles,volume_primary_only,client_updated_at_ms,deleted_at')
     .eq('owner_user_id', account.userId)
     .eq('id', 'settings')
     .maybeSingle();
@@ -189,9 +191,8 @@ const coachSetsTargets = async (changes: Record<string, unknown>): Promise<void>
       p_idempotency_key: `muscle-targets-live-${Date.now()}-${runSeq}`,
       p_payload_sha256: createHash('sha256').update(JSON.stringify(changes)).digest('hex'),
       p_expected_revision: row && row.deleted_at === null ? row.client_updated_at_ms : 0,
-      // The route derives the scope from the server's muscle rows; the devices
-      // hold the same system muscles, so the device's setup is the one it derives.
-      p_scope: deriveMuscleReportPreset(await listMuscleReportRows()),
+      // The route passes the map the status showed; it seeds only a row with none stored.
+      p_base_targets: row?.muscle_targets ?? {},
       p_changes: changes,
     }) as { error: { message: string } | null };
   if (error) throw new Error(`the coach's write failed: ${error.message}`);
@@ -245,7 +246,7 @@ describe('synced muscle targets against a live endpoint', () => {
     const first = newDevice({
       weeklyWorkingSetTarget: '12',
       muscleTargetMode: 'per-muscle',
-      muscleTargetOverrides: JSON.stringify({ detailed: { chest: 15 } }),
+      muscleTargetOverrides: JSON.stringify({ chest: 15 }),
       progressCountSecondary: 'false',
     });
     const second = newDevice({ weeklyWorkingSetTarget: '6', progressCountSecondary: 'true' });
@@ -255,7 +256,7 @@ describe('synced muscle targets against a live endpoint', () => {
     expect(uploaded).toMatchObject({
       weekly_working_set_target: 12,
       muscle_target_mode: 'per_muscle',
-      muscle_target_overrides: { detailed: { chest: 15 } },
+      muscle_targets: { chest: 15 },
       count_secondary_muscles: false,
     });
     expect(kvTargets()).toEqual({
@@ -267,7 +268,7 @@ describe('synced muscle targets against a live endpoint', () => {
     expect(preferences()).toMatchObject({
       weeklyWorkingSetTarget: 12,
       muscleTargetMode: 'per-muscle',
-      muscleTargetOverrides: { detailed: { chest: 15 } },
+      muscleTargetOverrides: { chest: 15 },
       progressCountSecondary: false,
     });
     expect(kvTargets()).toEqual({
@@ -297,11 +298,43 @@ describe('synced muscle targets against a live endpoint', () => {
     await drainAccountLocalSyncedWrites();
     await syncOn(phone);
     expect(await serverSettings()).toMatchObject({
-      weekly_working_set_target: 7, muscle_target_mode: 'per_muscle', muscle_target_overrides: { detailed: { chest: 14 } },
+      weekly_working_set_target: 7, muscle_target_mode: 'per_muscle', muscle_targets: { chest: 14 },
     });
 
     await syncOn(tablet);
     expect(preferences()).toMatchObject({ weeklyWorkingSetTarget: 7, muscleTargetMode: 'per-muscle' });
     expect(await todayPlanTargets()).toMatchObject({ chest: 14, delts_front: 7 });
+  }, LIVE_TIMEOUT_MS);
+  it('migrates a Broad setup once on the first device to sync, which the second device adopts as is', async () => {
+    // What an older build left: Broad keys on the rows and per-setup targets, no definitions.
+    const laptop = newDevice();
+    await useDevice(laptop);
+    for (const id of ['chest', 'serratus_anterior']) {
+      laptop.database.update(muscleGroups).set({ reportGroup: 'chest', localDirty: true, localUpdatedAtMs: 1 })
+        .where(eq(muscleGroups.id, id)).run();
+    }
+    laptop.database.insert(userSettings).values({ id: 'settings', weeklyWorkingSetTarget: 9, muscleTargetMode: 'per_muscle',
+      muscleTargetOverrides: JSON.stringify({ custom: { chest: 11, triceps: 6 }, detailed: { chest: 40 } }),
+      countSecondaryMuscles: false, volumePrimaryOnly: false, localDirty: true, localUpdatedAtMs: 1 }).run();
+    Storage.setItemSync(syncedTargetsAdoptedKey(profile), 'true');
+
+    await syncOn(laptop);
+    const migrated = await serverSettings();
+    expect(migrated).toMatchObject({
+      combined_muscles: [{ key: 'cm_chest', name: 'Chest', family: 'Chest' }],
+      muscle_targets: { cm_chest: 11, triceps: 6 },
+    });
+    const { data: rows } = await createLocalServiceRoleClient(config).schema(SYNC_RPC_SCHEMA).from('muscle_groups')
+      .select('id,report_group').eq('owner_user_id', account.userId);
+    expect((rows as Array<{ id: string; report_group: string | null }>).filter((row) => row.report_group !== null)
+      .map((row) => [row.id, row.report_group]).sort()).toEqual([['chest', 'cm_chest'], ['serratus_anterior', 'cm_chest']]);
+    expect(await todayPlanTargets()).toMatchObject({ cm_chest: 11, triceps: 6, quads: 9 });
+
+    const tablet = newDevice();
+    await syncOn(tablet);
+    expect((await readMuscleSetup()).definitions).toEqual([{ key: 'cm_chest', name: 'Chest', family: 'Chest' }]);
+    expect(preferences().muscleTargetOverrides).toEqual({ cm_chest: 11, triceps: 6 });
+    expect(await todayPlanTargets()).toMatchObject({ cm_chest: 11 });
+    expect((await serverSettings())?.client_updated_at_ms).toBe(migrated?.client_updated_at_ms);
   }, LIVE_TIMEOUT_MS);
 });

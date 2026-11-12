@@ -1,5 +1,5 @@
-import { MuscleSettingsPage } from '@/components/preferences/muscle-settings';
+import { MuscleTargetsSettingsPage } from '@/components/preferences/muscle-settings';
 
 export default function MuscleTargetsRoute() {
-  return <MuscleSettingsPage page="targets" />;
+  return <MuscleTargetsSettingsPage />;
 }

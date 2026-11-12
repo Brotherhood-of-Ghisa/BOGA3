@@ -2,7 +2,7 @@
 // the catalogue's anatomy entries read through the user's muscle setup, for
 // the screens that list, search or edit an exercise's muscles.
 import type { MuscleReportAssignment, ReportedMuscle } from '@/src/data/muscle-analytics';
-import { buildMuscleReportAssignment, type MuscleReportRow } from '@/src/data/muscle-report-presets';
+import { buildMuscleReportAssignment, type CombinedMuscle, type MuscleReportRow } from '@/src/data/combined-muscles';
 
 export type MuscleSetup = {
   /** Entry id → the muscle it reports under and whether it is tracked. */
@@ -17,9 +17,14 @@ export const EMPTY_MUSCLE_SETUP: MuscleSetup = { assignment: new Map(), muscles:
 const bySortOrderThenName = (left: ReportedMuscle, right: ReportedMuscle): number =>
   left.sortOrder - right.sortOrder || left.displayName.localeCompare(right.displayName);
 
-/** Reads the user's entry rows into the muscles every editor and search shows. */
-export const buildMuscleSetup = (entries: readonly MuscleReportRow[]): MuscleSetup => {
-  const assignment = buildMuscleReportAssignment(entries);
+/**
+ * Reads the user's entry rows and stored combined-muscle definitions (null:
+ * none stored yet) into the muscles every editor and search shows.
+ */
+export const buildMuscleSetup = (
+  entries: readonly MuscleReportRow[], combinedMuscles: readonly CombinedMuscle[] | null,
+): MuscleSetup => {
+  const assignment = buildMuscleReportAssignment(entries, combinedMuscles);
   const musclesById: Record<string, ReportedMuscle> = {};
   for (const { muscle, tracked } of assignment.values()) {
     if (tracked && !musclesById[muscle.id]) musclesById[muscle.id] = muscle;
@@ -34,6 +39,22 @@ export const isUntrackedEntry = (assignment: MuscleReportAssignment, entryId: st
 /** The muscle an entry reports under: its assigned muscle's id, else the entry itself. */
 export const muscleIdOfEntry = (assignment: MuscleReportAssignment, entryId: string): string =>
   assignment.get(entryId)?.muscle.id ?? entryId;
+
+/**
+ * The entry a new mapping to muscle `muscleId` is written to
+ * ([[muscle.no-breakdown]]): the muscle's first tracked entry by sort order
+ * (an own muscle is its entry). Undefined when the muscle has entries but none
+ * tracked; an id the setup does not know is written as itself.
+ */
+export const writableEntryOf = (assignment: MuscleReportAssignment, muscleId: string): string | undefined => {
+  let known = false;
+  for (const [entryId, { muscle, tracked }] of assignment) {
+    if (muscle.id !== muscleId) continue;
+    if (tracked) return entryId;
+    known = true;
+  }
+  return known ? undefined : muscleId;
+};
 
 /**
  * An exercise's mappings re-keyed from anatomy entry to the user's muscle,

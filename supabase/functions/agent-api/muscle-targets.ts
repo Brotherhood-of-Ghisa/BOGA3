@@ -7,9 +7,9 @@
 // The SQL writer (`agent_set_muscle_targets` in
 // supabase/migrations/20261028170000_agent_set_muscle_targets.sql) trusts this
 // shape and re-checks only what needs the database: the revision and the merge.
-import { buildMuscleReportAssignment, type MuscleReportRow } from '../../../apps/mobile/src/data/muscle-report-presets.ts';
-import { deriveMuscleReportPreset } from '../../../apps/mobile/src/data/muscle-report-setup.ts';
-import type { MuscleTargetScope } from '../../../apps/mobile/src/preferences/muscle-targets.ts';
+import {
+  buildMuscleReportAssignment, type CombinedMuscle, type MuscleReportRow,
+} from '../../../apps/mobile/src/data/combined-muscles.ts';
 
 const MAX_ID_LENGTH = 200;
 
@@ -91,18 +91,17 @@ export const normalizeMuscleTargetsWrite = (body: JsonObject): MuscleTargetsWrit
 };
 
 /**
- * The scope the write targets and the muscle ids it may name. The scope is the
- * setup the rows spell out, as the app derives it; the ids are the muscles that
- * setup reports and still counts (a Broad muscle has its anchor's id).
+ * The muscle ids a write may name: the muscles the user's setup reports and
+ * still counts, as the app reads it (a combined muscle has its key).
  */
-export const muscleTargetScope = (
-  rows: readonly MuscleReportRow[],
-): { scope: MuscleTargetScope; reportedIds: Set<string> } => {
+export const reportedMuscleIds = (
+  rows: readonly MuscleReportRow[], combinedMuscles: readonly CombinedMuscle[] | null,
+): Set<string> => {
   const reportedIds = new Set<string>();
-  for (const { muscle, tracked } of buildMuscleReportAssignment(rows).values()) {
+  for (const { muscle, tracked } of buildMuscleReportAssignment(rows, combinedMuscles).values()) {
     if (tracked) reportedIds.add(muscle.id);
   }
-  return { scope: deriveMuscleReportPreset(rows), reportedIds };
+  return reportedIds;
 };
 
 /** Rejects an override naming a muscle outside the user's reported setup, naming the id. */

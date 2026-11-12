@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { deriveMuscleReportPreset } from '@/src/data/muscle-report-settings';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
@@ -29,7 +28,7 @@ const systemNow = () => new Date();
  * The Plan page's read, again on every focus, at local midnight, on return to
  * the foreground and when a weekly target or the secondary-set default changes.
  * Per-muscle targets ([[muscle.weekly-targets]]) wait for the catalogue, which
- * names the muscle setup they belong to.
+ * holds the muscle setup whose reported ids they are keyed by.
  * The first read shows loading; a re-read keeps the page until it lands.
  */
 export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow }: UseTodayPlanInput) {
@@ -40,7 +39,7 @@ export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow 
   const calculationInputs = [calculationRevision, catalog.exercises, catalog.muscleGroups] as const;
   const previousInputs = useRef(calculationInputs);
   const perMuscle = values.muscleTargetMode === 'per-muscle';
-  const overrides = effectiveMuscleTargetOverrides(values, deriveMuscleReportPreset(catalog.muscleGroups));
+  const overrides = effectiveMuscleTargetOverrides(values);
   const overridesKey = JSON.stringify(overrides);
   const targetsReady = !perMuscle || catalog.status === 'ready';
   const [result, setResult] = useState<{ context: number; state: TodayPlanState }>({ context, state: { status: 'loading' } });

@@ -2,6 +2,7 @@ import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calculation-preference';
 import { refreshAccountLocalSyncedPreferences } from '@/src/preferences/account-local';
 import { adoptOrUploadMuscleTargets } from '@/src/sync/muscle-target-adoption';
+import { migrateLegacyMuscleSetupLogged } from '@/src/sync/combined-muscle-migration';
 // Client sync cycle: converges local SQLite state with the server by issuing
 // PULL -> PUSH -> PULL until both ends are quiet for one full round.
 //
@@ -588,6 +589,10 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TARGET('muscle_target_mode', 'muscleTargetMode'),
     // JSON text on the wire; the server stores jsonb.
     TARGET('muscle_target_overrides', 'muscleTargetOverrides'),
+    // JSON text on the wire, like the overrides: the single target map and
+    // the combined-muscle definitions. Null never clears either.
+    TARGET('muscle_targets', 'muscleTargets'),
+    TARGET('combined_muscles', 'combinedMuscles'),
     TARGET('count_secondary_muscles', 'countSecondaryMuscles'),
     TARGET('volume_primary_only', 'volumePrimaryOnly'),
     TS('created_at', 'createdAt'),
@@ -2171,6 +2176,7 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
       if (userId && !targetsAdoptionChecked) {
         targetsAdoptionChecked = true;
         await adoptOrUploadMuscleTargets(userId);
+        await migrateLegacyMuscleSetupLogged();
       }
       const pushed = await runPushLegRecoveringLostAttachment(database);
       if (pushed === null) {

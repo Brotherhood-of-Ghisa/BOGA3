@@ -307,7 +307,7 @@ total stays a count of physical sets.
 It allocates raw Volume before re-keying entries to muscles
 ([[muscle.report-groups]]) and dropping untracked entries
 ([[muscle.untracked]]). Merged entries combine as [[muscle.set-count]]
-says; the strongest role labels the result. A merged muscle takes its anchor's id;
+says; the strongest role labels the result. A combined muscle takes its own key as id;
 Detailed is the identity. Exercise figures never read it.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and
