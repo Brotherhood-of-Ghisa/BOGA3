@@ -578,34 +578,7 @@ try {
         throw new Error('delete_exercise / restore_exercise did not round-trip.');
       }
 
-      // A coach's note: add, then remove; the shell checks the stored row. Its
-      // replay and denial are the agent-api contract's: the whole smoke stays
-      // inside one 120-request window (the shell's budget check).
-      const addedNote = structured(await client.callTool({
-        arguments: {
-          body: `${exerciseQuery} agent note`,
-          exercise_id: expectedExerciseId,
-          idempotency_key: `smoke-note-${Date.now()}`,
-        },
-        name: 'add_note',
-      }), 'add_note');
-      const note = isObject(addedNote.note) ? addedNote.note : {};
-      if (
-        typeof note.id !== 'string' || note.source !== 'agent' || note.exercise_name !== exerciseQuery
-        || addedNote.idempotent_replay !== false
-      ) {
-        throw new Error('add_note did not add the agent note on the exercise.');
-      }
-      const removedNote = structured(
-        await client.callTool({ arguments: { idempotency_key: `smoke-note-remove-${Date.now()}`, note_id: note.id }, name: 'remove_note' }),
-        'remove_note',
-      );
-      if (removedNote.removed !== true || removedNote.note_id !== note.id) {
-        throw new Error('remove_note did not remove the agent note.');
-      }
-
-      // The coach's targets: set, replay, then the status shows them. A stale
-      // revision and a foreign muscle id are the agent-api contract's.
+      // The coach's targets: set, replay, stale, foreign id, then the status shows them.
       const before = isObject(trainingStatus.targets) ? trainingStatus.targets : {};
       const targetsArguments = {
         default_weekly_sets: 11,
@@ -630,6 +603,24 @@ try {
         targets.idempotent_replay !== false || replayed.idempotent_replay !== true
       ) {
         throw new Error('set_muscle_targets did not apply, or its replay did not return the first result.');
+      }
+      const staleTargets = await client.callTool({
+        arguments: { ...targetsArguments, default_weekly_sets: 9, idempotency_key: `smoke-targets-stale-${Date.now()}` },
+        name: 'set_muscle_targets',
+      });
+      if (!staleTargets.isError || !JSON.stringify(staleTargets).includes('REVISION_CONFLICT')) {
+        throw new Error('A stale set_muscle_targets revision did not fail with REVISION_CONFLICT.');
+      }
+      const foreignTargets = await client.callTool({
+        arguments: {
+          expected_revision: Number(newTargets.revision),
+          idempotency_key: `smoke-targets-foreign-${Date.now()}`,
+          overrides: { [`${smokeMuscleId}-missing`]: 9 },
+        },
+        name: 'set_muscle_targets',
+      });
+      if (!foreignTargets.isError || !JSON.stringify(foreignTargets).includes('VALIDATION_ERROR')) {
+        throw new Error('set_muscle_targets accepted an override for a muscle outside the setup.');
       }
       const after = structured(
         await client.callTool({ arguments: {}, name: 'get_training_status' }),

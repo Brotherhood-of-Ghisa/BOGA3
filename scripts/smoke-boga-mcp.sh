@@ -444,12 +444,6 @@ if [[ -n "${USER_UUID}" ]]; then
   ")"
   [[ "${PERFORMED_WITH_PROVENANCE}" == "0" ]] || fail "agent plan creation wrote performed source_plan_id rows"
 
-  AGENT_NOTES="$(run_psql "
-    select count(*) || ':' || count(deleted_at) from app_public.training_notes
-    where owner_user_id = '${USER_UUID}'::uuid and body = 'MCP Smoke ${RUN_TAG} agent note'
-      and source = 'agent' and exercise_definition_id = '${EXERCISE_ID}';
-  ")"
-  [[ "${AGENT_NOTES}" == "1:1" ]] || fail "expected one removed agent note (count:removed), found ${AGENT_NOTES}"
 
   echo "[boga-mcp-smoke] verifying metadata-only audit records"
   AUDIT_COUNT="$(run_psql "

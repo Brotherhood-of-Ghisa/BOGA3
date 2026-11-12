@@ -85,6 +85,7 @@ NOW_MS="$(($(date +%s) * 1000))"
 # IDs for user A's full sixteen-table FK chain (deleted by the helper) plus a
 # single user B gym that must survive (owner-scoping check).
 A_BW="dw-${RUN_TAG}-abw"
+A_NOTE="dw-${RUN_TAG}-anote"
 A_GYM="dw-${RUN_TAG}-agym"
 A_EDEF="dw-${RUN_TAG}-aedef"
 A_MG="dw-${RUN_TAG}-amg"
@@ -120,6 +121,7 @@ cleanup_rows() {
     delete from app_public.muscle_groups            where id in ('${A_MG}');
     delete from app_public.exercise_tag_definitions where id in ('${A_ETD}');
     delete from app_public.body_weight_measurements where id = '${A_BW}';
+    delete from app_public.training_notes where id = '${A_NOTE}';
     delete from app_public.user_settings           where owner_user_id = '${USER_A_UUID}'::uuid;
     delete from app_public.exercise_group_links     where id in ('${A_EGL}');
     delete from app_public.exercise_definitions     where id in ('${A_EDEF}');
@@ -294,6 +296,11 @@ run_psql_sql "
       (owner_user_id, id, weight_kg, measured_at, created_at, updated_at, client_updated_at_ms)
     values ('${USER_A_UUID}'::uuid, '${A_BW}', 80, ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
 
+    -- A general note: no exercise FK cascade can remove it, only the wipe.
+    insert into app_public.training_notes
+      (owner_user_id, id, body, noted_on, source, created_at, updated_at, client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid, '${A_NOTE}', 'General', '2026-11-12', 'app', ${NOW_MS}, ${NOW_MS}, ${NOW_MS});
+
     -- A group's bound reading context: not a Sync row, so not in the count.
     insert into app_public.group_set_body_weight_bindings (member_user_id, set_id, source_key, context)
     values ('${USER_A_UUID}'::uuid, '${A_SET}', 'dw-key', jsonb_build_object('body_weight_kg', 80));
@@ -328,8 +335,8 @@ deleted="$(run_psql_sql "
   commit;
 " | grep -E '^[0-9]+$' | head -n1)"
 
-if [[ "${deleted}" != "17" ]]; then
-  fail "scenario 3 expected 17 rows deleted (including workout permission), got '${deleted}'"
+if [[ "${deleted}" != "18" ]]; then
+  fail "scenario 3 expected 18 rows deleted (including workout permission), got '${deleted}'"
 fi
 pass "scenario 3: helper returned rows_deleted = 17"
 [[ "$(run_psql "select count(*) from public.agent_workout_permissions where owner_user_id='${USER_A_UUID}';")" == 0 ]] ||
@@ -351,6 +358,7 @@ remaining_a="$(run_psql "
   + (select count(*) from app_public.exercise_sets            where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_SET}')
   + (select count(*) from app_public.session_exercise_tags    where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_SXTAG}')
   + (select count(*) from app_public.body_weight_measurements where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_BW}')
+  + (select count(*) from app_public.training_notes           where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_NOTE}')
   + (select count(*) from app_public.user_settings           where owner_user_id = '${USER_A_UUID}'::uuid)
   + (select count(*) from app_public.exercise_group_links     where owner_user_id = '${USER_A_UUID}'::uuid and id = '${A_EGL}');
 ")"

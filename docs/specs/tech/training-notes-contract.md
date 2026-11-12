@@ -36,7 +36,9 @@ ones included, to the destination. Notes stay out of `exercise_merge_snapshot`
 (`exercise-merge-contract.md`), so the merge stamp also outruns every note
 clock and the moved rows reach devices through the ordinary layer-1 pull. A
 note written offline against the source after the merge keeps the source,
-which stays listed under its name.
+which stays listed under its name. Likewise, an offline removal stamped after
+the merge re-pushes the whole row with the source id; that matters only to a
+future restore, which must repoint such a note.
 
 ## Agent API
 
