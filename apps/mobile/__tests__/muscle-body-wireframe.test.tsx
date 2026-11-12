@@ -1,4 +1,4 @@
-import { Dimensions, StyleSheet } from 'react-native';
+import { Dimensions, StyleSheet, Text } from 'react-native';
 import { act, fireEvent } from '@testing-library/react-native';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { createMuscleWireframeRenderer } from '@/components/stats/muscle-wireframe-renderer';
@@ -108,5 +108,23 @@ it('fits the whole figure and controls on compact phones while retaining the lar
     expect(StyleSheet.flatten(view.getByTestId('stats-muscle-body-viewport').props.style).height).toBe(280);
     act(() => Dimensions.set({ window: { width: 402, height: 874, scale: 3, fontScale: 1 } }));
     expect(StyleSheet.flatten(view.getByTestId('stats-muscle-body-viewport').props.style).height).toBe(420);
+  } finally { act(() => Dimensions.set({ window: original })); }
+});
+
+it.each([320, 375, 402])('keeps the full Wireframe selector label at %spt without a compact-filter width cap', width => {
+  const original = Dimensions.get('window');
+  try {
+    act(() => Dimensions.set({ window: { width, height: 667, scale: 2, fontScale: 1 } }));
+    const view = renderWithTheme(<MuscleBodyCard muscles={muscles} metric="workingSetCount" selectedId="brachialis" onSelect={jest.fn()} />);
+    const selector = view.getByTestId('stats-muscle-body-overlay-toggle');
+    expect(selector.props.accessibilityLabel).toBe('Muscle overlay: Wireframe');
+    expect(StyleSheet.flatten(selector.props.style).maxWidth).toBeUndefined();
+    const label = selector.findByType(Text);
+    expect(label.props.children).toBe('Wireframe');
+    expect(label.props.numberOfLines).toBeUndefined();
+    fireEvent.press(selector);
+    expect(view.getByTestId('stats-muscle-body-overlay-toggle')).toHaveTextContent('Patches');
+    fireEvent.press(view.getByTestId('stats-muscle-body-overlay-toggle'));
+    expect(view.getByTestId('stats-muscle-body-overlay-toggle')).toHaveTextContent('Wireframe');
   } finally { act(() => Dimensions.set({ window: original })); }
 });

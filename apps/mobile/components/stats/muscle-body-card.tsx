@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } fr
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 import {
+  ActionButton,
   Card,
   FigureText,
   Icon,
@@ -116,14 +117,13 @@ function MuscleBodyHeader({
           testIDPrefix="stats-muscle-body-angle"
           value={orientation}
         />
-        <FilterChip
+        <ActionButton
           accessibilityHint="Switches between wireframe and filled patch views"
           accessibilityLabel={`Muscle overlay: ${overlay === 'contour' ? 'Patches' : 'Wireframe'}`}
-          accessibilityRole="button"
           label={overlay === 'contour' ? 'Patches' : 'Wireframe'}
-          on={false}
           onPress={() => onOverlayChange(overlay === 'contour' ? 'wireframe' : 'contour')}
           size="compact"
+          variant="outline"
           testID="stats-muscle-body-overlay-toggle"
         />
       </View>
