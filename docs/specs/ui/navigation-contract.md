@@ -8,9 +8,8 @@ For route owners, load `screen-map.md`.
 - `expo-router`, file-based. Root layout `apps/mobile/app/_layout.tsx`; the root
   stack and every root screen declaration
   `apps/mobile/components/navigation/root-stack.tsx`.
-- Parameterized links use encoding builders in
-  `apps/mobile/src/navigation/routes.ts` and
-  `apps/mobile/src/navigation/active-session-entry.ts` encode ids.
+- Encoding builders in `apps/mobile/src/navigation/routes.ts` and
+  `apps/mobile/src/navigation/active-session-entry.ts` build parameterized links.
 - Tab roots live in the `(tabs)` group (`apps/mobile/app/(tabs)/`), whose
   parenthesised name never appears in a URL (`/stats-history` is
   `app/(tabs)/stats-history.tsx`). Every other screen is a root-stack route.
@@ -24,8 +23,7 @@ For route owners, load `screen-map.md`.
   (`apps/mobile/components/navigation/main-tab-bar.tsx`) on every screen that
   shows tabs. `/stats-history`,
   `/exercise-catalog` and `/settings` each map to a canonical owner
-  (`resolveMainTab`), so every recognised root keeps exactly one tab selected
-  and an unrecognised one selects none. A tab root in
+  (`resolveMainTab`), so a recognised root selects one tab, an unrecognised none. A tab root in
   `apps/mobile/app/(tabs)/_layout.tsx` must appear in `main-tabs.ts` as a
   destination or as a preserved root with an owner, or it renders with no tab
   selected.
@@ -97,6 +95,7 @@ one access level. Screens never redirect to gate themselves:
 | `/rm-curve` | `exerciseDefinitionId` | required; trimmed first value when repeated. A changed id remounts chart scope; invalid targets stay unavailable in route. The window anchors on focus |
 | `/sessions` | `week`, `day` | where the list opens; malformed: the top |
 | `/exercise-history` | `exerciseDefinitionId` | required |
+| `/notes` | `exerciseId` | optional; absent: every note |
 | | `period` | `week` (legacy `7`), `progress`, `history`; otherwise History look-back ([[comparison.allowed-periods]]) |
 | | `tagDefinitionId`, `gymId`, `currentGymId` | pre-applied filters; `currentGymId` applies only under the current-gym past-records preference |
 | `/completed-session/[sessionId]` | `intent=edit` | replaces to `/session/<sessionId>` |
@@ -115,7 +114,7 @@ one access level. Screens never redirect to gate themselves:
 | `/programme/[programmeId]` | `programmeId` | required; missing, unknown or deleted renders the in-route unavailable state |
 | `/group/[groupId]/leaderboards/[exerciseId]`, `…/history` | `metric=volume\|e1rm`, `scope=certified\|all` | absent or invalid metric uses the comparison's current default, absent or invalid scope `certified` |
 
-| `/group/[groupId]/cows`, `…/cows/[cowId]` | `cowId`, `metric=e1rm\|improvement\|volume` | public identity and opening metric only; invalid/disabled metric uses the first enabled metric. A metric change replaces result pages without pushing a route |
+| `/group/[groupId]/cows`, `…/cows/[cowId]` | `cowId`, `metric=e1rm\|improvement\|volume` | public identity and opening metric; an invalid/disabled one uses the first enabled. Changing it replaces result pages, never pushing |
 | `/group/[groupId]/cows/schedule` | `cowId` | absent creates next week; present edits that definition before start only. The static schedule segment wins over cowId |
 | `/group/[groupId]/edit` | `focusTimeZone=1` | focuses calendar; Back refreshes management ([[groups.cow-calendar]]) |
 
@@ -136,7 +135,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/sync-setup` | `index` → `/today` | the first sync drains. Neither gate screen ever navigates itself: the stack drops it and the router lands |
 | `/sync-setup` | `/sign-in` | the latest cycle outcome is `AUTH_REQUIRED` (no Retry offered) |
 | `/today` ↔ `/train` ↔ `/progress` ↔ `/groups` ↔ `/more` | | `MainTabBar` |
-| `/sessions`, plan, programme, History, own group session | `/train` (the workout) | every way into an active workout (`dismissTo`). Train's own start swaps in place; `apps/mobile/src/session-entry/coordinator.ts` serialises requests: never two drafts |
+| `/sessions`, plan, programme, History, own group session | `/train` (the workout) | every way into a workout (`dismissTo`); Train's start swaps in place; `apps/mobile/src/session-entry/coordinator.ts` serialises requests: never two drafts |
 | the workout | `/completed-session/<id>?presentation=completion` | Finish, after its cleanup prompts and the completion write (`push` over the tabs, a fade); Train shows its disc beneath |
 | the workout | Train's disc | Abandon after its confirmation, in place |
 | `/session/<id>` (completed edit) | the previous screen | `Done`: `back()`, else `replace('/completed-session/<id>')`; completion is never replayed |
@@ -145,6 +144,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/session/<id>/add-exercise` | `/exercise-catalog?source=session&intent=manage` | the picker's Manage (`push`, a second sheet over it); the catalogue's post-save `back()` returns the picker as left |
 | the workout | `/session/<id>/compare`, `/gyms` | the ⋮ sheet's `Session vs history` and the gym sheet's `Manage gyms` (sheet closes, then `push`) |
 | `/session/<id>/exercise/<id>` | `/progress-history`, `/exercise-history` | the records panel's `Progress` (`progressHistoryHref`) and ⋮ `Exercise history` (`exerciseHistoryHref`, gym per [[gym.view-filter]]); `push` |
+| `/session/<id>/exercise/<id>` | `/notes?exerciseId=<id>` | ⋮ `Notes` (`notesHref`); `push` |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
 | `/progress-history?exerciseDefinitionId=<id>` | `/exercise-history?exerciseDefinitionId=<id>` | ⋮ `History` (`exerciseHistoryHref`, `push`), preserving gym selection |
 | `/exercise-catalog` | `/exercise-history?exerciseDefinitionId=<id>` | exercise actions `History` (`exerciseHistoryHref`, `push`), no pre-applied filters |
@@ -170,8 +170,8 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/completed-session/<id>` | `/train` | ⋮ `Resume session` in either section, after reopening the same workout; another active workout blocks it and offers `Open current session`. Deleted/missing targets cannot resume |
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`dismissTo`) |
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
-| `/more` | `/exercise-catalog`, `/gyms`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
-| `/exercise-catalog`, `/settings`, `/exercise-history`, `/session/<id>` | a tab | `MainTabBar` (unanimated `dismissTo`: the tabs below are reused) |
+| `/more` | `/exercise-catalog`, `/gyms`, `/notes`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
+| `/exercise-catalog`, `/settings`, `/notes`, `/exercise-history`, `/session/<id>` | a tab | `MainTabBar` (unanimated `dismissTo`: the tabs below are reused) |
 | `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
 | `/settings`, `/settings-muscles`, `/settings-appearance`, `/settings-data-sync` | `/profile`, `/body-weight`, `/theme-custom`, `/settings-*` | rows (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never from workouts |
 | `/settings-everything-else` | `/dev-logs` | `View logs` (`push`), only under `isDevMode()` |
@@ -182,7 +182,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/group/mine` | `/group/<groupId>` | a row tap — the only way to the group page (stream membership items do not navigate) |
 | `/groups`, `/group/mine` | `/group/new`, `/group/join` | `Join group` / `Create group` and the empty-state actions (`push`) |
 | `/group/new`, `/group/join` | `/group/<groupId>` | after create, join, or `Open group` when already a member (`replace`, so Back returns to where the flow started) |
-| `/group/<groupId>` | `/group/<groupId>/invite`, `/edit`, `/members`, `/exercises/new`, `/exercises/<exerciseId>/edit` | role-gated `Invite` / `Edit` actions, the member-count line, and owner/admin `Add exercise` / the exercise sheet's `Rename` (`push`); each returns `back()` after saving |
+| `/group/<groupId>` | `/group/<groupId>/invite`, `/edit`, `/members`, `/exercises/new`, `/exercises/<exerciseId>/edit` | role-gated `Invite` / `Edit`, the member-count line, owner/admin `Add exercise` / `Rename` (`push`); each `back()` after saving |
 | `/group/<groupId>/members` | `/groups` | after a successful leave (`dismissTo('/groups')`); the screen's focus refresh drops the group from the chips |
 | `/groups` | `/group/<groupId>/leaderboards/<exerciseId>` | a podium card on the Leaderboards page (`push`, no query: opens on All) |
 | `…/leaderboards/<exerciseId>` | `…/history?metric=&scope=` | the header `History`, passing the current toggles and rules revision |

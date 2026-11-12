@@ -144,8 +144,9 @@ describe('domain schema and runtime migrations', () => {
     // exercise rest timer default; m0025 adds merge revisions and account-private recovery;
     // m0026 adds synced muscle targets; m0027 separates the Volume choice; m0028 adds reusable plan uses;
     // m0029 extends the revision fence to the session lifecycle; m0030 mirrors server-owned logging control;
-    // m0031 adds combined muscles and the single target map, and re-pulls every row once.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(32);
+    // m0031 adds combined muscles and the single target map, and re-pulls every row once;
+    // m0032 adds training notes.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(33);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),

@@ -74,6 +74,7 @@ const SEGMENT_TO_MAIN_TAB: Readonly<Record<string, MainTabKey>> = {
   // tab bar (`TabOwnedPage`) each have an explicit canonical owner.
   'stats-history': 'progress',
   'exercise-catalog': 'more',
+  notes: 'more',
   settings: 'more',
 };
 
