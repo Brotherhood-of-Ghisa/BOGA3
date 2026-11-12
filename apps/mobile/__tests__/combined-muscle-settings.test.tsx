@@ -133,7 +133,7 @@ describe('Combined muscles', () => {
     expect(headerAdd().props).toMatchObject({ testID: 'settings-combined-muscles-add', disabled: true });
     await screen.findByTestId('settings-combined-muscles-empty');
     expect(screen.getByText('No combined muscles.')).toBeOnTheScreen();
-    expect(headerAdd().props.disabled).toBe(false);
+    expect(headerAdd().props).toMatchObject({ disabled: false });
     fireEvent.press(screen.getByTestId('settings-combined-muscles-new'));
     expect(mockPush).toHaveBeenLastCalledWith('/settings-combined-muscle');
     const options = mockScreenOptions.mock.calls.at(-1)?.[0] as { headerRight: () => ReactElement };
