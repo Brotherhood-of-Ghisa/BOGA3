@@ -45,6 +45,7 @@ const DIRTY_COUNTED_TABLES = [
   schema.sessionPlans,
   schema.sessionPlanExercises,
   schema.sessionPlanSets,
+  schema.trainingNotes,
 ] as const;
 
 /**
