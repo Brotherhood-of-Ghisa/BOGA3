@@ -355,6 +355,9 @@ cleanup() {
       delete from app_public.health_activities
         where user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and external_id like 'agent-api-${RUN_TAG}-%';
+      delete from app_public.training_notes
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
+          and (id like 'agent-api-${RUN_TAG}-%' or body like 'agent-api-${RUN_TAG} %');
       delete from app_public.exercise_sets
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and id like 'agent-api-${RUN_TAG}-%';
@@ -554,7 +557,8 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     and .data.recent_performances[0].volume.unit == "kg_reps"
     and .data.personal_records.estimated_one_rep_max.unit == "kg"
     and (.data.last_performed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
-    and (.data.unavailable_fields | index("user_authored_training_notes")) != null
+    and (.data.unavailable_fields | index("user_authored_training_notes")) == null
+    and .data.training_notes == [] and .data.training_notes_truncated == false
   ' >/dev/null || fail "exercise context schema/calculations are incomplete"
 
 echo "[agent-api-test] verifying cross-owner IDs are indistinguishable from missing IDs"
@@ -1183,6 +1187,15 @@ assert_status "403" "default-denied muscle targets write"
 [[ "$(run_psql "select split_by_gym from app_public.exercise_definitions
   where owner_user_id = '${USER_A_UUID}'::uuid and id = '${EXERCISE_A}';")" == "f" ]] ||
   fail "a denied exercise update changed the exercise"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} denied note" '{body:$body}')" "agent-api-${RUN_TAG}-note-denied"
+assert_status "403" "default-denied note add"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_PERMISSION_REQUIRED" ]] ||
+  fail "default-denied note add did not return PLAN_PERMISSION_REQUIRED"
+agent_post "notes/agent-api-${RUN_TAG}-note-missing/remove" '{}' "agent-api-${RUN_TAG}-note-remove-denied"
+assert_status "403" "default-denied note removal, before the note is resolved"
+[[ "$(run_psql "select count(*) from app_public.training_notes
+  where owner_user_id = '${USER_A_UUID}'::uuid and body like 'agent-api-${RUN_TAG} %';")" == "0" ]] ||
+  fail "a denied note add stored a note"
 
 echo "[agent-api-test] verifying the permission table is app-only and owner-scoped"
 GRANTED_AT="$(fetch_grant_granted_at)"
@@ -2256,6 +2269,180 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '.data.deleted == false and .data.changed
     and tool_name in ('list_muscles','create_exercise','update_exercise','delete_exercise','restore_exercise');")" == \
   "create_exercise,delete_exercise,list_muscles,restore_exercise,update_exercise" ]] ||
   fail "exercise routes are not audited under their tool names"
+
+echo "[agent-api-test] letting the per-minute request windows reset before the notes block"
+# The sections above spend the function's 120-per-minute read window; the
+# notes block makes ~35 requests and the block after it resets the window again.
+sleep 61
+echo "[agent-api-test] verifying training notes: list, filters, context, status and ownership"
+# The date, body, range and cursor rules are the pure module's, in
+# apps/mobile/__tests__/agent-api-notes.test.ts. Here: the reads, ownership,
+# the write permission, receipts and soft removal against the real tables.
+NOTE_PREFIX="agent-api-${RUN_TAG}-note"
+NOTE_EXERCISE_DELETED="agent-api-${RUN_TAG}-exercise-deleted"
+note_day() { node -e "process.stdout.write(new Date(Date.now() + Number(process.argv[1]) * 86400000).toISOString().slice(0, 10))" -- "$1"; }
+NOTE_TODAY="$(note_day 0)"
+# The exercise sections above renamed it; notes name it as it is now.
+EXERCISE_A_NAME="$(run_psql "select name from app_public.exercise_definitions
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = '${EXERCISE_A}';")"
+note_sql_row() { # <owner> <suffix> <exercise or null> <days ago> <created ms> <deleted ms or null>
+  local exercise="null"
+  [[ "$3" == "null" ]] || exercise="'$3'"
+  printf "('%s'::uuid,'%s-%s',%s,'agent-api-%s %s','%s','app',%s,%s,%s,%s)" \
+    "$1" "${NOTE_PREFIX}" "$2" "${exercise}" "${RUN_TAG}" "$2" "$(note_day "-$4")" "$5" "$5" "$6" "$5"
+}
+# User A: an exercise note and a general note on the same day (the newer
+# creation first), an older exercise note, one on a deleted exercise, a
+# general note older than the status's 56 days and a removed note.
+run_psql "
+  begin;
+    set constraints all deferred;
+    insert into app_public.exercise_definitions
+      (owner_user_id,id,name,load_input_mode,created_at,updated_at,deleted_at,client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid,'${NOTE_EXERCISE_DELETED}','Agent A Retired Lift','total_load',
+      ${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.training_notes
+      (owner_user_id,id,exercise_definition_id,body,noted_on,source,created_at,updated_at,deleted_at,client_updated_at_ms)
+    values
+      $(note_sql_row "${USER_A_UUID}" ex1 "${EXERCISE_A}" 3 $((NOW_MS + 1)) null),
+      $(note_sql_row "${USER_A_UUID}" gen "null" 3 "${NOW_MS}" null),
+      $(note_sql_row "${USER_A_UUID}" retired "${NOTE_EXERCISE_DELETED}" 5 "${NOW_MS}" null),
+      $(note_sql_row "${USER_A_UUID}" ex-old "${EXERCISE_A}" 10 "${NOW_MS}" null),
+      $(note_sql_row "${USER_A_UUID}" gen-old "null" 60 "${NOW_MS}" null),
+      $(note_sql_row "${USER_A_UUID}" removed "null" 1 "${NOW_MS}" "${NOW_MS}"),
+      $(note_sql_row "${USER_B_UUID}" b "null" 1 "${NOW_MS}" null);
+  commit;
+" >/dev/null
+# Every check keeps only this run's notes, so leftovers of another run cannot interfere.
+own_notes='[.[] | select(.id | startswith($p)) | .id | ltrimstr($p + "-")]'
+agent_get "notes?limit=50"
+assert_status "200" "list notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" --arg ex "${EXERCISE_A}" --arg name "${EXERCISE_A_NAME}" "
+  (.data.notes | ${own_notes}) == [\"ex1\", \"gen\", \"retired\", \"ex-old\", \"gen-old\"]
+  and (.data.notes[] | select(.id == \$p + \"-retired\") | .exercise_name) == \"Agent A Retired Lift\"
+  and (.data.notes[] | select(.id == \$p + \"-ex1\")
+    | .exercise_id == \$ex and .exercise_name == \$name and .source == \"app\"
+      and (.created_at | test(\"^[0-9]{4}-[0-9]{2}-[0-9]{2}T\")))
+  and (.data.notes[] | select(.id == \$p + \"-gen\") | .exercise_id == null and .exercise_name == null)
+" >/dev/null || fail "list notes order, projection, removal or ownership is wrong"
+agent_get "notes?exercise_id=${EXERCISE_A}&limit=1"
+assert_status "200" "first page of one exercise's notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" "
+  (.data.notes | ${own_notes}) == [\"ex1\"] and (.data.next_cursor | type) == \"string\"" >/dev/null ||
+  fail "the first page of one exercise's notes is wrong"
+agent_get "notes?exercise_id=${EXERCISE_A}&limit=1&cursor=$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.next_cursor')"
+assert_status "200" "second page of one exercise's notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" "
+  (.data.notes | ${own_notes}) == [\"ex-old\"] and .data.next_cursor == null" >/dev/null ||
+  fail "the second page did not continue to the older note and stop"
+agent_get "notes?from=$(note_day -5)&to=$(note_day -3)"
+assert_status "200" "notes in a date range"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" "
+  (.data.notes | ${own_notes}) == [\"ex1\", \"gen\", \"retired\"]" >/dev/null ||
+  fail "the date range did not include both of its days and nothing outside"
+agent_get "notes?from=2026-02-30"
+assert_status "400" "an impossible note date"
+agent_get "notes?from=$(note_day -3)&to=$(note_day -5)"
+assert_status "400" "a reversed note range"
+agent_get "notes?days=7"
+assert_status "400" "an unknown notes parameter"
+agent_get "notes?cursor=$(printf '%s' '{"kind":"activity","id":"x"}' | base64 | tr '+/' '-_' | tr -d '=')"
+assert_status "400" "another route's cursor on notes"
+agent_get "exercises/${EXERCISE_A}/context"
+assert_status "200" "exercise context with notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" "
+  (.data.training_notes | ${own_notes}) == [\"ex1\", \"ex-old\"] and .data.training_notes_truncated == false
+" >/dev/null || fail "exercise context did not return the exercise's own live notes, newest first"
+agent_get "training-status"
+assert_status "200" "training status with general notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" --arg from "$(note_day -55)" "
+  (.data.general_notes.notes | ${own_notes}) == [\"gen\"]
+  and .data.general_notes.from == \$from and (.data.general_notes.complete | type) == \"boolean\"
+  and (tostring | contains(\$p + \"-b\") | not)
+" >/dev/null || fail "training status did not return only the general notes of its 56 days"
+
+echo "[agent-api-test] verifying the coach adds and removes notes, idempotently"
+NOTE_KEY="agent-api-${RUN_TAG}-note-add"
+NOTE_ADD_BODY="$(jq -nc --arg body "  agent-api-${RUN_TAG} agent note  " --arg ex "${EXERCISE_A}" --arg on "$(note_day -1)" \
+  '{body:$body,exercise_id:$ex,noted_on:$on}')"
+agent_post "notes" "${NOTE_ADD_BODY}" "${NOTE_KEY}"
+assert_status "200" "coach adds a note"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg body "agent-api-${RUN_TAG} agent note" --arg ex "${EXERCISE_A}" --arg on "$(note_day -1)" \
+  --arg name "${EXERCISE_A_NAME}" '
+  .data.idempotent_replay == false
+  and (.data.note | .body == $body and .exercise_id == $ex and .exercise_name == $name
+    and .noted_on == $on and .source == "agent" and (.created_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T")))
+' >/dev/null || fail "the added note is wrong"
+AGENT_NOTE_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.note.id')"
+[[ "$(run_psql "select body || '|' || source || '|' || (deleted_at is null) || '|' || (client_updated_at_ms = created_at)
+  from app_public.training_notes where owner_user_id = '${USER_A_UUID}'::uuid and id = '${AGENT_NOTE_ID}';")" == \
+  "agent-api-${RUN_TAG} agent note|agent|true|true" ]] || fail "the stored agent note is wrong"
+agent_post "notes" "${NOTE_ADD_BODY}" "${NOTE_KEY}"
+assert_status "200" "note add replay"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${AGENT_NOTE_ID}" '.data.idempotent_replay == true and .data.note.id == $id' \
+  >/dev/null || fail "a repeated key did not replay the first note"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} other" '{body:$body}')" "${NOTE_KEY}"
+assert_status "409" "note key reused with another body"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IDEMPOTENCY_CONFLICT" ]] ||
+  fail "a reused note key did not return IDEMPOTENCY_CONFLICT"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} general" '{body:$body}')" "${NOTE_KEY}-general"
+assert_status "200" "coach adds a general note dated today"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg today "${NOTE_TODAY}" '.data.note.noted_on == $today and .data.note.exercise_id == null' \
+  >/dev/null || fail "an undated general note was not dated today in the profile zone"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} retired" --arg ex "${NOTE_EXERCISE_DELETED}" '{body:$body,exercise_id:$ex}')" \
+  "${NOTE_KEY}-retired"
+assert_status "409" "note on a deleted exercise"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "EXERCISE_DELETED" ]] ||
+  fail "a note on a deleted exercise did not return EXERCISE_DELETED"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} foreign" --arg ex "${EXERCISE_B}" '{body:$body,exercise_id:$ex}')" \
+  "${NOTE_KEY}-foreign"
+assert_status "400" "note on another owner's exercise"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "FOREIGN_RESOURCE_REFERENCE" ]] ||
+  fail "a note on another owner's exercise did not return FOREIGN_RESOURCE_REFERENCE"
+for BAD in \
+  "$(jq -nc --arg on "$(note_day 1)" '{body:"tomorrow",noted_on:$on}')" \
+  "$(jq -nc '{body:"   "}')" \
+  "$(jq -nc '{body:"ok",noted_on:"2026-02-30"}')" \
+  "$(jq -nc '{body:"ok",source:"app"}')"; do
+  agent_post "notes" "${BAD}" "${NOTE_KEY}-bad"
+  assert_status "400" "invalid note ${BAD}"
+  [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INVALID_ARGUMENT" ]] ||
+    fail "invalid note ${BAD} did not return INVALID_ARGUMENT"
+done
+agent_post "notes" '{"body":"ok"}' ""
+assert_status "400" "note add without an idempotency key"
+agent_put "notes" '{"body":"ok"}' "${NOTE_KEY}-put"
+assert_status "405" "PUT on the notes route"
+[[ "$(run_psql "select count(*) from app_public.training_notes
+  where owner_user_id = '${USER_A_UUID}'::uuid and source = 'agent' and body like 'agent-api-${RUN_TAG} %';")" == "2" ]] ||
+  fail "a rejected or replayed note add stored a note"
+
+agent_post "notes/${AGENT_NOTE_ID}/remove" '{}' "${NOTE_KEY}-remove"
+assert_status "200" "coach removes a note"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${AGENT_NOTE_ID}" '.data == {removed: true, note_id: $id, idempotent_replay: false}' \
+  >/dev/null || fail "the removal response is wrong"
+agent_post "notes/${AGENT_NOTE_ID}/remove" '{}' "${NOTE_KEY}-remove"
+assert_status "200" "note removal replay"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.data.idempotent_replay == true' >/dev/null || fail "a repeated removal key did not replay"
+agent_post "notes/${AGENT_NOTE_ID}/remove" '{}' "${NOTE_KEY}-remove-again"
+assert_status "404" "removing a removed note"
+agent_post "notes/${NOTE_PREFIX}-b/remove" '{}' "${NOTE_KEY}-remove-foreign"
+assert_status "404" "removing another owner's note"
+agent_post "notes/${NOTE_PREFIX}-gen/remove" '{"note_id":"x"}' "${NOTE_KEY}-remove-body"
+assert_status "400" "a removal with a body field"
+[[ "$(run_psql "select string_agg(id || ':' || (deleted_at is not null), ',' order by id) from app_public.training_notes
+  where (owner_user_id = '${USER_A_UUID}'::uuid and id in ('${AGENT_NOTE_ID}', '${NOTE_PREFIX}-gen'))
+     or (owner_user_id = '${USER_B_UUID}'::uuid and id = '${NOTE_PREFIX}-b');")" == \
+  "${NOTE_PREFIX}-b:false,${NOTE_PREFIX}-gen:false,${AGENT_NOTE_ID}:true" ]] ||
+  fail "removal soft-deleted the wrong notes"
+agent_get "notes?exercise_id=${EXERCISE_A}"
+assert_status "200" "notes after a removal"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${AGENT_NOTE_ID}" '(.data.notes | map(.id) | index($id)) == null' >/dev/null ||
+  fail "a removed note is still listed"
+[[ "$(run_psql "select string_agg(distinct tool_name, ',' order by tool_name) from public.agent_access_audit
+  where owner_user_id = '${USER_A_UUID}'::uuid and oauth_client_id = '${AGENT_CLIENT_ID}'
+    and tool_name in ('list_notes','add_note','remove_note') and http_status = 200;")" == "add_note,list_notes,remove_note" ]] ||
+  fail "note routes are not audited under their tool names"
 
 echo "[agent-api-test] letting the per-minute request windows reset before the targets block"
 # The earlier sections spend most of the function's 120-per-minute read window;

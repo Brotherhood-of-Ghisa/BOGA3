@@ -21,6 +21,9 @@ const skipReads = process.env.BOGA_MCP_SMOKE_SKIP_READS === '1';
 // Seeded locally: `<prefix>-run` (running) and `<prefix>-lift` (a strength
 // workout inside the seeded session).
 const activityPrefix = process.env.BOGA_MCP_SMOKE_ACTIVITY_PREFIX?.trim() ?? '';
+// Seeded locally: `<prefix>-general` (no exercise) and `<prefix>-exercise` (on
+// the seeded exercise), both dated two days ago.
+const notePrefix = process.env.BOGA_MCP_SMOKE_NOTE_PREFIX?.trim() ?? '';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -81,6 +84,7 @@ try {
   const tools = await client.listTools();
   const names = tools.tools.map((tool) => tool.name).sort();
   const expectedNames = [
+    'add_note',
     'create_exercise',
     'create_session_plan',
     'create_training_programme',
@@ -98,7 +102,9 @@ try {
     'get_upcoming_session_plans',
     'get_workout_detail',
     'list_muscles',
+    'list_notes',
     'log_sets',
+    'remove_note',
     'restore_exercise',
     'search_exercises',
     'set_muscle_targets',
@@ -213,6 +219,34 @@ try {
       .filter((entry) => entry.activity_type === 'running');
     if (runs.length === 0 || cardio.overlapping_excluded < 1) {
       throw new Error('The cardio summary did not count the run and exclude the overlapping strength workout.');
+    }
+  }
+
+  if (notePrefix) {
+    const listedNotes = structured(
+      await client.callTool({ arguments: { limit: 50 }, name: 'list_notes' }),
+      'list_notes',
+    );
+    const notes = (Array.isArray(listedNotes.notes) ? listedNotes.notes : []).filter(isObject);
+    const general = notes.find((note) => note.id === `${notePrefix}-general`);
+    const onExercise = notes.find((note) => note.id === `${notePrefix}-exercise`);
+    if (
+      !general || general.exercise_id !== null || general.source !== 'app'
+      || typeof general.noted_on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(general.noted_on)
+      || !onExercise || onExercise.exercise_id !== expectedExerciseId || onExercise.exercise_name !== exerciseQuery
+      || notes.some((note) => note.id === `${notePrefix}-removed`)
+    ) {
+      throw new Error('list_notes did not return the seeded general and exercise notes, or listed a removed one.');
+    }
+    const contextNotes = (Array.isArray(context.training_notes) ? context.training_notes : []).filter(isObject);
+    if (contextNotes.map((note) => note.id).join() !== `${notePrefix}-exercise` || context.training_notes_truncated !== false) {
+      throw new Error('Exercise context did not return exactly the exercise’s own note.');
+    }
+    const statusNotes = isObject(trainingStatus.general_notes) ? trainingStatus.general_notes : {};
+    const statusList = (Array.isArray(statusNotes.notes) ? statusNotes.notes : []).filter(isObject);
+    if (!statusList.some((note) => note.id === `${notePrefix}-general`)
+      || statusList.some((note) => note.id === `${notePrefix}-exercise`) || typeof statusNotes.complete !== 'boolean') {
+      throw new Error('Training status did not return the general note without the exercise note.');
     }
   }
 
@@ -544,7 +578,34 @@ try {
         throw new Error('delete_exercise / restore_exercise did not round-trip.');
       }
 
-      // The coach's targets: set, replay, stale, foreign id, then the status shows them.
+      // A coach's note: add, then remove; the shell checks the stored row. Its
+      // replay and denial are the agent-api contract's: the whole smoke stays
+      // inside one 120-request window (the shell's budget check).
+      const addedNote = structured(await client.callTool({
+        arguments: {
+          body: `${exerciseQuery} agent note`,
+          exercise_id: expectedExerciseId,
+          idempotency_key: `smoke-note-${Date.now()}`,
+        },
+        name: 'add_note',
+      }), 'add_note');
+      const note = isObject(addedNote.note) ? addedNote.note : {};
+      if (
+        typeof note.id !== 'string' || note.source !== 'agent' || note.exercise_name !== exerciseQuery
+        || addedNote.idempotent_replay !== false
+      ) {
+        throw new Error('add_note did not add the agent note on the exercise.');
+      }
+      const removedNote = structured(
+        await client.callTool({ arguments: { idempotency_key: `smoke-note-remove-${Date.now()}`, note_id: note.id }, name: 'remove_note' }),
+        'remove_note',
+      );
+      if (removedNote.removed !== true || removedNote.note_id !== note.id) {
+        throw new Error('remove_note did not remove the agent note.');
+      }
+
+      // The coach's targets: set, replay, then the status shows them. A stale
+      // revision and a foreign muscle id are the agent-api contract's.
       const before = isObject(trainingStatus.targets) ? trainingStatus.targets : {};
       const targetsArguments = {
         default_weekly_sets: 11,
@@ -569,24 +630,6 @@ try {
         targets.idempotent_replay !== false || replayed.idempotent_replay !== true
       ) {
         throw new Error('set_muscle_targets did not apply, or its replay did not return the first result.');
-      }
-      const staleTargets = await client.callTool({
-        arguments: { ...targetsArguments, default_weekly_sets: 9, idempotency_key: `smoke-targets-stale-${Date.now()}` },
-        name: 'set_muscle_targets',
-      });
-      if (!staleTargets.isError || !JSON.stringify(staleTargets).includes('REVISION_CONFLICT')) {
-        throw new Error('A stale set_muscle_targets revision did not fail with REVISION_CONFLICT.');
-      }
-      const foreignTargets = await client.callTool({
-        arguments: {
-          expected_revision: Number(newTargets.revision),
-          idempotency_key: `smoke-targets-foreign-${Date.now()}`,
-          overrides: { [`${smokeMuscleId}-missing`]: 9 },
-        },
-        name: 'set_muscle_targets',
-      });
-      if (!foreignTargets.isError || !JSON.stringify(foreignTargets).includes('VALIDATION_ERROR')) {
-        throw new Error('set_muscle_targets accepted an override for a muscle outside the setup.');
       }
       const after = structured(
         await client.callTool({ arguments: {}, name: 'get_training_status' }),
@@ -628,5 +671,5 @@ try {
   await client.close();
 }
 
-console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-four tools discovered and reads/denials verified');
+console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-seven tools discovered and reads/denials verified');
 
