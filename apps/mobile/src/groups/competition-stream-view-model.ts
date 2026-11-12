@@ -115,7 +115,8 @@ function eventCardBody(event: CompetitionEventWire,userId: string | null,record:
  * draws one only for a record that was a GR (`buildCompetitionStreamModels`).
  */
 export function buildCompetitionEventCard(event: CompetitionEventWire,userId: string | null,showGroup: boolean,
-  record: CompetitionStreamRecordWire | undefined, dateFormat: ExerciseDateFormat, withdrawn?: CompetitionStreamWithdrawnWire | null) {
+  { record,withdrawn }: { record?: CompetitionStreamRecordWire; withdrawn?: CompetitionStreamWithdrawnWire | null },
+  dateFormat: ExerciseDateFormat) {
   const { label,source,set,certification,details,date } = eventCardBody(event,userId,record,withdrawn,dateFormat);
   const context = source.group_exercise.name;
   const groupName = showGroup ? event.group.name : null;
@@ -158,6 +159,11 @@ function sessionRecordLine(key: string,event: CompetitionEventWire,boards: Recor
     accessibilityLabel: [event.group_exercise.name,value,certified ? 'certified' : null].filter(Boolean).join(', ') };
 }
 
+type CompetitionEventModel = Extract<CompetitionStreamModel,{ kind: 'competition' }>;
+/** A non-record event draws its card; a withdrawal only for a record the stream showed, one that took #1 (a GR). */
+const drawsEvent = (model: CompetitionEventModel): boolean =>
+  model.event.kind !== 'record_voided' || (model.withdrawn?.record.group_record_metrics.length ?? 0) > 0;
+
 /**
  * The stream as drawn: a session carries the records it took, so one session
  * is one card, and the hidden event kinds are dropped. Its group records (GR)
@@ -174,9 +180,7 @@ export function buildCompetitionStreamModels(items: CompetitionStreamItemWire[],
   for (const model of models) {
     if (model.kind !== 'competition') { drawn.push(model); continue; }
     if (hiddenKinds.includes(model.event.kind as StreamEventKind)) continue;
-    // A withdrawal is drawn only for a record the stream showed: one that took #1 (a GR).
-    if (model.event.kind === 'record_voided') { if (model.withdrawn?.record.group_record_metrics.length) drawn.push(model); continue; }
-    if (model.event.kind !== 'record') { drawn.push(model); continue; }
+    if (model.event.kind !== 'record') { if (drawsEvent(model)) drawn.push(model); continue; }
     // A withdrawn record leaves its place: its withdrawal shows it, once.
     if (model.event.voided) continue;
     const boards = splitRecordBoards(model.event,model.record);

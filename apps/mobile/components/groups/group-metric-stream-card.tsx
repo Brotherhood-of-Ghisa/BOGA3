@@ -21,7 +21,7 @@ export function GroupMetricStreamCard({ item,record,withdrawn,userId,showGroupNa
   const text = useUiText();
   const tone = useUiTextTone();
   const router = useRouter();
-  const model = buildCompetitionEventCard(item,userId,showGroupName,record,dateFormat,withdrawn);
+  const model = buildCompetitionEventCard(item,userId,showGroupName,{ record,withdrawn },dateFormat);
   const testID = `group-metric-stream-${item.event_id}`;
   return <CompactCard accessibilityLabel={model.accessibilityLabel} onPress={onPress ?? (() => router.push(model.historyPath))}
     testID={testID}>
