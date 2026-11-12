@@ -118,7 +118,7 @@ describe('training status: the profile clock', () => {
 });
 
 describe('training status: muscles', () => {
-  it('lists tracked muscles least trained first, with targets, week and the four full weeks before it', () => {
+  it('lists tracked muscles under target first, then fewest this week, with targets, week and the four full weeks before it', () => {
     const result = status({
       timeZone: 'UTC',
       training: training([
