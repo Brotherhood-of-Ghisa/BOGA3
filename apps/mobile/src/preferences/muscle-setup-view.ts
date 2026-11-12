@@ -96,21 +96,26 @@ export const muscleChoiceWrite = (
   return { kind: 'state', state: { kind: 'combined', key: next.key } };
 };
 
-export type CombinedMuscleChecklistRow = { id: string; label: string; checked: boolean; elsewhere: string | null };
+export type CombinedMuscleChecklistRow = { id: string; label: string; checked: boolean; note: string | null };
+
+/** Every entry in a combined muscle, Off ones included: what its editor ticks and saves. */
+export const combinedMuscleEntryIds = (rows: readonly MuscleReportRow[], key: string): string[] =>
+  rows.filter((row) => row.reportGroup === key).map((row) => row.id);
 
 /**
- * The editor's Muscles checklist for `family`: each entry, ticked or not, and
- * the combined muscle an unticked one is On in now when that is another one (ticking moves it).
+ * The editor's Muscles checklist for `family`: each entry, ticked or not,
+ * noted `Off` when it is, and `in <name>` while unticked and in another
+ * combined muscle (ticking moves it).
  */
 export const buildCombinedMuscleChecklist = (
   { rows, definitions }: MuscleSetupChange, family: string, ticked: ReadonlySet<string>, key: string | null,
 ): CombinedMuscleChecklistRow[] =>
   rowsOfFamily(rows, family).map((row) => {
-    const choice = muscleChoiceOf(row);
     const checked = ticked.has(row.id);
-    const other = !checked && typeof choice === 'object' && choice.key !== key
-      ? definitions.find((muscle) => muscle.key === choice.key)?.name ?? null : null;
-    return { id: row.id, label: row.displayName, checked, elsewhere: other };
+    const other = !checked && row.reportGroup !== null && row.reportGroup !== key
+      ? definitions.find((muscle) => muscle.key === row.reportGroup)?.name ?? null : null;
+    const note = [isTrackedRow(row) ? null : 'Off', other === null ? null : `in ${other}`].filter(Boolean).join(', ');
+    return { id: row.id, label: row.displayName, checked, note: note || null };
   });
 
 /** Save needs a name and at least one ticked muscle. */

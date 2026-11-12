@@ -215,6 +215,21 @@ describe('the combined-muscle editor', () => {
     expect(await row('biceps')).toMatchObject({ reportGroup: null, tracked: 1 });
   });
 
+  it('keeps Off members Off and in it on Save, so a combined muscle with every member Off can be renamed', async () => {
+    const key = await setup.createCombinedMuscle({ name: 'Arms', family: 'Arms', memberIds: ['biceps', 'triceps'] });
+    await setup.setMuscleTracked(['biceps', 'triceps'], false);
+    await renderPage(<CombinedMuscleEditorPage combinedKey={key} family={null} memberId={null} />, 'settings-combined-muscle-save');
+    expect(checked('settings-combined-muscle-member-biceps')).toBe(true);
+    expect(screen.getByLabelText('Triceps, Off')).toBeOnTheScreen();
+    fireEvent.changeText(screen.getByTestId('settings-combined-muscle-name'), 'Guns');
+    expect(screen.getByTestId('settings-combined-muscle-save')).toBeEnabled();
+    fireEvent.press(screen.getByTestId('settings-combined-muscle-save'));
+    await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    expect(await row('biceps')).toMatchObject({ reportGroup: key, tracked: 0 });
+    expect(await row('triceps')).toMatchObject({ reportGroup: key, tracked: 0 });
+    expect((await setup.readMuscleSetup()).definitions[0].name).toBe('Guns');
+  });
+
   it('shows a rule the save breaks and stays, without a Retry that would save twice', async () => {
     await renderPage(<CombinedMuscleEditorPage combinedKey={null} family="Arms" memberId="biceps" />, 'settings-combined-muscle-save');
     fireEvent.changeText(screen.getByTestId('settings-combined-muscle-name'), 'Arms');

@@ -170,6 +170,14 @@ describe('combined muscles', () => {
     expect(await readCombinedMuscleDefinitions()).toEqual([{ key, name: 'Upper back', family: 'Back' }]);
   });
 
+  it('keeps an existing member\'s tracking on an edit; a new member joins On', async () => {
+    const key = await createCombinedMuscle({ name: 'Back', family: 'Back', memberIds: ['back_lats', 'back_upper'] });
+    await setMuscleTracked(['back_upper', 'traps_upper'], false);
+    await updateCombinedMuscle({ key, name: 'Back', memberIds: ['back_lats', 'back_upper', 'traps_upper'] });
+    expect(stored().get('back_upper')).toMatchObject({ reportGroup: key, tracked: 0 });
+    expect(stored().get('traps_upper')).toMatchObject({ reportGroup: key, tracked: 1 });
+  });
+
   it('renames without touching members, Off ones included', async () => {
     const key = await createCombinedMuscle({ name: 'Back', family: 'Back', memberIds: ['back_lats', 'back_upper'] });
     await setMuscleTracked(['back_upper'], false);

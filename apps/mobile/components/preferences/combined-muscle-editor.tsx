@@ -7,7 +7,7 @@ import {
   createCombinedMuscle, deleteCombinedMuscle, updateCombinedMuscle, type MuscleSetupChange,
 } from '@/src/data/muscle-report-settings';
 import {
-  buildCombinedMuscleChecklist, canSaveCombinedMuscle, combinedMuscleMembers, muscleFamilies,
+  buildCombinedMuscleChecklist, canSaveCombinedMuscle, combinedMuscleEntryIds, muscleFamilies,
 } from '@/src/preferences/muscle-setup-view';
 import { MuscleSetupShell, type MuscleSetupState } from './muscle-settings';
 
@@ -16,7 +16,8 @@ type Target = { combinedKey: string | null; family: string | null; memberId: str
 /**
  * A combined muscle's editor ([[muscle.report-groups]]): its name, its family
  * (chosen when it is created, read-only after) and that family's muscles to
- * tick; a muscle in another combined muscle names it, and ticking moves it.
+ * tick, Off ones noted; a muscle in another combined muscle names it, and
+ * ticking moves it (a new member joins On, an existing one keeps its state).
  * `Add combined muscle` / `Save` needs a name and one muscle and goes back;
  * an existing one can be deleted, its members back On on their own.
  */
@@ -39,7 +40,7 @@ function Editor({ loaded, setup, target }: { loaded: MuscleSetupChange; setup: M
   const families = muscleFamilies(loaded.rows);
   const presetFamily = existing?.family ?? (target.family && families.includes(target.family) ? target.family : null);
   const family = presetFamily ?? draft.family ?? null;
-  const initialTicked = existing ? combinedMuscleMembers(loaded.rows, existing.key).map(row => row.id)
+  const initialTicked = existing ? combinedMuscleEntryIds(loaded.rows, existing.key)
     : target.memberId ? [target.memberId] : [];
   const familyIds = new Set(loaded.rows.filter(row => row.familyName === family).map(row => row.id));
   const ticked = (draft.ticked ?? initialTicked).filter(id => familyIds.has(id));
@@ -54,10 +55,10 @@ function Editor({ loaded, setup, target }: { loaded: MuscleSetupChange; setup: M
       : createCombinedMuscle({ name, family: family ?? '', memberIds: ticked }), { retry: false });
     if (saved) router.back();
   };
-  const remove = () => Alert.alert(`Delete ${existing?.name}?`, undefined, [
+  const remove = (key: string, label: string) => Alert.alert(`Delete ${label}?`, undefined, [
     { text: 'Cancel', style: 'cancel' },
     { text: 'Delete', style: 'destructive', onPress: () => {
-      void setup.change(() => deleteCombinedMuscle(existing!.key), { retry: false }).then(done => { if (done) router.back(); });
+      void setup.change(() => deleteCombinedMuscle(key), { retry: false }).then(done => { if (done) router.back(); });
     } },
   ]);
   return <>
@@ -72,14 +73,14 @@ function Editor({ loaded, setup, target }: { loaded: MuscleSetupChange; setup: M
     </FormSection>}
     {family ? <FormSection title="Muscles">
       {checklist.map((row, index) => <CheckRow key={row.id} checked={row.checked} divider={index > 0} label={row.label}
-        note={row.elsewhere ? `in ${row.elsewhere}` : undefined} onPress={() => toggle(row.id)}
+        note={row.note ?? undefined} onPress={() => toggle(row.id)}
         testID={`settings-combined-muscle-member-${row.id}`} />)}
     </FormSection> : null}
     <ActionButton disabled={setup.busy || !family || !canSaveCombinedMuscle(name, ticked)}
       label={existing ? 'Save' : 'Add combined muscle'} onPress={() => { void save(); }}
       testID="settings-combined-muscle-save" variant="primary" />
     {existing ? <FormSection>
-      <ActionRow disabled={setup.busy} kind="danger" label="Delete combined muscle" onPress={remove}
+      <ActionRow disabled={setup.busy} kind="danger" label="Delete combined muscle" onPress={() => remove(existing.key, existing.name)}
         testID="settings-combined-muscle-delete" />
     </FormSection> : null}
   </>;

@@ -1,6 +1,6 @@
 import type { MuscleReportRow } from '@/src/data/combined-muscles';
 import {
-  buildCombinedMuscleChecklist, buildCombinedMuscleSections, buildMuscleListSections, canSaveCombinedMuscle,
+  buildCombinedMuscleChecklist, buildCombinedMuscleSections, combinedMuscleEntryIds, buildMuscleListSections, canSaveCombinedMuscle,
   muscleChoiceLabel, muscleChoiceWrite, musclesOnStatus,
 } from '@/src/preferences/muscle-setup-view';
 
@@ -41,15 +41,16 @@ describe('the muscle setup as Settings shows it', () => {
     expect(muscleChoiceWrite(muscle, next)).toEqual(write);
   });
 
-  it('ticks the editor checklist and names another combined muscle an On muscle is in', () => {
-    expect(buildCombinedMuscleChecklist({ rows, definitions }, 'Arms', new Set(['biceps']), 'cm_arms')).toEqual([
-      { id: 'biceps', label: 'BICEPS', checked: true, elsewhere: null },
-      { id: 'triceps', label: 'TRICEPS', checked: false, elsewhere: null },
-      { id: 'forearms', label: 'FOREARMS', checked: false, elsewhere: 'Guns' },
+  it('ticks the editor checklist, noting Off muscles and another combined muscle an unticked one is in', () => {
+    expect(buildCombinedMuscleChecklist({ rows, definitions }, 'Arms', new Set(['biceps', 'triceps']), 'cm_arms')).toEqual([
+      { id: 'biceps', label: 'BICEPS', checked: true, note: null },
+      { id: 'triceps', label: 'TRICEPS', checked: true, note: 'Off' },
+      { id: 'forearms', label: 'FOREARMS', checked: false, note: 'in Guns' },
     ]);
-    expect(buildCombinedMuscleChecklist({ rows, definitions }, 'Arms', new Set(), null)[0].elsewhere).toBe('Arms');
+    expect(buildCombinedMuscleChecklist({ rows, definitions }, 'Arms', new Set(), 'cm_guns')[1].note).toBe('Off, in Arms');
     expect(buildCombinedMuscleChecklist({ rows, definitions }, 'Arms', new Set(['forearms']), 'cm_arms')[2])
-      .toMatchObject({ checked: true, elsewhere: null });
+      .toMatchObject({ checked: true, note: null });
+    expect(combinedMuscleEntryIds(rows, 'cm_arms')).toEqual(['biceps', 'triceps']);
   });
 
   it('saves with a name and a muscle', () => {

@@ -79,11 +79,15 @@ export type CombinedMuscleDraft = {
   name: string;
   /** Required to create; an existing combined muscle keeps its family. */
   family?: string;
-  /** Every member after the save; at least one. Members dropped go back to their own muscle. */
+  /** Every member after the save, Off ones included; at least one. Members dropped go back to their own muscle. */
   memberIds: readonly string[];
 };
 
-/** Creates or edits one combined muscle: its name and exactly its members, all switched on. */
+/**
+ * Creates or edits one combined muscle: its name and exactly its members. A
+ * member already in it keeps its tracking (Off keeps membership); a new one
+ * joins On.
+ */
 export const saveCombinedMuscle = (setup: MuscleSetupChange, draft: CombinedMuscleDraft): MuscleSetupChange => {
   const name = draft.name.trim();
   if (!isCombinedMuscleName(name)) fail('A combined muscle needs a name of at most 60 characters.');
@@ -101,7 +105,7 @@ export const saveCombinedMuscle = (setup: MuscleSetupChange, draft: CombinedMusc
   return {
     definitions,
     rows: withRows(setup, (row) => {
-      if (ids.has(row.id)) return { tracked: 1, reportGroup: draft.key };
+      if (ids.has(row.id)) return row.reportGroup === draft.key ? null : { tracked: 1, reportGroup: draft.key };
       return row.reportGroup === draft.key ? { reportGroup: null } : null;
     }),
   };

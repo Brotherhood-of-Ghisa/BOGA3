@@ -88,7 +88,7 @@ Code: `apps/mobile/src/preferences/muscle-targets.ts`; `legacyMuscleTargets` in 
 ### muscle.no-breakdown · presentation · accepted
 
 Every screen, the exercise editor and search show only the user's muscles, never
-an entry inside its muscle. An exercise mapped to two entries of one muscle shows
+an entry inside its muscle, except Settings → Muscles, where the setup is made. An exercise mapped to two entries of one muscle shows
 it once, labelled by the strongest role. Adding a muscle maps its first tracked
 member by sort order. Changing a role or removing it rewrites
 tracked entries of the muscle. Mappings to untracked muscles are hidden and kept.
