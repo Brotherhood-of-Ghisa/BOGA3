@@ -253,9 +253,18 @@ describe('the combined-muscle editor', () => {
     expect(await screen.findByTestId('settings-muscles-error')).toHaveTextContent(/Couldn’t save the change/);
     expect(screen.getByTestId('settings-combined-muscle-name')).toHaveProp('value', 'Arms');
     expect(mockBack).not.toHaveBeenCalled();
+    // Hold the delete after it is stored: the catalogue invalidation's re-read lands first.
+    const remove = setup.deleteCombinedMuscle;
+    let release!: () => void;
+    const held = new Promise<void>(resolve => { release = resolve; });
+    jest.spyOn(setup, 'deleteCombinedMuscle').mockImplementationOnce(async target => { await remove(target); await held; });
     fireEvent.press(screen.getByTestId('settings-combined-muscle-delete'));
     confirmAlert('Delete');
+    await waitFor(async () => expect((await setup.readMuscleSetup()).definitions).toEqual([]));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
     expect(screen.queryByTestId('settings-combined-muscle-missing')).toBeNull();
+    expect(mockBack).not.toHaveBeenCalled();
+    await act(async () => { release(); });
     await waitFor(() => expect(mockBack).toHaveBeenCalled());
     expect(screen.queryByTestId('settings-combined-muscle-missing')).toBeNull();
     expect((await setup.readMuscleSetup()).definitions).toEqual([]);

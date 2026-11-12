@@ -33,7 +33,7 @@ function Editor({ loaded, setup, target }: { loaded: MuscleSetupChange; setup: M
   const router = useRouter();
   const text = useUiText();
   const [draft, setDraft] = useState<Draft>({});
-  // Set once a delete is saved: the page is leaving, so it never reads as missing.
+  // Set as a delete starts (cleared if it fails): the page is leaving, so it never reads as missing.
   const [deleted, setDeleted] = useState(false);
   const existing = target.combinedKey ? loaded.definitions.find(muscle => muscle.key === target.combinedKey) ?? null : null;
   if (deleted) return null;
