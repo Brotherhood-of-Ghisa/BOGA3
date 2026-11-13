@@ -291,7 +291,7 @@ function MuscleBodyComparison({ selectedMuscle, metric, viewportWidth }: Compari
  * Colours follow [[comparison.colour-scale]], with CIE LCh lighting,
  * supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
  * and selects a reported muscle group on tap. Wireframe uses depth-tested mesh
- * edges on an opaque grey body; selected anatomy reveals above the body with
+ * edges on an opaque grey body; selected anatomy is clipped to its visible body region with
  * a distinct colour and light fill. Filled patches share the coarse anatomy,
  * camera, focus and hit testing; switching view changes only its material.
  * Decoration follows [[appearance.november]] without changing hit testing.
@@ -465,7 +465,7 @@ export function MuscleBodyCard({
         </View> : null}
         <View style={styles.information}>
           <Information title="About the muscle model" testIDPrefix="stats-muscle-body"
-            body="Wireframe lines are triangle edges. Both views share the same coarse muscle surfaces. Selected anatomy reveals through the body; covered edges stay hidden. Shapes are visually fitted: Forearms use an outer group envelope with hand tendons; spinal erectors use smoothed columns; Abs and Lats use body-surface approximations."
+            body="Wireframe lines are triangle edges. Both views share the same coarse muscle surfaces. Selected anatomy is shown only within its visible body region; nearer body surfaces hide it, and covered edges stay hidden. Shapes are visually fitted: Forearms use an outer group envelope with hand tendons; spinal erectors use smoothed columns; Abs and Lats use body-surface approximations."
             sections={[[ 'Anatomical source', 'BodyParts3D © The Database Center for Life Science, CC BY 4.0. Adapted by pose alignment, forearm/hand fitting, bilateral mirroring and simplified surface envelopes. Source and licence: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html' ]]} />
         </View>
       </View>

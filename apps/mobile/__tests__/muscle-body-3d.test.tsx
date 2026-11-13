@@ -774,7 +774,7 @@ describe('MuscleBodyCard', () => {
     expect(projected.contour!.d).not.toContain('M167.7 140L112.3 140');
   });
 
-  it('toggles between wireframe and patches and keeps selected anatomy revealed from the back', () => {
+  it('toggles between wireframe and patches without losing the selection or back camera', () => {
     const rows = [makeMuscle('chest', 'Chest', 8), makeMuscle('back_lats', 'Lats', 6)];
     render(<MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} defaultOverlay="wireframe" />);
 

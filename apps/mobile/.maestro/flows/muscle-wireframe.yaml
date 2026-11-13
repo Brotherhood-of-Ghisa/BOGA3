@@ -1,8 +1,8 @@
 appId: com.dinoderek.mobile
 ---
-# Proves: native GL wires and filled patches share coarse selected deep anatomy,
+# Proves: native GL wires and filled patches clip anatomy to its visible body region,
 # and composes with the muscle picker, focus and rotation gestures. Screenshots
-# are inspected for body occlusion, the one-hand outline and spinal columns.
+# are inspected for front/back/oblique body occlusion, the one-hand outline and spinal columns.
 # Why device: shader compilation, depth-tested pixels and native gesture-handler
 # composition and a material switch are unavailable behind the Jest native boundary.
 # Jest counterpart: muscle-wireframe-scene, muscle-wireframe-renderer,
@@ -31,6 +31,28 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - assertNotVisible: { id: "stats-muscle-wireframe-error" }
 - takeScreenshot: "wireframe-01-whole-body"
+# Regression: Jest cannot prove GPU stencil pixels; both views must hide back-side quads while retaining front detail.
+- tapOn: { id: "stats-muscle-body-picker-trigger" }
+- scrollUntilVisible:
+    element: { id: "stats-muscle-picker-row-quads" }
+    direction: DOWN
+- tapOn: { id: "stats-muscle-picker-row-quads" }
+- takeScreenshot: "occlusion-01-quads-wireframe-front"
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- takeScreenshot: "occlusion-02-quads-patches-front"
+- tapOn: { id: "stats-muscle-body-angle-back" }
+- takeScreenshot: "occlusion-03-quads-patches-back"
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- takeScreenshot: "occlusion-04-quads-wireframe-back"
+- swipe:
+    from: { id: "stats-muscle-body-viewport" }
+    direction: LEFT
+    duration: 500
+- takeScreenshot: "occlusion-05-quads-wireframe-oblique"
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- takeScreenshot: "occlusion-06-quads-patches-oblique"
+- tapOn: { id: "stats-muscle-body-angle-front" }
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
 # The fixed picker header covers rows after Maestro's centering swipe; use their first unobscured position.
 - tapOn: { id: "stats-muscle-body-picker-trigger" }
 - scrollUntilVisible:
@@ -44,6 +66,22 @@ appId: com.dinoderek.mobile
 - assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
 - assertVisible: { id: "stats-muscle-body-focus", text: "Show whole body" }
 - takeScreenshot: "patches-01-brachialis-focus"
+# Focus keeps one limb: rotate it behind and ahead of its counterpart to prove side-specific occlusion.
+- swipe:
+    start: "39%, 55%"
+    end: "65%, 55%"
+    duration: 500
+- takeScreenshot: "occlusion-07-focused-arm-patches-far"
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- takeScreenshot: "occlusion-08-focused-arm-wireframe-far"
+- tapOn: { id: "stats-muscle-body-angle-front" }
+- swipe:
+    start: "65%, 55%"
+    end: "39%, 55%"
+    duration: 500
+- takeScreenshot: "occlusion-09-focused-arm-wireframe-near"
+- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- takeScreenshot: "occlusion-10-focused-arm-patches-near"
 - tapOn: { id: "stats-muscle-body-angle-back" }
 - takeScreenshot: "patches-02-brachialis-back"
 - assertNotVisible: { id: "stats-muscle-wireframe-error" }

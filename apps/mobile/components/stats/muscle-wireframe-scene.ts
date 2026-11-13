@@ -76,6 +76,29 @@ export const BODY_WIRE_INSTANCES: readonly AnatomyInstance[] = MUSCLE_BODY_MESH.
   part: { id: group, vertices: MUSCLE_BODY_MESH.vertices, faces: MUSCLE_BODY_MESH.faces.filter(face => face[3] === material) },
 }));
 
+function faceRegion(mesh: AnatomyInstance, face: readonly number[]): number {
+  const left = face.slice(0, 3).reduce((x, i) => x + mesh.part.vertices[i][0] * mesh.side, 0) < 0;
+  return BODY_WIRE_INSTANCES.findIndex(body => body.group === mesh.group) * 2 + (left ? 2 : 1);
+}
+
+/** Raw muscle and body side share one label in the GPU mask and CPU picking. */
+export function anatomyRegions(instances: readonly AnatomyInstance[]) {
+  const regions = new Map<number, AnatomyInstance[]>();
+  for (const mesh of instances) {
+    const faces = new Map<number, (readonly number[])[]>();
+    for (const face of mesh.part.faces) {
+      const region = faceRegion(mesh, face);
+      if (!faces.has(region)) faces.set(region, []);
+      faces.get(region)!.push(face);
+    }
+    for (const [region, triangles] of faces) {
+      if (!regions.has(region)) regions.set(region, []);
+      regions.get(region)!.push({ ...mesh, part: { ...mesh.part, faces: triangles } });
+    }
+  }
+  return [...regions].map(([region, meshes]) => ({ region, meshes }));
+}
+
 function triangleDepth(point: readonly number[], points: readonly MuscleBodyVertex[]): number | null {
   const [a, b, c] = points;
   const denominator = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
@@ -86,14 +109,18 @@ function triangleDepth(point: readonly number[], points: readonly MuscleBodyVert
   return u >= 0 && v >= 0 && u + v <= 1 ? u * a[2] + v * b[2] + (1 - u - v) * c[2] : null;
 }
 
-function hitInstances(point: readonly number[], camera: WireframeCamera, instances: readonly AnatomyInstance[]): string | null {
-  let depth = -Infinity, hit: string | null = null;
-  for (const { part, side, group } of instances) {
+function hitInstances(point: readonly number[], camera: WireframeCamera, instances: readonly AnatomyInstance[], region?: number) {
+  let depth = -Infinity, hit: { group: string; region: number } | null = null;
+  for (const mesh of instances) {
+    const { part, side, group } = mesh;
     const points = part.vertices.map(([x, y, z]) => projectWireframePoint([x * side, y, z], camera));
     for (const face of part.faces) {
       const order = side === 1 ? [face[0], face[1], face[2]] : [face[0], face[2], face[1]];
       const value = triangleDepth(point, order.map(i => points[i]));
-      if (value !== null && value > depth) { depth = value; hit = group; }
+      if (value === null || value <= depth) continue;
+      const candidate = faceRegion(mesh, face);
+      if (region !== undefined && candidate !== region) continue;
+      depth = value; hit = { group, region: candidate };
     }
   }
   return hit;
@@ -104,9 +131,9 @@ export function hitWireframe(options: {
   selectedId: string | null; report?: MuscleReportAssignment;
 }): string | null {
   const { point, camera, selected, selectedId, report } = options;
-  // Revealed anatomy wins over the covering body's region.
-  if (selectedId && hitInstances(point, camera, selected)) return selectedId;
   const body = hitInstances(point, camera, BODY_WIRE_INSTANCES);
-  const reported = body ? reportedMaterial(body as MuscleBodyMaterialId, report) : 'neutral';
+  // Match the renderer's visible-region mask before letting internal anatomy receive a tap.
+  if (body && selectedId && hitInstances(point, camera, selected, body.region)) return selectedId;
+  const reported = body ? reportedMaterial(body.group as MuscleBodyMaterialId, report) : 'neutral';
   return reported === 'neutral' ? null : reported;
 }

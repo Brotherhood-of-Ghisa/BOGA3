@@ -46,12 +46,46 @@ it('uses triangle barycentrics and preserves outward normals when mirroring', ()
   expect(Array.from(vertices).every(Number.isFinite)).toBe(true);
 });
 
-it('lets revealed selected geometry win over the covering body and ignores its back faces', () => {
+it('does not let hidden anatomy intercept a covering body region or a point outside the body', () => {
   const point = projectWireframePoint([0, 0, -1], camera).slice(0, 2) as [number, number];
-  expect(hitWireframe({ point, camera, selected: [triangle], selectedId: 'brachialis' })).toBe('brachialis');
-  const reversed = { ...triangle, part: { ...triangle.part, faces: [[0, 2, 1]] } };
-  expect(hitWireframe({ point, camera, selected: [reversed], selectedId: 'custom' })).not.toBe('custom');
-  expect(hitWireframe({ point: [-100, -100], camera, selected: [], selectedId: null })).toBeNull();
+  expect(hitWireframe({ point, camera, selected: [triangle], selectedId: 'brachialis' })).toBe('abs_rectus');
+  expect(hitWireframe({ point: [-100, -100], camera, selected: [triangle], selectedId: 'brachialis' })).toBeNull();
+});
+
+it.each([0, 60, 90, 120, 180, 240, 270, 300])('uses the visible skin at %s degrees even when both sides belong to a combined selection', angle => {
+  const view = wireframeCamera({ angle, width: 280, height: 420, selected: [], focus: false });
+  const selected = [...selectMuscleMeshes('quads'), ...selectMuscleMeshes('hamstrings')];
+  const point = projectWireframePoint([.15, -.25, .03], view).slice(0, 2) as [number, number];
+  const visible = hitWireframe({ point, camera: view, selected: [], selectedId: null });
+  const quads = hitWireframe({ point, camera: view, selected: selectMuscleMeshes('quads'), selectedId: 'quads' });
+  expect(quads).toBe(visible);
+  const muscle = { id: 'cm_legs', displayName: 'Legs', familyName: 'Legs', sortOrder: 0 };
+  const report: MuscleReportAssignment = new Map([
+    ['quads', { muscle, tracked: true }], ['hamstrings', { muscle, tracked: true }],
+  ]);
+  const combined = hitWireframe({ point, camera: view, selected, selectedId: muscle.id, report });
+  expect(combined).toBe(['quads', 'hamstrings'].includes(visible ?? '') ? muscle.id : visible);
+});
+
+it('keeps front quads selectable, selects hamstrings through their back view, and rejects back-facing selected triangles', () => {
+  const point = projectWireframePoint([.15, -.25, .03], camera).slice(0, 2) as [number, number];
+  const selected = selectMuscleMeshes('quads');
+  expect(hitWireframe({ point, camera, selected, selectedId: 'quads' })).toBe('quads');
+  const back = wireframeCamera({ angle: 180, width: 280, height: 420, selected, focus: false });
+  const backPoint = projectWireframePoint([.15, -.25, .03], back).slice(0, 2) as [number, number];
+  expect(hitWireframe({ point: backPoint, camera: back, selected, selectedId: 'quads' })).toBe('hamstrings');
+  const reversed = { ...triangle, group: 'abs_rectus', part: { ...triangle.part, faces: [[0, 2, 1]] } };
+  const centre = projectWireframePoint([0, 0, -1], camera).slice(0, 2) as [number, number];
+  expect(hitWireframe({ point: centre, camera, selected: [reversed], selectedId: 'custom' })).toBe('abs_rectus');
+});
+
+it.each([90, 270])('does not paint or pick the focused limb through its counterpart at %s degrees', angle => {
+  const selected = selectMuscleMeshes('brachialis', undefined, true);
+  const camera = wireframeCamera({ angle, width: 280, height: 420, selected, focus: true });
+  // A point inside the right brachialis, covered by the left arm at 90 degrees.
+  const point = projectWireframePoint([.34368, .330576, .0006803], camera).slice(0, 2) as [number, number];
+  expect(hitWireframe({ point, camera, selected: [], selectedId: null })).toBe('brachialis');
+  expect(hitWireframe({ point, camera, selected, selectedId: 'focused-limb' })).toBe(angle === 90 ? 'brachialis' : 'focused-limb');
 });
 
 it('selects visible body regions under their report key and ignores untracked regions', () => {
