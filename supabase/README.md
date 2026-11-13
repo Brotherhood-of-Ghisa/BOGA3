@@ -16,6 +16,24 @@ This folder is the backend root (`Supabase` local-first development and testing)
 - `npx`/`npm` available (repo scripts run `npx supabase@<pin>`; the pin is `BOGA_SUPABASE_CLI_DEFAULT_VERSION` in `scripts/worktree-lib.sh`).
 - Optional: install Supabase CLI globally (`supabase`) if preferred, but repo scripts do not require it.
 
+## Migration filenames
+
+Generate new migrations from a leased repository root using the pinned CLI:
+
+```bash
+source supabase/scripts/_common.sh
+run_supabase migration new <name>
+```
+
+Keep its UTC `YYYYMMDDHHMMSS_<name>.sql` timestamp, including minutes and
+seconds; never choose rounded timestamps manually. Before merging, check
+uniqueness against the latest `origin/main` combined with the branch: full
+timestamps can still collide across concurrent branches. After reviewing
+hosted migration history, correct only an unapplied migration's filename and
+preserve dependency order. Never renumber already-applied hosted migrations.
+The checks live in `apps/mobile/__tests__/supabase-migration-versions.test.ts`
+and the release preflight in `scripts/ios-release.sh`.
+
 ## Local environment configuration strategy
 
 - Run `./boga worktree start` from the repo root first: every script here fails
