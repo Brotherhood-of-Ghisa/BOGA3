@@ -84,6 +84,7 @@ export function RootStack() {
         <Stack.Screen name="exercise-link" options={{ title: 'Link exercise' }} />
         <Stack.Screen name="exercise-share" options={{ title: 'Shared exercise' }} />
         <Stack.Screen name="body-weight" options={{ title: 'Bodyweight' }} />
+        <Stack.Screen name="injuries" options={{ title: 'Injuries' }} />
         {/* Settings' sub pages, one per Settings row. */}
         <Stack.Screen name="settings-rest-timer" options={{ title: 'Rest timer' }} />
         <Stack.Screen name="settings-progress" options={{ title: 'Progress' }} />

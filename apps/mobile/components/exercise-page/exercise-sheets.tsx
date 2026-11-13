@@ -63,6 +63,8 @@ type ExerciseOptionsSheetProps = {
   onOpenHistory: () => void;
   // Opens this exercise's training notes.
   onOpenNotes: () => void;
+  // Opens the injury / discomfort editor for this exercise's anatomy.
+  onReportInjury?: () => void;
   // Signed in only: opens the Link screen for this exercise (product E0.3).
   onLink?: () => void;
   onRemove: () => void;
@@ -82,6 +84,7 @@ export function ExerciseOptionsSheet({
   onSwap,
   onOpenHistory,
   onOpenNotes,
+  onReportInjury,
   onLink,
   onRemove,
   onCompleteBlock,
@@ -134,6 +137,14 @@ export function ExerciseOptionsSheet({
         onPress={onOpenNotes}
         testID="exercise-options-notes"
       />
+      {onReportInjury ? (
+        <ListRow
+          label="Log discomfort or injury"
+          leading={<Icon colorRole="danger" name="warning" />}
+          onPress={onReportInjury}
+          testID="exercise-options-report-injury"
+        />
+      ) : null}
       <ListRow
         label="Remove from session"
         leading={<Icon colorRole="danger" name="trash" />}

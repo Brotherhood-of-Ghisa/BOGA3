@@ -1,6 +1,6 @@
 # M42-T02 — Mobile injury management UI and profile navigation
 
-- Status: `planned`
+- Status: `completed`
 - Depends on: [M42-T01](M42-T01-Injury_contract_and_sync_schema.md)
 - Milestone: [M42](../milestones/M42-injury-and-discomfort-tracking.md)
 - Areas: frontend, mobile UI; UI impact: yes

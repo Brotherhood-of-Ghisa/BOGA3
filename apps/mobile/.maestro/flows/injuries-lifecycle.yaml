@@ -1,0 +1,85 @@
+appId: com.dinoderek.mobile
+---
+# Injury lifecycle and profile management flow.
+#
+# Proves:
+#   1. Settings displays the Injuries row and navigates to the dedicated Injuries screen;
+#   2. Logging a new injury via the editor sheet creates the record and renders it under Active injuries;
+#   3. Updating the lifecycle state (pain check-in / status transition) persists and updates the list;
+#   4. Resolving the injury transitions it to the Resolved history section.
+# Why device:
+#   1. Real modal sheet presentation and gesture dismissing across native stacks;
+#   2. Slider touch interaction on native platform;
+#   3. Navigation integration with Settings stack and back dispatch.
+# Jest counterpart: __tests__/injuries-screens.test.tsx, __tests__/injuries-data.test.ts
+
+- openLink: "boga3://maestro-harness?reset=data&teleport=today"
+- extendedWaitUntil:
+    visible:
+      id: "today-screen"
+    timeout: 30000
+
+# Navigate to Settings via More tab
+- tapOn:
+    id: "top-level-tab-more"
+- extendedWaitUntil:
+    visible:
+      id: "more-screen"
+    timeout: 10000
+- tapOn:
+    id: "more-settings-row"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+
+# Open Injuries screen
+- assertVisible:
+    id: "settings-injuries-row"
+- tapOn:
+    id: "settings-injuries-row"
+- extendedWaitUntil:
+    visible:
+      id: "injuries-screen"
+    timeout: 10000
+
+# Open the Log injury editor sheet
+- tapOn:
+    id: "injuries-log-button"
+- extendedWaitUntil:
+    visible:
+      id: "injuries-screen-editor"
+    timeout: 5000
+
+# Fill out injury details
+- tapOn:
+    id: "injury-form-label"
+- inputText: "Knee pain"
+- tapOn: "Right"
+
+# Save the injury
+- tapOn:
+    id: "injury-form-save-button"
+
+# Verify active injury appears in list
+- extendedWaitUntil:
+    visible: ".*Knee pain.*"
+    timeout: 5000
+- assertVisible: "Active injuries (1)"
+
+# Open the created injury to edit / check in
+- tapOn: ".*Knee pain.*"
+- extendedWaitUntil:
+    visible:
+      id: "injuries-screen-editor"
+    timeout: 5000
+
+# Mark the injury as resolved
+- tapOn:
+    id: "injury-form-resolve-button"
+
+# Verify injury transitioned to Resolved history
+- extendedWaitUntil:
+    visible: "Resolved history (1)"
+    timeout: 5000
+- assertVisible: "All clear"

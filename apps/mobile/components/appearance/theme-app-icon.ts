@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { getAppIconName, setAlternateAppIcon, supportsAlternateIcons } from 'expo-alternate-app-icons';
 
 import { useAppTheme } from '@/components/ui/theme-context';
 import { DEFAULT_THEME_PRESET_ID, resolveAppearance, type ResolvedTheme } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
+import { isDevMode } from '@/src/utils/isDevMode';
 import { isNovember, watchNovemberAppearance } from '@/src/utils/seasonal-appearance';
 
 let inFlight: Promise<void> | null = null;
@@ -42,7 +43,7 @@ async function applyThemeAppIcon(
 }
 
 export function startThemeAppIcon(preset: ResolvedTheme['preset']): () => void {
-  if (!supportsAlternateIcons) return () => {};
+  if (!supportsAlternateIcons || (isDevMode() && Platform.OS === 'android')) return () => {};
   let state = AppState.currentState;
   let stopped = false;
   let completedSeason: { year: number; november: boolean } | undefined;

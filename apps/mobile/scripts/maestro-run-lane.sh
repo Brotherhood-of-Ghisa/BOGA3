@@ -122,7 +122,8 @@ case "$lane" in
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml" \
       --scenario "Session plan" --flow "$APP_DIR/.maestro/flows/session-plan.yaml" \
       --scenario "Muscle report" --flow "$APP_DIR/.maestro/flows/muscle-report-broad.yaml" \
-      --scenario "Muscle wireframe" --flow "$APP_DIR/.maestro/flows/muscle-wireframe.yaml"
+      --scenario "Muscle wireframe" --flow "$APP_DIR/.maestro/flows/muscle-wireframe.yaml" \
+      --scenario "Injuries lifecycle" --flow "$APP_DIR/.maestro/flows/injuries-lifecycle.yaml"
     ;;
 
   # The Android data smoke shares the data-runtime-smoke, exercise-catalogue
@@ -139,7 +140,8 @@ case "$lane" in
       --session "Data runtime smoke" \
       --scenario "Data runtime smoke" --flow "$APP_DIR/.maestro/flows/data-runtime-smoke.yaml" \
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml" \
-      --scenario "Session plan" --flow "$APP_DIR/.maestro/flows/session-plan.yaml"
+      --scenario "Session plan" --flow "$APP_DIR/.maestro/flows/session-plan.yaml" \
+      --scenario "Injuries lifecycle" --flow "$APP_DIR/.maestro/flows/injuries-lifecycle.yaml"
     ;;
 
   # The exercise page: its own fixture, seeded and reset in-flow through the

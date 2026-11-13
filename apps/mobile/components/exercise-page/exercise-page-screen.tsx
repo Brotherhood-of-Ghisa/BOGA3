@@ -67,6 +67,7 @@ import { ExerciseSwapSheet } from './exercise-swap-sheet';
 import { ExerciseTopBar } from './exercise-top-bar';
 import { RecordsPanel, type RecordsView } from './records-panel';
 import { ExerciseSetRowItem } from './exercise-set-row-item';
+import { InjuryEditorSheet } from '@/components/injuries/injury-editor-sheet';
 
 type ExercisePageScreenProps = {
   sessionId: string;
@@ -76,7 +77,7 @@ type ExercisePageScreenProps = {
   loadRecords?: LoadExerciseRecords;
 };
 
-type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'switcher';
+type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'switcher' | 'injury';
 
 const LOAD_ERROR_MESSAGES = {
   'ai-controlled': 'AI is logging this session. Take over logging in Session options to edit.',
@@ -614,9 +615,21 @@ export function ExercisePageScreen({
         }
         onOpenHistory={onOpenHistory}
         onOpenNotes={onOpenNotes}
+        onReportInjury={() => setOpenSheet('injury')}
         onRemove={onRemove}
         onSwap={() => setOpenSheet('swap')}
         visible={openSheet === 'options'}
+      />
+      <InjuryEditorSheet
+        initialLabel={exercise.name}
+        initialMuscleGroupId={
+          editingExercise?.mappings.find((m) => m.role === 'primary')?.muscleGroupId ??
+          editingExercise?.mappings[0]?.muscleGroupId ??
+          null
+        }
+        onDismiss={() => setOpenSheet('none')}
+        testID="exercise-page-injury-sheet"
+        visible={openSheet === 'injury'}
       />
       <ExerciseSwitcherSheet
         onDismiss={() => setOpenSheet('none')}
