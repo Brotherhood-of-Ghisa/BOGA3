@@ -51,6 +51,7 @@ import { buildSessionViewModel } from '@/src/session-recorder/session-view-model
 import { useCompletedSessionTimes } from '@/src/session-recorder/use-completed-session-times';
 import { useSessionView } from '@/src/session-recorder/use-session-view';
 import { useWorkoutControl } from '@/src/session-recorder/use-workout-control';
+import { useSessionInjuryWarnings } from '@/src/injuries/use-session-injury-warnings';
 import { WorkoutChangesSavedForReview, WorkoutLifecycleChanged } from '@/src/data/session-edit-baseline';
 
 const isActiveSessionReady = (state: { status: string; data?: { status: string } }): boolean =>
@@ -272,12 +273,19 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
     },
   });
 
+  const sessionExercises = state.status === 'ready' ? state.data.session.exercises : undefined;
+  const injuryWarnings = useSessionInjuryWarnings(sessionId, sessionExercises);
+
   const model = useMemo(
     () =>
       state.status === 'ready'
-        ? buildSessionViewModel(state.data.session, state.data.recordBaselineByDefinitionId)
+        ? buildSessionViewModel(
+            state.data.session,
+            state.data.recordBaselineByDefinitionId,
+            injuryWarnings.warningSeveritiesByExerciseId
+          )
         : null,
-    [state]
+    [state, injuryWarnings.warningSeveritiesByExerciseId]
   );
 
   const openGymPicker = useCallback(() => {

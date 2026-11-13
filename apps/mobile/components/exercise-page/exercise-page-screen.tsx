@@ -21,7 +21,7 @@ import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { ScreenScroll } from '@/components/ui/screen';
-import { completePlanBlock, loadPlanBlockProgressStatus } from '@/src/session-planner';
+import { completePlanBlock, loadPlanBlockProgressStatus, skipPlanBlock } from '@/src/session-planner';
 import { StatePanel } from '@/components/ui/state-panel';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -62,12 +62,108 @@ import { useSessionExerciseDraft, type SessionExerciseMutationKind } from '@/src
 import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
 import { useTitleBarTimer } from '@/components/session-recorder/title-bar-timer';
 
-import { EffortSheet, ExerciseOptionsSheet, ExerciseSwitcherSheet } from './exercise-sheets';
+import {
+  EffortSheet,
+  ExerciseInjuryModals,
+  ExerciseOptionsSheet,
+  ExerciseSwitcherSheet,
+} from './exercise-sheets';
 import { ExerciseSwapSheet } from './exercise-swap-sheet';
 import { ExerciseTopBar } from './exercise-top-bar';
 import { RecordsPanel, type RecordsView } from './records-panel';
 import { ExerciseSetRowItem } from './exercise-set-row-item';
-import { InjuryEditorSheet } from '@/components/injuries/injury-editor-sheet';
+import { InjuryBadge } from '@/components/injuries/injury-badge';
+import { InjuryWarningBanner } from '@/components/injuries/injury-warning-banner';
+import type { InjuryWarning } from '@/src/injuries/injury-warning-engine';
+import {
+  useSessionInjuryWarnings,
+  type ExerciseWarningResult,
+} from '@/src/injuries/use-session-injury-warnings';
+
+function resolveActiveWarning(warningResult: ExerciseWarningResult | null) {
+  const active = warningResult?.activeWarning ?? null;
+  if (!active) return { activeWarning: null, isAcute: false, nonAcuteWarning: null };
+  const isAcute = active.severity === 'acute' && !active.isDismissed;
+  return {
+    activeWarning: active,
+    isAcute,
+    nonAcuteWarning: !isAcute || active.isDismissed ? active : null,
+  };
+}
+
+function renderInjuryBadge(
+  warning: InjuryWarning | null,
+  onPress: () => void
+) {
+  if (!warning) return undefined;
+  return (
+    <InjuryBadge
+      onPress={onPress}
+      severity={warning.severity}
+      status={warning.injury.status}
+      testID="exercise-page-injury-badge"
+    />
+  );
+}
+
+function ExerciseInjuryBanner({
+  activeWarning,
+  isAcute,
+  sessionExerciseId,
+  dismissWarning,
+  onSwap,
+}: {
+  activeWarning: InjuryWarning | null;
+  isAcute: boolean;
+  sessionExerciseId: string;
+  dismissWarning: (injuryId: string, exerciseId?: string) => void;
+  onSwap: () => void;
+}) {
+  if (!isAcute || !activeWarning) return null;
+  return (
+    <InjuryWarningBanner
+      onDismiss={() => dismissWarning(activeWarning.injury.id, sessionExerciseId)}
+      onSwap={onSwap}
+      testID="exercise-page-injury-banner"
+      warning={activeWarning}
+    />
+  );
+}
+
+function removeExerciseAndGoBack(
+  draft: { remove: () => Promise<unknown> },
+  goBack: () => void,
+  alertTitle: string,
+  sourcePlanExerciseId?: string | null
+) {
+  if (sourcePlanExerciseId) {
+    void skipPlanBlock(sourcePlanExerciseId).catch(() => {});
+  }
+  void draft
+    .remove()
+    .then(goBack)
+    .catch((error: unknown) =>
+      Alert.alert(alertTitle, error instanceof Error ? error.message : 'Nothing was changed.')
+    );
+}
+
+function resolveRecordSession(
+  exercise: SessionDraftExerciseSnapshot | null,
+  draftState: { status: string; sessionBlocks?: any }
+) {
+  return exercise && draftState.status === 'ready' && draftState.sessionBlocks
+    ? sessionRecordBlocks(exercise, draftState.sessionBlocks)
+    : null;
+}
+
+function resolveSwitcherRows(
+  exercise: SessionDraftExerciseSnapshot | null,
+  draftState: { status: string; sessionBlocks?: any }
+) {
+  return exercise && draftState.status === 'ready' && draftState.sessionBlocks
+    ? buildExerciseSwitcherRows(draftState.sessionBlocks, exercise)
+    : [];
+}
 
 type ExercisePageScreenProps = {
   sessionId: string;
@@ -77,7 +173,15 @@ type ExercisePageScreenProps = {
   loadRecords?: LoadExerciseRecords;
 };
 
-type OpenSheet = 'none' | 'effort' | 'options' | 'swap' | 'switcher' | 'injury';
+type OpenSheet =
+  | 'none'
+  | 'effort'
+  | 'options'
+  | 'swap'
+  | 'switcher'
+  | 'injury'
+  | 'injury-substitution'
+  | 'skip';
 
 const LOAD_ERROR_MESSAGES = {
   'ai-controlled': 'AI is logging this session. Take over logging in Session options to edit.',
@@ -206,6 +310,17 @@ export function ExercisePageScreen({
   const [recordsExpanded, setRecordsExpanded] = useState(false);
   const [recordsView, setRecordsView] = useState<RecordsView>('records');
   const [openSheet, setOpenSheet] = useState<OpenSheet>('none');
+  const { getWarningForExercise, dismissWarning } = useSessionInjuryWarnings(sessionId);
+
+  const warningResult = exercise
+    ? getWarningForExercise({
+        id: sessionExerciseId,
+        exerciseDefinitionId: exercise.exerciseDefinitionId,
+        name: exercise.name,
+      })
+    : null;
+  const { activeWarning, isAcute, nonAcuteWarning } = resolveActiveWarning(warningResult);
+
   // `null` follows the cursor: the logger sits on the first set not performed.
   const [openSetId, setOpenSetId] = useState<string | null>(null);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -258,11 +373,9 @@ export function ExercisePageScreen({
   );
   const baseline = records.status === 'ready'
     ? recordBaselineOf(records.summary.records) : null;
-  const recordSession = exercise && draft.state.status === 'ready'
-    ? sessionRecordBlocks(exercise, draft.state.sessionBlocks) : null;
+  const recordSession = resolveRecordSession(exercise, draft.state);
   const rows = buildSetRows(sets, baseline, loadContext, recordSession);
-  const switcherRows = exercise && draft.state.status === 'ready'
-    ? buildExerciseSwitcherRows(draft.state.sessionBlocks, exercise) : [];
+  const switcherRows = resolveSwitcherRows(exercise, draft.state);
   const recordLines = recordBandFor(sets, baseline, loadContext, recordSession);
   const cursorIndex = findCursorIndex(sets);
   const openSet =
@@ -391,6 +504,11 @@ export function ExercisePageScreen({
     ]);
   };
 
+  const performSkip = () => {
+    setOpenSheet('none');
+    removeExerciseAndGoBack(draft, goBack, 'Could not skip', exercise?.sourcePlanExerciseId);
+  };
+
   const onRemove = () => {
     setOpenSheet('none');
     if (!exercise) return;
@@ -402,17 +520,7 @@ export function ExercisePageScreen({
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => {
-            void draft
-              .remove()
-              .then(goBack)
-              .catch((error: unknown) =>
-                Alert.alert(
-                  'Could not remove',
-                  error instanceof Error ? error.message : 'Nothing was changed.'
-                )
-              );
-          },
+          onPress: () => removeExerciseAndGoBack(draft, goBack, 'Could not remove'),
         },
       ]
     );
@@ -487,6 +595,7 @@ export function ExercisePageScreen({
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.screen} testID="exercise-page">
       <ExerciseTopBar
+        injuryBadge={renderInjuryBadge(nonAcuteWarning, () => setOpenSheet('injury'))}
         onBack={goBack}
         onOpenOptions={() => setOpenSheet('options')}
         onOpenSwitcher={() => setOpenSheet('switcher')}
@@ -522,6 +631,13 @@ export function ExercisePageScreen({
             onToggleExpanded={() => setRecordsExpanded((current) => !current)}
             state={records}
             view={recordsView}
+          />
+          <ExerciseInjuryBanner
+            activeWarning={activeWarning}
+            dismissWarning={dismissWarning}
+            isAcute={isAcute}
+            onSwap={() => setOpenSheet('injury-substitution')}
+            sessionExerciseId={sessionExerciseId}
           />
           <Card testID="exercise-set-list">
             {blockNotice ? (
@@ -616,20 +732,27 @@ export function ExercisePageScreen({
         onOpenHistory={onOpenHistory}
         onOpenNotes={onOpenNotes}
         onReportInjury={() => setOpenSheet('injury')}
+        onSkip={() => setOpenSheet('skip')}
         onRemove={onRemove}
         onSwap={() => setOpenSheet('swap')}
         visible={openSheet === 'options'}
       />
-      <InjuryEditorSheet
-        initialLabel={exercise.name}
-        initialMuscleGroupId={
-          editingExercise?.mappings.find((m) => m.role === 'primary')?.muscleGroupId ??
-          editingExercise?.mappings[0]?.muscleGroupId ??
-          null
-        }
-        onDismiss={() => setOpenSheet('none')}
-        testID="exercise-page-injury-sheet"
-        visible={openSheet === 'injury'}
+      <ExerciseInjuryModals
+        editingExercise={editingExercise}
+        exercise={exercise}
+        onPerformSkip={performSkip}
+        onSwapExercise={(picked) => {
+          applyDraftUpdate(
+            (current) => ({
+              ...current,
+              exerciseDefinitionId: picked.id,
+              name: picked.name,
+            }),
+            'structural'
+          );
+        }}
+        openSheet={openSheet}
+        setOpenSheet={setOpenSheet}
       />
       <ExerciseSwitcherSheet
         onDismiss={() => setOpenSheet('none')}

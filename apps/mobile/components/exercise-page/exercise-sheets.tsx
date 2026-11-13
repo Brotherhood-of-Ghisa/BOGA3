@@ -1,12 +1,18 @@
+import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, useWindowDimensions } from 'react-native';
 
+import { InjuryEditorSheet } from '@/components/injuries/injury-editor-sheet';
+import { InjurySubstitutionSheet } from '@/components/injuries/injury-substitution-sheet';
+import { SkipExerciseDialog } from '@/components/injuries/skip-exercise-dialog';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { getSessionSetTypeCycle, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatEffort } from '@/src/session-recorder/exercise-page-model';
+import type { SessionDraftExerciseSnapshot } from '@/src/session-recorder/session-draft-model';
 import { EFFORT_CHOICES } from '@/src/exercise-calculations/effort-policy';
 import type { ExerciseSwitcherRow } from '@/src/session-recorder/exercise-switcher';
 
@@ -67,6 +73,7 @@ type ExerciseOptionsSheetProps = {
   onReportInjury?: () => void;
   // Signed in only: opens the Link screen for this exercise (product E0.3).
   onLink?: () => void;
+  onSkip?: () => void;
   onRemove: () => void;
   // A card sourced from a plan block: Complete block is its explicit
   // resolution, offered here and nowhere else.
@@ -86,6 +93,7 @@ export function ExerciseOptionsSheet({
   onOpenNotes,
   onReportInjury,
   onLink,
+  onSkip,
   onRemove,
   onCompleteBlock,
   onDismiss,
@@ -143,6 +151,14 @@ export function ExerciseOptionsSheet({
           leading={<Icon colorRole="danger" name="warning" />}
           onPress={onReportInjury}
           testID="exercise-options-report-injury"
+        />
+      ) : null}
+      {onSkip ? (
+        <ListRow
+          label="Skip exercise"
+          leading={<Icon name="x" />}
+          onPress={onSkip}
+          testID="exercise-options-skip"
         />
       ) : null}
       <ListRow
@@ -220,3 +236,99 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+export type ExerciseInjuryModalsProps = {
+  openSheet: 'none' | 'injury' | 'injury-substitution' | 'skip' | string;
+  setOpenSheet: (sheet: any) => void;
+  exercise: SessionDraftExerciseSnapshot;
+  editingExercise?: ExerciseCatalogExercise | null;
+  onSwapExercise: (picked: { id: string; name: string }) => void;
+  onPerformSkip: (reason?: string) => void;
+};
+
+export function ExerciseInjuryModals({
+  openSheet,
+  setOpenSheet,
+  exercise,
+  editingExercise,
+  onSwapExercise,
+  onPerformSkip,
+}: ExerciseInjuryModalsProps) {
+  const [pendingSkipAfterInjury, setPendingSkipAfterInjury] = useState(false);
+
+  const performSkip = useCallback(
+    (reason?: string) => {
+      setOpenSheet('none');
+      onPerformSkip(reason);
+    },
+    [onPerformSkip, setOpenSheet]
+  );
+
+  const initialMuscleGroupId =
+    editingExercise?.mappings.find((m) => m.role === 'primary')?.muscleGroupId ??
+    editingExercise?.mappings[0]?.muscleGroupId ??
+    null;
+
+  const handleInjuryDismiss = useCallback(() => {
+    setOpenSheet('none');
+    if (pendingSkipAfterInjury) {
+      setPendingSkipAfterInjury(false);
+      performSkip('discomfort');
+    }
+  }, [pendingSkipAfterInjury, performSkip, setOpenSheet]);
+
+  const handleInjurySaved = useCallback(() => {
+    if (pendingSkipAfterInjury) {
+      setPendingSkipAfterInjury(false);
+      performSkip('discomfort');
+    }
+  }, [pendingSkipAfterInjury, performSkip]);
+
+  const handleConfirmSkip = useCallback(
+    (reason: string) => {
+      if (reason === 'discomfort') {
+        setPendingSkipAfterInjury(true);
+        setOpenSheet('injury');
+      } else {
+        performSkip(reason);
+      }
+    },
+    [performSkip, setOpenSheet]
+  );
+
+  return (
+    <>
+      <InjuryEditorSheet
+        initialLabel={exercise.name}
+        initialMuscleGroupId={initialMuscleGroupId}
+        onDismiss={handleInjuryDismiss}
+        onSaved={handleInjurySaved}
+        testID="exercise-page-injury-sheet"
+        visible={openSheet === 'injury'}
+      />
+      <InjurySubstitutionSheet
+        currentExercise={{
+          id: exercise.exerciseDefinitionId,
+          name: exercise.name,
+          mappings: editingExercise?.mappings,
+        }}
+        onDismiss={() => setOpenSheet('none')}
+        onOpenFullCatalogue={() => setOpenSheet('swap')}
+        onSelect={(picked) => {
+          setOpenSheet('none');
+          onSwapExercise(picked);
+        }}
+        testID="exercise-page-injury-substitution-sheet"
+        visible={openSheet === 'injury-substitution'}
+      />
+      <SkipExerciseDialog
+        exerciseName={exercise.name}
+        onConfirmSkip={handleConfirmSkip}
+        onDismiss={() => setOpenSheet('none')}
+        testID="exercise-page-skip-dialog"
+        visible={openSheet === 'skip'}
+      />
+    </>
+  );
+}
+

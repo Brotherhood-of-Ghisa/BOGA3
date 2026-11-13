@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { TitleBarTimer, type TitleBarTimerProps } from '@/components/session-recorder/title-bar-timer';
@@ -19,6 +20,8 @@ type ExerciseTopBarProps = {
   restTimerActive?: boolean;
   // Settings › Experiments › Timer in title bar: replaces the timer button.
   titleBarTimer?: Omit<TitleBarTimerProps, 'testID'>;
+  // Subtle badge for managing/monitoring injuries.
+  injuryBadge?: ReactNode;
 };
 
 // Back · exercise name ▾ · timer · ⋮. No subtitle.
@@ -30,6 +33,7 @@ export function ExerciseTopBar({
   onToggleRestTimer,
   restTimerActive = false,
   titleBarTimer,
+  injuryBadge,
 }: ExerciseTopBarProps) {
   const styles = useStyles();
   const text = useUiText();
@@ -49,11 +53,15 @@ export function ExerciseTopBar({
             {title}
           </Text>
           <Icon colorRole="inkMuted" name="chevron-down" size="sm" />
+          {injuryBadge}
         </Pressable>
       ) : (
-        <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[text.title, styles.title]} testID="exercise-page-title">
-          {title}
-        </Text>
+        <View style={styles.staticTitleGroup}>
+          <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[text.title, styles.title]} testID="exercise-page-title">
+            {title}
+          </Text>
+          {injuryBadge}
+        </View>
       )}
       {titleBarTimer ? (
         <TitleBarTimer {...titleBarTimer} testID="exercise-page-rest-timer-button" />
@@ -96,6 +104,13 @@ const useStyles = makeStyles((roles) => ({
   title: {
     flex: 1,
     minWidth: 0,
+  },
+  staticTitleGroup: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
   },
   switcher: {
     flex: 1,
