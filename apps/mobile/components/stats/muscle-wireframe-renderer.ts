@@ -92,12 +92,16 @@ function frameColours(frame: WireframeFrame) {
     return buildMuscleShadeRamp(reported === 'neutral' ? null : frame.scores.get(reported) ?? null, frame.palette);
   });
   return {
-    low: grey(dark ? .12 : .40), high: grey(dark ? .30 : .15),
+    low: grey(.08), high: grey(dark ? .14 : .03),
     body: BODY_WIRE_INSTANCES.map(mesh => {
       if (selectedGroups.has(mesh.group)) return frame.roles.accent;
       const reported = reportedMaterial(mesh.group as MuscleBodyMaterialId, frame.report);
       const score = frame.scores.get(reported) ?? null;
-      return reported === 'neutral' || score === null ? frame.roles.inkMuted : buildMuscleShadeRamp(score, frame.palette)[6];
+      if (reported === 'neutral' || score === null || !Number.isFinite(score)) return grey(.20);
+      const colour = hexToLch(buildMuscleShadeRamp(score, frame.palette)[6]);
+      const grade = Math.max(0, Math.min(1, (score + 1) / 2));
+      // Thin wires need a wider contrast range than patches, clear of the neutral body shading.
+      return lchToHex({ ...colour, lightness: paper + (ink - paper) * (.38 + .44 * grade) });
     }),
     ramps,
   };
