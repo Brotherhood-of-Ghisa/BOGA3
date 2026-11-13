@@ -14,7 +14,7 @@ jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () =>
   return mockActiveClient;
 } }));
 import { archiveCompetitionExercise,certifyCompetition,createCompetitionExercise,createGroup,endCompetitionCertification,
-  getCompetitionBoard,getCompetitionCertification,getCompetitionHistory,getCompetitionPodiums,
+  getCompetitionBoard,getCompetitionCertification,getCompetitionHistory,getCompetitionPodiums,getCompetitionRecordsHistory,
   getCompetitionPeriodTotals,getCompetitionRevisions,getCompetitionSession,getCompetitionSessionRecords,getCompetitionStream,getCompetitionWeek,getGroup,getGroupInviteCode,
   joinGroup,listCompetitionExercises,listMyGroups,updateCompetitionExercise,updateGroup,createCoW,getCoWCalendar,getCoWResults,getCoWSummary,getPreviousCoWSummary } from '@/src/groups/api';
 
@@ -122,6 +122,8 @@ it('matches every safe competition endpoint, normalized disclosure, and certific
   expect((await as(owner,() => getCompetitionPodiums(groupId,false))).podiums[0].board.metric).toBe('volume');
   expect((await as(owner,() => getCompetitionRevisions(groupId,exerciseId))).revisions.length).toBeGreaterThan(0);
   expect(await as(owner,() => getCompetitionHistory({ groupId,exerciseId,metric: 'volume',certified: false }))).toMatchObject({ metric: 'volume',certified: false });
+  const log=await as(owner,() => getCompetitionRecordsHistory({ groupId,exerciseId,metric: 'volume',certified: false }));
+  expect(log.items.some(item => item.event.kind === 'record' && item.event.member?.user_id === member.userId && item.record !== null)).toBe(true);
   const args={ groupId,exerciseId,memberId: member.userId,setId,metric: 'volume' as const,
     revision: board.rules.rules_revision,token: board.entries[0].write_token };
   const certified=await as(owner,() => certifyCompetition(args));

@@ -93,6 +93,9 @@ export const SYNCABLE_FK_GRAPH: Partial<Record<EntityTableName, readonly SyncFkE
   training_notes: [
     { parentIdField: 'exercise_definition_id', parentType: 'exercise_definitions', required: false },
   ],
+  injuries: [
+    { parentIdField: 'muscle_group_id', parentType: 'muscle_groups', required: false },
+  ],
   session_exercises: [
     { parentIdField: 'source_plan_use_id', parentType: 'session_plan_uses', required: false },
     { parentIdField: 'session_id', parentType: 'sessions', required: true },
@@ -138,6 +141,7 @@ const PARENT_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema
   session_exercises: schema.sessionExercises,
   exercise_sets: schema.exerciseSets,
   session_exercise_tags: schema.sessionExerciseTags,
+  injuries: schema.injuries,
 };
 
 /** A single preflight failure: one dirty child whose parent is not provably safe. */

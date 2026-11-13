@@ -131,7 +131,7 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, grouped, onPress }: {
 }
 
 // A full-width header owns expansion, never child navigation. Collapsed children
-// unmount, so neither touch nor accessibility can reach them. All start expanded.
+// unmount, so neither touch nor accessibility can reach them. All start collapsed.
 function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
   plan: TodayPlan; weekStartIndex: number; grouped: boolean; onOpenMuscle: TodayPlanCardsProps['onOpenMuscle'];
 }) {
@@ -139,19 +139,19 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
   const text = useUiText();
   const tone = useUiTextTone();
   const dateFormat = useDateFormat();
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
   const renderRow = (row: RecoveryRow) => <RecoveryMuscleRow
     days={plan.recoveryDays} grouped={grouped} key={row.muscleGroupId}
     onPress={() => onOpenMuscle(row.muscleGroupId)} row={row} weekStartIndex={weekStartIndex} />;
   if (!grouped) return <>{plan.muscles.map(renderRow)}</>;
   return <>{groupRecoveryRows(plan.muscles).map(section => {
-    const expanded = !collapsed.has(section.name);
+    const expanded = expandedGroups.has(section.name);
     const figure = wholeSets(section.weekSets);
     const testID = `today-plan-group-${section.name}`;
     return <View key={section.name}>
       <Pressable accessibilityRole="button" accessibilityLabel={recoveryGroupLabel(section, plan.recoveryDays, dateFormat)}
         accessibilityState={{ expanded }} testID={testID}
-        onPress={() => setCollapsed(previous => {
+        onPress={() => setExpandedGroups(previous => {
           const next = new Set(previous);
           if (next.has(section.name)) next.delete(section.name);
           else next.add(section.name);
@@ -179,7 +179,7 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
 // Each muscle's sets on the last three days, today so far, and this week
 // against its weekly Target ([[muscle.weekly-targets]]): under target first,
 // then fewest this week.
-// Settings' family grouping adds initially expanded sections over the same
+// Settings' family grouping adds initially collapsed sections over the same
 // reported muscles, preserving recovery order within each. Family tiles sum
 // unrounded daily child contributions, including numeric zeros, and stay when
 // collapsed; their trailing total remains weekly ([[muscle.set-count]]).

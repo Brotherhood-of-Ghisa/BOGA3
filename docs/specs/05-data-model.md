@@ -31,6 +31,8 @@ sessions store no bodyweight tuple — the latest valid reading at or before the
 exact start is selected on read, so preference, contribution and reading
 changes recalculate derived history without touching raw sets.
 
+Creating/renaming migrations: [conventions](../../supabase/README.md#migration-filenames).
+
 ## Scope classification
 
 Session control columns are **in sync scope** but server-written; they also
@@ -45,7 +47,7 @@ round-trip and the drift checker ignores it.
 
 | Table group | Scope | Owning path |
 | --- | --- | --- |
-| The eighteen user-owned entities (`apps/mobile/src/sync/topo-order.ts` names them with their FK layers; training notes: [`tech/training-notes-contract.md`](tech/training-notes-contract.md)) | **in** — mirrored 1:1; the user's backup/restore scope | `apps/mobile/src/data/schema/`, `supabase/migrations/` |
+| The nineteen user-owned entities (`apps/mobile/src/sync/topo-order.ts` names them with their FK layers; training notes: [`tech/training-notes-contract.md`](tech/training-notes-contract.md); injuries: [`tech/injury-contract.md`](tech/injury-contract.md)) | **in** — mirrored 1:1; the user's backup/restore scope | `apps/mobile/src/data/schema/`, `supabase/migrations/` |
 | Device-local browsing and Progress preferences (key-value, not SQL tables) | out — device choices | `apps/mobile/src/preferences/` |
 | The three `exercise_session_facts*` tables | out — derived, rebuildable local facts | `apps/mobile/src/data/schema/exercise-session-facts.ts` |
 | `group_cache` | out — disposable cache of server group-RPC results, readable only by the signed-in `user_id` | `apps/mobile/src/data/schema/group-cache.ts` |

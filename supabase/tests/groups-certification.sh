@@ -332,6 +332,10 @@ stream_v4() {
   rpc "$1" group_competition_stream_v4 "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
   expect_ok "group_competition_stream_v4"
 }
+stream_v5() {
+  rpc "$1" group_competition_stream_v5 "$(jq -nc --arg g "${GID}" '{p_group_id: $g, p_before: null, p_limit: 50}')"
+  expect_ok "group_competition_stream_v5"
+}
 # jq: the stream's record items for set $s.
 RECORDS='[.items[] | select(.kind == "competition" and .event.kind == "record" and .event.set_id == $s)]'
 
@@ -1154,6 +1158,38 @@ expect_ok "group_competition_stream_v3"
   || fail "v4 is v3 plus GR boards, nothing else"
 check "v3: unchanged for installed builds (no GR boards)" 'all(.items[]; .record? // {} | has("group_record_metrics") | not)'
 pass "stream v4 names each record's #1 boards; a new best below #1 has none"
+
+# Stream v5: a withdrawal carries the record it withdrew, as v4 showed it, so
+# the app can draw a withdrawn GR as its GR card and drop a withdrawn PR.
+# Editing q1 (the GR) and q3 (a PR) voids both.
+set_edit "${ATHLETE_TOKEN}" "${T}-q1s" q1 0 80 1
+set_edit "${ADMIN_TOKEN}" "${T}-q3s" q3 0 85 1
+drain "a GR and a PR edited"
+expect_sql "v5 setup: q1 and q3 are each voided once" \
+  "select string_agg(replace(set_id, '${T}-', ''), ',' order by set_id) from app_public.group_events
+    where group_exercise_id = '${GX}' and kind = 'record_voided';" "q1,q3"
+stream_v4 "${ADMIN_TOKEN}"
+V4_PAGE="${BODY}"
+stream_v5 "${ADMIN_TOKEN}"
+DECODED="$(printf '%s' "${BODY}" | node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e "
+  import {isCompetitionStreamWire} from '${SUPABASE_DIR}/../apps/mobile/src/groups/competition-reader-guards.ts';
+  let data=''; for await (const chunk of process.stdin) data+=chunk;
+  process.stdout.write(String(isCompetitionStreamWire(JSON.parse(data))));")"
+[[ "${DECODED}" == true ]] || fail "v5: the app's stream decoder rejects a page with withdrawn records"
+WITHDRAWALS='[.items[] | select(.kind == "competition" and .event.kind == "record_voided" and .event.set_id == $s)]'
+check_args "v5: a withdrawn GR carries its record event and #1 boards" --arg s "${T}-q1" \
+  "${WITHDRAWALS}"' | length == 1 and .[0].withdrawn.event.event_id == .[0].event.related_event_id
+   and .[0].withdrawn.event.kind == "record" and .[0].withdrawn.event.voided and .[0].withdrawn.event.set_id == $s
+   and .[0].withdrawn.record.group_record_metrics == ["e1rm","volume"]
+   and ([.[0].withdrawn.event.values[] | select(.role == "record") | .metric] | sort) == ["e1rm","volume"]'
+check_args "v5: a withdrawn PR names no GR board" --arg s "${T}-q3" \
+  "${WITHDRAWALS}"' | length == 1 and .[0].withdrawn.record.group_record_metrics == []'
+check "v5: only withdrawals carry the withdrawn record" \
+  'all(.items[]; (.kind == "competition" and .event.kind == "record_voided") == has("withdrawn"))'
+[[ "$(jq -c 'del(.items[].withdrawn?)' <<<"${BODY}")" == "$(jq -c '.' <<<"${V4_PAGE}")" ]] \
+  || fail "v5 is v4 plus withdrawn records, nothing else"
+jq -e 'all(.items[]; has("withdrawn") | not)' <<<"${V4_PAGE}" >/dev/null || fail "v4: unchanged for installed builds (no withdrawn records)"
+pass "stream v5 carries each withdrawn record and its #1 boards"
 
 COMPLETED=1
 echo "[${LANE_LABEL}] passed (run ${RUN_TAG})"

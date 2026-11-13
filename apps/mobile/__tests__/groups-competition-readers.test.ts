@@ -193,6 +193,27 @@ test('a record stream item carries its set, previous #1 and GR boards, exactly, 
   expect(guards.isCompetitionStreamWire({ ...stream, items: [{ ...ordinaryItem, record: { performance: null,
     previous: [{ ...ordinaryPrevious, performance: { ...performance, set_id: 'set0' } }], group_record_metrics: [] } }] })).toBe(false);
 });
+test('a withdrawal carries the voided record it withdrew, exactly, or null when the record is gone', () => {
+  const withdrawal = { ...event, event_id: 'void', kind: 'record_voided', related_event_id: 'ev', values: [], record_context: null };
+  const withdrawnRecord = { ...event, voided: true };
+  const withItem = (patch: Record<string, unknown>) => guards.isCompetitionStreamWire({ ...stream,
+    items: [{ kind: 'competition', key: 'void', sort_at_ms: 300, event: withdrawal, ...patch }] });
+  expect(withItem({ withdrawn: { event: withdrawnRecord, record: recordDetail } })).toBe(true);
+  expect(withItem({ withdrawn: null })).toBe(true);
+  // The app reads v5: a withdrawal without its record (a v4 page) fails to decode.
+  expect(withItem({})).toBe(false);
+  expect(withItem({ withdrawn: { event: withdrawnRecord, record: recordDetail, extra: 1 } })).toBe(false);
+  expect(withItem({ withdrawn: { event: withdrawnRecord } })).toBe(false);
+  // Only the voided record of the same member, exercise and group that the withdrawal names.
+  expect(withItem({ withdrawn: { event: event, record: recordDetail } })).toBe(false);
+  expect(withItem({ withdrawn: { event: { ...withdrawnRecord, event_id: 'other' }, record: recordDetail } })).toBe(false);
+  expect(withItem({ withdrawn: { event: { ...withdrawnRecord, member: { user_id: 'u2', username: 'Rival' } }, record: recordDetail } })).toBe(false);
+  expect(withItem({ withdrawn: { event: { ...withdrawnRecord, group_exercise: { group_exercise_id: 'ge2', name: 'Row' } }, record: recordDetail } })).toBe(false);
+  expect(withItem({ withdrawn: { event: { ...withdrawnRecord, kind: 'lead_change' }, record: recordDetail } })).toBe(false);
+  expect(withItem({ withdrawn: { event: withdrawnRecord, record: { ...recordDetail, group_record_metrics: ['volume'] } } })).toBe(false);
+  // Only a withdrawal carries one.
+  expect(guards.isCompetitionStreamWire({ ...stream, items: [{ ...stream.items[0], withdrawn: null }] })).toBe(false);
+});
 test('session records name only this session\'s records, one board each, never a leading board without a leader', () => {
   const record = records.records[0];
   const variant = (patch: Record<string, unknown>) => ({ ...records, records: [{ ...record, ...patch }] });
@@ -231,6 +252,16 @@ test('readers check nested scope/revision/scope-state coherence', () => {
   expect(guards.isCompetitionPodiumsWire({ ...podiums,podiums: [{ exercise: { ...exercise,rules: { ...rules,bodyweight_contribution: 0.5 } },board }] })).toBe(false);
 });
 
+// Records log fixtures (decoder and request tests).
+const streamRecord = { performance, previous: [], group_record_metrics: ['e1rm'] };
+const previousBest = { ...historicalValue, role: 'previous', value: 120 };
+const recordItem = { event, record: streamRecord, previous_best: previousBest };
+const rulesItem = { event: { ...event, event_id: 'rc', kind: 'rules_change', values: [], record_context: null }, record: null, previous_best: null };
+const leadItem = { event: { ...event, event_id: 'lc', kind: 'lead_change', metric: 'e1rm', certified: true, record_context: null,
+  values: [{ ...historicalValue, role: 'leader' }] }, record: null, previous_best: null };
+const log = (certified: boolean, items: unknown[]) =>
+  ({ contract_version: 4, exercise, metric: 'e1rm', certified, items, next_cursor: null });
+
 describe('request-scoped protocol-4 API', () => {
   const rpc = jest.fn(), setHeader = jest.fn();
   const respond = (data: unknown, error: unknown = null, status = 200) => {
@@ -244,7 +275,8 @@ describe('request-scoped protocol-4 API', () => {
     ['podiums',() => api.getCompetitionPodiums('g'),podiums],
     ['revisions',() => api.getCompetitionRevisions('g','ge'),{ contract_version: 4, exercise, revisions: [revision] }],
     ['history',() => api.getCompetitionHistory({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm',certified: false }),history],
-    ['stream_v4',() => api.getCompetitionStream('g'),stream],
+    ['records_history',() => api.getCompetitionRecordsHistory({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm',certified: false }),log(false,[recordItem,rulesItem])],
+    ['stream_v5',() => api.getCompetitionStream('g'),stream],
     ['session_detail',() => api.getCompetitionSession('g','u1','s'),detail],
     ['session_records',() => api.getCompetitionSessionRecords('g','u1','s'),records],
     ['week_summary',() => api.getCompetitionWeek('g',0,1000),week],
@@ -256,6 +288,13 @@ describe('request-scoped protocol-4 API', () => {
     ['exercise_update',() => api.updateCompetitionExercise({ groupId: 'g',exerciseId: 'ge',revision: 1,name: 'Pull-up',mode: 'total_load',contribution: 1,metric: 'e1rm' }),{ contract_version: 4, exercise }],
     ['exercise_archive',() => api.archiveCompetitionExercise('g','ge',true),{ contract_version: 4, exercise: { ...exercise,archived_at_ms: 200 } }],
   ] as const;
+  it('records history sends its cursor and rejects a page for another view', async () => {
+    respond(log(true,[leadItem]));
+    await expect(api.getCompetitionRecordsHistory({ groupId: 'g',exerciseId: 'ge',metric: 'e1rm',certified: false,before: 'cursor' }))
+      .rejects.toMatchObject({ code: 'INTERNAL' });
+    expect(rpc).toHaveBeenCalledWith('group_competition_records_history',{ p_group_id: 'g',p_group_exercise_id: 'ge',
+      p_metric: 'e1rm',p_certified: false,p_before: 'cursor',p_limit: 50 });
+  });
   test.each(calls)('%s sets its own header and validates before returning', async (name,call,payload) => {
     respond(payload); await expect(call()).resolves.toEqual(payload);
     expect(rpc).toHaveBeenCalledWith(`group_competition_${name}`,expect.any(Object));
@@ -318,5 +357,35 @@ describe('request-scoped protocol-4 API', () => {
     await expect(api.createCompetitionExercise({ groupId: 'g',name: ' Pull-up ',mode: 'total_load',contribution: 1 })).resolves.toEqual(payload);
     respond(payload);
     await expect(api.updateCompetitionExercise({ groupId: 'g',exerciseId: 'ge',revision: 2,name: ' Pull-up ',mode: 'total_load',contribution: 1,metric: 'e1rm' })).resolves.toEqual(payload);
+  });
+});
+
+describe('records history decoder', () => {
+  it('accepts records and rules changes on All, lead changes and rules changes on Certified, from any revision', () => {
+    expect(guards.isCompetitionRecordsHistoryWire(log(false, [recordItem, rulesItem,
+      { ...recordItem, event: { ...event, event_id: 'old', rules_revision: 1 }, previous_best: null }]))).toBe(true);
+    expect(guards.isCompetitionRecordsHistoryWire(log(true, [leadItem, rulesItem]))).toBe(true);
+    for (const reason of ['link', 'void']) {
+      expect(guards.isCompetitionRecordsHistoryWire(log(false, [{ ...leadItem, event: { ...leadItem.event, certified: false, reason } }]))).toBe(true);
+    }
+  });
+  it.each([
+    ['a record on the Certified log', log(true, [recordItem])],
+    ['a Certified lead change on the All log', log(false, [leadItem])],
+    ['an All lead change a record explains', log(false, [{ ...leadItem, event: { ...leadItem.event, certified: false, reason: 'record' } }])],
+    ['a Certified lead change without a leader', log(true, [{ ...leadItem, event: { ...leadItem.event, values: [] } }])],
+    ['a voided record', log(false, [{ ...recordItem, event: { ...event, voided: true } }])],
+    ['a record without its stream record', log(false, [{ ...recordItem, record: null }])],
+    ['a record not on this metric', log(false, [{ ...recordItem, event: { ...event, values: [{ ...historicalValue, metric: 'volume', unit: 'percent_bw_reps' }] },
+      record: { ...streamRecord, group_record_metrics: [] } }])],
+    ['a previous best in another role', log(false, [{ ...recordItem, previous_best: historicalValue }])],
+    ['a previous best on another metric', log(false, [{ ...recordItem, previous_best: { ...previousBest, metric: 'volume', unit: 'percent_bw_reps' } }])],
+    ['a normalized previous best in kg', log(false, [{ ...recordItem, previous_best: { ...previousBest, unit: 'kg' } }])],
+    ['a rules change carrying a record', log(false, [{ ...rulesItem, record: streamRecord }])],
+    ['another comparison\'s event', log(false, [{ ...recordItem, event: { ...event, group_exercise: { group_exercise_id: 'other', name: 'Row' } } }])],
+    ['a historical metric', { ...log(false, []), metric: 'weight' }],
+    ['an extra field', { ...log(false, []), revision }],
+  ])('rejects %s', (_label, value) => {
+    expect(guards.isCompetitionRecordsHistoryWire(value)).toBe(false);
   });
 });

@@ -132,10 +132,10 @@ listed here:
 
 ## Deferrable foreign keys
 
-All twenty-three cross-entity FKs
-are `DEFERRABLE INITIALLY DEFERRED`, so the checks run at COMMIT. A push may
+All twenty-four cross-entity FKs
+are `DEFERRABLE INITIALLY DEFERRED`, so checks run at COMMIT. A push may
 write a child before its parent in one transaction, and any unsatisfied FK at
-COMMIT rolls back the whole batch. The migrations define names, targets and delete actions, checked by
+COMMIT rolls back the whole batch. Migrations define names, targets and delete actions, checked by
 `supabase/tests/sync-v2-deferrable-fk.sh` and
 `supabase/tests/sync-v2-schema-smoke.sh`.
 
@@ -170,7 +170,7 @@ Push batching and pull draining both use the layering in
 | Layer | Tables |
 | --- | --- |
 | 0 | `gyms`, `exercise_definitions`, `muscle_groups`, `user_settings`, `training_programmes` |
-| 1 | `session_plans`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `exercise_group_links`, `training_notes` |
+| 1 | `session_plans`, `exercise_muscle_mappings`, `exercise_tag_definitions`, `exercise_group_links`, `training_notes`, `injuries` |
 | 2 | `session_plan_exercises`, `session_plan_uses` |
 | 3 | `sessions`, `session_plan_sets` |
 | 4 | `session_exercises` |

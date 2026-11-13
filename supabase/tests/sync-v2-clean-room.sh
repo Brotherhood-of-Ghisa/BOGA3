@@ -99,7 +99,9 @@ ENTITIES=(
   session_plan_exercises
   session_plan_sets
   session_plan_uses
+  session_plan_uses
   training_notes
+  injuries
 )
 
 # -----------------------------------------------------------------------------
@@ -161,7 +163,7 @@ for entity in "${ENTITIES[@]}"; do
     fail "expected app_public.${entity} to exist (got count=${count})"
   fi
 done
-pass "check 1.B — eighteen v2 entity tables present in app_public"
+pass "check 1.B — nineteen v2 entity tables present in app_public"
 
 # -----------------------------------------------------------------------------
 # Check 2 — schema shape: composite PK, universal columns with correct

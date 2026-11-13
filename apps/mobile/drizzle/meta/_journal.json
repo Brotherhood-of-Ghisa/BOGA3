@@ -232,6 +232,13 @@
       "when": 1794511402205,
       "tag": "0032_futuristic_clint_barton",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1794518464603,
+      "tag": "0033_wandering_peter_quill",
+      "breakpoints": true
     }
   ]
 }

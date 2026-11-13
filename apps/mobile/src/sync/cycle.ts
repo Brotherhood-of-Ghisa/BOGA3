@@ -767,6 +767,20 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('created_at', 'createdAt'),
     TS('deleted_at', 'deletedAt'),
   ],
+  injuries: [
+    SC('muscle_group_id', 'muscleGroupId'),
+    SC('side', 'side'),
+    SC('status', 'status'),
+    SC('pain_score', 'painScore'),
+    SC('label', 'label'),
+    SC('notes', 'notes'),
+    SC('contraindications', 'contraindications'),
+    TS('started_at', 'startedAt'),
+    TS('resolved_at', 'resolvedAt'),
+    TS('created_at', 'createdAt'),
+    TS('updated_at', 'updatedAt'),
+    TS('deleted_at', 'deletedAt'),
+  ],
 };
 
 /** The Drizzle table object for each entity type. */
@@ -789,6 +803,7 @@ const ENTITY_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema
   session_exercises: schema.sessionExercises,
   exercise_sets: schema.exerciseSets,
   session_exercise_tags: schema.sessionExerciseTags,
+  injuries: schema.injuries,
 };
 
 /** Every entity type in fixed topological order (parents before children). */

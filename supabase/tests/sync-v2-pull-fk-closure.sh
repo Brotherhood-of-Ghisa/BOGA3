@@ -165,6 +165,7 @@ FK_EDGES=(
   "session_plan_exercises|exercise_definition_id|exercise_definitions"
   "session_plan_sets|session_plan_exercise_id|session_plan_exercises"
   "session_plan_uses|session_plan_id|session_plans"
+  "injuries|muscle_group_id|muscle_groups"
   "sessions|source_plan_use_id|session_plan_uses"
   "session_exercises|source_plan_use_id|session_plan_uses"
   "exercise_sets|source_plan_use_id|session_plan_uses"
@@ -366,8 +367,8 @@ pass "FK closure — ten FK-bearing entity types partition exactly across layers
 # ---------------------------------------------------------------------------
 echo "[sync-v2-pull-fk-closure] step 3 — partition assertion on the full layer response (no filter)"
 ALL_LAYER_TYPES=(
-  '["gyms","exercise_definitions","muscle_groups","training_programmes"]'
-  '["session_plans","exercise_muscle_mappings","exercise_tag_definitions","exercise_group_links","training_notes"]'
+  '["gyms","exercise_definitions","muscle_groups","training_programmes","user_settings"]'
+  '["session_plans","exercise_muscle_mappings","exercise_tag_definitions","exercise_group_links","training_notes","injuries"]'
   '["session_plan_exercises","session_plan_uses"]'
   '["sessions","session_plan_sets"]'
   '["session_exercises"]'

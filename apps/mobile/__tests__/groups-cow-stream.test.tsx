@@ -115,13 +115,14 @@ it('versions cached event payloads and isolates account/group, including foreign
   } finally { db.close(); }
 });
 
-it('drops a stream page cached before records named their GR boards, keeping the current one', () => {
+it('drops a stream page cached before withdrawals carried their records, keeping the current one', () => {
   const db=createInMemoryDatabase();
   try {
     const current=groupCacheKeys.stream('g1');
-    expect(current).toBe('stream:v8:g1:group-records-v1');
+    expect(current).toBe('stream:v8:g1:withdrawn-records-v1');
     writeGroupCache(db.database,{ cacheKey: current,userId: 'u1',payload: stream(),fetchedAtMs: 1 });
-    db.database.insert(groupCache).values({ cacheKey: 'stream:v8:g1:cow-events-v1',userId: 'u1',payloadJson: JSON.stringify(stream()),fetchedAtMs: 1 }).run();
+    for (const old of ['stream:v8:g1:cow-events-v1','stream:v8:g1:group-records-v1'])
+      db.database.insert(groupCache).values({ cacheKey: old,userId: 'u1',payloadJson: JSON.stringify(stream()),fetchedAtMs: 1 }).run();
     evictObsoleteGroupCache(db.database,'u1');
     const keys=db.database.select().from(groupCache).all().map(row => row.cacheKey);
     expect(keys).toEqual([current]);

@@ -6,7 +6,7 @@ import { isCompetitionMetric } from './competition-contract.ts';
 import { isCompetitionBoardWire, isCompetitionCertificationWire, isCompetitionPerformanceWire, isCompetitionExerciseWire } from './competition-wire-guards.ts';
 import type { CompetitionCertifyResultWire, CompetitionCertificationResultWire, CompetitionEventWire,
   CompetitionExerciseListWire, CompetitionExerciseWriteWire, CompetitionHistoryWire,
-  CompetitionPodiumsWire, CompetitionRevisionWire, CompetitionRevisionsWire, CompetitionSessionDetailWire,
+  CompetitionPodiumsWire, CompetitionRecordsHistoryWire, CompetitionRevisionWire, CompetitionRevisionsWire, CompetitionSessionDetailWire,
   CompetitionPeriodTotalsWire, CompetitionSessionRecordsWire, CompetitionSessionWire, CompetitionStreamWire, CompetitionWeekSummaryWire,
   GroupSharedExerciseDeleteWire, GroupSharedExerciseItemWire, GroupSharedExercisesListWire, GroupSharedExerciseWriteWire } from './competition-wire.ts';
 
@@ -158,6 +158,40 @@ function streamRecord(v: unknown, event: CompetitionEventWire): boolean {
       historyValue(p.value,normalized || (p.performance !== null && visibility(p.performance) === 'normalized')) &&
       (!normalized || p.performance === null || visibility(p.performance) === 'normalized'));
 }
+// Records log: a record lists the board's metric and is never voided; a lead
+// change has a leader and matches the log's scope (on All, only the #1 changes
+// a link, unlink or void made); a rules change carries nothing else.
+function recordsHistoryItem(v: unknown, log: { exercise: string; metric: string; certified: boolean }): boolean {
+  if (!exact(v,['event','record','previous_best']) || !isCompetitionEventWire(v.event) ||
+    v.event.group_exercise.group_exercise_id !== log.exercise) return false;
+  const event = v.event;
+  if (event.kind === 'rules_change') return v.record === null && v.previous_best === null;
+  if (event.kind === 'lead_change') return event.certified === log.certified && event.metric === log.metric &&
+    (log.certified || event.reason === 'link' || event.reason === 'void') &&
+    event.values.some(value => value.role === 'leader') &&
+    v.record === null && v.previous_best === null;
+  return event.kind === 'record' && !log.certified && !event.voided && streamRecord(v.record,event) &&
+    event.values.some(value => value.role === 'record' && value.metric === log.metric) &&
+    (v.previous_best === null || historyValue(v.previous_best,event.visibility === 'normalized') &&
+      (v.previous_best as { role: string; metric: string }).role === 'previous' &&
+      (v.previous_best as { metric: string }).metric === log.metric);
+}
+export function isCompetitionRecordsHistoryWire(v: unknown): v is CompetitionRecordsHistoryWire {
+  if (!exact(v,['contract_version','exercise','metric','certified','items','next_cursor']) || v.contract_version !== 4 ||
+    !isCompetitionExerciseWire(v.exercise) || !isCompetitionMetric(v.metric) || typeof v.certified !== 'boolean') return false;
+  const log = { exercise: v.exercise.group_exercise_id, metric: v.metric, certified: v.certified };
+  return arrayOf(v.items,item => recordsHistoryItem(item,log)) && nullableText(v.next_cursor);
+}
+// The record a withdrawal names: that member's record on that exercise, voided, with its own stream record.
+function streamWithdrawn(v: unknown, event: CompetitionEventWire): boolean {
+  if (event.kind !== 'record_voided') return false;
+  if (v === null) return true;
+  if (!exact(v,['event','record']) || !isCompetitionEventWire(v.event)) return false;
+  const record = v.event;
+  return record.kind === 'record' && record.voided && record.event_id === event.related_event_id &&
+    record.group.group_id === event.group.group_id && record.group_exercise.group_exercise_id === event.group_exercise.group_exercise_id &&
+    record.member?.user_id === event.member?.user_id && streamRecord(v.record,record);
+}
 function sharedExerciseMapping(v: unknown): boolean {
   return exact(v,['muscle_group_id','weight','role']) && id(v.muscle_group_id) &&
     typeof v.weight === 'number' && Number.isFinite(v.weight) && v.weight > 0 &&
@@ -191,10 +225,13 @@ export function isGroupSharedExerciseDeleteWire(v: unknown): v is GroupSharedExe
 }
 function streamItem(v: unknown): boolean {
   if (v && typeof v === 'object' && 'kind' in v && v.kind === 'cow') return isCoWStreamItemWire(v);
+  // A withdrawal always carries its record (v5): a page without it fails rather than hiding the card.
   if (exact(v,['kind','key','sort_at_ms','event']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
-    isCompetitionEventWire(v.event) && v.event.event_id === v.key;
+    isCompetitionEventWire(v.event) && v.event.event_id === v.key && v.event.kind !== 'record_voided';
   if (exact(v,['kind','key','sort_at_ms','event','record']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
     isCompetitionEventWire(v.event) && v.event.event_id === v.key && streamRecord(v.record,v.event);
+  if (exact(v,['kind','key','sort_at_ms','event','withdrawn']) && v.kind === 'competition') return id(v.key) && integer(v.sort_at_ms) &&
+    isCompetitionEventWire(v.event) && v.event.event_id === v.key && streamWithdrawn(v.withdrawn,v.event);
   if (exact(v,['kind','key','sort_at_ms','groups','session']) && v.kind === 'session') return id(v.key) && integer(v.sort_at_ms) &&
     Array.isArray(v.groups) && v.groups.length > 0 && v.groups.every(group) && isCompetitionSessionWire(v.session);
   if (exact(v,['kind','key','sort_at_ms','id','group_id','shared_by','exercise']) && v.kind === 'shared_exercise') {
