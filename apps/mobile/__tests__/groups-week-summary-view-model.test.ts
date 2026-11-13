@@ -9,6 +9,7 @@ import {
   buildGroupSessions,
   buildWeekBoard,
   buildGroupRecordLines,
+  buildLatestGroupRecordRows,
   buildLatestSessionRows,
   completedSessionsFromStream,
   formatTrainingStart,
@@ -330,32 +331,63 @@ describe('buildLatestSessionRows', () => {
     kind: 'session' as const, key: sessionId, sort_at_ms: startedAtMs, groups: [{ group_id: 'g1', name: 'Crew' }],
     session: { ...competitionSession.session, session_id: sessionId, member: { user_id: member, username: member }, started_at_ms: startedAtMs },
   });
-  const gr = (sessionId: string) => ({
-    kind: 'competition' as const, key: `record-${sessionId}`, sort_at_ms: 1,
-    event: { ...competitionEvent, event_id: `record-${sessionId}`, session_id: sessionId,
-      values: [{ role: 'record' as const, metric: 'e1rm' as const, unit: 'kg', value: 120, unavailable: false, member: null }] },
-    record: { performance: null, previous: [], group_record_metrics: ['e1rm' as const] },
-  });
-  const items = [
-    ...['a', 'b', 'c', 'd', 'e', 'f'].map((id, index) => session(id, id === 'b' ? ME : `m-${id}`, local(2026, 11, 10 - index, 9))),
-    gr('a'),
-  ];
+  const items = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, index) => session(id, id === 'b' ? ME : `m-${id}`, local(2026, 11, 10 - index, 9)));
 
   it('lists the five latest completed sessions with their sets', () => {
-    const rows = buildLatestSessionRows(items, 'sets', ME, 'DD-MM-YYYY');
-    expect(rows.map((row) => [row.sessionId, row.name, row.when, row.value, row.record])).toEqual([
-      ['a', 'm-a', '10 Nov 26', '1 set', false],
-      ['b', 'You', '9 Nov 26', '1 set', false],
-      ['c', 'm-c', '8 Nov 26', '1 set', false],
-      ['d', 'm-d', '7 Nov 26', '1 set', false],
-      ['e', 'm-e', '6 Nov 26', '1 set', false],
+    const rows = buildLatestSessionRows(items, ME, 'DD-MM-YYYY');
+    expect(rows.map((row) => [row.key, row.sessionId, row.name, row.exercise, row.when, row.value, row.record])).toEqual([
+      ['a', 'a', 'm-a', null, '10 Nov 26', '1 set', false],
+      ['b', 'b', 'You', null, '9 Nov 26', '1 set', false],
+      ['c', 'c', 'm-c', null, '8 Nov 26', '1 set', false],
+      ['d', 'd', 'm-d', null, '7 Nov 26', '1 set', false],
+      ['e', 'e', 'm-e', null, '6 Nov 26', '1 set', false],
     ]);
     expect(rows[0].accessibilityLabel).toBe('m-a, 10-11-2026 09:00, 1 set');
   });
+});
 
-  it('shows the GR count for the GR metric, in the record colour only above zero', () => {
-    const rows = buildLatestSessionRows(items, 'prs', ME, 'DD-MM-YYYY');
-    expect(rows.slice(0, 2).map((row) => [row.value, row.record])).toEqual([['1 GR', true], ['0 GR', false]]);
-    expect(rows[0].accessibilityLabel).toBe('m-a, 10-11-2026 09:00, 1 group record');
+describe('buildLatestGroupRecordRows', () => {
+  type Value = CompetitionEventWire['values'][number];
+  const value = (metric: CompetitionHistoricalMetric, amount: number): Value =>
+    ({ role: 'record', metric, unit: 'kg', value: amount, unavailable: false, member: null });
+  const gr = (id: string, member: string, atMs: number, overrides: Partial<CompetitionEventWire> = {}, metrics: CompetitionHistoricalMetric[] = ['e1rm']) => ({
+    kind: 'competition' as const, key: id, sort_at_ms: atMs,
+    event: { ...competitionEvent, event_id: id, session_id: `s-${id}`, sort_at_ms: atMs, member: { user_id: member, username: member },
+      group_exercise: { group_exercise_id: 'ge1', name: 'Deadlift' }, values: [value('e1rm', 213.3)], ...overrides },
+    record: { performance: null, previous: [], group_record_metrics: metrics },
+  });
+
+  it('lists the five latest group records, newest first, each naming its exercise and opening its session', () => {
+    const items = ['a', 'b', 'c', 'd', 'e', 'f'].map((id, index) => gr(id, id === 'b' ? ME : `m-${id}`, local(2026, 11, 5 + index, 9)));
+    const rows = buildLatestGroupRecordRows(items, ME, 'DD-MM-YYYY');
+    expect(rows.map((row) => [row.key, row.memberUserId, row.sessionId, row.name, row.exercise, row.when, row.value, row.record])).toEqual([
+      ['f', 'm-f', 's-f', 'm-f', 'Deadlift', '10 Nov 26', '1RM 213.3', true],
+      ['e', 'm-e', 's-e', 'm-e', 'Deadlift', '9 Nov 26', '1RM 213.3', true],
+      ['d', 'm-d', 's-d', 'm-d', 'Deadlift', '8 Nov 26', '1RM 213.3', true],
+      ['c', 'm-c', 's-c', 'm-c', 'Deadlift', '7 Nov 26', '1RM 213.3', true],
+      ['b', ME, 's-b', 'You', 'Deadlift', '6 Nov 26', '1RM 213.3', true],
+    ]);
+    expect(rows[0].accessibilityLabel).toBe('m-f, group record, Deadlift 1RM 213.3, 10-11-2026 09:00');
+  });
+
+  it('joins a set’s GR boards and leaves out its PR boards', () => {
+    const items = [gr('a', 'm', local(2026, 11, 10, 9), { values: [value('weight', 200), value('e1rm', 213.3)] }, ['weight', 'e1rm']),
+      gr('b', 'm', local(2026, 11, 9, 9), { values: [value('weight', 190), value('e1rm', 210)] }, ['weight'])];
+    expect(buildLatestGroupRecordRows(items, ME, 'DD-MM-YYYY').map((row) => row.value)).toEqual(['Weight 200.0 · 1RM 213.3', 'Weight 190.0']);
+  });
+
+  it('has no row for a PR-only, provisional, withdrawn or Volume-only record, a session-less one, or a stream session', () => {
+    const at = local(2026, 11, 10, 9);
+    const items = [
+      gr('pr', 'm', at, {}, []),
+      gr('provisional', 'm', at, { provisional: true }),
+      gr('voided', 'm', at, { voided: true }),
+      gr('volume', 'm', at, { values: [value('volume', 2400)] }, ['volume']),
+      gr('no-session', 'm', at, { session_id: null }),
+      gr('no-member', 'm', at, { member: null }),
+      gr('withdrawal', 'm', at, { kind: 'record_voided' }),
+      { kind: 'session' as const, key: 's1', sort_at_ms: at, groups: [{ group_id: 'g1', name: 'Crew' }], session: competitionSession.session },
+    ];
+    expect(buildLatestGroupRecordRows(items, ME, 'DD-MM-YYYY')).toEqual([]);
   });
 });

@@ -29,13 +29,15 @@ it.each([0, 6, 123456])('keeps both WeekFigure metrics, existing comparison bars
   expect(screen.getByTestId('group-week-totals-sets-value')).toHaveStyle(textRoles.figureHero);
 });
 
-it('ends the gallery page with the latest sessions, following the metric chip', () => {
+it('ends the gallery page with the latest sessions, or the latest group records for the GR metric', () => {
   render(<SummaryGallery review />);
   expect(screen.getAllByTestId(/^group-latest-session-gallery-s\d$/)).toHaveLength(5);
   expect(screen.getByTestId('group-latest-session-gallery-s0-value')).toHaveTextContent('12 sets');
   fireEvent.press(screen.getByTestId('groups-filter-metric'));
-  expect(screen.getByTestId('group-latest-session-gallery-s0-value')).toHaveTextContent('1 GR');
-  expect(screen.getByTestId('group-latest-session-gallery-s1-value')).toHaveTextContent('0 GR');
+  expect(screen.queryByTestId('group-latest-sessions-card')).toBeNull();
+  expect(screen.getAllByTestId(/^group-latest-record-gallery-gr-\d$/).map(row => row.props.testID))
+    .toEqual([0, 2, 4].map(index => `group-latest-record-gallery-gr-${index}`));
+  expect(screen.getByTestId('group-latest-record-gallery-gr-0')).toHaveTextContent(/^Marco · Pull-up30 Oct 26/);
 });
 
 it('keeps the page metric scoped to the board/chart and the period scoped to the whole page', () => {
