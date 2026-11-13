@@ -1,5 +1,6 @@
 import { createMuscleWireframeRenderer, colourVector } from '@/components/stats/muscle-wireframe-renderer';
 import { generateRoles } from '@/components/ui/theme';
+import { hexToLch } from '@/components/ui/lch';
 import { themePresets } from '@/components/ui/theme-presets';
 import { buildMuscleShadeRamp, buildThemeShadePalette } from '@/components/stats/muscle-body-projection';
 import { BODY_WIRE_INSTANCES, selectMuscleMeshes } from '@/components/stats/muscle-wireframe-scene';
@@ -111,15 +112,49 @@ it.each(['shader', 'link', 'buffer'])('cleans partial resources on %s creation f
 it('colours activity wires by reported scores, keeps untracked regions neutral and the body achromatic', () => {
   const { context, gl } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
   const muscle = { id: 'cm_arms', displayName: 'Arms', familyName: 'Arms', sortOrder: 0 };
-  const frame = wireframeFixture({ selected: [], scores: new Map([['cm_arms', .5], ['chest', 1]]),
-    report: new Map([['biceps', { muscle, tracked: true }], ['chest', { muscle, tracked: false }]]) });
+  const frame = wireframeFixture({ selected: [], scores: new Map([['cm_arms', .5], ['chest', 1], ['calves', Infinity], ['quads', NaN], ['back_lats', -Infinity]]),
+    report: new Map([['biceps', { muscle, tracked: true }], ['triceps', { muscle, tracked: true }], ['chest', { muscle, tracked: false }]]) });
   renderer.draw(frame);
   const wires = gl.uniform3fv.mock.calls.filter(call => call[0] === 'wireColour').map(call => call[1]);
   const colourOf = (id: string) => wires[BODY_WIRE_INSTANCES.findIndex(mesh => mesh.group === id)];
-  expect(colourOf('biceps')).toEqual(colourVector(buildMuscleShadeRamp(.5, frame.palette)[6]));
-  expect(colourOf('chest')).toEqual(colourVector(frame.roles.inkMuted));
+  expect(colourOf('biceps')).toEqual(colourOf('triceps'));
+  expect(colourOf('biceps')).not.toEqual(colourOf('neutral'));
+  for (const id of ['chest', 'calves', 'quads', 'back_lats', 'forearms_grip']) {
+    expect(colourOf(id)).toEqual(colourOf('neutral'));
+  }
   for (const [name, vector] of gl.uniform3fv.mock.calls) if (name === 'fillLow' || name === 'fillHigh') {
     expect(Math.max(...vector) - Math.min(...vector)).toBeLessThanOrEqual(1 / 255);
   }
+  renderer.dispose();
+});
+
+const lightnessOf = (vector: readonly number[]) => hexToLch(
+  `#${vector.map(channel => Math.round(channel * 255).toString(16).padStart(2, '0')).join('')}`,
+).lightness;
+
+it.each(themePresets.flatMap(preset => (['light', 'dark'] as const).map(mode => ({
+  name: preset.id, seeds: preset.seeds, mode,
+}))))('keeps neutral wires quieter than distinct activity grades in $name / $mode', ({ seeds, mode }) => {
+  const { context, gl } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
+  const roles = generateRoles(seeds, mode);
+  const muscleIds = ['chest', 'biceps', 'quads', 'calves', 'back_lats'];
+  const scores = new Map(muscleIds.map((id, index) => [id, index / 2 - 1]));
+  const frame = wireframeFixture({ selected: [], roles, palette: buildThemeShadePalette(roles, mode), scores });
+  renderer.draw(frame);
+  const wires = gl.uniform3fv.mock.calls.filter(call => call[0] === 'wireColour').map(call => call[1]);
+  const direction = mode === 'dark' ? 1 : -1;
+  const strengthOf = (id: string) => direction * lightnessOf(wires[BODY_WIRE_INSTANCES.findIndex(mesh => mesh.group === id)]);
+  const grades = ['neutral', ...muscleIds].map(strengthOf);
+  for (let index = 1; index < grades.length; index++) {
+    expect(grades[index] - grades[index - 1]).toBeGreaterThan(6);
+  }
+  const fills = gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillLow' || call[0] === 'fillHigh');
+  for (const [, vector] of fills) {
+    expect(grades[0] - direction * lightnessOf(vector)).toBeGreaterThan(0);
+    expect(Math.max(...vector) - Math.min(...vector)).toBeLessThanOrEqual(1 / 255);
+  }
+  gl.uniform3fv.mockClear();
+  renderer.draw({ ...frame, scores: new Map() });
+  expect(gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillLow' || call[0] === 'fillHigh')).toEqual(fills);
   renderer.dispose();
 });
