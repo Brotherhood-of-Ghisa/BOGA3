@@ -73,7 +73,7 @@ export function galleryCow(state: GalleryState, long: boolean): CoWResultWire {
   return result;
 }
 
-/** At a glance's Latest sessions: five completed sessions, the first and third taking a group record. */
+/** At a glance's last card: five completed sessions, the first, third and fifth taking a group record. */
 export const galleryStreamItems = (long: boolean): CompetitionStreamItemWire[] => {
   const names = long ? ['Contessa Serbelloni Mazzanti Vien dal Mare', 'me', 'Sam', 'Jules', 'Luca'] : ['Marco', 'me', 'Sam', 'Jules', 'Luca'];
   const day = 86_400_000;
@@ -91,7 +91,8 @@ export const galleryStreamItems = (long: boolean): CompetitionStreamItemWire[] =
             set_type: null, performance_status: null, weight_value: '100' })) }] } };
     if (index % 2 === 1) return [session];
     const record: CompetitionStreamItemWire = { kind: 'competition', key: `gallery-gr-${index}`, sort_at_ms: start - index * day,
-      event: { ...competitionEvent, event_id: `gallery-gr-${index}`, session_id: sessionId },
+      event: { ...competitionEvent, event_id: `gallery-gr-${index}`, session_id: sessionId, member, sort_at_ms: start - index * day,
+        values: [{ role: 'record', metric: 'e1rm', unit: 'kg', value: 140 - index * 10, unavailable: false, member }] },
       record: { performance: null, previous: [], group_record_metrics: ['e1rm'] } };
     return [record, session];
   });

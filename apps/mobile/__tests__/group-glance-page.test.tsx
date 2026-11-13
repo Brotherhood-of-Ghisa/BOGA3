@@ -419,13 +419,28 @@ describe('At a glance: the latest sessions', () => {
     expect(onOpenSession).toHaveBeenCalledWith(ME, 's2');
   });
 
-  it('shows each session’s GR count for the GR metric, in the record colour above zero', () => {
-    renderWithStream('prs');
-    expect(byId('group-latest-session-s1-value')).toHaveTextContent('1 GR');
-    expect(byId('group-latest-session-s1-value')).toHaveStyle({ color: themeRoles.record });
-    expect(byId('group-latest-session-s2-value')).toHaveTextContent('0 GR');
-    expect(byId('group-latest-session-s2-value')).not.toHaveStyle({ color: themeRoles.record });
-    expect(byId('group-latest-session-s1').props.accessibilityLabel).toMatch(/1 group record$/);
+  it('lists the latest group records instead for the GR metric, in the record colour, each opening its session', () => {
+    const onOpenSession = jest.fn();
+    renderWithStream('prs', onOpenSession);
+    expect(screen.queryByTestId('group-latest-sessions-card')).toBeNull();
+    const card = within(byId('group-latest-records-card'));
+    expect(card.getByTestId('group-latest-records-title')).toHaveTextContent('Latest group records');
+    expect(card.getAllByTestId(/^group-latest-record-gr-[^-]+$/).map((row) => row.props.testID)).toEqual(['group-latest-record-gr-s1']);
+    expect(byId('group-latest-record-gr-s1')).toHaveTextContent(new RegExp(`· ${competitionEvent.group_exercise.name}`));
+    expect(byId('group-latest-record-gr-s1-value')).toHaveStyle({ color: themeRoles.record });
+    expect(byId('group-latest-record-gr-s1').props.accessibilityLabel).toMatch(/group record, /);
+    fireEvent.press(byId('group-latest-record-gr-s1'));
+    expect(onOpenSession).toHaveBeenCalledWith(competitionEvent.member!.user_id, 's1');
+  });
+
+  it('draws no GR card when the loaded stream holds sessions but no group record', () => {
+    renderWithTheme(
+      <GroupGlancePage error={null} metric="prs" myUserId={ME} now={NOW} offline={false} offset={0} onMetricChange={jest.fn()}
+        onOffsetChange={jest.fn()} onRetry={jest.fn()} period="week" series={seriesFor('week', groupRankSeriesEnd(0))}
+        streamItems={items.filter((item) => item.kind === 'session')} />,
+    );
+    expect(screen.queryByTestId('group-latest-records-card')).toBeNull();
+    expect(screen.queryByTestId('group-latest-sessions-card')).toBeNull();
   });
 
   it('draws no card while the stream holds no completed session', () => {

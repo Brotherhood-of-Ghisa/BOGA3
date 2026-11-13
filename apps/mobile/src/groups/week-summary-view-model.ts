@@ -10,7 +10,7 @@ import { formatOrdinal } from './board-view-model';
 import { buildCompetitionSession } from './competition-session-view-model';
 import { SHOWN_BOARD } from './competition-session-records-view-model';
 import { formatExerciseCount, formatStreamPersonName } from './stream-view-model';
-import { formatGroupRecordCount, formatPersonalRecordCount, groupRecordEvent, spokenGroupRecordCount, splitRecordBoards } from './record-boards';
+import { formatPersonalRecordCount, groupRecordEvent, splitRecordBoards } from './record-boards';
 
 import type {
   CompetitionEventWire,
@@ -268,45 +268,85 @@ export const completedSessionsFromStream = (items: CompetitionStreamItemWire[]):
   });
 };
 
-/** At a glance's Latest sessions card lists this many sessions. */
-export const LATEST_SESSIONS_SHOWN = 5;
+/** At a glance's last card lists this many rows: Latest sessions, or Latest group records. */
+export const LATEST_ROWS_SHOWN = 5;
 
-/** One row of At a glance's Latest sessions: who, when, and the figure the metric chip picks. */
-export type LatestSessionRowViewModel = {
+/** One row of At a glance's last card: who, when, and the figure the metric chip picks. */
+export type LatestRowViewModel = {
+  /** The row's key: its session, or its record event. */
+  key: string;
   memberUserId: string;
   sessionId: string;
   name: string;
+  /** The record's exercise, on a Latest group records row; null on a session row. */
+  exercise: string | null;
   when: string;
-  /** `18 sets`, or `3 GR` for the GR metric. */
+  /** `18 sets`, or `1RM 213.3` for a group record. */
   value: string;
-  /** A GR figure above zero, drawn in the record colour. */
+  /** A group record, drawn in the record colour. */
   record: boolean;
   accessibilityLabel: string;
 };
 
 /**
  * The group's latest completed sessions in the loaded stream, newest first,
- * whatever period the page has selected: working sets, or the GR boards each
- * took, as the metric chip picks.
+ * whatever period the page has selected, with their working sets.
  */
 export const buildLatestSessionRows = (
   items: CompetitionStreamItemWire[],
-  metric: 'sets' | 'prs',
   myUserId: string,
   dateFormat: ExerciseDateFormat,
-): LatestSessionRowViewModel[] =>
-  completedSessionsFromStream(items).slice(0, LATEST_SESSIONS_SHOWN).map((session) => {
+): LatestRowViewModel[] =>
+  completedSessionsFromStream(items).slice(0, LATEST_ROWS_SHOWN).map((session) => {
     const name = formatStreamPersonName(session.member, myUserId);
-    const groupRecords = groupRecordBoards(session.group_records).length;
-    const value = metric === 'sets' ? plural(session.working_sets, 'set', 'sets') : formatGroupRecordCount(groupRecords);
-    const spoken = metric === 'sets' ? value : spokenGroupRecordCount(groupRecords);
+    const value = plural(session.working_sets, 'set', 'sets');
     return {
+      key: session.session_id,
       memberUserId: session.member.user_id,
       sessionId: session.session_id,
       name,
+      exercise: null,
       when: formatCompactDate(new Date(session.started_at_ms), dateFormat),
       value,
-      record: metric === 'prs' && groupRecords > 0,
-      accessibilityLabel: sessionLabel([name, formatLocalDateTime(session.started_at_ms, dateFormat), spoken]),
+      record: false,
+      accessibilityLabel: sessionLabel([name, formatLocalDateTime(session.started_at_ms, dateFormat), value]),
     };
   });
+
+/**
+ * The group's latest group records in the loaded stream, newest first,
+ * whatever period the page has selected: one row per record set, its GR
+ * boards joined as the session's GR lines join them. A provisional or
+ * withdrawn record, or one that took no shown board, has no row.
+ */
+export const buildLatestGroupRecordRows = (
+  items: CompetitionStreamItemWire[],
+  myUserId: string,
+  dateFormat: ExerciseDateFormat,
+): LatestRowViewModel[] =>
+  items
+    .flatMap((item) => {
+      if (item.kind !== 'competition' || item.event.kind !== 'record') return [];
+      const { event } = item;
+      if (event.member === null || event.session_id === null) return [];
+      const [line] = buildGroupRecordLines([groupRecordEvent(event, splitRecordBoards(event, item.record))]);
+      return line ? [{ event, member: event.member, sessionId: event.session_id, line }] : [];
+    })
+    .sort((a, b) => b.event.sort_at_ms - a.event.sort_at_ms)
+    .slice(0, LATEST_ROWS_SHOWN)
+    .map(({ event, member, sessionId, line }) => {
+      const name = formatStreamPersonName(member, myUserId);
+      return {
+        key: event.event_id,
+        memberUserId: member.user_id,
+        sessionId,
+        name,
+        exercise: line.exercise,
+        when: formatCompactDate(new Date(event.sort_at_ms), dateFormat),
+        value: line.value,
+        record: true,
+        accessibilityLabel: sessionLabel([
+          name, `group record, ${line.exercise} ${line.value}`, formatLocalDateTime(event.sort_at_ms, dateFormat),
+        ]),
+      };
+    });

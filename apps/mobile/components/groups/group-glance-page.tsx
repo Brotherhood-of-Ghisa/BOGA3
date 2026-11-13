@@ -19,7 +19,7 @@ import {
 } from '@/src/groups/home-periods';
 import type { CompetitionStreamItemWire } from '@/src/groups/competition-wire';
 import type { GroupGlanceHeld } from '@/src/groups/use-group-glance';
-import { buildLatestSessionRows, type LatestSessionRowViewModel } from '@/src/groups/week-summary-view-model';
+import { buildLatestGroupRecordRows, buildLatestSessionRows, type LatestRowViewModel } from '@/src/groups/week-summary-view-model';
 import {
   buildGroupHomeBoard,
   buildGroupRankSeries,
@@ -55,7 +55,7 @@ export type GroupGlancePageProps = {
   /** The page scrolls under the pinned controls, pulled to refresh. */
   refreshControl?: ReactElement<RefreshControlProps>;
   style?: StyleProp<ViewStyle>;
-  /** The group's loaded stream: its latest completed sessions head the last card, whatever the period. */
+  /** The group's loaded stream: its latest completed sessions, or group records for the GR metric, fill the last card, whatever the period. */
   streamItems?: CompetitionStreamItemWire[];
   onOpenSession?: (memberUserId: string, sessionId: string) => void;
   error: GroupApiError | null;
@@ -98,7 +98,8 @@ function useHoldFade(holding: boolean): boolean {
  * selected one fourth where later periods allow. A column tap selects its
  * period, as the stepper does, and every card follows. Last, `Latest
  * sessions` lists the group's newest sessions in the loaded stream (up to
- * five), whatever the period.
+ * five), whatever the period; with the GR metric it is `Latest group
+ * records`, the group's newest GRs there instead.
  */
 export function GroupGlancePage({
   myUserId,
@@ -166,7 +167,8 @@ export function GroupGlancePage({
         ) : (
           <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-glance" />
         )}
-        <LatestSessionsCard rows={buildLatestSessionRows(streamItems, metric, myUserId, dateFormat)} onOpenSession={onOpenSession} />
+        <LatestCard metric={metric} onOpenSession={onOpenSession}
+          rows={metric === 'prs' ? buildLatestGroupRecordRows(streamItems, myUserId, dateFormat) : buildLatestSessionRows(streamItems, myUserId, dateFormat)} />
       </ScrollView>
     </View>
   );
@@ -232,18 +234,28 @@ function GlanceCards({
   );
 }
 
-/** The last card: the group's latest sessions, one row each — who, when, and the chosen metric's figure. */
-function LatestSessionsCard({ rows, onOpenSession }: {
-  rows: LatestSessionRowViewModel[]; onOpenSession?: (memberUserId: string, sessionId: string) => void;
+const LATEST_CARD: Record<GroupHomeMetric, { title: string; testID: string; rowTestID: string }> = {
+  sets: { title: 'Latest sessions', testID: 'group-latest-sessions', rowTestID: 'group-latest-session' },
+  prs: { title: 'Latest group records', testID: 'group-latest-records', rowTestID: 'group-latest-record' },
+};
+
+/**
+ * The last card, one row each — who, when, and the figure: the group's latest
+ * sessions and their sets, or its latest group records, each naming its
+ * exercise. Either row opens the session it was set in.
+ */
+function LatestCard({ metric, rows, onOpenSession }: {
+  metric: GroupHomeMetric; rows: LatestRowViewModel[]; onOpenSession?: (memberUserId: string, sessionId: string) => void;
 }) {
   const text = useUiText();
   const tone = useUiTextTone();
   const themed = useLatestStyles();
+  const card = LATEST_CARD[metric];
   if (rows.length === 0) return null;
   return (
-    <Card testID="group-latest-sessions-card">
+    <Card testID={`${card.testID}-card`}>
       <View style={styles.card}>
-        <CardTitle testID="group-latest-sessions-title" title="Latest sessions" />
+        <CardTitle testID={`${card.testID}-title`} title={card.title} />
         <View>
           {rows.map((row, index) => (
             <Pressable
@@ -251,18 +263,19 @@ function LatestSessionsCard({ rows, onOpenSession }: {
               accessibilityLabel={row.accessibilityLabel}
               accessibilityRole={onOpenSession ? 'button' : undefined}
               disabled={!onOpenSession}
-              key={row.sessionId}
+              key={row.key}
               onPress={() => onOpenSession?.(row.memberUserId, row.sessionId)}
               style={[styles.latestRow, index > 0 ? themed.divider : null]}
-              testID={`group-latest-session-${row.sessionId}`}>
+              testID={`${card.rowTestID}-${row.key}`}>
               <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.bodyStrong, styles.latestName]}>
                 {row.name}
+                {row.exercise ? <Text allowFontScaling={false} style={[text.meta, tone.ink]}>{` · ${row.exercise}`}</Text> : null}
               </Text>
               <Text allowFontScaling={false} numberOfLines={1} style={text.meta}>
                 <FigureText>{row.when}</FigureText>
               </Text>
               <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.ink, styles.latestValue, row.record ? tone.record : null]}
-                testID={`group-latest-session-${row.sessionId}-value`}>
+                testID={`${card.rowTestID}-${row.key}-value`}>
                 <FigureText figureStyle={row.record ? tone.record : undefined}>{row.value}</FigureText>
               </Text>
             </Pressable>
