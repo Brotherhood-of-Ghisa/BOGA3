@@ -141,7 +141,7 @@ and gym chips count rows with a performed set.
 A record is a lifter's all-time best for one exercise definition in one
 reporting bucket (**Scope** below). Which sets can take each kind is
 [[set.eligibility]]; a Volume record may come from a session with zero working
-sets. Rehab sets never qualify for records or PRs. There are three kinds:
+sets. There are three kinds:
 
 | Record | A session's value | Beats the record when |
 | --- | --- | --- |
