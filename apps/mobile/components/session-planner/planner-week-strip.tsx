@@ -2,7 +2,7 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import type { PlanSummaryView } from '@/src/session-planner';
 import { localWeekWindow } from '@/src/utils/local-calendar';
 import { localDateKey } from '@/src/utils/calendar-weeks';
-import { formatCompactDateRange, formatDayMonth } from '@/src/utils/local-time';
+import { formatCalendarWeekHeading, formatDayMonth } from '@/src/utils/local-time';
 import { Pressable, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
@@ -36,8 +36,7 @@ export function PlannerWeekStrip({
 
   const now = new Date();
   const weekWindow = localWeekWindow(now);
-  const weekEnd = new Date(weekWindow.start.getFullYear(), weekWindow.start.getMonth(), weekWindow.start.getDate() + 6);
-  const weekRangeLabel = formatCompactDateRange(weekWindow.start, weekEnd, dateFormat);
+  const weekRangeLabel = formatCalendarWeekHeading(localDateKey(weekWindow.start), dateFormat);
 
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(weekWindow.start.getFullYear(), weekWindow.start.getMonth(), weekWindow.start.getDate() + i);

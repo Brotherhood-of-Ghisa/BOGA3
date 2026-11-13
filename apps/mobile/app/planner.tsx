@@ -182,7 +182,7 @@ function PlannerScheduleContent({
       <PlanSection
         label="Completed scheduled plans"
         onOpenPlan={openPlan}
-        plans={completedPlans}
+        plans={completedPlans.filter((plan) => plan.scheduledFor !== null)}
         testID="planner-plan-section-completed"
       />
     </>
@@ -212,7 +212,7 @@ function PlannerRoutinesContent({
       <PlanSection
         label="Completed routines"
         onOpenPlan={openPlan}
-        plans={completedPlans}
+        plans={completedPlans.filter((plan) => Boolean(plan.isRoutine))}
         testID="planner-plan-section-completed"
       />
     </>
