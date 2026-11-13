@@ -3,21 +3,26 @@ import { generateRoles } from '@/components/ui/theme';
 import { hexToLch } from '@/components/ui/lch';
 import { themePresets } from '@/components/ui/theme-presets';
 import { buildMuscleShadeRamp, buildThemeShadePalette } from '@/components/stats/muscle-body-projection';
-import { BODY_WIRE_INSTANCES, selectMuscleMeshes } from '@/components/stats/muscle-wireframe-scene';
+import { BODY_WIRE_INSTANCES, MUSCLE_COVER_INSTANCES, MUSCLE_COVER_OPACITY, selectMuscleMeshes, wireframeVertices } from '@/components/stats/muscle-wireframe-scene';
 import { recordingGL, wireframeFixture } from './helpers/muscle-wireframe';
 
-it('uses an opaque body, a selected-depth prepass and separate alpha blending', () => {
-  const { context, gl, calls } = recordingGL();
-  const renderer = createMuscleWireframeRenderer(context);
-  renderer.draw(wireframeFixture());
+it.each(['wireframe', 'contour'] as const)('attenuates straight highlight alpha through every closer muscle layer in %s', overlay => {
+  const { context, gl, calls } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
+  renderer.draw(wireframeFixture({ overlay }));
   expect(gl.clearColor.mock.calls[0][3]).toBe(1);
-  const clearDepth = calls.findIndex(call => call.name === 'clear' && call.args[0] === gl.DEPTH_BUFFER_BIT);
-  expect(clearDepth).toBeGreaterThan(0);
-  const selection = calls.slice(clearDepth);
-  expect(selection.findIndex(call => call.name === 'colorMask' && call.args.every(value => value === false)))
-    .toBeLessThan(selection.findIndex(call => call.name === 'drawArrays'));
-  expect(gl.blendFuncSeparate).toHaveBeenCalledWith(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-  expect(gl.uniform1f).toHaveBeenCalledWith('fillAlpha', .18);
+  expect(gl.clearColor).toHaveBeenCalledWith(0, 0, 0, 0);
+  const attenuation = calls.findIndex(c => c.name === 'blendFuncSeparate' && c.args[0] === gl.ZERO);
+  const before = calls.slice(0, attenuation);
+  expect(before.filter(c => c.name === 'disable' && c.args[0] === gl.BLEND)).toHaveLength(2);
+  expect(before.at(-1)).toEqual({ name: 'colorMask', args: [false, false, false, true] });
+  expect(before.filter(c => c.name === 'depthMask').at(-1)).toEqual({ name: 'depthMask', args: [false] });
+  expect(before).toContainEqual({ name: 'depthFunc', args: [gl.LESS] });
+  expect(calls[attenuation]).toEqual({ name: 'blendFuncSeparate', args: [gl.ZERO, gl.ONE, gl.ZERO, gl.ONE_MINUS_SRC_ALPHA] });
+  expect(gl.uniform1f).toHaveBeenCalledWith('fillAlpha', MUSCLE_COVER_OPACITY);
+  const coverCount = wireframeVertices(MUSCLE_COVER_INSTANCES).length / 9;
+  expect(calls.slice(attenuation)).toContainEqual({ name: 'drawArrays', args: [gl.TRIANGLES, 0, coverCount] });
+  expect(gl.blendFuncSeparate).toHaveBeenLastCalledWith(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  expect(gl.drawArrays).toHaveBeenLastCalledWith(gl.TRIANGLE_STRIP, 0, 4);
   expect(gl.endFrameEXP).toHaveBeenCalledTimes(1);
   renderer.dispose();
 });
@@ -35,11 +40,11 @@ it('keeps static GPU geometry across rotation and releases replaced selections a
   renderer.dispose(); renderer.dispose(); renderer.draw(frame);
   expect(gl.deleteBuffer).toHaveBeenCalledTimes(gl.createBuffer.mock.calls.length);
   expect(new Set(gl.deleteBuffer.mock.calls.map(call => call[0])).size).toBe(gl.deleteBuffer.mock.calls.length);
-  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+  expect(gl.deleteProgram).toHaveBeenCalledTimes(gl.createProgram.mock.calls.length);
   expect(gl.endFrameEXP).toHaveBeenCalledTimes(4);
 });
 
-it('shares selection buffers and camera between coarse wires and opaque filled patches', () => {
+it('shares selection and covering geometry, camera and target between wires and filled patches', () => {
   const { context, gl } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
   const frame = wireframeFixture(); renderer.draw(frame);
   const uploads = gl.bufferData.mock.calls.length;
@@ -54,15 +59,34 @@ it('shares selection buffers and camera between coarse wires and opaque filled p
   renderer.dispose();
 });
 
-it('masks covered body wires before drawing them and enables depth writes before clearing selection depth', () => {
-  const { context, gl, calls } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
-  renderer.draw(wireframeFixture());
-  const mask = calls.findIndex(c => c.name === 'uniform1f' && c.args[0] === 'reveal' && c.args[1] === 1);
-  const firstWire = calls.findIndex(c => c.name === 'uniform1f' && c.args[0] === 'wireWidth' && Number(c.args[1]) > 0);
-  expect(mask).toBeGreaterThan(0); expect(mask).toBeLessThan(firstWire);
-  const clear = calls.findIndex(c => c.name === 'clear' && c.args[0] === gl.DEPTH_BUFFER_BIT);
-  expect(calls[clear-1]).toEqual({ name: 'depthMask', args: [true] });
+it('composites only inside muscular body regions and clears the stencil for each new frame', () => {
+  const { context, gl } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
+  const frame = wireframeFixture(); renderer.draw(frame);
+  expect(gl.clear).toHaveBeenCalledWith(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
+  expect(gl.stencilFunc).toHaveBeenCalledWith(gl.ALWAYS, 0, 0xff);
+  expect(gl.stencilFunc).toHaveBeenCalledWith(gl.ALWAYS, 1, 0xff);
+  expect(gl.stencilFunc).toHaveBeenLastCalledWith(gl.EQUAL, 1, 0xff);
+  gl.stencilMask.mockClear(); gl.clear.mockClear(); gl.bindFramebuffer.mockClear();
+  renderer.draw({ ...frame, selected: [] });
+  expect(gl.stencilMask.mock.calls[0]).toEqual([0xff]);
+  expect(gl.clear).toHaveBeenCalledTimes(1);
+  expect(gl.bindFramebuffer).toHaveBeenCalledTimes(1);
+  expect(gl.bindFramebuffer).toHaveBeenCalledWith(gl.FRAMEBUFFER, null);
   renderer.dispose();
+});
+
+it('reuses the opacity target, resizes it with the drawing buffer, and rejects incomplete targets', () => {
+  const { context, gl } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
+  const frame = wireframeFixture(); renderer.draw(frame); renderer.draw(frame);
+  expect(gl.texImage2D).toHaveBeenCalledTimes(1);
+  gl.drawingBufferWidth = 800; renderer.draw(frame);
+  expect(gl.texImage2D).toHaveBeenLastCalledWith(gl.TEXTURE_2D, 0, gl.RGBA, 800, 840, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.drawingBufferHeight = 900; gl.checkFramebufferStatus.mockReturnValue(0);
+  expect(() => renderer.draw(frame)).toThrow('Muscle opacity target is incomplete');
+  renderer.dispose(); renderer.dispose();
+  expect(gl.deleteTexture).toHaveBeenCalledTimes(1);
+  expect(gl.deleteFramebuffer).toHaveBeenCalledTimes(1);
+  expect(gl.deleteRenderbuffer).toHaveBeenCalledTimes(1);
 });
 
 it('fills patches with the reported activity scale and leaves untracked body regions neutral', () => {
@@ -88,7 +112,8 @@ it('repaints live theme colours without rebuilding geometry and preserves the se
   expect(gl.bufferData).toHaveBeenCalledTimes(uploads);
   expect(gl.uniform3fv).toHaveBeenCalledWith('wireColour', colourVector(roles.accent));
   expect(gl.uniform3fv).toHaveBeenCalledWith('fillLow', colourVector(palette.moustache));
-  expect(gl.clearColor).toHaveBeenLastCalledWith(...colourVector(roles.surface), 1);
+  expect(gl.clearColor.mock.calls.at(-2)).toEqual([...colourVector(roles.surface), 1]);
+  expect(gl.clearColor).toHaveBeenLastCalledWith(0, 0, 0, 0);
   renderer.dispose();
 });
 
@@ -98,13 +123,16 @@ it('ignores an unusable viewport without drawing', () => {
   expect(gl.endFrameEXP).not.toHaveBeenCalled(); renderer.dispose();
 });
 
-it.each(['shader', 'link', 'buffer'])('cleans partial resources on %s creation failure', failure => {
+it.each(['shader', 'link', 'buffer', 'texture', 'framebuffer', 'renderbuffer'])('cleans partial resources on %s creation failure', failure => {
   const { context, gl } = recordingGL();
   if (failure === 'shader') gl.getShaderParameter.mockReturnValue(false);
   if (failure === 'link') gl.getProgramParameter.mockReturnValue(false);
   if (failure === 'buffer') gl.createBuffer.mockImplementationOnce(() => ({ id: 99 })).mockReturnValueOnce(null as never);
+  if (failure === 'texture') gl.createTexture.mockReturnValueOnce(null as never);
+  if (failure === 'framebuffer') gl.createFramebuffer.mockReturnValueOnce(null as never);
+  if (failure === 'renderbuffer') gl.createRenderbuffer.mockReturnValueOnce(null as never);
   expect(() => createMuscleWireframeRenderer(context)).toThrow();
-  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+  expect(gl.deleteProgram).toHaveBeenCalledTimes(gl.createProgram.mock.calls.length);
   expect(gl.deleteShader).toHaveBeenCalledTimes(gl.createShader.mock.calls.length);
   if (failure === 'buffer') expect(gl.deleteBuffer).toHaveBeenCalledTimes(1);
 });

@@ -2,7 +2,7 @@ import { Dimensions, StyleSheet, Text } from 'react-native';
 import { act, fireEvent } from '@testing-library/react-native';
 import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import { createMuscleWireframeRenderer } from '@/components/stats/muscle-wireframe-renderer';
-import { selectMuscleMeshes, projectWireframePoint, wireframeCamera } from '@/components/stats/muscle-wireframe-scene';
+import { BODY_WIRE_INSTANCES, hitWireframe, projectWireframePoint, wireframeCamera } from '@/components/stats/muscle-wireframe-scene';
 import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 import { recordingGL } from './helpers/muscle-wireframe';
 import { compareProgressVolume } from '@/src/data/progress-comparisons';
@@ -11,6 +11,13 @@ import type { ProgressMuscleComparison } from '@/src/data';
 
 jest.mock('@/components/stats/muscle-wireframe-renderer', () => ({ createMuscleWireframeRenderer: jest.fn() }));
 const createRenderer = jest.mocked(createMuscleWireframeRenderer);
+function visibleBrachialisPoint(camera: ReturnType<typeof wireframeCamera>) {
+  const mesh = BODY_WIRE_INSTANCES.find(mesh => mesh.group === 'brachialis')!;
+  return mesh.part.faces.map(face => {
+    const centre = [0, 1, 2].map(k => face.slice(0, 3).reduce((n, i) => n + mesh.part.vertices[i][k], 0) / 3);
+    return projectWireframePoint(centre as [number, number, number], camera).slice(0, 2) as [number, number];
+  }).find(point => hitWireframe({ point, camera, selected: [], selectedId: null }) === 'brachialis')!;
+}
 const muscles: ProgressMuscleComparison[] = [{ muscleGroupId: 'brachialis', displayName: 'Brachialis', familyName: 'Arms', sortOrder: 0,
   current: { workingSetCount: 4, totalVolume: 100, volumeSetCount: 1 }, previous: { workingSetCount: 2, totalVolume: 50, volumeSetCount: 1 },
   workingSetChange: 2, volumeChange: compareProgressVolume(100, 50), exercises: [] }];
@@ -63,6 +70,9 @@ it('keeps the selected coarse geometry, focused camera, native context and hit t
   fireEvent(view.getByTestId('stats-muscle-body-wireframe'), 'contextCreate', recordingGL().context);
   fireEvent.press(view.getByTestId('stats-muscle-body-focus'));
   act(() => { jest.advanceTimersByTime(20); });
+  const viewport = view.getByTestId('stats-muscle-body-viewport');
+  for (let step = 0; step < 3; step++) fireEvent(viewport, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+  act(() => { jest.advanceTimersByTime(20); });
   const before = renderer.draw.mock.calls.at(-1)![0];
   fireEvent.press(view.getByTestId('stats-muscle-body-overlay-toggle'));
   act(() => { jest.advanceTimersByTime(20); });
@@ -71,9 +81,7 @@ it('keeps the selected coarse geometry, focused camera, native context and hit t
   expect(view.getByTestId('stats-muscle-body-patches')).toBeTruthy();
   expect(view.getByTestId('stats-muscle-body-focus')).toHaveTextContent('Whole body');
   expect(createRenderer).toHaveBeenCalledTimes(1);
-  const centre = [0, 1, 2].map(k => after.selected[0].part.vertices.reduce((n: number,p: number[]) => n+p[k],0)/after.selected[0].part.vertices.length);
-  const [x,y] = projectWireframePoint(centre as [number,number,number], after.camera);
-  const viewport = view.getByTestId('stats-muscle-body-viewport');
+  const [x, y] = visibleBrachialisPoint(after.camera);
   const tap = viewport.props.gesture.gestures.find((g: { type: string }) => g.type === 'tap');
   tap.handlers.onEnd({ x, y });
   expect(onSelect).toHaveBeenCalledWith('brachialis');
@@ -84,11 +92,9 @@ it('uses the wireframe camera for taps, ignores invalid coordinates, and keeps c
   const view = renderWithTheme(<MuscleBodyCard muscles={muscles} metric="workingSetCount" selectedId="brachialis" onSelect={onSelect} />);
   const viewport = view.getByTestId('stats-muscle-body-viewport');
   fireEvent(viewport, 'layout', { nativeEvent: { layout: { width: 280, height: 420 } } });
-  const camera = wireframeCamera({ angle: 0, width: 280, height: 420, selected: [], focus: false });
-  const meshes = selectMuscleMeshes('brachialis');
-  const mesh = meshes[0], face = mesh.part.faces[0];
-  const point = [0, 1, 2].map(axis => face.reduce((n, i) => n + mesh.part.vertices[i][axis], 0) / 3) as [number, number, number];
-  const projected = projectWireframePoint(point, camera);
+  for (let step = 0; step < 3; step++) fireEvent(viewport, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+  const camera = wireframeCamera({ angle: 90, width: 280, height: 420, selected: [], focus: false });
+  const projected = visibleBrachialisPoint(camera);
   const tap = viewport.props.gesture.gestures.find((gesture: { type: string }) => gesture.type === 'tap');
   act(() => { tap.handlers.onEnd({ x: projected[0], y: projected[1] }); });
   expect(onSelect).toHaveBeenCalledWith('brachialis');

@@ -12,6 +12,12 @@ export type AnatomyInstance = { readonly part: AnatomyPart; readonly side: 1 | -
 type Anatomy = { readonly kind: 'atlas' | 'envelope' | 'surface'; readonly parts: readonly AnatomyPart[]; readonly mirror: boolean };
 export const MUSCLE_ANATOMY = rawAnatomy.muscles as unknown as Readonly<Record<string, Anatomy>>;
 const families = new Map(rawAnatomy.catalog.map(item => [item.id, item.family]));
+
+export const MUSCLE_COVER_OPACITY = .5;
+export const MUSCLE_COVER_INSTANCES: readonly AnatomyInstance[] = Object.entries(MUSCLE_ANATOMY).flatMap(([group, mesh]) =>
+  mesh.parts.flatMap(part => mesh.mirror
+    ? [{ part, group, side: 1 as const }, { part, group, side: -1 as const }]
+    : [{ part, group, side: 1 as const }]));
 const aliases: Readonly<Record<string, string>> = { front_delts: 'delts_front', side_delts: 'delts_lateral', rear_delts: 'delts_rear' };
 
 export function selectMuscleMeshes(selectedId: string | null, report?: MuscleReportAssignment, focus = false): readonly AnatomyInstance[] {
@@ -103,9 +109,8 @@ export function hitWireframe(options: {
   point: readonly [number, number]; camera: WireframeCamera; selected: readonly AnatomyInstance[];
   selectedId: string | null; report?: MuscleReportAssignment;
 }): string | null {
-  const { point, camera, selected, selectedId, report } = options;
-  // Revealed anatomy wins over the covering body's region.
-  if (selectedId && hitInstances(point, camera, selected)) return selectedId;
+  const { point, camera, report } = options;
+  // Translucent deep anatomy never steals a tap from the foreground surface.
   const body = hitInstances(point, camera, BODY_WIRE_INSTANCES);
   const reported = body ? reportedMaterial(body as MuscleBodyMaterialId, report) : 'neutral';
   return reported === 'neutral' ? null : reported;
