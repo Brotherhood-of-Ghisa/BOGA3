@@ -1,9 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
-import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { makeStyles } from '@/components/ui/theme-context';
 import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import type { InjuryWarning } from '@/src/injuries/injury-warning-engine';
 import { describePainScore } from '@/src/injuries/injury-presentation';
@@ -24,7 +24,6 @@ export function InjuryWarningBanner({
   const styles = useStyles();
   const text = useUiText();
   const tone = useUiTextTone();
-  const roles = useUiRoles();
 
   const { injury, onsetText, contraindicationsText } = warning;
   const painLabel =

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Icon } from '@/components/ui/icon';
@@ -8,12 +8,8 @@ import { PageSheet } from '@/components/ui/page-sheet';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
-import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
-import {
-  resolveExerciseSubstitutions,
-  type SubstitutionOption,
-} from '@/src/injuries/injury-substitutions';
+import { resolveExerciseSubstitutions } from '@/src/injuries/injury-substitutions';
 import type { ExerciseMuscleMappingTarget } from '@/src/injuries/injury-warning-engine';
 
 export type InjurySubstitutionSheetProps = {

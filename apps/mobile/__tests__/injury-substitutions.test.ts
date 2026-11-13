@@ -1,4 +1,5 @@
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
+import { hasCatalogSeedExercise } from '@/src/data/exercise-catalog-seeds';
 import {
   CURATED_SUBSTITUTIONS,
   resolveExerciseSubstitutions,
@@ -38,7 +39,12 @@ const mockCatalog: ExerciseCatalogExercise[] = [
   makeMockExercise('seed_push-ups', 'Push-Ups', [{ muscleGroupId: 'chest' }]),
   makeMockExercise('seed_deadlift', 'Barbell Deadlift', [{ muscleGroupId: 'hamstrings' }]),
   makeMockExercise('seed_trap_bar_deadlifts', 'Trap Bar Deadlifts', [{ muscleGroupId: 'hamstrings' }]),
+  makeMockExercise('seed_dumbbell_deadlifts', 'Dumbbell Deadlifts', [{ muscleGroupId: 'hamstrings' }]),
+  makeMockExercise('seed_romanian_deadlift', 'Romanian Deadlift', [{ muscleGroupId: 'hamstrings' }]),
   makeMockExercise('seed_overhead_press', 'Barbell Overhead Press', [{ muscleGroupId: 'delts_front' }]),
+  makeMockExercise('seed_seated_dumbbell_overhead_press', 'Seated Dumbbell Overhead Press', [{ muscleGroupId: 'delts_front' }]),
+  makeMockExercise('seed_standing_dumbbell_presses', 'Standing Dumbbell Presses', [{ muscleGroupId: 'delts_front' }]),
+  makeMockExercise('seed_dumbbell_presses', 'Dumbbell Presses', [{ muscleGroupId: 'delts_front' }]),
   makeMockExercise('deleted_exercise', 'Deleted Quad Exercise', [{ muscleGroupId: 'quads' }], new Date(2026, 1, 1)),
 ];
 
@@ -114,6 +120,50 @@ describe('injury substitutions', () => {
       expect(curatedNames).toContain('Dumbbell Bench Presses');
       expect(curatedNames).toContain('Machine Bench Presses');
       expect(curatedNames).toContain('Push-Ups');
+    });
+
+    it('returns curated alternatives for Barbell Deadlift including Romanian Deadlift', () => {
+      const result = resolveExerciseSubstitutions(
+        {
+          id: 'seed_deadlift',
+          name: 'Barbell Deadlift',
+          mappings: [{ muscleGroupId: 'hamstrings', role: 'primary' }],
+        },
+        mockCatalog
+      );
+
+      const curatedNames = result.curated.map((c) => c.exercise.name);
+      expect(curatedNames).toContain('Trap Bar Deadlifts');
+      expect(curatedNames).toContain('Dumbbell Deadlifts');
+      expect(curatedNames).toContain('Romanian Deadlift');
+    });
+
+    it('returns curated shoulder press alternatives for Barbell Overhead Press', () => {
+      const result = resolveExerciseSubstitutions(
+        {
+          id: 'seed_overhead_press',
+          name: 'Barbell Overhead Press',
+          mappings: [{ muscleGroupId: 'delts_front', role: 'primary' }],
+        },
+        mockCatalog
+      );
+
+      const curatedNames = result.curated.map((c) => c.exercise.name);
+      expect(curatedNames).toContain('Seated Dumbbell Overhead Press');
+      expect(curatedNames).toContain('Standing Dumbbell Presses');
+      expect(curatedNames).toContain('Dumbbell Presses');
+      expect(curatedNames).not.toContain('Seated Machine Bench Presses');
+    });
+
+    it('verifies that every curated substitution seed ID exists in system catalog seeds', () => {
+      const allCuratedSeeds = CURATED_SUBSTITUTIONS.flatMap((mapping) =>
+        mapping.substitutes.map((s) => s.seedIdOrName)
+      );
+      for (const seedId of allCuratedSeeds) {
+        if (seedId.startsWith('seed_')) {
+          expect(hasCatalogSeedExercise(seedId)).toBe(true);
+        }
+      }
     });
 
     it('falls back to primary muscle group alternatives when no curated pattern matches', () => {

@@ -80,14 +80,16 @@ import {
   type ExerciseWarningResult,
 } from '@/src/injuries/use-session-injury-warnings';
 
-function resolveActiveWarning(warningResult: ExerciseWarningResult | null) {
+export function resolveActiveWarning(warningResult: ExerciseWarningResult | null) {
   const active = warningResult?.activeWarning ?? null;
-  if (!active) return { activeWarning: null, isAcute: false, nonAcuteWarning: null };
-  const isAcute = active.severity === 'acute' && !active.isDismissed;
+  if (!active || active.isDismissed) {
+    return { activeWarning: active, isAcute: false, nonAcuteWarning: null };
+  }
+  const isAcute = active.severity === 'acute';
   return {
     activeWarning: active,
     isAcute,
-    nonAcuteWarning: !isAcute || active.isDismissed ? active : null,
+    nonAcuteWarning: isAcute ? null : active,
   };
 }
 

@@ -12,7 +12,7 @@ import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { getSessionSetTypeCycle, type SessionSetTypeValue } from '@/src/data/set-types';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatEffort } from '@/src/session-recorder/exercise-page-model';
-import type { SessionDraftExerciseSnapshot } from '@/src/session-recorder/session-draft-model';
+import type { SessionDraftExerciseSnapshot } from '@/src/data/session-drafts';
 import { EFFORT_CHOICES } from '@/src/exercise-calculations/effort-policy';
 import type { ExerciseSwitcherRow } from '@/src/session-recorder/exercise-switcher';
 

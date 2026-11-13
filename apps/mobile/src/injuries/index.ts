@@ -3,4 +3,9 @@ export * from './injury-presentation';
 export * from './injury-substitutions';
 export * from './injury-warning-engine';
 export * from './use-injuries';
-export * from './use-session-injury-warnings';
+export {
+  clearSessionInjuryDismissals,
+  useSessionInjuryWarnings,
+  type SessionInjuryWarningsState,
+} from './use-session-injury-warnings';
+

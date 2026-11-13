@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+import { resolveActiveWarning } from '@/components/exercise-page/exercise-page-screen';
 import { InjuryBadge } from '@/components/injuries/injury-badge';
 import { InjurySubstitutionSheet } from '@/components/injuries/injury-substitution-sheet';
 import { InjuryWarningBanner } from '@/components/injuries/injury-warning-banner';
@@ -228,8 +229,9 @@ describe('injury workout UI components', () => {
         />
       );
 
-      expect(screen.getByText('Why are you skipping Barbell Back Squat?')).toBeTruthy();
+      expect(screen.getByText('Skip exercise')).toBeTruthy();
       expect(screen.getByText('Discomfort / Injury flare-up')).toBeTruthy();
+      expect(screen.queryByText(/Why are you skipping/)).toBeNull();
 
       fireEvent.press(screen.getByTestId('skip-reason-discomfort'));
       expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -284,6 +286,90 @@ describe('injury workout UI components', () => {
     it('does not render injury badge when card has no injuryWarning', () => {
       renderWithTheme(<SessionExerciseCard card={baseCard} onPress={jest.fn()} />);
       expect(screen.queryByTestId('session-view-exercise-se-1-injury-badge')).toBeNull();
+    });
+  });
+
+  describe('resolveActiveWarning', () => {
+    it('returns null warnings when warningResult is null or activeWarning is null', () => {
+      expect(resolveActiveWarning(null)).toEqual({
+        activeWarning: null,
+        isAcute: false,
+        nonAcuteWarning: null,
+      });
+      expect(
+        resolveActiveWarning({
+          hasWarning: false,
+          activeWarning: null,
+          allMatchingWarnings: [],
+        })
+      ).toEqual({
+        activeWarning: null,
+        isAcute: false,
+        nonAcuteWarning: null,
+      });
+    });
+
+    it('returns isAcute=true and nonAcuteWarning=null for un-dismissed acute warning', () => {
+      const result = resolveActiveWarning({
+        hasWarning: true,
+        activeWarning: mockWarning,
+        allMatchingWarnings: [mockWarning],
+      });
+      expect(result).toEqual({
+        activeWarning: mockWarning,
+        isAcute: true,
+        nonAcuteWarning: null,
+      });
+    });
+
+    it('suppresses both acute banner and nonAcute badge when acute warning is dismissed', () => {
+      const dismissedAcute: InjuryWarning = { ...mockWarning, isDismissed: true };
+      const result = resolveActiveWarning({
+        hasWarning: true,
+        activeWarning: dismissedAcute,
+        allMatchingWarnings: [dismissedAcute],
+      });
+      expect(result).toEqual({
+        activeWarning: dismissedAcute,
+        isAcute: false,
+        nonAcuteWarning: null,
+      });
+    });
+
+    it('returns isAcute=false and nonAcuteWarning=active for managing warning', () => {
+      const managingWarning: InjuryWarning = {
+        ...mockWarning,
+        severity: 'managing',
+        injury: { ...mockInjury, status: 'managing' },
+      };
+      const result = resolveActiveWarning({
+        hasWarning: true,
+        activeWarning: managingWarning,
+        allMatchingWarnings: [managingWarning],
+      });
+      expect(result).toEqual({
+        activeWarning: managingWarning,
+        isAcute: false,
+        nonAcuteWarning: managingWarning,
+      });
+    });
+
+    it('returns nonAcuteWarning=null when managing warning is dismissed', () => {
+      const dismissedManaging: InjuryWarning = {
+        ...mockWarning,
+        severity: 'managing',
+        isDismissed: true,
+      };
+      const result = resolveActiveWarning({
+        hasWarning: true,
+        activeWarning: dismissedManaging,
+        allMatchingWarnings: [dismissedManaging],
+      });
+      expect(result).toEqual({
+        activeWarning: dismissedManaging,
+        isAcute: false,
+        nonAcuteWarning: null,
+      });
     });
   });
 });

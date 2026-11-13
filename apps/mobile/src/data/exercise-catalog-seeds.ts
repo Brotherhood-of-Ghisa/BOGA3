@@ -3012,3 +3012,7 @@ export const getSeededExerciseMapping = (exerciseDefinitionId: string, muscleGro
 
 export const hasSeededExerciseDefinition = (exerciseDefinitionId: string) =>
   SYSTEM_EXERCISE_DEFINITION_SEEDS.some((exercise) => exercise.id === exerciseDefinitionId);
+
+export const hasCatalogSeedExercise = (exerciseId: string) =>
+  SYSTEM_EXERCISE_DEFINITION_INPUTS.some((exercise) => exercise.id === exerciseId);
+

@@ -70,8 +70,8 @@ export const CURATED_SUBSTITUTIONS: readonly CuratedMovementMapping[] = [
         reason: 'Lighter per-side load and adjustable hand placement',
       },
       {
-        seedIdOrName: 'seed_romanian_deadlifts',
-        name: 'Romanian Deadlifts',
+        seedIdOrName: 'seed_romanian_deadlift',
+        name: 'Romanian Deadlift',
         reason: 'Controlled hip hinge emphasizing hamstrings with lighter load',
       },
     ],
@@ -81,19 +81,19 @@ export const CURATED_SUBSTITUTIONS: readonly CuratedMovementMapping[] = [
     matches: (name: string) => /overhead press|military press|barbell shoulder press/i.test(name),
     substitutes: [
       {
-        seedIdOrName: 'seed_seated_machine_bench_presses',
-        name: 'Seated Machine Overhead Press',
+        seedIdOrName: 'seed_seated_dumbbell_overhead_press',
+        name: 'Seated Dumbbell Overhead Press',
         reason: 'Limits lumbar hyperextension with back support',
       },
       {
-        seedIdOrName: 'seed_dumbbell_neutral_press',
-        name: 'Dumbbell Neutral-Grip Press',
-        reason: 'Avoids shoulder impingement in acromial space',
+        seedIdOrName: 'seed_standing_dumbbell_presses',
+        name: 'Standing Dumbbell Presses',
+        reason: 'Allows independent arm movement and natural path',
       },
       {
-        seedIdOrName: 'seed_dumbbell_shoulder_presses',
-        name: 'Dumbbell Shoulder Presses',
-        reason: 'Allows independent arm movement and natural path',
+        seedIdOrName: 'seed_dumbbell_presses',
+        name: 'Dumbbell Presses',
+        reason: 'Allows adjustable pressing angle to reduce shoulder impingement',
       },
     ],
   },

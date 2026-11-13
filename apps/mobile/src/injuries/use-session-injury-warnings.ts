@@ -10,6 +10,12 @@ import {
   type InjuryWarningSeverity,
 } from './injury-warning-engine';
 
+export type {
+  ExerciseAnatomyTarget,
+  ExerciseWarningResult,
+  InjuryWarningSeverity,
+};
+
 // In-memory dismissal registry across the active app process:
 // keyed by `${sessionId}:${injuryId}` and `${sessionId}:${exerciseId}:${injuryId}`
 const dismissedInjuryKeys = new Set<string>();

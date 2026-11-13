@@ -1,16 +1,15 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 
 export type SkipReason = 'discomfort' | 'equipment' | 'fatigue' | 'other';
 
 export type SkipExerciseDialogProps = {
   visible: boolean;
-  exerciseName: string;
+  exerciseName?: string;
   onDismiss: () => void;
   onConfirmSkip: (reason: SkipReason) => void;
   onReportDiscomfort?: () => void;
@@ -19,15 +18,12 @@ export type SkipExerciseDialogProps = {
 
 export function SkipExerciseDialog({
   visible,
-  exerciseName,
+  exerciseName: _exerciseName,
   onDismiss,
   onConfirmSkip,
   onReportDiscomfort,
   testID = 'skip-exercise-dialog',
 }: SkipExerciseDialogProps) {
-  const text = useUiText();
-  const tone = useUiTextTone();
-
   const handleDiscomfort = () => {
     onDismiss();
     onConfirmSkip('discomfort');
@@ -49,12 +45,7 @@ export function SkipExerciseDialog({
       title="Skip exercise"
       visible={visible}>
       <View style={styles.body}>
-        <Text allowFontScaling={false} style={[text.meta, tone.faint, styles.prompt]}>
-          Why are you skipping {exerciseName}?
-        </Text>
-
         <ListRow
-          description="Logs check-in or updates active injury notes"
           label="Discomfort / Injury flare-up"
           leading={<Icon colorRole="danger" name="warning" />}
           onPress={handleDiscomfort}
@@ -87,9 +78,5 @@ export function SkipExerciseDialog({
 const styles = StyleSheet.create({
   body: {
     paddingBottom: uiSpace.lg,
-  },
-  prompt: {
-    paddingHorizontal: uiSpace.lg,
-    paddingBottom: uiSpace.sm,
   },
 });

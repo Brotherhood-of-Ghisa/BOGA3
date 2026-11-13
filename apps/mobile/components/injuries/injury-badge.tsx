@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiBorder, uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { InjuryStatus } from '@/src/data/injuries';
@@ -23,7 +23,6 @@ export function InjuryBadge({
 }: InjuryBadgeProps) {
   const styles = useStyles();
   const text = useUiText();
-  const tone = useUiTextTone();
 
   const effectiveStatus = severity ?? status ?? 'managing';
   const defaultLabel =
