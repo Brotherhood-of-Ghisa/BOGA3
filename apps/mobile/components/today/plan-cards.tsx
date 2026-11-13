@@ -1,4 +1,4 @@
-import { useDateFormat } from '@/src/preferences/hooks';
+import { useAccountLocalPreferenceState, useDateFormat } from '@/src/preferences/hooks';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -10,7 +10,6 @@ import { Icon } from '@/components/ui/icon';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
-import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatWholeSetCount, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
@@ -23,8 +22,10 @@ export type TodayPlanCardsProps = {
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenProgress: () => void;
   onOpenPlan: (planId: string) => void;
-  /** Opens Sessions, where sessions are planned and the plans listed. */
-  onOpenSessions: () => void;
+  /** Opens the dedicated Planner space. */
+  onOpenPlanner?: () => void;
+  /** Opens Sessions. */
+  onOpenSessions?: () => void;
 };
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -289,12 +290,12 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
 }
 
 // This week's trained and planned days, then the next planned sessions; the
-// Sessions link opens them all, where they are planned.
-function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
+// Planner link opens the planning hub.
+function PlanWeekCard({ plan, now, onOpenPlan, onOpenPlanner }: {
   plan: TodayPlan;
   now: Date;
   onOpenPlan: (planId: string) => void;
-  onOpenSessions: () => void;
+  onOpenPlanner: () => void;
 }) {
   const styles = useStyles();
   const text = useUiText();
@@ -305,7 +306,7 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
         <Text accessibilityRole="header" allowFontScaling={false} style={[text.label, tone.ink]}>
           Plan
         </Text>
-        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-plan-sessions-button" variant="link" />
+        <ActionButton label="Planner" onPress={onOpenPlanner} testID="today-plan-sessions-button" variant="link" />
       </View>
       <View style={styles.week}>
         {plan.week.map((day) => (
@@ -330,10 +331,11 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
 /** Today's Plan page: the recovery card over the week's plan. */
 export function TodayPlanCards({ now, ...props }: TodayPlanCardsProps & { now: Date }) {
   const styles = useStyles();
+  const openPlanner = props.onOpenPlanner ?? props.onOpenSessions ?? (() => {});
   return (
     <View style={[styles.stack, styles.fill]}>
       <RecoveryCard {...props} />
-      <PlanWeekCard now={now} onOpenPlan={props.onOpenPlan} onOpenSessions={props.onOpenSessions} plan={props.plan} />
+      <PlanWeekCard now={now} onOpenPlan={props.onOpenPlan} onOpenPlanner={openPlanner} plan={props.plan} />
     </View>
   );
 }

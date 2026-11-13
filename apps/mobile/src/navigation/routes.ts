@@ -6,6 +6,7 @@ import { encodeGymRouteParam } from '@/src/utils/gym-scope-route';
 
 export const SIGN_IN_ROUTE = '/sign-in';
 export const EXERCISE_LINK_ROUTE = '/exercise-link';
+export const PLANNER_ROUTE = '/planner';
 // The Gyms screen, from the session view's gym sheet (`Manage gyms`) and More.
 export const GYMS_ROUTE = '/gyms';
 export const BODY_WEIGHT_ROUTE = '/body-weight';
@@ -13,6 +14,8 @@ export const BODY_WEIGHT_ROUTE = '/body-weight';
 export const NOTES_ROUTE = '/notes';
 export const notesHref = (exerciseDefinitionId?: string | null): Href =>
   (exerciseDefinitionId ? `${NOTES_ROUTE}?exerciseId=${encodeURIComponent(exerciseDefinitionId)}` : NOTES_ROUTE) as Href;
+
+export const plannerHref = (): Href => PLANNER_ROUTE as Href;
 
 /** Settings' sub pages, one per Settings row; Bodyweight's is `BODY_WEIGHT_ROUTE`. */
 export const SETTINGS_SUB_PAGES = {

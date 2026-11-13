@@ -521,11 +521,11 @@ describe('Today: the Plan page over real data', () => {
     expect(mockPush.mock.calls).toEqual([['/progress-history?muscleGroupId=quads&metric=sets&secondary=hidden'], ['/progress']]);
   });
 
-  it('opens Sessions, where sessions are planned, from the plan card', async () => {
+  it('opens Planner from the plan card', async () => {
     await renderToday();
 
-    fireEvent.press(within(text('today-plan-week-card')).getByText('Sessions'));
-    expect(mockPush).toHaveBeenCalledWith('/sessions');
+    fireEvent.press(within(text('today-plan-week-card')).getByText('Planner'));
+    expect(mockPush).toHaveBeenCalledWith('/planner');
   });
 
   it('marks the trained and planned days and lists the next planned sessions, each opening its plan', async () => {

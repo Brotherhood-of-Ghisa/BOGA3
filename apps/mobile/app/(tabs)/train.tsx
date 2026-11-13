@@ -1,4 +1,4 @@
-import { useIsFocused } from 'expo-router';
+import { useIsFocused, useRouter, type Href } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ import {
   type SessionEntryCoordinator,
   type SessionEntryResult,
 } from '@/src/session-entry';
+import { isPlanEligibleToStart, planQueries, startSessionPlan } from '@/src/session-planner';
 
 export type TrainPlanningState =
   | { status: 'unavailable' }
@@ -40,6 +41,7 @@ export type TrainScreenProps = {
   isFocused?: boolean;
   loadActiveSessionId?: (preferredId?: string | null) => Promise<string | null>;
   planningState?: TrainPlanningState;
+  onWorkoutEnded?: () => void;
   sessionEntry?: SessionEntryCoordinator;
   // The workout in progress, drawn in place of the disc; `onEnded` brings the disc back.
   renderWorkout?: (sessionId: string, onEnded: (moment: WorkoutEndMoment) => void) => ReactNode;
@@ -66,7 +68,11 @@ type ActiveCheck =
  * ended under a page that covers Train (Finish's summary) gives way to the
  * disc only once Train is back in focus, so the disc never shows through.
  */
-function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: (preferredId?: string | null) => Promise<string | null>) {
+function useActiveSessionCheck(
+  isFocused: boolean,
+  loadActiveSessionId: (preferredId?: string | null) => Promise<string | null>,
+  onWorkoutEnded?: () => void,
+) {
   const [check, setCheck] = useState<ActiveCheck>({ status: 'checking' });
   const [workoutId, setWorkoutId] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -74,6 +80,8 @@ function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: (preferr
   const [checkedFocus, setCheckedFocus] = useState(isFocused);
   const preferredId = useRef<string | null>(null);
   const selectionVersion = useRef(0);
+  const prevWorkoutIdRef = useRef<string | null>(null);
+
   if (checkedFocus !== isFocused) {
     setCheckedFocus(isFocused);
     if (isFocused) setCheck({ status: 'checking' });
@@ -103,6 +111,13 @@ function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: (preferr
     };
   }, [attempt, isFocused, loadActiveSessionId]);
 
+  useEffect(() => {
+    if (prevWorkoutIdRef.current !== null && workoutId === null) {
+      onWorkoutEnded?.();
+    }
+    prevWorkoutIdRef.current = workoutId;
+  }, [workoutId, onWorkoutEnded]);
+
   const retry = () => {
     setCheck({ status: 'checking' });
     setAttempt((value) => value + 1);
@@ -114,8 +129,12 @@ function useActiveSessionCheck(isFocused: boolean, loadActiveSessionId: (preferr
     setEndsOnReturn(false);
     setCheck({ status: 'done', activeSessionId });
     setWorkoutId(activeSessionId);
-  }, []);
+    if (activeSessionId === null) {
+      onWorkoutEnded?.();
+    }
+  }, [onWorkoutEnded]);
   const end = (moment: WorkoutEndMoment) => {
+    onWorkoutEnded?.();
     if (moment === 'now') return show(null);
     preferredId.current = null;
     selectionVersion.current += 1;
@@ -136,6 +155,7 @@ export function TrainScreen({
   isFocused = true,
   loadActiveSessionId = loadActiveSessionIdFromDatabase,
   planningState = { status: 'unavailable' },
+  onWorkoutEnded,
   sessionEntry = DEFAULT_SESSION_ENTRY_COORDINATOR,
   renderWorkout = renderSessionView,
 }: TrainScreenProps) {
@@ -147,7 +167,7 @@ export function TrainScreen({
     kind: LaunchKind;
     message: string;
   } | null>(null);
-  const { check, end, retry, show, workoutId } = useActiveSessionCheck(isFocused, loadActiveSessionId);
+  const { check, end, retry, show, workoutId } = useActiveSessionCheck(isFocused, loadActiveSessionId, onWorkoutEnded);
   // Opened from a page over the tabs: shown before that page slides away.
   useEffect(() => subscribeOpenedWorkout(show), [show]);
 
@@ -337,9 +357,97 @@ function TrainPlanning({
   );
 }
 
+export function useTrainPlanningState({
+  isFocused = true,
+  reloadToken = 0,
+}: {
+  isFocused?: boolean;
+  reloadToken?: number;
+} = {}): TrainPlanningState {
+  const router = useRouter();
+  const [state, setState] = useState<TrainPlanningState>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!isFocused) return;
+    let cancelled = false;
+
+    planQueries
+      .listUpcomingPlans()
+      .then(async (upcoming) => {
+        if (cancelled) return;
+        const pending = upcoming.filter((plan) => plan.progress !== 'completed');
+
+        let nextPlan: (typeof pending)[number] | null = null;
+        for (const plan of pending) {
+          const eligible = await isPlanEligibleToStart(plan.id);
+          if (cancelled) return;
+          if (eligible) {
+            nextPlan = plan;
+            break;
+          }
+        }
+
+        if (!nextPlan) {
+          setState({
+            status: 'empty',
+            openManager: () => router.push('/planner' as Href),
+          });
+          return;
+        }
+
+        const counts = nextPlan.blockCounts;
+        const totalBlocks = counts.pending + counts.attached + counts.completed + counts.skipped;
+        const detail = `${totalBlocks} ${totalBlocks === 1 ? 'exercise' : 'exercises'}`;
+
+        setState({
+          status: 'ready',
+          title: nextPlan.title,
+          detail,
+          materialize: async () => {
+            const result = await startSessionPlan(nextPlan.id);
+            if (result.status === 'started' || result.status === 'already-active') {
+              return { sessionId: result.sessionId };
+            }
+            throw new Error('Unable to start plan');
+          },
+          openManager: () => router.push('/planner' as Href),
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setState({
+          status: 'error',
+          message: "Couldn't load your plans.",
+          retry: () => {
+            setState({ status: 'loading' });
+            setAttempt((prev) => prev + 1);
+          },
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attempt, isFocused, reloadToken, router]);
+
+  return state;
+}
+
 export default function TrainRoute() {
   const isFocused = useIsFocused();
-  return <TrainScreen isFocused={isFocused} />;
+  const [reloadToken, setReloadToken] = useState(0);
+  const handleWorkoutEnded = useCallback(() => {
+    setReloadToken((prev) => prev + 1);
+  }, []);
+  const planningState = useTrainPlanningState({ isFocused, reloadToken });
+  return (
+    <TrainScreen
+      isFocused={isFocused}
+      onWorkoutEnded={handleWorkoutEnded}
+      planningState={planningState}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
