@@ -50,9 +50,9 @@ function changes(item: MergeReviewItem, dateFormat: Parameters<typeof formatLoca
 }
 
 const confirmRemoval = (onConfirm: () => void) =>
-  Alert.alert('Apply saved removal?', 'The saved removal replaces your current history.', [
+  Alert.alert('Overwrite remote?', 'The saved removal replaces the remote version of this item.', [
     { text: 'Cancel', style: 'cancel' },
-    { text: 'Apply', style: 'destructive', onPress: onConfirm },
+    { text: 'Overwrite remote', style: 'destructive', onPress: onConfirm },
   ]);
 
 // Settings → Data & sync → Review changes. Recovery only: every Apply is
@@ -132,9 +132,9 @@ export function ExerciseMergeReviewScreen() {
           divider={index > 0 || Boolean(item.sessionStartedAt)} label={change.label}
           value={change.current + ' → ' + change.saved}
           accessibilityLabel={change.label + ': current ' + change.current + ', saved ' + change.saved} />)}
-        <ActionRow divider kind="act" label="Keep current history" disabled={busy}
+        <ActionRow divider kind="act" label="Keep remote" disabled={busy}
           onPress={() => { void resolve(item, true); }} testID={'exercise-merge-keep-' + item.id} />
-        <ActionRow divider kind={removal ? 'danger' : 'act'} label={removal ? 'Apply saved removal' : 'Apply saved changes'}
+        <ActionRow divider kind={removal ? 'danger' : 'act'} label="Overwrite remote"
           disabled={busy || item.invalid || noMetadata} onPress={removal ? () => confirmRemoval(apply) : apply}
           testID={'exercise-merge-apply-' + item.id} />
       </FormSection>;
