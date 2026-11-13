@@ -31,6 +31,8 @@ sessions store no bodyweight tuple — the latest valid reading at or before the
 exact start is selected on read, so preference, contribution and reading
 changes recalculate derived history without touching raw sets.
 
+Creating/renaming migrations: [conventions](../../supabase/README.md#migration-filenames).
+
 ## Scope classification
 
 Session control columns are **in sync scope** but server-written; they also

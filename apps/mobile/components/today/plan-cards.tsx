@@ -1,4 +1,4 @@
-import { useDateFormat } from '@/src/preferences/hooks';
+import { useAccountLocalPreferenceState, useDateFormat } from '@/src/preferences/hooks';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -10,7 +10,6 @@ import { Icon } from '@/components/ui/icon';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
-import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatWholeSetCount, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
@@ -23,8 +22,10 @@ export type TodayPlanCardsProps = {
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenProgress: () => void;
   onOpenPlan: (planId: string) => void;
-  /** Opens Sessions, where sessions are planned and the plans listed. */
-  onOpenSessions: () => void;
+  /** Opens the dedicated Planner space. */
+  onOpenPlanner?: () => void;
+  /** Opens Sessions. */
+  onOpenSessions?: () => void;
 };
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -130,7 +131,7 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, grouped, onPress }: {
 }
 
 // A full-width header owns expansion, never child navigation. Collapsed children
-// unmount, so neither touch nor accessibility can reach them. All start expanded.
+// unmount, so neither touch nor accessibility can reach them. All start collapsed.
 function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
   plan: TodayPlan; weekStartIndex: number; grouped: boolean; onOpenMuscle: TodayPlanCardsProps['onOpenMuscle'];
 }) {
@@ -138,19 +139,19 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
   const text = useUiText();
   const tone = useUiTextTone();
   const dateFormat = useDateFormat();
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
   const renderRow = (row: RecoveryRow) => <RecoveryMuscleRow
     days={plan.recoveryDays} grouped={grouped} key={row.muscleGroupId}
     onPress={() => onOpenMuscle(row.muscleGroupId)} row={row} weekStartIndex={weekStartIndex} />;
   if (!grouped) return <>{plan.muscles.map(renderRow)}</>;
   return <>{groupRecoveryRows(plan.muscles).map(section => {
-    const expanded = !collapsed.has(section.name);
+    const expanded = expandedGroups.has(section.name);
     const figure = wholeSets(section.weekSets);
     const testID = `today-plan-group-${section.name}`;
     return <View key={section.name}>
       <Pressable accessibilityRole="button" accessibilityLabel={recoveryGroupLabel(section, plan.recoveryDays, dateFormat)}
         accessibilityState={{ expanded }} testID={testID}
-        onPress={() => setCollapsed(previous => {
+        onPress={() => setExpandedGroups(previous => {
           const next = new Set(previous);
           if (next.has(section.name)) next.delete(section.name);
           else next.add(section.name);
@@ -178,7 +179,7 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
 // Each muscle's sets on the last three days, today so far, and this week
 // against its weekly Target ([[muscle.weekly-targets]]): under target first,
 // then fewest this week.
-// Settings' family grouping adds initially expanded sections over the same
+// Settings' family grouping adds initially collapsed sections over the same
 // reported muscles, preserving recovery order within each. Family tiles sum
 // unrounded daily child contributions, including numeric zeros, and stay when
 // collapsed; their trailing total remains weekly ([[muscle.set-count]]).
@@ -289,12 +290,12 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
 }
 
 // This week's trained and planned days, then the next planned sessions; the
-// Sessions link opens them all, where they are planned.
-function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
+// Planner link opens the planning hub.
+function PlanWeekCard({ plan, now, onOpenPlan, onOpenPlanner }: {
   plan: TodayPlan;
   now: Date;
   onOpenPlan: (planId: string) => void;
-  onOpenSessions: () => void;
+  onOpenPlanner: () => void;
 }) {
   const styles = useStyles();
   const text = useUiText();
@@ -305,7 +306,7 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
         <Text accessibilityRole="header" allowFontScaling={false} style={[text.label, tone.ink]}>
           Plan
         </Text>
-        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-plan-sessions-button" variant="link" />
+        <ActionButton label="Planner" onPress={onOpenPlanner} testID="today-plan-sessions-button" variant="link" />
       </View>
       <View style={styles.week}>
         {plan.week.map((day) => (
@@ -330,10 +331,11 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
 /** Today's Plan page: the recovery card over the week's plan. */
 export function TodayPlanCards({ now, ...props }: TodayPlanCardsProps & { now: Date }) {
   const styles = useStyles();
+  const openPlanner = props.onOpenPlanner ?? props.onOpenSessions ?? (() => {});
   return (
     <View style={[styles.stack, styles.fill]}>
       <RecoveryCard {...props} />
-      <PlanWeekCard now={now} onOpenPlan={props.onOpenPlan} onOpenSessions={props.onOpenSessions} plan={props.plan} />
+      <PlanWeekCard now={now} onOpenPlan={props.onOpenPlan} onOpenPlanner={openPlanner} plan={props.plan} />
     </View>
   );
 }

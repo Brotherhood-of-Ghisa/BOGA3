@@ -131,7 +131,7 @@ const expectNoPressedFill = (testID: string, resting: object) => {
 };
 
 describe('Today: the Plan page over real data', () => {
-  it('groups reported muscles by the saved family setting, sums before flooring, and toggles only that header', async () => {
+  it('starts every family collapsed, keeps its totals, and toggles only the pressed header', async () => {
     await bootLocalApp();
     act(() => updatePreferences({ progressGrouped: true, progressCountSecondary: true }));
     await exerciseCatalogData.saveExerciseCatalogExercise({ id: BENCH.id, name: BENCH.name,
@@ -140,8 +140,12 @@ describe('Today: the Plan page over real data', () => {
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 3 }]);
     await renderToday();
 
+    for (const header of screen.getAllByRole('button').filter(button => button.props.testID?.startsWith('today-plan-group-'))) {
+      expect(header).toHaveProp('accessibilityState', { expanded: false });
+    }
+    expect(screen.queryAllByTestId(/^today-plan-muscle-/)).toHaveLength(0);
+    expect(screen.queryByRole('button', { name: /^Biceps,/ })).toBeNull();
     const arms = text('today-plan-group-Arms');
-    expect(arms).toHaveProp('accessibilityState', { expanded: true });
     expect(arms).toHaveProp('accessibilityRole', 'button');
     expect(arms).toHaveProp('accessibilityLabel',
       'Arms, 3 sets this week, Wednesday 28-10-2026: 0 sets, Thursday 29-10-2026: 0 sets, Friday 30-10-2026: 3 sets, today: 0 sets');
@@ -156,6 +160,10 @@ describe('Today: the Plan page over real data', () => {
     expect(arms).not.toHaveStyle({ borderTopWidth: 1 });
     expect(text('today-plan-recovery-rows')).toHaveStyle({ marginHorizontal: -uiSpace.sm });
     expectNoPressedFill('today-plan-group-Arms', { backgroundColor: roles.accentWash });
+    fireEvent.press(arms);
+    expect(arms).toHaveProp('accessibilityState', { expanded: true });
+    expect(text('today-plan-group-Legs')).toHaveProp('accessibilityState', { expanded: false });
+    expect(screen.queryByTestId('today-plan-muscle-quads')).toBeNull();
     expectNoPressedFill('today-plan-muscle-biceps', { borderTopColor: roles.ruleSoft });
     expect(text('today-plan-group-Arms-day-2')).toHaveStyle({ backgroundColor: roles.accent });
     expect(within(text('today-plan-group-Arms-day-2')).getByText('3')).toHaveStyle({ color: roles.onAccent });
@@ -165,6 +173,7 @@ describe('Today: the Plan page over real data', () => {
     expect(text('today-plan-muscle-biceps-week')).toHaveTextContent('1/8');
     expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('1/8');
     expect(text('today-plan-muscle-biceps').props.accessibilityLabel).toContain('this week 1.5 of 8 sets');
+    fireEvent.press(text('today-plan-group-Legs'));
     fireEvent.press(arms);
     expect(text('today-plan-group-Arms')).toHaveProp('accessibilityState', { expanded: false });
     expect(screen.getByTestId('today-plan-group-Arms-collapsed', { includeHiddenElements: true })).toBeTruthy();
@@ -182,11 +191,15 @@ describe('Today: the Plan page over real data', () => {
 
     act(() => updatePreferences({ progressCountSecondary: false }));
     await waitFor(() => expect(text('today-plan-group-Arms-total')).toHaveTextContent('0 sets'));
+    expect(text('today-plan-group-Arms')).toHaveProp('accessibilityState', { expanded: true });
     expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('0');
     expect(text('today-plan-muscle-biceps-day-2')).toHaveTextContent('');
     act(() => updatePreferences({ progressGrouped: false }));
     expect(screen.queryByTestId('today-plan-group-Arms')).toBeNull();
     expect(text('today-plan-muscle-biceps')).toBeTruthy();
+    act(() => updatePreferences({ progressGrouped: true }));
+    expect(text('today-plan-group-Arms')).toHaveProp('accessibilityState', { expanded: false });
+    expect(screen.queryByTestId('today-plan-muscle-biceps')).toBeNull();
   });
 
   it('keeps previous-week daily tiles separate from today and the weekly total, and follows a live dark theme', async () => {
@@ -198,6 +211,7 @@ describe('Today: the Plan page over real data', () => {
     await logSession('sat', local(2026, 11, 7, 9), [{ ...BENCH, count: 3 }]);
     await logSession('tue', local(2026, 11, 10, 9), [{ ...BENCH, count: 1 }]);
     await renderToday({ now: () => local(2026, 11, 10, 15) });
+    fireEvent.press(text('today-plan-group-Arms'));
     expect(text('today-plan-group-Arms-day-0')).toHaveTextContent('3');
     expect(text('today-plan-group-Arms-day-1')).toHaveTextContent('0');
     expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('0');
@@ -229,6 +243,7 @@ describe('Today: the Plan page over real data', () => {
     await logSession('sun', local(2026, 10, 25, 9), [{ ...BENCH, count: 10 }]);
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 1 }]);
     await renderToday();
+    fireEvent.press(text('today-plan-group-Arms'));
     expect(text('today-plan-group-Arms-total')).toHaveTextContent('2 sets');
     await act(() => applyBroadTemplate());
     await waitForGone(() => screen.queryByTestId('today-plan-muscle-brachialis'));
@@ -248,15 +263,21 @@ describe('Today: the Plan page over real data', () => {
     expect(text('today-plan-group-Arms-day-2')).toHaveTextContent('1');
   });
 
-  it('takes grouping from the active account and clears its collapsed state on account switches', async () => {
-    await renderToday();
+  it('takes grouping from the active account and starts collapsed after account switches and remounts', async () => {
+    const view = await renderToday();
     act(() => updatePreferences({ progressGrouped: true }));
     fireEvent.press(text('today-plan-group-Arms'));
-    expect(screen.queryByTestId('today-plan-muscle-biceps')).toBeNull();
+    expect(text('today-plan-muscle-biceps')).toBeTruthy();
     Storage.setItemSync(preferenceKey('account:B', 'progressGrouped'), 'true');
     await act(async () => setAccountLocalPreferenceAccount('B', true));
-    await waitFor(() => expect(text('today-plan-group-Arms')).toHaveProp('accessibilityState', { expanded: true }));
+    await waitFor(() => expect(text('today-plan-group-Arms')).toHaveProp('accessibilityState', { expanded: false }));
+    expect(screen.queryByTestId('today-plan-muscle-biceps')).toBeNull();
+    fireEvent.press(text('today-plan-group-Arms'));
     expect(text('today-plan-muscle-biceps')).toBeTruthy();
+    view.unmount();
+    await renderToday();
+    expect(text('today-plan-group-Arms')).toHaveProp('accessibilityState', { expanded: false });
+    expect(screen.queryByTestId('today-plan-muscle-biceps')).toBeNull();
     Storage.setItemSync(preferenceKey('account:C', 'progressGrouped'), 'false');
     await act(async () => setAccountLocalPreferenceAccount('C', true));
     await waitForGone(() => screen.queryByTestId('today-plan-group-Arms'));
@@ -397,6 +418,9 @@ describe('Today: the Plan page over real data', () => {
     await bootLocalApp();
     await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 2 }]);
     await renderToday();
+    fireEvent.press(text('today-plan-group-Chest'));
+    fireEvent.press(text('today-plan-group-Arms'));
+    fireEvent.press(text('today-plan-group-Legs'));
     expect(text('today-plan-muscle-chest-week')).toHaveTextContent('2/8');
     expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('1');
 
@@ -497,11 +521,11 @@ describe('Today: the Plan page over real data', () => {
     expect(mockPush.mock.calls).toEqual([['/progress-history?muscleGroupId=quads&metric=sets&secondary=hidden'], ['/progress']]);
   });
 
-  it('opens Sessions, where sessions are planned, from the plan card', async () => {
+  it('opens Planner from the plan card', async () => {
     await renderToday();
 
-    fireEvent.press(within(text('today-plan-week-card')).getByText('Sessions'));
-    expect(mockPush).toHaveBeenCalledWith('/sessions');
+    fireEvent.press(within(text('today-plan-week-card')).getByText('Planner'));
+    expect(mockPush).toHaveBeenCalledWith('/planner');
   });
 
   it('marks the trained and planned days and lists the next planned sessions, each opening its plan', async () => {

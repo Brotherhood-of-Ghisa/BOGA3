@@ -156,21 +156,22 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/rm-curve` | originating History, else `/progress` | Back pops unchanged History metric/week/scroll; without history, replaces to Progress. Workout drafts stay untouched |
 | `/progress-history?exerciseDefinitionId=<id>` | `/progress-history?muscleGroupId=<id>` | header ⋮ muscle rows carry gym and supported metric (`progressHistoryHref`, `push`) |
 | `/sessions` | `/completed-session/<id>` | a completed row (`push`). `/sessions` never completes an active session directly |
-| `/sessions` | `/session-plan/new`, `/session-plan/<planId>` | the `Plan session` action, and a plan row (`push`). A create/duplicate save `replace`s to the new plan's detail; an edit save returns `back()` |
-| `/sessions` | `/programme/new`, `/programme/<programmeId>` | the `New programme` action, and a programme row in Unscheduled (`push`). Create/duplicate save `replace`s to `/programme/<id>`; edit save returns `back()` |
+| `/planner` | `/session-plan/new`, `/session-plan/<planId>` | `Plan session` action and plan rows (`push`). Save `replace`s to detail; edit returns `back()` |
+| `/planner` | `/programme/new`, `/programme/<programmeId>` | `New programme` action and programme rows (`push`). Save `replace`s to detail; edit returns `back()` |
+| `/train` | `/planner` | `Plan a workout` and `Manage planning` (`push`) |
 | `/session-plan/<id>` | `/train`, `/session/<id>` | **Start all**, **Add to session** and an attached block's `Open session` open the workout; a consumed block's opens its edit page (`push`). Conflict offers Resume; the ambiguous card choice is a sheet |
 | `/session-plan/new` | `/session-plan/new?edit=`, `?from=` | the detail's `Edit` (pencil) and duplicate actions (`push`) |
 | `/programme/<id>` | `/train` | **Add to session** on the next unresolved block, as the plan row above |
 | `/programme/<id>` | `/session-plan/<planId>` | a child session plan row (`push`) |
 | `/programme/<id>` | `/programme/new?edit=`, `?from=` | the detail's `Edit` and duplicate actions (`push`) |
-| `/programme/<id>` | Back to `/sessions` | confirmed `Delete` (detaches child plans as standalone plans without deleting workouts), returns `back()` |
-| `/today` | `/sessions`, `/completed-session/<id>`, `/train` | the Progress section's and Plan's `Sessions`, the latest-session row (or the session its arrows stepped to), the empty panel's `Open Train` (`push`) |
+| `/programme/<id>` | Back to `/planner` | confirmed `Delete` (detaches child plans without deleting workouts), returns `back()` |
+| `/today` | `/planner`, `/sessions`, `/completed-session/<id>`, `/train` | Plan card's `Planner`, Progress `Sessions`, latest-session row, empty panel's `Open Train` (`push`) |
 | `/exercise-history` | `/completed-session/<id>` | a session card or an all-time-best row |
 | `/completed-session/<id>` | `/session/<id>` | `Edit` in either section (`push`); a deleted session offers no `Edit`, because the session view edits only a live session |
 | `/completed-session/<id>` | `/train` | ⋮ `Resume session` in either section, after reopening the same workout; another active workout blocks it and offers `Open current session`. Deleted/missing targets cannot resume |
 | `/completed-session/<id>?presentation=completion` | `/progress` | Done, Android system back, or an unavailable target (`dismissTo`) |
 | `/completed-session/<id>` | its originating screen | Back pops once, else `replace('/progress')` with no history. `Summary` / `Sets` switch locally, legacy `presentation=summary` included |
-| `/more` | `/exercise-catalog`, `/gyms`, `/notes`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
+| `/more` | `/planner`, `/exercise-catalog`, `/gyms`, `/notes`, `/connected-agents`, `/settings` | hub rows (`push`); `Connect an AI` only with an agent connected |
 | `/exercise-catalog`, `/settings`, `/notes` (all notes), `/exercise-history`, `/session/<id>` | a tab | `MainTabBar` (unanimated `dismissTo`, reusing the tabs) |
 | `/more` | the first-party `/connect` page, system browser | `Connect an AI` with no agent connected (or signed out); launch failure stays inline. OAuth begins later, in the user's own MCP client |
 | `/settings`, `/settings-muscles`, `/settings-appearance`, `/settings-data-sync` | `/profile`, `/body-weight`, `/theme-custom`, `/settings-*` | rows (`push`), Back; enablement follows [[muscle.report-groups]]. Bodyweight always shown, never from workouts |
@@ -186,7 +187,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/group/<groupId>/members` | `/groups` | after a successful leave (`dismissTo('/groups')`); the screen's focus refresh drops the group from the chips |
 | `/groups` | `/group/<groupId>/leaderboards/<exerciseId>` | a podium card on the Leaderboards page (`push`, no query: opens on All) |
 | `…/leaderboards/<exerciseId>` | `…/history?metric=&scope=` | the header `History`, passing the current toggles and rules revision |
-| `/groups`, `/today`, a board | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | a stream session card, a Today session row, a latest-sessions row, the row sheet's `View full session` (`push`). Every full-session exit carries `groupId` |
+| `/groups`, `/today`, a board | `/group-session/<memberId>/<sessionId>?groupId=<groupId>` | a stream session card, a Today session row, a latest-sessions/GRs row, the row sheet's `View full session` (`push`). Every full-session exit carries `groupId` |
 | `/today` | `/groups?groupId=<groupId>`, `/group/mine` | The board card's group name, the week board and the `<n> training now` row, carrying Today's selected group; `Find a group` when there is none. Picking a chip changes the selection Today shares with `/groups`; it does not navigate |
 | `/today`, `/group/<groupId>` | `/group/<groupId>/cows?cowId=…&metric=…` | preview header pushes the browser carrying the displayed CoW/metric; in-card switching never navigates |
 | CoWs tab/browser or Stream lifecycle card | CoW standings or schedule | Stream opens its exact challenge; admins schedule/edit next week. Save/cancel returns `back()` |

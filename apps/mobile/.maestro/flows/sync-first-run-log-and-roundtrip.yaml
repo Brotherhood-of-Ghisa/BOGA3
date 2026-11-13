@@ -381,12 +381,12 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "25-merge-pending-review"
 - tapOn: { id: "settings-merge-review" }
 - extendedWaitUntil:
-    visible: "Apply saved changes"
+    visible: "Overwrite remote"
     timeout: 30000
 - assertVisible: "Maestro Merge Destination"
 - assertVisible: "Weight: current 20, saved 25"
 - takeScreenshot: "26-merge-review"
-- tapOn: "Apply saved changes"
+- tapOn: "Overwrite remote"
 - extendedWaitUntil:
     visible: "No changes need review."
     timeout: 60000

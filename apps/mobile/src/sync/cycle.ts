@@ -1328,11 +1328,16 @@ const applySiblingWrites = (
   candidates: SiblingCandidate[],
 ): number => {
   let changed = 0;
+  // Tombstones can occupy any high slot; temporary writes must also clear final targets.
+  const scratchBase = Math.max(
+    existingSiblings.reduce((max, row) => Math.max(max, row.orderIndex + 1), PULL_SCRATCH_BASE),
+    candidates.reduce((max, cand) => Math.max(max, cand.targetOrderIndex + 1), PULL_SCRATCH_BASE),
+  );
 
   for (let i = 0; i < existingSiblings.length; i++) {
     const row = existingSiblings[i];
     tx.update(config.table)
-      .set({ [config.orderColName]: PULL_SCRATCH_BASE + i } as never)
+      .set({ [config.orderColName]: scratchBase + i } as never)
       .where(eq(config.table.id, row.id))
       .run();
   }

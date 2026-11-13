@@ -35,6 +35,7 @@ import { requireWithReactCompiler } from './helpers/react-compiler';
 import { renderWithTheme } from './helpers/theme';
 
 const SessionsRoute = requireWithReactCompiler<typeof import('@/app/sessions')>('app/sessions.tsx').default;
+const PlannerRoute = requireWithReactCompiler<typeof import('@/app/planner')>('app/planner.tsx').default;
 const sessionId = 'date-format-history';
 const startedAt = new Date(2026, 8, 17, 23, 45);
 const completedAt = new Date(2026, 8, 18, 0, 45);
@@ -48,35 +49,24 @@ const readStoredDates = () => ({
 beforeEach(() => { resetLocalData(); mockIsFocused = true; });
 afterEach(() => closeLocalData());
 
-it('keeps compiled planned and historical rows in the active date format through mounted returns and fresh opens', async () => {
+const formats: [ExerciseDateFormat, string, string][] = [
+  ['DD-MM-YYYY', '17-09-2026', '14-09-2026 – 20-09-2026'],
+  ['MM-DD-YYYY', '09-17-2026', '09-14-2026 – 09-20-2026'],
+  ['YYYY-MM-DD', '2026-09-17', '2026-09-14 – 2026-09-20'],
+  ['DD-MM-YYYY', '17-09-2026', '14-09-2026 – 20-09-2026'],
+];
+
+it('keeps compiled historical rows in the active date format through mounted returns and fresh opens', async () => {
   await bootLocalApp();
   await persistSessionDraftSnapshot({ sessionId, gymId: null, startedAt, exercises: [] });
   await completeSessionDraft(sessionId, { completedAt, now: completedAt });
-  const saved = await planRepository.createPlan({
-    title: 'Scheduled workout', gymId: null, scheduledFor,
-    exercises: [{ exerciseDefinitionId: null, name: 'Back Squat',
-      sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }] }],
-  });
-  expect(saved.status).toBe('saved');
-  if (saved.status !== 'saved') throw new Error('Plan fixture was not saved');
   const storedBefore = readStoredDates();
   let view = renderWithTheme(<SessionsRoute />);
-  const planRowId = `sessions-plan-section-upcoming-row-${saved.id}`;
   const historyRowId = `completed-session-open-button-${sessionId}`;
-  await screen.findByTestId(planRowId);
   await screen.findByTestId(historyRowId);
-  const mountedPlan = screen.getByTestId(planRowId);
   const mountedHistory = screen.getByTestId(historyRowId);
 
-  const formats: [ExerciseDateFormat, string, string][] = [
-    ['DD-MM-YYYY', '17-09-2026', '14-09-2026 – 20-09-2026'],
-    ['MM-DD-YYYY', '09-17-2026', '09-14-2026 – 09-20-2026'],
-    ['YYYY-MM-DD', '2026-09-17', '2026-09-14 – 2026-09-20'],
-    ['DD-MM-YYYY', '17-09-2026', '14-09-2026 – 20-09-2026'],
-  ];
   const expectFormat = (date: string, week: string) => {
-    expect(within(screen.getByTestId(planRowId)).getByText(`${date} 07:30 · 1 block`)).toBeTruthy();
-    expect(screen.getByTestId(planRowId)).toHaveProp('accessibilityLabel', `Scheduled workout, ${date} 07:30`);
     expect(screen.getByTestId(`${historyRowId}-start`)).toHaveTextContent(`${date} 23:45`);
     expect(screen.getByTestId(historyRowId)).toHaveProp('accessibilityLabel', expect.stringContaining(`Completed session on ${date} 23:45`));
     expect(within(screen.getByTestId('completed-history-week-2026-09-14')).getByText(week)).toBeTruthy();
@@ -90,7 +80,6 @@ it('keeps compiled planned and historical rows in the active date format through
     mockIsFocused = true;
     view.rerender(<SessionsRoute />);
     expectFormat(date, week);
-    expect(screen.getByTestId(planRowId)).toBe(mountedPlan);
     expect(screen.getByTestId(historyRowId)).toBe(mountedHistory);
   }
 
@@ -98,9 +87,50 @@ it('keeps compiled planned and historical rows in the active date format through
   for (const [dateFormat, date, week] of formats) {
     await act(async () => { updatePreferences({ dateFormat }); });
     view = renderWithTheme(<SessionsRoute />);
-    await screen.findByTestId(planRowId);
     await screen.findByTestId(historyRowId);
     expectFormat(date, week);
+    view.unmount();
+  }
+  expect(readStoredDates()).toEqual(storedBefore);
+});
+
+it('keeps compiled planned rows in the active date format through mounted returns and fresh opens', async () => {
+  await bootLocalApp();
+  const saved = await planRepository.createPlan({
+    title: 'Scheduled workout', gymId: null, scheduledFor,
+    exercises: [{ exerciseDefinitionId: null, name: 'Back Squat',
+      sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }] }],
+  });
+  expect(saved.status).toBe('saved');
+  if (saved.status !== 'saved') throw new Error('Plan fixture was not saved');
+  const storedBefore = readStoredDates();
+  let view = renderWithTheme(<PlannerRoute />);
+  const planRowId = `planner-plan-section-upcoming-row-${saved.id}`;
+  await screen.findByTestId(planRowId);
+  const mountedPlan = screen.getByTestId(planRowId);
+
+  const expectFormat = (date: string) => {
+    expect(within(screen.getByTestId(planRowId)).getByText(`${date} 07:30 · 1 block`)).toBeTruthy();
+    expect(screen.getByTestId(planRowId)).toHaveProp('accessibilityLabel', `Scheduled workout, ${date} 07:30`);
+  };
+
+  for (const [dateFormat, date] of formats) {
+    mockIsFocused = false;
+    view.rerender(<PlannerRoute />);
+    await act(async () => { updatePreferences({ dateFormat }); });
+    expectFormat(date);
+    mockIsFocused = true;
+    view.rerender(<PlannerRoute />);
+    expectFormat(date);
+    expect(screen.getByTestId(planRowId)).toBe(mountedPlan);
+  }
+
+  view.unmount();
+  for (const [dateFormat, date] of formats) {
+    await act(async () => { updatePreferences({ dateFormat }); });
+    view = renderWithTheme(<PlannerRoute />);
+    await screen.findByTestId(planRowId);
+    expectFormat(date);
     view.unmount();
   }
   expect(readStoredDates()).toEqual(storedBefore);
