@@ -253,9 +253,19 @@ run_cow_priority_privacy_cases() {
   ordinary="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
   cow_worker_fixture "${template}" "${ordinary}" 60
   run_psql "update app_public.group_cow_contexts set context=jsonb_set(jsonb_set(context,'{normalized}','false'),'{bodyweight_calculations_enabled}','false') where cow_id='${ordinary}';
-    update app_public.group_cow_sources set input=jsonb_set(input,'{context}',jsonb_set(jsonb_set(input->'context','{normalized}','false'),'{bodyweight_calculations_enabled}','false')) where cow_id='${ordinary}';" >/dev/null
-  cow_run "${ordinary}" "${secret}"
-  [[ "$(run_psql "select finalized_at is not null from app_public.group_cows where id='${ordinary}';")" == t ]] || fail 'ordinary privacy fixture did not finalize'
+    update app_public.group_cow_sources set input=jsonb_set(input,'{context}',jsonb_set(jsonb_set(input->'context','{normalized}','false'),'{bodyweight_calculations_enabled}','false')) where cow_id='${ordinary}';
+    update app_public.group_cows set available_at=clock_timestamp(),lease_until=null where id='${ordinary}';" >/dev/null
+  deadline=$((SECONDS+25))
+  until [[ "$(run_psql "select finalized_at is not null from app_public.group_cows where id='${ordinary}';")" == t ]]; do
+    eval_drain "${secret}"; expect_ok 'worker fixture drains'
+    until [[ "$(run_psql "select lease_until is null or lease_until<clock_timestamp() from app_public.group_cows where id='${ordinary}';")" == t ]]; do
+      [[ ${SECONDS} -lt ${deadline} ]] || fail 'worker fixture claim did not settle'
+      sleep 0.05
+    done
+    [[ "$(run_psql "select finalized_at is not null from app_public.group_cows where id='${ordinary}';")" == t ]] && break
+    [[ ${SECONDS} -lt ${deadline} ]] || fail 'ordinary privacy fixture did not finalize'
+    sleep 0.1
+  done
   saved="$(run_psql "select md5(final_rankings::text) from app_public.group_cows where id='${ordinary}';")"
   rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${group}" --arg c "${ordinary}" '{p_group_id:$g,p_cow_id:$c,p_metric:"volume"}')"
   check 'ordinary stored totals use kg units and keep all eligible members' '.state=="ready" and .normalized==false and .rankings[0].unit=="kg_reps" and all(.rankings[0].entries[];.value>0)'

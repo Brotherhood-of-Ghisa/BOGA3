@@ -92,6 +92,7 @@ try {
     'delete_exercise',
     'delete_set',
     'finish_workout',
+    'get_active_injuries',
     'get_active_workout',
     'get_exercise_context',
     'get_exercise_history',
@@ -103,6 +104,7 @@ try {
     'get_workout_detail',
     'list_muscles',
     'list_notes',
+    'log_injury',
     'log_sets',
     'remove_note',
     'restore_exercise',
@@ -110,6 +112,7 @@ try {
     'set_muscle_targets',
     'start_workout',
     'update_exercise',
+    'update_injury_status',
     'update_set',
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
@@ -248,6 +251,14 @@ try {
       || statusList.some((note) => note.id === `${notePrefix}-exercise`) || typeof statusNotes.complete !== 'boolean') {
       throw new Error('Training status did not return the general note without the exercise note.');
     }
+  }
+
+  const injuriesResult = structured(
+    await client.callTool({ arguments: { limit: 10 }, name: 'get_active_injuries' }),
+    'get_active_injuries',
+  );
+  if (!Array.isArray(injuriesResult.injuries)) {
+    throw new Error('get_active_injuries did not return an injuries array.');
   }
 
   // Drain exact exercise history across pages

@@ -281,6 +281,30 @@ agent_put() {
   rm -f "${response_file}"
 }
 
+agent_patch() {
+  local route="$1"
+  local body="$2"
+  local idempotency_key="${3:-}"
+  local token="${4:-${AGENT_ACCESS_TOKEN}}"
+  local response_file
+  response_file="$(mktemp)"
+  local -a request_args=(
+    --silent
+    --show-error
+    -X PATCH
+    -H "Accept: application/json"
+    -H "Authorization: Bearer ${token}"
+    -H "Content-Type: application/json"
+    -o "${response_file}"
+    -w "%{http_code}"
+  )
+  [[ -n "${idempotency_key}" ]] && request_args+=(-H "Idempotency-Key: ${idempotency_key}")
+  request_args+=(--data "${body}")
+  RESPONSE_STATUS="$(curl "${request_args[@]}" "${AGENT_API_BASE}/${route}")"
+  RESPONSE_BODY="$(cat "${response_file}")"
+  rm -f "${response_file}"
+}
+
 # PostgREST against the default `public` schema (permission/receipt tables).
 public_request() {
   local method="$1"
@@ -1196,6 +1220,17 @@ assert_status "403" "default-denied note removal, before the note is resolved"
 [[ "$(run_psql "select count(*) from app_public.training_notes
   where owner_user_id = '${USER_A_UUID}'::uuid and body like 'agent-api-${RUN_TAG} %';")" == "0" ]] ||
   fail "a denied note add stored a note"
+agent_post "injuries" "$(jq -nc --arg label "agent-api-${RUN_TAG} denied injury" '{label:$label}')" "agent-api-${RUN_TAG}-inj-denied"
+assert_status "403" "default-denied injury add"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INJURY_PERMISSION_REQUIRED" ]] ||
+  fail "default-denied injury add did not return INJURY_PERMISSION_REQUIRED"
+agent_patch "injuries/agent-api-${RUN_TAG}-inj-missing" '{"status":"managing"}' "agent-api-${RUN_TAG}-inj-update-denied"
+assert_status "403" "default-denied injury update"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INJURY_PERMISSION_REQUIRED" ]] ||
+  fail "default-denied injury update did not return INJURY_PERMISSION_REQUIRED"
+[[ "$(run_psql "select count(*) from app_public.injuries
+  where owner_user_id = '${USER_A_UUID}'::uuid and label like 'agent-api-${RUN_TAG} %';")" == "0" ]] ||
+  fail "a denied injury add stored an injury"
 
 echo "[agent-api-test] verifying the permission table is app-only and owner-scoped"
 GRANTED_AT="$(fetch_grant_granted_at)"
@@ -3017,6 +3052,9 @@ app_public_request GET "exercise_definitions?select=id" "${AGENT_ACCESS_TOKEN}"
 assert_status "200" "agent direct table read denial"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq 'length')" == "0" ]] ||
   fail "agent credential bypassed the dedicated API read boundary"
+
+# shellcheck source=lib/agent-injury-contract.sh
+source "${SUPABASE_DIR}/tests/lib/agent-injury-contract.sh"
 
 # shellcheck source=lib/agent-workout-contract.sh
 source "${SUPABASE_DIR}/tests/lib/agent-workout-contract.sh"

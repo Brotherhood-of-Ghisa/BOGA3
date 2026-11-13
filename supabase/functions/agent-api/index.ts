@@ -26,6 +26,12 @@ import {
   checkOverrideIds, MuscleTargetsError, normalizeMuscleTargetsWrite, reportedMuscleIds,
 } from './muscle-targets.ts';
 import {
+  DEFAULT_INJURY_LIMIT, INJURY_COLUMNS, InjuryInputError, MAX_INJURY_LIMIT,
+  injuryCursorFrom, injuryCursorOf, injuryKeysetFilter, injuryMuscleIds,
+  normalizeInjuryAdd, normalizeInjuryUpdate, parseInjuryQuery, projectInjury,
+  type InjuryRow,
+} from './injuries.ts';
+import {
   DEFAULT_NOTE_LIMIT, EMBEDDED_NOTE_LIMIT, MAX_NOTE_LIMIT, NOTE_COLUMNS, NoteInputError, normalizeNoteAdd,
   normalizeNoteRemove, noteCursorFrom, noteCursorOf, noteExerciseIds, noteKeysetFilter, noteToday, parseNoteExerciseFilter,
   parseNoteRange, projectNote, statusNotesFrom, type NoteRow,
@@ -73,7 +79,7 @@ const ISO_DATE_MAX_MS = 8_640_000_000_000_000;
 
 const CORS_HEADERS = {
   'access-control-allow-headers': 'authorization, content-type, x-request-id, idempotency-key',
-  'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+  'access-control-allow-methods': 'GET, POST, PUT, PATCH, OPTIONS',
   'access-control-allow-origin': '*',
 };
 
@@ -167,6 +173,7 @@ const exerciseWriteRateWindows = new Map<string, RateWindow>();
 const muscleTargetsWriteRateWindows = new Map<string, RateWindow>();
 const workoutWriteRateWindows = new Map<string, RateWindow>();
 const noteWriteRateWindows = new Map<string, RateWindow>();
+const injuryWriteRateWindows = new Map<string, RateWindow>();
 
 const getRequiredEnv = (name: string): string => {
   const value = Deno.env.get(name)?.trim();
@@ -374,6 +381,8 @@ const routeToolName = (path: string, method: string): string => {
   if (path === '/v1/agent/muscle-targets') return 'set_muscle_targets';
   if (path === '/v1/agent/notes') return method === 'POST' ? 'add_note' : 'list_notes';
   if (method === 'POST' && NOTE_REMOVE_PATH.test(path)) return 'remove_note';
+  if (path === '/v1/agent/injuries') return method === 'POST' ? 'log_injury' : 'get_active_injuries';
+  if (method === 'PATCH' && /^\/v1\/agent\/injuries\/[^/]+$/.test(path)) return 'update_injury_status';
   if (path === '/v1/agent/session-plans') {
     return method === 'POST' ? 'create_session_plan' : 'get_upcoming_session_plans';
   }
@@ -443,6 +452,9 @@ const enforceExerciseWriteRateLimit = (agent: AuthenticatedAgent): void =>
 
 const enforceMuscleTargetsWriteRateLimit = (agent: AuthenticatedAgent): void =>
   enforceRateLimit(muscleTargetsWriteRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
+
+const enforceInjuryWriteRateLimit = (agent: AuthenticatedAgent): void =>
+  enforceRateLimit(injuryWriteRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
 
 const parseBoundedInteger = (
   raw: string | null,
@@ -2120,6 +2132,152 @@ const noteRemoveId = (path: string): string | null => {
   }
 };
 
+const asInjuryInput = <T>(fn: () => T): T => {
+  try {
+    return fn();
+  } catch (error) {
+    if (error instanceof InjuryInputError) {
+      throw new ApiError(error.status, error.code, error.message);
+    }
+    throw error;
+  }
+};
+
+const projectInjuryDates = (injury: JsonObject): JsonObject => {
+  const projected = { ...injury };
+  for (const key of ['started_at', 'resolved_at', 'created_at', 'updated_at']) {
+    if (key in projected) {
+      const val = projected[key];
+      if (typeof val === 'number') {
+        projected[key] = new Date(val).toISOString();
+      }
+    }
+  }
+  return projected;
+};
+
+const listInjuries = async (
+  client: SupabaseClient,
+  userId: string,
+  url: URL,
+): Promise<JsonObject> => {
+  const parsed = asInjuryInput(() => parseInjuryQuery(url));
+  const limit = parseBoundedInteger(
+    url.searchParams.get('limit'),
+    DEFAULT_INJURY_LIMIT,
+    1,
+    MAX_INJURY_LIMIT,
+    'limit',
+  );
+  const rawCursor = decodeCursor(url.searchParams.get('cursor'), 'injury');
+  const cursor = rawCursor ? asInjuryInput(() => injuryCursorFrom(rawCursor)) : null;
+
+  let query = client.schema('app_public').from('injuries')
+    .select(INJURY_COLUMNS)
+    .eq('owner_user_id', userId)
+    .is('deleted_at', null);
+
+  if (parsed.status !== null) {
+    query = query.eq('status', parsed.status);
+  } else if (!parsed.include_resolved) {
+    query = query.neq('status', 'resolved');
+  }
+
+  if (cursor) {
+    query = query.or(injuryKeysetFilter(cursor));
+  }
+
+  query = query.order('started_at', { ascending: false }).order('id', { ascending: false }).limit(limit + 1);
+
+  const { data, error } = await query.returns<InjuryRow[]>();
+  throwDatabaseError(error);
+
+  const rows = data ?? [];
+  const page = rows.slice(0, limit);
+  const last = page[page.length - 1];
+
+  const muscleIds = injuryMuscleIds(page);
+  let muscleNames = new Map<string, string>();
+  if (muscleIds.length > 0) {
+    const { data: muscles, error: muscleError } = await client.schema('app_public')
+      .from('muscle_groups')
+      .select('id,display_name')
+      .eq('owner_user_id', userId)
+      .in('id', muscleIds)
+      .returns<Array<{ display_name: string; id: string }>>();
+    throwDatabaseError(muscleError);
+    muscleNames = new Map((muscles ?? []).map((m) => [m.id, m.display_name]));
+  }
+
+  return {
+    injuries: page.map((row) => projectInjury(row, muscleNames)),
+    next_cursor: rows.length > limit && last ? encodeCursor(injuryCursorOf(last)) : null,
+  };
+};
+
+const throwInjuryWriteError = (
+  error: { message?: string } | null,
+  operation: 'log' | 'update',
+): void => {
+  if (!error) return;
+  const message = error.message ?? '';
+  if (message.includes('IDEMPOTENCY_CONFLICT')) {
+    throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This key already names a different operation payload.');
+  }
+  if (message.includes('INVALID_ANATOMY_REFERENCE')) {
+    throw new ApiError(400, 'INVALID_ANATOMY_REFERENCE', 'Referenced muscle group was not found.');
+  }
+  if (message.includes('NOT_FOUND')) {
+    throw new ApiError(404, 'INJURY_NOT_FOUND', 'Injury not found.');
+  }
+  if (message.includes('INVALID_ARGUMENT')) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'The request could not be accepted.');
+  }
+  throwDatabaseError(error);
+};
+
+const writeInjuryLog = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  const body = await readJsonBody(request);
+  const add = asInjuryInput(() => normalizeInjuryAdd(body));
+  const identity = { p_owner: agent.userId, p_client_id: agent.clientId, p_idempotency_key: idempotencyKey };
+  const { data, error } = await client.schema('app_public').rpc('agent_log_injury', {
+    ...identity,
+    p_payload_sha256: await sha256Hex(JSON.stringify(add.hashed)),
+    p_injury: add.injury,
+  });
+  throwInjuryWriteError(error, 'log');
+  const result = data as JsonObject;
+  const injury = result.injury as JsonObject | undefined;
+  return injury ? { ...result, injury: projectInjuryDates(injury) } : result;
+};
+
+const writeInjuryUpdate = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+  injuryId: string,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  const body = await readJsonBody(request);
+  const update = asInjuryInput(() => normalizeInjuryUpdate(body, injuryId));
+  const identity = { p_owner: agent.userId, p_client_id: agent.clientId, p_idempotency_key: idempotencyKey };
+  const { data, error } = await client.schema('app_public').rpc('agent_update_injury_status', {
+    ...identity,
+    p_payload_sha256: await sha256Hex(JSON.stringify(update.changes)),
+    p_injury_id: update.injury_id,
+    p_changes: update.changes,
+  });
+  throwInjuryWriteError(error, 'update');
+  const result = data as JsonObject;
+  const injury = result.injury as JsonObject | undefined;
+  return injury ? { ...result, injury: projectInjuryDates(injury) } : result;
+};
+
 const getTrainingStatus = async (
   client: SupabaseClient,
   userId: string,
@@ -2444,6 +2602,32 @@ const loadPlanPermission = async (
     throw new ApiError(
       403,
       'PLAN_PERMISSION_REQUIRED',
+      'Write access is not enabled for this coach. The person can turn it on in BoGa under Connected Agents.',
+    );
+  }
+};
+
+const loadInjuryPermission = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+): Promise<void> => {
+  const { data, error } = await client
+    .from('agent_plan_permissions')
+    .select('plan_access_enabled,granted_at')
+    .eq('owner_user_id', agent.userId)
+    .eq('client_id', agent.clientId)
+    .maybeSingle<{ granted_at: string | null; plan_access_enabled: boolean }>();
+  throwDatabaseError(error);
+  const liveGrant = Date.parse(agent.grantedAt);
+  const storedGrant = typeof data?.granted_at === 'string' ? Date.parse(data.granted_at) : Number.NaN;
+  const allowed = data?.plan_access_enabled === true
+    && Number.isFinite(liveGrant)
+    && Number.isFinite(storedGrant)
+    && liveGrant === storedGrant;
+  if (!allowed) {
+    throw new ApiError(
+      403,
+      'INJURY_PERMISSION_REQUIRED',
       'Write access is not enabled for this coach. The person can turn it on in BoGa under Connected Agents.',
     );
   }
@@ -3260,6 +3444,25 @@ const dispatchAgentRequest = async (
     return writeNote(client, agent, request, removeNoteId);
   }
 
+  if (path === '/v1/agent/injuries' && method === 'POST') {
+    enforceInjuryWriteRateLimit(agent);
+    await loadInjuryPermission(client, agent);
+    return writeInjuryLog(client, agent, request);
+  }
+
+  const injuryPatchMatch = method === 'PATCH' ? /^\/v1\/agent\/injuries\/([^/]+)$/.exec(path) : null;
+  if (injuryPatchMatch) {
+    let injuryId: string;
+    try {
+      injuryId = decodeURIComponent(injuryPatchMatch[1]);
+    } catch {
+      throw new ApiError(400, 'INVALID_ARGUMENT', 'injury_id is invalid.');
+    }
+    enforceInjuryWriteRateLimit(agent);
+    await loadInjuryPermission(client, agent);
+    return writeInjuryUpdate(client, agent, request, injuryId);
+  }
+
   if (method === 'POST') {
     const exerciseWrite = exerciseWriteFor(path);
     if (exerciseWrite) {
@@ -3282,6 +3485,11 @@ const dispatchAgentRequest = async (
   }
   if (path === '/v1/agent/notes') {
     return listNotes(client, agent.userId, url);
+  }
+  if (path === '/v1/agent/injuries') {
+    rejectRequestBody(request);
+    rejectIdentityInputs(url);
+    return listInjuries(client, agent.userId, url);
   }
 
   const bodyweightCalculationsEnabled = await loadBodyweightCalculationsEnabled(client, agent.userId);
@@ -3360,8 +3568,8 @@ const handleRequest = async (request: Request): Promise<Response> => {
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
-  if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'PUT') {
-    return errorResponse(requestId, new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET, POST or PUT.'));
+  if (request.method !== 'GET' && request.method !== 'POST' && request.method !== 'PUT' && request.method !== 'PATCH') {
+    return errorResponse(requestId, new ApiError(405, 'METHOD_NOT_ALLOWED', 'Use GET, POST, PUT or PATCH.'));
   }
 
   const startedAt = performance.now();

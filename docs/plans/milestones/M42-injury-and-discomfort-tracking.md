@@ -166,7 +166,7 @@ also deletes this milestone. Durable rules graduate to their owning docs.
 | [M42-T03](../tasks/M42-T03-Live_workout_warnings_and_substitutions.md) | Tiered live workout warnings, session dismissal, curated substitutions, and abort reasons | T01, T02 | planned |
 | [M42-T04](../tasks/M42-T04-Set_rehab_tagging_and_metric_protection.md) | Set-level 'rehab' effort choice, 1RM/PR exclusion rules, and volume calculation updates | T01 | planned |
 | [M42-T05](../tasks/M42-T05-Heatmap_injury_overlay_and_reload_analytics.md) | 3D muscle mesh injury visualization and tissue reload volume tracking with set-floor gating | T01, T02, T04 | planned |
-| [M42-T06](../tasks/M42-T06-MCP_coach_tools_and_agent_api.md) | Edge API routes and MCP tools for active injury reads, logging, and plan checks | T01 | planned |
+| [M42-T06](../tasks/M42-T06-MCP_coach_tools_and_agent_api.md) | Edge API routes and MCP tools for active injury reads, logging, and plan checks | T01 | completed |
 | [M42-T07](../tasks/M42-T07-Milestone_closeout_and_spec_graduation.md) | Quality gates (coverage, complexity, deps), spec graduation, and milestone closeout | T03, T05, T06 | planned |
 
 ## Risks and dependencies

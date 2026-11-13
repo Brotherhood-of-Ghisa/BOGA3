@@ -229,7 +229,7 @@ afterEach(async () => {
 });
 
 describe('BoGa MCP server', () => {
-  it('discovers exactly twenty-seven tools with correct annotations', async () => {
+  it('discovers exactly thirty tools with correct annotations', async () => {
     const running = await startMcp();
     active.push(running);
     const result = await running.client.listTools();
@@ -243,6 +243,7 @@ describe('BoGa MCP server', () => {
       'delete_exercise',
       'delete_set',
       'finish_workout',
+      'get_active_injuries',
       'get_active_workout',
       'get_exercise_context',
       'get_exercise_history',
@@ -254,6 +255,7 @@ describe('BoGa MCP server', () => {
       'get_workout_detail',
       'list_muscles',
       'list_notes',
+      'log_injury',
       'log_sets',
       'remove_note',
       'restore_exercise',
@@ -261,9 +263,11 @@ describe('BoGa MCP server', () => {
       'set_muscle_targets',
       'start_workout',
       'update_exercise',
+      'update_injury_status',
       'update_set',
     ]);
     const readOnlyNames = new Set([
+      'get_active_injuries',
       'get_active_workout',
       'get_exercise_context',
       'get_exercise_history',
@@ -278,8 +282,8 @@ describe('BoGa MCP server', () => {
       'search_exercises',
     ]);
     // The instructions count the read-only tools a client can call.
-    expect(readOnlyNames.size).toBe(12);
-    expect(running.client.getInstructions()).toContain('Twelve read-only tools');
+    expect(readOnlyNames.size).toBe(13);
+    expect(running.client.getInstructions()).toContain('Thirteen read-only tools');
     // Edits, deletes and new targets replace what the person had, so clients confirm them.
     const destructiveNames = new Set(['delete_exercise', 'set_muscle_targets', 'update_exercise', 'update_set', 'delete_set', 'finish_workout', 'remove_note']);
     for (const tool of result.tools) {
@@ -665,6 +669,94 @@ describe('BoGa MCP server', () => {
       { body: { body: 'Shoulder sore' }, key: 'note-add-2', path: 'notes' },
       { body: {}, key: 'note-remove-1', path: 'notes/note%2F1/remove' },
     ]);
+  });
+
+  it('translates injury tools into the injuries routes, forwarding idempotency keys', async () => {
+    const injury = {
+      contraindications: 'Deep back squats',
+      created_at: '2026-11-10T10:00:00.000Z',
+      id: 'injury-1',
+      label: 'Patellar tendon irritation',
+      muscle_group_id: 'quads',
+      muscle_group_name: 'Quads',
+      notes: 'Sharp pain on deep knee flexion',
+      pain_score: 7,
+      resolved_at: null,
+      side: 'right',
+      started_at: '2026-11-10T10:00:00.000Z',
+      status: 'acute',
+      updated_at: '2026-11-10T10:00:00.000Z',
+    };
+    const injuriesPath = '/functions/v1/agent-api/v1/agent/injuries';
+    const listed = { injuries: [injury], next_cursor: null };
+    const running = await startMcp({
+      [injuriesPath]: envelopeResponse(listed),
+      [`${injuriesPath}/injury-1`]: envelopeResponse({
+        idempotent_replay: false,
+        injury: { ...injury, pain_score: 3, status: 'managing' },
+      }),
+    });
+    active.push(running);
+
+    const list = await running.client.callTool({
+      arguments: { include_resolved: true, limit: 10 },
+      name: 'get_active_injuries',
+    });
+    expect(list.structuredContent).toEqual(listed);
+
+    await running.client.callTool({
+      arguments: {
+        idempotency_key: 'inj-log-1',
+        injury: {
+          contraindications: 'Deep back squats',
+          label: 'Patellar tendon irritation',
+          muscle_group_id: 'quads',
+          notes: 'Sharp pain on deep knee flexion',
+          pain_score: 7,
+          side: 'right',
+          status: 'acute',
+        },
+      },
+      name: 'log_injury',
+    });
+
+    const updated = await running.client.callTool({
+      arguments: {
+        changes: {
+          pain_score: 3,
+          status: 'managing',
+        },
+        idempotency_key: 'inj-update-1',
+        injury_id: 'injury-1',
+      },
+      name: 'update_injury_status',
+    });
+    expect(updated.structuredContent).toEqual({
+      idempotent_replay: false,
+      injury: { ...injury, pain_score: 3, status: 'managing' },
+    });
+
+    const posts = running.requests.filter((r) => r.method === 'POST' && r.url.pathname === injuriesPath);
+    expect(posts).toHaveLength(1);
+    expect(posts[0].headers.get('idempotency-key')).toBe('inj-log-1');
+    expect(JSON.parse(posts[0].body ?? '{}')).toEqual({
+      contraindications: 'Deep back squats',
+      label: 'Patellar tendon irritation',
+      muscle_group_id: 'quads',
+      notes: 'Sharp pain on deep knee flexion',
+      pain_score: 7,
+      side: 'right',
+      status: 'acute',
+    });
+
+    const patches = running.requests.filter((r) => r.method === 'PATCH');
+    expect(patches).toHaveLength(1);
+    expect(patches[0].url.pathname).toBe(`${injuriesPath}/injury-1`);
+    expect(patches[0].headers.get('idempotency-key')).toBe('inj-update-1');
+    expect(JSON.parse(patches[0].body ?? '{}')).toEqual({
+      pain_score: 3,
+      status: 'managing',
+    });
   });
 
   it.each([
