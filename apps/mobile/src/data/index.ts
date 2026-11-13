@@ -85,6 +85,8 @@ export {
   aggregateSelectedMuscleWeeklyEffort,
   collectMuscleSetContributions,
   countMuscleAnalyticsWorkingSets,
+  countMuscleRehabSet,
+  countMuscleRehabSets,
   countMuscleSet,
   countMuscleSets,
   createMuscleSetCounter,

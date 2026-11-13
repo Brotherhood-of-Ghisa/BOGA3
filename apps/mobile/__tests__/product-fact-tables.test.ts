@@ -108,6 +108,7 @@ describe('set.eligibility', () => {
     'Stored RIR above 4': ['rir_5', 'rir_12'],
     Technique: ['technique'],
     Cooldown: ['cooldown'],
+    Rehab: ['rehab'],
     'Unknown stored label': ['drop_set'],
   };
   const performed = { weight: '100', reps: '5', performanceStatus: null };

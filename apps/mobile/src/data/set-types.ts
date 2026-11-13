@@ -4,15 +4,17 @@ import { DEFAULT_DISPLAY_EFFORTS, getSessionSetRir, type EffortChoice } from '..
 export { getSessionSetRir } from '../exercise-calculations/effort-policy.ts';
 
 export type RirSessionSetType = `rir_${number}`;
-export type SessionSetType = 'warm_up' | 'technique' | 'cooldown' | RirSessionSetType;
+export type SessionSetType = 'warm_up' | 'technique' | 'cooldown' | 'rehab' | RirSessionSetType;
 export type SessionSetTypeValue = SessionSetType | null;
 
 /** Current selectable efforts; persisted values are validated independently. */
 export const RIR_SESSION_SET_TYPES: readonly RirSessionSetType[] = ['rir_0', 'rir_1', 'rir_2', 'rir_3', 'rir_4'];
-export const SESSION_SET_TYPES: readonly SessionSetType[] = ['warm_up', ...RIR_SESSION_SET_TYPES, 'technique', 'cooldown'];
+export const SESSION_SET_TYPES: readonly SessionSetType[] = ['warm_up', ...RIR_SESSION_SET_TYPES, 'technique', 'cooldown', 'rehab'];
 
 export const isSessionSetType = (value: unknown): value is SessionSetType =>
-  value === 'warm_up' || value === 'technique' || value === 'cooldown' || getSessionSetRir(value) !== null;
+  value === 'warm_up' || value === 'technique' || value === 'cooldown' || value === 'rehab' || getSessionSetRir(value) !== null;
+
+export const isRehabSessionSetType = (value: unknown): boolean => value === 'rehab';
 
 export const normalizeSessionSetType = (value: unknown): SessionSetTypeValue =>
   isSessionSetType(value) ? value : null;
@@ -22,6 +24,7 @@ export const formatSessionSetType = (value: unknown, style: 'full' | 'compact' =
   if (value === 'warm_up') return 'W-Up';
   if (value === 'technique') return style === 'compact' ? 'Tech' : 'Technique';
   if (value === 'cooldown') return style === 'compact' ? 'CD' : 'Cooldown';
+  if (value === 'rehab') return 'Rehab';
   const rir = getSessionSetRir(value);
   return rir === null ? null : `${style === 'compact' ? 'R' : 'RIR '}${rir}`;
 };

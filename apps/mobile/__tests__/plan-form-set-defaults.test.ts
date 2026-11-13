@@ -12,7 +12,7 @@ it('starts empty plan blocks with the recorder default, including filtered choic
   expect(planFormBlockFromSuggestion(exercise, [], display).sets[0].targetSetType).toBe('rir_2');
 });
 
-it.each<SessionSetTypeValue>(['warm_up', null, 'rir_4', 'rir_3', 'rir_2', 'rir_12', 'technique', 'cooldown'])(
+it.each<SessionSetTypeValue>(['warm_up', null, 'rir_4', 'rir_3', 'rir_2', 'rir_12', 'technique', 'cooldown', 'rehab'])(
   'appends exact values and effort for %p', (targetSetType) => {
     const source = { id: 'source', targetWeightText: '0', targetRepsText: '100', targetSetType };
     const result = addPlanFormSets([source], '1');
