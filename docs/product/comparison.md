@@ -71,7 +71,7 @@ middle-to-weak losses; displayed −100% neutral while scaling losses. Filters
 may rescale Volume; rotation/selection cannot. Unchanged middle;
 empty/unavailable neutral; `new`/overflow strongest, outside extrema.
 Strong darkens in light mode, lightens in dark. Wireframe colours edges on opaque
-grey; Patches colours fills. Both clip selected anatomy to its nearest visible body region.
+grey; Patches colours fills. Both attenuate selected anatomy through covering muscle layers.
 Selection has its own colour and Now/Prev/Change;
 no legend.
 

@@ -1,4 +1,4 @@
-import { BODY_WIRE_INSTANCES, MUSCLE_ANATOMY, hitWireframe, projectWireframePoint,
+import { BODY_WIRE_INSTANCES, MUSCLE_ANATOMY, MUSCLE_COVER_INSTANCES, hitWireframe, projectWireframePoint,
   selectMuscleMeshes, wireframeCamera, wireframeVertices, type AnatomyInstance } from '@/components/stats/muscle-wireframe-scene';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 
@@ -79,13 +79,21 @@ it('keeps front quads selectable, selects hamstrings through their back view, an
   expect(hitWireframe({ point: centre, camera, selected: [reversed], selectedId: 'custom' })).toBe('abs_rectus');
 });
 
-it.each([90, 270])('does not paint or pick the focused limb through its counterpart at %s degrees', angle => {
+it.each([90, 270])('keeps taps on the foreground limb while selected deep anatomy is translucent at %s degrees', angle => {
   const selected = selectMuscleMeshes('brachialis', undefined, true);
   const camera = wireframeCamera({ angle, width: 280, height: 420, selected, focus: true });
   // A point inside the right brachialis, covered by the left arm at 90 degrees.
   const point = projectWireframePoint([.34368, .330576, .0006803], camera).slice(0, 2) as [number, number];
   expect(hitWireframe({ point, camera, selected: [], selectedId: null })).toBe('brachialis');
-  expect(hitWireframe({ point, camera, selected, selectedId: 'focused-limb' })).toBe(angle === 90 ? 'brachialis' : 'focused-limb');
+  expect(hitWireframe({ point, camera, selected, selectedId: 'focused-limb' })).toBe('brachialis');
+});
+
+it('includes opposite-side and all deep anatomical parts as covers, while taps stay on the foreground biceps', () => {
+  expect(MUSCLE_COVER_INSTANCES).toEqual(expect.arrayContaining(selectMuscleMeshes('brachialis')));
+  expect(new Set(MUSCLE_COVER_INSTANCES.map(mesh => mesh.group))).toEqual(new Set(Object.keys(MUSCLE_ANATOMY)));
+  const selected = selectMuscleMeshes('brachialis');
+  const point = projectWireframePoint([.3436801, .330576, .0006803], camera).slice(0, 2) as [number, number];
+  expect(hitWireframe({ point, camera, selected, selectedId: 'brachialis' })).toBe('biceps');
 });
 
 it('selects visible body regions under their report key and ignores untracked regions', () => {
