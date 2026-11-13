@@ -133,14 +133,24 @@ const planDetailLine = (plan: PlanSummaryView, dateFormat: ExerciseDateFormat): 
 };
 
 /** The quiet Plan session action: the hub's persistent entry and the empty states' one. */
-export function PlanSessionAction({ onPress, testID = 'plan-session-action' }: { onPress: () => void; testID?: string }) {
+export function PlanSessionAction({
+  onPress,
+  label = 'Plan session',
+  accessibilityLabel = 'Plan a session',
+  testID = 'plan-session-action',
+}: {
+  onPress: () => void;
+  label?: string;
+  accessibilityLabel?: string;
+  testID?: string;
+}) {
   return (
     <ListRow
-      accessibilityLabel="Plan a session"
+      accessibilityLabel={accessibilityLabel}
       density="list"
       divider={false}
       leading={<Icon name="plus" size="xs" />}
-      label="Plan session"
+      label={label}
       onPress={onPress}
       testID={testID}
     />
