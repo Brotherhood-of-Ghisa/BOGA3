@@ -30,6 +30,7 @@ import {
   exerciseDefinitions,
   gyms,
   muscleGroups,
+  sessionExercises,
   sessionPlanExercises,
   sessionPlanSets,
   sessions,
@@ -538,6 +539,50 @@ describe('applyPullPage collision-safe order application and tombstone parking',
     const a = database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, 'block-a')).get();
     expect(b?.orderIndex).toBe(0);
     expect(a?.orderIndex).toBe(1);
+  });
+
+  it('preserves a dirty local exercise beside a tombstone occupying the old scratch range', () => {
+    database.insert(sessions).values({ id: 'session-1', startedAt: new Date(100) }).run();
+    database.insert(sessionExercises).values([
+      { id: 'live', sessionId: 'session-1', name: 'Local edit', orderIndex: 0,
+        localDirty: true, localUpdatedAtMs: 300 },
+      { id: 'removed', sessionId: 'session-1', name: 'Removed', orderIndex: 10_000_000,
+        deletedAt: new Date(100), localUpdatedAtMs: 100 },
+    ]).run();
+    const before = database.select().from(sessionExercises).all();
+
+    const changed = database.transaction((tx) => applyPullPage(tx as Transaction, [{
+      type: 'session_exercises', id: 'live', client_updated_at_ms: 200,
+      fields: { session_id: 'session-1', name: 'Older server edit', order_index: 0, deleted_at: null },
+    }], 'session_exercises'));
+
+    expect(changed).toBe(0);
+    expect(database.select().from(sessionExercises).all()).toEqual(before);
+    expect(selectPushBatch(database as unknown as Transaction, BATCH_CAP).map(row => row.id)).toContain('live');
+  });
+
+  it('keeps temporary positions clear of incoming final positions', () => {
+    database.transaction((tx) => {
+      applyPullPage(tx as Transaction, [planWire('plan-1', 100, 'Push Day')], 'session_plans');
+      applyPullPage(tx as Transaction, [
+        blockWire('block-a', 'plan-1', 0, 100),
+        blockWire('block-b', 'plan-1', 1, 100),
+      ], 'session_plan_exercises');
+    });
+
+    database.transaction((tx) => applyPullPage(tx as Transaction, [
+      blockWire('block-a', 'plan-1', 10_000_001, 200, 200),
+      blockWire('block-b', 'plan-1', 0, 200),
+    ], 'session_plan_exercises'));
+
+    const rows = database.select().from(sessionPlanExercises).all();
+    expect(rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'block-a', orderIndex: 10_000_001, deletedAt: new Date(200),
+        localDirty: false, localUpdatedAtMs: 200 }),
+      expect.objectContaining({ id: 'block-b', orderIndex: 0, deletedAt: null,
+        localDirty: false, localUpdatedAtMs: 200 }),
+    ]));
+    expect(rows).toHaveLength(2);
   });
 
   it('handles block tombstone parking above occupied slots on populated and wiped stores', () => {
