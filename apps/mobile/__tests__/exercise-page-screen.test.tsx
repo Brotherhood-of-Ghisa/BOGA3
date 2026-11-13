@@ -976,6 +976,17 @@ describe('ExercisePageScreen', () => {
     expect((await benchSets())[2]).toMatchObject({ weightValue: '90' });
   });
 
+  it('opens injury editor sheet from Exercise options with pre-filled exercise context', async () => {
+    await openPage();
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    const sheet = await screen.findByTestId('exercise-options-sheet');
+    fireEvent.press(within(sheet).getByTestId('exercise-options-report-injury'));
+
+    const injurySheet = await screen.findByTestId('exercise-page-injury-sheet');
+    expect(injurySheet).toBeTruthy();
+    expect(screen.getByDisplayValue('Barbell Bench Press')).toBeTruthy();
+  });
+
   it('swaps the exercise and keeps its sets', async () => {
     await openPage();
 
