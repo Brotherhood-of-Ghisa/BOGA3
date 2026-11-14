@@ -29,10 +29,10 @@ coaching: [[set.eligibility]].
 - **Personal effort policy** ([[set.eligibility]] gives its defaults):
   Settings has fixed Warm-up, Unspecified, RIR-4 through RIR-0, Technique,
   Cooldown and Rehab rows, with independent Display, Working set and Volume columns.
-  All labels default displayed. At least one Display choice is required;
-  either calculation column may be empty. Hidden labels can contribute, and
-  visible labels can be excluded. Recorded labels stay intact and do not
-  become selectable options.
+  By default, 'Rehab' effort sets are excluded from 1RM estimation, Weight records,
+  and working set volume ([[set.eligibility]]). All labels default displayed; at least
+  one is required. Either calculation column may be empty. Hidden labels can contribute;
+  visible labels can be excluded. Recorded labels stay intact and do not become selectable.
 - **Scope**: these choices are account-local on this device. Personal adapters
   pass the durable active policy explicitly to the kernel. Groups and coaching
   receive no device policy: the kernel's default, `SHARED_EFFORT_POLICY`
