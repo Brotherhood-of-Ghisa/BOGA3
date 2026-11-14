@@ -8,6 +8,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import type { Caller } from './session.ts';
+
 export const MIGRATIONS_DIR = path.resolve(__dirname, '../../../../../supabase/migrations');
 /**
  * Saved live definitions, never applied: a definition a later migration
@@ -133,7 +135,27 @@ export type ParityCase<Context> = {
   /** Old helper definitions the old body must call: helper name → definition source. */
   helpers?: Record<string, string>;
   /** Every argument set to compare, each called by every viewer the fixture holds. */
-  argumentSets: (context: Context) => Record<string, unknown>[];
+  argumentSets?: (context: Context) => Record<string, unknown>[];
+  /** The exact calls to compare, when not every viewer should call every argument set. */
+  calls?: (context: Context) => { viewer: string; args: Record<string, unknown> }[];
+  /** Who calls it: the viewer as the app does (default), or a worker's role. */
+  caller?: (viewer: string, context: Context) => Caller;
+  /**
+   * For an RPC that writes: SQL returning the rows it may change as one JSON
+   * value. Each call then runs in its own savepoint, the rows are read after
+   * it and the savepoint is rolled back, so old and new start from the same
+   * state and their writes are compared as well as their results.
+   */
+  state?: string;
+  /** The scenarios (named changes to the fixture) the case runs under; `['base']` when absent. */
+  scenarios?: string[];
+  /**
+   * Names what a live call returned (`true`, `refused`…). A case that
+   * `requires` outcomes fails unless each was seen at least once, so a case
+   * whose calls all fail the same way cannot pass for lack of a difference.
+   */
+  observe?: (live: unknown) => string;
+  requires?: string[];
   /** The helper's self-check: one text replacement that must change the JSON. */
   plant?: { from: string; to: string };
 };
@@ -145,11 +167,20 @@ export type ParityOutcome = {
   /** Whether the planted definition was told apart; null without a plant. */
   plantDetected: boolean | null;
   error: string | null;
+  /** How many live calls returned each named outcome (`observe`). */
+  observed?: Record<string, number>;
+  /** Required outcomes (`requires`) no live call returned. */
+  missing?: string[];
 };
+
+/** The required outcomes not yet observed. */
+export const missingOutcomes = (required: readonly string[] | undefined, observed: Record<string, number> | undefined): string[] =>
+  (required ?? []).filter((label) => !observed?.[label]);
 
 /** A case passes when every call matched and its plant, if any, was detected. */
 export const parityPassed = (outcome: ParityOutcome): boolean =>
-  outcome.error === null && outcome.compared > 0 && outcome.differences.length === 0 && outcome.plantDetected !== false;
+  outcome.error === null && outcome.compared > 0 && outcome.differences.length === 0 && outcome.plantDetected !== false
+  && (outcome.missing ?? []).length === 0;
 
 /** The statements that install a case's old definitions in pg_temp: helpers first, then the function, then its plant. */
 export const parityInstallStatements = <Context>(item: ParityCase<Context>): { legacy: string; planted: string | null; sql: string[] } => {
@@ -179,18 +210,22 @@ export const compareParity = async <Context>(
   installed: { legacy: string; planted: string | null },
 ): Promise<ParityOutcome> => {
   const outcome: ParityOutcome = { fn: item.fn, compared: 0, differences: [], plantDetected: item.plant ? false : null, error: null };
-  const sets = item.argumentSets(context);
-  for (const viewer of viewers) {
-    for (const [index, args] of sets.entries()) {
-      const live = await call(viewer, item.fn, args);
-      const old = await call(viewer, `pg_temp.${installed.legacy}`, args);
-      outcome.compared += 1;
-      const found = jsonDifference(old, live);
-      if (found) outcome.differences.push(`viewer ${viewer}, arguments #${index}: ${found}`);
-      if (installed.planted && !outcome.plantDetected) {
-        outcome.plantDetected = jsonDifference(await call(viewer, `pg_temp.${installed.planted}`, args), live) !== null;
-      }
+  const sets = item.argumentSets?.(context) ?? [];
+  const pairs = item.calls?.(context) ?? viewers.flatMap((viewer) => sets.map((args) => ({ viewer, args })));
+  for (const [index, { viewer, args }] of pairs.entries()) {
+    const live = await call(viewer, item.fn, args);
+    if (item.observe) {
+      const label = item.observe(live);
+      outcome.observed = { ...outcome.observed, [label]: (outcome.observed?.[label] ?? 0) + 1 };
+    }
+    const old = await call(viewer, `pg_temp.${installed.legacy}`, args);
+    outcome.compared += 1;
+    const found = jsonDifference(old, live);
+    if (found) outcome.differences.push(`viewer ${viewer}, arguments #${index}: ${found}`);
+    if (installed.planted && !outcome.plantDetected) {
+      outcome.plantDetected = jsonDifference(await call(viewer, `pg_temp.${installed.planted}`, args), live) !== null;
     }
   }
+  if (item.requires) outcome.missing = missingOutcomes(item.requires, outcome.observed);
   return outcome;
 };

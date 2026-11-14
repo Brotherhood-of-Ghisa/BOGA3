@@ -2044,5 +2044,9 @@ check 'expired captured moments and older workout deadlines do not renew' \
   '.session_ids==[$p+"-17"] and .next_session_id==null' --arg p "${READER_PREFIX}"
 rpc "${E_TOKEN}" notification_pending_completions '{"p_after_session_id":""}'
 expect_error VALIDATION 'invalid completion cursor'
+assert_sql 'the context source stays private to the proofs that read it' "select p.prosecdef and p.proconfig @> array['search_path=app_public, pg_temp']
+  and not has_function_privilege('anon',p.oid,'execute') and not has_function_privilege('authenticated',p.oid,'execute')
+  and not has_function_privilege('service_role',p.oid,'execute')
+  from pg_proc p where p.oid='app_public.notification_context_source(uuid,uuid,uuid,text)'::regprocedure;"
 COMPLETED=1
 pass 'workout graph, full-rank publication, overlap, ownership, expiry, clamp, sink and admission contracts'

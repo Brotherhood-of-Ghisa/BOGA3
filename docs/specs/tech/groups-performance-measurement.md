@@ -141,6 +141,17 @@ before the rewrite, as `apps/mobile/scripts/perf/groups/parity-definitions/<migr
 proves the helper itself: identical definitions pass, and a planted one-field
 change must be caught.
 
+An RPC that writes sets `state` (SQL returning the rows it may change, with
+generated ids and clock-timed columns left out) and `caller` (its worker's
+role). Each call then runs in its own savepoint, old and new start from the
+same rows, and the result, a refusal's error and the rows changed are compared.
+`calls` lists exact viewer and argument pairs. `scenarios` (in
+`notification-parity.ts`) re-run a case after one planted change each (an edited
+set, a stale stored rank or digest, an unenqueued workout), so every check of a
+proof is the one that fails in turn. `observe` names each live outcome and
+`requires` lists those that must each occur, so a case whose calls all fail the
+same way does not pass. A helper shared by several cases installs once.
+
 ## Tier 2 — `./boga test groups-perf-load`
 
 A committed fixture, drained by the real `group-eval` Edge function. C
