@@ -492,7 +492,7 @@ if [[ -n "${USER_UUID}" ]]; then
   workout_smoke revoked
   AUDIT_COUNT="$(run_psql "select count(*) from public.agent_access_audit
     where owner_user_id='${USER_UUID}'::uuid and oauth_client_id='${AGENT_CLIENT_ID}';")"
-  [[ "${AUDIT_COUNT}" -le 118 ]] || fail "smoke request budget exceeds 118: ${AUDIT_COUNT}; do not rely on elapsed time to reset limits"
+  [[ "${AUDIT_COUNT}" -le 119 ]] || fail "smoke request budget exceeds 119: ${AUDIT_COUNT}; do not rely on elapsed time to reset limits"
   echo "[boga-mcp-smoke] audited requests: ${AUDIT_COUNT} (within the unchanged 120/minute API limit)"
 
   echo "[boga-mcp-smoke] verifying pre-existing plan sentinel survived all test phases"

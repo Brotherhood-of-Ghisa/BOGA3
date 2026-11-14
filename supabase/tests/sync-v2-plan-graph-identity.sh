@@ -233,7 +233,7 @@ pass "an auth user's delete cascade through a full plan graph succeeds"
 # identity, from their validated p_owner. An exact list, so a trigger (or a
 # helper a trigger calls) that sets it fails here even if its EXECUTE is
 # revoked.
-ALLOWED_SETTERS="app_public.agent_create_session_plan, app_public.agent_create_training_programme, app_public.agent_exercise_act_as_owner, app_public.agent_plan_claim_receipt"
+ALLOWED_SETTERS="app_public.agent_create_session_plan, app_public.agent_create_training_programme, app_public.agent_exercise_act_as_owner, app_public.agent_log_injury, app_public.agent_plan_claim_receipt, app_public.agent_update_injury_status"
 setters="$(run_psql_sql "
   select coalesce(string_agg(n.nspname || '.' || p.proname, ', ' order by n.nspname || '.' || p.proname), '')
     from pg_proc p

@@ -151,26 +151,10 @@ nonexistent exercise produce the same `404` envelope.
     "duration_seconds": 3600,
     "volume": { "value": 640, "unit": "kg_reps" },
     "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
-    "sets": [{
-      "id": "set-id",
-      "order_index": 0,
-      "load": { "value": 80, "unit": "kg" },
-      "reps": 8,
-      "set_type": "rir_2",
-      "performance_status": null,
-      "outcome": "completed"
-    }]
+    "sets": [{ "id": "set-id", "order_index": 0, "load": { "value": 80, "unit": "kg" }, "reps": 8, "set_type": "rir_2", "performance_status": null, "outcome": "completed" }]
   }],
-  "personal_records": {
-    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
-    "top_weight": { "value": 80, "reps": 8, "unit": "kg" },
-    "max_session_volume": { "value": 640, "unit": "kg_reps" }
-  },
-  "volume_series": [{
-    "completed_at": "2026-07-25T18:00:00.000Z",
-    "value": 640,
-    "unit": "kg_reps"
-  }],
+  "personal_records": { "estimated_one_rep_max": { "value": 102.14, "unit": "kg" }, "top_weight": { "value": 80, "reps": 8, "unit": "kg" }, "max_session_volume": { "value": 640, "unit": "kg_reps" } },
+  "volume_series": [{ "completed_at": "2026-07-25T18:00:00.000Z", "value": 640, "unit": "kg_reps" }],
   "last_performed_at": "2026-07-25T18:00:00.000Z",
   "training_notes": [],
   "training_notes_truncated": false,
@@ -204,54 +188,19 @@ it and `exercise.gym` name it.
 
 ```json
 {
-  "sets": [{
-    "id": "set-id",
-    "session_id": "session-id",
-    "session_completed_at": "2026-07-25T18:00:00.000Z",
-    "exercise_id": "exercise-id",
-    "exercise_name": "Bench press",
-    "order_index": 0,
-    "load": { "value": 80, "unit": "kg" },
-    "calculated_load": { "value": 80, "unit": "kg" },
-    "reps": 8,
-    "set_type": "rir_2",
-    "volume": { "value": 640, "unit": "kg_reps" },
-    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
-    "gym": { "id": "gym-id", "name": "Home" }
-  }],
+  "sets": [{ "id": "set-id", "session_id": "session-id", "session_completed_at": "2026-07-25T18:00:00.000Z",
+    "exercise_id": "exercise-id", "exercise_name": "Bench press", "order_index": 0, "load": { "value": 80, "unit": "kg" },
+    "calculated_load": { "value": 80, "unit": "kg" }, "reps": 8, "set_type": "rir_2", "volume": { "value": 640, "unit": "kg_reps" },
+    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" }, "gym": { "id": "gym-id", "name": "Home" } }],
   "next_cursor": null
 }
 ```
 
 ## Gym buckets
 
-An exercise the user tracks separately per gym (`exercise.split_by_gym`) keeps
-its whole-exercise figures and adds one bucket per gym ([[gym.split]]). Unset
-`gym_bucket` is the whole exercise: every gym, and the sessions with no gym,
-which count only there and are never a bucket of their own. `gym_bucket` names
-one gym id, and context's figures, or history's stream, then come from that
-gym's sessions alone. It is `400 INVALID_ARGUMENT` on an exercise that is not
-split, when empty, or against a cursor for another gym, and `404` for a gym the
-user does not own. `none` is rejected the same way, and a history cursor pinned
-to the no-gym sessions is `400 INVALID_CURSOR` while the exercise is split.
+An exercise tracked separately per gym (`split_by_gym: true`) keeps whole-exercise figures and adds one bucket per gym ([[gym.split]]). Unset `gym_bucket` covers the whole exercise; naming a gym id scopes figures or history sets to that gym alone. Non-split exercises, empty values, or foreign gyms reject with `400` or `404`; `none` or no-gym history cursors reject with `400 INVALID_CURSOR`.
 
-The context route's `exercise.gym_buckets` lists every gym it could see, most
-recently performed first, each with its own `personal_records` and
-`session_count`, so one call compares the gyms. Past 50 gyms it lists the 50
-newest and sets `gym_buckets_truncated`. Gyms are
-ranked over the sessions those figures count — [working sets
-only](#working-sets-only) — so a gym performed only as warm-ups is not listed.
-Each of a split exercise's `recent_performances` and `volume_series` points
-names its `gym` (`null` for no gym). The history route carries no inventory;
-its sets already name their gyms.
-
-`exercise.gym` appears only when one gym owns the response: a request naming
-`gym_bucket`. Equal `last_performed_at` values break on the gym id; a truncated
-history (`history_truncated`) can still hide a gym. An exercise that is not
-split carries `split_by_gym: false` and no gym field, and a cursor's filter
-lapses if the flag is turned off between pages. A filtered history's
-`next_cursor` carries its gym, so draining it keeps the filter; an unfiltered
-cursor stays unfiltered.
+`exercise.gym_buckets` lists up to 50 gyms, newest performed first, each with `personal_records` and `session_count` across [working sets only](#working-sets-only); past 50 sets `gym_buckets_truncated: true`. In split exercises, `recent_performances` and `volume_series` points name their `gym`. `exercise.gym` appears only when `gym_bucket` is specified. Filtered history cursors preserve their gym filter.
 
 ## Workout detail
 
@@ -274,19 +223,9 @@ inaccessible or nonexistent session produces a `404` envelope.
     "completed_set_count": 2,
     "total_volume": { "value": 1440, "unit": "kg_reps" },
     "exercises": [{ "id": "block-id", "exercise_id": "exercise-id", "name": "Bench press" }],
-    "sets": [{
-      "id": "set-id",
-      "session_id": "session-id",
-      "session_exercise_id": "block-id",
-      "exercise_id": "exercise-id",
-      "exercise_name": "Bench press",
-      "order_index": 0,
-      "load": { "value": 80, "unit": "kg" },
-      "calculated_load": { "value": 80, "unit": "kg" },
-      "reps": 8,
-      "set_type": "rir_2",
-      "volume": { "value": 640, "unit": "kg_reps" }
-    }],
+    "sets": [{ "id": "set-id", "session_id": "session-id", "session_exercise_id": "block-id",
+      "exercise_id": "exercise-id", "exercise_name": "Bench press", "order_index": 0, "load": { "value": 80, "unit": "kg" },
+      "calculated_load": { "value": 80, "unit": "kg" }, "reps": 8, "set_type": "rir_2", "volume": { "value": 640, "unit": "kg_reps" } }],
     "next_cursor": null
   }
 }
@@ -401,6 +340,19 @@ default (hashed as sent, so a retry after midnight replays). Add returns `note`
 `idempotent_replay`. A foreign or unknown exercise is `400
 FOREIGN_RESOURCE_REFERENCE`, a deleted one `409 EXERCISE_DELETED`; a missing,
 foreign or removed note `404`.
+
+## Injuries and physical limitations
+
+Load [injury contract](../../../docs/specs/tech/injury-contract.md) for data model and lifecycle states. `GET /v1/agent/injuries` returns active and recent injuries, newest `started_at` first, then id. Optional `status` (`acute`, `managing`, `monitoring`, `resolved`), `include_resolved` (default false), `limit` (`1..50`, default 20), `cursor`.
+
+```json
+{ "injuries": [{ "id": "injury-id", "muscle_group_id": "quads", "muscle_group_name": "Quads",
+  "side": "right", "status": "acute", "pain_score": 7, "label": "Patellar irritation",
+  "notes": null, "contraindications": "Deep squats", "started_at": "2026-11-10T10:00:00.000Z",
+  "resolved_at": null, "created_at": "2026-11-10T10:00:00.000Z", "updated_at": "2026-11-10T10:00:00.000Z" }], "next_cursor": null }
+```
+
+`POST /v1/agent/injuries` (`{label, muscle_group_id?, side?, status?, pain_score?, notes?, contraindications?, started_at?}`) and `PATCH /v1/agent/injuries/:id` (`{status?, pain_score?, notes?, contraindications?}`) need write access (`403 INJURY_PERMISSION_REQUIRED`) and an `Idempotency-Key` (own 30/min window). `label` is 1–100 trimmed characters; `muscle_group_id` one of 25 canonical IDs or null (`400 INVALID_ANATOMY_REFERENCE` if invalid); `pain_score` 0–10 or null; `started_at` not in the future. Resolving an injury stamps `resolved_at`. Both return `injury` and `idempotent_replay`. Missing, foreign or deleted injury is `404 INJURY_NOT_FOUND`.
 
 ## Working sets only
 
