@@ -33,6 +33,7 @@ import {
   buildThemeShadePalette,
   canonicalOrientationForMuscle,
   computeMuscleScores,
+  INJURY_STATUS_PRIORITY,
   normaliseBodyAngle,
   projectMuscleBody,
   type ActiveInjuryOverlay,
@@ -246,9 +247,21 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect, act
       {muscles.map(row => {
         const figures = comparisonFigures(row, metric);
         const selected = row.muscleGroupId === selectedId;
-        const matchingInjuries = activeInjuries?.filter(
-          i => i.status !== 'resolved' && (i.muscleGroupId === row.muscleGroupId || resolveInjuryMuscleGroupId({ muscleGroupId: i.muscleGroupId ?? null, label: i.label ?? '' }) === row.muscleGroupId)
-        );
+        const matchingInjuries = activeInjuries
+          ?.filter(
+            i =>
+              i.status !== 'resolved' &&
+              (i.muscleGroupId === row.muscleGroupId ||
+                resolveInjuryMuscleGroupId({
+                  muscleGroupId: i.muscleGroupId ?? null,
+                  label: i.label ?? '',
+                }) === row.muscleGroupId)
+          )
+          .sort(
+            (a, b) =>
+              (INJURY_STATUS_PRIORITY[a.status] ?? 99) -
+              (INJURY_STATUS_PRIORITY[b.status] ?? 99)
+          );
         const injuryNotice = matchingInjuries && matchingInjuries.length > 0
           ? ` Active injury: ${matchingInjuries.map(i => `${i.status} ${i.label ?? ''}`).join(', ')}.`
           : '';
@@ -306,8 +319,9 @@ function MuscleInjuryOverlays({
           ))}
         </Svg>
       ) : null}
-      {projected.injuryBadges?.map(badge =>
-        badge.visible ? (
+      {projected.injuryBadges?.map(badge => {
+        const severityZIndex = badge.status === 'acute' ? 30 : badge.status === 'managing' ? 20 : 10;
+        return badge.visible ? (
           <View
             key={`injury-badge-${badge.injuryId}`}
             pointerEvents="box-none"
@@ -316,6 +330,7 @@ function MuscleInjuryOverlays({
               {
                 left: Math.max(8, Math.min(viewportWidth - 76, badge.x - 30)),
                 top: Math.max(8, Math.min(viewportHeight - 24, badge.y - 12)),
+                zIndex: severityZIndex,
               },
             ]}>
             <InjuryBadge
@@ -324,8 +339,8 @@ function MuscleInjuryOverlays({
               testID={`stats-muscle-injury-badge-${badge.injuryId}`}
             />
           </View>
-        ) : null
-      )}
+        ) : null;
+      })}
     </>
   );
 }

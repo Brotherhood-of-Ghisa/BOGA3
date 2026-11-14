@@ -597,21 +597,52 @@ type InjuryAccumulator = {
   triangleCount: number;
 };
 
+export const INJURY_STATUS_PRIORITY: Record<ActiveInjuryOverlay['status'], number> = {
+  acute: 0,
+  managing: 1,
+  monitoring: 2,
+  resolved: 3,
+};
+
+const normalizeInjurySide = (
+  side?: 'left' | 'right' | 'bilateral' | null
+): 'left' | 'right' | 'bilateral' => {
+  return side === 'left' || side === 'right' ? side : 'bilateral';
+};
+
 const createInjuryAccumulators = (
   activeInjuries?: readonly ActiveInjuryOverlay[]
 ): InjuryAccumulator[] => {
   if (!activeInjuries || activeInjuries.length === 0) return [];
+
+  const sorted = [...activeInjuries]
+    .filter(injury => injury.status !== 'resolved')
+    .sort((a, b) => {
+      const pDiff = INJURY_STATUS_PRIORITY[a.status] - INJURY_STATUS_PRIORITY[b.status];
+      if (pDiff !== 0) return pDiff;
+      return (b.painScore ?? 0) - (a.painScore ?? 0);
+    });
+
   const accumulators: InjuryAccumulator[] = [];
-  for (const injury of activeInjuries) {
-    if (injury.status === 'resolved') continue;
+  const seen = new Set<string>();
+
+  for (const injury of sorted) {
     const resolvedId = resolveInjuryMuscleGroupId({
       muscleGroupId: injury.muscleGroupId ?? null,
       label: injury.label ?? '',
     });
     if (!resolvedId) continue;
+
+    const targetMuscleId = canonicalMuscleId(resolvedId);
+    const normalizedSide = normalizeInjurySide(injury.side);
+    const key = `${targetMuscleId}:${normalizedSide}`;
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+
     accumulators.push({
       injury,
-      targetMuscleId: canonicalMuscleId(resolvedId),
+      targetMuscleId,
       edgeCounts: new Map<number, number>(),
       sumX: 0,
       sumY: 0,
@@ -634,12 +665,19 @@ const accumulateInjuryFace = (
   mesh: MuscleBodyMesh,
   accumulators: readonly InjuryAccumulator[]
 ) => {
-  const [i0, i1, i2] = face;
+  const [i0, i1, i2, matIdx] = face;
   const rawCenterX = (mesh.vertices[i0][0] + mesh.vertices[i1][0] + mesh.vertices[i2][0]) / 3;
   const faceMuscleId = canonicalMuscleId(projected.muscleGroupId);
+  const baseMaterial = matIdx !== undefined ? mesh.materials[matIdx] : undefined;
+  const baseMuscleId =
+    baseMaterial && baseMaterial !== 'neutral' ? canonicalMuscleId(baseMaterial) : null;
 
   for (const acc of accumulators) {
-    if (acc.targetMuscleId === faceMuscleId && matchesInjurySide(rawCenterX, acc.injury.side)) {
+    const matchesTarget =
+      acc.targetMuscleId === faceMuscleId ||
+      (baseMuscleId !== null && acc.targetMuscleId === baseMuscleId);
+
+    if (matchesTarget && matchesInjurySide(rawCenterX, acc.injury.side)) {
       recordFaceEdges(i0, i1, i2, acc.edgeCounts);
       acc.sumX += (projected.x0 + projected.x1 + projected.x2) / 3;
       acc.sumY += (projected.y0 + projected.y1 + projected.y2) / 3;
@@ -708,6 +746,16 @@ const buildProjectedInjuries = (
       });
     }
   }
+
+  // Sort SVG contours in painter's order (lowest severity first, acute last on top)
+  injuryContours.sort(
+    (a, b) => INJURY_STATUS_PRIORITY[b.status] - INJURY_STATUS_PRIORITY[a.status]
+  );
+
+  // Sort badges in DOM painter's order (lowest severity first, acute last on top)
+  injuryBadges.sort(
+    (a, b) => INJURY_STATUS_PRIORITY[b.status] - INJURY_STATUS_PRIORITY[a.status]
+  );
 
   return { injuryContours, injuryBadges };
 };
