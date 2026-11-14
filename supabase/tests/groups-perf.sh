@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Groups performance, Tier 1 (lane groups-perf): deterministic work counters
 # per logged set and per idle cron tick, for a history sweep and a members
-# sweep, each scenario inside one rolled-back transaction. Report-only: it
-# fails only when the harness itself fails. GROUPS_PERF_MATRIX=full runs the
+# sweep, each scenario inside one rolled-back transaction; then the read-path
+# set's per-call page budgets and parity cases. The sweeps are report-only;
+# the read-path set fails the lane on any budget, slope or parity failure,
+# with or without GROUPS_PERF_STRICT. GROUPS_PERF_MATRIX=full runs the
 # production-scale matrix. What it measures: docs/specs/tech/groups-performance-measurement.md.
 # Execute only through its Boga lane.
 set -euo pipefail
