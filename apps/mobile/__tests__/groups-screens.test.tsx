@@ -566,6 +566,33 @@ describe('Groups tab', () => {
     expect(api.getCompetitionPodiums).toHaveBeenCalledWith('group-a', false);
   });
 
+  it('polls only the pages in view: a Leaderboards read idles once At a glance is back', async () => {
+    jest.useFakeTimers();
+    try {
+      render(<GroupsTabRoute />);
+      await screen.findByTestId('groups-tab-glance');
+      goToSection('Leaderboards');
+      await screen.findByTestId('group-leaderboards-empty');
+      goToSection('At a glance');
+      await act(async () => { await jest.advanceTimersByTimeAsync(1_000); });
+      const boards = api.getCompetitionPodiums.mock.calls.length;
+      const glance = api.getCompetitionPeriodTotals.mock.calls.length;
+      const stream = api.getCompetitionStream.mock.calls.length;
+
+      await act(async () => { await jest.advanceTimersByTimeAsync(60_000); });
+      expect(api.getCompetitionPodiums.mock.calls.length).toBe(boards);
+      expect(api.getCompetitionPeriodTotals.mock.calls.length).toBeGreaterThan(glance);
+      // At a glance draws the stream's recent items, so the stream stays live with it.
+      expect(api.getCompetitionStream.mock.calls.length).toBeGreaterThan(stream);
+
+      goToSection('Leaderboards');
+      await act(async () => { await jest.advanceTimersByTimeAsync(1_000); });
+      expect(api.getCompetitionPodiums.mock.calls.length).toBe(boards + 1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('pull-to-refresh refetches My groups and the stream', async () => {
     api.getCompetitionStream.mockResolvedValue(page([completedItem()]));
     render(<GroupsTabRoute />);
