@@ -141,6 +141,15 @@ before the rewrite, as `apps/mobile/scripts/perf/groups/parity-definitions/<migr
 proves the helper itself: identical definitions pass, and a planted one-field
 change must be caught.
 
+**Publish parity** (`publish-parity.ts`) does the same for the comparison
+publisher, a write: on the H=90 point every `group_metric_eval_publish` call,
+in both steady-state drains and the measured workout, first runs the old
+definition (with the old helpers it calls) inside a savepoint that is rolled
+back, then the live one, from the same state. Their results, rows written per
+table, and the group's published rows and queue state must match; new event
+ids compare by stream position. A planted change to the old publisher must be
+caught.
+
 ## Tier 2 — `./boga test groups-perf-load`
 
 A committed fixture, drained by the real `group-eval` Edge function. C

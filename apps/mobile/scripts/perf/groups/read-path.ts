@@ -18,6 +18,7 @@ import { Client } from 'pg';
 import { scans, type Counters } from './counters.ts';
 import { fixtureStatements, FIXTURE_COUNTS_SQL } from './fixture.ts';
 import { compareParity, parityInstallStatements, parityPassed, type ParityCase, type ParityOutcome } from './parity.ts';
+import { PublishParity } from './publish-parity.ts';
 import {
   checkBudgets, readPathMarkdown, type BudgetCheck, type BudgetEntry, type PointCost,
 } from './read-path-budgets.ts';
@@ -116,8 +117,12 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   { fn: 'group_competition_exercise_list', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 400, scoped: true } },
-  { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 28_000, scoped: false } },
-  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'baseline', pages: 270_000, scoped: false } },
+  { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'budgeted', pages: 4_200, scoped: false } },
+  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 240_000, scoped: false,
+    justification: 'A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
+      + 'before and after publishing, which checks bodyweight redaction once per member and source set; its source graph, '
+      + 'score writes and board apply stay under 20k pages. It falls toward the ceiling once that capture checks '
+      + 'redaction once per member and exercise rather than once per source set.' } },
   { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 160_000, scoped: true } },
   { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 160_000, scoped: true } },
   { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 160_000, scoped: true } },
@@ -346,10 +351,20 @@ const drain = async (run: Tier1Run, session: Tier1Session, label: string): Promi
 type Viewer = { role: 'authenticated'; userId: string; sessionId: string };
 type RecordFailure = (fn: string) => (error: Error) => void;
 
-/** The fixture, its planted cases and steady state; the context to measure, or null when the point is incomplete. */
-const buildPoint = async (session: Tier1Session, run: Tier1Run, point: ReadPathPoint): Promise<ReadPathContext | null> => {
+/**
+ * The fixture, its planted cases and steady state; the context to measure, or
+ * null when the point is incomplete. With `publishParity`, every publication
+ * from here on runs the old and new definitions side by side.
+ */
+const buildPoint = async (
+  session: Tier1Session, run: Tier1Run, point: ReadPathPoint, publishParity: PublishParity | null,
+): Promise<ReadPathContext | null> => {
   await session.begin();
   await configureHosted(session);
+  if (publishParity) {
+    for (const statement of publishParity.installStatements()) await session.exec(statement);
+    run.serviceWrapper = (rpc, unmeasured) => publishParity.wrap(rpc, unmeasured);
+  }
   const spec = { members: READ_PATH_MEMBERS, historyDays: point.historyDays, tag: `r${point.historyDays}` };
   for (const statement of [...fixtureStatements(spec), ...plantStatements()]) await session.exec(statement);
   [point.fixture] = await session.exec<ReadPathPoint['fixture']>(FIXTURE_COUNTS_SQL);
@@ -432,8 +447,9 @@ export const runReadPathPoint = async (historyDays: number, options: Tier1Option
   const recordFailure: RecordFailure = (fn) => (error) => {
     point.errors[fn] = error.message;
   };
+  const publishParity = options.parity ? new PublishParity(session) : null;
   try {
-    const context = await buildPoint(session, run, point);
+    const context = await buildPoint(session, run, point, publishParity);
     if (!context) return point;
     options.log(`[${name}] steady state after ${Math.round((Date.now() - startedAt) / 1000)} s: ${point.fixture.sets} sets`);
     // Reads first, against the steady state the planted cases left.
@@ -444,7 +460,7 @@ export const runReadPathPoint = async (historyDays: number, options: Tier1Option
     const reads = session.take();
     const steps = await measureWorkout(session, run, context, viewer, recordFailure);
     // Parity last, so its many unmeasured calls cannot touch a measured one.
-    if (options.parity) point.parity = await runParityCases(session, context);
+    if (options.parity) point.parity = [...await runParityCases(session, context), publishParity!.outcome];
     point.walPerLoggedSet = steps[1].total.walBytes;
     point.cascade = sumCascades(steps);
     const measuredFns = new Set(READ_PATH_RPCS.map((rpc) => rpc.fn));

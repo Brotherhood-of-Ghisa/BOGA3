@@ -30,14 +30,13 @@ deletes and undeletes flow through; membership at logging time decides; and
 personal sync never changes (no second push path; triggers failure-isolated).
 
 The stream is one persistent table, `group_events`. All access goes through
-`SECURITY DEFINER` RPCs. Devices pull (focus, 30 s poll, pull-to-refresh) into
-a disposable cache; there is no Realtime. The `group-eval` Edge Function
-normalizes shared sets with the app's TS and materializes the boards.
+`SECURITY DEFINER` RPCs. Devices pull into a disposable cache; there is no
+Realtime. The `group-eval` Edge Function normalizes shared sets with the app's
+TS and materializes the boards.
 
 Rejected: per-group session copies or client-pushed projections (duplicated
 state), membership-window reads (no durable share), synced group rows
-(per-owner LWW cannot serve many readers), an Edge API (authorization belongs
-in the database).
+(per-owner LWW), an Edge API (authorization belongs in the database).
 
 ## Server rules
 
@@ -88,18 +87,20 @@ CoW lifecycle uses a dedicated Stream family; load
 their exercises to. Shares `ExerciseCore` with personal exercises; SQL trims with
 `group_exercise_trim`, held by `exercise-core-vectors.json`. Archiving keeps
 links and a frozen board. Members can also share exercises into the group library
-(`app_public.group_shared_exercises`), emitting a `shared_exercise` stream event (`app_public.group_events`).
-Members import into their catalog in one tap; if linked to a competition exercise
-(`group_exercise_id`), both create atomically. Authors and admins can soft-delete.
+(`app_public.group_shared_exercises`), emitting a `shared_exercise` stream event.
+Members import into their catalog in one tap; if linked to a competition exercise,
+both create atomically. Authors and admins can soft-delete.
 Links are the member's Sync v2 entity `exercise_group_links`.
 
 ## Authorization
 
 Spec 10 rules 15–19 own the model. In addition: execute is granted to `anon` so
 the function raises `AUTH_REQUIRED` instead of PostgREST's 42501; every
-mutating RPC locks the `groups` row before role checks, serializing role
-changes, transfers, removals and leaves; usernames come from `user_profiles`,
-and create and join need one. The owner cannot leave (`OWNER_MUST_TRANSFER`)
+mutating RPC locks the `groups` row `FOR UPDATE` before role checks,
+serializing role changes, transfers, removals and leaves; publishers take `FOR
+NO KEY UPDATE` and reads `KEY SHARE`: reads wait for writes, not publishers,
+and see a mid-read publication in later statements only; usernames come from
+`user_profiles`, and create and join need one. The owner cannot leave (`OWNER_MUST_TRANSFER`)
 and becomes admin on transfer. Admins invite, edit, manage group exercises,
 remove members and cancel certifications.
 
@@ -118,7 +119,7 @@ retry), `UPDATE_REQUIRED` (client contract too old). Client-only: `NETWORK`,
   sending bad input gets `NOT_FOUND`.
 - **Cursors** are keyset, sent back verbatim (`next_cursor`); malformed is
   `VALIDATION`, JSON `null` is none. Keys compare in `"C"` collation, the same
-  in SQL and TS. Reads take no locks.
+  in SQL and TS.
 - **Raw sets:** reads return a shared session's live sets as synced (planned,
   skipped, blank included; tombstones omitted; never GPS). Performed-only is a
   device display rule.
@@ -263,8 +264,8 @@ once.
 
 **Known limits.** Silent recomputes have no history. Link attribution compares
 device clocks. Only the latest provisional lead change rolls back. Frozen
-targets await catch-up. Racing withdraw/void can deadlock; one aborts, then
-state converges.
+targets await catch-up. Racing withdraw/void can deadlock; one aborts, state
+converges.
 
 ## Certification
 
@@ -328,10 +329,10 @@ payload or calculation change bumps the versioned keys (`cache.ts`).
 
 ## Not built
 
-Live follow (needs membership RLS through the helpers, spec 10 rule 16, or a
-broadcast channel); history PR highlights on cards (needs unshared history;
-no SQL mirrors of TS set rules); group gyms, time-windowed boards, member
-proposals, disputes, native notification integration.
+Live follow (needs membership RLS, spec 10 rule 16, or a broadcast channel);
+history PR highlights on cards (needs unshared history); group gyms,
+time-windowed boards, member proposals, disputes, native notification
+integration.
 
 ## Rule IDs
 
