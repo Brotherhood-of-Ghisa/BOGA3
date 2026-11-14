@@ -11,7 +11,7 @@ An injury tracks tissue discomfort through four lifecycle states:
 Active warnings (`acute`, `managing`, `monitoring`) alert lifters when an exercise maps to affected muscles. Dismissing a warning suppresses it in memory for the active workout session only, without altering stored injury records. Skipping an exercise due to pain or discomfort logs a structured skip reason.
 
 Why: keeps lifters aware of compromised tissue during workouts while allowing session-scoped dismissal and structured skip tracking.
-Code: `apps/mobile/src/injuries/injury-warning-engine.ts`; `apps/mobile/src/injuries/use-session-injury-warnings.ts`; `components/injuries/`.
+Code: `apps/mobile/src/injuries/injury-warning-engine.ts`; `apps/mobile/src/injuries/use-session-injury-warnings.ts`; `apps/mobile/components/injuries/`.
 
 ### injury.privacy · principle · accepted
 
@@ -25,4 +25,4 @@ Code: `docs/specs/tech/injury-contract.md`; `supabase/migrations/20261113081138_
 Tissue reload tracking compares current-week working sets ($S_{\text{curr}}$) against the 4-week pre-injury baseline weekly average ($\bar{S}_{\text{pre}}$) over $[T_{\text{injury}}-28\text{d}, T_{\text{injury}})$. A caution alert triggers when $S_{\text{curr}} \ge 6$ and either $\bar{S}_{\text{pre}} = 0$ or $S_{\text{curr}} > 1.30 \times \bar{S}_{\text{pre}}$. Rehab sets ($R_{\text{curr}}$) track therapeutic volume in kilograms without counting toward working-set reload stress. Reloading metrics remain strictly owner-private.
 
 Why: protects recovering tissue against volume spikes exceeding 130% of healthy capacity while suppressing noise when working sets are below the 6-set floor.
-Code: `apps/mobile/src/injuries/tissue-reload.ts`; `components/injuries/tissue-reload-card.tsx`.
+Code: `apps/mobile/src/injuries/tissue-reload.ts`; `apps/mobile/components/injuries/tissue-reload-card.tsx`.
