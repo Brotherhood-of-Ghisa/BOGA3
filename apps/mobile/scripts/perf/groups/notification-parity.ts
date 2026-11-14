@@ -37,7 +37,7 @@ export type NotificationFixture = {
 export type WithNotification = { notification: NotificationFixture | null };
 
 export const SCENARIOS = [
-  'base', 'peer-set-edited', 'own-set-edited', 'link-changed', 'publication-stale', 'final-ranks-stale', 'without-stale', 'unprepared',
+  'base', 'peer-set-edited', 'own-set-edited', 'link-changed', 'link-removed', 'publication-stale', 'final-ranks-stale', 'without-stale', 'unprepared',
   'unenqueued',
 ] as const;
 export type Scenario = (typeof SCENARIOS)[number];
@@ -65,6 +65,10 @@ export const scenarioStatements = (scenario: Scenario, fixture: NotificationFixt
     case 'link-changed': return asMember(fixture.ownSet.member,
       `update app_public.exercise_group_links set updated_at=updated_at+1,client_updated_at_ms=client_updated_at_ms+1
          where owner_user_id=${literal(fixture.ownSet.member)}`);
+    // No counting link: sets are then reached only through certifications, records, board entries or scores.
+    case 'link-removed': return asMember(fixture.ownSet.member,
+      `update app_public.exercise_group_links set deleted_at=(extract(epoch from now())*1000)::bigint,
+         updated_at=updated_at+1,client_updated_at_ms=client_updated_at_ms+1 where owner_user_id=${literal(fixture.ownSet.member)}`);
     case 'publication-stale': return [`update app_public.notification_comparison_publications set source_digest='stale'`];
     case 'final-ranks-stale': return [`update app_public.notification_workout_targets set final_ranks='[]'::jsonb`];
     case 'without-stale': return [`update app_public.notification_workout_targets set without_workout='[]'::jsonb`];
@@ -177,7 +181,7 @@ export const notificationParityCases = <Context extends WithNotification>(): Par
   { fn: 'notification_workout_ready', migration: BEFORE, helpers: DIGEST_HELPER, calls: readiness, caller: callerFor('postgres'),
     scenarios: [...SCENARIOS], observe: (live) => String(settled(live)), requires: ['true', 'false'] },
   { fn: 'notification_context_digest', migration: BEFORE, calls: digests, caller: callerFor('postgres'),
-    scenarios: ['base', 'peer-set-edited', 'own-set-edited', 'link-changed'] },
+    scenarios: ['base', 'peer-set-edited', 'own-set-edited', 'link-changed', 'link-removed'] },
   { fn: 'notification_workout_enqueue', migration: BEFORE, helpers: HELPERS, calls: enqueues, caller: callerFor('service_role'),
     state: NOTIFICATION_STATE_SQL, scenarios: [...SCENARIOS], observe: (live) => String(settled(live)), requires: ['true', 'false'] },
   { fn: 'notification_workout_prepare', migration: BEFORE, helpers: HELPERS, caller: callerFor('service_role'),

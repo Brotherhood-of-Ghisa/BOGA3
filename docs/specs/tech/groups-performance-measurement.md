@@ -147,8 +147,8 @@ role). Each call then runs in its own savepoint, old and new start from the
 same rows, and the result, a refusal's error and the rows changed are compared.
 `calls` lists exact viewer and argument pairs. `scenarios` (in
 `notification-parity.ts`) re-run a case after one planted change each (an edited
-set, a stale stored rank or digest, an unenqueued workout), so every check of a
-proof is the one that fails in turn. `observe` names each live outcome and
+set, a removed link, a stale stored rank or digest, an unenqueued workout); old
+and new must agree under every one. `observe` names each live outcome and
 `requires` lists those that must each occur, so a case whose calls all fail the
 same way does not pass. A helper shared by several cases installs once.
 
