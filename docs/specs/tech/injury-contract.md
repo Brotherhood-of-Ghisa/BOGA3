@@ -67,6 +67,23 @@ tendons to canonical `muscle_groups.id` values:
 - "achilles", "ankle" -> `calves`
 - "hip joint" -> `hip_flexors`
 
+### Tissue reloading analytics
+
+Active injuries link to the workout history to monitor post-injury tissue
+reloading:
+1. **Pre-injury baseline ($\bar{S}_{\text{pre}}$):** calculated as the average
+   weekly working sets over the 4-week window prior to injury date,
+   $[T_{\text{injury}}-28\text{d}, T_{\text{injury}})$.
+2. **Current-week load ($S_{\text{curr}}$):** total working sets performed for
+   the injured muscle group in the current calendar week.
+3. **Rehab volume ($R_{\text{curr}}$):** total sets and volume (kg) logged with
+   the `rehab` purpose tag in the current calendar week; tracked therapeutically
+   without triggering reload volume cautions.
+4. **Caution alert:** evaluates when $S_{\text{curr}} \ge 6$ and
+   $(\bar{S}_{\text{pre}} = 0 \lor S_{\text{curr}} > 1.30 \times \bar{S}_{\text{pre}})$.
+5. **Privacy:** all reload analytics are computed locally and strictly
+   owner-private.
+
 ## Server schema
 
 Table: `app_public.injuries`
