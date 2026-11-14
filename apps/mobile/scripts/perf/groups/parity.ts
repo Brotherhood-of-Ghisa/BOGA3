@@ -52,7 +52,8 @@ export const definitionFromMigration = (sql: string, fn: string): string => {
   // text ends at the tag, and the next statement is never swallowed. Anything
   // else after the body is refused rather than dropped.
   const rest = sql.slice(after);
-  const trailer = /^[ \t\r\n]*((?:[a-z_]+[ \t\r\n]*)*);/i.exec(rest);
+  // Each word ends in whitespace (or is the last), so there is one way to split them: linear time.
+  const trailer = /^\s*((?:[a-z_]+\s+)*[a-z_]*)\s*;/i.exec(rest);
   const statement = /\b(create|grant|revoke|alter|comment|drop|select|insert|update|delete|do|begin|commit)\b/i;
   if (trailer && !statement.test(trailer[1])) return sql.slice(start, after + trailer[0].length);
   if (/^\s*$/.test(rest) || statement.test(/^\s*([a-z_]+)/i.exec(rest)?.[1] ?? '')) return `${sql.slice(start, after)};`;

@@ -86,7 +86,7 @@ those: shared pages, temp bytes and sequential scans per call, at M=5 and
 H=90 and H=180 days.
 
 Each point starts from a full vacuum: rolled-back runs leave pages behind
-that a plain vacuum frees but never returns, and page counts would grow
+that a plain vacuum frees but does not compact, and page counts would grow
 with them. Then it builds the Tier 1 fixture, in one rolled-back
 transaction, plus planted cases the reads must handle:
 

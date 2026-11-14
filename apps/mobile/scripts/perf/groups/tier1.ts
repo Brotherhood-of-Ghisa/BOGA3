@@ -224,8 +224,8 @@ export type Tier1Options = {
 /**
  * `full` also rewrites every table and index compactly: a rolled-back
  * fixture leaves its pages behind, and plain vacuum frees them without
- * shrinking the files, so page counts would depend on how many runs came
- * before.
+ * compacting index pages or the middle of a file, so page counts would
+ * depend on how many runs came before.
  */
 export const vacuum = async (adminDbUrl: string, full = false): Promise<void> => {
   // The warning in group-metric-publish-benchmark.sql: rolled-back runs leave

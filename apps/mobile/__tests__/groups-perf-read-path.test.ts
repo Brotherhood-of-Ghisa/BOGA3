@@ -228,6 +228,14 @@ begin return jsonb_build_object('a', p_a); end $function$
       .toBe(definition);
     expect(() => definitionFromMigration("create function app_public.f() returns int as $$ select 1 $$ language sql set search_path = '';", 'f'))
       .toThrow('not a plain clause');
+    // Long word runs after the body are read in linear time, never by backtracking.
+    const words = ' language plpgsql stable security definer set search_path = public;';
+    const started = Date.now();
+    expect(() => definitionFromMigration(`create function app_public.f() returns int as $$ select 1 $$${words.repeat(20)}`, 'f'))
+      .toThrow('not a plain clause');
+    expect(definitionFromMigration(`create function app_public.f() returns int as $$ select 1 $$\n${'CREATE OR REPLACE FUNCTION app_public.group_cow_redacts_exercise('.repeat(20)}`, 'f'))
+      .toBe('create function app_public.f() returns int as $$ select 1 $$;');
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 
   test('the legacy copy is renamed into pg_temp and can call old helpers', () => {
