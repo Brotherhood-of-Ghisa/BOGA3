@@ -10,6 +10,7 @@ import {
   compareParity,
   definitionFromMigration,
   definitionPath,
+  helperParityStatements,
   jsonDifference,
   legacyDefinition,
   migrationDefinition,
@@ -19,12 +20,17 @@ import {
   type ParityCase,
 } from '../scripts/perf/groups/parity';
 import {
+  HELPER_PARITY_CASES,
   PARITY_CASES,
+  PARITY_DAYS,
+  PARITY_PLANT_STATEMENTS,
+  plantedAll,
   pointCost,
   READ_PATH_DAYS,
   READ_PATH_RPCS,
   readPathBudgets,
   summarizeReadPath,
+  type ReadPathContext,
   type ReadPathPoint,
 } from '../scripts/perf/groups/read-path';
 import {
@@ -310,5 +316,101 @@ begin return jsonb_build_object('a', p_a); end $function$
     for (const source of ['parity-definitions/../x.sql', 'other/20261008120000_a.sql', '20261008120000_a.sql.bak', 'x.sql']) {
       expect(() => definitionPath(source)).toThrow('invalid definition source');
     }
+  });
+});
+
+describe('helper parity', () => {
+  test('an old helper several cases share is installed with or replace, and an old body calls it in pg_temp', () => {
+    const shared = PARITY_CASES.filter((item) => item.helpers?.group_week_session_counts);
+    expect(shared.map((item) => item.fn).sort()).toEqual(['group_competition_period_totals', 'group_competition_week_summary']);
+    for (const item of shared) {
+      const { legacy, sql } = parityInstallStatements(item);
+      expect(sql[0].startsWith('create or replace function pg_temp.group_week_session_counts__legacy(')).toBe(true);
+      const body = sql.find((statement) => statement.startsWith(`create function pg_temp.${legacy}(`))!;
+      expect(body).toContain('pg_temp.group_week_session_counts__legacy(');
+      expect(body).not.toContain('app_public.group_week_session_counts(');
+    }
+  });
+
+  test('an old-against-new case installs the old helpers and compares the pg_temp copy with the live function', () => {
+    const { sql, compare } = helperParityStatements({
+      name: 'outer', fn: 'group_competition_redacts_exercise', migration: 'parity-definitions/20261030064514_group_cow_readers.sql',
+      helpers: { group_cow_redacts_exercise: '20261030064514_group_cow_readers.sql' },
+      argumentsSql: 'select 1 as a1', call: '{fn}(a1)',
+    });
+    expect(sql).toHaveLength(2);
+    expect(sql[0].startsWith('create or replace function pg_temp.group_cow_redacts_exercise__legacy(')).toBe(true);
+    expect(sql[1].startsWith('create or replace function pg_temp.group_competition_redacts_exercise__legacy(')).toBe(true);
+    expect(sql[1]).toContain('pg_temp.group_cow_redacts_exercise__legacy(p_groups,p_member,p_definition)');
+    expect(compare).toContain('select (pg_temp.group_competition_redacts_exercise__legacy(a1)) as expected, '
+      + '(app_public.group_competition_redacts_exercise(a1)) as actual');
+    expect(compare).toContain('from (select 1 as a1) a');
+  });
+
+  test('the old copy may be installed again, and a bad function name is refused', () => {
+    const item = HELPER_PARITY_CASES.find((entry) => 'fn' in entry && entry.fn === 'group_cow_redacts_exercise')!;
+    const { sql } = helperParityStatements(item);
+    expect(sql.at(-1)?.startsWith('create or replace function pg_temp.group_cow_redacts_exercise__legacy(')).toBe(true);
+    expect(() => helperParityStatements({ name: 'x', fn: 'f(); drop', migration: 'm', argumentsSql: 'select 1', call: '{fn}()' }))
+      .toThrow('invalid function name');
+  });
+
+  test('a check compares its two expressions and installs nothing', () => {
+    const { sql, compare } = helperParityStatements({ name: 'check', argumentsSql: 'select 1 as a1', expected: 'a1', actual: 'a1 + 0' });
+    expect(sql).toEqual([]);
+    expect(compare).toContain('select (a1) as expected, (a1 + 0) as actual');
+    expect(compare).toContain('count(distinct x.expected::text)::integer as answers');
+    const redaction = HELPER_PARITY_CASES.filter((item) => item.name.includes('redact'));
+    expect(redaction.map((item) => item.minAnswers)).toEqual([2, 2, 2]);
+  });
+
+  test('the redaction helpers, their cache and the session counts are each compared, every registered case installing', () => {
+    expect(HELPER_PARITY_CASES.map((item) => item.name).sort()).toEqual([
+      'group_competition_redactions', 'group_competition_redacts_exercise', 'group_cow_redacts_exercise', 'group_week_session_counts']);
+    for (const item of HELPER_PARITY_CASES) {
+      const { sql, compare } = helperParityStatements(item);
+      if ('fn' in item) expect(sql.at(-1)).toContain(`pg_temp.${item.fn}__legacy(`);
+      expect(compare).toContain(item.argumentsSql);
+    }
+    const cache = HELPER_PARITY_CASES.find((item) => item.name === 'group_competition_redactions')!;
+    expect(cache.argumentsSql).toContain('app_public.group_competition_redactions(');
+  });
+
+  test('every planted stale fact is edited under its owner\'s claims and must edit exactly one row; the claims are cleared after', () => {
+    const statements = PARITY_PLANT_STATEMENTS();
+    const edits = statements.filter((statement) => /\bupdate app_public\./.test(statement));
+    expect(edits).toHaveLength(3);
+    for (const edit of edits) {
+      const before = statements[statements.indexOf(edit) - 1];
+      expect(before).toContain("set_config('request.jwt.claims'");
+      expect(edit).toMatch(/returning 1\)\s*select count\(\*\)=1 as planted from edited$/);
+    }
+    expect(statements.at(-1)).toContain("set_config('request.jwt.claims','',true)");
+    const plants = statements.filter((statement) => !statement.startsWith('select set_config'));
+    expect(plants).toHaveLength(5);
+    for (const plant of plants) expect(plant).toMatch(/select count\(\*\)=[12] as planted from edited$/);
+    expect(plantedAll([{ planted: true }])).toBe(true);
+    expect(plantedAll([{ planted: false }])).toBe(false);
+    expect(plantedAll([{ set_config: '' }])).toBe(true);
+  });
+
+  test('the period totals cases send only windows the RPC accepts, months back over the parity history', () => {
+    const day = 86400000;
+    const now = 1_800_000_000_000;
+    const weeks = Array.from({ length: 6 }, (_, index) => ({ start_ms: now - (6 - index) * 7 * day, end_ms: now - (5 - index) * 7 * day }));
+    const context = { groupId: 'g', weeks } as unknown as ReadPathContext;
+    const sets = PARITY_CASES.find((item) => item.fn === 'group_competition_period_totals')!.argumentSets(context);
+    expect(sets).toHaveLength(weeks.length + 2);
+    for (const { p_windows: windows } of sets as { p_windows: { start_ms: number; end_ms: number }[] }[]) {
+      expect(windows.length).toBeGreaterThanOrEqual(1);
+      expect(windows.length).toBeLessThanOrEqual(12);
+      for (const window of windows) {
+        expect(window.start_ms).toBeGreaterThanOrEqual(0);
+        expect(window.end_ms).toBeGreaterThan(window.start_ms);
+        expect(window.end_ms - window.start_ms).toBeLessThanOrEqual(32 * day);
+      }
+    }
+    const months = (sets.at(-1) as { p_windows: { start_ms: number }[] }).p_windows;
+    expect(Math.min(...months.map((window) => window.start_ms))).toBeLessThanOrEqual(now - PARITY_DAYS * day);
   });
 });
