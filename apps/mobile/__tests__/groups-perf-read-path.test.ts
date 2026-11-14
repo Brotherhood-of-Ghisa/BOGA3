@@ -208,7 +208,24 @@ revoke all on function app_public.f(int) from public;`;
     expect(definitionFromMigration(SQL.split('\n').slice(0, 2).join('\n'), 'f')).toBe(
       "create function app_public.f(p_a int) returns jsonb language sql as $$ select jsonb_build_object('a', p_a) $$;");
     expect(() => definitionFromMigration(SQL, 'g')).toThrow('no definition of app_public.g');
+    expect(definitionFromMigration("create function app_public.f() returns int as $$ select 1 $$ language sql stable;\nrevoke all on function app_public.f() from public;", 'f'))
+      .toBe('create function app_public.f() returns int as $$ select 1 $$ language sql stable;');
     expect(() => definitionFromMigration(SQL, 'f(); drop')).toThrow('invalid function name');
+  });
+
+  test('a saved pg_get_functiondef text, with no closing semicolon, installs; a following statement is never taken', () => {
+    const saved = `CREATE OR REPLACE FUNCTION app_public.f(p_a integer)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SET search_path TO 'app_public', 'pg_temp'
+AS $function$
+begin return jsonb_build_object('a', p_a); end $function$
+`;
+    const definition = definitionFromMigration(saved, 'f');
+    expect(definition.endsWith('end $function$;')).toBe(true);
+    expect(legacyDefinition(definition, 'f', 'f__legacy').startsWith('create function pg_temp.f__legacy(p_a integer)')).toBe(true);
+    expect(definitionFromMigration(`${saved}\ngrant execute on function app_public.f(integer) to authenticated;`, 'f'))
+      .toBe(definition);
   });
 
   test('the legacy copy is renamed into pg_temp and can call old helpers', () => {

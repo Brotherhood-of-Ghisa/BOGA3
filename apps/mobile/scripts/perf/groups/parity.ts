@@ -31,8 +31,9 @@ const header = (fn: string) => new RegExp(`create\\s+(?:or\\s+replace\\s+)?funct
 
 /**
  * The last `create [or replace] function app_public.<fn>(…)` statement in a
- * migration's SQL, through the `;` that ends it. The body's dollar quote is
- * the first `$tag$` after `as`; nothing inside it is parsed.
+ * migration's SQL (or a saved pg_get_functiondef text), through the `;` that
+ * ends it. The body's dollar quote is the first `$tag$` after `as`; nothing
+ * inside it is parsed.
  */
 export const definitionFromMigration = (sql: string, fn: string): string => {
   if (!IDENT.test(fn)) throw new Error(`invalid function name: ${fn}`);
@@ -46,9 +47,15 @@ export const definitionFromMigration = (sql: string, fn: string): string => {
   const tag = open[1];
   const close = sql.indexOf(tag, open.index + open[0].length);
   if (close < 0) throw new Error(`app_public.${fn}'s body is not closed`);
-  const end = sql.indexOf(';', close + tag.length);
-  if (end < 0) throw new Error(`app_public.${fn}'s definition does not end`);
-  return sql.slice(start, end + 1);
+  const after = close + tag.length;
+  // Trailing clauses (`$$ language sql;`) end at their `;`; pg_get_functiondef
+  // text ends at the tag, and the next statement is never swallowed.
+  const trailer = /^[ \t\r\n]*((?:[a-z_]+[ \t\r\n]*)*);/i.exec(sql.slice(after));
+  const clauses = trailer?.[1] ?? '';
+  if (trailer && !/\b(create|grant|revoke|alter|comment|drop|select|insert|update|delete|do|begin|commit)\b/i.test(clauses)) {
+    return sql.slice(start, after + trailer[0].length);
+  }
+  return `${sql.slice(start, after)};`;
 };
 
 /** Reads a definition source (see `definitionPath`) and returns `fn`'s last definition in it. */

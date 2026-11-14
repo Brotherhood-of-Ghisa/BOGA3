@@ -10,8 +10,8 @@
 // plants the cases the reads must handle (a bodyweight-redacted member
 // exercise, a voided record, a live and a finished CoW, notification
 // installations), drains to steady state, then measures: every read once as
-// a member calls it, then one logged set's evaluator and notification
-// cascade, which is where the write RPCs run.
+// a member calls it, then the cascades of one workout's start, logged set
+// and confirmation, which is where the write RPCs run.
 
 import { Client } from 'pg';
 
@@ -104,7 +104,7 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     budget: { kind: 'baseline', pages: 19_000, scoped: true } },
   { fn: 'group_competition_session_records', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
-    budget: { kind: 'baseline', pages: 360, scoped: true } },
+    budget: { kind: 'budgeted', pages: 360, scoped: true } },
   { fn: 'group_cow_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'baseline', pages: 530_000, scoped: true } },
   { fn: 'group_cow_previous_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
@@ -115,7 +115,7 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   { fn: 'group_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }), budget: { kind: 'budgeted', pages: 40, scoped: true } },
   { fn: 'group_competition_exercise_list', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
-  { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'baseline', pages: 370, scoped: true } },
+  { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 370, scoped: true } },
   { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 26_000, scoped: false } },
   { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'baseline', pages: 280_000, scoped: false } },
   { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 150_000, scoped: true } },

@@ -100,10 +100,12 @@ planted cases the reads must handle:
 The point fails if a planted case is missing after steady state. Reads run
 first, as the owner calls them through PostgREST. Week and period arguments
 are rolling 7-day windows ending at the fixture's clock, so a run's cost does
-not depend on the weekday. Then one logged set's evaluator and notification
-cascade runs, and the write RPCs are measured inside it with the service
-role, as their Edge callers run them; the costliest call counts. The report
-adds WAL per logged set (headline a).
+not depend on the weekday. Then the owner's workout runs as the app syncs
+it: its start, a logged set, its finish and the confirmation of its graph
+(a member call). The cascades of the start, the set and the confirmation
+are measured, and the write RPCs inside them run with the service role, as
+their Edge callers run them; the costliest call counts. The report adds WAL
+per logged set (headline a).
 
 **Budgets** sit beside each scenario in `READ_PATH_RPCS`. A budget is the
 costliest call measured at either point plus about 25%. There are two kinds:
