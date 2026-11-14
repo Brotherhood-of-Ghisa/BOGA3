@@ -1,14 +1,13 @@
 // One coalesced "the server has this device's new rows" refresh for every
 // mounted group resource.
 //
-// A sync cycle that pushes rows fires `notifyRowsPushed()`. Each resource used
-// to arm its own timers from that signal; here a single timer serves them all:
-// each push (re)arms it to fire `GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS` after
-// the latest push, then every subscribed listener runs once. Pushes inside the
-// window therefore coalesce into one refresh per subscriber. Listeners are the
-// resources on screen: a hidden resource unsubscribes and so is never refreshed
-// by a push. The timer and the push subscription exist only while someone is
-// subscribed.
+// A sync cycle that pushes rows fires `notifyRowsPushed()`. A single timer
+// serves every resource: each push (re)arms it to fire
+// `GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS` after the latest push, then every
+// subscribed listener runs once. Pushes inside the window therefore coalesce
+// into one refresh per subscriber. Listeners are the resources on screen: a
+// hidden resource unsubscribes and so is never refreshed by a push. The timer
+// and the push subscription exist only while someone is subscribed.
 
 import { getLastRowsPushedAtMs, subscribeToRowsPushed } from '@/src/sync/push-signal';
 
