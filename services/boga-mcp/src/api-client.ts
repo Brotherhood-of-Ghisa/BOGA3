@@ -253,6 +253,7 @@ export class BogaAgentApi {
         notes?: string;
         pain_score?: number | null;
         side?: 'left' | 'right' | 'bilateral' | null;
+        started_at?: string;
         status?: 'acute' | 'managing' | 'monitoring';
       };
     },

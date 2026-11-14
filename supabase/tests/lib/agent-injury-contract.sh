@@ -164,6 +164,12 @@ assert_status 409 "injury update conflict"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IDEMPOTENCY_CONFLICT" ]] ||
   fail "update idempotency conflict did not return IDEMPOTENCY_CONFLICT"
 
+# 11b. Cross-injury idempotency key reuse conflict
+agent_patch "injuries/${INJURY_ID_UNMAPPED}" "${UPDATE_BODY_1}" "${UPDATE_KEY_1}"
+assert_status 409 "cross-injury idempotency key reuse conflict"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IDEMPOTENCY_CONFLICT" ]] ||
+  fail "cross-injury idempotency key reuse did not return IDEMPOTENCY_CONFLICT"
+
 # 12. Transition to resolved sets resolved_at
 RESOLVE_KEY="agent-api-${RUN_TAG}-inj-resolve"
 agent_patch "injuries/${INJURY_ID_1}" '{"status":"resolved"}' "${RESOLVE_KEY}"

@@ -353,6 +353,11 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
           notes: z.string().trim().max(1000).optional(),
           pain_score: z.number().int().min(0).max(10).nullable().optional(),
           side: z.enum(['left', 'right', 'bilateral']).nullable().optional(),
+          started_at: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD format required')
+            .optional()
+            .describe('Date when discomfort or limitation began (YYYY-MM-DD). Defaults to current date if omitted.'),
           status: z.enum(['acute', 'managing', 'monitoring']).optional(),
         }).strict(),
       }).strict(),

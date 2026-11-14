@@ -714,6 +714,7 @@ describe('BoGa MCP server', () => {
           notes: 'Sharp pain on deep knee flexion',
           pain_score: 7,
           side: 'right',
+          started_at: '2026-11-10',
           status: 'acute',
         },
       },
@@ -746,6 +747,7 @@ describe('BoGa MCP server', () => {
       notes: 'Sharp pain on deep knee flexion',
       pain_score: 7,
       side: 'right',
+      started_at: '2026-11-10',
       status: 'acute',
     });
 
@@ -757,6 +759,24 @@ describe('BoGa MCP server', () => {
       pain_score: 3,
       status: 'managing',
     });
+  });
+
+  it('rejects log_injury with malformed started_at', async () => {
+    const running = await startMcp();
+    active.push(running);
+    const before = running.requests.length;
+    const result = await running.client.callTool({
+      arguments: {
+        idempotency_key: 'inj-bad-date',
+        injury: {
+          label: 'Elbow strain',
+          started_at: 'not-a-date',
+        },
+      },
+      name: 'log_injury',
+    });
+    expect(result.isError).toBe(true);
+    expect(running.requests.slice(before).filter((r) => r.method === 'POST')).toHaveLength(0);
   });
 
   it.each([

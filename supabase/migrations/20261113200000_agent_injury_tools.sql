@@ -221,6 +221,12 @@ begin
     _muscle := _row.muscle_group_id;
   end if;
 
+  if p_changes ? 'label' and p_changes ->> 'label' is not null then
+    if coalesce(length(trim(p_changes ->> 'label')), 0) < 1 or length(p_changes ->> 'label') > 100 then
+      raise exception 'INVALID_ARGUMENT' using errcode = 'P0001';
+    end if;
+  end if;
+
   update app_public.injuries
      set status = _new_status,
          resolved_at = _resolved_at,

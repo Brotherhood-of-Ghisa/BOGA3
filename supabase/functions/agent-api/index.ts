@@ -2268,7 +2268,9 @@ const writeInjuryUpdate = async (
   const identity = { p_owner: agent.userId, p_client_id: agent.clientId, p_idempotency_key: idempotencyKey };
   const { data, error } = await client.schema('app_public').rpc('agent_update_injury_status', {
     ...identity,
-    p_payload_sha256: await sha256Hex(JSON.stringify(update.changes)),
+    p_payload_sha256: await sha256Hex(
+      JSON.stringify({ injury_id: update.injury_id, changes: update.changes }),
+    ),
     p_injury_id: update.injury_id,
     p_changes: update.changes,
   });
