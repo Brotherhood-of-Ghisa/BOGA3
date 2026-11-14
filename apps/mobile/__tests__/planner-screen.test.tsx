@@ -496,3 +496,123 @@ describe('Planner Routine section over real data', () => {
     expect(screen.getByTestId(`planner-plan-section-routines-row-${id}`)).toBeTruthy();
   });
 });
+
+describe('Planner Power UX scopes and agenda strip', () => {
+  const planDraft = (
+    overrides: Partial<Parameters<typeof planRepository.createPlan>[0]> = {},
+  ): Parameters<typeof planRepository.createPlan>[0] => ({
+    title: 'Power Session',
+    gymId: null,
+    scheduledFor: null,
+    exercises: [
+      {
+        exerciseDefinitionId: null,
+        name: 'Back Squat',
+        sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+      },
+    ],
+    ...overrides,
+  });
+
+  it('switches between scopes (All, Schedule, Routines, Programmes) with segmented control', async () => {
+    let routineId = '';
+    await openPlanner(async () => {
+      const routine = await planRepository.createPlan(
+        planDraft({ title: 'Morning Mobility', isRoutine: true }),
+      );
+      if (routine.status !== 'saved') throw new Error('Routine failed');
+      routineId = routine.id;
+
+      await planRepository.createPlan(
+        planDraft({ title: 'Legs Tomorrow', scheduledFor: new Date(Date.now() + 86400000) }),
+      );
+      await planRepository.createPlan(planDraft({ title: 'Backlog Deadlift' }));
+    });
+
+    expect(screen.getByTestId('planner-scope-row')).toBeTruthy();
+    expect(screen.getByTestId('planner-scope-all').props.accessibilityState).toEqual({ selected: true });
+
+    // Initial 'All' tab renders all sections and week strip
+    expect(screen.getByTestId('planner-week-strip')).toBeTruthy();
+    expect(screen.getByTestId('planner-plan-section-upcoming')).toBeTruthy();
+    expect(screen.getByTestId('planner-plan-section-unscheduled')).toBeTruthy();
+    expect(screen.getByTestId('planner-plan-section-routines')).toBeTruthy();
+
+    // Switch to Schedule
+    fireEvent.press(screen.getByTestId('planner-scope-schedule'));
+    expect(screen.getByTestId('planner-scope-schedule').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByTestId('planner-week-strip')).toBeTruthy();
+    expect(screen.getByTestId('planner-plan-section-upcoming')).toBeTruthy();
+    expect(screen.getByTestId('planner-plan-section-unscheduled')).toBeTruthy();
+    expect(screen.queryByTestId('planner-plan-section-routines')).toBeNull();
+
+    // Switch to Routines
+    fireEvent.press(screen.getByTestId('planner-scope-routines'));
+    expect(screen.getByTestId('planner-scope-routines').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByTestId('planner-plan-section-routines')).toBeTruthy();
+    expect(screen.getByTestId(`planner-plan-section-routines-row-${routineId}`)).toBeTruthy();
+    expect(screen.queryByTestId('planner-week-strip')).toBeNull();
+    expect(screen.queryByTestId('planner-plan-section-upcoming')).toBeNull();
+
+    // Switch to Programmes
+    fireEvent.press(screen.getByTestId('planner-scope-programmes'));
+    expect(screen.getByTestId('planner-scope-programmes').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByTestId('planner-plan-section-programmes')).toBeTruthy();
+    expect(screen.getByTestId('planner-new-programme-action')).toBeTruthy();
+    expect(screen.queryByTestId('planner-plan-section-upcoming')).toBeNull();
+
+    // Switch back to All
+    fireEvent.press(screen.getByTestId('planner-scope-all'));
+    expect(screen.getByTestId('planner-scope-all').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByTestId('planner-plan-section-upcoming')).toBeTruthy();
+    expect(screen.getByTestId('planner-plan-section-routines')).toBeTruthy();
+  });
+
+  it('interacts with week strip to filter scheduled workouts by day and clears filter', async () => {
+    const today = new Date();
+    const todayKey = `${String(today.getFullYear()).padStart(4, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    let planId = '';
+    await openPlanner(async () => {
+      const res = await planRepository.createPlan(
+        planDraft({ title: 'Today Squats', scheduledFor: today }),
+      );
+      if (res.status !== 'saved') throw new Error('Plan failed');
+      planId = res.id;
+    });
+
+    const todayDayTile = screen.getByTestId(`planner-week-strip-day-${todayKey}`);
+    expect(todayDayTile).toBeTruthy();
+
+    // Selecting today filters and switches to schedule scope
+    fireEvent.press(todayDayTile);
+    expect(screen.getByTestId('planner-scope-schedule').props.accessibilityState).toEqual({ selected: true });
+    expect(screen.getByTestId(`planner-plan-section-upcoming-row-${planId}`)).toBeTruthy();
+
+    // Clear filter restores all upcoming dates
+    expect(screen.getByTestId('planner-week-strip-clear')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('planner-week-strip-clear'));
+    expect(screen.queryByTestId('planner-week-strip-clear')).toBeNull();
+  });
+
+  it('shows empty state panel when a day with no workouts is selected', async () => {
+    await openPlanner(async () => {
+      await planRepository.createPlan(
+        planDraft({ title: 'Upcoming Workout', scheduledFor: new Date(2028, 5, 1) }),
+      );
+    });
+
+    fireEvent.press(screen.getByTestId('planner-scope-schedule'));
+
+    // Select the first day of the current week strip
+    const allDays = screen.getAllByTestId(/^planner-week-strip-day-/);
+    expect(allDays.length).toBe(7);
+    fireEvent.press(allDays[0]);
+
+    // Expect empty card with 'Plan a session' action
+    expect(screen.getByTestId('planner-day-empty-card')).toBeTruthy();
+    expect(screen.getByTestId('planner-plan-for-day')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('planner-plan-for-day'));
+    expect(mockPush).toHaveBeenCalledWith('/session-plan/new');
+  });
+});

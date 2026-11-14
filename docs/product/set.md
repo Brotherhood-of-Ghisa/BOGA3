@@ -31,11 +31,12 @@ never read a device's policy.
 | Stored RIR above 4 | as RIR 4 | as RIR 4 | yes |
 | Technique | no | no | no |
 | Cooldown | no | no | no |
+| Rehab | no | no | no |
 | Unknown stored label | as Unspecified | as Unspecified | yes |
 
 A session counts toward a figure when it holds at least one working set.
 
-Why: warm-ups, technique and cooldown work is logged but is not training
+Why: warm-ups, technique, cooldown, and rehab work is logged but is not training
 stimulus; groups compare people, so they use one rule nobody can tune.
 Code: `isWorkingSet`, `isVolumeSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; defaults and the fixed group and coaching rule (`SHARED_EFFORT_POLICY`) in `apps/mobile/src/exercise-calculations/effort-policy.ts`; groups read the `working` flag from `apps/mobile/src/groups/set-facts.ts`.
 

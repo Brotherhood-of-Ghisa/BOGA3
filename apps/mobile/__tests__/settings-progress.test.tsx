@@ -334,21 +334,25 @@ it('keeps the effort choices on their own page, not under Progress', async () =>
   expect(screen.getByTestId('settings-effort-selections')).toBeTruthy();
 });
 
-it('offers nine fixed labels and independent Display, Working set and Volume controls with no Add', async () => {
+it('offers ten fixed labels and independent Display, Working set and Volume controls with no Add', async () => {
   await openSettings();
   expect(screen.queryByTestId('settings-add-rir-input')).toBeNull();
   expect(screen.queryByText('Add')).toBeNull();
-  expect(screen.getAllByRole('checkbox')).toHaveLength(27);
+  expect(screen.getAllByRole('checkbox')).toHaveLength(30);
   // The section headings name each use; no sentence explains them (copy.no-inline-explanation).
   expect(within(screen.getByTestId('settings-effort-selections')).queryByText(/Display chooses|Groups keep/)).toBeNull();
   const checkboxLabels = screen.getAllByRole('checkbox').map(checkbox => checkbox.props.accessibilityLabel);
-  expect(checkboxLabels.slice(0, 9).every(label => label.endsWith(', Display'))).toBe(true);
-  expect(checkboxLabels.slice(9, 18).every(label => label.endsWith(', Working set'))).toBe(true);
-  expect(checkboxLabels.slice(18).every(label => label.endsWith(', Volume'))).toBe(true);
+  expect(checkboxLabels.slice(0, 10).every(label => label.endsWith(', Display'))).toBe(true);
+  expect(checkboxLabels.slice(10, 20).every(label => label.endsWith(', Working set'))).toBe(true);
+  expect(checkboxLabels.slice(20).every(label => label.endsWith(', Volume'))).toBe(true);
   expect(checkboxLabels).toEqual(expect.arrayContaining(['Technique, Display', 'Technique, Working set', 'Technique, Volume',
-    'Cooldown, Display', 'Cooldown, Working set', 'Cooldown, Volume']));
+    'Cooldown, Display', 'Cooldown, Working set', 'Cooldown, Volume',
+    'Rehab, Display', 'Rehab, Working set', 'Rehab, Volume']));
   expect(screen.getByLabelText('Technique, Display')).toHaveProp('accessibilityState', { checked: true });
   expect(screen.getByLabelText('Technique, Working set')).toHaveProp('accessibilityState', { checked: false });
+  expect(screen.getByLabelText('Rehab, Display')).toHaveProp('accessibilityState', { checked: true });
+  expect(screen.getByLabelText('Rehab, Working set')).toHaveProp('accessibilityState', { checked: false });
+  expect(screen.getByLabelText('Rehab, Volume')).toHaveProp('accessibilityState', { checked: false });
   fireEvent.press(screen.getByLabelText('RIR-2, Display'));
   expect(values().displayEfforts).not.toContain('rir_2');
   expect(values().workingSetEfforts).toContain('rir_2');

@@ -128,6 +128,7 @@ it('rejects nonperformed, nonworking, corrupt, overflow and noncanonical inputs 
     expect(projectRmCurveSet({ ...input, performanceStatus })).toBe('not_working');
   expect(projectRmCurveSet({ ...input, weightValue: '-1' })).toBe('not_working');
   expect(projectRmCurveSet({ ...input, setType: 'warm_up' })).toBe('not_working');
+  expect(projectRmCurveSet({ ...input, setType: 'rehab' })).toBe('not_working');
   expect(projectRmCurveSet({ ...input, bodyweightContribution: -1 })).toBe('invalid_metrics');
   expect(projectRmCurveSet({ ...input, loadInputMode: 'per_side_load', weightValue: '9'.repeat(308) })).toBe('invalid_metrics');
   expect(projectRmCurveSet({ ...input, repsValue: '1', weightValue: '9'.repeat(307), setType: 'rir_12' })).toBe('invalid_metrics');
