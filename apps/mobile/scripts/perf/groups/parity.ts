@@ -214,6 +214,8 @@ export type HelperParityCase = {
   name: string;
   /** A query over the fixture whose columns a1…aN are one call's arguments. */
   argumentsSql: string;
+  /** At least this many distinct expected answers, so the case cannot pass on one answer alone. */
+  minAnswers?: number;
 } & (
   | {
     /** The helper, with its old definition installed as pg_temp.<fn>__legacy. */
@@ -233,7 +235,8 @@ export type HelperParityCase = {
 /**
  * The statements that install a helper case's old definitions (none for a
  * `check`), and the query that compares it: one row of the number of
- * argument rows compared and up to five that differ, as text.
+ * argument rows compared, of distinct expected answers, and up to five rows
+ * that differ, as text.
  */
 export const helperParityStatements = (item: HelperParityCase): { sql: string[]; compare: string } => {
   let sql: string[] = [];
@@ -249,7 +252,7 @@ export const helperParityStatements = (item: HelperParityCase): { sql: string[];
   } else {
     ({ expected, actual } = item);
   }
-  const compare = `select count(*)::integer as compared,
+  const compare = `select count(*)::integer as compared, count(distinct x.expected::text)::integer as answers,
     coalesce((array_agg(row(a.*)::text||': '||coalesce(x.expected::text,'null')||' ≠ '||coalesce(x.actual::text,'null'))
       filter (where x.expected is distinct from x.actual))[1:5],'{}') as differences
     from (${item.argumentsSql}) a cross join lateral (select (${expected}) as expected, (${actual}) as actual) x`;

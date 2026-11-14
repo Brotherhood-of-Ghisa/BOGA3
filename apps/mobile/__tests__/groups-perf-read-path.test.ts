@@ -359,6 +359,9 @@ describe('helper parity', () => {
     const { sql, compare } = helperParityStatements({ name: 'check', argumentsSql: 'select 1 as a1', expected: 'a1', actual: 'a1 + 0' });
     expect(sql).toEqual([]);
     expect(compare).toContain('select (a1) as expected, (a1 + 0) as actual');
+    expect(compare).toContain('count(distinct x.expected::text)::integer as answers');
+    const redaction = HELPER_PARITY_CASES.filter((item) => item.name.includes('redact'));
+    expect(redaction.map((item) => item.minAnswers)).toEqual([2, 2, 2]);
   });
 
   test('the redaction helpers, their cache and the session counts are each compared, every registered case installing', () => {
@@ -383,6 +386,9 @@ describe('helper parity', () => {
       expect(edit).toMatch(/returning 1\)\s*select count\(\*\)=1 as planted from edited$/);
     }
     expect(statements.at(-1)).toContain("set_config('request.jwt.claims','',true)");
+    const plants = statements.filter((statement) => !statement.startsWith('select set_config'));
+    expect(plants).toHaveLength(5);
+    for (const plant of plants) expect(plant).toMatch(/select count\(\*\)=[12] as planted from edited$/);
     expect(plantedAll([{ planted: true }])).toBe(true);
     expect(plantedAll([{ planted: false }])).toBe(false);
     expect(plantedAll([{ set_config: '' }])).toBe(true);

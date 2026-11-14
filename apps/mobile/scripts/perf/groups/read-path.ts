@@ -189,11 +189,11 @@ export const HELPER_PARITY_CASES: readonly HelperParityCase[] = [
     name: 'group_competition_redacts_exercise', fn: 'group_competition_redacts_exercise',
     migration: 'parity-definitions/20261030064514_group_cow_readers.sql',
     helpers: { group_cow_redacts_exercise: '20261030064514_group_cow_readers.sql' },
-    argumentsSql: REDACTION_PAIRS_SQL, call: '{fn}(array[a1],a2,a3)',
+    argumentsSql: REDACTION_PAIRS_SQL, call: '{fn}(array[a1],a2,a3)', minAnswers: 2,
   },
   {
     name: 'group_cow_redacts_exercise', fn: 'group_cow_redacts_exercise', migration: '20261030064514_group_cow_readers.sql',
-    argumentsSql: REDACTION_PAIRS_SQL, call: '{fn}(array[a1],a2,a3)',
+    argumentsSql: REDACTION_PAIRS_SQL, call: '{fn}(array[a1],a2,a3)', minAnswers: 2,
   },
   {
     name: 'group_competition_redactions',
@@ -202,7 +202,7 @@ export const HELPER_PARITY_CASES: readonly HelperParityCase[] = [
         array(select a2 from pairs),array(select a3 from pairs)))
       select p.*,(select c.redacted from cache c where c.member_user_id=p.a2 and c.definition_id is not distinct from p.a3) as a4
       from pairs p`,
-    expected: 'app_public.group_competition_redacts_exercise(array[a1],a2,a3)', actual: 'a4',
+    expected: 'app_public.group_competition_redacts_exercise(array[a1],a2,a3)', actual: 'a4', minAnswers: 2,
   },
   {
     name: 'group_week_session_counts', fn: 'group_week_session_counts', migration: '20261003180000_group_board_raw_weight.sql',
@@ -222,13 +222,47 @@ const edited = (update: string) => `, edited as (${update} returning 1)
 export const plantedAll = (rows: readonly Record<string, unknown>[]): boolean => rows.every((row) => row.planted !== false);
 
 /**
- * Planted before parity, after every measured call: facts the evaluator has
- * not caught up with, which the counts must still read through. Member 4's
- * newest working set is deleted, member 5's newest session loses an
- * exercise, and one of member 4's sets moves to an older session. Each edit
- * runs under its owner's claims, as sync would run it.
+ * Planted before parity, after every measured call. A cancelled CoW on the
+ * bodyweight-aware Pull-up, two weeks back (cancelled, so no worker or
+ * reader takes it up), whose retained refs make the CoW
+ * disclosure redact through each branch: member 3's ref has an unknown
+ * definition (''), member 4's names Bench press while its set is now logged
+ * under another definition. Member 2's newest completed session is no longer
+ * shared, so the latest completed session must skip it. Then facts the
+ * evaluator has not caught up with, which the counts must still read
+ * through: member 4's newest working set is deleted, member 5's newest
+ * session loses an exercise, and one of member 4's sets moves to an older
+ * session. Each sync edit runs under its owner's claims, as sync would run
+ * it; each plant must edit exactly one row.
  */
 export const PARITY_PLANT_STATEMENTS = (): string[] => [
+  `with cow as (
+     insert into app_public.group_cows(id,group_id,group_exercise_id,week_start,time_zone,starts_at,ends_at,metrics,create_key,
+       created_by,available_at,definition_xid,cancelled_at)
+     select gen_random_uuid(),f.group_id,ge.id,w.week,'UTC',lower(w.bounds),upper(w.bounds),array['e1rm'],'perf-cow-parity',
+       (select uid from perf_members where idx=1),clock_timestamp(),0,clock_timestamp()
+     from perf_fx f, perf_group_exercises ge,
+       lateral (select app_public.group_cow_week('UTC',now())-14 as week) w0,
+       lateral (select w0.week,app_public.group_cow_bounds('UTC',w0.week) as bounds) w
+     where ge.ex=5 returning id),
+   refs as (
+     select m.uid,e.set_id,case m.idx when 3 then '' else 'perf-def-0' end as definition
+     from perf_members m cross join lateral (
+       select es.id as set_id from app_public.exercise_sets es
+         join app_public.session_exercises se on se.owner_user_id=es.owner_user_id and se.id=es.session_exercise_id
+        where es.owner_user_id=m.uid and se.exercise_definition_id=case m.idx when 3 then 'perf-def-0' else 'perf-def-1' end
+        order by es.id limit 1) e
+     where m.idx in (3,4))
+   ${edited(`insert into app_public.group_cow_source_refs(cow_id,member_user_id,metric,set_id,definition_id)
+     select cow.id,r.uid,'e1rm',r.set_id,r.definition from cow,refs r`).replace('count(*)=1', 'count(*)=2')}`,
+  `with target as (
+     select sh.group_id,sh.member_user_id,sh.session_id from app_public.group_session_shares sh
+       join perf_members m on m.uid=sh.member_user_id
+       join app_public.sessions s on s.owner_user_id=sh.member_user_id and s.id=sh.session_id
+      where m.idx=2 and sh.group_id=(select group_id from perf_fx) and s.status='completed' and s.deleted_at is null
+      order by s.completed_at desc nulls last,s.started_at desc,s.id limit 1)
+   ${edited(`delete from app_public.group_session_shares sh using target t
+     where sh.group_id=t.group_id and sh.member_user_id=t.member_user_id and sh.session_id=t.session_id`)}`,
   asMember(4),
   `with target as (
      select f.member_user_id,f.set_id from app_public.group_set_facts f join perf_members m on m.uid=f.member_user_id
@@ -439,9 +473,11 @@ const runHelperParity = async (session: Tier1Session, item: HelperParityCase): P
   try {
     const { sql, compare } = helperParityStatements(item);
     for (const statement of sql) await session.exec(statement);
-    const [row] = await session.exec<{ compared: number; differences: string[] }>(compare);
+    const [row] = await session.exec<{ compared: number; answers: number; differences: string[] }>(compare);
     await session.exec('release savepoint helper_parity');
-    return { fn: item.name, compared: row.compared, differences: row.differences, plantDetected: null, error: null };
+    const varied = row.answers >= (item.minAnswers ?? 1)
+      ? null : `${row.answers} distinct answers, fewer than the ${item.minAnswers} the case needs`;
+    return { fn: item.name, compared: row.compared, differences: row.differences, plantDetected: null, error: varied };
   } catch (error) {
     await session.exec('rollback to savepoint helper_parity');
     return { fn: item.name, compared: 0, differences: [], plantDetected: null, error: (error as Error).message };
