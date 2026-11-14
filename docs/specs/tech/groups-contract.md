@@ -306,13 +306,13 @@ the failure-isolated source-mode trigger implements [[groups.certification]].
   `apps/mobile/src/sync/account-wipe.ts` and arms a timer on
   `apps/mobile/src/sync/push-signal.ts`.
 - **Reads** are cache-first (`useGroupResource`): focus, 30 s while focused,
-  3 s after this device pushes (shared), pull-to-refresh; skipped offline;
-  out-of-view reads idle; concurrent refreshes share a
-  request; stale responses are dropped. Full boards and history are never
-  cached. Entries seen this run draw on first render, never a loader.
+  3 s after a push, pull-to-refresh; skipped offline or hidden;
+  concurrent refreshes share a request; stale responses are dropped. Full
+  boards and history are never cached. Entries seen this run draw on first
+  render, never behind a loader.
 - **Writes** (`useGroupAction`) are refused offline, never queued or cached;
   success refreshes.
-- **Linking** is a local synced write, works offline; only cached,
+- **Linking** is a local synced write and works offline; only cached,
   live exercises are offered. Unlink keeps past activity and certifications
   and checks the expected group exercise in its transaction: a moved mapping
   is left alone and the screen refreshes.
