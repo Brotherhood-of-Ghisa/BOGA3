@@ -139,7 +139,7 @@ mix values.
 The local store holds one account's data; `sync_runtime_state.account_user_id`
 records which (null on a fresh or signed-out store). One complete wipe,
 `wipeLocalDatabaseRows` (`apps/mobile/src/data/local-wipe.ts`), empties it in
-one transaction — the eighteen entity tables child before parent, `group_cache`,
+one transaction — the nineteen entity tables child before parent, `group_cache`,
 `sync_quarantine`, then the three facts tables last, after the raw deletes have
 fired their triggers — resets `bootstrap_completed_at`, `pull_cursor` and
 `applied_seed_migration_app_version`, sets `account_user_id`, keeps
@@ -171,7 +171,7 @@ every retry). Wipes run under the cycle's lock, never between pages.
 
 ## Local sync bookkeeping (Sync v2)
 
-Per-row sync state is two local-only columns on each of the eighteen user-owned
+Per-row sync state is two local-only columns on each of the nineteen user-owned
 entity tables — `local_dirty` (1 iff the row needs pushing) and
 `local_updated_at_ms` (the monotonic client timestamp, sent as
 `client_updated_at_ms`). Neither crosses the wire, and there is no outbox or
@@ -202,17 +202,17 @@ one local orphan cannot wedge the backlog.
    `tech/sync-v2-server-contract.md`, "LWW and undelete", included).
 5. Diagnostic log rows are write-only from authenticated clients, read through
    backend operator tooling.
-6. All eighteen mirror tables use composite primary key `(owner_user_id, id)` —
+6. All nineteen mirror tables use composite primary key `(owner_user_id, id)` —
    **owner-first**. The order is load-bearing: the canonical pull query
    (`where owner_user_id = … order by server_received_at`) leads with the PK
    column and the per-layer cursor depends on it. Every user owns their own
-   `id` keyspace, so two users may hold the same `id` (the same seeded
-   `exercise_definitions.id`, say) without conflict: cross-owner conflicts are
-   impossible by construction and the backend has no rejection path for one.
-   Each user's seed catalog is per-user data from day one; no shared or global
-   catalog exists.
-7. Gym coordinate metadata is private, user-owned data on `gyms`, not a shared
-   or public location entity.
+   `id` keyspace, so users may hold the same `id` without conflict:
+   cross-owner conflicts are impossible by construction. Each user's seed
+   catalog is per-user data; no global catalog exists.
+7. Gym coordinates on `gyms`, training notes, bodyweight entries, and Layer 1
+   `injuries` (`tech/injury-contract.md`) have strict owner-private isolation:
+   they are never broadcast to groups, visible to other members, or shared
+   without explicit owner consent.
 
 ## Local integrity contract
 
@@ -315,7 +315,7 @@ the data-model-level invariants.
 
 ### Entity coverage (Sync v2)
 
-All eighteen entities use typed-envelope LWW upserts. Deletion sets
+All nineteen entities use typed-envelope LWW upserts. Deletion sets
 `deleted_at`; undelete clears it on the same row. Reorder, complete and attach
 are ordinary field changes. The envelope and error tokens belong to
 `tech/sync-v2-server-contract.md`.
@@ -333,7 +333,7 @@ tests) or `out of sync scope` (rationale and guardrails).
 
 ## Client schema drift rule (Sync v2)
 
-Modifying any file under `apps/mobile/src/data/schema/` for the eighteen
+Modifying any file under `apps/mobile/src/data/schema/` for the nineteen
 user-owned entities to add a domain column requires a paired server migration
 under `supabase/migrations/` that adds the matching `app_public.<entity>`
 column with a compatible Postgres type, **and the server migration must be
