@@ -98,13 +98,13 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     budget: { kind: 'baseline', pages: 15_000, scoped: true } },
   { fn: 'group_competition_records_history', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_before: null, p_limit: 50 }),
-    budget: { kind: 'baseline', pages: 24_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 21_000, scoped: true } },
   { fn: 'group_competition_session_detail', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'baseline', pages: 19_000, scoped: true } },
   { fn: 'group_competition_session_records', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
-    budget: { kind: 'budgeted', pages: 360, scoped: true } },
+    budget: { kind: 'budgeted', pages: 350, scoped: true } },
   { fn: 'group_cow_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'baseline', pages: 530_000, scoped: true } },
   { fn: 'group_cow_previous_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
@@ -115,15 +115,15 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   { fn: 'group_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }), budget: { kind: 'budgeted', pages: 40, scoped: true } },
   { fn: 'group_competition_exercise_list', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
-  { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 370, scoped: true } },
-  { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 26_000, scoped: false } },
-  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'baseline', pages: 280_000, scoped: false } },
-  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 150_000, scoped: true } },
+  { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 400, scoped: true } },
+  { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 28_000, scoped: false } },
+  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'baseline', pages: 270_000, scoped: false } },
+  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 160_000, scoped: true } },
   { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 160_000, scoped: true } },
   { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 160_000, scoped: true } },
   { fn: 'notification_confirm_completion', via: 'member',
     args: (c) => ({ p_session_id: c.completion!.sessionId, p_entities: c.completion!.entities }),
-    budget: { kind: 'baseline', pages: 26_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 28_000, scoped: true } },
 ];
 
 /**
@@ -419,7 +419,8 @@ const measureWorkout = async (
 export const runReadPathPoint = async (historyDays: number, options: Tier1Options & { parity: boolean }): Promise<ReadPathPoint> => {
   const startedAt = Date.now();
   const name = `read-m${READ_PATH_MEMBERS}-h${historyDays}d`;
-  await vacuum(options.adminDbUrl);
+  // Compact first: strict per-call budgets need the same pages run after run.
+  await vacuum(options.adminDbUrl, true);
   const client = new Client({ connectionString: options.dbUrl });
   await client.connect();
   const session = new Tier1Session(client, options.callBudgetMs);
@@ -441,8 +442,9 @@ export const runReadPathPoint = async (historyDays: number, options: Tier1Option
       await session.call(viewer, rpc.fn, rpc.args!(context), true).catch(recordFailure(rpc.fn));
     }
     const reads = session.take();
-    if (options.parity) point.parity = await runParityCases(session, context);
     const steps = await measureWorkout(session, run, context, viewer, recordFailure);
+    // Parity last, so its many unmeasured calls cannot touch a measured one.
+    if (options.parity) point.parity = await runParityCases(session, context);
     point.walPerLoggedSet = steps[1].total.walBytes;
     point.cascade = sumCascades(steps);
     const measuredFns = new Set(READ_PATH_RPCS.map((rpc) => rpc.fn));

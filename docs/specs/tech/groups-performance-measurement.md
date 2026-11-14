@@ -85,8 +85,10 @@ evaluator write and notification RPCs listed in `READ_PATH_RPCS`, and only
 those: shared pages, temp bytes and sequential scans per call, at M=5 and
 H=90 and H=180 days.
 
-Each point is the Tier 1 fixture, in one rolled-back transaction, plus
-planted cases the reads must handle:
+Each point starts from a full vacuum: rolled-back runs leave pages behind
+that a plain vacuum frees but never returns, and page counts would grow
+with them. Then it builds the Tier 1 fixture, in one rolled-back
+transaction, plus planted cases the reads must handle:
 
 - a bodyweight-redacted member exercise: one member also links an ordinary
   exercise to the bodyweight-aware one, so it is redacted for that member
@@ -118,9 +120,10 @@ costliest call measured at either point plus about 25%. There are two kinds:
 
 The set fails when a call exceeds its budget, a call fails, or a budgeted
 scoped RPC grows too fast. A slope is asserted only above 100 pages per
-call, where a few pages of noise cannot move it. The lane lists the entries still `baseline`. A
-change that moves an RPC's cost re-measures it and updates its entry in the
-same PR, and a rewrite that meets the ceiling turns its entry `budgeted`.
+call, where a few pages of noise cannot move it. The lane lists the entries
+still `baseline`. A change that moves an RPC's cost re-measures it and
+updates its entry in the same PR, and a rewrite that meets the ceiling turns
+its entry `budgeted`.
 
 **Parity** (`parity.ts`) proves a rewritten RPC returns the same JSON as the
 definition it replaces. Before the rewrite, add a case to `PARITY_CASES`

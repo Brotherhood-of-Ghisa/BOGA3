@@ -226,6 +226,8 @@ begin return jsonb_build_object('a', p_a); end $function$
     expect(legacyDefinition(definition, 'f', 'f__legacy').startsWith('create function pg_temp.f__legacy(p_a integer)')).toBe(true);
     expect(definitionFromMigration(`${saved}\ngrant execute on function app_public.f(integer) to authenticated;`, 'f'))
       .toBe(definition);
+    expect(() => definitionFromMigration("create function app_public.f() returns int as $$ select 1 $$ language sql set search_path = '';", 'f'))
+      .toThrow('not a plain clause');
   });
 
   test('the legacy copy is renamed into pg_temp and can call old helpers', () => {

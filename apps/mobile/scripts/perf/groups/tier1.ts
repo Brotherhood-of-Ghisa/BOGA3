@@ -221,14 +221,20 @@ export type Tier1Options = {
   log: (line: string) => void;
 };
 
-export const vacuum = async (adminDbUrl: string): Promise<void> => {
+/**
+ * `full` also rewrites every table and index compactly: a rolled-back
+ * fixture leaves its pages behind, and plain vacuum frees them without
+ * shrinking the files, so page counts would depend on how many runs came
+ * before.
+ */
+export const vacuum = async (adminDbUrl: string, full = false): Promise<void> => {
   // The warning in group-metric-publish-benchmark.sql: rolled-back runs leave
   // dead rows and stale statistics behind, so each scenario starts clean.
   const admin = new Client({ connectionString: adminDbUrl });
   await admin.connect();
   try {
     await admin.query("set statement_timeout = '600s'");
-    await admin.query('vacuum (analyze)');
+    await admin.query(full ? 'vacuum (full, analyze)' : 'vacuum (analyze)');
   } finally {
     await admin.end();
   }
