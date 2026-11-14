@@ -227,8 +227,9 @@ export const plantedAll = (rows: readonly Record<string, unknown>[]): boolean =>
  * reader takes it up), whose retained refs make the CoW
  * disclosure redact through each branch: member 3's ref has an unknown
  * definition (''), member 4's names Bench press while its set is now logged
- * under another definition. Member 2's newest completed session is no longer
- * shared, so the latest completed session must skip it. Then facts the
+ * under another definition. The group's latest completed shared session (the
+ * viewer's finished workout) is no longer shared, so the week summary's
+ * latest completed session must skip it for an older one. Then facts the
  * evaluator has not caught up with, which the counts must still read
  * through: member 4's newest working set is deleted, member 5's newest
  * session loses an exercise, and one of member 4's sets moves to an older
@@ -257,10 +258,10 @@ export const PARITY_PLANT_STATEMENTS = (): string[] => [
      select cow.id,r.uid,'e1rm',r.set_id,r.definition from cow,refs r`).replace('count(*)=1', 'count(*)=2')}`,
   `with target as (
      select sh.group_id,sh.member_user_id,sh.session_id from app_public.group_session_shares sh
-       join perf_members m on m.uid=sh.member_user_id
+       join app_public.group_memberships gm on gm.group_id=sh.group_id and gm.user_id=sh.member_user_id and gm.ended_at is null
        join app_public.sessions s on s.owner_user_id=sh.member_user_id and s.id=sh.session_id
-      where m.idx=2 and sh.group_id=(select group_id from perf_fx) and s.status='completed' and s.deleted_at is null
-      order by s.completed_at desc nulls last,s.started_at desc,s.id limit 1)
+      where sh.group_id=(select group_id from perf_fx) and s.status='completed' and s.deleted_at is null
+      order by s.completed_at desc nulls last,s.started_at desc,s.owner_user_id,s.id limit 1)
    ${edited(`delete from app_public.group_session_shares sh using target t
      where sh.group_id=t.group_id and sh.member_user_id=t.member_user_id and sh.session_id=t.session_id`)}`,
   asMember(4),

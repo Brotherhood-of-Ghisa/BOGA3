@@ -145,9 +145,10 @@ Internal helpers readers share (redaction, session counts) are compared the
 same way in `HELPER_PARITY_CASES`, old against new, as the table owner, for
 every argument row the fixture holds; a cache is compared with the live
 function it caches. Before parity, after every measured call,
-`PARITY_PLANT_STATEMENTS` leaves facts the evaluator has not caught up with
-(a deleted set, a deleted exercise, a moved set), so both kinds of case
-cover them.
+`PARITY_PLANT_STATEMENTS` plants retained CoW refs that redact through each
+branch, un-shares the group's latest completed session, and leaves facts the
+evaluator has not caught up with (a deleted set, a deleted exercise, a moved
+set), so both kinds of case cover them.
 
 ## Tier 2 — `./boga test groups-perf-load`
 
