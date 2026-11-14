@@ -14,7 +14,7 @@
 -- cache (group_competition_redactions) that asks the live function once per
 -- distinct (member, definition). One statement sees one snapshot, so a
 -- cached answer is the per-row answer. The live functions stay for single
--- calls.
+-- calls. No reader uses the cache yet; the per-RPC rewrites adopt it.
 --
 -- Answers and figures are unchanged; the read-path parity cases prove it.
 -- Indexes only: no table or column changes.
@@ -23,8 +23,10 @@
 create index group_events_session_records on app_public.group_events (group_id, member_user_id, session_id)
   where kind = 'record';
 
--- R1: the redaction branches, by exercise and member.
-create index group_events_exercise_member on app_public.group_events (group_exercise_id, member_user_id);
+-- R1: the redaction branches, by exercise and member. Events with no exercise
+-- (sessions, joins, leaves) can never match one, so they are left out.
+create index group_events_exercise_member on app_public.group_events (group_exercise_id, member_user_id)
+  where group_exercise_id is not null;
 create index group_metric_set_scores_member on app_public.group_metric_set_scores (group_exercise_id, member_user_id)
   where counting;
 create index group_metric_certifications_member on app_public.group_metric_certifications (group_exercise_id, member_user_id);

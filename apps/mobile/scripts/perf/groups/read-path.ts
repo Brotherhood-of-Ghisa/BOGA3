@@ -214,6 +214,13 @@ export const HELPER_PARITY_CASES: readonly HelperParityCase[] = [
 const asMember = (idx: number) => `select set_config('request.jwt.claim.sub',uid::text,true),
   set_config('request.jwt.claims',json_build_object('sub',uid,'role','authenticated')::text,true) from perf_members where idx=${idx}`;
 
+/** One plant's edit, as the last CTE: the statement says whether it edited exactly one row. */
+const edited = (update: string) => `, edited as (${update} returning 1)
+   select count(*)=1 as planted from edited`;
+
+/** False when a plant statement reports it edited no row, or more than one. */
+export const plantedAll = (rows: readonly Record<string, unknown>[]): boolean => rows.every((row) => row.planted !== false);
+
 /**
  * Planted before parity, after every measured call: facts the evaluator has
  * not caught up with, which the counts must still read through. Member 4's
@@ -228,17 +235,17 @@ export const PARITY_PLANT_STATEMENTS = (): string[] => [
        join app_public.sessions s on s.owner_user_id=f.member_user_id and s.id=f.session_id
       where m.idx=4 and s.status='completed' and f.performed and f.live and f.working is not false
       order by s.started_at desc,f.set_id limit 1)
-   update app_public.exercise_sets es set deleted_at=es.updated_at+1,updated_at=es.updated_at+1,
+   ${edited(`update app_public.exercise_sets es set deleted_at=es.updated_at+1,updated_at=es.updated_at+1,
        client_updated_at_ms=es.client_updated_at_ms+1
-     from target t where es.owner_user_id=t.member_user_id and es.id=t.set_id`,
+     from target t where es.owner_user_id=t.member_user_id and es.id=t.set_id`)}`,
   asMember(5),
   `with target as (
      select se.owner_user_id,se.id from app_public.session_exercises se join perf_members m on m.uid=se.owner_user_id
        join app_public.sessions s on s.owner_user_id=se.owner_user_id and s.id=se.session_id
       where m.idx=5 and s.status='completed' and se.deleted_at is null order by s.started_at desc,se.order_index limit 1)
-   update app_public.session_exercises se set deleted_at=se.updated_at+1,updated_at=se.updated_at+1,
+   ${edited(`update app_public.session_exercises se set deleted_at=se.updated_at+1,updated_at=se.updated_at+1,
        client_updated_at_ms=se.client_updated_at_ms+1
-     from target t where se.owner_user_id=t.owner_user_id and se.id=t.id`,
+     from target t where se.owner_user_id=t.owner_user_id and se.id=t.id`)}`,
   asMember(4),
   `with ranked as (
      select s.owner_user_id,s.id,row_number() over(order by s.started_at desc) as n from app_public.sessions s
@@ -249,9 +256,9 @@ export const PARITY_PLANT_STATEMENTS = (): string[] => [
    into_exercise as (
      select se.id from app_public.session_exercises se join ranked r on r.owner_user_id=se.owner_user_id and r.id=se.session_id
       where r.n=3 and se.deleted_at is null order by se.order_index limit 1)
-   update app_public.exercise_sets es set session_exercise_id=(select id from into_exercise),updated_at=es.updated_at+1,
+   ${edited(`update app_public.exercise_sets es set session_exercise_id=(select id from into_exercise),updated_at=es.updated_at+1,
        client_updated_at_ms=es.client_updated_at_ms+1
-     from moved t where es.owner_user_id=t.member_user_id and es.id=t.set_id`,
+     from moved t where es.owner_user_id=t.member_user_id and es.id=t.set_id`)}`,
   `select set_config('request.jwt.claim.sub','',true), set_config('request.jwt.claims','',true)`,
 ];
 
@@ -444,7 +451,9 @@ const runHelperParity = async (session: Tier1Session, item: HelperParityCase): P
 const runParityCases = async (session: Tier1Session, context: ReadPathContext): Promise<ParityOutcome[]> => {
   const outcomes: ParityOutcome[] = [];
   try {
-    for (const statement of PARITY_PLANT_STATEMENTS()) await session.exec(statement);
+    for (const statement of PARITY_PLANT_STATEMENTS()) {
+      if (!plantedAll(await session.exec(statement))) throw new Error(`a stale-fact plant edited no row: ${statement.slice(0, 80)}`);
+    }
   } catch (error) {
     return [{ fn: 'parity plants', compared: 0, differences: [], plantDetected: null, error: (error as Error).message }];
   }

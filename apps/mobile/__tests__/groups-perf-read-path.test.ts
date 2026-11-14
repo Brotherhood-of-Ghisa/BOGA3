@@ -10,7 +10,6 @@ import {
   compareParity,
   definitionFromMigration,
   definitionPath,
-  helperParityPassed,
   helperParityStatements,
   jsonDifference,
   legacyDefinition,
@@ -25,6 +24,7 @@ import {
   PARITY_CASES,
   PARITY_DAYS,
   PARITY_PLANT_STATEMENTS,
+  plantedAll,
   pointCost,
   READ_PATH_DAYS,
   READ_PATH_RPCS,
@@ -361,14 +361,6 @@ describe('helper parity', () => {
     expect(compare).toContain('select (a1) as expected, (a1 + 0) as actual');
   });
 
-  test('a helper case passes only when it compared something and nothing differed', () => {
-    const outcome = { name: 'h', compared: 3, differences: [], error: null };
-    expect(helperParityPassed(outcome)).toBe(true);
-    expect(helperParityPassed({ ...outcome, compared: 0 })).toBe(false);
-    expect(helperParityPassed({ ...outcome, differences: ['(1): t ≠ f'] })).toBe(false);
-    expect(helperParityPassed({ ...outcome, error: 'boom' })).toBe(false);
-  });
-
   test('the redaction helpers, their cache and the session counts are each compared, every registered case installing', () => {
     expect(HELPER_PARITY_CASES.map((item) => item.name).sort()).toEqual([
       'group_competition_redactions', 'group_competition_redacts_exercise', 'group_cow_redacts_exercise', 'group_week_session_counts']);
@@ -381,15 +373,19 @@ describe('helper parity', () => {
     expect(cache.argumentsSql).toContain('app_public.group_competition_redactions(');
   });
 
-  test('every planted stale fact is edited under its owner\'s claims, and the claims are cleared after', () => {
+  test('every planted stale fact is edited under its owner\'s claims and must edit exactly one row; the claims are cleared after', () => {
     const statements = PARITY_PLANT_STATEMENTS();
     const edits = statements.filter((statement) => /\bupdate app_public\./.test(statement));
     expect(edits).toHaveLength(3);
     for (const edit of edits) {
       const before = statements[statements.indexOf(edit) - 1];
       expect(before).toContain("set_config('request.jwt.claims'");
+      expect(edit).toMatch(/returning 1\)\s*select count\(\*\)=1 as planted from edited$/);
     }
     expect(statements.at(-1)).toContain("set_config('request.jwt.claims','',true)");
+    expect(plantedAll([{ planted: true }])).toBe(true);
+    expect(plantedAll([{ planted: false }])).toBe(false);
+    expect(plantedAll([{ set_config: '' }])).toBe(true);
   });
 
   test('the period totals cases send only windows the RPC accepts, months back over the parity history', () => {

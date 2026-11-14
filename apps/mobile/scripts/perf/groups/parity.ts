@@ -230,11 +230,6 @@ export type HelperParityCase = {
   }
 );
 
-export type HelperParityOutcome = { name: string; compared: number; differences: string[]; error: string | null };
-
-export const helperParityPassed = (outcome: HelperParityOutcome): boolean =>
-  outcome.error === null && outcome.compared > 0 && outcome.differences.length === 0;
-
 /**
  * The statements that install a helper case's old definitions (none for a
  * `check`), and the query that compares it: one row of the number of
