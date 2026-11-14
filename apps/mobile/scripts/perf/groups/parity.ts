@@ -3,12 +3,27 @@
 // created it and installed as a pg_temp function for this session only, so
 // old and new run side by side on the same fixture, as the same caller, inside
 // the rolled-back transaction. Pure helpers here; the read-path set runs the
-// registered cases (`parity-cases.ts`).
+// registered cases (`PARITY_CASES` in read-path.ts).
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 export const MIGRATIONS_DIR = path.resolve(__dirname, '../../../../../supabase/migrations');
+/**
+ * Saved live definitions, never applied: a definition a later migration
+ * patched in place (pg_get_functiondef + replace) has no verbatim copy in any
+ * one migration, so its text is saved here, named after that migration.
+ */
+export const PARITY_DEFINITIONS_DIR = path.resolve(__dirname, 'parity-definitions');
+
+const SOURCE = /^(parity-definitions\/)?([0-9]{14}_[a-z0-9_]+\.sql)$/;
+
+/** Where a definition source lives: a migration file name, or `parity-definitions/<migration>.sql`. */
+export const definitionPath = (source: string): string => {
+  const match = SOURCE.exec(source);
+  if (!match) throw new Error(`invalid definition source: ${source}`);
+  return path.join(match[1] ? PARITY_DEFINITIONS_DIR : MIGRATIONS_DIR, match[2]);
+};
 
 const IDENT = /^[a-z_][a-z0-9_]*$/;
 
@@ -36,11 +51,9 @@ export const definitionFromMigration = (sql: string, fn: string): string => {
   return sql.slice(start, end + 1);
 };
 
-/** Reads a migration under `supabase/migrations` and returns `fn`'s last definition in it. */
-export const migrationDefinition = (migration: string, fn: string): string => {
-  if (!/^[0-9]{14}_[a-z0-9_]+\.sql$/.test(migration)) throw new Error(`invalid migration file name: ${migration}`);
-  return definitionFromMigration(readFileSync(path.join(MIGRATIONS_DIR, migration), 'utf8'), fn);
-};
+/** Reads a definition source (see `definitionPath`) and returns `fn`'s last definition in it. */
+export const migrationDefinition = (source: string, fn: string): string =>
+  definitionFromMigration(readFileSync(definitionPath(source), 'utf8'), fn);
 
 /**
  * The definition renamed to `pg_temp.<alias>`, everything else unchanged.
@@ -102,9 +115,13 @@ export const jsonDifference = (a: unknown, b: unknown, at = '$'): string | null 
 /** One RPC's parity case: the definition it replaces, and the calls to compare. */
 export type ParityCase<Context> = {
   fn: string;
-  /** The migration holding the definition being replaced, copied verbatim. */
+  /**
+   * Where the definition being replaced is, copied verbatim: the migration
+   * that created it, or `parity-definitions/<migration>.sql` when a later
+   * migration patched it in place.
+   */
   migration: string;
-  /** Old helper definitions the old body must call: helper name → migration. */
+  /** Old helper definitions the old body must call: helper name → definition source. */
   helpers?: Record<string, string>;
   /** Every argument set to compare, each called by every viewer the fixture holds. */
   argumentSets: (context: Context) => Record<string, unknown>[];

@@ -80,10 +80,10 @@ Fidelity limits, by design:
 ## Read path — strict per-call page budgets
 
 The last part of `./boga test groups-perf` (alone: `cli.ts read-path`,
-`apps/mobile/scripts/perf/groups/read-path.ts`). It measures one call of
-every group and notification RPC the app or the evaluator makes: shared
-pages, temp bytes and sequential scans per call, at M=5 and H=90 and H=180
-days.
+`apps/mobile/scripts/perf/groups/read-path.ts`). It measures the group read,
+evaluator write and notification RPCs listed in `READ_PATH_RPCS`, and only
+those: shared pages, temp bytes and sequential scans per call, at M=5 and
+H=90 and H=180 days.
 
 Each point is the Tier 1 fixture, in one rolled-back transaction, plus
 planted cases the reads must handle:
@@ -91,7 +91,8 @@ planted cases the reads must handle:
 - a bodyweight-redacted member exercise: one member also links an ordinary
   exercise to the bodyweight-aware one, so it is redacted for that member
   only;
-- a voided record: a member's best set edited down after evaluation;
+- a voided record: a member's best set edited down after evaluation, inside
+  the weeks parity compares;
 - last week's finished CoW and this week's live one, their sources
   backdated to when each set was logged;
 - a local notification installation per member, so the cascade sends.
@@ -114,7 +115,8 @@ costliest call measured at either point plus about 25%. There are two kinds:
   RPC its growth per doubling of history must stay at or under 1.2×.
 
 The set fails when a call exceeds its budget, a call fails, or a budgeted
-scoped RPC grows too fast. The lane lists the entries still `baseline`. A
+scoped RPC grows too fast. A slope is asserted only above 100 pages per
+call, where a few pages of noise cannot move it. The lane lists the entries still `baseline`. A
 change that moves an RPC's cost re-measures it and updates its entry in the
 same PR, and a rewrite that meets the ceiling turns its entry `budgeted`.
 
@@ -127,8 +129,10 @@ every argument set, on the H=90 point. It fails on any JSON difference, by
 path. A rewrite that also changes a helper installs the helper's old
 definition too (`helpers`). Some definitions were patched in place by a
 later migration (`pg_get_functiondef` and replace) and have no verbatim copy
-in any one migration. For those, save the live text in a migration-named
-file before the rewrite. The standing case `group_competition_week_summary`
+in any one migration. For those, save the live `pg_get_functiondef` text,
+before the rewrite, as `apps/mobile/scripts/perf/groups/parity-definitions/<migration>.sql`
+(named after the migration whose result it captures) and name it as
+`parity-definitions/<migration>.sql`; it is never applied. The standing case `group_competition_week_summary`
 proves the helper itself: identical definitions pass, and a planted one-field
 change must be caught.
 

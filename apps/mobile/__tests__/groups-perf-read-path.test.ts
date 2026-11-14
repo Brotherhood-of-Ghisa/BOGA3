@@ -1,6 +1,6 @@
 /** @jest-environment ./jest.node-environment.js */
 // The groups performance harness's strict read-path set: its budget checks,
-// that every group and notification RPC the app or the evaluator calls has a
+// that each group read, evaluator write and notification RPC it budgets has a
 // scenario and a budget, and the parity helper that proves a rewritten RPC
 // returns the same JSON. Pure; the live lane is groups-perf.
 import { readFileSync } from 'node:fs';
@@ -9,6 +9,7 @@ import path from 'node:path';
 import {
   compareParity,
   definitionFromMigration,
+  definitionPath,
   jsonDifference,
   legacyDefinition,
   migrationDefinition,
@@ -64,6 +65,11 @@ describe('budget checks', () => {
     expect(levels(checkBudget('f', budgeted, [cost(90, 500), cost(180, 600)]))).toEqual(['pass']);
   });
 
+  test('a slope is not asserted while every point stays within 100 pages, where noise moves it', () => {
+    expect(levels(checkBudget('f', budgeted, [cost(90, 9), cost(180, 11)]))).toEqual(['pass']);
+    expect(levels(checkBudget('f', budgeted, [cost(90, 60), cost(180, 101)]))).toEqual(['fail']);
+  });
+
   test('a baseline slope only warns, and an unscoped slope is not checked', () => {
     expect(checkBudget('f', baseline, [cost(90, 30000), cost(180, 80000)])).toEqual([
       { fn: 'f', level: 'warn', message: 'grows 2.67× per doubling of history (baseline: reported, not asserted)' }]);
@@ -115,7 +121,7 @@ describe('budget checks', () => {
   });
 });
 
-describe('every group and notification RPC the app or the evaluator calls is measured', () => {
+describe('the group read, evaluator write and notification RPCs the lane budgets are each measured', () => {
   /** The group read RPCs, the evaluator's write RPCs and the notification RPCs whose cost the lane holds. */
   const SURFACE_RPCS = [
     'group_competition_stream_v5', 'group_competition_stream_v4', 'group_competition_stream_v3', 'group_competition_stream_v2',
@@ -266,6 +272,16 @@ revoke all on function app_public.f(int) from public;`;
     }
     expect(migrationDefinition('20261008120000_group_competition_v4_only.sql', 'group_competition_week_summary'))
       .toMatch(/^create or replace function app_public\.group_competition_week_summary\(/);
-    expect(() => migrationDefinition('../secrets.sql', 'f')).toThrow('invalid migration file name');
+    expect(() => migrationDefinition('../secrets.sql', 'f')).toThrow('invalid definition source');
+  });
+
+  test('a definition source is a migration, or a saved definition named after one under parity-definitions', () => {
+    expect(definitionPath('20261008120000_group_competition_v4_only.sql'))
+      .toBe(path.resolve(__dirname, '../../../supabase/migrations/20261008120000_group_competition_v4_only.sql'));
+    expect(definitionPath('parity-definitions/20261008120000_group_competition_v4_only.sql'))
+      .toBe(path.resolve(__dirname, '../scripts/perf/groups/parity-definitions/20261008120000_group_competition_v4_only.sql'));
+    for (const source of ['parity-definitions/../x.sql', 'other/20261008120000_a.sql', '20261008120000_a.sql.bak', 'x.sql']) {
+      expect(() => definitionPath(source)).toThrow('invalid definition source');
+    }
   });
 });

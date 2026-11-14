@@ -12,6 +12,8 @@ import { perDoubling } from './report.ts';
 export const PAGE_CEILING = 5000;
 /** The most a budgeted week- or period-scoped RPC may grow per doubling of history. */
 export const SLOPE_LIMIT = 1.2;
+/** Below this many pages per call a few pages of noise move the slope, so it is not checked. */
+export const SLOPE_MIN_PAGES = 100;
 /** Headroom a budget adds over the measured cost. */
 export const BUDGET_HEADROOM = 1.25;
 
@@ -73,8 +75,8 @@ const fmtSlope = (slope: number | null) => (slope === null ? '—' : `${slope.to
 /**
  * Every check for one RPC: it was measured at every point without failing, no
  * call exceeded its budget, a budgeted entry over the ceiling says why, and a
- * budgeted scoped entry grows at most SLOPE_LIMIT per doubling (a baseline
- * entry's slope only warns).
+ * budgeted scoped entry over SLOPE_MIN_PAGES grows at most SLOPE_LIMIT per
+ * doubling (a baseline entry's slope only warns).
  */
 export const checkBudget = (fn: string, entry: BudgetEntry | undefined, points: readonly PointCost[]): BudgetCheck[] => {
   if (!entry) return [{ fn, level: 'fail', message: 'measured but has no budget entry' }];
@@ -91,7 +93,8 @@ export const checkBudget = (fn: string, entry: BudgetEntry | undefined, points: 
     }
   }
   const slope = historySlope(points);
-  if (entry.scoped && slope !== null && slope > SLOPE_LIMIT) {
+  const largest = Math.max(0, ...points.map((point) => point.pages));
+  if (entry.scoped && slope !== null && slope > SLOPE_LIMIT && largest > SLOPE_MIN_PAGES) {
     checks.push(entry.kind === 'budgeted'
       ? { fn, level: 'fail', message: `grows ${fmtSlope(slope)} per doubling of history, over ${SLOPE_LIMIT}×` }
       : { fn, level: 'warn', message: `grows ${fmtSlope(slope)} per doubling of history (baseline: reported, not asserted)` });

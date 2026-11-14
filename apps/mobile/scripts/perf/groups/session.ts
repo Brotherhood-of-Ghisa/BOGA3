@@ -96,10 +96,9 @@ export class Tier1Session {
     await this.client.query('rollback');
   }
 
-  /** A plain statement outside any measurement (fixture, setup). */
-  async exec<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
-    const result = await this.client.query(sql, params);
-    return result.rows as T[];
+  /** A plain statement outside any measurement (fixture, setup), in turn with every call. */
+  exec<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+    return this.enqueue(async () => (await this.client.query(sql, params)).rows as T[]);
   }
 
   /** Drains records collected since the last take (one step's calls). */
@@ -114,12 +113,16 @@ export class Tier1Session {
    * production, so running them in turn changes no counter.
    */
   call<T>(caller: Caller, fn: string, args: Record<string, unknown>, measured: boolean): Promise<T> {
-    const result = this.queue.then(() => this.callNow<T>(caller, fn, args, measured));
-    this.queue = result.then(() => undefined, () => undefined);
-    return result;
+    return this.enqueue(() => this.callNow<T>(caller, fn, args, measured));
   }
 
   private queue: Promise<void> = Promise.resolve();
+
+  private enqueue<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(work);
+    this.queue = result.then(() => undefined, () => undefined);
+    return result;
+  }
 
   private async callNow<T>(caller: Caller, fn: string, args: Record<string, unknown>, measured: boolean): Promise<T> {
     const { sql, params } = rpcCall(fn, args);

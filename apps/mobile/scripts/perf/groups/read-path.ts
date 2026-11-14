@@ -1,5 +1,6 @@
-// The read-path scenario set (lane groups-perf): what one call of every group
-// and notification RPC the app or the evaluator makes costs, on a fixture of
+// The read-path scenario set (lane groups-perf): what one call of each group
+// read, evaluator write and notification RPC in READ_PATH_RPCS costs (only
+// those; the workers' other RPCs carry no budget), on a fixture of
 // READ_PATH_MEMBERS members at each of READ_PATH_DAYS days of history. Unlike
 // the sweeps it is strict: a call over its budget, a budgeted scoped RPC that
 // grows faster than SLOPE_LIMIT per doubling of history, a failed parity case
@@ -91,13 +92,13 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     args: (c) => ({ p_group_id: c.groupId, p_window_start_ms: c.weeks.at(-1)!.start_ms, p_window_end_ms: c.weeks.at(-1)!.end_ms }),
     budget: { kind: 'budgeted', pages: 2_700, scoped: true } },
   { fn: 'group_competition_podiums', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_certified: false }),
-    budget: { kind: 'baseline', pages: 30_000, scoped: false } },
+    budget: { kind: 'baseline', pages: 30_000, scoped: true } },
   { fn: 'group_competition_board', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_limit: 50, p_cursor: null }),
-    budget: { kind: 'baseline', pages: 15_000, scoped: false } },
+    budget: { kind: 'baseline', pages: 15_000, scoped: true } },
   { fn: 'group_competition_records_history', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_before: null, p_limit: 50 }),
-    budget: { kind: 'baseline', pages: 24_000, scoped: false } },
+    budget: { kind: 'baseline', pages: 24_000, scoped: true } },
   { fn: 'group_competition_session_detail', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'baseline', pages: 19_000, scoped: true } },
@@ -224,14 +225,26 @@ export const postSteadyPlantStatements = (): string[] => [
   `select set_config('request.jwt.claim.sub','',true), set_config('request.jwt.claims','',true)`,
 ];
 
-/** Each planted case, true when the fixture holds it after steady state. */
+/** The start of the rolling weeks parity compares, in the fixture's ms clock. */
+const PARITY_WEEKS_START = `f.now_ms-${PERIOD_WINDOWS}::bigint*${WEEK_MS}`;
+
+/**
+ * Each planted case, true when the fixture holds it after steady state; the
+ * voided record and the redacted exercise fall inside the weeks parity
+ * compares, so parity exercises both.
+ */
 export const PLANT_CHECKS_SQL = `select
   app_public.group_competition_redacts_exercise(array[f.group_id],(select uid from perf_members where idx=2),'perf-def-6')
     and not app_public.group_competition_redacts_exercise(array[f.group_id],(select uid from perf_members where idx=3),'perf-def-6')
     as redacted_member_exercise,
-  exists(select 1 from app_public.group_events e where e.group_id=f.group_id and e.kind='lead_change' and e.reason='void')
-    or exists(select 1 from app_public.group_events e where e.group_id=f.group_id and e.reason in ('edited','deleted'))
-    as voided_record,
+  exists(select 1 from app_public.group_events e
+    join app_public.exercise_sets es on es.owner_user_id=e.member_user_id and es.id=e.set_id
+    join app_public.session_exercises se on se.owner_user_id=es.owner_user_id and se.id=es.session_exercise_id
+    join app_public.sessions s on s.owner_user_id=se.owner_user_id and s.id=se.session_id
+    where e.group_id=f.group_id and e.kind='record_voided' and s.started_at>=${PARITY_WEEKS_START}) as voided_record,
+  exists(select 1 from app_public.sessions s join app_public.session_exercises se on se.owner_user_id=s.owner_user_id and se.session_id=s.id
+    where s.owner_user_id=(select uid from perf_members where idx=2) and se.exercise_definition_id='perf-def-6'
+      and s.started_at>=${PARITY_WEEKS_START}) as redacted_in_parity_weeks,
   exists(select 1 from app_public.group_cows c where c.group_id=f.group_id and c.finalized_at is not null and c.final_outcome='ready')
     as finished_cow,
   exists(select 1 from app_public.group_cows c where c.group_id=f.group_id and c.finalized_at is null

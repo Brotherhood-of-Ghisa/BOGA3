@@ -208,7 +208,7 @@ the name does not give away.
 | `sync-infra` | The cross-stack layer above — the one lane whose body is frontend and whose infra is backend. Runs last in the backend gate. |
 | `mcp-smoke` | Protocol-to-data proof for the MCP service: OAuth/PKCE consent, tool discovery and calls, returned fixture ids, account-data exclusion, artifact cleanup. |
 | `dev-wipe-my-data` | The developer-only RPC's guards: auth, non-production environment, owner-scoped deletion only. |
-| `groups-perf`, `groups-perf-load` | Report-only: how group evaluation and sweep cost grows with history, group size and concurrent loggers. If you are changing those costs, load `docs/specs/tech/groups-performance-measurement.md`. |
+| `groups-perf`, `groups-perf-load` | Cost growth with history, group size and loggers (reported) and per-RPC page budgets (fail the lane). If you change those costs, load `docs/specs/tech/groups-performance-measurement.md`. |
 
 Required coverage by surface: policy, SQL-function and constraint changes need
 DB-level tests; Edge Functions need runtime-native unit tests *and* local
