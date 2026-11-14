@@ -223,6 +223,10 @@ exercises retain reps and conservatively omit kg in an enabled positive group.
 Historical values preserve original units and carry `unavailable` with null
 value when current disclosure suppresses them. Full-session and week totals
 contain no absolute volume field that could recover a redacted contribution.
+`group_competition_redactions` answers current disclosure once per distinct
+(member, definition) in one statement; a reader that materializes it looks
+each row up and falls back to the live helper for a missing pair. One
+statement sees one snapshot, so the answer is the per-row one.
 
 `group_competition_records_history` is a board's records log, newest first by
 event sequence, over every protocol-4 revision (protocol-3 history stays with

@@ -137,9 +137,18 @@ later migration (`pg_get_functiondef` and replace) and have no verbatim copy
 in any one migration. For those, save the live `pg_get_functiondef` text,
 before the rewrite, as `apps/mobile/scripts/perf/groups/parity-definitions/<migration>.sql`
 (named after the migration whose result it captures) and name it as
-`parity-definitions/<migration>.sql`; it is never applied. The standing case `group_competition_week_summary`
-proves the helper itself: identical definitions pass, and a planted one-field
-change must be caught.
+`parity-definitions/<migration>.sql`; it is never applied. The
+`group_competition_week_summary` case also proves the helper itself: a
+planted one-field change must be caught.
+
+Internal helpers readers share (redaction, session counts) are compared the
+same way in `HELPER_PARITY_CASES`, old against new, as the table owner, for
+every argument row the fixture holds; a cache is compared with the live
+function it caches. Before parity, after every measured call,
+`PARITY_PLANT_STATEMENTS` plants retained CoW refs that redact through each
+branch, un-shares the group's latest completed session, and leaves facts the
+evaluator has not caught up with (a deleted set, a deleted exercise, a moved
+set), so both kinds of case cover them.
 
 An RPC that writes sets `state` (SQL returning the rows it may change, with
 generated ids and clock-timed columns left out) and `caller` (its worker's

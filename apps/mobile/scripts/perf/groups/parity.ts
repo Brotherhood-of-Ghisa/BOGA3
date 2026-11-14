@@ -182,11 +182,19 @@ export const parityPassed = (outcome: ParityOutcome): boolean =>
   outcome.error === null && outcome.compared > 0 && outcome.differences.length === 0 && outcome.plantDetected !== false
   && (outcome.missing ?? []).length === 0;
 
+/** `or replace`: cases that share an old helper each install it. */
+const orReplace = (definition: string): string => definition.replace(/^create function pg_temp\./, 'create or replace function pg_temp.');
+
+const helperInstalls = (helpers: Record<string, string> = {}): { aliases: Record<string, string>; sql: string[] } => {
+  const aliases = Object.fromEntries(Object.keys(helpers).map((helper) => [helper, `${helper}__legacy`]));
+  const sql = Object.entries(helpers).map(([helper, migration]) =>
+    orReplace(legacyDefinition(migrationDefinition(migration, helper), helper, aliases[helper], aliases)));
+  return { aliases, sql };
+};
+
 /** The statements that install a case's old definitions in pg_temp: helpers first, then the function, then its plant. */
 export const parityInstallStatements = <Context>(item: ParityCase<Context>): { legacy: string; planted: string | null; sql: string[] } => {
-  const helperAliases = Object.fromEntries(Object.keys(item.helpers ?? {}).map((helper) => [helper, `${helper}__legacy`]));
-  const sql = Object.entries(item.helpers ?? {}).map(([helper, migration]) =>
-    legacyDefinition(migrationDefinition(migration, helper), helper, helperAliases[helper], helperAliases));
+  const { aliases: helperAliases, sql } = helperInstalls(item.helpers);
   const definition = migrationDefinition(item.migration, item.fn);
   const legacy = `${item.fn}__legacy`;
   sql.push(legacyDefinition(definition, item.fn, legacy, helperAliases));
@@ -228,4 +236,60 @@ export const compareParity = async <Context>(
   }
   if (item.requires) outcome.missing = missingOutcomes(item.requires, outcome.observed);
   return outcome;
+};
+
+/**
+ * A helper's parity: an internal function readers call (not an RPC), its old
+ * and new answers compared in SQL, as the table owner, for every argument
+ * row the fixture holds. `check` cases compare two expressions that need no
+ * old definition (a cache against the live function it caches).
+ */
+export type HelperParityCase = {
+  /** The case's name in the report. */
+  name: string;
+  /** A query over the fixture whose columns a1…aN are one call's arguments. */
+  argumentsSql: string;
+  /** At least this many distinct expected answers, so the case cannot pass on one answer alone. */
+  minAnswers?: number;
+} & (
+  | {
+    /** The helper, with its old definition installed as pg_temp.<fn>__legacy. */
+    fn: string;
+    migration: string;
+    helpers?: Record<string, string>;
+    /** One call as a comparable value; `{fn}` stands for the function, e.g. `{fn}(array[a1],a2,a3)`. */
+    call: string;
+  }
+  | {
+    /** The expected and actual values of one argument row, over a1…aN. */
+    expected: string;
+    actual: string;
+  }
+);
+
+/**
+ * The statements that install a helper case's old definitions (none for a
+ * `check`), and the query that compares it: one row of the number of
+ * argument rows compared, of distinct expected answers, and up to five rows
+ * that differ, as text.
+ */
+export const helperParityStatements = (item: HelperParityCase): { sql: string[]; compare: string } => {
+  let sql: string[] = [];
+  let expected: string;
+  let actual: string;
+  if ('fn' in item) {
+    if (!IDENT.test(item.fn)) throw new Error(`invalid function name: ${item.fn}`);
+    const installs = helperInstalls(item.helpers);
+    const legacy = `${item.fn}__legacy`;
+    sql = [...installs.sql, orReplace(legacyDefinition(migrationDefinition(item.migration, item.fn), item.fn, legacy, installs.aliases))];
+    expected = item.call.replaceAll('{fn}', `pg_temp.${legacy}`);
+    actual = item.call.replaceAll('{fn}', `app_public.${item.fn}`);
+  } else {
+    ({ expected, actual } = item);
+  }
+  const compare = `select count(*)::integer as compared, count(distinct x.expected::text)::integer as answers,
+    coalesce((array_agg(row(a.*)::text||': '||coalesce(x.expected::text,'null')||' ≠ '||coalesce(x.actual::text,'null'))
+      filter (where x.expected is distinct from x.actual))[1:5],'{}') as differences
+    from (${item.argumentsSql}) a cross join lateral (select (${expected}) as expected, (${actual}) as actual) x`;
+  return { sql, compare };
 };
