@@ -5,6 +5,7 @@ import { isCombinedMuscleKey } from '@/src/data/combined-muscles';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
 import { muscleTargetAttainment } from '@/src/preferences/targets';
+import { resolveInjuryMuscleGroupId } from '@/src/injuries/injury-warning-engine';
 import {
   MUSCLE_BODY_MESH,
   type MuscleBodyFace,
@@ -23,7 +24,7 @@ export type MuscleSetTargets = {
 
 export type ThemeShadeRoles = Pick<
   UiRoles,
-  'paper' | 'rule' | 'viz1' | 'viz2' | 'viz4' | 'ink' | 'inkMuted' | 'onInk'
+  'paper' | 'rule' | 'viz1' | 'viz2' | 'viz4' | 'ink' | 'inkMuted' | 'onInk' | 'danger' | 'accent'
 >;
 
 export type ThemeShadePalette = {
@@ -32,6 +33,30 @@ export type ThemeShadePalette = {
   // The November moustache.
   readonly moustache: string;
   readonly selectedStroke: string;
+  readonly injuryAcuteStroke: string;
+  readonly injuryManagingStroke: string;
+  readonly injuryMonitoringStroke: string;
+};
+
+export type ActiveInjuryOverlay = {
+  readonly id: string;
+  readonly muscleGroupId?: string | null;
+  readonly side?: 'left' | 'right' | 'bilateral' | null;
+  readonly status: 'acute' | 'managing' | 'monitoring' | 'resolved';
+  readonly painScore?: number | null;
+  readonly label?: string;
+};
+
+export type ProjectedInjuryBadge = {
+  readonly injuryId: string;
+  readonly muscleGroupId: string;
+  readonly status: 'acute' | 'managing' | 'monitoring';
+  readonly side: 'left' | 'right' | 'bilateral' | null;
+  readonly label?: string;
+  readonly painScore?: number | null;
+  readonly x: number;
+  readonly y: number;
+  readonly visible: boolean;
 };
 
 export type ProjectedTriangle = {
@@ -63,12 +88,23 @@ export type ProjectedMuscleContour = {
   readonly stroke: string;
 };
 
+export type ProjectedInjuryContour = {
+  readonly injuryId: string;
+  readonly muscleGroupId: string;
+  readonly status: 'acute' | 'managing' | 'monitoring';
+  readonly side: 'left' | 'right' | 'bilateral' | null;
+  readonly d: string;
+  readonly stroke: string;
+};
+
 export type MuscleOverlayStyle = 'wireframe' | 'contour';
 
 export type ProjectedMuscleBody = {
   readonly triangles: readonly ProjectedTriangle[];
   readonly batches: readonly ProjectedPathBatch[];
   readonly contour?: ProjectedMuscleContour | null;
+  readonly injuryContours?: readonly ProjectedInjuryContour[];
+  readonly injuryBadges?: readonly ProjectedInjuryBadge[];
 };
 
 export const SHADE_STEPS = 12;
@@ -225,6 +261,9 @@ export function buildThemeShadePalette(roles: ThemeShadeRoles, mode: ThemeMode):
     anchors: [hexToLch(roles.viz1), hexToLch(roles.viz2), hexToLch(roles.viz4)],
     moustache: lchToHex(MOUSTACHE_LCH[mode]),
     selectedStroke: roles.ink,
+    injuryAcuteStroke: roles.danger,
+    injuryManagingStroke: roles.accent,
+    injuryMonitoringStroke: roles.rule,
   };
 }
 
@@ -546,6 +585,179 @@ export type ProjectMuscleBodyOptions = {
   readonly mesh?: MuscleBodyMesh;
   readonly november?: boolean;
   readonly overlay?: MuscleOverlayStyle;
+  readonly activeInjuries?: readonly ActiveInjuryOverlay[];
+};
+
+type InjuryAccumulator = {
+  readonly injury: ActiveInjuryOverlay;
+  readonly targetMuscleId: string;
+  readonly edgeCounts: Map<number, number>;
+  sumX: number;
+  sumY: number;
+  triangleCount: number;
+};
+
+export const INJURY_STATUS_PRIORITY: Record<ActiveInjuryOverlay['status'], number> = {
+  acute: 0,
+  managing: 1,
+  monitoring: 2,
+  resolved: 3,
+};
+
+const normalizeInjurySide = (
+  side?: 'left' | 'right' | 'bilateral' | null
+): 'left' | 'right' | 'bilateral' => {
+  return side === 'left' || side === 'right' ? side : 'bilateral';
+};
+
+const createInjuryAccumulators = (
+  activeInjuries?: readonly ActiveInjuryOverlay[]
+): InjuryAccumulator[] => {
+  if (!activeInjuries || activeInjuries.length === 0) return [];
+
+  const sorted = [...activeInjuries]
+    .filter(injury => injury.status !== 'resolved')
+    .sort((a, b) => {
+      const pDiff = INJURY_STATUS_PRIORITY[a.status] - INJURY_STATUS_PRIORITY[b.status];
+      if (pDiff !== 0) return pDiff;
+      return (b.painScore ?? 0) - (a.painScore ?? 0);
+    });
+
+  const accumulators: InjuryAccumulator[] = [];
+  const seen = new Set<string>();
+
+  for (const injury of sorted) {
+    const resolvedId = resolveInjuryMuscleGroupId({
+      muscleGroupId: injury.muscleGroupId ?? null,
+      label: injury.label ?? '',
+    });
+    if (!resolvedId) continue;
+
+    const targetMuscleId = canonicalMuscleId(resolvedId);
+    const normalizedSide = normalizeInjurySide(injury.side);
+    const key = `${targetMuscleId}:${normalizedSide}`;
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    accumulators.push({
+      injury,
+      targetMuscleId,
+      edgeCounts: new Map<number, number>(),
+      sumX: 0,
+      sumY: 0,
+      triangleCount: 0,
+    });
+  }
+  return accumulators;
+};
+
+const matchesInjurySide = (rawCenterX: number, side?: 'left' | 'right' | 'bilateral' | null): boolean => {
+  if (!side || side === 'bilateral') return true;
+  if (side === 'right') return rawCenterX > 0.005;
+  if (side === 'left') return rawCenterX < -0.005;
+  return true;
+};
+
+const accumulateInjuryFace = (
+  projected: ProjectedTriangle,
+  face: MuscleBodyFace,
+  mesh: MuscleBodyMesh,
+  accumulators: readonly InjuryAccumulator[]
+) => {
+  const [i0, i1, i2, matIdx] = face;
+  const rawCenterX = (mesh.vertices[i0][0] + mesh.vertices[i1][0] + mesh.vertices[i2][0]) / 3;
+  const faceMuscleId = canonicalMuscleId(projected.muscleGroupId);
+  const baseMaterial = matIdx !== undefined ? mesh.materials[matIdx] : undefined;
+  const baseMuscleId =
+    baseMaterial && baseMaterial !== 'neutral' ? canonicalMuscleId(baseMaterial) : null;
+
+  for (const acc of accumulators) {
+    const matchesTarget =
+      acc.targetMuscleId === faceMuscleId ||
+      (baseMuscleId !== null && acc.targetMuscleId === baseMuscleId);
+
+    if (matchesTarget && matchesInjurySide(rawCenterX, acc.injury.side)) {
+      recordFaceEdges(i0, i1, i2, acc.edgeCounts);
+      acc.sumX += (projected.x0 + projected.x1 + projected.x2) / 3;
+      acc.sumY += (projected.y0 + projected.y1 + projected.y2) / 3;
+      acc.triangleCount += 1;
+    }
+  }
+};
+
+const injuryStrokeForStatus = (status: ActiveInjuryOverlay['status'], palette: ThemeShadePalette): string => {
+  if (status === 'acute') return palette.injuryAcuteStroke;
+  if (status === 'managing') return palette.injuryManagingStroke;
+  return palette.injuryMonitoringStroke;
+};
+
+const buildProjectedInjuries = (
+  accumulators: readonly InjuryAccumulator[],
+  verts: RotatedVertices,
+  triangles: readonly ProjectedTriangle[],
+  palette: ThemeShadePalette,
+  angleDeg: number
+): { injuryContours: ProjectedInjuryContour[]; injuryBadges: ProjectedInjuryBadge[] } => {
+  const injuryContours: ProjectedInjuryContour[] = [];
+  const injuryBadges: ProjectedInjuryBadge[] = [];
+  const currentOrientation = bodyOrientationForAngle(angleDeg);
+
+  for (const acc of accumulators) {
+    const stroke = injuryStrokeForStatus(acc.injury.status, palette);
+    const contour = buildBoundaryContour(acc.edgeCounts, verts, stroke, triangles);
+    if (contour) {
+      injuryContours.push({
+        injuryId: acc.injury.id,
+        muscleGroupId: acc.targetMuscleId,
+        status: acc.injury.status === 'resolved' ? 'monitoring' : acc.injury.status,
+        side: acc.injury.side ?? null,
+        d: contour.d,
+        stroke: contour.stroke,
+      });
+    }
+
+    const muscleOrientation = canonicalOrientationForMuscle(acc.targetMuscleId);
+    const isFacing = currentOrientation === muscleOrientation;
+
+    if (acc.triangleCount > 0 && isFacing) {
+      injuryBadges.push({
+        injuryId: acc.injury.id,
+        muscleGroupId: acc.targetMuscleId,
+        status: acc.injury.status === 'resolved' ? 'monitoring' : acc.injury.status,
+        side: acc.injury.side ?? null,
+        label: acc.injury.label,
+        painScore: acc.injury.painScore,
+        x: roundCoord(acc.sumX / acc.triangleCount),
+        y: roundCoord(acc.sumY / acc.triangleCount),
+        visible: true,
+      });
+    } else {
+      injuryBadges.push({
+        injuryId: acc.injury.id,
+        muscleGroupId: acc.targetMuscleId,
+        status: acc.injury.status === 'resolved' ? 'monitoring' : acc.injury.status,
+        side: acc.injury.side ?? null,
+        label: acc.injury.label,
+        painScore: acc.injury.painScore,
+        x: acc.triangleCount > 0 ? roundCoord(acc.sumX / acc.triangleCount) : 0,
+        y: acc.triangleCount > 0 ? roundCoord(acc.sumY / acc.triangleCount) : 0,
+        visible: false,
+      });
+    }
+  }
+
+  // Sort SVG contours in painter's order (lowest severity first, acute last on top)
+  injuryContours.sort(
+    (a, b) => INJURY_STATUS_PRIORITY[b.status] - INJURY_STATUS_PRIORITY[a.status]
+  );
+
+  // Sort badges in DOM painter's order (lowest severity first, acute last on top)
+  injuryBadges.sort(
+    (a, b) => INJURY_STATUS_PRIORITY[b.status] - INJURY_STATUS_PRIORITY[a.status]
+  );
+
+  return { injuryContours, injuryBadges };
 };
 
 /**
@@ -563,6 +775,7 @@ export function projectMuscleBody({
   mesh = MUSCLE_BODY_MESH,
   november = false,
   overlay = 'contour',
+  activeInjuries,
 }: ProjectMuscleBodyOptions): ProjectedMuscleBody {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0 || !mesh.vertices.length || !mesh.faces.length) {
     return { triangles: [], batches: [] };
@@ -579,6 +792,7 @@ export function projectMuscleBody({
   };
   const triangles: ProjectedTriangle[] = [];
   const edgeCounts = overlay === 'contour' && selectedCanonicalId ? new Map<number, number>() : null;
+  const injuryAccums = createInjuryAccumulators(activeInjuries);
 
   for (const face of mesh.faces) {
     const projected = projectSingleFace(face, ctx);
@@ -586,6 +800,9 @@ export function projectMuscleBody({
       triangles.push(projected);
       if (edgeCounts && projected.selected) {
         recordFaceEdges(face[0], face[1], face[2], edgeCounts);
+      }
+      if (injuryAccums.length) {
+        accumulateInjuryFace(projected, face, mesh, injuryAccums);
       }
     }
   }
@@ -608,10 +825,20 @@ export function projectMuscleBody({
     ? buildBoundaryContour(edgeCounts, verts, palette.selectedStroke, triangles)
     : null;
 
+  const { injuryContours, injuryBadges } = buildProjectedInjuries(
+    injuryAccums,
+    verts,
+    triangles,
+    palette,
+    angleDeg
+  );
+
   return {
     triangles,
     batches,
     ...(contour ? { contour } : {}),
+    ...(injuryContours.length ? { injuryContours } : {}),
+    ...(injuryBadges.length ? { injuryBadges } : {}),
   };
 }
 

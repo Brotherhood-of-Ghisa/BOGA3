@@ -38,6 +38,8 @@ import {
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import { NO_MUSCLE_REPORT, reportedPrimaryFamilyName } from '@/src/exercise-catalog/reported-muscles';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
+import type { InjuryView } from '@/src/data/injuries';
+import { useInjuries } from '@/src/injuries/use-injuries';
 import {
   COLUMN_KEYS,
   COLUMN_NAMES,
@@ -248,6 +250,7 @@ export type StatsScreenShellProps = {
   defaultCountSecondary?: boolean;
   defaultCountSecondaryVolume?: boolean;
   defaultGrouped?: boolean;
+  activeInjuries?: readonly InjuryView[];
 };
 
 // The pinned search row keeps its controls reachable above either table; the
@@ -319,6 +322,7 @@ export function StatsScreenShell({
   defaultCountSecondary = true,
   defaultCountSecondaryVolume = true,
   defaultGrouped = true,
+  activeInjuries,
 }: StatsScreenShellProps) {
   const text = useUiText();
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
@@ -456,6 +460,7 @@ export function StatsScreenShell({
           onSelect={showContributions}
           onMuscleHistory={(row, target, view) => openHistory(muscle => onOpenMuscleHistory(muscle, view), { muscleGroupId: row.muscleGroupId }, target)}
           onExerciseHistory={(row, target) => openHistory(onOpenExerciseHistory, { exerciseDefinitionId: row.exerciseDefinitionId }, target)}
+          activeInjuries={activeInjuries}
           /> : null}
         <ListRow onPress={onPressSessionsCard} accessibilityLabel="Open sessions list" testID="stats-sessions-link"
           meta={<Icon name="chevron-right" size="sm" />}><Text allowFontScaling={false} style={[text.bodyStrong, statsTableStyles.name]}>Sessions</Text></ListRow>
@@ -622,6 +627,8 @@ function StatsContent() {
   const summaryGymId = filters.breakdown === 'muscle' && values.progressMuscleLayout === 'list' ? gymId : undefined;
   const summary = useStatsSummary(weeks, values.targetWindowWeeks, revision, reload,
     { gymId: summaryGymId, countSecondary, countSecondaryVolume });
+  const { state: injuriesState } = useInjuries();
+  const activeInjuries = injuriesState.status === 'ready' ? injuriesState.active : undefined;
   const [searchQuery, setSearchQuery] = useState('');
   // An exercise is listed when either period counted a set for it: one that
   // stopped is as much a comparison as one that started.
@@ -668,7 +675,8 @@ function StatsContent() {
     countSecondary={countSecondary} onChangeCountSecondary={filters.selectCountSecondary}
     countSecondaryVolume={countSecondaryVolume} onChangeCountSecondaryVolume={filters.selectCountSecondaryVolume}
     defaultCountSecondary={values.progressCountSecondary} defaultCountSecondaryVolume={!values.muscleVolumePrimaryOnly}
-    defaultGrouped={values.progressGrouped} />;
+    defaultGrouped={values.progressGrouped}
+    activeInjuries={activeInjuries} />;
 }
 
 // A period the exercise has no aggregate for is a genuine nothing: zero sets,

@@ -103,3 +103,18 @@ figures (sets, Volume, records, 1RM) do not change. No line reports the dropped 
 
 Why: the user chose not to follow that muscle.
 Code: `applyMuscleReport` in `apps/mobile/src/data/muscle-analytics.ts`.
+
+### muscle.tissue-reloading · calculation · accepted
+
+Tissue reload tracking compares current-week working sets ($S_{\text{curr}}$)
+against the 4-week pre-injury baseline weekly average ($\bar{S}_{\text{pre}}$)
+over $[T_{\text{injury}}-28\text{d}, T_{\text{injury}})$. A caution alert triggers
+when $S_{\text{curr}} \ge 6$ and either $\bar{S}_{\text{pre}} = 0$ or
+$S_{\text{curr}} > 1.30 \times \bar{S}_{\text{pre}}$. Rehab sets ($R_{\text{curr}}$)
+track therapeutic volume in kilograms without counting toward working-set reload
+stress. Reloading metrics remain strictly owner-private.
+
+Why: protects recovering tissue against volume spikes exceeding 130% of healthy
+capacity while suppressing noise when working sets are below the 6-set floor.
+Code: `apps/mobile/src/injuries/tissue-reload.ts`; `apps/mobile/components/injuries/tissue-reload-card.tsx`.
+
