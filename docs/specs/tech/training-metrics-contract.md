@@ -27,8 +27,8 @@ coaching: [[set.eligibility]].
   negatives are not. The input fields' validation, the performed check and
   every calculation all call it.
 - **Personal effort policy** ([[set.eligibility]] gives its defaults):
-  Settings has fixed Warm-up, Unspecified, RIR-4 through RIR-0, Technique and
-  Cooldown rows, with independent Display, Working set and Volume columns.
+  Settings has fixed Warm-up, Unspecified, RIR-4 through RIR-0, Technique,
+  Cooldown and Rehab rows, with independent Display, Working set and Volume columns.
   All labels default displayed. At least one Display choice is required;
   either calculation column may be empty. Hidden labels can contribute, and
   visible labels can be excluded. Recorded labels stay intact and do not
@@ -156,9 +156,8 @@ sets. There are three kinds:
   record itself. A tie never takes a record, so a record tied across sessions
   belongs to the earliest session.
 - **Zero.** A zero 1RM ([[1rm.formula]]), Weight or Volume is never a record,
-  never a baseline and never ranks. Nothing beats a zero, and a zero beats nothing. An
-  Volume that left out sets whose load cannot be calculated competes like
-  any other (§4); one whose sum is not finite has no value.
+  baseline, or rank. Nothing beats a zero, and a zero beats nothing. Volume
+  leaving out uncalculable sets competes normally (§4); non-finite sums have no value.
 - **Scope.** Which sessions a record is taken over, per exercise split per
   gym or not, is [[gym.split]]. `reportingBucket`
   (`exercise-calculations/gym-bucket.ts`) is its one implementation: it names

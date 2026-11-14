@@ -20,7 +20,7 @@ import type { ExerciseSessionFact } from './schema';
  * Bump when a rule below changes what a row holds. Every device then rebuilds
  * the whole table once before its next facts read.
  */
-export const EXERCISE_SESSION_FACTS_RULES_VERSION = 9;
+export const EXERCISE_SESSION_FACTS_RULES_VERSION = 10;
 
 export type FactsSetInput = {
   id: string;

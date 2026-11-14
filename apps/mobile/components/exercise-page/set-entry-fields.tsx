@@ -34,7 +34,7 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
   const text = useUiText();
   const tone = useUiTextTone();
   const effort = formatEffort(setType);
-  const effortText = setType === 'technique' || setType === 'cooldown'
+  const effortText = setType === 'technique' || setType === 'cooldown' || setType === 'rehab'
     ? formatSessionSetType(setType, 'compact')
     : effort;
 
