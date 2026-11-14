@@ -545,14 +545,16 @@ const prepareNotificationParity = async (session: Tier1Session): Promise<Notific
 /** A helper several cases share is installed once, whichever way each case spells its `create`. */
 const replacing = (sql: string): string => sql.replace(/^create function pg_temp\./, 'create or replace function pg_temp.');
 
-const runCaseParity = async (session: Tier1Session, context: ReadPathContext): Promise<ParityOutcome[]> => {
+const runCaseParity = async (
+  session: Tier1Session, context: ReadPathContext, cases: readonly ParityCase<ReadPathContext>[],
+): Promise<ParityOutcome[]> => {
   const outcomes = new Map<string, ParityOutcome>();
   const installedSql = new Set<string>();
   const installs = new Map<ParityCase<ReadPathContext>, ReturnType<typeof parityInstallStatements>>();
   const fail = (item: ParityCase<ReadPathContext>, error: unknown) => {
     outcomes.set(item.fn, { fn: item.fn, compared: 0, differences: [], plantDetected: null, error: (error as Error).message });
   };
-  for (const item of PARITY_CASES) {
+  for (const item of cases) {
     try {
       const installed = parityInstallStatements(item);
       // A helper several cases share is installed once.
@@ -576,7 +578,7 @@ const runCaseParity = async (session: Tier1Session, context: ReadPathContext): P
   try {
     context.notification = await prepareNotificationParity(session);
   } catch (error) {
-    for (const item of PARITY_CASES.filter((candidate) => candidate.scenarios)) fail(item, error);
+    for (const item of cases.filter((candidate) => candidate.scenarios)) fail(item, error);
   }
   for (const scenario of SCENARIOS) {
     await session.exec('savepoint parity_scenario');
@@ -584,7 +586,7 @@ const runCaseParity = async (session: Tier1Session, context: ReadPathContext): P
       if (scenario !== 'base' && context.notification) {
         for (const statement of scenarioStatements(scenario, context.notification)) await session.exec(statement);
       }
-      for (const item of PARITY_CASES.filter((candidate) => (candidate.scenarios ?? ['base']).includes(scenario))) {
+      for (const item of cases.filter((candidate) => (candidate.scenarios ?? ['base']).includes(scenario))) {
         const installed = installs.get(item);
         if (!installed || outcomes.get(item.fn)?.error) continue;
         try {
@@ -608,11 +610,12 @@ const runCaseParity = async (session: Tier1Session, context: ReadPathContext): P
       await session.exec('release savepoint parity_scenario');
     }
   }
-  return PARITY_CASES.map((item) => outcomes.get(item.fn)).filter((outcome): outcome is ParityOutcome => outcome !== undefined);
+  return cases.map((item) => outcomes.get(item.fn)).filter((outcome): outcome is ParityOutcome => outcome !== undefined);
 };
 
 const runParityCases = async (session: Tier1Session, context: ReadPathContext): Promise<ParityOutcome[]> => {
-  const outcomes: ParityOutcome[] = [];
+  // The notification cases first: the stale-fact plants below edit sessions their proofs read.
+  const outcomes: ParityOutcome[] = await runCaseParity(session, context, PARITY_CASES.filter((item) => item.scenarios));
   try {
     for (const statement of PARITY_PLANT_STATEMENTS()) {
       if (!plantedAll(await session.exec(statement))) throw new Error(`a stale-fact plant edited no row: ${statement.slice(0, 80)}`);
@@ -621,7 +624,7 @@ const runParityCases = async (session: Tier1Session, context: ReadPathContext): 
     return [{ fn: 'parity plants', compared: 0, differences: [], plantDetected: null, error: (error as Error).message }];
   }
   for (const item of HELPER_PARITY_CASES) outcomes.push(await runHelperParity(session, item));
-  outcomes.push(...await runCaseParity(session, context));
+  outcomes.push(...await runCaseParity(session, context, PARITY_CASES.filter((item) => !item.scenarios)));
   return outcomes;
 };
 
