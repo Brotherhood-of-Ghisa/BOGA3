@@ -17,7 +17,10 @@ import { Client } from 'pg';
 
 import { scans, type Counters } from './counters.ts';
 import { fixtureStatements, FIXTURE_COUNTS_SQL } from './fixture.ts';
-import { compareParity, parityInstallStatements, parityPassed, type ParityCase, type ParityOutcome } from './parity.ts';
+import {
+  compareParity, helperParityStatements, parityInstallStatements, parityPassed,
+  type HelperParityCase, type ParityCase, type ParityOutcome,
+} from './parity.ts';
 import {
   checkBudgets, readPathMarkdown, type BudgetCheck, type BudgetEntry, type PointCost,
 } from './read-path-budgets.ts';
@@ -33,6 +36,7 @@ export const PARITY_DAYS = READ_PATH_DAYS[0];
 
 const DAY_MS = 86400000;
 const WEEK_MS = 7 * DAY_MS;
+const MONTH_MS = 30 * DAY_MS;
 /** The At a glance read: the period in view and the five before it. */
 const PERIOD_WINDOWS = 6;
 
@@ -82,33 +86,33 @@ const stream = (fn: string, pages: number): ReadPathRpc => ({
  * ceiling. Re-measure and update an entry in the change that moves its cost.
  */
 export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
-  stream('group_competition_stream_v5', 1_100_000),
-  stream('group_competition_stream_v4', 1_100_000),
-  stream('group_competition_stream_v3', 1_100_000),
-  stream('group_competition_stream_v2', 330_000),
+  stream('group_competition_stream_v5', 290_000),
+  stream('group_competition_stream_v4', 280_000),
+  stream('group_competition_stream_v3', 280_000),
+  stream('group_competition_stream_v2', 90_000),
   { fn: 'group_competition_period_totals', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_windows: c.weeks }),
-    budget: { kind: 'baseline', pages: 83_000, scoped: true } },
+    budget: { kind: 'budgeted', pages: 3_800, scoped: true } },
   { fn: 'group_competition_week_summary', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_window_start_ms: c.weeks.at(-1)!.start_ms, p_window_end_ms: c.weeks.at(-1)!.end_ms }),
-    budget: { kind: 'budgeted', pages: 2_700, scoped: true } },
+    budget: { kind: 'budgeted', pages: 1_100, scoped: true } },
   { fn: 'group_competition_podiums', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_certified: false }),
-    budget: { kind: 'baseline', pages: 30_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 8_900, scoped: true } },
   { fn: 'group_competition_board', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_limit: 50, p_cursor: null }),
-    budget: { kind: 'baseline', pages: 15_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 4_300, scoped: true } },
   { fn: 'group_competition_records_history', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_before: null, p_limit: 50 }),
-    budget: { kind: 'baseline', pages: 25_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 11_000, scoped: true } },
   { fn: 'group_competition_session_detail', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
-    budget: { kind: 'baseline', pages: 19_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 4_600, scoped: true } },
   { fn: 'group_competition_session_records', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'budgeted', pages: 350, scoped: true } },
   { fn: 'group_cow_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'baseline', pages: 540_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 150_000, scoped: true } },
   { fn: 'group_cow_previous_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'baseline', pages: 780_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 200_000, scoped: true } },
   { fn: 'group_cow_calendar_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_list_mine', via: 'member', args: () => ({}), budget: { kind: 'budgeted', pages: 20, scoped: true } },
@@ -117,10 +121,10 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 400, scoped: true } },
   { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 28_000, scoped: false } },
-  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'baseline', pages: 270_000, scoped: false } },
-  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 160_000, scoped: true } },
-  { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 160_000, scoped: true } },
-  { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 160_000, scoped: true } },
+  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'baseline', pages: 150_000, scoped: false } },
+  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 140_000, scoped: true } },
+  { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 140_000, scoped: true } },
+  { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 140_000, scoped: true } },
   { fn: 'notification_confirm_completion', via: 'member',
     args: (c) => ({ p_session_id: c.completion!.sessionId, p_entities: c.completion!.entities }),
     budget: { kind: 'baseline', pages: 28_000, scoped: true } },
@@ -137,16 +141,160 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
  * named file before the rewrite instead.
  */
 export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
-  // The helper's own proof, on an RPC nothing here changes: every rolling
-  // week of the At a glance read, for every viewer. The plant shifts one field
-  // of each member's row (its rank), which the comparison must catch.
+  // Every rolling week of the At a glance read, for every viewer, against the
+  // definition before the keyset latest session and the session-first counts.
+  // It is also the helper's own proof: the plant shifts one field of each
+  // member's row (its rank), which the comparison must catch.
   {
     fn: 'group_competition_week_summary',
     migration: '20261008120000_group_competition_v4_only.sql',
+    helpers: { group_week_session_counts: '20261003180000_group_board_raw_weight.sql' },
     argumentSets: (context) => context.weeks.map((week) =>
       ({ p_group_id: context.groupId, p_window_start_ms: week.start_ms, p_window_end_ms: week.end_ms })),
     plant: { from: `'rank', r.rank,`, to: `'rank', r.rank + 1,` },
   },
+  // The At a glance periods before the materialized session totals: the six
+  // rolling weeks together, each alone, and 30-day months back over the
+  // whole history.
+  {
+    fn: 'group_competition_period_totals',
+    migration: '20261011120000_group_competition_period_totals.sql',
+    helpers: { group_week_session_counts: '20261003180000_group_board_raw_weight.sql' },
+    argumentSets: (context) => {
+      const end = context.weeks.at(-1)!.end_ms;
+      const months = Array.from({ length: Math.ceil(PARITY_DAYS / 30) + 1 }, (_, index) =>
+        ({ start_ms: end - (index + 1) * MONTH_MS, end_ms: end - index * MONTH_MS }));
+      return [context.weeks, ...context.weeks.map((week) => [week]), months]
+        .map((windows) => ({ p_group_id: context.groupId, p_windows: windows }));
+    },
+  },
+];
+
+/** Every (group, member, definition) the redaction helpers are compared on: every definition a member logged or a CoW retained, none, and one never logged. */
+const REDACTION_PAIRS_SQL = `select f.group_id as a1, m.uid as a2, d.definition as a3
+  from perf_fx f cross join perf_members m cross join (
+    select se.exercise_definition_id as definition from app_public.session_exercises se join perf_members p on p.uid=se.owner_user_id
+    union select r.definition_id from app_public.group_cow_source_refs r join perf_members p on p.uid=r.member_user_id
+    union select null union select 'perf-def-unlogged') d`;
+
+/**
+ * The internal helpers the readers share, compared old against new as the
+ * table owner on the PARITY_DAYS fixture, after PARITY_PLANT_STATEMENTS (see
+ * parity.ts, `HelperParityCase`). The redaction cache is checked against the
+ * live function it caches, asked once for every pair in one statement.
+ */
+export const HELPER_PARITY_CASES: readonly HelperParityCase[] = [
+  {
+    // Patched in place by 20261030064514 (the CoW disclosure); its old CoW branch too.
+    name: 'group_competition_redacts_exercise', fn: 'group_competition_redacts_exercise',
+    migration: 'parity-definitions/20261030064514_group_cow_readers.sql',
+    helpers: { group_cow_redacts_exercise: '20261030064514_group_cow_readers.sql' },
+    argumentsSql: REDACTION_PAIRS_SQL, call: '{fn}(array[a1],a2,a3)', minAnswers: 2,
+  },
+  {
+    name: 'group_cow_redacts_exercise', fn: 'group_cow_redacts_exercise', migration: '20261030064514_group_cow_readers.sql',
+    argumentsSql: REDACTION_PAIRS_SQL, call: '{fn}(array[a1],a2,a3)', minAnswers: 2,
+  },
+  {
+    name: 'group_competition_redactions',
+    argumentsSql: `with pairs as materialized (${REDACTION_PAIRS_SQL}),
+      cache as materialized (select * from app_public.group_competition_redactions((select group_id from perf_fx),
+        array(select a2 from pairs),array(select a3 from pairs)))
+      select p.*,(select c.redacted from cache c where c.member_user_id=p.a2 and c.definition_id is not distinct from p.a3) as a4
+      from pairs p`,
+    expected: 'app_public.group_competition_redacts_exercise(array[a1],a2,a3)', actual: 'a4', minAnswers: 2,
+  },
+  {
+    name: 'group_week_session_counts', fn: 'group_week_session_counts', migration: '20261003180000_group_board_raw_weight.sql',
+    argumentsSql: `select s.owner_user_id as a1, s.id as a2 from app_public.sessions s join perf_members m on m.uid=s.owner_user_id`,
+    call: '(select row(c.*)::text from {fn}(a1,a2) c)',
+  },
+];
+
+const asMember = (idx: number) => `select set_config('request.jwt.claim.sub',uid::text,true),
+  set_config('request.jwt.claims',json_build_object('sub',uid,'role','authenticated')::text,true) from perf_members where idx=${idx}`;
+
+/** One plant's edit, as the last CTE: the statement says whether it edited exactly one row. */
+const edited = (update: string) => `, edited as (${update} returning 1)
+   select count(*)=1 as planted from edited`;
+
+/** False when a plant statement reports it edited no row, or more than one. */
+export const plantedAll = (rows: readonly Record<string, unknown>[]): boolean => rows.every((row) => row.planted !== false);
+
+/**
+ * Planted before parity, after every measured call. A cancelled CoW on the
+ * bodyweight-aware Pull-up, two weeks back (cancelled, so no worker or
+ * reader takes it up), whose retained refs make the CoW
+ * disclosure redact through each branch: member 3's ref has an unknown
+ * definition (''), member 4's names Bench press while its set is now logged
+ * under another definition. The group's latest completed shared session (the
+ * viewer's finished workout) is no longer shared, so the week summary's
+ * latest completed session must skip it for an older one. Then facts the
+ * evaluator has not caught up with, which the counts must still read
+ * through: member 4's newest working set is deleted, member 5's newest
+ * session loses an exercise, and one of member 4's sets moves to an older
+ * session. Each sync edit runs under its owner's claims, as sync would run
+ * it; each plant must edit exactly one row.
+ */
+export const PARITY_PLANT_STATEMENTS = (): string[] => [
+  `with cow as (
+     insert into app_public.group_cows(id,group_id,group_exercise_id,week_start,time_zone,starts_at,ends_at,metrics,create_key,
+       created_by,available_at,definition_xid,cancelled_at)
+     select gen_random_uuid(),f.group_id,ge.id,w.week,'UTC',lower(w.bounds),upper(w.bounds),array['e1rm'],'perf-cow-parity',
+       (select uid from perf_members where idx=1),clock_timestamp(),0,clock_timestamp()
+     from perf_fx f, perf_group_exercises ge,
+       lateral (select app_public.group_cow_week('UTC',now())-14 as week) w0,
+       lateral (select w0.week,app_public.group_cow_bounds('UTC',w0.week) as bounds) w
+     where ge.ex=5 returning id),
+   refs as (
+     select m.uid,e.set_id,case m.idx when 3 then '' else 'perf-def-0' end as definition
+     from perf_members m cross join lateral (
+       select es.id as set_id from app_public.exercise_sets es
+         join app_public.session_exercises se on se.owner_user_id=es.owner_user_id and se.id=es.session_exercise_id
+        where es.owner_user_id=m.uid and se.exercise_definition_id=case m.idx when 3 then 'perf-def-0' else 'perf-def-1' end
+        order by es.id limit 1) e
+     where m.idx in (3,4))
+   ${edited(`insert into app_public.group_cow_source_refs(cow_id,member_user_id,metric,set_id,definition_id)
+     select cow.id,r.uid,'e1rm',r.set_id,r.definition from cow,refs r`).replace('count(*)=1', 'count(*)=2')}`,
+  `with target as (
+     select sh.group_id,sh.member_user_id,sh.session_id from app_public.group_session_shares sh
+       join app_public.group_memberships gm on gm.group_id=sh.group_id and gm.user_id=sh.member_user_id and gm.ended_at is null
+       join app_public.sessions s on s.owner_user_id=sh.member_user_id and s.id=sh.session_id
+      where sh.group_id=(select group_id from perf_fx) and s.status='completed' and s.deleted_at is null
+      order by s.completed_at desc nulls last,s.started_at desc,s.owner_user_id,s.id limit 1)
+   ${edited(`delete from app_public.group_session_shares sh using target t
+     where sh.group_id=t.group_id and sh.member_user_id=t.member_user_id and sh.session_id=t.session_id`)}`,
+  asMember(4),
+  `with target as (
+     select f.member_user_id,f.set_id from app_public.group_set_facts f join perf_members m on m.uid=f.member_user_id
+       join app_public.sessions s on s.owner_user_id=f.member_user_id and s.id=f.session_id
+      where m.idx=4 and s.status='completed' and f.performed and f.live and f.working is not false
+      order by s.started_at desc,f.set_id limit 1)
+   ${edited(`update app_public.exercise_sets es set deleted_at=es.updated_at+1,updated_at=es.updated_at+1,
+       client_updated_at_ms=es.client_updated_at_ms+1
+     from target t where es.owner_user_id=t.member_user_id and es.id=t.set_id`)}`,
+  asMember(5),
+  `with target as (
+     select se.owner_user_id,se.id from app_public.session_exercises se join perf_members m on m.uid=se.owner_user_id
+       join app_public.sessions s on s.owner_user_id=se.owner_user_id and s.id=se.session_id
+      where m.idx=5 and s.status='completed' and se.deleted_at is null order by s.started_at desc,se.order_index limit 1)
+   ${edited(`update app_public.session_exercises se set deleted_at=se.updated_at+1,updated_at=se.updated_at+1,
+       client_updated_at_ms=se.client_updated_at_ms+1
+     from target t where se.owner_user_id=t.owner_user_id and se.id=t.id`)}`,
+  asMember(4),
+  `with ranked as (
+     select s.owner_user_id,s.id,row_number() over(order by s.started_at desc) as n from app_public.sessions s
+       join perf_members m on m.uid=s.owner_user_id where m.idx=4 and s.status='completed'),
+   moved as (
+     select f.member_user_id,f.set_id from app_public.group_set_facts f join ranked r on r.owner_user_id=f.member_user_id and r.id=f.session_id
+      where r.n=2 and f.performed and f.live and f.working is not false order by f.set_id limit 1),
+   into_exercise as (
+     select se.id from app_public.session_exercises se join ranked r on r.owner_user_id=se.owner_user_id and r.id=se.session_id
+      where r.n=3 and se.deleted_at is null order by se.order_index limit 1)
+   ${edited(`update app_public.exercise_sets es set session_exercise_id=(select id from into_exercise),updated_at=es.updated_at+1,
+       client_updated_at_ms=es.client_updated_at_ms+1
+     from moved t where es.owner_user_id=t.member_user_id and es.id=t.set_id`)}`,
+  `select set_config('request.jwt.claim.sub','',true), set_config('request.jwt.claims','',true)`,
 ];
 
 export const readPathBudgets = (rpcs: readonly ReadPathRpc[] = READ_PATH_RPCS): Record<string, BudgetEntry> =>
@@ -320,8 +468,33 @@ const groupByFn = (records: readonly CallRecord[]): Record<string, CallRecord[]>
   return out;
 };
 
+/** One helper case, in a savepoint: a failed case cannot abort the ones after it. */
+const runHelperParity = async (session: Tier1Session, item: HelperParityCase): Promise<ParityOutcome> => {
+  await session.exec('savepoint helper_parity');
+  try {
+    const { sql, compare } = helperParityStatements(item);
+    for (const statement of sql) await session.exec(statement);
+    const [row] = await session.exec<{ compared: number; answers: number; differences: string[] }>(compare);
+    await session.exec('release savepoint helper_parity');
+    const varied = row.answers >= (item.minAnswers ?? 1)
+      ? null : `${row.answers} distinct answers, fewer than the ${item.minAnswers} the case needs`;
+    return { fn: item.name, compared: row.compared, differences: row.differences, plantDetected: null, error: varied };
+  } catch (error) {
+    await session.exec('rollback to savepoint helper_parity');
+    return { fn: item.name, compared: 0, differences: [], plantDetected: null, error: (error as Error).message };
+  }
+};
+
 const runParityCases = async (session: Tier1Session, context: ReadPathContext): Promise<ParityOutcome[]> => {
   const outcomes: ParityOutcome[] = [];
+  try {
+    for (const statement of PARITY_PLANT_STATEMENTS()) {
+      if (!plantedAll(await session.exec(statement))) throw new Error(`a stale-fact plant edited no row: ${statement.slice(0, 80)}`);
+    }
+  } catch (error) {
+    return [{ fn: 'parity plants', compared: 0, differences: [], plantDetected: null, error: (error as Error).message }];
+  }
+  for (const item of HELPER_PARITY_CASES) outcomes.push(await runHelperParity(session, item));
   for (const item of PARITY_CASES) {
     try {
       const installed = parityInstallStatements(item);
