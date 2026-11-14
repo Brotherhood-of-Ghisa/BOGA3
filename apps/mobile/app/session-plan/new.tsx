@@ -18,6 +18,8 @@ export type SessionPlanNewScreenProps = {
   fromPlanId: string | null;
   /** `edit`: a plan to edit in place; Save writes the guarded operations. */
   editPlanId: string | null;
+  /** `routine`: preselect the Routine switch on a fresh plan form. */
+  initialIsRoutine?: boolean;
 };
 
 /**
@@ -28,13 +30,17 @@ export type SessionPlanNewScreenProps = {
  * refuses (and writes nothing) when the diff would touch a consumed block.
  * Saving is local-first, so it works offline.
  */
-export function SessionPlanNewScreen({ fromPlanId, editPlanId }: SessionPlanNewScreenProps) {
+export function SessionPlanNewScreen({
+  fromPlanId,
+  editPlanId,
+  initialIsRoutine = false,
+}: SessionPlanNewScreenProps) {
   const router = useRouter();
   const catalog = useExerciseCatalog();
   const isEdit = editPlanId !== null;
   const prefillPlanId = fromPlanId ?? editPlanId;
   const [initialForm, setInitialForm] = useState<PlanFormState | 'loading' | 'unavailable'>(
-    prefillPlanId === null ? emptyPlanForm() : 'loading'
+    prefillPlanId === null ? emptyPlanForm({ isRoutine: initialIsRoutine }) : 'loading'
   );
 
   useEffect(() => {
@@ -117,6 +123,17 @@ export function SessionPlanNewScreen({ fromPlanId, editPlanId }: SessionPlanNewS
 }
 
 export default function SessionPlanNewRoute() {
-  const params = useLocalSearchParams<{ from?: string | string[]; edit?: string | string[] }>();
-  return <SessionPlanNewScreen editPlanId={coerceParam(params.edit)} fromPlanId={coerceParam(params.from)} />;
+  const params = useLocalSearchParams<{
+    from?: string | string[];
+    edit?: string | string[];
+    routine?: string | string[];
+  }>();
+  const routineParam = coerceParam(params.routine);
+  return (
+    <SessionPlanNewScreen
+      editPlanId={coerceParam(params.edit)}
+      fromPlanId={coerceParam(params.from)}
+      initialIsRoutine={routineParam === '1' || routineParam === 'true'}
+    />
+  );
 }

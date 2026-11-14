@@ -190,12 +190,12 @@ function PlannerScheduleContent({
 }
 
 function PlannerRoutinesContent({
-  openPlanNew,
+  openRoutineNew,
   openPlan,
   planSections,
   completedPlans,
 }: {
-  openPlanNew: () => void;
+  openRoutineNew: () => void;
   openPlan: (id: string) => void;
   planSections: PlanSectionsState;
   completedPlans: PlanSummaryView[];
@@ -205,7 +205,7 @@ function PlannerRoutinesContent({
       <PlanSessionAction
         accessibilityLabel="Create a new routine"
         label="Create routine"
-        onPress={openPlanNew}
+        onPress={openRoutineNew}
         testID="planner-plan-session-action"
       />
       <RoutinePlanSection onOpenPlan={openPlan} state={planSections} testID="planner-plan-section-routines" />
@@ -286,6 +286,7 @@ export function PlannerScreen({
   const completedProgrammes = showCompletedPlans ? extractCompletedProgrammes(planSections.programmes) : [];
 
   const openPlanNew = () => router.push('/session-plan/new' as Href);
+  const openRoutineNew = () => router.push('/session-plan/new?routine=1' as Href);
   const openPlan = (planId: string) => router.push(`/session-plan/${encodeURIComponent(planId)}` as Href);
   const openProgrammeNew = () => router.push('/programme/new' as Href);
   const openProgramme = (programmeId: string) =>
@@ -314,7 +315,7 @@ export function PlannerScreen({
       <ScreenScroll contentContainerStyle={styles.content} testID="planner-scroll">
         <SegmentedControl
           density="compact"
-          layout="fill"
+          layout="fit"
           onChange={setScope}
           options={SCOPE_OPTIONS}
           testIDPrefix="planner-scope"
@@ -354,7 +355,7 @@ export function PlannerScreen({
           <PlannerRoutinesContent
             completedPlans={completedPlans}
             openPlan={openPlan}
-            openPlanNew={openPlanNew}
+            openRoutineNew={openRoutineNew}
             planSections={planSections}
           />
         ) : null}
