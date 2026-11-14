@@ -21,7 +21,7 @@ import type { RpcFailure } from './group-eval-mirror.ts';
 export type Caller =
   | { role: 'service_role' }
   | { role: 'postgres' }
-  | { role: 'authenticated'; userId: string };
+  | { role: 'authenticated'; userId: string; /** The auth session the JWT names, as a signed-in app's does. */ sessionId?: string };
 
 /** One measured RPC; `error` is its SQLSTATE when it failed (57014: the call budget). */
 export type CallRecord = { fn: string; counters: Counters; error: string | null };
@@ -52,12 +52,16 @@ const DEFERRED_CONSTRAINTS_SQL = `select string_agg(quote_ident(n.nspname)||'.'|
 const toParam = (value: unknown): unknown =>
   value === null || value === undefined ? null : typeof value === 'object' ? JSON.stringify(value) : value;
 
-/** `app_public.fn(p_a => $1, …)` with its parameter values. */
+/**
+ * `app_public.fn(p_a => $1, …)` with its parameter values. A `pg_temp.`
+ * name calls a definition a parity check installed for this session.
+ */
 export const rpcCall = (fn: string, args: Record<string, unknown>): { sql: string; params: unknown[] } => {
-  if (!IDENT.test(fn)) throw new Error(`invalid function name: ${fn}`);
+  const [schema, name] = fn.startsWith('pg_temp.') ? ['pg_temp', fn.slice('pg_temp.'.length)] : ['app_public', fn];
+  if (!IDENT.test(name)) throw new Error(`invalid function name: ${fn}`);
   const names = Object.keys(args);
-  for (const name of names) if (!IDENT.test(name)) throw new Error(`invalid argument name: ${name}`);
-  const sql = `app_public.${fn}(${names.map((name, index) => `${name} => $${index + 1}`).join(', ')})`;
+  for (const arg of names) if (!IDENT.test(arg)) throw new Error(`invalid argument name: ${arg}`);
+  const sql = `${schema}.${name}(${names.map((arg, index) => `${arg} => $${index + 1}`).join(', ')})`;
   return { sql, params: names.map((name) => toParam(args[name])) };
 };
 
@@ -103,7 +107,21 @@ export class Tier1Session {
     return this.records.splice(0, this.records.length);
   }
 
-  async call<T>(caller: Caller, fn: string, args: Record<string, unknown>, measured: boolean): Promise<T> {
+  /**
+   * One call at a time: the workers fan out (the notification worker sends
+   * with Promise.all), but every call needs this one connection to itself,
+   * from its savepoint to its release. Each is its own transaction in
+   * production, so running them in turn changes no counter.
+   */
+  call<T>(caller: Caller, fn: string, args: Record<string, unknown>, measured: boolean): Promise<T> {
+    const result = this.queue.then(() => this.callNow<T>(caller, fn, args, measured));
+    this.queue = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
+  private queue: Promise<void> = Promise.resolve();
+
+  private async callNow<T>(caller: Caller, fn: string, args: Record<string, unknown>, measured: boolean): Promise<T> {
     const { sql, params } = rpcCall(fn, args);
     const savepoint = `perf_call_${(this.savepoints += 1)}`;
     await this.client.query(`savepoint ${savepoint}`);
@@ -147,7 +165,8 @@ export class Tier1Session {
 
   private async enter(caller: Caller): Promise<void> {
     const claims = caller.role === 'authenticated'
-      ? JSON.stringify({ sub: caller.userId, role: 'authenticated', aud: 'authenticated' })
+      ? JSON.stringify({ sub: caller.userId, role: 'authenticated', aud: 'authenticated',
+        ...(caller.sessionId ? { session_id: caller.sessionId } : {}) })
       : caller.role === 'service_role' ? JSON.stringify({ role: 'service_role' }) : '';
     await this.client.query(
       `select set_config('app.group_eval_kicked','',true), set_config('boga.notification_kicked','',true),

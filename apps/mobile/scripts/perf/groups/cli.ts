@@ -1,14 +1,18 @@
 // Groups performance harness entrypoint (lanes groups-perf, groups-perf-load).
 //
 //   tsx scripts/perf/groups/cli.ts tier1 [--matrix default|full] [--strict]
+//   tsx scripts/perf/groups/cli.ts read-path
 //   tsx scripts/perf/groups/cli.ts load [--strict]
 //
 // Writes artifacts/perf/groups/<run>/report.json and summary.md under
-// apps/mobile and prints the summary. Assertions are report-only: --strict
-// turns a WARN into exit 1. Reads DB_URL, API_URL, ANON_KEY, JWT_SECRET and
-// SERVICE_ROLE_KEY from the slot's `supabase status` (the lane body exports
-// them). Load-run knobs: GROUPS_PERF_LEVELS (1,5,10), GROUPS_PERF_WINDOW_S,
-// GROUPS_PERF_CADENCE_S, GROUPS_PERF_IDLE_TICKS.
+// apps/mobile and prints the summary. The sweeps' scaling assertions are
+// report-only: --strict turns a WARN into exit 1. tier1 then runs the
+// read-path set (read-path.ts), which is strict always: a failure there exits
+// 1 with or without --strict. `read-path` runs that set alone. Reads DB_URL,
+// API_URL, ANON_KEY, JWT_SECRET and SERVICE_ROLE_KEY from the slot's
+// `supabase status` (the lane body exports them). Load-run knobs:
+// GROUPS_PERF_LEVELS (1,5,10), GROUPS_PERF_WINDOW_S, GROUPS_PERF_CADENCE_S,
+// GROUPS_PERF_IDLE_TICKS.
 
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -30,6 +34,7 @@ import {
   type ScenarioSummary,
   type SweepPlan,
 } from './report.ts';
+import { runReadPath, type ReadPathResult } from './read-path.ts';
 import { runTier1Scenario, type Tier1Scenario } from './tier1.ts';
 import { Tier2Run } from './tier2.ts';
 
@@ -119,12 +124,30 @@ export const runPlan = async (plan: SweepPlan, run: (members: number, days: numb
 
 const isScenario = (value: Tier1Scenario | ScenarioSummary): value is Tier1Scenario => 'steps' in value;
 
-const tier1 = async (args: string[], log: (line: string) => void) => {
+type Outcome = { summary: string; dir: string; assertions: Assertion[]; strictFailures: string[] };
+
+const tier1Options = (log: (line: string) => void) => {
+  const dbUrl = env('DB_URL');
+  return { dbUrl, adminDbUrl: adminUrl(dbUrl), callBudgetMs: CALL_BUDGET_MS, log };
+};
+
+const readPathReport = (result: ReadPathResult) => ({ costs: result.costs, checks: result.checks, failures: result.failures,
+  points: result.points.map(({ calls, ...point }) => ({ ...point, callCounts: Object.fromEntries(Object.entries(calls).map(([fn, list]) => [fn, list.length])) })) });
+
+const readPath = async (log: (line: string) => void): Promise<Outcome> => {
+  const result = await runReadPath(tier1Options(log));
+  const summary = `## Groups performance — read path (${gitRef()})\n\n${result.markdown}`;
+  const dir = writeReport('read-path', { tier: 1, set: 'read-path', gitRef: gitRef(), generatedAt: new Date().toISOString(),
+    callBudgetMs: CALL_BUDGET_MS, readPath: readPathReport(result) }, summary);
+  return { summary, dir, assertions: [], strictFailures: result.failures };
+};
+
+const tier1 = async (args: string[], log: (line: string) => void): Promise<Outcome> => {
   const matrix = args.includes('--matrix') ? args[args.indexOf('--matrix') + 1] : 'default';
   if (matrix !== 'default' && matrix !== 'full') throw new Error(`unknown matrix ${matrix}`);
   const plan = matrix === 'full' ? FULL_PLAN : DEFAULT_PLAN;
-  const dbUrl = env('DB_URL');
-  const options = { dbUrl, adminDbUrl: adminUrl(dbUrl), callBudgetMs: CALL_BUDGET_MS, log };
+  const options = tier1Options(log);
+  const { dbUrl } = options;
   const raw = await runPlan(plan, (members, days) =>
     runTier1Scenario(scenarioName(members, days), { members, historyDays: days, tag: `t${members}x${days}` }, options));
   const client = new Client({ connectionString: dbUrl });
@@ -145,13 +168,14 @@ const tier1 = async (args: string[], log: (line: string) => void) => {
     assertions.push({ id: 'cron-jobs-measured', description: 'every pg_cron job has a measured idle step',
       observed: `unmeasured: ${[...unmeasured].join(', ')}`, pass: false });
   }
-  const summary = `## Groups performance — Tier 1 (${matrix} matrix, ${gitRef()})\n\n${tier1Markdown(summaries, slopes, assertions)}`;
+  const read = await runReadPath(options);
+  const summary = `## Groups performance — Tier 1 (${matrix} matrix, ${gitRef()})\n\n${tier1Markdown(summaries, slopes, assertions)}\n${read.markdown}`;
   const dir = writeReport(`tier1-${matrix}`, { tier: 1, matrix, gitRef: gitRef(), generatedAt: new Date().toISOString(),
-    plan, cronJobs: jobs, callBudgetMs: CALL_BUDGET_MS, summaries, slopes, assertions, scenarios: raw }, summary);
-  return { summary, dir, assertions };
+    plan, cronJobs: jobs, callBudgetMs: CALL_BUDGET_MS, summaries, slopes, assertions, scenarios: raw, readPath: readPathReport(read) }, summary);
+  return { summary, dir, assertions, strictFailures: read.failures };
 };
 
-const load = async (log: (line: string) => void) => {
+const load = async (log: (line: string) => void): Promise<Outcome> => {
   const dbUrl = env('DB_URL');
   const fixture = { members: 10, historyDays: 28 };
   const run = new Tier2Run({
@@ -176,16 +200,22 @@ const load = async (log: (line: string) => void) => {
   const assertions = tier2Assertions(levels, result.idle);
   const summary = `## Groups performance — Tier 2 load run (${gitRef()})\n\n${tier2Markdown(result.fixture, levels, result.idle, assertions)}`;
   const dir = writeReport('load', { tier: 2, gitRef: gitRef(), generatedAt: new Date().toISOString(), levels, result, assertions }, summary);
-  return { summary, dir, assertions };
+  return { summary, dir, assertions, strictFailures: [] };
 };
 
 const main = async () => {
   const [command, ...args] = process.argv.slice(2);
   const log = (line: string) => console.log(line);
-  const outcome = command === 'tier1' ? await tier1(args, log) : command === 'load' ? await load(log) : null;
-  if (!outcome) throw new Error('usage: cli.ts tier1 [--matrix default|full] [--strict] | load [--strict]');
+  const outcome = command === 'tier1' ? await tier1(args, log) : command === 'read-path' ? await readPath(log)
+    : command === 'load' ? await load(log) : null;
+  if (!outcome) throw new Error('usage: cli.ts tier1 [--matrix default|full] [--strict] | read-path | load [--strict]');
   console.log(`\n${outcome.summary}`);
   console.log(`[groups-perf] report: ${path.join(outcome.dir, 'report.json')}`);
+  if (outcome.strictFailures.length > 0) {
+    console.error(`[groups-perf] FAIL: ${outcome.strictFailures.length} read-path failures (strict whatever GROUPS_PERF_STRICT says):`);
+    for (const failure of outcome.strictFailures) console.error(`[groups-perf]   ${failure}`);
+    process.exit(1);
+  }
   const warned = outcome.assertions.filter((assertion) => assertion.pass === false).length;
   if (warned > 0 && args.includes('--strict')) {
     console.error(`[groups-perf] ${warned} scaling assertions failed (--strict)`);

@@ -5,7 +5,8 @@
 > exercises → `groups-contract.md`; lane registry → `scripts/lanes.tsv`;
 > thresholds, matrices and knobs → the code in `apps/mobile/scripts/perf/groups/`.
 > **Load when:** measuring or changing the server cost of group evaluation,
-> publication, notification capture or the pg_cron sweeps, or running lane
+> publication, notification capture, the pg_cron sweeps or any group or
+> notification RPC, rewriting one of those RPCs, or running lane
 > `groups-perf` / `groups-perf-load`.
 
 ## Rules
@@ -20,7 +21,8 @@
    notification worker's handler); it changes no production code.
 3. **Assertions are report-only** until the operator promotes one: a failed
    scaling assertion prints `WARN` and exits 0. `GROUPS_PERF_STRICT=1` turns
-   them into failures.
+   them into failures. The exception is the read-path set below, which is
+   strict always: its failures exit 1 whatever `GROUPS_PERF_STRICT` says.
 4. **A lane leaves its stack as it found it.** Tier 1 rolls back. Tier 2
    restores the cron schedules, the notification cutover and the Vault
    entries it set, and deletes its fixture; a cleanup failure fails the lane.
@@ -68,7 +70,67 @@ Fidelity limits, by design:
 
 - the fixture is uncommitted, so no visibility map or hint bits help reads;
 - deferred constraint checks run unmeasured (a few index probes per row);
-- no notification installations exist, so no delivery is sent.
+- the sweeps' fixture has no notification installations, so no delivery is
+  sent there;
+- calls run one at a time on the one connection, even where a worker fans
+  out;
+- `now()` is the transaction's start, so a delivery's lease is renewed at
+  clock time before its send, as a claim made moments earlier holds.
+
+## Read path — strict per-call page budgets
+
+The last part of `./boga test groups-perf` (alone: `cli.ts read-path`,
+`apps/mobile/scripts/perf/groups/read-path.ts`). It measures one call of
+every group and notification RPC the app or the evaluator makes: shared
+pages, temp bytes and sequential scans per call, at M=5 and H=90 and H=180
+days.
+
+Each point is the Tier 1 fixture, in one rolled-back transaction, plus
+planted cases the reads must handle:
+
+- a bodyweight-redacted member exercise: one member also links an ordinary
+  exercise to the bodyweight-aware one, so it is redacted for that member
+  only;
+- a voided record: a member's best set edited down after evaluation;
+- last week's finished CoW and this week's live one, their sources
+  backdated to when each set was logged;
+- a local notification installation per member, so the cascade sends.
+
+The point fails if a planted case is missing after steady state. Reads run
+first, as the owner calls them through PostgREST. Week and period arguments
+are rolling 7-day windows ending at the fixture's clock, so a run's cost does
+not depend on the weekday. Then one logged set's evaluator and notification
+cascade runs, and the write RPCs are measured inside it with the service
+role, as their Edge callers run them; the costliest call counts. The report
+adds WAL per logged set (headline a).
+
+**Budgets** sit beside each scenario in `READ_PATH_RPCS`. A budget is the
+costliest call measured at either point plus about 25%. There are two kinds:
+
+- `baseline` records today's cost so a regression fails. It may sit over
+  the 5,000-page ceiling, and its slope is reported, not asserted.
+- `budgeted` must stay at or under the ceiling unless the entry carries a
+  written justification. For a week-, period-, page- or single-item-scoped
+  RPC its growth per doubling of history must stay at or under 1.2×.
+
+The set fails when a call exceeds its budget, a call fails, or a budgeted
+scoped RPC grows too fast. The lane lists the entries still `baseline`. A
+change that moves an RPC's cost re-measures it and updates its entry in the
+same PR, and a rewrite that meets the ceiling turns its entry `budgeted`.
+
+**Parity** (`parity.ts`) proves a rewritten RPC returns the same JSON as the
+definition it replaces. Before the rewrite, add a case to `PARITY_CASES`
+naming the migration that holds the old definition, plus argument sets that
+cover the fixture. The set copies that definition verbatim, installs it as
+`pg_temp.<fn>__legacy` and calls old and new for every member as viewer and
+every argument set, on the H=90 point. It fails on any JSON difference, by
+path. A rewrite that also changes a helper installs the helper's old
+definition too (`helpers`). Some definitions were patched in place by a
+later migration (`pg_get_functiondef` and replace) and have no verbatim copy
+in any one migration. For those, save the live text in a migration-named
+file before the rewrite. The standing case `group_competition_week_summary`
+proves the helper itself: identical definitions pass, and a planted one-field
+change must be caught.
 
 ## Tier 2 — `./boga test groups-perf-load`
 

@@ -58,7 +58,7 @@ const mergeSummary = (into: Omit<DrainSummary, 'failures'>, from: DrainSummary):
   into.setsScored += from.setsScored;
 };
 
-class Tier1Run {
+export class Tier1Run {
   private lastKickId = 0;
 
   constructor(private readonly session: Tier1Session) {}
@@ -77,6 +77,23 @@ class Tier1Run {
       'select id, url from net.http_request_queue where id > $1 order by id', [this.lastKickId]);
     if (rows.length > 0) this.lastKickId = Number(rows[rows.length - 1].id);
     return rows.map((row) => ({ id: Number(row.id), url: row.url }));
+  }
+
+  /**
+   * The notification worker's RPCs. A claim leases a delivery until now() +
+   * 60 s, and now() is this transaction's start, so once the scenario is a
+   * minute old every lease reads as expired and the send is skipped. In
+   * production the claim and the send are moments apart; renewing the lease
+   * at clock time first (unmeasured) keeps that.
+   */
+  private notificationRpc(service: Rpc): Rpc {
+    return async <T>(name: string, args: Record<string, unknown> = {}) => {
+      if (name === 'notification_begin_send') {
+        await this.session.exec(`update app_public.notification_deliveries set lease_until=clock_timestamp()+interval '60 seconds'
+          where id=$1 and claim_id=$2 and state='leased'`, [args.p_delivery_id, args.p_claim_id]);
+      }
+      return service<T>(name, args);
+    };
   }
 
   /** Run `start`, then one Edge invocation per pg_net kick, in order, until no kick is left. */
@@ -107,7 +124,7 @@ class Tier1Run {
           result.edgeRuns.notificationWorker += 1;
           const response = await handleNotificationRequest(
             new Request(NOTIFICATION_WORKER_URL, { method: 'POST', headers: { apikey: NOTIFICATION_KEY } }),
-            { serviceKeys: [NOTIFICATION_KEY], rpc: service as never });
+            { serviceKeys: [NOTIFICATION_KEY], rpc: this.notificationRpc(service) as never });
           const body = (await response.json()) as { outcomes?: Record<string, number> };
           for (const [outcome, count] of Object.entries(body.outcomes ?? {})) {
             result.notificationOutcomes[outcome] = (result.notificationOutcomes[outcome] ?? 0) + count;
@@ -146,7 +163,7 @@ export const pushEntities = {
   }),
 };
 
-const steadyState = async (run: Tier1Run, session: Tier1Session): Promise<Tier1Scenario['steadyState']> => {
+export const steadyState = async (run: Tier1Run, session: Tier1Session): Promise<Tier1Scenario['steadyState']> => {
   const failures: string[] = [];
   let groupEvalRuns = 0;
   // After one publication outruns the call budget the scenario is
@@ -177,6 +194,25 @@ const steadyState = async (run: Tier1Run, session: Tier1Session): Promise<Tier1S
   return { groupEvalRuns, leftoverJobs: left.n, failures };
 };
 
+/**
+ * Hosted configuration, inside the rolled-back transaction: both kick URLs
+ * set, and a notification cutover a week old so recent sessions are
+ * post-cutover workouts. No kick is ever sent: pg_net sends after commit.
+ */
+export const configureHosted = async (session: Tier1Session): Promise<void> => {
+  await session.exec(`select app_public.group_eval_set_url($1)`, [GROUP_EVAL_KICK_URL]);
+  await session.exec(`select vault.create_secret($1,'notification_worker_url'), vault.create_secret($2,'notification_worker_key')`,
+    [NOTIFICATION_WORKER_URL, NOTIFICATION_KEY]);
+  await session.exec(`update app_public.notification_workout_epoch set started_at = now() - interval '7 days'`);
+};
+
+/** Analyze every app table inside the transaction, so the planner sees the fixture. */
+export const analyzeAppTables = async (session: Tier1Session): Promise<void> => {
+  const tables = await session.exec<{ t: string }>(
+    `select quote_ident(schemaname)||'.'||quote_ident(tablename) as t from pg_tables where schemaname in ('app_public','public')`);
+  await session.exec(`analyze ${tables.map((row) => row.t).join(', ')}`);
+};
+
 export type Tier1Options = {
   dbUrl: string;
   adminDbUrl: string;
@@ -185,7 +221,7 @@ export type Tier1Options = {
   log: (line: string) => void;
 };
 
-const vacuum = async (adminDbUrl: string): Promise<void> => {
+export const vacuum = async (adminDbUrl: string): Promise<void> => {
   // The warning in group-metric-publish-benchmark.sql: rolled-back runs leave
   // dead rows and stale statistics behind, so each scenario starts clean.
   const admin = new Client({ connectionString: adminDbUrl });
@@ -223,13 +259,7 @@ export const runTier1Scenario = async (
   const session = new Tier1Session(client, options.callBudgetMs);
   try {
     await session.begin();
-    // Hosted configuration, inside the rolled-back transaction: both kick
-    // URLs set, and a notification cutover a week old so recent sessions are
-    // post-cutover workouts. No kick is ever sent: pg_net sends after commit.
-    await session.exec(`select app_public.group_eval_set_url($1)`, [GROUP_EVAL_KICK_URL]);
-    await session.exec(`select vault.create_secret($1,'notification_worker_url'), vault.create_secret($2,'notification_worker_key')`,
-      [NOTIFICATION_WORKER_URL, NOTIFICATION_KEY]);
-    await session.exec(`update app_public.notification_workout_epoch set started_at = now() - interval '7 days'`);
+    await configureHosted(session);
     for (const statement of fixtureStatements(spec)) await session.exec(statement);
     const [counts] = await session.exec<Tier1Scenario['fixture']>(FIXTURE_COUNTS_SQL);
     const run = new Tier1Run(session);
@@ -240,9 +270,7 @@ export const runTier1Scenario = async (
     if (scenarioIncomplete(steady, {}) !== null) {
       return { ...base, steps: {}, incomplete: scenarioIncomplete(steady, {}), setupMs: Date.now() - startedAt };
     }
-    const tables = await session.exec<{ t: string }>(
-      `select quote_ident(schemaname)||'.'||quote_ident(tablename) as t from pg_tables where schemaname in ('app_public','public')`);
-    await session.exec(`analyze ${tables.map((row) => row.t).join(', ')}`);
+    await analyzeAppTables(session);
     await run.markKicks();
 
     const steps: Record<string, StepResult> = {};
