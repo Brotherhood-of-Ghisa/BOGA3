@@ -303,10 +303,10 @@ the failure-isolated source-mode trigger implements [[groups.certification]].
   message prefix maps to the token; status 0 or a throw to `NETWORK`; anything
   else to `INTERNAL`.
 - Group code never runs in the sync cycle; it only wipes on
-  `apps/mobile/src/sync/account-wipe.ts` and arms timers on
+  `apps/mobile/src/sync/account-wipe.ts` and arms a timer on
   `apps/mobile/src/sync/push-signal.ts`.
 - **Reads** are cache-first (`useGroupResource`): focus, 30 s while focused,
-  2 s and 6 s after this device pushes, pull-to-refresh; skipped offline;
+  3 s after a push, pull-to-refresh; skipped offline or hidden;
   concurrent refreshes share a request; stale responses are dropped. Full
   boards and history are never cached. Entries seen this run draw on first
   render, never behind a loader.

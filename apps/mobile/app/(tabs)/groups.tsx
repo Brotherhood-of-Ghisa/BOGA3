@@ -2,7 +2,7 @@ import { groupSessionHref } from '@/src/navigation/routes';
 import { getCompetitionPodiums } from '@/src/groups/api';
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { useCallback, useEffect, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useCallback, useEffect, useReducer, useState, type ReactElement, type ReactNode } from 'react';
 import { RefreshControl, ScrollView, View, type RefreshControlProps } from 'react-native';
 
 import {
@@ -120,7 +120,8 @@ function GroupsTabContent({ userId }: { userId: string }) {
   }, [selectedGroupId]);
 
   // No group selected (My groups loading or empty): read nothing.
-  const stream = useGroupStream({ userId, groupId: selectedGroupId });
+  // Only the pages in view poll: At a glance also draws the stream's recent items.
+  const stream = useGroupStream({ userId, groupId: selectedGroupId, active: segment === 'stream' || segment === 'glance' });
   const boardsFetcher = useCallback(() => getCompetitionPodiums(selectedGroupId ?? '', false), [selectedGroupId]);
   // Cache-first, read once Leaderboards has been shown.
   const boards = useGroupResource<GroupMetricPodiumWire>({
@@ -128,6 +129,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
     cacheKey: selectedGroupId && visited.includes('leaderboards') ? groupCacheKeys.boards(selectedGroupId) : null,
     fetcher: boardsFetcher,
     evictGroupIdOnNotFound: selectedGroupId,
+    active: segment === 'leaderboards',
   });
 
   // Cache-first, read once At a glance has been shown: the chart's six weeks around the selection.
@@ -137,6 +139,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
     period,
     offset: groupRankSeriesEnd(glanceOffset),
     now: new Date(),
+    active: segment === 'glance',
   });
 
   // Lost access to the selected group: refresh My groups so the group goes
@@ -155,16 +158,6 @@ function GroupsTabContent({ userId }: { userId: string }) {
     [refreshMine, refreshStream, refreshBoards, refreshGlance],
   );
   const { pulling, onRefresh } = usePullToRefresh(refreshAll);
-  // Back on a page read before: read it again, as opening it the first time does.
-  const shown = useRef(new Set<GroupsSection>());
-  useEffect(() => {
-    const returning = shown.current.has(segment);
-    shown.current.add(segment);
-    if (returning && segment === 'leaderboards') void refreshBoards();
-    if (returning && segment === 'glance') void refreshGlance();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only a page change reads; a new group reads by its own key.
-  }, [segment]);
-
   // The banner speaks for the page in view; each page draws its own read's state.
   const segmentResource = segment === 'leaderboards' ? boards : segment === 'glance' ? glance.resource : stream;
   const offline = mine.offline || segmentResource.offline;

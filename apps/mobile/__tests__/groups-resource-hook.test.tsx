@@ -64,6 +64,7 @@ jest.mock('expo-router', () => {
 });
 
 import { groupCache } from '@/src/data/schema';
+import { __resetAfterPushRefreshForTests } from '@/src/groups/after-push-refresh';
 import { notifyRowsPushed } from '@/src/sync/push-signal';
 import {
   GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS,
@@ -179,6 +180,7 @@ describe('useGroupResource', () => {
     clearIntervalSpy = jest.spyOn(global, 'clearInterval');
     fixture = createInMemoryDatabase();
     mockNetInfoListeners.clear();
+    __resetAfterPushRefreshForTests();
     mockFocus.focused = true;
     mockFocus.callback = null;
     mockFocus.cleanup = null;
@@ -297,52 +299,129 @@ describe('useGroupResource', () => {
     expect(renderResource({ fetcher, userId: 'user-2' }).result.current).toMatchObject({ data: null, hydrated: false });
   });
 
-  it('refreshes 2 s and 6 s after a push while focused, and not while blurred', async () => {
-    expect(GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS).toEqual([2_000, 6_000]);
+  it('refreshes once, 3 s after a push, while focused, and not while blurred', async () => {
+    expect(GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS).toBe(3_000);
     const fetcher = jest.fn(() => Promise.resolve(payload('x')));
     renderResource({ fetcher });
     await flush();
     expect(fetcher).toHaveBeenCalledTimes(1);
 
     act(() => notifyRowsPushed());
-    await advance(1_999);
+    await advance(2_999);
     expect(fetcher).toHaveBeenCalledTimes(1);
     await advance(1);
     expect(fetcher).toHaveBeenCalledTimes(2);
-    await advance(4_000);
-    expect(fetcher).toHaveBeenCalledTimes(3);
-
-    // A second push re-arms both refreshes from its own time.
-    act(() => notifyRowsPushed());
-    await advance(1_000);
-    act(() => notifyRowsPushed());
-    await advance(2_000);
-    expect(fetcher).toHaveBeenCalledTimes(4);
-    await advance(4_000);
-    expect(fetcher).toHaveBeenCalledTimes(5);
+    // No second, later refresh from the same push.
+    await advance(10_000);
+    expect(fetcher).toHaveBeenCalledTimes(2);
 
     blurScreen();
     act(() => notifyRowsPushed());
     await advance(10_000);
-    expect(fetcher).toHaveBeenCalledTimes(5);
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
-  it('a push just before focus still refreshes at its remaining delays', async () => {
+  it('coalesces pushes inside the window into one refresh from the latest push', async () => {
+    const fetcher = jest.fn(() => Promise.resolve(payload('x')));
+    renderResource({ fetcher });
+    await flush();
+    fetcher.mockClear();
+
+    act(() => notifyRowsPushed());
+    await advance(1_000);
+    act(() => notifyRowsPushed());
+    await advance(2_999);
+    expect(fetcher).not.toHaveBeenCalled();
+    await advance(1);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await advance(10_000);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes every visible resource once per push, on one shared timer', async () => {
+    const fetchers = [1, 2, 3].map(() => jest.fn(() => Promise.resolve(payload('x'))));
+    fetchers.forEach((fetcher, index) => renderResource({ fetcher, cacheKey: groupCacheKeys.stream(`g${index}`) }));
+    await flush();
+    fetchers.forEach((fetcher) => fetcher.mockClear());
+    const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+
+    act(() => notifyRowsPushed());
+    const afterPushTimers = setTimeoutSpy.mock.calls.filter((call) => call[1] === GROUP_RESOURCE_AFTER_PUSH_REFRESH_MS);
+    setTimeoutSpy.mockRestore();
+    expect(afterPushTimers).toHaveLength(1);
+
+    await advance(3_000);
+    fetchers.forEach((fetcher) => expect(fetcher).toHaveBeenCalledTimes(1));
+  });
+
+  it('a push just before focus still refreshes at its remaining delay', async () => {
     const fetcher = jest.fn(() => Promise.resolve(payload('x')));
     blurScreen();
     renderResource({ fetcher });
     act(() => notifyRowsPushed());
-    await advance(3_000);
+    await advance(1_000);
     expect(fetcher).not.toHaveBeenCalled();
 
     focusScreen();
     await flush();
     expect(fetcher).toHaveBeenCalledTimes(1);
-    // The 2 s refresh has passed; the 6 s one is 3 s away.
-    await advance(2_999);
+    // The push was 1 s ago: its refresh is 2 s away.
+    await advance(1_999);
     expect(fetcher).toHaveBeenCalledTimes(1);
     await advance(1);
     expect(fetcher).toHaveBeenCalledTimes(2);
+    await advance(10_000);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('a push older than the delay before focus arms nothing', async () => {
+    const fetcher = jest.fn(() => Promise.resolve(payload('x')));
+    blurScreen();
+    renderResource({ fetcher });
+    act(() => notifyRowsPushed());
+    await advance(3_000);
+
+    focusScreen();
+    await flush();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await advance(10_000);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('an inactive resource neither polls nor follows a push, and refreshes when it becomes active', async () => {
+    const fetcher = jest.fn(() => Promise.resolve(payload('x')));
+    const { rerender } = renderResource({ fetcher, active: false });
+    await flush();
+    expect(fetcher).not.toHaveBeenCalled();
+
+    act(() => notifyRowsPushed());
+    await advance(GROUP_RESOURCE_POLL_INTERVAL_MS * 2);
+    expect(fetcher).not.toHaveBeenCalled();
+
+    rerender({ userId: USER, cacheKey: groupCacheKeys.mine, fetcher, active: true });
+    await flush();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    await advance(GROUP_RESOURCE_POLL_INTERVAL_MS);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+
+    rerender({ userId: USER, cacheKey: groupCacheKeys.mine, fetcher, active: false });
+    act(() => notifyRowsPushed());
+    await advance(GROUP_RESOURCE_POLL_INTERVAL_MS * 2);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('only the active resource follows a push', async () => {
+    const visible = jest.fn(() => Promise.resolve(payload('x')));
+    const hidden = jest.fn(() => Promise.resolve(payload('x')));
+    renderResource({ fetcher: visible, cacheKey: groupCacheKeys.stream('g1') });
+    renderResource({ fetcher: hidden, cacheKey: groupCacheKeys.stream('g2'), active: false });
+    await flush();
+    visible.mockClear();
+
+    act(() => notifyRowsPushed());
+    await advance(3_000);
+    expect(visible).toHaveBeenCalledTimes(1);
+    expect(hidden).not.toHaveBeenCalled();
   });
 
   it('refresh() fetches on demand and collapses concurrent calls into one request', async () => {

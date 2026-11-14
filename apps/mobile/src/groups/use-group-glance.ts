@@ -43,12 +43,15 @@ export function useGroupGlance({
   period,
   offset,
   now,
+  active,
 }: {
   userId: string;
   groupId: string | null;
   period: GroupHomePeriod;
   offset: number;
   now: Date;
+  /** False while the page is out of view: no poll, no after-push refresh. */
+  active?: boolean;
 }): GroupGlanceState {
   const windows = groupHomeSeriesWindows({ period, offset, now });
   // The windows depend on `now` only through the period it falls in, so the
@@ -67,6 +70,7 @@ export function useGroupGlance({
     cacheKey: groupId ? groupCacheKeys.glance(groupId, period, offset) : null,
     fetcher,
     evictGroupIdOnNotFound: groupId,
+    active,
   });
   const series = resource.data ? readGroupHomeSeries({ totals: resource.data, windows, myUserId: userId }) : null;
 

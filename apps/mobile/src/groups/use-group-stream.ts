@@ -70,14 +70,15 @@ export type GroupStreamState = GroupResourceState<GroupStreamResult> & {
   loadMore: () => Promise<void>;
 };
 
-/** One group's stream. A null `userId` or `groupId` reads nothing. */
-export function useGroupStream({ userId, groupId }: { userId: string | null; groupId: string | null }): GroupStreamState {
+/** One group's stream. A null `userId` or `groupId` reads nothing; an inactive one neither polls nor follows pushes. */
+export function useGroupStream({ userId, groupId, active }: { userId: string | null; groupId: string | null; active?: boolean }): GroupStreamState {
   const fetcher = useCallback(() => getCompetitionStream(groupId ?? ''), [groupId]);
   const resource = useGroupResource<GroupStreamResult>({
     userId,
     cacheKey: groupId ? groupCacheKeys.stream(groupId) : null,
     fetcher,
     evictGroupIdOnNotFound: groupId,
+    active,
   });
 
   const baseIdentity=`${userId ?? ''} ${groupId ?? ''}`;
