@@ -211,6 +211,26 @@ describe('plan form: create', () => {
     expect(unscheduled[0]).toMatchObject({ title: 'Heavy Day', progress: 'planned' });
   });
 
+  it('preselects Routine when opened with routine=1 and saves it as a routine', async () => {
+    await seedCatalog();
+    mockParams = { routine: '1' };
+    renderWithTheme(<SessionPlanNewRoute />);
+
+    expect(screen.getByTestId('plan-form-routine')).toHaveProp('accessibilityState', expect.objectContaining({ checked: true }));
+    expect(screen.getByTestId('plan-form-schedule')).toHaveTextContent(/Anytime/);
+    expect(screen.getByLabelText('Schedule, Anytime, locked while Routine is on')).toBeTruthy();
+
+    fillTitle('Morning Mobility');
+    await addExerciseBlock('Barbell Squat');
+    fillSet(1, 1, '60', '8');
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
+    const routines = await planQueries.listRoutines();
+    expect(routines).toHaveLength(1);
+    expect(routines[0]).toMatchObject({ title: 'Morning Mobility', isRoutine: true });
+  });
+
   it('uses recorder effort entry and keeps the last target effort unchanged when adding sets', async () => {
     await seedCatalog();
     const { unmount } = renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);

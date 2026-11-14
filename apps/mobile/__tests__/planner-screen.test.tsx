@@ -1,7 +1,7 @@
 /* eslint-disable import/first */
 
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -531,6 +531,10 @@ describe('Planner Power UX scopes and agenda strip', () => {
 
     expect(screen.getByTestId('planner-scope-row')).toBeTruthy();
     expect(screen.getByTestId('planner-scope-all').props.accessibilityState).toEqual({ selected: true });
+    expect(StyleSheet.flatten(screen.getByTestId('planner-scope-programmes').props.style)).toMatchObject({
+      flexGrow: 1,
+    });
+    expect(StyleSheet.flatten(screen.getByTestId('planner-scope-programmes').props.style).flex).toBeUndefined();
 
     // Initial 'All' tab renders all sections and week strip
     expect(screen.getByTestId('planner-week-strip')).toBeTruthy();
@@ -553,6 +557,8 @@ describe('Planner Power UX scopes and agenda strip', () => {
     expect(screen.getByTestId(`planner-plan-section-routines-row-${routineId}`)).toBeTruthy();
     expect(screen.queryByTestId('planner-week-strip')).toBeNull();
     expect(screen.queryByTestId('planner-plan-section-upcoming')).toBeNull();
+    fireEvent.press(screen.getByTestId('planner-plan-session-action'));
+    expect(mockPush).toHaveBeenCalledWith('/session-plan/new?routine=1');
 
     // Switch to Programmes
     fireEvent.press(screen.getByTestId('planner-scope-programmes'));
