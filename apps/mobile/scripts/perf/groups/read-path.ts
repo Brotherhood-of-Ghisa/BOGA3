@@ -16,14 +16,13 @@ import { Client } from 'pg';
 
 import { scans, type Counters } from './counters.ts';
 import { fixtureStatements, FIXTURE_COUNTS_SQL } from './fixture.ts';
-import { runGroupEval } from './group-eval-mirror.ts';
 import { compareParity, parityInstallStatements, parityPassed, type ParityCase, type ParityOutcome } from './parity.ts';
 import {
   checkBudgets, readPathMarkdown, type BudgetCheck, type BudgetEntry, type PointCost,
 } from './read-path-budgets.ts';
 import { Tier1Session, type CallRecord } from './session.ts';
 import {
-  analyzeAppTables, configureHosted, pushEntities, steadyState, Tier1Run, vacuum, type Tier1Options,
+  analyzeAppTables, configureHosted, pushEntities, steadyState, Tier1Run, vacuum, type StepResult, type Tier1Options,
 } from './tier1.ts';
 
 export const READ_PATH_MEMBERS = 5;
@@ -331,6 +330,79 @@ const drain = async (run: Tier1Run, session: Tier1Session, label: string): Promi
   return null;
 };
 
+type Viewer = { role: 'authenticated'; userId: string; sessionId: string };
+type RecordFailure = (fn: string) => (error: Error) => void;
+
+/** The fixture, its planted cases and steady state; the context to measure, or null when the point is incomplete. */
+const buildPoint = async (session: Tier1Session, run: Tier1Run, point: ReadPathPoint): Promise<ReadPathContext | null> => {
+  await session.begin();
+  await configureHosted(session);
+  const spec = { members: READ_PATH_MEMBERS, historyDays: point.historyDays, tag: `r${point.historyDays}` };
+  for (const statement of [...fixtureStatements(spec), ...plantStatements()]) await session.exec(statement);
+  [point.fixture] = await session.exec<ReadPathPoint['fixture']>(FIXTURE_COUNTS_SQL);
+  point.incomplete = await drain(run, session, 'steady state');
+  if (point.incomplete) return null;
+  for (const statement of postSteadyPlantStatements()) await session.exec(statement);
+  point.incomplete = await drain(run, session, 'steady state after the planted cases');
+  if (point.incomplete) return null;
+  [point.plants] = await session.exec<PlantChecks>(PLANT_CHECKS_SQL);
+  const missing = Object.entries(point.plants).filter(([, held]) => !held).map(([plant]) => plant);
+  if (missing.length > 0) {
+    point.incomplete = `planted cases missing: ${missing.join(', ')}`;
+    return null;
+  }
+  await analyzeAppTables(session);
+  return readContext(session);
+};
+
+const sumCascades = (steps: readonly StepResult[]): NonNullable<ReadPathPoint['cascade']> => ({
+  edgeRuns: {
+    groupEval: steps.reduce((sum, step) => sum + step.edgeRuns.groupEval, 0),
+    notificationWorker: steps.reduce((sum, step) => sum + step.edgeRuns.notificationWorker, 0),
+  },
+  notificationOutcomes: steps.reduce<Record<string, number>>((sum, step) => {
+    for (const [outcome, count] of Object.entries(step.notificationOutcomes)) sum[outcome] = (sum[outcome] ?? 0) + count;
+    return sum;
+  }, {}),
+});
+
+/**
+ * The viewer's workout as the app syncs it: its start, a logged set, its
+ * finish and the confirmation of its graph, each with every Edge run its
+ * kicks start and every kick those start. The write RPCs are measured inside
+ * these cascades (the finish push itself is not); a workout's start and its
+ * confirmation are what run the notification worker.
+ */
+const measureWorkout = async (
+  session: Tier1Session, run: Tier1Run, context: ReadPathContext, viewer: Viewer, recordFailure: RecordFailure,
+): Promise<StepResult[]> => {
+  await run.markKicks();
+  let clock = Number((await session.exec<{ now_ms: string }>('select now_ms from perf_fx'))[0].now_ms);
+  const lifter = run.rpc(viewer, true);
+  // Started ten minutes ago; the finish push repeats that start.
+  const startedAt = clock - 600000;
+  const live = (status: 'active' | 'completed') => {
+    const entity = pushEntities.session('perf-live', startedAt, (clock += 1));
+    return status === 'active' ? entity : { ...entity, fields: { ...entity.fields, status, completed_at: clock, duration_sec: 600 } };
+  };
+  const started = await run.step('workout_start', true, () => lifter('sync_push', { entities: [
+    live('active'),
+    pushEntities.block('perf-live-b0', 'perf-live', 0, 0, 'Bench press', (clock += 1)),
+    pushEntities.set('perf-live-b0-x0', 'perf-live-b0', 0, '50', '8', (clock += 1)),
+  ] }));
+  const logged = await run.step('logged_set', true, () => lifter(
+    'sync_push', { entities: [pushEntities.set('perf-live-b0-x1', 'perf-live-b0', 1, '82.5', '5', (clock += 1))] }));
+  await run.step('workout_finish', false, () => lifter('sync_push', { entities: [live('completed')] }));
+  // After a quiet sync the app confirms the finished workout's graph, exactly as the server holds it.
+  const [graph] = await session.exec<{ entities: unknown }>(
+    `select app_public.notification_source_manifest($1,'perf-live') as entities`, [context.viewer]);
+  context.completion = { sessionId: 'perf-live', entities: graph.entities };
+  const confirm = READ_PATH_RPCS.find((item) => item.fn === 'notification_confirm_completion')!;
+  const confirmed = await run.step('workout_confirmed', true,
+    () => lifter(confirm.fn, confirm.args!(context)).catch(recordFailure(confirm.fn)));
+  return [started, logged, confirmed];
+};
+
 export const runReadPathPoint = async (historyDays: number, options: Tier1Options & { parity: boolean }): Promise<ReadPathPoint> => {
   const startedAt = Date.now();
   const name = `read-m${READ_PATH_MEMBERS}-h${historyDays}d`;
@@ -338,82 +410,31 @@ export const runReadPathPoint = async (historyDays: number, options: Tier1Option
   const client = new Client({ connectionString: options.dbUrl });
   await client.connect();
   const session = new Tier1Session(client, options.callBudgetMs);
+  const run = new Tier1Run(session);
   const point: ReadPathPoint = {
     name, members: READ_PATH_MEMBERS, historyDays, fixture: { members: 0, sessions: 0, sets: 0 }, plants: {}, calls: {},
     errors: {}, cascade: null, walPerLoggedSet: null, parity: [], incomplete: null, setupMs: 0,
   };
-  const recordFailure = (fn: string) => (error: Error) => {
+  const recordFailure: RecordFailure = (fn) => (error) => {
     point.errors[fn] = error.message;
   };
   try {
-    await session.begin();
-    await configureHosted(session);
-    for (const statement of fixtureStatements({ members: READ_PATH_MEMBERS, historyDays, tag: `r${historyDays}` })) await session.exec(statement);
-    for (const statement of plantStatements()) await session.exec(statement);
-    [point.fixture] = await session.exec<ReadPathPoint['fixture']>(FIXTURE_COUNTS_SQL);
-    const run = new Tier1Run(session);
-    point.incomplete = await drain(run, session, 'steady state');
-    if (point.incomplete) return point;
-    for (const statement of postSteadyPlantStatements()) await session.exec(statement);
-    point.incomplete = await drain(run, session, 'steady state after the planted cases');
-    if (point.incomplete) return point;
-    [point.plants] = await session.exec<PlantChecks>(PLANT_CHECKS_SQL);
-    const missing = Object.entries(point.plants).filter(([, held]) => !held).map(([plant]) => plant);
-    if (missing.length > 0) {
-      point.incomplete = `planted cases missing: ${missing.join(', ')}`;
-      return point;
-    }
-    await analyzeAppTables(session);
-    const context = await readContext(session);
+    const context = await buildPoint(session, run, point);
+    if (!context) return point;
     options.log(`[${name}] steady state after ${Math.round((Date.now() - startedAt) / 1000)} s: ${point.fixture.sets} sets`);
-
     // Reads first, against the steady state the planted cases left.
-    const viewer = { role: 'authenticated' as const, userId: context.viewer, sessionId: context.viewerSession };
+    const viewer: Viewer = { role: 'authenticated', userId: context.viewer, sessionId: context.viewerSession };
     for (const rpc of READ_PATH_RPCS.filter((item) => item.via === 'member' && item.fn !== 'notification_confirm_completion')) {
       await session.call(viewer, rpc.fn, rpc.args!(context), true).catch(recordFailure(rpc.fn));
     }
     const reads = session.take();
     if (options.parity) point.parity = await runParityCases(session, context);
-
-    // The viewer's workout as the app syncs it: its start, a logged set, its
-    // finish and the confirmation of its graph, each with every Edge run its
-    // kicks start and every kick those start. The write RPCs are measured
-    // inside these cascades (the finish push itself is not); a workout's
-    // start and its confirmation are what run the notification worker.
-    await run.markKicks();
-    let clock = Number((await session.exec<{ now_ms: string }>('select now_ms from perf_fx'))[0].now_ms);
-    const lifter = run.rpc(viewer, true);
-    const started = await run.step('workout_start', true, () => lifter('sync_push', { entities: [
-      pushEntities.session('perf-live', clock - 600000, (clock += 1)),
-      pushEntities.block('perf-live-b0', 'perf-live', 0, 0, 'Bench press', (clock += 1)),
-      pushEntities.set('perf-live-b0-x0', 'perf-live-b0', 0, '50', '8', (clock += 1)),
-    ] }));
-    const logged = await run.step('logged_set', true, () => lifter(
-      'sync_push', { entities: [pushEntities.set('perf-live-b0-x1', 'perf-live-b0', 1, '82.5', '5', (clock += 1))] }));
-    const live = pushEntities.session('perf-live', clock - 600000, (clock += 1));
-    await run.step('workout_finish', false, () => lifter('sync_push', { entities: [
-      { ...live, fields: { ...live.fields, status: 'completed', completed_at: clock, duration_sec: 600 } }] }));
-    // After a quiet sync the app confirms the finished workout's graph, exactly as the server holds it.
-    const [graph] = await session.exec<{ entities: unknown }>(
-      `select app_public.notification_source_manifest($1,'perf-live') as entities`, [context.viewer]);
-    context.completion = { sessionId: 'perf-live', entities: graph.entities };
-    const confirm = READ_PATH_RPCS.find((item) => item.fn === 'notification_confirm_completion')!;
-    const confirmed = await run.step('workout_confirmed', true,
-      () => lifter(confirm.fn, confirm.args!(context)).catch(recordFailure(confirm.fn)));
-    point.walPerLoggedSet = logged.total.walBytes;
-    const steps = [started, logged, confirmed];
-    point.cascade = {
-      edgeRuns: { groupEval: steps.reduce((sum, step) => sum + step.edgeRuns.groupEval, 0),
-        notificationWorker: steps.reduce((sum, step) => sum + step.edgeRuns.notificationWorker, 0) },
-      notificationOutcomes: steps.reduce<Record<string, number>>((sum, step) => {
-        for (const [outcome, count] of Object.entries(step.notificationOutcomes)) sum[outcome] = (sum[outcome] ?? 0) + count;
-        return sum;
-      }, {}),
-    };
-
-    const records = [...reads, ...steps.flatMap((step) => step.calls)];
+    const steps = await measureWorkout(session, run, context, viewer, recordFailure);
+    point.walPerLoggedSet = steps[1].total.walBytes;
+    point.cascade = sumCascades(steps);
     const measuredFns = new Set(READ_PATH_RPCS.map((rpc) => rpc.fn));
-    point.calls = Object.fromEntries(Object.entries(groupByFn(records)).filter(([fn]) => measuredFns.has(fn)));
+    point.calls = Object.fromEntries(Object.entries(groupByFn([...reads, ...steps.flatMap((step) => step.calls)]))
+      .filter(([fn]) => measuredFns.has(fn)));
     const failures = steps.flatMap((step) => step.failures.map((failure) => `${step.label}: ${failure}`));
     if (failures.length > 0) point.incomplete = failures.join('; ');
     return point;
