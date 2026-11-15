@@ -193,16 +193,15 @@ describe('the group read, evaluator write and notification RPCs the lane budgets
     }
   });
 
-  test('a screen read that is budgeted but not slope-asserted says why, and the CoW summaries are such reads', () => {
+  test('a screen read that is budgeted but not slope-asserted says why, and the previous CoW summary is the only one', () => {
     for (const rpc of READ_PATH_RPCS) {
       if (rpc.via === 'member' && rpc.budget.kind === 'budgeted' && !rpc.budget.scoped) expect(rpc.budget.justification?.trim()).toBeTruthy();
     }
-    for (const fn of ['group_cow_summary', 'group_cow_previous_summary']) {
-      const budget = READ_PATH_RPCS.find((rpc) => rpc.fn === fn)!.budget;
-      expect(budget).toMatchObject({ kind: 'budgeted', scoped: false });
-      expect(budget.pages).toBeLessThan(PAGE_CEILING / 2);
-      expect(budget.justification).toContain('1.2x');
-    }
+    const budget = READ_PATH_RPCS.find((rpc) => rpc.fn === 'group_cow_previous_summary')!.budget;
+    expect(budget).toMatchObject({ kind: 'budgeted', scoped: false });
+    expect(budget.pages).toBeLessThan(PAGE_CEILING / 2);
+    expect(budget.justification).toContain('1.2x');
+    expect(READ_PATH_RPCS.find((rpc) => rpc.fn === 'group_cow_summary')!.budget).toMatchObject({ kind: 'budgeted', scoped: true });
   });
 
   test('no entry is baseline: every RPC is held to the ceiling', () => {
@@ -212,13 +211,13 @@ describe('the group read, evaluator write and notification RPCs the lane budgets
   test('the exceptions are exactly the ones the operator approved', () => {
     const over = READ_PATH_RPCS.filter((rpc) => rpc.budget.pages > PAGE_CEILING).map((rpc) => [rpc.fn, rpc.budget.pages]);
     expect(Object.fromEntries(over)).toEqual({
-      group_metric_eval_publish: 61_000,
-      notification_workout_prepare: 6_500,
-      notification_workout_enqueue: 6_500,
-      notification_begin_send: 6_500,
+      group_metric_eval_publish: 53_000,
+      notification_workout_prepare: 5_700,
+      notification_workout_enqueue: 5_700,
+      notification_begin_send: 5_700,
     });
     const unscopedReads = READ_PATH_RPCS.filter((rpc) => rpc.via === 'member' && !rpc.budget.scoped).map((rpc) => [rpc.fn, rpc.budget.pages]);
-    expect(Object.fromEntries(unscopedReads)).toEqual({ group_cow_summary: 1_200, group_cow_previous_summary: 1_300 });
+    expect(Object.fromEntries(unscopedReads)).toEqual({ group_cow_previous_summary: 360 });
     expect(unscopedReadChecks()).toEqual([]);
   });
 

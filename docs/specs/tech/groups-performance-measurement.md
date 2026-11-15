@@ -133,9 +133,9 @@ The exceptions the operator agreed, each justified in code, and pinned by
 
 | RPC | Budget | Exception and cause |
 | --- | --: | --- |
-| `group_metric_eval_publish` | 61,000 | over the ceiling: a background evaluator job; its notification captures and source graph read the exercise's shared history |
-| `notification_workout_enqueue`, `notification_workout_prepare`, `notification_begin_send` | 6,500 each | over the ceiling: each proves its capture still holds by digesting the exercise's whole source graph (about 2.2 pages a set) |
-| `group_cow_summary`, `group_cow_previous_summary` | 1,200, 1,300 | slope not asserted: one bodyweight-redaction cache build scans each participant's history (1.3-1.5× per doubling); only a stored current definition per score removes it |
+| `group_metric_eval_publish` | 53,000 | over the ceiling: a background evaluator job; its notification captures and source graph read the exercise's shared history |
+| `notification_workout_enqueue`, `notification_workout_prepare`, `notification_begin_send` | 5,700 each | budget over the ceiling: each proves its capture still holds by digesting the exercise's whole source graph (about 2.2 pages a set) |
+| `group_cow_previous_summary` | 360 | slope not asserted: 1.19× per doubling, at the 1.2× limit; cause not yet traced |
 
 Every other RPC the set measures is under the ceiling, and every other
 screen read is scoped. `group_metric_eval_prepare`, an evaluator write, is

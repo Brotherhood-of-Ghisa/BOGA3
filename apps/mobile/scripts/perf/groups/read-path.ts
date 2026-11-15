@@ -93,21 +93,18 @@ const stream = (fn: string, budget: BudgetEntry): ReadPathRpc => ({
   fn, via: 'member', args: (c) => ({ p_group_id: c.groupId, p_before: null, p_limit: 20 }), budget,
 });
 
-/** Readiness proof (graph once per target): over the ceiling because the graph reads the exercise's whole shared history. */
-const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 6_500, scoped: false,
-  justification: 'Measured warm (5.0-5.2k pages at H=180, budget = warm +25%); over the 5,000 ceiling by operator agreement. The proof that the captured comparison still holds compares the digest of the group\'s whole source graph '
+/** Readiness proof (graph once per target): its budget is over the ceiling because the graph reads the exercise's whole shared history. */
+const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 5_700, scoped: false,
+  justification: 'Measured warm (4.4-4.5k pages at H=180, budget = warm +25%); the budget is over the 5,000 ceiling by operator agreement. The proof that the captured comparison still holds compares the digest of the group\'s whole source graph '
     + '(every shared set of the exercise, about 2.2 pages a set, so linear in history) and ranks the exercise from it.' };
 
 /**
- * The two CoW summaries are not slope-asserted (`scoped: false`) though far
- * under the ceiling: each builds its rows once per metric and one
- * bodyweight-redaction cache over the participants' counting scores, events and
- * sets, and that cache's reads grow with history (about 1.3-1.5x per doubling:
- * summary 737 -> 964 pages, previous summary 709 -> 1,060 at H=90 -> 180).
+ * The previous CoW summary is not slope-asserted (`scoped: false`) though far
+ * under the ceiling: it measured 240 -> 285 pages from H=90 to H=180, 1.19x
+ * per doubling, at the 1.2x limit, so run-to-run noise would fail the set.
  */
-const COW_REDACTION_SLOPE = 'One bodyweight-redaction cache build per call reads each participant\'s counting scores, events and sets, '
-  + 'so it grows with history: summary 737 -> 964 pages and previous summary 709 -> 1,060 pages from H=90 to H=180 '
-  + '(1.31x and 1.50x per doubling, over 1.2x). Both are measured under a quarter of the ceiling.';
+const COW_PREVIOUS_SLOPE = 'Measured 240 -> 285 pages from H=90 to H=180 (1.19x per doubling, at the 1.2x limit), '
+  + 'so a slope assertion would fail on run-to-run noise; under a tenth of the ceiling. The cause of the growth is not yet traced.';
 
 /**
  * Every RPC the set measures, with its budget beside it. A budget is the
@@ -116,33 +113,33 @@ const COW_REDACTION_SLOPE = 'One bodyweight-redaction cache build per call reads
  * justification. Re-measure and update an entry in the change that moves its cost.
  */
 export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
-  stream('group_competition_stream_v5', { kind: 'budgeted', pages: 4_000, scoped: true }),
-  stream('group_competition_stream_v4', { kind: 'budgeted', pages: 3_900, scoped: true }),
-  stream('group_competition_stream_v3', { kind: 'budgeted', pages: 3_800, scoped: true }),
-  stream('group_competition_stream_v2', { kind: 'budgeted', pages: 2_300, scoped: true }),
+  stream('group_competition_stream_v5', { kind: 'budgeted', pages: 2_300, scoped: true }),
+  stream('group_competition_stream_v4', { kind: 'budgeted', pages: 2_200, scoped: true }),
+  stream('group_competition_stream_v3', { kind: 'budgeted', pages: 2_200, scoped: true }),
+  stream('group_competition_stream_v2', { kind: 'budgeted', pages: 2_100, scoped: true }),
   { fn: 'group_competition_period_totals', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_windows: c.weeks }),
     budget: { kind: 'budgeted', pages: 3_600, scoped: true } },
   { fn: 'group_competition_week_summary', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_window_start_ms: c.weeks.at(-1)!.start_ms, p_window_end_ms: c.weeks.at(-1)!.end_ms }),
     budget: { kind: 'budgeted', pages: 1_000, scoped: true } },
   { fn: 'group_competition_podiums', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_certified: false }),
-    budget: { kind: 'budgeted', pages: 3_000, scoped: true } },
+    budget: { kind: 'budgeted', pages: 280, scoped: true } },
   { fn: 'group_competition_board', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_limit: 50, p_cursor: null }),
-    budget: { kind: 'budgeted', pages: 1_500, scoped: true } },
+    budget: { kind: 'budgeted', pages: 100, scoped: true } },
   { fn: 'group_competition_records_history', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_before: null, p_limit: 50 }),
-    budget: { kind: 'budgeted', pages: 2_100, scoped: true } },
+    budget: { kind: 'budgeted', pages: 650, scoped: true } },
   { fn: 'group_competition_session_detail', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
-    budget: { kind: 'budgeted', pages: 1_100, scoped: true } },
+    budget: { kind: 'budgeted', pages: 70, scoped: true } },
   { fn: 'group_competition_session_records', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'budgeted', pages: 360, scoped: true } },
   { fn: 'group_cow_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'budgeted', pages: 1_200, scoped: false, justification: COW_REDACTION_SLOPE } },
+    budget: { kind: 'budgeted', pages: 320, scoped: true } },
   { fn: 'group_cow_previous_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'budgeted', pages: 1_300, scoped: false, justification: COW_REDACTION_SLOPE } },
+    budget: { kind: 'budgeted', pages: 360, scoped: false, justification: COW_PREVIOUS_SLOPE } },
   { fn: 'group_cow_calendar_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_list_mine', via: 'member', args: () => ({}), budget: { kind: 'budgeted', pages: 20, scoped: true } },
@@ -151,8 +148,8 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 400, scoped: true } },
   { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'budgeted', pages: 3_600, scoped: false } },
-  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 61_000, scoped: false,
-    justification: 'Measured 48.7k pages at H=180 (budget = measured +25%). A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
+  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 53_000, scoped: false,
+    justification: 'Measured 41.7k pages at H=180 (budget = measured +25%). A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
       + 'before and after publishing: every source session\'s boards with and without its workout. Each capture also builds the source graph, which reads every shared set of the exercise (linear in history). '
       + 'Score writes and board apply are a small share of the cost.' } },
   // Each of these three proves the captured comparison still holds: it builds
