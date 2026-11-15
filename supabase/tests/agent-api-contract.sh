@@ -2955,12 +2955,12 @@ done
 FOREIGN_NOTE_SESSION="${SCOPED_KEY}-foreign-session"
 FOREIGN_NOTE_BLOCK="${SCOPED_KEY}-foreign-block"
 FOREIGN_NOTE_SET="${SCOPED_KEY}-foreign-set"
-run_psql "insert into app_public.sessions(owner_user_id,id,status,started_at,client_updated_at_ms)
-  values ('${USER_B_UUID}','${FOREIGN_NOTE_SESSION}','active',${NOW_MS},${NOW_MS});
-  insert into app_public.session_exercises(owner_user_id,id,session_id,order_index,name,client_updated_at_ms)
-  values ('${USER_B_UUID}','${FOREIGN_NOTE_BLOCK}','${FOREIGN_NOTE_SESSION}',0,'Private lift',${NOW_MS});
-  insert into app_public.exercise_sets(owner_user_id,id,session_exercise_id,order_index,client_updated_at_ms)
-  values ('${USER_B_UUID}','${FOREIGN_NOTE_SET}','${FOREIGN_NOTE_BLOCK}',0,${NOW_MS});" >/dev/null
+run_psql "insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+  values ('${USER_B_UUID}','${FOREIGN_NOTE_SESSION}','active',${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
+  insert into app_public.session_exercises(owner_user_id,id,session_id,order_index,name,created_at,updated_at,client_updated_at_ms)
+  values ('${USER_B_UUID}','${FOREIGN_NOTE_BLOCK}','${FOREIGN_NOTE_SESSION}',0,'Private lift',${NOW_MS},${NOW_MS},${NOW_MS});
+  insert into app_public.exercise_sets(owner_user_id,id,session_exercise_id,order_index,created_at,updated_at,client_updated_at_ms)
+  values ('${USER_B_UUID}','${FOREIGN_NOTE_SET}','${FOREIGN_NOTE_BLOCK}',0,${NOW_MS},${NOW_MS},${NOW_MS});" >/dev/null
 for scope in "session_id" "set_id"; do
   foreign_target="${FOREIGN_NOTE_SESSION}"
   [[ "$scope" == "set_id" ]] && foreign_target="${FOREIGN_NOTE_SET}"
