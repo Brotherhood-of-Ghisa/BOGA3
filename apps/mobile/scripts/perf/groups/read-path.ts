@@ -99,6 +99,17 @@ const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 6_500, scoped
     + 'The ranks cost a fixed share: redaction answered once per member, not once per ranked row.' };
 
 /**
+ * The two CoW summaries are not slope-asserted (`scoped: false`) though far
+ * under the ceiling: each builds its rows once per metric and one
+ * bodyweight-redaction cache over the participants' counting scores, events and
+ * sets, and that cache's reads grow with history (about 1.3-1.5x per doubling:
+ * summary 737 -> 964 pages, previous summary 709 -> 1,060 at H=90 -> 180).
+ */
+const COW_REDACTION_SLOPE = 'One bodyweight-redaction cache build per call reads each participant\'s counting scores, events and sets, '
+  + 'so it grows with history: summary 737 -> 964 pages and previous summary 709 -> 1,060 pages from H=90 to H=180 '
+  + '(1.31x and 1.50x per doubling, over 1.2x). Both are measured under a quarter of the ceiling.';
+
+/**
  * Every RPC the set measures, with its budget beside it. A budget is the
  * costliest call measured at either point (reads warm: `warmUp`) plus ~25% (`suggestBudget`);
  * `baseline` entries record today's cost, `budgeted` ones hold an RPC to the
@@ -129,10 +140,9 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'budgeted', pages: 360, scoped: true } },
   { fn: 'group_cow_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'budgeted', pages: 2_200, scoped: true } },
-  // Still `baseline`: under the ceiling, but its cost grows 1.36-1.38x per doubling of history.
+    budget: { kind: 'budgeted', pages: 1_200, scoped: false, justification: COW_REDACTION_SLOPE } },
   { fn: 'group_cow_previous_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'baseline', pages: 2_500, scoped: true } },
+    budget: { kind: 'budgeted', pages: 1_300, scoped: false, justification: COW_REDACTION_SLOPE } },
   { fn: 'group_cow_calendar_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_list_mine', via: 'member', args: () => ({}), budget: { kind: 'budgeted', pages: 20, scoped: true } },
@@ -166,6 +176,7 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
 const READ_DEFINITIONS = 'parity-definitions/20261114220000_group_read_helpers.sql';
 const PUBLICATION = '20261004233855_group_competition_publication.sql';
 const COW_READERS = '20261030064514_group_cow_readers.sql';
+const COW_LIFECYCLE = '20261029204606_group_cow_lifecycle.sql';
 const COW_STREAM = '20261030203502_group_cow_stream_events.sql';
 
 /**
@@ -241,6 +252,12 @@ const cowParityCases = (): ParityCase<ReadPathContext>[] => [
   { fn: 'group_cow_summary', migration: COW_READERS, helpers: COW_RESULT_HELPERS, ignoreKeys: ['observed_at_us'],
     argumentSets: (context) => [{ p_group_id: context.groupId }] },
   { fn: 'group_cow_previous_summary', migration: '20261030210545_group_cow_previous_summary.sql', helpers: COW_RESULT_HELPERS, ignoreKeys: ['observed_at_us'],
+    argumentSets: (context) => [{ p_group_id: context.groupId }] },
+  // The calendar before the zone list: its own definition and the helpers that validate the zone
+  // (the old one reads pg_timezone_names on every call), for every viewer. The fixture group's
+  // zone is UTC, `next_week_start` is the clock's week, so the call is the same on both sides.
+  { fn: 'group_cow_calendar_get', migration: COW_LIFECYCLE,
+    helpers: { group_cow_zone: COW_LIFECYCLE, group_cow_week: COW_LIFECYCLE, group_cow_calendar_json: COW_LIFECYCLE },
     argumentSets: (context) => [{ p_group_id: context.groupId }] },
   { fn: 'group_cow_results', migration: COW_READERS, helpers: COW_RESULT_HELPERS,
     argumentSets: (context) => context.cows.flatMap((cow) => cow.metrics.flatMap((metric) => [1, 20].map((limit) =>
