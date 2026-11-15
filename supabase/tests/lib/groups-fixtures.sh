@@ -233,11 +233,11 @@ mint_token() {
 
 next_cuam() { CUAM=$((CUAM + 1)); }
 
-# e_def <id> <name> <cuam> [load_input_mode]
+# e_def <id> <name> <cuam> [load_input_mode] [bodyweight_contribution]
 e_def() {
-  jq -nc --arg id "$1" --arg name "$2" --argjson c "$3" --arg m "${4:-total_load}" \
+  jq -nc --arg id "$1" --arg name "$2" --argjson c "$3" --arg m "${4:-total_load}" --argjson bw "${5:-0}" \
     '{type: "exercise_definitions", id: $id, client_updated_at_ms: $c,
-      fields: {name: $name, load_input_mode: $m, bodyweight_contribution: 0,
+      fields: {name: $name, load_input_mode: $m, bodyweight_contribution: $bw,
                created_at: $c, updated_at: $c, deleted_at: null}}'
 }
 # e_gym <id> <name> <cuam> — carries coordinates so the no-GPS assertions bite.

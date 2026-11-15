@@ -485,8 +485,8 @@ check 'deleted shared exercise is gone from list' 'all(.shared_exercises[];.id!=
 
 pass 'shared exercise contract: validation, projection decoders, stream wire, and deletion'
 
-# A published percentage remains joinable by set ID while source work is
-# queued. Moving that source to an ordinary definition cannot reveal its kg.
+# Disclosure reads the current exercise only: a member who moves a scored
+# source to an ordinary definition shows its kg, even while work is queued.
 next_cuam
 push "${RIVAL_TOKEN}" 'source identity move before publication' \
   "$(e_def "${T}-moved-def" 'Moved ordinary' "${CUAM}")" \
@@ -494,12 +494,11 @@ push "${RIVAL_TOKEN}" 'source identity move before publication' \
 rpc "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${RIVAL_UID}" --arg s "${T}-RIVAL" \
   '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"
 expect_ok 'queued source move session'; assert_wire isCompetitionSessionDetailWire
-check 'queued source move hides kg counterpart' '.session.exercises[0].visibility=="normalized" and (.session.exercises[0].sets[0]|has("weight_value")|not)'
+check "a member's own source move shows its kg" '.session.exercises[0].visibility=="ordinary" and .session.exercises[0].sets[0].weight_value=="20"'
 next_cuam
 push "${RIVAL_TOKEN}" 'restore source identity' "$(e_se "${T}-RIVAL-se" "${T}-RIVAL" "${T}-RIVAL-def" 0 'Pull-up' "${CUAM}")"
 drain 'coalesced source identity move'
-# Preserve raw reps even when an exercise has no definition. Unknown identity
-# cannot establish that an absolute counterpart is unrelated.
+# An exercise with no definition has no setting to hide it: reps and kg show.
 next_cuam
 push "${ATHLETE_TOKEN}" 'unbound exercise raw context' \
   "$(e_se "${T}-unknown-se" "${T}-ATHLETE" '' 2 'Unknown exercise' "${CUAM}")" \
@@ -507,9 +506,35 @@ push "${ATHLETE_TOKEN}" 'unbound exercise raw context' \
 rpc "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
   '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"
 expect_ok 'unknown exercise session'; assert_wire isCompetitionSessionDetailWire
-check 'unknown exercise retains reps and omits kg' 'any(.session.exercises[]; .exercise_definition_id==null and .load_input_mode==null and
-  .visibility=="normalized" and .sets[0].reps_value=="7" and (.sets[0]|has("weight_value")|not))'
-pass 'queued identity and unbound exercise privacy with permitted reps retained'
+check 'unknown exercise shows reps and kg' 'any(.session.exercises[]; .exercise_definition_id==null and .load_input_mode==null and
+  .visibility=="ordinary" and .sets[0].reps_value=="7" and .sets[0].weight_value=="40")'
+pass 'a moved source and an unknown exercise follow the current exercise'
+
+# The rest of the rule, on two more exercises in the athlete's session: an
+# unlinked exercise with its own bodyweight contribution hides kg, and an
+# exercise whose link to the bodyweight comparison is tombstoned shows it.
+next_cuam
+push "${ATHLETE_TOKEN}" 'own contribution and tombstoned link' \
+  "$(e_def "${T}-own-bw-def" 'Own bodyweight' "${CUAM}" total_load 0.5)" \
+  "$(e_se "${T}-own-bw-se" "${T}-ATHLETE" "${T}-own-bw-def" 3 'Own bodyweight' "${CUAM}")" \
+  "$(e_set "${T}-own-bw-set" "${T}-own-bw-se" 0 15 6 '' "${CUAM}" null rir_0)" \
+  "$(e_def "${T}-unlinked-def" 'Unlinked' "${CUAM}")" \
+  "$(e_link "${T}-unlinked-def" "${GID}" "${GX}" "${CUAM}" "${CUAM}")" \
+  "$(e_se "${T}-unlinked-se" "${T}-ATHLETE" "${T}-unlinked-def" 4 'Unlinked' "${CUAM}")" \
+  "$(e_set "${T}-unlinked-set" "${T}-unlinked-se" 0 25 4 '' "${CUAM}" null rir_0)"
+rpc "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
+  '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"
+expect_ok 'own contribution session'; assert_wire isCompetitionSessionDetailWire
+check "an unlinked exercise's own contribution hides its kg" 'any(.session.exercises[]; .exercise_definition_id==$d and
+  .visibility=="normalized" and .sets[0].reps_value=="6" and (.sets[0]|has("weight_value")|not))' --arg d "${T}-own-bw-def"
+check 'a tombstoned link hides nothing' 'any(.session.exercises[]; .exercise_definition_id==$d and
+  .visibility=="ordinary" and .sets[0].weight_value=="25")' --arg d "${T}-unlinked-def"
+next_cuam
+push "${ATHLETE_TOKEN}" 'remove rule exercises' \
+  "$(e_se "${T}-own-bw-se" "${T}-ATHLETE" "${T}-own-bw-def" 3 'Own bodyweight' "${CUAM}" "${CUAM}")" \
+  "$(e_se "${T}-unlinked-se" "${T}-ATHLETE" "${T}-unlinked-def" 4 'Unlinked' "${CUAM}" "${CUAM}")"
+drain 'rule exercises removed'
+pass 'an own contribution hides kg and a tombstoned link hides nothing'
 
 # Rules, distribution and reading changes against BOTH dependent metrics. Public
 # IDs and immutable observed audit are checked separately from private bindings.

@@ -14,21 +14,22 @@
 -- Every reader keeps its signature and shape.
 
 -- The rule. One group at a time, with bodyweight calculations on:
---  * an exercise with a live link to one of the group's exercises hides kg
---    when that group exercise has a bodyweight contribution;
+--  * an exercise with live links to the group's exercises hides kg when one
+--    of those group exercises has a bodyweight contribution;
 --  * any other exercise hides kg when the member's own exercise has one;
 --  * no exercise (an unknown definition) hides nothing.
 create or replace function app_public.group_competition_redacts_exercise(p_groups uuid[],p_member uuid,p_definition text)
 returns boolean language sql stable set search_path=app_public,pg_temp as $$
   select p_definition is not null and exists(
     select 1 from app_public.groups g
-    left join app_public.exercise_group_links l on l.owner_user_id=p_member and l.id=g.id::text||':'||p_definition
-      and l.exercise_definition_id=p_definition and l.group_id=g.id::text and l.deleted_at is null
-    left join app_public.group_exercises ge on ge.group_id=g.id and ge.id=app_public.group_eval_try_uuid(l.group_exercise_id)
     where g.id=any(p_groups) and g.deleted_at is null and g.bodyweight_calculations_enabled
-      and case when ge.id is not null then ge.bodyweight_contribution>0
-        else exists(select 1 from app_public.exercise_definitions ed
-          where ed.owner_user_id=p_member and ed.id=p_definition and ed.bodyweight_contribution>0) end);
+      and coalesce(
+        (select bool_or(ge.bodyweight_contribution>0) from app_public.exercise_group_links l
+          join app_public.group_exercises ge on ge.group_id=g.id and ge.id=app_public.group_eval_try_uuid(l.group_exercise_id)
+          where l.owner_user_id=p_member and l.exercise_definition_id=p_definition and l.group_id=g.id::text
+            and l.deleted_at is null),
+        exists(select 1 from app_public.exercise_definitions ed
+          where ed.owner_user_id=p_member and ed.id=p_definition and ed.bodyweight_contribution>0)));
 $$;
 
 -- Board rows: an ordinary board hides a member whose source exercise the rule hides.

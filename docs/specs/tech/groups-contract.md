@@ -168,7 +168,8 @@ them); ordinary Volume
 uses [[set.eligibility]]. The device uses the source entry factor for total
 load, independently of target mode. No set rules are mirrored in SQL; each
 co-member's device receives permitted live sets and safe published projections,
-never a personal preference, contribution or reading.
+never a personal preference, contribution or reading. Hidden kg on an unlinked
+exercise reveals only that its contribution is positive.
 
 ## Evaluator
 

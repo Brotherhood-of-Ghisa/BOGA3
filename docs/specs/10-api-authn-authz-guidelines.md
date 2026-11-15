@@ -86,8 +86,8 @@ access; the Edge endpoint still requires its Vault-held secret.
 
 [The protocol-4 competition contract](tech/group-competition-contract.md)
 requires the exact capability header on every group RPC, after the
-app-user/OAuth checks. Its readers enforce normalized disclosure across board,
-history, session and summary RPCs, hide absolute counterparts and private
+app-user/OAuth checks. Its readers enforce its current-setup disclosure rule across
+board, history, session and summary RPCs, hide absolute counterparts and private
 dependency digests, and use random write tokens. Ordinary Off sharing
 intentionally retains the documented cross-mode/cross-group inference limit.
 Private Sync v2 protocols are separate.

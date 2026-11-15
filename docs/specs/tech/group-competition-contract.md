@@ -63,8 +63,8 @@ working/counting. A Volume witness covers that set's performance, never
 other sets or a session total.
 
 If changing weekly aggregates, load [group-cow-contract.md](group-cow-contract.md):
-[[groups.cow-metrics]] leaves these lifetime boards unchanged. CoW stored source
-references extend the same current-disclosure helper, including after unlink/move.
+[[groups.cow-metrics]] leaves these lifetime boards unchanged. A CoW row's disclosure
+asks the §2 rule about its stored source definition.
 
 Keep finite unrounded kernel values through publication/ranking. Display
 rounding is presentation only; values are never quantized for ranking.
@@ -116,10 +116,21 @@ Group session rows implement [[set.row-figures]] with public added-load Weight
 and the added 1RM projection; Volume remains total work. Unit labels follow
 [[copy.no-weight-unit]].
 
-All group routes must obey disclosure selected by the current authorized
-group/comparison state, including old history, retired/archived revisions and
-View full session. Historic Off rules must not bypass current enabled redaction. Suppress session/week absolute totals if they would recover a
-redacted contribution by subtracting remaining sets. Counts, dates, reps,
+**Disclosure** follows the current setup alone, per member exercise in one
+group (`group_competition_redacts_exercise`). With the group's bodyweight
+calculations off, kg shows. With live links to the group's exercises, kg
+is hidden when one of those group exercises has a positive contribution;
+without one, when the member's own exercise's contribution is positive. A session exercise
+with no exercise definition shows kg. The same answer hides a member's
+absolute scores, events and CoW rows on an ordinary board. Retained history
+never counts: unlinked links, scores, certifications, events, CoW source
+references or the exercise a set has since moved to. A member who re-points a
+link or moves a set chooses what that shows, and hidden kg reveals that their
+exercise counts bodyweight, never its contribution. Every group route applies
+the rule on each read, including old history, retired/archived revisions and
+View full session; historic Off rules never bypass it. Suppress session/week
+absolute totals if they would recover a hidden contribution by subtracting
+remaining sets. Counts, dates, reps,
 duration and permitted ordinary exercise context stay public. A protocol-4
 full-session read/cache binds one authorized group.
 No cross-endpoint join in the same enabled group may recover an absolute
@@ -215,25 +226,12 @@ only the score rows whose values changed (disk IO): a random score token changes
 when its score does and an unchanged score keeps it; certify also refreshes the
 live source fingerprint.
 
-Disclosure retains immutable historical source associations and extends them
-through stored ranked set IDs to a moved current exercise. Unlink, archive,
-identity edits or a delayed worker cannot expose a kg counterpart to a saved
-percentage. Unrelated ordinary session context keeps its logged kg; unbound
-exercises retain reps and conservatively omit kg in an enabled positive group.
-Historical values preserve original units and carry `unavailable` with null
-value when current disclosure suppresses them. Full-session and week totals
-contain no absolute volume field that could recover a redacted contribution.
-Readers that ask about many (member, definition) pairs build
-`group_competition_redaction_cache`: what current disclosure depends on, read
-once per member in one statement. Readers that ask about a few build a map of
-pairs, each asked live once (`group_competition_redactions`). Both are a
-reader's `p_redactions`; `group_competition_redaction_lookup` answers from
-either and falls back to the live helper for anything they lack. One
-statement sees one snapshot, so the answer is the per-row one. The cache
-restates the live helper's branches, so a change to one changes the other; a
-read-path parity case compares them over every fixture pair. A one-group
-stream builds a cache per page (the All stream asks live), the CoW result
-reader one per CoW, the records history a pair map.
+Readers apply the §2 rule per row. It reads only the group, the live link and
+the two contributions (key lookups), so no reader keeps an answer cache.
+Unrelated ordinary session context keeps its logged kg. Historical values
+preserve original units and carry `unavailable` with null value when current
+disclosure suppresses them. Full-session and week totals contain no absolute
+volume field that could recover a hidden contribution.
 
 The stream page takes, per kind, the first `limit + 1` items after the
 cursor and merges them. Session cards are selected by their item's

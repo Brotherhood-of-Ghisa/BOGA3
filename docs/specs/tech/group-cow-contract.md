@@ -166,10 +166,10 @@ Final rows reject updates. The existing kick and sweep discover work without rea
 `cow-evaluation.ts` supports pinned scorer 7 independently of lifetime rebuild
 versions. Before changing its arithmetic imports, retain a callable implementation
 for every unfinished pinned version (load `docs/procedures/rule-upgrade.md`).
-Original set/definition references remain service-only for historical disclosure.
-Legacy receipts lacking definition identity keep their versions and priority;
-an empty private identity requests conservative member-wide suppression rather
-than guessing today's graph. Metadata enrichment alone never revises a receipt.
+Original set/definition references remain service-only. Disclosure asks the
+competition contract's current rule about a reference's definition; an empty
+identity hides nothing. Legacy receipts lacking definition identity keep their
+versions and priority. Metadata enrichment alone never revises a receipt.
 
 `apps/mobile/src/groups/cow-wire.ts` owns exact public result/calendar shapes;
 `api.ts` remains the sole group RPC caller. Full metric pages stay online, with
