@@ -442,7 +442,9 @@ begin
     'next_cursor', case when _has_more then _last else null end, 'has_more', _has_more);
 end $function$;
 
--- CoW result rows: a kg CoW hides a member whose source exercise the rule hides.
+-- CoW result rows: a kg CoW hides every figure while its group exercise now
+-- counts bodyweight, as a board does, and otherwise a member whose source
+-- exercise the rule hides.
 CREATE OR REPLACE FUNCTION app_public.group_cow_result_rows(p_cow app_public.group_cows, p_metric text)
  RETURNS TABLE(ordinal integer, member_id uuid, row_json jsonb)
  LANGUAGE plpgsql
@@ -461,10 +463,13 @@ begin
         select v as entry from jsonb_array_elements(r.r->'entries') v where v->>'memberId'=p.member_user_id::text
       ) e on true where p.cow_id=p_cow.id
   ), disclosure as materialized (
-    select m.*,not (p_cow.start_context->>'normalized')::boolean and exists(
+    select m.*,not (p_cow.start_context->>'normalized')::boolean and (exists(
+      select 1 from app_public.groups g join app_public.group_exercises ge on ge.group_id=g.id
+        where g.id=p_cow.group_id and ge.id=p_cow.group_exercise_id and g.deleted_at is null
+          and g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0) or exists(
       select 1 from app_public.group_cow_source_refs refs where refs.cow_id=p_cow.id
         and refs.member_user_id=m.member_user_id and refs.metric=p_metric and
-        app_public.group_competition_redacts_exercise(array[p_cow.group_id],m.member_user_id,nullif(refs.definition_id,''))) as suppressed
+        app_public.group_competition_redacts_exercise(array[p_cow.group_id],m.member_user_id,nullif(refs.definition_id,'')))) as suppressed
       from members m
   ) select (m.entry->>'rank')::integer,m.member_user_id,jsonb_build_object('rank',(m.entry->>'rank')::integer,
       'member',app_public.group_member_ref_json(m.member_user_id),

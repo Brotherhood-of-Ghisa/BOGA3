@@ -116,17 +116,9 @@ Group session rows implement [[set.row-figures]] with public added-load Weight
 and the added 1RM projection; Volume remains total work. Unit labels follow
 [[copy.no-weight-unit]].
 
-**Disclosure** follows the current setup alone, per member exercise in one
-group (`group_competition_redacts_exercise`). With the group's bodyweight
-calculations off, kg shows. With live links to the group's exercises, kg
-is hidden when one of those group exercises has a positive contribution;
-without one, when the member's own exercise's contribution is positive. A session exercise
-with no exercise definition shows kg. The same answer hides a member's
-absolute scores, events and CoW rows on an ordinary board. Retained history
-never counts: unlinked links, scores, certifications, events, CoW source
-references or the exercise a set has since moved to. A member who re-points a
-link or moves a set chooses what that shows, and hidden kg reveals that their
-exercise counts bodyweight, never its contribution. Every group route applies
+**Disclosure** is [[groups.kg-disclosure]], decided per member exercise in
+one group by `group_competition_redacts_exercise`. The same answer hides a
+member's absolute scores, events and CoW rows on an ordinary board. Every group route applies
 the rule on each read, including old history, retired/archived revisions and
 View full session; historic Off rules never bypass it. Suppress session/week
 absolute totals if they would recover a hidden contribution by subtracting
@@ -134,14 +126,15 @@ remaining sets. Counts, dates, reps,
 duration and permitted ordinary exercise context stay public. A protocol-4
 full-session read/cache binds one authorized group.
 No cross-endpoint join in the same enabled group may recover an absolute
-counterpart. Frozen former-member/archived entries with an incompatible unit or
+counterpart the current setup hides. Frozen former-member/archived entries with an incompatible unit or
 disallowed absolute score are omitted from the current board with generic
 unavailable state; preserve their server audit and authorized safe history. Do
 not rescore an inactive source merely to invent a display value or mix units. Owner-private workouts/coaching keep their authorized kg access.
 
 Ordinary Off/zero sharing remains intentional. Previously seen Off kg, equivalent
 scores in another group or external plate knowledge can be correlated with a
-later percentage to infer B. This contract promises private reading
+later percentage to infer B, as can a kept percentage beside the kg a
+member's own re-point or set move shows. This contract promises private reading
 non-disclosure and safe enabled responses, not protection from cross-mode,
 cross-group or external inference. Cache eviction cannot erase values seen.
 
