@@ -143,9 +143,8 @@ before the rewrite, as `apps/mobile/scripts/perf/groups/parity-definitions/<migr
 `group_competition_week_summary` case also proves the helper itself: a
 planted one-field change must be caught. A paged RPC's case walks every page
 (`walk`): old and new each follow their own cursor to the end, so a moved
-page boundary is a difference. A case may name fewer viewers (`viewers`, for
-a costly walk) and leave out a clock reading (`ignoreKeys`). Each case runs
-in its own savepoint.
+page boundary is a difference. A case may leave out a clock reading
+(`ignoreKeys`).
 
 Internal helpers readers share (redaction, session counts) are compared the
 same way in `HELPER_PARITY_CASES`, old against new, as the table owner, for
