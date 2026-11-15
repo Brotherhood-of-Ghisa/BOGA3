@@ -108,6 +108,7 @@ const useStyles = makeStyles((roles) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: uiSpace.sm,
     paddingVertical: uiSpace.md,
     paddingHorizontal: uiSpace.md,
     backgroundColor: roles.surface,
@@ -141,6 +142,5 @@ const useStyles = makeStyles((roles) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.xs,
-    marginTop: uiSpace.xs,
   },
 }));

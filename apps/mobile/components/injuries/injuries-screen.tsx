@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
+import { SectionHeader } from '@/components/ui/page-header';
 import { ScreenScroll } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
 import type { InjuryView } from '@/src/data/injuries';
@@ -20,8 +20,6 @@ export type InjuriesScreenProps = {
 
 export function InjuriesScreen({ muscleGroupId, initialNew = false }: InjuriesScreenProps) {
   const styles = useStyles();
-  const textRoles = useUiText();
-  const textTones = useUiTextTone();
   const { state, reload } = useInjuries({ muscleGroupId });
 
   const [editorVisible, setEditorVisible] = useState(initialNew);
@@ -46,15 +44,13 @@ export function InjuriesScreen({ muscleGroupId, initialNew = false }: InjuriesSc
     <ScreenScroll
       contentInsetAdjustmentBehavior="automatic"
       testID="injuries-screen">
-      <View style={styles.topActionContainer}>
-        <ActionButton
-          accessibilityLabel="Log new injury or discomfort"
-          label="+ Log injury"
-          onPress={handleOpenNew}
-          testID="injuries-log-button"
-          variant="primary"
-        />
-      </View>
+      <ActionButton
+        accessibilityLabel="Log new injury or discomfort"
+        label="+ Log injury"
+        onPress={handleOpenNew}
+        testID="injuries-log-button"
+        variant="primary"
+      />
 
       {state.status === 'error' ? (
         <Card>
@@ -84,11 +80,7 @@ export function InjuriesScreen({ muscleGroupId, initialNew = false }: InjuriesSc
       ) : null}
 
       {/* Active Injuries Section */}
-      <View style={styles.sectionHeader}>
-        <Text allowFontScaling={false} style={[textRoles.title, textTones.ink]}>
-          Active injuries ({state.active.length})
-        </Text>
-      </View>
+      <SectionHeader title={`Active injuries (${state.active.length})`} />
 
       {state.status !== 'loading' && state.active.length === 0 ? (
         <Card>
@@ -117,10 +109,8 @@ export function InjuriesScreen({ muscleGroupId, initialNew = false }: InjuriesSc
       {/* Resolved History Section */}
       {state.resolved.length > 0 ? (
         <>
-          <View style={[styles.sectionHeader, styles.resolvedSectionHeader]}>
-            <Text allowFontScaling={false} style={[textRoles.title, textTones.muted]}>
-              Resolved history ({state.resolved.length})
-            </Text>
+          <View style={styles.resolvedSectionHeader}>
+            <SectionHeader title={`Resolved history (${state.resolved.length})`} />
           </View>
 
           <Card testID="injuries-resolved-card">
@@ -150,14 +140,7 @@ export function InjuriesScreen({ muscleGroupId, initialNew = false }: InjuriesSc
 }
 
 const useStyles = makeStyles(() => ({
-  topActionContainer: {
-    paddingBottom: uiSpace.sm,
-  },
-  sectionHeader: {
-    paddingVertical: uiSpace.sm,
-    paddingHorizontal: uiSpace.xs,
-  },
   resolvedSectionHeader: {
-    marginTop: uiSpace.lg,
+    marginTop: uiSpace.sm,
   },
 }));

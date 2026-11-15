@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, Platform, ScrollView, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
 import { ChoiceRow, FormError, FormSection } from '@/components/ui/form-section';
 import { FormField } from '@/components/ui/form-field';
 import { ListRow } from '@/components/ui/list-row';
 import { PageSheet } from '@/components/ui/page-sheet';
+import { ScreenScroll } from '@/components/ui/screen';
 import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control';
 import { Sheet } from '@/components/ui/sheet';
 import { SliderRow } from '@/components/ui/slider-row';
@@ -119,7 +120,6 @@ function PainLifecycleSection({
   return (
     <FormSection title="Pain & Lifecycle">
       <SliderRow
-        divider
         format={formatPainSlider}
         label="Pain rating"
         max={10}
@@ -138,18 +138,18 @@ function PainLifecycleSection({
           {painDescription.bandLabel}
         </Text>
       </View>
-      <View style={styles.sectionRow}>
-        <Text allowFontScaling={false} style={textRoles.label}>
-          Status
-        </Text>
-        <SegmentedControl
-          accessibilityLabel="Status selector"
-          onChange={onStatusChange}
-          options={STATUS_OPTIONS}
-          testIDPrefix="injury-form-status"
-          value={status}
-        />
-      </View>
+      <ListRow density="list" divider label="Status">
+        <View style={styles.segmentRow}>
+          <SegmentedControl
+            accessibilityLabel="Status selector"
+            layout="fit"
+            onChange={onStatusChange}
+            options={STATUS_OPTIONS}
+            testIDPrefix="injury-form-status"
+            value={status}
+          />
+        </View>
+      </ListRow>
     </FormSection>
   );
 }
@@ -230,28 +230,30 @@ function MusclePickerSheet({
       testID="injury-muscle-picker-sheet"
       title="Select Muscle"
       visible={visible}>
-      <ListRow
-        key="none"
-        label="None / Unmapped anatomy"
-        onPress={() => {
-          onSelect(null);
-          onDismiss();
-        }}
-        selected={muscleGroupId === null}
-        testID="injury-muscle-option-none"
-      />
-      {catalog.muscleGroups.map((mg) => (
+      <ScrollView>
         <ListRow
-          key={mg.id}
-          label={mg.displayName}
+          key="none"
+          label="None / Unmapped anatomy"
           onPress={() => {
-            onSelect(mg.id);
+            onSelect(null);
             onDismiss();
           }}
-          selected={mg.id === muscleGroupId}
-          testID={`injury-muscle-option-${mg.id}`}
+          selected={muscleGroupId === null}
+          testID="injury-muscle-option-none"
         />
-      ))}
+        {catalog.muscleGroups.map((mg) => (
+          <ListRow
+            key={mg.id}
+            label={mg.displayName}
+            onPress={() => {
+              onSelect(mg.id);
+              onDismiss();
+            }}
+            selected={mg.id === muscleGroupId}
+            testID={`injury-muscle-option-${mg.id}`}
+          />
+        ))}
+      </ScrollView>
     </Sheet>
   );
 }
@@ -360,42 +362,43 @@ function InjuryEditorContent({
   const anatomySummary = formatInjuryAnatomy(selectedMuscle?.displayName ?? null, side);
 
   return (
-    <View style={styles.content}>
-      {errorMessage ? (
-        <View style={styles.errorContainer}>
-          <FormError message={errorMessage} testID="injury-form-error" />
-        </View>
-      ) : null}
+    <ScreenScroll
+      automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+      contentContainerStyle={styles.content}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled">
+      <FormError message={errorMessage} testID="injury-form-error" />
+
+      <FormField
+        autoFocus={!injury}
+        face="text"
+        label="Injury or discomfort"
+        onChangeText={handleLabelChange}
+        placeholder="e.g. Patellar tendon irritation"
+        testID="injury-form-label"
+        value={label}
+      />
 
       <FormSection title="Details">
-        <FormField
-          autoFocus={!injury}
-          label="Injury or discomfort"
-          onChangeText={handleLabelChange}
-          placeholder="e.g. Patellar tendon irritation"
-          testID="injury-form-label"
-          value={label}
-        />
         <ChoiceRow
           accessibilityLabel={`Target anatomy, ${anatomySummary}`}
-          divider
           label="Anatomy"
           onPress={() => setMusclePickerVisible(true)}
           testID="injury-form-muscle-choice"
           value={selectedMuscle?.displayName ?? 'Unlinked / None'}
         />
-        <View style={styles.sectionRow}>
-          <Text allowFontScaling={false} style={textRoles.label}>
-            Side
-          </Text>
-          <SegmentedControl
-            accessibilityLabel="Side selector"
-            onChange={(val) => setSide(val === 'none' ? null : val)}
-            options={SIDE_OPTIONS}
-            testIDPrefix="injury-form-side"
-            value={side ?? 'none'}
-          />
-        </View>
+        <ListRow density="list" divider label="Side">
+          <View style={styles.segmentRow}>
+            <SegmentedControl
+              accessibilityLabel="Side selector"
+              layout="fit"
+              onChange={(val) => setSide(val === 'none' ? null : val)}
+              options={SIDE_OPTIONS}
+              testIDPrefix="injury-form-side"
+              value={side ?? 'none'}
+            />
+          </View>
+        </ListRow>
       </FormSection>
 
       <PainLifecycleSection
@@ -406,24 +409,31 @@ function InjuryEditorContent({
         styles={styles}
       />
 
-      <FormSection title="Notes & Limitations">
-        <FormField
-          label="Notes"
-          multiline
-          numberOfLines={3}
-          onChangeText={setNotes}
-          placeholder="Flare-up triggers, sensations, notes..."
-          testID="injury-form-notes"
-          value={notes}
-        />
-        <FormField
-          label="Contraindications"
-          onChangeText={setContraindications}
-          placeholder="Movements to avoid (e.g. deep squats)"
-          testID="injury-form-contraindications"
-          value={contraindications}
-        />
-      </FormSection>
+      <View style={styles.notesSection}>
+        <Text allowFontScaling={false} accessibilityRole="header" style={textRoles.label}>
+          Notes & Limitations
+        </Text>
+        <View style={styles.notesFields}>
+          <FormField
+            face="text"
+            label="Notes"
+            multiline
+            numberOfLines={3}
+            onChangeText={setNotes}
+            placeholder="Flare-up triggers, sensations, notes..."
+            testID="injury-form-notes"
+            value={notes}
+          />
+          <FormField
+            face="text"
+            label="Contraindications"
+            onChangeText={setContraindications}
+            placeholder="Movements to avoid (e.g. deep squats)"
+            testID="injury-form-contraindications"
+            value={contraindications}
+          />
+        </View>
+      </View>
 
       <EditorActions
         isEditing={Boolean(injury)}
@@ -441,30 +451,30 @@ function InjuryEditorContent({
         onSelect={setMuscleGroupId}
         visible={musclePickerVisible}
       />
-    </View>
+    </ScreenScroll>
   );
 }
 
 const useStyles = makeStyles(() => ({
   content: {
-    paddingBottom: uiSpace.xl,
+    paddingBottom: uiSpace.xxl,
   },
-  errorContainer: {
-    paddingHorizontal: uiSpace.md,
-    paddingTop: uiSpace.sm,
-  },
-  sectionRow: {
-    paddingHorizontal: uiSpace.md,
-    paddingVertical: uiSpace.sm,
-    gap: uiSpace.xs,
+  segmentRow: {
+    paddingTop: uiSpace.xs,
+    paddingBottom: uiSpace.sm,
   },
   painBandRow: {
     paddingHorizontal: uiSpace.md,
     paddingBottom: uiSpace.sm,
   },
+  notesSection: {
+    gap: uiSpace.sm,
+  },
+  notesFields: {
+    gap: uiSpace.md,
+  },
   actions: {
-    paddingHorizontal: uiSpace.md,
-    paddingTop: uiSpace.lg,
+    paddingTop: uiSpace.sm,
     gap: uiSpace.sm,
   },
 }));
