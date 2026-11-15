@@ -381,7 +381,8 @@ begin return jsonb_build_object('a', p_a); end $function$
     expect(limits.sort()).toEqual([
       'group_competition_stream:g:50:all',
       'group_competition_stream_v2:g:50:all', 'group_competition_stream_v2:null:50:all',
-      'group_competition_stream_v3:g:50:all', 'group_competition_stream_v4:g:50:all',
+      'group_competition_stream_v3:g:50:all', 'group_competition_stream_v4:g:20:all', 'group_competition_stream_v4:g:50:all',
+      'group_competition_stream_v4:g:5:all',
       'group_competition_stream_v5:g:1:owner', 'group_competition_stream_v5:g:20:all', 'group_competition_stream_v5:g:50:all',
       'group_competition_stream_v5:null:50:all']);
     expect(cowResultsWalk({ p_limit: 1 }, { rankings: [{ next_cursor: 'n' }] })).toEqual({ p_limit: 1, p_before: 'n' });

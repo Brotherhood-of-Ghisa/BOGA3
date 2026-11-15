@@ -221,9 +221,10 @@ const streamParityCases = (): ParityCase<ReadPathContext>[] => [
       group_competition_stream_v4: '20261111160000_group_stream_group_record_metrics.sql',
       group_competition_stream_withdrawn: '20261112190000_group_stream_withdrawn_records.sql' },
     calls: (context) => streamArgs(context, 1).map((args) => ({ viewer: context.viewer, args })), walk: streamWalk },
+  // v4 also at 20 and 5 a page: its records keep their group records when nothing retracts them.
   { fn: 'group_competition_stream_v4', migration: '20261111160000_group_stream_group_record_metrics.sql',
     helpers: { ...V3_HELPERS, group_competition_stream_v3: COW_STREAM },
-    argumentSets: (context) => streamArgs(context, 50), walk: streamWalk },
+    argumentSets: (context) => [50, 20, 5].flatMap((limit) => streamArgs(context, limit)), walk: streamWalk },
   { fn: 'group_competition_stream_v3', migration: COW_STREAM, helpers: V3_HELPERS,
     argumentSets: (context) => streamArgs(context, 50), walk: streamWalk },
   { fn: 'group_competition_stream_v2', migration: '20261008160000_group_competition_set_certification.sql',
@@ -344,12 +345,6 @@ export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
   },
   // The notification RPCs and the readiness and context-digest helpers they share (notification-parity.ts).
   ...notificationParityCases<ReadPathContext>(),
-  // Stream records keep their group records when nothing retracts them.
-  {
-    fn: 'group_competition_stream_v4',
-    migration: '20261111160000_group_stream_group_record_metrics.sql',
-    argumentSets: (context) => [20, 5].map((limit) => ({ p_group_id: context.groupId, p_before: null, p_limit: limit })),
-  },
   ...streamParityCases(),
   ...cowParityCases(),
 ];
