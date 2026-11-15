@@ -19,7 +19,7 @@ export const EMBEDDED_NOTE_LIMIT = 20;
 const MAX_ID_LENGTH = 200;
 const MIN_YEAR = 1900;
 
-export const NOTE_COLUMNS = 'id,exercise_definition_id,body,noted_on,source,created_at';
+export const NOTE_COLUMNS = 'id,exercise_definition_id,body,noted_on,source,author,client_id,session_id,set_id,activity_source,activity_external_id,target_label,target_started_at,created_at';
 
 /** `app_public.training_notes` as the routes read it: live rows only. */
 export type NoteRow = {
@@ -28,6 +28,14 @@ export type NoteRow = {
   body: string;
   noted_on: string;
   source: string | null;
+  author?: 'user' | 'agent' | null;
+  client_id?: string | null;
+  session_id?: string | null;
+  set_id?: string | null;
+  activity_source?: string | null;
+  activity_external_id?: string | null;
+  target_label?: string | null;
+  target_started_at?: number | null;
   created_at: number;
 };
 
@@ -109,6 +117,14 @@ export const projectNote = (row: NoteRow, exerciseNames: ReadonlyMap<string, str
   body: row.body,
   noted_on: row.noted_on,
   source: row.source === 'agent' ? 'agent' : 'app',
+  author: row.author ?? (row.source === 'agent' ? null : 'user'),
+  client_id: row.client_id ?? null,
+  session_id: row.session_id ?? null,
+  set_id: row.set_id ?? null,
+  activity_source: row.activity_source ?? null,
+  activity_external_id: row.activity_external_id ?? null,
+  target_label: row.target_label ?? null,
+  target_started_at: row.target_started_at == null ? null : new Date(row.target_started_at).toISOString(),
   exercise_id: row.exercise_definition_id,
   exercise_name: row.exercise_definition_id === null ? null : exerciseNames.get(row.exercise_definition_id) ?? null,
   created_at: new Date(row.created_at).toISOString(),
@@ -117,16 +133,34 @@ export const projectNote = (row: NoteRow, exerciseNames: ReadonlyMap<string, str
 export const noteExerciseIds = (rows: readonly NoteRow[]): string[] =>
   [...new Set(rows.flatMap((row) => (row.exercise_definition_id === null ? [] : [row.exercise_definition_id])))];
 
-const ADD_KEYS = new Set(['body', 'noted_on', 'exercise_id']);
+const TARGET_KEYS = ['exercise_id', 'session_id', 'set_id', 'activity_source', 'activity_external_id'] as const;
+const ADD_KEYS = new Set(['body', 'noted_on', 'author', ...TARGET_KEYS]);
+
+export type NoteTarget = Record<typeof TARGET_KEYS[number], string | null>;
+
+/** Exactly one scope, with both parts of an imported activity's identity. */
+export const parseNoteTarget = (input: JsonObject): NoteTarget => {
+  const target = Object.fromEntries(TARGET_KEYS.map(key => [key, readTargetId(input[key], key)])) as NoteTarget;
+  if ((target.activity_source === null) !== (target.activity_external_id === null)) {
+    fail('activity_source and activity_external_id must be supplied together.');
+  }
+  if ([target.exercise_id, target.session_id, target.set_id, target.activity_source].filter(v => v !== null).length > 1) {
+    fail('Supply at most one note target.');
+  }
+  return target;
+};
+
+export const parseNoteTargetFilter = (params: URLSearchParams): NoteTarget =>
+  parseNoteTarget(Object.fromEntries(TARGET_KEYS.map(key => [key, params.get(key)])));
 
 export type NoteAdd = {
   /** What the RPC stores. */
-  note: { body: string; noted_on: string; exercise_id: string | null };
+  note: NoteTarget & { body: string; noted_on: string; author: 'user' | 'agent' };
   /**
    * What the idempotency hash covers: the caller's input, with an omitted date
    * as null, so a retry after midnight still replays the first result.
    */
-  hashed: { body: string; noted_on: string | null; exercise_id: string | null };
+  hashed: NoteTarget & { body: string; noted_on: string | null; author: 'user' | 'agent' };
 };
 
 const readBody = (value: unknown): string => {
@@ -137,10 +171,10 @@ const readBody = (value: unknown): string => {
   return body;
 };
 
-const readExerciseId = (value: unknown): string | null => {
+const readTargetId = (value: unknown, key: string): string | null => {
   if (value === undefined || value === null) return null;
   if (typeof value !== 'string' || value.length === 0 || value.length > MAX_ID_LENGTH) {
-    return fail('exercise_id must be an exercise id from search_exercises, or null for a general note.');
+    return fail(`${key} must be a nonempty id of at most ${MAX_ID_LENGTH} characters.`);
   }
   return value;
 };
@@ -159,10 +193,12 @@ export const normalizeNoteAdd = (input: JsonObject, today: string): NoteAdd => {
   }
   const body = readBody(input.body);
   const notedOn = readNotedOn(input.noted_on, today);
-  const exerciseId = readExerciseId(input.exercise_id);
+  const target = parseNoteTarget(input);
+  const author = input.author;
+  if (author !== 'user' && author !== 'agent') return fail('author must be user or agent.');
   return {
-    note: { body, noted_on: notedOn ?? today, exercise_id: exerciseId },
-    hashed: { body, noted_on: notedOn, exercise_id: exerciseId },
+    note: { body, noted_on: notedOn ?? today, author, ...target },
+    hashed: { body, noted_on: notedOn, author, ...target },
   };
 };
 

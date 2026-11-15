@@ -295,6 +295,7 @@ describe('entityToWire / wireToEntity round-trip', () => {
       type: 'training_notes', id: 'note-general', client_updated_at_ms: 3000,
       fields: {
         exercise_definition_id: null, body: 'Shoulder sore: no pressing', noted_on: '2026-05-01', source: 'app',
+        author: null, client_id: null, session_id: null, set_id: null, activity_source: null, activity_external_id: null, target_label: null, target_started_at: null,
         created_at: 1000, updated_at: 2000, deleted_at: null,
       },
     });

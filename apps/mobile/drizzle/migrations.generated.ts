@@ -211,6 +211,12 @@ export const generatedMigrationBundle = {
     tag: "0033_wandering_peter_quill",
     breakpoints: true,
   },
+  {
+    idx: 34,
+    when: 1794747537307,
+    tag: "0034_plain_the_call",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -1033,6 +1039,19 @@ CREATE INDEX \`injuries_muscle_group_id_idx\` ON \`injuries\` (\`muscle_group_id
 CREATE INDEX \`injuries_started_at_idx\` ON \`injuries\` (\`started_at\`);--> statement-breakpoint
 CREATE INDEX \`injuries_deleted_at_idx\` ON \`injuries\` (\`deleted_at\`);--> statement-breakpoint
 -- Re-pull every layer once so existing injuries are downloaded on upgrade.
+UPDATE sync_runtime_state SET pull_cursor = '{}';
+`,
+  m0034: `ALTER TABLE \`training_notes\` ADD \`author\` text;--> statement-breakpoint
+ALTER TABLE \`training_notes\` ADD \`client_id\` text;--> statement-breakpoint
+ALTER TABLE \`training_notes\` ADD \`session_id\` text;--> statement-breakpoint
+ALTER TABLE \`training_notes\` ADD \`set_id\` text;--> statement-breakpoint
+ALTER TABLE \`training_notes\` ADD \`activity_source\` text;--> statement-breakpoint
+ALTER TABLE \`training_notes\` ADD \`activity_external_id\` text;--> statement-breakpoint
+ALTER TABLE \`training_notes\` ADD \`target_label\` text;--> statement-breakpoint
+ALTER TABLE \`training_notes\` ADD \`target_started_at\` integer;
+--> statement-breakpoint
+-- Rehydrate creation metadata an older build discarded at the same clock.
+UPDATE training_notes SET local_updated_at_ms = 0 WHERE local_dirty = 0;--> statement-breakpoint
 UPDATE sync_runtime_state SET pull_cursor = '{}';
 `,
   },

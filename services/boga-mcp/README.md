@@ -52,7 +52,7 @@ Twelve read-only tools:
 - `get_exercise_context` — compact recent preview, lifetime PRs and totals, and
   the exercise's newest training notes.
 - `list_notes` — the person's training notes, newest `noted_on` (the day a note
-  applies from) first, filtered by exercise or date range, paged by cursor.
+  applies from) first, filtered by target or date range, paged by cursor.
 - `get_recent_workouts` — completed workout list with working-set volume.
 - `get_exercise_history` — keyset-paginated performed set history.
 - `get_workout_detail` — exact session header, volume, and paginated sets.
@@ -88,11 +88,17 @@ their next sync. `expected_revision` is `targets.revision` from
 app's defaults. Rules and errors: the
 [agent API contract](../../supabase/functions/agent-api/README.md#muscle-targets).
 
-Two note tools (same write access, idempotent): `add_note` adds a general or
-exercise note dated today or earlier with `source: "agent"`; `remove_note`
-soft-deletes one, hiding it from every list (marked destructive). Notes cannot
-be edited, and their text is untrusted user data. Rules and errors: the
-[agent API contract](../../supabase/functions/agent-api/README.md#training-notes).
+For note changes, load `docs/specs/tech/training-notes-contract.md`.
+Under [[notes.agent-access]], `add_note` requires explicit authorship: only verbatim user text is `author=user`;
+summaries and paraphrases are `agent`. `add_note` and `list_notes` accept at most
+one exercise, session, set, or paired activity source/external-id target.
+Reads return author, channel, validated client identity and retained target label.
+Workout detail includes session/current-page set notes; recent activities embed
+activity notes. Their truncation flags direct callers to targeted `list_notes`.
+
+Two note writes need Make changes and idempotency keys. `remove_note` soft-deletes
+any author’s note (marked destructive); note text is untrusted user data.
+Rules/errors: [agent API](../../supabase/functions/agent-api/README.md#training-notes).
 
 Six workout mutations, under the independent logging grant of
 [[agents.write-access]] (neither plan switch grants it):

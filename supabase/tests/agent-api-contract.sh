@@ -381,7 +381,9 @@ cleanup() {
           and external_id like 'agent-api-${RUN_TAG}-%';
       delete from app_public.training_notes
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
-          and (id like 'agent-api-${RUN_TAG}-%' or body like 'agent-api-${RUN_TAG} %');
+          and (id like 'agent-api-${RUN_TAG}-%' or body like 'agent-api-${RUN_TAG} %'
+            or session_id like 'agent-api-${RUN_TAG}-%' or set_id like 'agent-api-${RUN_TAG}-%'
+            or activity_external_id like 'agent-api-${RUN_TAG}-%');
       delete from app_public.exercise_sets
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and id like 'agent-api-${RUN_TAG}-%';
@@ -2705,7 +2707,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" --arg from "$(no
 echo "[agent-api-test] verifying the coach adds and removes notes, idempotently"
 NOTE_KEY="agent-api-${RUN_TAG}-note-add"
 NOTE_ADD_BODY="$(jq -nc --arg body "  agent-api-${RUN_TAG} agent note  " --arg ex "${EXERCISE_A}" --arg on "$(note_day -1)" \
-  '{body:$body,exercise_id:$ex,noted_on:$on}')"
+  '{body:$body,author:"agent",exercise_id:$ex,noted_on:$on}')"
 agent_post "notes" "${NOTE_ADD_BODY}" "${NOTE_KEY}"
 assert_status "200" "coach adds a note"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg body "agent-api-${RUN_TAG} agent note" --arg ex "${EXERCISE_A}" --arg on "$(note_day -1)" \
@@ -2722,20 +2724,20 @@ agent_post "notes" "${NOTE_ADD_BODY}" "${NOTE_KEY}"
 assert_status "200" "note add replay"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${AGENT_NOTE_ID}" '.data.idempotent_replay == true and .data.note.id == $id' \
   >/dev/null || fail "a repeated key did not replay the first note"
-agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} other" '{body:$body}')" "${NOTE_KEY}"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} other" '{body:$body,author:"agent"}')" "${NOTE_KEY}"
 assert_status "409" "note key reused with another body"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IDEMPOTENCY_CONFLICT" ]] ||
   fail "a reused note key did not return IDEMPOTENCY_CONFLICT"
-agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} general" '{body:$body}')" "${NOTE_KEY}-general"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} general" '{body:$body,author:"agent"}')" "${NOTE_KEY}-general"
 assert_status "200" "coach adds a general note dated today"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg today "${NOTE_TODAY}" '.data.note.noted_on == $today and .data.note.exercise_id == null' \
   >/dev/null || fail "an undated general note was not dated today in the profile zone"
-agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} retired" --arg ex "${NOTE_EXERCISE_DELETED}" '{body:$body,exercise_id:$ex}')" \
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} retired" --arg ex "${NOTE_EXERCISE_DELETED}" '{body:$body,author:"agent",exercise_id:$ex}')" \
   "${NOTE_KEY}-retired"
 assert_status "409" "note on a deleted exercise"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "EXERCISE_DELETED" ]] ||
   fail "a note on a deleted exercise did not return EXERCISE_DELETED"
-agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} foreign" --arg ex "${EXERCISE_B}" '{body:$body,exercise_id:$ex}')" \
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} foreign" --arg ex "${EXERCISE_B}" '{body:$body,author:"agent",exercise_id:$ex}')" \
   "${NOTE_KEY}-foreign"
 assert_status "400" "note on another owner's exercise"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "FOREIGN_RESOURCE_REFERENCE" ]] ||
@@ -2912,6 +2914,73 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
     and tool_name = 'get_recent_activities' and http_status = 200;")" -ge 1 ]] ||
   fail "recent activities were not audited under their tool name"
 
+# Structured scopes, author/channel separation, and validated connection provenance.
+SCOPED_KEY="agent-api-${RUN_TAG}-scoped"
+agent_post "notes" "$(jq -nc --arg session "${SESSION_A}" '{body:"My own words",author:"user",session_id:$session}')" "${SCOPED_KEY}-session"
+assert_status "200" "user words on a workout through the coach"
+SESSION_NOTE_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.note.id')"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg client "${AGENT_CLIENT_ID}" --arg session "${SESSION_A}" '
+  .data.note | .source == "agent" and .author == "user" and .client_id == $client
+  and .session_id == $session and (.target_label | length) > 0' >/dev/null || fail "scoped session provenance missing"
+agent_post "notes" "$(jq -nc --arg set "${SET_A1}" '{body:"Steady reps",author:"agent",set_id:$set}')" "${SCOPED_KEY}-set"
+assert_status "200" "coach observation on a set"
+SET_NOTE_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.note.id')"
+agent_get "workouts/${SESSION_A}?limit=100"
+assert_status "200" "workout embeds session and set notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg a "${SESSION_NOTE_ID}" --arg b "${SET_NOTE_ID}" '
+  [.data.workout.training_notes[].id] | index($a) != null and index($b) != null' >/dev/null || fail "workout notes missing"
+agent_post "notes" "$(jq -nc --arg run "${ACTIVITY_RUN}" '{body:"Steady run",author:"agent",activity_source:"apple_health",activity_external_id:$run}')" "${SCOPED_KEY}-run"
+assert_status "200" "coach note on imported activity"
+ACTIVITY_NOTE_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.note.id')"
+agent_get "activities?limit=50"
+assert_status "200" "activity embeds notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg run "${ACTIVITY_RUN}" --arg id "${ACTIVITY_NOTE_ID}" '
+  .data.activities[] | select(.external_id==$run) | .training_notes[0].id==$id and .training_notes_truncated==false' >/dev/null || fail "activity note missing"
+for scope in "session_id=${SESSION_A}" "set_id=${SET_A1}" "activity_source=apple_health&activity_external_id=${ACTIVITY_RUN}"; do
+  agent_get "notes?${scope}"
+  assert_status "200" "target-filtered notes"
+  printf '%s' "${RESPONSE_BODY}" | jq -e '.data.notes | length == 1' >/dev/null || fail "scope filter leaked notes"
+done
+agent_get "training-status"
+assert_status "200" "general notes exclude all scoped notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg a "${SESSION_NOTE_ID}" --arg b "${SET_NOTE_ID}" --arg c "${ACTIVITY_NOTE_ID}" '
+  [.data.general_notes.notes[].id] | index($a)==null and index($b)==null and index($c)==null' >/dev/null || fail "scoped notes became general notes"
+for payload in \
+  '{"body":"no author"}' \
+  "$(jq -nc --arg s "${SESSION_A}" --arg x "${SET_A1}" '{body:"two",author:"agent",session_id:$s,set_id:$x}')" \
+  '{"body":"partial activity", "author":"agent", "activity_source":"apple_health"}'; do
+  agent_post "notes" "${payload}" "${SCOPED_KEY}-bad"
+  assert_status "400" "invalid scoped input"
+done
+FOREIGN_NOTE_SESSION="${SCOPED_KEY}-foreign-session"
+FOREIGN_NOTE_BLOCK="${SCOPED_KEY}-foreign-block"
+FOREIGN_NOTE_SET="${SCOPED_KEY}-foreign-set"
+run_psql "insert into app_public.sessions(owner_user_id,id,status,started_at,created_at,updated_at,client_updated_at_ms)
+  values ('${USER_B_UUID}','${FOREIGN_NOTE_SESSION}','active',${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
+  insert into app_public.session_exercises(owner_user_id,id,session_id,order_index,name,created_at,updated_at,client_updated_at_ms)
+  values ('${USER_B_UUID}','${FOREIGN_NOTE_BLOCK}','${FOREIGN_NOTE_SESSION}',0,'Private lift',${NOW_MS},${NOW_MS},${NOW_MS});
+  insert into app_public.exercise_sets(owner_user_id,id,session_exercise_id,order_index,created_at,updated_at,client_updated_at_ms)
+  values ('${USER_B_UUID}','${FOREIGN_NOTE_SET}','${FOREIGN_NOTE_BLOCK}',0,${NOW_MS},${NOW_MS},${NOW_MS});" >/dev/null
+for scope in "session_id" "set_id"; do
+  foreign_target="${FOREIGN_NOTE_SESSION}"
+  [[ "$scope" == "set_id" ]] && foreign_target="${FOREIGN_NOTE_SET}"
+  agent_post "notes" "$(jq -nc --arg scope "$scope" --arg target "${foreign_target}" '{body:"foreign",author:"agent",($scope):$target}')" "${SCOPED_KEY}-foreign-${scope}"
+  assert_status "400" "existing foreign target denied"
+done
+agent_post "notes" "$(jq -nc --arg run "${ACTIVITY_B}" '{body:"foreign run",author:"agent",activity_source:"apple_health",activity_external_id:$run}')" "${SCOPED_KEY}-foreign-run"
+assert_status "400" "foreign activity denied"
+# An older app may soft-remove a note without sending the new columns.
+NOTE_PUSH_STAMP="$(node -e 'process.stdout.write(String(Date.now()+1000))')"
+app_public_request POST "rpc/sync_push" "${APP_ACCESS_TOKEN}" "$(jq -nc --arg id "${SET_NOTE_ID}" --argjson now "${NOTE_PUSH_STAMP}" --arg on "${NOTE_TODAY}" '{entities:[{type:"training_notes",id:$id,client_updated_at_ms:$now,fields:{body:"Steady reps",source:"agent",noted_on:$on,created_at:$now,updated_at:$now,deleted_at:$now}}]}')"
+assert_status "200" "legacy app note tombstone"
+[[ "$(run_psql "select author||':'||set_id||':'||client_id from app_public.training_notes where owner_user_id='${USER_A_UUID}' and id='${SET_NOTE_ID}' and deleted_at is not null;")" == "agent:${SET_A1}:${AGENT_CLIENT_ID}" ]] || fail "legacy push erased scoped provenance"
+# Upgraded legacy clients may send explicit null metadata after adding columns.
+app_public_request POST "rpc/sync_push" "${APP_ACCESS_TOKEN}" "$(jq -nc --arg id "${SET_NOTE_ID}" --argjson now "$((NOTE_PUSH_STAMP+1))" --arg on "${NOTE_TODAY}" '{entities:[{type:"training_notes",id:$id,client_updated_at_ms:$now,fields:{body:"Steady reps",source:"agent",noted_on:$on,created_at:$now,updated_at:$now,deleted_at:$now,author:null,client_id:null,set_id:null,target_label:null,target_started_at:null}}]}')"
+assert_status "200" "upgraded legacy tombstone with unknown metadata"
+[[ "$(run_psql "select author||':'||set_id||':'||client_id from app_public.training_notes where owner_user_id='${USER_A_UUID}' and id='${SET_NOTE_ID}' and deleted_at is not null and target_started_at is not null;")" == "agent:${SET_A1}:${AGENT_CLIENT_ID}" ]] || fail "explicit nulls erased metadata"
+agent_post "notes/${SESSION_NOTE_ID}/remove" '{}' "${SCOPED_KEY}-remove-user"
+assert_status "200" "Make changes permits removal of user-authored notes"
+
 # HealthKit deletions remove rows; a fresh backfill's complete id list prunes the rest.
 FUTURE_A="agent-api-${RUN_TAG}-activity-future-a"
 FUTURE_B="agent-api-${RUN_TAG}-activity-future-b"
@@ -2924,6 +2993,9 @@ app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(j
 assert_status "200" "an import with a deletion"
 printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 2, deleted: 1, pruned: 0}' >/dev/null ||
   fail "a HealthKit deletion did not delete the activity"
+agent_get "notes?activity_source=apple_health&activity_external_id=${ACTIVITY_RUN}"
+assert_status "200" "note survives target deletion"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${ACTIVITY_NOTE_ID}" '.data.notes[0] | .id==$id and (.target_label | length)>0' >/dev/null || fail "activity deletion lost the note or label"
 app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(jq -nc \
   --arg b "${FUTURE_B}" \
   '{p_source: "apple_health", p_complete_since: "2031-01-01T00:00:00Z"}')"
