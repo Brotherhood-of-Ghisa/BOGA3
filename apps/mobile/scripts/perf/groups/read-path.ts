@@ -98,8 +98,8 @@ const stream = (fn: string, pages: number): ReadPathRpc => ({
  * ceiling. Re-measure and update an entry in the change that moves its cost.
  */
 export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
-  stream('group_competition_stream_v5', 300_000),
-  stream('group_competition_stream_v4', 300_000),
+  stream('group_competition_stream_v5', 290_000),
+  stream('group_competition_stream_v4', 280_000),
   stream('group_competition_stream_v3', 280_000),
   stream('group_competition_stream_v2', 90_000),
   { fn: 'group_competition_period_totals', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_windows: c.weeks }),
