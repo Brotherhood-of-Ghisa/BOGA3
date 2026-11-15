@@ -2,9 +2,10 @@
 // read, evaluator write and notification RPC in READ_PATH_RPCS costs (only
 // those; the workers' other RPCs carry no budget), on a fixture of
 // READ_PATH_MEMBERS members at each of READ_PATH_DAYS days of history. Unlike
-// the sweeps it is strict: a call over its budget, a budgeted scoped RPC that
-// grows faster than SLOPE_LIMIT per doubling of history, a failed parity case
-// or a missing planted case fails the lane, whatever GROUPS_PERF_STRICT says.
+// the sweeps it is strict: a call over its budget, a scoped RPC that grows
+// faster than SLOPE_LIMIT per doubling of history, a `baseline` entry, an
+// unscoped screen read without a justification, a failed parity case or a
+// missing planted case fails the lane, whatever GROUPS_PERF_STRICT says.
 //
 // Each point builds the Tier 1 fixture inside one rolled-back transaction,
 // plants the cases the reads must handle (a bodyweight-redacted member
@@ -111,9 +112,9 @@ const COW_REDACTION_SLOPE = 'One bodyweight-redaction cache build per call reads
 
 /**
  * Every RPC the set measures, with its budget beside it. A budget is the
- * costliest call measured at either point (reads warm: `warmUp`) plus ~25% (`suggestBudget`);
- * `baseline` entries record today's cost, `budgeted` ones hold an RPC to the
- * ceiling. Re-measure and update an entry in the change that moves its cost.
+ * costliest call measured at either point (reads warm: `warmUp`) plus ~25% (`suggestBudget`).
+ * Every entry is `budgeted`: held to the ceiling, or over it only with a
+ * justification. Re-measure and update an entry in the change that moves its cost.
  */
 export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   stream('group_competition_stream_v5', { kind: 'budgeted', pages: 4_000, scoped: true }),
@@ -609,6 +610,16 @@ export const PARITY_PLANT_STATEMENTS = (): string[] => [
 
 export const readPathBudgets = (rpcs: readonly ReadPathRpc[] = READ_PATH_RPCS): Record<string, BudgetEntry> =>
   Object.fromEntries(rpcs.map((rpc) => [rpc.fn, rpc.budget]));
+
+/**
+ * A screen read (`member`) is week-, period-, page- or single-item-scoped, so
+ * the slope check skips one (`scoped: false`) only by the operator's agreement,
+ * which its justification records. An evaluator or notification write
+ * (`cascade`) that runs over an exercise's history may be unscoped.
+ */
+export const unscopedReadChecks = (rpcs: readonly ReadPathRpc[] = READ_PATH_RPCS): BudgetCheck[] => rpcs
+  .filter((rpc) => rpc.via === 'member' && !rpc.budget.scoped && !rpc.budget.justification?.trim())
+  .map((rpc) => ({ fn: rpc.fn, level: 'fail', message: 'a screen read with `scoped: false` has no justification giving its slope and cause' }));
 
 const NOTIFICATION_PROJECT = '00000000-0000-4000-8000-00000000b06a';
 
@@ -1149,7 +1160,7 @@ export const summarizeReadPath = (points: readonly ReadPathPoint[], rpcs: readon
   const costs: Record<string, PointCost[]> = Object.fromEntries(rpcs.map((rpc) => [rpc.fn,
     points.map((point) => (point.incomplete ? { ...pointCost(point.historyDays, []), error: `incomplete: ${point.incomplete}` }
       : pointCost(point.historyDays, point.calls[rpc.fn])))]));
-  const checks = checkBudgets(readPathBudgets(rpcs), costs);
+  const checks = [...checkBudgets(readPathBudgets(rpcs), costs), ...unscopedReadChecks(rpcs)];
   const parity = points.flatMap((point) => point.parity);
   const failures = [
     ...points.filter((point) => point.incomplete).map((point) => `${point.name}: ${point.incomplete}`),

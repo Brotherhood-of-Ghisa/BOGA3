@@ -110,22 +110,35 @@ their Edge callers run them; the costliest call counts. The report adds WAL
 per logged set (headline a).
 
 **Budgets** sit beside each scenario in `READ_PATH_RPCS`. A budget is the
-costliest call measured at either point plus about 25%. There are two kinds:
+costliest call measured at either point plus about 25%. Every entry is
+`budgeted`: the set refuses a `baseline` entry (a recorded cost held to no
+ceiling), so a new RPC is measured and budgeted in the change that adds it.
+A budgeted entry stays at or under the 5,000-page ceiling unless it carries a
+written justification. A screen read is week-, period-, page- or
+single-item-scoped, and its growth per doubling of history must stay at or
+under 1.2×. It may opt out of that check (`scoped: false`) only with the
+operator's agreement and a justification giving the measured slope and its
+cause; an unscoped screen read without one fails the set. An evaluator or
+notification write that runs over an exercise's history (publish, prepare,
+the readiness proofs) is not scoped; the others are.
 
-- `baseline` records today's cost so a regression fails. It may sit over
-  the 5,000-page ceiling, and its slope is reported, not asserted.
-- `budgeted` must stay at or under the ceiling unless the entry carries a
-  written justification. For a week-, period-, page- or single-item-scoped
-  RPC its growth per doubling of history must stay at or under 1.2×. Such an
-  RPC may opt out of that check (`scoped: false`) only with the operator's
-  agreement and a justification giving the measured slope and its cause.
+The set fails when a call exceeds its budget, a call fails, or a scoped RPC
+grows too fast. A slope is asserted only above 100 pages per call, where a
+few pages of noise cannot move it. A change that moves an RPC's cost
+re-measures it and updates its entry in the same PR.
 
-The set fails when a call exceeds its budget, a call fails, or a budgeted
-scoped RPC grows too fast. A slope is asserted only above 100 pages per
-call, where a few pages of noise cannot move it. The lane lists the entries
-still `baseline`. A change that moves an RPC's cost re-measures it and
-updates its entry in the same PR, and a rewrite that meets the ceiling turns
-its entry `budgeted`.
+The exceptions the operator agreed, each justified in code, and pinned by
+`__tests__/groups-perf-read-path.test.ts` so adding one is a reviewed change:
+
+| RPC | Budget | Exception and cause |
+| --- | --: | --- |
+| `group_metric_eval_publish` | 61,000 | over the ceiling: a background evaluator job; its notification captures and source graph read the exercise's shared history |
+| `notification_workout_enqueue`, `notification_workout_prepare`, `notification_begin_send` | 6,500 each | over the ceiling: each proves its capture still holds by digesting the exercise's whole source graph (about 2.2 pages a set) |
+| `group_cow_summary`, `group_cow_previous_summary` | 1,200, 1,300 | slope not asserted: one bodyweight-redaction cache build scans each participant's history (1.3-1.5× per doubling); only a stored current definition per score removes it |
+
+Every other RPC the set measures is under the ceiling, and every other
+screen read is scoped. `group_metric_eval_prepare`, an evaluator write, is
+unscoped by design.
 
 **Warm reads.** Before any read is measured, each is called once, unmeasured
 and rolled back, on the same connection. A connection's first call of a read

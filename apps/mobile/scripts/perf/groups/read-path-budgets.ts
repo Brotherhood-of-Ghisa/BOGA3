@@ -18,10 +18,10 @@ export const SLOPE_MIN_PAGES = 100;
 export const BUDGET_HEADROOM = 1.25;
 
 /**
- * `baseline`: today's cost, recorded so a regression fails; it may sit over
- * the ceiling and its slope is reported, not asserted. `budgeted`: at or under
- * the ceiling unless `justification` says why not; a scoped entry's slope is
- * asserted.
+ * `budgeted`: at or under the ceiling unless `justification` says why not; a
+ * scoped entry's slope is asserted. `baseline` (a recorded cost with no
+ * ceiling or slope held) is retired: the set refuses one, so every RPC it
+ * measures is held to the ceiling.
  */
 export type BudgetKind = 'baseline' | 'budgeted';
 
@@ -47,7 +47,7 @@ export type PointCost = {
   error: string | null;
 };
 
-export type CheckLevel = 'pass' | 'warn' | 'fail';
+export type CheckLevel = 'pass' | 'fail';
 export type BudgetCheck = { fn: string; level: CheckLevel; message: string };
 
 /**
@@ -73,15 +73,18 @@ export const historySlope = (points: readonly PointCost[]): number | null => {
 const fmtSlope = (slope: number | null) => (slope === null ? '—' : `${slope.toFixed(2)}×`);
 
 /**
- * Every check for one RPC: it was measured at every point without failing, no
- * call exceeded its budget, a budgeted entry over the ceiling says why, and a
- * budgeted scoped entry over SLOPE_MIN_PAGES grows at most SLOPE_LIMIT per
- * doubling (a baseline entry's slope only warns).
+ * Every check for one RPC: its entry is `budgeted`, it was measured at every
+ * point without failing, no call exceeded its budget, an entry over the
+ * ceiling says why, and a scoped entry over SLOPE_MIN_PAGES grows at most
+ * SLOPE_LIMIT per doubling.
  */
 export const checkBudget = (fn: string, entry: BudgetEntry | undefined, points: readonly PointCost[]): BudgetCheck[] => {
   if (!entry) return [{ fn, level: 'fail', message: 'measured but has no budget entry' }];
   const checks: BudgetCheck[] = [];
-  if (entry.kind === 'budgeted' && entry.pages > PAGE_CEILING && !entry.justification?.trim()) {
+  if (entry.kind !== 'budgeted') {
+    checks.push({ fn, level: 'fail', message: `a \`${entry.kind}\` entry is no longer accepted: measure it and make it \`budgeted\`` });
+  }
+  if (entry.pages > PAGE_CEILING && !entry.justification?.trim()) {
     checks.push({ fn, level: 'fail', message: `budget ${entry.pages} pages is over the ${PAGE_CEILING}-page ceiling without a justification` });
   }
   if (points.length === 0) checks.push({ fn, level: 'fail', message: 'not measured' });
@@ -95,9 +98,7 @@ export const checkBudget = (fn: string, entry: BudgetEntry | undefined, points: 
   const slope = historySlope(points);
   const largest = Math.max(0, ...points.map((point) => point.pages));
   if (entry.scoped && slope !== null && slope > SLOPE_LIMIT && largest > SLOPE_MIN_PAGES) {
-    checks.push(entry.kind === 'budgeted'
-      ? { fn, level: 'fail', message: `grows ${fmtSlope(slope)} per doubling of history, over ${SLOPE_LIMIT}×` }
-      : { fn, level: 'warn', message: `grows ${fmtSlope(slope)} per doubling of history (baseline: reported, not asserted)` });
+    checks.push({ fn, level: 'fail', message: `grows ${fmtSlope(slope)} per doubling of history, over ${SLOPE_LIMIT}×` });
   }
   if (checks.length === 0) checks.push({ fn, level: 'pass', message: `within ${entry.pages} pages per call` });
   return checks;
@@ -111,9 +112,6 @@ export const checkBudgets = (
   ...Object.keys(budgets).filter((fn) => !(fn in measured)).map((fn) => ({ fn, level: 'fail' as const, message: 'has a budget but no scenario' })),
 ];
 
-export const baselineEntries = (budgets: Readonly<Record<string, BudgetEntry>>): string[] =>
-  Object.entries(budgets).filter(([, entry]) => entry.kind === 'baseline').map(([fn]) => fn).sort();
-
 const fmt = (value: number | undefined): string => {
   if (value === undefined) return '—';
   if (value >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
@@ -121,7 +119,11 @@ const fmt = (value: number | undefined): string => {
   return `${Math.round(value)}`;
 };
 
-/** The read-path table: one row per RPC, its cost at each point, its slope, budget and verdict. */
+/**
+ * The read-path table: one row per RPC, its cost at each point, its slope,
+ * budget and verdict, against the ceiling; then why each justified entry is
+ * over the ceiling or not slope-asserted, and every failure.
+ */
 export const readPathMarkdown = (
   budgets: Readonly<Record<string, BudgetEntry>>, measured: Readonly<Record<string, readonly PointCost[]>>,
   historyDays: readonly number[], checks: readonly BudgetCheck[],
@@ -129,7 +131,7 @@ export const readPathMarkdown = (
   const at = (fn: string, days: number) => measured[fn]?.find((point) => point.historyDays === days);
   const verdict = (fn: string) => {
     const levels = checks.filter((check) => check.fn === fn).map((check) => check.level);
-    return levels.includes('fail') ? 'FAIL' : levels.includes('warn') ? 'WARN' : 'PASS';
+    return levels.includes('fail') ? 'FAIL' : 'PASS';
   };
   const columns = historyDays.flatMap((days) => [`Pages H=${days}`, `Temp H=${days}`, `Seq scans H=${days}`]);
   const lines = [
@@ -146,8 +148,10 @@ export const readPathMarkdown = (
       return `| ${fn} | ${entry?.kind ?? '—'}${entry?.scoped ? ', scoped' : ''} | ${fmt(entry?.pages)} | ${cells.join(' | ')} | ${fmtSlope(historySlope(measured[fn] ?? []))} | ${verdict(fn)} |`;
     }),
     '',
-    `Still \`baseline\` (later work converts them to \`budgeted\`): ${baselineEntries(budgets).join(', ') || 'none'}.`,
+    `Ceiling ${PAGE_CEILING} pages per call; a scoped RPC grows at most ${SLOPE_LIMIT}× per doubling of history.`,
     '',
+    ...Object.entries(budgets).filter(([, entry]) => entry.justification?.trim())
+      .map(([fn, entry]) => `- ${fn} (${entry.pages > PAGE_CEILING ? 'over the ceiling' : 'slope not asserted'}): ${entry.justification!.trim()}`),
     ...checks.filter((check) => check.level !== 'pass').map((check) => `- ${check.level.toUpperCase()} ${check.fn}: ${check.message}`),
   ];
   return `${lines.join('\n')}\n`;
