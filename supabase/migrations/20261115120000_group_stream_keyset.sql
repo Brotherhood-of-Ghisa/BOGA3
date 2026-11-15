@@ -383,9 +383,6 @@ begin
     from disclosure m;
 end $$;
 
--- `p_redactions` null: one is built here for the CoW's participants, when a row
--- can need it (a ready, not normalized CoW).
-
 create or replace function app_public.group_cow_result_rows(p_cow app_public.group_cows,p_metric text)
 returns table(ordinal integer,member_id uuid,row_json jsonb)
 language plpgsql stable security definer set search_path=app_public,pg_temp as $$
@@ -393,6 +390,8 @@ begin
   return query select * from app_public.group_cow_result_rows(p_cow,p_metric,null::jsonb);
 end $$;
 
+-- `p_redactions` null: one is built here for the CoW's participants, when a row
+-- can need it (a ready, not normalized CoW).
 create function app_public.group_cow_public_result(p_cow app_public.group_cows,p_metrics text[],p_before text,p_limit integer,p_top boolean,p_redactions jsonb)
 returns jsonb language plpgsql stable security definer set search_path=app_public,pg_temp as $$
 declare metric text; state text:=app_public.group_cow_public_state(p_cow); ranks jsonb:='[]'; rows jsonb; page jsonb;

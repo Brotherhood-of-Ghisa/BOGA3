@@ -452,12 +452,13 @@ describe('helper parity', () => {
     expect(compare).toContain('select (a1) as expected, (a1 + 0) as actual');
     expect(compare).toContain('count(distinct x.expected::text)::integer as answers');
     const redaction = HELPER_PARITY_CASES.filter((item) => item.name.includes('redact'));
-    expect(redaction.map((item) => item.minAnswers)).toEqual([2, 2, 2]);
+    expect(redaction.map((item) => item.minAnswers)).toEqual([2, 2, 2, 2]);
   });
 
   test('the redaction helpers, their cache and the session counts are each compared, every registered case installing', () => {
     expect(HELPER_PARITY_CASES.map((item) => item.name).sort()).toEqual([
-      'group_competition_event_json', 'group_competition_event_json (cache)', 'group_competition_redactions',
+      'group_competition_event_json', 'group_competition_event_json (cache)', 'group_competition_redaction_lookup (cache)',
+      'group_competition_redactions',
       'group_competition_redacts_exercise', 'group_competition_session_card', 'group_competition_session_card (cache)',
       'group_competition_stream_record', 'group_competition_stream_record (cache)', 'group_competition_stream_withdrawn (cache)',
       'group_cow_redacts_exercise', 'group_cow_result_rows (cache)', 'group_cow_stream_item (cache)', 'group_week_session_counts']);

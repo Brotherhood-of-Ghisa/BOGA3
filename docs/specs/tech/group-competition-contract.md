@@ -229,9 +229,11 @@ once per member in one statement. Readers that ask about a few build a map of
 pairs, each asked live once (`group_competition_redactions`). Both are a
 reader's `p_redactions`; `group_competition_redaction_lookup` answers from
 either and falls back to the live helper for anything they lack. One
-statement sees one snapshot, so the answer is the per-row one. The stream
-builds a cache per page, the CoW result reader one per CoW, the records
-history a pair map.
+statement sees one snapshot, so the answer is the per-row one. The cache
+restates the live helper's branches, so a change to one changes the other; a
+read-path parity case compares them over every fixture pair. A one-group
+stream builds a cache per page (the All stream asks live), the CoW result
+reader one per CoW, the records history a pair map.
 
 The stream page takes, per kind, the first `limit + 1` items after the
 cursor and merges them. Session cards are selected by their item's

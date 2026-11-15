@@ -157,7 +157,11 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     budget: { kind: 'budgeted', pages: 280, scoped: true } },
 ];
 
-/** The read definitions as they stood before the per-call caches: those later migrations patched in place. */
+/**
+ * Live read definitions saved before the board, history, session detail and
+ * stream rewrites (each patched in place by a later migration, so in no one
+ * migration).
+ */
 const READ_DEFINITIONS = 'parity-definitions/20261114220000_group_read_helpers.sql';
 const PUBLICATION = '20261004233855_group_competition_publication.sql';
 const COW_READERS = '20261030064514_group_cow_readers.sql';
@@ -252,8 +256,6 @@ const cowParityCases = (): ParityCase<ReadPathContext>[] => [
  * verbatim copy in any one migration: copy the live text into a migration-
  * named file before the rewrite instead.
  */
-/** Live definitions saved before the board, history and session detail rewrite (patched in place, so in no one migration). */
-
 const boardArguments = (context: ReadPathContext): Record<string, unknown>[] =>
   context.exercises.flatMap((exercise) => (['e1rm', 'volume'] as const).flatMap((metric) =>
     [true, false].flatMap((certified) => [50, 2].map((limit) => ({
@@ -385,6 +387,15 @@ export const HELPER_PARITY_CASES: readonly HelperParityCase[] = [
       select p.*,(select c.redacted from cache c where c.member_user_id=p.a2 and c.definition_id is not distinct from p.a3) as a4
       from pairs p`,
     expected: 'app_public.group_competition_redacts_exercise(array[a1],a2,a3)', actual: 'a4', minAnswers: 2,
+  },
+  {
+    // The per-member cache mirrors the live helper's branches: every pair, a
+    // null, '' and a never-logged definition included, against the live answer.
+    name: 'group_competition_redaction_lookup (cache)',
+    argumentsSql: `${WITH_CACHE} select p.*, c.cache as a4 from (${REDACTION_PAIRS_SQL}) p, cache c
+      union all select p.a1, p.a2, '' as a3, c.cache from (${REDACTION_PAIRS_SQL}) p, cache c where p.a3 is null`,
+    expected: 'app_public.group_competition_redacts_exercise(array[a1],a2,a3)',
+    actual: 'app_public.group_competition_redaction_lookup(a4,array[a1],a2,a3)', minAnswers: 2,
   },
   // The readers' item builders against their definitions before the per-call
   // caches (no cache), for every fixture event, record and session; then
