@@ -238,9 +238,11 @@ $locks$;
 -- Readers no longer hold publication off, so a reader that reads published
 -- rows in more than one statement must still return a shape its client
 -- accepts. A board's count, page and own row now come from one statement
--- (the client rejects a page longer than its count). A stream record that a
--- publication retracts between the page and its group-record lookup keeps
--- the page's card, with no group records, instead of losing that field.
+-- (the client rejects a page longer than its count). A stream record card's
+-- event, record and group records are rebuilt together from the record's
+-- row as it stands (a publication can rewrite a kept record's boards between
+-- the page and its decoration); a card whose record a publication retracted
+-- meanwhile keeps the page's card, with no group records.
 do $readers$
 declare
   _definition text;
@@ -270,9 +272,11 @@ begin
   _definition := pg_get_functiondef('app_public.group_competition_stream_v4(uuid,text,integer)'::regprocedure);
   _anchor := $a$    select jsonb_agg(case when e.id is not null and e.kind='record' and jsonb_typeof(i->'record')='object'
       then jsonb_set(i,'{record,group_record_metrics}',app_public.group_competition_stream_group_record_metrics(e)) else i end$a$;
-  _replacement := $r$    select jsonb_agg(case when jsonb_typeof(i->'record')='object'
-      then jsonb_set(i,'{record,group_record_metrics}',case when e.id is not null and e.kind='record'
-        then app_public.group_competition_stream_group_record_metrics(e) else '[]'::jsonb end) else i end$r$;
+  _replacement := $r$    select jsonb_agg(case when e.id is not null and e.kind='record' and jsonb_typeof(i->'record')='object'
+      then app_public.group_competition_stream_event(e.id,(i->>'sort_at_ms')::bigint)
+        ||jsonb_build_object('record',app_public.group_competition_stream_record(e)
+          ||jsonb_build_object('group_record_metrics',app_public.group_competition_stream_group_record_metrics(e)))
+      when jsonb_typeof(i->'record')='object' then jsonb_set(i,'{record,group_record_metrics}','[]'::jsonb) else i end$r$;
   if (length(_definition) - length(replace(_definition, _anchor, ''))) <> length(_anchor) then
     raise exception 'group_competition_stream_v4: record anchor not found exactly once';
   end if;

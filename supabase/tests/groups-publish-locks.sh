@@ -21,6 +21,11 @@
 #     in-flight comparison publisher (it did behind FOR UPDATE), and still waits
 #     for a manager holding the row FOR UPDATE, so its group row → CoW fence
 #     order matches management's.
+#   - stream: a reader that builds a page in one statement and decorates it
+#     in a later one sees a publication committed in between (readers no longer
+#     hold it off). A record card's event, record and group records must still
+#     agree: the old decoration listed a newly led board in the group records
+#     that the card's event did not hold, which the client rejects.
 #
 # Direct-drain mode: the kick URL is unset and the sweep paused for the run.
 # Hermetic: per-run users, deleted on exit with everything they own.
@@ -143,10 +148,13 @@ legacy_definition() {
 }
 OLD_PUBLISH_SQL="$(legacy_definition 20261023091259_group_metric_graph_referenced_sets.sql group_metric_eval_publish group_metric_eval_publish__legacy)"
 OLD_READER_SQL="$(legacy_definition 20261004233855_group_competition_publication.sql group_competition_require_member group_competition_require_member__legacy)"
+OLD_STREAM_SQL="$(legacy_definition 20261111160000_group_stream_group_record_metrics.sql group_competition_stream_v4 group_competition_stream_v4__legacy)"
 [[ "${OLD_PUBLISH_SQL}" == *"for update;"* && "${OLD_PUBLISH_SQL}" == "create function pg_temp."* ]] ||
   fail "the old publisher's definition was not found"
 [[ "${OLD_READER_SQL}" == *"for share;"* && "${OLD_READER_SQL}" == "create function pg_temp."* ]] ||
   fail "the old reader check's definition was not found"
+[[ "${OLD_STREAM_SQL}" == "create function pg_temp."* && "${OLD_STREAM_SQL}" == *"group_record_metrics"* ]] ||
+  fail "the old stream decoration's definition was not found"
 
 cleanup() {
   bg_stop_all
@@ -362,6 +370,69 @@ bg_send E "rollback;"; bg_read E >/dev/null
 bg_send R "rollback;"; bg_read R >/dev/null
 bg_stop E; bg_stop R
 pass "CoW publication still waits for a manager's group-row lock"
+
+# =============================================================================
+echo "[${LANE_LABEL}] stream: a record card decorated after a publication"
+# =============================================================================
+
+EVAL_SECRET="$(run_psql "select app_public.group_eval_config('group_eval_secret');")"
+[[ -n "${EVAL_SECRET}" ]] || fail "no group_eval_secret in Vault"
+CUAM="$(run_psql "select floor(extract(epoch from clock_timestamp())*1000)::bigint;")"
+# Started after the owner joined (the share rule), finished a second later.
+STARTED=$((CUAM - 1000))
+push "${OWNER_TOKEN}" "a linked set that sets a record" "$(e_def "locks-def-${RUN_TAG}" Lift "${CUAM}")" \
+  "$(e_session "locks-s-${RUN_TAG}" "${STARTED}" completed "${CUAM}" 1 null "${CUAM}")" \
+  "$(e_se "locks-b-${RUN_TAG}" "locks-s-${RUN_TAG}" "locks-def-${RUN_TAG}" 0 Lift "${CUAM}")" \
+  "$(e_set "locks-x-${RUN_TAG}" "locks-b-${RUN_TAG}" 0 100 5 '' "${CUAM}")" \
+  "$(e_link "locks-def-${RUN_TAG}" "${GID}" "${GX_A}" "${CUAM}")"
+for pass in 1 2; do eval_drain; expect_ok "group-eval drain ${pass}"; check "group-eval drain ${pass}: no failed job" '.failed == 0'; done
+expect_sql_eq "the owner's first set holds a record on two Lift A boards" \
+  "select count(*) > 0 from app_public.group_events where group_id = '${GID}' and kind = 'record'
+     and jsonb_array_length(payload->'boards') > 1;" t
+
+# In one rolled-back transaction: the record holds only its first board
+# while stream_v3 builds its page; then a publication (stood in for by an
+# update) gives it the other board it leads, and each stream_v4 decorates
+# that page. Every card's group records must be record values of its own
+# event, and the newly led board must have been seen.
+stream_case_sql() {
+  printf '%s\n' "begin;
+do \$set\$ begin
+  perform set_config('request.jwt.claims', json_build_object('sub','${OWNER_UID}','role','authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', '${OWNER_UID}', true);
+  perform set_config('request.headers', '{\"x-boga-sync-protocol\":\"7\",\"x-boga-group-contract\":\"4\"}', true);
+  execute replace(pg_get_functiondef('app_public.group_competition_stream_v3(uuid,text,integer)'::regprocedure),
+    'FUNCTION app_public.group_competition_stream_v3(', 'FUNCTION pg_temp.stream_v3_page(');
+  create temp table locks_boards on commit drop as select id, payload->'boards' as boards
+    from app_public.group_events where group_id = '${GID}' and kind = 'record';
+  update app_public.group_events e set payload = jsonb_set(e.payload, '{boards}', jsonb_build_array(b.boards->0))
+    from locks_boards b where b.id = e.id;
+end \$set\$;
+create or replace function app_public.group_competition_stream_v3(p_group_id uuid default null, p_before text default null,
+  p_limit integer default 20) returns jsonb language plpgsql security definer set search_path=app_public,pg_temp as \$f\$
+declare page jsonb;
+begin
+  page := pg_temp.stream_v3_page(p_group_id, p_before, p_limit);
+  update app_public.group_events e set payload = jsonb_set(e.payload, '{boards}', b.boards)
+    from locks_boards b where b.id = e.id;
+  return page;
+end \$f\$;
+${OLD_STREAM_SQL}
+select '$1' as which;
+with page as (select $1('${GID}', null, 20) as p),
+  cards as (select i from page, jsonb_array_elements(page.p->'items') i where jsonb_typeof(i->'record') = 'object')
+select (select count(*) from cards) > 0
+  and (select bool_and(not exists(select 1 from jsonb_array_elements_text(c.i->'record'->'group_record_metrics') m
+    where not exists(select 1 from jsonb_array_elements(c.i->'event'->'values') v
+      where v->>'role' = 'record' and v->>'metric' = m.value))) from cards c)
+  and (select bool_or(jsonb_array_length(c.i->'record'->'group_record_metrics') > 1) from cards c) as agrees;
+rollback;"
+}
+old_agrees="$(run_psql "$(stream_case_sql pg_temp.group_competition_stream_v4__legacy)" | tail -1)"
+[[ "${old_agrees}" == f ]] || fail "old stream decoration: expected a card whose group records its event does not hold (got '${old_agrees}')"
+new_agrees="$(run_psql "$(stream_case_sql app_public.group_competition_stream_v4)" | tail -1)"
+[[ "${new_agrees}" == t ]] || fail "stream decoration: a card's event, record and group records disagree after a publication (got '${new_agrees}')"
+pass "stream (old decoration): a newly led board in the group records only; (new): card agrees"
 
 COMPLETED=1
 echo "[${LANE_LABEL}] all publish-lock checks passed"
