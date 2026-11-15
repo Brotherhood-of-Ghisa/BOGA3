@@ -55,6 +55,10 @@ export type ReadPathContext = {
   /** Every member, owner first: the viewers parity compares for. */
   members: string[];
   bench: string;
+  /** Every group exercise, in the fixture's order. */
+  exercises: string[];
+  /** Shared, completed sessions parity opens: each member's two newest and their newest with the bodyweight-aware exercise. */
+  sessions: { member: string; sessionId: string }[];
   /** Another member's newest shared session that set a record: the one a stream card opens. */
   session: { member: string; sessionId: string };
   /** The workout the viewer finishes and its synced graph, as the app confirms it; set once it is finished. */
@@ -103,16 +107,16 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     args: (c) => ({ p_group_id: c.groupId, p_window_start_ms: c.weeks.at(-1)!.start_ms, p_window_end_ms: c.weeks.at(-1)!.end_ms }),
     budget: { kind: 'budgeted', pages: 1_100, scoped: true } },
   { fn: 'group_competition_podiums', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_certified: false }),
-    budget: { kind: 'baseline', pages: 8_900, scoped: true } },
+    budget: { kind: 'budgeted', pages: 3_100, scoped: true } },
   { fn: 'group_competition_board', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_limit: 50, p_cursor: null }),
-    budget: { kind: 'baseline', pages: 4_300, scoped: true } },
+    budget: { kind: 'budgeted', pages: 1_500, scoped: true } },
   { fn: 'group_competition_records_history', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_before: null, p_limit: 50 }),
-    budget: { kind: 'baseline', pages: 11_000, scoped: true } },
+    budget: { kind: 'budgeted', pages: 2_300, scoped: true } },
   { fn: 'group_competition_session_detail', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
-    budget: { kind: 'baseline', pages: 4_600, scoped: true } },
+    budget: { kind: 'budgeted', pages: 1_150, scoped: true } },
   { fn: 'group_competition_session_records', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'budgeted', pages: 350, scoped: true } },
@@ -151,6 +155,18 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
  * verbatim copy in any one migration: copy the live text into a migration-
  * named file before the rewrite instead.
  */
+/** Live definitions saved before the board, history and session detail rewrite (patched in place, so in no one migration). */
+const READ_DEFINITIONS = 'parity-definitions/20261114220000_group_read_helpers.sql';
+
+const boardArguments = (context: ReadPathContext): Record<string, unknown>[] =>
+  context.exercises.flatMap((exercise) => (['e1rm', 'volume'] as const).flatMap((metric) =>
+    [true, false].flatMap((certified) => [50, 2].map((limit) => ({
+      p_group_id: context.groupId, p_group_exercise_id: exercise, p_metric: metric, p_certified: certified, p_limit: limit, p_cursor: null,
+    })))));
+
+const sessionArguments = (context: ReadPathContext): Record<string, unknown>[] =>
+  context.sessions.map((item) => ({ p_group_id: context.groupId, p_member_user_id: item.member, p_session_id: item.sessionId }));
+
 export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
   // Every rolling week of the At a glance read, for every viewer, against the
   // definition before the keyset latest session and the session-first counts.
@@ -178,6 +194,51 @@ export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
       return [context.weeks, ...context.weeks.map((week) => [week]), months]
         .map((windows) => ({ p_group_id: context.groupId, p_windows: windows }));
     },
+  },
+  // The board and the podiums before the single ranked set: every exercise,
+  // both metrics, both scopes, a full page and a short one (a next cursor).
+  {
+    fn: 'group_competition_board',
+    migration: READ_DEFINITIONS,
+    argumentSets: (context) => boardArguments(context),
+    plant: { from: `'entry_count',_count`, to: `'entry_count',_count+1` },
+  },
+  {
+    fn: 'group_competition_podiums',
+    migration: READ_DEFINITIONS,
+    helpers: { group_competition_board: READ_DEFINITIONS },
+    argumentSets: (context) => [true, false].map((certified) => ({ p_group_id: context.groupId, p_certified: certified })),
+  },
+  // The history before the per-page redaction map: every exercise, both
+  // metrics and scopes, a full page and a short one. The old cascade of
+  // helpers is installed too, so the old body calls the old helpers.
+  {
+    fn: 'group_competition_records_history',
+    migration: READ_DEFINITIONS,
+    helpers: {
+      group_competition_event_json: READ_DEFINITIONS,
+      group_competition_stream_record: READ_DEFINITIONS,
+      group_competition_records_history_item: READ_DEFINITIONS,
+    },
+    argumentSets: (context) => context.exercises.flatMap((exercise) => (['e1rm', 'volume'] as const).flatMap((metric) =>
+      [true, false].flatMap((certified) => [50, 3].map((limit) => ({
+        p_group_id: context.groupId, p_group_exercise_id: exercise, p_metric: metric, p_certified: certified, p_before: null, p_limit: limit,
+      }))))),
+    plant: { from: `'items',_rows`, to: `'items',_rows||_rows` },
+  },
+  // A session's detail before the once-per-definition redaction.
+  {
+    fn: 'group_competition_session_detail',
+    migration: READ_DEFINITIONS,
+    helpers: { group_competition_session_exercises: READ_DEFINITIONS, group_competition_session_json: READ_DEFINITIONS },
+    argumentSets: (context) => sessionArguments(context),
+  },
+  // A session's records, over the event renderer the history rewrite touched.
+  {
+    fn: 'group_competition_session_records',
+    migration: READ_DEFINITIONS,
+    helpers: { group_competition_event_json: READ_DEFINITIONS },
+    argumentSets: (context) => sessionArguments(context),
   },
   // The notification RPCs and the readiness and context-digest helpers they share (notification-parity.ts).
   ...notificationParityCases<ReadPathContext>(),
@@ -419,6 +480,17 @@ export type PlantChecks = Record<string, boolean>;
 const CONTEXT_SQL = `select f.group_id, f.now_ms,
   (select array_agg(uid order by idx) from perf_members) as members,
   (select id from perf_group_exercises where ex=0) as bench,
+  (select array_agg(id order by ex) from perf_group_exercises) as exercises,
+  (with pick as (
+      select sh.member_user_id as m, sh.session_id as sid,
+        row_number() over (partition by sh.member_user_id order by s.started_at desc) as rn,
+        exists(select 1 from app_public.session_exercises se where se.owner_user_id=s.owner_user_id and se.session_id=s.id
+          and se.exercise_definition_id='perf-def-6') as pull
+      from app_public.group_session_shares sh
+        join app_public.sessions s on s.owner_user_id=sh.member_user_id and s.id=sh.session_id and s.deleted_at is null
+      where sh.group_id=f.group_id and s.status='completed' and s.id<>'perf-live'),
+    chosen as (select * from pick where rn<=2 or (pull and rn=(select min(p2.rn) from pick p2 where p2.m=pick.m and p2.pull)))
+    select jsonb_agg(jsonb_build_object('member',m,'sessionId',sid)) from chosen) as sessions,
   (select row(e.member_user_id,e.session_id)::text from app_public.group_events e join perf_members m on m.uid=e.member_user_id
      where e.group_id=f.group_id and e.kind='record' and m.idx=2 and e.session_id is not null
      order by e.seq desc limit 1) as session,
@@ -428,12 +500,14 @@ const CONTEXT_SQL = `select f.group_id, f.now_ms,
 
 const readContext = async (session: Tier1Session): Promise<ReadPathContext> => {
   const [row] = await session.exec<{
-    group_id: string; now_ms: string; members: string[]; bench: string; session: string; viewer: string; viewer_session: string;
+    group_id: string; now_ms: string; members: string[]; bench: string; exercises: string[];
+    sessions: ReadPathContext['sessions'] | null; session: string; viewer: string; viewer_session: string;
   }>(CONTEXT_SQL);
   const [member, sessionId] = row.session.replace(/^\(|\)$/g, '').split(',');
   const now = Number(row.now_ms);
   return {
     groupId: row.group_id, viewer: row.viewer, viewerSession: row.viewer_session, members: row.members, bench: row.bench,
+    exercises: row.exercises, sessions: row.sessions ?? [],
     session: { member, sessionId },
     completion: null,
     notification: null,
