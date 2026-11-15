@@ -26,7 +26,8 @@ returns boolean language sql stable set search_path=app_public,pg_temp as $$
       and coalesce(
         (select bool_or(ge.bodyweight_contribution>0) from app_public.exercise_group_links l
           join app_public.group_exercises ge on ge.group_id=g.id and ge.id=app_public.group_eval_try_uuid(l.group_exercise_id)
-          where l.owner_user_id=p_member and l.exercise_definition_id=p_definition and l.group_id=g.id::text
+          where l.owner_user_id=p_member and l.exercise_definition_id=p_definition
+            and app_public.group_eval_try_uuid(l.group_id)=g.id
             and l.deleted_at is null),
         exists(select 1 from app_public.exercise_definitions ed
           where ed.owner_user_id=p_member and ed.id=p_definition and ed.bodyweight_contribution>0)));

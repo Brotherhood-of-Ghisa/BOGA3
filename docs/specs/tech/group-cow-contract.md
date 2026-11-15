@@ -166,9 +166,10 @@ Final rows reject updates. The existing kick and sweep discover work without rea
 `cow-evaluation.ts` supports pinned scorer 7 independently of lifetime rebuild
 versions. Before changing its arithmetic imports, retain a callable implementation
 for every unfinished pinned version (load `docs/procedures/rule-upgrade.md`).
-Original set/definition references remain service-only. Disclosure asks
-[[groups.kg-disclosure]] about a reference's definition; an empty identity
-hides nothing. Legacy receipts lacking definition identity keep their
+Original set/definition references remain service-only. A kg CoW hides every
+figure while its group exercise counts bodyweight; otherwise disclosure asks
+[[groups.kg-disclosure]] about a reference's definition, and an empty
+identity hides nothing. Legacy receipts lacking definition identity keep their
 versions and priority. Metadata enrichment alone never revises a receipt.
 
 `apps/mobile/src/groups/cow-wire.ts` owns exact public result/calendar shapes;

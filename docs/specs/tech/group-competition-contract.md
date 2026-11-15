@@ -63,8 +63,9 @@ working/counting. A Volume witness covers that set's performance, never
 other sets or a session total.
 
 If changing weekly aggregates, load [group-cow-contract.md](group-cow-contract.md):
-[[groups.cow-metrics]] leaves these lifetime boards unchanged. A CoW row's disclosure
-asks the §2 rule about its stored source definition.
+[[groups.cow-metrics]] leaves these lifetime boards unchanged. A kg CoW hides every figure
+while its group exercise counts bodyweight; otherwise a row asks the §2 rule
+about its stored source definition.
 
 Keep finite unrounded kernel values through publication/ranking. Display
 rounding is presentation only; values are never quantized for ranking.

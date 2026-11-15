@@ -529,6 +529,23 @@ check "an unlinked exercise's own contribution hides its kg" 'any(.session.exerc
   .visibility=="normalized" and .sets[0].reps_value=="6" and (.sets[0]|has("weight_value")|not))' --arg d "${T}-own-bw-def"
 check 'a tombstoned link hides nothing' 'any(.session.exercises[]; .exercise_definition_id==$d and
   .visibility=="ordinary" and .sets[0].weight_value=="25")' --arg d "${T}-unlinked-def"
+# A live link decides over the member's own setting: linked to the ordinary
+# comparison, an exercise with its own contribution shows kg, and an event
+# naming it there (a link, say) is ordinary.
+next_cuam
+push "${ATHLETE_TOKEN}" 'own contribution linked to an ordinary comparison' \
+  "$(e_link "${T}-own-bw-def" "${GID}" "${ZERO_GX}" "${CUAM}")"
+rpc "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" \
+  '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"
+expect_ok 'linked own contribution session'; assert_wire isCompetitionSessionDetailWire
+check "a live link to an ordinary comparison shows kg whatever the member's own setting" 'any(.session.exercises[];
+  .exercise_definition_id==$d and .visibility=="ordinary" and .sets[0].weight_value=="15")' --arg d "${T}-own-bw-def"
+expect_sql 'a link event on the ordinary comparison naming that exercise is ordinary' "select not app_public.group_competition_event_normalized(
+  jsonb_populate_record(e,jsonb_build_object('kind','link','group_exercise_id','${ZERO_GX}','member_user_id','${ATHLETE_UID}',
+    'payload',jsonb_build_object('exercise_definition_id','${T}-own-bw-def'))))
+  from app_public.group_events e where e.group_id='${GID}' limit 1;" t
+next_cuam
+push "${ATHLETE_TOKEN}" 'unlink own contribution' "$(e_link "${T}-own-bw-def" "${GID}" "${ZERO_GX}" "${CUAM}" "${CUAM}")"
 next_cuam
 push "${ATHLETE_TOKEN}" 'remove rule exercises' \
   "$(e_se "${T}-own-bw-se" "${T}-ATHLETE" "${T}-own-bw-def" 3 'Own bodyweight' "${CUAM}" "${CUAM}")" \
