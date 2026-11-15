@@ -316,7 +316,7 @@ export const HELPER_PARITY_CASES: readonly HelperParityCase[] = [
       where a7 and w.member_user_id=a4 and w.session_id=a5 and w.group_exercise_id=a2),a6,
       app_public.notification_redaction_map(a1,a2,a3,(select w from app_public.notification_workout_targets w
         where a7 and w.member_user_id=a4 and w.session_id=a5 and w.group_exercise_id=a2)))`,
-    minAnswers: 1,
+    minAnswers: 2,
   },
   {
     name: 'group_week_session_counts', fn: 'group_week_session_counts', migration: '20261003180000_group_board_raw_weight.sql',

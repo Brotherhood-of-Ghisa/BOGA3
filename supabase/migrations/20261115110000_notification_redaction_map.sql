@@ -2,7 +2,7 @@
 -- function (group_competition_redacts_exercise, ~370 pages a call) for the same
 -- (member, definition) pairs over and over: board_rows once per ranked entry in
 -- every ranks call, and readiness ranks twice, a capture twice per workout
--- target. Two changes, neither of which changes an answer:
+-- target. One change, which changes no answer:
 --
 --  * A proof asks each distinct pair once, as a map (group_competition_redaction_key,
 --    as the history readers do), and hands it to the ranks and the board rows
@@ -10,8 +10,10 @@
 --    pages but never change an answer. Readiness is one statement-snapshot
 --    function, so the map is the per-row answer. A capture builds its map
 --    before its own disclosure baseline; the live check at its end still
---    compares against the live function, so a change in between still aborts
---    the publication.
+--    compares against the live function, so a change in between that alters the
+--    common board still aborts the publication. A change that only alters a
+--    target's own without-workout ranks fails closed: readiness recomputes
+--    from a fresh map, the comparison no longer holds, and nothing is sent.
 
 -- Board rows: the redaction check reads the map first.
 create function pg_temp.patch(p_definition text,p_anchor text,p_replacement text,p_count integer,p_label text)
