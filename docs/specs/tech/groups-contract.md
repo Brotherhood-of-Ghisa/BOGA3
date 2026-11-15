@@ -94,11 +94,11 @@ Links are the member's Sync v2 entity `exercise_group_links`.
 
 ## Authorization
 
-Spec 10 rules 15–19 own the model. In addition: execute is granted to `anon` so
+Spec 10 rules 15–19 own the model. Also: execute is granted to `anon` so
 the function raises `AUTH_REQUIRED` instead of PostgREST's 42501; every
 mutating RPC locks the `groups` row `FOR UPDATE` before role checks,
 serializing role changes, transfers, removals and leaves; publishers take `FOR
-NO KEY UPDATE` and reads `KEY SHARE`: reads wait for writes, not publishers,
+NO KEY UPDATE` and reads `KEY SHARE`: reads wait for mutating RPCs, not publishers,
 and see a mid-read publication in later statements only; usernames come from
 `user_profiles`, and create and join need one. The owner cannot leave (`OWNER_MUST_TRANSFER`)
 and becomes admin on transfer. Admins invite, edit, manage group exercises,
