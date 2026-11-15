@@ -122,11 +122,10 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 400, scoped: true } },
   { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'budgeted', pages: 4_200, scoped: false } },
-  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 150_000, scoped: false,
+  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 110_000, scoped: false,
     justification: 'A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
-      + 'before and after publishing, which checks bodyweight redaction once per member and source set; its source graph, '
-      + 'score writes and board apply stay under 20k pages. It falls toward the ceiling once that capture checks '
-      + 'redaction once per member and exercise rather than once per source set.' } },
+      + 'before and after publishing: every source session\'s boards with and without its workout. Its source graph, score '
+      + 'writes and board apply are a small share of the cost.' } },
   { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 140_000, scoped: true } },
   { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 140_000, scoped: true } },
   { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 140_000, scoped: true } },
@@ -556,6 +555,11 @@ const buildPoint = async (
   }
   const spec = { members: READ_PATH_MEMBERS, historyDays: point.historyDays, tag: `r${point.historyDays}` };
   for (const statement of [...fixtureStatements(spec), ...plantStatements()]) await session.exec(statement);
+  // The fixture's deferred constraint checks fire here, planned on fresh
+  // statistics and outside any call's budget: left to the first call, they
+  // ran on the plans of an emptied database and could outrun it.
+  await analyzeAppTables(session);
+  await session.exec('select pg_temp.perf_flush()');
   [point.fixture] = await session.exec<ReadPathPoint['fixture']>(FIXTURE_COUNTS_SQL);
   point.incomplete = await drain(run, session, 'steady state');
   if (point.incomplete) return null;
