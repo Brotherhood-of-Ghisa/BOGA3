@@ -96,9 +96,10 @@ Every table also has the index `<table>_owner_received_idx` on
 
 ## Per-entity rules
 
-Column mappings live in the Drizzle schema files and the migrations, and the
-drift checker enforces their parity. Only the rules the columns do not show are
-listed here:
+Drizzle and migrations own columns; drift checks enforce parity. Additional rules:
+
+- **`training_notes`** metadata compatibility: when changing note sync, load
+  [`training-notes-contract.md`](training-notes-contract.md).
 
 - **`session_exercise_tags`** has no client `updated_at`; it still carries the
   universal server columns.

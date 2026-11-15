@@ -202,14 +202,14 @@ export class BogaAgentApi {
 
   async listNotes(
     accessToken: string,
-    input: { cursor?: string; exercise_id?: string; from?: string; limit?: number; to?: string },
+    input: { cursor?: string; exercise_id?: string; session_id?: string; set_id?: string; activity_source?: string; activity_external_id?: string; from?: string; limit?: number; to?: string },
   ): Promise<Record<string, unknown>> {
     return this.#getObject('v1/agent/notes', accessToken, input);
   }
 
   async addNote(
     accessToken: string,
-    input: { body: string; exercise_id?: string | null; idempotency_key: string; noted_on?: string },
+    input: { body: string; author: 'user' | 'agent'; exercise_id?: string | null; session_id?: string | null; set_id?: string | null; activity_source?: string | null; activity_external_id?: string | null; idempotency_key: string; noted_on?: string },
   ): Promise<Record<string, unknown>> {
     const { idempotency_key, ...body } = input;
     return this.#postObject('v1/agent/notes', accessToken, idempotency_key, body);

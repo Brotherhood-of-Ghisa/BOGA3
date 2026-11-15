@@ -16,6 +16,17 @@ export const trainingNotes = sqliteTable(
     body: text('body').notNull(),
     notedOn: text('noted_on').notNull(),
     source: text('source', { enum: ['app', 'agent'] }).notNull().default('app'),
+    // Nullable author: legacy coach notes did not record who supplied the text.
+    author: text('author', { enum: ['user', 'agent'] }),
+    clientId: text('client_id'),
+    // Retained identity, without FKs: notes survive deleted targets and health
+    // activities are server-only. The agent writer validates ownership.
+    sessionId: text('session_id'),
+    setId: text('set_id'),
+    activitySource: text('activity_source'),
+    activityExternalId: text('activity_external_id'),
+    targetLabel: text('target_label'),
+    targetStartedAt: integer('target_started_at', { mode: 'timestamp_ms' }),
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
     localDirty: integer('local_dirty', { mode: 'boolean' }).notNull().default(false),
     localUpdatedAtMs: integer('local_updated_at_ms').notNull().default(0),

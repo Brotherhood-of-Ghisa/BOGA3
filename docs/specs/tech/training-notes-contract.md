@@ -8,10 +8,21 @@ app's notes pages or the coach's note tools. Product rules:
 
 `training_notes` is the eighteenth Sync v2 entity, in layer 1
 (`apps/mobile/src/sync/topo-order.ts`): `exercise_definition_id` (nullable;
-null is a general note), `body`, `noted_on`, `source` and the standard
+null unless exercise-scoped), `body`, `noted_on`, `source` and the standard
 timestamps. `noted_on` is a local calendar date stored as `YYYY-MM-DD` text,
-not epoch ms: a note applies from a day, not an instant. `source` is `app` or
-`agent`. Following the Sync v2 ground rules, the server has no CHECK on body
+not epoch ms: a note applies from a day, not an instant. `source` is `app` or `agent`; `author` records `user` or `agent` separately.
+Nullable `session_id`, `set_id`, or the pair `activity_source` +
+`activity_external_id` provide alternative targets. Agent writes allow at most
+one target, including an exercise. These retained references deliberately have
+no FK: notes stay in layer 1, health activities are outside sync, and target
+removal must retain notes. `target_label` and epoch-ms `target_started_at` snapshot the scope at creation;
+the app formats that instant in its local date preference.
+`client_id` comes from the validated OAuth connection, never caller input.
+Legacy agent authors and client IDs remain null; app-channel notes read as
+user-authored. Push preserves already-recorded nonnull creation metadata even when an older
+writer sends nulls. Upgrade resets clean note clocks and pull cursors; pull also
+fills missing metadata on newer dirty rows without replacing their tombstones. No topology or protocol
+cutover is needed. Following the Sync v2 ground rules, the server has no CHECK on body
 length, date shape or source; the app repository
 (`apps/mobile/src/data/training-notes.ts`) and the agent API validate their own
 writes. The composite FK to `exercise_definitions` cascades only on a hard
