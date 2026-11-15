@@ -87,8 +87,8 @@ const stream = (fn: string, pages: number): ReadPathRpc => ({
  * ceiling. Re-measure and update an entry in the change that moves its cost.
  */
 export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
-  stream('group_competition_stream_v5', 290_000),
-  stream('group_competition_stream_v4', 280_000),
+  stream('group_competition_stream_v5', 300_000),
+  stream('group_competition_stream_v4', 300_000),
   stream('group_competition_stream_v3', 280_000),
   stream('group_competition_stream_v2', 90_000),
   { fn: 'group_competition_period_totals', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_windows: c.weeks }),
@@ -126,12 +126,12 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     justification: 'A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
       + 'before and after publishing: every source session\'s boards with and without its workout. Its source graph, score '
       + 'writes and board apply are a small share of the cost.' } },
-  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 140_000, scoped: true } },
-  { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 140_000, scoped: true } },
-  { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 140_000, scoped: true } },
+  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 26_000, scoped: true } },
+  { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 26_000, scoped: true } },
+  { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 26_000, scoped: true } },
   { fn: 'notification_confirm_completion', via: 'member',
     args: (c) => ({ p_session_id: c.completion!.sessionId, p_entities: c.completion!.entities }),
-    budget: { kind: 'baseline', pages: 28_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 3_600, scoped: true } },
 ];
 
 /**

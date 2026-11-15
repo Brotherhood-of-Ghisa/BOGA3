@@ -242,7 +242,7 @@ $locks$;
 -- event, record and group records are rebuilt together from the record's
 -- row as it stands (a publication can rewrite a kept record's boards between
 -- the page and its decoration); a card whose record a publication retracted
--- meanwhile keeps the page's card, with no group records.
+-- meanwhile drops its record, as the earlier decoration does.
 do $readers$
 declare
   _definition text;
@@ -276,7 +276,7 @@ begin
       then app_public.group_competition_stream_event(e.id,(i->>'sort_at_ms')::bigint)
         ||jsonb_build_object('record',app_public.group_competition_stream_record(e)
           ||jsonb_build_object('group_record_metrics',app_public.group_competition_stream_group_record_metrics(e)))
-      when jsonb_typeof(i->'record')='object' then jsonb_set(i,'{record,group_record_metrics}','[]'::jsonb) else i end$r$;
+      when jsonb_typeof(i->'record')='object' then i-'record' else i end$r$;
   if (length(_definition) - length(replace(_definition, _anchor, ''))) <> length(_anchor) then
     raise exception 'group_competition_stream_v4: record anchor not found exactly once';
   end if;
