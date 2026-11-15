@@ -150,6 +150,17 @@ branch, un-shares the group's latest completed session, and leaves facts the
 evaluator has not caught up with (a deleted set, a deleted exercise, a moved
 set), so both kinds of case cover them.
 
+An RPC that writes sets `state` (SQL returning the rows it may change, with
+generated ids and clock-timed columns left out) and `caller` (its worker's
+role). Each call then runs in its own savepoint, old and new start from the
+same rows, and the result, a refusal's error and the rows changed are compared.
+`calls` lists exact viewer and argument pairs. `scenarios` (in
+`notification-parity.ts`) re-run a case after one planted change each (an edited
+set, a removed link, a stale stored rank or digest, an unenqueued workout); old
+and new must agree under every one. `observe` names each live outcome and
+`requires` lists those that must each occur, so a case whose calls all fail the
+same way does not pass. A helper shared by several cases installs once.
+
 **Publish parity** (`publish-parity.ts`) does the same for the comparison
 publisher, a write: on the H=90 point every `group_metric_eval_publish` call,
 in both steady-state drains and the measured workout, first runs the old

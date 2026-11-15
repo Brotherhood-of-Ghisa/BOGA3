@@ -18,7 +18,11 @@ import { Client } from 'pg';
 import { scans, type Counters } from './counters.ts';
 import { fixtureStatements, FIXTURE_COUNTS_SQL } from './fixture.ts';
 import {
-  compareParity, helperParityStatements, parityInstallStatements, parityPassed,
+  LEASE_DELIVERIES_SQL, NOTIFICATION_FIXTURE_SQL, SCENARIOS, notificationParityCases, scenarioStatements,
+  type NotificationFixture,
+} from './notification-parity.ts';
+import {
+  compareParity, helperParityStatements, missingOutcomes, parityInstallStatements, parityPassed,
   type HelperParityCase, type ParityCase, type ParityOutcome,
 } from './parity.ts';
 import { PublishParity } from './publish-parity.ts';
@@ -26,6 +30,7 @@ import {
   checkBudgets, readPathMarkdown, type BudgetCheck, type BudgetEntry, type PointCost,
 } from './read-path-budgets.ts';
 import { Tier1Session, type CallRecord } from './session.ts';
+import type { RpcFailure } from './group-eval-mirror.ts';
 import {
   analyzeAppTables, configureHosted, pushEntities, steadyState, Tier1Run, vacuum, type StepResult, type Tier1Options,
 } from './tier1.ts';
@@ -51,10 +56,16 @@ export type ReadPathContext = {
   /** Every member, owner first: the viewers parity compares for. */
   members: string[];
   bench: string;
+  /** Every group exercise, in the fixture's order. */
+  exercises: string[];
+  /** Shared, completed sessions parity opens: each member's two newest and their newest with the bodyweight-aware exercise. */
+  sessions: { member: string; sessionId: string }[];
   /** Another member's newest shared session that set a record: the one a stream card opens. */
   session: { member: string; sessionId: string };
   /** The workout the viewer finishes and its synced graph, as the app confirms it; set once it is finished. */
   completion: { sessionId: string; entities: unknown } | null;
+  /** What the notification parity cases call with; set when parity runs. */
+  notification: NotificationFixture | null;
   /**
    * Rolling 7-day windows ending at the fixture's clock, oldest first. The
    * app sends Monday-aligned local weeks; rolling ones hold the same number of
@@ -97,16 +108,16 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     args: (c) => ({ p_group_id: c.groupId, p_window_start_ms: c.weeks.at(-1)!.start_ms, p_window_end_ms: c.weeks.at(-1)!.end_ms }),
     budget: { kind: 'budgeted', pages: 1_100, scoped: true } },
   { fn: 'group_competition_podiums', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_certified: false }),
-    budget: { kind: 'baseline', pages: 8_900, scoped: true } },
+    budget: { kind: 'budgeted', pages: 3_100, scoped: true } },
   { fn: 'group_competition_board', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_limit: 50, p_cursor: null }),
-    budget: { kind: 'baseline', pages: 4_300, scoped: true } },
+    budget: { kind: 'budgeted', pages: 1_500, scoped: true } },
   { fn: 'group_competition_records_history', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_before: null, p_limit: 50 }),
-    budget: { kind: 'baseline', pages: 11_000, scoped: true } },
+    budget: { kind: 'budgeted', pages: 2_300, scoped: true } },
   { fn: 'group_competition_session_detail', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
-    budget: { kind: 'baseline', pages: 4_600, scoped: true } },
+    budget: { kind: 'budgeted', pages: 1_150, scoped: true } },
   { fn: 'group_competition_session_records', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'budgeted', pages: 350, scoped: true } },
@@ -126,12 +137,16 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     justification: 'A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
       + 'before and after publishing: every source session\'s boards with and without its workout. Its source graph, score '
       + 'writes and board apply are a small share of the cost.' } },
-  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 26_000, scoped: true } },
-  { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 26_000, scoped: true } },
-  { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 26_000, scoped: true } },
+  // Each of these three proves the captured comparison still holds, which
+  // reads the group's shared history once (the source graph) and ranks the
+  // exercise twice: its cost grows with that history until the graph build
+  // and the per-entry redaction answers get cheaper.
+  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 48_000, scoped: true } },
+  { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 48_000, scoped: true } },
+  { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 48_000, scoped: true } },
   { fn: 'notification_confirm_completion', via: 'member',
     args: (c) => ({ p_session_id: c.completion!.sessionId, p_entities: c.completion!.entities }),
-    budget: { kind: 'baseline', pages: 3_600, scoped: true } },
+    budget: { kind: 'budgeted', pages: 280, scoped: true } },
 ];
 
 /**
@@ -144,6 +159,18 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
  * verbatim copy in any one migration: copy the live text into a migration-
  * named file before the rewrite instead.
  */
+/** Live definitions saved before the board, history and session detail rewrite (patched in place, so in no one migration). */
+const READ_DEFINITIONS = 'parity-definitions/20261114220000_group_read_helpers.sql';
+
+const boardArguments = (context: ReadPathContext): Record<string, unknown>[] =>
+  context.exercises.flatMap((exercise) => (['e1rm', 'volume'] as const).flatMap((metric) =>
+    [true, false].flatMap((certified) => [50, 2].map((limit) => ({
+      p_group_id: context.groupId, p_group_exercise_id: exercise, p_metric: metric, p_certified: certified, p_limit: limit, p_cursor: null,
+    })))));
+
+const sessionArguments = (context: ReadPathContext): Record<string, unknown>[] =>
+  context.sessions.map((item) => ({ p_group_id: context.groupId, p_member_user_id: item.member, p_session_id: item.sessionId }));
+
 export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
   // Every rolling week of the At a glance read, for every viewer, against the
   // definition before the keyset latest session and the session-first counts.
@@ -172,16 +199,53 @@ export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
         .map((windows) => ({ p_group_id: context.groupId, p_windows: windows }));
     },
   },
-  // A board's count, page and own row from one statement: every metric and
-  // scope, a full page and a two-row page (which has a next cursor). Patched
-  // in place by 20261008120000, so its text before the change is saved.
+  // The board and the podiums before the single ranked set: every exercise,
+  // both metrics, both scopes, a full page and a short one (a next cursor).
   {
     fn: 'group_competition_board',
-    migration: 'parity-definitions/20261008120000_group_competition_v4_only.sql',
-    argumentSets: (context) => ['e1rm', 'volume'].flatMap((metric) => [false, true].flatMap((certified) => [50, 2].map((limit) =>
-      ({ p_group_id: context.groupId, p_group_exercise_id: context.bench, p_metric: metric, p_certified: certified,
-        p_limit: limit, p_cursor: null })))),
+    migration: READ_DEFINITIONS,
+    argumentSets: (context) => boardArguments(context),
+    plant: { from: `'entry_count',_count`, to: `'entry_count',_count+1` },
   },
+  {
+    fn: 'group_competition_podiums',
+    migration: READ_DEFINITIONS,
+    helpers: { group_competition_board: READ_DEFINITIONS },
+    argumentSets: (context) => [true, false].map((certified) => ({ p_group_id: context.groupId, p_certified: certified })),
+  },
+  // The history before the per-page redaction map: every exercise, both
+  // metrics and scopes, a full page and a short one. The old cascade of
+  // helpers is installed too, so the old body calls the old helpers.
+  {
+    fn: 'group_competition_records_history',
+    migration: READ_DEFINITIONS,
+    helpers: {
+      group_competition_event_json: READ_DEFINITIONS,
+      group_competition_stream_record: READ_DEFINITIONS,
+      group_competition_records_history_item: READ_DEFINITIONS,
+    },
+    argumentSets: (context) => context.exercises.flatMap((exercise) => (['e1rm', 'volume'] as const).flatMap((metric) =>
+      [true, false].flatMap((certified) => [50, 3].map((limit) => ({
+        p_group_id: context.groupId, p_group_exercise_id: exercise, p_metric: metric, p_certified: certified, p_before: null, p_limit: limit,
+      }))))),
+    plant: { from: `'items',_rows`, to: `'items',_rows||_rows` },
+  },
+  // A session's detail before the once-per-definition redaction.
+  {
+    fn: 'group_competition_session_detail',
+    migration: READ_DEFINITIONS,
+    helpers: { group_competition_session_exercises: READ_DEFINITIONS, group_competition_session_json: READ_DEFINITIONS },
+    argumentSets: (context) => sessionArguments(context),
+  },
+  // A session's records, over the event renderer the history rewrite touched.
+  {
+    fn: 'group_competition_session_records',
+    migration: READ_DEFINITIONS,
+    helpers: { group_competition_event_json: READ_DEFINITIONS },
+    argumentSets: (context) => sessionArguments(context),
+  },
+  // The notification RPCs and the readiness and context-digest helpers they share (notification-parity.ts).
+  ...notificationParityCases<ReadPathContext>(),
   // Stream records keep their group records when nothing retracts them.
   {
     fn: 'group_competition_stream_v4',
@@ -426,6 +490,17 @@ export type PlantChecks = Record<string, boolean>;
 const CONTEXT_SQL = `select f.group_id, f.now_ms,
   (select array_agg(uid order by idx) from perf_members) as members,
   (select id from perf_group_exercises where ex=0) as bench,
+  (select array_agg(id order by ex) from perf_group_exercises) as exercises,
+  (with pick as (
+      select sh.member_user_id as m, sh.session_id as sid,
+        row_number() over (partition by sh.member_user_id order by s.started_at desc) as rn,
+        exists(select 1 from app_public.session_exercises se where se.owner_user_id=s.owner_user_id and se.session_id=s.id
+          and se.exercise_definition_id='perf-def-6') as pull
+      from app_public.group_session_shares sh
+        join app_public.sessions s on s.owner_user_id=sh.member_user_id and s.id=sh.session_id and s.deleted_at is null
+      where sh.group_id=f.group_id and s.status='completed' and s.id<>'perf-live'),
+    chosen as (select * from pick where rn<=2 or (pull and rn=(select min(p2.rn) from pick p2 where p2.m=pick.m and p2.pull)))
+    select jsonb_agg(jsonb_build_object('member',m,'sessionId',sid)) from chosen) as sessions,
   (select row(e.member_user_id,e.session_id)::text from app_public.group_events e join perf_members m on m.uid=e.member_user_id
      where e.group_id=f.group_id and e.kind='record' and m.idx=2 and e.session_id is not null
      order by e.seq desc limit 1) as session,
@@ -435,14 +510,17 @@ const CONTEXT_SQL = `select f.group_id, f.now_ms,
 
 const readContext = async (session: Tier1Session): Promise<ReadPathContext> => {
   const [row] = await session.exec<{
-    group_id: string; now_ms: string; members: string[]; bench: string; session: string; viewer: string; viewer_session: string;
+    group_id: string; now_ms: string; members: string[]; bench: string; exercises: string[];
+    sessions: ReadPathContext['sessions'] | null; session: string; viewer: string; viewer_session: string;
   }>(CONTEXT_SQL);
   const [member, sessionId] = row.session.replace(/^\(|\)$/g, '').split(',');
   const now = Number(row.now_ms);
   return {
     groupId: row.group_id, viewer: row.viewer, viewerSession: row.viewer_session, members: row.members, bench: row.bench,
+    exercises: row.exercises, sessions: row.sessions ?? [],
     session: { member, sessionId },
     completion: null,
+    notification: null,
     weeks: Array.from({ length: PERIOD_WINDOWS }, (_, index) => {
       const end = now - (PERIOD_WINDOWS - 1 - index) * WEEK_MS;
       return { start_ms: end - WEEK_MS, end_ms: end };
@@ -505,8 +583,123 @@ const runHelperParity = async (session: Tier1Session, item: HelperParityCase): P
   }
 };
 
+/** One parity call: the RPC as its caller runs it, and for an RPC that writes, what it changed. */
+const callParity = async (
+  session: Tier1Session, item: ParityCase<ReadPathContext>, context: ReadPathContext, viewer: string, fn: string, args: Record<string, unknown>,
+): Promise<unknown> => {
+  const caller = item.caller?.(viewer, context) ?? { role: 'authenticated' as const, userId: viewer };
+  if (!item.caller && !item.state) return session.call(caller, fn, args, false);
+  // A failure is a result too: old and new must refuse the same calls the same way.
+  const settle = () => session.call(caller, fn, args, false).then(
+    (result) => ({ result }),
+    (error: RpcFailure) => ({ error: `${error.sqlstate ?? ''} ${error.message.replace(/^\S+: /, '')}` }),
+  );
+  if (!item.state) return settle();
+  await session.exec('savepoint parity_call');
+  try {
+    const outcome = await settle();
+    const [row] = await session.exec<{ state: unknown }>(item.state);
+    return { ...outcome, state: row.state };
+  } finally {
+    await session.exec('rollback to savepoint parity_call');
+    await session.exec('release savepoint parity_call');
+  }
+};
+
+/**
+ * The notification cases call with confirmed workouts and leased deliveries:
+ * every eligible workout is confirmed as its owner, as the app does after a
+ * quiet sync, then the fixture is read for the cases' arguments.
+ */
+const prepareNotificationParity = async (session: Tier1Session): Promise<NotificationFixture> => {
+  const workouts = await session.exec<{ member: string; session: string; auth: string; manifest: unknown }>(
+    `select w.member_user_id as member,w.session_id as session,
+       (select s.id from auth.sessions s where s.user_id=w.member_user_id order by s.created_at limit 1) as auth,
+       app_public.notification_source_manifest(w.member_user_id,w.session_id) as manifest
+     from app_public.notification_workouts w where w.eligible order by w.member_user_id,w.session_id`);
+  for (const workout of workouts) {
+    await session.call({ role: 'authenticated', userId: workout.member, sessionId: workout.auth }, 'notification_confirm_completion',
+      { p_session_id: workout.session, p_entities: workout.manifest }, false).catch(() => undefined);
+  }
+  await session.exec(LEASE_DELIVERIES_SQL);
+  const [row] = await session.exec<{ fixture: NotificationFixture }>(NOTIFICATION_FIXTURE_SQL);
+  return row.fixture;
+};
+
+/** A helper several cases share is installed once, whichever way each case spells its `create`. */
+const replacing = (sql: string): string => sql.replace(/^create function pg_temp\./, 'create or replace function pg_temp.');
+
+const runCaseParity = async (
+  session: Tier1Session, context: ReadPathContext, cases: readonly ParityCase<ReadPathContext>[],
+): Promise<ParityOutcome[]> => {
+  const outcomes = new Map<string, ParityOutcome>();
+  const installedSql = new Set<string>();
+  const installs = new Map<ParityCase<ReadPathContext>, ReturnType<typeof parityInstallStatements>>();
+  const fail = (item: ParityCase<ReadPathContext>, error: unknown) => {
+    outcomes.set(item.fn, { fn: item.fn, compared: 0, differences: [], plantDetected: null, error: (error as Error).message });
+  };
+  for (const item of cases) {
+    try {
+      const installed = parityInstallStatements(item);
+      // A helper several cases share is installed once.
+      for (const statement of installed.sql.map(replacing).filter((sql) => !installedSql.has(sql))) {
+        await session.exec('savepoint parity_install');
+        try {
+          await session.exec(statement);
+        } catch (error) {
+          await session.exec('rollback to savepoint parity_install');
+          throw error;
+        } finally {
+          await session.exec('release savepoint parity_install').catch(() => undefined);
+        }
+        installedSql.add(statement);
+      }
+      installs.set(item, installed);
+    } catch (error) {
+      fail(item, error);
+    }
+  }
+  try {
+    context.notification = await prepareNotificationParity(session);
+  } catch (error) {
+    for (const item of cases.filter((candidate) => candidate.scenarios)) fail(item, error);
+  }
+  for (const scenario of SCENARIOS) {
+    await session.exec('savepoint parity_scenario');
+    try {
+      if (scenario !== 'base' && context.notification) {
+        for (const statement of scenarioStatements(scenario, context.notification)) await session.exec(statement);
+      }
+      for (const item of cases.filter((candidate) => (candidate.scenarios ?? ['base']).includes(scenario))) {
+        const installed = installs.get(item);
+        if (!installed || outcomes.get(item.fn)?.error) continue;
+        try {
+          const outcome = await compareParity(item, context, context.members,
+            (viewer, fn, args) => callParity(session, item, context, viewer, fn, args), installed);
+          const merged = outcomes.get(item.fn) ?? { ...outcome, compared: 0, differences: [], observed: undefined };
+          merged.compared += outcome.compared;
+          merged.differences.push(...outcome.differences.map((difference) => `[${scenario}] ${difference}`));
+          merged.plantDetected = outcome.plantDetected === null ? merged.plantDetected : outcome.plantDetected;
+          for (const [label, count] of Object.entries(outcome.observed ?? {})) {
+            merged.observed = { ...merged.observed, [label]: (merged.observed?.[label] ?? 0) + count };
+          }
+          merged.missing = missingOutcomes(item.requires, merged.observed);
+          outcomes.set(item.fn, merged);
+        } catch (error) {
+          fail(item, error);
+        }
+      }
+    } finally {
+      await session.exec('rollback to savepoint parity_scenario');
+      await session.exec('release savepoint parity_scenario');
+    }
+  }
+  return cases.map((item) => outcomes.get(item.fn)).filter((outcome): outcome is ParityOutcome => outcome !== undefined);
+};
+
 const runParityCases = async (session: Tier1Session, context: ReadPathContext): Promise<ParityOutcome[]> => {
-  const outcomes: ParityOutcome[] = [];
+  // The notification cases first: the stale-fact plants below edit sessions their proofs read.
+  const outcomes: ParityOutcome[] = await runCaseParity(session, context, PARITY_CASES.filter((item) => item.scenarios));
   try {
     for (const statement of PARITY_PLANT_STATEMENTS()) {
       if (!plantedAll(await session.exec(statement))) throw new Error(`a stale-fact plant edited no row: ${statement.slice(0, 80)}`);
@@ -515,16 +708,7 @@ const runParityCases = async (session: Tier1Session, context: ReadPathContext): 
     return [{ fn: 'parity plants', compared: 0, differences: [], plantDetected: null, error: (error as Error).message }];
   }
   for (const item of HELPER_PARITY_CASES) outcomes.push(await runHelperParity(session, item));
-  for (const item of PARITY_CASES) {
-    try {
-      const installed = parityInstallStatements(item);
-      for (const statement of installed.sql) await session.exec(statement);
-      outcomes.push(await compareParity(item, context, context.members,
-        (viewer, fn, args) => session.call({ role: 'authenticated', userId: viewer }, fn, args, false), installed));
-    } catch (error) {
-      outcomes.push({ fn: item.fn, compared: 0, differences: [], plantDetected: null, error: (error as Error).message });
-    }
-  }
+  outcomes.push(...await runCaseParity(session, context, PARITY_CASES.filter((item) => !item.scenarios)));
   return outcomes;
 };
 
@@ -688,11 +872,13 @@ export const summarizeReadPath = (points: readonly ReadPathPoint[], rpcs: readon
     ...points.filter((point) => point.incomplete).map((point) => `${point.name}: ${point.incomplete}`),
     ...checks.filter((check) => check.level === 'fail').map((check) => `${check.fn}: ${check.message}`),
     ...parity.filter((outcome) => !parityPassed(outcome)).map((outcome) => `parity ${outcome.fn}: ${outcome.error
-      ?? (outcome.compared === 0 ? 'nothing compared' : outcome.differences[0] ?? 'the planted difference was not detected')}`),
+      ?? (outcome.compared === 0 ? 'nothing compared' : outcome.differences[0]
+      ?? (outcome.missing?.length ? `no call returned ${outcome.missing.join(', ')}` : 'the planted difference was not detected'))}`),
   ];
   if (!points.some((point) => point.parity.length > 0)) failures.push('parity: no case ran');
   const parityLines = parity.map((outcome) => `- ${parityPassed(outcome) ? 'PASS' : 'FAIL'} parity ${outcome.fn}: ${outcome.compared} calls compared, `
-    + `${outcome.differences.length} differences, planted difference ${outcome.plantDetected === null ? 'not planted' : outcome.plantDetected ? 'detected' : 'NOT detected'}`);
+    + `${outcome.differences.length} differences, ${outcome.plantDetected === null ? 'no plant' : `planted difference ${outcome.plantDetected ? 'detected' : 'NOT detected'}`}`
+    + `${outcome.observed ? `, outcomes ${JSON.stringify(outcome.observed)}` : ''}`);
   const wal = points.map((point) => `H=${point.historyDays}: ${point.walPerLoggedSet ?? '—'} B`).join(', ');
   const cascades = points.map((point) => `- H=${point.historyDays} workout cascades: ${point.cascade?.edgeRuns.groupEval ?? 0} group-eval runs, `
     + `${point.cascade?.edgeRuns.notificationWorker ?? 0} notification-worker runs, outcomes ${JSON.stringify(point.cascade?.notificationOutcomes ?? {})}`

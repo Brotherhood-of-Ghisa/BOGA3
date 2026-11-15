@@ -237,38 +237,18 @@ $locks$;
 
 -- Readers no longer hold publication off, so a reader that reads published
 -- rows in more than one statement must still return a shape its client
--- accepts. A board's count, page and own row now come from one statement
--- (the client rejects a page longer than its count). A stream record card's
--- event, record and group records are rebuilt together from the record's
--- row as it stands (a publication can rewrite a kept record's boards between
--- the page and its decoration); a card whose record a publication retracted
--- meanwhile drops its record, as the earlier decoration does.
+-- accepts (the board already reads its count, page and own row in one). A
+-- stream record card's event, record and group records are rebuilt together
+-- from the record's row as it stands (a publication can rewrite a kept
+-- record's boards between the page and its decoration); a card whose record a
+-- publication retracted meanwhile drops its record, as the earlier
+-- decoration does.
 do $readers$
 declare
   _definition text;
   _anchor text;
   _replacement text;
 begin
-  _definition := pg_get_functiondef(
-    'app_public.group_competition_board(uuid,uuid,text,boolean,integer,text)'::regprocedure);
-  _anchor := $a$    select count(*) into _count from app_public.group_competition_board_rows(p_group_id,_ge.id,_ge.rules_revision,p_metric,p_certified);
-    select coalesce(jsonb_agg(r.row_json order by r.rank),'[]'),max(r.rank) into _entries,_last from (
-      select * from app_public.group_competition_board_rows(p_group_id,_ge.id,_ge.rules_revision,p_metric,p_certified)
-      where rank>_after order by rank limit p_limit) r;
-    select row_json into _me from app_public.group_competition_board_rows(p_group_id,_ge.id,_ge.rules_revision,p_metric,p_certified) where member_user_id=_uid;$a$;
-  _replacement := $r$    with board as materialized (
-      select * from app_public.group_competition_board_rows(p_group_id,_ge.id,_ge.rules_revision,p_metric,p_certified)
-    ), page as (select * from board where rank>_after order by rank limit p_limit)
-    select (select count(*) from board),
-      (select coalesce(jsonb_agg(r.row_json order by r.rank),'[]') from page r),
-      (select max(r.rank) from page r),
-      (select b.row_json from board b where b.member_user_id=_uid limit 1)
-      into _count,_entries,_last,_me;$r$;
-  if (length(_definition) - length(replace(_definition, _anchor, ''))) <> length(_anchor) then
-    raise exception 'group_competition_board: read anchor not found exactly once';
-  end if;
-  execute replace(_definition, _anchor, _replacement);
-
   _definition := pg_get_functiondef('app_public.group_competition_stream_v4(uuid,text,integer)'::regprocedure);
   _anchor := $a$    select jsonb_agg(case when e.id is not null and e.kind='record' and jsonb_typeof(i->'record')='object'
       then jsonb_set(i,'{record,group_record_metrics}',app_public.group_competition_stream_group_record_metrics(e)) else i end$a$;
