@@ -100,7 +100,7 @@ const stream = (fn: string, budget: BudgetEntry): ReadPathRpc => ({
  */
 /** Readiness proof (graph once per target, ranks from one redaction map): over the ceiling because the graph reads the exercise's whole shared history. */
 const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 6_500, scoped: false,
-  justification: 'Provisional (cold first-call numbers; the warm re-measure re-budgets it). The proof that the captured comparison still holds compares the digest of the group\'s whole source graph '
+  justification: 'Measured warm (5.0-5.2k pages at H=180, budget = warm +25%); over the 5,000 ceiling, escalated to the operator. The proof that the captured comparison still holds compares the digest of the group\'s whole source graph '
     + '(every shared set of the exercise, about 2.2 pages a set, so linear in history) and ranks the exercise from it. '
     + 'The ranks cost a fixed share: redaction answered once per member, not once per ranked row.' };
 
