@@ -13,6 +13,11 @@ import { formatCompactDate, formatShortDate } from '@/src/utils/local-time';
 /** The label of the robot mark on a note an agent wrote. */
 export const AGENT_NOTE_LABEL = 'Added by your coach';
 
+export const noteAttribution = (note: TrainingNoteView): string => {
+  if (note.source !== 'agent') return 'You';
+  return note.author === 'user' ? 'You, via coach' : note.author === 'agent' ? 'Coach' : 'Author not recorded';
+};
+
 /** A note's applies-from date: compact on screen, full numeric when spoken. */
 export const noteDateLabels = (notedOn: string, dateFormat: ExerciseDateFormat) => {
   const date = parseLocalDateKey(notedOn);
@@ -37,7 +42,10 @@ export function NoteRow({ note, dateFormat, showExercise, divider, removing, onR
   const text = useUiText();
   const tone = useUiTextTone();
   const date = noteDateLabels(note.notedOn, dateFormat);
-  const subject = note.exerciseId ? note.exerciseName ?? 'Exercise' : 'General';
+  const targetDate = note.targetStartedAt ? formatCompactDate(note.targetStartedAt, dateFormat) : null;
+  const subject = note.targetLabel
+    ? `${note.targetLabel}${targetDate ? ` · ${targetDate}` : ''}`
+    : note.exerciseId ? note.exerciseName ?? 'Exercise' : 'General';
   return (
     <ListRow
       density="list"
@@ -57,6 +65,7 @@ export function NoteRow({ note, dateFormat, showExercise, divider, removing, onR
         <Text allowFontScaling={false} style={[text.meta, tone.muted]} testID={`note-meta-${note.id}`}>
           <FigureText>{date.shown}</FigureText>
           {showExercise ? ` · ${subject}` : ''}
+          {` · ${noteAttribution(note)}`}
         </Text>
         {note.source === 'agent' ? (
           <Icon colorRole="inkMuted" label={AGENT_NOTE_LABEL} name="ai-logging" size="sm" testID={`note-agent-${note.id}`} />

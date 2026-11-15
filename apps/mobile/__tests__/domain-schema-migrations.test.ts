@@ -147,7 +147,7 @@ describe('domain schema and runtime migrations', () => {
     // m0031 adds combined muscles and the single target map, and re-pulls every row once;
     // m0031 adds combined muscles and the single target map, and re-pulls every row once;
     // m0032 adds training notes; m0033 adds injuries schema.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(34);
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(35);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -211,6 +211,7 @@ describe('domain schema and runtime migrations', () => {
       'm0031',
       'm0032',
       'm0033',
+      'm0034',
     ]);
   });
 
@@ -560,4 +561,28 @@ describe('migration chunks run one prepared statement each, as on the device', (
     expect(client.prepare("SELECT name FROM sqlite_master WHERE name = 'a'").get()).toEqual({ name: 'a' });
     client.close();
   });
+});
+
+
+it('upgrades populated notes without inventing legacy authorship or losing tombstones and clocks', () => {
+  const client = new Database(':memory:');
+  try {
+    client.pragma('foreign_keys = ON');
+    const prior = { ...localRuntimeMigrations, journal: { ...localRuntimeMigrations.journal,
+      entries: localRuntimeMigrations.journal.entries.filter(entry => entry.idx < 34) } };
+    applyMigrationBundle(client, prior);
+    client.prepare(`insert into training_notes (id,body,noted_on,source,created_at,updated_at,deleted_at,local_dirty,local_updated_at_ms)
+      values (?,?,?,?,?,?,?,?,?)`).run('legacy','Kept text','2026-11-12','agent',12,13,14,1,15);
+    client.prepare("insert into sync_runtime_state (id,pull_cursor) values ('global',?)").run('{"1":{"id":"seen-by-old-build"}}');
+    client.prepare("insert into training_notes (id,body,noted_on,source,local_dirty,local_updated_at_ms) values ('clean','old','2026-11-12','agent',0,16)").run();
+    applyMigrationBundle(client, { ...localRuntimeMigrations, journal: { ...localRuntimeMigrations.journal,
+      entries: localRuntimeMigrations.journal.entries.filter(entry => entry.idx >= 34) } });
+    expect(client.prepare('select pull_cursor from sync_runtime_state').get()).toEqual({ pull_cursor: '{}' });
+    expect(client.prepare("select local_updated_at_ms from training_notes where id='clean'").get()).toEqual({ local_updated_at_ms: 0 });
+    expect(client.prepare('select * from training_notes where id=?').get('legacy')).toMatchObject({
+      body: 'Kept text', source: 'agent', author: null, client_id: null, session_id: null, set_id: null,
+      activity_source: null, activity_external_id: null, target_label: null, target_started_at: null,
+      created_at: 12, updated_at: 13, deleted_at: 14, local_dirty: 1, local_updated_at_ms: 15,
+    });
+  } finally { client.close(); }
 });

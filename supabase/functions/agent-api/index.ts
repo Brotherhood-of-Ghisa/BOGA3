@@ -37,7 +37,7 @@ import {
 } from './injuries.ts';
 import {
   DEFAULT_NOTE_LIMIT, EMBEDDED_NOTE_LIMIT, MAX_NOTE_LIMIT, NOTE_COLUMNS, NoteInputError, normalizeNoteAdd,
-  normalizeNoteRemove, noteCursorFrom, noteCursorOf, noteExerciseIds, noteKeysetFilter, noteToday, parseNoteExerciseFilter,
+  normalizeNoteRemove, noteCursorFrom, noteCursorOf, noteExerciseIds, noteKeysetFilter, noteToday, parseNoteTargetFilter,
   parseNoteRange, projectNote, statusNotesFrom, type NoteRow,
 } from './notes.ts';
 import {
@@ -1949,7 +1949,10 @@ const getRecentActivities = async (
   const nowMs = Date.now();
   const last = page[page.length - 1];
   return {
-    activities: page.map((row) => projectActivity(row, overlaps.rows, nowMs)),
+    activities: await Promise.all(page.map(async (row) => ({
+      ...projectActivity(row, overlaps.rows, nowMs),
+      ...await loadTargetNotes(client, userId, { activity_source: row.source, activity_external_id: row.external_id }),
+    }))),
     overlap_complete: !overlaps.truncated,
     next_cursor: rows.length > limit && last
       ? encodeCursor({ kind: 'activity', started_at: last.started_at, source: last.source, external_id: last.external_id })
@@ -2023,14 +2026,16 @@ const projectNotes = async (client: SupabaseClient, userId: string, rows: readon
 };
 
 const listNotes = async (client: SupabaseClient, userId: string, url: URL): Promise<JsonObject> => {
-  rejectUnexpectedQuery(url, new Set(['exercise_id', 'from', 'to', 'limit', 'cursor']));
+  rejectUnexpectedQuery(url, new Set(['exercise_id', 'session_id', 'set_id', 'activity_source', 'activity_external_id', 'from', 'to', 'limit', 'cursor']));
   const limit = parseBoundedInteger(url.searchParams.get('limit'), DEFAULT_NOTE_LIMIT, 1, MAX_NOTE_LIMIT, 'limit');
-  const exerciseId = asNoteInput(() => parseNoteExerciseFilter(url.searchParams.get('exercise_id')));
+  const target = asNoteInput(() => parseNoteTargetFilter(url.searchParams));
   const range = asNoteInput(() => parseNoteRange(url.searchParams.get('from'), url.searchParams.get('to')));
   const rawCursor = decodeCursor(url.searchParams.get('cursor'), 'note');
   const cursor = rawCursor ? asNoteInput(() => noteCursorFrom(rawCursor), 'INVALID_CURSOR') : null;
   let query = notesQuery(client, userId, limit);
-  if (exerciseId !== null) query = query.eq('exercise_definition_id', exerciseId);
+  for (const [key, value] of Object.entries(target)) {
+    if (value !== null) query = query.eq(key === 'exercise_id' ? 'exercise_definition_id' : key, value);
+  }
   if (range.from !== null) query = query.gte('noted_on', range.from);
   if (range.to !== null) query = query.lte('noted_on', range.to);
   if (cursor) query = query.or(noteKeysetFilter(cursor));
@@ -2057,13 +2062,45 @@ const loadExerciseNotes = async (client: SupabaseClient, userId: string, exercis
   };
 };
 
+/** A bounded slice per target; list_notes pages the remainder. */
+const loadTargetNotes = async (
+  client: SupabaseClient, userId: string, target: Record<string, string>,
+): Promise<JsonObject> => {
+  let query = notesQuery(client, userId, EMBEDDED_NOTE_LIMIT);
+  for (const [key, value] of Object.entries(target)) query = query.eq(key, value);
+  const { data, error } = await query.returns<NoteRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  return {
+    training_notes: await projectNotes(client, userId, rows.slice(0, EMBEDDED_NOTE_LIMIT)),
+    training_notes_truncated: rows.length > EMBEDDED_NOTE_LIMIT,
+  };
+};
+
+/** Session notes and notes on the returned page's sets, one bounded slice. */
+const loadWorkoutNotes = async (
+  client: SupabaseClient, userId: string, sessionId: string, setIds: string[],
+): Promise<JsonObject> => {
+  const scopes = [`session_id.eq.${postgrestQuote(sessionId)}`];
+  if (setIds.length) scopes.push(`set_id.in.(${setIds.map(postgrestQuote).join(',')})`);
+  const { data, error } = await notesQuery(client, userId, EMBEDDED_NOTE_LIMIT)
+    .or(scopes.join(',')).returns<NoteRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  return {
+    training_notes: await projectNotes(client, userId, rows.slice(0, EMBEDDED_NOTE_LIMIT)),
+    training_notes_truncated: rows.length > EMBEDDED_NOTE_LIMIT,
+  };
+};
+
 /** The status's general notes (no exercise) dated within its 56 days. */
 const loadStatusNotes = async (
   client: SupabaseClient, userId: string, window: TrainingStatusWindow,
 ): Promise<JsonObject> => {
   const from = statusNotesFrom(window);
   const { data, error } = await notesQuery(client, userId, EMBEDDED_NOTE_LIMIT)
-    .is('exercise_definition_id', null).gte('noted_on', from).returns<NoteRow[]>();
+    .is('exercise_definition_id', null).is('session_id', null).is('set_id', null)
+    .is('activity_source', null).is('activity_external_id', null).gte('noted_on', from).returns<NoteRow[]>();
   throwDatabaseError(error);
   const rows = data ?? [];
   return {
@@ -2087,7 +2124,7 @@ const throwNoteWriteError = (error: { message?: string } | null, operation: 'add
     throw new ApiError(409, 'EXERCISE_DELETED', 'The exercise is deleted. Restore it before adding a note to it.');
   }
   if (message.includes('NOT_FOUND') && operation === 'add') {
-    throw new ApiError(400, 'FOREIGN_RESOURCE_REFERENCE', 'exercise_id is not one of the person’s exercises. Use search_exercises.');
+    throw new ApiError(400, 'FOREIGN_RESOURCE_REFERENCE', 'The note target is not one of the person’s available resources. Read its id before adding a note.');
   }
   if (message.includes('NOT_FOUND')) throw new ApiError(404, 'NOT_FOUND', 'Note not found.');
   if (message.includes('INVALID_ARGUMENT')) {
@@ -2124,7 +2161,8 @@ const writeNote = async (
   const note = result.note as JsonObject | undefined;
   // The RPC stores `created_at` as epoch ms; the API speaks ISO 8601.
   return note && typeof note.created_at === 'number'
-    ? { ...result, note: { ...note, created_at: new Date(note.created_at).toISOString() } }
+    ? { ...result, note: { ...note, created_at: new Date(note.created_at).toISOString(),
+      target_started_at: typeof note.target_started_at === 'number' ? new Date(note.target_started_at).toISOString() : null } }
     : result;
 };
 
@@ -2500,10 +2538,12 @@ const getWorkoutDetail = async (
   const hasMore = filteredDetailSets.length > limit;
   const pagedDetailSets = filteredDetailSets.slice(0, limit);
   const lastDetailSet = pagedDetailSets[pagedDetailSets.length - 1];
+  const notes = await loadWorkoutNotes(client, userId, sessionId, pagedDetailSets.map(item => item.setPayload.id));
 
   return {
     metric_revision: METRIC_REVISION,
     workout: {
+      ...notes,
       id: sessionWithContext.id,
       started_at: toIsoTimestamp(sessionWithContext.started_at),
       completed_at: toIsoTimestamp(sessionWithContext.completed_at),

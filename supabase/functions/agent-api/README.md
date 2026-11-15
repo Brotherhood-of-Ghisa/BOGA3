@@ -319,27 +319,29 @@ false it builds on app defaults (first writer wins). It returns `overrides`,
 
 ## Training notes
 
-`GET /v1/agent/notes` lists live notes, newest `noted_on` (the day a note
-applies from) first, then newest created, then id. Optional `exercise_id`,
-`from`/`to` (`YYYY-MM-DD`, both included), `limit` (`1..50`, default `20`),
-`cursor`.
+For note storage changes, load `docs/specs/tech/training-notes-contract.md`.
+`GET /v1/agent/notes` lists live notes, newest `noted_on` first, then creation,
+then id. Optional exclusive targets: `exercise_id`, `session_id`, `set_id`, or
+paired `activity_source`/`activity_external_id`. Omit for all scopes.
+`from`/`to` bound `noted_on` inclusively; `limit` is `1..50` (default 20);
+`cursor` pages.
 
-```json
-{ "notes": [{ "id": "note-id", "body": "Squat to a bench", "noted_on": "2026-11-12",
-  "source": "agent", "exercise_id": "exercise-id", "exercise_name": "Back Squat",
-  "created_at": "2026-11-12T09:00:00.000Z" }], "next_cursor": null }
-```
+`POST /v1/agent/notes` takes `body`, required `author=user|agent`, optional
+`noted_on` and target. Under [[notes.agent-access]], add and
+`POST /v1/agent/notes/{id}/remove` (`{}`) require Make changes and
+`Idempotency-Key` (own 30/min window), including removal of user-authored notes.
+Body: 1–1000 trimmed characters. Date: profile-zone today or earlier. Omitted-date
+hashes survive midnight retries.
+Add returns `note`; remove returns `removed`, `note_id`; both return
+`idempotent_replay`. Invalid targets return `400
+FOREIGN_RESOURCE_REFERENCE`; deleted exercises return `409 EXERCISE_DELETED`.
+Unavailable notes return `404`.
 
-A deleted exercise keeps its `exercise_name`; general notes have null exercise
-fields. `POST /v1/agent/notes` (`{body, noted_on?, exercise_id?}`) and
-`POST /v1/agent/notes/{id}/remove` (`{}`) need write access and an
-`Idempotency-Key` (own 30-per-minute window). `body` is 1–1000 characters after
-trimming; `noted_on` a real date not after the profile zone's today, the
-default (hashed as sent, so a retry after midnight replays). Add returns `note`
-(`source: "agent"`), remove soft-deletes (`removed`, `note_id`); both return
-`idempotent_replay`. A foreign or unknown exercise is `400
-FOREIGN_RESOURCE_REFERENCE`, a deleted one `409 EXERCISE_DELETED`; a missing,
-foreign or removed note `404`.
+`id`, `body`, `noted_on`, ISO `created_at`,
+`source` (channel), `author`, validated `client_id`, all target fields,
+`exercise_name`, `target_label` and ISO `target_started_at`. Legacy coach authors/clients are null. Retained targets follow [[notes.definition]].
+Workout detail embeds 20 session/current-page-set notes; each activity embeds
+20 of its own. `training_notes_truncated` flags more. General status excludes scopes.
 
 ## Injuries and physical limitations
 

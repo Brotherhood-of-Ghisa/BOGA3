@@ -16,6 +16,14 @@ export type TrainingNoteView = {
   body: string;
   notedOn: string;
   source: 'app' | 'agent';
+  author: 'user' | 'agent' | null;
+  clientId: string | null;
+  sessionId: string | null;
+  setId: string | null;
+  activitySource: string | null;
+  activityExternalId: string | null;
+  targetLabel: string | null;
+  targetStartedAt: Date | null;
   exerciseId: string | null;
   /** The exercise's name, also when that exercise was deleted or merged away; null for a general note. */
   exerciseName: string | null;
@@ -84,6 +92,14 @@ const toView = (note: TrainingNote, exerciseName: string | null): TrainingNoteVi
   body: note.body,
   notedOn: note.notedOn,
   source: note.source === 'agent' ? 'agent' : 'app',
+  author: note.author ?? (note.source === 'agent' ? null : 'user'),
+  clientId: note.clientId,
+  sessionId: note.sessionId,
+  setId: note.setId,
+  activitySource: note.activitySource,
+  activityExternalId: note.activityExternalId,
+  targetLabel: note.targetLabel,
+  targetStartedAt: note.targetStartedAt,
   exerciseId: note.exerciseDefinitionId ?? null,
   exerciseName: note.exerciseDefinitionId ? exerciseName : null,
   createdAt: note.createdAt,
@@ -112,7 +128,7 @@ export const addTrainingNote = async (input: TrainingNoteInput): Promise<Trainin
     }
     const id = newNoteId(now);
     tx.insert(trainingNotes).values({
-      id, exerciseDefinitionId: exerciseId, body: value.body, notedOn: value.notedOn, source: 'app',
+      id, exerciseDefinitionId: exerciseId, body: value.body, notedOn: value.notedOn, source: 'app', author: 'user',
       createdAt: now, updatedAt: now, localDirty: true, localUpdatedAtMs: nowMonotonic(tx as Transaction),
     }).run();
     const row = tx.select().from(trainingNotes).where(eq(trainingNotes.id, id)).get();

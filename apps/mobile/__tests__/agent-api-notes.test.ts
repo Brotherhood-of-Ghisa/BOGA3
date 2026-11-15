@@ -21,6 +21,8 @@ import {
   noteKeysetFilter,
   noteToday,
   parseNoteExerciseFilter,
+  parseNoteTarget,
+  parseNoteTargetFilter,
   parseNoteRange,
   projectNote,
   statusNotesFrom,
@@ -40,6 +42,8 @@ const rejection = (read: () => unknown): string => {
 };
 
 const TODAY = '2026-11-12';
+const emptyTarget = { exercise_id: null, session_id: null, set_id: null, activity_source: null, activity_external_id: null };
+const emptyProvenance = { author: null, client_id: null, session_id: null, set_id: null, activity_source: null, activity_external_id: null, target_label: null, target_started_at: null };
 
 const row = (overrides: Partial<NoteRow> = {}): NoteRow => ({
   id: 'note-1',
@@ -78,25 +82,25 @@ describe('noteToday and statusNotesFrom', () => {
 
 describe('normalizeNoteAdd', () => {
   it('trims the body, keeps inner line breaks and the exercise, and stores the given date', () => {
-    expect(normalizeNoteAdd({ body: '  Bench touch\nfrom now  ', noted_on: '2026-11-01', exercise_id: 'squat' }, TODAY))
+    expect(normalizeNoteAdd({ author: 'agent', body: '  Bench touch\nfrom now  ', noted_on: '2026-11-01', exercise_id: 'squat' }, TODAY))
       .toEqual({
-        note: { body: 'Bench touch\nfrom now', noted_on: '2026-11-01', exercise_id: 'squat' },
-        hashed: { body: 'Bench touch\nfrom now', noted_on: '2026-11-01', exercise_id: 'squat' },
+        note: { ...emptyTarget, author: 'agent', body: 'Bench touch\nfrom now', noted_on: '2026-11-01', exercise_id: 'squat' },
+        hashed: { ...emptyTarget, author: 'agent', body: 'Bench touch\nfrom now', noted_on: '2026-11-01', exercise_id: 'squat' },
       });
   });
 
   it('defaults the date to today but hashes the omitted date as null, so a later retry still replays', () => {
-    expect(normalizeNoteAdd({ body: 'Shoulder sore' }, TODAY)).toEqual({
-      note: { body: 'Shoulder sore', noted_on: TODAY, exercise_id: null },
-      hashed: { body: 'Shoulder sore', noted_on: null, exercise_id: null },
+    expect(normalizeNoteAdd({ author: 'agent', body: 'Shoulder sore' }, TODAY)).toEqual({
+      note: { ...emptyTarget, author: 'agent', body: 'Shoulder sore', noted_on: TODAY, exercise_id: null },
+      hashed: { ...emptyTarget, author: 'agent', body: 'Shoulder sore', noted_on: null, exercise_id: null },
     });
-    expect(normalizeNoteAdd({ body: 'Shoulder sore', noted_on: null, exercise_id: null }, '2026-11-13').hashed)
-      .toEqual(normalizeNoteAdd({ body: 'Shoulder sore' }, TODAY).hashed);
+    expect(normalizeNoteAdd({ author: 'agent', body: 'Shoulder sore', noted_on: null, exercise_id: null }, '2026-11-13').hashed)
+      .toEqual(normalizeNoteAdd({ author: 'agent', body: 'Shoulder sore' }, TODAY).hashed);
   });
 
   it('accepts today and the full length, as the app does', () => {
     const body = 'x'.repeat(NOTE_MAX_LENGTH);
-    expect(normalizeNoteAdd({ body, noted_on: TODAY }, TODAY).note.body).toHaveLength(NOTE_MAX_LENGTH);
+    expect(normalizeNoteAdd({ author: 'agent', body, noted_on: TODAY }, TODAY).note.body).toHaveLength(NOTE_MAX_LENGTH);
     expect(() => validateTrainingNoteInput({ body, notedOn: TODAY }, new Date(2026, 10, 12, 12))).not.toThrow();
   });
 
@@ -114,7 +118,7 @@ describe('normalizeNoteAdd', () => {
     [{ body: 'ok', source: 'agent' }, /Unsupported field: source/],
     [{ body: 'ok', id: 'note-mine' }, /Unsupported field: id/],
   ])('rejects %j', (input, message) => {
-    expect(rejection(() => normalizeNoteAdd(input as Record<string, unknown>, TODAY))).toMatch(message);
+    expect(rejection(() => normalizeNoteAdd({ author: 'agent', ...input }, TODAY))).toMatch(message);
   });
 });
 
@@ -179,6 +183,7 @@ describe('projectNote', () => {
   it('names the exercise from the lookup, including a deleted one, and dates creation in ISO', () => {
     const names = new Map([['squat', 'Back Squat (deleted)']]);
     expect(projectNote(row({ exercise_definition_id: 'squat', source: 'agent' }), names)).toEqual({
+      ...emptyProvenance,
       id: 'note-1',
       body: 'Squat to a bench from today',
       noted_on: '2026-11-10',
@@ -200,5 +205,38 @@ describe('projectNote', () => {
       row({ exercise_definition_id: 'a' }), row({ exercise_definition_id: null }), row({ exercise_definition_id: 'a' }),
       row({ exercise_definition_id: 'b' }),
     ])).toEqual(['a', 'b']);
+  });
+});
+
+
+describe('scopes and authorship', () => {
+  it.each(['user', 'agent'] as const)('requires an explicit %s author and hashes it with the target', author => {
+    const add = normalizeNoteAdd({ body: 'Direct words', author, set_id: 'set-1' }, TODAY);
+    expect(add.note).toMatchObject({ author, set_id: 'set-1', session_id: null });
+    expect(add.hashed).toMatchObject({ author, set_id: 'set-1', noted_on: null });
+  });
+
+  it.each([undefined, null, '', 'coach', 1])('rejects missing or invalid author %p', author => {
+    expect(() => normalizeNoteAdd({ body: 'ok', author }, TODAY)).toThrow(/author/);
+  });
+
+  it.each([
+    { exercise_id: 'ex', session_id: 'session' },
+    { session_id: 'session', set_id: 'set' },
+    { activity_source: 'apple_health' },
+    { activity_external_id: 'run' },
+    { set_id: 'set', activity_source: 'apple_health', activity_external_id: 'run' },
+    { session_id: '' }, { set_id: 12 }, { activity_external_id: 'x'.repeat(201) },
+  ])('rejects ambiguous or malformed targets %j', target => {
+    expect(() => parseNoteTarget(target)).toThrow(NoteInputError);
+  });
+
+  it('filters by the complete activity identity and retains a deleted target label', () => {
+    expect(parseNoteTargetFilter(new URLSearchParams('activity_source=apple_health&activity_external_id=run')))
+      .toEqual({ ...emptyTarget, activity_source: 'apple_health', activity_external_id: 'run' });
+    expect(projectNote(row({ source: 'agent', author: 'user', client_id: 'coach-a', session_id: 'gone', target_label: 'Workout Monday' }), new Map()))
+      .toMatchObject({ author: 'user', source: 'agent', client_id: 'coach-a', session_id: 'gone', target_label: 'Workout Monday' });
+    expect(projectNote(row({ source: 'agent' }), new Map())).toMatchObject({ author: null });
+    expect(projectNote(row(), new Map())).toMatchObject({ author: 'user' });
   });
 });

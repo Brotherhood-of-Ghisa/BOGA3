@@ -128,6 +128,7 @@ describe('sync', () => {
     const note = await addTrainingNote({ body: 'pushed', notedOn: '2026-11-12', exerciseId: 'bench', now: NOW });
     const wire = entityToWire(rawNote(note.id) as Record<string, unknown>, 'training_notes');
     expect(wire.fields).toEqual({
+      author: 'user', client_id: null, session_id: null, set_id: null, activity_source: null, activity_external_id: null, target_label: null, target_started_at: null,
       exercise_definition_id: 'bench', body: 'pushed', noted_on: '2026-11-12', source: 'app',
       created_at: NOW.getTime(), updated_at: NOW.getTime(), deleted_at: null,
     });
@@ -150,4 +151,36 @@ describe('sync', () => {
     db.transaction(tx => applyPullPage(tx as Transaction, [tombstone], 'training_notes'));
     expect((await listTrainingNotes()).map(row => row.id)).toEqual([note.id]);
   });
+});
+
+
+it('keeps scoped provenance through pull, app removal and the full-row push', async () => {
+  const metadata = { author: 'user', client_id: 'coach-a', session_id: null, set_id: 'deleted-set',
+    activity_source: null, activity_external_id: null, target_label: 'Back Squat · Set 3' };
+  const envelope = { type: 'training_notes', id: 'scoped', client_updated_at_ms: NOW.getTime(), fields: {
+    ...metadata, exercise_definition_id: null, body: 'My own words', noted_on: '2026-11-12', source: 'agent',
+    created_at: NOW.getTime(), updated_at: NOW.getTime(), deleted_at: null,
+  } };
+  mockFixture.database.transaction(tx => applyPullPage(tx as Transaction, [envelope], 'training_notes'));
+  expect(await listTrainingNotes()).toEqual([expect.objectContaining({ author: 'user', source: 'agent', setId: 'deleted-set', targetLabel: metadata.target_label })]);
+  // No target exists locally: retained references must not introduce FKs.
+  await removeTrainingNote('scoped', NOW);
+  expect(entityToWire(rawNote('scoped') as Record<string, unknown>, 'training_notes').fields).toMatchObject({ ...metadata, deleted_at: NOW.getTime() });
+});
+
+
+it('hydrates metadata on a dirty legacy tombstone without replacing its newer removal', () => {
+  const db = mockFixture.database;
+  db.insert(trainingNotes).values({ id: 'legacy-dirty', body: 'Old user words', source: 'agent', notedOn: '2026-11-12',
+    deletedAt: NOW, localDirty: true, localUpdatedAtMs: NOW.getTime()+100 }).run();
+  const incoming = { type: 'training_notes', id: 'legacy-dirty', client_updated_at_ms: NOW.getTime(), fields: {
+    body: 'Old user words', source: 'agent', noted_on: '2026-11-12', deleted_at: null,
+    author: 'user', client_id: 'coach', session_id: 'session', target_label: 'Workout', target_started_at: NOW.getTime(),
+  } };
+  expect(db.transaction(tx => applyPullPage(tx as Transaction, [incoming], 'training_notes'))).toBe(1);
+  expect(rawNote('legacy-dirty')).toMatchObject({ author: 'user', clientId: 'coach', sessionId: 'session',
+    targetStartedAt: NOW, deletedAt: NOW, localDirty: true, localUpdatedAtMs: NOW.getTime()+100 });
+  expect(db.transaction(tx => applyPullPage(tx as Transaction, [incoming], 'training_notes'))).toBe(0);
+  expect(entityToWire(rawNote('legacy-dirty') as Record<string, unknown>, 'training_notes').fields)
+    .toMatchObject({ author: 'user', session_id: 'session', target_started_at: NOW.getTime(), deleted_at: NOW.getTime() });
 });

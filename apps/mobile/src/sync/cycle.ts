@@ -582,6 +582,15 @@ const TARGET = (wireKey: string, prop: string): FieldSpec =>
  * cross the wire. deleted_at is a normal LWW column and is emitted like any
  * other.
  */
+// Creation metadata is immutable. Hydration of a legacy row may fill missing
+// values without overwriting a newer pending removal or its LWW clock.
+const NOTE_METADATA_FIELDS: readonly FieldSpec[] = [
+  TARGET('author', 'author'), TARGET('client_id', 'clientId'), TARGET('session_id', 'sessionId'), TARGET('set_id', 'setId'),
+  TARGET('activity_source', 'activitySource'), TARGET('activity_external_id', 'activityExternalId'),
+  TARGET('target_label', 'targetLabel'),
+  { ...TS('target_started_at', 'targetStartedAt'), keepWhenAbsent: true, keepWhenNull: true },
+];
+
 const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
   user_settings: [
     SC('bodyweight_calculations_enabled', 'bodyweightCalculationsEnabled'),
@@ -608,6 +617,7 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
   ],
   training_notes: [
     SC('exercise_definition_id', 'exerciseDefinitionId'), SC('body', 'body'), SC('noted_on', 'notedOn'),
+    ...NOTE_METADATA_FIELDS,
     SC('source', 'source'), TS('created_at', 'createdAt'), TS('updated_at', 'updatedAt'), TS('deleted_at', 'deletedAt'),
   ],
   training_programmes: [
@@ -1438,6 +1448,17 @@ const applyUnorderedPullPage = (
       .from(table)
       .where(eq(table.id, envelope.id))
       .get() as EntityRow | undefined;
+
+    if (type === 'training_notes' && existing && !force
+      && envelope.client_updated_at_ms <= Number(existing.localUpdatedAtMs)) {
+      const metadata = Object.fromEntries(NOTE_METADATA_FIELDS.flatMap(spec =>
+        existing[spec.prop] == null && envelope.fields[spec.wireKey] != null
+          ? [[spec.prop, fromWireValue(envelope.fields[spec.wireKey], spec.kind)]] : []));
+      if (Object.keys(metadata).length) {
+        tx.update(table).set(metadata as never).where(eq(table.id, envelope.id)).run();
+        changed += 1;
+      }
+    }
 
     if (!force && !mergePullCanApply(tx, envelope, existing)) continue;
     const values = wireToEntity(envelope, type);

@@ -646,10 +646,10 @@ describe('BoGa MCP server', () => {
       name: 'list_notes',
     });
     await running.client.callTool({
-      arguments: { body: '  Squat to a bench  ', exercise_id: 'exercise-a', idempotency_key: 'note-add-1', noted_on: '2026-11-12' },
+      arguments: { author: 'agent', body: '  Squat to a bench  ', exercise_id: 'exercise-a', idempotency_key: 'note-add-1', noted_on: '2026-11-12' },
       name: 'add_note',
     });
-    await running.client.callTool({ arguments: { body: 'Shoulder sore', idempotency_key: 'note-add-2' }, name: 'add_note' });
+    await running.client.callTool({ arguments: { author: 'agent', body: 'Shoulder sore', idempotency_key: 'note-add-2' }, name: 'add_note' });
     const removed = await running.client.callTool({
       arguments: { idempotency_key: 'note-remove-1', note_id: 'note/1' },
       name: 'remove_note',
@@ -665,10 +665,24 @@ describe('BoGa MCP server', () => {
       key: r.headers.get('idempotency-key'),
       path: r.url.pathname.replace('/functions/v1/agent-api/v1/agent/', ''),
     }))).toEqual([
-      { body: { body: 'Squat to a bench', exercise_id: 'exercise-a', noted_on: '2026-11-12' }, key: 'note-add-1', path: 'notes' },
-      { body: { body: 'Shoulder sore' }, key: 'note-add-2', path: 'notes' },
+      { body: { author: 'agent', body: 'Squat to a bench', exercise_id: 'exercise-a', noted_on: '2026-11-12' }, key: 'note-add-1', path: 'notes' },
+      { body: { author: 'agent', body: 'Shoulder sore' }, key: 'note-add-2', path: 'notes' },
       { body: {}, key: 'note-remove-1', path: 'notes/note%2F1/remove' },
     ]);
+  });
+
+  it.each([
+    { session_id: 'session-a' }, { set_id: 'set-a' },
+    { activity_source: 'apple_health', activity_external_id: 'run-a' },
+  ])('forwards scoped note targets and explicit user authorship %j', async target => {
+    const running = await startMcp({ '/functions/v1/agent-api/v1/agent/notes': envelopeResponse({ notes: [] }) });
+    active.push(running);
+    await running.client.callTool({ name: 'add_note', arguments: { body: 'My words', author: 'user', idempotency_key: 'scoped', ...target } });
+    await running.client.callTool({ name: 'list_notes', arguments: target });
+    const post = running.requests.find(r => r.method === 'POST');
+    expect(JSON.parse(post?.body ?? '{}')).toEqual({ body: 'My words', author: 'user', ...target });
+    const get = running.requests.find(r => r.url.pathname.endsWith('/notes') && r.method === 'GET');
+    for (const [key, value] of Object.entries(target)) expect(get?.url.searchParams.get(key)).toBe(value);
   });
 
   it('translates injury tools into the injuries routes, forwarding idempotency keys', async () => {
@@ -780,6 +794,10 @@ describe('BoGa MCP server', () => {
   });
 
   it.each([
+    [{ body: 'ok', author: undefined }],
+    [{ body: 'ok', author: 'coach' }],
+    [{ body: 'ok', set_id: 'set', session_id: 'session' }],
+    [{ body: 'ok', activity_source: 'apple_health' }],
     [{ body: '   ' }],
     [{ body: 'x'.repeat(1001) }],
     [{ body: 'ok', exercise_id: '' }],
@@ -791,7 +809,7 @@ describe('BoGa MCP server', () => {
     const before = running.requests.length;
     const { omitKey, ...fields } = input as Record<string, unknown>;
     const result = await running.client.callTool({
-      arguments: { ...(omitKey ? {} : { idempotency_key: 'note-bad' }), ...fields },
+      arguments: { author: 'agent', ...(omitKey ? {} : { idempotency_key: 'note-bad' }), ...fields },
       name: 'add_note',
     });
     expect(result.isError).toBe(true);
@@ -808,6 +826,7 @@ describe('BoGa MCP server', () => {
       expect(descriptionOf(name)).toMatch(/untrusted user data/);
       expect(descriptionOf(name)).toMatch(/the date a note applies from/);
     }
+    expect(descriptionOf('add_note')).toMatch(/only verbatim user-provided text counts as author=user/);
     expect(descriptionOf('remove_note')).toMatch(/soft delete: the note disappears from every list/);
     for (const name of ['add_note', 'remove_note']) {
       expect(descriptionOf(name)).toMatch(/Make changes switch/);

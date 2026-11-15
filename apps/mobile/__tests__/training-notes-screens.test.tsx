@@ -154,9 +154,9 @@ describe('All notes (More → Notes)', () => {
     await screen.findByTestId('notes-list');
 
     expect(listedIds()).toEqual(['agent-note', squat.id, general.id]);
-    expect(screen.getByTestId(`note-meta-${general.id}`)).toHaveTextContent(`${compact(daysAgo(3))} · General`);
-    expect(screen.getByTestId(`note-meta-${squat.id}`)).toHaveTextContent(`${compact(daysAgo(1))} · Note Back Squat`);
-    expect(screen.getByTestId('note-meta-agent-note')).toHaveTextContent(`${compact(new Date())} · Note Bench Press`);
+    expect(screen.getByTestId(`note-meta-${general.id}`)).toHaveTextContent(`${compact(daysAgo(3))} · General · You`);
+    expect(screen.getByTestId(`note-meta-${squat.id}`)).toHaveTextContent(`${compact(daysAgo(1))} · Note Back Squat · You`);
+    expect(screen.getByTestId('note-meta-agent-note')).toHaveTextContent(`${compact(new Date())} · Note Bench Press · Author not recorded`);
     expect(screen.getByTestId(`note-body-${squat.id}`)).toHaveTextContent('From today I squat to a bench');
 
     expect(screen.getByTestId('note-agent-agent-note').props.accessibilityLabel).toBe('Added by your coach');
@@ -312,7 +312,7 @@ describe('One exercise\'s notes (exercise page ⋮ → Notes)', () => {
 
     expect(listedIds()).toEqual([squat.id]);
     // The page is the exercise's: rows do not repeat its name.
-    expect(screen.getByTestId(`note-meta-${squat.id}`)).toHaveTextContent(compact(daysAgo(1)));
+    expect(screen.getByTestId(`note-meta-${squat.id}`)).toHaveTextContent(`${compact(daysAgo(1))} · You`);
     expect(screen.queryByTestId('note-exercise-row')).toBeNull();
     await waitFor(() => {
       if (!mockScreenOptions.some((options) => options.title === 'Note Back Squat notes')) throw new Error('title not set');
@@ -348,4 +348,26 @@ describe('One exercise\'s notes (exercise page ⋮ → Notes)', () => {
 
     expect(await screen.findByTestId('note-form-error')).toHaveTextContent('This exercise is no longer available.');
   });
+});
+
+
+it('shows retained scoped targets and separates a user’s words saved by a coach from coach observations', async () => {
+  await seedExercises();
+  localDatabase().insert(trainingNotes).values([
+    { id: 'dictated', body: 'My knee felt fine', notedOn: today(), source: 'agent', author: 'user',
+      clientId: 'coach-a', setId: 'deleted-set', targetLabel: 'Note Back Squat · Set 3' },
+    { id: 'observation', body: 'Steadier pace today', notedOn: today(), source: 'agent', author: 'agent',
+      clientId: 'coach-b', activitySource: 'apple_health', activityExternalId: 'deleted-run', targetLabel: 'Morning run', targetStartedAt: new Date(2026, 0, 5, 23, 30) },
+  ]).run();
+  await renderNotes();
+  expect(await screen.findByTestId('note-meta-dictated')).toHaveTextContent(`${compact(new Date())} · Note Back Squat · Set 3 · You, via coach`);
+  expect(screen.getByTestId('note-meta-observation')).toHaveTextContent(`${compact(new Date())} · Morning run · ${compact(new Date(2026, 0, 5, 23, 30))} · Coach`);
+  expect(screen.queryByTestId('note-edit-dictated')).toBeNull();
+  // The user still owns removal, even for read-only scoped content.
+  fireEvent.press(screen.getByTestId('note-remove-dictated'));
+  const buttons = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2];
+  const remove = buttons?.find(button => button.style === 'destructive');
+  await act(async () => { remove?.onPress?.(); });
+  await waitForGone(() => screen.queryByTestId('note-row-dictated'));
+  expect(noteRow('dictated')?.deletedAt).toBeInstanceOf(Date);
 });
