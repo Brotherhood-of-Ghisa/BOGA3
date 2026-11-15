@@ -92,18 +92,18 @@ const stream = (fn: string, budget: BudgetEntry): ReadPathRpc => ({
   fn, via: 'member', args: (c) => ({ p_group_id: c.groupId, p_before: null, p_limit: 20 }), budget,
 });
 
+/** Readiness proof (graph once per target, ranks from one redaction map): over the ceiling because the graph reads the exercise's whole shared history. */
+const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 6_500, scoped: false,
+  justification: 'Measured warm (5.0-5.2k pages at H=180, budget = warm +25%); over the 5,000 ceiling by operator agreement. The proof that the captured comparison still holds compares the digest of the group\'s whole source graph '
+    + '(every shared set of the exercise, about 2.2 pages a set, so linear in history) and ranks the exercise from it. '
+    + 'The ranks cost a fixed share: redaction answered once per member, not once per ranked row.' };
+
 /**
  * Every RPC the set measures, with its budget beside it. A budget is the
  * costliest call measured at either point (reads warm: `warmUp`) plus ~25% (`suggestBudget`);
  * `baseline` entries record today's cost, `budgeted` ones hold an RPC to the
  * ceiling. Re-measure and update an entry in the change that moves its cost.
  */
-/** Readiness proof (graph once per target, ranks from one redaction map): over the ceiling because the graph reads the exercise's whole shared history. */
-const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 6_500, scoped: false,
-  justification: 'Measured warm (5.0-5.2k pages at H=180, budget = warm +25%); over the 5,000 ceiling, escalated to the operator. The proof that the captured comparison still holds compares the digest of the group\'s whole source graph '
-    + '(every shared set of the exercise, about 2.2 pages a set, so linear in history) and ranks the exercise from it. '
-    + 'The ranks cost a fixed share: redaction answered once per member, not once per ranked row.' };
-
 export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   stream('group_competition_stream_v5', { kind: 'budgeted', pages: 4_000, scoped: true }),
   stream('group_competition_stream_v4', { kind: 'budgeted', pages: 3_900, scoped: true }),
@@ -142,7 +142,7 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 400, scoped: true } },
   { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'budgeted', pages: 3_600, scoped: false } },
   { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 61_000, scoped: false,
-    justification: 'A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
+    justification: 'Measured 48.7k pages at H=180 (budget = measured +25%). A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
       + 'before and after publishing: every source session\'s boards with and without its workout, from one redaction map '
       + 'per capture. Each capture also builds the source graph, which reads every shared set of the exercise (linear in history). '
       + 'Score writes and board apply are a small share of the cost.' } },
