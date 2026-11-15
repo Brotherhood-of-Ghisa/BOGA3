@@ -21,7 +21,8 @@
 -- - The base page takes at most limit+1 candidates per kind, by keyset on the
 --   group's events, merges them in stream order and builds only the items it
 --   returns, all in one statement: candidates, cache and items see one
---   snapshot. Sessions page by their stream event's sort_at_ms, which the
+--   snapshot, so a publication between statements (readers take no lock that
+--   holds one off) cannot split a card's event, record and group records. Sessions page by their stream event's sort_at_ms, which the
 --   session trigger keeps equal to the session's started_at on every
 --   accepted write; positions are still the live started_at. Records sort at
 --   their session's live start, which their event does not track, so a

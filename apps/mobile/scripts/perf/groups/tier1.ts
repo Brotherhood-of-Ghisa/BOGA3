@@ -63,8 +63,20 @@ export class Tier1Run {
 
   constructor(private readonly session: Tier1Session) {}
 
+  /**
+   * Wraps the workers' service-role RPC: the read path's publish parity sets
+   * it, so every publication runs old and new definitions side by side.
+   */
+  serviceWrapper: ((rpc: Rpc, unmeasured: Rpc) => Rpc) | null = null;
+
   rpc(caller: Caller, measured: boolean): Rpc {
     return <T>(name: string, args: Record<string, unknown> = {}) => this.session.call<T>(caller, name, args, measured);
+  }
+
+  /** The service role, as the Edge workers call the database. */
+  service(measured: boolean): Rpc {
+    const rpc = this.rpc({ role: 'service_role' }, measured);
+    return this.serviceWrapper ? this.serviceWrapper(rpc, this.rpc({ role: 'service_role' }, false)) : rpc;
   }
 
   async markKicks(): Promise<void> {
@@ -106,7 +118,7 @@ export class Tier1Run {
       evaluations: 0, rejectedPublishes: 0, notificationOutcomes: {}, failures: [], cascadeCapped: false,
     };
     await start();
-    const service = this.rpc({ role: 'service_role' }, measured);
+    const service = this.service(measured);
     for (let runs = 0; ; runs += 1) {
       const kicks = await this.newKicks();
       if (kicks.length === 0) break;
@@ -168,7 +180,7 @@ export const steadyState = async (run: Tier1Run, session: Tier1Session): Promise
   let groupEvalRuns = 0;
   // After one publication outruns the call budget the scenario is
   // unreachable; later comparisons fail at once instead of each waiting it out.
-  const inner = run.rpc({ role: 'service_role' }, false);
+  const inner = run.service(false);
   let timedOut = false;
   const service: Rpc = async <T>(name: string, args: Record<string, unknown>) => {
     if (timedOut && (name === 'group_metric_eval_prepare' || name === 'group_metric_eval_publish')) {

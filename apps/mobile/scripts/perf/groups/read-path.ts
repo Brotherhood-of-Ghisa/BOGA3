@@ -25,6 +25,7 @@ import {
   compareParity, helperParityStatements, missingOutcomes, parityInstallStatements, parityPassed, streamWalk,
   type HelperParityCase, type ParityCase, type ParityOutcome,
 } from './parity.ts';
+import { PublishParity } from './publish-parity.ts';
 import {
   checkBudgets, readPathMarkdown, type BudgetCheck, type BudgetEntry, type PointCost,
 } from './read-path-budgets.ts';
@@ -143,8 +144,11 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   { fn: 'group_competition_exercise_list', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 400, scoped: true } },
-  { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 28_000, scoped: false } },
-  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'baseline', pages: 150_000, scoped: false } },
+  { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'budgeted', pages: 4_200, scoped: false } },
+  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 110_000, scoped: false,
+    justification: 'A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
+      + 'before and after publishing: every source session\'s boards with and without its workout. Its source graph, score '
+      + 'writes and board apply are a small share of the cost.' } },
   // Each of these three proves the captured comparison still holds, which
   // reads the group's shared history once (the source graph) and ranks the
   // exercise twice: its cost grows with that history until the graph build
@@ -340,6 +344,12 @@ export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
   },
   // The notification RPCs and the readiness and context-digest helpers they share (notification-parity.ts).
   ...notificationParityCases<ReadPathContext>(),
+  // Stream records keep their group records when nothing retracts them.
+  {
+    fn: 'group_competition_stream_v4',
+    migration: '20261111160000_group_stream_group_record_metrics.sql',
+    argumentSets: (context) => [20, 5].map((limit) => ({ p_group_id: context.groupId, p_before: null, p_limit: limit })),
+  },
   ...streamParityCases(),
   ...cowParityCases(),
 ];
@@ -911,12 +921,27 @@ const drain = async (run: Tier1Run, session: Tier1Session, label: string): Promi
 type Viewer = { role: 'authenticated'; userId: string; sessionId: string };
 type RecordFailure = (fn: string) => (error: Error) => void;
 
-/** The fixture, its planted cases and steady state; the context to measure, or null when the point is incomplete. */
-const buildPoint = async (session: Tier1Session, run: Tier1Run, point: ReadPathPoint): Promise<ReadPathContext | null> => {
+/**
+ * The fixture, its planted cases and steady state; the context to measure, or
+ * null when the point is incomplete. With `publishParity`, every publication
+ * from here on runs the old and new definitions side by side.
+ */
+const buildPoint = async (
+  session: Tier1Session, run: Tier1Run, point: ReadPathPoint, publishParity: PublishParity | null,
+): Promise<ReadPathContext | null> => {
   await session.begin();
   await configureHosted(session);
+  if (publishParity) {
+    for (const statement of publishParity.installStatements()) await session.exec(statement);
+    run.serviceWrapper = (rpc, unmeasured) => publishParity.wrap(rpc, unmeasured);
+  }
   const spec = { members: READ_PATH_MEMBERS, historyDays: point.historyDays, tag: `r${point.historyDays}` };
   for (const statement of [...fixtureStatements(spec), ...plantStatements()]) await session.exec(statement);
+  // The fixture's deferred constraint checks fire here, planned on fresh
+  // statistics and outside any call's budget: left to the first call, they
+  // ran on the plans of an emptied database and could outrun it.
+  await analyzeAppTables(session);
+  await session.exec('select pg_temp.perf_flush()');
   [point.fixture] = await session.exec<ReadPathPoint['fixture']>(FIXTURE_COUNTS_SQL);
   point.incomplete = await drain(run, session, 'steady state');
   if (point.incomplete) return null;
@@ -981,24 +1006,30 @@ const measureWorkout = async (
   return [started, logged, confirmed];
 };
 
-export const runReadPathPoint = async (historyDays: number, options: Tier1Options & { parity: boolean }): Promise<ReadPathPoint> => {
-  const startedAt = Date.now();
-  const name = `read-m${READ_PATH_MEMBERS}-h${historyDays}d`;
+/** A point's connection and run, opened after a full vacuum, and its empty record. */
+const openPoint = async (historyDays: number, options: Tier1Options) => {
   // Compact first: strict per-call budgets need the same pages run after run.
   await vacuum(options.adminDbUrl, true);
   const client = new Client({ connectionString: options.dbUrl });
   await client.connect();
   const session = new Tier1Session(client, options.callBudgetMs);
-  const run = new Tier1Run(session);
   const point: ReadPathPoint = {
-    name, members: READ_PATH_MEMBERS, historyDays, fixture: { members: 0, sessions: 0, sets: 0 }, plants: {}, calls: {},
+    name: `read-m${READ_PATH_MEMBERS}-h${historyDays}d`, members: READ_PATH_MEMBERS, historyDays,
+    fixture: { members: 0, sessions: 0, sets: 0 }, plants: {}, calls: {},
     errors: {}, cascade: null, walPerLoggedSet: null, parity: [], incomplete: null, setupMs: 0,
   };
+  return { client, session, run: new Tier1Run(session), point };
+};
+
+export const runReadPathPoint = async (historyDays: number, options: Tier1Options & { parity: boolean }): Promise<ReadPathPoint> => {
+  const startedAt = Date.now();
+  const { client, session, run, point } = await openPoint(historyDays, options);
+  const { name } = point;
   const recordFailure: RecordFailure = (fn) => (error) => {
     point.errors[fn] = error.message;
   };
   try {
-    const context = await buildPoint(session, run, point);
+    const context = await buildPoint(session, run, point, null);
     if (!context) return point;
     options.log(`[${name}] steady state after ${Math.round((Date.now() - startedAt) / 1000)} s: ${point.fixture.sets} sets`);
     // Reads first, against the steady state the planted cases left.
@@ -1020,6 +1051,37 @@ export const runReadPathPoint = async (historyDays: number, options: Tier1Option
     return point;
   } finally {
     point.setupMs = Date.now() - startedAt;
+    await session.rollback().catch(() => undefined);
+    await client.end();
+  }
+};
+
+/**
+ * Publish parity, on a build of the point of its own that nothing measures:
+ * every publication of its steady state and of the owner's workout runs the
+ * old and new definitions side by side. The old runs are rolled back, but
+ * the rows they wrote stay behind as dead rows the transaction cannot vacuum,
+ * so a measured call on the same build would pay for them.
+ */
+export const runPublishParity = async (historyDays: number, options: Tier1Options): Promise<ParityOutcome> => {
+  const startedAt = Date.now();
+  const { client, session, run, point } = await openPoint(historyDays, options);
+  const parity = new PublishParity(session);
+  try {
+    const context = await buildPoint(session, run, point, parity);
+    if (context) {
+      const viewer: Viewer = { role: 'authenticated', userId: context.viewer, sessionId: context.viewerSession };
+      const steps = await measureWorkout(session, run, context, viewer, () => () => undefined);
+      const failures = steps.flatMap((step) => step.failures.map((failure) => `${step.label}: ${failure}`));
+      if (failures.length > 0) point.incomplete = failures.join('; ');
+    }
+    if (point.incomplete) parity.outcome.error ??= `publish parity point incomplete: ${point.incomplete}`;
+    options.log(`[${point.name} publish parity] ${parity.outcome.compared} publications compared in ${Math.round((Date.now() - startedAt) / 1000)} s`);
+    return parity.outcome;
+  } catch (failure) {
+    parity.outcome.error ??= (failure as Error).message;
+    return parity.outcome;
+  } finally {
     await session.rollback().catch(() => undefined);
     await client.end();
   }
@@ -1063,5 +1125,8 @@ export const summarizeReadPath = (points: readonly ReadPathPoint[], rpcs: readon
 export const runReadPath = async (options: Tier1Options): Promise<ReadPathResult> => {
   const points: ReadPathPoint[] = [];
   for (const days of READ_PATH_DAYS) points.push(await runReadPathPoint(days, { ...options, parity: days === PARITY_DAYS }));
+  // Last, so its leftovers are vacuumed before anything is measured again.
+  const parityPoint = points.find((point) => point.historyDays === PARITY_DAYS && !point.incomplete);
+  if (parityPoint) parityPoint.parity.push(await runPublishParity(PARITY_DAYS, options));
   return summarizeReadPath(points);
 };
