@@ -223,13 +223,23 @@ exercises retain reps and conservatively omit kg in an enabled positive group.
 Historical values preserve original units and carry `unavailable` with null
 value when current disclosure suppresses them. Full-session and week totals
 contain no absolute volume field that could recover a redacted contribution.
-`group_competition_redaction_cache` reads what current disclosure depends on
-once per member, in one statement, and `group_competition_redaction_lookup`
-answers any (member, definition) from it, falling back to the live helper for
-a member or group it does not cover; `group_competition_redactions` answers a
-list of pairs through it. One statement sees one snapshot, so the answer is
-the per-row one. The stream builds one cache per page, the CoW result reader
-one per CoW.
+Readers that ask about many (member, definition) pairs build
+`group_competition_redaction_cache`: what current disclosure depends on, read
+once per member in one statement. Readers that ask about a few build a map of
+pairs, each asked live once (`group_competition_redactions`). Both are a
+reader's `p_redactions`; `group_competition_redaction_lookup` answers from
+either and falls back to the live helper for anything they lack. One
+statement sees one snapshot, so the answer is the per-row one. The stream
+builds a cache per page, the CoW result reader one per CoW, the records
+history a pair map.
+
+The stream page takes, per kind, the first `limit + 1` items after the
+cursor and merges them. Session cards are selected by their item's
+`sort_at_ms`, the session trigger's copy of `started_at`; their position is
+the live `started_at`. A failed trigger leaves the copy stale, misplacing that
+card in paging until the session's next accepted write. Records sort at their
+session's live start, which their item does not hold, so they are ranked
+whole.
 
 `group_competition_records_history` is a board's records log, newest first by
 event sequence, over every protocol-4 revision (protocol-3 history stays with

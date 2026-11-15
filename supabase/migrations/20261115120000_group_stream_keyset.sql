@@ -13,28 +13,30 @@
 --   member on the page, one pass over what the bodyweight redaction reads
 --   (links, counting scores, certifications, legacy entries, events and the
 --   CoW refs, with each set's current definition), answering every
---   definition from memory. A lookup outside the cache (another group, a
---   member not in it) asks the live function. One statement sees one
---   snapshot, so a cached answer is the live answer.
+--   definition from memory (group_competition_redaction_lookup). A lookup it
+--   does not cover (another group, a member not in it, no cache) asks the
+--   live function. The readers' `p_redactions` overloads take it, or the
+--   records history's map of a few pairs each asked live: one lookup reads
+--   both.
 -- - The base page takes at most limit+1 candidates per kind, by keyset on the
 --   group's events, merges them in stream order and builds only the items it
---   returns. Sessions page by their stream event's sort_at_ms, which the
+--   returns, all in one statement: candidates, cache and items see one
+--   snapshot. Sessions page by their stream event's sort_at_ms, which the
 --   session trigger keeps equal to the session's started_at on every
 --   accepted write; positions are still the live started_at. Records sort at
 --   their session's live start, which their event does not track, so a
 --   group's records are ranked whole (the record-only index).
 -- - v2-v5 build each item once at their own level (v2/v3 add `record`, v4
 --   `group_record_metrics`, v5 `withdrawn`), instead of re-reading items by
---   `e.id::text`.
+--   `e.id::text`; an event's disclosure is decided by one function
+--   (group_competition_event_normalized), so a record's `record` no longer
+--   builds its event JSON again.
 -- - group_cow_public_result builds each metric's rows once and asks
 --   redaction through one cache for the CoW's participants.
 --
 -- Every reader returns the same JSON as before; the read-path parity cases
--- compare old and new for every fixture viewer, walking every stream page.
--- The single-call builders (event_json, session_card, stream_record, ...) are
--- unchanged, so their other readers keep their plans: the `_cached` builders
--- are their copies with each redaction asked through the cache (null: live),
--- and parity compares each copy, with a cache, against its original.
+-- compare old and new for every fixture viewer, walking every stream page,
+-- and each builder with a cache against itself without one.
 
 -- ---------------------------------------------------------------------------
 -- Redaction cache
@@ -137,11 +139,18 @@ begin
 end $$;
 
 -- group_competition_redacts_exercise(p_groups, p_member, p_definition), from
--- the cache when it covers the call, else live.
+-- a reader's `p_redactions` when it answers the call, else live. Two forms:
+-- the per-member cache above (a reader that asks about many definitions),
+-- or a map of answered pairs keyed by group_competition_redaction_key (a
+-- reader that asks about a few, each asked live once).
 create function app_public.group_competition_redaction_lookup(p_cache jsonb,p_groups uuid[],p_member uuid,p_definition text)
 returns boolean language sql stable set search_path=app_public,pg_temp as $$
   select case
-    when p_cache is not null and p_member is not null and cardinality(p_groups)=1
+    when p_cache is null then app_public.group_competition_redacts_exercise(p_groups,p_member,p_definition)
+    when not p_cache ? 'members' then coalesce(
+      (p_cache->>app_public.group_competition_redaction_key(p_member,p_definition))::boolean,
+      app_public.group_competition_redacts_exercise(p_groups,p_member,p_definition))
+    when p_member is not null and cardinality(p_groups)=1
       and p_groups[1]=(p_cache->>'group')::uuid and p_cache->'members' ? p_member::text then
       (p_cache->>'bw')::boolean and (p_definition is null
         or (p_cache->'members'->p_member::text->>'cow_all')::boolean
@@ -150,28 +159,19 @@ returns boolean language sql stable set search_path=app_public,pg_temp as $$
     else app_public.group_competition_redacts_exercise(p_groups,p_member,p_definition) end;
 $$;
 
--- The readers' cache, as before: one answer per distinct (member,
--- definition), now from one pass per member.
-create or replace function app_public.group_competition_redactions(p_group uuid,p_members uuid[],p_definitions text[])
-returns table(member_user_id uuid,definition_id text,redacted boolean)
-language sql stable set search_path=app_public,pg_temp as $$
-  select d.member_user_id,d.definition_id,
-    app_public.group_competition_redaction_lookup(c.cache,array[p_group],d.member_user_id,d.definition_id)
-  from (select distinct x.member_user_id,x.definition_id
-    from unnest(p_members,p_definitions) x(member_user_id,definition_id)) d
-  cross join (select app_public.group_competition_redaction_cache(p_group,p_members) as cache) c;
-$$;
-
 revoke all on function app_public.group_competition_redaction_cache(uuid,uuid[]),
   app_public.group_competition_redaction_lookup(jsonb,uuid[],uuid,text) from public,anon,authenticated,service_role;
 
+
 -- ---------------------------------------------------------------------------
--- Item builders, with a cache (null: every answer live). Each is its
--- original's body with redaction asked through the cache; keep them in step.
+-- Readers' item builders: disclosure in one place, a cache per call
 -- ---------------------------------------------------------------------------
 
-create function app_public.group_competition_event_json_cached(p_event app_public.group_events,p_cache jsonb)
-returns jsonb language sql stable set search_path=app_public,pg_temp as $$
+-- An event's disclosure: whether event_json shows it `normalized` (null: the
+-- event names no group exercise, and event_json is null). The one place it
+-- is decided; event_json and stream_record read it.
+create function app_public.group_competition_event_normalized(p_event app_public.group_events,p_redactions jsonb)
+returns boolean language sql stable set search_path=app_public,pg_temp as $$
   with holders as (
     select h from jsonb_array_elements(jsonb_build_array(p_event.payload->'leader',p_event.payload->'previous')) h
       where jsonb_typeof(h)='object'
@@ -185,14 +185,28 @@ returns jsonb language sql stable set search_path=app_public,pg_temp as $$
     select p_event.member_user_id as member,coalesce(p_event.payload->'performance'->>'exercise_definition_id',p_event.payload->>'exercise_definition_id') as definition
     union all select member,definition from holder_identities
     union all select p_event.member_user_id,d from jsonb_array_elements_text(coalesce(p_event.payload->'exercise_definition_ids','[]')) d
-  ), disclosure as (select g.bodyweight_calculations_enabled and (ge.bodyweight_contribution>0
-      or exists(select 1 from identities i where app_public.group_competition_redaction_lookup(p_cache,array[p_event.group_id],i.member,i.definition))
+  )
+  select g.bodyweight_calculations_enabled and (ge.bodyweight_contribution>0
+      or exists(select 1 from identities i
+        where app_public.group_competition_redaction_lookup(p_redactions,array[p_event.group_id],i.member,i.definition))
       -- Unknown historical source identities cannot exempt an absolute holder
       -- from the enabled group's privacy boundary.
       or (exists(select 1 from app_public.group_exercises x where x.group_id=g.id and x.bodyweight_contribution>0) and (
         exists(select 1 from holder_identities i where i.member is null or i.definition is null)
         or (p_event.kind='record' and not exists(select 1 from identities i where i.member=p_event.member_user_id and i.definition is not null))
-        or p_event.kind in ('link','unlink')))) as normalized,
+        or p_event.kind in ('link','unlink'))))
+    from app_public.groups g join app_public.group_exercises ge on ge.group_id=g.id
+   where g.id=p_event.group_id and ge.id=p_event.group_exercise_id;
+$$;
+revoke all on function app_public.group_competition_event_normalized(app_public.group_events,jsonb) from public,anon,authenticated,service_role;
+
+create or replace FUNCTION app_public.group_competition_event_json(p_event app_public.group_events, p_redactions jsonb)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'app_public', 'pg_temp'
+AS $function$
+  with disclosure as (select app_public.group_competition_event_normalized(p_event,p_redactions) as normalized,
     ge.name,r.representation_version from app_public.groups g join app_public.group_exercises ge on ge.group_id=g.id
     left join app_public.group_rule_revisions r on r.group_exercise_id=ge.id and r.revision=coalesce(p_event.rules_revision,1)
     where g.id=p_event.group_id and ge.id=p_event.group_exercise_id), values_to_project as (
@@ -217,20 +231,21 @@ returns jsonb language sql stable set search_path=app_public,pg_temp as $$
       filter(where jsonb_typeof(v)='object') from values_to_project),'[]'::jsonb),
     'record_context',case when p_event.kind='record' then app_public.group_competition_record_context(p_event) end)
   from disclosure d;
-$$;
+$function$;
 
--- `p_normalized`: the record event's own visibility when the caller already
--- built its event JSON; null reads it here.
-create function app_public.group_competition_stream_record_cached(p_event app_public.group_events,p_cache jsonb,p_normalized boolean)
-returns jsonb language sql stable set search_path=app_public,pg_temp as $$
-  with v as (select coalesce(p_normalized,
-      (app_public.group_competition_event_json_cached(p_event,p_cache)->>'visibility')='normalized') as normalized),
+create or replace FUNCTION app_public.group_competition_stream_record(p_event app_public.group_events, p_redactions jsonb)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE
+ SET search_path TO 'app_public', 'pg_temp'
+AS $function$
+  with v as (select app_public.group_competition_event_normalized(p_event,p_redactions) as normalized),
   perf as (select p_event.payload->'performance' as p),
   boards as (select b from jsonb_array_elements(coalesce(p_event.payload->'boards','[]'::jsonb)) b
     where jsonb_typeof(b)='object' and b->>'metric' in ('volume','e1rm')),
   previous as (
     select b->>'metric' as metric,l.payload->'previous' as holder,
-      v.normalized or (app_public.group_competition_event_json_cached(l,p_cache)->>'visibility')='normalized' as normalized
+      v.normalized or app_public.group_competition_event_normalized(l,p_redactions) as normalized
     from boards,v
     cross join lateral (select l.* from app_public.group_events l
       where l.kind='lead_change' and not l.certified and l.related_event_id=p_event.id and l.metric=boards.b->>'metric'
@@ -260,24 +275,44 @@ returns jsonb language sql stable set search_path=app_public,pg_temp as $$
       from previous p where jsonb_typeof(p.holder)='object'
         and app_public.group_competition_history_display(p.holder,p.normalized,'previous',p.metric,p_event) is not null),'[]'::jsonb))
   from v,perf;
-$$;
+$function$;
 
-create function app_public.group_competition_stream_withdrawn_cached(p_event app_public.group_events,p_cache jsonb)
+create function app_public.group_competition_stream_withdrawn(p_event app_public.group_events,p_redactions jsonb)
 returns jsonb language sql stable set search_path=app_public,pg_temp as $$
-  select jsonb_build_object('event',x.event,
-    'record',app_public.group_competition_stream_record_cached(r,p_cache,(x.event->>'visibility')='normalized')
+  select jsonb_build_object('event',app_public.group_competition_event_json(r,p_redactions),
+    'record',app_public.group_competition_stream_record(r,p_redactions)
       ||jsonb_build_object('group_record_metrics',app_public.group_competition_stream_group_record_metrics(r)))
   from app_public.group_events r
-  cross join lateral (select app_public.group_competition_event_json_cached(r,p_cache) as event offset 0) x
   where r.id=p_event.related_event_id and r.kind='record' and r.group_id=p_event.group_id
     and r.group_exercise_id=p_event.group_exercise_id and r.member_user_id=p_event.member_user_id;
 $$;
 
-create function app_public.group_competition_session_exercises_cached(p_groups uuid[],p_member uuid,p_session text,p_cache jsonb)
+create or replace function app_public.group_competition_stream_withdrawn(p_event app_public.group_events)
 returns jsonb language sql stable set search_path=app_public,pg_temp as $$
+  select app_public.group_competition_stream_withdrawn(p_event,null::jsonb);
+$$;
+
+create function app_public.group_competition_session_exercises(p_groups uuid[], p_member uuid, p_session text, p_redactions jsonb)
+returns jsonb
+language sql
+stable
+set search_path to 'app_public', 'pg_temp'
+as $function$
+  -- The redaction answer is asked once per distinct definition the session
+  -- logged, not once per exercise block; one statement sees one snapshot.
+  with blocks as (
+    select se.*, ed.id as ed_id, ed.load_input_mode as ed_load_input_mode,
+      case when ed.id is not null then se.exercise_definition_id end as redaction_definition
+    from app_public.session_exercises se
+    left join app_public.exercise_definitions ed on ed.owner_user_id=se.owner_user_id and ed.id=se.exercise_definition_id
+    where se.owner_user_id=p_member and se.session_id=p_session and se.deleted_at is null
+  ), redaction as materialized (
+    select x.definition, app_public.group_competition_redaction_lookup(p_redactions,p_groups,p_member,x.definition) as normalized
+    from (select distinct b.redaction_definition as definition from blocks b) x
+  )
   select coalesce(jsonb_agg(jsonb_build_object('session_exercise_id',se.id,'exercise_definition_id',se.exercise_definition_id,
     'visibility',case when d.normalized then 'normalized' else 'ordinary' end,
-    'load_input_mode',ed.load_input_mode,'name',se.name,'machine_name',se.machine_name,'order_index',se.order_index,
+    'load_input_mode',se.ed_load_input_mode,'name',se.name,'machine_name',se.machine_name,'order_index',se.order_index,
     'sets',coalesce((select jsonb_agg(jsonb_build_object('set_id',es.id,'order_index',es.order_index,
       'reps_value',es.reps_value,'set_type',es.set_type,'performance_status',es.performance_status)
       ||case when not d.normalized then jsonb_build_object('weight_value',es.weight_value)
@@ -287,26 +322,24 @@ returns jsonb language sql stable set search_path=app_public,pg_temp as $$
       order by es.order_index,es.id collate "C") from app_public.exercise_sets es
       where es.owner_user_id=p_member and es.session_exercise_id=se.id and es.deleted_at is null),'[]'))
     order by se.order_index,se.id collate "C"),'[]')
-  from app_public.session_exercises se left join app_public.exercise_definitions ed on ed.owner_user_id=se.owner_user_id and ed.id=se.exercise_definition_id
-  cross join lateral (select app_public.group_competition_redaction_lookup(p_cache,p_groups,p_member,
-    case when ed.id is not null then se.exercise_definition_id end) as normalized) d
-  where se.owner_user_id=p_member and se.session_id=p_session and se.deleted_at is null;
-$$;
+  from blocks se
+  join redaction d on d.definition is not distinct from se.redaction_definition;
+$function$;
 
-create function app_public.group_competition_session_json_cached(p_groups uuid[],p_member uuid,p_session text,p_cache jsonb)
+create function app_public.group_competition_session_json(p_groups uuid[],p_member uuid,p_session text,p_redactions jsonb)
 returns jsonb language sql stable set search_path=app_public,pg_temp as $$
   select jsonb_build_object('member',app_public.group_member_ref_json(p_member),'session_id',s.id,
     'gym_name',(select g.name from app_public.gyms g where g.owner_user_id=p_member and g.id=s.gym_id and g.deleted_at is null),
     'status',s.status,'started_at_ms',s.started_at,'completed_at_ms',s.completed_at,'duration_sec',s.duration_sec,
-    'exercises',app_public.group_competition_session_exercises_cached(p_groups,p_member,p_session,p_cache))
+    'exercises',app_public.group_competition_session_exercises(p_groups,p_member,p_session,p_redactions))
   from app_public.sessions s where s.owner_user_id=p_member and s.id=p_session and s.deleted_at is null;
 $$;
 
-create function app_public.group_competition_session_card_cached(p_member uuid,p_session text,p_groups jsonb,p_cache jsonb)
+create function app_public.group_competition_session_card(p_member uuid,p_session text,p_groups jsonb,p_redactions jsonb)
 returns jsonb language sql stable set search_path=app_public,pg_temp as $$
   select jsonb_build_object('kind','session','key',p_member::text||':'||p_session,'sort_at_ms',s.started_at,
-    'groups',p_groups,'session',app_public.group_competition_session_json_cached(
-      array(select (g->>'group_id')::uuid from jsonb_array_elements(p_groups) g),p_member,p_session,p_cache))
+    'groups',p_groups,'session',app_public.group_competition_session_json(
+      array(select (g->>'group_id')::uuid from jsonb_array_elements(p_groups) g),p_member,p_session,p_redactions))
   from app_public.sessions s where s.owner_user_id=p_member and s.id=p_session and s.deleted_at is null;
 $$;
 
@@ -314,7 +347,7 @@ $$;
 -- CoW result: rows once per metric, redaction from one cache
 -- ---------------------------------------------------------------------------
 
-create function app_public.group_cow_result_rows_cached(p_cow app_public.group_cows,p_metric text,p_cache jsonb)
+create function app_public.group_cow_result_rows(p_cow app_public.group_cows,p_metric text,p_redactions jsonb)
 returns table(ordinal integer,member_id uuid,row_json jsonb)
 language plpgsql stable security definer set search_path=app_public,pg_temp as $$
 begin
@@ -332,11 +365,11 @@ begin
     select m.*,not (p_cow.start_context->>'normalized')::boolean and exists(
       select 1 from app_public.group_cow_source_refs refs where refs.cow_id=p_cow.id
         and refs.member_user_id=m.member_user_id and refs.metric=p_metric and
-        (app_public.group_competition_redaction_lookup(p_cache,array[p_cow.group_id],m.member_user_id,nullif(refs.definition_id,''))
+        (app_public.group_competition_redaction_lookup(p_redactions,array[p_cow.group_id],m.member_user_id,nullif(refs.definition_id,''))
           or exists(select 1 from app_public.exercise_sets es join app_public.session_exercises se
             on se.owner_user_id=es.owner_user_id and se.id=es.session_exercise_id
             where es.owner_user_id=m.member_user_id and es.id=refs.set_id
-              and app_public.group_competition_redaction_lookup(p_cache,array[p_cow.group_id],m.member_user_id,se.exercise_definition_id)))) as suppressed
+              and app_public.group_competition_redaction_lookup(p_redactions,array[p_cow.group_id],m.member_user_id,se.exercise_definition_id)))) as suppressed
       from members m
   ) select (m.entry->>'rank')::integer,m.member_user_id,jsonb_build_object('rank',(m.entry->>'rank')::integer,
       'member',app_public.group_member_ref_json(m.member_user_id),
@@ -350,13 +383,21 @@ begin
     from disclosure m;
 end $$;
 
--- `p_cache` null: one is built here for the CoW's participants, when a row
+-- `p_redactions` null: one is built here for the CoW's participants, when a row
 -- can need it (a ready, not normalized CoW).
-create function app_public.group_cow_public_result_cached(p_cow app_public.group_cows,p_metrics text[],p_before text,p_limit integer,p_top boolean,p_cache jsonb)
+
+create or replace function app_public.group_cow_result_rows(p_cow app_public.group_cows,p_metric text)
+returns table(ordinal integer,member_id uuid,row_json jsonb)
+language plpgsql stable security definer set search_path=app_public,pg_temp as $$
+begin
+  return query select * from app_public.group_cow_result_rows(p_cow,p_metric,null::jsonb);
+end $$;
+
+create function app_public.group_cow_public_result(p_cow app_public.group_cows,p_metrics text[],p_before text,p_limit integer,p_top boolean,p_redactions jsonb)
 returns jsonb language plpgsql stable security definer set search_path=app_public,pg_temp as $$
 declare metric text; state text:=app_public.group_cow_public_state(p_cow); ranks jsonb:='[]'; rows jsonb; page jsonb;
   cursor jsonb; edge integer:=0; edge_id uuid:='00000000-0000-0000-0000-000000000000'; last_row jsonb; total integer; more boolean;
-  ge app_public.group_exercises; normalized boolean; unit text; publication uuid; cache jsonb:=p_cache;
+  ge app_public.group_exercises; normalized boolean; unit text; publication uuid; cache jsonb:=p_redactions;
 begin
   perform app_public.group_cow_reject_agent();
   select * into ge from app_public.group_exercises where id=p_cow.group_exercise_id and group_id=p_cow.group_id;
@@ -381,7 +422,7 @@ begin
   foreach metric in array p_metrics loop
     unit:=case when normalized is null then null when metric='improvement' then 'percent'
       else app_public.group_competition_unit(metric,normalized) end;
-    with r as materialized (select * from app_public.group_cow_result_rows_cached(p_cow,metric,cache))
+    with r as materialized (select * from app_public.group_cow_result_rows(p_cow,metric,cache))
     select (select count(*)::integer from r),coalesce(jsonb_agg(x.row_json order by coalesce(x.ordinal,2147483647),x.member_id),'[]'),count(*)>p_limit
       into total,rows,more
       from (select * from r where (not p_top or r.ordinal<=3) and (coalesce(r.ordinal,2147483647),r.member_id)>(edge,edge_id)
@@ -401,10 +442,10 @@ end $$;
 create or replace function app_public.group_cow_public_result(p_cow app_public.group_cows,p_metrics text[],p_before text,p_limit integer,p_top boolean default false)
 returns jsonb language plpgsql stable security definer set search_path=app_public,pg_temp as $$
 begin
-  return app_public.group_cow_public_result_cached(p_cow,p_metrics,p_before,p_limit,p_top,null);
+  return app_public.group_cow_public_result(p_cow,p_metrics,p_before,p_limit,p_top,null::jsonb);
 end $$;
 
-create function app_public.group_cow_stream_item_cached(p_event_id uuid,p_sort bigint,p_cache jsonb) returns jsonb
+create function app_public.group_cow_stream_item(p_event_id uuid,p_sort bigint,p_redactions jsonb) returns jsonb
 language plpgsql stable security definer set search_path=app_public,pg_temp as $$
 declare e app_public.group_events; c app_public.group_cows; result jsonb;
 begin
@@ -413,22 +454,27 @@ begin
   if e.payload->>'event' in ('results','unavailable') then
     select * into strict c from app_public.group_cows where id=(e.payload->'definition'->>'cow_id')::uuid
       and group_id=e.group_id and finalized_at is not null and publication_id::text=e.payload->>'publication_id';
-    result:=app_public.group_cow_public_result_cached(c,c.metrics,null,1,true,p_cache);
+    result:=app_public.group_cow_public_result(c,c.metrics,null,1,true,p_redactions);
   end if;
   return jsonb_build_object('kind','cow','key',lpad(e.seq::text,20,'0'),'sort_at_ms',p_sort,
     'event',e.payload->'event','definition',e.payload->'definition','previous',e.payload->'previous',
     'actor',case when e.actor_user_id is not null then app_public.group_member_ref_json(e.actor_user_id) end,'result',result);
 end $$;
 
-revoke all on function app_public.group_competition_event_json_cached(app_public.group_events,jsonb),
-  app_public.group_competition_stream_record_cached(app_public.group_events,jsonb,boolean),
-  app_public.group_competition_stream_withdrawn_cached(app_public.group_events,jsonb),
-  app_public.group_competition_session_exercises_cached(uuid[],uuid,text,jsonb),
-  app_public.group_competition_session_json_cached(uuid[],uuid,text,jsonb),
-  app_public.group_competition_session_card_cached(uuid,text,jsonb,jsonb),
-  app_public.group_cow_result_rows_cached(app_public.group_cows,text,jsonb),
-  app_public.group_cow_public_result_cached(app_public.group_cows,text[],text,integer,boolean,jsonb),
-  app_public.group_cow_stream_item_cached(uuid,bigint,jsonb) from public,anon,authenticated,service_role;
+create or replace function app_public.group_cow_stream_item(p_event_id uuid,p_sort bigint) returns jsonb
+language plpgsql stable security definer set search_path=app_public,pg_temp as $$
+begin
+  return app_public.group_cow_stream_item(p_event_id,p_sort,null::jsonb);
+end $$;
+
+-- The new overloads are private, like the forms they sit beside.
+revoke all on function app_public.group_competition_stream_withdrawn(app_public.group_events,jsonb),
+  app_public.group_competition_session_exercises(uuid[],uuid,text,jsonb),
+  app_public.group_competition_session_json(uuid[],uuid,text,jsonb),
+  app_public.group_competition_session_card(uuid,text,jsonb,jsonb),
+  app_public.group_cow_result_rows(app_public.group_cows,text,jsonb),
+  app_public.group_cow_public_result(app_public.group_cows,text[],text,integer,boolean,jsonb),
+  app_public.group_cow_stream_item(uuid,bigint,jsonb) from public,anon,authenticated,service_role;
 
 -- ---------------------------------------------------------------------------
 -- The stream page
@@ -444,7 +490,7 @@ returns jsonb language plpgsql volatile security definer set search_path=app_pub
 declare
   _uid uuid := app_public.group_require_app_user();
   _scope uuid[]; _limit integer; _c_sort bigint; _c_kind text; _c_key text; _group uuid;
-  _rows jsonb; _items jsonb; _has_more boolean; _last jsonb; _cache jsonb;
+  _items jsonb; _has_more boolean; _last jsonb;
 begin
   if p_group_id is not null then
     perform app_public.group_require_member(p_group_id, _uid, false);
@@ -555,57 +601,53 @@ begin
       from distinct_candidates d
      order by d.sort_at_ms desc, d.kind collate "C", d.key collate "C" desc
      limit _limit + 1
-  )
-  select coalesce(jsonb_agg(to_jsonb(p) order by p.rn), '[]'::jsonb) into _rows from page p;
-
-  _has_more := jsonb_array_length(_rows) > _limit;
-  if _has_more then _rows := _rows - _limit; end if;
-
+  ),
+  shown as materialized (select * from page where rn <= _limit),
   -- One redaction cache for everything the page's items ask about: the
   -- members of its items, the holders their events name, and a finished
-  -- CoW's participants.
-  if cardinality(_scope) = 1 and jsonb_array_length(_rows) > 0 then
-    _cache := app_public.group_competition_redaction_cache(_scope[1], array(
-      select distinct m from (
-        select (r->>'user_id')::uuid as m from jsonb_array_elements(_rows) r
-        union all
-        select app_public.group_eval_try_uuid(h#>>'{}')
-          from jsonb_array_elements(_rows) r
-          join app_public.group_events e on e.id = (r->>'event_id')::uuid
-          left join app_public.group_events x on x.related_event_id = e.id and x.kind = 'lead_change'
-          left join app_public.group_events w on w.id = e.related_event_id and e.kind = 'record_voided'
-          cross join lateral jsonb_path_query(jsonb_build_array(e.payload, x.payload, w.payload), 'lax $.**.member_user_id') h
-        union all
-        select w.member_user_id
-          from jsonb_array_elements(_rows) r
-          join app_public.group_events e on e.id = (r->>'event_id')::uuid and e.kind = 'record_voided'
-          join app_public.group_events w on w.id = e.related_event_id
-        union all
-        select p.member_user_id
-          from jsonb_array_elements(_rows) r
-          join app_public.group_events e on e.id = (r->>'event_id')::uuid and e.kind = 'cow' and e.payload->>'event' = 'results'
-          join app_public.group_cow_participants p on p.cow_id = (e.payload->'definition'->>'cow_id')::uuid
-      ) x where m is not null));
-  end if;
-
-  select coalesce(jsonb_agg(
-           case
-             when r->>'kind' = 'session' then
-               app_public.group_competition_session_card_cached((r->>'user_id')::uuid, r->>'session_id', (
+  -- CoW's participants. In this statement, so the cache and the items it
+  -- governs see one snapshot.
+  cache as materialized (
+    select case when cardinality(_scope) = 1 and exists(select 1 from shown) then
+      app_public.group_competition_redaction_cache(_scope[1], array(
+        select distinct m from (
+          select s.user_id as m from shown s
+          union all
+          select app_public.group_eval_try_uuid(h#>>'{}')
+            from shown s
+            join app_public.group_events e on e.id = s.event_id
+            left join app_public.group_events x on x.related_event_id = e.id and x.kind = 'lead_change'
+            left join app_public.group_events w on w.id = e.related_event_id and e.kind = 'record_voided'
+            cross join lateral jsonb_path_query(jsonb_build_array(e.payload, x.payload, w.payload), 'lax $.**.member_user_id') h
+          union all
+          select w.member_user_id
+            from shown s
+            join app_public.group_events e on e.id = s.event_id and e.kind = 'record_voided'
+            join app_public.group_events w on w.id = e.related_event_id
+          union all
+          select p.member_user_id
+            from shown s
+            join app_public.group_events e on e.id = s.event_id and e.kind = 'cow' and e.payload->>'event' = 'results'
+            join app_public.group_cow_participants p on p.cow_id = (e.payload->'definition'->>'cow_id')::uuid
+        ) x where m is not null)) end as c
+  ),
+  items as (
+    select s.rn, case
+             when s.kind = 'session' then
+               app_public.group_competition_session_card(s.user_id, s.session_id, (
                  select jsonb_agg(jsonb_build_object('group_id', g.id, 'name', g.name) order by lower(g.name), g.name, g.id)
                    from app_public.group_events e
                    join app_public.groups g on g.id = e.group_id and g.deleted_at is null
-                  where e.kind = 'session' and e.member_user_id = (r->>'user_id')::uuid and e.session_id = r->>'session_id'
-                    and e.group_id = any(_scope)), _cache)
-             when r->>'kind' = 'membership' then
-               jsonb_build_object('kind', 'membership', 'key', r->>'key', 'sort_at_ms', (r->>'sort_at_ms')::bigint,
-                 'event', r->>'event',
-                 'group', (select jsonb_build_object('group_id', g.id, 'name', g.name) from app_public.groups g where g.id = (r->>'group_id')::uuid),
-                 'member', app_public.group_member_ref_json((r->>'user_id')::uuid))
-             when r->>'kind' = 'cow' then
-               app_public.group_cow_stream_item_cached((r->>'event_id')::uuid, (r->>'sort_at_ms')::bigint, _cache)
-             when r->>'kind' = 'shared_exercise' then
-               app_public.group_shared_exercise_stream_card((r->>'event_id')::uuid, (r->>'sort_at_ms')::bigint)
+                  where e.kind = 'session' and e.member_user_id = s.user_id and e.session_id = s.session_id
+                    and e.group_id = any(_scope)), (select c from cache))
+             when s.kind = 'membership' then
+               jsonb_build_object('kind', 'membership', 'key', s.key, 'sort_at_ms', s.sort_at_ms, 'event', s.event,
+                 'group', (select jsonb_build_object('group_id', g.id, 'name', g.name) from app_public.groups g where g.id = s.group_id),
+                 'member', app_public.group_member_ref_json(s.user_id))
+             when s.kind = 'cow' then
+               app_public.group_cow_stream_item(s.event_id, s.sort_at_ms, (select c from cache))
+             when s.kind = 'shared_exercise' then
+               app_public.group_shared_exercise_stream_card(s.event_id, s.sort_at_ms)
              else (
                select case
                    when p_level >= 2 and e.kind = 'record' then
@@ -613,24 +655,24 @@ begin
                        jsonb_set(i.item, '{record,group_record_metrics}', app_public.group_competition_stream_group_record_metrics(e))
                      else i.item end
                    when p_level >= 5 and e.kind = 'record_voided' then
-                     i.item || jsonb_build_object('withdrawn', coalesce(app_public.group_competition_stream_withdrawn_cached(e, _cache), 'null'::jsonb))
+                     i.item || jsonb_build_object('withdrawn', coalesce(app_public.group_competition_stream_withdrawn(e, (select c from cache)), 'null'::jsonb))
                    else i.item end
                  from app_public.group_events e
-                 -- offset 0: each built once, not once per reference.
-                 cross join lateral (select app_public.group_competition_event_json_cached(e, _cache) as event offset 0) x
-                 cross join lateral (select jsonb_build_object('kind', 'competition', 'key', e.id, 'sort_at_ms', (r->>'sort_at_ms')::bigint,
-                     'event', x.event)
+                 -- offset 0: built once, not once per reference.
+                 cross join lateral (select jsonb_build_object('kind', 'competition', 'key', e.id, 'sort_at_ms', s.sort_at_ms,
+                     'event', app_public.group_competition_event_json(e, (select c from cache)))
                    || case when p_level >= 2 and e.kind = 'record' then jsonb_build_object('record',
-                        app_public.group_competition_stream_record_cached(e, _cache, (x.event->>'visibility') = 'normalized')) else '{}'::jsonb end
+                        app_public.group_competition_stream_record(e, (select c from cache))) else '{}'::jsonb end
                    as item offset 0) i
-                where e.id = (r->>'event_id')::uuid)
-           end
-           order by ordinality), '[]'::jsonb)
-    into _items
-    from jsonb_array_elements(_rows) with ordinality t(r, ordinality);
+                where e.id = s.event_id)
+           end as item
+      from shown s
+  )
+  select coalesce((select jsonb_agg(i.item order by i.rn) from items i), '[]'::jsonb),
+         (select count(*) > _limit from page),
+         (select jsonb_build_object('sort_at_ms', s.sort_at_ms, 'kind', s.kind, 'key', s.key) from shown s order by s.rn desc limit 1)
+    into _items, _has_more, _last;
 
-  _last := (select jsonb_build_object('sort_at_ms', (r->>'sort_at_ms')::bigint, 'kind', r->>'kind', 'key', r->>'key')
-              from jsonb_array_elements(_rows) with ordinality t(r, ordinality) order by ordinality desc limit 1);
   return jsonb_build_object('contract_version', 4, 'items', _items,
     'next_cursor', case when _has_more then _last else null end, 'has_more', _has_more);
 end $$;
