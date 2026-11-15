@@ -466,7 +466,7 @@ describe('board, podiums, history and session parity cases', () => {
   });
 
   test('the podium arguments cover both scopes and the session arguments every opened session', () => {
-    expect(caseFor("group_competition_podiums").argumentSets!(context)).toEqual([
+    expect(caseFor('group_competition_podiums').argumentSets!(context)).toEqual([
       { p_group_id: 'g', p_certified: true }, { p_group_id: 'g', p_certified: false }]);
     for (const fn of ['group_competition_session_detail', 'group_competition_session_records']) {
       expect(caseFor(fn).argumentSets!(context)).toEqual([
