@@ -107,7 +107,7 @@ const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 6_500, scoped
  */
 const COW_REDACTION_SLOPE = 'One bodyweight-redaction cache build per call reads each participant\'s counting scores, events and sets, '
   + 'so it grows with history: summary 737 -> 964 pages and previous summary 709 -> 1,060 pages from H=90 to H=180 '
-  + '(1.31x and 1.50x per doubling, over 1.2x). Both stay under a quarter of the ceiling.';
+  + '(1.31x and 1.50x per doubling, over 1.2x). Both are measured under a quarter of the ceiling.';
 
 /**
  * Every RPC the set measures, with its budget beside it. A budget is the

@@ -144,9 +144,8 @@ run_psql_once "begin;
 ${HELPERS_SQL}
 create or replace function app_public.group_cow_zone_known(p_zone text) returns boolean language sql immutable as \$f\$ select false \$f\$;
 do \$\$
-declare z text; n int := 0; sampled int := 0;
+declare z text; sampled int := 0;
 begin
-  select count(*) into n from pg_catalog.pg_timezone_names where pg_temp.answer('current', name) = name and name = 'UTC';
   for z in select name from (select name, row_number() over (order by name) as r from pg_catalog.pg_timezone_names) x
            where r % 10 = 0 or name in ('UTC', 'Europe/London', 'Etc/GMT+5') loop
     sampled := sampled + 1;
@@ -154,7 +153,8 @@ begin
       raise exception 'fallback: zone % answers % before and % now', z, pg_temp.answer('legacy', z), pg_temp.answer('current', z);
     end if;
   end loop;
-  if n <> 1 or sampled < 100 then raise exception 'fallback compared too little: UTC accepted % times, % sampled', n, sampled; end if;
+  if pg_temp.answer('current', 'UTC') <> 'UTC' then raise exception 'fallback rejected UTC'; end if;
+  if sampled < 100 then raise exception 'fallback compared too little: % sampled', sampled; end if;
   if pg_temp.answer('current', 'Europe/Nowhere') not like 'error: P0001 VALIDATION%' then
     raise exception 'fallback accepted a name that is not a zone';
   end if;
