@@ -546,7 +546,8 @@ begin
     'actor',case when e.actor_user_id is not null then app_public.group_member_ref_json(e.actor_user_id) end,'result',result);
 end $function$;
 
--- Notification ranks.
+-- Notification ranks. The target member's scores span their whole history, so
+-- the rule is asked once per definition they hold, not once per score row.
 CREATE OR REPLACE FUNCTION app_public.notification_ranks_from_graph(p_group uuid, p_exercise uuid, p_revision bigint, p_target app_public.notification_workout_targets, p_graph jsonb)
  RETURNS jsonb
  LANGUAGE sql
@@ -560,6 +561,14 @@ AS $function$
   saved as (select b,admitted,(b->>'certified')::boolean as bound_certified from saved_sources
     union all select b||jsonb_build_object('certified',true),admitted,false from saved_sources where not (b->>'certified')::boolean
     union all select b||jsonb_build_object('certified',false),admitted,true from saved_sources where (b->>'certified')::boolean),
+  hidden as materialized(
+    select d.definition,group_competition_redacts_exercise(array[p_group],(p_target).member_user_id,d.definition) as redacted
+    from (select s.exercise_definition_id as definition from group_metric_set_scores s
+        where s.group_exercise_id=p_exercise and s.rules_revision=p_revision
+          and s.member_user_id=(p_target).member_user_id and s.counting
+      union select b->>'exercise_definition_id' from saved_sources) d
+    where (p_target).member_user_id is not null
+  ),
   qualified_saved as (
     select saved.* from saved join group_exercises ge on ge.id=p_exercise join groups g on g.id=ge.group_id
     where (p_target).rules_revision=p_revision
@@ -576,7 +585,7 @@ AS $function$
             select 1 from source,jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=(p_target).member_user_id::text
               and x->>'set_id'=b->>'set_id' and (x->>'observed_set_pin' is distinct from b->>'observed_set_pin' or not (x->>'live')::boolean))))))
       and (g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
-        not group_competition_redacts_exercise(array[p_group],(p_target).member_user_id,b->>'exercise_definition_id'))
+        not (select h.redacted from hidden h where h.definition is not distinct from b->>'exercise_definition_id'))
   ), compatible_saved as (
     select q.* from qualified_saved q cross join source where coalesce((b->>'projection_known')::boolean,false) and exists(
       select 1 from jsonb_array_elements(source.graph->'sets') x where x->>'member_user_id'=(p_target).member_user_id::text
@@ -656,7 +665,7 @@ AS $function$
       and s.group_exercise_id=p_exercise and s.rules_revision=p_revision and s.counting and (not d.certified or c.id is not null)
       and s.unit=group_competition_unit(d.metric,g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0)
       and (g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
-        not group_competition_redacts_exercise(array[p_group],(p_target).member_user_id,s.exercise_definition_id))
+        not (select h.redacted from hidden h where h.definition is not distinct from s.exercise_definition_id))
     union all
     -- Unchanged original/admitted performances use current control and witness eligibility, including metadata-rescored lower sources.
     select s.metric,d.certified,s.value,s.achieved_at_ms,s.exercise_order_index,s.set_order_index,s.set_created_at_ms,s.set_id
@@ -670,7 +679,7 @@ AS $function$
       and s.rules_revision=p_revision and s.counting and (not d.certified or c.id is not null)
       and s.unit=group_competition_unit(d.metric,g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0)
       and (g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
-        not group_competition_redacts_exercise(array[p_group],(p_target).member_user_id,s.exercise_definition_id))
+        not (select h.redacted from hidden h where h.definition is not distinct from s.exercise_definition_id))
       and (coalesce(origin->'counted_metrics','[]'::jsonb) ? s.metric or coalesce(origin->'admission_metrics','[]'::jsonb) ? s.metric)
       and coalesce(origin->>'admission_pin',origin->>'performed_pin')=x->>'observed_set_pin'
     union all

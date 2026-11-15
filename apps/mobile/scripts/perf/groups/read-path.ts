@@ -522,8 +522,11 @@ export const plantStatements = (): string[] => [
      select m.uid,f.group_id::text||':perf-def-6','perf-def-6',f.group_id::text,ge.id::text,t.at,t.at+1,t.at+1,t.at+1
      from perf_members m, perf_fx f, perf_group_exercises ge, lateral (select f.now_ms-(f.days+30)::bigint*86400000 as at) t
      where m.idx=5 and ge.ex=5`,
-  `update app_public.exercise_definitions d set bodyweight_contribution=0.5 from perf_members m
-     where m.idx=4 and d.owner_user_id=m.uid and d.id='perf-def-6'`,
+  asMember(4),
+  `update app_public.exercise_definitions d set bodyweight_contribution=0.5,updated_at=d.updated_at+1,
+     client_updated_at_ms=d.client_updated_at_ms+1
+     from perf_members m where m.idx=4 and d.owner_user_id=m.uid and d.id='perf-def-6'`,
+  `select set_config('request.jwt.claim.sub','',true), set_config('request.jwt.claims','',true)`,
 ];
 
 const OWN_COWS = `select id from app_public.group_cows where group_id=(select group_id from perf_fx)`;

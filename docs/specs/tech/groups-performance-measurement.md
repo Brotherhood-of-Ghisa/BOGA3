@@ -90,9 +90,10 @@ that a plain vacuum frees but does not compact, and page counts would grow
 with them. Then it builds the Tier 1 fixture, in one rolled-back
 transaction, plus planted cases the reads must handle:
 
-- a bodyweight-redacted member exercise: one member also links an ordinary
-  exercise to the bodyweight-aware one, so it is redacted for that member
-  only;
+- the disclosure rule's cases on one ordinary exercise: one member links it
+  to the bodyweight-aware one and another gives it a bodyweight
+  contribution, so both hide its kg; a third member's link is tombstoned,
+  so theirs shows;
 - a voided record: a member's best set edited down after evaluation, inside
   the weeks parity compares;
 - last week's finished CoW and this week's live one, their sources
@@ -166,12 +167,11 @@ planted one-field change must be caught. A paged RPC's case walks every page
 page boundary is a difference. A case may leave out a clock reading
 (`ignoreKeys`).
 
-Internal helpers readers share (redaction, session counts) are compared the
-same way in `HELPER_PARITY_CASES`, old against new, as the table owner, for
-every argument row the fixture holds; a cache, or a builder that reads one,
-is compared with the live function it stands for. Before parity, after every
-measured call, `PARITY_PLANT_STATEMENTS` plants retained CoW refs that redact
-through each branch, un-shares the group's latest completed session, leaves
+Internal helpers readers share (item builders, session counts) are compared
+the same way in `HELPER_PARITY_CASES`, old against new, as the table owner,
+for every argument row the fixture holds. Before parity, after every
+measured call, `PARITY_PLANT_STATEMENTS` un-shares the group's latest
+completed session, leaves
 facts the evaluator has not caught up with (a deleted set, a deleted
 exercise, a moved set), and moves a session with records to another member's
 start (its records then sort where their events do not say, tied with that
