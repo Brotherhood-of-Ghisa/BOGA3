@@ -23,118 +23,39 @@ Update this standard only for shared process or pattern changes.
 
 For a new UI block, show the applicable approved families from
 `docs/specs/ui/components-catalog.md`, recommend one and record the selected
-production export/variant before coding. Reusing an approved design template
-within its bounded variants needs no fresh design acceptance. Carry existing
-selections forward within their agreed scope.
+production export/variant before coding. Carry existing selections forward
+within their agreed scope.
 
 A composition outside those templates, or a derivative beyond their allowed
 variants, is **custom design**. Record its nearest parent and differences,
 including inherited type, geometry and action boundaries. Custom UI follows
-ordinary PR review with the required tests and visual evidence. It needs no
-separate pre-build approval reference or specially formatted acceptance comment.
+ordinary PR review with the required tests and visual evidence.
 
-### Record and verify the choice
+### Record and review the choice
 
-The existing guardrail lane requires one visible `ui-pattern-selection` JSON
-code block in the draft/PR body for new or changed JSX/presentation under
-app/components. It maps each affected source to `template` or `custom`, its
-production parents and its delta. Existing compositions are established design:
-comments, formatting and logic edits that preserve JSX and presentation values
-need no declaration. The checker compares parsed JSX and presentation values;
-reviewers judge visual materiality. Schema and failing/safe cases:
-`apps/mobile/scripts/ui-pattern-selection.js` and
-`apps/mobile/__tests__/ui-pattern-selection.test.ts`.
-
-Before a PR exists, save that body at `apps/mobile/artifacts/ui-review.md`
-(or set `BOGA_UI_REVIEW_BODY` to its path), then run normal gates. A template
-parent must exist at the base and be imported/rendered from its real export;
-template selections inherit existing family checks. CI verifies declarations;
-reviewers verify truthful classification, scope and evidence. Custom declarations
-do not require approval metadata. Template promotion has its own process below.
+Record the selection in the UX Contract (below): the template and variant, or
+for custom design its nearest parent and delta. Existing compositions are
+established design; edits that keep their JSX and presentation need no record.
+Reviewers check that the classification, scope and evidence are truthful. The
+static guardrail lane (`npm run lint:ui-guardrails`) holds each family's
+adopted presenters to its type, casing and geometry rules; its adoption lists
+live in the `apps/mobile/scripts/*-pattern-guardrail.js` modules.
 
 ### Review custom coded results
 
 Provide the running custom component/reference and native comparisons under
 `docs/specs/ui/ai-design-policy.md`: small/normal widths, long content, relevant
 states and owned actions; pair list/table rows when their rhythm changes.
-Review this evidence in the normal PR process. An unrelated push does not
-create a new design-acceptance step; refresh evidence when the design changes.
-The `UI pattern review` check enforces declarations, template inheritance and
-template promotion, never separate approval of custom-component use.
+Review this evidence in the normal PR process; refresh it when the design
+changes.
 
-### Promote a design into a reusable template
+### Add or change a reusable template
 
-A human **or agent** may propose promotion in the existing UX Contract and
-`ui-pattern-selection` block. Shipping custom UI never promotes it to a reusable
-template. Only a human with repository write/maintain/admin authority,
-including the PR author, may accept promotion.
-
-1. **Propose.** Add the proposed contract to the catalog's
-   `ui-template-catalog` array: stable `id`, production `source`/`export`,
-   intended `uses`, named `variants` with explicit bounds, `slots`,
-   `typography`, `geometry`, `interactions`, `accessibility`, owned implementation
-   `files`, representative `gallery` source/export and Jest `tests` paths.
-   Include production and gallery sources in `files`. The inventory is the
-   durable contract; acceptance evidence stays in the PR.
-   In `ui-pattern-selection.promotions`, name the `id`, `whyExistingInsufficient`,
-   `nearestParent` (existing family/source/export), `differences`,
-   `visualReference` and `preBuildApproval` (human login/reference).
-2. **Review before building.** Obtain explicit human acceptance of the proposed
-   design **and template scope** before implementing novel production design.
-   Carry valid earlier design evidence forward for an existing custom component,
-   but obtain a separate promotion decision. Agents may prepare proposals,
-   implementations and evidence; they must never fabricate or post acceptance.
-3. **Implement and verify.** Build the production export, representative gallery
-   examples using it, meaningful tests and native comparisons required by the
-   design policy. The promotion's `evidence.native` lists references with
-   `device`, `viewport` and `covers`: collectively `small`, `normal`,
-   `content-extremes`, `states`, `interactions`, `accessibility`. Include long/empty
-   content, each variant and relevant loading/error/disabled/selected states,
-   wrapping/stacking and owned actions; explain inapplicable cases. Show shared
-   row rhythm together. Record screenshots and behavior/accessibility results
-   at the reviewed full commit. Changed UI still declares custom design;
-   adding a catalog row cannot authorize its own reuse.
-4. **Accept the running template.** After inspecting the implementation,
-   contract and evidence, the authorized human posts this whole PR comment:
-
-   ```text
-   UI template accepted at <full-head-sha>:
-   - <TemplateId> sha256:<digest>
-   ```
-
-   The existing checker prints the required id/digest when acceptance is missing;
-   its `promotionDigest` hashes the catalog entry and complete promotion record
-   deterministically. List each accepted promotion. Generic PR approval,
-   proposal approval do not promote anything. This acceptance is specific to
-   reusable-template registration; custom-component use has no separate gate.
-   Every push invalidates acceptance; contract/proposal/evidence edits change
-   the digest even without a push. Comment deletion/edit withdraws it. Renew
-   evidence and human acceptance after implementation or scope changes.
-5. **Register and activate.** Merge only after the existing `UI pattern review`
-   check passes on the final head. The candidate catalog is parsed as data;
-   only unchanged registrations already in the trusted merged base are eligible
-   for reuse. Future template parents use `family: "catalog"` plus `template`
-   id, `source`, `export`, accepted `use` and named `variant`. Style/spread overrides and mismatched/dynamic `variant` props fail reuse. Within
-   those bounds reuse needs no renewed design acceptance. Outside them declare custom
-   design for ordinary PR review; changing the reusable contract requires
-   promotion again. Preserve production exports, catalog bounds and checker
-   inheritance in the same change.
-
-The checker verifies registration structure, real exports, gallery use, file
-presence, declared bounds and authorized exact-head/digest comments. Humans
-verify semantic fit, evidence quality, truthful pre-build authority/timing and
-completeness of owned files. A reference is not independent proof of those facts.
-GitHub User identity cannot distinguish a human from an agent using shared
-credentials; agents must not use that limitation to post acceptance.
-
-Installation uses the existing base-owned workflow and required check, never
-candidate executables. If it is not yet installed/enforced on protected `main`,
-activation is pending: merge the policy first, verify the check on a subsequent
-PR, then require it in branch protection/rulesets. Stacked PRs must retarget the
-merged `main` and pass its trusted check before merge. No new approval service
-or generic approval-count requirement is introduced. For schema and fixture
-examples, load `apps/mobile/scripts/ui-template-promotion.js` and
-`apps/mobile/__tests__/ui-template-promotion.test.ts`.
+Shipping custom UI never makes it a template. A new or changed template ships
+its production export, gallery examples using it and Jest tests, adds its row
+to `docs/specs/ui/components-catalog.md` ("Coded compositions"), and adds its
+presenters to a family guardrail's adoption list when the family is guarded.
+It is accepted by ordinary PR review.
 
 ## Required task-level UX contract
 

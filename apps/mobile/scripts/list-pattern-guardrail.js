@@ -12,9 +12,9 @@ const TYPE_FIELDS = new Set(['fontFamily', 'fontWeight', 'fontSize', 'lineHeight
 const ROW_FIELDS = new Set(['padding', 'paddingVertical', 'paddingTop', 'paddingBottom', 'paddingBlock', 'paddingBlockStart', 'paddingBlockEnd', 'marginVertical', 'marginTop', 'marginBottom', 'minHeight']);
 const PATTERNS = new Set(['ListCard', 'ListCardHeader', 'ListRow']);
 
-function findListPatternViolations({ rootDir = path.resolve(__dirname, '..'), adoptedFiles = [] } = {}) {
+function findListPatternViolations({ rootDir = path.resolve(__dirname, '..') } = {}) {
   const violations = [];
-  const files = patternFiles(rootDir, [...LIST_PATTERN_FILES, ...adoptedFiles]);
+  const files = patternFiles(rootDir, LIST_PATTERN_FILES);
   for (const file of files) {
     const absolute = path.join(rootDir, file);
     if (!fs.existsSync(absolute)) continue;

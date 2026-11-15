@@ -232,9 +232,6 @@ catch their regressions. Run your area's gates before the PR.
 
 Updates: [workflow](../../.github/workflows/daily-development-log.yml).
 
-For UI declarations/promotion, load spec `08`.
-`.github/workflows/ui-pattern-review.yml` checks PR declarations and template promotions.
-
 ## Maintenance
 
 Changing a gate or lane means updating the registries in the same change:
