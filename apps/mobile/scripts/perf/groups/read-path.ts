@@ -173,6 +173,22 @@ export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
         .map((windows) => ({ p_group_id: context.groupId, p_windows: windows }));
     },
   },
+  // A board's count, page and own row from one statement: every metric and
+  // scope, a full page and a two-row page (which has a next cursor). Patched
+  // in place by 20261008120000, so its text before the change is saved.
+  {
+    fn: 'group_competition_board',
+    migration: 'parity-definitions/20261008120000_group_competition_v4_only.sql',
+    argumentSets: (context) => ['e1rm', 'volume'].flatMap((metric) => [false, true].flatMap((certified) => [50, 2].map((limit) =>
+      ({ p_group_id: context.groupId, p_group_exercise_id: context.bench, p_metric: metric, p_certified: certified,
+        p_limit: limit, p_cursor: null })))),
+  },
+  // Stream records keep their group records when nothing retracts them.
+  {
+    fn: 'group_competition_stream_v4',
+    migration: '20261111160000_group_stream_group_record_metrics.sql',
+    argumentSets: (context) => [20, 5].map((limit) => ({ p_group_id: context.groupId, p_before: null, p_limit: limit })),
+  },
 ];
 
 /** Every (group, member, definition) the redaction helpers are compared on: every definition a member logged or a CoW retained, none, and one never logged. */

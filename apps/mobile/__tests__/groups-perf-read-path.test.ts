@@ -299,7 +299,7 @@ begin return jsonb_build_object('a', p_a); end $function$
     expect(PARITY_CASES.length).toBeGreaterThan(0);
     for (const parityCase of PARITY_CASES) {
       const { legacy, planted, sql } = parityInstallStatements(parityCase);
-      expect(sql.at(-2)?.startsWith(`create function pg_temp.${legacy}(`)).toBe(parityCase.plant !== undefined);
+      expect(sql.at(-2)?.startsWith(`create function pg_temp.${legacy}(`) ?? false).toBe(parityCase.plant !== undefined);
       expect(sql.at(-1)?.startsWith(`create function pg_temp.${planted ?? legacy}(`)).toBe(true);
       expect(sql.at(-1)).not.toContain(`app_public.${parityCase.fn}(`);
     }

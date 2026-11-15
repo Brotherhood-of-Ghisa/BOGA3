@@ -57,7 +57,7 @@ describe('publish parity helpers', () => {
   test('the publisher’s case installs its old helpers first, renamed into pg_temp, and its plant matches once', () => {
     const parity = new PublishParity({ exec: async () => [] });
     const sql = parity.installStatements();
-    expect(sql.map((statement) => /create function pg_temp\.([a-z_]+)\(/.exec(statement)?.[1])).toEqual([
+    expect(sql.map((statement) => /create (?:or replace )?function pg_temp\.([a-z_]+)\(/.exec(statement)?.[1])).toEqual([
       'group_metric_eval_source_graph__legacy',
       'group_metric_eval_publish_without_notifications__legacy',
       'group_metric_eval_publish__legacy',
