@@ -158,6 +158,22 @@ export type ParityCase<Context> = {
   requires?: string[];
   /** The helper's self-check: one text replacement that must change the JSON. */
   plant?: { from: string; to: string };
+  /**
+   * A paged RPC: the arguments of the next page after `result`, or null at
+   * the end. Each definition follows its own cursor to the last page, so a
+   * page boundary that moved is a difference.
+   */
+  walk?: (args: Record<string, unknown>, result: unknown) => Record<string, unknown> | null;
+  /** Top-level keys left out of the comparison: a clock reading each call takes anew. */
+  ignoreKeys?: readonly string[];
+};
+
+/** A walk longer than this is a cursor that never ends. */
+export const PARITY_MAX_PAGES = 2000;
+
+const withoutKeys = (value: unknown, keys: readonly string[] | undefined): unknown => {
+  if (!keys?.length || value === null || typeof value !== 'object' || Array.isArray(value)) return value;
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([key]) => !keys.includes(key)));
 };
 
 export type ParityOutcome = {
@@ -197,11 +213,12 @@ export const parityInstallStatements = <Context>(item: ParityCase<Context>): { l
   const { aliases: helperAliases, sql } = helperInstalls(item.helpers);
   const definition = migrationDefinition(item.migration, item.fn);
   const legacy = `${item.fn}__legacy`;
-  sql.push(legacyDefinition(definition, item.fn, legacy, helperAliases));
+  // `or replace`: two cases may compare one RPC (different calls).
+  sql.push(orReplace(legacyDefinition(definition, item.fn, legacy, helperAliases)));
   let planted: string | null = null;
   if (item.plant) {
     planted = `${item.fn}__planted`;
-    sql.push(legacyDefinition(plantDifference(definition, item.plant.from, item.plant.to), item.fn, planted, helperAliases));
+    sql.push(orReplace(legacyDefinition(plantDifference(definition, item.plant.from, item.plant.to), item.fn, planted, helperAliases)));
   }
   return { legacy, planted, sql };
 };
@@ -221,21 +238,39 @@ export const compareParity = async <Context>(
   const sets = item.argumentSets?.(context) ?? [];
   const pairs = item.calls?.(context) ?? viewers.flatMap((viewer) => sets.map((args) => ({ viewer, args })));
   for (const [index, { viewer, args }] of pairs.entries()) {
-    const live = await call(viewer, item.fn, args);
-    if (item.observe) {
-      const label = item.observe(live);
-      outcome.observed = { ...outcome.observed, [label]: (outcome.observed?.[label] ?? 0) + 1 };
-    }
-    const old = await call(viewer, `pg_temp.${installed.legacy}`, args);
-    outcome.compared += 1;
-    const found = jsonDifference(old, live);
-    if (found) outcome.differences.push(`viewer ${viewer}, arguments #${index}: ${found}`);
-    if (installed.planted && !outcome.plantDetected) {
-      outcome.plantDetected = jsonDifference(await call(viewer, `pg_temp.${installed.planted}`, args), live) !== null;
+    let [liveArgs, oldArgs] = [args, args];
+    for (let page = 0; ; page += 1) {
+      const live = await call(viewer, item.fn, liveArgs);
+      if (item.observe) {
+        const label = item.observe(live);
+        outcome.observed = { ...outcome.observed, [label]: (outcome.observed?.[label] ?? 0) + 1 };
+      }
+      const old = await call(viewer, `pg_temp.${installed.legacy}`, oldArgs);
+      outcome.compared += 1;
+      const found = jsonDifference(withoutKeys(old, item.ignoreKeys), withoutKeys(live, item.ignoreKeys));
+      const at = `viewer ${viewer}, arguments #${index}${item.walk ? `, page ${page}` : ''}`;
+      if (found) outcome.differences.push(`${at}: ${found}`);
+      if (page === 0 && installed.planted && !outcome.plantDetected) {
+        outcome.plantDetected = jsonDifference(await call(viewer, `pg_temp.${installed.planted}`, args), live) !== null;
+      }
+      // A page that says one has more and the other not is already a difference.
+      const [nextLive, nextOld] = item.walk ? [item.walk(liveArgs, live), item.walk(oldArgs, old)] : [null, null];
+      if (!nextLive || !nextOld) break;
+      if (page + 1 >= PARITY_MAX_PAGES) {
+        outcome.differences.push(`${at}: still paging after ${PARITY_MAX_PAGES} pages`);
+        break;
+      }
+      [liveArgs, oldArgs] = [nextLive, nextOld];
     }
   }
   if (item.requires) outcome.missing = missingOutcomes(item.requires, outcome.observed);
   return outcome;
+};
+
+/** The next page of a stream read: its `next_cursor` as `p_before` while `has_more`. */
+export const streamWalk = (args: Record<string, unknown>, result: unknown): Record<string, unknown> | null => {
+  const page = result as { has_more?: unknown; next_cursor?: unknown } | null;
+  return page?.has_more === true && typeof page.next_cursor === 'string' ? { ...args, p_before: page.next_cursor } : null;
 };
 
 /**

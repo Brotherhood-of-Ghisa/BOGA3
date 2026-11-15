@@ -16,8 +16,10 @@ import {
   migrationDefinition,
   missingOutcomes,
   parityInstallStatements,
+  PARITY_MAX_PAGES,
   parityPassed,
   plantDifference,
+  streamWalk,
   type ParityCase,
 } from '../scripts/perf/groups/parity';
 import {
@@ -28,6 +30,7 @@ import {
   type NotificationFixture,
 } from '../scripts/perf/groups/notification-parity';
 import {
+  cowResultsWalk,
   HELPER_PARITY_CASES,
   PARITY_CASES,
   PARITY_DAYS,
@@ -38,6 +41,7 @@ import {
   READ_PATH_RPCS,
   readPathBudgets,
   summarizeReadPath,
+  warmUp,
   type ReadPathContext,
   type ReadPathPoint,
 } from '../scripts/perf/groups/read-path';
@@ -170,6 +174,25 @@ describe('the group read, evaluator write and notification RPCs the lane budgets
 
   test('the set measures two history points, smallest first', () => {
     expect(READ_PATH_DAYS).toEqual([90, 180]);
+  });
+});
+
+describe('warm reads', () => {
+  test('each read is called once, unmeasured, inside a savepoint that is rolled back, before any is measured', async () => {
+    const log: string[] = [];
+    const session = {
+      exec: async (sql: string) => { log.push(sql); return []; },
+      call: async (_caller: unknown, fn: string, _args: Record<string, unknown>, measured: boolean) => {
+        log.push(`${fn}:${measured ? 'measured' : 'unmeasured'}`);
+        if (fn === 'b') throw new Error('refused');
+        return null;
+      },
+    } as unknown as Parameters<typeof warmUp>[0];
+    const reads = ['a', 'b'].map((fn) => ({ fn, via: 'member' as const, args: () => ({}),
+      budget: { kind: 'budgeted' as const, pages: 10, scoped: true } }));
+    await warmUp(session, { role: 'authenticated', userId: 'u', sessionId: 's' }, reads, {} as ReadPathContext);
+    expect(log).toEqual(['savepoint perf_warm_up', 'a:unmeasured', 'b:unmeasured',
+      'rollback to savepoint perf_warm_up', 'release savepoint perf_warm_up']);
   });
 });
 
@@ -315,13 +338,86 @@ begin return jsonb_build_object('a', p_a); end $function$
     expect(PARITY_CASES.length).toBeGreaterThan(0);
     for (const parityCase of PARITY_CASES) {
       const { legacy, planted, sql } = parityInstallStatements(parityCase);
-      expect(Boolean(sql.at(-2)?.startsWith(`create function pg_temp.${legacy}(`))).toBe(parityCase.plant !== undefined);
-      expect(sql.at(-1)?.startsWith(`create function pg_temp.${planted ?? legacy}(`)).toBe(true);
+      expect(Boolean(sql.at(-2)?.startsWith(`create or replace function pg_temp.${legacy}(`))).toBe(parityCase.plant !== undefined);
+      expect(sql.at(-1)?.startsWith(`create or replace function pg_temp.${planted ?? legacy}(`)).toBe(true);
       expect(sql.at(-1)).not.toContain(`app_public.${parityCase.fn}(`);
     }
     expect(migrationDefinition('20261008120000_group_competition_v4_only.sql', 'group_competition_week_summary'))
       .toMatch(/^create or replace function app_public\.group_competition_week_summary\(/);
     expect(() => migrationDefinition('../secrets.sql', 'f')).toThrow('invalid definition source');
+  });
+
+  test('a paged case walks each definition by its own cursor to the end, and a moved page boundary is a difference', async () => {
+    const paged: ParityCase<Context> = { fn: 'f', migration: 'm', argumentSets: (context) => context.args, walk: streamWalk };
+    // Three items, two per page.
+    const items = ['a', 'b', 'c'];
+    const page = (args: Record<string, unknown>) => {
+      const start = args.p_before === null ? 0 : Number(args.p_before);
+      const more = start + 2 < items.length;
+      return { items: items.slice(start, start + 2), has_more: more, next_cursor: more ? String(start + 2) : null };
+    };
+    const calls: string[] = [];
+    const outcome = await compareParity(paged, { args: [{ p_before: null }] }, ['v1'], async (_viewer, fn, args) => {
+      calls.push(`${fn}:${String(args.p_before)}`);
+      return page(args);
+    }, { legacy: 'f__legacy', planted: null });
+    expect(calls).toEqual(['f:null', 'pg_temp.f__legacy:null', 'f:2', 'pg_temp.f__legacy:2']);
+    expect(outcome).toMatchObject({ compared: 2, differences: [] });
+    // The old definition's pages differ; only the owner is compared.
+    const moved = await compareParity({ ...paged, calls: () => [{ viewer: 'owner', args: { p_before: null } }] }, { args: [] }, ['v1', 'v2'],
+      async (_viewer, fn, args) => (fn === 'f' ? page(args) : { ...page(args), items: ['x'] }), { legacy: 'f__legacy', planted: null });
+    expect(moved.differences).toEqual([
+      'viewer owner, arguments #0, page 0: $.items: 1 items ≠ 2 items',
+      'viewer owner, arguments #0, page 1: $.items[0]: "x" ≠ "c"',
+    ]);
+  });
+
+  test('a cursor that never ends is reported, and an ignored clock key is not compared', async () => {
+    const endless: ParityCase<Context> = { fn: 'f', migration: 'm', argumentSets: (context) => context.args, walk: streamWalk };
+    const outcome = await compareParity(endless, { args: [{ p_before: null }] }, ['v1'],
+      async () => ({ has_more: true, next_cursor: 'again' }), { legacy: 'f__legacy', planted: null });
+    expect(outcome.compared).toBe(PARITY_MAX_PAGES);
+    expect(outcome.differences).toEqual([`viewer v1, arguments #0, page ${PARITY_MAX_PAGES - 1}: still paging after ${PARITY_MAX_PAGES} pages`]);
+    const clocked: ParityCase<Context> = { fn: 'f', migration: 'm', argumentSets: (context) => context.args, ignoreKeys: ['observed_at_us'] };
+    const read = await compareParity(clocked, { args: [{}] }, ['v1'], async (_viewer, fn) =>
+      ({ observed_at_us: fn.length, value: 1 }), { legacy: 'f__legacy', planted: null });
+    expect(read.differences).toEqual([]);
+    expect(streamWalk({ p_limit: 1 }, { has_more: true, next_cursor: 'c' })).toEqual({ p_limit: 1, p_before: 'c' });
+    expect(streamWalk({ p_limit: 1 }, { has_more: false, next_cursor: null })).toBeNull();
+    expect(streamWalk({ p_limit: 1 }, null)).toBeNull();
+  });
+
+  test('every stream version walks every page against its old chain; the old SQL helpers install callees first', () => {
+    const streams = PARITY_CASES.filter((item) => item.fn.startsWith('group_competition_stream'));
+    expect(streams.map((item) => item.fn).sort()).toEqual([
+      'group_competition_stream', 'group_competition_stream_v2', 'group_competition_stream_v3', 'group_competition_stream_v4',
+      'group_competition_stream_v5', 'group_competition_stream_v5']);
+    const context = { groupId: 'g', viewer: 'owner', members: ['owner', 'm2'] } as unknown as ReadPathContext;
+    for (const item of streams) expect(item.walk).toBe(streamWalk);
+    const limits = streams.flatMap((item) => [
+      ...(item.argumentSets?.(context) ?? []).map((args) => `${item.fn}:${String(args.p_group_id)}:${String(args.p_limit)}:all`),
+      ...(item.calls?.(context) ?? []).map((call) => `${item.fn}:${String(call.args.p_group_id)}:${String(call.args.p_limit)}:${call.viewer}`),
+    ]);
+    expect(limits.sort()).toEqual([
+      'group_competition_stream:g:50:all',
+      'group_competition_stream_v2:g:50:all', 'group_competition_stream_v2:null:50:all',
+      'group_competition_stream_v3:g:50:all', 'group_competition_stream_v4:g:20:all', 'group_competition_stream_v4:g:50:all',
+      'group_competition_stream_v4:g:5:all',
+      'group_competition_stream_v5:g:1:owner', 'group_competition_stream_v5:g:20:all', 'group_competition_stream_v5:g:50:all',
+      'group_competition_stream_v5:null:50:all']);
+    expect(cowResultsWalk({ p_limit: 1 }, { rankings: [{ next_cursor: 'n' }] })).toEqual({ p_limit: 1, p_before: 'n' });
+    expect(cowResultsWalk({ p_limit: 1 }, { rankings: [{ next_cursor: null }] })).toBeNull();
+    expect(PARITY_CASES.find((item) => item.fn === 'group_cow_results')?.walk).toBe(cowResultsWalk);
+    for (const item of PARITY_CASES) {
+      const helpers = Object.keys(item.helpers ?? {});
+      const { sql } = parityInstallStatements(item);
+      helpers.forEach((helper, index) => {
+        const later = helpers.slice(index + 1);
+        if (!/\blanguage sql\b/i.test(sql[index])) return;
+        for (const callee of later) expect(sql[index]).not.toContain(`pg_temp.${callee}__legacy(`);
+      });
+      for (const helper of helpers) expect(sql.at(-1)).not.toContain(`app_public.${helper}(`);
+    }
   });
 
   test('a definition source is a migration, or a saved definition named after one under parity-definitions', () => {
@@ -342,7 +438,7 @@ describe('helper parity', () => {
     for (const item of shared) {
       const { legacy, sql } = parityInstallStatements(item);
       expect(sql[0].startsWith('create or replace function pg_temp.group_week_session_counts__legacy(')).toBe(true);
-      const body = sql.find((statement) => statement.startsWith(`create function pg_temp.${legacy}(`))!;
+      const body = sql.find((statement) => statement.startsWith(`create or replace function pg_temp.${legacy}(`))!;
       expect(body).toContain('pg_temp.group_week_session_counts__legacy(');
       expect(body).not.toContain('app_public.group_week_session_counts(');
     }
@@ -377,12 +473,16 @@ describe('helper parity', () => {
     expect(compare).toContain('select (a1) as expected, (a1 + 0) as actual');
     expect(compare).toContain('count(distinct x.expected::text)::integer as answers');
     const redaction = HELPER_PARITY_CASES.filter((item) => item.name.includes('redact'));
-    expect(redaction.map((item) => item.minAnswers)).toEqual([2, 2, 2]);
+    expect(redaction.map((item) => item.minAnswers)).toEqual([2, 2, 2, 2]);
   });
 
   test('the redaction helpers, their cache and the session counts are each compared, every registered case installing', () => {
     expect(HELPER_PARITY_CASES.map((item) => item.name).sort()).toEqual([
-      'group_competition_redactions', 'group_competition_redacts_exercise', 'group_cow_redacts_exercise', 'group_week_session_counts']);
+      'group_competition_event_json', 'group_competition_event_json (cache)', 'group_competition_redaction_lookup (cache)',
+      'group_competition_redactions',
+      'group_competition_redacts_exercise', 'group_competition_session_card', 'group_competition_session_card (cache)',
+      'group_competition_stream_record', 'group_competition_stream_record (cache)', 'group_competition_stream_withdrawn (cache)',
+      'group_cow_redacts_exercise', 'group_cow_result_rows (cache)', 'group_cow_stream_item (cache)', 'group_week_session_counts']);
     for (const item of HELPER_PARITY_CASES) {
       const { sql, compare } = helperParityStatements(item);
       if ('fn' in item) expect(sql.at(-1)).toContain(`pg_temp.${item.fn}__legacy(`);
@@ -395,7 +495,7 @@ describe('helper parity', () => {
   test('every planted stale fact is edited under its owner\'s claims and must edit exactly one row; the claims are cleared after', () => {
     const statements = PARITY_PLANT_STATEMENTS();
     const edits = statements.filter((statement) => /\bupdate app_public\./.test(statement));
-    expect(edits).toHaveLength(3);
+    expect(edits).toHaveLength(4);
     for (const edit of edits) {
       const before = statements[statements.indexOf(edit) - 1];
       expect(before).toContain("set_config('request.jwt.claims'");
@@ -403,7 +503,7 @@ describe('helper parity', () => {
     }
     expect(statements.at(-1)).toContain("set_config('request.jwt.claims','',true)");
     const plants = statements.filter((statement) => !statement.startsWith('select set_config'));
-    expect(plants).toHaveLength(5);
+    expect(plants).toHaveLength(6);
     for (const plant of plants) expect(plant).toMatch(/select count\(\*\)=[12] as planted from edited$/);
     expect(plantedAll([{ planted: true }])).toBe(true);
     expect(plantedAll([{ planted: false }])).toBe(false);
