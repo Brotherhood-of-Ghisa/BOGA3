@@ -92,6 +92,12 @@ const stream = (fn: string, budget: BudgetEntry): ReadPathRpc => ({
   fn, via: 'member', args: (c) => ({ p_group_id: c.groupId, p_before: null, p_limit: 20 }), budget,
 });
 
+/** Readiness proof (graph once per target, ranks from one redaction map): over the ceiling because the graph reads the exercise's whole shared history. */
+const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 6_500, scoped: false,
+  justification: 'Measured warm (5.0-5.2k pages at H=180, budget = warm +25%); over the 5,000 ceiling by operator agreement. The proof that the captured comparison still holds compares the digest of the group\'s whole source graph '
+    + '(every shared set of the exercise, about 2.2 pages a set, so linear in history) and ranks the exercise from it. '
+    + 'The ranks cost a fixed share: redaction answered once per member, not once per ranked row.' };
+
 /**
  * The two CoW summaries are not slope-asserted (`scoped: false`) though far
  * under the ceiling: each builds its rows once per metric and one
@@ -145,17 +151,18 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 400, scoped: true } },
   { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'budgeted', pages: 3_600, scoped: false } },
-  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 110_000, scoped: false,
-    justification: 'A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
-      + 'before and after publishing: every source session\'s boards with and without its workout. Its source graph, score '
-      + 'writes and board apply are a small share of the cost.' } },
-  // Each of these three proves the captured comparison still holds, which
-  // reads the group's shared history once (the source graph) and ranks the
-  // exercise twice: its cost grows with that history until the graph build
-  // and the per-entry redaction answers get cheaper.
-  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 12_000, scoped: true } },
-  { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 12_000, scoped: true } },
-  { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 12_000, scoped: true } },
+  { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 61_000, scoped: false,
+    justification: 'Measured 48.7k pages at H=180 (budget = measured +25%). A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
+      + 'before and after publishing: every source session\'s boards with and without its workout, from one redaction map '
+      + 'per capture. Each capture also builds the source graph, which reads every shared set of the exercise (linear in history). '
+      + 'Score writes and board apply are a small share of the cost.' } },
+  // Each of these three proves the captured comparison still holds: it builds
+  // the group's source graph once per target (every shared set of the exercise,
+  // so its cost grows with that history, about 2.2 pages a set) and ranks the
+  // exercise twice from one redaction map. Not week-scoped, so no slope check.
+  { fn: 'notification_workout_prepare', via: 'cascade', budget: NOTIFICATION_PROOF },
+  { fn: 'notification_workout_enqueue', via: 'cascade', budget: NOTIFICATION_PROOF },
+  { fn: 'notification_begin_send', via: 'cascade', budget: NOTIFICATION_PROOF },
   { fn: 'notification_confirm_completion', via: 'member',
     args: (c) => ({ p_session_id: c.completion!.sessionId, p_entities: c.completion!.entities }),
     budget: { kind: 'budgeted', pages: 280, scoped: true } },
@@ -399,6 +406,29 @@ export const HELPER_PARITY_CASES: readonly HelperParityCase[] = [
       select p.*,(select c.redacted from cache c where c.member_user_id=p.a2 and c.definition_id is not distinct from p.a3) as a4
       from pairs p`,
     expected: 'app_public.group_competition_redacts_exercise(array[a1],a2,a3)', actual: 'a4', minAnswers: 2,
+  },
+  {
+    // The map a proof builds holds the live answer for every key it has.
+    name: 'notification_redaction_map',
+    argumentsSql: `select p.a1,p.a2,p.a3,app_public.group_competition_redaction_key(p.a2,p.a3) as a4,m.map as a5
+      from (${REDACTION_PAIRS_SQL}) p cross join lateral (select app_public.notification_redaction_map(p.a1,ge.id,ge.rules_revision,null) as map
+        from app_public.group_exercises ge where ge.group_id=p.a1) m`,
+    expected: 'case when a5 ? a4 then app_public.group_competition_redacts_exercise(array[a1],a2,a3) end', actual: '(a5->>a4)::boolean', minAnswers: 2,
+  },
+  {
+    // Ranks from the map equal ranks from the live function, for the common ranks and every workout target's.
+    name: 'notification_ranks_from_graph',
+    argumentsSql: `select t.group_id as a1,t.group_exercise_id as a2,t.rules_revision as a3,t.member_user_id as a4,t.session_id as a5,
+        g.graph as a6,v.own as a7
+      from app_public.notification_workout_targets t cross join (values (true),(false)) v(own)
+      cross join lateral (select app_public.group_metric_eval_source_graph(t.group_id,t.group_exercise_id) as graph) g`,
+    expected: `app_public.notification_ranks_from_graph(a1,a2,a3,(select w from app_public.notification_workout_targets w
+      where a7 and w.member_user_id=a4 and w.session_id=a5 and w.group_exercise_id=a2),a6)`,
+    actual: `app_public.notification_ranks_from_graph(a1,a2,a3,(select w from app_public.notification_workout_targets w
+      where a7 and w.member_user_id=a4 and w.session_id=a5 and w.group_exercise_id=a2),a6,
+      app_public.notification_redaction_map(a1,a2,a3,(select w from app_public.notification_workout_targets w
+        where a7 and w.member_user_id=a4 and w.session_id=a5 and w.group_exercise_id=a2)))`,
+    minAnswers: 2,
   },
   {
     // The per-member cache mirrors the live helper's branches: every pair, a
