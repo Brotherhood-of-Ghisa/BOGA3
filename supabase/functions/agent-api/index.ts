@@ -1,9 +1,17 @@
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.98.0';
 
+import {
+  ACTIVE_SESSION_MAX_MS, ACTIVITY_COLUMNS, ActivityQueryError, activityCursorFrom, buildCardioSummary, cardioReadStart,
+  overlapReadWindows,
+  parseActivityRange, projectActivity, type ActivityRow, type OverlapSessionRow,
+} from './activities.ts';
 import { summarizeVolume } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations/records.ts';
 import { isSessionSetType } from '../../../apps/mobile/src/data/set-types.ts';
 import { isRestTimerSec } from '../../../apps/mobile/src/exercise-core/rest-timer.ts';
+import {
+  parseStoredCombinedMuscles, resolveCombinedMuscleSetup,
+} from '../../../apps/mobile/src/data/combined-muscles.ts';
 import {
   AUTH_RETRY_AFTER_SECONDS, authUpstreamFetch, isTokenRejection,
 } from './auth-upstream.ts';
@@ -19,13 +27,24 @@ import {
   type GymBucketRank,
 } from './gym-buckets.ts';
 import {
-  checkOverrideIds, muscleTargetScope, MuscleTargetsError, normalizeMuscleTargetsWrite,
+  checkOverrideIds, MuscleTargetsError, normalizeMuscleTargetsWrite, reportedMuscleIds,
 } from './muscle-targets.ts';
 import {
+  DEFAULT_INJURY_LIMIT, INJURY_COLUMNS, InjuryInputError, MAX_INJURY_LIMIT,
+  injuryCursorFrom, injuryCursorOf, injuryKeysetFilter, injuryMuscleIds,
+  normalizeInjuryAdd, normalizeInjuryUpdate, parseInjuryQuery, projectInjury,
+  type InjuryRow,
+} from './injuries.ts';
+import {
+  DEFAULT_NOTE_LIMIT, EMBEDDED_NOTE_LIMIT, MAX_NOTE_LIMIT, NOTE_COLUMNS, NoteInputError, normalizeNoteAdd,
+  normalizeNoteRemove, noteCursorFrom, noteCursorOf, noteExerciseIds, noteKeysetFilter, noteToday, parseNoteExerciseFilter,
+  parseNoteRange, projectNote, statusNotesFrom, type NoteRow,
+} from './notes.ts';
+import {
   asMuscleReportRows, buildTrainingStatus, rankFavouriteExercises, resolveStatusTimeZone, STATUS_READ_DAYS, statusReadComplete,
-  trainingStatusWindow,
+  statusSettings, trainingStatusWindow,
   type StatusBlockRow, type StatusDefinitionRow, type StatusMappingRow, type StatusMuscleRow,
-  type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining,
+  type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining, type TrainingStatusWindow,
 } from './training-status.ts';
 import {
   METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
@@ -157,6 +176,8 @@ const writeRateWindows = new Map<string, RateWindow>();
 const exerciseWriteRateWindows = new Map<string, RateWindow>();
 const muscleTargetsWriteRateWindows = new Map<string, RateWindow>();
 const workoutWriteRateWindows = new Map<string, RateWindow>();
+const noteWriteRateWindows = new Map<string, RateWindow>();
+const injuryWriteRateWindows = new Map<string, RateWindow>();
 
 const getRequiredEnv = (name: string): string => {
   const value = Deno.env.get(name)?.trim();
@@ -360,7 +381,12 @@ const routeToolName = (path: string, method: string): string => {
   if (method === 'POST' && /^\/v1\/agent\/exercises\/[^/]+$/.test(path)) return 'update_exercise';
   if (path === '/v1/agent/workouts/recent') return 'get_recent_workouts';
   if (path === '/v1/agent/training-status') return 'get_training_status';
+  if (path === '/v1/agent/activities') return 'get_recent_activities';
   if (path === '/v1/agent/muscle-targets') return 'set_muscle_targets';
+  if (path === '/v1/agent/notes') return method === 'POST' ? 'add_note' : 'list_notes';
+  if (method === 'POST' && NOTE_REMOVE_PATH.test(path)) return 'remove_note';
+  if (path === '/v1/agent/injuries') return method === 'POST' ? 'log_injury' : 'get_active_injuries';
+  if (method === 'PATCH' && /^\/v1\/agent\/injuries\/[^/]+$/.test(path)) return 'update_injury_status';
   if (path === '/v1/agent/session-plans') {
     return method === 'POST' ? 'create_session_plan' : 'get_upcoming_session_plans';
   }
@@ -433,6 +459,9 @@ const enforceExerciseWriteRateLimit = (agent: AuthenticatedAgent): void =>
 
 const enforceMuscleTargetsWriteRateLimit = (agent: AuthenticatedAgent): void =>
   enforceRateLimit(muscleTargetsWriteRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
+
+const enforceInjuryWriteRateLimit = (agent: AuthenticatedAgent): void =>
+  enforceRateLimit(injuryWriteRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
 
 const parseBoundedInteger = (
   raw: string | null,
@@ -784,31 +813,49 @@ const projectCatalogExercises = async (
   }));
 };
 
+/** The settings singleton's target and combined-muscle columns, null with no live row. */
+const readMuscleSetupSettings = async (client: SupabaseClient, userId: string): Promise<StatusSettingsRow | null> => {
+  const { data, error } = await client.schema('app_public').from('user_settings')
+    .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,muscle_targets,combined_muscles,count_secondary_muscles,volume_primary_only,client_updated_at_ms')
+    .eq('owner_user_id', userId).eq('id', 'settings').is('deleted_at', null).maybeSingle<StatusSettingsRow>();
+  throwDatabaseError(error);
+  return data;
+};
+
 /**
  * The owner's muscle taxonomy: the ids an exercise's muscles must name. Each
- * entry carries the user's setup: the `report_group` key it reports under
- * (null = the entry is its own muscle) and whether that muscle is `tracked`.
+ * entry carries the user's setup as the app reads it: `report_group`, the key
+ * of the combined muscle it is a member of (null = the entry is its own
+ * muscle), and whether it is `tracked`. `combined_muscles` lists each combined
+ * muscle's key, name and family.
  */
 const listMuscles = async (client: SupabaseClient, userId: string): Promise<JsonObject> => {
-  const { data, error } = await client
-    .schema('app_public')
-    .from('muscle_groups')
-    .select('id,display_name,family_name,sort_order,report_group,tracked')
-    .eq('owner_user_id', userId)
-    .is('deleted_at', null)
-    .order('sort_order')
-    .order('id')
-    .limit(500)
-    .returns<Array<MuscleGroupRow & { sort_order: number; report_group: string | null; tracked: number }>>();
+  const [{ data, error }, settings] = await Promise.all([
+    client
+      .schema('app_public')
+      .from('muscle_groups')
+      .select('id,display_name,family_name,sort_order,report_group,tracked')
+      .eq('owner_user_id', userId)
+      .is('deleted_at', null)
+      .order('sort_order')
+      .order('id')
+      .limit(500)
+      .returns<StatusMuscleRow[]>(),
+    readMuscleSetupSettings(client, userId),
+  ]);
   throwDatabaseError(error);
+  const setup = resolveCombinedMuscleSetup(
+    asMuscleReportRows(data ?? []), parseStoredCombinedMuscles(settings?.combined_muscles ?? null));
+  const reportGroups = new Map(setup.rows.map((row) => [row.id, row.reportGroup]));
   return {
     muscles: (data ?? []).map((row) => ({
       id: row.id,
       name: row.display_name,
       family: row.family_name,
-      report_group: row.report_group,
-      tracked: row.tracked !== 0,
+      report_group: reportGroups.get(row.id) ?? null,
+      tracked: row.tracked !== 0 && row.tracked !== false,
     })),
+    combined_muscles: setup.definitions,
   };
 };
 
@@ -1199,12 +1246,13 @@ const getExerciseContext = async (
   const historyTruncated = (blocks?.length ?? 0) > MAX_CONTEXT_BLOCKS;
   const boundedBlocks = (blocks ?? []).slice(0, MAX_CONTEXT_BLOCKS);
 
-  const [sessions, setResult, mappings, equipmentByExercise] = await Promise.all([
+  const [sessions, setResult, mappings, equipmentByExercise, notes] = await Promise.all([
     loadSessionsById(client, userId, boundedBlocks.map((row) => row.session_id),
       bodyweightCalculationsEnabled && definition.bodyweight_contribution > 0),
     loadSetsByBlock(client, userId, boundedBlocks.map((row) => row.id)),
     loadMappings(client, userId, [exerciseId]),
     loadEquipmentByExercise(client, userId, [exerciseId]),
+    loadExerciseNotes(client, userId, exerciseId),
   ]);
   const completedSessions = sessions
     .filter((row): row is SessionRow & { completed_at: number } => row.completed_at !== null)
@@ -1350,8 +1398,8 @@ const getExerciseContext = async (
     last_performed_at: bucketRows.length > 0
       ? toIsoTimestamp(bucketRows[0].session.completed_at)
       : null,
-    training_notes: [],
-    unavailable_fields: ['failed_set_semantics', 'user_authored_training_notes'],
+    ...notes,
+    unavailable_fields: ['failed_set_semantics'],
     history_truncated: historyIncomplete,
   };
 };
@@ -1830,6 +1878,415 @@ const loadFavouriteHistory = async (
   return { training: { sessions, blocks, sets: sets.rows }, truncated };
 };
 
+const DEFAULT_ACTIVITY_LIMIT = 20;
+const MAX_ACTIVITY_LIMIT = 50;
+const STATUS_MAX_ACTIVITIES = 500;
+const MAX_OVERLAP_SESSIONS = 500;
+
+const asActivityQuery = <T>(read: () => T, code = 'INVALID_ARGUMENT'): T => {
+  try {
+    return read();
+  } catch (error) {
+    if (error instanceof ActivityQueryError) throw new ApiError(400, code, error.message);
+    throw error;
+  }
+};
+
+/**
+ * The owner's completed and active sessions that share time with any
+ * strength activity in `rows` (`overlapReadWindows`): the ones such an
+ * activity may duplicate. `truncated` when the read hit its cap, so a flag may
+ * be missing. Every clause value is a number the server computed.
+ */
+const loadActivityOverlaps = async (
+  client: SupabaseClient, userId: string, rows: readonly ActivityRow[],
+): Promise<{ rows: OverlapSessionRow[]; truncated: boolean }> => {
+  const windows = overlapReadWindows(rows);
+  if (windows.length === 0) return { rows: [], truncated: false };
+  const clauses = windows.map(({ fromMs, toMs }) =>
+    `and(started_at.lt.${toMs},or(completed_at.gt.${fromMs},and(status.eq.active,started_at.gt.${fromMs - ACTIVE_SESSION_MAX_MS})))`);
+  const { data, error } = await client.schema('app_public').from('sessions')
+    .select('id,status,started_at,completed_at').eq('owner_user_id', userId).is('deleted_at', null)
+    .or(clauses.join(','))
+    .order('started_at', { ascending: false }).order('id').limit(MAX_OVERLAP_SESSIONS + 1)
+    .returns<OverlapSessionRow[]>();
+  throwDatabaseError(error);
+  return { rows: (data ?? []).slice(0, MAX_OVERLAP_SESSIONS), truncated: (data?.length ?? 0) > MAX_OVERLAP_SESSIONS };
+};
+
+const getRecentActivities = async (
+  client: SupabaseClient,
+  userId: string,
+  url: URL,
+): Promise<JsonObject> => {
+  rejectUnexpectedQuery(url, new Set(['from', 'to', 'limit', 'cursor']));
+  const limit = parseBoundedInteger(
+    url.searchParams.get('limit'), DEFAULT_ACTIVITY_LIMIT, 1, MAX_ACTIVITY_LIMIT, 'limit',
+  );
+  const range = asActivityQuery(() => parseActivityRange(url.searchParams.get('from'), url.searchParams.get('to')));
+  const rawCursor = decodeCursor(url.searchParams.get('cursor'), 'activity');
+  const cursor = rawCursor ? asActivityQuery(() => activityCursorFrom(rawCursor), 'INVALID_CURSOR') : null;
+
+  let query = client.schema('app_public').from('health_activities').select(ACTIVITY_COLUMNS)
+    .eq('user_id', userId)
+    .order('started_at', { ascending: false }).order('source').order('external_id')
+    .limit(limit + 1);
+  if (range.from !== null) query = query.gte('started_at', range.from);
+  if (range.to !== null) query = query.lt('started_at', range.to);
+  if (cursor) {
+    const at = postgrestQuote(cursor.started_at);
+    const source = postgrestQuote(cursor.source);
+    const externalId = postgrestQuote(cursor.external_id);
+    query = query.or(
+      `started_at.lt.${at},and(started_at.eq.${at},or(source.gt.${source},and(source.eq.${source},external_id.gt.${externalId})))`,
+    );
+  }
+  const { data, error } = await query.returns<ActivityRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  const page = rows.slice(0, limit);
+  const overlaps = await loadActivityOverlaps(client, userId, page);
+  const nowMs = Date.now();
+  const last = page[page.length - 1];
+  return {
+    activities: page.map((row) => projectActivity(row, overlaps.rows, nowMs)),
+    overlap_complete: !overlaps.truncated,
+    next_cursor: rows.length > limit && last
+      ? encodeCursor({ kind: 'activity', started_at: last.started_at, source: last.source, external_id: last.external_id })
+      : null,
+  };
+};
+
+/** The status's `cardio`: the activities since the oldest listed week, flagged against the sessions they overlap. */
+const loadStatusCardio = async (
+  client: SupabaseClient, userId: string, now: Date, window: TrainingStatusWindow, timeZone: string,
+): Promise<JsonObject> => {
+  // The window's dates carry the profile's wall clock; a day's margin each side
+  // covers any zone offset, and the builder keeps only the listed weeks.
+  const readFrom = new Date(cardioReadStart(window).getTime() - DAY_MS);
+  const readTo = new Date(window.plan.week.end.getTime() + DAY_MS);
+  const { data, error } = await client.schema('app_public').from('health_activities').select(ACTIVITY_COLUMNS)
+    .eq('user_id', userId).gte('started_at', readFrom.toISOString()).lt('started_at', readTo.toISOString())
+    .order('started_at', { ascending: false }).order('source').order('external_id')
+    .limit(STATUS_MAX_ACTIVITIES + 1).returns<ActivityRow[]>();
+  throwDatabaseError(error);
+  const rows = (data ?? []).slice(0, STATUS_MAX_ACTIVITIES);
+  const overlaps = await loadActivityOverlaps(client, userId, rows);
+  return buildCardioSummary({
+    rows, sessions: overlaps.rows, window, timeZone, nowMs: now.getTime(),
+    complete: (data?.length ?? 0) <= STATUS_MAX_ACTIVITIES && !overlaps.truncated,
+  });
+};
+
+const NOTE_REMOVE_PATH = /^\/v1\/agent\/notes\/([^/]+)\/remove$/;
+
+const asNoteInput = <T>(read: () => T, code = 'INVALID_ARGUMENT'): T => {
+  try {
+    return read();
+  } catch (error) {
+    if (error instanceof NoteInputError) throw new ApiError(400, code, error.message);
+    throw error;
+  }
+};
+
+/** The profile's zone, as the training status reads it. */
+const loadProfileTimeZone = async (client: SupabaseClient, userId: string): Promise<string> => {
+  const { data, error } = await client.schema('app_public').from('user_profiles').select('time_zone').eq('id', userId)
+    .maybeSingle<{ time_zone: string | null }>();
+  throwDatabaseError(error);
+  return resolveStatusTimeZone(data?.time_zone);
+};
+
+/**
+ * Live notes in list order, one more than `limit` so the caller can tell a
+ * cut. Rows without a date or creation time are malformed (the app writes
+ * both) and are not read.
+ */
+const notesQuery = (client: SupabaseClient, userId: string, limit: number) =>
+  client.schema('app_public').from('training_notes').select(NOTE_COLUMNS)
+    .eq('owner_user_id', userId).is('deleted_at', null)
+    .not('noted_on', 'is', null).not('created_at', 'is', null).not('body', 'is', null)
+    .order('noted_on', { ascending: false }).order('created_at', { ascending: false }).order('id', { ascending: false })
+    .limit(limit + 1);
+
+/** The page's notes projected, each exercise named even when it was deleted. */
+const projectNotes = async (client: SupabaseClient, userId: string, rows: readonly NoteRow[]): Promise<JsonObject[]> => {
+  const ids = noteExerciseIds(rows);
+  const names = new Map<string, string>();
+  if (ids.length > 0) {
+    const { data, error } = await client.schema('app_public').from('exercise_definitions').select('id,name')
+      .eq('owner_user_id', userId).in('id', ids).returns<Array<{ id: string; name: string }>>();
+    throwDatabaseError(error);
+    for (const row of data ?? []) names.set(row.id, row.name);
+  }
+  return rows.map((row) => projectNote(row, names));
+};
+
+const listNotes = async (client: SupabaseClient, userId: string, url: URL): Promise<JsonObject> => {
+  rejectUnexpectedQuery(url, new Set(['exercise_id', 'from', 'to', 'limit', 'cursor']));
+  const limit = parseBoundedInteger(url.searchParams.get('limit'), DEFAULT_NOTE_LIMIT, 1, MAX_NOTE_LIMIT, 'limit');
+  const exerciseId = asNoteInput(() => parseNoteExerciseFilter(url.searchParams.get('exercise_id')));
+  const range = asNoteInput(() => parseNoteRange(url.searchParams.get('from'), url.searchParams.get('to')));
+  const rawCursor = decodeCursor(url.searchParams.get('cursor'), 'note');
+  const cursor = rawCursor ? asNoteInput(() => noteCursorFrom(rawCursor), 'INVALID_CURSOR') : null;
+  let query = notesQuery(client, userId, limit);
+  if (exerciseId !== null) query = query.eq('exercise_definition_id', exerciseId);
+  if (range.from !== null) query = query.gte('noted_on', range.from);
+  if (range.to !== null) query = query.lte('noted_on', range.to);
+  if (cursor) query = query.or(noteKeysetFilter(cursor));
+  const { data, error } = await query.returns<NoteRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  const page = rows.slice(0, limit);
+  const last = page[page.length - 1];
+  return {
+    notes: await projectNotes(client, userId, page),
+    next_cursor: rows.length > limit && last ? encodeCursor(noteCursorOf(last)) : null,
+  };
+};
+
+/** One exercise's newest notes for its context. */
+const loadExerciseNotes = async (client: SupabaseClient, userId: string, exerciseId: string): Promise<JsonObject> => {
+  const { data, error } = await notesQuery(client, userId, EMBEDDED_NOTE_LIMIT)
+    .eq('exercise_definition_id', exerciseId).returns<NoteRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  return {
+    training_notes: await projectNotes(client, userId, rows.slice(0, EMBEDDED_NOTE_LIMIT)),
+    training_notes_truncated: rows.length > EMBEDDED_NOTE_LIMIT,
+  };
+};
+
+/** The status's general notes (no exercise) dated within its 56 days. */
+const loadStatusNotes = async (
+  client: SupabaseClient, userId: string, window: TrainingStatusWindow,
+): Promise<JsonObject> => {
+  const from = statusNotesFrom(window);
+  const { data, error } = await notesQuery(client, userId, EMBEDDED_NOTE_LIMIT)
+    .is('exercise_definition_id', null).gte('noted_on', from).returns<NoteRow[]>();
+  throwDatabaseError(error);
+  const rows = data ?? [];
+  return {
+    from,
+    notes: await projectNotes(client, userId, rows.slice(0, EMBEDDED_NOTE_LIMIT)),
+    complete: rows.length <= EMBEDDED_NOTE_LIMIT,
+  };
+};
+
+/**
+ * The note RPCs' errors. `NOT_FOUND` from `add_note` is its exercise, a
+ * reference like a plan's (`400`); from `remove_note` it is the note itself.
+ */
+const throwNoteWriteError = (error: { message?: string } | null, operation: 'add' | 'remove'): void => {
+  if (!error) return;
+  const message = error.message ?? '';
+  if (message.includes('IDEMPOTENCY_CONFLICT')) {
+    throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This idempotency key was used with a different payload.');
+  }
+  if (message.includes('EXERCISE_DELETED')) {
+    throw new ApiError(409, 'EXERCISE_DELETED', 'The exercise is deleted. Restore it before adding a note to it.');
+  }
+  if (message.includes('NOT_FOUND') && operation === 'add') {
+    throw new ApiError(400, 'FOREIGN_RESOURCE_REFERENCE', 'exercise_id is not one of the person’s exercises. Use search_exercises.');
+  }
+  if (message.includes('NOT_FOUND')) throw new ApiError(404, 'NOT_FOUND', 'Note not found.');
+  if (message.includes('INVALID_ARGUMENT')) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'The request could not be accepted.');
+  }
+  throwDatabaseError(error);
+};
+
+/** `add_note` and `remove_note`; the receipt makes a retry with the same key and body replay the first result. */
+const writeNote = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+  noteId: string | null,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  const body = await readJsonBody(request);
+  const identity = { p_owner: agent.userId, p_client_id: agent.clientId, p_idempotency_key: idempotencyKey };
+  if (noteId !== null) {
+    const remove = asNoteInput(() => normalizeNoteRemove(body, noteId));
+    const { data, error } = await client.schema('app_public').rpc('agent_remove_note', {
+      ...identity, p_payload_sha256: await sha256Hex(JSON.stringify(remove)), p_note_id: remove.note_id,
+    });
+    throwNoteWriteError(error, 'remove');
+    return data as JsonObject;
+  }
+  const today = noteToday(new Date(), await loadProfileTimeZone(client, agent.userId));
+  const add = asNoteInput(() => normalizeNoteAdd(body, today));
+  const { data, error } = await client.schema('app_public').rpc('agent_add_note', {
+    ...identity, p_payload_sha256: await sha256Hex(JSON.stringify(add.hashed)), p_note: add.note,
+  });
+  throwNoteWriteError(error, 'add');
+  const result = data as JsonObject;
+  const note = result.note as JsonObject | undefined;
+  // The RPC stores `created_at` as epoch ms; the API speaks ISO 8601.
+  return note && typeof note.created_at === 'number'
+    ? { ...result, note: { ...note, created_at: new Date(note.created_at).toISOString() } }
+    : result;
+};
+
+/** The note id of a `POST /v1/agent/notes/{id}/remove` path, or null for another path. */
+const noteRemoveId = (path: string): string | null => {
+  const match = NOTE_REMOVE_PATH.exec(path);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'note_id is invalid.');
+  }
+};
+
+const asInjuryInput = <T>(fn: () => T): T => {
+  try {
+    return fn();
+  } catch (error) {
+    if (error instanceof InjuryInputError) {
+      throw new ApiError(error.status, error.code, error.message);
+    }
+    throw error;
+  }
+};
+
+const projectInjuryDates = (injury: JsonObject): JsonObject => {
+  const projected = { ...injury };
+  for (const key of ['started_at', 'resolved_at', 'created_at', 'updated_at']) {
+    if (key in projected) {
+      const val = projected[key];
+      if (typeof val === 'number') {
+        projected[key] = new Date(val).toISOString();
+      }
+    }
+  }
+  return projected;
+};
+
+const listInjuries = async (
+  client: SupabaseClient,
+  userId: string,
+  url: URL,
+): Promise<JsonObject> => {
+  const parsed = asInjuryInput(() => parseInjuryQuery(url));
+  const limit = parseBoundedInteger(
+    url.searchParams.get('limit'),
+    DEFAULT_INJURY_LIMIT,
+    1,
+    MAX_INJURY_LIMIT,
+    'limit',
+  );
+  const rawCursor = decodeCursor(url.searchParams.get('cursor'), 'injury');
+  const cursor = rawCursor ? asInjuryInput(() => injuryCursorFrom(rawCursor)) : null;
+
+  let query = client.schema('app_public').from('injuries')
+    .select(INJURY_COLUMNS)
+    .eq('owner_user_id', userId)
+    .is('deleted_at', null);
+
+  if (parsed.status !== null) {
+    query = query.eq('status', parsed.status);
+  } else if (!parsed.include_resolved) {
+    query = query.neq('status', 'resolved');
+  }
+
+  if (cursor) {
+    query = query.or(injuryKeysetFilter(cursor));
+  }
+
+  query = query.order('started_at', { ascending: false }).order('id', { ascending: false }).limit(limit + 1);
+
+  const { data, error } = await query.returns<InjuryRow[]>();
+  throwDatabaseError(error);
+
+  const rows = data ?? [];
+  const page = rows.slice(0, limit);
+  const last = page[page.length - 1];
+
+  const muscleIds = injuryMuscleIds(page);
+  let muscleNames = new Map<string, string>();
+  if (muscleIds.length > 0) {
+    const { data: muscles, error: muscleError } = await client.schema('app_public')
+      .from('muscle_groups')
+      .select('id,display_name')
+      .eq('owner_user_id', userId)
+      .in('id', muscleIds)
+      .returns<Array<{ display_name: string; id: string }>>();
+    throwDatabaseError(muscleError);
+    muscleNames = new Map((muscles ?? []).map((m) => [m.id, m.display_name]));
+  }
+
+  return {
+    injuries: page.map((row) => projectInjury(row, muscleNames)),
+    next_cursor: rows.length > limit && last ? encodeCursor(injuryCursorOf(last)) : null,
+  };
+};
+
+const throwInjuryWriteError = (
+  error: { message?: string } | null,
+  operation: 'log' | 'update',
+): void => {
+  if (!error) return;
+  const message = error.message ?? '';
+  if (message.includes('IDEMPOTENCY_CONFLICT')) {
+    throw new ApiError(409, 'IDEMPOTENCY_CONFLICT', 'This key already names a different operation payload.');
+  }
+  if (message.includes('INVALID_ANATOMY_REFERENCE')) {
+    throw new ApiError(400, 'INVALID_ANATOMY_REFERENCE', 'Referenced muscle group was not found.');
+  }
+  if (message.includes('NOT_FOUND')) {
+    throw new ApiError(404, 'INJURY_NOT_FOUND', 'Injury not found.');
+  }
+  if (message.includes('INVALID_ARGUMENT')) {
+    throw new ApiError(400, 'INVALID_ARGUMENT', 'The request could not be accepted.');
+  }
+  throwDatabaseError(error);
+};
+
+const writeInjuryLog = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  const body = await readJsonBody(request);
+  const add = asInjuryInput(() => normalizeInjuryAdd(body));
+  const identity = { p_owner: agent.userId, p_client_id: agent.clientId, p_idempotency_key: idempotencyKey };
+  const { data, error } = await client.schema('app_public').rpc('agent_log_injury', {
+    ...identity,
+    p_payload_sha256: await sha256Hex(JSON.stringify(add.hashed)),
+    p_injury: add.injury,
+  });
+  throwInjuryWriteError(error, 'log');
+  const result = data as JsonObject;
+  const injury = result.injury as JsonObject | undefined;
+  return injury ? { ...result, injury: projectInjuryDates(injury) } : result;
+};
+
+const writeInjuryUpdate = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+  request: Request,
+  injuryId: string,
+): Promise<JsonObject> => {
+  const idempotencyKey = readIdempotencyKey(request);
+  const body = await readJsonBody(request);
+  const update = asInjuryInput(() => normalizeInjuryUpdate(body, injuryId));
+  const identity = { p_owner: agent.userId, p_client_id: agent.clientId, p_idempotency_key: idempotencyKey };
+  const { data, error } = await client.schema('app_public').rpc('agent_update_injury_status', {
+    ...identity,
+    p_payload_sha256: await sha256Hex(
+      JSON.stringify({ injury_id: update.injury_id, changes: update.changes }),
+    ),
+    p_injury_id: update.injury_id,
+    p_changes: update.changes,
+  });
+  throwInjuryWriteError(error, 'update');
+  const result = data as JsonObject;
+  const injury = result.injury as JsonObject | undefined;
+  return injury ? { ...result, injury: projectInjuryDates(injury) } : result;
+};
+
 const getTrainingStatus = async (
   client: SupabaseClient,
   userId: string,
@@ -1842,7 +2299,7 @@ const getTrainingStatus = async (
     client.schema('app_public').from('user_profiles').select('time_zone').eq('id', userId)
       .maybeSingle<{ time_zone: string | null }>(),
     client.schema('app_public').from('user_settings')
-      .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,count_secondary_muscles,volume_primary_only,client_updated_at_ms')
+      .select('weekly_working_set_target,muscle_target_mode,muscle_target_overrides,muscle_targets,combined_muscles,count_secondary_muscles,volume_primary_only,client_updated_at_ms')
       .eq('owner_user_id', userId).eq('id', 'settings').is('deleted_at', null).maybeSingle<StatusSettingsRow>(),
     client.schema('app_public').from('muscle_groups')
       .select('id,display_name,family_name,sort_order,report_group,tracked').eq('owner_user_id', userId)
@@ -1874,10 +2331,12 @@ const getTrainingStatus = async (
   const training: StatusTraining = { sessions, blocks: blocks.rows, sets: sets.rows };
   const window = trainingStatusWindow(now, timeZone);
   const favourites = rankFavouriteExercises(training, definitions, bodyweightCalculationsEnabled, window, timeZone);
-  const history = await loadFavouriteHistory(
-    client, userId, favourites.map((favourite) => favourite.exerciseId), bodyweightCalculationsEnabled,
-  );
-  return buildTrainingStatus({
+  const [history, cardio, notes] = await Promise.all([
+    loadFavouriteHistory(client, userId, favourites.map((favourite) => favourite.exerciseId), bodyweightCalculationsEnabled),
+    loadStatusCardio(client, userId, now, window, timeZone),
+    loadStatusNotes(client, userId, window),
+  ]);
+  const status = buildTrainingStatus({
     now, timeZone,
     settings: settings.data,
     muscleRows: muscles.data ?? [],
@@ -1894,6 +2353,7 @@ const getTrainingStatus = async (
       truncatedReads: [blocks, sets, mappings],
     }),
   });
+  return { ...status, cardio, general_notes: notes };
 };
 
 const getWorkoutDetail = async (
@@ -2163,6 +2623,32 @@ const loadPlanPermission = async (
   }
 };
 
+const loadInjuryPermission = async (
+  client: SupabaseClient,
+  agent: AuthenticatedAgent,
+): Promise<void> => {
+  const { data, error } = await client
+    .from('agent_plan_permissions')
+    .select('plan_access_enabled,granted_at')
+    .eq('owner_user_id', agent.userId)
+    .eq('client_id', agent.clientId)
+    .maybeSingle<{ granted_at: string | null; plan_access_enabled: boolean }>();
+  throwDatabaseError(error);
+  const liveGrant = Date.parse(agent.grantedAt);
+  const storedGrant = typeof data?.granted_at === 'string' ? Date.parse(data.granted_at) : Number.NaN;
+  const allowed = data?.plan_access_enabled === true
+    && Number.isFinite(liveGrant)
+    && Number.isFinite(storedGrant)
+    && liveGrant === storedGrant;
+  if (!allowed) {
+    throw new ApiError(
+      403,
+      'INJURY_PERMISSION_REQUIRED',
+      'Write access is not enabled for this coach. The person can turn it on in BoGa under Connected Agents.',
+    );
+  }
+};
+
 const sha256Hex = async (value: string): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -2170,6 +2656,7 @@ const sha256Hex = async (value: string): Promise<string> => {
 
 const workoutOperationFor = (path: string): WorkoutOperation | null => {
   const operations: Record<string, WorkoutOperation> = {
+    '/v1/agent/workouts/create': 'create_workout',
     '/v1/agent/workouts/start': 'start_workout',
     '/v1/agent/workouts/log-sets': 'log_sets',
     '/v1/agent/workouts/update-set': 'update_set',
@@ -2183,7 +2670,7 @@ const throwWorkoutError = (error: { message?: string } | null): void => {
   if (!error) return;
   const errors: Record<string, [number, string]> = {
     WORKOUT_PERMISSION_REQUIRED: [403, 'Workout logging is not enabled for this coach.'],
-    WORKOUT_CONTROL_REQUIRED: [409, 'You no longer control this session. Read get_active_workout for its current controller. The person must choose Let AI log this session in BoGa to give you control; do not retry writes or reclaim it automatically.'],
+    WORKOUT_CONTROL_REQUIRED: [409, 'You no longer control this session. Read get_active_workout for its current controller. For an active workout the person may choose Let AI log this session in BoGa. Released or taken-over completed history must be edited in BoGa. Do not retry writes or reclaim control automatically.'],
     NOT_FOUND: [404, 'Workout, exercise block or set not found.'],
     FOREIGN_RESOURCE_REFERENCE: [400, 'Use an exercise or gym from the person\'s current library.'],
     ACTIVE_WORKOUT_CONFLICT: [409, 'A server-visible workout is already active. Read active workouts and choose one explicitly.'],
@@ -2575,9 +3062,10 @@ const throwMuscleTargetsWriteError = (error: { message?: string } | null): void 
 };
 
 /**
- * Sets the weekly targets on the settings row. Overrides land in the scope of
- * the setup the user reports under now, derived as the app derives it; the RPC
- * merges them and keeps the other scopes.
+ * Sets the weekly targets on the settings row. Overrides name muscles the
+ * user's setup reports now, read as the app reads it; the RPC merges them into
+ * the single target map. A row with no map yet starts from the legacy targets
+ * the status shows (`statusSettings`), so the coach builds on what it read.
  */
 const setMuscleTargets = async (
   client: SupabaseClient,
@@ -2593,12 +3081,17 @@ const setMuscleTargets = async (
     if (error instanceof MuscleTargetsError) throw new ApiError(400, 'VALIDATION_ERROR', error.message);
     throw error;
   }
-  const { data: muscles, error: musclesError } = await client.schema('app_public').from('muscle_groups')
-    .select('id,display_name,family_name,sort_order,report_group,tracked').eq('owner_user_id', agent.userId)
-    .is('deleted_at', null).order('sort_order').order('id').limit(STATUS_MAX_MUSCLES)
-    .returns<StatusMuscleRow[]>();
+  const [{ data: muscles, error: musclesError }, settings] = await Promise.all([
+    client.schema('app_public').from('muscle_groups')
+      .select('id,display_name,family_name,sort_order,report_group,tracked').eq('owner_user_id', agent.userId)
+      .is('deleted_at', null).order('sort_order').order('id').limit(STATUS_MAX_MUSCLES)
+      .returns<StatusMuscleRow[]>(),
+    readMuscleSetupSettings(client, agent.userId),
+  ]);
   throwDatabaseError(musclesError);
-  const { scope, reportedIds } = muscleTargetScope(asMuscleReportRows(muscles ?? []));
+  const muscleRows = asMuscleReportRows(muscles ?? []);
+  const current = statusSettings(settings, muscleRows);
+  const reportedIds = reportedMuscleIds(muscleRows, current.combinedMuscles);
   try {
     checkOverrideIds(write.changes, reportedIds);
   } catch (error) {
@@ -2611,7 +3104,7 @@ const setMuscleTargets = async (
     p_idempotency_key: idempotencyKey,
     p_payload_sha256: await sha256Hex(JSON.stringify(write)),
     p_expected_revision: write.expected_revision,
-    p_scope: scope,
+    p_base_targets: current.preferences.muscleTargetOverrides,
     p_changes: write.changes,
   });
   throwMuscleTargetsWriteError(error);
@@ -3427,6 +3920,32 @@ const dispatchAgentRequest = async (
     return setMuscleTargets(client, agent, request, await readJsonBody(request));
   }
 
+  const removeNoteId = method === 'POST' ? noteRemoveId(path) : null;
+  if ((path === '/v1/agent/notes' && method === 'POST') || removeNoteId !== null) {
+    enforceRateLimit(noteWriteRateWindows, agent, WRITE_RATE_LIMIT_REQUESTS);
+    await loadPlanPermission(client, agent);
+    return writeNote(client, agent, request, removeNoteId);
+  }
+
+  if (path === '/v1/agent/injuries' && method === 'POST') {
+    enforceInjuryWriteRateLimit(agent);
+    await loadInjuryPermission(client, agent);
+    return writeInjuryLog(client, agent, request);
+  }
+
+  const injuryPatchMatch = method === 'PATCH' ? /^\/v1\/agent\/injuries\/([^/]+)$/.exec(path) : null;
+  if (injuryPatchMatch) {
+    let injuryId: string;
+    try {
+      injuryId = decodeURIComponent(injuryPatchMatch[1]);
+    } catch {
+      throw new ApiError(400, 'INVALID_ARGUMENT', 'injury_id is invalid.');
+    }
+    enforceInjuryWriteRateLimit(agent);
+    await loadInjuryPermission(client, agent);
+    return writeInjuryUpdate(client, agent, request, injuryId);
+  }
+
   if (method === 'POST') {
     const exerciseWrite = exerciseWriteFor(path);
     if (exerciseWrite) {
@@ -3443,6 +3962,17 @@ const dispatchAgentRequest = async (
   if (path === '/v1/agent/muscles') {
     rejectUnexpectedQuery(url, new Set());
     return listMuscles(client, agent.userId);
+  }
+  if (path === '/v1/agent/activities') {
+    return getRecentActivities(client, agent.userId, url);
+  }
+  if (path === '/v1/agent/notes') {
+    return listNotes(client, agent.userId, url);
+  }
+  if (path === '/v1/agent/injuries') {
+    rejectRequestBody(request);
+    rejectIdentityInputs(url);
+    return listInjuries(client, agent.userId, url);
   }
 
   const bodyweightCalculationsEnabled = await loadBodyweightCalculationsEnabled(client, agent.userId);

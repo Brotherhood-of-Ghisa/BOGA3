@@ -452,17 +452,18 @@ describe('completed-session detail over real data', () => {
       invalidateExerciseCatalogCache();
     });
 
+    // Legacy Broad keys with no stored definitions read as the Broad template's combined muscles.
     // Glute Max gets ½ as a Secondary; hidden Spinal Erectors keeps its own ½.
-    const glutes = await screen.findByTestId('session-completion-muscle-glutes_max');
+    const glutes = await screen.findByTestId('session-completion-muscle-cm_glutes_hams');
     expect(glutes).toHaveTextContent('Glutes & Hams——0');
     expect(glutes).toHaveProp('accessibilityLabel', 'Glutes & Hams, 0 sets: 0 primary, 0 secondary');
-    expect(screen.getByTestId('session-completion-muscle-quads')).toBeTruthy();
+    expect(screen.getByTestId('session-completion-muscle-cm_quads')).toBeTruthy();
     expect(screen.queryByTestId('session-completion-muscle-adductors')).toBeNull();
     expect(screen.queryByTestId('session-completion-muscle-spinal_erectors')).toBeNull();
 
     fireEvent.press(screen.getByTestId('session-insight-mode-muscle'));
-    expect(await screen.findByTestId('session-completion-muscle-comparison-quads')).toBeTruthy();
-    expect(screen.queryByTestId('session-completion-muscle-comparison-glutes_max')).toBeNull();
+    expect(await screen.findByTestId('session-completion-muscle-comparison-cm_quads')).toBeTruthy();
+    expect(screen.queryByTestId('session-completion-muscle-comparison-cm_glutes_hams')).toBeNull();
   });
 
   it('opens the Summary with the record, switches grouping locally, and lists the sets', async () => {

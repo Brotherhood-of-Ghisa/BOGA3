@@ -94,6 +94,9 @@ Define the canonical repository structure, path ownership, and placement convent
   - owns emergency backups: whole-database snapshots under Documents (the
     newest 30; rules in `snapshots.ts`) and share-sheet Export. No permission
     or server; they outlive an account wipe or a bad sync.
+- `apps/mobile/src/health-import/`
+  - owns the Apple Health import, outside the sync cycle
+    (`docs/specs/tech/health-activities-contract.md`); its adapter is the only HealthKit code.
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
 - `apps/mobile/src/session-planner/`
@@ -187,8 +190,7 @@ Define the canonical repository structure, path ownership, and placement convent
   - canonical location for mobile UI tokens and primitive components used by shared/screen UI code.
   - keep specialized feature components (for example navigation/session-layout components) in domain folders under `apps/mobile/components/**`; compose primitives from `apps/mobile/components/ui/**`.
 - `apps/mobile/src/auth/`
-  - canonical location for shared mobile auth modules.
-  - keep Supabase auth bootstrap/session/provider code here rather than scattering route-local client wiring under `app/**`.
+  - keep Supabase auth bootstrap/session/provider code here, never route-local under `app/**`.
 - `apps/mobile/src/utils/isDevMode.ts`
   - canonical dev-mode guard for the mobile app.
   - returns `true` for Metro dev bundles (`__DEV__`) **and** for the `com.phano.boga3.dev` EAS build (TestFlight dev), so developer-only UI / escape hatches (e.g. the local-data reset on the Settings screen, the Maestro harness route) stay available on internal builds.

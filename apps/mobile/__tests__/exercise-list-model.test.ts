@@ -1,3 +1,4 @@
+import { BROAD_COMBINED_MUSCLES } from '@/src/data/combined-muscles';
 import { aggregateExerciseCatalogStats, type ExerciseCatalogStatsRawHistory } from '@/src/data/exercise-catalog-stats';
 import {
   DEFAULT_EXERCISE_LIST_PREFERENCES,
@@ -26,7 +27,7 @@ const rawHistory = (): ExerciseCatalogStatsRawHistory => ({
   })),
 });
 const muscleGroups = [{ id: 'chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 10, reportGroup: null, tracked: 1 }];
-const muscleSetup = buildMuscleSetup(muscleGroups);
+const muscleSetup = buildMuscleSetup(muscleGroups, null);
 const exercises: IndexedExerciseCatalogExercise[] = [
   { id: 'bench', name: 'Bench Press', bodyweightContribution: 0, splitByGym: false, restTimerSec: null, deletedAt: null, mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }], searchText: 'bench press chest' },
   { id: 'old', name: 'Ancient Press', bodyweightContribution: 0, splitByGym: false, restTimerSec: null, deletedAt: null, mappings: [{ id: 'm2', muscleGroupId: 'chest', weight: 1, role: 'secondary' }], searchText: 'ancient press' },
@@ -47,7 +48,7 @@ describe('exercise browser model', () => {
       ...muscleGroups,
       { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 20, reportGroup: null, tracked: 1 },
       { id: 'delts', displayName: 'Front Delts', familyName: 'Shoulders', sortOrder: 30, reportGroup: null, tracked: 1 },
-    ]);
+    ], null);
     const exercise: IndexedExerciseCatalogExercise = { ...exercises[0], mappings: [
       { id: 's1', muscleGroupId: 'delts', role: 'secondary', weight: 0.5 },
       { id: 'p1', muscleGroupId: 'chest', role: 'primary', weight: 1 },
@@ -63,11 +64,11 @@ describe('exercise browser model', () => {
     expect(formatExerciseMuscleLines(exercises[3], muscleSetup)).toEqual({ primary: 'Primary: None', secondary: 'Secondary: None' });
     expect(formatExerciseMuscleLines(exercises[0], muscleSetup)).toEqual({ primary: 'Primary: Chest', secondary: 'Secondary: None' });
     expect(formatExerciseMuscleLines(exercises[1], muscleSetup)).toEqual({ primary: 'Primary: None', secondary: 'Secondary: Chest' });
-    expect(formatExerciseMuscleLines(exercises[0], buildMuscleSetup([])).primary).toBe('Primary: chest');
+    expect(formatExerciseMuscleLines(exercises[0], buildMuscleSetup([], null)).primary).toBe('Primary: chest');
   });
 
   it("names the user's muscles: a merged muscle once at its strongest role, untracked ones left out", () => {
-    const broad = buildMuscleSetup(broadMuscleRows());
+    const broad = buildMuscleSetup(broadMuscleRows(), BROAD_COMBINED_MUSCLES);
     const mapped = (mappings: IndexedExerciseCatalogExercise['mappings']) => ({ ...exercises[0], mappings });
     expect(formatExerciseMuscleLines(mapped([
       { id: 'q', muscleGroupId: 'quads', role: 'primary', weight: 1 },

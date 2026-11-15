@@ -40,7 +40,7 @@ const DASHED_RING = [
 ];
 
 export const ICON_GLYPHS = {
-  // Lucide `bot`: the active workout's AI-controlled logging state.
+  // Lucide `bot`: the active workout's AI-controlled logging state, and a note an agent wrote.
   'ai-logging': [path('M12 8V4H8'), path('M6 8h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2Z'), path('M2 14h2'), path('M20 14h2'), path('M15 13v2'), path('M9 13v2')],
   // Lucide `lock`: a retained schedule is read-only while Routine is on.
   lock: [path('M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Z'), path('M7 11V7a5 5 0 0 1 10 0v4')],
@@ -259,6 +259,15 @@ export const ICON_GLYPHS = {
     path('M21 5h-7'),
     path('M8 10v4'),
     path('M8 12H3'),
+  ],
+  // Lucide `notebook-pen`: training notes (More and the exercise page's ⋮).
+  notes: [
+    path('M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4'),
+    path('M2 6h4'),
+    path('M2 10h4'),
+    path('M2 14h4'),
+    path('M2 18h4'),
+    path('M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z'),
   ],
 } satisfies Record<string, readonly IconShape[]>;
 

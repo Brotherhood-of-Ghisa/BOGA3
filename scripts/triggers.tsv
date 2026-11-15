@@ -1,6 +1,7 @@
 # BOGA path-trigger registry — machine-readable form of "which lanes a change
-# runs by default" (the human table lives in AGENTS.md; keep both in sync in the same
-# change — docs-check validates that the lanes cited here exist). The result is
+# runs by default" (AGENTS.md carries the short human summary of the main
+# defaults; keep it true when a row changes what it summarizes — docs-check
+# validates that the lanes cited here exist). The result is
 # a default the agent settles per its build protocol, not a requirement
 # (spec 02, "Choosing lanes").
 #
@@ -67,7 +68,9 @@ apps/mobile/.maestro/flows/data-runtime-smoke.yaml	-frontend,ios-data-smoke,andr
 apps/mobile/.maestro/flows/session-completion-states-fixture.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it (iOS-only: asserts the iOS share sheet)
 apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
 apps/mobile/.maestro/flows/session-plan.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
+apps/mobile/.maestro/flows/injuries-lifecycle.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
 apps/mobile/.maestro/flows/muscle-report-broad.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it (iOS-only: tap points measured on iOS)
+apps/mobile/.maestro/flows/muscle-wireframe.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it (native GL pixels and gestures verified on iOS)
 apps/mobile/.maestro/flows/exercise-page.yaml	-frontend,ios-exercise-page	single flow → the lane that runs it
 apps/mobile/.maestro/flows/rm-curve-regimes.yaml	-frontend,ios-rm-curve	single flow → the lane that runs it
 apps/mobile/.maestro/flows/session-view.yaml	-frontend,ios-session-view	single flow → the lane that runs it
@@ -77,6 +80,9 @@ apps/mobile/.maestro/flows/groups-two-user-stream.yaml	-frontend,ios-groups-e2e	
 apps/mobile/.maestro/scripts/groups-*	-frontend,ios-groups-e2e	groups flow helper scripts → the groups lane
 supabase/migrations/**	backend	server schema / RLS / RPCs
 supabase/migrations/*group*	groups-api-live,ios-groups-e2e	group schema / RPCs (the client's live wire check + two-user e2e lane)
+supabase/migrations/*group*	groups-perf	group RPC cost (the read-path page budgets)
+supabase/migrations/*notification*	groups-perf	notification RPC cost (the read-path page budgets)
+apps/mobile/scripts/perf/groups/**	groups-perf	the groups performance harness
 supabase/scripts/groups-fixture-reset.sh	ios-groups-e2e	groups e2e fixture reset
 supabase/scripts/sync-e2e-fixture-reset.sh	ios-sync-e2e	sync e2e fixture reset
 supabase/functions/**	backend	edge functions

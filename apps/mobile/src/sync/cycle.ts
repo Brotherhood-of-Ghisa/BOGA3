@@ -2,6 +2,7 @@ import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import { refreshBodyweightCalculationPreference } from '@/src/bodyweight/calculation-preference';
 import { refreshAccountLocalSyncedPreferences } from '@/src/preferences/account-local';
 import { adoptOrUploadMuscleTargets } from '@/src/sync/muscle-target-adoption';
+import { migrateLegacyMuscleSetupLogged } from '@/src/sync/combined-muscle-migration';
 // Client sync cycle: converges local SQLite state with the server by issuing
 // PULL -> PUSH -> PULL until both ends are quiet for one full round.
 //
@@ -55,6 +56,7 @@ import {
   type QuarantineWriteResult,
 } from '@/src/sync/quarantine';
 import { TOPO_LAYERS, type EntityTableName } from '@/src/sync/topo-order';
+import { recordLayerTypes, resetLayersMissingTypes } from '@/src/sync/pull-layer-types';
 
 // -----------------------------------------------------------------------------
 // Tunables
@@ -587,6 +589,10 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TARGET('muscle_target_mode', 'muscleTargetMode'),
     // JSON text on the wire; the server stores jsonb.
     TARGET('muscle_target_overrides', 'muscleTargetOverrides'),
+    // JSON text on the wire, like the overrides: the single target map and
+    // the combined-muscle definitions. Null never clears either.
+    TARGET('muscle_targets', 'muscleTargets'),
+    TARGET('combined_muscles', 'combinedMuscles'),
     TARGET('count_secondary_muscles', 'countSecondaryMuscles'),
     TARGET('volume_primary_only', 'volumePrimaryOnly'),
     TS('created_at', 'createdAt'),
@@ -599,6 +605,10 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
+  ],
+  training_notes: [
+    SC('exercise_definition_id', 'exerciseDefinitionId'), SC('body', 'body'), SC('noted_on', 'notedOn'),
+    SC('source', 'source'), TS('created_at', 'createdAt'), TS('updated_at', 'updatedAt'), TS('deleted_at', 'deletedAt'),
   ],
   training_programmes: [
     SC('name', 'name'),
@@ -757,12 +767,27 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
     TS('created_at', 'createdAt'),
     TS('deleted_at', 'deletedAt'),
   ],
+  injuries: [
+    SC('muscle_group_id', 'muscleGroupId'),
+    SC('side', 'side'),
+    SC('status', 'status'),
+    SC('pain_score', 'painScore'),
+    SC('label', 'label'),
+    SC('notes', 'notes'),
+    SC('contraindications', 'contraindications'),
+    TS('started_at', 'startedAt'),
+    TS('resolved_at', 'resolvedAt'),
+    TS('created_at', 'createdAt'),
+    TS('updated_at', 'updatedAt'),
+    TS('deleted_at', 'deletedAt'),
+  ],
 };
 
 /** The Drizzle table object for each entity type. */
 const ENTITY_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema]> = {
   user_settings: schema.userSettings,
   body_weight_measurements: schema.bodyWeightMeasurements,
+  training_notes: schema.trainingNotes,
   training_programmes: schema.trainingProgrammes,
   session_plans: schema.sessionPlans,
   session_plan_uses: schema.sessionPlanUses,
@@ -778,6 +803,7 @@ const ENTITY_TABLES: Record<EntityTableName, (typeof schema)[keyof typeof schema
   session_exercises: schema.sessionExercises,
   exercise_sets: schema.exerciseSets,
   session_exercise_tags: schema.sessionExerciseTags,
+  injuries: schema.injuries,
 };
 
 /** Every entity type in fixed topological order (parents before children). */
@@ -1302,11 +1328,16 @@ const applySiblingWrites = (
   candidates: SiblingCandidate[],
 ): number => {
   let changed = 0;
+  // Tombstones can occupy any high slot; temporary writes must also clear final targets.
+  const scratchBase = Math.max(
+    existingSiblings.reduce((max, row) => Math.max(max, row.orderIndex + 1), PULL_SCRATCH_BASE),
+    candidates.reduce((max, cand) => Math.max(max, cand.targetOrderIndex + 1), PULL_SCRATCH_BASE),
+  );
 
   for (let i = 0; i < existingSiblings.length; i++) {
     const row = existingSiblings[i];
     tx.update(config.table)
-      .set({ [config.orderColName]: PULL_SCRATCH_BASE + i } as never)
+      .set({ [config.orderColName]: scratchBase + i } as never)
       .where(eq(config.table.id, row.id))
       .run();
   }
@@ -1495,7 +1526,7 @@ export const applyPullPage = (
 // Pull cursor persistence
 // -----------------------------------------------------------------------------
 
-const applyMergeRows = (tx: Transaction, rows: MergeWireEntity[], force = false): number => {
+export const applyMergeRows = (tx: Transaction, rows: MergeWireEntity[], force = false): number => {
   if (rows.some(row => !ENTITY_ORDER.includes(row.type as EntityTableName))) {
     throw new Error('Invalid exercise history entity.');
   }
@@ -1556,6 +1587,7 @@ export const writeCursorAndPendingMoves = (
 ): void => {
   const state = readRawCursorState(tx);
   state[String(layer)] = cursor;
+  recordLayerTypes(state, layer);
   if (pendingMoves !== undefined) {
     if (pendingMoves.length > 0) {
       state.provisional_moves = pendingMoves;
@@ -1563,6 +1595,10 @@ export const writeCursorAndPendingMoves = (
       delete state.provisional_moves;
     }
   }
+  writeRawCursorState(tx, state);
+};
+
+const writeRawCursorState = (tx: Transaction, state: Record<string, unknown>): void => {
   tx.insert(schema.syncRuntimeState)
     .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: state as never })
     .onConflictDoUpdate({
@@ -1576,14 +1612,40 @@ const clearPersistedPendingMoves = (tx: Transaction): void => {
   const state = readRawCursorState(tx);
   if ('provisional_moves' in state) {
     delete state.provisional_moves;
-    tx.insert(schema.syncRuntimeState)
-      .values({ id: PRIMARY_RUNTIME_STATE_ID, pullCursor: state as never })
-      .onConflictDoUpdate({
-        target: schema.syncRuntimeState.id,
-        set: { pullCursor: state as never },
-      })
-      .run();
+    writeRawCursorState(tx, state);
   }
+};
+
+const logPullLayersReset = (layers: number[]): void => {
+  try {
+    void logEvent({
+      level: 'info',
+      source: 'database',
+      event: 'sync.pull_layers_reset',
+      message: 'Pull restarted for layers whose known entity types changed since their cursor was stored.',
+      context: { operation: 'pull_layer_types_reset', layers },
+    }).catch(() => undefined);
+  } catch {
+    // Logging must never fail the cycle.
+  }
+};
+
+/**
+ * Restarts the pull of every layer whose stored cursor was advanced by a build
+ * that did not apply one of this build's entity types there, so rows of a type
+ * an older build skipped arrive now. Other layers keep their cursors; rows, dirty
+ * bits and the bootstrap flag are untouched. Returns the layers reset.
+ */
+export const resetPullCursorsForNewLayerTypes = (database: LocalDatabase): number[] => {
+  const reset = database.transaction((tx) => {
+    const transaction = tx as Transaction;
+    const state = readRawCursorState(transaction);
+    const layers = resetLayersMissingTypes(state);
+    if (layers.length > 0) writeRawCursorState(transaction, state);
+    return layers;
+  });
+  if (reset.length > 0) logPullLayersReset(reset);
+  return reset;
 };
 
 // -----------------------------------------------------------------------------
@@ -2111,6 +2173,11 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
     // loop so a fresh account has its seeded rows ready to push in the same call.
     await runBootstrapper(database);
 
+    // Before the first pull leg: re-pull any layer on which this build applies
+    // a type the build that advanced its cursor did not. After the bootstrapper,
+    // whose from-scratch pull records this build's lists itself.
+    if (userId) resetPullCursorsForNewLayerTypes(database);
+
     // Apply any pending catalog-bundle migrations, then bring the applied-
     // generation marker up to the current generation. Runs after the
     // bootstrapper on every cycle — whether it seeded a fresh account or no-op'd
@@ -2134,6 +2201,7 @@ const runSyncCycleLocked = async (): Promise<SyncCycleOutcome> => {
       if (userId && !targetsAdoptionChecked) {
         targetsAdoptionChecked = true;
         await adoptOrUploadMuscleTargets(userId);
+        await migrateLegacyMuscleSetupLogged();
       }
       const pushed = await runPushLegRecoveringLostAttachment(database);
       if (pushed === null) {

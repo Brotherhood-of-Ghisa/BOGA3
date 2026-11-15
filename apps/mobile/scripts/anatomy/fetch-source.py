@@ -8,7 +8,7 @@ import zlib
 from pathlib import Path
 
 root = Path(__file__).resolve().parent
-metadata = json.loads((root / 'source.json').read_text())['sources']
+metadata = json.loads((root / 'mesh-source.json').read_text())['sources']
 parser = argparse.ArgumentParser(description='Fetch only pinned BodyParts3D source components; no mobile runtime use.')
 parser.add_argument('--source-dir', type=Path, default=root.parents[3] / 'apps/mobile/artifacts/muscle-body-anatomy/source')
 destination = parser.parse_args().source_dir

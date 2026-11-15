@@ -44,14 +44,14 @@ export function GroupMetricStreamRecordSheet({ record, detail, userId, myRole, o
       </View>
       {model.metrics.map(entry => <View key={entry.metric} style={styles.valueLine} testID={`group-metric-record-${entry.metric}`}>
         <Text allowFontScaling={false} style={[text.bodyStrong, styles.metricLabel]}>{entry.label}</Text>
-        <Text allowFontScaling={false} style={[scoreStyle(entry.value, 'large'), scoreHasFigure(entry.value) ? tone.record : null]} testID={`group-metric-record-${entry.metric}-value`}>{entry.value}</Text>
+        <Text allowFontScaling={false} style={[scoreStyle(entry.value, 'large'), scoreHasFigure(entry.value) ? tone.record : null]} testID={`group-metric-record-${entry.metric}-value`}><FigureText figureStyle={[scoreStyle(entry.value, 'large'), scoreHasFigure(entry.value) ? tone.record : null]}>{entry.value}</FigureText></Text>
       </View>)}
       {model.previous.length > 0 ? <View style={styles.previous} testID="group-metric-record-previous">
         <Text allowFontScaling={false} style={text.label}>Previous #1</Text>
         {model.previous.map(entry => <View key={entry.metric} style={styles.previousRow} testID={`group-metric-record-previous-${entry.metric}`}>
           <View style={styles.valueLine}>
             <Text allowFontScaling={false} style={[text.bodyStrong, styles.metricLabel]}>{entry.label}</Text>
-            <Text allowFontScaling={false} style={scoreStyle(entry.value, 'base')}>{entry.value}</Text>
+            <Text allowFontScaling={false} style={scoreStyle(entry.value, 'base')}><FigureText figureStyle={scoreStyle(entry.value, 'base')}>{entry.value}</FigureText></Text>
           </View>
           <Text allowFontScaling={false} style={text.meta}><FigureText>{[entry.holder, entry.set].filter(Boolean).join(' · ')}</FigureText></Text>
         </View>)}

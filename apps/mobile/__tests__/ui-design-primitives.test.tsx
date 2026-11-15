@@ -62,6 +62,13 @@ describe('Card', () => {
 });
 
 describe('Stat', () => {
+  it.each(['inline', 'stacked'] as const)('retains the full spoken unit when %s uses an abbreviated visible value', (layout) => {
+    render(<Stat label="1RM" layout={layout} value="28.8%" spokenValue="28.8 %BW" testID="spoken" />);
+    expect(screen.getByTestId('spoken')).toHaveProp('accessibilityLabel', '1RM 28.8 %BW');
+    expect(screen.getByText('28.8%')).toBeTruthy();
+    expect(screen.queryByText('28.8 %BW')).toBeNull();
+  });
+
   it('stacks a micro-label legend above a figure and reads as one element', () => {
     render(<Stat label="Volume" testID="stat" value="8420" />);
 

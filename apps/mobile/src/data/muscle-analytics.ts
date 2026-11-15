@@ -5,10 +5,12 @@ import { type SetMetrics } from '../exercise-calculations/load-metrics.ts';
 import { addFiniteVolume, calculateAnalyticsSetMetrics, enteredWeightKg, personalLoadContext } from '../exercise-calculations/analytics.ts';
 import {
   countedSessionIds,
+  isConfirmedPerformedSet,
   isWorkingSet,
   isVolumeSet,
   type SessionSetPerformanceStatus,
 } from '../exercise-calculations/set-semantics.ts';
+import { isRehabSessionSetType } from './set-types.ts';
 
 export type MuscleContributionRole = 'primary' | 'secondary' | 'stabilizer' | null;
 
@@ -20,6 +22,7 @@ export type MuscleAnalyticsInput = {
   countSecondarySets?: boolean;
   countSecondaryVolume?: boolean;
   bodyweightCalculationsEnabled?: boolean;
+  includeRehabSets?: boolean;
   exerciseDefinitions?: {
     id: string;
     name?: string;
@@ -63,6 +66,8 @@ export type MuscleSetContribution = {
   /** Physical working eligibility before the muscle-role setting. */
   physicalWorking?: boolean;
   volumeIncluded: boolean;
+  /** True when the set is a performed rehab set. */
+  rehab?: boolean;
   /** Stable identity of the physical source set within one aggregation run. */
   setIdentity: string;
   muscleGroupId: string;
@@ -231,6 +236,26 @@ export const countMuscleSets = (contributions: Iterable<MuscleSetContribution>):
   return counter.counts;
 };
 
+/** Rehab sets are excluded from working set counts but counted for tissue reload tracking. */
+export const countMuscleRehabSet = (counter: MuscleSetCounter, contribution: MuscleSetContribution): void => {
+  if (contribution.rehab !== true || contribution.roleWeight === 0) return;
+  const previous = counter.roleWeightBySet.get(contribution.setIdentity) ?? 0;
+  if (previous >= contribution.roleWeight) return;
+  counter.roleWeightBySet.set(contribution.setIdentity, contribution.roleWeight);
+  const counts = counter.counts;
+  if (previous === 0.5) counts.secondarySetCount -= 1;
+  if (contribution.roleWeight === 1) counts.primarySetCount += 1;
+  else counts.secondarySetCount += 1;
+  counts.weightedSetCount = counts.primarySetCount + counts.secondarySetCount / 2;
+};
+
+/** One bucket's rehab set count over a whole list of contributions. */
+export const countMuscleRehabSets = (contributions: Iterable<MuscleSetContribution>): MuscleSetCounts => {
+  const counter = createMuscleSetCounter();
+  for (const contribution of contributions) countMuscleRehabSet(counter, contribution);
+  return counter.counts;
+};
+
 /** Personal working-set eligibility controls counts and strength metrics. */
 const isMuscleAnalyticsWorkingSet = (
   set: MuscleAnalyticsInput['exerciseSets'][number], policy?: EffortCalculationPolicy,
@@ -346,7 +371,10 @@ export const collectMuscleSetContributions = (
     const working = isMuscleAnalyticsWorkingSet(set, input.effortPolicy);
     const volumeIncluded = isVolumeSet({ reps: set.repsValue, weight: set.weightValue,
       performanceStatus: set.performanceStatus, setType: set.setType }, input.effortPolicy);
-    if (!working && !volumeIncluded) continue;
+    const isRehab = isRehabSessionSetType(set.setType) && isConfirmedPerformedSet({
+      reps: set.repsValue, weight: set.weightValue, performanceStatus: set.performanceStatus,
+    });
+    if (!working && !volumeIncluded && (!input.includeRehabSets || !isRehab)) continue;
 
     const exercise = sessionExerciseById.get(set.sessionExerciseId);
     if (!exercise || exercise.exerciseDefinitionId === null) continue;
@@ -364,7 +392,7 @@ export const collectMuscleSetContributions = (
       input.effortPolicy,
     );
     const metrics = calculateAnalyticsSetMetrics({ ...set, ...context });
-    const rawSetVolume = !volumeIncluded ? 0 : metrics.eligible && metrics.load.status === 'known'
+    const rawSetVolume = (!volumeIncluded && !isRehab) ? 0 : metrics.eligible && metrics.load.status === 'known'
       ? metrics.load.perSideCalculatedLoadKg * metrics.reps : null;
     const setVolume = rawSetVolume !== null && Number.isFinite(rawSetVolume) ? rawSetVolume : null;
 
@@ -373,10 +401,11 @@ export const collectMuscleSetContributions = (
         ? 0 : getMuscleContributionRoleWeight(mapping.role);
       const volumeWeight = mapping.allocation.primary
         + (input.countSecondaryVolume === false ? 0 : mapping.allocation.secondary);
-      if ((!working || roleWeight === 0) && (!volumeIncluded || volumeWeight === 0)) continue;
+      if ((!working || roleWeight === 0) && (!volumeIncluded || volumeWeight === 0) && (!input.includeRehabSets || !isRehab || roleWeight === 0)) continue;
 
       contributions.push({
         physicalWorking: working, working: working && roleWeight > 0, volumeIncluded: volumeIncluded && volumeWeight > 0,
+        rehab: isRehab,
         setIdentity: set.id !== undefined ? `id:${set.id}` : `row:${setIndex}`,
         muscleGroupId: mapping.muscleGroupId,
         role: mapping.role,

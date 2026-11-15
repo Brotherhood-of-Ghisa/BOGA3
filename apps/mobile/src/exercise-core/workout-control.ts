@@ -9,10 +9,10 @@ export class WorkoutAiControlled extends Error {
 
 export function workoutLoggingClientId(baseline?: readonly MergeWireEntity[]): string | null {
   const header = baseline?.find(row => row.type === 'sessions');
-  return header?.fields.status === 'active' && typeof header.fields.logging_client_id === 'string'
+  return typeof header?.fields.logging_client_id === 'string'
     ? header.fields.logging_client_id : null;
 }
 
 export function assertHumanWorkoutControl(row?: { status: string; loggingClientId?: string | null } | null): void {
-  if (row?.status === 'active' && row.loggingClientId) throw new WorkoutAiControlled();
+  if (row?.loggingClientId) throw new WorkoutAiControlled();
 }

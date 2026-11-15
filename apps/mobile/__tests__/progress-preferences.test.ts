@@ -302,7 +302,7 @@ it('migrates the former visible grades to fixed choices while leaving legacy sto
   const key = 'boga3.accountPreferences.v1.account%3AA.visibleEffortGrades';
   Storage.setItemSync(key, '[0,2,12]');
   await account();
-  expect(values().displayEfforts).toEqual(['warm_up', 'unspecified', 'rir_4', 'rir_2', 'rir_0', 'technique', 'cooldown']);
+  expect(values().displayEfforts).toEqual(['warm_up', 'unspecified', 'rir_4', 'rir_2', 'rir_0', 'technique', 'cooldown', 'rehab']);
   expect(Storage.getItemSync(key)).toBe('[0,2,12]');
 });
 

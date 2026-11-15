@@ -64,6 +64,12 @@ describe('ChoiceRow', () => {
     expect(screen.getByLabelText('Secondary: None')).toBeOnTheScreen();
   });
 
+  it('draws a description under its label, read with it', () => {
+    render(<ChoiceRow description="Biceps, Triceps" label="Arms" onPress={jest.fn()} testID="choice" />);
+    expect(screen.getByText('Biceps, Triceps')).toHaveStyle({ color: roles.inkMuted });
+    expect(screen.getByLabelText('Arms, Biceps, Triceps: none')).toBeOnTheScreen();
+  });
+
   it('draws its leading icon only when given one', () => {
     const view = render(<ChoiceRow icon="bell" label="Notifications" onPress={jest.fn()} />);
     expect(drawsGlyph(view.root, 'bell')).toBe(true);

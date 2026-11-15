@@ -23,6 +23,8 @@ const card = (records: CompetitionSessionCard['records']): CompetitionSessionCar
   setsLabel: '2 sets',
   exercisesLabel: '1 exercise',
   records,
+  groupRecordCount: records.length,
+  personalRecordCount: 0,
 });
 
 const line = { key: 'r-1', exercise: 'Deadlift', value: '1RM 213.3 kg', certified: true, accessibilityLabel: 'Deadlift, 1RM 213.3 kg, certified' };

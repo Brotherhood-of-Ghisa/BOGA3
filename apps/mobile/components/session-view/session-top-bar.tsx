@@ -32,11 +32,13 @@ type SessionTopBarProps =
       controlPending?: boolean;
     }
   | {
-      // A completed session being edited: no options (nothing to abandon),
-      // and Done saves the edit instead of Finish.
+      // Done saves human edits; AI-controlled history exposes takeover too.
       mode: 'completed';
       onDone: () => void;
       doneDisabled?: boolean;
+      aiControlled?: boolean;
+      controlPending?: boolean;
+      onOpenOptions?: () => void;
     }
   | {
       // The completion screen after Finish: Done sits where Finish sat. Omitted
@@ -76,6 +78,13 @@ function ActiveTitle({ startedAt, now }: { startedAt: Date; now: () => Date }) {
   );
 }
 
+function WorkoutControlButton({ pending, onPress, tone }: { pending?: boolean; onPress: () => void; tone?: 'accent' }) {
+  return <IconButton
+    accessibilityLabel={pending ? 'Session control is not confirmed. Open session controls' : 'AI is logging. Session is read only. Open session controls'}
+    name="ai-logging" onPress={onPress} testID="session-view-ai-control" tone={tone}
+  />;
+}
+
 // `Training · <elapsed>` · ⋮ · ✓ (Finish);
 // `Edit session` · Done for a completed session; `Session summary` · Done
 // after Finish. The primary is the screen's one `accent` action.
@@ -109,6 +118,9 @@ export function SessionTopBar(props: SessionTopBarProps) {
           testID="session-view-rest-timer-button"
         />
       ) : null}
+      {props.mode === 'completed' && props.aiControlled && props.onOpenOptions ? (
+        <WorkoutControlButton pending={props.controlPending} onPress={props.onOpenOptions} />
+      ) : null}
       {props.mode === 'active' ? (
         <IconButton
           accessibilityLabel="Session options"
@@ -119,13 +131,7 @@ export function SessionTopBar(props: SessionTopBarProps) {
         />
       ) : null}
       {props.mode === 'active' && props.aiControlled ? (
-        <IconButton
-          accessibilityLabel={props.controlPending ? 'Session control is not confirmed. Open session controls' : 'AI is logging. Session is read only. Open session controls'}
-          name="ai-logging"
-          onPress={props.onOpenOptions}
-          testID="session-view-ai-control"
-          tone="accent"
-        />
+        <WorkoutControlButton pending={props.controlPending} onPress={props.onOpenOptions} tone="accent" />
       ) : onPrimary && props.mode === 'active' ? (
         // Finish is a tick, the screen's one `accent` action as an icon.
         <IconButton

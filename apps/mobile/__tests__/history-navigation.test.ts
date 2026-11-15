@@ -8,26 +8,13 @@ import {
   parseHistoryJump,
   type SessionListItem,
 } from '@/components/session-list';
-import { completedSessionHref, exerciseHistoryHref, historyDayHref, sessionsDayHref, sessionsWeekHref, progressHistoryHref } from '@/src/navigation/routes';
+import { completedSessionHref, exerciseHistoryHref, historyDetailHref, progressHistoryHref } from '@/src/navigation/routes';
 
 describe('history hrefs', () => {
   it('opens exercise session history with the selected gym, including no gym', () => {
     expect(exerciseHistoryHref('a/b c')).toBe('/exercise-history?exerciseDefinitionId=a%2Fb%20c');
     expect(exerciseHistoryHref('lift', 'gym a/b')).toBe('/exercise-history?exerciseDefinitionId=lift&gymId=gym%20a%2Fb');
     expect(exerciseHistoryHref('lift', null)).toBe('/exercise-history?exerciseDefinitionId=lift&gymId=no-gym');
-  });
-
-  it('opens a day with one session on that session, several on Sessions at the day, and none nowhere', () => {
-    expect(historyDayHref('2026-10-07', ['session-a'])).toBe('/completed-session/session-a');
-    expect(historyDayHref('2026-10-07', ['session-a', 'session-b'])).toBe('/sessions?day=2026-10-07');
-    expect(historyDayHref('2026-10-07', [])).toBeNull();
-  });
-
-  it('opens the active workout on Train, where it lives, and preserves other day destinations', () => {
-    expect(historyDayHref('2026-10-25', ['active a/b'], 'active a/b')).toBe('/train');
-    expect(historyDayHref('2026-10-25', ['completed'], 'active')).toBe('/completed-session/completed');
-    expect(historyDayHref('2026-10-25', ['active', 'completed'], 'active')).toBe('/sessions?day=2026-10-25');
-    expect(historyDayHref('2026-10-25', [], 'active')).toBeNull();
   });
 
   it('adds the optional history entry override only when requested', () => {
@@ -61,8 +48,8 @@ describe('history hrefs', () => {
 
   it('encodes what it carries', () => {
     expect(completedSessionHref('a/b c')).toBe('/completed-session/a%2Fb%20c');
-    expect(sessionsWeekHref('2026-10-05')).toBe('/sessions?week=2026-10-05');
-    expect(sessionsDayHref('2026-10-07')).toBe('/sessions?day=2026-10-07');
+    expect(historyDetailHref({ exerciseDefinitionId: 'a/b c', gymId: null }, { day: '2026-10-07' }, 'estimatedRM1'))
+      .toBe('/progress-history?exerciseDefinitionId=a%2Fb%20c&metric=1rm&gymId=no-gym&day=2026-10-07');
   });
 });
 

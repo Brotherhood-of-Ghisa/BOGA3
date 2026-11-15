@@ -9,6 +9,7 @@ export const EFFORT_CHOICES = [
   { id: 'rir_0', label: 'RIR-0' },
   { id: 'technique', label: 'Technique' },
   { id: 'cooldown', label: 'Cooldown' },
+  { id: 'rehab', label: 'Rehab' },
 ] as const;
 
 export type EffortChoice = typeof EFFORT_CHOICES[number]['id'];

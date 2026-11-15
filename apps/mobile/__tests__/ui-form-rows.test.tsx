@@ -58,6 +58,12 @@ describe('RadioRow', () => {
     expect(screen.getByText('swatch')).toBeOnTheScreen();
   });
 
+  it('draws a description under its label, read with it', () => {
+    render(<RadioRow checked={false} description="Biceps, Triceps" label="Arms" onPress={jest.fn()} testID="row" />);
+    expect(screen.getByText('Biceps, Triceps')).toHaveStyle({ color: roles.inkMuted });
+    expect(screen.getByTestId('row')).toHaveProp('accessibilityLabel', 'Arms, Biceps, Triceps');
+  });
+
   it('blocks presses while disabled', () => {
     const onPress = jest.fn();
     render(<RadioRow checked={false} disabled label="Ember" onPress={onPress} />);
@@ -77,6 +83,12 @@ describe('CheckRow', () => {
     view.rerender(<CheckRow checked={false} label="Show weight" onPress={onPress} testID="check" />);
     expect(screen.getByRole('checkbox', { name: 'Show weight' })).not.toBeChecked();
     expect(drawsGlyph(view.root, 'check')).toBe(false);
+  });
+
+  it('draws a muted note at the row end, read with the label', () => {
+    render(<CheckRow checked={false} label="Lats" note="in Back" onPress={jest.fn()} testID="row" />);
+    expect(screen.getByText('in Back')).toHaveStyle({ color: roles.inkMuted });
+    expect(screen.getByTestId('row')).toHaveProp('accessibilityLabel', 'Lats, in Back');
   });
 
   it('blocks presses while disabled and says so', () => {

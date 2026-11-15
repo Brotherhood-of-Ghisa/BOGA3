@@ -1,10 +1,11 @@
 import { hexToLch, lchToHex, type Lch } from '@/components/ui/lch';
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
 import type { ProgressMuscleComparison } from '@/src/data';
+import { isCombinedMuscleKey } from '@/src/data/combined-muscles';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
 import { muscleTargetAttainment } from '@/src/preferences/targets';
-import { isModelFibre, MUSCLE_BODY_FASCICLES, type ModelFibreSegment, type MuscleBodyFascicles, type MuscleBodyFibreSegment, type MuscleBodyFibreSelection, type TriangleFibreSegment } from './muscle-body-fibres';
+import { resolveInjuryMuscleGroupId } from '@/src/injuries/injury-warning-engine';
 import {
   MUSCLE_BODY_MESH,
   type MuscleBodyFace,
@@ -12,7 +13,6 @@ import {
   type MuscleBodyMesh,
 } from './muscle-body-mesh';
 import { MOUSTACHE_LCH, NOVEMBER_MOUSTACHE_MESH } from './muscle-body-moustache';
-import { reduceFibreRun, type FibrePoint } from './projected-fibre-contour';
 
 export type BodyOrientation = 'front' | 'back';
 
@@ -24,7 +24,7 @@ export type MuscleSetTargets = {
 
 export type ThemeShadeRoles = Pick<
   UiRoles,
-  'paper' | 'rule' | 'viz1' | 'viz2' | 'viz4' | 'ink' | 'inkMuted' | 'onInk'
+  'paper' | 'rule' | 'viz1' | 'viz2' | 'viz4' | 'ink' | 'inkMuted' | 'onInk' | 'danger' | 'accent'
 >;
 
 export type ThemeShadePalette = {
@@ -32,9 +32,31 @@ export type ThemeShadePalette = {
   readonly anchors: readonly [Lch, Lch, Lch];
   // The November moustache.
   readonly moustache: string;
-  // A selected muscle's fibre relief: a light edge, then a dark one.
-  readonly relief: { readonly highlight: string; readonly shade: string };
   readonly selectedStroke: string;
+  readonly injuryAcuteStroke: string;
+  readonly injuryManagingStroke: string;
+  readonly injuryMonitoringStroke: string;
+};
+
+export type ActiveInjuryOverlay = {
+  readonly id: string;
+  readonly muscleGroupId?: string | null;
+  readonly side?: 'left' | 'right' | 'bilateral' | null;
+  readonly status: 'acute' | 'managing' | 'monitoring' | 'resolved';
+  readonly painScore?: number | null;
+  readonly label?: string;
+};
+
+export type ProjectedInjuryBadge = {
+  readonly injuryId: string;
+  readonly muscleGroupId: string;
+  readonly status: 'acute' | 'managing' | 'monitoring';
+  readonly side: 'left' | 'right' | 'bilateral' | null;
+  readonly label?: string;
+  readonly painScore?: number | null;
+  readonly x: number;
+  readonly y: number;
+  readonly visible: boolean;
 };
 
 export type ProjectedTriangle = {
@@ -45,7 +67,8 @@ export type ProjectedTriangle = {
   readonly x2: number;
   readonly y2: number;
   readonly depth: number;
-  readonly muscleGroupId: MuscleBodyMaterialId;
+  /** The reported muscle: an anatomy entry, a combined muscle's key, or `neutral`. */
+  readonly muscleGroupId: string;
   readonly fill: string;
   readonly selected: boolean;
   readonly v0: number;
@@ -65,13 +88,23 @@ export type ProjectedMuscleContour = {
   readonly stroke: string;
 };
 
-export type MuscleOverlayStyle = 'fibres' | 'contour';
+export type ProjectedInjuryContour = {
+  readonly injuryId: string;
+  readonly muscleGroupId: string;
+  readonly status: 'acute' | 'managing' | 'monitoring';
+  readonly side: 'left' | 'right' | 'bilateral' | null;
+  readonly d: string;
+  readonly stroke: string;
+};
+
+export type MuscleOverlayStyle = 'wireframe' | 'contour';
 
 export type ProjectedMuscleBody = {
   readonly triangles: readonly ProjectedTriangle[];
   readonly batches: readonly ProjectedPathBatch[];
-  readonly fibres: { readonly surface: string; readonly deep: string; readonly anatomicalParts?: readonly { readonly id: string; readonly d: string }[] };
   readonly contour?: ProjectedMuscleContour | null;
+  readonly injuryContours?: readonly ProjectedInjuryContour[];
+  readonly injuryBadges?: readonly ProjectedInjuryBadge[];
 };
 
 export const SHADE_STEPS = 12;
@@ -117,9 +150,15 @@ const POSTERIOR_MUSCLES = new Set<string>([
   'calves',
 ]);
 
-/** Which canonical side of the body best showcases the given muscle group. */
-export function canonicalOrientationForMuscle(muscleId: string): BodyOrientation {
-  return POSTERIOR_MUSCLES.has(canonicalMuscleId(muscleId)) ? 'back' : 'front';
+/**
+ * Which canonical side of the body best showcases the given muscle: for a
+ * combined muscle, the side of its first tracked member under `report`.
+ */
+export function canonicalOrientationForMuscle(muscleId: string, report?: MuscleReportAssignment): BodyOrientation {
+  const member = report && isCombinedMuscleKey(muscleId)
+    ? [...report].find(([, { muscle, tracked }]) => tracked && muscle.id === muscleId)?.[0]
+    : undefined;
+  return POSTERIOR_MUSCLES.has(canonicalMuscleId(member ?? muscleId)) ? 'back' : 'front';
 }
 
 const canonicalMuscleId = (id: string): string => LEGACY_MUSCLE_ALIASES[id] ?? id;
@@ -167,7 +206,8 @@ export function computeMuscleScores(
   let largestLoss = 0;
   for (const row of muscles) {
     const id = canonicalMuscleId(row.muscleGroupId);
-    if (!BODY_MUSCLE_IDS.has(id) || (id !== row.muscleGroupId && ids.has(id))) continue;
+    // A combined muscle shades the mesh of every member it reports.
+    if (!(BODY_MUSCLE_IDS.has(id) || isCombinedMuscleKey(id)) || (id !== row.muscleGroupId && ids.has(id))) continue;
     const change = metric === 'workingSetCount' ? muscleSetScore(row, setTargets) : muscleVolumeChange(row);
     changes.set(id, change);
     if (metric === 'totalVolume' && change !== null && Number.isFinite(change)) {
@@ -220,14 +260,10 @@ export function buildThemeShadePalette(roles: ThemeShadeRoles, mode: ThemeMode):
     neutral,
     anchors: [hexToLch(roles.viz1), hexToLch(roles.viz2), hexToLch(roles.viz4)],
     moustache: lchToHex(MOUSTACHE_LCH[mode]),
-    // The relief is lit from the palest ink-family colour and shaded with a
-    // dark one, whichever end of the ladder the page is at: in light mode white
-    // (`onInk`) and `inkMuted`; in dark the pale `ink` and the dark `paper`.
-    relief:
-      mode === 'light'
-        ? { highlight: roles.onInk, shade: roles.inkMuted }
-        : { highlight: roles.ink, shade: roles.paper },
     selectedStroke: roles.ink,
+    injuryAcuteStroke: roles.danger,
+    injuryManagingStroke: roles.accent,
+    injuryMonitoringStroke: roles.rule,
   };
 }
 
@@ -259,12 +295,12 @@ const computeLightStep = (nx: number, ny: number, nz: number): number => {
  * entry takes its muscle's id (so it shades and selects with it) and an
  * untracked one is neutral anatomy, neither shaded nor tappable.
  */
-const reportedMaterial = (
+export const reportedMaterial = (
   entry: MuscleBodyMaterialId, report: MuscleReportAssignment | undefined
-): MuscleBodyMaterialId => {
+): string => {
   const assigned = entry === 'neutral' ? undefined : report?.get(entry);
   if (!assigned) return entry;
-  return assigned.tracked ? assigned.muscle.id as MuscleBodyMaterialId : 'neutral';
+  return assigned.tracked ? assigned.muscle.id : 'neutral';
 };
 
 type ProjectionContext = {
@@ -277,7 +313,7 @@ type ProjectionContext = {
 };
 
 const resolveFaceFill = (
-  materialId: MuscleBodyMaterialId,
+  materialId: string,
   step: number,
   ctx: ProjectionContext
 ): string => {
@@ -484,105 +520,6 @@ const buildBoundaryContour = (
   return { d: segments.join(''), stroke };
 };
 
-const prepareModelContour = (
-  segments: readonly MuscleBodyFibreSegment[],
-  offset: number,
-  indices: readonly number[],
-): readonly ModelFibreSegment[] => indices.map(index => {
-  const s = segments[offset + (index >= 0 ? index : -index - 1)] as ModelFibreSegment;
-  return index >= 0 ? s : [s[3], s[4], s[5], s[0], s[1], s[2], s[6], s[7], s[8]];
-});
-
-/** Select and orient topology-checked contours once per setup/selection. */
-export function selectMuscleFibres(
-  selectedId: string | null,
-  report?: MuscleReportAssignment,
-  fascicles: MuscleBodyFascicles = MUSCLE_BODY_FASCICLES,
-): MuscleBodyFibreSelection {
-  if (!selectedId) return { segments: [], anatomicalParts: [] };
-  const selected = canonicalMuscleId(selectedId);
-  const entries = Object.entries(fascicles)
-    .filter(([entry]) => reportedMaterial(entry as MuscleBodyMaterialId, report) === selected)
-    .map(([, muscle]) => muscle);
-  return {
-    segments: entries.flatMap(muscle => muscle.segments.filter((segment): segment is TriangleFibreSegment => !isModelFibre(segment))),
-    anatomicalParts: entries.flatMap(muscle => (muscle.anatomicalParts ?? []).map(part => ({ id: part.id,
-      chains: part.chains.map(indices => prepareModelContour(muscle.segments, part.start, indices)) }))),
-  };
-}
-
-const projectFibreSegments = (
-  selection: MuscleBodyFibreSelection,
-  mesh: MuscleBodyMesh,
-  verts: RotatedVertices,
-  frame: ReturnType<typeof projectionFrame>,
-): ProjectedMuscleBody['fibres'] => {
-  const surface: string[] = [];
-  const deep: string[] = [];
-  const endpoint = (face: MuscleBodyFace, weights: readonly number[]): string => {
-    const x = weights[0] * verts.sx[face[0]] + weights[1] * verts.sx[face[1]] + weights[2] * verts.sx[face[2]];
-    const y = weights[0] * verts.sy[face[0]] + weights[1] * verts.sy[face[1]] + weights[2] * verts.sy[face[2]];
-    return `${roundCoord(x)} ${roundCoord(y)}`;
-  };
-  for (const segment of selection.segments) {
-    const face = mesh.faces[segment.face];
-    if (!face) continue;
-    // Selection deliberately surfaces every independent segment, including hidden/deep guides.
-    const target = segment.layer === 'surface' ? surface : deep;
-    target.push(`M${endpoint(face, segment.a)}L${endpoint(face, segment.b)}`);
-  }
-  const fibres: ProjectedMuscleBody['fibres'] = { surface: surface.join(''), deep: deep.join('') };
-  if (!selection.anatomicalParts.length) return fibres;
-  // Keep each component's highlight/shade together; flattening them fills fibre gaps at overlaps.
-  return { ...fibres, anatomicalParts: selection.anatomicalParts.map(part => {
-    const paths: string[] = [];
-    for (const chain of part.chains) projectModelContour(chain, frame, paths);
-    return { id: part.id, d: paths.join('') };
-  }) };
-};
-
-const modelEndpoint = (
-  segment: ModelFibreSegment,
-  offset: 0 | 3,
-  side: number,
-  frame: ReturnType<typeof projectionFrame>,
-): FibrePoint => {
-  const { cos, sin, scale, halfW, halfH } = frame;
-  const x = halfW + (side * segment[offset] * cos + segment[offset + 2] * sin) * scale;
-  return [Math.round(x * 10), Math.round((halfH - segment[offset + 1] * scale) * 10)];
-};
-
-const appendModelRun = (points: readonly FibrePoint[], paths: string[]): void => {
-  if (!points.length) return;
-  const reduced = reduceFibreRun(points);
-  paths.push(reduced.map((point, i) => `${i === 0 ? 'M' : 'L'}${point[0] / 10} ${point[1] / 10}`).join(''));
-  // SVG needs a zero-length edge to paint the isolated round cap.
-  if (reduced.length === 1) paths.push(`L${reduced[0][0] / 10} ${reduced[0][1] / 10}`);
-};
-
-const projectModelContour = (
-  chain: readonly ModelFibreSegment[],
-  frame: ReturnType<typeof projectionFrame>,
-  paths: string[],
-): void => {
-  const { cos, sin } = frame;
-  for (const side of [1, -1]) {
-    let points: FibrePoint[] = [];
-    for (const segment of chain) {
-      if (-side * segment[6] * sin + segment[8] * cos < BACKFACE_CULL_NZ) {
-        appendModelRun(points, paths);
-        points = [];
-        continue;
-      }
-      if (!points.length) points.push(modelEndpoint(segment, 0, side, frame));
-      const end = modelEndpoint(segment, 3, side, frame);
-      const last = points[points.length - 1];
-      if (end[0] !== last[0] || end[1] !== last[1]) points.push(end);
-    }
-    appendModelRun(points, paths);
-  }
-};
-
 const batchSlabTriangles = (
   slabTriangles: readonly ProjectedTriangle[],
   slabIndex: number
@@ -646,10 +583,181 @@ export type ProjectMuscleBodyOptions = {
   /** The shades to draw in: `buildThemeShadePalette(roles, mode)` for the theme now in use. */
   readonly palette: ThemeShadePalette;
   readonly mesh?: MuscleBodyMesh;
-  /** Prepared for this selection/report; omit to resolve directly from the source asset. */
-  readonly selectedFibres?: MuscleBodyFibreSelection;
   readonly november?: boolean;
   readonly overlay?: MuscleOverlayStyle;
+  readonly activeInjuries?: readonly ActiveInjuryOverlay[];
+};
+
+type InjuryAccumulator = {
+  readonly injury: ActiveInjuryOverlay;
+  readonly targetMuscleId: string;
+  readonly edgeCounts: Map<number, number>;
+  sumX: number;
+  sumY: number;
+  triangleCount: number;
+};
+
+export const INJURY_STATUS_PRIORITY: Record<ActiveInjuryOverlay['status'], number> = {
+  acute: 0,
+  managing: 1,
+  monitoring: 2,
+  resolved: 3,
+};
+
+const normalizeInjurySide = (
+  side?: 'left' | 'right' | 'bilateral' | null
+): 'left' | 'right' | 'bilateral' => {
+  return side === 'left' || side === 'right' ? side : 'bilateral';
+};
+
+const createInjuryAccumulators = (
+  activeInjuries?: readonly ActiveInjuryOverlay[]
+): InjuryAccumulator[] => {
+  if (!activeInjuries || activeInjuries.length === 0) return [];
+
+  const sorted = [...activeInjuries]
+    .filter(injury => injury.status !== 'resolved')
+    .sort((a, b) => {
+      const pDiff = INJURY_STATUS_PRIORITY[a.status] - INJURY_STATUS_PRIORITY[b.status];
+      if (pDiff !== 0) return pDiff;
+      return (b.painScore ?? 0) - (a.painScore ?? 0);
+    });
+
+  const accumulators: InjuryAccumulator[] = [];
+  const seen = new Set<string>();
+
+  for (const injury of sorted) {
+    const resolvedId = resolveInjuryMuscleGroupId({
+      muscleGroupId: injury.muscleGroupId ?? null,
+      label: injury.label ?? '',
+    });
+    if (!resolvedId) continue;
+
+    const targetMuscleId = canonicalMuscleId(resolvedId);
+    const normalizedSide = normalizeInjurySide(injury.side);
+    const key = `${targetMuscleId}:${normalizedSide}`;
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    accumulators.push({
+      injury,
+      targetMuscleId,
+      edgeCounts: new Map<number, number>(),
+      sumX: 0,
+      sumY: 0,
+      triangleCount: 0,
+    });
+  }
+  return accumulators;
+};
+
+const matchesInjurySide = (rawCenterX: number, side?: 'left' | 'right' | 'bilateral' | null): boolean => {
+  if (!side || side === 'bilateral') return true;
+  if (side === 'right') return rawCenterX > 0.005;
+  if (side === 'left') return rawCenterX < -0.005;
+  return true;
+};
+
+const accumulateInjuryFace = (
+  projected: ProjectedTriangle,
+  face: MuscleBodyFace,
+  mesh: MuscleBodyMesh,
+  accumulators: readonly InjuryAccumulator[]
+) => {
+  const [i0, i1, i2, matIdx] = face;
+  const rawCenterX = (mesh.vertices[i0][0] + mesh.vertices[i1][0] + mesh.vertices[i2][0]) / 3;
+  const faceMuscleId = canonicalMuscleId(projected.muscleGroupId);
+  const baseMaterial = matIdx !== undefined ? mesh.materials[matIdx] : undefined;
+  const baseMuscleId =
+    baseMaterial && baseMaterial !== 'neutral' ? canonicalMuscleId(baseMaterial) : null;
+
+  for (const acc of accumulators) {
+    const matchesTarget =
+      acc.targetMuscleId === faceMuscleId ||
+      (baseMuscleId !== null && acc.targetMuscleId === baseMuscleId);
+
+    if (matchesTarget && matchesInjurySide(rawCenterX, acc.injury.side)) {
+      recordFaceEdges(i0, i1, i2, acc.edgeCounts);
+      acc.sumX += (projected.x0 + projected.x1 + projected.x2) / 3;
+      acc.sumY += (projected.y0 + projected.y1 + projected.y2) / 3;
+      acc.triangleCount += 1;
+    }
+  }
+};
+
+const injuryStrokeForStatus = (status: ActiveInjuryOverlay['status'], palette: ThemeShadePalette): string => {
+  if (status === 'acute') return palette.injuryAcuteStroke;
+  if (status === 'managing') return palette.injuryManagingStroke;
+  return palette.injuryMonitoringStroke;
+};
+
+const buildProjectedInjuries = (
+  accumulators: readonly InjuryAccumulator[],
+  verts: RotatedVertices,
+  triangles: readonly ProjectedTriangle[],
+  palette: ThemeShadePalette,
+  angleDeg: number
+): { injuryContours: ProjectedInjuryContour[]; injuryBadges: ProjectedInjuryBadge[] } => {
+  const injuryContours: ProjectedInjuryContour[] = [];
+  const injuryBadges: ProjectedInjuryBadge[] = [];
+  const currentOrientation = bodyOrientationForAngle(angleDeg);
+
+  for (const acc of accumulators) {
+    const stroke = injuryStrokeForStatus(acc.injury.status, palette);
+    const contour = buildBoundaryContour(acc.edgeCounts, verts, stroke, triangles);
+    if (contour) {
+      injuryContours.push({
+        injuryId: acc.injury.id,
+        muscleGroupId: acc.targetMuscleId,
+        status: acc.injury.status === 'resolved' ? 'monitoring' : acc.injury.status,
+        side: acc.injury.side ?? null,
+        d: contour.d,
+        stroke: contour.stroke,
+      });
+    }
+
+    const muscleOrientation = canonicalOrientationForMuscle(acc.targetMuscleId);
+    const isFacing = currentOrientation === muscleOrientation;
+
+    if (acc.triangleCount > 0 && isFacing) {
+      injuryBadges.push({
+        injuryId: acc.injury.id,
+        muscleGroupId: acc.targetMuscleId,
+        status: acc.injury.status === 'resolved' ? 'monitoring' : acc.injury.status,
+        side: acc.injury.side ?? null,
+        label: acc.injury.label,
+        painScore: acc.injury.painScore,
+        x: roundCoord(acc.sumX / acc.triangleCount),
+        y: roundCoord(acc.sumY / acc.triangleCount),
+        visible: true,
+      });
+    } else {
+      injuryBadges.push({
+        injuryId: acc.injury.id,
+        muscleGroupId: acc.targetMuscleId,
+        status: acc.injury.status === 'resolved' ? 'monitoring' : acc.injury.status,
+        side: acc.injury.side ?? null,
+        label: acc.injury.label,
+        painScore: acc.injury.painScore,
+        x: acc.triangleCount > 0 ? roundCoord(acc.sumX / acc.triangleCount) : 0,
+        y: acc.triangleCount > 0 ? roundCoord(acc.sumY / acc.triangleCount) : 0,
+        visible: false,
+      });
+    }
+  }
+
+  // Sort SVG contours in painter's order (lowest severity first, acute last on top)
+  injuryContours.sort(
+    (a, b) => INJURY_STATUS_PRIORITY[b.status] - INJURY_STATUS_PRIORITY[a.status]
+  );
+
+  // Sort badges in DOM painter's order (lowest severity first, acute last on top)
+  injuryBadges.sort(
+    (a, b) => INJURY_STATUS_PRIORITY[b.status] - INJURY_STATUS_PRIORITY[a.status]
+  );
+
+  return { injuryContours, injuryBadges };
 };
 
 /**
@@ -665,12 +773,12 @@ export function projectMuscleBody({
   report,
   palette,
   mesh = MUSCLE_BODY_MESH,
-  selectedFibres = selectMuscleFibres(selectedId, report),
   november = false,
-  overlay = 'fibres',
+  overlay = 'contour',
+  activeInjuries,
 }: ProjectMuscleBodyOptions): ProjectedMuscleBody {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0 || !mesh.vertices.length || !mesh.faces.length) {
-    return { triangles: [], batches: [], fibres: { surface: '', deep: '' } };
+    return { triangles: [], batches: [] };
   }
   const verts = rotateAndProjectVertices(mesh, angleDeg, width, height);
   const selectedCanonicalId = selectedId ? canonicalMuscleId(selectedId) : null;
@@ -684,6 +792,7 @@ export function projectMuscleBody({
   };
   const triangles: ProjectedTriangle[] = [];
   const edgeCounts = overlay === 'contour' && selectedCanonicalId ? new Map<number, number>() : null;
+  const injuryAccums = createInjuryAccumulators(activeInjuries);
 
   for (const face of mesh.faces) {
     const projected = projectSingleFace(face, ctx);
@@ -691,6 +800,9 @@ export function projectMuscleBody({
       triangles.push(projected);
       if (edgeCounts && projected.selected) {
         recordFaceEdges(face[0], face[1], face[2], edgeCounts);
+      }
+      if (injuryAccums.length) {
+        accumulateInjuryFace(projected, face, mesh, injuryAccums);
       }
     }
   }
@@ -713,15 +825,20 @@ export function projectMuscleBody({
     ? buildBoundaryContour(edgeCounts, verts, palette.selectedStroke, triangles)
     : null;
 
-  const fibres = overlay === 'contour'
-    ? { surface: '', deep: '' }
-    : projectFibreSegments(selectedFibres, mesh, verts, projectionFrame(angleDeg, width, height));
+  const { injuryContours, injuryBadges } = buildProjectedInjuries(
+    injuryAccums,
+    verts,
+    triangles,
+    palette,
+    angleDeg
+  );
 
   return {
     triangles,
     batches,
-    fibres,
     ...(contour ? { contour } : {}),
+    ...(injuryContours.length ? { injuryContours } : {}),
+    ...(injuryBadges.length ? { injuryBadges } : {}),
   };
 }
 
@@ -734,7 +851,7 @@ export function hitTestProjectedMuscle(
   projected: ProjectedMuscleBody,
   x: number,
   y: number
-): Exclude<MuscleBodyMaterialId, 'neutral'> | null {
+): string | null {
   for (let i = projected.triangles.length - 1; i >= 0; i -= 1) {
     const tri = projected.triangles[i];
     if (pointInTriangle(x, y, tri)) {

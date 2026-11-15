@@ -13,8 +13,9 @@ accept `GET` only; the write routes accept `POST` (`PUT` for muscle targets, `PA
 for plan mutations) and require their current-grant permission. GET bodies and caller identity
 fields (`user_id`, `userId`, `owner_user_id`) are rejected.
 
-For active workout reads/writes and staged enablement, load
-[workout logging](../../../docs/specs/tech/agent-workout-contract.md).
+Load [workout logging](../../../docs/specs/tech/agent-workout-contract.md) for
+active workouts, and [health activities](../../../docs/specs/tech/health-activities-contract.md)
+for `/activities` and training-status `cardio`.
 
 Success envelope:
 
@@ -56,8 +57,7 @@ minute per function instance.
 }
 ```
 
-The MCP resource server calls this route to validate every bearer token; it
-returns no user or account fields.
+The MCP server validates every bearer token here; no user or account fields.
 
 ## Training profile
 
@@ -73,7 +73,8 @@ returns no user or account fields.
 }
 ```
 
-Gyms are capped at 50; account admin is excluded.
+Gyms cap at 50 and derived equipment at bounded history reads; email, username,
+billing, auth and account administration are excluded.
 
 ## Exercise search
 
@@ -108,9 +109,9 @@ Only owner rows are returned, soft-deleted ones only with `include_deleted`.
 Cursor ordering is stable by name then ID. `revision` is the definition's LWW
 stamp, quoted by every exercise edit.
 `GET /v1/agent/muscles` lists the owner's live muscles (`id`, `name`,
-`family`, plus the owner's setup: `report_group`, the key of the muscle the
-entry reports under or `null` for its own, and `tracked`, a boolean);
-exercise writes must name these ids, never a `report_group`.
+`family`, `report_group`: its combined muscle's key or `null`, and `tracked`)
+and `combined_muscles` (`key`, `name`, `family`);
+exercise writes must name these ids, never a combined muscle's key.
 
 ## Exercise context
 
@@ -139,12 +140,7 @@ nonexistent exercise produce the same `404` envelope.
     "gym_buckets": [
       { "gym": { "id": "gym-id", "name": "Home" },
         "last_performed_at": "2026-07-25T18:00:00.000Z",
-        "session_count": 23,
-        "personal_records": {
-          "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
-          "top_weight": { "value": 80, "reps": 8, "unit": "kg" },
-          "max_session_volume": { "value": 640, "unit": "kg_reps" }
-        } }
+        "session_count": 23, "personal_records": {} }
     ]
   },
   "recent_performances": [{
@@ -155,49 +151,26 @@ nonexistent exercise produce the same `404` envelope.
     "duration_seconds": 3600,
     "volume": { "value": 640, "unit": "kg_reps" },
     "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
-    "sets": [{
-      "id": "set-id",
-      "order_index": 0,
-      "load": { "value": 80, "unit": "kg" },
-      "reps": 8,
-      "set_type": "rir_2",
-      "performance_status": null,
-      "outcome": "completed"
-    }, {
-      "id": "warm-up-set-id",
-      "order_index": 1,
-      "load": { "value": 60, "unit": "kg" },
-      "reps": 5,
-      "set_type": "warm_up",
-      "performance_status": null,
-      "outcome": "completed"
-    }]
+    "sets": [{ "id": "set-id", "order_index": 0, "load": { "value": 80, "unit": "kg" }, "reps": 8, "set_type": "rir_2", "performance_status": null, "outcome": "completed" }]
   }],
-  "personal_records": {
-    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
-    "top_weight": { "value": 80, "reps": 8, "unit": "kg" },
-    "max_session_volume": { "value": 640, "unit": "kg_reps" }
-  },
-  "volume_series": [{
-    "completed_at": "2026-07-25T18:00:00.000Z",
-    "value": 640,
-    "unit": "kg_reps"
-  }],
+  "personal_records": { "estimated_one_rep_max": { "value": 102.14, "unit": "kg" }, "top_weight": { "value": 80, "reps": 8, "unit": "kg" }, "max_session_volume": { "value": 640, "unit": "kg_reps" } },
+  "volume_series": [{ "completed_at": "2026-07-25T18:00:00.000Z", "value": 640, "unit": "kg_reps" }],
   "last_performed_at": "2026-07-25T18:00:00.000Z",
   "training_notes": [],
-  "unavailable_fields": [
-    "failed_set_semantics",
-    "user_authored_training_notes"
-  ],
+  "training_notes_truncated": false,
+  "unavailable_fields": ["failed_set_semantics"],
   "history_truncated": false
 }
 ```
 
 Personal-record and volume calculations import the canonical mobile domain
 calculation module and read [working sets only](#working-sets-only)
-([[set.eligibility]]), so the warm-up above is listed but feeds no figure.
-`gym_usage` counts working-set sessions per gym (up to 50) and no gym;
-`complete` is false when bounded. Unauthored notes and failed sets report unavailable.
+([[set.eligibility]]): a warm-up (`set_type: "warm_up"`) is listed but feeds no figure.
+`gym_usage`, on every exercise, counts the sessions holding a working set per
+gym (up to 50, most recent first) and with no gym; `complete` is false when the
+history read was bounded. BoGa has no failed-set meaning, so that field is
+reported unavailable. `training_notes` are the exercise's 20 newest
+[notes](#training-notes).
 
 ## Exercise history
 
@@ -207,60 +180,27 @@ Keyset-paginated performed set history for one exercise owned by the user,
 ordered in reverse chronological completed-session order by
 `(session_completed_at, session_id, exercise_order, set_order)`. Query
 parameters: `limit` (`1..100`, default `20`), opaque `cursor`, and `gym_bucket`
-(see [gym buckets](#gym-buckets)). Drains to exhaustion. Sets each carry their
-own `gym` (`null` for no gym); `gym_bucket` filters the stream to one gym and pins
-the cursor.
+(see [gym buckets](#gym-buckets)). Paging never partitions by gym: a page is one page of sets
+across every gym, and a split exercise's sets each carry their own `gym` (`null`
+for a session with no gym), as a workout does — group by it before comparing.
+`gym_bucket` filters the stream to one gym, and only then does the cursor pin
+it and `exercise.gym` name it.
 
 ```json
 {
-  "sets": [{
-    "id": "set-id",
-    "session_id": "session-id",
-    "session_completed_at": "2026-07-25T18:00:00.000Z",
-    "exercise_id": "exercise-id",
-    "exercise_name": "Bench press",
-    "order_index": 0,
-    "load": { "value": 80, "unit": "kg" },
-    "calculated_load": { "value": 80, "unit": "kg" },
-    "reps": 8,
-    "set_type": "rir_2",
-    "volume": { "value": 640, "unit": "kg_reps" },
-    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" },
-    "gym": { "id": "gym-id", "name": "Home" }
-  }],
+  "sets": [{ "id": "set-id", "session_id": "session-id", "session_completed_at": "2026-07-25T18:00:00.000Z",
+    "exercise_id": "exercise-id", "exercise_name": "Bench press", "order_index": 0, "load": { "value": 80, "unit": "kg" },
+    "calculated_load": { "value": 80, "unit": "kg" }, "reps": 8, "set_type": "rir_2", "volume": { "value": 640, "unit": "kg_reps" },
+    "estimated_one_rep_max": { "value": 102.14, "unit": "kg" }, "gym": { "id": "gym-id", "name": "Home" } }],
   "next_cursor": null
 }
 ```
 
 ## Gym buckets
 
-An exercise the user tracks separately per gym (`exercise.split_by_gym`) keeps
-its whole-exercise figures and adds one bucket per gym ([[gym.split]]). Unset
-`gym_bucket` is the whole exercise: every gym, and the sessions with no gym,
-which count only there and are never a bucket of their own. `gym_bucket` names
-one gym id, and context's figures, or history's stream, then come from that
-gym's sessions alone. It is `400 INVALID_ARGUMENT` on an exercise that is not
-split, when empty, or against a cursor for another gym, and `404` for a gym the
-user does not own. `none` is rejected the same way, and a history cursor pinned
-to the no-gym sessions is `400 INVALID_CURSOR` while the exercise is split.
+An exercise tracked separately per gym (`split_by_gym: true`) keeps whole-exercise figures and adds one bucket per gym ([[gym.split]]). Unset `gym_bucket` covers the whole exercise; naming a gym id scopes figures or history sets to that gym alone. Non-split exercises, empty values, or foreign gyms reject with `400` or `404`; `none` or no-gym history cursors reject with `400 INVALID_CURSOR`.
 
-The context route's `exercise.gym_buckets` lists every gym it could see, most
-recently performed first, each with its own `personal_records` and
-`session_count`, so one call compares the gyms. Past 50 gyms it lists the 50
-newest and sets `gym_buckets_truncated`. Gyms are
-ranked over the sessions those figures count — [working sets
-only](#working-sets-only) — so a gym performed only as warm-ups is not listed.
-Each of a split exercise's `recent_performances` and `volume_series` points
-names its `gym` (`null` for no gym). The history route carries no inventory;
-its sets already name their gyms.
-
-`exercise.gym` appears only when one gym owns the response: a request naming
-`gym_bucket`. Equal `last_performed_at` values break on the gym id; a truncated
-history (`history_truncated`) can still hide a gym. An exercise that is not
-split carries `split_by_gym: false` and no gym field, and a cursor's filter
-lapses if the flag is turned off between pages. A filtered history's
-`next_cursor` carries its gym, so draining it keeps the filter; an unfiltered
-cursor stays unfiltered.
+`exercise.gym_buckets` lists up to 50 gyms, newest performed first, each with `personal_records` and `session_count` across [working sets only](#working-sets-only); past 50 sets `gym_buckets_truncated: true`. In split exercises, `recent_performances` and `volume_series` points name their `gym`. `exercise.gym` appears only when `gym_bucket` is specified. Filtered history cursors preserve their gym filter.
 
 ## Workout detail
 
@@ -283,19 +223,9 @@ inaccessible or nonexistent session produces a `404` envelope.
     "completed_set_count": 2,
     "total_volume": { "value": 1440, "unit": "kg_reps" },
     "exercises": [{ "id": "block-id", "exercise_id": "exercise-id", "name": "Bench press" }],
-    "sets": [{
-      "id": "set-id",
-      "session_id": "session-id",
-      "session_exercise_id": "block-id",
-      "exercise_id": "exercise-id",
-      "exercise_name": "Bench press",
-      "order_index": 0,
-      "load": { "value": 80, "unit": "kg" },
-      "calculated_load": { "value": 80, "unit": "kg" },
-      "reps": 8,
-      "set_type": "rir_2",
-      "volume": { "value": 640, "unit": "kg_reps" }
-    }],
+    "sets": [{ "id": "set-id", "session_id": "session-id", "session_exercise_id": "block-id",
+      "exercise_id": "exercise-id", "exercise_name": "Bench press", "order_index": 0, "load": { "value": 80, "unit": "kg" },
+      "calculated_load": { "value": 80, "unit": "kg" }, "reps": 8, "set_type": "rir_2", "volume": { "value": 640, "unit": "kg_reps" } }],
     "next_cursor": null
   }
 }
@@ -347,20 +277,22 @@ returns one bounded object; days and Monday-start weeks are the profile
 {
   "metric_revision": "working_sets_v10", "as_of": "2026-10-28T12:00:00.000Z",
   "time_zone": "Europe/London", "today": "2026-10-28", "week_start": "2026-10-26",
-  "muscle_setup": "broad", "counts_secondary_sets": true, "volume_primary_only": false,
+  "muscle_setup": "combined", "counts_secondary_sets": true, "volume_primary_only": false,
   "targets": { "mode": "per_muscle", "default_weekly_sets": 8, "uploaded": true, "revision": 1761650000000 },
-  "muscles": [{ "id": "chest", "name": "Chest", "family": "Chest", "weekly_target": 12,
+  "muscles": [{ "id": "cm_chest", "name": "Chest", "family": "Chest", "weekly_target": 12,
     "week_sets": 6.5, "recovery_days": [{ "date": "2026-10-25", "sets": null }],
     "today_sets": null, "last_trained_on": "2026-10-27",
     "weekly_sets_last_4_weeks": [{ "week_start": "2026-09-28", "sets": 10 }] }],
   "favourite_exercises": [{ "exercise_id": "…", "name": "Bench Press", "sessions_28d": 7,
     "last_done_on": "2026-10-26", "best_e1rm_kg": { "last_28d": 102.5, "previous_28d": 98.0 },
     "last_record_on": "2026-10-12", "record_history_complete": true }],
-  "complete": true
+  "complete": true,
+  "general_notes": { "from": "2026-09-03", "notes": [], "complete": true }
 }
 ```
 
-`training-status.ts` uses Today's Plan functions with coaching eligibility and
+`general_notes` holds the 20 newest general [notes](#training-notes) dated
+from `from`, the first of the 56 days. `training-status.ts` uses Today's Plan functions with coaching eligibility and
 completed workouts. `counts_secondary_sets` controls Sets; `volume_primary_only`
 reports the independent Volume choice ([[muscle.secondary-filter]]). Favourites
 rank by working-set sessions in 28 days, latest done, then name; the app uses
@@ -379,12 +311,48 @@ muscle read hit its cap: 200 sessions, 1000 rows per chunk, or 500 muscles.
 (`single` | `per_muscle`), `overrides` (`{muscle_id: n | null}`, null clears).
 Targets are positive whole numbers, ids muscles the user's setup reports (`400
 VALIDATION_ERROR` naming the id; [[muscle.weekly-targets]]); a stale revision
-is `409 REVISION_CONFLICT`. The setup scope is derived as the app does
-(`muscle-targets.ts`); `agent_set_muscle_targets` merges into it, keeps the
-other scopes and the count-secondary switch, and stamps the row past the wall
-clock so devices pull it. While `uploaded` is false it builds on app defaults
-(first writer wins). It returns `scope`, `overrides`, `targets`,
-`idempotent_replay`.
+is `409 REVISION_CONFLICT`. `agent_set_muscle_targets` merges into
+`muscle_targets` (seeded from the legacy targets the status shows), keeps
+other columns, and stamps the row past the wall clock so devices pull it. While `uploaded` is
+false it builds on app defaults (first writer wins). It returns `overrides`,
+`targets`, `idempotent_replay`.
+
+## Training notes
+
+`GET /v1/agent/notes` lists live notes, newest `noted_on` (the day a note
+applies from) first, then newest created, then id. Optional `exercise_id`,
+`from`/`to` (`YYYY-MM-DD`, both included), `limit` (`1..50`, default `20`),
+`cursor`.
+
+```json
+{ "notes": [{ "id": "note-id", "body": "Squat to a bench", "noted_on": "2026-11-12",
+  "source": "agent", "exercise_id": "exercise-id", "exercise_name": "Back Squat",
+  "created_at": "2026-11-12T09:00:00.000Z" }], "next_cursor": null }
+```
+
+A deleted exercise keeps its `exercise_name`; general notes have null exercise
+fields. `POST /v1/agent/notes` (`{body, noted_on?, exercise_id?}`) and
+`POST /v1/agent/notes/{id}/remove` (`{}`) need write access and an
+`Idempotency-Key` (own 30-per-minute window). `body` is 1–1000 characters after
+trimming; `noted_on` a real date not after the profile zone's today, the
+default (hashed as sent, so a retry after midnight replays). Add returns `note`
+(`source: "agent"`), remove soft-deletes (`removed`, `note_id`); both return
+`idempotent_replay`. A foreign or unknown exercise is `400
+FOREIGN_RESOURCE_REFERENCE`, a deleted one `409 EXERCISE_DELETED`; a missing,
+foreign or removed note `404`.
+
+## Injuries and physical limitations
+
+Load [injury contract](../../../docs/specs/tech/injury-contract.md) for data model and lifecycle states. `GET /v1/agent/injuries` returns active and recent injuries, newest `started_at` first, then id. Optional `status` (`acute`, `managing`, `monitoring`, `resolved`), `include_resolved` (default false), `limit` (`1..50`, default 20), `cursor`.
+
+```json
+{ "injuries": [{ "id": "injury-id", "muscle_group_id": "quads", "muscle_group_name": "Quads",
+  "side": "right", "status": "acute", "pain_score": 7, "label": "Patellar irritation",
+  "notes": null, "contraindications": "Deep squats", "started_at": "2026-11-10T10:00:00.000Z",
+  "resolved_at": null, "created_at": "2026-11-10T10:00:00.000Z", "updated_at": "2026-11-10T10:00:00.000Z" }], "next_cursor": null }
+```
+
+`POST /v1/agent/injuries` (`{label, muscle_group_id?, side?, status?, pain_score?, notes?, contraindications?, started_at?}`) and `PATCH /v1/agent/injuries/:id` (`{status?, pain_score?, notes?, contraindications?}`) need write access (`403 INJURY_PERMISSION_REQUIRED`) and an `Idempotency-Key` (own 30/min window). `label` is 1–100 trimmed characters; `muscle_group_id` one of 25 canonical IDs or null (`400 INVALID_ANATOMY_REFERENCE` if invalid); `pain_score` 0–10 or null; `started_at` not in the future. Resolving an injury stamps `resolved_at`. Both return `injury` and `idempotent_replay`. Missing, foreign or deleted injury is `404 INJURY_NOT_FOUND`.
 
 ## Working sets only
 
@@ -421,28 +389,21 @@ an earlier `metric_revision` meant, see the
 
 ## Optional bodyweight calculation response
 
-> **Status: accepted current response contract.**
+Exercise-context and workout responses (`metric_revision: "working_sets_v10"`)
+carry this contract. Weights are kg; set `load` and `top_weight` are the raw
+entered Weight, never including bodyweight. The API reads the owner-synced
+private preference first:
 
-Exercise-context and workout responses carry
-`metric_revision: "working_sets_v10"`, which includes this bodyweight contract. Routes, arguments, authorization
-and envelopes stay at API v1. Every weight is kg. The existing set `load` and
-`top_weight` are raw entered Weight and never include bodyweight contribution.
-
-The API resolves the owner-synced private preference before calculating:
-
-- preference off: use ordinary Weight/1RM/Volume math and omit
-  `session_body_weight`, reading provenance and contribution fields;
-- preference on with a positive contribution: include
-  `bodyweight_contribution`, use the latest valid reading at/before each session
-  start, and return the applicable reading needed for an authorized coach to
-  interpret those bodyweight-aware derived metrics;
-- preference on with a zero contribution: use ordinary math and omit the
-  reading and bodyweight context because no derived metric requires them;
-- preference on with a positive contribution but no reading: use the personal
-  zero fallback and return a `missing` context without blocking metrics.
+- off: ordinary Weight/1RM/Volume math, without `session_body_weight`,
+  provenance or contribution fields;
+- on, positive contribution: include `bodyweight_contribution` and the latest
+  valid reading at/before each session start, which the derived metrics use;
+- on, zero contribution: ordinary math, no reading or bodyweight context;
+- on, positive contribution, no reading: the personal zero fallback and a
+  `missing` context, without blocking metrics.
 
 The service-only `session_weight_contexts` RPC batches already-authorized
-sessions. It is not executable by normal app/OAuth clients and never returns the
+sessions; normal app/OAuth clients cannot execute it and it never returns the
 owner's timeline. An enabled response may contain:
 
 ```json
@@ -456,12 +417,11 @@ owner's timeline. An enabled response may contain:
 }
 ```
 
-Missing uses
-`{"status":"missing","value":null,"unit":"kg","measured_at":null}`;
-malformed rows are skipped, so an older valid row may apply; if none applies the
-context is `missing`. There is no future estimate or session override.
+Missing is `{"status":"missing","value":null,"unit":"kg","measured_at":null}`;
+malformed rows are skipped, so an older valid row may apply. There is no future
+estimate or session override.
 
-Performed sets use ordinary vocabulary and separate raw/derived values:
+Performed sets keep raw and derived values apart:
 
 ```json
 {
@@ -477,24 +437,23 @@ Parsing, the zero rule and the load, Volume and 1RM formulas are the app's
 §4); only confirmed performed rows ([[set.performed]]) that are not deleted
 contribute.
 
-Volume coverage remains explicit for invalid/overflow/truncated input. Missing
-bodyweight under the personal policy is complete zero-fallback input, not
-incomplete coverage. A null value is unavailable, never zero. Records stay
-bounded by `history_truncated`, never implying lifetime coverage.
-
-Settings, definitions, sessions, sets and applicable readings are owner-filtered and batched,
-with no per-set query or timeline response. Preference, contribution,
-reading and session-start changes affect the next API read; no derived value is
-persisted.
+Volume coverage stays explicit for invalid/overflow/truncated input; missing
+bodyweight under the personal policy is complete zero-fallback input. A null
+value is unavailable, never zero; records stay bounded by `history_truncated`.
+Reads are owner-filtered and batched (no per-set query); changes apply on the
+next read and no derived value is persisted.
 
 ## Plan permission and write routes
 
-The base OAuth grant is read-only. Reading upcoming plans, creating plans or programmes,
-editing exercises and setting muscle targets additionally require a current-grant row in
-`public.agent_plan_permissions` (`plan_access_enabled = true` and matching `granted_at`).
-Missing or mismatched rows return `403 PLAN_PERMISSION_REQUIRED`. Mutating plans or
+The base OAuth grant is read-only. Reading the upcoming plan queue, creating
+plans/programmes, editing exercises, setting muscle targets and writing notes additionally
+require a current-grant row in `public.agent_plan_permissions`
+(`plan_access_enabled = true` and `granted_at` equal to the live OAuth grant
+timestamp). A missing, false or grant-mismatched row returns `403
+PLAN_PERMISSION_REQUIRED` before any referenced resource is resolved. Mutating plans or
 programmes (`PATCH`) additionally requires `plan_edit_enabled = true`
-(`403 PLAN_EDIT_PERMISSION_REQUIRED`). Enabled per client on Connected Agents ([[agents.write-access]]).
+(`403 PLAN_EDIT_PERMISSION_REQUIRED`). The person enables it per client on the
+Connected Agents screen ([[agents.write-access]]).
 
 ### `GET /v1/agent/session-plans` and `GET /v1/agent/programmes/{id}`
 
@@ -577,10 +536,10 @@ change re-scores linked group exercises. The response is the RPC result
 - `400` invalid argument, cursor, foreign reference, or active block edit (`IMMUTABLE_BLOCK_MUTATION`).
 - `401` missing, invalid, expired, normal-app, or revoked authorization.
 - `403` write access missing, disabled or bound to a stale grant (`PLAN_PERMISSION_REQUIRED`, `PLAN_EDIT_PERMISSION_REQUIRED`).
-- `404` unknown route or nonexistent resource.
-- `405` unsupported method (`GET, POST, PUT, PATCH`).
-- `409` idempotency conflict, stale version (`PLAN_CONCURRENT_MODIFICATION`), or deleted exercise.
-- `413` request body exceeds bound or response exceeds 256 KiB safety bound.
+- `404` unknown route or inaccessible/nonexistent resource, exercise, or note.
+- `405` unsupported method for the route (`GET, POST, PUT, PATCH`).
+- `409` idempotency conflict, stale revision or version (`PLAN_CONCURRENT_MODIFICATION`), or edit of a deleted exercise.
+- `413` the request body exceeds its bound, or the generated response exceeds its 256 KiB safety bound.
 - `429` request rate exceeded.
 - `500` internal/database failure with no sensitive detail.
 - `503` `UPSTREAM_UNAVAILABLE` with `Retry-After`: Supabase Auth unavailable.

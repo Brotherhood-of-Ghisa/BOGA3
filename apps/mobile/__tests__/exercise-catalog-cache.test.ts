@@ -15,6 +15,7 @@ jest.mock('@/src/data/exercise-catalog', () => ({
   listExerciseCatalogMuscleGroups: jest.fn(),
   listExerciseCatalogExercises: jest.fn(),
 }));
+jest.mock('@/src/data/muscle-report-settings', () => ({ readCombinedMuscleDefinitions: jest.fn(async () => null) }));
 
 const mockListMuscleGroups = jest.mocked(listExerciseCatalogMuscleGroups);
 const mockListExercises = jest.mocked(listExerciseCatalogExercises);

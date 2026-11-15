@@ -67,6 +67,8 @@ import { competitionEvent, competitionSession } from './helpers/competition-fixt
 
 import { bootLocalApp, closeLocalData, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
+import { rolesFor } from './helpers/theme';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 
 import TodayRoute from '../app/(tabs)/today';
 
@@ -198,11 +200,14 @@ const streamSession = (userId: string, sessionId: string, startedAtMs: number, s
 const boardValue = (metric: 'e1rm' | 'weight', value: number) =>
   ({ role: 'record' as const, metric, unit: 'kg', value, unavailable: false, member: null });
 const deadlift = { ...competitionEvent, visibility: 'ordinary' as const, group_exercise: { group_exercise_id: 'gx-dl', name: 'Deadlift' } };
-const recordItem = (userId: string, sessionId: string, values: ReturnType<typeof boardValue>[]) => ({
+// A new best on each board in `values`; `groupRecords` names the boards it took #1 on (all of them by default).
+const recordItem = (userId: string, sessionId: string, values: ReturnType<typeof boardValue>[],
+  groupRecords: ('e1rm' | 'weight')[] = values.map((value) => value.metric), key = `record-${sessionId}`) => ({
   kind: 'competition' as const,
-  key: `record-${sessionId}`,
+  key,
   sort_at_ms: NOW.getTime() - 2 * DAY,
-  event: { ...deadlift, event_id: `record-${sessionId}`, member: member(userId), session_id: sessionId, values },
+  event: { ...deadlift, event_id: key, member: member(userId), session_id: sessionId, values },
+  record: { performance: null, previous: [], group_record_metrics: groupRecords },
 });
 const streamPage = (items: unknown[], nextCursor: string | null = null) =>
   ({ contract_version: 4 as const, items, next_cursor: nextCursor, has_more: nextCursor !== null }) as Awaited<
@@ -291,7 +296,7 @@ describe('Today: the group card', () => {
     expect(byId('today-group-board-me-records')).toHaveTextContent('2');
     // No count of the members left off.
     expect(screen.queryByText(/more$/)).toBeNull();
-    expect(byId('today-group-board').props.accessibilityLabel).toMatch(/^This week, 05-10-2026 – 11-10-2026; 1, dave, 60 sets, 0 PRs;.*; You, 7th, 30 sets, 2 PRs$/);
+    expect(byId('today-group-board').props.accessibilityLabel).toMatch(/^This week, 05-10-2026 – 11-10-2026; 1, dave, 60 sets, 0 group records;.*; You, 7th, 30 sets, 2 group records$/);
   });
 
   it("with several groups: the header row names the Groups screen pick, and its switch, on the same row, moves both", async () => {
@@ -361,7 +366,7 @@ describe('Today: the group card', () => {
       ]);
     });
 
-    it('reads the stream only when the live sessions and the latest leave room', async () => {
+    it('reads the stream only when the live sessions leave room, the latest included for its PRs', async () => {
       api.listMyGroups.mockResolvedValue({ groups: [IRON] });
       // Four training now fill the card: no latest, no stream.
       api.getCompetitionWeek.mockResolvedValueOnce(summary({ training_now: ['maria', 'sam', 'tom', 'kit'].map(live) }));
@@ -373,31 +378,40 @@ describe('Today: the group card', () => {
       expect(api.getCompetitionStream).not.toHaveBeenCalled();
       view.unmount();
 
-      // Three training now and the summary's latest: four again, still no stream.
+      // Three training now and the summary's latest: four again, and the stream is read for the latest's PRs.
       api.getCompetitionWeek.mockResolvedValueOnce(summary({ training_now: ['maria', 'sam', 'tom'].map(live) }));
       await renderToday();
       await waitFor(() => expect(sessionMembers()).toEqual(['maria', 'sam', 'tom', 'dave']));
       expect(within(byId('today-group-recent')).getByTestId('today-group-session-dave-done')).toBeTruthy();
-      expect(api.getCompetitionStream).not.toHaveBeenCalled();
+      await waitFor(() => expect(api.getCompetitionStream).toHaveBeenCalledWith('g1', null));
     });
 
-    it('names one group record and counts several', async () => {
+    it('names every GR under its session in the record colour, and counts the PRs on the figures line', async () => {
       const latest = summary().latest_completed!;
       api.listMyGroups.mockResolvedValue({ groups: [IRON] });
       api.getCompetitionWeek.mockResolvedValue(summary({
-        latest_completed: { ...latest, group_records: [{ ...deadlift, values: [boardValue('e1rm', 213.3)] }] },
+        latest_completed: { ...latest, group_records: [{ ...deadlift, event_id: 'dave-gr', values: [boardValue('e1rm', 213.3)] }] },
       }));
-      // One set #1 on Weight and on 1RM: two group records, only counted.
       api.getCompetitionStream.mockResolvedValue(streamPage([
-        recordItem('sam', 'sam-1', [boardValue('weight', 200), boardValue('e1rm', 213.3)]),
+        // The latest's own records, from the stream: one #1 and one new best that took no #1.
+        recordItem('dave', 'dave-done', [boardValue('e1rm', 213.3)], ['e1rm'], 'dave-gr'),
+        recordItem('dave', 'dave-done', [boardValue('weight', 150)], [], 'dave-pr'),
+        streamSession('dave', 'dave-done', NOW.getTime() - DAY),
+        // sam: #1 on Weight and on 1RM in one set, then a set that was only a new best.
+        recordItem('sam', 'sam-1', [boardValue('weight', 200), boardValue('e1rm', 213.3)], ['weight', 'e1rm'], 'sam-gr'),
+        recordItem('sam', 'sam-1', [boardValue('e1rm', 180), boardValue('weight', 170)], [], 'sam-pr'),
         streamSession('sam', 'sam-1', NOW.getTime() - 2 * DAY),
       ]));
       await renderToday();
 
-      await waitFor(() => expect(byId('today-group-session-sam-1-record')).toHaveTextContent('2 group records'));
-      expect(byId('today-group-session-dave-done-record')).toHaveTextContent('Deadlift 1RM 213.3');
-      expect(byId('today-group-session-dave-done-figures')).toHaveTextContent('4 exercises · 18 sets · Deadlift 1RM 213.3');
-      expect(byId('today-group-session-sam-1-figures')).toHaveTextContent('1 exercise · 1 set · 2 group records');
+      await waitFor(() => expect(byId('today-group-session-sam-1-record-sam-gr')).toHaveTextContent('DeadliftWeight 200.0 · 1RM 213.3'));
+      expect(within(byId('today-group-session-sam-1-record-sam-gr')).getByText(/1RM/)).toHaveStyle({ color: rolesFor(DEFAULT_APPEARANCE).record });
+      expect(screen.queryByTestId('today-group-session-sam-1-record-sam-pr')).toBeNull();
+      expect(byId('today-group-session-sam-1-figures')).toHaveTextContent('1 exercise · 1 set · 2 PRs');
+      expect(byId('today-group-session-dave-done-record-dave-gr')).toHaveTextContent('Deadlift1RM 213.3');
+      // The latest keeps the summary's figures, with the PR count the stream adds.
+      await waitFor(() => expect(byId('today-group-session-dave-done-figures')).toHaveTextContent('4 exercises · 18 sets · 1 PR'));
+      expect(byId('today-group-session-dave-done').props.accessibilityLabel).toContain('4 exercises · 18 sets · 1 PR, group record, Deadlift 1RM 213.3');
     });
 
     it("says so when the earlier sessions can't be read, keeping the summary's", async () => {

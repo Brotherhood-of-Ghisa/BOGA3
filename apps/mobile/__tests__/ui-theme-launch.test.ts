@@ -48,12 +48,13 @@ const WARM = getThemePreset('warm');
 
 // Custom colours far from any preset: a dark teal page, a high-strength accent.
 const CUSTOM: CustomColours = {
-  background: { hue: 200, strength: 30, lightness: 20, depth: 150 },
-  ink: { hue: 265, strength: 30 },
-  text: { hue: 60, strength: 10 },
+  background: { hue: 200, strength: 30, mode: 'dark', lightness: 20, depth: 150 },
+  borders: { hue: 200, strength: 30, match: true, contrast: 150 },
+  ink: { hue: 265, strength: 30, lightness: 95 },
+  text: { hue: 60, strength: 10, contrast: 100 },
   accent: { hue: 330, strength: 80 },
   record: { hue: 90, strength: 60 },
-  viz: { hue: 150, strength: 50 },
+  viz: { hue: 150, strength: 50, gamut: false },
 };
 const CHOSEN: AppearanceChoice = { theme: 'custom', mode: 'light', custom: CUSTOM };
 
@@ -290,16 +291,28 @@ describe('the mode a choice draws in', () => {
     expect(resolveMode(mode, osScheme)).toBe(expected);
   });
 
+  it.each(['light', 'dark'] as const)('draws a custom page in its own mode (%s), whatever its lightness, the stored mode and the phone', (expected) => {
+    for (const lightness of [20, 96]) {
+      const custom = { ...CUSTOM, background: { ...CUSTOM.background, mode: expected, lightness } };
+      for (const osScheme of ['light', 'dark', null] as const) {
+        expect(appearanceMode({ theme: 'custom', mode: 'system', custom }, osScheme)).toBe(expected);
+      }
+    }
+  });
+
   it.each([
     [20, 'dark'],
     [49, 'dark'],
     [50, 'light'],
     [96, 'light'],
-  ] as const)('draws a custom page of %s in %s, whatever the stored mode and the phone', (lightness, expected) => {
-    const custom = { ...CUSTOM, background: { ...CUSTOM.background, lightness } };
-    for (const osScheme of ['light', 'dark', null] as const) {
-      expect(appearanceMode({ theme: 'custom', mode: 'system', custom }, osScheme)).toBe(expected);
-    }
+  ] as const)('launches a custom page of %s saved before it had a mode in %s, as it was drawn', (lightness, expected) => {
+    const { mode: _mode, ...saved } = CUSTOM.background;
+    const legacy = { background: { ...saved, lightness }, ink: { hue: 265, strength: 30 }, text: { hue: 60, strength: 10 }, accent: CUSTOM.accent, record: CUSTOM.record, viz: { hue: 150, strength: 50 } };
+    Storage.setItemSync(APPEARANCE_STORAGE_KEY, JSON.stringify({ theme: 'custom', mode: 'light', custom: legacy }));
+    const { launch } = launchWith('light');
+    expect(launch.launchTheme.problem).toBeNull();
+    expect(launch.launchTheme.appearance.custom?.background.mode).toBe(expected);
+    expect(appearanceMode(launch.launchTheme.appearance, 'light')).toBe(expected);
   });
 
   it('is not pinned by loading the stored choice: the theme provider pins it (`theme-context.tsx`)', () => {

@@ -4,8 +4,9 @@
  * Settings → Appearance (`docs/specs/ui/design-language.md` "Presets"): the
  * theme presets and Custom as radio rows on a page, a choice saved per device
  * at once and drawn by the app at once, Mode for a preset, the custom
- * colours' rows that open their pickers, and the failures that must be logged
- * rather than silent. Settings home's row names the choice and pushes the page.
+ * colours' rows that open their pickers, the preview below them, the header's
+ * indicator while a choice is being drawn, and the failures that must be
+ * logged rather than silent. Settings home's row names the choice and pushes the page.
  *
  * The choice lives in expo-sqlite's key-value store, faked in memory for every
  * suite by jest.setup.ts and read back here. Replaced: the router, the auth
@@ -26,6 +27,10 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useNavigation: () => ({ setOptions: jest.fn() }),
   useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+  // The header's right control is rendered in place.
+  Stack: {
+    Screen: ({ options }: { options: { headerRight?: () => unknown } }) => options.headerRight?.() ?? null,
+  },
 }));
 
 jest.mock('@/src/auth', () => ({ useAuth: () => ({ user: null }) }));
@@ -44,6 +49,7 @@ import { DEFAULT_APPEARANCE, getThemePreset } from '@/components/ui/theme-preset
 import { APPEARANCE_STORAGE_KEY, saveAppearance, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { ensureExerciseListPreferencesLoaded } from '@/src/exercise-catalog/list-preferences';
+import { waitForGone } from './helpers/wait-for-gone';
 import { renderWithTheme, switchTheme } from './helpers/theme';
 import SettingsAppearanceRoute from '../app/settings-appearance';
 import SettingsRoute from '../app/settings';
@@ -114,6 +120,55 @@ it('saves a choice at once, with no word that it waits for the next launch', asy
   fireEvent.press(screen.getByTestId('settings-appearance-option-warm'));
   await waitFor(() => expect(storedAccent()).toBe('warm'));
   expect(within(screen.getByTestId('settings-appearance-option-warm')).getByText('Default')).toBeTruthy();
+});
+
+it('draws the preview below the choices', () => {
+  render(<SettingsAppearanceRoute />);
+  const ids: string[] = [];
+  const walk = (node: { props?: { testID?: string }; children?: unknown[] } | string) => {
+    if (typeof node === 'string') return;
+    if (node.props?.testID) ids.push(node.props.testID);
+    (node.children ?? []).forEach((child) => walk(child as never));
+  };
+  walk(screen.toJSON() as never);
+  const at = (id: string) => ids.indexOf(id);
+  expect(at('settings-appearance-preview')).toBeGreaterThan(at('settings-appearance-mode-dark'));
+  expect(at('settings-appearance-option-warm')).toBeLessThan(at('settings-appearance-mode-dark'));
+});
+
+it('shows the applying indicator from a choice until the app is drawn in it, and not after a failed save', async () => {
+  let finish: () => void = () => undefined;
+  jest.spyOn(Storage, 'setItem').mockImplementationOnce((key, value) => new Promise<void>((resolve) => {
+    finish = () => {
+      Storage.setItemSync(key, value as string);
+      resolve();
+    };
+  }));
+  renderWithTheme(<SettingsAppearanceRoute />);
+  expect(screen.queryByTestId('settings-appearance-applying')).toBeNull();
+
+  fireEvent.press(screen.getByTestId('settings-appearance-option-slate'));
+  expect(screen.getByRole('progressbar', { name: 'Applying the theme' })).toBeTruthy();
+  // The save is queued behind earlier ones: let it reach the store first.
+  await waitFor(() => expect(Storage.setItem).toHaveBeenCalled());
+  expect(screen.getByRole('progressbar', { name: 'Applying the theme' })).toBeTruthy();
+  await act(async () => finish());
+  await waitForGone(() => screen.queryByTestId('settings-appearance-applying'));
+
+  jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
+  fireEvent.press(screen.getByTestId('settings-appearance-option-plum'));
+  expect(await screen.findByTestId('settings-appearance-error')).toBeTruthy();
+  expect(screen.queryByTestId('settings-appearance-applying')).toBeNull();
+  await switchTheme(DEFAULT_APPEARANCE);
+});
+
+it('shows no applying indicator when the stored choice differs from the one drawn without a save', () => {
+  // Outside a provider the app is drawn in the launch theme, the default:
+  // the stored Slate differs, as an older record read on another mode would.
+  Storage.setItemSync(APPEARANCE_STORAGE_KEY, '{"theme":"slate","mode":"dark","custom":null}');
+  render(<SettingsAppearanceRoute />);
+  expect(radio('Slate').props.accessibilityState).toEqual({ checked: true });
+  expect(screen.queryByTestId('settings-appearance-applying')).toBeNull();
 });
 
 it('writes nothing when the choice in use is chosen again', async () => {
@@ -229,12 +284,13 @@ it('updates Settings home when the Appearance page saves a choice', async () => 
 describe('custom', () => {
   const WARM_CUSTOM = customFromSeeds(getThemePreset('warm').seeds, 'light');
   const CUSTOM: CustomColours = {
-    background: { hue: 200, strength: 30, lightness: 20, depth: 150 },
-    ink: { hue: 265, strength: 40 },
-    text: { hue: 60, strength: 10 },
+    background: { hue: 200, strength: 30, mode: 'dark', lightness: 20, depth: 150 },
+    borders: { hue: 200, strength: 30, match: true, contrast: 150 },
+    ink: { hue: 265, strength: 40, lightness: 95 },
+    text: { hue: 60, strength: 10, contrast: 100 },
     accent: { hue: 330, strength: 80 },
     record: { hue: 90, strength: 60 },
-    viz: { hue: 150, strength: 50 },
+    viz: { hue: 150, strength: 50, gamut: false },
   };
   const storeCustom = (theme = 'custom') =>
     Storage.setItemSync(APPEARANCE_STORAGE_KEY, JSON.stringify({ theme, mode: 'light', custom: CUSTOM }));
@@ -268,11 +324,12 @@ describe('custom', () => {
     await waitFor(() => expect(storedRecord()).toEqual({ theme: 'custom', mode: 'light', custom: CUSTOM }));
   });
 
-  it('names each part’s hue and strength, and the page’s lightness, and pushes its picker', () => {
+  it('names each part’s hue and strength, the page’s mode and lightness, and borders that match it, and pushes its picker', () => {
     storeCustom();
     render(<SettingsAppearanceRoute />);
     const rows = screen.getByTestId('settings-appearance-custom');
-    expect(within(rows).getByText('Teal, 30%, light 20')).toBeTruthy();
+    expect(within(rows).getByText('Dark, Teal, 30%, lightness 20')).toBeTruthy();
+    expect(screen.getByLabelText('Borders, Match background')).toBeTruthy();
     expect(within(rows).getByText('Purple, 80%')).toBeTruthy();
     expect(screen.getByLabelText('Primary text, Blue, 40%')).toBeTruthy();
     expect(screen.getByLabelText('Best ever, Olive, 60%')).toBeTruthy();

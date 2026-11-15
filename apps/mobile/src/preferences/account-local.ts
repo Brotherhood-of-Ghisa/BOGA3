@@ -235,6 +235,9 @@ function writeSyncedPreferences(activeProfile: `account:${string}`, patch: Parti
       // direct adoption read can discover another device's explicit choice.
       if (row?.volumePrimaryOnly == null && patch.muscleVolumePrimaryOnly === undefined
         && Storage.getItemSync(syncedMuscleVolumeAdoptedKey(activeProfile)) !== 'true') write.volumePrimaryOnly = null;
+      // A row with no target map yet still holds legacy per-setup targets for
+      // the combined-muscle migration; only a target edit may write the map.
+      if (row?.muscleTargets == null && patch.muscleTargetOverrides === undefined) write.muscleTargets = null;
       await store.write(write);
       if (version !== syncedVersion) return;
       synced = keepingOverrides(next);
@@ -299,8 +302,7 @@ function keepingOverrides(next: Partial<SyncedPreferences>): Partial<SyncedPrefe
 
 /** Key order differs between a local write and the server's jsonb text. */
 const canonicalOverrides = (overrides: SyncedPreferences['muscleTargetOverrides']): string =>
-  JSON.stringify(Object.entries(overrides).sort(([a], [b]) => a.localeCompare(b))
-    .map(([scope, targets]) => [scope, Object.entries(targets ?? {}).sort(([a], [b]) => a.localeCompare(b))]));
+  JSON.stringify(Object.entries(overrides).sort(([a], [b]) => a.localeCompare(b)));
 
 /** Wipes call this first, so no queued edit lands in the emptied store. */
 export const drainAccountLocalSyncedWrites = (): Promise<void> => syncedWrites;

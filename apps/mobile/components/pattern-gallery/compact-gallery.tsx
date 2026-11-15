@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Card, CompactCard, Notice, ScreenScroll, SegmentedControl, SwitchRow, ToggleChip, uiSpace, useUiText } from '@/components/ui';
+import { CompactCard, Notice, ScreenScroll, SegmentedControl, SwitchRow, ToggleChip, uiSpace, useUiText } from '@/components/ui';
 import { CoWPreview, CoWResultHeading } from '@/components/groups/cow-preview';
 import { GroupMetricStreamCard } from '@/components/groups/group-metric-stream-card';
 import { GroupStreamSessionCard } from '@/components/groups/stream-session-card';
-import { TodayCoWSummarySection } from '@/components/today/group-cow-summary';
+import { TodayCoWCard } from '@/components/today/group-cow-summary';
 import { GroupApiError } from '@/src/groups/api';
 import type { GroupResourceState } from '@/src/groups/use-group-resource';
 import type { CoWResultWire, CoWSummaryWire } from '@/src/groups/cow-wire';
@@ -54,13 +54,21 @@ export function CompactGallery({ initialSample, initialState, initialLong = fals
       <CompactCard><CoWResultHeading result={galleryCow('past', long)} previous today dateFormat="DD-MM-YYYY" /></CompactCard>
     </> : sample === 'cow' ? <CoWPreview result={result} userId="u1" dateFormat="DD-MM-YYYY" previous={state === 'past'}
       onOpen={metric => setAction(`CoW · ${metric}`)} onBrowse={metric => setAction(`Standings · ${metric}`)} testID="gallery-cow" />
-      : <Card testID="gallery-embedded-card">
-        <TodayCoWSummarySection resource={resource} previous={state === 'past'} dateFormat="DD-MM-YYYY"
-          onOpen={() => setAction('Current CoW')} onRetry={retry} />
-      </Card>}
+      : <EmbeddedCoW resource={resource} past={state === 'past'} onAction={setAction} onRetry={retry} />}
     {sample === 'embedded' && state === 'absent' ? <Text allowFontScaling={false} style={text.meta} testID="gallery-absent">No CoW summary</Text> : null}
     {action ? <Notice live message={action} testID="ui-gallery-action" /> : null}
   </ScreenScroll>;
+}
+
+/** Today's CoW card on its gallery state: last week steps forward, this week back. */
+function EmbeddedCoW({ resource, past, onAction, onRetry }: {
+  resource: GroupResourceState<CoWSummaryWire>; past: boolean; onAction: (action: string) => void; onRetry: () => void;
+}) {
+  const step = past ? { onLater: () => onAction('This week CoW') } : { onEarlier: () => onAction('Last week CoW') };
+  return <View testID="gallery-embedded-card">
+    <TodayCoWCard resource={resource} previous={past} dateFormat="DD-MM-YYYY" userId="u1" {...step}
+      onOpen={() => onAction('Current CoW')} onRetry={onRetry} />
+  </View>;
 }
 
 function galleryResource(state: GalleryState, result: CoWResultWire): GroupResourceState<CoWSummaryWire> {

@@ -465,6 +465,15 @@ for bad in "$(jq 'map(select(.type!="exercise_sets"))' <<<"${MANIFEST}")" \
     "$(jq '.[0].id="extra-row"' <<<"${MANIFEST}")"; do
   confirm "${B_TOKEN}" "${SESSION}" "${bad}"; check 'inexact graph remains pending' '.confirmed==false'
 done
+# A completed MCP entry is visible history, but cannot seal a partial graph.
+run_psql "begin; set local request.jwt.claim.sub='${B_UID}'; set local boga.exercise_merge_internal='on'; set local boga.workout_control_write='on';
+  update app_public.sessions set logging_client_id='dated-entry-probe',logging_granted_at=now()::text
+    where owner_user_id='${B_UID}' and id='${SESSION}'; commit;" >/dev/null
+MANIFEST_CONTROLLED="$(manifest "${B_UID}" "${SESSION}")"
+confirm "${B_TOKEN}" "${SESSION}" "${MANIFEST_CONTROLLED}"; check 'MCP-controlled completed graph remains unconfirmed' '.confirmed==false'
+run_psql "begin; set local request.jwt.claim.sub='${B_UID}'; set local boga.exercise_merge_internal='on'; set local boga.workout_control_write='on';
+  update app_public.sessions set logging_client_id=null,logging_granted_at=null
+    where owner_user_id='${B_UID}' and id='${SESSION}'; commit;" >/dev/null
 confirm "${B_TOKEN}" "${SESSION}" "${MANIFEST}"; check 'exact graph confirmed' '.confirmed==true'
 assert_sql 'pending evaluator is not zero achievements' "select not app_public.notification_workout_ready('${B_UID}','${SESSION}');"
 drain_eval
@@ -2035,5 +2044,9 @@ check 'expired captured moments and older workout deadlines do not renew' \
   '.session_ids==[$p+"-17"] and .next_session_id==null' --arg p "${READER_PREFIX}"
 rpc "${E_TOKEN}" notification_pending_completions '{"p_after_session_id":""}'
 expect_error VALIDATION 'invalid completion cursor'
+assert_sql 'the context source stays private to the proofs that read it' "select p.prosecdef and p.proconfig @> array['search_path=app_public, pg_temp']
+  and not has_function_privilege('anon',p.oid,'execute') and not has_function_privilege('authenticated',p.oid,'execute')
+  and not has_function_privilege('service_role',p.oid,'execute')
+  from pg_proc p where p.oid='app_public.notification_context_source(uuid,uuid,uuid,text)'::regprocedure;"
 COMPLETED=1
 pass 'workout graph, full-rank publication, overlap, ownership, expiry, clamp, sink and admission contracts'

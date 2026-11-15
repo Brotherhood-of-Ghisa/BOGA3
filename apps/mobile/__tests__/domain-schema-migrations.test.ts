@@ -143,8 +143,11 @@ describe('domain schema and runtime migrations', () => {
     // m0023 adds the muscle report group and tracked flag, and m0024 adds the
     // exercise rest timer default; m0025 adds merge revisions and account-private recovery;
     // m0026 adds synced muscle targets; m0027 separates the Volume choice; m0028 adds reusable plan uses;
-    // m0029 extends the revision fence to the session lifecycle; m0030 mirrors server-owned logging control.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(31);
+    // m0029 extends the revision fence to the session lifecycle; m0030 mirrors server-owned logging control;
+    // m0031 adds combined muscles and the single target map, and re-pulls every row once;
+    // m0031 adds combined muscles and the single target map, and re-pulls every row once;
+    // m0032 adds training notes; m0033 adds injuries schema.
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(34);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -205,7 +208,20 @@ describe('domain schema and runtime migrations', () => {
       'm0028',
       'm0029',
       'm0030',
+      'm0031',
+      'm0032',
+      'm0033',
     ]);
+  });
+
+  it('creates the synced injuries table and resets pull cursor in m0033', () => {
+    expect(localRuntimeMigrations.migrations.m0033).toContain('CREATE TABLE `injuries`');
+    expect(localRuntimeMigrations.migrations.m0033).toContain(
+      'FOREIGN KEY (`muscle_group_id`) REFERENCES `muscle_groups`(`id`)'
+    );
+    expect(localRuntimeMigrations.migrations.m0033).toContain(
+      'UPDATE sync_runtime_state SET pull_cursor = \'{}\';'
+    );
   });
 
   it('adds the nullable synced muscle targets to the settings row in m0026', () => {
@@ -229,6 +245,23 @@ describe('domain schema and runtime migrations', () => {
     client.exec(m0027);
     expect(client.prepare('select weekly_working_set_target, count_secondary_muscles, volume_primary_only from user_settings').get())
       .toEqual({ weekly_working_set_target: 12, count_secondary_muscles: 0, volume_primary_only: null });
+    client.close();
+  });
+
+  it('adds the combined muscles and single target map in m0031 and re-pulls every row once', () => {
+    const { m0031, ...earlier } = localRuntimeMigrations.migrations;
+    const client = new Database(':memory:');
+    for (const migration of Object.values(earlier)) client.exec(migration);
+    client.exec("insert into user_settings (id, muscle_target_overrides, local_updated_at_ms) values ('settings', '{\"detailed\":{\"chest\":9}}', 700)");
+    client.exec("insert into sync_runtime_state (id, pull_cursor) values ('primary', '{\"0\":\"cursor\"}')");
+    client.exec(m0031);
+    // Null until a device writes them: readers take the legacy setup and targets meanwhile.
+    expect(client.prepare('select muscle_target_overrides, muscle_targets, combined_muscles from user_settings').get())
+      .toEqual({ muscle_target_overrides: '{"detailed":{"chest":9}}', muscle_targets: null, combined_muscles: null });
+    // A row an older build pulled lacked the columns, so the next cycle pulls everything again.
+    expect(client.prepare('select pull_cursor from sync_runtime_state').get()).toEqual({ pull_cursor: '{}' });
+    // A clean settings row loses its stamp so the re-pull replaces it; a dirty one would keep its edit.
+    expect(client.prepare('select local_updated_at_ms from user_settings').get()).toEqual({ local_updated_at_ms: 0 });
     client.close();
   });
 
@@ -480,7 +513,7 @@ describe('muscle_groups is created by the squashed baseline and only gains colum
       const statements = sql
         .split('--> statement-breakpoint')
         .map((chunk) => chunk.trim())
-        .filter((chunk) => chunk.includes('muscle_groups'));
+        .filter((chunk) => /TABLE\s+`?(__new_)?muscle_groups`?/i.test(chunk));
       for (const statement of statements) {
         expect(statement).toMatch(/^ALTER TABLE `muscle_groups` ADD `[a-z_]+` /);
       }

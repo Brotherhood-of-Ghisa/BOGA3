@@ -52,7 +52,7 @@ const pageShell = (content: string): string => `
       <span>BoGa</span>
     </header>
     ${content}
-    <p class="security-note">Authorization is handled securely by BoGa. Your password is never shared with the agent.</p>
+    <p class="security-note">Your password is never shared with the coach. You can change permissions or revoke access at any time from Connected agents.</p>
   </section>
 `;
 
@@ -81,7 +81,7 @@ const renderSetup = (): void => {
     <div class="consent-card setup-card">
       <p class="eyebrow">AI coach setup</p>
       <h1>Connect BoGa to your AI coach</h1>
-      <p class="lede">Use an MCP-compatible client to give your coach read-only access to your training history.</p>
+      <p class="lede">Connect your coach to read your training data and, with your permission, make changes.</p>
 
       <div class="endpoint-panel">
         <p class="permission-title">BoGa MCP server</p>
@@ -96,9 +96,8 @@ const renderSetup = (): void => {
 
       <div class="denied-panel">
         <span class="denied-icon" aria-hidden="true">✓</span>
-        <p><strong>This approval grants read-only training access.</strong> Changes require separate permissions you enable in BoGa → Connected agents.</p>
+        <p><strong>You control write access.</strong> Connecting enables reading. To allow changes, enable the permissions you want in <strong>BoGa → Settings → Connected agents</strong>.</p>
       </div>
-      <p class="revoke-note">To disconnect later, open BoGa → Settings → Connected agents and revoke the connection.</p>
     </div>
   `);
 };
@@ -108,7 +107,7 @@ const renderSignIn = (authorizationId: string, errorMessage = ''): void => {
     <div class="consent-card">
       <p class="eyebrow">Agent connection</p>
       <h1>Sign in to BoGa</h1>
-      <p class="lede">Confirm your account before choosing whether to grant read-only training access.</p>
+      <p class="lede">Sign in to review this coach’s access to your training data and optional write permissions.</p>
       <form id="sign-in-form" class="form-stack">
         <label>
           <span>Email</span>
@@ -149,28 +148,33 @@ const renderConsent = (details: ConsentDetails): void => {
     .join('');
   root.innerHTML = pageShell(`
     <div class="consent-card">
-      <p class="eyebrow">Read-only coaching access</p>
-      <h1>Connect ${escapeHtml(details.clientName)}?</h1>
-      <p class="lede">This agent will be able to read the training data you choose to keep in BoGa.</p>
+      <p class="eyebrow">Coach connection</p>
+      <h1>Connect ${escapeHtml(details.clientName)} to BoGa?</h1>
+      <p class="lede">Give this coach access to your training data to help you plan and track your workouts.</p>
       <div class="permission-panel">
         <p class="permission-title">It can read</p>
         <ul>
-          <li>Your training units, gyms, and available equipment</li>
-          <li>Your exercise library and muscle mappings</li>
-          <li>Your recent workouts, exercise history, and personal records</li>
+          <li>Your training setup, gyms and equipment</li>
+          <li>Your exercise library, workout history and personal records</li>
+          <li>Your training notes and imported health activities</li>
+        </ul>
+        <p class="permission-title identity-permission-title">With your permission, it can also</p>
+        <ul>
+          <li>Create training plans and programmes</li>
+          <li>Manage exercises, muscle targets and training notes</li>
+          <li>Start, log and update workouts</li>
         </ul>
         <p class="permission-title identity-permission-title">Identity permissions requested</p>
         <ul>${identityPermissions}</ul>
       </div>
       <div class="denied-panel">
         <span class="denied-icon" aria-hidden="true">×</span>
-        <p><strong>This approval grants read-only training access.</strong> Changes require separate permissions you enable in BoGa → Connected agents.</p>
+        <p><strong>You control write access.</strong> Connecting enables reading. To allow changes, enable the permissions you want in <strong>BoGa → Settings → Connected agents</strong>.</p>
       </div>
       <div class="button-row">
         <button id="deny-button" class="secondary-button" type="button">Cancel</button>
-        <button id="approve-button" class="primary-button" type="button">Allow read-only access</button>
+        <button id="approve-button" class="primary-button" type="button">Connect coach</button>
       </div>
-      <p class="revoke-note">You can revoke this connection at any time from Settings → Connected agents.</p>
     </div>
   `);
   const decide = async (decision: 'approve' | 'deny') => {

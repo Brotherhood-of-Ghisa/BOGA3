@@ -8,7 +8,7 @@ const sessionWith = (value: unknown) => ({ ...competitionSession, session: { ...
   exercises: competitionSession.session.exercises.map(exercise => ({ ...exercise,
     sets: exercise.sets.map(set => ({ ...set, normalized_metrics: value })) })) } });
 
-test.each([null, metrics, { ...metrics, added_load_percent_bw: 0 },
+test.each([null, metrics, { ...metrics, added_e1rm_percent_bw: 0 }, { ...metrics, added_e1rm_percent_bw: null }, { ...metrics, added_load_percent_bw: 0 },
   { ...metrics, e1rm_percent_bw: null, volume_percent_bw_reps: null }])('accepts only safe normalized display shapes: %p', value => {
   expect(isNormalizedSetMetrics(value)).toBe(true);
   expect(isCompetitionSessionDetailWire(sessionWith(value))).toBe(true);
@@ -18,7 +18,7 @@ test.each([null, metrics, { ...metrics, added_load_percent_bw: 0 },
 test.each([undefined, false, [], '25', {}, { ...metrics, added_load_percent_bw: -1 },
   { ...metrics, added_load_percent_bw: NaN }, { ...metrics, e1rm_percent_bw: Infinity },
   { ...metrics, volume_percent_bw_reps: '625' }, { ...metrics, body_weight_kg: 80 },
-  { ...metrics, weight_value: '20' }, { ...metrics, reading_id: 'private' }])('rejects malformed or private normalized metrics: %p', value => {
+  { ...metrics, weight_value: '20' }, { ...metrics, reading_id: 'private' }, { ...metrics, added_e1rm_percent_bw: -1 }, { ...metrics, added_e1rm_percent_bw: Infinity }, { ...metrics, added_e1rm_percent_bw: '25' }])('rejects malformed or private normalized metrics: %p', value => {
   expect(isNormalizedSetMetrics(value)).toBe(false);
   expect(isCompetitionSessionDetailWire(sessionWith(value))).toBe(false);
   expect(isCompetitionPerformanceWire({ ...competitionRow.performance, normalized_metrics: value }, true)).toBe(false);

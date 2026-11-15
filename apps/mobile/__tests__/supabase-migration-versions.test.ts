@@ -1,6 +1,13 @@
 import { readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 
+it('uses fourteen-digit timestamps including hours, minutes and seconds in Supabase migration filenames', () => {
+  const files = readdirSync(join(__dirname, '../../../supabase/migrations'))
+    .filter((file) => file.endsWith('.sql'));
+
+  expect(files.filter((file) => !/^\d{14}_[a-z0-9_]+\.sql$/.test(file))).toEqual([]);
+});
+
 it('keeps Supabase migration versions unique so hosted releases can apply each file', () => {
   const versions = readdirSync(join(__dirname, '../../../supabase/migrations'))
     .filter((file) => file.endsWith('.sql'))

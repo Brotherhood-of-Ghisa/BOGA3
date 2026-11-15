@@ -41,8 +41,11 @@ describe('working-set rule', () => {
     }
   );
 
-  it('excludes only warm-ups', () => {
+  it('excludes non-working effort choices', () => {
     expect(isWorkingSetType('warm_up')).toBe(false);
+    expect(isWorkingSetType('technique')).toBe(false);
+    expect(isWorkingSetType('cooldown')).toBe(false);
+    expect(isWorkingSetType('rehab')).toBe(false);
   });
 
   it('counts every valid performed non-warm-up set in analytics', () => {
@@ -75,19 +78,23 @@ describe('working-set rule', () => {
 });
 
 describe('fixed selectable efforts', () => {
-  it('offers the nine fixed choices, while retaining canonical historical RIR labels', () => {
+  it('offers the ten fixed choices, while retaining canonical historical RIR labels', () => {
     const types = jest.requireActual<typeof import('@/src/data/set-types')>('@/src/data/set-types');
-    const cycle = ['warm_up', null, 'rir_4', 'rir_3', 'rir_2', 'rir_1', 'rir_0', 'technique', 'cooldown'];
+    const cycle = ['warm_up', null, 'rir_4', 'rir_3', 'rir_2', 'rir_1', 'rir_0', 'technique', 'cooldown', 'rehab'];
     expect(types.SESSION_SET_TYPE_CYCLE).toEqual(cycle);
     const visited = [types.SESSION_SET_TYPE_CYCLE[0]];
     for (let i = 1; i < cycle.length; i += 1) visited.push(types.nextSessionSetType(visited[i - 1]));
     expect(visited).toEqual(cycle);
-    expect(types.nextSessionSetType('cooldown')).toBe('warm_up');
+    expect(types.nextSessionSetType('cooldown')).toBe('rehab');
+    expect(types.nextSessionSetType('rehab')).toBe('warm_up');
     expect(types.normalizeSessionSetType('rir_12')).toBe('rir_12');
     expect(types.formatSessionSetType('rir_12')).toBe('RIR 12');
     expect(types.SESSION_SET_TYPES).not.toContain('rir_12');
     expect(types.normalizeSessionSetType('cooldown')).toBe('cooldown');
     expect(types.normalizeSessionSetType('technique')).toBe('technique');
+    expect(types.normalizeSessionSetType('rehab')).toBe('rehab');
+    expect(types.formatSessionSetType('rehab')).toBe('Rehab');
+    expect(types.formatSessionSetType('rehab', 'compact')).toBe('Rehab');
   });
 
   it.each(['rir_-1', 'rir_1.5', 'rir_01', 'rir_NaN', 'rir_9007199254740992', 'rir_3\n', 'rir_ 3', 'drop_set'])(

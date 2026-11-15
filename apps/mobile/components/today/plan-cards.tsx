@@ -1,4 +1,4 @@
-import { useDateFormat } from '@/src/preferences/hooks';
+import { useAccountLocalPreferenceState, useDateFormat } from '@/src/preferences/hooks';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -10,7 +10,6 @@ import { Icon } from '@/components/ui/icon';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
-import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { formatWholeSetCount, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
@@ -23,8 +22,10 @@ export type TodayPlanCardsProps = {
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenProgress: () => void;
   onOpenPlan: (planId: string) => void;
-  /** Opens Sessions, where sessions are planned and the plans listed. */
-  onOpenSessions: () => void;
+  /** Opens the dedicated Planner space. */
+  onOpenPlanner?: () => void;
+  /** Opens Sessions. */
+  onOpenSessions?: () => void;
 };
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -110,7 +111,7 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, grouped, onPress }: {
       accessibilityLabel={recoveryRowLabel(row, days, dateFormat)}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.muscleRow, pressed ? styles.pressed : null]}
+      style={styles.muscleRow}
       testID={testID}>
       <Text allowFontScaling={false} style={[text.body, styles.nameCell, grouped ? styles.childName : null]}>
         {row.name}
@@ -130,7 +131,7 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, grouped, onPress }: {
 }
 
 // A full-width header owns expansion, never child navigation. Collapsed children
-// unmount, so neither touch nor accessibility can reach them. All start expanded.
+// unmount, so neither touch nor accessibility can reach them. All start collapsed.
 function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
   plan: TodayPlan; weekStartIndex: number; grouped: boolean; onOpenMuscle: TodayPlanCardsProps['onOpenMuscle'];
 }) {
@@ -138,25 +139,25 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
   const text = useUiText();
   const tone = useUiTextTone();
   const dateFormat = useDateFormat();
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
   const renderRow = (row: RecoveryRow) => <RecoveryMuscleRow
     days={plan.recoveryDays} grouped={grouped} key={row.muscleGroupId}
     onPress={() => onOpenMuscle(row.muscleGroupId)} row={row} weekStartIndex={weekStartIndex} />;
   if (!grouped) return <>{plan.muscles.map(renderRow)}</>;
   return <>{groupRecoveryRows(plan.muscles).map(section => {
-    const expanded = !collapsed.has(section.name);
+    const expanded = expandedGroups.has(section.name);
     const figure = wholeSets(section.weekSets);
     const testID = `today-plan-group-${section.name}`;
     return <View key={section.name}>
       <Pressable accessibilityRole="button" accessibilityLabel={recoveryGroupLabel(section, plan.recoveryDays, dateFormat)}
         accessibilityState={{ expanded }} testID={testID}
-        onPress={() => setCollapsed(previous => {
+        onPress={() => setExpandedGroups(previous => {
           const next = new Set(previous);
           if (next.has(section.name)) next.delete(section.name);
           else next.add(section.name);
           return next;
         })}
-        style={({ pressed }) => [styles.groupHeader, pressed ? styles.pressed : null]}>
+        style={styles.groupHeader}>
         <Text allowFontScaling={false} style={[text.label, tone.ink, styles.nameCell]}>{section.name}</Text>
         {section.days.map((count, index) => <DayCell aggregate count={count} edge={index === 0 ? 'start' : undefined}
           key={plan.recoveryDays[index].getTime()} testID={`${testID}-day-${index}`} weekStart={index === weekStartIndex} />)}
@@ -176,8 +177,9 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
 }
 
 // Each muscle's sets on the last three days, today so far, and this week
-// against its weekly Target ([[muscle.weekly-targets]]), least trained first.
-// Settings' family grouping adds initially expanded sections over the same
+// against its weekly Target ([[muscle.weekly-targets]]): under target first,
+// then fewest this week.
+// Settings' family grouping adds initially collapsed sections over the same
 // reported muscles, preserving recovery order within each. Family tiles sum
 // unrounded daily child contributions, including numeric zeros, and stay when
 // collapsed; their trailing total remains weekly ([[muscle.set-count]]).
@@ -217,7 +219,8 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
         <Text allowFontScaling={false} style={[...label, styles.weekCell]}>Target</Text>
         {grouped ? <View style={styles.chevronGutter} /> : null}
       </View>
-      <ScrollView alwaysBounceVertical={false} nestedScrollEnabled showsVerticalScrollIndicator={false} style={styles.fillRows} testID="today-plan-recovery-rows">
+      <ScrollView alwaysBounceVertical={false} contentContainerStyle={styles.rowsContent} nestedScrollEnabled
+        showsVerticalScrollIndicator={false} style={styles.fillRows} testID="today-plan-recovery-rows">
         <RecoveryRows grouped={grouped} key={`${accountRevision}-${grouped}`} onOpenMuscle={onOpenMuscle}
           plan={plan} weekStartIndex={weekStartIndex} />
       </ScrollView>
@@ -265,7 +268,7 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
         `${session.exerciseCount} ${session.exerciseCount === 1 ? 'exercise' : 'exercises'}`, targetSets(session.setCount), ...session.muscles].join(', ')}
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.plannedRow, pressed ? styles.pressed : null]}
+      style={styles.plannedRow}
       testID={testID}>
       <View style={styles.plannedWhen}>
         <Text allowFontScaling={false} style={text.bodyStrong} testID={`${testID}-day`}>{day}</Text>
@@ -287,12 +290,12 @@ function PlannedRow({ session, now, onPress }: { session: NextPlannedSession; no
 }
 
 // This week's trained and planned days, then the next planned sessions; the
-// Sessions link opens them all, where they are planned.
-function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
+// Planner link opens the planning hub.
+function PlanWeekCard({ plan, now, onOpenPlan, onOpenPlanner }: {
   plan: TodayPlan;
   now: Date;
   onOpenPlan: (planId: string) => void;
-  onOpenSessions: () => void;
+  onOpenPlanner: () => void;
 }) {
   const styles = useStyles();
   const text = useUiText();
@@ -303,7 +306,7 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
         <Text accessibilityRole="header" allowFontScaling={false} style={[text.label, tone.ink]}>
           Plan
         </Text>
-        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-plan-sessions-button" variant="link" />
+        <ActionButton label="Planner" onPress={onOpenPlanner} testID="today-plan-sessions-button" variant="link" />
       </View>
       <View style={styles.week}>
         {plan.week.map((day) => (
@@ -328,15 +331,16 @@ function PlanWeekCard({ plan, now, onOpenPlan, onOpenSessions }: {
 /** Today's Plan page: the recovery card over the week's plan. */
 export function TodayPlanCards({ now, ...props }: TodayPlanCardsProps & { now: Date }) {
   const styles = useStyles();
+  const openPlanner = props.onOpenPlanner ?? props.onOpenSessions ?? (() => {});
   return (
     <View style={[styles.stack, styles.fill]}>
       <RecoveryCard {...props} />
-      <PlanWeekCard now={now} onOpenPlan={props.onOpenPlan} onOpenSessions={props.onOpenSessions} plan={props.plan} />
+      <PlanWeekCard now={now} onOpenPlan={props.onOpenPlan} onOpenPlanner={openPlanner} plan={props.plan} />
     </View>
   );
 }
 
-// The least trained rows that show before the rest scroll,
+// The first rows (under target, fewest this week) that show before the rest scroll,
 // leaving the plan card room below; a phone too short for both scrolls the page.
 export const VISIBLE_MUSCLE_ROWS = 10;
 const DAY_CELL = 26;
@@ -345,6 +349,7 @@ const WEEK_WIDTH = 64;
 const ROW_HEIGHT = 32;
 const MARK = 8;
 const PLANNED_WHEN_WIDTH = 52;
+const GROUP_BLEED = uiSpace.sm;
 
 const useMarkStyles = makeStyles((roles) => ({
   trained: { backgroundColor: roles.ink },
@@ -365,10 +370,14 @@ const useStyles = makeStyles((roles) => ({
     minHeight: 0,
   },
   // A fixed row height, so the rows that show are exactly `VISIBLE_MUSCLE_ROWS * ROW_HEIGHT`.
+  // The scroller reaches into the card's side padding, so a group header's wash
+  // can too (a clipped scroller would cut it); the rows' own width is unchanged.
   fillRows: {
     flexShrink: 1,
     maxHeight: VISIBLE_MUSCLE_ROWS * ROW_HEIGHT,
+    marginHorizontal: -GROUP_BLEED,
   },
+  rowsContent: { paddingHorizontal: GROUP_BLEED },
   card: {
     paddingHorizontal: uiSpace.md,
     paddingBottom: uiSpace.md,
@@ -389,6 +398,7 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'center',
     gap: uiSpace.xs,
   },
+  // Rows take no pressed fill: a tap goes straight to its destination.
   muscleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -402,9 +412,12 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'center',
     gap: uiSpace.xs,
     minHeight: ROW_HEIGHT,
+    // The wash insets its name and chevron from its edges without moving a column;
+    // the band itself separates the groups, so no hairline.
+    marginHorizontal: -GROUP_BLEED,
+    paddingHorizontal: GROUP_BLEED,
+    borderRadius: uiGeometry.radius.card,
     backgroundColor: roles.accentWash,
-    borderTopWidth: 1,
-    borderTopColor: roles.ruleSoft,
   },
   childName: { paddingLeft: uiSpace.md },
   childConnector: {
@@ -417,9 +430,6 @@ const useStyles = makeStyles((roles) => ({
     borderRadius: uiGeometry.radius.control,
   },
   chevronGutter: { width: uiIconSize.sm },
-  pressed: {
-    backgroundColor: roles.paper,
-  },
   // Gutters either side of the day grid keep it clear of the name and the target.
   nameCell: {
     flex: 1,

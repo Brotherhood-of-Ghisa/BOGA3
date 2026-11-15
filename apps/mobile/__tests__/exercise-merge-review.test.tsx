@@ -22,7 +22,7 @@ const item: MergeReviewItem = { id: 'saved', type: 'exercise_sets', entityId: 's
 const review = (overrides: object = {}) => ({ items: [item], pending: 0, operation: false, error: null, ...overrides });
 const confirmAlert = () => {
   const buttons = (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2] as { text: string; onPress?: () => void }[];
-  act(() => buttons.find(button => button.text === 'Apply')?.onPress?.());
+  act(() => buttons.find(button => button.text === 'Overwrite remote')?.onPress?.());
 };
 beforeEach(() => {
   mockLoad.mockReset().mockResolvedValue(review());
@@ -38,23 +38,26 @@ it('shows each changed field as a value row, current then saved, under the exerc
   expect(screen.getByLabelText('Weight: current 20, saved 25')).toBeTruthy();
   expect(screen.getByLabelText('History: current Kept, saved Removed')).toBeTruthy();
   expect(screen.getByText('Destination')).toBeTruthy();
-  expect(screen.getByText('Apply saved removal')).toHaveStyle({ color: roles.danger });
-  expect(screen.getByText('Keep current history')).toHaveStyle({ color: roles.accent });
+  expect(screen.getByText('Overwrite remote')).toHaveStyle({ color: roles.danger });
+  expect(screen.getByText('Keep remote')).toHaveStyle({ color: roles.accent });
 });
 
 it('confirms a saved removal in an Alert and retains refreshed review after a race', async () => {
   render(<ExerciseMergeReviewScreen />);
-  await screen.findByText('Apply saved removal');
+  await screen.findByText('Overwrite remote');
   mockLoad.mockResolvedValue(review({ items: [{ ...item, token: 'new', current: { ...item.current, weight_value: '24' } }] }));
   mockResolve.mockRejectedValueOnce(new Error('MERGE_STALE: changed'));
-  fireEvent.press(screen.getByText('Apply saved removal'));
-  expect(Alert.alert).toHaveBeenCalledWith('Apply saved removal?', expect.any(String), expect.any(Array));
+  fireEvent.press(screen.getByText('Overwrite remote'));
+  expect(Alert.alert).toHaveBeenCalledWith('Overwrite remote?', 'The saved removal replaces the remote version of this item.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Overwrite remote', style: 'destructive', onPress: expect.any(Function) },
+  ]);
   expect(mockResolve).not.toHaveBeenCalled();
   confirmAlert();
   await screen.findByText('History changed on another device. Review the refreshed values before applying.');
   expect(mockResolve).toHaveBeenCalledWith(expect.objectContaining({ token: 'old' }), false);
   expect(screen.getByLabelText('Weight: current 24, saved 25')).toBeTruthy();
-  fireEvent.press(screen.getByText('Keep current history'));
+  fireEvent.press(screen.getByText('Keep remote'));
   await waitFor(() => expect(mockResolve).toHaveBeenLastCalledWith(expect.objectContaining({ token: 'new' }), true));
 });
 
@@ -62,13 +65,13 @@ it('applies saved changes that remove nothing straight away', async () => {
   mockLoad.mockResolvedValueOnce(review({ items: [{ ...item, saved: { ...item.saved, deleted_at: null } }] }))
     .mockResolvedValue(review({ items: [] }));
   render(<ExerciseMergeReviewScreen />);
-  fireEvent.press(await screen.findByText('Apply saved changes'));
+  fireEvent.press(await screen.findByText('Overwrite remote'));
   expect(Alert.alert).not.toHaveBeenCalled();
   await screen.findByText('No changes need review.');
   expect(mockResolve).toHaveBeenCalledWith(expect.objectContaining({ id: 'saved' }), false);
 });
 
-it('retains invalid saved values for reading while permitting only Keep current', async () => {
+it('retains invalid saved values for reading while permitting only Keep remote', async () => {
   mockLoad.mockResolvedValue(review({ items: [{ ...item, invalid: true }] }));
   render(<ExerciseMergeReviewScreen />);
   await screen.findByText('These saved values need correction before they can be applied.');

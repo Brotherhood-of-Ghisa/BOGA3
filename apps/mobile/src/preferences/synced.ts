@@ -5,19 +5,27 @@ import { type AccountLocalPreferences, DEFAULT_ACCOUNT_LOCAL_PREFERENCES, isPref
 
 /**
  * The settings row's columns as the data layer stores them (null until
- * uploaded or adopted; wire mode, JSON-text overrides). Declared here because
- * this directory never imports the data layer.
+ * uploaded or adopted; wire mode, JSON-text target maps). Declared here because
+ * this directory never imports the data layer. `muscleTargetOverrides` is the
+ * legacy per-setup map, read only to migrate it; `muscleTargets` is the map
+ * the preference reads and writes.
  */
 export type StoredMuscleTargetSettings = {
   weeklyWorkingSetTarget: number | null;
   muscleTargetMode: string | null;
   muscleTargetOverrides: string | null;
+  muscleTargets?: string | null;
   countSecondaryMuscles: boolean | null;
   volumePrimaryOnly?: boolean | null;
 };
+/** What a preference write sets; a null target map or Volume choice leaves the stored column as it is. */
 export type MuscleTargetSettingsWrite = {
-  [K in Exclude<keyof StoredMuscleTargetSettings, 'volumePrimaryOnly'>]-?: NonNullable<StoredMuscleTargetSettings[K]>
-} & { volumePrimaryOnly: boolean | null };
+  weeklyWorkingSetTarget: number;
+  muscleTargetMode: string;
+  muscleTargets: string | null;
+  countSecondaryMuscles: boolean;
+  volumePrimaryOnly: boolean | null;
+};
 
 export const syncedPreferenceFields = [
   'weeklyWorkingSetTarget', 'muscleTargetMode', 'muscleTargetOverrides', 'progressCountSecondary', 'muscleVolumePrimaryOnly',
@@ -60,7 +68,7 @@ export const syncedPreferencesFromStored = (stored: StoredMuscleTargetSettings |
   const candidates: Record<SyncedPreferenceField, unknown> = {
     weeklyWorkingSetTarget: stored.weeklyWorkingSetTarget,
     muscleTargetMode: stored.muscleTargetMode === 'per_muscle' ? 'per-muscle' : stored.muscleTargetMode,
-    muscleTargetOverrides: parseOverrides(stored.muscleTargetOverrides),
+    muscleTargetOverrides: parseOverrides(stored.muscleTargets ?? null),
     progressCountSecondary: stored.countSecondaryMuscles,
     muscleVolumePrimaryOnly: stored.volumePrimaryOnly,
   };
@@ -77,7 +85,7 @@ export const storedFromSyncedPreferences = (values: Partial<SyncedPreferences>):
   return {
     weeklyWorkingSetTarget: complete.weeklyWorkingSetTarget,
     muscleTargetMode: complete.muscleTargetMode === 'per-muscle' ? 'per_muscle' : 'single',
-    muscleTargetOverrides: JSON.stringify(complete.muscleTargetOverrides),
+    muscleTargets: JSON.stringify(complete.muscleTargetOverrides),
     countSecondaryMuscles: complete.progressCountSecondary,
     volumePrimaryOnly: complete.muscleVolumePrimaryOnly,
   };

@@ -1,9 +1,9 @@
-import { useId, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Svg, { Defs, Path, Use } from 'react-native-svg';
 
 import {
+  ActionButton,
   Card,
   FigureText,
   Icon,
@@ -11,6 +11,7 @@ import {
   ListRow,
   SegmentedControl,
   Sheet,
+  StatePanel,
   uiSpace,
   useUiMode,
   useUiRoles,
@@ -19,7 +20,11 @@ import {
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { useNovemberAppearance } from '@/components/appearance/use-november-appearance';
 import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
+import Svg, { Path } from 'react-native-svg';
+import { InjuryBadge } from '@/components/injuries/injury-badge';
 import type { ProgressMuscleComparison } from '@/src/data';
+import type { InjuryView } from '@/src/data/injuries';
+import { resolveInjuryMuscleGroupId } from '@/src/injuries/injury-warning-engine';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
 import { COLUMN_LABELS, ComparisonValues, comparisonFigures, metricUnit } from './comparison-columns';
@@ -28,15 +33,18 @@ import {
   buildThemeShadePalette,
   canonicalOrientationForMuscle,
   computeMuscleScores,
-  hitTestProjectedMuscle,
+  INJURY_STATUS_PRIORITY,
   normaliseBodyAngle,
   projectMuscleBody,
-  selectMuscleFibres,
+  type ActiveInjuryOverlay,
   type BodyOrientation,
   type MuscleOverlayStyle,
   type MuscleSetTargets,
-  type ThemeShadePalette,
+  type ProjectedMuscleBody,
 } from './muscle-body-projection';
+import { MuscleBodyCanvas } from './muscle-body-canvas';
+import type { WireframeFrame } from './muscle-wireframe-renderer';
+import { hitWireframe, selectMuscleMeshes, wireframeCamera } from './muscle-wireframe-scene';
 
 type Props = {
   readonly muscles: readonly ProgressMuscleComparison[];
@@ -49,6 +57,7 @@ type Props = {
   readonly defaultOverlay?: MuscleOverlayStyle;
   readonly overlay?: MuscleOverlayStyle;
   readonly onOverlayChange?: (next: MuscleOverlayStyle) => void;
+  readonly activeInjuries?: readonly (ActiveInjuryOverlay | InjuryView)[];
 };
 
 const ORIENTATION_OPTIONS: readonly SegmentedControlOption<BodyOrientation>[] = [
@@ -63,8 +72,6 @@ const PAN_ACTIVATION_X = 8;
 const PAN_FAIL_Y = 12;
 const DEGREES_PER_POINT = 0.85;
 const ACCESSIBILITY_ANGLE_STEP = 30;
-const FACET_STROKE_WIDTH = 0.35;
-const CONTOUR_STROKE_WIDTH = 1.5;
 
 const LEGACY_REVERSE_ALIASES: Readonly<Record<string, readonly string[]>> = {
   delts_front: ['delts_front', 'front_delts'],
@@ -120,14 +127,13 @@ function MuscleBodyHeader({
           testIDPrefix="stats-muscle-body-angle"
           value={orientation}
         />
-        <FilterChip
-          accessibilityHint="Switches between fibres and contour overlay"
-          accessibilityLabel={`Muscle overlay: ${overlay === 'contour' ? 'Contour' : 'Fibres'}`}
-          accessibilityRole="button"
-          label={overlay === 'contour' ? 'Contour' : 'Fibres'}
-          on={false}
-          onPress={() => onOverlayChange(overlay === 'contour' ? 'fibres' : 'contour')}
+        <ActionButton
+          accessibilityHint="Switches between wireframe and filled patch views"
+          accessibilityLabel={`Muscle overlay: ${overlay === 'contour' ? 'Patches' : 'Wireframe'}`}
+          label={overlay === 'contour' ? 'Patches' : 'Wireframe'}
+          onPress={() => onOverlayChange(overlay === 'contour' ? 'wireframe' : 'contour')}
           size="compact"
+          variant="outline"
           testID="stats-muscle-body-overlay-toggle"
         />
       </View>
@@ -231,7 +237,7 @@ function MusclePickerSheet({
   );
 }
 
-function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: Props) {
+function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect, activeInjuries }: Props) {
   const unit = metricUnit(metric);
   return (
     <View
@@ -241,10 +247,28 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
       {muscles.map(row => {
         const figures = comparisonFigures(row, metric);
         const selected = row.muscleGroupId === selectedId;
+        const matchingInjuries = activeInjuries
+          ?.filter(
+            i =>
+              i.status !== 'resolved' &&
+              (i.muscleGroupId === row.muscleGroupId ||
+                resolveInjuryMuscleGroupId({
+                  muscleGroupId: i.muscleGroupId ?? null,
+                  label: i.label ?? '',
+                }) === row.muscleGroupId)
+          )
+          .sort(
+            (a, b) =>
+              (INJURY_STATUS_PRIORITY[a.status] ?? 99) -
+              (INJURY_STATUS_PRIORITY[b.status] ?? 99)
+          );
+        const injuryNotice = matchingInjuries && matchingInjuries.length > 0
+          ? ` Active injury: ${matchingInjuries.map(i => `${i.status} ${i.label ?? ''}`).join(', ')}.`
+          : '';
         return (
           <Pressable
             accessibilityHint="Selects muscle on the 3D body model."
-            accessibilityLabel={`Select ${row.displayName}. Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${unit}.`}
+            accessibilityLabel={`Select ${row.displayName}.${injuryNotice} Now ${figures.now}, previous ${figures.previous}, change ${figures.change.text}. ${unit}.`}
             accessibilityRole="button"
             accessibilityState={{ selected, expanded: selected }}
             key={row.muscleGroupId}
@@ -258,55 +282,145 @@ function MuscleAccessibilityTargets({ muscles, metric, selectedId, onSelect }: P
   );
 }
 
-type SvgProps = {
-  readonly projected: ReturnType<typeof projectMuscleBody>;
+type InjuryOverlaysProps = {
+  readonly projected: ProjectedMuscleBody;
   readonly viewportWidth: number;
-  readonly overlay: MuscleOverlayStyle;
-  readonly relief: ThemeShadePalette['relief'];
+  readonly viewportHeight: number;
+  readonly onSelectMuscle: (id: string) => void;
 };
 
-function MuscleBodySvg({ projected, viewportWidth, overlay, relief }: SvgProps) {
+function MuscleInjuryOverlays({
+  projected,
+  viewportWidth,
+  viewportHeight,
+  onSelectMuscle,
+}: InjuryOverlaysProps) {
+  const hasContours = projected.injuryContours && projected.injuryContours.length > 0;
+  const hasBadges = projected.injuryBadges && projected.injuryBadges.some(b => b.visible);
+  if (!hasContours && !hasBadges) return null;
+
   return (
-    <Svg
-      height={VIEWPORT_HEIGHT}
-      pointerEvents="none"
-      testID="stats-muscle-body-svg"
-      width={viewportWidth}>
-      {projected.batches.map(batch => (
-        <Path
-          d={batch.d}
-          fill={batch.fill}
-          key={batch.key}
-          stroke={batch.fill}
-          strokeLinejoin="round"
-          strokeWidth={FACET_STROKE_WIDTH}
-        />
-      ))}
-      {overlay === 'contour' && projected.contour ? (
-        <Path
-          d={projected.contour.d}
-          fill="none"
-          key="stats-muscle-contour"
-          stroke={projected.contour.stroke}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={CONTOUR_STROKE_WIDTH}
-          testID="stats-muscle-body-contour"
-        />
+    <>
+      {hasContours ? (
+        <Svg
+          height={viewportHeight}
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+          testID="stats-muscle-injury-contours"
+          width={viewportWidth}>
+          {projected.injuryContours!.map((contour, i) => (
+            <Path
+              d={contour.d}
+              fill="none"
+              key={`injury-contour-${contour.injuryId}-${i}`}
+              stroke={contour.stroke}
+              strokeWidth={contour.status === 'acute' ? 2.5 : 1.6}
+            />
+          ))}
+        </Svg>
       ) : null}
-      {overlay === 'fibres' &&
-        (['surface', 'deep'] as const).map(layer =>
-          projected.fibres[layer] ? (
-            <ReliefFibres key={layer} d={projected.fibres[layer]} layer={layer} relief={relief} />
-          ) : null
-        )}
-      {overlay === 'fibres' &&
-        projected.fibres.anatomicalParts?.map(part =>
-          part.d ? (
-            <ReliefFibres key={part.id} d={part.d} id={`anatomy-${part.id}`} layer="deep" relief={relief} />
-          ) : null
-        )}
-    </Svg>
+      {projected.injuryBadges?.map(badge => {
+        const severityZIndex = badge.status === 'acute' ? 30 : badge.status === 'managing' ? 20 : 10;
+        return badge.visible ? (
+          <View
+            key={`injury-badge-${badge.injuryId}`}
+            pointerEvents="box-none"
+            style={[
+              styles.injuryBadgeAnchor,
+              {
+                left: Math.max(8, Math.min(viewportWidth - 76, badge.x - 30)),
+                top: Math.max(8, Math.min(viewportHeight - 24, badge.y - 12)),
+                zIndex: severityZIndex,
+              },
+            ]}>
+            <InjuryBadge
+              onPress={() => onSelectMuscle(badge.muscleGroupId)}
+              severity={badge.status}
+              testID={`stats-muscle-injury-badge-${badge.injuryId}`}
+            />
+          </View>
+        ) : null;
+      })}
+    </>
+  );
+}
+
+type ViewportAreaProps = {
+  readonly canvasFailed: boolean;
+  readonly viewportHeight: number;
+  readonly viewportWidth: number;
+  readonly onRetry: () => void;
+  readonly gesture: ReturnType<typeof Gesture.Exclusive>;
+  readonly orientation: BodyOrientation;
+  readonly angleDeg: number;
+  readonly onAccessibilityAction: (delta: number) => void;
+  readonly onLayoutWidth: (width: number) => void;
+  readonly wireframe: WireframeFrame;
+  readonly onCanvasError: () => void;
+  readonly projected: ProjectedMuscleBody;
+  readonly onSelectMuscle: (id: string) => void;
+};
+
+function MuscleBodyViewportArea({
+  canvasFailed,
+  viewportHeight,
+  viewportWidth,
+  onRetry,
+  gesture,
+  orientation,
+  angleDeg,
+  onAccessibilityAction,
+  onLayoutWidth,
+  wireframe,
+  onCanvasError,
+  projected,
+  onSelectMuscle,
+}: ViewportAreaProps) {
+  if (canvasFailed) {
+    return (
+      <View style={[styles.viewport, { height: viewportHeight }]} testID="stats-muscle-body-viewport">
+        <StatePanel
+          action={{ label: 'Retry', testID: 'stats-muscle-wireframe-retry', onPress: onRetry }}
+          kind="error"
+          testID="stats-muscle-wireframe-error"
+          title="Muscle model unavailable"
+        />
+      </View>
+    );
+  }
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <View
+        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+        accessibilityLabel="Muscle body model"
+        accessibilityRole="adjustable"
+        accessibilityValue={{
+          text: `${orientation === 'front' ? 'Front' : 'Back'} view, ${angleDeg} degrees`,
+        }}
+        accessible
+        onAccessibilityAction={event => {
+          const delta =
+            event.nativeEvent.actionName === 'increment'
+              ? ACCESSIBILITY_ANGLE_STEP
+              : -ACCESSIBILITY_ANGLE_STEP;
+          onAccessibilityAction(delta);
+        }}
+        onLayout={event => {
+          const nextWidth = Math.round(event.nativeEvent.layout.width);
+          if (nextWidth > 0) onLayoutWidth(nextWidth);
+        }}
+        style={[styles.viewport, { height: viewportHeight }]}
+        testID="stats-muscle-body-viewport">
+        <MuscleBodyCanvas frame={wireframe} onError={onCanvasError} />
+        <MuscleInjuryOverlays
+          onSelectMuscle={onSelectMuscle}
+          projected={projected}
+          viewportHeight={viewportHeight}
+          viewportWidth={viewportWidth}
+        />
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -346,9 +460,10 @@ function MuscleBodyComparison({ selectedMuscle, metric, viewportWidth }: Compari
  * Interactive 3D low-poly anatomical muscle model for the Progress Muscle breakdown.
  * Colours follow [[comparison.colour-scale]], with CIE LCh lighting,
  * supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
- * and selects a muscle group on tap. Selected schematic fibres reveal
- * full source-shape extents through covering anatomy, with provisional registration;
- * independent normals hide their own far surface. Body colours and hit targets stay live.
+ * and selects a reported muscle group on tap. Wireframe uses depth-tested mesh
+ * edges on an opaque grey body; selected anatomy fades through covering muscle layers with
+ * a distinct colour and light fill. Filled patches share the coarse anatomy,
+ * camera, focus and hit testing; switching view changes only its material.
  * Decoration follows [[appearance.november]] without changing hit testing.
  */
 export function MuscleBodyCard({
@@ -358,11 +473,12 @@ export function MuscleBodyCard({
   onSelect,
   report,
   setTargets,
-  defaultOverlay = 'fibres',
+  defaultOverlay = 'wireframe',
   overlay: controlledOverlay,
   onOverlayChange,
+  activeInjuries,
 }: Props) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const november = useNovemberAppearance();
   const roles = useUiRoles();
   const mode = useUiMode();
@@ -370,14 +486,19 @@ export function MuscleBodyCard({
   const [baseAngleDeg, setBaseAngleDeg] = useState(0);
   const [dragOffsetDeg, setDragOffsetDeg] = useState(0);
   const [internalOverlay, setInternalOverlay] = useState<MuscleOverlayStyle>(defaultOverlay);
+  const [canvasFailed, setCanvasFailed] = useState(false);
 
   const overlay = controlledOverlay ?? internalOverlay;
 
   const handleOverlayChange = (next: MuscleOverlayStyle) => {
+    setCanvasFailed(false);
     setInternalOverlay(next);
     onOverlayChange?.(next);
   };
 
+  const [focus, setFocus] = useState(false);
+  // Leave room for Progress controls, comparison and the tab bar on compact phones.
+  const viewportHeight = Math.min(420, Math.max(VIEWPORT_HEIGHT, windowHeight - 440));
   const angleDeg = normaliseBodyAngle(baseAngleDeg + dragOffsetDeg);
 
   const viewportWidth =
@@ -388,22 +509,38 @@ export function MuscleBodyCard({
   const orientation = bodyOrientationForAngle(angleDeg);
   const scores = useMemo(() => computeMuscleScores(muscles, metric, setTargets), [muscles, metric, setTargets]);
   const palette = useMemo(() => buildThemeShadePalette(roles, mode), [roles, mode]);
-  const selectedFibres = useMemo(() => selectMuscleFibres(selectedId, report), [selectedId, report]);
+  const selectedMeshes = useMemo(() => selectMuscleMeshes(selectedId, report, focus), [selectedId, report, focus]);
+  const camera = useMemo(() => wireframeCamera({ angle: angleDeg, width: viewportWidth, height: viewportHeight,
+    selected: selectedMeshes, focus }), [angleDeg, viewportWidth, viewportHeight, selectedMeshes, focus]);
+  const wireframe = useMemo(() => ({ overlay, camera, selected: selectedMeshes, scores, report, palette, roles, november }),
+    [overlay, camera, selectedMeshes, scores, report, palette, roles, november]);
+
+  const activeInjuryOverlays = useMemo<readonly ActiveInjuryOverlay[] | undefined>(() => {
+    if (!activeInjuries || activeInjuries.length === 0) return undefined;
+    return activeInjuries.map(injury => ({
+      id: injury.id,
+      muscleGroupId: injury.muscleGroupId ?? null,
+      side: injury.side ?? null,
+      status: injury.status,
+      painScore: injury.painScore ?? null,
+      label: injury.label,
+    }));
+  }, [activeInjuries]);
+
   const projected = useMemo(
     () =>
       projectMuscleBody({
         angleDeg,
         width: viewportWidth,
-        height: VIEWPORT_HEIGHT,
+        height: viewportHeight,
         scores,
         selectedId,
-        selectedFibres,
         report,
         palette,
-        november,
         overlay,
+        activeInjuries: activeInjuryOverlays,
       }),
-    [angleDeg, scores, palette, report, selectedId, selectedFibres, viewportWidth, november, overlay]
+    [angleDeg, viewportWidth, viewportHeight, scores, selectedId, report, palette, overlay, activeInjuryOverlays]
   );
 
   const selectedMuscle = useMemo(
@@ -415,7 +552,7 @@ export function MuscleBodyCard({
 
   const selectWithAutoOrientation = (targetId: string) => {
     onSelect(targetId);
-    const targetOrientation = canonicalOrientationForMuscle(targetId);
+    const targetOrientation = canonicalOrientationForMuscle(targetId, report);
     if (targetOrientation !== orientation) {
       setDragOffsetDeg(0);
       setBaseAngleDeg(targetOrientation === 'front' ? 0 : 180);
@@ -439,7 +576,7 @@ export function MuscleBodyCard({
 
   const handleTapPoint = (x: number, y: number) => {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-    const hit = hitTestProjectedMuscle(projected, x, y);
+    const hit = hitWireframe({ point: [x, y], camera, selected: selectedMeshes, selectedId, report });
     if (hit) {
       onSelect(resolveDatasetMuscleId(hit, muscles));
     }
@@ -487,43 +624,35 @@ export function MuscleBodyCard({
         selectedMuscle={selectedMuscle}
       />
       <View>
-        <GestureDetector gesture={gesture}>
-          <View
-            accessible
-            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-            accessibilityLabel="Muscle body model"
-            accessibilityRole="adjustable"
-            accessibilityValue={{
-              text: `${orientation === 'front' ? 'Front' : 'Back'} view, ${angleDeg} degrees`,
-            }}
-            onAccessibilityAction={event => {
-              const delta =
-                event.nativeEvent.actionName === 'increment'
-                  ? ACCESSIBILITY_ANGLE_STEP
-                  : -ACCESSIBILITY_ANGLE_STEP;
-              setDragOffsetDeg(0);
-              setBaseAngleDeg(current => normaliseBodyAngle(current + delta));
-            }}
-            onLayout={event => {
-              const nextWidth = Math.round(event.nativeEvent.layout.width);
-              if (nextWidth > 0 && nextWidth !== measuredWidth) {
-                setMeasuredWidth(nextWidth);
-              }
-            }}
-            style={styles.viewport}
-            testID="stats-muscle-body-viewport">
-            <MuscleBodySvg
-              overlay={overlay}
-              projected={projected}
-              relief={palette.relief}
-              viewportWidth={viewportWidth}
-            />
-          </View>
-        </GestureDetector>
+        <MuscleBodyViewportArea
+          angleDeg={angleDeg}
+          canvasFailed={canvasFailed}
+          gesture={gesture}
+          onAccessibilityAction={delta => {
+            setDragOffsetDeg(0);
+            setBaseAngleDeg(current => normaliseBodyAngle(current + delta));
+          }}
+          onCanvasError={() => setCanvasFailed(true)}
+          onLayoutWidth={nextWidth => {
+            if (nextWidth !== measuredWidth) setMeasuredWidth(nextWidth);
+          }}
+          onRetry={() => setCanvasFailed(false)}
+          onSelectMuscle={selectWithAutoOrientation}
+          orientation={orientation}
+          projected={projected}
+          viewportHeight={viewportHeight}
+          viewportWidth={viewportWidth}
+          wireframe={wireframe}
+        />
+        {!canvasFailed && selectedMeshes.length > 0 ? <View style={styles.viewerActions}>
+          <FilterChip label={focus ? 'Whole body' : 'Focus'} on={focus} size="compact"
+            accessibilityLabel={focus ? 'Show whole body' : 'Focus selected muscle'} accessibilityRole="button"
+            onPress={() => setFocus(value => !value)} testID="stats-muscle-body-focus" />
+        </View> : null}
         <View style={styles.information}>
           <Information title="About the muscle model" testIDPrefix="stats-muscle-body"
-            body="Fibre directions are schematic, not measured anatomy. Selected guides reveal the full muscle shape through covering muscles as you rotate. Anatomical shapes are provisionally aligned to this model."
-            sections={[[ 'Anatomical source', 'BodyParts3D © The Database Center for Life Science, CC BY 4.0. Adapted by pose alignment, bilateral mirroring and schematic fibre generation. Source and licence: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html' ]]} />
+            body="Wireframe lines are triangle edges. Both views share the same coarse muscle surfaces. Muscle layers partially cover selected anatomy; several layers make it faint. Taps select the foreground body region. Shapes are visually fitted: Forearms use an outer group envelope with hand tendons; spinal erectors use smoothed columns; Abs and Lats use body-surface approximations."
+            sections={[[ 'Anatomical source', 'BodyParts3D © The Database Center for Life Science, CC BY 4.0. Adapted by pose alignment, forearm/hand fitting, bilateral mirroring and simplified surface envelopes. Source and licence: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html' ]]} />
         </View>
       </View>
       {selectedMuscle ? (
@@ -534,6 +663,7 @@ export function MuscleBodyCard({
         />
       ) : null}
       <MuscleAccessibilityTargets
+        activeInjuries={activeInjuries}
         metric={metric}
         muscles={muscles}
         onSelect={onSelect}
@@ -554,31 +684,8 @@ export function MuscleBodyCard({
   );
 }
 
-type ReliefFibresProps = {
-  d: string;
-  layer: 'surface' | 'deep';
-  id?: string;
-  relief: ThemeShadePalette['relief'];
-};
-
-function ReliefFibres({ d, layer, id = layer, relief }: ReliefFibresProps) {
-  const definitionId = useId();
-  // Share native path parsing and stroked bounds between the ordered relief paints.
-  // Transparent fill and stroke alpha avoid native outline clips and offscreen opacity layers.
-  // A light edge then a dark one on the figure's mid-tone shading, in the palette's mode
-  // (`buildThemeShadePalette`).
-  return <>
-    <Defs><Path id={definitionId} d={d} /></Defs>
-    <Use href={`#${definitionId}`} fill="transparent" stroke={relief.highlight} strokeWidth={1.1} strokeOpacity={0.95}
-      translateX={0.45} translateY={-0.45} strokeLinecap="round" strokeLinejoin="round"
-      testID={`stats-muscle-body-fibres-${id}-highlight`} />
-    <Use href={`#${definitionId}`} fill="transparent" stroke={relief.shade} strokeWidth={0.9}
-      strokeOpacity={layer === 'surface' ? 0.72 : 0.70} strokeLinecap="round" strokeLinejoin="round"
-      testID={`stats-muscle-body-fibres-${id}-shade`} />
-  </>;
-}
-
 const styles = StyleSheet.create({
+  viewerActions: { flexDirection: 'row', justifyContent: 'flex-end' },
   information: { position: 'absolute', top: 0, right: 0 },
   comparisonLabels: { flexDirection: 'row', gap: uiSpace.sm },
   card: {
@@ -587,6 +694,7 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: uiSpace.sm,
@@ -648,5 +756,9 @@ const styles = StyleSheet.create({
   srTarget: {
     width: 1,
     height: 1,
+  },
+  injuryBadgeAnchor: {
+    position: 'absolute',
+    zIndex: 10,
   },
 });

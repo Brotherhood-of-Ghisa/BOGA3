@@ -175,7 +175,7 @@ export class BogaAgentApi {
 
   async writeWorkout(
     accessToken: string,
-    operation: 'start' | 'log-sets' | 'update-set' | 'delete-set' | 'finish',
+    operation: 'create' | 'start' | 'log-sets' | 'update-set' | 'delete-set' | 'finish',
     input: Record<string, unknown> & { idempotency_key: string },
   ): Promise<Record<string, unknown>> {
     const { idempotency_key, ...body } = input;
@@ -193,12 +193,93 @@ export class BogaAgentApi {
     return this.#getObject('v1/agent/training-status', accessToken);
   }
 
+  async getRecentActivities(
+    accessToken: string,
+    input: { cursor?: string; from?: string; limit?: number; to?: string },
+  ): Promise<Record<string, unknown>> {
+    return this.#getObject('v1/agent/activities', accessToken, input);
+  }
+
+  async listNotes(
+    accessToken: string,
+    input: { cursor?: string; exercise_id?: string; from?: string; limit?: number; to?: string },
+  ): Promise<Record<string, unknown>> {
+    return this.#getObject('v1/agent/notes', accessToken, input);
+  }
+
+  async addNote(
+    accessToken: string,
+    input: { body: string; exercise_id?: string | null; idempotency_key: string; noted_on?: string },
+  ): Promise<Record<string, unknown>> {
+    const { idempotency_key, ...body } = input;
+    return this.#postObject('v1/agent/notes', accessToken, idempotency_key, body);
+  }
+
+  async removeNote(
+    accessToken: string,
+    input: { idempotency_key: string; note_id: string },
+  ): Promise<Record<string, unknown>> {
+    return this.#postObject(
+      `v1/agent/notes/${encodeURIComponent(input.note_id)}/remove`,
+      accessToken,
+      input.idempotency_key,
+      {},
+    );
+  }
+
   async setMuscleTargets(
     accessToken: string,
     input: MuscleTargetFields & { idempotency_key: string },
   ): Promise<Record<string, unknown>> {
     const { idempotency_key, ...body } = input;
     return this.#postObject('v1/agent/muscle-targets', accessToken, idempotency_key, body, 'PUT');
+  }
+
+  async getActiveInjuries(
+    accessToken: string,
+    input: { include_resolved?: boolean; limit?: number } = {},
+  ): Promise<Record<string, unknown>> {
+    return this.#getObject('v1/agent/injuries', accessToken, input);
+  }
+
+  async logInjury(
+    accessToken: string,
+    input: {
+      idempotency_key: string;
+      injury: {
+        contraindications?: string;
+        label: string;
+        muscle_group_id?: string | null;
+        notes?: string;
+        pain_score?: number | null;
+        side?: 'left' | 'right' | 'bilateral' | null;
+        started_at?: string;
+        status?: 'acute' | 'managing' | 'monitoring';
+      };
+    },
+  ): Promise<Record<string, unknown>> {
+    return this.#postObject('v1/agent/injuries', accessToken, input.idempotency_key, input.injury);
+  }
+
+  async updateInjuryStatus(
+    accessToken: string,
+    input: {
+      changes: {
+        contraindications?: string | null;
+        notes?: string | null;
+        pain_score?: number | null;
+        status?: 'acute' | 'managing' | 'monitoring' | 'resolved';
+      };
+      idempotency_key: string;
+      injury_id: string;
+    },
+  ): Promise<Record<string, unknown>> {
+    return this.#patchObject(
+      `v1/agent/injuries/${encodeURIComponent(input.injury_id)}`,
+      accessToken,
+      input.idempotency_key,
+      input.changes,
+    );
   }
 
   async getExerciseHistory(
@@ -320,7 +401,7 @@ export class BogaAgentApi {
     accessToken: string,
     idempotencyKey: string,
     body: Record<string, unknown>,
-    method: 'POST' | 'PUT' = 'POST',
+    method: 'POST' | 'PUT' | 'PATCH' = 'POST',
   ): Promise<Record<string, unknown>> {
     const value = await this.#request(method, relativePath, accessToken, {
       body,
@@ -337,6 +418,15 @@ export class BogaAgentApi {
     return value;
   }
 
+  async #patchObject(
+    relativePath: string,
+    accessToken: string,
+    idempotencyKey: string,
+    body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    return this.#postObject(relativePath, accessToken, idempotencyKey, body, 'PATCH');
+  }
+
   async #get(
     relativePath: string,
     accessToken: string,
@@ -346,7 +436,7 @@ export class BogaAgentApi {
   }
 
   async #request(
-    method: 'GET' | 'POST' | 'PUT',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH',
     relativePath: string,
     accessToken: string,
     options: {

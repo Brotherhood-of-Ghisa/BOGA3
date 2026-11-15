@@ -13,29 +13,56 @@ const renderCard=(item: CompetitionEventWire,props: Partial<Parameters<typeof Gr
 };
 it('shows original normalized units and the set with its one status, without raw load, bodyweight or dependency pins', () => {
   const card=renderCard(competitionEvent);
-  expect(card).toHaveTextContent('1RM 145.7 %BW',{ exact: false });
+  expect(card).toHaveTextContent('1RM 45.7 %BW',{ exact: false });
   expect(screen.getByTestId('group-metric-stream-event1-set')).toHaveTextContent('5 reps');
   expect(screen.getByTestId('group-metric-stream-event1-certification')).toHaveTextContent('Not certified');
   expect(card).not.toHaveTextContent(/As logged|Uncertified/);
-  expect(card.props.accessibilityLabel).toContain('1RM 145.7 %BW');
+  expect(card.props.accessibilityLabel).toContain('1RM 45.7 %BW');
   expect(card.props.accessibilityLabel).not.toMatch(/kg|bodyweight reading|fingerprint|digest/);
   fireEvent.press(card);
   expect(mockPush).toHaveBeenCalledWith('/group/g1/leaderboards/ge1/history?metric=e1rm&scope=all');
 });
 it.each([
   ['e1rm','kg',120,'1RM 120.0'],['volume','kg_reps',600,'Volume 600.0'],
-  ['volume','percent_bw_reps',620,'Volume 620.0 %BW·reps'],
+  ['volume','percent_bw_reps',620,'Volume 620.0 %BW'],
 ] as const)('keeps %s original unit %s', (metric,unit,value,line) => {
   const card=renderCard({ ...competitionEvent,metric,values: [{ ...competitionEvent.values[0],metric,unit,value }] });
   expect(card).toHaveTextContent(line,{ exact: false });
 });
-it.each(['record_voided','record'] as const)('uses generic ended copy for %s and never reads the private cause', kind => {
-  const event={ ...competitionEvent,kind,voided: true };
+const withdrawal=(): CompetitionEventWire => {
+  const event={ ...competitionEvent,event_id: 'w1',kind: 'record_voided' as const,sort_at_ms: Date.UTC(2026,10,11,9),
+    related_event_id: 'event1',metric: null,values: [],record_context: null,reps: null };
   Object.defineProperty(event,'reason',{ get: () => { throw new Error('private cause read'); } });
+  return event;
+};
+const withdrawnRecord={ event: { ...competitionEvent,voided: true,sort_at_ms: Date.UTC(2026,10,10,8),
+  member: { user_id: 'u2',username: 'GoldmanBoyo' },
+  values: [{ ...competitionEvent.values[0],unit: 'kg',value: 116 },{ ...competitionEvent.values[0],metric: 'volume' as const,unit: 'kg_reps',value: 580 }] },
+  record: { performance: ordinarySet,previous: [],group_record_metrics: ['e1rm' as const] } };
+it('shows a withdrawn GR as its GR card, dated at withdrawal, without a certification or the private cause', () => {
+  const card=renderCard(withdrawal(),{ withdrawn: withdrawnRecord });
+  expect(screen.getByTestId('group-metric-stream-w1-label')).toHaveTextContent('GoldmanBoyo · GR withdrawn');
+  expect(screen.getByTestId('group-metric-stream-w1-context')).toHaveTextContent('Pull-up');
+  expect(screen.getByTestId('group-metric-stream-w1-set')).toHaveTextContent('120.0 × 5');
+  expect(screen.getByTestId('group-metric-stream-w1-date')).toHaveTextContent('11-11-2026');
+  expect(card).toHaveTextContent('1RM 116.0',{ exact: false });
+  expect(card).not.toHaveTextContent(/Volume|Certif|Score unavailable/);
+  expect(screen.queryByTestId('group-metric-stream-w1-certification')).toBeNull();
+  expect(card.props.accessibilityLabel).toBe('GoldmanBoyo · GR withdrawn, Pull-up, 120.0 × 5, 1RM 116.0, 11-11-2026');
+  fireEvent.press(card);
+  expect(mockPush).toHaveBeenCalledWith('/group/g1/leaderboards/ge1/history?metric=e1rm&scope=all');
+});
+it('names you on your own withdrawn GR', () => {
+  renderCard(withdrawal(),{ withdrawn: { ...withdrawnRecord,event: { ...withdrawnRecord.event,member: { user_id: 'me',username: 'Me' } } } });
+  expect(screen.getByTestId('group-metric-stream-w1-label')).toHaveTextContent('You · GR withdrawn');
+});
+it.each([
+  ['a withdrawal without its record',withdrawal()],
+  ['a withdrawn record',{ ...competitionEvent,voided: true }],
+])('labels %s withdrawn, with no figures', (_name,event) => {
   const card=renderCard(event);
-  expect(card).toHaveTextContent('Certification ended',{ exact: false });
-  expect(card).toHaveTextContent('Score unavailable',{ exact: false });
-  expect(card).not.toHaveTextContent('145.7',{ exact: false });
+  expect(screen.getByTestId(`group-metric-stream-${event.event_id}-label`)).toHaveTextContent('Friend · GR withdrawn');
+  expect(card).not.toHaveTextContent(/45\.7|Score unavailable|Certif/);
 });
 it('labels absent score as unavailable rather than zero', () => {
   const card=renderCard({ ...competitionEvent,values: [{ ...competitionEvent.values[0],value: null,unavailable: true }] });
@@ -69,10 +96,10 @@ it('shows one status per set however many boards the record took, and the set fr
   const metric=competitionEvent.record_context!.metrics[0];
   renderCard({ ...competitionEvent,values: [...competitionEvent.values,{ ...competitionEvent.values[0],metric: 'volume',unit: 'percent_bw_reps',value: 650 }],
     record_context: { ...competitionEvent.record_context!,metrics: [metric,{ ...metric,metric: 'volume',write_token: 'v' }] } },
-  { record: { performance: ordinarySet,previous: [] } });
+  { record: { performance: ordinarySet,previous: [],group_record_metrics: ['e1rm','volume'] } });
   expect(screen.getAllByTestId('group-metric-stream-event1-certification')).toHaveLength(1);
   expect(screen.getByTestId('group-metric-stream-event1-set')).toHaveTextContent('120.0 × 5');
-  expect(screen.getByTestId('group-metric-stream-event1')).toHaveTextContent('Volume 650.0 %BW·reps',{ exact: false });
+  expect(screen.getByTestId('group-metric-stream-event1')).toHaveTextContent('Volume 650.0 %BW',{ exact: false });
 });
 it('says an ended certification and leaves a record with no current context without a status', () => {
   const metric=competitionEvent.record_context!.metrics[0];

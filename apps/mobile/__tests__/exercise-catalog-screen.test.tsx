@@ -71,7 +71,7 @@ import {
 } from '@/src/bodyweight/calculation-preference';
 import * as catalogRepository from '@/src/data/exercise-catalog';
 import * as catalogStats from '@/src/data/exercise-catalog-stats';
-import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from '@/src/data/schema';
+import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups, userSettings } from '@/src/data/schema';
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import { __resetExerciseListPreferencesForTests } from '@/src/exercise-catalog/list-preferences';
 import {
@@ -81,7 +81,7 @@ import {
   localDatabase,
   resetLocalData,
 } from './helpers/local-data';
-import { broadSetupOf } from './helpers/muscle-setup';
+import { BROAD_COMBINED_MUSCLES, broadSetupOf } from './helpers/muscle-setup';
 import { waitForGone } from './helpers/wait-for-gone';
 import {
   exerciseEditorHrefs,
@@ -170,6 +170,7 @@ const chooseBroad = () => {
   for (const { id } of SYSTEM_MUSCLE_GROUP_SEEDS) {
     localDatabase().update(muscleGroups).set(broadSetupOf(id)).where(eq(muscleGroups.id, id)).run();
   }
+  localDatabase().insert(userSettings).values({ id: 'settings', combinedMuscles: JSON.stringify(BROAD_COMBINED_MUSCLES) }).run();
 };
 
 const createExercise = async (name: string) => {

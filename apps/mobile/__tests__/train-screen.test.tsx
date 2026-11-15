@@ -24,9 +24,13 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule()
 );
 
+const mockDismissTo = jest.fn();
+const mockPush = jest.fn();
+const mockRouter = { dismissTo: mockDismissTo, push: mockPush };
+
 jest.mock('expo-router', () => ({
   useIsFocused: () => true,
-  useRouter: () => ({ dismissTo: jest.fn() }),
+  useRouter: () => mockRouter,
 }));
 
 jest.mock('@/components/session-view/session-view-screen', () => {
@@ -41,6 +45,7 @@ jest.mock('@/components/session-view/session-view-screen', () => {
 });
 
 import TrainRoute, { TrainScreen, type TrainPlanningState } from '../app/(tabs)/train';
+import { planRepository, startSessionPlan } from '@/src/session-planner';
 import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
@@ -51,6 +56,7 @@ import * as sessionDrafts from '@/src/data/session-drafts';
 import * as sessionList from '@/src/data/session-list';
 import { listSessionListBuckets, setSessionDeletedState } from '@/src/data/session-list';
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
+import { createDrizzleSessionPlanStore } from '@/src/data/session-plan-store';
 import type { SessionEntryCoordinator } from '@/src/session-entry';
 import {
   bootLocalApp,
@@ -74,6 +80,15 @@ const openTrain = async (fixture?: 'session-view') => {
   await seed(fixture);
   renderWithTheme(<TrainRoute />);
   await checked();
+  if (!fixture) {
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('train-manage-planning-button') ||
+          screen.queryByTestId('train-planning-section') ||
+          screen.queryByTestId('train-planning-error'),
+      ).toBeTruthy();
+    });
+  }
 };
 
 // The workout Train shows in place of its disc, as `<placement> workout <id>`.
@@ -131,6 +146,8 @@ const renderWithPlan = async (planningState: TrainPlanningState, sessionEntry?: 
 
 beforeEach(() => {
   resetLocalData();
+  mockDismissTo.mockClear();
+  mockPush.mockClear();
 });
 
 afterEach(() => {
@@ -146,8 +163,10 @@ describe('Train over real data', () => {
     expect(screen.getByRole('button', { name: 'Start workout' })).toBe(screen.getByTestId('train-start-empty-button'));
     expect(screen.getByTestId('train-start-empty-button')).toHaveTextContent('Start');
     expect(screen.queryByTestId('train-planning-section')).toBeNull();
-    expect(screen.queryByTestId('train-manage-planning-button')).toBeNull();
-    expect(screen.queryByText('Watch this space 👀')).toBeNull();
+    expect(screen.getByTestId('train-manage-planning-button')).toHaveTextContent('Plan a workout');
+
+    fireEvent.press(screen.getByTestId('train-manage-planning-button'));
+    expect(mockPush).toHaveBeenCalledWith('/planner');
   });
 
   it('checks for a workout with one row, never the whole session history', async () => {
@@ -373,6 +392,41 @@ describe('Train over real data', () => {
     expect(await activeSessionId()).toBe('planned-session');
   });
 
+  it('loads upcoming plan from database on TrainRoute, displaying 1-tap start and linking manage planning to /planner', async () => {
+    await seed();
+    const store = createDrizzleSessionPlanStore();
+    await store.savePlanGraph(
+      {
+        title: 'Heavy Deadlift Day',
+        gymId: null,
+        scheduledFor: new Date(2026, 10, 5, 10),
+        exercises: [
+          {
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Bench Press',
+            sets: [{ targetWeightValue: '100', targetReps: 5, targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 10, 4, 10),
+    );
+
+    renderWithTheme(<TrainRoute />);
+    await checked();
+    await waitFor(() => {
+      expect(screen.queryByTestId('train-planned-session-card')).toBeTruthy();
+    });
+
+    expect(screen.getByTestId('train-planned-session-card')).toHaveTextContent('Heavy Deadlift Day1 exerciseStart');
+    expect(screen.getByTestId('train-start-planned-button')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('train-manage-planning-button'));
+    expect(mockPush).toHaveBeenCalledWith('/planner');
+
+    fireEvent.press(screen.getByTestId('train-start-planned-button'));
+    await waitFor(() => expect(shownWorkout()).not.toBeNull());
+  });
+
   it('keeps a failed planned launch inline, leaving empty training usable (a failed plan write)', async () => {
     await seed();
     await renderWithPlan(readyPlan({ materialize: jest.fn().mockRejectedValue(new Error('stale plan')) }));
@@ -489,7 +543,154 @@ describe('Train launch states', () => {
 
     renderWithTheme(<TrainRoute />);
     await checked();
+    await waitFor(() => {
+      expect(screen.queryByTestId('train-manage-planning-button')).toBeTruthy();
+    });
     expect(accentButtons()).toEqual(['train-start-empty-button']);
     expect(discWidth()).toBeGreaterThan(compact);
+  });
+
+  it('selects the first scheduled plan eligible to start, skipping earlier plans with only unmapped blocks', async () => {
+    await seed();
+    await planRepository.createPlan(
+      {
+        title: 'Unmapped Earlier Plan',
+        gymId: null,
+        scheduledFor: new Date(2026, 9, 10, 8),
+        exercises: [
+          {
+            exerciseDefinitionId: null,
+            name: 'Mystery Exercise',
+            sets: [{ targetWeightText: '50', targetRepsText: '10', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 1, 8),
+    );
+    await planRepository.createPlan(
+      {
+        title: 'Valid Later Plan',
+        gymId: null,
+        scheduledFor: new Date(2026, 9, 11, 8),
+        exercises: [
+          {
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Barbell Bench Press',
+            sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 1, 9),
+    );
+
+    renderWithTheme(<TrainRoute />);
+    await checked();
+
+    await waitFor(() => {
+      expect(screen.getByText('Valid Later Plan')).toBeTruthy();
+    });
+    expect(screen.queryByText('Unmapped Earlier Plan')).toBeNull();
+
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('train-start-planned-button'));
+    });
+
+    await waitFor(() => {
+      expect(shownWorkout()).toContain('tab workout');
+    });
+  });
+
+  it('shows the planner link when only unmapped plans are scheduled', async () => {
+    await seed();
+    await planRepository.createPlan(
+      {
+        title: 'Only Unmapped Plan',
+        gymId: null,
+        scheduledFor: new Date(2026, 9, 10, 8),
+        exercises: [
+          {
+            exerciseDefinitionId: null,
+            name: 'Mystery Exercise',
+            sets: [{ targetWeightText: '50', targetRepsText: '10', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 1, 8),
+    );
+
+    renderWithTheme(<TrainRoute />);
+    await checked();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('train-manage-planning-button')).toHaveTextContent('Plan a workout');
+    });
+    expect(screen.queryByTestId('train-start-planned-button')).toBeNull();
+  });
+
+  it('refreshes planning state when an active workout ends in place without changing focus', async () => {
+    await seed();
+    const plan1 = await planRepository.createPlan(
+      {
+        title: 'First Plan',
+        gymId: null,
+        scheduledFor: new Date(2026, 9, 10, 8),
+        exercises: [
+          {
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Barbell Bench Press',
+            sets: [{ targetWeightText: '100', targetRepsText: '5', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 1, 8),
+    );
+    await planRepository.createPlan(
+      {
+        title: 'Second Plan',
+        gymId: null,
+        scheduledFor: new Date(2026, 9, 11, 8),
+        exercises: [
+          {
+            exerciseDefinitionId: 'seed_barbell_bench_press',
+            name: 'Barbell Bench Press',
+            sets: [{ targetWeightText: '80', targetRepsText: '8', targetSetType: null }],
+          },
+        ],
+      },
+      new Date(2026, 9, 1, 9),
+    );
+
+    if (plan1.status !== 'saved') throw new Error('Expected saved');
+    const plan1Id = plan1.id;
+
+    const startResult = await startSessionPlan(plan1Id);
+    expect(startResult.status).toBe('started');
+    if (startResult.status !== 'started') throw new Error('Expected started');
+    const sessionId = startResult.sessionId;
+
+    renderWithTheme(<TrainRoute />);
+    await waitFor(() => {
+      expect(shownWorkout()).toBe(`tab workout ${sessionId}`);
+    });
+
+    // Complete first plan session and block in SQLite
+    localDataClient()
+      .prepare("UPDATE sessions SET status = 'completed', completed_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(sessionId);
+    localDataClient()
+      .prepare("UPDATE session_plan_exercises SET progress_status = 'completed', resolved_at = CURRENT_TIMESTAMP WHERE session_plan_id = ?")
+      .run(plan1Id);
+
+    // End shown workout in place via onEnded('now') without changing focus
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('train-workout-abandon'));
+    });
+
+    // The disc returns and planning refreshes to Second Plan
+    await waitFor(() => {
+      expect(screen.getByTestId('train-start-empty-button')).toBeTruthy();
+      expect(screen.getByText('Second Plan')).toBeTruthy();
+    });
+    expect(screen.queryByText('First Plan')).toBeNull();
   });
 });

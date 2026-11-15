@@ -1,11 +1,11 @@
 import { isCompetitionCachePayload } from './competition-cache-guards';
 import { isCompetitionBoardWire } from './competition-wire-guards';
 import { isCompetitionCertificationResultWire, isCompetitionCertifyResultWire, isCompetitionExerciseListWire,
-  isCompetitionExerciseWriteWire, isCompetitionHistoryWire, isCompetitionPodiumsWire, isCompetitionRevisionsWire,
+  isCompetitionExerciseWriteWire, isCompetitionHistoryWire, isCompetitionRecordsHistoryWire, isCompetitionPodiumsWire, isCompetitionRevisionsWire,
   isCompetitionSessionDetailWire, isCompetitionSessionRecordsWire, isCompetitionPeriodTotalsWire, isCompetitionStreamWire, isCompetitionWeekSummaryWire,
   isGroupSharedExerciseDeleteWire, isGroupSharedExercisesListWire, isGroupSharedExerciseWriteWire } from './competition-reader-guards';
 import type { CompetitionBoardWire, CompetitionCertifyResultWire, CompetitionCertificationResultWire,
-  CompetitionExerciseListWire, CompetitionExerciseWriteWire, CompetitionHistoricalMetric, CompetitionHistoryWire,
+  CompetitionExerciseListWire, CompetitionExerciseWriteWire, CompetitionHistoricalMetric, CompetitionHistoryWire, CompetitionRecordsHistoryWire,
   CompetitionPodiumsWire, CompetitionRevisionsWire, CompetitionSessionDetailWire, CompetitionSessionRecordsWire, CompetitionPeriodTotalsWire, CompetitionStreamWire, CompetitionWeekSummaryWire,
   GroupSharedExerciseDeleteWire, GroupSharedExercisesListWire, GroupSharedExerciseWriteWire } from './competition-wire';
 import type { CompetitionMetric } from './competition-contract';
@@ -122,7 +122,8 @@ export type GroupRpcName =
   | 'group_competition_certification_end'
   | 'group_competition_revisions'
   | 'group_competition_history'
-  | 'group_competition_stream_v3'
+  | 'group_competition_records_history'
+  | 'group_competition_stream_v5'
   | 'group_competition_session_detail'
   | 'group_competition_session_records'
   | 'group_competition_week_summary'
@@ -156,7 +157,8 @@ const callGroupRpc = async (name: GroupRpcName, args: Record<string, unknown>): 
   let response: RpcResponse;
   try {
     response = (await client.schema('app_public').rpc(name, args).setHeader('x-boga-group-contract','4')
-      .setHeader('x-boga-group-set-metrics','1')) as RpcResponse;
+      .setHeader('x-boga-group-set-metrics','1')
+      .setHeader('x-boga-group-added-load','1')) as RpcResponse;
   } catch (error) {
     throw new GroupApiError('NETWORK', describeUnknownError(error, 'Network request failed.'));
   }
@@ -187,11 +189,11 @@ const isString = (value: unknown): value is string => typeof value === 'string';
 // ---- Reads --------------------------------------------------------------------
 
 export const listMyGroups = async (): Promise<GroupListMineResult> =>
-  expectShape('group_list_mine', await callGroupRpc('group_list_mine', {}), (r) => isCompetitionCachePayload('groups:v7:mine',r));
+  expectShape('group_list_mine', await callGroupRpc('group_list_mine', {}), (r) => isCompetitionCachePayload('groups:v8:mine',r));
 
 export const getGroup = async (groupId: string): Promise<GroupGetResult> =>
   expectShape('group_get', await callGroupRpc('group_get', { p_group_id: groupId }), (r) =>
-    isCompetitionCachePayload(`group:v7:${groupId}`,r),
+    isCompetitionCachePayload(`group:v8:${groupId}`,r),
   );
 
 export const previewGroupInvite = async (code: string): Promise<GroupInvitePreviewResult> =>
@@ -323,8 +325,14 @@ export const getCompetitionHistory = ({ groupId, exerciseId, metric, certified, 
   competitionRpc('group_competition_history',{ p_group_id: groupId, p_group_exercise_id: exerciseId, p_metric: metric,
     p_certified: certified, p_revision: revision, p_before: before, p_limit: limit },isCompetitionHistoryWire,p => p.exercise.group_exercise_id === exerciseId && p.metric === metric &&
       p.certified === certified && p.revision.rules_revision === (revision ?? p.exercise.rules.rules_revision));
+/** A board's records log (All: new bests; Certified: new #1s) across every rules revision, newest first. */
+export const getCompetitionRecordsHistory = ({ groupId, exerciseId, metric, certified, before = null, limit = 50 }: {
+  groupId: string; exerciseId: string; metric: CompetitionMetric; certified: boolean; before?: string | null; limit?: number }): Promise<CompetitionRecordsHistoryWire> =>
+  competitionRpc('group_competition_records_history',{ p_group_id: groupId, p_group_exercise_id: exerciseId, p_metric: metric,
+    p_certified: certified, p_before: before, p_limit: limit },isCompetitionRecordsHistoryWire,
+    p => p.exercise.group_exercise_id === exerciseId && p.metric === metric && p.certified === certified);
 export const getCompetitionStream = (groupId: string | null = null, before: string | null = null, limit = 20): Promise<CompetitionStreamWire> =>
-  competitionRpc('group_competition_stream_v3',{ p_group_id: groupId, p_before: before, p_limit: limit },isCompetitionStreamWire,
+  competitionRpc('group_competition_stream_v5',{ p_group_id: groupId, p_before: before, p_limit: limit },isCompetitionStreamWire,
     p => groupId === null || p.items.every(item => item.kind === 'session' ? item.groups.every(g => g.group_id === groupId) :
       item.kind === 'competition' ? item.event.group.group_id === groupId :
       item.kind === 'cow' ? item.definition.group_id === groupId :

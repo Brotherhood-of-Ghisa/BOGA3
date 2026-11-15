@@ -44,7 +44,7 @@ cleanup() {
         set local boga.exercise_merge_internal = 'on';
         create temp table smoke_workout_ids on commit drop as
           select result_ids->>'session_id' as id from public.agent_plan_write_receipts
-          where owner_user_id='${USER_UUID}'::uuid and client_id='${AGENT_CLIENT_ID}' and operation='start_workout'
+          where owner_user_id='${USER_UUID}'::uuid and client_id='${AGENT_CLIENT_ID}' and operation in ('start_workout','create_workout')
           union select id from app_public.sessions where owner_user_id='${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from public.exercise_merge_contexts where user_id='${USER_UUID}'::uuid and operation_id in
           (select id from public.exercise_merge_operations where user_id='${USER_UUID}'::uuid and session_id in (select id from smoke_workout_ids));
@@ -151,6 +151,11 @@ cleanup() {
         delete from public.agent_access_audit
           where owner_user_id = '${USER_UUID}'::uuid
             and oauth_client_id = '${AGENT_CLIENT_ID}';
+        delete from app_public.health_activities
+          where user_id = '${USER_UUID}'::uuid and external_id like 'mcp-smoke-${RUN_TAG}-%';
+        delete from app_public.training_notes
+          where owner_user_id = '${USER_UUID}'::uuid
+            and (id like 'mcp-smoke-${RUN_TAG}-%' or body like 'MCP Smoke ${RUN_TAG} %');
         delete from app_public.exercise_sets
           where owner_user_id = '${USER_UUID}'::uuid and id like 'mcp-smoke-${RUN_TAG}-%';
         delete from app_public.session_exercises
@@ -216,11 +221,12 @@ if [[ -n "${BOGA_MCP_SMOKE_ACCESS_TOKEN:-}" ]]; then
     fail "provided tokens require BOGA_MCP_SMOKE_EXERCISE_ID, SESSION_ID, and EXERCISE_QUERY"
   USER_UUID=""
 else
+  # user_g is this smoke's own fixture (auth-fixture-constants.sh): its checks
+  # are account-wide, so no other suite may sign in as it.
   USER_UUID="$(run_psql "
-    select subject_uuid from public.dev_fixture_principals
-    where fixture_key = '${USER_A_FIXTURE_KEY}';
+    select id from auth.users where email = '${USER_G_EMAIL}';
   ")"
-  [[ -n "${USER_UUID}" ]] || fail "local user A fixture is missing"
+  [[ -n "${USER_UUID}" ]] || fail "local user_g fixture (${USER_G_EMAIL}) is missing"
   GYM_ID="mcp-smoke-${RUN_TAG}-gym"
   EXERCISE_ID="mcp-smoke-${RUN_TAG}-exercise"
   SESSION_ID="mcp-smoke-${RUN_TAG}-session"
@@ -230,6 +236,10 @@ else
   # the stored report_group and tracked = false, not just the keys.
   GROUPED_MUSCLE_ID="mcp-smoke-${RUN_TAG}-muscle-grouped"
   SET_ID="mcp-smoke-${RUN_TAG}-set"
+  # Imported health activities: a run, and a watch strength workout inside the session.
+  ACTIVITY_PREFIX="mcp-smoke-${RUN_TAG}-activity"
+  # Training notes: one general, one on the exercise, and a removed one no read returns.
+  NOTE_PREFIX="mcp-smoke-${RUN_TAG}-note"
   EXPECT_BODYWEIGHT=1
   EXERCISE_QUERY="MCP Smoke ${RUN_TAG}"
   NOW_MS="$(($(date +%s) * 1000))"
@@ -237,7 +247,7 @@ else
   run_psql "
     begin;
       set constraints all deferred;
-      -- The owner's identity lets a re-run update user A's existing settings row.
+      -- The owner's identity lets a re-run update user_g's existing settings row.
       select set_config('request.jwt.claims', json_build_object('sub', '${USER_UUID}', 'role', 'authenticated')::text, true);
       insert into app_public.gyms
         (owner_user_id,id,name,created_at,updated_at,client_updated_at_ms)
@@ -251,7 +261,7 @@ else
         (owner_user_id,id,display_name,family_name,sort_order,is_editable,report_group,tracked,
          created_at,updated_at,client_updated_at_ms)
       values
-        ('${USER_UUID}'::uuid,'${GROUPED_MUSCLE_ID}','MCP Smoke Grouped Muscle','chest',0,0,'mcp_smoke_group',0,
+        ('${USER_UUID}'::uuid,'${GROUPED_MUSCLE_ID}','MCP Smoke Grouped Muscle','chest',0,0,'cm_mcp_smoke',0,
          ${NOW_MS},${NOW_MS},${NOW_MS});
       insert into app_public.exercise_definitions
         (owner_user_id,id,name,load_input_mode,bodyweight_contribution,created_at,updated_at,client_updated_at_ms)
@@ -271,10 +281,12 @@ else
       -- A device has uploaded the person's targets (the coach cannot write before).
       insert into app_public.user_settings
         (owner_user_id,id,bodyweight_calculations_enabled,weekly_working_set_target,muscle_target_mode,
-         muscle_target_overrides,count_secondary_muscles,created_at,updated_at,client_updated_at_ms)
-      values ('${USER_UUID}'::uuid,'settings',true,8,'single','{}'::jsonb,true,${NOW_MS},${NOW_MS},${NOW_MS})
+         muscle_targets,combined_muscles,count_secondary_muscles,created_at,updated_at,client_updated_at_ms)
+      values ('${USER_UUID}'::uuid,'settings',true,8,'single','{}'::jsonb,
+        '[{\"key\":\"cm_mcp_smoke\",\"name\":\"MCP Smoke\",\"family\":\"chest\"}]'::jsonb,true,${NOW_MS},${NOW_MS},${NOW_MS})
       on conflict(owner_user_id,id) do update set bodyweight_calculations_enabled=true,
-        weekly_working_set_target=8,muscle_target_mode='single',muscle_target_overrides='{}'::jsonb,
+        weekly_working_set_target=8,muscle_target_mode='single',muscle_targets='{}'::jsonb,
+        combined_muscles=excluded.combined_muscles,
         count_secondary_muscles=true,
         deleted_at=null,updated_at=excluded.updated_at,client_updated_at_ms=excluded.client_updated_at_ms;
       insert into app_public.session_exercises
@@ -291,6 +303,22 @@ else
          ${NOW_MS},${NOW_MS},${NOW_MS}),
         ('${USER_UUID}'::uuid,'${SET_ID}-warm-up','${BLOCK_ID}',1,'60','5','warm_up',
          ${NOW_MS},${NOW_MS},${NOW_MS});
+      insert into app_public.health_activities
+        (user_id,source,external_id,activity_type,started_at,ended_at,duration_sec,distance_m,active_energy_kcal)
+      values
+        ('${USER_UUID}'::uuid,'apple_health','${ACTIVITY_PREFIX}-run','running',
+         to_timestamp($((NOW_MS - 300000)) / 1000.0),to_timestamp($((NOW_MS - 60000)) / 1000.0),240,800,60),
+        ('${USER_UUID}'::uuid,'apple_health','${ACTIVITY_PREFIX}-lift','traditional_strength_training',
+         to_timestamp($((NOW_MS - 880000)) / 1000.0),to_timestamp($((NOW_MS - 620000)) / 1000.0),260,null,40);
+      insert into app_public.training_notes
+        (owner_user_id,id,exercise_definition_id,body,noted_on,source,created_at,updated_at,deleted_at,client_updated_at_ms)
+      values
+        ('${USER_UUID}'::uuid,'${NOTE_PREFIX}-general',null,'MCP Smoke ${RUN_TAG} general note',
+         to_char(now() - interval '2 days','YYYY-MM-DD'),'app',${NOW_MS},${NOW_MS},null,${NOW_MS}),
+        ('${USER_UUID}'::uuid,'${NOTE_PREFIX}-exercise','${EXERCISE_ID}','MCP Smoke ${RUN_TAG} exercise note',
+         to_char(now() - interval '2 days','YYYY-MM-DD'),'app',${NOW_MS},${NOW_MS},null,${NOW_MS}),
+        ('${USER_UUID}'::uuid,'${NOTE_PREFIX}-removed','${EXERCISE_ID}','MCP Smoke ${RUN_TAG} removed note',
+         to_char(now() - interval '2 days','YYYY-MM-DD'),'app',${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
       -- Pre-existing sentinel plan to prove smoke cleanup does not delete unrelated user plans
       insert into app_public.session_plans
         (owner_user_id,id,title,provenance,created_at,updated_at,client_updated_at_ms)
@@ -332,8 +360,8 @@ if [[ -n "${USER_UUID}" ]]; then
     cd "${REPO_ROOT}/apps/agent-auth-web"
     BOGA_LOCAL_SUPABASE_URL="${API_URL}" \
     BOGA_LOCAL_SUPABASE_PUBLISHABLE_KEY="${PUBLISHABLE_KEY:-${ANON_KEY}}" \
-    BOGA_LOCAL_OAUTH_EMAIL="${USER_A_EMAIL}" \
-    BOGA_LOCAL_OAUTH_PASSWORD="${USER_A_PASSWORD}" \
+    BOGA_LOCAL_OAUTH_EMAIL="${USER_G_EMAIL}" \
+    BOGA_LOCAL_OAUTH_PASSWORD="${USER_G_PASSWORD}" \
     BOGA_LOCAL_OAUTH_CLIENT_NAME="BoGa MCP smoke ${RUN_TAG}" \
     BOGA_LOCAL_OAUTH_MCP_URL="${MCP_URL}" \
       npx tsx scripts/mint-local-oauth.ts
@@ -357,6 +385,8 @@ BOGA_MCP_SMOKE_EXERCISE_ID="${EXERCISE_ID}" \
 BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
 BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
 BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
+BOGA_MCP_SMOKE_ACTIVITY_PREFIX="${ACTIVITY_PREFIX:-}" \
+BOGA_MCP_SMOKE_NOTE_PREFIX="${NOTE_PREFIX:-}" \
 BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
 BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
   npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
@@ -389,6 +419,8 @@ if [[ -n "${USER_UUID}" ]]; then
   BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
   BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
   BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
+  BOGA_MCP_SMOKE_ACTIVITY_PREFIX="${ACTIVITY_PREFIX:-}" \
+  BOGA_MCP_SMOKE_NOTE_PREFIX="${NOTE_PREFIX:-}" \
   BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_PLAN_ENABLED="1" \
     npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
@@ -412,6 +444,7 @@ if [[ -n "${USER_UUID}" ]]; then
   ")"
   [[ "${PERFORMED_WITH_PROVENANCE}" == "0" ]] || fail "agent plan creation wrote performed source_plan_id rows"
 
+
   echo "[boga-mcp-smoke] verifying metadata-only audit records"
   AUDIT_COUNT="$(run_psql "
     select count(*) from public.agent_access_audit
@@ -434,6 +467,8 @@ if [[ -n "${USER_UUID}" ]]; then
   BOGA_MCP_SMOKE_SESSION_ID="${SESSION_ID}" \
   BOGA_MCP_SMOKE_EXERCISE_QUERY="${EXERCISE_QUERY}" \
   BOGA_MCP_SMOKE_MUSCLE_ID="${MUSCLE_ID:-}" \
+  BOGA_MCP_SMOKE_ACTIVITY_PREFIX="${ACTIVITY_PREFIX:-}" \
+  BOGA_MCP_SMOKE_NOTE_PREFIX="${NOTE_PREFIX:-}" \
   BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID="${GROUPED_MUSCLE_ID:-}" \
   BOGA_MCP_SMOKE_PLAN_ENABLED="0" \
     npm --prefix "${REPO_ROOT}/services/boga-mcp" run smoke-client
@@ -457,7 +492,7 @@ if [[ -n "${USER_UUID}" ]]; then
   workout_smoke revoked
   AUDIT_COUNT="$(run_psql "select count(*) from public.agent_access_audit
     where owner_user_id='${USER_UUID}'::uuid and oauth_client_id='${AGENT_CLIENT_ID}';")"
-  [[ "${AUDIT_COUNT}" -le 118 ]] || fail "smoke request budget exceeds 118: ${AUDIT_COUNT}; do not rely on elapsed time to reset limits"
+  [[ "${AUDIT_COUNT}" -le 119 ]] || fail "smoke request budget exceeds 119: ${AUDIT_COUNT}; do not rely on elapsed time to reset limits"
   echo "[boga-mcp-smoke] audited requests: ${AUDIT_COUNT} (within the unchanged 120/minute API limit)"
 
   echo "[boga-mcp-smoke] verifying pre-existing plan sentinel survived all test phases"

@@ -32,7 +32,7 @@ import { competitionLinkExercise } from '@/src/groups/competition-view-model';
 import type { CompetitionExerciseWire } from '@/src/groups/competition-wire';
 import type { GroupExercise } from '@/src/groups/types';
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
-import { presetRowSetup } from '@/src/data/muscle-report-settings';
+import { BROAD_COMBINED_MUSCLES, broadTemplateKeyOf } from '@/src/data/combined-muscles';
 import { EMPTY_MUSCLE_SETUP, buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 
 const groupExercise = (overrides: Partial<GroupExercise> & Pick<GroupExercise, 'group_exercise_id' | 'name'>): GroupExercise => ({
@@ -179,7 +179,7 @@ describe('pick sheet', () => {
       exercises: [exercise({ id: 'ex-press', name: 'Heavy Push Thing', mappings: [{ id: 'm1', muscleGroupId: 'chest', weight: 1, role: 'primary' }] })],
       links: [],
     });
-    const muscleSetup = buildMuscleSetup([{ id: 'chest', displayName: 'Pectoralis', familyName: 'Chest', sortOrder: 0, reportGroup: null, tracked: 1 }]);
+    const muscleSetup = buildMuscleSetup([{ id: 'chest', displayName: 'Pectoralis', familyName: 'Chest', sortOrder: 0, reportGroup: null, tracked: 1 }], null);
     expect(filterPickSheetChoices(model.choices, 'chest', muscleSetup).map((choice) => choice.exercise.id)).toEqual(['ex-press']);
     expect(filterPickSheetChoices(model.choices, 'Heavy Push Thing', muscleSetup).map((choice) => choice.exercise.id)).toEqual(['ex-press']);
   });
@@ -413,8 +413,8 @@ describe('group searches match the user\'s muscles ([[muscle.no-breakdown]])', (
   const setupFor = (preset: 'detailed' | 'broad', untracked: readonly string[] = []) =>
     buildMuscleSetup(SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) => ({
       id: seed.id, displayName: seed.displayName, familyName: seed.familyName, sortOrder: seed.sortOrder,
-      reportGroup: presetRowSetup(preset, seed.id).reportGroup ?? null, tracked: untracked.includes(seed.id) ? 0 : 1,
-    })));
+      reportGroup: preset === 'broad' ? broadTemplateKeyOf(seed.id) : null, tracked: untracked.includes(seed.id) ? 0 : 1,
+    })), BROAD_COMBINED_MUSCLES);
   const DETAILED = setupFor('detailed');
   const BROAD = setupFor('broad', ['calves', 'tibialis_anterior']);
   // Names that carry no muscle word, so only the muscle terms can match.

@@ -2,6 +2,7 @@ import { Text, View, type TextStyle } from 'react-native';
 
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
+import { FigureText } from '@/components/ui/figure-text';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type StatLayout = 'stacked' | 'inline';
@@ -19,6 +20,8 @@ export type StatProps = {
   // Pre-formatted by the caller: no thousands separators, no unit suffix
   // (`design-language.md` §6).
   value: string;
+  // Full reading when the visible value abbreviates a unit.
+  spokenValue?: string;
   // `stacked`: label above value (summary card, records panel). `inline`: a
   // mini legend left of a fixed-width, right-aligned value (the set row).
   layout?: StatLayout;
@@ -54,6 +57,7 @@ export function Stat({
   label,
   spokenLabel = label,
   value,
+  spokenValue = value,
   layout = 'stacked',
   rank = 'primary',
   state = 'realised',
@@ -108,10 +112,10 @@ export function Stat({
 
   if (layout === 'inline') {
     return (
-      <View accessibilityLabel={`${spokenLabel} ${value}`} accessible style={[styles.inline, valueWidth === 'hug' ? styles.inlineHug : null]} testID={testID}>
+      <View accessibilityLabel={`${spokenLabel} ${spokenValue}`} accessible style={[styles.inline, valueWidth === 'hug' ? styles.inlineHug : null]} testID={testID}>
         <Text allowFontScaling={false} style={legendStyle}>{label}</Text>
         <Text allowFontScaling={false} numberOfLines={1} style={[valueStyle, valueWidth === 'fixed' ? styles.inlineValue : styles.inlineValueHug]}>
-          {value}
+          {kind === 'figure' && value.includes('%BW') ? <FigureText figureStyle={valueStyle}>{value}</FigureText> : value}
         </Text>
       </View>
     );
@@ -119,13 +123,13 @@ export function Stat({
 
   return (
     <View
-      accessibilityLabel={`${spokenLabel} ${value}`}
+      accessibilityLabel={`${spokenLabel} ${spokenValue}`}
       accessible
       style={align === 'end' ? styles.stackedEnd : null}
       testID={testID}>
       <Text allowFontScaling={false} style={legendStyle}>{label}</Text>
       <Text allowFontScaling={false} numberOfLines={1} style={valueStyle}>
-        {value}
+        {kind === 'figure' && value.includes('%BW') ? <FigureText figureStyle={valueStyle}>{value}</FigureText> : value}
       </Text>
     </View>
   );

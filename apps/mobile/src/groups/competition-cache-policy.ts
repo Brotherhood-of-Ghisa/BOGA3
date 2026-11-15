@@ -1,5 +1,5 @@
 import { isCompetitionBoardWire,isCompetitionRulesWire } from './competition-wire-guards';
-import { isCompetitionExerciseListWire, isCompetitionPodiumsWire, isCompetitionHistoryWire,isCompetitionRevisionsWire,isCompetitionSessionDetailWire,
+import { isCompetitionExerciseListWire, isCompetitionPodiumsWire, isCompetitionHistoryWire,isCompetitionRecordsHistoryWire,isCompetitionRevisionsWire,isCompetitionSessionDetailWire,
   isCompetitionPeriodTotalsWire,isCompetitionStreamWire,isCompetitionWeekSummaryWire } from './competition-reader-guards';
 import type { CompetitionExerciseWire, CompetitionRulesWire, CompetitionSessionWire } from './competition-wire';
 import { isCoWResultWire, isCoWSummaryWire } from './cow-wire';
@@ -40,7 +40,7 @@ function currentPolicyObservations(key: string,value: unknown): CompetitionPolic
     exercises: value.exercise ? [publicExercise(value.exercise)] : [] }];
   if (isCompetitionBoardWire(value)) return [{ groupId,enabled: value.rules.bodyweight_contribution>0?value.rules.bodyweight_calculations_enabled:undefined,exercises: [{ id: value.group_exercise_id,
     rules: value.rules,archived: value.state === 'archived' }] }];
-  if (isCompetitionHistoryWire(value) || isCompetitionRevisionsWire(value)) return [catalogueObservation(groupId,[value.exercise])];
+  if (isCompetitionHistoryWire(value) || isCompetitionRecordsHistoryWire(value) || isCompetitionRevisionsWire(value)) return [catalogueObservation(groupId,[value.exercise])];
   if (isCompetitionExerciseListWire(value)) return [catalogueObservation(groupId,value.exercises)];
   if (isCompetitionPodiumsWire(value)) return [catalogueObservation(groupId,value.podiums.map(row=>row.exercise))];
   if (isCompetitionSessionDetailWire(value)) return [{ groupId: value.group_id,sessions: publicSession(value.session) }];

@@ -1,8 +1,8 @@
 # BoGa MCP Virtual Coach
 
 `services/boga-mcp` is the public, authenticated MCP resource server for the
-BoGa Virtual Coach. It exposes twenty-two tools over stateless Streamable HTTP
-(ten read-only tools and twelve mutations) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
+BoGa Virtual Coach. It exposes twenty-seven tools over stateless Streamable HTTP
+(twelve read-only tools and fifteen mutations) and delegates every data read or write to the dedicated BoGa agent API. It has no database client,
 Supabase data credentials, SQL, or service-role key.
 
 ## Public endpoints
@@ -29,21 +29,30 @@ and does not offer server-sent event sessions.
 
 ## Tool surface
 
-Ten read-only tools:
+Twelve read-only tools:
 - `get_training_status` — one bounded check-in: per tracked muscle, sets on the
   three recovery days, today, this week and the four weeks before, with its
   weekly target and last trained date (Today's Plan's counting and order, under
   the coaching working-set rule, completed workouts only); the
   top ten exercises of the last 28 days with best 1RM in that window and the 28
   days before and the last record date; the target mode, default and
-  `revision`. Days are the profile `time_zone`'s.
+  `revision`; weekly `cardio` from imported health activities; `general_notes`,
+  the general training notes of those 56 days. Days are the profile
+  `time_zone`'s.
+- `get_recent_activities` — workouts imported from the person's health app,
+  newest first, flagging strength workouts that overlap a logged session
+  ([health activities](../../docs/specs/tech/health-activities-contract.md)).
 - `get_training_profile` — training preferences, equipment, gyms.
 - `list_muscles` — the muscle ids exercise mappings name, each with the
-  person's `report_group` and `tracked` setup.
+  person's `report_group` (combined muscle key) and `tracked` setup, plus the
+  person's `combined_muscles`.
 - `search_exercises` — database-side filter by name, muscle, equipment; each
   exercise carries `split_by_gym`, `rest_timer_sec`, `deleted` and its
   `revision`.
-- `get_exercise_context` — compact recent preview, lifetime PRs and totals.
+- `get_exercise_context` — compact recent preview, lifetime PRs and totals, and
+  the exercise's newest training notes.
+- `list_notes` — the person's training notes, newest `noted_on` (the day a note
+  applies from) first, filtered by exercise or date range, paged by cursor.
 - `get_recent_workouts` — completed workout list with working-set volume.
 - `get_exercise_history` — keyset-paginated performed set history.
 - `get_workout_detail` — exact session header, volume, and paginated sets.
@@ -79,18 +88,27 @@ their next sync. `expected_revision` is `targets.revision` from
 app's defaults. Rules and errors: the
 [agent API contract](../../supabase/functions/agent-api/README.md#muscle-targets).
 
-Five workout mutations, under the independent logging grant of
+Two note tools (same write access, idempotent): `add_note` adds a general or
+exercise note dated today or earlier with `source: "agent"`; `remove_note`
+soft-deletes one, hiding it from every list (marked destructive). Notes cannot
+be edited, and their text is untrusted user data. Rules and errors: the
+[agent API contract](../../supabase/functions/agent-api/README.md#training-notes).
+
+Six workout mutations, under the independent logging grant of
 [[agents.write-access]] (neither plan switch grants it):
 
 | Tool | Input beyond `idempotency_key` |
 | --- | --- |
+| `create_workout` | required `started_at`/`completed_at` ISO instants with explicit zones; optional `gym_id`; creates editable completed history |
 | `start_workout` | optional `gym_id`; server-time start, refuses an existing active workout |
 | `log_sets` | `session_id`, `expected_revision`, exactly one `exercise_id`/`session_exercise_id`, 1–30 performed `sets` |
 | `update_set` | `session_id`, `expected_revision`, `set_id`, replacement performed `set` |
 | `delete_set` | `session_id`, `expected_revision`, `set_id`; soft deletion |
-| `finish_workout` | `session_id`, `expected_revision`; one server completion instant/duration |
+| `finish_workout` | `session_id`, `expected_revision`; server completion instant/duration for live training; releases dated-entry control with its times unchanged |
 
-Corrections, removal and finish carry destructive hints; start/log are additive.
+Corrections, removal and finish carry destructive hints; create/start/log are additive.
+Dated sessions remain completed and do not occupy live training. Add/correct sets incrementally, resume by `session_id` through `get_active_workout`, then call `finish_workout` when entry is done. Released history continues in BoGa.
+
 All writes are idempotent by their required printable ASCII operation key
 (1–128 characters, no whitespace). Strict nested schemas reject identity,
 plan targets and unsupported fields. The adapter forwards raw structured
@@ -232,6 +250,13 @@ consent page's scope gate, token exchange and a refresh. It checks that a
 rejected token is challenged, discovers and invokes every tool with the
 refreshed token, verifies fixture IDs, and cleans up. See
 `RUNBOOK.md` for the supplied-token form.
+
+It runs as its own fixture user, `user_g`
+(`supabase/scripts/auth-fixture-constants.sh`), never a shared one: it checks
+account-wide state (no active workout before it starts one, agent plan and
+audit counts), and the backend gate runs it after the `user_a` sync and
+contract suites without a reset. `scripts/tests/mcp-smoke-fixture-user.test.sh`
+(`meta-tests`) fails if any other suite signs in as `user_g`.
 
 ### Reproducible walkthrough and evidence
 

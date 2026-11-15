@@ -10,30 +10,93 @@ import { ProgressTables, ProgressContributionRows, type ProgressTablesProps } fr
 
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMuscleLayout } from '@/src/preferences/model';
-type Props = ProgressTablesProps & { muscleLayout: ProgressMuscleLayout; report?: MuscleReportAssignment; setTargets?: MuscleSetTargets };
+import { TissueReloadCard } from '@/components/injuries/tissue-reload-card';
+import { useTissueReloadMetrics } from '@/src/injuries/use-tissue-reload';
+import type { InjuryView } from '@/src/data/injuries';
+import type { TissueReloadMetrics } from '@/src/injuries/tissue-reload';
+
+type Props = ProgressTablesProps & {
+  muscleLayout: ProgressMuscleLayout;
+  report?: MuscleReportAssignment;
+  setTargets?: MuscleSetTargets;
+  activeInjuries?: readonly InjuryView[];
+  reloadMetrics?: readonly TissueReloadMetrics[];
+};
 
 // Settings chooses the layout; both share contribution rows and selection.
 export function ProgressMuscleView(props: Props) {
-  const { muscles, metric, selectedId, muscleLayout, onSelect, onMuscleHistory, onExerciseHistory, report } = props;
+  const {
+    muscles,
+    metric,
+    selectedId,
+    muscleLayout,
+    onSelect,
+    onMuscleHistory,
+    onExerciseHistory,
+    report,
+    activeInjuries: propInjuries,
+    reloadMetrics: propMetrics,
+  } = props;
   const text = useUiText();
   const { width } = useWindowDimensions();
+  const activeInjuries = propInjuries ?? [];
+  const reloadMetrics = useTissueReloadMetrics(activeInjuries, propMetrics);
+
   if (muscleLayout === 'list') return <ProgressTables {...props} />;
   const selected = muscles.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
   const layout = resolveComparisonLayout(width, exercises, metric, false, { compact: true });
-  return <View style={styles.body}>
-    <MuscleBodyCard muscles={muscles} metric={metric} selectedId={selectedId} onSelect={onSelect} report={report} setTargets={props.setTargets} />
-    {selected ? <StatsTable testID="stats-contributions">
-      <View style={statsTableStyles.sectionHeader}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={[text.title, styles.heading]}>{selected.displayName}</Text>
-        <SegmentedControl accessibilityLabel={`Open ${selected.displayName} history`} density="compact" layout="inline"
-          hitSlop={uiSpace.md} options={HISTORY_VIEW_OPTIONS.map(option => ({ ...option,
-            accessibilityLabel: `Open ${selected.displayName} ${option.value === 'daily' ? 'Daily Heatmap' : option.value === 'weekly' ? 'Weekly Heatmap' : 'Timeline'}` }))}
-          testIDPrefix="stats-contributions-view" onNavigate={(view, target) => onMuscleHistory(selected, target, view)} />
-      </View>
-      <ProgressContributionRows axis={false} splitByEffort muscle={selected} metric={metric} layout={layout} onHistory={onExerciseHistory} />
-    </StatsTable> : null}
-  </View>;
+  return (
+    <View style={styles.body}>
+      <MuscleBodyCard
+        activeInjuries={activeInjuries}
+        metric={metric}
+        muscles={muscles}
+        onSelect={onSelect}
+        report={report}
+        selectedId={selectedId}
+        setTargets={props.setTargets}
+      />
+      {reloadMetrics.length > 0 ? (
+        <TissueReloadCard
+          metrics={reloadMetrics}
+          onSelectMuscle={onSelect}
+          selectedMuscleId={selectedId}
+        />
+      ) : null}
+      {selected ? (
+        <StatsTable testID="stats-contributions">
+          <View style={statsTableStyles.sectionHeader}>
+            <Text accessibilityRole="header" allowFontScaling={false} style={[text.title, styles.heading]}>
+              {selected.displayName}
+            </Text>
+            <SegmentedControl
+              accessibilityLabel={`Open ${selected.displayName} history`}
+              density="compact"
+              hitSlop={uiSpace.md}
+              layout="inline"
+              onNavigate={(view, target) => onMuscleHistory(selected, target, view)}
+              options={HISTORY_VIEW_OPTIONS.map(option => ({
+                ...option,
+                accessibilityLabel: `Open ${selected.displayName} ${
+                  option.value === 'daily' ? 'Daily Heatmap' : option.value === 'weekly' ? 'Weekly Heatmap' : 'Timeline'
+                }`,
+              }))}
+              testIDPrefix="stats-contributions-view"
+            />
+          </View>
+          <ProgressContributionRows
+            axis={false}
+            layout={layout}
+            metric={metric}
+            muscle={selected}
+            onHistory={onExerciseHistory}
+            splitByEffort
+          />
+        </StatsTable>
+      ) : null}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

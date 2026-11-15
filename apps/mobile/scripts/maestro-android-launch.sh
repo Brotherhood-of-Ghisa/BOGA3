@@ -43,7 +43,7 @@ maestro_android_require_sdk
 #                                iOS, whose dev menu is seeded off natively)
 # The reserved `__expo_*` names are required (ExpoLauncherUrl.kt); only
 # `disableOnboarding` has a legacy alias.
-MAESTRO_DEV_CLIENT_URL="$(maestro_development_client_url "$EXPO_DEV_SERVER_PORT")&__expo_disable_onboarding=1&__expo_disable_fab=1&__expo_disable_auto_launch=1"
+MAESTRO_DEV_CLIENT_URL="$(maestro_development_client_url "$EXPO_DEV_SERVER_PORT" "android")&__expo_disable_onboarding=1&__expo_disable_fab=1&__expo_disable_auto_launch=1"
 
 echo "[maestro-android-launch] Runtime env: $RUNTIME_ENV_FILE"
 echo "[maestro-android-launch] Starting Expo on port $EXPO_DEV_SERVER_PORT"
@@ -103,7 +103,7 @@ fi
 # expo-dev-client `exp+<scheme>` link the config plugin registers on Android.
 adb -s "$ANDROID_SERIAL" shell am start \
   -a android.intent.action.VIEW \
-  -d "$MAESTRO_DEV_CLIENT_URL" >/dev/null
+  -d "'$MAESTRO_DEV_CLIENT_URL'" >/dev/null
 
 # Block until Metro has built + served the app-entry bundle (the launch above
 # made the dev client request it). Polling Metro's own log returns the instant the

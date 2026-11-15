@@ -17,7 +17,7 @@ it('preserves passive row identities, order, full names, unabridged figures and 
   expect(screen.getAllByTestId(/^group-home-board-row-u\d$/).map(row => row.props.testID)).toEqual(['u0', 'u1', 'u2', 'u3', 'u4'].map(id => `group-home-board-row-${id}`));
   expect(screen.getByTestId('group-home-board-row-u0-name')).toHaveProp('numberOfLines', 1);
   expect(screen.getByTestId('group-home-board').props.accessibilityLabel).toContain('Contessa Serbelloni Mazzanti Vien dal Mare, 123456');
-  expect(screen.getByTestId('today-group-board').props.accessibilityLabel).toContain('123456 sets, 12345 PRs');
+  expect(screen.getByTestId('today-group-board').props.accessibilityLabel).toContain('123456 sets, 12345 group records');
   expect(screen.getByTestId('today-group-board-row-u0-working-sets')).toHaveTextContent('123456');
   expect(screen.getByTestId('today-group-board-row-u0-fill')).toHaveStyle({ width: '100%' });
   expect(screen.getByTestId('today-group-board-row-u0').props.onPress).toBeUndefined();
@@ -43,7 +43,7 @@ it('keeps the group switch, heading and CoW outside the board action', () => {
   render(<ListGallery initialSample="actions" />);
   fireEvent.press(screen.getByTestId('today-group-title'));
   expect(screen.getByTestId('list-gallery-action')).toHaveTextContent('Group home · g1');
-  fireEvent.press(screen.getByTestId('today-cow-current'));
+  fireEvent.press(screen.getByTestId('today-cow-current-open'));
   expect(screen.getByTestId('list-gallery-action')).toHaveTextContent('Current CoW');
   fireEvent.press(screen.getByTestId('today-group-switch'));
   fireEvent.press(screen.getByTestId('today-group-switch-g2'));

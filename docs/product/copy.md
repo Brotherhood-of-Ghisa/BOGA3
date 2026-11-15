@@ -10,6 +10,8 @@ Screen, sheet, card and section titles stand alone: no descriptive line beneath.
 - **Good:** `06-10-2026 · 52 min` under a session title.
 - **Kept:** `<group> · group view` identifies otherwise-unknown ownership
   above group session titles (decided 2026-10-08).
+- **Kept:** group board and records-log headers name the exercise, then the
+  view beneath (`1RM leaderboard`, `Volume history`) (decided 2026-11-12).
 
 ### copy.no-inline-explanation · principle · accepted
 
@@ -41,13 +43,15 @@ Code: `apps/mobile/components/heatmaps/calendar-tile.tsx`; `apps/mobile/componen
 ### copy.no-weight-unit · presentation · accepted
 
 While kg is the sole weight unit, visible/spoken labels omit kg/kilograms,
-including compound volume units. Retain `per side`, `%BW`, `%BW·reps`. Stored
+including compound volume units. Retain `per side` and `%BW`. Stored
 values, wire units and coaching/import payloads stay unchanged.
 Today's weekly box and pace chart may show Volume in metric tonnes: `Tons`
 in the weekly heading, `t` beside chart figures, spoken as tonnes. Display
 tonnes rounded to one decimal place with trailing zeros removed.
-Shared group-session cards may use `(% BW)` once in the exercise heading
-instead of visible per-set units; spoken units remain complete.
+Exercise names carry no generated unit suffix. Group percentage figures retain
+small `%BW` units beside the value or in its column heading, including Volume. Shared-session set rows
+abbreviate these to `%` with the existing inline metric labels and no column
+headings. Spoken figures retain complete units.
 
 Code: `apps/mobile/src/groups/competition-view-model.ts` and mobile label components.
 

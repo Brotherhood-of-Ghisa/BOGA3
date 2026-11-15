@@ -3,11 +3,12 @@ import { formatBoardDate } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
 import { buildCompetitionSession } from './competition-session-view-model';
 import { sessionRecordCertificationStatus, setCertification } from './competition-session-records-view-model';
-import { describeCompetitionEvent, formatCompetitionFigure, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
+import { describeCompetitionEvent, formatCompetitionHistoricalFigure, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
 import type { CompetitionEventWire, CompetitionStreamItemWire, CompetitionHistoryValueWire, CompetitionHistoricalMetric,
-  CompetitionStreamRecordWire, CompetitionStreamSharedExerciseWire, CoWStreamItemWire } from './competition-wire';
+  CompetitionStreamRecordWire, CompetitionStreamSharedExerciseWire, CompetitionStreamWithdrawnWire, CoWStreamItemWire } from './competition-wire';
 import { formatMemberName, formatMembershipSentence, formatSessionStatusLabel, formatSetCount,
   formatExerciseCount, formatStreamStartedAt, type RecordCertificationStatus, type StreamMembershipViewModel } from './stream-view-model';
+import { splitRecordBoards, type RecordBoards } from './record-boards';
 
 /** A group record taken in a session, drawn inside that session's card. */
 export type CompetitionSessionRecordLine = {
@@ -17,18 +18,23 @@ export type CompetitionSessionCard = {
   kind: 'session'; key: string; groupId: string; memberUserId: string; sessionId: string;
   memberName: string; isTrainingNow: boolean; statusLabel: string; startedAtLabel: string;
   gymName: string | null; groupNames: string[]; setsLabel: string; exercisesLabel: string;
-  /** The session's own group records; a card with none shows no record block. */
+  /** The session's own group records (GR), one line per set; a card with none shows no record block. */
   records: CompetitionSessionRecordLine[];
+  /** GR boards taken, counted on the figures line (one set can take more than one board). */
+  groupRecordCount: number;
+  /** The member's new bests in the group that took no #1 (PRs): counted, never listed. */
+  personalRecordCount: number;
 };
 export type CompetitionStreamModel = CompetitionSessionCard | StreamMembershipViewModel |
-  { kind: 'competition'; key: string; event: CompetitionEventWire; record?: CompetitionStreamRecordWire } |
+  { kind: 'competition'; key: string; event: CompetitionEventWire; record?: CompetitionStreamRecordWire;
+    withdrawn?: CompetitionStreamWithdrawnWire | null } |
   CompetitionStreamSharedExerciseWire | CoWStreamItemWire;
 
 /** Every competition event kind the stream can carry, each able to be hidden. */
 export const STREAM_EVENT_KINDS = ['record','record_voided','lead_change','link','unlink','rules_change'] as const;
 export type StreamEventKind = typeof STREAM_EVENT_KINDS[number];
 export const STREAM_EVENT_KIND_LABELS: Record<StreamEventKind,string> = {
-  record: 'Records', record_voided: 'Voided records', lead_change: 'Lead changes',
+  record: 'GR', record_voided: 'Withdrawn GR', lead_change: 'Lead changes',
   link: 'Exercise links', unlink: 'Exercise unlinks', rules_change: 'Rules changes',
 };
 /** Linking says nothing about training, so the stream leaves it out until the debug drawer asks for it. */
@@ -37,12 +43,12 @@ export const DEFAULT_HIDDEN_STREAM_EVENT_KINDS: readonly StreamEventKind[] = ['l
 /** Counts come only from permitted set context; absolute totals are never reconstructed. */
 export function buildCompetitionStreamItem(item: CompetitionStreamItemWire, dateFormat: ExerciseDateFormat): CompetitionStreamModel {
   if (item.kind === 'shared_exercise' || item.kind === 'cow') return item;
-  if (item.kind === 'competition') return { kind: item.kind,key: item.key,event: item.event,record: item.record };
+  if (item.kind === 'competition') return { kind: item.kind,key: item.key,event: item.event,record: item.record,withdrawn: item.withdrawn };
   if (item.kind === 'membership') return { kind: item.kind,key: item.key,groupId: item.group.group_id,
     groupName: item.group.name,sentence: formatMembershipSentence(item.event,item.member.username) };
   const { session } = item;
   const counts = buildCompetitionSession(session);
-  return { kind: 'session',records: [],key: item.key,groupId: item.groups[0].group_id,
+  return { kind: 'session',records: [],groupRecordCount: 0,personalRecordCount: 0,key: item.key,groupId: item.groups[0].group_id,
     memberUserId: session.member.user_id,sessionId: session.session_id,
     memberName: formatMemberName(session.member.username),isTrainingNow: session.status === 'active',
     statusLabel: session.status === 'draft' ? 'Draft' : formatSessionStatusLabel({ ...session,status: session.status }),
@@ -69,32 +75,60 @@ export function streamRecordSet(event: CompetitionEventWire,record: CompetitionS
   return event.reps === null ? null : `${event.reps} reps`;
 }
 
-export function buildCompetitionEventCard(event: CompetitionEventWire,userId: string | null,showGroup: boolean,
-  record: CompetitionStreamRecordWire | undefined, dateFormat: ExerciseDateFormat) {
+/**
+ * A record's values as the stream shows them: its GR boards only (a PR is
+ * counted on its session's card, never drawn). Without its `record` the
+ * boards are unknown, and every value shows.
+ */
+const shownRecordValues = (event: CompetitionEventWire,record: CompetitionStreamRecordWire | undefined): CompetitionHistoryValueWire[] =>
+  event.values.filter(value => value.role === 'leader' || value.role === 'record' && (!record || record.group_record_metrics.includes(value.metric)));
+
+/** A withdrawn record's GR card: the card the record drew, dated at its withdrawal, without a certification. */
+function withdrawnRecordCard(event: CompetitionEventWire,withdrawn: CompetitionStreamWithdrawnWire,userId: string | null,dateFormat: ExerciseDateFormat) {
+  const source = withdrawn.event;
+  const name = source.member?.user_id === userId ? 'You' : formatMemberName(source.member?.username);
+  return { label: `${name} · GR withdrawn`,source,set: streamRecordSet(source,withdrawn.record),certification: null,
+    details: shownRecordValues(source,withdrawn.record).map(value => formatCompetitionHistoricalValue(value)),
+    date: formatBoardDate(event.sort_at_ms,dateFormat) };
+}
+
+function eventCardBody(event: CompetitionEventWire,userId: string | null,record: CompetitionStreamRecordWire | undefined,
+  withdrawn: CompetitionStreamWithdrawnWire | null | undefined,dateFormat: ExerciseDateFormat) {
+  if (event.kind === 'record_voided' && withdrawn) return withdrawnRecordCard(event,withdrawn,userId,dateFormat);
   const name = event.member?.user_id === userId ? 'You' : formatMemberName(event.member?.username);
   const ended = event.voided || event.kind === 'record_voided';
-  const label = ended ? 'Certification ended' : event.kind === 'record' ? `${name} · record`
+  const label = ended ? `${name} · GR withdrawn` : event.kind === 'record' ? `${name} · GR`
     : event.kind === 'rules_change' ? 'Group rules changed' : 'Leaderboard changed';
-  const values = ended ? [] : event.values.filter(value => value.role === 'record' || value.role === 'leader');
-  const details = ended ? ['Score unavailable'] : values.length
+  const values = ended ? [] : shownRecordValues(event,record);
+  const details = ended ? [] : values.length
     ? values.map(value => formatCompetitionHistoricalValue(value))
     : event.kind === 'rules_change' ? [] : [describeCompetitionEvent(event)];
   const isRecord = !ended && event.kind === 'record';
-  const set = isRecord ? streamRecordSet(event,record) : null;
-  const certification = isRecord ? certificationLine(event,userId,dateFormat) : null;
-  const context = event.group_exercise.name;
   const date = isRecord && event.provisional ? `${formatBoardDate(event.sort_at_ms,dateFormat)} · Session in progress` : formatBoardDate(event.sort_at_ms,dateFormat);
+  return { label,source: event,set: isRecord ? streamRecordSet(event,record) : null,
+    certification: isRecord ? certificationLine(event,userId,dateFormat) : null,details,date };
+}
+
+/**
+ * A stream card. A withdrawal (`record_voided`) shows the withdrawn record's
+ * GR card (who, exercise, set, GR values) dated at withdrawal; the stream
+ * draws one only for a record that was a GR (`buildCompetitionStreamModels`).
+ */
+export function buildCompetitionEventCard(event: CompetitionEventWire,userId: string | null,showGroup: boolean,
+  { record,withdrawn }: { record?: CompetitionStreamRecordWire; withdrawn?: CompetitionStreamWithdrawnWire | null },
+  dateFormat: ExerciseDateFormat) {
+  const { label,source,set,certification,details,date } = eventCardBody(event,userId,record,withdrawn,dateFormat);
+  const context = source.group_exercise.name;
   const groupName = showGroup ? event.group.name : null;
   return { label,context,set,certification,details,groupName,date,
     accessibilityLabel: [groupName,label,context,set,certification?.label,...details,date].filter(Boolean).join(', '),
-    historyPath: `/group/${event.group.group_id}/leaderboards/${event.group_exercise.group_exercise_id}/history?metric=${isCompetitionMetric(event.metric) ? event.metric : 'e1rm'}&scope=all` as const };
+    historyPath: `/group/${event.group.group_id}/leaderboards/${event.group_exercise.group_exercise_id}/history?metric=${isCompetitionMetric(source.metric) ? source.metric : 'e1rm'}&scope=all` as const };
 }
 
 export type StreamRecordMetric = { metric: CompetitionHistoricalMetric; label: string; value: string };
 export type StreamPreviousRecord = { metric: CompetitionHistoricalMetric; label: string; value: string; holder: string; set: string | null };
 
-const figure = (value: CompetitionHistoryValueWire): string => value.unavailable || value.value === null ? 'Score unavailable'
-  : formatCompetitionFigure(value.value,value.unit);
+const figure = formatCompetitionHistoricalFigure;
 const e1rmFirst = (a: { metric: string },b: { metric: string }) => (a.metric === 'e1rm' ? 0 : 1) - (b.metric === 'e1rm' ? 0 : 1);
 
 /**
@@ -106,7 +140,7 @@ export function buildStreamRecordSheet(event: CompetitionEventWire,record: Compe
   userId: string | null,dateFormat: ExerciseDateFormat) {
   const nameOf = (member: { user_id: string; username: string | null } | null | undefined) =>
     member?.user_id === userId ? 'You' : formatMemberName(member?.username);
-  const metrics: StreamRecordMetric[] = event.values.filter(value => value.role === 'record').sort(e1rmFirst)
+  const metrics: StreamRecordMetric[] = shownRecordValues(event,record).filter(value => value.role === 'record').sort(e1rmFirst)
     .map(value => ({ metric: value.metric,label: HISTORICAL_METRIC_LABELS[value.metric],
       value: event.voided ? 'Score unavailable' : figure(value) }));
   const previous: StreamPreviousRecord[] = event.voided ? [] : (record?.previous ?? []).map(entry => ({
@@ -116,20 +150,26 @@ export function buildStreamRecordSheet(event: CompetitionEventWire,record: Compe
     certification: event.voided ? null : setCertification(event),metrics,previous };
 }
 
-/** A record's one line inside its session card: `Deadlift · 1RM 213.3`. */
-function sessionRecordLine(key: string,event: CompetitionEventWire): CompetitionSessionRecordLine {
-  const values = event.values.filter(value => value.role === 'record');
-  const value = values.map(formatCompetitionHistoricalValue).join(' · ') || describeCompetitionEvent(event);
+/** A record's one line inside its session card, its GR boards only: `Deadlift · 1RM 213.3`. */
+function sessionRecordLine(key: string,event: CompetitionEventWire,boards: RecordBoards): CompetitionSessionRecordLine {
+  const value = boards.groupRecords.map(formatCompetitionHistoricalValue).join(' · ');
   const certified = (event.record_context?.metrics ?? [])
     .some(entry => entry.certification !== null && entry.certification.ended_at_ms === null);
   return { key,exercise: event.group_exercise.name,value,certified,
     accessibilityLabel: [event.group_exercise.name,value,certified ? 'certified' : null].filter(Boolean).join(', ') };
 }
 
+type CompetitionEventModel = Extract<CompetitionStreamModel,{ kind: 'competition' }>;
+/** A non-record event draws its card; a withdrawal only for a record the stream showed, one that took #1 (a GR). */
+const drawsEvent = (model: CompetitionEventModel): boolean =>
+  model.event.kind !== 'record_voided' || (model.withdrawn?.record.group_record_metrics.length ?? 0) > 0;
+
 /**
- * The stream as drawn: a session carries the group records it took, so one
- * session is one card, and the hidden event kinds are dropped. Only a record
- * tied to a session in the same page nests; anything else keeps its own card.
+ * The stream as drawn: a session carries the records it took, so one session
+ * is one card, and the hidden event kinds are dropped. Its group records (GR)
+ * are lines and its PRs a count. Only a record tied to a session in the same
+ * page nests; any other record keeps its own card, and only while it is a GR.
+ * A withdrawn record leaves both; its withdrawal draws it once, if it was a GR.
  */
 export function buildCompetitionStreamModels(items: CompetitionStreamItemWire[],
   hiddenKinds: readonly StreamEventKind[] = DEFAULT_HIDDEN_STREAM_EVENT_KINDS, dateFormat: ExerciseDateFormat): CompetitionStreamModel[] {
@@ -140,12 +180,19 @@ export function buildCompetitionStreamModels(items: CompetitionStreamItemWire[],
   for (const model of models) {
     if (model.kind !== 'competition') { drawn.push(model); continue; }
     if (hiddenKinds.includes(model.event.kind as StreamEventKind)) continue;
+    if (model.event.kind !== 'record') { if (drawsEvent(model)) drawn.push(model); continue; }
+    // A withdrawn record leaves its place: its withdrawal shows it, once.
+    if (model.event.voided) continue;
+    const boards = splitRecordBoards(model.event,model.record);
     const host = model.event.session_id === null ? undefined : sessions.get(model.event.session_id);
-    if (host && model.event.kind === 'record' && !model.event.voided) {
-      host.records.push(sessionRecordLine(model.key,model.event));
+    if (host) {
+      host.personalRecordCount += boards.personalRecords.length;
+      host.groupRecordCount += boards.groupRecords.length;
+      if (boards.groupRecords.length > 0) host.records.push(sessionRecordLine(model.key,model.event,boards));
       continue;
     }
-    drawn.push(model);
+    // A record standing alone is drawn only while it took #1 on a board (a Volume GR included).
+    if (!model.record || model.record.group_record_metrics.length > 0) drawn.push(model);
   }
   return drawn;
 }

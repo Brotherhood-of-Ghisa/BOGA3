@@ -239,7 +239,7 @@ it('opens a training week, holds no selection, and announces the current week', 
   renderWithTheme(chart(data([day(TODAY, 12), day('2026-09-28', 54)]), open));
   const week = screen.getByTestId('bars-heatmap-cell-2026-09-28');
   expect(week).toHaveProp('accessibilityRole', 'button');
-  expect(week).toHaveProp('accessibilityHint', "Opens the week's sessions");
+  expect(week).toHaveProp('accessibilityHint', "Opens the week's sets");
   expect(week.props.accessibilityState?.selected).toBeFalsy();
   fireEvent.press(week);
   expect(open).toHaveBeenCalledWith('2026-09-28');

@@ -369,13 +369,19 @@ cleanup() {
           and request_id like 'agent-api-${RUN_TAG}-%';
       delete from app_public.sessions s where s.owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
         and s.id in(select result_ids->>'session_id' from public.agent_plan_write_receipts
-          where owner_user_id=s.owner_user_id and operation='start_workout');
+          where owner_user_id=s.owner_user_id and operation in ('start_workout','create_workout'));
       delete from public.agent_plan_write_receipts
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from public.agent_workout_permissions
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
       delete from public.agent_plan_permissions
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid);
+      delete from app_public.health_activities
+        where user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
+          and external_id like 'agent-api-${RUN_TAG}-%';
+      delete from app_public.training_notes
+        where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
+          and (id like 'agent-api-${RUN_TAG}-%' or body like 'agent-api-${RUN_TAG} %');
       delete from app_public.exercise_sets
         where owner_user_id in ('${USER_A_UUID}'::uuid, '${USER_B_UUID}'::uuid)
           and id like 'agent-api-${RUN_TAG}-%';
@@ -493,7 +499,7 @@ run_psql "
       ('${USER_A_UUID}'::uuid,'${MUSCLE_A}','Pectorals','chest',0,0,
        null,1,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_A_UUID}'::uuid,'${MUSCLE_A2}','Triceps','arms',1,0,
-       'arms',0,${NOW_MS},${NOW_MS},${NOW_MS}),
+       'cm_arms',0,${NOW_MS},${NOW_MS},${NOW_MS}),
       ('${USER_B_UUID}'::uuid,'${MUSCLE_B}','User B Muscle','arms',0,0,
        null,1,${NOW_MS},${NOW_MS},${NOW_MS});
     insert into app_public.exercise_muscle_mappings
@@ -575,7 +581,8 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     and .data.recent_performances[0].volume.unit == "kg_reps"
     and .data.personal_records.estimated_one_rep_max.unit == "kg"
     and (.data.last_performed_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T"))
-    and (.data.unavailable_fields | index("user_authored_training_notes")) != null
+    and (.data.unavailable_fields | index("user_authored_training_notes")) == null
+    and .data.training_notes == [] and .data.training_notes_truncated == false
   ' >/dev/null || fail "exercise context schema/calculations are incomplete"
 
 echo "[agent-api-test] verifying cross-owner IDs are indistinguishable from missing IDs"
@@ -1204,6 +1211,26 @@ assert_status "403" "default-denied muscle targets write"
 [[ "$(run_psql "select split_by_gym from app_public.exercise_definitions
   where owner_user_id = '${USER_A_UUID}'::uuid and id = '${EXERCISE_A}';")" == "f" ]] ||
   fail "a denied exercise update changed the exercise"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} denied note" '{body:$body}')" "agent-api-${RUN_TAG}-note-denied"
+assert_status "403" "default-denied note add"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "PLAN_PERMISSION_REQUIRED" ]] ||
+  fail "default-denied note add did not return PLAN_PERMISSION_REQUIRED"
+agent_post "notes/agent-api-${RUN_TAG}-note-missing/remove" '{}' "agent-api-${RUN_TAG}-note-remove-denied"
+assert_status "403" "default-denied note removal, before the note is resolved"
+[[ "$(run_psql "select count(*) from app_public.training_notes
+  where owner_user_id = '${USER_A_UUID}'::uuid and body like 'agent-api-${RUN_TAG} %';")" == "0" ]] ||
+  fail "a denied note add stored a note"
+agent_post "injuries" "$(jq -nc --arg label "agent-api-${RUN_TAG} denied injury" '{label:$label}')" "agent-api-${RUN_TAG}-inj-denied"
+assert_status "403" "default-denied injury add"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INJURY_PERMISSION_REQUIRED" ]] ||
+  fail "default-denied injury add did not return INJURY_PERMISSION_REQUIRED"
+agent_patch "injuries/agent-api-${RUN_TAG}-inj-missing" '{"status":"managing"}' "agent-api-${RUN_TAG}-inj-update-denied"
+assert_status "403" "default-denied injury update"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INJURY_PERMISSION_REQUIRED" ]] ||
+  fail "default-denied injury update did not return INJURY_PERMISSION_REQUIRED"
+[[ "$(run_psql "select count(*) from app_public.injuries
+  where owner_user_id = '${USER_A_UUID}'::uuid and label like 'agent-api-${RUN_TAG} %';")" == "0" ]] ||
+  fail "a denied injury add stored an injury"
 
 echo "[agent-api-test] verifying the permission table is app-only and owner-scoped"
 GRANTED_AT="$(fetch_grant_granted_at)"
@@ -2373,8 +2400,9 @@ printf '%s' "${RESPONSE_BODY}" | jq -e --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_
 ' >/dev/null || fail "muscle list is not the owner taxonomy"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg a "${MUSCLE_A}" --arg a2 "${MUSCLE_A2}" '
   (.data.muscles[] | select(.id == $a) | {report_group, tracked}) == {report_group: null, tracked: true}
-  and (.data.muscles[] | select(.id == $a2) | {report_group, tracked}) == {report_group: "arms", tracked: false}
-' >/dev/null || fail "muscle list does not carry each entry's report group and tracked state"
+  and (.data.muscles[] | select(.id == $a2) | {report_group, tracked}) == {report_group: null, tracked: false}
+  and .data.combined_muscles == []
+' >/dev/null || fail "muscle list does not read a key with no stored combined muscle as the entry's own"
 agent_get "exercises?query=Agent%20A%20Bench"
 assert_status "200" "catalog view"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg ex "${EXERCISE_A}" --argjson rev "${NOW_MS}" '
@@ -2583,11 +2611,342 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '.data.deleted == false and .data.changed
   "create_exercise,delete_exercise,list_muscles,restore_exercise,update_exercise" ]] ||
   fail "exercise routes are not audited under their tool names"
 
+echo "[agent-api-test] letting the per-minute request windows reset before the notes block"
+# The sections above spend the function's 120-per-minute read window; the
+# notes block makes ~35 requests and the block after it resets the window again.
+sleep 61
+echo "[agent-api-test] verifying training notes: list, filters, context, status and ownership"
+# The date, body, range and cursor rules are the pure module's, in
+# apps/mobile/__tests__/agent-api-notes.test.ts. Here: the reads, ownership,
+# the write permission, receipts and soft removal against the real tables.
+NOTE_PREFIX="agent-api-${RUN_TAG}-note"
+NOTE_EXERCISE_DELETED="agent-api-${RUN_TAG}-exercise-deleted"
+note_day() { node -e "process.stdout.write(new Date(Date.now() + Number(process.argv[1]) * 86400000).toISOString().slice(0, 10))" -- "$1"; }
+NOTE_TODAY="$(note_day 0)"
+# The exercise sections above renamed it; notes name it as it is now.
+EXERCISE_A_NAME="$(run_psql "select name from app_public.exercise_definitions
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = '${EXERCISE_A}';")"
+note_sql_row() { # <owner> <suffix> <exercise or null> <days ago> <created ms> <deleted ms or null>
+  local exercise="null"
+  [[ "$3" == "null" ]] || exercise="'$3'"
+  printf "('%s'::uuid,'%s-%s',%s,'agent-api-%s %s','%s','app',%s,%s,%s,%s)" \
+    "$1" "${NOTE_PREFIX}" "$2" "${exercise}" "${RUN_TAG}" "$2" "$(note_day "-$4")" "$5" "$5" "$6" "$5"
+}
+# User A: an exercise note and a general note on the same day (the newer
+# creation first), an older exercise note, one on a deleted exercise, a
+# general note older than the status's 56 days and a removed note.
+run_psql "
+  begin;
+    set constraints all deferred;
+    insert into app_public.exercise_definitions
+      (owner_user_id,id,name,load_input_mode,created_at,updated_at,deleted_at,client_updated_at_ms)
+    values ('${USER_A_UUID}'::uuid,'${NOTE_EXERCISE_DELETED}','Agent A Retired Lift','total_load',
+      ${NOW_MS},${NOW_MS},${NOW_MS},${NOW_MS});
+    insert into app_public.training_notes
+      (owner_user_id,id,exercise_definition_id,body,noted_on,source,created_at,updated_at,deleted_at,client_updated_at_ms)
+    values
+      $(note_sql_row "${USER_A_UUID}" ex1 "${EXERCISE_A}" 3 $((NOW_MS + 1)) null),
+      $(note_sql_row "${USER_A_UUID}" gen "null" 3 "${NOW_MS}" null),
+      $(note_sql_row "${USER_A_UUID}" retired "${NOTE_EXERCISE_DELETED}" 5 "${NOW_MS}" null),
+      $(note_sql_row "${USER_A_UUID}" ex-old "${EXERCISE_A}" 10 "${NOW_MS}" null),
+      $(note_sql_row "${USER_A_UUID}" gen-old "null" 60 "${NOW_MS}" null),
+      $(note_sql_row "${USER_A_UUID}" removed "null" 1 "${NOW_MS}" "${NOW_MS}"),
+      $(note_sql_row "${USER_B_UUID}" b "null" 1 "${NOW_MS}" null);
+  commit;
+" >/dev/null
+# Every check keeps only this run's notes, so leftovers of another run cannot interfere.
+own_notes='[.[] | select(.id | startswith($p)) | .id | ltrimstr($p + "-")]'
+agent_get "notes?limit=50"
+assert_status "200" "list notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" --arg ex "${EXERCISE_A}" --arg name "${EXERCISE_A_NAME}" "
+  (.data.notes | ${own_notes}) == [\"ex1\", \"gen\", \"retired\", \"ex-old\", \"gen-old\"]
+  and (.data.notes[] | select(.id == \$p + \"-retired\") | .exercise_name) == \"Agent A Retired Lift\"
+  and (.data.notes[] | select(.id == \$p + \"-ex1\")
+    | .exercise_id == \$ex and .exercise_name == \$name and .source == \"app\"
+      and (.created_at | test(\"^[0-9]{4}-[0-9]{2}-[0-9]{2}T\")))
+  and (.data.notes[] | select(.id == \$p + \"-gen\") | .exercise_id == null and .exercise_name == null)
+" >/dev/null || fail "list notes order, projection, removal or ownership is wrong"
+agent_get "notes?exercise_id=${EXERCISE_A}&limit=1"
+assert_status "200" "first page of one exercise's notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" "
+  (.data.notes | ${own_notes}) == [\"ex1\"] and (.data.next_cursor | type) == \"string\"" >/dev/null ||
+  fail "the first page of one exercise's notes is wrong"
+agent_get "notes?exercise_id=${EXERCISE_A}&limit=1&cursor=$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.next_cursor')"
+assert_status "200" "second page of one exercise's notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" "
+  (.data.notes | ${own_notes}) == [\"ex-old\"] and .data.next_cursor == null" >/dev/null ||
+  fail "the second page did not continue to the older note and stop"
+agent_get "notes?from=$(note_day -5)&to=$(note_day -3)"
+assert_status "200" "notes in a date range"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" "
+  (.data.notes | ${own_notes}) == [\"ex1\", \"gen\", \"retired\"]" >/dev/null ||
+  fail "the date range did not include both of its days and nothing outside"
+agent_get "notes?from=2026-02-30"
+assert_status "400" "an impossible note date"
+agent_get "notes?from=$(note_day -3)&to=$(note_day -5)"
+assert_status "400" "a reversed note range"
+agent_get "notes?days=7"
+assert_status "400" "an unknown notes parameter"
+agent_get "notes?cursor=$(printf '%s' '{"kind":"activity","id":"x"}' | base64 | tr '+/' '-_' | tr -d '=')"
+assert_status "400" "another route's cursor on notes"
+agent_get "exercises/${EXERCISE_A}/context"
+assert_status "200" "exercise context with notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" "
+  (.data.training_notes | ${own_notes}) == [\"ex1\", \"ex-old\"] and .data.training_notes_truncated == false
+" >/dev/null || fail "exercise context did not return the exercise's own live notes, newest first"
+agent_get "training-status"
+assert_status "200" "training status with general notes"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg p "${NOTE_PREFIX}" --arg from "$(note_day -55)" "
+  (.data.general_notes.notes | ${own_notes}) == [\"gen\"]
+  and .data.general_notes.from == \$from and (.data.general_notes.complete | type) == \"boolean\"
+  and (tostring | contains(\$p + \"-b\") | not)
+" >/dev/null || fail "training status did not return only the general notes of its 56 days"
+
+echo "[agent-api-test] verifying the coach adds and removes notes, idempotently"
+NOTE_KEY="agent-api-${RUN_TAG}-note-add"
+NOTE_ADD_BODY="$(jq -nc --arg body "  agent-api-${RUN_TAG} agent note  " --arg ex "${EXERCISE_A}" --arg on "$(note_day -1)" \
+  '{body:$body,exercise_id:$ex,noted_on:$on}')"
+agent_post "notes" "${NOTE_ADD_BODY}" "${NOTE_KEY}"
+assert_status "200" "coach adds a note"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg body "agent-api-${RUN_TAG} agent note" --arg ex "${EXERCISE_A}" --arg on "$(note_day -1)" \
+  --arg name "${EXERCISE_A_NAME}" '
+  .data.idempotent_replay == false
+  and (.data.note | .body == $body and .exercise_id == $ex and .exercise_name == $name
+    and .noted_on == $on and .source == "agent" and (.created_at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T")))
+' >/dev/null || fail "the added note is wrong"
+AGENT_NOTE_ID="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.note.id')"
+[[ "$(run_psql "select body || '|' || source || '|' || (deleted_at is null) || '|' || (client_updated_at_ms = created_at)
+  from app_public.training_notes where owner_user_id = '${USER_A_UUID}'::uuid and id = '${AGENT_NOTE_ID}';")" == \
+  "agent-api-${RUN_TAG} agent note|agent|true|true" ]] || fail "the stored agent note is wrong"
+agent_post "notes" "${NOTE_ADD_BODY}" "${NOTE_KEY}"
+assert_status "200" "note add replay"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${AGENT_NOTE_ID}" '.data.idempotent_replay == true and .data.note.id == $id' \
+  >/dev/null || fail "a repeated key did not replay the first note"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} other" '{body:$body}')" "${NOTE_KEY}"
+assert_status "409" "note key reused with another body"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "IDEMPOTENCY_CONFLICT" ]] ||
+  fail "a reused note key did not return IDEMPOTENCY_CONFLICT"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} general" '{body:$body}')" "${NOTE_KEY}-general"
+assert_status "200" "coach adds a general note dated today"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg today "${NOTE_TODAY}" '.data.note.noted_on == $today and .data.note.exercise_id == null' \
+  >/dev/null || fail "an undated general note was not dated today in the profile zone"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} retired" --arg ex "${NOTE_EXERCISE_DELETED}" '{body:$body,exercise_id:$ex}')" \
+  "${NOTE_KEY}-retired"
+assert_status "409" "note on a deleted exercise"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "EXERCISE_DELETED" ]] ||
+  fail "a note on a deleted exercise did not return EXERCISE_DELETED"
+agent_post "notes" "$(jq -nc --arg body "agent-api-${RUN_TAG} foreign" --arg ex "${EXERCISE_B}" '{body:$body,exercise_id:$ex}')" \
+  "${NOTE_KEY}-foreign"
+assert_status "400" "note on another owner's exercise"
+[[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "FOREIGN_RESOURCE_REFERENCE" ]] ||
+  fail "a note on another owner's exercise did not return FOREIGN_RESOURCE_REFERENCE"
+for BAD in \
+  "$(jq -nc --arg on "$(note_day 1)" '{body:"tomorrow",noted_on:$on}')" \
+  "$(jq -nc '{body:"   "}')" \
+  "$(jq -nc '{body:"ok",noted_on:"2026-02-30"}')" \
+  "$(jq -nc '{body:"ok",source:"app"}')"; do
+  agent_post "notes" "${BAD}" "${NOTE_KEY}-bad"
+  assert_status "400" "invalid note ${BAD}"
+  [[ "$(printf '%s' "${RESPONSE_BODY}" | jq -r '.error.code')" == "INVALID_ARGUMENT" ]] ||
+    fail "invalid note ${BAD} did not return INVALID_ARGUMENT"
+done
+agent_post "notes" '{"body":"ok"}' ""
+assert_status "400" "note add without an idempotency key"
+agent_put "notes" '{"body":"ok"}' "${NOTE_KEY}-put"
+assert_status "405" "PUT on the notes route"
+[[ "$(run_psql "select count(*) from app_public.training_notes
+  where owner_user_id = '${USER_A_UUID}'::uuid and source = 'agent' and body like 'agent-api-${RUN_TAG} %';")" == "2" ]] ||
+  fail "a rejected or replayed note add stored a note"
+
+agent_post "notes/${AGENT_NOTE_ID}/remove" '{}' "${NOTE_KEY}-remove"
+assert_status "200" "coach removes a note"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${AGENT_NOTE_ID}" '.data == {removed: true, note_id: $id, idempotent_replay: false}' \
+  >/dev/null || fail "the removal response is wrong"
+agent_post "notes/${AGENT_NOTE_ID}/remove" '{}' "${NOTE_KEY}-remove"
+assert_status "200" "note removal replay"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.data.idempotent_replay == true' >/dev/null || fail "a repeated removal key did not replay"
+agent_post "notes/${AGENT_NOTE_ID}/remove" '{}' "${NOTE_KEY}-remove-again"
+assert_status "404" "removing a removed note"
+agent_post "notes/${NOTE_PREFIX}-b/remove" '{}' "${NOTE_KEY}-remove-foreign"
+assert_status "404" "removing another owner's note"
+agent_post "notes/${NOTE_PREFIX}-gen/remove" '{"note_id":"x"}' "${NOTE_KEY}-remove-body"
+assert_status "400" "a removal with a body field"
+[[ "$(run_psql "select string_agg(id || ':' || (deleted_at is not null), ',' order by id) from app_public.training_notes
+  where (owner_user_id = '${USER_A_UUID}'::uuid and id in ('${AGENT_NOTE_ID}', '${NOTE_PREFIX}-gen'))
+     or (owner_user_id = '${USER_B_UUID}'::uuid and id = '${NOTE_PREFIX}-b');")" == \
+  "${NOTE_PREFIX}-b:false,${NOTE_PREFIX}-gen:false,${AGENT_NOTE_ID}:true" ]] ||
+  fail "removal soft-deleted the wrong notes"
+agent_get "notes?exercise_id=${EXERCISE_A}"
+assert_status "200" "notes after a removal"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg id "${AGENT_NOTE_ID}" '(.data.notes | map(.id) | index($id)) == null' >/dev/null ||
+  fail "a removed note is still listed"
+[[ "$(run_psql "select string_agg(distinct tool_name, ',' order by tool_name) from public.agent_access_audit
+  where owner_user_id = '${USER_A_UUID}'::uuid and oauth_client_id = '${AGENT_CLIENT_ID}'
+    and tool_name in ('list_notes','add_note','remove_note') and http_status = 200;")" == "add_note,list_notes,remove_note" ]] ||
+  fail "note routes are not audited under their tool names"
+
 echo "[agent-api-test] letting the per-minute request windows reset before the targets block"
 # The earlier sections spend most of the function's 120-per-minute read window;
 # the seeded-history check and the targets block make ~30 more requests and a
 # 30-write rate-limit probe.
 sleep 61
+echo "[agent-api-test] verifying imported health activities: the app write path, RLS and the coach's reads"
+# The overlap rule, range parsing and weekly cardio buckets are the pure
+# module's, in apps/mobile/__tests__/agent-api-activities.test.ts. Here: the
+# owner-only RPC and table boundary, and the route's reads, shape and paging.
+ACTIVITY_RUN="agent-api-${RUN_TAG}-activity-run"
+ACTIVITY_LIFT="agent-api-${RUN_TAG}-activity-lift"
+ACTIVITY_B="agent-api-${RUN_TAG}-activity-b"
+iso_ms() { node -e "process.stdout.write(new Date(Number(process.argv[1])).toISOString())" "$1"; }
+RUN_START="$(iso_ms $((NOW_MS - 10800000)))"
+RUN_END="$(iso_ms $((NOW_MS - 9000000)))"
+# Inside SESSION_A (STARTED_MS..COMPLETED_MS): the watch recorded the same lifting.
+LIFT_START="$(iso_ms $((STARTED_MS + 120000)))"
+LIFT_END="$(iso_ms $((COMPLETED_MS - 60000)))"
+activity_payload() {
+  jq -nc --arg run "${ACTIVITY_RUN}" --arg lift "${ACTIVITY_LIFT}" \
+    --arg rs "${RUN_START}" --arg re "${RUN_END}" --arg ls "${LIFT_START}" --arg le "${LIFT_END}" --argjson km "$1" '{
+    p_source: "apple_health",
+    p_upserts: [
+      {external_id: $run, activity_type: "running", started_at: $rs, ended_at: $re, duration_sec: 1800,
+       distance_m: $km, active_energy_kcal: 312.5, avg_heart_rate_bpm: 151, max_heart_rate_bpm: 176,
+       elevation_gain_m: 18, source_name: "Workout", device_name: "Apple Watch"},
+      {external_id: $lift, activity_type: "traditional_strength_training", started_at: $ls, ended_at: $le,
+       duration_sec: 420, active_energy_kcal: 90}
+    ]
+  }'
+}
+run_psql "insert into app_public.health_activities
+  (user_id,source,external_id,activity_type,started_at,ended_at,duration_sec)
+  values ('${USER_B_UUID}'::uuid,'apple_health','${ACTIVITY_B}','running',now() - interval '1 hour',now(),3600);" >/dev/null
+
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(activity_payload 4000)"
+assert_status "200" "app imports activities"
+printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 2, deleted: 0, pruned: 0}' >/dev/null ||
+  fail "activity import did not report two upserts"
+# A re-import of the same workouts updates them in place: idempotent by (owner, source, external id).
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(activity_payload 4321.5)"
+assert_status "200" "app re-imports activities"
+[[ "$(run_psql "select count(*) || ':' || max(distance_m) from app_public.health_activities
+  where user_id = '${USER_A_UUID}'::uuid and external_id in ('${ACTIVITY_RUN}','${ACTIVITY_LIFT}');")" == "2:4321.5" ]] ||
+  fail "a re-import duplicated or did not update the activity"
+
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" \
+  "$(activity_payload 1 | jq -c '.p_upserts[0].route = []')"
+assert_non_2xx "an unknown activity field"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.message | test("INVALID_ARGUMENT: unknown activity field route")' >/dev/null ||
+  fail "an unknown activity field was not rejected by name"
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" \
+  "$(activity_payload 1 | jq -c '.p_upserts[0].max_heart_rate_bpm = 900')"
+assert_non_2xx "an out-of-range heart rate"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.message | test("INVALID_ARGUMENT: .*max_heart_rate_bpm")' >/dev/null ||
+  fail "an out-of-range figure was not rejected naming its check"
+[[ "$(run_psql "select distance_m from app_public.health_activities
+  where user_id = '${USER_A_UUID}'::uuid and external_id = '${ACTIVITY_RUN}';")" == "4321.5" ]] ||
+  fail "a rejected batch changed stored activities"
+
+app_public_request GET "health_activities?select=external_id" "${APP_ACCESS_TOKEN}"
+assert_status "200" "owner app reads its activities"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg run "${ACTIVITY_RUN}" --arg b "${ACTIVITY_B}" \
+  '(map(.external_id) | index($run)) != null and (map(.external_id) | index($b)) == null' >/dev/null ||
+  fail "the owner read crossed the ownership boundary"
+app_public_request POST "health_activities" "${APP_ACCESS_TOKEN}" \
+  "$(jq -nc --arg u "${USER_A_UUID}" '{user_id: $u, source: "apple_health", external_id: "direct",
+    activity_type: "running", started_at: "2026-01-01T00:00:00Z", ended_at: "2026-01-01T00:10:00Z", duration_sec: 600}')"
+assert_non_2xx "a direct app insert"
+app_public_request GET "health_activities?select=external_id" "${AGENT_ACCESS_TOKEN}"
+[[ "${RESPONSE_STATUS}" != "200" || "$(printf '%s' "${RESPONSE_BODY}" | jq 'length')" == "0" ]] ||
+  fail "an OAuth token read activities directly"
+app_public_request POST "rpc/health_activities_apply" "${AGENT_ACCESS_TOKEN}" "$(activity_payload 1)"
+assert_non_2xx "an OAuth token import"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.message | test("AGENT_FORBIDDEN")' >/dev/null ||
+  fail "an OAuth token import was not refused as AGENT_FORBIDDEN"
+
+agent_get "activities?limit=50"
+assert_status "200" "recent activities"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg run "${ACTIVITY_RUN}" --arg lift "${ACTIVITY_LIFT}" \
+  --arg b "${ACTIVITY_B}" --arg session "${SESSION_A}" --arg rs "${RUN_START}" '
+    .data.activities as $a
+    | ($a | map(select(.external_id == $run)) | first) as $r
+    | ($a | map(select(.external_id == $lift)) | first) as $l
+    | ($a | map(.started_at)) == ($a | map(.started_at) | sort | reverse)
+    and ($a | map(.external_id) | index($b)) == null
+    and $r.started_at == $rs and $r.activity_type == "running" and $r.duration_seconds == 1800
+    and $r.distance_m == 4321.5 and $r.max_heart_rate_bpm == 176 and $r.device_name == "Apple Watch"
+    and $r.overlaps_logged_session == false and $r.overlapping_session_id == null
+    and $l.overlaps_logged_session == true and $l.overlapping_session_id == $session
+    and $l.distance_m == null and .data.overlap_complete == true
+  ' >/dev/null || fail "recent activities shape, order, ownership or overlap flag is wrong"
+RANGE_TO="$(iso_ms $((NOW_MS + 60000)))"
+agent_get "activities?limit=1&from=${RUN_START}&to=${RANGE_TO}"
+assert_status "200" "first page of a bounded range"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg lift "${ACTIVITY_LIFT}" \
+  '(.data.activities | map(.external_id)) == [$lift] and (.data.next_cursor | type) == "string"' >/dev/null ||
+  fail "a bounded first page did not return only the newest activity in range"
+agent_get "activities?limit=1&from=${RUN_START}&to=${RANGE_TO}&cursor=$(printf '%s' "${RESPONSE_BODY}" | jq -r '.data.next_cursor')"
+assert_status "200" "second page of a bounded range"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg run "${ACTIVITY_RUN}" \
+  '(.data.activities | map(.external_id)) == [$run] and .data.next_cursor == null' >/dev/null ||
+  fail "the second page did not continue to the older activity and stop at the range start"
+agent_get "activities?from=2026-11-01"
+assert_status "400" "a range bound without a time and zone"
+agent_get "activities?days=7"
+assert_status "400" "an unknown activities parameter"
+agent_get "activities?cursor=$(printf '%s' '{"kind":"workout","id":"x"}' | base64 | tr '+/' '-_' | tr -d '=')"
+assert_status "400" "another route's cursor"
+
+agent_get "training-status"
+assert_status "200" "training status with imported activities"
+printf '%s' "${RESPONSE_BODY}" | jq -e '
+    .data.cardio as $c
+    | ([$c.this_week, $c.last_4_weeks[]] | map(.by_type[] | select(.activity_type == "running") | .distance_m) | add // 0) as $km
+    | ($c.last_4_weeks | length) == 4
+    and ($c.this_week.week_start == .data.week_start)
+    and $km >= 4322
+    and $c.overlapping_excluded >= 1
+    and ([$c.this_week, $c.last_4_weeks[]] | map(.by_type[] | select(.activity_type == "traditional_strength_training")) | length) == 0
+    and ($c.complete | type) == "boolean"
+  ' >/dev/null || fail "the cardio summary did not count the run and exclude the overlapping strength workout"
+[[ "$(run_psql "select count(*) from public.agent_access_audit
+  where owner_user_id = '${USER_A_UUID}'::uuid and oauth_client_id = '${AGENT_CLIENT_ID}'
+    and tool_name = 'get_recent_activities' and http_status = 200;")" -ge 1 ]] ||
+  fail "recent activities were not audited under their tool name"
+
+# HealthKit deletions remove rows; a fresh backfill's complete id list prunes the rest.
+FUTURE_A="agent-api-${RUN_TAG}-activity-future-a"
+FUTURE_B="agent-api-${RUN_TAG}-activity-future-b"
+future_activity() { jq -nc --arg id "$1" --arg s "$2" '{external_id: $id, activity_type: "walking",
+  started_at: $s, ended_at: $s, duration_sec: 0}'; }
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(jq -nc \
+  --argjson a "$(future_activity "${FUTURE_A}" 2031-01-02T08:00:00Z)" \
+  --argjson b "$(future_activity "${FUTURE_B}" 2031-01-03T08:00:00Z)" \
+  --arg run "${ACTIVITY_RUN}" '{p_source: "apple_health", p_upserts: [$a, $b], p_deletes: [$run]}')"
+assert_status "200" "an import with a deletion"
+printf '%s' "${RESPONSE_BODY}" | jq -e '. == {upserted: 2, deleted: 1, pruned: 0}' >/dev/null ||
+  fail "a HealthKit deletion did not delete the activity"
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(jq -nc \
+  --arg b "${FUTURE_B}" \
+  '{p_source: "apple_health", p_complete_since: "2031-01-01T00:00:00Z"}')"
+assert_non_2xx "a complete window without its id list"
+# The closing call of a multi-batch backfill: no upserts of its own, the whole id list.
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" "$(jq -nc \
+  --arg b "${FUTURE_B}" \
+  '{p_source: "apple_health", p_complete_since: "2031-01-01T00:00:00Z", p_complete_ids: [$b]}')"
+assert_status "200" "a complete backfill window"
+# Another run's leftover 2031 rows may be pruned too; the rows below pin this run's outcome.
+printf '%s' "${RESPONSE_BODY}" | jq -e '.upserted == 0 and .deleted == 0 and .pruned >= 1' >/dev/null ||
+  fail "a complete window did not keep the listed activity and prune the one the store no longer has"
+[[ "$(run_psql "select string_agg(external_id, ',' order by external_id) from app_public.health_activities
+  where user_id = '${USER_A_UUID}'::uuid and external_id like 'agent-api-${RUN_TAG}-%';")" == \
+  "${FUTURE_B},${ACTIVITY_LIFT}" ]] || fail "deletion or pruning touched the wrong activities"
+app_public_request POST "rpc/health_activities_apply" "${APP_ACCESS_TOKEN}" \
+  "$(activity_payload 1 | jq -c '.p_upserts[0].started_at = "2026-11-01T24:00:00Z"')"
+assert_non_2xx "an hour-24 start"
+printf '%s' "${RESPONSE_BODY}" | jq -e '.message | test("INVALID_ARGUMENT: started_at")' >/dev/null ||
+  fail "an hour-24 start was not rejected like the read side rejects it"
+[[ "$(run_psql "select count(*) from app_public.health_activities where user_id = '${USER_B_UUID}'::uuid
+  and external_id = '${ACTIVITY_B}';")" == "1" ]] || fail "another owner's activity was deleted"
+
 echo "[agent-api-test] verifying the training status figures over a seeded seven-week history"
 # Figures worked out by hand from the rows below (UTC, the fixture's zone).
 # The muscle's sets fall on the Thursdays of the 1st, 2nd and 4th full weeks
@@ -2670,20 +3029,30 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
 
 echo "[agent-api-test] verifying the coach sets weekly muscle targets"
 TARGETS_KEY="agent-api-${RUN_TAG}-targets"
-# Another scope's override and independent counting choices already on the row:
-# a target-only write keeps all three.
+# Another muscle's override, a legacy per-setup map, a combined muscle and
+# independent counting choices already on the row: a target-only write keeps all.
 update_training_fixture "insert into app_public.user_settings
     (owner_user_id, id, created_at, updated_at, client_updated_at_ms, weekly_working_set_target,
-     muscle_target_mode, muscle_target_overrides, count_secondary_muscles, volume_primary_only)
+     muscle_target_mode, muscle_target_overrides, muscle_targets, combined_muscles,
+     count_secondary_muscles, volume_primary_only)
   values ('${USER_A_UUID}'::uuid, 'settings', ${NOW_MS}, ${NOW_MS}, ${NOW_MS}, 6, 'single',
-     '{\"detailed\":{\"agent-api-keep\":3},\"broad\":{\"agent-api-keep\":3}}'::jsonb, false, true)
+     '{\"detailed\":{\"agent-api-legacy\":3}}'::jsonb, '{\"agent-api-keep\":3}'::jsonb,
+     '[{\"key\":\"cm_arms\",\"name\":\"Arms\",\"family\":\"arms\"}]'::jsonb, false, true)
   on conflict (owner_user_id, id) do update set
     weekly_working_set_target = excluded.weekly_working_set_target,
     muscle_target_mode = excluded.muscle_target_mode,
     muscle_target_overrides = excluded.muscle_target_overrides,
+    muscle_targets = excluded.muscle_targets,
+    combined_muscles = excluded.combined_muscles,
     count_secondary_muscles = excluded.count_secondary_muscles,
     volume_primary_only = excluded.volume_primary_only,
     deleted_at = null, client_updated_at_ms = excluded.client_updated_at_ms;" >/dev/null
+agent_get "muscles"
+assert_status "200" "muscle list with a stored combined muscle"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg a2 "${MUSCLE_A2}" '
+  (.data.muscles[] | select(.id == $a2) | .report_group) == "cm_arms"
+  and .data.combined_muscles == [{key: "cm_arms", name: "Arms", family: "arms"}]
+' >/dev/null || fail "muscle list does not carry the stored combined muscles and their members"
 agent_get "training-status"
 assert_status "200" "training status before the coach sets targets"
 printf '%s' "${RESPONSE_BODY}" | jq -e --argjson rev "${NOW_MS}" '
@@ -2696,25 +3065,24 @@ TARGETS_BODY="$(jq -nc --argjson rev "${TARGETS_REVISION}" --arg m "${MUSCLE_A}"
 TARGETS_BEFORE_MS="$(node -e 'process.stdout.write(String(Date.now()))')"
 agent_put "muscle-targets" "${TARGETS_BODY}" "${TARGETS_KEY}"
 assert_status "200" "coach sets muscle targets"
-TARGETS_SCOPE="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.scope')"
 TARGETS_NEW_REVISION="$(printf '%s' "${RESPONSE_BODY}" | jq -er '.data.targets.revision')"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" '
   .data.targets.default_weekly_sets == 11 and .data.targets.mode == "per_muscle"
-  and .data.targets.uploaded == true and .data.overrides[$m] == 14 and .data.idempotent_replay == false
-  and (.data.scope == "detailed" or .data.scope == "broad" or .data.scope == "custom")
+  and .data.targets.uploaded == true and .data.overrides[$m] == 14 and .data.overrides["agent-api-keep"] == 3
+  and .data.idempotent_replay == false and (.data | has("scope") | not)
 ' >/dev/null || fail "muscle targets response is wrong"
 [[ "${TARGETS_NEW_REVISION}" -ge "${TARGETS_BEFORE_MS}" ]] ||
   fail "the targets write was not stamped with the server's now"
 [[ "$(run_psql "select weekly_working_set_target || ',' || muscle_target_mode || ',' || client_updated_at_ms
-    || ',' || (muscle_target_overrides -> '${TARGETS_SCOPE}' ->> '${MUSCLE_A}') || ',' || count_secondary_muscles || ',' || volume_primary_only
+    || ',' || (muscle_targets ->> '${MUSCLE_A}') || ',' || count_secondary_muscles || ',' || volume_primary_only
   from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
   "11,per_muscle,${TARGETS_NEW_REVISION},14,false,true" ]] ||
   fail "the settings row did not take the coach's targets and stamp"
-OTHER_SCOPE="broad"
-[[ "${TARGETS_SCOPE}" != "broad" ]] || OTHER_SCOPE="detailed"
-[[ "$(run_psql "select muscle_target_overrides -> '${OTHER_SCOPE}' ->> 'agent-api-keep'
-  from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == "3" ]] ||
-  fail "the write dropped another scope's override"
+[[ "$(run_psql "select (muscle_targets ->> 'agent-api-keep') || ',' || muscle_target_overrides::text
+    || ',' || jsonb_array_length(combined_muscles)
+  from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
+  '3,{"detailed": {"agent-api-legacy": 3}},1' ]] ||
+  fail "the write dropped another muscle's override, the legacy map or the combined muscles"
 
 echo "[agent-api-test] verifying the targets reach the app through sync_pull and the status"
 TARGETS_CURSOR_AT="$(run_psql "select to_char((server_received_at - interval '1 second') at time zone 'UTC',
@@ -2723,11 +3091,12 @@ TARGETS_CURSOR_AT="$(run_psql "select to_char((server_received_at - interval '1 
 app_public_request POST "rpc/sync_pull" "${APP_ACCESS_TOKEN}" "$(jq -nc --arg at "${TARGETS_CURSOR_AT}" \
   '{layer:0,limit:200,cursor:{server_received_at:$at,owner_user_id:"00000000-0000-0000-0000-000000000000",type:"gyms",id:""}}')"
 assert_status "200" "sync pull after the coach sets targets"
-printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" --arg scope "${TARGETS_SCOPE}" --argjson rev "${TARGETS_NEW_REVISION}" '
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" --argjson rev "${TARGETS_NEW_REVISION}" '
   [.entities[] | select(.type == "user_settings")] | length == 1
   and (.[0].client_updated_at_ms == $rev)
   and (.[0].fields.weekly_working_set_target == 11 and .[0].fields.muscle_target_mode == "per_muscle")
-  and ((.[0].fields.muscle_target_overrides | fromjson)[$scope][$m] == 14)
+  and ((.[0].fields.muscle_targets | fromjson)[$m] == 14)
+  and ((.[0].fields.combined_muscles | fromjson)[0].key == "cm_arms")
 ' >/dev/null || fail "sync_pull did not return the coach's targets"
 agent_get "training-status"
 assert_status "200" "training status after the coach sets targets"
@@ -2793,7 +3162,7 @@ assert_status "200" "null clears an override"
 CLEARED_BODY="${RESPONSE_BODY}"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" '(.data.overrides | has($m) | not) and .data.targets.default_weekly_sets == 11' >/dev/null ||
   fail "clearing an override changed more than that override"
-[[ "$(run_psql "select coalesce(muscle_target_overrides -> '${TARGETS_SCOPE}' ->> '${MUSCLE_A}', 'cleared')
+[[ "$(run_psql "select coalesce(muscle_targets ->> '${MUSCLE_A}', 'cleared')
   from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == "cleared" ]] ||
   fail "the override was not cleared on the row"
 agent_put "muscle-targets" '{"default_weekly_sets":9}' "${TARGETS_KEY}-no-revision"
@@ -2817,13 +3186,13 @@ assert_defaults_after_first_write() {
   local label="$1"
   local secondary="${2:-false}"
   [[ "$(run_psql "select weekly_working_set_target || ',' || muscle_target_mode || ',' || count_secondary_muscles || ',' || volume_primary_only
-      || ',' || muscle_target_overrides::text || ',' || coalesce(deleted_at::text, 'live')
+      || ',' || muscle_targets::text || ',' || coalesce(deleted_at::text, 'live')
     from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
     "8,per_muscle,${secondary},false,{},live" ]] || fail "${label}: the first write did not build on the app defaults"
 }
 update_training_fixture "update app_public.user_settings
   set weekly_working_set_target = null, muscle_target_mode = null, muscle_target_overrides = null,
-      count_secondary_muscles = null, volume_primary_only = null, client_updated_at_ms = ${NOW_MS}
+      muscle_targets = null, count_secondary_muscles = null, volume_primary_only = null, client_updated_at_ms = ${NOW_MS}
   where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
 agent_get "training-status"
 printf '%s' "${RESPONSE_BODY}" | jq -e --argjson rev "${NOW_MS}" \
@@ -2836,9 +3205,34 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '.data.targets.uploaded == true and .data
   >/dev/null || fail "the first write did not return the defaults it built on"
 assert_defaults_after_first_write "legacy null targets" true
 
+echo "[agent-api-test] verifying a coach write on a legacy per-setup map builds on the targets the status shows"
+# An older build's row: no single map yet. The rows here spell out no preset
+# (one entry carries a key), so the legacy custom map is the one in force.
+update_training_fixture "update app_public.user_settings
+  set weekly_working_set_target = 6, muscle_target_mode = 'per_muscle', muscle_targets = null, combined_muscles = null,
+      muscle_target_overrides = '{\"custom\":{\"${MUSCLE_A}\":5},\"detailed\":{\"${MUSCLE_A}\":40}}'::jsonb,
+      client_updated_at_ms = ${NOW_MS}
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
+agent_get "training-status"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" '
+  (.data.muscles[] | select(.id == $m) | .weekly_target) == 5 and .data.muscle_setup == "detailed"
+' >/dev/null || fail "training status did not read the legacy map for the setup the rows spell out"
+agent_put "muscle-targets" "$(jq -nc --argjson rev "${NOW_MS}" '{default_weekly_sets:7,expected_revision:$rev}')" "${TARGETS_KEY}-legacy"
+assert_status "200" "write over a legacy per-setup map"
+printf '%s' "${RESPONSE_BODY}" | jq -e --arg m "${MUSCLE_A}" '.data.overrides == {($m): 5}' >/dev/null ||
+  fail "the write did not build its map on the legacy targets"
+[[ "$(run_psql "select muscle_targets::text || ',' || (muscle_target_overrides -> 'detailed' ->> '${MUSCLE_A}')
+  from app_public.user_settings where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';")" == \
+  "{\"${MUSCLE_A}\": 5},40" ]] || fail "the legacy write did not store the single map, or changed the legacy one"
+update_training_fixture "update app_public.user_settings
+  set weekly_working_set_target = null, muscle_target_mode = null, muscle_target_overrides = null,
+      muscle_targets = null, count_secondary_muscles = null, volume_primary_only = null, client_updated_at_ms = ${NOW_MS}
+  where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
+
 update_training_fixture "update app_public.user_settings
   set weekly_working_set_target = 6, muscle_target_mode = 'single',
       muscle_target_overrides = '{\"broad\":{\"agent-api-stale\":3}}'::jsonb,
+      muscle_targets = '{\"agent-api-stale\":3}'::jsonb,
       count_secondary_muscles = false, deleted_at = ${NOW_MS}
   where owner_user_id = '${USER_A_UUID}'::uuid and id = 'settings';" >/dev/null
 agent_put "muscle-targets" "$(jq -nc '{mode:"per_muscle",expected_revision:0}')" "${TARGETS_KEY}-deleted"
@@ -2964,6 +3358,9 @@ app_public_request GET "exercise_definitions?select=id" "${AGENT_ACCESS_TOKEN}"
 assert_status "200" "agent direct table read denial"
 [[ "$(printf '%s' "${RESPONSE_BODY}" | jq 'length')" == "0" ]] ||
   fail "agent credential bypassed the dedicated API read boundary"
+
+# shellcheck source=lib/agent-injury-contract.sh
+source "${SUPABASE_DIR}/tests/lib/agent-injury-contract.sh"
 
 # shellcheck source=lib/agent-workout-contract.sh
 source "${SUPABASE_DIR}/tests/lib/agent-workout-contract.sh"

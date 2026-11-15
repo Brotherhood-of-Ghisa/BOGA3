@@ -40,7 +40,7 @@ export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChan
       onPressRecord={setSelectedKey} showGroupNames={showGroupNames} />;
     if (item.kind === 'membership') return <GroupStreamMembershipItem item={item} onPress={onPressMembership} showGroupName={showGroupNames} />;
     if (item.kind === 'shared_exercise') return <StreamSharedExerciseCard item={item} userId={userId} showGroupName={showGroupNames} />;
-    return <GroupMetricStreamCard item={item.event} record={item.record} userId={userId} showGroupName={showGroupNames}
+    return <GroupMetricStreamCard item={item.event} record={item.record} withdrawn={item.withdrawn} userId={userId} showGroupName={showGroupNames}
       onPress={item.event.kind === 'record' ? () => setSelectedKey(item.key) : undefined} />;
   };
   const footer = stream.loadingMore ? <StatePanel fill={false} kind="loading" testID={`${testID}-loading-more`} />

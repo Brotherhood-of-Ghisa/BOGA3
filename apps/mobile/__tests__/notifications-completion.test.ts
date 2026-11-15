@@ -47,6 +47,13 @@ test('dirty quarantined rows prevent false completion proof without affecting ot
   seed(); fixture.database.update(exerciseSets).set({ localDirty: true }).where(eq(exerciseSets.id, 'deleted-set')).run();
   expect(readCompletedNotificationGraphs(db(), entityToWire, ['session'])).toEqual([]);
 });
+test('dated history cannot acknowledge a partial graph while MCP still controls entry', () => {
+  seed();
+  fixture.database.update(sessions).set({ loggingClientId: 'coach', loggingGrantedAt: '2026-11-10T12:00:00Z' }).run();
+  expect(readCompletedNotificationGraphs(db(), entityToWire, ['session'])).toEqual([]);
+  fixture.database.update(sessions).set({ loggingClientId: null, loggingGrantedAt: null }).run();
+  expect(readCompletedNotificationGraphs(db(), entityToWire, ['session'])).toHaveLength(1);
+});
 test('uses original server candidates despite backdated local timestamp, pins token and advances a bounded cursor', async () => {
   seed();
   mockRpc.mockImplementation(async name => ({ data: name === 'notification_pending_completions'

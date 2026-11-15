@@ -31,11 +31,12 @@ never read a device's policy.
 | Stored RIR above 4 | as RIR 4 | as RIR 4 | yes |
 | Technique | no | no | no |
 | Cooldown | no | no | no |
+| Rehab | no | no | no |
 | Unknown stored label | as Unspecified | as Unspecified | yes |
 
 A session counts toward a figure when it holds at least one working set.
 
-Why: warm-ups, technique and cooldown work is logged but is not training
+Why: warm-ups, technique, cooldown, and rehab work is logged but is not training
 stimulus; groups compare people, so they use one rule nobody can tune.
 Code: `isWorkingSet`, `isVolumeSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; defaults and the fixed group and coaching rule (`SHARED_EFFORT_POLICY`) in `apps/mobile/src/exercise-calculations/effort-policy.ts`; groups read the `working` flag from `apps/mobile/src/groups/set-facts.ts`.
 
@@ -58,8 +59,8 @@ row's real 1RM and Volume describe that row only; [[set.eligibility]] decides
 which sets can be records, never what a row shows. The only highlights on a set
 list are the session's record sets (`docs/specs/tech/training-metrics-contract.md`
 §3). The group session view highlights instead the set that took #1 on a group
-1RM board: one `#1 in group` band per set.
-In a shared group session, normalized Weight is effective total load as `%BW`;
+1RM board: one `GR` band per set.
+In a shared group session, normalized Weight is added load as `%BW`;
 ordinary and personal Weight retain their existing meaning.
 
 Why: the row is a record of what was lifted; eligibility decides what counts,

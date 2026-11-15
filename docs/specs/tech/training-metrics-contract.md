@@ -27,12 +27,12 @@ coaching: [[set.eligibility]].
   negatives are not. The input fields' validation, the performed check and
   every calculation all call it.
 - **Personal effort policy** ([[set.eligibility]] gives its defaults):
-  Settings has fixed Warm-up, Unspecified, RIR-4 through RIR-0, Technique and
-  Cooldown rows, with independent Display, Working set and Volume columns.
-  All labels default displayed. At least one Display choice is required;
-  either calculation column may be empty. Hidden labels can contribute, and
-  visible labels can be excluded. Recorded labels stay intact and do not
-  become selectable options.
+  Settings has fixed Warm-up, Unspecified, RIR-4 through RIR-0, Technique,
+  Cooldown and Rehab rows, with independent Display, Working set and Volume columns.
+  By default, 'Rehab' effort sets are excluded from 1RM estimation, Weight records,
+  and working set volume ([[set.eligibility]]). All labels default displayed; at least
+  one is required. Either calculation column may be empty. Hidden labels can contribute;
+  visible labels can be excluded. Recorded labels stay intact and do not become selectable.
 - **Scope**: these choices are account-local on this device. Personal adapters
   pass the durable active policy explicitly to the kernel. Groups and coaching
   receive no device policy: the kernel's default, `SHARED_EFFORT_POLICY`
@@ -72,13 +72,13 @@ strength record, comparison baseline or `Last` date. It may still contribute to
 volume totals, volume heatmap cells and Volume records when it has a
 volume-included set. A scope with neither kind contributes nothing.
 
-**The workout in progress.** Progress's tables, `/progress-history` and
-Today's week and period also count the most recent active, non-deleted session,
-independently of the workout explicitly opened in Train, dated
-the instant before the read: where finishing it now would date it. It takes no
-PR until completed. Lists (the week drill-down, Sessions, Today's session
-card), records, the catalogue, groups and coaching read completed sessions
-only (`apps/mobile/src/data/in-progress-session.ts`).
+**The workout in progress.** Progress tables, `/progress-history` and
+Today's week/period include the newest active, non-deleted workout, dated just
+before now as if finished. Train may hold another explicitly opened workout.
+It earns no PRs until completion. Chart day/week details show its performed
+sets; its card opens Train. Timeline cards, Sessions, Today's session card,
+records, the catalogue, groups and coaching read completed sessions only
+(`apps/mobile/src/data/in-progress-session.ts`).
 
 **Code.**
 
@@ -156,9 +156,8 @@ sets. There are three kinds:
   record itself. A tie never takes a record, so a record tied across sessions
   belongs to the earliest session.
 - **Zero.** A zero 1RM ([[1rm.formula]]), Weight or Volume is never a record,
-  never a baseline and never ranks. Nothing beats a zero, and a zero beats nothing. An
-  Volume that left out sets whose load cannot be calculated competes like
-  any other (§4); one whose sum is not finite has no value.
+  baseline, or rank. Nothing beats a zero, and a zero beats nothing. Volume
+  leaving out uncalculable sets competes normally (§4); non-finite sums have no value.
 - **Scope.** Which sessions a record is taken over, per exercise split per
   gym or not, is [[gym.split]]. `reportingBucket`
   (`exercise-calculations/gym-bucket.ts`) is its one implementation: it names
@@ -174,8 +173,8 @@ sets. There are three kinds:
 - **A session's PRs** are one per record kind each exercise took, so one
   exercise adds up to three (1RM, Weight and Volume). Every screen that counts
   a session's PRs, or PRs over a period, counts these
-  (`sessionRecordKinds`). A group session's count is its group records, one
-  per board taken (`tech/groups-contract.md`).
+  (`sessionRecordKinds`). A group session counts boards taken #1 as `GR`,
+  other new bests as PRs (`tech/groups-contract.md`).
 - **The record set of a session** is the one set the share image lists for an
   exercise. Among the session's working sets of the exercise,
   across every block, it is the highest 1RM that beats the 1RM record. When no
@@ -307,7 +306,7 @@ total stays a count of physical sets.
 It allocates raw Volume before re-keying entries to muscles
 ([[muscle.report-groups]]) and dropping untracked entries
 ([[muscle.untracked]]). Merged entries combine as [[muscle.set-count]]
-says; the strongest role labels the result. A merged muscle takes its anchor's id;
+says; the strongest role labels the result. A combined muscle takes its own key as id;
 Detailed is the identity. Exercise figures never read it.
 
 `computeProgressComparisons` (`src/data/stats.ts`) loads one local graph and

@@ -1,5 +1,9 @@
+import { StyleSheet, View } from 'react-native';
+
 import { ExerciseSetsCard } from '@/components/session-detail';
 import { Icon } from '@/components/ui/icon';
+import { InjuryBadge } from '@/components/injuries/injury-badge';
+import { uiSpace } from '@/components/ui/tokens';
 import type { SessionViewExerciseCard } from '@/src/session-recorder/session-view-model';
 
 type SessionExerciseCardProps = {
@@ -13,16 +17,29 @@ type SessionExerciseCardProps = {
 export function SessionExerciseCard({ card, onPress }: SessionExerciseCardProps) {
   const label = [
     card.name,
+    card.injuryWarning ? `Injury warning ${card.injuryWarning}` : null,
     `${card.doneCount} of ${card.totalCount} sets done`,
     ...card.record.map((line) => line.spoken),
   ]
     .filter(Boolean)
     .join(', ');
 
+  const accessory = (
+    <View style={styles.accessory}>
+      {card.injuryWarning ? (
+        <InjuryBadge
+          severity={card.injuryWarning}
+          testID={`session-view-exercise-${card.id}-injury-badge`}
+        />
+      ) : null}
+      {onPress ? <Icon colorRole="inkFaint" name="chevron-right" size="sm" /> : null}
+    </View>
+  );
+
   return (
     <ExerciseSetsCard
       accessibilityLabel={label}
-      accessory={onPress ? <Icon colorRole="inkFaint" name="chevron-right" size="sm" /> : undefined}
+      accessory={accessory}
       count={`${card.doneCount}/${card.totalCount}`}
       countMuted={card.doneCount === 0}
       name={card.name}
@@ -33,3 +50,11 @@ export function SessionExerciseCard({ card, onPress }: SessionExerciseCardProps)
     />
   );
 }
+
+const styles = StyleSheet.create({
+  accessory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.xs,
+  },
+});

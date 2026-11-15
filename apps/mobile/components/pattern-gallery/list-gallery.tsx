@@ -5,7 +5,7 @@ import { GroupHomeBoard } from '@/components/groups/group-home-board';
 import { GroupGlancePage } from '@/components/groups/group-glance-page';
 import { TodayGroupHeader } from '@/components/today/group-header';
 import { TodayWeekBoardCard } from '@/components/today/today-week-board';
-import { TodayCoWSummarySection } from '@/components/today/group-cow-summary';
+import { TodayCoWCard } from '@/components/today/group-cow-summary';
 import { buildGroupHomeBoard } from '@/src/groups/home-view-model';
 import type { GroupHomeMetric } from '@/src/groups/home-periods';
 import { GroupApiError } from '@/src/groups/api';
@@ -49,12 +49,13 @@ export function ListGallery({ initialSample, initialState, initialLong = false, 
     </View> : <>
       <GroupHomeBoard board={board} metric={metric} title="Top brothers" />
       <TodayWeekBoardCard board={listGalleryWeekBoard(state, long)} range="26 Oct – 1 Nov 26" accessibilityRange="26-10-2026 – 01-11-2026"
-        challenges={sample === 'actions' ? <TodayCoWSummarySection resource={{ data: cowSummary(), lastUpdatedAtMs: LIST_GALLERY_NOW.getTime(),
-          hydrated: true, refreshing: false, offline: false, error: null, lostAccess: false, refresh: async () => {} }}
-          previous={false} dateFormat="DD-MM-YYYY" onOpen={() => setAction('Current CoW')} onRetry={() => setAction('CoW Retry')} /> : null}
         onOpenGroup={() => setAction(`Board · ${group}`)} header={<TodayGroupHeader
           groupName={groups.find(item => item.groupId === group)!.name} groups={groups} selectedGroupId={group}
           onSelectGroup={id => { setGroup(id); setAction(`Group · ${id}`); }} onOpenHome={() => setAction(`Group home · ${group}`)} />} />
+      {sample === 'actions' ? <TodayCoWCard resource={{ data: cowSummary(), lastUpdatedAtMs: LIST_GALLERY_NOW.getTime(),
+        hydrated: true, refreshing: false, offline: false, error: null, lostAccess: false, refresh: async () => {} }}
+        previous={false} dateFormat="DD-MM-YYYY" userId="me" onEarlier={() => setAction('Last week CoW')}
+        onOpen={() => setAction('Current CoW')} onRetry={() => setAction('CoW Retry')} /> : null}
     </>}
     {action ? <Notice live message={action} testID="list-gallery-action" /> : null}
   </ScreenScroll>;

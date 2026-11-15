@@ -1,3 +1,4 @@
+import { BROAD_COMBINED_MUSCLES } from '@/src/data/combined-muscles';
 /**
  * The exercise editor page on its own: its sections (Groups, Muscles, Weight,
  * Options), how an existing exercise's mappings become the primary and
@@ -82,7 +83,7 @@ const catalog = (over: Partial<ExerciseCatalogCacheSnapshot> = {}): ExerciseCata
   exercises: [],
   muscleGroups: MUSCLES,
   muscleGroupsById: Object.fromEntries(MUSCLES.map((muscle) => [muscle.id, muscle])),
-  muscleSetup: buildMuscleSetup(MUSCLES),
+  muscleSetup: buildMuscleSetup(MUSCLES, null),
   lastError: null,
   ...over,
 });
@@ -616,7 +617,7 @@ describe('muscle picker sheets', () => {
   });
 
   it('says when there is no muscle group to pick', () => {
-    mockCatalog = catalog({ muscleGroups: [], muscleGroupsById: {}, muscleSetup: buildMuscleSetup([]) });
+    mockCatalog = catalog({ muscleGroups: [], muscleGroupsById: {}, muscleSetup: buildMuscleSetup([], null) });
     renderEditor();
     fireEvent.press(primaryRow());
     expect(screen.getByText('No muscles to choose from.')).toBeOnTheScreen();
@@ -628,7 +629,7 @@ describe("under Broad: the user's muscles ([[muscle.no-breakdown]])", () => {
   const broadCatalog = () => catalog({
     muscleGroups: BROAD_ROWS,
     muscleGroupsById: Object.fromEntries(BROAD_ROWS.map((muscle) => [muscle.id, muscle])),
-    muscleSetup: buildMuscleSetup(BROAD_ROWS),
+    muscleSetup: buildMuscleSetup(BROAD_ROWS, BROAD_COMBINED_MUSCLES),
   });
   const squat = () => exercise({
     name: 'Back Squat',
@@ -695,7 +696,7 @@ describe("under Broad: the user's muscles ([[muscle.no-breakdown]])", () => {
         { id: 'h', muscleGroupId: 'hamstrings', weight: 0.5, role: 'secondary' },
       ],
     });
-    mockCatalog = catalog({ muscleGroups: detailedRows, muscleSetup: buildMuscleSetup(detailedRows) });
+    mockCatalog = catalog({ muscleGroups: detailedRows, muscleSetup: buildMuscleSetup(detailedRows, null) });
     const view = renderEditor({ editing });
     fireEvent.press(secondaryRow());
     fireEvent.press(screen.getByLabelText('Secondary muscle Hamstrings'));

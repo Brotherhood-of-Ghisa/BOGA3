@@ -393,7 +393,7 @@ describe('exercise session facts — rules version', () => {
   // kernel (1RM formula, set eligibility, working-set rule). If this test
   // fails, a rule changed: bump the version, then update the literals.
   it('pins the derived values the current rules version stands for', () => {
-    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(9);
+    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(10);
     expect(summarizeFactSession(DEFINITION, session('per-side', 1, [
       block('side', 0, [['10', '8']], ordinaryLoadContext('per_side_load')),
     ]))).toMatchObject({ volumeKg: 160, topWeightKg: 10, bestE1rmKg: estimateOneRepMax(10, 8), workingSets: 1 });
@@ -409,6 +409,8 @@ describe('exercise session facts — rules version', () => {
       // rest can take the Volume record ([[copy.no-inline-explanation]]).
       // Version 9: every row names its own record book (unsplit: `all`) and
       // keeps that book's flags beside the whole exercise's.
+      // Version 10: rehab effort classification; sets tagged 'rehab' are excluded
+      // from working and volume eligibility.
       session('s6', 6, [block('f1', 0, [['130', '10', 'rir_2']]), block('f2', 1, [['50', '5', 'rir_2']], corrupt)]),
     ]);
 
@@ -448,5 +450,14 @@ describe('exercise session facts — rules version', () => {
         ownPrE1rm: true, ownPrWeight: true, ownPrVolume: true,
       },
     ]);
+  });
+
+  it('excludes rehab sets from facts and PR records', () => {
+    const s1 = session('s1', 1, [block('a1', 0, [['100', '5', 'rir_1']])]);
+    const s2Rehab = session('s2', 2, [block('b1', 0, [['40', '10', 'rehab']])]);
+    expect(summarizeFactSession(DEFINITION, s2Rehab)).toBeNull();
+    const rows = deriveExerciseSessionFacts(DEFINITION, [s1, s2Rehab]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].sessionId).toBe('s1');
   });
 });

@@ -38,7 +38,8 @@ import {
 import { normalizeSessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 import { calendarWeekBounds, shiftCalendarWeeks } from '@/src/utils/calendar-weeks';
 import { aggregateProgressComparisons, type ProgressMuscleComparison } from './progress-comparisons';
-import { buildMuscleReportAssignment } from './muscle-report-presets';
+import { buildMuscleReportAssignment } from './combined-muscles';
+import { selectStoredCombinedMuscles } from './muscle-report-settings';
 
 export type StatsPeriodDays = 7 | 30 | 90 | 365;
 
@@ -439,7 +440,7 @@ export const createDrizzleStatsStore = (): StatsStore => ({
         })),
         muscleMappings: muscleMappingRows,
         muscleGroups: muscleGroupRows.map(({ id, displayName, familyName, sortOrder }) => ({ id, displayName, familyName, sortOrder })),
-        muscleReport: buildMuscleReportAssignment(muscleGroupRows),
+        muscleReport: buildMuscleReportAssignment(muscleGroupRows, selectStoredCombinedMuscles(database)),
       };
     });
   },

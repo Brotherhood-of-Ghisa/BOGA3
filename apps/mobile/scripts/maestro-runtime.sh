@@ -75,13 +75,16 @@ maestro_urlencode() {
 # same on iOS and Android, so both launchers share it.
 maestro_development_client_url() {
   local port="$1"
+  local platform="${2:-}"
   local scheme
   local dev_client_scheme
   local bundle_url
 
   scheme="$(maestro_current_app_scheme)"
   [[ -n "$scheme" ]] || maestro_fail "Unable to resolve Expo app scheme from $APP_DIR/app.config.ts."
-  if [[ "$scheme" == exp+* ]]; then
+  if [[ "$platform" == "android" ]]; then
+    dev_client_scheme="$scheme"
+  elif [[ "$scheme" == exp+* ]]; then
     dev_client_scheme="$scheme"
   else
     dev_client_scheme="exp+$scheme"

@@ -1,8 +1,9 @@
 import { MAX_SET_REPS, parseSetWeight } from '../../../apps/mobile/src/exercise-calculations/parse.ts';
 import { SESSION_SET_TYPES } from '../../../apps/mobile/src/data/set-types.ts';
+import { strictInstantMs } from './activities.ts';
 
 type ObjectValue = Record<string, unknown>;
-export type WorkoutOperation = 'start_workout' | 'log_sets' | 'update_set' | 'delete_set' | 'finish_workout';
+export type WorkoutOperation = 'create_workout' | 'start_workout' | 'log_sets' | 'update_set' | 'delete_set' | 'finish_workout';
 
 export class WorkoutInputError extends Error {}
 
@@ -37,6 +38,17 @@ function performedSet(value: unknown): ObjectValue {
 
 /** Strict normalized input also gives retries a stable hash independent of JSON key order. */
 export function normalizeWorkoutInput(operation: WorkoutOperation, value: unknown): ObjectValue {
+  if (operation === 'create_workout') {
+    const body = object(value, ['gym_id', 'started_at', 'completed_at']);
+    const startedAt = typeof body.started_at === 'string' ? strictInstantMs(body.started_at) : NaN;
+    const completedAt = typeof body.completed_at === 'string' ? strictInstantMs(body.completed_at) : NaN;
+    if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt) || startedAt > completedAt || completedAt > Date.now()
+      || Math.floor((completedAt - startedAt) / 1000) > 2147483647) {
+      throw new WorkoutInputError('Supply ISO 8601 start/end times with explicit time zones, start <= end <= now and a duration within 2147483647 seconds.');
+    }
+    return { gym_id: body.gym_id === null || body.gym_id === undefined ? null : id(body.gym_id, 'gym_id'),
+      started_at: startedAt, completed_at: completedAt };
+  }
   if (operation === 'start_workout') {
     const body = object(value, ['gym_id']);
     return { gym_id: body.gym_id === null || body.gym_id === undefined ? null : id(body.gym_id, 'gym_id') };

@@ -878,6 +878,9 @@ source "${SUPABASE_DIR}/tests/sync-session-plan-contract.sh"
 # shellcheck source=sync-routine-contract.sh
 source "${SUPABASE_DIR}/tests/sync-routine-contract.sh"
 
+# shellcheck source=sync-injury-contract.sh
+source "${SUPABASE_DIR}/tests/sync-injury-contract.sh"
+
 echo "[sync-push] cleanup"
 service_delete "exercise_sets" "owner_user_id=eq.${USER_A_UUID}&id=like.push-set-%-${RUN_TAG}"
 service_delete "session_exercises" "owner_user_id=eq.${USER_A_UUID}&id=like.push-sx-%-${RUN_TAG}"

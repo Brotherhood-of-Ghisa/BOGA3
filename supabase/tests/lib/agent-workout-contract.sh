@@ -7,6 +7,8 @@ agent_get 'workouts/active'
 assert_status 403 'workout permission defaults off independently of plan access'
 agent_post 'workouts/start' '{}' "${RUN_TAG}-workout-denied"
 assert_status 403 'plan access cannot start a workout'
+agent_post 'workouts/create' '{"started_at":"2000-01-01T00:00:00Z","completed_at":"2000-01-01T01:00:00Z"}' "${RUN_TAG}-dated-denied"
+assert_status 403 'dated creation requires the separate workout grant'
 
 # The owner app controls this permission; OAuth clients cannot grant themselves access.
 WORKOUT_GRANT="$(fetch_grant_granted_at)"
@@ -127,6 +129,7 @@ select (select count(*) from public.agent_plan_write_receipts where idempotency_
 [[ "${WORKOUT_ATOMIC_RESULT}" == '0:4' ]] || fail 'failed batch left partial sets or a success receipt'
 
 source "${SUPABASE_DIR}/tests/lib/agent-workout-control.sh"
+source "${SUPABASE_DIR}/tests/lib/agent-dated-workout-contract.sh"
 
 WORKOUT_DELETE_BODY="$(jq -nc --arg sid "${WORKOUT_ID}" --arg rev "${WORKOUT_REV}" --arg set "${WORKOUT_SET}" \
   '{session_id:$sid,expected_revision:$rev,set_id:$set}')"
@@ -144,6 +147,9 @@ agent_post 'workouts/log-sets' "$(workout_log_body)" "${RUN_TAG}-workout-finishe
 assert_status 409 'finished history cannot receive new sets'
 agent_post 'workouts/update-set' "${WORKOUT_EDIT_BODY}" "${RUN_TAG}-workout-finished-edit"
 assert_status 409 'finished history cannot be corrected'
+agent_post 'workouts/start' "${WORKOUT_START_BODY}" "${RUN_TAG}-workout-start"
+assert_status 200 'accepted live start receipt remains recoverable after finish'
+jq -e '(.data.control.can_edit|not) and .data.idempotent_replay' <<<"${RESPONSE_BODY}" >/dev/null || fail 'live finish replay revived control'
 
 # Both SQL sessions contend for the same owner lock. Exactly one operation may commit.
 WORKOUT_RACE_DIR="$(mktemp -d)"

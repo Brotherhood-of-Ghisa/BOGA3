@@ -615,6 +615,7 @@ describe('ExercisePageScreen', () => {
   it.each([
     ['technique', 'Technique', 'Tech'],
     ['cooldown', 'Cooldown', 'CD'],
+    ['rehab', 'Rehab', 'Rehab'],
   ])('shows a compact %s label in the logger and keeps its full accessible and picker names', async (setType, fullLabel, compactLabel) => {
     await openPage();
     fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
@@ -629,7 +630,7 @@ describe('ExercisePageScreen', () => {
 
   it('cycles effort in descending RIR order, including blank, and persists the selection', async () => {
     await openPage();
-    for (const label of ['RIR 0', 'Technique', 'Cooldown', 'W-Up', 'none', 'RIR 4', 'RIR 3', 'RIR 2', 'RIR 1']) {
+    for (const label of ['RIR 0', 'Technique', 'Cooldown', 'Rehab', 'W-Up', 'none', 'RIR 4', 'RIR 3', 'RIR 2', 'RIR 1']) {
       fireEvent.press(screen.getByTestId('exercise-set-logger-effort'));
       expect(screen.getByLabelText(`Change effort, currently ${label}`)).toBeTruthy();
     }
@@ -956,6 +957,35 @@ describe('ExercisePageScreen', () => {
       expect(mockRouter.push).toHaveBeenCalledWith(`/exercise-link?exerciseDefinitionId=${BENCH_DEF}`)
     );
     expect((await benchSets())[2]).toMatchObject({ weightValue: '90' });
+  });
+
+  it('lists Notes right after Exercise history and opens this exercise\'s notes, pending edits written first', async () => {
+    await openPage();
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '90');
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    const sheet = await screen.findByTestId('exercise-options-sheet');
+    const rowIds = sheet
+      .findAll((node) => typeof node.props.testID === 'string' && /^exercise-options-[a-z-]+$/.test(node.props.testID) && node.props.testID !== 'exercise-options-sheet', { deep: true })
+      .map((node) => node.props.testID as string)
+      .filter((id, index, ids) => ids.indexOf(id) === index);
+    expect(rowIds.indexOf('exercise-options-notes')).toBe(rowIds.indexOf('exercise-options-history') + 1);
+
+    fireEvent.press(within(sheet).getByTestId('exercise-options-notes'));
+
+    await waitFor(() => expect(mockRouter.push).toHaveBeenCalledWith(`/notes?exerciseId=${BENCH_DEF}`));
+    expect(screen.queryByTestId('exercise-options-sheet')).toBeNull();
+    expect((await benchSets())[2]).toMatchObject({ weightValue: '90' });
+  });
+
+  it('opens injury editor sheet from Exercise options with pre-filled exercise context', async () => {
+    await openPage();
+    fireEvent.press(screen.getByTestId('exercise-page-options'));
+    const sheet = await screen.findByTestId('exercise-options-sheet');
+    fireEvent.press(within(sheet).getByTestId('exercise-options-report-injury'));
+
+    const injurySheet = await screen.findByTestId('exercise-page-injury-sheet');
+    expect(injurySheet).toBeTruthy();
+    expect(screen.getByDisplayValue('Barbell Bench Press')).toBeTruthy();
   });
 
   it('swaps the exercise and keeps its sets', async () => {

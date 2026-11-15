@@ -12,7 +12,7 @@ Writers must echo the revision their editor loaded, including graph rewrites, re
 An importer starts at zero; it must never attach today's revision to an older package.
 
 `public.exercise_merge_operations`, `public.exercise_merge_contexts` and
-`public.exercise_merge_conflicts` are **out of the seventeen-table mirror**.
+`public.exercise_merge_conflicts` are **out of the eighteen-table mirror**.
 They are owner-private server control/recovery storage, reached only through authenticated app RPCs.
 No direct table grants; RLS enabled; OAuth `client_id` requests denied.
 Receipts keep input hashes and counts, contexts keep immutable conversion factors, and unresolved
@@ -72,6 +72,13 @@ load [the workout handoff contract](agent-workout-contract.md).
 The client stages an exhaustive, token-fenced snapshot of affected sessions and required ancestors
 in durable pages, including Routine use ancestors before performed rows. Same-slot use repair commits with snapshot installation; losing work survives. Repeated uses never clear ordinary provenance. A changed token restarts staging; interruption resumes from its last page.
 Ordinary pulls retain the complete old context until the snapshot is ready.
+Snapshot rows and review items of entity types the build does not know are skipped,
+yet still count toward paging, so a page of only unknown rows advances; malformed rows still fail.
+Builds before this rule throw on an unknown snapshot type, so a new table stays out of
+`exercise_merge_snapshot` until the oldest supported build skips them. Until then its rows reach
+clients only through `sync_pull`: a merge that repoints them must raise their
+`client_updated_at_ms` so the re-pull applies.
+Training notes are such a table ([`training-notes-contract.md`](training-notes-contract.md)).
 One SQLite transaction preserves stale dirty rows, replaces the complete canonical context,
 and restores valid unsent additions with collision-safe slots.
 Edits made while fetching are captured again at apply time. Future-clock stale rows are still fenced.

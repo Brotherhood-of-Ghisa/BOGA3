@@ -25,8 +25,19 @@ it.each([0, 6, 123456])('keeps both WeekFigure metrics, existing comparison bars
   render(<SummaryTile title="Group stats" metrics={<GroupWeekTotalsFigures current={{ sets: current, prs: current }} previous={{ sets: 152, prs: 4 }} offset={0} />} />);
   for (const metric of ['sets', 'prs']) expect(screen.getByTestId(`group-week-totals-${metric}-value`)).toHaveTextContent(String(current));
   expect(screen.getByTestId('group-week-totals-sets-previous')).toHaveTextContent('vs 152 last wk');
-  expect(screen.getByTestId('group-week-totals-prs').props.accessibilityLabel).toBe(`PRs ${current}, vs 4 last week`);
+  expect(screen.getByTestId('group-week-totals-prs').props.accessibilityLabel).toBe(`Group records ${current}, vs 4 last week`);
   expect(screen.getByTestId('group-week-totals-sets-value')).toHaveStyle(textRoles.figureHero);
+});
+
+it('ends the gallery page with the latest sessions, or the latest group records for the GR metric', () => {
+  render(<SummaryGallery review />);
+  expect(screen.getAllByTestId(/^group-latest-session-gallery-s\d$/)).toHaveLength(5);
+  expect(screen.getByTestId('group-latest-session-gallery-s0-value')).toHaveTextContent('12 sets');
+  fireEvent.press(screen.getByTestId('groups-filter-metric'));
+  expect(screen.queryByTestId('group-latest-sessions-card')).toBeNull();
+  expect(screen.getAllByTestId(/^group-latest-record-gallery-gr-\d$/).map(row => row.props.testID))
+    .toEqual([0, 2, 4].map(index => `group-latest-record-gallery-gr-${index}`));
+  expect(screen.getByTestId('group-latest-record-gallery-gr-0')).toHaveTextContent(/^Marco · Pull-up30 Oct 26/);
 });
 
 it('keeps the page metric scoped to the board/chart and the period scoped to the whole page', () => {
@@ -34,7 +45,7 @@ it('keeps the page metric scoped to the board/chart and the period scoped to the
   const totals = screen.getByTestId('group-week-totals-card');
   const before = within(totals).getByTestId('group-week-totals-sets-value').props.children;
   fireEvent.press(screen.getByTestId('groups-filter-metric'));
-  expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('PRs');
+  expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('GR');
   expect(within(totals).getByTestId('group-week-totals-sets-value').props.children).toBe(before);
   expect(within(totals).getByTestId('group-week-totals-prs-value')).toHaveTextContent('6');
   fireEvent.press(screen.getByTestId('group-home-period-earlier'));

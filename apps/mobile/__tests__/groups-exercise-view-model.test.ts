@@ -20,7 +20,7 @@ import {
   type GroupRole,
 } from '@/src/groups';
 import { SYSTEM_MUSCLE_GROUP_SEEDS } from '@/src/data/exercise-catalog-seeds';
-import { presetRowSetup } from '@/src/data/muscle-report-settings';
+import { BROAD_COMBINED_MUSCLES, broadTemplateKeyOf } from '@/src/data/combined-muscles';
 import { EMPTY_MUSCLE_SETUP, buildMuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 
 const exercise = (id: string, name: string, overrides: Partial<GroupExercise> = {}): GroupExercise => ({
@@ -182,8 +182,8 @@ describe('searchStandardExercises', () => {
   it('matches the user\'s muscles: under Broad a merged entry matches by its muscle, an untracked one not at all', () => {
     const broad = buildMuscleSetup(SYSTEM_MUSCLE_GROUP_SEEDS.map((seed) => ({
       id: seed.id, displayName: seed.displayName, familyName: seed.familyName, sortOrder: seed.sortOrder,
-      reportGroup: presetRowSetup('broad', seed.id).reportGroup ?? null, tracked: seed.id === 'calves' ? 0 : 1,
-    })));
+      reportGroup: broadTemplateKeyOf(seed.id), tracked: seed.id === 'calves' ? 0 : 1,
+    })), BROAD_COMBINED_MUSCLES);
     const ids = (query: string, muscleSetup: typeof broad) =>
       searchStandardExercises(query, muscleSetup, Infinity).options.map((option) => option.sourceExerciseId);
 

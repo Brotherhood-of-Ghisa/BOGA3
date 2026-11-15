@@ -193,6 +193,24 @@ export const generatedMigrationBundle = {
     tag: "0030_panoramic_doomsday",
     breakpoints: true,
   },
+  {
+    idx: 31,
+    when: 1794438485979,
+    tag: "0031_user_settings_combined_muscles",
+    breakpoints: true,
+  },
+  {
+    idx: 32,
+    when: 1794511402205,
+    tag: "0032_futuristic_clint_barton",
+    breakpoints: true,
+  },
+  {
+    idx: 33,
+    when: 1794518464603,
+    tag: "0033_wandering_peter_quill",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -966,6 +984,57 @@ UPDATE sync_runtime_state SET pull_cursor = '{}';
   m0029: `ALTER TABLE \`sessions\` ADD \`merge_revision\` integer DEFAULT 0 NOT NULL;`,
   m0030: `ALTER TABLE \`sessions\` ADD \`logging_client_id\` text;--> statement-breakpoint
 ALTER TABLE \`sessions\` ADD \`logging_granted_at\` text;`,
+  m0031: `ALTER TABLE \`user_settings\` ADD \`muscle_targets\` text;--> statement-breakpoint
+ALTER TABLE \`user_settings\` ADD \`combined_muscles\` text;--> statement-breakpoint
+-- A clean settings row an older build pulled reached this device without the
+-- new columns, at the server's stamp, where a replay would be a no-op. Zero its
+-- stamp so the re-pull below applies it again: the combined-muscle migration
+-- must see another device's definitions before it writes its own.
+UPDATE user_settings SET local_updated_at_ms = 0 WHERE local_dirty = 0;--> statement-breakpoint
+-- Re-pull every row once.
+UPDATE sync_runtime_state SET pull_cursor = '{}';
+`,
+  m0032: `CREATE TABLE \`training_notes\` (
+	\`id\` text PRIMARY KEY NOT NULL,
+	\`exercise_definition_id\` text,
+	\`body\` text NOT NULL,
+	\`noted_on\` text NOT NULL,
+	\`source\` text DEFAULT 'app' NOT NULL,
+	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
+	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	FOREIGN KEY (\`exercise_definition_id\`) REFERENCES \`exercise_definitions\`(\`id\`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE INDEX \`training_notes_exercise_definition_id_idx\` ON \`training_notes\` (\`exercise_definition_id\`);--> statement-breakpoint
+CREATE INDEX \`training_notes_deleted_at_idx\` ON \`training_notes\` (\`deleted_at\`);`,
+  m0033: `CREATE TABLE \`injuries\` (
+	\`id\` text PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))) NOT NULL,
+	\`muscle_group_id\` text,
+	\`side\` text,
+	\`status\` text NOT NULL,
+	\`pain_score\` integer,
+	\`label\` text NOT NULL,
+	\`notes\` text,
+	\`contraindications\` text,
+	\`started_at\` integer NOT NULL,
+	\`resolved_at\` integer,
+	\`deleted_at\` integer,
+	\`local_dirty\` integer DEFAULT false NOT NULL,
+	\`local_updated_at_ms\` integer DEFAULT 0 NOT NULL,
+	\`created_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	\`updated_at\` integer DEFAULT (unixepoch() * 1000) NOT NULL,
+	FOREIGN KEY (\`muscle_group_id\`) REFERENCES \`muscle_groups\`(\`id\`) ON UPDATE no action ON DELETE set null
+);
+--> statement-breakpoint
+CREATE INDEX \`injuries_muscle_group_id_idx\` ON \`injuries\` (\`muscle_group_id\`);--> statement-breakpoint
+CREATE INDEX \`injuries_started_at_idx\` ON \`injuries\` (\`started_at\`);--> statement-breakpoint
+CREATE INDEX \`injuries_deleted_at_idx\` ON \`injuries\` (\`deleted_at\`);--> statement-breakpoint
+-- Re-pull every layer once so existing injuries are downloaded on upgrade.
+UPDATE sync_runtime_state SET pull_cursor = '{}';
+`,
   },
 } as const;
 

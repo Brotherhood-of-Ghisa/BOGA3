@@ -101,13 +101,22 @@ const responses: Record<string, Record<string, unknown>> = {
     muscles: [{ id: 'chest_sternal', name: 'Chest', week_sets: 4.5, weekly_target: 10 }],
     targets: { default_weekly_sets: 10, mode: 'single', revision: 1_730_000_000_000, uploaded: true },
   },
+  '/functions/v1/agent-api/v1/agent/activities': {
+    activities: [{
+      activity_type: 'traditional_strength_training', duration_seconds: 3000, external_id: 'hk-1',
+      overlapping_session_id: 'workout-a', overlaps_logged_session: true, source: 'apple_health',
+      started_at: '2026-10-27T17:05:00.000Z',
+    }],
+    next_cursor: null,
+    overlap_complete: true,
+  },
   '/functions/v1/agent-api/v1/agent/muscle-targets': {
     idempotent_replay: false,
     overrides: { chest_sternal: 14 },
-    scope: 'broad',
     targets: { default_weekly_sets: 10, mode: 'per_muscle', revision: 1_730_000_000_001, uploaded: true },
   },
   '/functions/v1/agent-api/v1/agent/muscles': {
+    combined_muscles: [],
     muscles: [{ family: 'chest', id: 'chest_sternal', name: 'Chest', report_group: null, tracked: true }],
   },
   '/functions/v1/agent-api/v1/agent/exercises/exercise-a': {
@@ -220,52 +229,63 @@ afterEach(async () => {
 });
 
 describe('BoGa MCP server', () => {
-  it('discovers exactly twenty-two tools with correct annotations', async () => {
+  it('discovers exactly thirty tools with correct annotations', async () => {
     const running = await startMcp();
     active.push(running);
     const result = await running.client.listTools();
 
     expect(result.tools.map((tool) => tool.name).sort()).toEqual([
+      'add_note',
       'create_exercise',
       'create_session_plan',
       'create_training_programme',
+      'create_workout',
       'delete_exercise',
       'delete_set',
       'finish_workout',
+      'get_active_injuries',
       'get_active_workout',
       'get_exercise_context',
       'get_exercise_history',
+      'get_recent_activities',
       'get_recent_workouts',
       'get_training_profile',
       'get_training_status',
       'get_upcoming_session_plans',
       'get_workout_detail',
       'list_muscles',
+      'list_notes',
+      'log_injury',
       'log_sets',
+      'remove_note',
       'restore_exercise',
       'search_exercises',
       'set_muscle_targets',
       'start_workout',
       'update_exercise',
+      'update_injury_status',
       'update_set',
     ]);
     const readOnlyNames = new Set([
+      'get_active_injuries',
       'get_active_workout',
       'get_exercise_context',
       'get_exercise_history',
+      'get_recent_activities',
       'get_recent_workouts',
       'get_training_profile',
       'get_training_status',
       'get_upcoming_session_plans',
       'get_workout_detail',
       'list_muscles',
+      'list_notes',
       'search_exercises',
     ]);
     // The instructions count the read-only tools a client can call.
-    expect(readOnlyNames.size).toBe(10);
-    expect(running.client.getInstructions()).toContain('Ten read-only tools');
+    expect(readOnlyNames.size).toBe(13);
+    expect(running.client.getInstructions()).toContain('Thirteen read-only tools');
     // Edits, deletes and new targets replace what the person had, so clients confirm them.
-    const destructiveNames = new Set(['delete_exercise', 'set_muscle_targets', 'update_exercise', 'update_set', 'delete_set', 'finish_workout']);
+    const destructiveNames = new Set(['delete_exercise', 'set_muscle_targets', 'update_exercise', 'update_set', 'delete_set', 'finish_workout', 'remove_note']);
     for (const tool of result.tools) {
       if (destructiveNames.has(tool.name)) {
         expect(tool.annotations).toMatchObject({
@@ -299,7 +319,7 @@ describe('BoGa MCP server', () => {
       rows: [{ type: 'set', id: 'set-a', weight_kg: '80', reps: '8' }], next_cursor: 's:next' };
     const mutation = { session_id: 'workout/a', revision: graph, status: 'active', idempotent_replay: false,
       session_exercise_id: 'block-a', set_ids: ['set-a'], control: { owner: 'mcp', client_id: 'coach', can_edit: true } };
-    const running = await startMcp({ ...Object.fromEntries(['start', 'log-sets', 'update-set', 'delete-set', 'finish']
+    const running = await startMcp({ ...Object.fromEntries(['create', 'start', 'log-sets', 'update-set', 'delete-set', 'finish']
       .map(operation => [`/functions/v1/agent-api/v1/agent/workouts/${operation}`, envelopeResponse(mutation)])),
       '/functions/v1/agent-api/v1/agent/workouts/active': envelopeResponse(snapshot) });
     active.push(running);
@@ -313,6 +333,7 @@ describe('BoGa MCP server', () => {
     const common = { session_id: 'workout/a', expected_revision: graph };
     const set = { weight_kg: '80', reps: 8, set_type: 'rir_2' };
     const writes: Array<[string, string, Record<string, unknown>]> = [
+      ['create_workout', 'create', { started_at: '2026-10-25T01:30:00+01:00', completed_at: '2026-10-25T01:30:00Z' }],
       ['start_workout', 'start', { gym_id: null }],
       ['log_sets', 'log-sets', { ...common, exercise_id: 'exercise-a', sets: [set] }],
       ['log_sets', 'log-sets', { ...common, session_exercise_id: 'block-a', sets: [set, set] }],
@@ -335,6 +356,8 @@ describe('BoGa MCP server', () => {
   it.each([
     ['start_workout', { idempotency_key: 'key', owner_user_id: 'another' }],
     ['start_workout', { idempotency_key: 'bad\nheader' }],
+    ['create_workout', { idempotency_key: 'key', started_at: 1, completed_at: '2026-10-25T01:30:00Z' }],
+    ['create_workout', { idempotency_key: 'key', started_at: '2026-10-25T01:30:00Z' }],
     ['log_sets', { sets: [{ weight_kg: '80', reps: 8 }] }],
     ['log_sets', { exercise_id: 'e', session_exercise_id: 'b', sets: [{ weight_kg: '80', reps: 8 }] }],
     ['log_sets', { exercise_id: 'e', sets: [] }],
@@ -352,7 +375,7 @@ describe('BoGa MCP server', () => {
     ['get_active_workout', { owner_user_id: 'another' }],
   ])('rejects invalid %s input without a workout API request', async (name, patch) => {
     const running = await startMcp(); active.push(running);
-    const input = name === 'start_workout' || name === 'get_active_workout' ? patch : {
+    const input = name === 'create_workout' || name === 'start_workout' || name === 'get_active_workout' ? patch : {
       session_id: 's', expected_revision: 'a'.repeat(32), idempotency_key: 'key', ...patch,
     };
     const result = await running.client.callTool({ name, arguments: input });
@@ -401,6 +424,10 @@ describe('BoGa MCP server', () => {
       name: 'get_workout_detail',
     });
     const status = await running.client.callTool({ arguments: {}, name: 'get_training_status' });
+    const activities = await running.client.callTool({
+      arguments: { from: '2026-10-01T00:00:00Z', limit: 5, to: '2026-11-01T00:00:00Z' },
+      name: 'get_recent_activities',
+    });
     const plans = await running.client.callTool({
       arguments: { include_unscheduled: true, limit: 5 },
       name: 'get_upcoming_session_plans',
@@ -450,6 +477,9 @@ describe('BoGa MCP server', () => {
     expect(status.structuredContent).toEqual(responses[
       '/functions/v1/agent-api/v1/agent/training-status'
     ]);
+    expect(activities.structuredContent).toEqual(responses[
+      '/functions/v1/agent-api/v1/agent/activities'
+    ]);
     expect(plans.structuredContent).toEqual(responses[
       '/functions/v1/agent-api/v1/agent/session-plans'
     ]);
@@ -471,6 +501,9 @@ describe('BoGa MCP server', () => {
       'GET /functions/v1/agent-api/v1/agent/workouts/recent?limit=4',
     );
     expect(called).toContain('GET /functions/v1/agent-api/v1/agent/training-status');
+    expect(called).toContain(
+      'GET /functions/v1/agent-api/v1/agent/activities?from=2026-10-01T00%3A00%3A00Z&limit=5&to=2026-11-01T00%3A00%3A00Z',
+    );
     expect(called).toContain(
       'GET /functions/v1/agent-api/v1/agent/exercises/exercise-a/history?limit=10',
     );
@@ -593,6 +626,193 @@ describe('BoGa MCP server', () => {
       path: 'muscle-targets',
       type: 'application/json',
     }]);
+  });
+
+  it('translates the note tools into the notes routes, forwarding idempotency keys', async () => {
+    const note = {
+      body: 'Squat to a bench', created_at: '2026-11-12T09:00:00.000Z', exercise_id: 'exercise-a',
+      exercise_name: 'Back Squat', id: 'note-1', noted_on: '2026-11-12', source: 'agent',
+    };
+    const notesPath = '/functions/v1/agent-api/v1/agent/notes';
+    const listed = { next_cursor: null, notes: [note] };
+    const running = await startMcp({
+      [notesPath]: envelopeResponse(listed),
+      [`${notesPath}/note%2F1/remove`]: envelopeResponse({ idempotent_replay: false, note_id: 'note/1', removed: true }),
+    });
+    active.push(running);
+
+    const list = await running.client.callTool({
+      arguments: { exercise_id: 'exercise-a', from: '2026-11-01', limit: 5, to: '2026-11-12' },
+      name: 'list_notes',
+    });
+    await running.client.callTool({
+      arguments: { body: '  Squat to a bench  ', exercise_id: 'exercise-a', idempotency_key: 'note-add-1', noted_on: '2026-11-12' },
+      name: 'add_note',
+    });
+    await running.client.callTool({ arguments: { body: 'Shoulder sore', idempotency_key: 'note-add-2' }, name: 'add_note' });
+    const removed = await running.client.callTool({
+      arguments: { idempotency_key: 'note-remove-1', note_id: 'note/1' },
+      name: 'remove_note',
+    });
+
+    expect(list.structuredContent).toEqual(listed);
+    expect(removed.structuredContent).toEqual({ idempotent_replay: false, note_id: 'note/1', removed: true });
+    expect(running.requests.map((r) => `${r.method} ${r.url.pathname}${r.url.search}`)).toContain(
+      'GET /functions/v1/agent-api/v1/agent/notes?exercise_id=exercise-a&from=2026-11-01&limit=5&to=2026-11-12',
+    );
+    expect(running.requests.filter((r) => r.method === 'POST').map((r) => ({
+      body: JSON.parse(r.body ?? '{}') as unknown,
+      key: r.headers.get('idempotency-key'),
+      path: r.url.pathname.replace('/functions/v1/agent-api/v1/agent/', ''),
+    }))).toEqual([
+      { body: { body: 'Squat to a bench', exercise_id: 'exercise-a', noted_on: '2026-11-12' }, key: 'note-add-1', path: 'notes' },
+      { body: { body: 'Shoulder sore' }, key: 'note-add-2', path: 'notes' },
+      { body: {}, key: 'note-remove-1', path: 'notes/note%2F1/remove' },
+    ]);
+  });
+
+  it('translates injury tools into the injuries routes, forwarding idempotency keys', async () => {
+    const injury = {
+      contraindications: 'Deep back squats',
+      created_at: '2026-11-10T10:00:00.000Z',
+      id: 'injury-1',
+      label: 'Patellar tendon irritation',
+      muscle_group_id: 'quads',
+      muscle_group_name: 'Quads',
+      notes: 'Sharp pain on deep knee flexion',
+      pain_score: 7,
+      resolved_at: null,
+      side: 'right',
+      started_at: '2026-11-10T10:00:00.000Z',
+      status: 'acute',
+      updated_at: '2026-11-10T10:00:00.000Z',
+    };
+    const injuriesPath = '/functions/v1/agent-api/v1/agent/injuries';
+    const listed = { injuries: [injury], next_cursor: null };
+    const running = await startMcp({
+      [injuriesPath]: envelopeResponse(listed),
+      [`${injuriesPath}/injury-1`]: envelopeResponse({
+        idempotent_replay: false,
+        injury: { ...injury, pain_score: 3, status: 'managing' },
+      }),
+    });
+    active.push(running);
+
+    const list = await running.client.callTool({
+      arguments: { include_resolved: true, limit: 10 },
+      name: 'get_active_injuries',
+    });
+    expect(list.structuredContent).toEqual(listed);
+
+    await running.client.callTool({
+      arguments: {
+        idempotency_key: 'inj-log-1',
+        injury: {
+          contraindications: 'Deep back squats',
+          label: 'Patellar tendon irritation',
+          muscle_group_id: 'quads',
+          notes: 'Sharp pain on deep knee flexion',
+          pain_score: 7,
+          side: 'right',
+          started_at: '2026-11-10',
+          status: 'acute',
+        },
+      },
+      name: 'log_injury',
+    });
+
+    const updated = await running.client.callTool({
+      arguments: {
+        changes: {
+          pain_score: 3,
+          status: 'managing',
+        },
+        idempotency_key: 'inj-update-1',
+        injury_id: 'injury-1',
+      },
+      name: 'update_injury_status',
+    });
+    expect(updated.structuredContent).toEqual({
+      idempotent_replay: false,
+      injury: { ...injury, pain_score: 3, status: 'managing' },
+    });
+
+    const posts = running.requests.filter((r) => r.method === 'POST' && r.url.pathname === injuriesPath);
+    expect(posts).toHaveLength(1);
+    expect(posts[0].headers.get('idempotency-key')).toBe('inj-log-1');
+    expect(JSON.parse(posts[0].body ?? '{}')).toEqual({
+      contraindications: 'Deep back squats',
+      label: 'Patellar tendon irritation',
+      muscle_group_id: 'quads',
+      notes: 'Sharp pain on deep knee flexion',
+      pain_score: 7,
+      side: 'right',
+      started_at: '2026-11-10',
+      status: 'acute',
+    });
+
+    const patches = running.requests.filter((r) => r.method === 'PATCH');
+    expect(patches).toHaveLength(1);
+    expect(patches[0].url.pathname).toBe(`${injuriesPath}/injury-1`);
+    expect(patches[0].headers.get('idempotency-key')).toBe('inj-update-1');
+    expect(JSON.parse(patches[0].body ?? '{}')).toEqual({
+      pain_score: 3,
+      status: 'managing',
+    });
+  });
+
+  it('rejects log_injury with malformed started_at', async () => {
+    const running = await startMcp();
+    active.push(running);
+    const before = running.requests.length;
+    const result = await running.client.callTool({
+      arguments: {
+        idempotency_key: 'inj-bad-date',
+        injury: {
+          label: 'Elbow strain',
+          started_at: 'not-a-date',
+        },
+      },
+      name: 'log_injury',
+    });
+    expect(result.isError).toBe(true);
+    expect(running.requests.slice(before).filter((r) => r.method === 'POST')).toHaveLength(0);
+  });
+
+  it.each([
+    [{ body: '   ' }],
+    [{ body: 'x'.repeat(1001) }],
+    [{ body: 'ok', exercise_id: '' }],
+    [{ body: 'ok', source: 'agent' }],
+    [{ body: 'ok', omitKey: true }],
+  ])('rejects add_note %j before calling the API', async (input) => {
+    const running = await startMcp();
+    active.push(running);
+    const before = running.requests.length;
+    const { omitKey, ...fields } = input as Record<string, unknown>;
+    const result = await running.client.callTool({
+      arguments: { ...(omitKey ? {} : { idempotency_key: 'note-bad' }), ...fields },
+      name: 'add_note',
+    });
+    expect(result.isError).toBe(true);
+    expect(running.requests.slice(before).filter((r) => r.method === 'POST')).toHaveLength(0);
+  });
+
+  it('tells the coach notes are untrusted, dated from noted_on, soft-removed and need Make changes', async () => {
+    const running = await startMcp();
+    active.push(running);
+
+    const { tools } = await running.client.listTools();
+    const descriptionOf = (name: string) => tools.find((tool) => tool.name === name)?.description ?? '';
+    for (const name of ['list_notes', 'get_exercise_context', 'get_training_status']) {
+      expect(descriptionOf(name)).toMatch(/untrusted user data/);
+      expect(descriptionOf(name)).toMatch(/the date a note applies from/);
+    }
+    expect(descriptionOf('remove_note')).toMatch(/soft delete: the note disappears from every list/);
+    for (const name of ['add_note', 'remove_note']) {
+      expect(descriptionOf(name)).toMatch(/Make changes switch/);
+      expect(descriptionOf(name)).toMatch(/idempotency_key/);
+    }
   });
 
   it('tells the coach overrides need per_muscle mode and name the revision to quote', async () => {

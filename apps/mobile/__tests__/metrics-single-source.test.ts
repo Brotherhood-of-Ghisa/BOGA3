@@ -61,7 +61,7 @@ describe('training-metric rules have one implementation', () => {
   });
 
   it('compares a set type with an effort label only to show or pick it, never to count it', () => {
-    const label = `['"](?:warm_up|technique|cooldown)['"]`;
+    const label = `['"](?:warm_up|technique|cooldown|rehab)['"]`;
     const comparison = new RegExp(`[!=]==?\\s*${label}|${label}\\s*[!=]==?`);
     expect(offenders(comparison, [
       // Effort labels and the picker cycle, not a statistic.

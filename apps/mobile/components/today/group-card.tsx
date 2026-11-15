@@ -45,7 +45,6 @@ function SessionRow({ row, onPress }: { row: GroupSessionRowViewModel; onPress: 
   const text = useUiText();
   const tone = useUiTextTone();
   const testID = `today-group-session-${row.sessionId}`;
-  const { record } = row;
   return (
     <Pressable
       accessibilityHint="Opens their session"
@@ -77,15 +76,17 @@ function SessionRow({ row, onPress }: { row: GroupSessionRowViewModel; onPress: 
       ) : null}
       <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.meta, tone.ink]} testID={`${testID}-figures`}>
         <FigureText>{row.figures}</FigureText>
-        {record ? (
-          <>
-            <Text allowFontScaling={false} style={tone.faint}> · </Text>
-            <Text allowFontScaling={false} style={tone.record} testID={`${testID}-record`}>
-              {record.kind === 'one' ? record.lead : record.count}
-            </Text>
-          </>
-        ) : null}
       </Text>
+      {row.groupRecords.map((line) => (
+        <View key={line.key} style={styles.recordLine} testID={`${testID}-record-${line.key}`}>
+          <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.ink, uiTextEmphasis.strong, styles.recordExercise]}>
+            {line.exercise}
+          </Text>
+          <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.record, styles.recordValue]}>
+            <FigureText figureStyle={tone.record}>{line.value}</FigureText>
+          </Text>
+        </View>
+      ))}
     </Pressable>
   );
 }
@@ -115,8 +116,8 @@ function SessionsSection({ title, rows, onOpenSession, testID }: {
 }
 
 // Today's group page: the board card, headed by the group's name (the way to
-// the group) and the switch between groups, then up to four sessions, the
-// members training now first.
+// the group) and the switch between groups; the CoW card; then up to four
+// sessions, the members training now first.
 export function TodayGroupCard({
   selectedGroupId,
   groupName,
@@ -134,8 +135,8 @@ export function TodayGroupCard({
   const text = useUiText();
   const board = buildWeekBoard(summary.members, myUserId);
   const range = formatPeriodRange(localWeekWindow(new Date(nowMs)), dateFormat);
-  // The week summary carries one completed session; the stream fills the rest.
-  const wanted = GROUP_SESSIONS_SHOWN - summary.training_now.length - (summary.latest_completed ? 1 : 0);
+  // The stream supplies the completed sessions with their PRs; the week summary's latest stands in until it loads.
+  const wanted = GROUP_SESSIONS_SHOWN - summary.training_now.length;
   const recent = useGroupRecentSessions(selectedGroupId, summary.latest_completed?.session_id ?? null, wanted, loadStreamPage, summary);
   const sessions = buildGroupSessions(summary, recent.sessions, myUserId, nowMs, dateFormat);
   const openSession = (row: GroupSessionRowViewModel) => onOpenSession(row.memberUserId, row.sessionId, selectedGroupId);
@@ -163,7 +164,6 @@ export function TodayGroupCard({
     <View style={[styles.stack, styles.fill]}>
       <TodayWeekBoardCard
         board={board}
-        challenges={<TodayCoWSummaries key={`${myUserId}:${selectedGroupId}`} groupId={selectedGroupId} userId={myUserId} />}
         header={
           <TodayGroupHeader
             groupName={groupName}
@@ -177,6 +177,7 @@ export function TodayGroupCard({
         range={range}
         accessibilityRange={formatWeekRange(localWeekWindow(new Date(nowMs)), dateFormat)}
       />
+      <TodayCoWSummaries key={`${myUserId}:${selectedGroupId}`} groupId={selectedGroupId} userId={myUserId} />
       {/* Members training now, then the latest completed sessions: a card each. */}
       {sessions.live.length > 0 ? (
         <SessionsCard fill={!showRecent} testID="today-group-live">
@@ -246,6 +247,18 @@ const useStyles = makeStyles((roles) => ({
     gap: uiSpace.sm,
   },
   who: {
+    flexShrink: 1,
+  },
+  // A GR line, as on the group stream's session card.
+  recordLine: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: uiSpace.xs,
+  },
+  recordExercise: {
+    flexShrink: 1,
+  },
+  recordValue: {
     flexShrink: 1,
   },
 }));

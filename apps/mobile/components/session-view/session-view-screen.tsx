@@ -51,6 +51,7 @@ import { buildSessionViewModel } from '@/src/session-recorder/session-view-model
 import { useCompletedSessionTimes } from '@/src/session-recorder/use-completed-session-times';
 import { useSessionView } from '@/src/session-recorder/use-session-view';
 import { useWorkoutControl } from '@/src/session-recorder/use-workout-control';
+import { useSessionInjuryWarnings } from '@/src/injuries/use-session-injury-warnings';
 import { WorkoutChangesSavedForReview, WorkoutLifecycleChanged } from '@/src/data/session-edit-baseline';
 
 const isActiveSessionReady = (state: { status: string; data?: { status: string } }): boolean =>
@@ -172,6 +173,7 @@ function SessionViewBody({ state, sessionId, model, times, control, reload, endW
           times={
             data.status === 'completed'
               ? {
+                  readOnly: control.blocked,
                   text: times.text,
                   errors: times.errors,
                   notice: times.notice ?? (times.saveError ? `Not saved: ${times.saveError}` : null),
@@ -271,12 +273,19 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
     },
   });
 
+  const sessionExercises = state.status === 'ready' ? state.data.session.exercises : undefined;
+  const injuryWarnings = useSessionInjuryWarnings(sessionId, sessionExercises);
+
   const model = useMemo(
     () =>
       state.status === 'ready'
-        ? buildSessionViewModel(state.data.session, state.data.recordBaselineByDefinitionId)
+        ? buildSessionViewModel(
+            state.data.session,
+            state.data.recordBaselineByDefinitionId,
+            injuryWarnings.warningSeveritiesByExerciseId
+          )
         : null,
-    [state]
+    [state, injuryWarnings.warningSeveritiesByExerciseId]
   );
 
   const openGymPicker = useCallback(() => {
@@ -409,6 +418,12 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
   // where the edit was opened from.
   const saveEdit = async () => {
     if (!sessionId || isSavingEdit) return;
+    if (control.aiControlled || control.pending) {
+      if (router.canGoBack()) router.back();
+      else router.replace(`/completed-session/${encodeURIComponent(sessionId)}` as Href);
+      return;
+    }
+    if (control.blocked) return;
     setNotice(null);
     let editedTimes = times.submit();
     if (!editedTimes) return;
@@ -509,7 +524,9 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
       {props.placement === 'page' ? <Stack.Screen options={{ gestureEnabled: isCompleted }} /> : null}
       {state.status === 'ready' ? (
         isCompleted ? (
-          <SessionTopBar doneDisabled={isSavingEdit} mode="completed" onDone={() => void saveEdit()} />
+          <SessionTopBar doneDisabled={isSavingEdit || (control.busy && !control.aiControlled && !control.pending)}
+            mode="completed" onDone={() => void saveEdit()} aiControlled={control.aiControlled || control.pending}
+            controlPending={control.pending} onOpenOptions={() => setIsOptionsVisible(true)} />
         ) : (
           <SessionTopBar
             aiControlled={control.aiControlled || control.pending}
@@ -548,6 +565,7 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
       ) : null}
 
       <SessionOptionsSheet
+        completed={isCompleted}
         control={{ ...control,
           onControl: () => { void control.openControl().then(changed => { if (changed) setIsOptionsVisible(false); }); },
           onChoose: agent => { void control.choose(agent).then(changed => { if (changed) setIsOptionsVisible(false); }); },

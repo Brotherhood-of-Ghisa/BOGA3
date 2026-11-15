@@ -85,6 +85,8 @@ export {
   aggregateSelectedMuscleWeeklyEffort,
   collectMuscleSetContributions,
   countMuscleAnalyticsWorkingSets,
+  countMuscleRehabSet,
+  countMuscleRehabSets,
   countMuscleSet,
   countMuscleSets,
   createMuscleSetCounter,
@@ -194,3 +196,27 @@ export {
 
 export { computeMuscleDailySets, type ComputeMuscleDailySetsOptions } from './stats';
 export { aggregateMuscleDailySets, type MuscleDailySets } from './muscle-daily-sets';
+export {
+  getInjuriesRevision,
+  invalidateInjuries,
+  subscribeToInjuries,
+} from './injury-invalidation';
+export {
+  INJURY_LABEL_MAX_LENGTH,
+  INJURY_NOTES_MAX_LENGTH,
+  INJURY_CONTRAINDICATIONS_MAX_LENGTH,
+  InjuryInputError,
+  listInjuries,
+  readInjuries,
+  readInjury,
+  removeInjury,
+  resolveInjury,
+  saveInjury,
+  updateInjuryStatus,
+  validateInjuryInput,
+  type InjuryInput,
+  type InjurySide,
+  type InjuryStatus,
+  type InjuryView,
+  type ListInjuriesOptions,
+} from './injuries';

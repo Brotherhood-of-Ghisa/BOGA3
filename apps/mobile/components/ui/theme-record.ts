@@ -31,10 +31,13 @@ import {
 //
 // - `theme`: a preset id, or `custom`.
 // - `mode`: `light`, `dark` or `system`; a custom theme ignores it.
-// - `custom`: null, or `{background, ink, text, accent, record, viz}`, each a
-//   `{hue, strength}` and the background also `{lightness, depth}`
-//   (`theme-custom.ts`). Never null while `theme` is `custom`. A `custom`
-//   without `ink` (saved before it was a part) takes it from `text`.
+// - `custom`: null, or `{background, borders, ink, text, accent, record,
+//   viz}`, each a `{hue, strength}`; the background also `{mode, lightness,
+//   depth}`, the borders `{match, contrast}`, `ink` `{lightness}`, `text`
+//   `{contrast}` and `viz` `{gamut}` (`theme-custom.ts`). Never null while
+//   `theme` is `custom`. Every part and field added since the first custom
+//   themes may be absent: its default draws what the theme drew before it
+//   (`parseCustomColours`).
 //
 // Fields this build does not know are ignored, so a later build may add one
 // without an older build falling back on read. A save writes only the three

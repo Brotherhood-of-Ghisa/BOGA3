@@ -12,7 +12,7 @@ jest.mock('@/src/data/bootstrap', () =>
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
 import { StandardExercisePicker } from '@/components/groups';
-import { setMuscleReportPreset, setMuscleTracked } from '@/src/data/muscle-report-settings';
+import { applyBroadTemplate, setMuscleTracked } from '@/src/data/muscle-report-settings';
 import { closeLocalData, resetLocalData } from './helpers/local-data';
 
 beforeEach(() => resetLocalData());
@@ -28,7 +28,7 @@ it('matches the user\'s muscles: Detailed by entry, Broad by muscle, an untracke
   await search('lats');
   expect(await screen.findByText('Lat Pulldown')).toBeTruthy();
 
-  await act(async () => { await setMuscleReportPreset('broad'); });
+  await act(async () => { await applyBroadTemplate(); });
   await search('lats');
   expect(screen.queryByText('Lat Pulldown')).toBeNull();
   await search('back pulldown');

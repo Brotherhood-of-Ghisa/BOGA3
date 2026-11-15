@@ -2,7 +2,7 @@ import type { CoWMetric } from './cow-scoring.ts';
 import type { LoadInputMode } from '../exercise-core/index.ts';
 import type { CompetitionMetric, CompetitionValue } from './competition-contract.ts';
 import type { GroupMemberRef } from './types.ts';
-import type { NormalizedSetMetrics } from './competition-set-display.ts';
+import type { AddedOneRepMaxDisplay, NormalizedSetMetrics } from './competition-set-display.ts';
 
 export type CompetitionRulesWire = {
   bodyweight_calculations_enabled: boolean;
@@ -35,7 +35,7 @@ export type CompetitionCertificationWire = {
   ended_at_ms: number | null;
   end_reason: 'withdrawn' | 'cancelled' | 'voided' | null;
 };
-export type CompetitionBoardRowWire = CompetitionValue & {
+export type CompetitionBoardRowWire = CompetitionValue & AddedOneRepMaxDisplay & {
   rank: number;
   member: GroupMemberRef;
   former: boolean;
@@ -80,7 +80,7 @@ export type CompetitionRevisionWire = {
   reason: 'initial' | 'activation' | 'rules_change'; legacy: boolean;
   published_at_ms: number | null; retired_at_ms: number | null;
 };
-export type CompetitionHistoryValueWire = {
+export type CompetitionHistoryValueWire = AddedOneRepMaxDisplay & {
   role: 'record' | 'leader' | 'previous' | 'before' | 'after';
   metric: CompetitionHistoricalMetric; unit: string;
   value: number | null; unavailable: boolean; member: GroupMemberRef | null;
@@ -131,7 +131,27 @@ export type CompetitionSessionRecordsWire = {
 export type CompetitionStreamRecordWire = {
   performance: CompetitionPerformanceWire | null;
   previous: { value: CompetitionHistoryValueWire; performance: CompetitionPerformanceWire | null }[];
+  /** The boards this set took #1 on: its group records. Its other boards are the member's own new bests (PRs). */
+  group_record_metrics: CompetitionHistoricalMetric[];
 };
+/**
+ * One records-log entry. `record`: a new personal best on the board's metric,
+ * with its stream record and the member's previous best (null for a first
+ * entry). `lead_change`: a new #1 (Certified), or one a link, unlink or
+ * correction made (All). `rules_change`: a divider.
+ */
+export type CompetitionRecordsHistoryItemWire = {
+  event: CompetitionEventWire;
+  record: CompetitionStreamRecordWire | null;
+  previous_best: CompetitionHistoryValueWire | null;
+};
+/** A board's records log across every rules revision, newest first. */
+export type CompetitionRecordsHistoryWire = {
+  contract_version: 4; exercise: CompetitionExerciseWire; metric: CompetitionMetric; certified: boolean;
+  items: CompetitionRecordsHistoryItemWire[]; next_cursor: string | null;
+};
+/** The record a `record_voided` event withdrew, as the stream showed it; null when the record is gone. */
+export type CompetitionStreamWithdrawnWire = { event: CompetitionEventWire; record: CompetitionStreamRecordWire };
 export type GroupSharedExerciseDetailsWire = {
   group_exercise_id: string | null;
   group_exercise_name: string | null;
@@ -178,8 +198,10 @@ export type GroupSharedExerciseDeleteWire = {
 };
 export type CompetitionStreamItemWire =
   | { kind: 'competition'; key: string; sort_at_ms: number; event: CompetitionEventWire;
-      /** Record events only, from group_competition_stream_v2; absent in a payload cached from the first reader. */
-      record?: CompetitionStreamRecordWire }
+      /** Record events only (group_competition_stream_v4 onwards). */
+      record?: CompetitionStreamRecordWire;
+      /** `record_voided` events only (group_competition_stream_v5). */
+      withdrawn?: CompetitionStreamWithdrawnWire | null }
   | { kind: 'session'; key: string; sort_at_ms: number; groups: { group_id: string; name: string }[]; session: CompetitionSessionWire }
   | { kind: 'membership'; key: string; sort_at_ms: number; event: 'joined' | 'left' | 'removed';
       group: { group_id: string; name: string }; member: GroupMemberRef }
@@ -210,7 +232,7 @@ export type CoWDefinitionWire = {
 export type CoWWriteWire = { cow: CoWDefinitionWire };
 export type CoWListWire = { cows: CoWDefinitionWire[]; next_cursor: string | null };
 
-export type CoWRowWire = { rank: number | null; member: GroupMemberRef; former: boolean;
+export type CoWRowWire = AddedOneRepMaxDisplay & { rank: number | null; member: GroupMemberRef; former: boolean;
   value: number | null; state: 'ranked' | 'unranked' | 'unavailable' };
 export type CoWRankingWire = { metric: CoWMetric; unit: CompetitionValue['unit'] | 'percent' | null;
   entries: CoWRowWire[]; entry_count: number; next_cursor: string | null };

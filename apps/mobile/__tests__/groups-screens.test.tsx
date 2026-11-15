@@ -566,6 +566,33 @@ describe('Groups tab', () => {
     expect(api.getCompetitionPodiums).toHaveBeenCalledWith('group-a', false);
   });
 
+  it('polls only the pages in view: a Leaderboards read idles once At a glance is back', async () => {
+    jest.useFakeTimers();
+    try {
+      render(<GroupsTabRoute />);
+      await screen.findByTestId('groups-tab-glance');
+      goToSection('Leaderboards');
+      await screen.findByTestId('group-leaderboards-empty');
+      goToSection('At a glance');
+      await act(async () => { await jest.advanceTimersByTimeAsync(1_000); });
+      const boards = api.getCompetitionPodiums.mock.calls.length;
+      const glance = api.getCompetitionPeriodTotals.mock.calls.length;
+      const stream = api.getCompetitionStream.mock.calls.length;
+
+      await act(async () => { await jest.advanceTimersByTimeAsync(60_000); });
+      expect(api.getCompetitionPodiums.mock.calls.length).toBe(boards);
+      expect(api.getCompetitionPeriodTotals.mock.calls.length).toBeGreaterThan(glance);
+      // At a glance draws the stream's recent items, so the stream stays live with it.
+      expect(api.getCompetitionStream.mock.calls.length).toBeGreaterThan(stream);
+
+      goToSection('Leaderboards');
+      await act(async () => { await jest.advanceTimersByTimeAsync(1_000); });
+      expect(api.getCompetitionPodiums.mock.calls.length).toBe(boards + 1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('pull-to-refresh refetches My groups and the stream', async () => {
     api.getCompetitionStream.mockResolvedValue(page([completedItem()]));
     render(<GroupsTabRoute />);
@@ -638,10 +665,10 @@ describe('Groups tab', () => {
     expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
     expect(screen.queryByTestId('groups-filter-period')).toBeNull();
 
-    // The metric pill cycles Sets -> PRs (no Volume), and the board follows it.
+    // The metric pill cycles Sets -> GR (no Volume), and the board follows it.
     fireEvent.press(screen.getByTestId('groups-filter-metric'));
-    expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('PRs');
-    expect(within(screen.getByTestId('group-home-board')).getByText('PRs')).toBeTruthy();
+    expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('GR');
+    expect(within(screen.getByTestId('group-home-board')).getByText('GR')).toBeTruthy();
     expect(screen.getByTestId(`group-home-board-row-${USER_ID}-value`)).toHaveTextContent('3');
     fireEvent.press(screen.getByTestId('groups-filter-metric'));
     expect(screen.getByTestId('groups-filter-metric')).toHaveTextContent('Sets');
@@ -911,20 +938,20 @@ describe("Friend's session view", () => {
     expect(screen.getByTestId('group-session-volume').props.accessibilityLabel).toBe('Volume —');
   });
 
-  it('shows normalized total load, 1RM and Volume under one exercise unit label without absolute values or a mixed total', async () => {
+  it('shows normalized added Weight and 1RM with explicit units and total Volume without absolute values or a mixed total', async () => {
     const safe = sessionDetail();
     api.getCompetitionSession.mockResolvedValue({ ...safe, session: { ...safe.session, exercises: safe.session.exercises.map(exercise => ({
       ...exercise, visibility: 'normalized', sets: exercise.sets.map(set => ({ set_id: set.set_id, order_index: set.order_index,
         reps_value: set.reps_value, set_type: set.set_type, performance_status: set.performance_status,
-        normalized_metrics: { added_load_percent_bw: 25, e1rm_percent_bw: 145.7, volume_percent_bw_reps: 625 } })) })) } });
+        normalized_metrics: { added_load_percent_bw: 25, e1rm_percent_bw: 145.7, added_e1rm_percent_bw: 45.7, volume_percent_bw_reps: 625 } })) })) } });
     render(<GroupSessionRoute />);
     const row = await screen.findByTestId('group-session-set-row-set-2');
-    expect(within(row).getByTestId('group-session-set-row-set-2-values')).toHaveTextContent('125.0 × 5');
-    expect(within(row).getByTestId('group-session-set-row-set-2-values')).toHaveProp('accessibilityLabel', '125.0 %BW × 5');
-    expect(within(screen.getByTestId('group-session-exercise-ex-1')).getByText('Bench Press (% BW)')).toBeTruthy();
-    expect(screen.queryByTestId('group-session-exercise-ex-1-columns')).toBeNull();
-    expect(within(row).getByTestId('group-session-set-row-set-2-1rm').props.accessibilityLabel).toBe('1RM 145.7 %BW');
-    expect(within(row).getByTestId('group-session-set-row-set-2-vol').props.accessibilityLabel).toBe('Vol 625.0 %BW·reps');
+    expect(within(row).getByTestId('group-session-set-row-set-2-values')).toHaveTextContent('25.0% × 5');
+    expect(within(row).getByTestId('group-session-set-row-set-2-values')).toHaveProp('accessibilityLabel', '25.0 %BW × 5');
+    expect(within(screen.getByTestId('group-session-exercise-ex-1')).getByText('Bench Press')).toBeTruthy();
+    expect(within(screen.getByTestId('group-session-exercise-ex-1')).queryByText('Vol %BW')).toBeNull();
+    expect(within(row).getByTestId('group-session-set-row-set-2-1rm').props.accessibilityLabel).toBe('1RM 45.7 %BW');
+    expect(within(row).getByTestId('group-session-set-row-set-2-vol').props.accessibilityLabel).toBe('Vol 625.0 %BW');
     expect(screen.queryByText(/102.5|110.0|kg/)).toBeNull();
     expect(screen.getByTestId('group-session-volume').props.accessibilityLabel).toBe('Volume —');
   });
@@ -943,9 +970,9 @@ describe("Friend's session view", () => {
     expect(screen.queryByText(/kg·reps/)).toBeNull();
     expect(rm.getByText('Bench · 1RM')).toBeTruthy();
     expect(rm.getByText('119.6')).toBeTruthy();
-    expect(rm.getByText('#1 in group · 102.5 × 5 · since passed by sam')).toBeTruthy();
+    expect(rm.getByText('GR · 102.5 × 5 · since passed by sam')).toBeTruthy();
     expect(rm.getByText('Not certified')).toBeTruthy();
-    expect(screen.getByText('#1 in group · 1RM')).toBeTruthy();
+    expect(screen.getByText('GR · 1RM')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('group-session-record-ev-1:e1rm-link'));
     expect(mockPush).toHaveBeenCalledWith('/group/group-a/leaderboards/ge-bench?metric=e1rm&scope=all');
@@ -1037,7 +1064,7 @@ describe("Friend's session view", () => {
     expect(mockPush).not.toHaveBeenCalled();
     await waitFor(() => expect(api.getCompetitionSessionRecords).toHaveBeenCalled());
     expect(screen.queryByTestId('group-session-records')).toBeNull();
-    expect(screen.queryByText(/#1 in group/)).toBeNull();
+    expect(screen.queryByText(/GR/)).toBeNull();
   });
 
   it('marks an active session In progress with its elapsed Duration, and pull-to-refresh updates it', async () => {

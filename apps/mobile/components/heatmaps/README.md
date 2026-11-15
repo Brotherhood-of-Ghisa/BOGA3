@@ -10,10 +10,10 @@ Progress pushes (`components/stats/history-view.tsx`, route
 | `heatmapData.ts`    | `buildHeatmapData(dailyMetrics, metric, opts)` → `HeatmapData` (`{ daily, weekly, todayDateKey }`). Pure adapter; no RN imports. |
 | `heatmap-style.ts`  | Shared micro-label and Week-column spacing styles. |
 | `HeatmapLegend.tsx` | The percentage reference and 0%…100% ramp above each chart. |
-| `DailyHeatmap.tsx`  | **Daily** — month calendars stacked newest first, Monday–Sunday plus Week tiles; a training day or week opens its sessions. |
+| `DailyHeatmap.tsx`  | **Daily** — month calendars stacked newest first, Monday–Sunday plus Week tiles; a training day or week opens its sets. |
 | `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, zero-based y ticks and month labels; `timelineGeometry` → the columns and where each month label sits; `weekLabel` → a week's name on screen. Pure. |
 | `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as zero-based columns, oldest on the left: readout with the focused week between its previous / next arrows, y axis, month axis, the focused column in `ink` on a `ruleSoft` band; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`, a column wide enough to tap; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. The only view that selects a week; the host keeps the selection and is told which week is focused (`FocusedTimelineWeek`), for the page's ⋮. |
-| `WeeklyHeatmap.tsx` | **Weekly** — newest-first horizontal bars in a virtualized list; it computes their lengths and references, colour independently; a training week opens its sessions. |
+| `WeeklyHeatmap.tsx` | **Weekly** — newest-first horizontal bars in a virtualized list; it computes their lengths and references, colour independently; a training week opens its sets. |
 
 ## Data flow
 
@@ -62,7 +62,7 @@ Daily retains a neutral dashed rule.
 
 ## Props & opening
 
-A day or week with training opens its sessions: the host passes the openers
+A day or week with training opens its sets: the host passes the openers
 and routes; rest cells in Daily stay text.
 
 ```tsx

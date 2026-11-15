@@ -61,6 +61,8 @@ const SQLITE_BOOLEAN_COLUMNS: ReadonlySet<string> = new Set([
  */
 const SQLITE_JSON_TEXT_COLUMNS: ReadonlySet<string> = new Set([
   'user_settings.muscle_target_overrides',
+  'user_settings.muscle_targets',
+  'user_settings.combined_muscles',
 ]);
 
 /**

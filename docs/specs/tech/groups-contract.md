@@ -30,14 +30,13 @@ deletes and undeletes flow through; membership at logging time decides; and
 personal sync never changes (no second push path; triggers failure-isolated).
 
 The stream is one persistent table, `group_events`. All access goes through
-`SECURITY DEFINER` RPCs. Devices pull (focus, 30 s poll, pull-to-refresh) into
-a disposable cache; there is no Realtime. The `group-eval` Edge Function
-normalizes shared sets with the app's TS and materializes the boards.
+`SECURITY DEFINER` RPCs. Devices pull into a disposable cache; there is no
+Realtime. The `group-eval` Edge Function normalizes shared sets with the app's
+TS and materializes the boards.
 
 Rejected: per-group session copies or client-pushed projections (duplicated
 state), membership-window reads (no durable share), synced group rows
-(per-owner LWW cannot serve many readers), an Edge API (authorization belongs
-in the database).
+(per-owner LWW), an Edge API (authorization belongs in the database).
 
 ## Server rules
 
@@ -88,18 +87,20 @@ CoW lifecycle uses a dedicated Stream family; load
 their exercises to. Shares `ExerciseCore` with personal exercises; SQL trims with
 `group_exercise_trim`, held by `exercise-core-vectors.json`. Archiving keeps
 links and a frozen board. Members can also share exercises into the group library
-(`app_public.group_shared_exercises`), emitting a `shared_exercise` stream event (`app_public.group_events`).
-Members import into their catalog in one tap; if linked to a competition exercise
-(`group_exercise_id`), both create atomically. Authors and admins can soft-delete.
+(`app_public.group_shared_exercises`), emitting a `shared_exercise` stream event.
+Members import into their catalog in one tap; if linked to a competition exercise,
+both create atomically. Authors and admins can soft-delete.
 Links are the member's Sync v2 entity `exercise_group_links`.
 
 ## Authorization
 
-Spec 10 rules 15–19 own the model. In addition: execute is granted to `anon` so
+Spec 10 rules 15–19 own the model. Also: execute is granted to `anon` so
 the function raises `AUTH_REQUIRED` instead of PostgREST's 42501; every
-mutating RPC locks the `groups` row before role checks, serializing role
-changes, transfers, removals and leaves; usernames come from `user_profiles`,
-and create and join need one. The owner cannot leave (`OWNER_MUST_TRANSFER`)
+mutating RPC locks the `groups` row `FOR UPDATE` before role checks,
+serializing role changes, transfers, removals and leaves; publishers take `FOR
+NO KEY UPDATE` and reads `KEY SHARE`: reads wait for mutating RPCs, not publishers,
+and see a mid-read publication in later statements only; usernames come from
+`user_profiles`, and create and join need one. The owner cannot leave (`OWNER_MUST_TRANSFER`)
 and becomes admin on transfer. Admins invite, edit, manage group exercises,
 remove members and cancel certifications.
 
@@ -118,7 +119,7 @@ retry), `UPDATE_REQUIRED` (client contract too old). Client-only: `NETWORK`,
   sending bad input gets `NOT_FOUND`.
 - **Cursors** are keyset, sent back verbatim (`next_cursor`); malformed is
   `VALIDATION`, JSON `null` is none. Keys compare in `"C"` collation, the same
-  in SQL and TS. Reads take no locks.
+  in SQL and TS.
 - **Raw sets:** reads return a shared session's live sets as synced (planned,
   skipped, blank included; tombstones omitted; never GPS). Performed-only is a
   device display rule.
@@ -132,7 +133,7 @@ competitive. Every group RPC requires the `x-boga-group-contract: 4` header
 (`UPDATE_REQUIRED` otherwise). The legacy kg and protocol-3 RPCs are gone; their
 stored rows remain history.
 
-**Week summary and period totals.** The client supplies local windows; the server never guesses a time zone.
+**Week summary and period totals.** Windows are client-local; the server never guesses a zone.
 Both count, over completed, untombstoned
 sessions shared to the group by current members and started in a window,
 their performed, live, working facts whose rows still exist (trailing the
@@ -144,16 +145,16 @@ training now is an active session written within 2 h (latest
 totals (At a glance): 1–12 windows of ≤ 32 days, in order, unranked.
 
 **Record stream** (`group_competition_stream_v2`) adds each record's
-`record`: its set, and per board taken the previous #1 (holder and set, or
-the lifter's own prior value).
+`record`: its set, and per board the previous #1 (holder and set, or own
+prior value); `_v4` adds `group_record_metrics`: boards
+taken #1 (`GR`), the rest PRs (`apps/mobile/src/groups/record-boards.ts`);
+`_v5` gives each withdrawal its voided record (`withdrawn`, or null).
 
-**Session records** (`group_competition_session_records`) sit beside the
-session detail, not in it: exact readers reject a new key. One shared session's
-non-voided records that took #1 in the group, as stream events whose `record`
-values are those boards, each with the All board's current leader (`leads`
-while its own set holds #1; no leader for an earlier revision). The app shows
-them once the session completes (a provisional record can still move), and
-no Volume board: groups are dropping that metric.
+**Session records** (`group_competition_session_records`, beside the session
+detail; exact readers reject new keys): one shared session's non-voided group records, as stream events whose
+`record` values are those boards, each with the All board's current leader
+(`leads` while its own set holds #1; none for an earlier revision). The app
+shows them once the session completes; no Volume board (being dropped).
 
 ## Device-computed card metrics
 
@@ -263,8 +264,8 @@ once.
 
 **Known limits.** Silent recomputes have no history. Link attribution compares
 device clocks. Only the latest provisional lead change rolls back. Frozen
-targets await catch-up. Racing withdraw/void can deadlock; one aborts, then
-state converges.
+targets await catch-up. Racing withdraw/void can deadlock; one aborts, state
+converges.
 
 ## Certification
 
@@ -303,10 +304,10 @@ the failure-isolated source-mode trigger implements [[groups.certification]].
   message prefix maps to the token; status 0 or a throw to `NETWORK`; anything
   else to `INTERNAL`.
 - Group code never runs in the sync cycle; it only wipes on
-  `apps/mobile/src/sync/account-wipe.ts` and arms timers on
+  `apps/mobile/src/sync/account-wipe.ts` and arms a timer on
   `apps/mobile/src/sync/push-signal.ts`.
 - **Reads** are cache-first (`useGroupResource`): focus, 30 s while focused,
-  2 s and 6 s after this device pushes, pull-to-refresh; skipped offline;
+  3 s after a push, pull-to-refresh; skipped offline or hidden;
   concurrent refreshes share a request; stale responses are dropped. Full
   boards and history are never cached. Entries seen this run draw on first
   render, never behind a loader.
@@ -328,10 +329,10 @@ payload or calculation change bumps the versioned keys (`cache.ts`).
 
 ## Not built
 
-Live follow (needs membership RLS through the helpers, spec 10 rule 16, or a
-broadcast channel); history PR highlights on cards (needs unshared history;
-no SQL mirrors of TS set rules); group gyms, time-windowed boards, member
-proposals, disputes, native notification integration.
+Live follow (needs membership RLS, spec 10 rule 16, or a broadcast channel);
+history PR highlights on cards (needs unshared history); group gyms,
+time-windowed boards, member proposals, disputes, native notification
+integration.
 
 ## Rule IDs
 
@@ -342,9 +343,9 @@ proposals, disputes, native notification integration.
 | P2, P4, D17 | Sets count only through a link (one per exercise per group); links are retroactive, offline, inactive while away |
 | P3, D9, D13 | Group exercises only in picker search, the Link screen and the group page |
 | P5, D10, D14 | Group page: header, Exercises, Members via count; Groups screen: one group's Stream · At a glance · Leaderboards |
-| P6–P9, D11, D12 | Volume/1RM × Certified/All boards (open on All: [[groups.certification]]); one row per member; history is lead changes |
+| P6–P9, D11, D12 | Volume/1RM × Certified/All boards (open on All: [[groups.certification]]); one row per member; history logs new bests |
 | P10–P13, D3–D5 | Certification lifecycle: [[groups.certification]] |
-| P14–P17, D1, D2, D15, D16 | Records (first set too, provisional while active), one card per set; links make none; voided cards stay |
+| P14–P17, D1, D2, D15, D16 | Records (first set too, provisional while active), one card per set; links make none; a voided GR shows once, at withdrawal (`· GR withdrawn`) |
 | P18 | Certify and admin actions need a connection |
 | D6 | Ordinary 1RM converts across load modes; Volume stays total (competition contract §1) |
 | E0–E0.4 | Linking: picker search, pick sheet, Link screen, group-page link/unlink |

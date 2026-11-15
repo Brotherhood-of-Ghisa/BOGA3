@@ -40,6 +40,7 @@ export {
 } from '@/components/ui/form-rows';
 export { FormField, type FormFieldFace, type FormFieldProps } from '@/components/ui/form-field';
 export { pointToValue, SliderRow, type SliderRowProps } from '@/components/ui/slider-row';
+export { HeaderTitleMenu, type HeaderTitleMenuProps, type HeaderTitleOption } from '@/components/ui/header-title-menu';
 export { Icon, type IconName, type IconProps } from '@/components/ui/icon';
 export { IconButton, type IconButtonProps, type IconButtonTone } from '@/components/ui/icon-button';
 export { Information, type InformationProps } from '@/components/ui/information';

@@ -5,16 +5,17 @@ MCP-compatible AI coaching integration. Its routes have deliberately separate
 responsibilities:
 
 - `/` and `/connect` show standalone public setup guidance, the canonical MCP
-  endpoint, the read-only boundary, and the in-app revocation path. They neither
-  create a Supabase client nor inspect OAuth state and never ask for a password.
+  endpoint, the optional-write disclosure, and the in-app revocation path. They
+  neither create a Supabase client nor inspect OAuth state and never ask for a
+  password.
 - `/oauth/consent` is entered only after an MCP client starts OAuth. It requires
   a valid `authorization_id` before sign-in, consent lookup, approval, or denial;
   missing/invalid state remains a fail-closed error with return-to-client help.
 
 Supabase owns protocol validation, authorization codes, PKCE, token
 issuance/refresh, expiry, and revocation. On the consent route this app only
-signs the BoGa user in, shows the requesting client and read-only training-data
-disclosure, and calls the supported approve/deny methods.
+signs the BoGa user in, shows the requesting client, training-access disclosure
+and requested identity permissions, and calls the supported approve/deny methods.
 
 The consent surface accepts the scopes currently advertised by the Supabase
 OAuth server: `openid`, `profile`, `email`, `phone`, and `offline_access`
@@ -169,8 +170,8 @@ For an individual account:
 2. Select **+ > Add custom connector**.
 3. Enter `https://boga3.onrender.com/mcp`.
 4. Leave the advanced OAuth Client ID and Client Secret fields empty.
-5. Add the connector, select **Connect**, then sign in to BoGa and approve the
-   requested read-only access.
+5. Add the connector, select **Connect**, then sign in to BoGa, review access
+   and select **Connect coach**.
 6. Enable the connector for a conversation from **+ > Connectors**.
 
 Team and Enterprise owners add the URL under
@@ -191,7 +192,7 @@ Custom MCP servers need developer mode, which is web-only (Plus or higher plan):
    **Developer mode**.
 2. Open the plugins page, choose **+**, enter `https://boga3.onrender.com/mcp`
    and choose OAuth with no client ID or secret (ChatGPT registers itself).
-3. Sign in to BoGa and approve the requested read-only access.
+3. Sign in to BoGa, review access and select **Connect coach**.
 
 The ChatGPT mobile apps do not run developer-mode servers. See the
 [ChatGPT developer mode documentation][chatgpt-dev-mode].
@@ -230,7 +231,7 @@ Start a connection from a real MCP client; do not invent an
 
 1. While signed out, the consent URL asks the user to sign in and then returns
    to the same authorization request.
-2. **Allow access** returns the browser to the MCP client's registered callback
+2. **Connect coach** returns the browser to the MCP client's registered callback
    and the client can call the read-only BoGa tools.
 3. **Cancel** returns the browser to the client with an access-denied result and
    issues no usable access token.

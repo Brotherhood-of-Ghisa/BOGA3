@@ -43,8 +43,8 @@ export function TodayScreen({ isFocused = true, loadProgress, loadPlan, now = sy
       router.push(progressHistoryHref({ muscleGroupId, countSecondary: progressCountSecondary }, 'workingSetCount')),
     onOpenPlan: (planId: string) => router.push(`/session-plan/${encodeURIComponent(planId)}` as Href),
     onOpenProgress: () => router.push('/progress'),
-    // Sessions is where sessions are planned, and lists the plans.
-    onOpenSessions: () => router.push('/sessions'),
+    onOpenPlanner: () => router.push('/planner'),
+    onOpenSessions: () => router.push('/planner'),
     onRetry: () => {
       void retryPlan();
     },
@@ -127,6 +127,7 @@ function TodayPlanSection({
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenPlan: (planId: string) => void;
   onOpenProgress: () => void;
+  onOpenPlanner?: () => void;
   onOpenSessions: () => void;
   onRetry: () => void;
 }) {

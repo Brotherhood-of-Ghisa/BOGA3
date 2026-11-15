@@ -14,6 +14,7 @@ export const GROUP_COACHING_ELIGIBILITY: readonly (readonly [label: string, setT
   ['Stored RIR above 4', 'rir_12', true],
   ['Technique', 'technique', false],
   ['Cooldown', 'cooldown', false],
+  ['Rehab', 'rehab', false],
   ['Unknown stored label', 'working', true],
   ['Unknown stored label (case)', 'RIR_1', true],
 ];

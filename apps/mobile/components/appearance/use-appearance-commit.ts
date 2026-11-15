@@ -29,10 +29,24 @@ export type CommitFailure = {
 // - The choice shows before its save returns. A failed save is logged, shows
 //   the stored choice again (another page may have saved meanwhile) and sets
 //   `saveError`.
+// - `applying` is true from a commit until the app is drawn in the stored
+//   choice: while a save is on its way, then until the theme provider's
+//   repaint (a transition, `theme-context.tsx`) has committed it. Both sides
+//   are read through the same parser, so they compare equal once it lands.
+//   Only a commit from this page starts it: a stored choice that reads
+//   differently from the one drawn without any save (an older record
+//   converted on the phone's current mode) shows no spinner.
 export function useAppearanceCommit() {
   const [appearance, setAppearance] = useStoredAppearance();
   const inUse = useAppTheme().appearance;
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(0);
+  const [committed, setCommitted] = useState(false);
+  const drawn = JSON.stringify(appearance) === JSON.stringify(inUse);
+  const applying = saving > 0 || (committed && !drawn);
+  // Once drawn, forget the commit, so a later difference this page did not
+  // save shows nothing (state adjusted while rendering, not in an effect).
+  if (committed && saving === 0 && drawn) setCommitted(false);
 
   const commit = async (part: Partial<AppearanceChoice>, failure: CommitFailure): Promise<CommitOutcome> => {
     setSaveError(null);
@@ -44,6 +58,8 @@ export function useAppearanceCommit() {
     );
     if (unchanged && !storedChoiceUnusable()) return 'unchanged';
     setAppearance({ ...intended, ...part });
+    setSaving((count) => count + 1);
+    setCommitted(true);
     try {
       await saveAppearancePart(part);
     } catch (error) {
@@ -54,11 +70,15 @@ export function useAppearanceCommit() {
         context: { ...failure.context, error: error instanceof Error ? error.message : String(error) },
       });
       setAppearance(readStoredAppearance(inUse));
+      // Nothing was saved, so nothing is being drawn.
+      setCommitted(false);
       setSaveError(failure.message);
       return 'failed';
+    } finally {
+      setSaving((count) => count - 1);
     }
     return 'saved';
   };
 
-  return { appearance, setAppearance, saveError, commit };
+  return { appearance, setAppearance, saveError, commit, applying };
 }

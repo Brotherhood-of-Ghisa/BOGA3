@@ -91,4 +91,17 @@ describe('FigureText', () => {
     expect(screen.getByTestId('line')).toHaveTextContent('Today');
     expect(screen.UNSAFE_getAllByType(Text)).toHaveLength(1);
   });
+
+  it('keeps percentage units small beside their figures and preserves the complete reading', () => {
+    render(<Text style={textTones.record} testID="percentage">
+      <FigureText figureStyle={textTones.record}>{'1RM 28.8 %BW · Vol 625.0 %BW·reps'}</FigureText>
+    </Text>);
+    expect(screen.getByTestId('percentage')).toHaveTextContent('1RM 28.8 %BW · Vol 625.0 %BW·reps');
+    for (const unit of ['%BW', '%BW·reps']) {
+      expect(screen.getByText(unit)).toHaveStyle({ fontFamily: textRoles.label.fontFamily, fontSize: textRoles.label.fontSize });
+      expect(screen.getByText(unit)).not.toHaveStyle({ color: roles.inkMuted });
+    }
+    expect(screen.getByText('28.8')).toHaveStyle({ color: roles.record });
+  });
+
 });

@@ -1,3 +1,4 @@
+import { AppleHealthSection } from '@/components/settings/apple-health-section';
 import { BackupPanel } from '@/components/settings/backup-panel';
 import { EffortSettings } from '@/components/preferences/effort-settings';
 import { ProgressSettings } from '@/components/preferences/progress-settings';
@@ -49,6 +50,7 @@ export function DataSyncSettingsScreen() {
         onRefreshPreferences={retry}
         preferenceError={error}
       />
+      <AppleHealthSection />
       <BackupPanel />
     </SubPage>
   );

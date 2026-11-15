@@ -7,7 +7,8 @@ import { buildCoWStreamCard } from '@/src/groups/cow-stream-view-model';
 import { buildCompetitionStreamModels } from '@/src/groups/competition-stream-view-model';
 import type { CoWStreamEvent, CompetitionStreamWire } from '@/src/groups/competition-wire';
 import { compareStreamOrder, mergeStreamPages } from '@/src/groups/use-group-stream';
-import { groupCacheKeys, readGroupCache, writeGroupCache, observeGroupCompetitionPolicy } from '@/src/groups/cache';
+import { evictObsoleteGroupCache, groupCacheKeys, readGroupCache, writeGroupCache, observeGroupCompetitionPolicy } from '@/src/groups/cache';
+import { groupCache } from '@/src/data/schema';
 import { cowStreamItem } from './helpers/cow-fixtures';
 import { competitionSession } from './helpers/competition-fixtures';
 import { createInMemoryDatabase } from './helpers/in-memory-db';
@@ -67,7 +68,7 @@ it('keeps independent winners, empty metrics and suppressed original winners dis
   const item=cowStreamItem('results');
   const model=buildCoWStreamCard(item,'u1','DD-MM-YYYY');
   expect(model.details[0]).toContain('You');
-  expect(model.details[0]).toContain('150.0');
+  expect(model.details[0]).toContain('50.0');
   expect(model.details[1]).toContain('No qualifying results');
   item.result!.rankings[0].entries[0]={ ...item.result!.rankings[0].entries[0],value: null,state: 'unavailable' };
   expect(isCoWStreamItemWire(item)).toBe(true);
@@ -110,7 +111,21 @@ it('versions cached event payloads and isolates account/group, including foreign
     expect(readGroupCache(db.database,groupCacheKeys.stream('g2'),'u1')).toBeNull();
     const foreign=stream(); (foreign.items[0] as ReturnType<typeof cowStreamItem>).definition.group_id='g2';
     expect(() => writeGroupCache(db.database,{ cacheKey: key,userId: 'u1',payload: foreign,fetchedAtMs: 1 })).toThrow('Unsafe group cache payload.');
-    expect(readGroupCache(db.database,'stream:v7:g1','u1')).toBeNull();
+    expect(readGroupCache(db.database,'stream:v8:g1','u1')).toBeNull();
+  } finally { db.close(); }
+});
+
+it('drops a stream page cached before withdrawals carried their records, keeping the current one', () => {
+  const db=createInMemoryDatabase();
+  try {
+    const current=groupCacheKeys.stream('g1');
+    expect(current).toBe('stream:v8:g1:withdrawn-records-v1');
+    writeGroupCache(db.database,{ cacheKey: current,userId: 'u1',payload: stream(),fetchedAtMs: 1 });
+    for (const old of ['stream:v8:g1:cow-events-v1','stream:v8:g1:group-records-v1'])
+      db.database.insert(groupCache).values({ cacheKey: old,userId: 'u1',payloadJson: JSON.stringify(stream()),fetchedAtMs: 1 }).run();
+    evictObsoleteGroupCache(db.database,'u1');
+    const keys=db.database.select().from(groupCache).all().map(row => row.cacheKey);
+    expect(keys).toEqual([current]);
   } finally { db.close(); }
 });
 
@@ -120,6 +135,7 @@ it('retires an absolute cached CoW event when a newly normalized source is obser
     const item=cowStreamItem('results'); const result=item.result!;
     result.normalized=false; result.bodyweight_calculations_enabled=false;
     result.exercise={ ...result.exercise!,rules: { ...result.exercise!.rules,bodyweight_calculations_enabled: false } };
+    delete result.rankings[0].entries[0].added_e1rm_percent_bw;
     result.rankings[0].unit='kg'; result.rankings[1].unit='kg_reps';
     const key=groupCacheKeys.stream('g1');
     writeGroupCache(db.database,{ cacheKey: key,userId: 'u1',payload: { ...stream(),items: [item] },fetchedAtMs: 1 });

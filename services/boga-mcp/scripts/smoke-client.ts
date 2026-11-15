@@ -15,9 +15,15 @@ const exerciseQuery = required('BOGA_MCP_SMOKE_EXERCISE_QUERY');
 // Set only for the seeded local fixture: exercise writes never run against a
 // supplied (possibly hosted) token.
 const smokeMuscleId = process.env.BOGA_MCP_SMOKE_MUSCLE_ID?.trim() ?? '';
-// Seeded beside it with report_group `mcp_smoke_group` and tracked 0.
+// Seeded beside it as a member of the combined muscle `cm_mcp_smoke`, tracked 0.
 const smokeGroupedMuscleId = process.env.BOGA_MCP_SMOKE_GROUPED_MUSCLE_ID?.trim() ?? '';
 const skipReads = process.env.BOGA_MCP_SMOKE_SKIP_READS === '1';
+// Seeded locally: `<prefix>-run` (running) and `<prefix>-lift` (a strength
+// workout inside the seeded session).
+const activityPrefix = process.env.BOGA_MCP_SMOKE_ACTIVITY_PREFIX?.trim() ?? '';
+// Seeded locally: `<prefix>-general` (no exercise) and `<prefix>-exercise` (on
+// the seeded exercise), both dated two days ago.
+const notePrefix = process.env.BOGA_MCP_SMOKE_NOTE_PREFIX?.trim() ?? '';
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -78,27 +84,35 @@ try {
   const tools = await client.listTools();
   const names = tools.tools.map((tool) => tool.name).sort();
   const expectedNames = [
+    'add_note',
     'create_exercise',
     'create_session_plan',
     'create_training_programme',
+    'create_workout',
     'delete_exercise',
     'delete_set',
     'finish_workout',
+    'get_active_injuries',
     'get_active_workout',
     'get_exercise_context',
     'get_exercise_history',
+    'get_recent_activities',
     'get_recent_workouts',
     'get_training_profile',
     'get_training_status',
     'get_upcoming_session_plans',
     'get_workout_detail',
     'list_muscles',
+    'list_notes',
+    'log_injury',
     'log_sets',
+    'remove_note',
     'restore_exercise',
     'search_exercises',
     'set_muscle_targets',
     'start_workout',
     'update_exercise',
+    'update_injury_status',
     'update_set',
   ];
   if (JSON.stringify(names) !== JSON.stringify(expectedNames)) {
@@ -182,6 +196,69 @@ try {
     )
   ) {
     throw new Error('Training status did not return the bounded shape with the test exercise as a favourite.');
+  }
+  const cardio = trainingStatus.cardio;
+  if (!isObject(cardio) || !isObject(cardio.this_week) || !Array.isArray(cardio.last_4_weeks)
+    || typeof cardio.overlapping_excluded !== 'number' || typeof cardio.complete !== 'boolean') {
+    throw new Error('Training status did not return the cardio summary.');
+  }
+
+  if (activityPrefix) {
+    const listed = structured(
+      await client.callTool({ arguments: { limit: 50 }, name: 'get_recent_activities' }),
+      'get_recent_activities',
+    );
+    const activities = (Array.isArray(listed.activities) ? listed.activities : []).filter(isObject);
+    const run = activities.find((activity) => activity.external_id === `${activityPrefix}-run`);
+    const lift = activities.find((activity) => activity.external_id === `${activityPrefix}-lift`);
+    if (
+      !run || run.activity_type !== 'running' || run.overlaps_logged_session !== false || run.distance_m !== 800
+      || !lift || lift.overlaps_logged_session !== true || lift.overlapping_session_id !== expectedSessionId
+    ) {
+      throw new Error('Recent activities did not return the seeded run and the strength workout flagged as the session.');
+    }
+    const weeks = [cardio.this_week, ...cardio.last_4_weeks].filter(isObject);
+    const runs = weeks.flatMap((week) => (Array.isArray(week.by_type) ? week.by_type : []).filter(isObject))
+      .filter((entry) => entry.activity_type === 'running');
+    if (runs.length === 0 || cardio.overlapping_excluded < 1) {
+      throw new Error('The cardio summary did not count the run and exclude the overlapping strength workout.');
+    }
+  }
+
+  if (notePrefix) {
+    const listedNotes = structured(
+      await client.callTool({ arguments: { limit: 50 }, name: 'list_notes' }),
+      'list_notes',
+    );
+    const notes = (Array.isArray(listedNotes.notes) ? listedNotes.notes : []).filter(isObject);
+    const general = notes.find((note) => note.id === `${notePrefix}-general`);
+    const onExercise = notes.find((note) => note.id === `${notePrefix}-exercise`);
+    if (
+      !general || general.exercise_id !== null || general.source !== 'app'
+      || typeof general.noted_on !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(general.noted_on)
+      || !onExercise || onExercise.exercise_id !== expectedExerciseId || onExercise.exercise_name !== exerciseQuery
+      || notes.some((note) => note.id === `${notePrefix}-removed`)
+    ) {
+      throw new Error('list_notes did not return the seeded general and exercise notes, or listed a removed one.');
+    }
+    const contextNotes = (Array.isArray(context.training_notes) ? context.training_notes : []).filter(isObject);
+    if (contextNotes.map((note) => note.id).join() !== `${notePrefix}-exercise` || context.training_notes_truncated !== false) {
+      throw new Error('Exercise context did not return exactly the exercise’s own note.');
+    }
+    const statusNotes = isObject(trainingStatus.general_notes) ? trainingStatus.general_notes : {};
+    const statusList = (Array.isArray(statusNotes.notes) ? statusNotes.notes : []).filter(isObject);
+    if (!statusList.some((note) => note.id === `${notePrefix}-general`)
+      || statusList.some((note) => note.id === `${notePrefix}-exercise`) || typeof statusNotes.complete !== 'boolean') {
+      throw new Error('Training status did not return the general note without the exercise note.');
+    }
+  }
+
+  const injuriesResult = structured(
+    await client.callTool({ arguments: { limit: 10 }, name: 'get_active_injuries' }),
+    'get_active_injuries',
+  );
+  if (!Array.isArray(injuriesResult.injuries)) {
+    throw new Error('get_active_injuries did not return an injuries array.');
   }
 
   // Drain exact exercise history across pages
@@ -423,8 +500,12 @@ try {
       }
       if (smokeGroupedMuscleId) {
         const grouped = muscleList.find((m) => isObject(m) && m.id === smokeGroupedMuscleId);
-        if (!isObject(grouped) || grouped.report_group !== 'mcp_smoke_group' || grouped.tracked !== false) {
-          throw new Error('list_muscles did not return the stored report_group and tracked = false of the grouped muscle.');
+        if (!isObject(grouped) || grouped.report_group !== 'cm_mcp_smoke' || grouped.tracked !== false) {
+          throw new Error('list_muscles did not return the combined muscle and tracked = false of the grouped muscle.');
+        }
+        const combined = isObject(muscles) && Array.isArray(muscles.combined_muscles) ? muscles.combined_muscles : [];
+        if (!combined.some((m) => isObject(m) && m.key === 'cm_mcp_smoke' && m.name === 'MCP Smoke')) {
+          throw new Error('list_muscles did not return the stored combined muscle definitions.');
         }
       }
 
@@ -592,5 +673,5 @@ try {
   await client.close();
 }
 
-console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-two tools discovered and reads/denials verified');
+console.log(skipReads ? '[boga-mcp-smoke] PASS: permission phase verified' : '[boga-mcp-smoke] PASS: rejected token challenged; twenty-seven tools discovered and reads/denials verified');
 

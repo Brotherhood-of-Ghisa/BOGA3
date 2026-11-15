@@ -80,3 +80,32 @@ describe('m0017 pull-cursor reset', () => {
     expect(JSON.parse(reset('not json'))).toEqual({});
   });
 });
+
+describe('m0033 pull-cursor reset on upgrade', () => {
+  const reset0033 = (oldCursor: unknown): string => {
+    const client = new Database(':memory:');
+    try {
+      applyRange(client, 0, 32);
+      client
+        .prepare(`insert into sync_runtime_state (id, pull_cursor) values ('primary', ?)`)
+        .run(typeof oldCursor === 'string' ? oldCursor : JSON.stringify(oldCursor));
+      applyRange(client, 33, 33);
+      const row = client
+        .prepare(`select pull_cursor from sync_runtime_state where id = 'primary'`)
+        .get() as { pull_cursor: string };
+      return row.pull_cursor;
+    } finally {
+      client.close();
+    }
+  };
+
+  it('resets layer-1 advanced cursor to empty object when upgrading to m0033', () => {
+    // When an older build skipped layer-1 injuries and advanced its cursor,
+    // m0033 resets the cursor so the next sync re-drains layer 1 and learns the injuries.
+    const advancedCursor = {
+      '0': cursorOf({ type: 'gyms', id: 'g0' }),
+      '1': cursorOf({ type: 'user_settings', id: 'u1' }),
+    };
+    expect(JSON.parse(reset0033(advancedCursor))).toEqual({});
+  });
+});

@@ -32,7 +32,7 @@ export async function loadPendingWorkoutControl(sessionId: string): Promise<Work
   // A clean terminal epoch is newer than this action; its delayed request can
   // no longer grant control. Do not strand history behind an unreachable retry.
   if (pending && row && !row.localDirty && row.mergeRevision > pending.p_base_revision
-    && (row.status === 'completed' || row.deletedAt !== null)) {
+    && ((row.status === 'completed' && row.loggingClientId === null) || row.deletedAt !== null)) {
     const owner = database.select().from(syncRuntimeState).where(eq(syncRuntimeState.id, PRIMARY_RUNTIME_STATE_ID)).get()?.accountUserId;
     if (owner) database.transaction(tx => deleteMergeLocal(tx, owner, workoutControlStorageId(sessionId)));
     return null;

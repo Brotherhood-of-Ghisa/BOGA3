@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 
 import { AppearanceSettingsRow } from '@/components/appearance/appearance-settings';
 import { BodyWeightSettingsRow } from '@/components/bodyweight/settings-row';
+import { InjuriesSettingsRow } from '@/components/injuries/settings-row';
 import { TabOwnedPage } from '@/components/navigation/tab-owned-page';
 import { NotificationSettingsRow } from '@/components/notifications/settings-row';
 import { effortStatus, progressStatus, restTimerStatus, syncStatus } from '@/components/settings/statuses';
@@ -48,6 +49,7 @@ function SettingsScreen() {
           value={restTimerStatus(values)}
         />
         <BodyWeightSettingsRow divider />
+        <InjuriesSettingsRow divider />
         <DestinationRow
           divider icon="sliders" label="Muscles" route={SETTINGS_SUB_PAGES.muscles} testID="settings-muscles-row"
           value={values.muscleTargetMode === 'per-muscle' ? 'Per muscle targets' : 'Single target'}

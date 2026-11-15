@@ -103,6 +103,24 @@ it('does not strand completed history when MCP finishes after an unconfirmed tra
   expect(() => assertWorkoutWritable(mockDatabase, 'workout')).not.toThrow();
 });
 
+it('keeps dated completed history locked through an unconfirmed takeover and preserves its dates', async () => {
+  const start = new Date(100), end = new Date(2100);
+  mockDatabase.update(sessions).set({ status: 'completed', startedAt: start, completedAt: end, durationSec: 2,
+    loggingClientId: 'coach', loggingGrantedAt: agent.grantedAt }).run();
+  expect(() => assertWorkoutWritable(mockDatabase, 'workout')).toThrow(/AI is logging/);
+  mockRpc.mockRejectedValueOnce(new Error('lost takeover response'));
+  await expect(changeWorkoutControl('workout', null)).rejects.toThrow(/confirm/);
+  mockDatabase.update(sessions).set({ mergeRevision: 2 }).run();
+  expect(await loadPendingWorkoutControl('workout')).not.toBeNull();
+  mockRpc.mockImplementation(async () => {
+    mockDatabase.update(sessions).set({ loggingClientId: null, loggingGrantedAt: null, mergeRevision: 3 }).run();
+    return {};
+  });
+  await changeWorkoutControl('workout', null);
+  expect(() => assertWorkoutWritable(mockDatabase, 'workout')).not.toThrow();
+  expect(mockDatabase.select().from(sessions).get()).toMatchObject({ status: 'completed', startedAt: start, completedAt: end, durationSec: 2 });
+});
+
 it('refuses transfer with any unsynced child, including a quarantined row, and does not cross an account switch', async () => {
   mockDatabase.update(exerciseSets).set({ localDirty: true }).where(eq(exerciseSets.id, 'set')).run();
   await expect(changeWorkoutControl('workout', agent)).rejects.toThrow(/pending changes/);

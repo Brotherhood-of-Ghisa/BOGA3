@@ -1,3 +1,4 @@
+import { BROAD_COMBINED_MUSCLES } from '@/src/data/combined-muscles';
 import {
   buildDuplicateExercisePrefill,
   editorOpenState,
@@ -175,7 +176,7 @@ describe('exercise-editor-model', () => {
         { muscleGroupId: 'chest', weight: 1, role: 'primary' },
         { muscleGroupId: 'triceps', weight: 1, role: 'primary' },
       ]);
-      const muscles = buildMuscleSetup(detailedMuscleRows()).muscles;
+      const muscles = buildMuscleSetup(detailedMuscleRows(), null).muscles;
       expect(muscleSelectorOptions('secondary', muscles, new Set(['chest', 'triceps']), new Set()).map(({ id }) => id))
         .not.toEqual(expect.arrayContaining(['chest', 'triceps']));
       expect(muscleSelectorOptions('primary', muscles, new Set(['chest', 'triceps']), new Set(['delts_front'])).map(({ id }) => id))
@@ -195,8 +196,8 @@ describe('exercise-editor-model', () => {
   });
 
   describe("in the user's muscles ([[muscle.no-breakdown]])", () => {
-    const broad = buildMuscleSetup(broadMuscleRows()).assignment;
-    const detailed = buildMuscleSetup(detailedMuscleRows()).assignment;
+    const broad = buildMuscleSetup(broadMuscleRows(), BROAD_COMBINED_MUSCLES).assignment;
+    const detailed = buildMuscleSetup(detailedMuscleRows(), null).assignment;
     const exerciseMapped = (mappings: EditorMapping[]): ExerciseCatalogExercise => ({
       id: 'exercise',
       name: 'Exercise',
@@ -223,7 +224,7 @@ describe('exercise-editor-model', () => {
 
     it('shows an exercise mapped Quads primary and Adductors secondary as Quads once, primary', () => {
       const squat = exerciseMapped([primary('quads'), secondary('adductors')]);
-      expect(editorOpenState(squat, null, broad)).toMatchObject({ primaryMuscleGroupIds: ['quads'], secondaryMuscleRows: [] });
+      expect(editorOpenState(squat, null, broad)).toMatchObject({ primaryMuscleGroupIds: ['cm_quads'], secondaryMuscleRows: [] });
       expect(editorOpenState(squat, null, detailed)).toMatchObject({
         primaryMuscleGroupIds: ['quads'],
         secondaryMuscleRows: [{ muscleGroupId: 'adductors' }],
@@ -232,14 +233,14 @@ describe('exercise-editor-model', () => {
 
     it('adds Back as one mapping to its anchor, Lats', () => {
       const row = exerciseMapped([primary('biceps')]);
-      expect(saveUnderBroad(row, 'biceps', ['back_lats']).mappings).toEqual([secondary('back_lats'), primary('biceps')]);
+      expect(saveUnderBroad(row, 'cm_biceps', ['cm_back']).mappings).toEqual([secondary('back_lats'), primary('biceps')]);
     });
 
     it('keeps an unchanged muscle\'s mappings as they were, entry by entry', () => {
       const deadlift = exerciseMapped([primary('glutes_max'), primary('hamstrings'), secondary('hip_abductors'), secondary('quads')]);
       const opened = editorOpenState(deadlift, null, broad);
-      expect(opened).toMatchObject({ primaryMuscleGroupIds: ['glutes_max'], secondaryMuscleRows: [{ muscleGroupId: 'quads' }] });
-      expect(saveUnderBroad(deadlift, 'glutes_max', ['quads']).mappings).toEqual([
+      expect(opened).toMatchObject({ primaryMuscleGroupIds: ['cm_glutes_hams'], secondaryMuscleRows: [{ muscleGroupId: 'cm_quads' }] });
+      expect(saveUnderBroad(deadlift, 'cm_glutes_hams', ['cm_quads']).mappings).toEqual([
         primary('glutes_max'), primary('hamstrings'), secondary('hip_abductors'), secondary('quads'),
       ]);
     });
@@ -256,30 +257,30 @@ describe('exercise-editor-model', () => {
     it.each([broad, detailed])('saves a primary as secondary when explicitly moved to the secondary selection', (assignment) => {
       const squat = exerciseMapped([primary('glutes_max'), primary('quads')]);
       const saved = validateEditorInput({ name: squat.name, loadInputMode: 'total_load',
-        primaryMuscleGroupIds: ['glutes_max'],
-        secondaryMuscleRows: [{ rowId: 'new-secondary-row', muscleGroupId: 'quads' }],
+        primaryMuscleGroupIds: [assignment.get('glutes_max')!.muscle.id],
+        secondaryMuscleRows: [{ rowId: 'new-secondary-row', muscleGroupId: assignment.get('quads')!.muscle.id }],
         openedMappings: squat.mappings, assignment });
       expect(saved.mappings).toEqual([primary('glutes_max'), secondary('quads')]);
     });
 
     it('rewrites every Glute Max, Hamstrings and Hip Abductors mapping when Glutes & Hams turns secondary, and removes them all', () => {
       const deadlift = exerciseMapped([primary('glutes_max'), primary('hamstrings'), secondary('hip_abductors'), secondary('quads')]);
-      expect(saveUnderBroad(deadlift, 'quads', ['glutes_max']).mappings).toEqual([
+      expect(saveUnderBroad(deadlift, 'cm_quads', ['cm_glutes_hams']).mappings).toEqual([
         secondary('glutes_max'), secondary('hamstrings'), secondary('hip_abductors'), primary('quads'),
       ]);
-      expect(saveUnderBroad(deadlift, 'quads', []).mappings).toEqual([primary('quads')]);
+      expect(saveUnderBroad(deadlift, 'cm_quads', []).mappings).toEqual([primary('quads')]);
     });
 
     it('keeps a Forearms mapping it hides under Broad, and needs no primary when the hidden one is primary', () => {
       const curl = exerciseMapped([primary('biceps'), secondary('forearms_grip')]);
-      expect(editorOpenState(curl, null, broad)).toMatchObject({ primaryMuscleGroupIds: ['biceps'], secondaryMuscleRows: [] });
-      expect(saveUnderBroad(curl, 'biceps', []).mappings).toEqual([primary('biceps'), secondary('forearms_grip')]);
-      expect(saveUnderBroad(curl, 'biceps', ['back_lats']).mappings).toEqual([
+      expect(editorOpenState(curl, null, broad)).toMatchObject({ primaryMuscleGroupIds: ['cm_biceps'], secondaryMuscleRows: [] });
+      expect(saveUnderBroad(curl, 'cm_biceps', []).mappings).toEqual([primary('biceps'), secondary('forearms_grip')]);
+      expect(saveUnderBroad(curl, 'cm_biceps', ['cm_back']).mappings).toEqual([
         secondary('back_lats'), primary('biceps'), secondary('forearms_grip'),
       ]);
 
       const agentWeighted = exerciseMapped([primary('biceps'), { muscleGroupId: 'forearms_grip', weight: 0.3, role: 'secondary' }]);
-      expect(saveUnderBroad(agentWeighted, 'biceps', []).mappings).toEqual([
+      expect(saveUnderBroad(agentWeighted, 'cm_biceps', []).mappings).toEqual([
         primary('biceps'), { muscleGroupId: 'forearms_grip', weight: 0.3, role: 'secondary' },
       ]);
 
@@ -290,21 +291,21 @@ describe('exercise-editor-model', () => {
     });
 
     it('adds a tracked entry when the reported anchor is hidden, preserving its raw Primary', () => {
-      const assignment = buildMuscleSetup(broadMuscleRows().map((row) => row.id === 'chest' ? { ...row, tracked: 0 } : row)).assignment;
+      const assignment = buildMuscleSetup(broadMuscleRows().map((row) => row.id === 'chest' ? { ...row, tracked: 0 } : row), BROAD_COMBINED_MUSCLES).assignment;
       const opened = exerciseMapped([primary('chest')]);
       expect(editorOpenState(opened, null, assignment)).toMatchObject({ primaryMuscleGroupIds: [], secondaryMuscleRows: [] });
       const saved = validateEditorInput({ name: opened.name, loadInputMode: 'total_load', primaryMuscleGroupIds: [],
-        secondaryMuscleRows: [{ rowId: 'visible-chest', muscleGroupId: 'chest' }], openedMappings: opened.mappings, assignment });
+        secondaryMuscleRows: [{ rowId: 'visible-chest', muscleGroupId: 'cm_chest' }], openedMappings: opened.mappings, assignment });
       expect(saved.mappings).toEqual([secondary('serratus_anterior'), primary('chest')]);
       expect(editorOpenState(exerciseMapped(saved.mappings!), null, assignment)).toMatchObject({
-        primaryMuscleGroupIds: [], secondaryMuscleRows: [{ muscleGroupId: 'chest' }],
+        primaryMuscleGroupIds: [], secondaryMuscleRows: [{ muscleGroupId: 'cm_chest' }],
       });
     });
 
     it('rejects a Primary selection that cannot resolve to any tracked entry', () => {
       const assignment = buildMuscleSetup(broadMuscleRows().map((row) =>
-        ['chest', 'serratus_anterior'].includes(row.id) ? { ...row, tracked: 0 } : row)).assignment;
-      expect(validateEditorInput({ name: 'Exercise', loadInputMode: 'total_load', primaryMuscleGroupIds: ['chest'],
+        ['chest', 'serratus_anterior'].includes(row.id) ? { ...row, tracked: 0 } : row), BROAD_COMBINED_MUSCLES).assignment;
+      expect(validateEditorInput({ name: 'Exercise', loadInputMode: 'total_load', primaryMuscleGroupIds: ['cm_chest'],
         secondaryMuscleRows: [], assignment })).toMatchObject({
         validation: { primaryMuscleError: 'Select a primary muscle before saving.' }, mappings: null,
       });
@@ -314,13 +315,13 @@ describe('exercise-editor-model', () => {
       const backExtension = exerciseMapped([primary('spinal_erectors'), secondary('glutes_max'), secondary('hamstrings')]);
       expect(editorOpenState(backExtension, null, broad)).toMatchObject({
         primaryMuscleGroupIds: [],
-        secondaryMuscleRows: [{ muscleGroupId: 'glutes_max' }],
+        secondaryMuscleRows: [{ muscleGroupId: 'cm_glutes_hams' }],
       });
-      expect(saveUnderBroad(backExtension, null, ['glutes_max']).mappings).toEqual([
+      expect(saveUnderBroad(backExtension, null, ['cm_glutes_hams']).mappings).toEqual([
         secondary('glutes_max'), secondary('hamstrings'), primary('spinal_erectors'),
       ]);
       const unmarked = exerciseMapped([{ muscleGroupId: 'quads', weight: 0.75, role: 'secondary' }, secondary('adductors')]);
-      expect(editorOpenState(unmarked, null, broad).primaryMuscleGroupIds).toEqual(['quads']);
+      expect(editorOpenState(unmarked, null, broad).primaryMuscleGroupIds).toEqual(['cm_quads']);
     });
   });
 });

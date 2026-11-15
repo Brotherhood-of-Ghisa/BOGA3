@@ -114,8 +114,9 @@ export const planFormBlockFromSuggestion = (
       : [createPlanFormSet(displayEfforts)],
 });
 
-export const emptyPlanForm = (): PlanFormState => ({
+export const emptyPlanForm = (options?: { isRoutine?: boolean }): PlanFormState => ({
   title: '',
+  ...(options?.isRoutine ? { isRoutine: true } : {}),
   scheduleText: '',
   gymId: null,
   blocks: [],

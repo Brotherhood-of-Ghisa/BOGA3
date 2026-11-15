@@ -30,7 +30,6 @@ interface Props {
 
 type Openers = Pick<Props, 'onOpenDay' | 'onOpenWeek'>;
 
-const dayHint = (day: DayCell) => day.sessionIds.length === 1 ? 'Opens the session' : "Opens the day's sessions";
 // A day opens by its sessions.
 const dayOpener = (day: DayCell, onOpenDay: Props['onOpenDay']) =>
   onOpenDay && day.sessionIds.length > 0 ? () => onOpenDay(day) : undefined;
@@ -52,14 +51,14 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
         current={!!day.day?.isToday}
         metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
         onPress={dayOpener(day.day, onOpenDay)}
-        accessibilityHint={dayHint(day.day)}
+        accessibilityHint="Opens the day's sets"
         testID={`${testID}-cell-${day.dateKey}`} />
         : <View key={day.dateKey} style={styles.blankTile} testID={`${testID}-empty-${monthKey}-${day.dateKey}`} />)}
       {week ? <CalendarTile weekly cell={week} dateLabel={`Week of ${formatCalendarDate(row.weekStartDateKey, dateFormat)}`} future={row.weekStartDateKey > data.todayDateKey}
         current={!!week.isCurrentWeek}
         metricLabel={metricLabel} formatValue={formatValue} targetAveraged={data.targetGrading?.averaged}
         onPress={onOpenWeek && week.hasTraining ? () => onOpenWeek(row.weekStartDateKey) : undefined}
-        accessibilityHint="Opens the week's sessions"
+        accessibilityHint="Opens the week's sets"
         testID={`${testID}-week-${monthKey}-${row.weekStartDateKey}`} />
         : <View style={[styles.blankTile, heatmapStyles.weekColumn]} testID={`${testID}-empty-week-${monthKey}-${row.weekStartDateKey}`} />}
     </View>

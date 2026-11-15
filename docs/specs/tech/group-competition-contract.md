@@ -40,6 +40,8 @@ raw Weight, reps board or absolute bodyweight alternative in protocol 4. Raw
 workout values stay kg; percentages never replace them or occupy a kg field.
 The normalized numerator uses `estimatedTotalOneRepMaxKg`, not the personal
 added-load display `estimatedOneRepMaxKg` after subtracting the bodyweight part.
+Stored scores and ordering retain that numerator. Public 1RM display follows
+[[1rm.added-load-display]] through the opt-in reader projection below.
 
 `scoreCompetitionPerformance` uses the existing parser/load/Wathan kernel.
 For every score, source per-side external kg is doubled once; normalized
@@ -82,7 +84,7 @@ performed-set and certification shapes. Unknown nested fields fail decoding.
 Normalized performed-set context contains source/session/set identity, reps,
 performed state, source distribution, achieved instant and ordering. Opt-in
 `x-boga-group-set-metrics: 1` responses add an exact nullable
-`normalized_metrics` object, shown as `%BW` (load, 1RM) and `%BW·reps` (Volume)
+`normalized_metrics` object, shown as `%BW` for load, 1RM and Volume
 and never mixed into absolute totals; absent capability
 keeps legacy shapes. Updated clients accept both exact shapes and evict prior
 cache generations. Its fields are `added_load_percent_bw`, `e1rm_percent_bw` and
@@ -102,8 +104,17 @@ and fenced by revision/source generation, never the reading-dependent hash.
 Old fingerprint fields cannot be renamed into this token without changing their
 origin. Cursor/token expiry or mismatch must reject a stale write.
 
-Group session rows implement [[set.row-figures]] with public Volume divided by
-reps; unit labels follow [[copy.no-weight-unit]]. Other performance labels retain additional load.
+`x-boga-group-added-load: 1` adds nullable `added_e1rm_percent_bw` to normalized
+1RM board rows, historical values, set metrics and CoW rows. It subtracts the
+original rules revision's contribution (a holder's own revision where present),
+or CoW's frozen start contribution, without rewriting scores, rankings or audits.
+Legacy requests keep their exact shapes. Updated readers accept both and show
+unavailable when this projection is absent; zero remains numeric. Disposable
+cache generation 8 retires earlier displays.
+
+Group session rows implement [[set.row-figures]] with public added-load Weight
+and the added 1RM projection; Volume remains total work. Unit labels follow
+[[copy.no-weight-unit]].
 
 All group routes must obey disclosure selected by the current authorized
 group/comparison state, including old history, retired/archived revisions and
@@ -212,6 +223,19 @@ exercises retain reps and conservatively omit kg in an enabled positive group.
 Historical values preserve original units and carry `unavailable` with null
 value when current disclosure suppresses them. Full-session and week totals
 contain no absolute volume field that could recover a redacted contribution.
+`group_competition_redactions` answers current disclosure once per distinct
+(member, definition) in one statement; a reader that materializes it looks
+each row up and falls back to the live helper for a missing pair. One
+statement sees one snapshot, so the answer is the per-row one.
+
+`group_competition_records_history` is a board's records log, newest first by
+event sequence, over every protocol-4 revision (protocol-3 history stays with
+`group_competition_history`): All lists non-voided `record` events naming the
+board's metric, each with its stream record and the member's previous best on
+that metric, plus All lead changes a link, unlink or void made (no record explains
+them); Certified lists Certified lead changes that have a leader. Both
+include rules changes. The cursor binds group, exercise, metric and scope;
+disclosure is the stream's own helpers.
 
 Kernel upgrades rescore live comparisons silently, preserving immutable record
 and certification audits and advancing private record baselines. Personal facts,

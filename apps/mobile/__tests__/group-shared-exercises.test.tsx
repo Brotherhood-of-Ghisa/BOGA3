@@ -49,7 +49,7 @@ import { seedSystemExerciseCatalog } from '@/src/data/exercise-catalog-seeds';
 import { __resetExerciseCatalogCacheForTests } from '@/src/exercise-catalog/cache';
 import { linkExercise, listLinks } from '@/src/data/exercise-group-links';
 import { saveExerciseCatalogExercise, listExerciseCatalogExercises } from '@/src/data/exercise-catalog';
-import { setMuscleReportPreset, setMuscleTracked } from '@/src/data/muscle-report-settings';
+import { applyBroadTemplate, setMuscleTracked } from '@/src/data/muscle-report-settings';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import type { CompetitionStreamSharedExerciseWire, GroupSharedExerciseItemWire } from '@/src/groups/competition-wire';
 
@@ -198,7 +198,7 @@ describe('StreamSharedExerciseCard', () => {
 
   it('projects muscles through user muscle setup: merges broad entries and hides untracked muscles', async () => {
     // Set broad preset (merges 'chest' and 'serratus_anterior' into 'Chest') and untrack 'quads'
-    await setMuscleReportPreset('broad');
+    await applyBroadTemplate();
     await setMuscleTracked(['quads'], false);
     await invalidateExerciseCatalogCache();
 

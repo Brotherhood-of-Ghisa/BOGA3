@@ -48,6 +48,7 @@ export type SessionViewExerciseCard = {
   rows: SessionViewSetRow[];
   // The card's `record` band: a line per record it holds, empty without one.
   record: RecordLine[];
+  injuryWarning?: 'acute' | 'managing' | 'monitoring' | null;
 };
 
 export type SessionViewModel = {
@@ -164,7 +165,8 @@ export const buildSessionViewModel = (
   // Each exercise definition's records in the sessions before this one;
   // absent without an earlier record, while history loads or when it failed,
   // which shows no record rather than a wrong one.
-  recordBaselineByDefinitionId: ReadonlyMap<string, RecordBaseline>
+  recordBaselineByDefinitionId: ReadonlyMap<string, RecordBaseline>,
+  injuryWarningSeverities?: ReadonlyMap<string, 'acute' | 'managing' | 'monitoring'> | null
 ): SessionViewModel => {
   const insightExercises = toSessionInsightExercises(session, new Map());
   const volumeMetrics: SetMetrics[] = [];
@@ -199,6 +201,7 @@ export const buildSessionViewModel = (
       totalCount: figures.length,
       rows,
       record: cardRecordBand(record, exercise.id),
+      injuryWarning: injuryWarningSeverities?.get(exercise.id) ?? null,
     };
   });
 

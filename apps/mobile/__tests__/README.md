@@ -222,7 +222,7 @@ single-set Volume, effective total-load 1RM normalization with the same dated B,
 physical source distribution, ordinary target conversion, missing/invalid/zero
 omission, full-precision scores and exact public allowlists. Nested kg/private
 fields, dependency digests and unsupported units/versions must fail decoding.
-`groups-cache.test.ts` proves group-scoped version-7 session keys and account-only
+`groups-cache.test.ts` proves group-scoped version-8 session keys and account-only
 whole-group-cache eviction across generations. The backend competition fixture
 runs the actual negotiation response through the mobile decoder and proves
 anonymous/OAuth/outsider/unsupported-protocol denial.

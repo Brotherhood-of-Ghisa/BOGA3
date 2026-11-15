@@ -5,8 +5,8 @@
  */
 import { configure, screen, within } from '@testing-library/react-native';
 
-import { HueRing } from '@/components/appearance/hue-ring';
-import { ThemePreview } from '@/components/appearance/theme-preview';
+import { PartSpotlight, ThemePreview } from '@/components/appearance/theme-preview';
+import { HeaderTitleMenu } from '@/components/ui';
 import { SignedOutCard } from '@/components/profile/profile-cards';
 import { generateRoles } from '@/components/ui/theme';
 import { seedsFromHue } from '@/components/ui/theme-hue';
@@ -59,11 +59,24 @@ describe('ThemePreview', () => {
   });
 });
 
-describe('HueRing', () => {
-  it('names the hue as a title and its degrees as a muted figure', () => {
-    renderWithTheme(<HueRing hue={47} onChange={jest.fn()} testID="ring" />);
-    expect(screen.getByTestId('ring-name')).toHaveStyle(TITLE);
-    expect(screen.getByText('47°')).toHaveStyle({ ...FIGURE, color: defaultRoles.inkMuted });
+describe('PartSpotlight', () => {
+  beforeAll(() => configure({ defaultIncludeHiddenElements: true }));
+  afterAll(() => configure({ defaultIncludeHiddenElements: false }));
+  const roles = generateRoles(seedsFromHue(200));
+
+  it('names each sample in meta words, in the previewed theme’s muted ink', () => {
+    renderWithTheme(<PartSpotlight part="text" roles={roles} testID="spotlight" />);
+    expect(screen.getByText('Faint')).toHaveStyle({ ...META, color: roles.inkMuted });
+  });
+});
+
+describe('HeaderTitleMenu', () => {
+  it('draws the current option in the sheet-title role', () => {
+    renderWithTheme(
+      <HeaderTitleMenu currentId="b" onChoose={jest.fn()} options={[{ id: 'a', label: 'Alpha' }, { id: 'b', label: 'Beta' }]}
+        sheetTitle="Letter" testID="title" />,
+    );
+    expect(screen.getByText('Beta')).toHaveStyle({ fontFamily: uiFonts.display.family, color: defaultRoles.ink });
   });
 });
 

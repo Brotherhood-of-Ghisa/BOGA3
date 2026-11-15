@@ -1,10 +1,12 @@
 import type { IconName } from '@/components/ui/icon-glyphs';
 
-export type MoreDestinationKey = 'exercises' | 'gyms' | 'connect-ai' | 'settings';
+export type MoreDestinationKey = 'planner' | 'exercises' | 'gyms' | 'notes' | 'connect-ai' | 'settings';
 
 export type MoreRoute =
+  | '/planner'
   | '/exercise-catalog'
   | '/gyms'
+  | '/notes'
   | '/settings';
 
 export type MoreDestination = {
@@ -21,6 +23,13 @@ export type MoreDestination = {
 export const MORE_GROUPS: readonly (readonly MoreDestination[])[] = [
   [
     {
+      key: 'planner',
+      label: 'Planner',
+      icon: 'calendar-grid',
+      testID: 'more-planner-row',
+      action: { type: 'route', href: '/planner' },
+    },
+    {
       key: 'exercises',
       label: 'Exercises',
       icon: 'database',
@@ -33,6 +42,13 @@ export const MORE_GROUPS: readonly (readonly MoreDestination[])[] = [
       icon: 'location',
       testID: 'more-gyms-row',
       action: { type: 'route', href: '/gyms' },
+    },
+    {
+      key: 'notes',
+      label: 'Notes',
+      icon: 'notes',
+      testID: 'more-notes-row',
+      action: { type: 'route', href: '/notes' },
     },
   ],
   [

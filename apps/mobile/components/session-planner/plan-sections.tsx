@@ -133,14 +133,24 @@ const planDetailLine = (plan: PlanSummaryView, dateFormat: ExerciseDateFormat): 
 };
 
 /** The quiet Plan session action: the hub's persistent entry and the empty states' one. */
-export function PlanSessionAction({ onPress, testID = 'plan-session-action' }: { onPress: () => void; testID?: string }) {
+export function PlanSessionAction({
+  onPress,
+  label = 'Plan session',
+  accessibilityLabel = 'Plan a session',
+  testID = 'plan-session-action',
+}: {
+  onPress: () => void;
+  label?: string;
+  accessibilityLabel?: string;
+  testID?: string;
+}) {
   return (
     <ListRow
-      accessibilityLabel="Plan a session"
+      accessibilityLabel={accessibilityLabel}
       density="list"
       divider={false}
       leading={<Icon name="plus" size="xs" />}
-      label="Plan session"
+      label={label}
       onPress={onPress}
       testID={testID}
     />
@@ -173,7 +183,15 @@ export type PlanSectionsState = {
 };
 
 /** The reusable-intent section stays visible across empty, loading and failed reads. */
-export function RoutinePlanSection({ state, onOpenPlan }: { state: PlanSectionsState; onOpenPlan: (id: string) => void }) {
+export function RoutinePlanSection({
+  state,
+  onOpenPlan,
+  testID = 'sessions-plan-section-routines',
+}: {
+  state: PlanSectionsState;
+  onOpenPlan: (id: string) => void;
+  testID?: string;
+}) {
   return <PlanSection
     emptyMessage="No routines yet."
     errorMessage={state.loadErrorMessage}
@@ -182,7 +200,7 @@ export function RoutinePlanSection({ state, onOpenPlan }: { state: PlanSectionsS
     onOpenPlan={onOpenPlan}
     onRetry={() => void state.reload()}
     plans={state.routines}
-    testID="sessions-plan-section-routines"
+    testID={testID}
   />;
 }
 

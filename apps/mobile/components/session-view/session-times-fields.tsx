@@ -7,6 +7,7 @@ import { uiSpace } from '@/components/ui/tokens';
 import type { SessionTimesText, SessionTimesValidation } from '@/src/session-recorder/session-times';
 
 export type SessionTimesFieldsProps = {
+  readOnly?: boolean;
   text: SessionTimesText;
   errors: SessionTimesValidation;
   // The autosave-paused notice, while the times are invalid.
@@ -18,6 +19,7 @@ export type SessionTimesFieldsProps = {
 };
 
 type TimeFieldProps = {
+  readOnly?: boolean;
   label: string;
   value: string;
   error: string | null;
@@ -28,7 +30,7 @@ type TimeFieldProps = {
 
 // A labelled time field: a `FormField` (the logger's field style) whose
 // figure `base` fits the 16 characters of a time in half the card's width.
-function TimeField({ label, value, error, onChange, onCommit, testID }: TimeFieldProps) {
+function TimeField({ label, value, error, onChange, onCommit, testID, readOnly }: TimeFieldProps) {
   const dateFormat = useDateFormat();
   return (
     <FormField
@@ -38,6 +40,7 @@ function TimeField({ label, value, error, onChange, onCommit, testID }: TimeFiel
       autoCorrect={false}
       containerStyle={styles.column}
       error={error}
+      editable={!readOnly}
       keyboardType="numbers-and-punctuation"
       label={label}
       onBlur={onCommit}
@@ -58,6 +61,7 @@ function TimeField({ label, value, error, onChange, onCommit, testID }: TimeFiel
  * elapsed Time (the completed edit).
  */
 export function SessionTimesFields({
+  readOnly,
   text,
   errors,
   notice,
@@ -71,6 +75,7 @@ export function SessionTimesFields({
     <View style={styles.section} testID="session-view-times">
       <View style={styles.row}>
         <TimeField
+          readOnly={readOnly}
           error={errors.start}
           label="Start"
           onChange={onChangeStart}
@@ -79,6 +84,7 @@ export function SessionTimesFields({
           value={text.start}
         />
         <TimeField
+          readOnly={readOnly}
           error={errors.end}
           label="End"
           onChange={onChangeEnd}

@@ -19,9 +19,8 @@ appId: com.dinoderek.mobile
 #      Progress finds Exercise.
 #   6. an exercise row pushes its history page; its chart scrolls inside the
 #      page, and native back returns to Progress;
-#   7. the history grid opens its sessions ([[session.history-open]]): today's
-#      Grid tile opens the session just logged, and this week's Weekly row
-#      opens Sessions at its week; Back returns to the page in the view left.
+#   7. Grid and Weekly open scoped set cards; only the card opens its workout.
+#      Native Back returns through the detail to the unchanged chart.
 # Why device:
 #   1. and 5. the on-device expo-sqlite runtime and boot data layer;
 #   2. and 3. a real sheet and the keyboard;
@@ -180,6 +179,73 @@ appId: com.dinoderek.mobile
     visible:
       id: "stats-view-mode-chip-muscle"
     timeout: 15000
+# Both subject kinds must survive native same-route navigation to set cards.
+- evalScript: ${output.today = (function() { var d = new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); })()}
+- evalScript: ${output.monday = (function() { var d = new Date(); d.setDate(d.getDate()-(d.getDay()+6)%7); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); })()}
+- scrollUntilVisible:
+    element:
+      id: "stats-muscle-history-quads"
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: "stats-muscle-history-quads"
+- extendedWaitUntil:
+    visible:
+      id: "stats-muscle-history-view-chip-row"
+    timeout: 15000
+- tapOn:
+    id: "stats-muscle-history-view-chip-daily"
+- tapOn:
+    id: "stats-muscle-history-heatmap-cell-${output.today}"
+- extendedWaitUntil:
+    visible:
+      id: "muscle-period-detail-sets-card-.*"
+    timeout: 15000
+- assertNotVisible:
+    id: "sessions-screen"
+- takeScreenshot: "05a-muscle-day-sets"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "BackButton"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- tapOn:
+    id: "stats-muscle-history-view-chip-weekly"
+- tapOn:
+    id: "stats-muscle-history-heatmap-cell-${output.monday}"
+- extendedWaitUntil:
+    visible:
+      id: "muscle-period-detail-sets-card-.*"
+    timeout: 15000
+- takeScreenshot: "05b-muscle-week-sets"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "BackButton"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "BackButton"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
 - tapOn:
     id: "stats-view-mode-chip"
 - extendedWaitUntil:
@@ -224,36 +290,59 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "stats-exercise-history-metric-chip-workingSetCount"
 - takeScreenshot: "06-history-page-grid"
-# 7. Today's tile holds the one Squat session this flow logged: it opens it,
-# and Back returns to the page, still on Grid.
+# 7. The day opens its performed sets; the card opens the workout.
+# Device check: the same-route push and two native Back transitions retain Grid.
 - evalScript: ${output.today = (function() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); })()}
 - evalScript: ${output.monday = (function() { var d = new Date(); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); })()}
 - tapOn:
     id: "stats-exercise-history-heatmap-cell-${output.today}"
 - extendedWaitUntil:
     visible:
+      id: "exercise-period-detail-sets-card-.*"
+    timeout: 15000
+- assertNotVisible:
+    id: "sessions-screen"
+- takeScreenshot: "06a-history-day-opens-sets"
+- tapOn:
+    id: "exercise-period-detail-sets-card-.*"
+- extendedWaitUntil:
+    visible:
       id: "completed-session-detail-screen"
     timeout: 15000
-- takeScreenshot: "06a-history-day-opens-session"
 # View Session draws its own header: its back control, not UIKit's.
 - tapOn:
     id: "completed-session-detail-back"
 - extendedWaitUntil:
     visible:
+      id: "exercise-period-detail"
+    timeout: 10000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: "BackButton"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- extendedWaitUntil:
+    visible:
       id: "stats-exercise-history-heatmap-cell-${output.today}"
     timeout: 10000
-# This week's Weekly row opens Sessions at that week; Back returns to Weekly.
+# This week's Weekly bar opens its sets; Back returns to Weekly.
 - tapOn:
     id: "stats-exercise-history-view-chip-weekly"
 - tapOn:
     id: "stats-exercise-history-heatmap-cell-${output.monday}"
 - extendedWaitUntil:
     visible:
-      id: "completed-history-week-${output.monday}"
+      id: "exercise-period-detail-sets-card-.*"
     timeout: 15000
-- assertVisible:
+- assertNotVisible:
     id: "sessions-screen"
-- takeScreenshot: "06b-history-week-opens-sessions"
+- takeScreenshot: "06b-history-week-opens-sets"
 - runFlow:
     when:
       platform: iOS

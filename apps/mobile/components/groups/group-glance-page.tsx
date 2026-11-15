@@ -1,10 +1,12 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { useEffect, useState, type ReactElement } from 'react';
-import { ScrollView, StyleSheet, Text, View, type RefreshControlProps, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type RefreshControlProps, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { FigureText } from '@/components/ui/figure-text';
 import { SummaryTile } from '@/components/ui/summary-tile';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { makeStyles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
 import type { GroupApiError } from '@/src/groups/api';
 import {
@@ -15,12 +17,15 @@ import {
   type GroupHomePeriod,
   type GroupHomeWindow,
 } from '@/src/groups/home-periods';
+import type { CompetitionStreamItemWire } from '@/src/groups/competition-wire';
 import type { GroupGlanceHeld } from '@/src/groups/use-group-glance';
+import { buildLatestGroupRecordRows, buildLatestSessionRows, type LatestRowViewModel } from '@/src/groups/week-summary-view-model';
 import {
   buildGroupHomeBoard,
   buildGroupRankSeries,
   buildGroupWeekTotals,
   GROUP_HOME_METRIC_LABELS,
+  GROUP_HOME_METRIC_UNIT,
 } from '@/src/groups/home-view-model';
 
 import { GroupCycleButton } from './group-cycle-button';
@@ -50,6 +55,9 @@ export type GroupGlancePageProps = {
   /** The page scrolls under the pinned controls, pulled to refresh. */
   refreshControl?: ReactElement<RefreshControlProps>;
   style?: StyleProp<ViewStyle>;
+  /** The group's loaded stream: its latest completed sessions, or group records for the GR metric, fill the last card, whatever the period. */
+  streamItems?: CompetitionStreamItemWire[];
+  onOpenSession?: (memberUserId: string, sessionId: string) => void;
   error: GroupApiError | null;
   offline: boolean;
   onRetry: () => void;
@@ -59,7 +67,7 @@ const PERIOD_NOUN: Record<GroupHomePeriod, string> = { week: 'weeks' };
 
 const METRIC_OPTIONS = [
   { value: 'sets' as const, label: GROUP_HOME_METRIC_LABELS.sets },
-  { value: 'prs' as const, label: GROUP_HOME_METRIC_LABELS.prs },
+  { value: 'prs' as const, label: GROUP_HOME_METRIC_LABELS.prs, spokenLabel: 'Group records' },
 ];
 
 /**
@@ -88,7 +96,10 @@ function useHoldFade(holding: boolean): boolean {
  * before; `Top brothers`, the period's top five by the chosen metric; and
  * `Rankings over time`, every member's place over six periods with the
  * selected one fourth where later periods allow. A column tap selects its
- * period, as the stepper does, and every card follows.
+ * period, as the stepper does, and every card follows. Last, `Latest
+ * sessions` lists the group's newest sessions in the loaded stream (up to
+ * five), whatever the period; with the GR metric it is `Latest group
+ * records`, the group's newest GRs there instead.
  */
 export function GroupGlancePage({
   myUserId,
@@ -105,6 +116,8 @@ export function GroupGlancePage({
   onRetry,
   refreshControl,
   style,
+  streamItems = [],
+  onOpenSession,
 }: GroupGlancePageProps) {
   const dateFormat = useDateFormat();
   const faded = useHoldFade(held !== null);
@@ -154,6 +167,8 @@ export function GroupGlancePage({
         ) : (
           <GroupMissingDataState error={error} offline={offline} onRetry={onRetry} testIDPrefix="group-glance" />
         )}
+        <LatestCard metric={metric} onOpenSession={onOpenSession}
+          rows={metric === 'prs' ? buildLatestGroupRecordRows(streamItems, myUserId, dateFormat) : buildLatestSessionRows(streamItems, myUserId, dateFormat)} />
       </ScrollView>
     </View>
   );
@@ -196,7 +211,7 @@ function GlanceCards({
   return (
     <View
       accessibilityState={{ busy: held !== null }}
-      style={[styles.sections, faded ? styles.held : null]}
+      style={[styles.figures, faded ? styles.held : null]}
       testID="group-glance-figures">
       <SummaryTile testID="group-week-totals-card" title="Group stats" titleTestID="group-week-totals-title"
         metrics={<GroupWeekTotalsFigures current={totals.current} offset={figuresOffset} previous={totals.previous} />} />
@@ -207,7 +222,7 @@ function GlanceCards({
         <View style={styles.card}>
           <CardTitle testID="group-position-title" title="Rankings over time" />
           <GroupRankChart
-            accessibilityLabel={`Place over ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} by ${GROUP_HOME_METRIC_LABELS[metric].toLowerCase()}`}
+            accessibilityLabel={`Place over ${GROUP_RANK_PERIODS} ${PERIOD_NOUN[figures.period]} by ${GROUP_HOME_METRIC_UNIT[metric]}`}
             columnLabels={rankSeries.periods.map((entry) => groupHomeColumnLabel(figures.period, entry.window, dateFormat))}
             onSelect={(index) => onOffsetChange(Math.min(0, figures.offset - (last - index)))}
             selectedIndex={selectedIndex}
@@ -218,6 +233,62 @@ function GlanceCards({
     </View>
   );
 }
+
+const LATEST_CARD: Record<GroupHomeMetric, { title: string; testID: string; rowTestID: string }> = {
+  sets: { title: 'Latest sessions', testID: 'group-latest-sessions', rowTestID: 'group-latest-session' },
+  prs: { title: 'Latest group records', testID: 'group-latest-records', rowTestID: 'group-latest-record' },
+};
+
+/**
+ * The last card, one row each — who, when, and the figure: the group's latest
+ * sessions and their sets, or its latest group records, each naming its
+ * exercise. Either row opens the session it was set in.
+ */
+function LatestCard({ metric, rows, onOpenSession }: {
+  metric: GroupHomeMetric; rows: LatestRowViewModel[]; onOpenSession?: (memberUserId: string, sessionId: string) => void;
+}) {
+  const text = useUiText();
+  const tone = useUiTextTone();
+  const themed = useLatestStyles();
+  const card = LATEST_CARD[metric];
+  if (rows.length === 0) return null;
+  return (
+    <Card testID={`${card.testID}-card`}>
+      <View style={styles.card}>
+        <CardTitle testID={`${card.testID}-title`} title={card.title} />
+        <View>
+          {rows.map((row, index) => (
+            <Pressable
+              accessibilityHint={onOpenSession ? 'Opens their session' : undefined}
+              accessibilityLabel={row.accessibilityLabel}
+              accessibilityRole={onOpenSession ? 'button' : undefined}
+              disabled={!onOpenSession}
+              key={row.key}
+              onPress={() => onOpenSession?.(row.memberUserId, row.sessionId)}
+              style={[styles.latestRow, index > 0 ? themed.divider : null]}
+              testID={`${card.rowTestID}-${row.key}`}>
+              <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.bodyStrong, styles.latestName]}>
+                {row.name}
+                {row.exercise ? <Text allowFontScaling={false} style={[text.meta, tone.ink]}>{` · ${row.exercise}`}</Text> : null}
+              </Text>
+              <Text allowFontScaling={false} numberOfLines={1} style={text.meta}>
+                <FigureText>{row.when}</FigureText>
+              </Text>
+              <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.ink, styles.latestValue, row.record ? tone.record : null]}
+                testID={`${card.rowTestID}-${row.key}-value`}>
+                <FigureText figureStyle={row.record ? tone.record : undefined}>{row.value}</FigureText>
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    </Card>
+  );
+}
+
+const useLatestStyles = makeStyles((roles) => ({
+  divider: { borderTopWidth: 1, borderTopColor: roles.ruleSoft },
+}));
 
 /** A card's heading, as Today's cards head theirs: an ink micro-label at the card's top. */
 function CardTitle({ title, testID }: { title: string; testID: string }) {
@@ -238,6 +309,12 @@ const styles = StyleSheet.create({
     gap: uiSpace.md,
     paddingBottom: uiSpace.lg,
   },
+  // The figure cards sit inside the scroll's column: the same gap between
+  // them, but no bottom padding of their own, so the gap to the next card
+  // matches every other one.
+  figures: {
+    gap: uiSpace.md,
+  },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -250,6 +327,20 @@ const styles = StyleSheet.create({
   metric: {
     flex: 0,
     minWidth: 72,
+  },
+  latestRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: uiSpace.sm,
+    paddingVertical: uiSpace.sm,
+  },
+  latestName: {
+    flex: 1,
+    minWidth: 0,
+  },
+  latestValue: {
+    minWidth: 56,
+    textAlign: 'right',
   },
   // A held read under a new period label: faded until the read in view lands.
   held: {

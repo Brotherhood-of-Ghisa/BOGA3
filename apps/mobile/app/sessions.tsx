@@ -1,4 +1,4 @@
-import { Stack, useIsFocused, useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { Stack, useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -13,14 +13,6 @@ import {
   type SessionListDataClient,
   type SessionListItem,
 } from '@/components/session-list';
-import {
-  NewProgrammeAction,
-  PlanSection,
-  RoutinePlanSection,
-  PlanSessionAction,
-  usePlanSections,
-} from '@/components/session-planner/plan-sections';
-import { StatePanel } from '@/components/ui/state-panel';
 import {
   IconButton,
   Screen,
@@ -40,9 +32,8 @@ export type SessionsScreenProps = {
 };
 
 /**
- * The planning queues hold unfinished work; Show completed plans reveals a
- * separate section before workout history, including resolved programme children.
- * Both view options last for this screen mount; workout history is independent.
+ * Dedicated workout history screen: completed workouts grouped by week/month/day,
+ * active workout card if one is running, and Show deleted sessions toggle in options.
  */
 export function SessionsScreen({
   dataClient,
@@ -53,7 +44,6 @@ export function SessionsScreen({
   const router = useRouter();
   const text = useUiText();
   const tone = useUiTextTone();
-  const [showCompletedPlans, setShowCompletedPlans] = useState(false);
   const [showDeletedSessions, setShowDeletedSessions] = useState(false);
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [activeDurationNowMs, setActiveDurationNowMs] = useState(() => Date.now());
@@ -66,18 +56,6 @@ export function SessionsScreen({
       showDeletedSessions,
       isFocused,
     });
-  const planSections = usePlanSections();
-  const upcoming = planSections.upcoming.filter((plan) => plan.progress !== 'completed');
-  const unscheduled = planSections.unscheduled.filter((plan) => plan.progress !== 'completed');
-  const programmes = planSections.programmes.filter((programme) => programme.progress !== 'completed');
-  const completedPlans = showCompletedPlans ? [...new Map([
-    ...planSections.upcoming,
-    ...planSections.unscheduled,
-    ...planSections.programmes.flatMap((programme) => programme.plans.filter((plan) => plan.scheduledFor === null)),
-  ].filter((plan) => plan.progress === 'completed').map((plan) => [plan.id, plan])).values()] : [];
-  const completedProgrammes = showCompletedPlans ? [...new Map(planSections.programmes
-    .filter((programme) => programme.progress === 'completed')
-    .map((programme) => [programme.id, programme])).values()] : [];
 
   const activeSessions = sessions.filter(
     (session) => session.status === 'active' && session.deletedAt === null
@@ -91,21 +69,10 @@ export function SessionsScreen({
       return rightTime - leftTime;
     });
 
-  const planningEmpty =
-    !planSections.isLoading &&
-    !planSections.loadErrorMessage &&
-    planSections.routines.length === 0 &&
-    upcoming.length === 0 &&
-    unscheduled.length === 0 &&
-    programmes.length === 0 &&
-    completedPlans.length === 0 &&
-    completedProgrammes.length === 0;
-
   const showGlobalEmptyState =
     !isLoadingSessions &&
     !loadErrorMessage &&
     activeSessions.length === 0 &&
-    planningEmpty &&
     completedSessions.length === 0;
 
   useEffect(() => {
@@ -139,23 +106,6 @@ export function SessionsScreen({
     );
   };
 
-  const openPlanNew = () => {
-    // The routes land with the plan form and detail; the cast falls away then.
-    router.push('/session-plan/new' as Href);
-  };
-
-  const openPlan = (planId: string) => {
-    router.push(`/session-plan/${encodeURIComponent(planId)}` as Href);
-  };
-
-  const openProgrammeNew = () => {
-    router.push('/programme/new' as Href);
-  };
-
-  const openProgramme = (programmeId: string) => {
-    router.push(`/programme/${encodeURIComponent(programmeId)}` as Href);
-  };
-
   const openCompletedSessionSummary = (sessionId: string) => {
     router.push(`/completed-session/${encodeURIComponent(sessionId)}`);
   };
@@ -167,46 +117,20 @@ export function SessionsScreen({
           <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
             Active
           </Text>
-          {activeSessions.map(activeSession => <ActiveSessionRow
-            key={activeSession.id}
-            session={activeSession}
-            nowMs={activeDurationNowMs}
-            onResume={() => openActiveSession(activeSession.id)}
-            onComplete={() => openActiveSession(activeSession.id)}
-            onDelete={() => {
-              void discardActiveSession(activeSession.id, activeSession.mergeRevision ?? 0);
-            }}
-          />)}
+          {activeSessions.map((activeSession) => (
+            <ActiveSessionRow
+              key={activeSession.id}
+              nowMs={activeDurationNowMs}
+              onComplete={() => openActiveSession(activeSession.id)}
+              onDelete={() => {
+                void discardActiveSession(activeSession.id, activeSession.mergeRevision ?? 0);
+              }}
+              onResume={() => openActiveSession(activeSession.id)}
+              session={activeSession}
+            />
+          ))}
         </View>
       ) : null}
-
-      {/* The hub's persistent authoring entry; the planning sections' rows
-          open the plan detail. */}
-      <PlanSessionAction onPress={openPlanNew} testID="sessions-plan-session-action" />
-      <NewProgrammeAction onPress={openProgrammeNew} testID="sessions-new-programme-action" />
-      <RoutinePlanSection state={planSections} onOpenPlan={openPlan} />
-      <PlanSection
-        label="Upcoming"
-        onOpenPlan={openPlan}
-        plans={upcoming}
-        testID="sessions-plan-section-upcoming"
-      />
-      <PlanSection
-        label="Unscheduled"
-        onOpenPlan={openPlan}
-        onOpenProgramme={openProgramme}
-        plans={unscheduled}
-        programmes={programmes}
-        testID="sessions-plan-section-unscheduled"
-      />
-      <PlanSection
-        label="Completed plans"
-        onOpenPlan={openPlan}
-        onOpenProgramme={openProgramme}
-        plans={completedPlans}
-        programmes={completedProgrammes}
-        testID="sessions-plan-section-completed"
-      />
     </>
   );
 
@@ -228,9 +152,7 @@ export function SessionsScreen({
       <HistoryList
         header={hub}
         isLoading={isLoadingSessions}
-        // The plans above the history load on their own: jump once they have,
-        // so they cannot push the target down after it lands.
-        jumpTo={planSections.isLoading ? null : jumpTo}
+        jumpTo={jumpTo}
         loadErrorMessage={actionError ?? loadErrorMessage}
         nowMs={loadedAtMs}
         onOpenCompletedSession={openCompletedSessionSummary}
@@ -247,12 +169,6 @@ export function SessionsScreen({
         testID="sessions-options-sheet"
         visible={optionsVisible}>
         <View style={styles.options}>
-          <SwitchRow
-            label="Show completed plans"
-            onValueChange={setShowCompletedPlans}
-            testID="toggle-completed-plans"
-            value={showCompletedPlans}
-          />
           <SwitchRow
             label="Show deleted sessions"
             onValueChange={setShowDeletedSessions}

@@ -1,6 +1,7 @@
 export { exerciseMergeLocal } from './exercise-merge-local';
 export { sessionPlanUses, type SessionPlanUse, type NewSessionPlanUse } from './session-plan-uses';
 export { bodyWeightMeasurements, type BodyWeightMeasurement, type NewBodyWeightMeasurement } from './body-weight-measurements';
+export { trainingNotes, type TrainingNote, type NewTrainingNote } from './training-notes';
 export {
   exerciseDefinitions,
   type ExerciseDefinition,
@@ -70,3 +71,8 @@ export {
   type NewSyncRuntimeState,
   type SyncRuntimeState,
 } from './sync-runtime-state';
+export {
+  injuries,
+  type Injury,
+  type NewInjury,
+} from './injuries';

@@ -78,15 +78,15 @@ test('records show only once the session is completed, never provisional or void
 
 test('one row per #1 board, frozen value, passed-by note, board link and certification target', () => {
   const [rm, volume] = buildSessionRecordRows({ records: [record()], places, groupId: 'g 1', userId: ME });
-  expect(rm).toMatchObject({ key: 'ev-1:e1rm', setId: 'b-2', title: 'Bench · 1RM', value: '122.5', detail: '#1 in group · 110.0 × 2',
+  expect(rm).toMatchObject({ key: 'ev-1:e1rm', setId: 'b-2', title: 'Bench · 1RM', value: '122.5', detail: 'GR · 110.0 × 2',
     boardHref: '/group/g%201/leaderboards/ge-bench?metric=e1rm&scope=all' });
   expect(rm.certification).toEqual({ exercise, eligible: true, target: { metric: 'e1rm', member: alex, former: false,
     write_token: 'tok-1rm', certification: null, performance: { set_id: 'b-2' } } });
-  expect(volume).toMatchObject({ title: 'Bench · Volume', value: '220.0', detail: '#1 in group · 110.0 × 2 · since passed by sam' });
+  expect(volume).toMatchObject({ title: 'Bench · Volume', value: '220.0', detail: 'GR · 110.0 × 2 · since passed by sam', spokenDetail: 'Group record, 110.0 × 2, since passed by sam' });
   expect(volume.certification?.eligible).toBe(false);
   const [, passedByMe] = buildSessionRecordRows({ records: [record({ boards: [{ metric: 'e1rm', leader: alex, leads: true },
     { metric: 'volume', leader: { user_id: ME, username: 'dino' }, leads: false }] })], places, groupId: 'g', userId: ME });
-  expect(passedByMe.detail).toBe('#1 in group · 110.0 × 2 · since passed by you');
+  expect(passedByMe.detail).toBe('GR · 110.0 × 2 · since passed by you');
 });
 
 test('a historic Weight board has no current board to certify or link a metric to; an unknown set or value still reads', () => {
@@ -94,7 +94,7 @@ test('a historic Weight board has no current board to certify or link a metric t
     boards: [{ metric: 'weight' as never, leader: null, leads: false }] })], places, groupId: 'g', userId: ME });
   expect(weight).toMatchObject({ title: 'Bench · Weight', value: '110.0', boardHref: '/group/g/leaderboards/ge-bench', certification: null });
   const [lost] = buildSessionRecordRows({ records: [record({ setId: 'gone', values: [], withContext: false })], places, groupId: 'g', userId: ME });
-  expect(lost).toMatchObject({ value: 'Score unavailable', detail: '#1 in group', certification: null });
+  expect(lost).toMatchObject({ value: 'Score unavailable', detail: 'GR', certification: null });
 });
 
 test('rows follow the session: exercise then set order, then 1RM before Volume', () => {
@@ -107,9 +107,9 @@ test('rows follow the session: exercise then set order, then 1RM before Volume',
 test('the exercise card band: one line per record set, its boards joined', () => {
   const bands = buildSessionRecordBands([record(), record({ eventId: 'ev-pull', setId: 'p-1', groupExercise: { group_exercise_id: 'ge-pull', name: 'Pull' },
     boards: [{ metric: 'volume', leader: alex, leads: true }] }), record({ eventId: 'ev-gone', setId: 'gone' })], places);
-  expect(bands.get('bench')).toEqual([{ key: 'ev-1', label: '#1 in group · 1RM + Volume', set: '110.0 × 2',
-    spoken: '#1 in group on 1RM and Volume, 110.0 × 2' }]);
-  expect(bands.get('pull')).toEqual([{ key: 'ev-pull', label: '#1 in group · Volume', set: '8 reps', spoken: '#1 in group on Volume, 8 reps' }]);
+  expect(bands.get('bench')).toEqual([{ key: 'ev-1', label: 'GR · 1RM + Volume', set: '110.0 × 2',
+    spoken: 'Group record on 1RM and Volume, 110.0 × 2' }]);
+  expect(bands.get('pull')).toEqual([{ key: 'ev-pull', label: 'GR · Volume', set: '8 reps', spoken: 'Group record on Volume, 8 reps' }]);
   expect([...bands.keys()]).toEqual(['bench', 'pull']);
 });
 

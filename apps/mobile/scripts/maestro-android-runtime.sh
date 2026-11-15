@@ -126,6 +126,13 @@ maestro_android_create_avd() {
 
   avd_home="$(maestro_android_avd_home)"
   seed_config="$avd_home/$template.avd/config.ini"
+  if [[ -f "$avd_home/$template.ini" ]]; then
+    local ini_path
+    ini_path="$(awk -F= '$1 == "path" { print $2 }' "$avd_home/$template.ini" | tail -n 1)"
+    if [[ -n "$ini_path" && -f "$ini_path/config.ini" ]]; then
+      seed_config="$ini_path/config.ini"
+    fi
+  fi
   [[ -f "$seed_config" ]] \
     || maestro_fail "Cannot create AVD '$name': template AVD '$template' has no config at $seed_config."
 
@@ -263,4 +270,11 @@ maestro_android_preauthorize_permissions() {
       echo "[maestro]   could not pre-grant '$permission' (best-effort)"
     fi
   done
+
+  # Suppress Google Play Services Location Accuracy prompt and system dialogs
+  adb -s "$serial" shell settings put secure location_mode 3 >/dev/null 2>&1 || true
+  adb -s "$serial" shell settings put secure location_accuracy_acknowledged 1 >/dev/null 2>&1 || true
+  adb -s "$serial" shell settings put secure location_accuracy_state 1 >/dev/null 2>&1 || true
+  adb -s "$serial" shell settings put global location_mode 3 >/dev/null 2>&1 || true
+  adb -s "$serial" shell settings put global google_core_apps_in_background 1 >/dev/null 2>&1 || true
 }

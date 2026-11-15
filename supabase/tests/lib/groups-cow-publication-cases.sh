@@ -61,6 +61,11 @@ run_cow_publication_cases() {
   check 'owner wins Volume independently' '.rankings[0].entries[0].member.user_id==$u' --arg u "${OWNER_UID}"
   rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${g}" --arg c "${c}" '{p_group_id:$g,p_cow_id:$c,p_metric:"e1rm"}')"
   check 'bodyweight 1RM uses the normal group units' '.rankings[0].unit=="percent_bw" and [.rankings[0].entries[].value]==[160,150]'
+  check 'legacy CoW rows keep their exact shape' 'all(.rankings[0].entries[];has("added_e1rm_percent_bw")|not)'
+  GROUP_ADDED_LOAD_DISPLAY=1 rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${g}" --arg c "${c}" '{p_group_id:$g,p_cow_id:$c,p_metric:"e1rm"}')"
+  expect_ok 'added CoW display'
+  check 'added CoW display preserves order and stored total values' \
+    '[.rankings[0].entries[].value]==[160,150] and [.rankings[0].entries[].added_e1rm_percent_bw]==[60,50]'
   check 'member wins 1RM independently' '.rankings[0].entries[0].member.user_id==$u' --arg u "${MEMBER_UID}"
   rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${g}" --arg c "${c}" '{p_group_id:$g,p_cow_id:$c,p_metric:"improvement"}')"
   check 'improvement compares normalized baseline and weekly 1RM' '.rankings[0].unit=="percent" and (.rankings[0].entries[0].value-20|fabs)<0.000000001 and .rankings[0].entries[0].member.user_id==$u' --arg u "${OWNER_UID}"
@@ -92,6 +97,12 @@ run_cow_publication_cases() {
   push "${OWNER_TOKEN}" 'post-cutoff edit cannot rerank final' "$(e_set "cow-pub-o1-${RUN_TAG}" "cow-pub-owblock-${RUN_TAG}" 0 1 1 '' "${CUAM}" null)"
   eval_drain "${secret}"; expect_ok 'worker after cutoff edit'
   [[ "$(run_psql "select final_rankings::text from app_public.group_cows where id='${c}';")" == "${saved}" ]] || fail 'stored final reranked'
+  [[ "$(run_psql "begin;
+    set local request.headers='{\"x-boga-group-added-load\":\"1\"}';
+    update app_public.group_exercises set bodyweight_contribution=0.7 where id='${e}';
+    select bool_and((row_json->>'added_e1rm_percent_bw')::numeric=(row_json->>'value')::numeric-100)
+    from app_public.group_cows c cross join lateral app_public.group_cow_result_rows(c,'e1rm') r where c.id='${c}';
+    rollback;")" == t ]] || fail 'frozen CoW display read the current contribution'
   rpc "${OWNER_TOKEN}" group_cow_summary "$(jq -nc --arg g "${g}" '{p_group_id:$g}')"
   check 'exactly last-week stored final is the fallback' '.selection=="previous_final" and .result.cow.state=="final" and .result.state=="ready"'
   run_cow_previous_summary_cases "${g}" "${c}"
@@ -242,9 +253,19 @@ run_cow_priority_privacy_cases() {
   ordinary="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
   cow_worker_fixture "${template}" "${ordinary}" 60
   run_psql "update app_public.group_cow_contexts set context=jsonb_set(jsonb_set(context,'{normalized}','false'),'{bodyweight_calculations_enabled}','false') where cow_id='${ordinary}';
-    update app_public.group_cow_sources set input=jsonb_set(input,'{context}',jsonb_set(jsonb_set(input->'context','{normalized}','false'),'{bodyweight_calculations_enabled}','false')) where cow_id='${ordinary}';" >/dev/null
-  cow_run "${ordinary}" "${secret}"
-  [[ "$(run_psql "select finalized_at is not null from app_public.group_cows where id='${ordinary}';")" == t ]] || fail 'ordinary privacy fixture did not finalize'
+    update app_public.group_cow_sources set input=jsonb_set(input,'{context}',jsonb_set(jsonb_set(input->'context','{normalized}','false'),'{bodyweight_calculations_enabled}','false')) where cow_id='${ordinary}';
+    update app_public.group_cows set available_at=clock_timestamp(),lease_until=null where id='${ordinary}';" >/dev/null
+  deadline=$((SECONDS+25))
+  until [[ "$(run_psql "select finalized_at is not null from app_public.group_cows where id='${ordinary}';")" == t ]]; do
+    eval_drain "${secret}"; expect_ok 'worker fixture drains'
+    until [[ "$(run_psql "select lease_until is null or lease_until<clock_timestamp() from app_public.group_cows where id='${ordinary}';")" == t ]]; do
+      [[ ${SECONDS} -lt ${deadline} ]] || fail 'worker fixture claim did not settle'
+      sleep 0.05
+    done
+    [[ "$(run_psql "select finalized_at is not null from app_public.group_cows where id='${ordinary}';")" == t ]] && break
+    [[ ${SECONDS} -lt ${deadline} ]] || fail 'ordinary privacy fixture did not finalize'
+    sleep 0.1
+  done
   saved="$(run_psql "select md5(final_rankings::text) from app_public.group_cows where id='${ordinary}';")"
   rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${group}" --arg c "${ordinary}" '{p_group_id:$g,p_cow_id:$c,p_metric:"volume"}')"
   check 'ordinary stored totals use kg units and keep all eligible members' '.state=="ready" and .normalized==false and .rankings[0].unit=="kg_reps" and all(.rankings[0].entries[];.value>0)'

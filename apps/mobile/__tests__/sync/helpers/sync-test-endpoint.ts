@@ -221,6 +221,7 @@ const SYNC_TABLES_CHILD_FIRST = [
   'sessions',
   'exercise_group_links',
   'exercise_definitions',
+  'injuries',
   'muscle_groups',
   'gyms',
   'body_weight_measurements',

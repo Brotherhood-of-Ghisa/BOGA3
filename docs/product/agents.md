@@ -2,22 +2,23 @@
 
 ### agents.write-access · definition · accepted
 
-A connected coach reads training data, muscle setup included. Independent per-client switches bind
-writes to the current OAuth grant and default off (existing plan-creation
-grants retain main-switch access):
+A coach reads training data. Per-client write switches bind to the
+current grant and default off (existing plan grants retain main access):
 
 | Switch | Authority |
 | --- | --- |
-| Make changes (`plan_access_enabled`) | Read upcoming/unscheduled plans; create plans/programmes; create/edit/delete/restore exercises; set weekly muscle targets |
-| Edit plans (`plan_edit_enabled`) | Mutate/delete pending authored plans/programmes |
-| Log workouts (`workout_logging_enabled`) | Discover active workouts; start/log/edit/finish controlled ad-hoc workouts |
+| Make changes (`plan_access_enabled`) | Read/create plans/programmes; manage exercises; set targets; notes ([[notes.agent-access]]); log/update injuries |
+| Edit plans (`plan_edit_enabled`) | Mutate/delete pending plans/programmes |
+| Log workouts (`workout_logging_enabled`) | Read/start/create/log/edit/finish controlled ad-hoc workouts |
 
-Logging needs neither plan switch. Each active workout has one writer: human,
-or one MCP client bound to its grant. MCP-created sessions start MCP-controlled;
-phone-created sessions start human-controlled. Online handoffs retain the same
-workout and sets. MCP control locks app editing; the timer remains usable.
-Human takeover revokes MCP editing. Only the app edits completed history,
-plan-backed workouts or muscle setup. Chat sees synced state; human logging works offline.
+Logging needs neither plan switch. One writer controls each workout: human or
+grant-bound MCP client. MCP creation retains control; app creation is human.
+Handoff preserves IDs; takeover revokes MCP editing. MCP control locks app edits,
+leaving the timer usable. Dated creation takes start/end, stays completed and
+permits incremental history without occupying live training. Figures update per
+batch; Finish releases control without changing dates/duration. Released history,
+planned workouts and muscle setup remain app-only. Chat sees synced data;
+human logging works offline.
 
 Why: each write surface needs explicit authority; handoff must preserve acknowledged work.
 Approved 2026-11-10.
@@ -36,3 +37,18 @@ Code: MCP logging tools in `services/boga-mcp/src/workout-tools.ts` delegate to
 Code: exclusive session control and handoff in
 `supabase/migrations/20261110192235_workout_logging_control.sql` and
 `apps/mobile/src/sync/workout-control.ts`.
+
+### agents.health-activities · definition · accepted
+
+A connected coach reads the workouts the person's phone imports from their
+health app (Apple Health): every activity type, summary figures only (no
+routes or samples), under the base read grant with no extra switch. Imported
+activities never count as sets, Volume, records or group figures and are never
+shared with groups. A watch strength workout overlapping a logged session is
+the same training: it stays listed, flagged, and is left out of the coach's
+cardio summary.
+
+Why: the coach should factor cardio into advice without counting a gym session twice.
+Code: `supabase/functions/agent-api/activities.ts`;
+`supabase/migrations/20261110213906_health_activities.sql`.
+Code: the phone import in `apps/mobile/src/health-import/`.

@@ -2,7 +2,8 @@ import { Pressable, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 
-export type GroupCycleOption<TValue extends string> = { value: TValue; label: string };
+/** `spokenLabel`: what VoiceOver says for an abbreviated `label` (`GR`). */
+export type GroupCycleOption<TValue extends string> = { value: TValue; label: string; spokenLabel?: string };
 
 /**
  * One filter as a single pill showing its current option; a tap moves to the
@@ -26,8 +27,8 @@ export function GroupCycleButton<TValue extends string>({ options, value, onChan
   const next = options[(index + 1) % options.length];
   return (
     <Pressable
-      accessibilityHint={next && next.value !== current?.value ? `Changes to ${next.label}` : undefined}
-      accessibilityLabel={`${accessibilityLabel}, ${current?.label ?? ''}`}
+      accessibilityHint={next && next.value !== current?.value ? `Changes to ${next.spokenLabel ?? next.label}` : undefined}
+      accessibilityLabel={`${accessibilityLabel}, ${current?.spokenLabel ?? current?.label ?? ''}`}
       accessibilityRole="button"
       disabled={options.length < 2}
       hitSlop={uiSpace.xs}

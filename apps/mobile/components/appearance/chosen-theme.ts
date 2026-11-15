@@ -68,6 +68,7 @@ export const MODE_LABELS: Record<AppearanceMode, string> = { light: 'Light', dar
 // The custom parts as the Appearance page names them, in its order.
 export const CUSTOM_PART_LABELS: Record<CustomPart, string> = {
   background: 'Background',
+  borders: 'Borders',
   ink: 'Primary text',
   text: 'Secondary text',
   accent: 'Accent',
@@ -93,14 +94,18 @@ export function themeLabel(appearance: AppearanceChoice): string {
   return appearance.theme === 'custom' ? 'Custom' : getThemePreset(appearance.theme as ThemePresetId).label;
 }
 
-// A custom part's value as a row shows it: its hue's name and strength, and
-// for the background its lightness.
+// A custom part's value as a row shows it: its hue's name and strength; for
+// the background its mode and lightness first; borders that match the page
+// say so.
 export function customPartLabel(appearance: AppearanceChoice, part: CustomPart): string {
   const colours = appearance.custom;
   if (!colours) return '';
+  if (part === 'borders' && colours.borders.match) return 'Match background';
   const { hue, strength } = colours[part];
   const words = [hueName(hue), `${strength}%`];
-  return part === 'background' ? [...words, `light ${colours.background.lightness}`].join(', ') : words.join(', ');
+  if (part !== 'background') return words.join(', ');
+  const { mode, lightness } = colours.background;
+  return [MODE_LABELS[mode], ...words, `lightness ${lightness}`].join(', ');
 }
 
 // The whole choice for Settings home's row: the theme, and a preset's mode

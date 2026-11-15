@@ -49,7 +49,9 @@ const planned = (id: string, plannedWeightValue: string, plannedRepsValue: strin
   performanceStatus: 'planned' as const,
 });
 
-export const seedSessionViewFixture = async ({ now = new Date(), aiControlled = false }: { now?: Date; aiControlled?: boolean } = {}) => {
+export const seedSessionViewFixture = async ({ now = new Date(), aiControlled = false, completed = false }: {
+  now?: Date; aiControlled?: boolean; completed?: boolean;
+} = {}) => {
   await seedExerciseBlockHistoryFixture({ now });
 
   await persistSessionDraftSnapshot({
@@ -95,6 +97,8 @@ export const seedSessionViewFixture = async ({ now = new Date(), aiControlled = 
 
   if (aiControlled) {
     const database = await bootstrapLocalDataLayer();
+    if (completed) database.update(sessions).set({ status: 'completed', completedAt: now, durationSec: 47 * 60 })
+      .where(eq(sessions.id, SESSION_VIEW_FIXTURE.sessionId)).run();
     database.update(sessions).set({ loggingClientId: 'maestro-coach', loggingGrantedAt: '2026-11-10T12:00:00Z',
       mergeRevision: 1, localDirty: false }).where(eq(sessions.id, SESSION_VIEW_FIXTURE.sessionId)).run();
   }

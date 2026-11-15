@@ -60,12 +60,15 @@ export function RootStack() {
         {/* More's destinations that keep the tab bar (`TabOwnedPage`). */}
         <Stack.Screen name="exercise-catalog" options={{ title: 'Exercises' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        {/* All notes keep the tab bar; one exercise's replaces this title with `<name> notes`. */}
+        <Stack.Screen name="notes" options={{ title: 'Notes' }} />
         {/* The subject's name replaces this title once it resolves. */}
         <Stack.Screen name="progress-history" options={{ title: 'History' }} />
         <Stack.Screen name="rm-curve" options={{ title: 'RM curve' }} />
         {/* Draws its own top bar (`Stack.Screen` options in the screen). */}
         <Stack.Screen name="completed-session/[sessionId]" options={completedSessionOptions} />
         <Stack.Screen name="sessions" options={{ title: 'Sessions' }} />
+        <Stack.Screen name="planner" options={{ title: 'Planner' }} />
         <Stack.Screen name="session-plan/new" options={{ title: 'New session plan' }} />
         <Stack.Screen name="session-plan/[planId]" options={{ title: 'Plan' }} />
         <Stack.Screen name="programme/new" options={{ title: 'New programme' }} />
@@ -81,12 +84,17 @@ export function RootStack() {
         <Stack.Screen name="exercise-link" options={{ title: 'Link exercise' }} />
         <Stack.Screen name="exercise-share" options={{ title: 'Shared exercise' }} />
         <Stack.Screen name="body-weight" options={{ title: 'Bodyweight' }} />
+        <Stack.Screen name="injuries" options={{ title: 'Injuries' }} />
         {/* Settings' sub pages, one per Settings row. */}
         <Stack.Screen name="settings-rest-timer" options={{ title: 'Rest timer' }} />
         <Stack.Screen name="settings-progress" options={{ title: 'Progress' }} />
         <Stack.Screen name="settings-muscles" options={{ title: 'Muscles' }} />
         <Stack.Screen name="settings-muscle-targets" options={{ title: 'Per muscle targets' }} />
-        <Stack.Screen name="settings-enabled-muscles" options={{ title: 'Enabled muscles' }} />
+        <Stack.Screen name="settings-muscle-list" options={{ title: 'Muscles' }} />
+        {/* The muscle's page and the editor replace these titles with a name once loaded. */}
+        <Stack.Screen name="settings-muscle" options={{ title: 'Muscle' }} />
+        <Stack.Screen name="settings-combined-muscles" options={{ title: 'Combined muscles' }} />
+        <Stack.Screen name="settings-combined-muscle" options={{ title: 'Combined muscle' }} />
         <Stack.Screen name="settings-effort" options={{ title: 'Effort' }} />
         <Stack.Screen name="settings-appearance" options={{ title: 'Appearance' }} />
         <Stack.Screen name="settings-notifications" options={{ title: 'Notifications' }} />

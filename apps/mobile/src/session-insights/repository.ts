@@ -6,7 +6,8 @@ import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, or } from "drizzle-o
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 
 import { bootstrapLocalDataLayer } from "@/src/data/bootstrap";
-import { buildMuscleReportAssignment } from "@/src/data/muscle-report-presets";
+import { buildMuscleReportAssignment, type CombinedMuscle } from "@/src/data/combined-muscles";
+import { selectStoredCombinedMuscles } from "@/src/data/muscle-report-settings";
 import { loadEarlierBestsByDefinition, recordBaselinesOf } from "@/src/data/exercise-session-facts";
 import {
   exerciseDefinitions,
@@ -84,6 +85,8 @@ export type SessionInsightsStore = {
       reportGroup?: string | null;
       tracked?: number | boolean;
     }[];
+    /** The stored combined-muscle definitions; null or absent reads the legacy setup. */
+    combinedMuscles?: CombinedMuscle[] | null;
   }>;
 };
 
@@ -141,6 +144,7 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
         })
         .from(muscleGroups)
         .all(),
+      combinedMuscles: selectStoredCombinedMuscles(database),
     };
   },
   async loadTargetSession(sessionId) {
@@ -343,7 +347,7 @@ export const createCompletedSessionInsightsRepository = (
       { muscleMappings: catalog.mappings, muscleGroups: catalog.groups },
       buildMuscleReportAssignment(catalog.groups.map((group) => ({
         ...group, reportGroup: group.reportGroup ?? null, tracked: group.tracked ?? 1,
-      }))),
+      })), catalog.combinedMuscles ?? null),
     );
 
     return deriveCompletedSessionInsights({

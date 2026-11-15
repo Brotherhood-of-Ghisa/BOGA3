@@ -5,6 +5,28 @@ const revision = 'a'.repeat(32);
 const base = { session_id: 'workout', expected_revision: revision };
 const set = { weight_kg: '80', reps: 8 };
 
+it('canonicalizes dated creation across offsets and the repeated DST hour', () => {
+  expect(normalizeWorkoutInput('create_workout', {
+    started_at: '2026-10-25T01:30:00+01:00', completed_at: '2026-10-25T01:30:00Z',
+  })).toEqual({ gym_id: null, started_at: Date.parse('2026-10-25T00:30:00Z'), completed_at: Date.parse('2026-10-25T01:30:00Z') });
+  expect(normalizeWorkoutInput('create_workout', {
+    gym_id: 'gym', started_at: '2026-10-25T00:30:00Z', completed_at: '2026-10-25T02:30:00+01:00',
+  })).toEqual({ gym_id: 'gym', started_at: Date.parse('2026-10-25T00:30:00Z'), completed_at: Date.parse('2026-10-25T01:30:00Z') });
+});
+
+it.each([
+  {}, { started_at: 1, completed_at: 2 },
+  { started_at: '2026-02-30T12:00:00Z', completed_at: '2026-03-01T13:00:00Z' },
+  { started_at: '2026-10-25T12:00:00', completed_at: '2026-10-25T13:00:00Z' },
+  { started_at: '2026-10-25T24:00:00Z', completed_at: '2026-10-26T01:00:00Z' },
+  { started_at: '2026-10-25T12:00:00Z', completed_at: '2026-10-25T11:00:00Z' },
+  { started_at: '2026-10-25T12:00:00Z', completed_at: '9999-01-01T00:00:00Z' },
+  { started_at: '1900-01-01T00:00:00Z', completed_at: '2026-10-25T13:00:00Z' },
+  { started_at: '2026-10-25T12:00:00Z', completed_at: '2026-10-25T13:00:00Z', owner_user_id: 'other' },
+])('rejects malformed, ambiguous, reversed or future dated creation: %p', input => {
+  expect(() => normalizeWorkoutInput('create_workout', input)).toThrow(WorkoutInputError);
+});
+
 it('normalizes strict operations into stable retry payloads', () => {
   expect(normalizeWorkoutInput('start_workout', {})).toEqual({ gym_id: null });
   expect(normalizeWorkoutInput('start_workout', { gym_id: 'gym' })).toEqual({ gym_id: 'gym' });

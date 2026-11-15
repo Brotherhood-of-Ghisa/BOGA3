@@ -141,5 +141,19 @@
     "volumeKgReps": 160,
     "estimatedOneRepMaxKg": 12.767141908045373,
     "perSideCalculatedLoadKg": 10
+  },
+  {
+    "name": "ordinary total-load rehab set",
+    "policy": "ordinary",
+    "bodyweightContribution": 0,
+    "bodyWeightKg": null,
+    "loadInputMode": "total_load",
+    "weightValue": "50",
+    "repsValue": "8",
+    "setType": "rehab",
+    "calculatedLoadKg": 50,
+    "volumeKgReps": 400,
+    "estimatedOneRepMaxKg": 63.835709540226865,
+    "perSideCalculatedLoadKg": 25
   }
 ]

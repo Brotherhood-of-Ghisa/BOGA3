@@ -122,10 +122,12 @@ GROUP_CONTRACT_HEADER="x-boga-group-contract: 4"
 # rpc <bearer> <function> <json-body>
 rpc() {
   local bearer="$1" name="$2" body="$3"
+  local -a display_headers=()
+  [[ "${GROUP_ADDED_LOAD_DISPLAY:-0}" != 1 ]] || display_headers=(-H 'x-boga-group-added-load: 1' -H 'x-boga-group-set-metrics: 1')
   http_call -X POST \
     -H "apikey: ${ANON_KEY}" \
     -H "Authorization: Bearer ${bearer}" \
-    -H "${GROUP_CONTRACT_HEADER}" \
+    -H "${GROUP_CONTRACT_HEADER}" ${display_headers[@]+"${display_headers[@]}"} \
     -H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-7}" -H "Content-Type: application/json" \
     -H "Content-Profile: app_public" \
     --data "${body}" \

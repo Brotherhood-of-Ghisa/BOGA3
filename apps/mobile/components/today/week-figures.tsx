@@ -47,6 +47,8 @@ const TODAY_LAST_WEEK: PreviousWeekName = { short: null, spoken: 'last week' };
 
 type FigureProps = {
   label: string;
+  /** What a screen reader says for `label`, when the label is an abbreviation (`GR`). */
+  spokenLabel?: string;
   current: number | null;
   previous: number | null;
   metric?: ProgressMetric;
@@ -56,7 +58,7 @@ type FigureProps = {
   testID: string;
 };
 
-export function WeekFigure({ label, current, previous, record = false, previousWeek = LAST_WEEK, testID,
+export function WeekFigure({ label, spokenLabel = label, current, previous, record = false, previousWeek = LAST_WEEK, testID,
   metric = 'workingSetCount', onToggleMetric }: FigureProps) {
   const styles = useStyles();
   const text = useUiText();
@@ -66,7 +68,7 @@ export function WeekFigure({ label, current, previous, record = false, previousW
   const previousText = formatPaceValue(previous, metric);
   const spoken = metric === 'totalVolume'
     ? `Tonnes ${current === null ? 'unavailable' : currentText}, vs ${previous === null ? 'unavailable' : previousText} ${previousWeek.spoken}`
-    : weekFigureAccessibilityLabel(label, { current: current ?? 0, previous: previous ?? 0 }, previousWeek.spoken);
+    : weekFigureAccessibilityLabel(spokenLabel, { current: current ?? 0, previous: previous ?? 0 }, previousWeek.spoken);
   const content = (
     <View
       accessible={!onToggleMetric}

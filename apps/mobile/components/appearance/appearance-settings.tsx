@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, View, type ColorSchemeName } from 'react-native';
 
@@ -13,6 +13,7 @@ import {
   usePhoneScheme,
   useStoredAppearance,
 } from '@/components/appearance/chosen-theme';
+import { applyingHeaderRight } from '@/components/appearance/theme-header';
 import { ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
 import { SubPage } from '@/components/settings/sub-page';
@@ -47,14 +48,14 @@ export function AppearanceSettingsRow({ divider = false }: { divider?: boolean }
   );
 }
 
-// Settings → Appearance: a live preview of the choice, then Theme (the presets
-// and Custom as radio rows), then Mode for a preset or the custom colours for
-// Custom. While Custom is chosen, Theme collapses to its Custom row and a
+// Settings → Appearance: Theme (the presets and Custom as radio rows), then
+// Mode for a preset or the custom colours for Custom, then a live preview of
+// the choice. While Custom is chosen, Theme collapses to its Custom row and a
 // `Show presets` row that lists the presets again; Hide presets or a tap on
-// Custom folds them. Each choice is saved at
-// once, and the app repaints in it.
+// Custom folds them. Each choice is saved at once, and the app repaints in it;
+// the header's indicator shows until it has.
 export function AppearanceSettingsScreen() {
-  const { appearance, saveError, commit } = useAppearanceCommit();
+  const { appearance, saveError, commit, applying } = useAppearanceCommit();
   const phoneScheme = usePhoneScheme();
   const [presetsShown, setPresetsShown] = useState(false);
   const custom = appearance.theme === 'custom';
@@ -67,7 +68,8 @@ export function AppearanceSettingsScreen() {
 
   return (
     <SubPage testID="settings-appearance-screen">
-      <PreviewBlock appearance={appearance} phoneScheme={phoneScheme} />
+      {/* Named either way: options merge across renders. */}
+      <Stack.Screen options={{ headerRight: applyingHeaderRight(applying, 'settings-appearance-applying') }} />
       <FormSection title="Theme">
         {(presetsListed ? themePresets : []).map((preset, index) => {
           const checked = preset.id === appearance.theme;
@@ -125,6 +127,7 @@ export function AppearanceSettingsScreen() {
         <ModeSection appearance={appearance} commit={commit} />
       )}
       {saveError ? <Notice icon="warning" live message={saveError} testID="settings-appearance-error" tone="danger" /> : null}
+      <PreviewBlock appearance={appearance} phoneScheme={phoneScheme} />
     </SubPage>
   );
 }

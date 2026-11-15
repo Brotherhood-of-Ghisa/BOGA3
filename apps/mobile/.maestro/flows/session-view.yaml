@@ -344,6 +344,50 @@ appId: com.dinoderek.mobile
       id: "session-view-options-sheet"
     timeout: 10000
 
+# --- 9. Dated completed AI history has native takeover and a read-only exit ---
+# Device proof: completed-page robot -> native control sheet -> dismiss -> Done
+# crosses navigator/modal boundaries that Jest replaces; SQL proves takeover.
+- openLink: "boga3://maestro-harness?reset=data&fixture=session-view-ai-history&teleport=completed-session&sessionId=maestro_session_view_active"
+- extendedWaitUntil:
+    visible:
+      id: "completed-session-detail-edit-button"
+    timeout: 30000
+- tapOn:
+    id: "completed-session-detail-edit-button"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-done-button"
+    timeout: 15000
+- assertVisible:
+    id: "session-view-ai-control"
+- assertNotVisible:
+    id: "session-view-add-exercise"
+- takeScreenshot: "08-dated-ai-history"
+- tapOn:
+    id: "session-view-ai-control"
+- extendedWaitUntil:
+    visible:
+      id: "session-view-control-action"
+    timeout: 10000
+- assertVisible: "Take over logging"
+- assertNotVisible:
+    id: "session-view-abandon"
+- takeScreenshot: "09-dated-history-takeover"
+# Dismiss the short two-row sheet through its backdrop; its drag zone cannot
+# produce the same native swipe travel as the taller active-session sheet.
+- tapOn:
+    point: "50%,25%"
+- extendedWaitUntil:
+    notVisible:
+      id: "session-view-options-sheet"
+    timeout: 10000
+- tapOn:
+    id: "session-view-done-button"
+- extendedWaitUntil:
+    notVisible:
+      id: "session-view-done-button"
+    timeout: 15000
+
 # Leave the simulator as this flow found it: data reset.
 - openLink: "boga3://maestro-harness?reset=data&teleport=session-list"
 - extendedWaitUntil:
