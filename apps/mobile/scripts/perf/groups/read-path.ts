@@ -18,7 +18,7 @@ import { Client } from 'pg';
 import { scans, type Counters } from './counters.ts';
 import { fixtureStatements, FIXTURE_COUNTS_SQL } from './fixture.ts';
 import {
-  compareParity, helperParityStatements, parityInstallStatements, parityPassed,
+  compareParity, helperParityStatements, parityInstallStatements, parityPassed, streamWalk,
   type HelperParityCase, type ParityCase, type ParityOutcome,
 } from './parity.ts';
 import {
@@ -52,6 +52,8 @@ export type ReadPathContext = {
   bench: string;
   /** Another member's newest shared session that set a record: the one a stream card opens. */
   session: { member: string; sessionId: string };
+  /** The group's CoWs and their metrics: the ones the CoW result readers page. */
+  cows: { id: string; metrics: string[] }[];
   /** The workout the viewer finishes and its synced graph, as the app confirms it; set once it is finished. */
   completion: { sessionId: string; entities: unknown } | null;
   /**
@@ -74,10 +76,20 @@ export type ReadPathRpc = {
   budget: BudgetEntry;
 };
 
-const stream = (fn: string, pages: number): ReadPathRpc => ({
-  fn, via: 'member', args: (c) => ({ p_group_id: c.groupId, p_before: null, p_limit: 20 }),
-  budget: { kind: 'baseline', pages, scoped: true },
+const stream = (fn: string, budget: BudgetEntry): ReadPathRpc => ({
+  fn, via: 'member', args: (c) => ({ p_group_id: c.groupId, p_before: null, p_limit: 20 }), budget,
 });
+
+/**
+ * The stream's first page. v5 is the set's first read on its connection, so
+ * its one call also loads the catalog entries and compiled functions every
+ * stream builder needs, once per backend: about 2,200 pages of its cost. A
+ * repeat call on the same connection (as PostgREST's pooled connections make
+ * it) costs 3.0k pages at H=90 and 3.3k at H=180; v4, measured next on the
+ * same builders, 2.9k-3.2k.
+ */
+const STREAM_V5_JUSTIFICATION = 'first read on a fresh connection: ~2.2k of its pages are one-time catalog and function '
+  + 'loading; a warm call costs 3.0k-3.3k pages, under the ceiling';
 
 /**
  * Every RPC the set measures, with its budget beside it. A budget is the
@@ -86,10 +98,10 @@ const stream = (fn: string, pages: number): ReadPathRpc => ({
  * ceiling. Re-measure and update an entry in the change that moves its cost.
  */
 export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
-  stream('group_competition_stream_v5', 290_000),
-  stream('group_competition_stream_v4', 280_000),
-  stream('group_competition_stream_v3', 280_000),
-  stream('group_competition_stream_v2', 90_000),
+  stream('group_competition_stream_v5', { kind: 'budgeted', pages: 6_600, scoped: true, justification: STREAM_V5_JUSTIFICATION }),
+  stream('group_competition_stream_v4', { kind: 'budgeted', pages: 4_100, scoped: true }),
+  stream('group_competition_stream_v3', { kind: 'budgeted', pages: 3_800, scoped: true }),
+  stream('group_competition_stream_v2', { kind: 'budgeted', pages: 2_300, scoped: true }),
   { fn: 'group_competition_period_totals', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_windows: c.weeks }),
     budget: { kind: 'budgeted', pages: 3_800, scoped: true } },
   { fn: 'group_competition_week_summary', via: 'member',
@@ -110,9 +122,9 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'budgeted', pages: 350, scoped: true } },
   { fn: 'group_cow_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'baseline', pages: 150_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 2_200, scoped: true } },
   { fn: 'group_cow_previous_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'baseline', pages: 200_000, scoped: true } },
+    budget: { kind: 'baseline', pages: 2_500, scoped: true } },
   { fn: 'group_cow_calendar_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_list_mine', via: 'member', args: () => ({}), budget: { kind: 'budgeted', pages: 20, scoped: true } },
@@ -128,6 +140,79 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   { fn: 'notification_confirm_completion', via: 'member',
     args: (c) => ({ p_session_id: c.completion!.sessionId, p_entities: c.completion!.entities }),
     budget: { kind: 'baseline', pages: 28_000, scoped: true } },
+];
+
+/** The definitions the keyset stream replaced, as they stood before it. */
+const BEFORE_STREAM_KEYSET = 'parity-definitions/20261114220000_group_read_helpers.sql';
+const PUBLICATION = '20261004233855_group_competition_publication.sql';
+const COW_READERS = '20261030064514_group_cow_readers.sql';
+const COW_STREAM = '20261030203502_group_cow_stream_events.sql';
+
+/**
+ * The old item builders every stream and CoW reader case installs, callees
+ * first: an old SQL body must find the old helpers it calls already there.
+ */
+const COW_RESULT_HELPERS = {
+  group_cow_result_rows: BEFORE_STREAM_KEYSET,
+  group_cow_public_result: COW_READERS,
+};
+const STREAM_ITEM_HELPERS = {
+  ...COW_RESULT_HELPERS,
+  group_cow_stream_item: COW_STREAM,
+  group_competition_session_exercises: '20261023094929_group_normalized_set_display.sql',
+  group_competition_session_json: PUBLICATION,
+  group_competition_session_card: PUBLICATION,
+  group_competition_event_json: BEFORE_STREAM_KEYSET,
+  group_competition_stream_event: PUBLICATION,
+  group_competition_stream_record: BEFORE_STREAM_KEYSET,
+};
+const V3_HELPERS = {
+  ...STREAM_ITEM_HELPERS,
+  group_competition_stream_page_v3: BEFORE_STREAM_KEYSET,
+};
+
+const streamArgs = (context: ReadPathContext, limit: number) => [{ p_group_id: context.groupId, p_before: null, p_limit: limit }];
+
+/**
+ * Every stream version against its old definition chain, each walking every
+ * page by its own cursor: v2-v5 at the largest page (50) for every viewer,
+ * v5 also at the app's page (20) for every viewer and one item per page for
+ * the owner, so every item boundary, ties included, is a page boundary once.
+ */
+const streamParityCases = (): ParityCase<ReadPathContext>[] => [
+  { fn: 'group_competition_stream_v5', migration: '20261112190000_group_stream_withdrawn_records.sql',
+    helpers: { ...V3_HELPERS, group_competition_stream_v3: COW_STREAM,
+      group_competition_stream_v4: '20261111160000_group_stream_group_record_metrics.sql',
+      group_competition_stream_withdrawn: '20261112190000_group_stream_withdrawn_records.sql' },
+    argumentSets: (context) => [...streamArgs(context, 20), ...streamArgs(context, 50)], walk: streamWalk },
+  { fn: 'group_competition_stream_v5', migration: '20261112190000_group_stream_withdrawn_records.sql',
+    helpers: { ...V3_HELPERS, group_competition_stream_v3: COW_STREAM,
+      group_competition_stream_v4: '20261111160000_group_stream_group_record_metrics.sql',
+      group_competition_stream_withdrawn: '20261112190000_group_stream_withdrawn_records.sql' },
+    argumentSets: (context) => streamArgs(context, 1), walk: streamWalk, viewers: (context) => [context.viewer] },
+  { fn: 'group_competition_stream_v4', migration: '20261111160000_group_stream_group_record_metrics.sql',
+    helpers: { ...V3_HELPERS, group_competition_stream_v3: COW_STREAM },
+    argumentSets: (context) => streamArgs(context, 50), walk: streamWalk },
+  { fn: 'group_competition_stream_v3', migration: COW_STREAM, helpers: V3_HELPERS,
+    argumentSets: (context) => streamArgs(context, 50), walk: streamWalk },
+  { fn: 'group_competition_stream_v2', migration: '20261008160000_group_competition_set_certification.sql',
+    helpers: { ...STREAM_ITEM_HELPERS, group_competition_stream_page: BEFORE_STREAM_KEYSET, group_competition_stream: BEFORE_STREAM_KEYSET },
+    argumentSets: (context) => streamArgs(context, 50), walk: streamWalk },
+];
+
+/**
+ * The CoW result readers, whose rows are now built once: the summaries
+ * (`observed_at_us` is the clock at each call, so it is not compared), and
+ * each CoW's results per metric.
+ */
+const cowParityCases = (): ParityCase<ReadPathContext>[] => [
+  { fn: 'group_cow_summary', migration: COW_READERS, helpers: COW_RESULT_HELPERS, ignoreKeys: ['observed_at_us'],
+    argumentSets: (context) => [{ p_group_id: context.groupId }] },
+  { fn: 'group_cow_previous_summary', migration: '20261030210545_group_cow_previous_summary.sql', helpers: COW_RESULT_HELPERS, ignoreKeys: ['observed_at_us'],
+    argumentSets: (context) => [{ p_group_id: context.groupId }] },
+  { fn: 'group_cow_results', migration: COW_READERS, helpers: COW_RESULT_HELPERS,
+    argumentSets: (context) => context.cows.flatMap((cow) => cow.metrics.flatMap((metric) => [1, 20].map((limit) =>
+      ({ p_group_id: context.groupId, p_cow_id: cow.id, p_metric: metric, p_before: null, p_limit: limit })))) },
 ];
 
 /**
@@ -168,7 +253,13 @@ export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
         .map((windows) => ({ p_group_id: context.groupId, p_windows: windows }));
     },
   },
+  ...streamParityCases(),
+  ...cowParityCases(),
 ];
+
+/** A redaction cache for every fixture member, as a `cache(cache)` CTE. */
+const WITH_CACHE = `with cache as materialized (select app_public.group_competition_redaction_cache((select group_id from perf_fx),
+  array(select uid from perf_members)) as cache)`;
 
 /** Every (group, member, definition) the redaction helpers are compared on: every definition a member logged or a CoW retained, none, and one never logged. */
 const REDACTION_PAIRS_SQL = `select f.group_id as a1, m.uid as a2, d.definition as a3
@@ -204,6 +295,54 @@ export const HELPER_PARITY_CASES: readonly HelperParityCase[] = [
       from pairs p`,
     expected: 'app_public.group_competition_redacts_exercise(array[a1],a2,a3)', actual: 'a4', minAnswers: 2,
   },
+  // The cached item builders the stream and the CoW result reader call,
+  // each with a cache for every fixture member, against the original they
+  // copy: every fixture event, record, withdrawal, session card, CoW item and
+  // CoW row set.
+  {
+    name: 'group_competition_event_json_cached',
+    argumentsSql: `${WITH_CACHE} select e as a1, c.cache as a2 from app_public.group_events e, cache c
+      where e.group_id=(select group_id from perf_fx)`,
+    expected: 'app_public.group_competition_event_json(a1)', actual: 'app_public.group_competition_event_json_cached(a1,a2)', minAnswers: 2,
+  },
+  {
+    name: 'group_competition_stream_record_cached',
+    argumentsSql: `${WITH_CACHE} select e as a1, c.cache as a2 from app_public.group_events e, cache c
+      where e.group_id=(select group_id from perf_fx) and e.kind='record'`,
+    expected: 'app_public.group_competition_stream_record(a1)', actual: 'app_public.group_competition_stream_record_cached(a1,a2,null)',
+    minAnswers: 2,
+  },
+  {
+    name: 'group_competition_stream_withdrawn_cached',
+    argumentsSql: `${WITH_CACHE} select e as a1, c.cache as a2 from app_public.group_events e, cache c
+      where e.group_id=(select group_id from perf_fx) and e.kind='record_voided'`,
+    expected: 'app_public.group_competition_stream_withdrawn(a1)', actual: 'app_public.group_competition_stream_withdrawn_cached(a1,a2)',
+  },
+  {
+    name: 'group_competition_session_card_cached',
+    argumentsSql: `${WITH_CACHE} select e.member_user_id as a1, e.session_id as a2,
+      jsonb_build_array(jsonb_build_object('group_id',g.id,'name',g.name)) as a3, c.cache as a4
+      from app_public.group_events e join app_public.groups g on g.id=e.group_id, cache c
+      where e.group_id=(select group_id from perf_fx) and e.kind='session'`,
+    expected: 'app_public.group_competition_session_card(a1,a2,a3)', actual: 'app_public.group_competition_session_card_cached(a1,a2,a3,a4)',
+    minAnswers: 2,
+  },
+  {
+    name: 'group_cow_stream_item_cached',
+    argumentsSql: `${WITH_CACHE} select e.id as a1, e.sort_at_ms as a2, c.cache as a3 from app_public.group_events e, cache c
+      where e.group_id=(select group_id from perf_fx) and e.kind='cow'`,
+    expected: 'app_public.group_cow_stream_item(a1,a2)', actual: 'app_public.group_cow_stream_item_cached(a1,a2,a3)', minAnswers: 2,
+  },
+  {
+    name: 'group_cow_result_rows_cached',
+    argumentsSql: `${WITH_CACHE} select x as a1, m as a2, c.cache as a3 from app_public.group_cows x cross join unnest(x.metrics) m, cache c
+      where x.group_id=(select group_id from perf_fx)`,
+    expected: `(select coalesce(jsonb_agg(jsonb_build_array(r.ordinal,r.member_id,r.row_json) order by r.member_id),'[]')
+      from app_public.group_cow_result_rows(a1,a2) r)`,
+    actual: `(select coalesce(jsonb_agg(jsonb_build_array(r.ordinal,r.member_id,r.row_json) order by r.member_id),'[]')
+      from app_public.group_cow_result_rows_cached(a1,a2,a3) r)`,
+    minAnswers: 2,
+  },
   {
     name: 'group_week_session_counts', fn: 'group_week_session_counts', migration: '20261003180000_group_board_raw_weight.sql',
     argumentsSql: `select s.owner_user_id as a1, s.id as a2 from app_public.sessions s join perf_members m on m.uid=s.owner_user_id`,
@@ -233,8 +372,11 @@ export const plantedAll = (rows: readonly Record<string, unknown>[]): boolean =>
  * evaluator has not caught up with, which the counts must still read
  * through: member 4's newest working set is deleted, member 5's newest
  * session loses an exercise, and one of member 4's sets moves to an older
- * session. Each sync edit runs under its owner's claims, as sync would run
- * it; each plant must edit exactly one row.
+ * session. Last, member 2's newest session with a group record is moved
+ * back to start exactly when one of member 3's did: its records now sort at
+ * a start their events do not hold, tied with another member's card. Each
+ * sync edit runs under its owner's claims, as sync would run it; each plant
+ * must edit exactly one row.
  */
 export const PARITY_PLANT_STATEMENTS = (): string[] => [
   `with cow as (
@@ -294,6 +436,18 @@ export const PARITY_PLANT_STATEMENTS = (): string[] => [
    ${edited(`update app_public.exercise_sets es set session_exercise_id=(select id from into_exercise),updated_at=es.updated_at+1,
        client_updated_at_ms=es.client_updated_at_ms+1
      from moved t where es.owner_user_id=t.member_user_id and es.id=t.set_id`)}`,
+  asMember(2),
+  `with target as (
+     select s.owner_user_id,s.id,s.started_at from app_public.sessions s join perf_members m on m.uid=s.owner_user_id
+      where m.idx=2 and s.status='completed' and exists(select 1 from app_public.group_events e
+        where e.group_id=(select group_id from perf_fx) and e.kind='record' and e.member_user_id=s.owner_user_id and e.session_id=s.id)
+      order by s.started_at desc limit 1),
+   tie as (
+     select s.started_at from app_public.sessions s join perf_members m on m.uid=s.owner_user_id, target t
+      where m.idx=3 and s.status='completed' and s.started_at<t.started_at order by s.started_at desc limit 1)
+   ${edited(`update app_public.sessions s set started_at=(select started_at from tie),updated_at=s.updated_at+1,
+       client_updated_at_ms=s.client_updated_at_ms+1
+     from target t where s.owner_user_id=t.owner_user_id and s.id=t.id`)}`,
   `select set_config('request.jwt.claim.sub','',true), set_config('request.jwt.claims','',true)`,
 ];
 
@@ -410,18 +564,22 @@ const CONTEXT_SQL = `select f.group_id, f.now_ms,
      where e.group_id=f.group_id and e.kind='record' and m.idx=2 and e.session_id is not null
      order by e.seq desc limit 1) as session,
   (select uid from perf_members where idx=1) as viewer,
-  (select s.id from auth.sessions s join perf_members m on m.uid=s.user_id where m.idx=1) as viewer_session
+  (select s.id from auth.sessions s join perf_members m on m.uid=s.user_id where m.idx=1) as viewer_session,
+  (select coalesce(json_agg(json_build_object('id',c.id,'metrics',c.metrics) order by c.created_at,c.id),'[]')
+     from app_public.group_cows c where c.group_id=f.group_id) as cows
   from perf_fx f`;
 
 const readContext = async (session: Tier1Session): Promise<ReadPathContext> => {
   const [row] = await session.exec<{
     group_id: string; now_ms: string; members: string[]; bench: string; session: string; viewer: string; viewer_session: string;
+    cows: { id: string; metrics: string[] }[];
   }>(CONTEXT_SQL);
   const [member, sessionId] = row.session.replace(/^\(|\)$/g, '').split(',');
   const now = Number(row.now_ms);
   return {
     groupId: row.group_id, viewer: row.viewer, viewerSession: row.viewer_session, members: row.members, bench: row.bench,
     session: { member, sessionId },
+    cows: row.cows,
     completion: null,
     weeks: Array.from({ length: PERIOD_WINDOWS }, (_, index) => {
       const end = now - (PERIOD_WINDOWS - 1 - index) * WEEK_MS;
@@ -496,12 +654,16 @@ const runParityCases = async (session: Tier1Session, context: ReadPathContext): 
   }
   for (const item of HELPER_PARITY_CASES) outcomes.push(await runHelperParity(session, item));
   for (const item of PARITY_CASES) {
+    // In a savepoint, as the helper cases: a failed case cannot abort the ones after it.
+    await session.exec('savepoint rpc_parity');
     try {
       const installed = parityInstallStatements(item);
       for (const statement of installed.sql) await session.exec(statement);
       outcomes.push(await compareParity(item, context, context.members,
         (viewer, fn, args) => session.call({ role: 'authenticated', userId: viewer }, fn, args, false), installed));
+      await session.exec('release savepoint rpc_parity');
     } catch (error) {
+      await session.exec('rollback to savepoint rpc_parity');
       outcomes.push({ fn: item.fn, compared: 0, differences: [], plantDetected: null, error: (error as Error).message });
     }
   }

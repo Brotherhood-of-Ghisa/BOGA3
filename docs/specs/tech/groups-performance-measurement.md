@@ -123,7 +123,9 @@ scoped RPC grows too fast. A slope is asserted only above 100 pages per
 call, where a few pages of noise cannot move it. The lane lists the entries
 still `baseline`. A change that moves an RPC's cost re-measures it and
 updates its entry in the same PR, and a rewrite that meets the ceiling turns
-its entry `budgeted`.
+its entry `budgeted`. Reads run in one connection, so the first one also pays
+for loading the catalog entries and functions it shares with later ones
+(about 2,200 pages for the stream); a justification may cite its warm cost.
 
 **Parity** (`parity.ts`) proves a rewritten RPC returns the same JSON as the
 definition it replaces. Before the rewrite, add a case to `PARITY_CASES`
@@ -139,16 +141,22 @@ before the rewrite, as `apps/mobile/scripts/perf/groups/parity-definitions/<migr
 (named after the migration whose result it captures) and name it as
 `parity-definitions/<migration>.sql`; it is never applied. The
 `group_competition_week_summary` case also proves the helper itself: a
-planted one-field change must be caught.
+planted one-field change must be caught. A paged RPC's case walks every page
+(`walk`): old and new each follow their own cursor to the end, so a moved
+page boundary is a difference. A case may name fewer viewers (`viewers`, for
+a costly walk) and leave out a clock reading (`ignoreKeys`). Each case runs
+in its own savepoint.
 
 Internal helpers readers share (redaction, session counts) are compared the
 same way in `HELPER_PARITY_CASES`, old against new, as the table owner, for
-every argument row the fixture holds; a cache is compared with the live
-function it caches. Before parity, after every measured call,
-`PARITY_PLANT_STATEMENTS` plants retained CoW refs that redact through each
-branch, un-shares the group's latest completed session, and leaves facts the
-evaluator has not caught up with (a deleted set, a deleted exercise, a moved
-set), so both kinds of case cover them.
+every argument row the fixture holds; a cache, or a builder that reads one,
+is compared with the live function it stands for. Before parity, after every
+measured call, `PARITY_PLANT_STATEMENTS` plants retained CoW refs that redact
+through each branch, un-shares the group's latest completed session, leaves
+facts the evaluator has not caught up with (a deleted set, a deleted
+exercise, a moved set), and moves a session with records to another member's
+start (its records then sort where their events do not say, tied with that
+card), so both kinds of case cover them.
 
 ## Tier 2 — `./boga test groups-perf-load`
 
