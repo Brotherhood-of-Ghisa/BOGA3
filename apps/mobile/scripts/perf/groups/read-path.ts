@@ -8,9 +8,9 @@
 // missing planted case fails the lane, whatever GROUPS_PERF_STRICT says.
 //
 // Each point builds the Tier 1 fixture inside one rolled-back transaction,
-// plants the cases the reads must handle (a bodyweight-redacted member
-// exercise, a voided record, a live and a finished CoW, notification
-// installations), drains to steady state, then measures: every read once as
+// plants the cases the reads must handle (the disclosure rule's linked,
+// own-contribution and tombstoned-link exercises, a voided record, a live and
+// a finished CoW, notification installations), drains to steady state, then measures: every read once as
 // a member calls it, then the cascades of one workout's start, logged set
 // and confirmation, which is where the write RPCs run.
 
@@ -93,11 +93,10 @@ const stream = (fn: string, budget: BudgetEntry): ReadPathRpc => ({
   fn, via: 'member', args: (c) => ({ p_group_id: c.groupId, p_before: null, p_limit: 20 }), budget,
 });
 
-/** Readiness proof (graph once per target, ranks from one redaction map): over the ceiling because the graph reads the exercise's whole shared history. */
+/** Readiness proof (graph once per target): over the ceiling because the graph reads the exercise's whole shared history. */
 const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 6_500, scoped: false,
   justification: 'Measured warm (5.0-5.2k pages at H=180, budget = warm +25%); over the 5,000 ceiling by operator agreement. The proof that the captured comparison still holds compares the digest of the group\'s whole source graph '
-    + '(every shared set of the exercise, about 2.2 pages a set, so linear in history) and ranks the exercise from it. '
-    + 'The ranks cost a fixed share: redaction answered once per member, not once per ranked row.' };
+    + '(every shared set of the exercise, about 2.2 pages a set, so linear in history) and ranks the exercise from it.' };
 
 /**
  * The two CoW summaries are not slope-asserted (`scoped: false`) though far
@@ -154,13 +153,12 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'budgeted', pages: 3_600, scoped: false } },
   { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 61_000, scoped: false,
     justification: 'Measured 48.7k pages at H=180 (budget = measured +25%). A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
-      + 'before and after publishing: every source session\'s boards with and without its workout, from one redaction map '
-      + 'per capture. Each capture also builds the source graph, which reads every shared set of the exercise (linear in history). '
+      + 'before and after publishing: every source session\'s boards with and without its workout. Each capture also builds the source graph, which reads every shared set of the exercise (linear in history). '
       + 'Score writes and board apply are a small share of the cost.' } },
   // Each of these three proves the captured comparison still holds: it builds
   // the group's source graph once per target (every shared set of the exercise,
   // so its cost grows with that history, about 2.2 pages a set) and ranks the
-  // exercise twice from one redaction map. Not week-scoped, so no slope check.
+  // exercise twice. Not week-scoped, so no slope check.
   { fn: 'notification_workout_prepare', via: 'cascade', budget: NOTIFICATION_PROOF },
   { fn: 'notification_workout_enqueue', via: 'cascade', budget: NOTIFICATION_PROOF },
   { fn: 'notification_begin_send', via: 'cascade', budget: NOTIFICATION_PROOF },
@@ -271,7 +269,7 @@ const cowParityCases = (): ParityCase<ReadPathContext>[] => [
  * change that rewrites an RPC adds a case naming the migration whose
  * definition it replaces, with argument sets that cover the fixture; the case
  * proves the rewrite returns the same JSON for every member as viewer, the
- * redacted member exercise and the voided record included. A definition a
+ * hidden exercises and the voided record included. A definition a
  * later migration patched in place (pg_get_functiondef + replace) has no
  * verbatim copy in any one migration: copy the live text into a migration-
  * named file before the rewrite instead.
@@ -327,7 +325,7 @@ export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
     helpers: { group_competition_board: READ_DEFINITIONS },
     argumentSets: (context) => [true, false].map((certified) => ({ p_group_id: context.groupId, p_certified: certified })),
   },
-  // The history before the per-page redaction map: every exercise, both
+  // The history before its rewrite: every exercise, both
   // metrics and scopes, a full page and a short one. The old cascade of
   // helpers is installed too, so the old body calls the old helpers.
   {
@@ -344,7 +342,7 @@ export const PARITY_CASES: readonly ParityCase<ReadPathContext>[] = [
       }))))),
     plant: { from: `'items',_rows`, to: `'items',_rows||_rows` },
   },
-  // A session's detail before the once-per-definition redaction.
+  // A session's detail before its rewrite.
   {
     fn: 'group_competition_session_detail',
     migration: READ_DEFINITIONS,
@@ -370,80 +368,14 @@ const SESSION_CARDS_SQL = `select e.member_user_id as a1, e.session_id as a2,
   from app_public.group_events e join app_public.groups g on g.id=e.group_id
   where e.group_id=(select group_id from perf_fx) and e.kind='session'`;
 
-/** A redaction cache for every fixture member, as a `cache(cache)` CTE. */
-const WITH_CACHE = `with cache as materialized (select app_public.group_competition_redaction_cache((select group_id from perf_fx),
-  array(select uid from perf_members)) as cache)`;
-
-/** Every (group, member, definition) the redaction helpers are compared on: every definition a member logged or a CoW retained, none, and one never logged. */
-const REDACTION_PAIRS_SQL = `select f.group_id as a1, m.uid as a2, d.definition as a3
-  from perf_fx f cross join perf_members m cross join (
-    select se.exercise_definition_id as definition from app_public.session_exercises se join perf_members p on p.uid=se.owner_user_id
-    union select r.definition_id from app_public.group_cow_source_refs r join perf_members p on p.uid=r.member_user_id
-    union select null union select 'perf-def-unlogged') d`;
-
 /**
  * The internal helpers the readers share, compared old against new as the
  * table owner on the PARITY_DAYS fixture, after PARITY_PLANT_STATEMENTS (see
- * parity.ts, `HelperParityCase`). The redaction cache is checked against the
- * live function it caches, asked once for every pair in one statement.
+ * parity.ts, `HelperParityCase`).
  */
 export const HELPER_PARITY_CASES: readonly HelperParityCase[] = [
-  {
-    // Patched in place by 20261030064514 (the CoW disclosure); its old CoW branch too.
-    name: 'group_competition_redacts_exercise', fn: 'group_competition_redacts_exercise',
-    migration: 'parity-definitions/20261030064514_group_cow_readers.sql',
-    helpers: { group_cow_redacts_exercise: '20261030064514_group_cow_readers.sql' },
-    argumentsSql: REDACTION_PAIRS_SQL, call: '{fn}(array[a1],a2,a3)', minAnswers: 2,
-  },
-  {
-    name: 'group_cow_redacts_exercise', fn: 'group_cow_redacts_exercise', migration: '20261030064514_group_cow_readers.sql',
-    argumentsSql: REDACTION_PAIRS_SQL, call: '{fn}(array[a1],a2,a3)', minAnswers: 2,
-  },
-  {
-    name: 'group_competition_redactions',
-    argumentsSql: `with pairs as materialized (${REDACTION_PAIRS_SQL}),
-      cache as materialized (select * from app_public.group_competition_redactions((select group_id from perf_fx),
-        array(select a2 from pairs),array(select a3 from pairs)))
-      select p.*,(select c.redacted from cache c where c.member_user_id=p.a2 and c.definition_id is not distinct from p.a3) as a4
-      from pairs p`,
-    expected: 'app_public.group_competition_redacts_exercise(array[a1],a2,a3)', actual: 'a4', minAnswers: 2,
-  },
-  {
-    // The map a proof builds holds the live answer for every key it has.
-    name: 'notification_redaction_map',
-    argumentsSql: `select p.a1,p.a2,p.a3,app_public.group_competition_redaction_key(p.a2,p.a3) as a4,m.map as a5
-      from (${REDACTION_PAIRS_SQL}) p cross join lateral (select app_public.notification_redaction_map(p.a1,ge.id,ge.rules_revision,null) as map
-        from app_public.group_exercises ge where ge.group_id=p.a1) m`,
-    expected: 'case when a5 ? a4 then app_public.group_competition_redacts_exercise(array[a1],a2,a3) end', actual: '(a5->>a4)::boolean', minAnswers: 2,
-  },
-  {
-    // Ranks from the map equal ranks from the live function, for the common ranks and every workout target's.
-    name: 'notification_ranks_from_graph',
-    argumentsSql: `select t.group_id as a1,t.group_exercise_id as a2,t.rules_revision as a3,t.member_user_id as a4,t.session_id as a5,
-        g.graph as a6,v.own as a7
-      from app_public.notification_workout_targets t cross join (values (true),(false)) v(own)
-      cross join lateral (select app_public.group_metric_eval_source_graph(t.group_id,t.group_exercise_id) as graph) g`,
-    expected: `app_public.notification_ranks_from_graph(a1,a2,a3,(select w from app_public.notification_workout_targets w
-      where a7 and w.member_user_id=a4 and w.session_id=a5 and w.group_exercise_id=a2),a6)`,
-    actual: `app_public.notification_ranks_from_graph(a1,a2,a3,(select w from app_public.notification_workout_targets w
-      where a7 and w.member_user_id=a4 and w.session_id=a5 and w.group_exercise_id=a2),a6,
-      app_public.notification_redaction_map(a1,a2,a3,(select w from app_public.notification_workout_targets w
-        where a7 and w.member_user_id=a4 and w.session_id=a5 and w.group_exercise_id=a2)))`,
-    minAnswers: 2,
-  },
-  {
-    // The per-member cache mirrors the live helper's branches: every pair, a
-    // null, '' and a never-logged definition included, against the live answer.
-    name: 'group_competition_redaction_lookup (cache)',
-    argumentsSql: `${WITH_CACHE} select p.*, c.cache as a4 from (${REDACTION_PAIRS_SQL}) p, cache c
-      union all select p.a1, p.a2, '' as a3, c.cache from (${REDACTION_PAIRS_SQL}) p, cache c where p.a3 is null`,
-    expected: 'app_public.group_competition_redacts_exercise(array[a1],a2,a3)',
-    actual: 'app_public.group_competition_redaction_lookup(a4,array[a1],a2,a3)', minAnswers: 2,
-  },
-  // The readers' item builders against their definitions before the per-call
-  // caches (no cache), for every fixture event, record and session; then
-  // each with a cache for every fixture member against itself without one:
-  // every event, record, withdrawal, session card, CoW item and CoW row set.
+  // The readers' item builders against their definitions before the stream
+  // rewrite, for every fixture event, record and session.
   {
     name: 'group_competition_event_json', fn: 'group_competition_event_json', migration: READ_DEFINITIONS,
     argumentsSql: `select e as a1 from app_public.group_events e where e.group_id=(select group_id from perf_fx)`,
@@ -459,46 +391,6 @@ export const HELPER_PARITY_CASES: readonly HelperParityCase[] = [
     name: 'group_competition_session_card', fn: 'group_competition_session_card', migration: PUBLICATION,
     helpers: { group_competition_session_exercises: READ_DEFINITIONS, group_competition_session_json: READ_DEFINITIONS },
     argumentsSql: SESSION_CARDS_SQL, call: '{fn}(a1,a2,a3)', minAnswers: 2,
-  },
-  {
-    name: 'group_competition_event_json (cache)',
-    argumentsSql: `${WITH_CACHE} select e as a1, c.cache as a2 from app_public.group_events e, cache c
-      where e.group_id=(select group_id from perf_fx)`,
-    expected: 'app_public.group_competition_event_json(a1)', actual: 'app_public.group_competition_event_json(a1,a2)', minAnswers: 2,
-  },
-  {
-    name: 'group_competition_stream_record (cache)',
-    argumentsSql: `${WITH_CACHE} select e as a1, c.cache as a2 from app_public.group_events e, cache c
-      where e.group_id=(select group_id from perf_fx) and e.kind='record'`,
-    expected: 'app_public.group_competition_stream_record(a1)', actual: 'app_public.group_competition_stream_record(a1,a2)', minAnswers: 2,
-  },
-  {
-    name: 'group_competition_stream_withdrawn (cache)',
-    argumentsSql: `${WITH_CACHE} select e as a1, c.cache as a2 from app_public.group_events e, cache c
-      where e.group_id=(select group_id from perf_fx) and e.kind='record_voided'`,
-    expected: 'app_public.group_competition_stream_withdrawn(a1)', actual: 'app_public.group_competition_stream_withdrawn(a1,a2)',
-  },
-  {
-    name: 'group_competition_session_card (cache)',
-    argumentsSql: `${WITH_CACHE} select x.*, c.cache as a4 from (${SESSION_CARDS_SQL}) x, cache c`,
-    expected: 'app_public.group_competition_session_card(a1,a2,a3)', actual: 'app_public.group_competition_session_card(a1,a2,a3,a4)',
-    minAnswers: 2,
-  },
-  {
-    name: 'group_cow_stream_item (cache)',
-    argumentsSql: `${WITH_CACHE} select e.id as a1, e.sort_at_ms as a2, c.cache as a3 from app_public.group_events e, cache c
-      where e.group_id=(select group_id from perf_fx) and e.kind='cow'`,
-    expected: 'app_public.group_cow_stream_item(a1,a2)', actual: 'app_public.group_cow_stream_item(a1,a2,a3)', minAnswers: 2,
-  },
-  {
-    name: 'group_cow_result_rows (cache)',
-    argumentsSql: `${WITH_CACHE} select x as a1, m as a2, c.cache as a3 from app_public.group_cows x cross join unnest(x.metrics) m, cache c
-      where x.group_id=(select group_id from perf_fx)`,
-    expected: `(select coalesce(jsonb_agg(jsonb_build_array(r.ordinal,r.member_id,r.row_json) order by r.member_id),'[]')
-      from app_public.group_cow_result_rows(a1,a2) r)`,
-    actual: `(select coalesce(jsonb_agg(jsonb_build_array(r.ordinal,r.member_id,r.row_json) order by r.member_id),'[]')
-      from app_public.group_cow_result_rows(a1,a2,a3) r)`,
-    minAnswers: 2,
   },
   {
     name: 'group_week_session_counts', fn: 'group_week_session_counts', migration: '20261003180000_group_board_raw_weight.sql',
@@ -518,13 +410,8 @@ const edited = (update: string) => `, edited as (${update} returning 1)
 export const plantedAll = (rows: readonly Record<string, unknown>[]): boolean => rows.every((row) => row.planted !== false);
 
 /**
- * Planted before parity, after every measured call. A cancelled CoW on the
- * bodyweight-aware Pull-up, two weeks back (cancelled, so no worker or
- * reader takes it up), whose retained refs make the CoW
- * disclosure redact through each branch: member 3's ref has an unknown
- * definition (''), member 4's names Bench press while its set is now logged
- * under another definition. The group's latest completed shared session (the
- * viewer's finished workout) is no longer shared, so the week summary's
+ * Planted before parity, after every measured call. The group's latest
+ * completed shared session (the viewer's finished workout) is no longer shared, so the week summary's
  * latest completed session must skip it for an older one. Then facts the
  * evaluator has not caught up with, which the counts must still read
  * through: member 4's newest working set is deleted, member 5's newest
@@ -536,25 +423,6 @@ export const plantedAll = (rows: readonly Record<string, unknown>[]): boolean =>
  * must edit exactly one row.
  */
 export const PARITY_PLANT_STATEMENTS = (): string[] => [
-  `with cow as (
-     insert into app_public.group_cows(id,group_id,group_exercise_id,week_start,time_zone,starts_at,ends_at,metrics,create_key,
-       created_by,available_at,definition_xid,cancelled_at)
-     select gen_random_uuid(),f.group_id,ge.id,w.week,'UTC',lower(w.bounds),upper(w.bounds),array['e1rm'],'perf-cow-parity',
-       (select uid from perf_members where idx=1),clock_timestamp(),0,clock_timestamp()
-     from perf_fx f, perf_group_exercises ge,
-       lateral (select app_public.group_cow_week('UTC',now())-14 as week) w0,
-       lateral (select w0.week,app_public.group_cow_bounds('UTC',w0.week) as bounds) w
-     where ge.ex=5 returning id),
-   refs as (
-     select m.uid,e.set_id,case m.idx when 3 then '' else 'perf-def-0' end as definition
-     from perf_members m cross join lateral (
-       select es.id as set_id from app_public.exercise_sets es
-         join app_public.session_exercises se on se.owner_user_id=es.owner_user_id and se.id=es.session_exercise_id
-        where es.owner_user_id=m.uid and se.exercise_definition_id=case m.idx when 3 then 'perf-def-0' else 'perf-def-1' end
-        order by es.id limit 1) e
-     where m.idx in (3,4))
-   ${edited(`insert into app_public.group_cow_source_refs(cow_id,member_user_id,metric,set_id,definition_id)
-     select cow.id,r.uid,'e1rm',r.set_id,r.definition from cow,refs r`).replace('count(*)=1', 'count(*)=2')}`,
   `with target as (
      select sh.group_id,sh.member_user_id,sh.session_id from app_public.group_session_shares sh
        join app_public.group_memberships gm on gm.group_id=sh.group_id and gm.user_id=sh.member_user_id and gm.ended_at is null
@@ -627,9 +495,10 @@ const NOTIFICATION_PROJECT = '00000000-0000-4000-8000-00000000b06a';
  * Planted before steady state: local notification delivery for every member
  * (config, an auth session and an opted-in installation each, so the
  * cascade sends and `notification_begin_send` runs), the group calendar, and
- * the bodyweight-redacted member exercise: member 2 also links Biceps curl
- * to the bodyweight-aware Pull-up, so that member's curls are redacted where
- * no other member's are.
+ * the disclosure rule's Biceps curls: member 2 links them to the
+ * bodyweight-aware Pull-up and member 4 gives them a bodyweight contribution,
+ * so both hide their kg; member 5's link to the Pull-up is tombstoned, so
+ * theirs, like everyone else's, shows.
  */
 export const plantStatements = (): string[] => [
   `delete from app_public.notification_config`,
@@ -648,6 +517,13 @@ export const plantStatements = (): string[] => [
      select m.uid,f.group_id::text||':perf-def-6','perf-def-6',f.group_id::text,ge.id::text,t.at,t.at,t.at
      from perf_members m, perf_fx f, perf_group_exercises ge, lateral (select f.now_ms-(f.days+30)::bigint*86400000 as at) t
      where m.idx=2 and ge.ex=5`,
+  `insert into app_public.exercise_group_links(owner_user_id,id,exercise_definition_id,group_id,group_exercise_id,
+     created_at,updated_at,deleted_at,client_updated_at_ms)
+     select m.uid,f.group_id::text||':perf-def-6','perf-def-6',f.group_id::text,ge.id::text,t.at,t.at+1,t.at+1,t.at+1
+     from perf_members m, perf_fx f, perf_group_exercises ge, lateral (select f.now_ms-(f.days+30)::bigint*86400000 as at) t
+     where m.idx=5 and ge.ex=5`,
+  `update app_public.exercise_definitions d set bodyweight_contribution=0.5 from perf_members m
+     where m.idx=4 and d.owner_user_id=m.uid and d.id='perf-def-6'`,
 ];
 
 const OWN_COWS = `select id from app_public.group_cows where group_id=(select group_id from perf_fx)`;
@@ -699,13 +575,15 @@ const PARITY_WEEKS_START = `f.now_ms-${PERIOD_WINDOWS}::bigint*${WEEK_MS}`;
 
 /**
  * Each planted case, true when the fixture holds it after steady state; the
- * voided record and the redacted exercise fall inside the weeks parity
+ * voided record and the hidden exercises fall inside the weeks parity
  * compares, so parity exercises both.
  */
+const hidesCurls = (idx: number) =>
+  `app_public.group_competition_redacts_exercise(array[f.group_id],(select uid from perf_members where idx=${idx}),'perf-def-6')`;
 export const PLANT_CHECKS_SQL = `select
-  app_public.group_competition_redacts_exercise(array[f.group_id],(select uid from perf_members where idx=2),'perf-def-6')
-    and not app_public.group_competition_redacts_exercise(array[f.group_id],(select uid from perf_members where idx=3),'perf-def-6')
-    as redacted_member_exercise,
+  ${hidesCurls(2)} and not ${hidesCurls(3)} as linked_exercise_hidden,
+  ${hidesCurls(4)} as own_contribution_hidden,
+  not ${hidesCurls(5)} as tombstoned_link_shown,
   exists(select 1 from app_public.group_events e
     join app_public.exercise_sets es on es.owner_user_id=e.member_user_id and es.id=e.set_id
     join app_public.session_exercises se on se.owner_user_id=es.owner_user_id and se.id=es.session_exercise_id
@@ -713,7 +591,7 @@ export const PLANT_CHECKS_SQL = `select
     where e.group_id=f.group_id and e.kind='record_voided' and s.started_at>=${PARITY_WEEKS_START}) as voided_record,
   exists(select 1 from app_public.sessions s join app_public.session_exercises se on se.owner_user_id=s.owner_user_id and se.session_id=s.id
     where s.owner_user_id=(select uid from perf_members where idx=2) and se.exercise_definition_id='perf-def-6'
-      and s.started_at>=${PARITY_WEEKS_START}) as redacted_in_parity_weeks,
+      and s.started_at>=${PARITY_WEEKS_START}) as hidden_in_parity_weeks,
   exists(select 1 from app_public.group_cows c where c.group_id=f.group_id and c.finalized_at is not null and c.final_outcome='ready')
     as finished_cow,
   exists(select 1 from app_public.group_cows c where c.group_id=f.group_id and c.finalized_at is null

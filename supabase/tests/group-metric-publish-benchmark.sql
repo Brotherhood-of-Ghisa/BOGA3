@@ -7,8 +7,7 @@
 -- notification-workout-events.sh asserts its output. It does not
 -- include TypeScript scoring: the evaluation is built from the source graph.
 -- Each sample reports row writes, WAL and how many times the source graph was
--- built (graph_calls) and how many times capture asked bodyweight disclosure
--- (redaction_calls); elapsed_ms swings by 30x once
+-- built (graph_calls); elapsed_ms swings by 30x once
 -- repeated rolled-back runs leave planner statistics stale, so run
 -- `vacuum analyze` (as supabase_admin) before comparing timings.
 \set ON_ERROR_STOP on
@@ -69,10 +68,10 @@ create function pg_temp.publish_evaluation(p_graph jsonb) returns jsonb language
   where (r->>'live')::boolean
 $$;
 create temporary table publish_samples(step text,scores int,elapsed_ms numeric,wal_kb numeric,
-  inserted bigint,updated bigint,deleted bigint,graph_calls bigint,redaction_calls bigint,completed boolean,rejected text);
+  inserted bigint,updated bigint,deleted bigint,graph_calls bigint,completed boolean,rejected text);
 create function pg_temp.publish_once(p_step text) returns void language plpgsql as $$
 declare f record; job jsonb; graph jsonb; evaluation jsonb; result jsonb; started timestamptz; lsn pg_lsn;
-  before record; after record; calls_before bigint; redactions_before bigint; rejected text;
+  before record; after record; calls_before bigint; rejected text;
 begin
   select * into strict f from publish_fixture;
   -- Enqueue and claim this fixture's job only, as the enqueue triggers and
@@ -88,8 +87,6 @@ begin
     where relid='app_public.group_metric_set_scores'::regclass;
   select coalesce(sum(calls),0) into calls_before from pg_stat_xact_user_functions
     where funcid='app_public.group_metric_eval_source_graph(uuid,uuid)'::regprocedure;
-  select coalesce(sum(calls),0) into redactions_before from pg_stat_xact_user_functions
-    where funcid='app_public.group_competition_redacts_exercise(uuid[],uuid,text)'::regprocedure;
   lsn:=pg_current_wal_insert_lsn();
   started:=clock_timestamp();
   begin
@@ -105,8 +102,6 @@ begin
     after.n_tup_ins-before.n_tup_ins,after.n_tup_upd-before.n_tup_upd,after.n_tup_del-before.n_tup_del,
     (select coalesce(sum(calls),0) from pg_stat_xact_user_functions
       where funcid='app_public.group_metric_eval_source_graph(uuid,uuid)'::regprocedure)-calls_before,
-    (select coalesce(sum(calls),0) from pg_stat_xact_user_functions
-      where funcid='app_public.group_competition_redacts_exercise(uuid[],uuid,text)'::regprocedure)-redactions_before,
     (result->>'completed')::boolean,rejected);
 end $$;
 select pg_temp.publish_once('first');

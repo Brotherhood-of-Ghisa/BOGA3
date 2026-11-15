@@ -348,7 +348,7 @@ begin return jsonb_build_object('a', p_a); end $function$
     const started = Date.now();
     expect(() => definitionFromMigration(`create function app_public.f() returns int as $$ select 1 $$${words.repeat(20)}`, 'f'))
       .toThrow('not a plain clause');
-    expect(definitionFromMigration(`create function app_public.f() returns int as $$ select 1 $$\n${'CREATE OR REPLACE FUNCTION app_public.group_cow_redacts_exercise('.repeat(20)}`, 'f'))
+    expect(definitionFromMigration(`create function app_public.f() returns int as $$ select 1 $$\n${'CREATE OR REPLACE FUNCTION app_public.helper('.repeat(20)}`, 'f'))
       .toBe('create function app_public.f() returns int as $$ select 1 $$;');
     expect(Date.now() - started).toBeLessThan(1000);
   });
@@ -522,23 +522,23 @@ describe('helper parity', () => {
 
   test('an old-against-new case installs the old helpers and compares the pg_temp copy with the live function', () => {
     const { sql, compare } = helperParityStatements({
-      name: 'outer', fn: 'group_competition_redacts_exercise', migration: 'parity-definitions/20261030064514_group_cow_readers.sql',
-      helpers: { group_cow_redacts_exercise: '20261030064514_group_cow_readers.sql' },
+      name: 'outer', fn: 'group_competition_stream_record', migration: 'parity-definitions/20261114220000_group_read_helpers.sql',
+      helpers: { group_competition_event_json: 'parity-definitions/20261114220000_group_read_helpers.sql' },
       argumentsSql: 'select 1 as a1', call: '{fn}(a1)',
     });
     expect(sql).toHaveLength(2);
-    expect(sql[0].startsWith('create or replace function pg_temp.group_cow_redacts_exercise__legacy(')).toBe(true);
-    expect(sql[1].startsWith('create or replace function pg_temp.group_competition_redacts_exercise__legacy(')).toBe(true);
-    expect(sql[1]).toContain('pg_temp.group_cow_redacts_exercise__legacy(p_groups,p_member,p_definition)');
-    expect(compare).toContain('select (pg_temp.group_competition_redacts_exercise__legacy(a1)) as expected, '
-      + '(app_public.group_competition_redacts_exercise(a1)) as actual');
+    expect(sql[0].startsWith('create or replace function pg_temp.group_competition_event_json__legacy(')).toBe(true);
+    expect(sql[1].startsWith('create or replace function pg_temp.group_competition_stream_record__legacy(')).toBe(true);
+    expect(sql[1]).toContain('pg_temp.group_competition_event_json__legacy(p_event)');
+    expect(compare).toContain('select (pg_temp.group_competition_stream_record__legacy(a1)) as expected, '
+      + '(app_public.group_competition_stream_record(a1)) as actual');
     expect(compare).toContain('from (select 1 as a1) a');
   });
 
   test('the old copy may be installed again, and a bad function name is refused', () => {
-    const item = HELPER_PARITY_CASES.find((entry) => 'fn' in entry && entry.fn === 'group_cow_redacts_exercise')!;
+    const item = HELPER_PARITY_CASES.find((entry) => 'fn' in entry && entry.fn === 'group_week_session_counts')!;
     const { sql } = helperParityStatements(item);
-    expect(sql.at(-1)?.startsWith('create or replace function pg_temp.group_cow_redacts_exercise__legacy(')).toBe(true);
+    expect(sql.at(-1)?.startsWith('create or replace function pg_temp.group_week_session_counts__legacy(')).toBe(true);
     expect(() => helperParityStatements({ name: 'x', fn: 'f(); drop', migration: 'm', argumentsSql: 'select 1', call: '{fn}()' }))
       .toThrow('invalid function name');
   });
@@ -548,25 +548,16 @@ describe('helper parity', () => {
     expect(sql).toEqual([]);
     expect(compare).toContain('select (a1) as expected, (a1 + 0) as actual');
     expect(compare).toContain('count(distinct x.expected::text)::integer as answers');
-    const redaction = HELPER_PARITY_CASES.filter((item) => item.name.includes('redact'));
-    expect(redaction.map((item) => item.minAnswers)).toEqual([2, 2, 2, 2, 2]);
   });
 
-  test('the redaction helpers, their cache and the session counts are each compared, every registered case installing', () => {
+  test('the item builders and the session counts are each compared, every registered case installing', () => {
     expect(HELPER_PARITY_CASES.map((item) => item.name).sort()).toEqual([
-      'group_competition_event_json', 'group_competition_event_json (cache)', 'group_competition_redaction_lookup (cache)',
-      'group_competition_redactions',
-      'group_competition_redacts_exercise', 'group_competition_session_card', 'group_competition_session_card (cache)',
-      'group_competition_stream_record', 'group_competition_stream_record (cache)', 'group_competition_stream_withdrawn (cache)',
-      'group_cow_redacts_exercise', 'group_cow_result_rows (cache)', 'group_cow_stream_item (cache)', 'group_week_session_counts',
-      'notification_ranks_from_graph', 'notification_redaction_map']);
+      'group_competition_event_json', 'group_competition_session_card', 'group_competition_stream_record', 'group_week_session_counts']);
     for (const item of HELPER_PARITY_CASES) {
       const { sql, compare } = helperParityStatements(item);
       if ('fn' in item) expect(sql.at(-1)).toContain(`pg_temp.${item.fn}__legacy(`);
       expect(compare).toContain(item.argumentsSql);
     }
-    const cache = HELPER_PARITY_CASES.find((item) => item.name === 'group_competition_redactions')!;
-    expect(cache.argumentsSql).toContain('app_public.group_competition_redactions(');
   });
 
   test('every planted stale fact is edited under its owner\'s claims and must edit exactly one row; the claims are cleared after', () => {
@@ -580,7 +571,7 @@ describe('helper parity', () => {
     }
     expect(statements.at(-1)).toContain("set_config('request.jwt.claims','',true)");
     const plants = statements.filter((statement) => !statement.startsWith('select set_config'));
-    expect(plants).toHaveLength(6);
+    expect(plants).toHaveLength(5);
     for (const plant of plants) expect(plant).toMatch(/select count\(\*\)=[12] as planted from edited$/);
     expect(plantedAll([{ planted: true }])).toBe(true);
     expect(plantedAll([{ planted: false }])).toBe(false);
