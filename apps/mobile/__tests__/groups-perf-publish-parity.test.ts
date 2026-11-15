@@ -73,7 +73,7 @@ describe('publish parity helpers', () => {
 
   test('the plant changes a stored row, not the result, so only the database comparison can catch it', () => {
     const { from, to } = PUBLISH_PARITY_CASE.plant!;
-    expect(from).toMatch(/^update notification_comparison_publications set /);
+    expect(to).toMatch(/update notification_comparison_publications set source_digest=/);
     expect(`${from} ${to}`).not.toMatch(/\breturn\b/);
     const sql = new PublishParity({ exec: async () => [] }).installStatements();
     const returns = (statement: string) => statement.match(/^\s*return .*$/gm);
