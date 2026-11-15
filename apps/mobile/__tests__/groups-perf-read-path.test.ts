@@ -41,12 +41,12 @@ import {
   READ_PATH_RPCS,
   readPathBudgets,
   summarizeReadPath,
+  unscopedReadChecks,
   warmUp,
   type ReadPathContext,
   type ReadPathPoint,
 } from '../scripts/perf/groups/read-path';
 import {
-  baselineEntries,
   checkBudget,
   checkBudgets,
   historySlope,
@@ -71,10 +71,14 @@ describe('budget checks', () => {
     expect(levels(checkBudget('f', budgeted, [cost(90, 800), cost(180, 900)]))).toEqual(['pass']);
   });
 
-  test('a call over its budget fails, whatever its kind', () => {
+  test('a call over its budget fails', () => {
     expect(checkBudget('f', budgeted, [cost(90, 900), cost(180, 1001)])).toEqual([
       { fn: 'f', level: 'fail', message: 'H=180: 1001 pages per call, over its budget of 1000' }]);
-    expect(levels(checkBudget('f', baseline, [cost(90, 80000), cost(180, 90001)]))).toContain('fail');
+  });
+
+  test('a baseline entry fails, even with every call within its pages', () => {
+    expect(checkBudget('f', { ...baseline, justification: 'today\'s cost' }, [cost(90, 10), cost(180, 20)])).toEqual([
+      { fn: 'f', level: 'fail', message: 'a `baseline` entry is refused: measure it and make it `budgeted`' }]);
   });
 
   test('a budgeted scoped RPC growing over 1.2x per doubling of history fails', () => {
@@ -88,9 +92,7 @@ describe('budget checks', () => {
     expect(levels(checkBudget('f', budgeted, [cost(90, 60), cost(180, 101)]))).toEqual(['fail']);
   });
 
-  test('a baseline slope only warns, and an unscoped slope is not checked', () => {
-    expect(checkBudget('f', baseline, [cost(90, 30000), cost(180, 80000)])).toEqual([
-      { fn: 'f', level: 'warn', message: 'grows 2.67× per doubling of history (baseline: reported, not asserted)' }]);
+  test('an unscoped slope is not checked', () => {
     expect(levels(checkBudget('f', { ...budgeted, scoped: false }, [cost(90, 300), cost(180, 900)]))).toEqual(['pass']);
   });
 
@@ -100,7 +102,9 @@ describe('budget checks', () => {
       { fn: 'f', level: 'fail', message: 'budget 5001 pages is over the 5000-page ceiling without a justification' }]);
     expect(levels(checkBudget('f', { ...over, justification: '  ' }, [cost(180, 10)]))).toEqual(['fail']);
     expect(levels(checkBudget('f', { ...over, justification: 'a background job, never on a screen' }, [cost(180, 10)]))).toEqual(['pass']);
-    expect(levels(checkBudget('f', { ...baseline, pages: PAGE_CEILING * 20 }, [cost(180, 10)]))).toEqual(['pass']);
+    expect(checkBudget('f', { ...baseline, scoped: false, pages: PAGE_CEILING * 20 }, [cost(180, 10)]).map((check) => check.message)).toEqual([
+      'a `baseline` entry is refused: measure it and make it `budgeted`',
+      'budget 100000 pages is over the 5000-page ceiling without a justification']);
   });
 
   test('a failed, missing or unbudgeted measurement fails', () => {
@@ -128,14 +132,31 @@ describe('budget checks', () => {
     expect(suggestBudget(3200)).toBe(4000);
   });
 
-  test('the table lists every RPC with its verdict and names the entries still baseline', () => {
+  test('the table lists every RPC with its verdict and each failure', () => {
     const budgets = { a: budgeted, b: baseline };
     const measured = { a: [cost(90, 100), cost(180, 100)], b: [cost(90, 1), cost(180, 0, { error: '57014' })] };
     const markdown = readPathMarkdown(budgets, measured, [90, 180], checkBudgets(budgets, measured));
     expect(markdown).toContain('| a | budgeted, scoped | 1000 | 100 | 0 | 0 | 100 | 0 | 0 | 1.00× | PASS |');
     expect(markdown).toContain('| b | baseline, scoped | 90.0k | 1 | 0 | 0 | error 57014 | — | — | — | FAIL |');
-    expect(markdown).toContain('Still `baseline` (later work converts them to `budgeted`): b.');
-    expect(baselineEntries(budgets)).toEqual(['b']);
+    expect(markdown).toContain('- FAIL b: a `baseline` entry is refused: measure it and make it `budgeted`');
+    expect(markdown).not.toContain('Still `baseline`');
+    expect(markdown).toContain('Ceiling 5000 pages per call; a scoped RPC grows at most 1.2× per doubling of history.');
+    expect(markdown).not.toMatch(/^- a \(/m);
+  });
+
+  test('the table gives each justified entry its reason: over the ceiling, or its slope not asserted', () => {
+    const budgets: Record<string, BudgetEntry> = {
+      job: { kind: 'budgeted', pages: PAGE_CEILING * 2, scoped: false, justification: ' a background job ' },
+      read: { kind: 'budgeted', pages: 900, scoped: false, justification: 'its cache scans history' },
+      noted: { ...budgeted, justification: 'measured twice' },
+      plain: budgeted,
+    };
+    const measured = { job: [cost(90, 10)], read: [cost(90, 10)], noted: [cost(90, 10)], plain: [cost(90, 10)] };
+    const markdown = readPathMarkdown(budgets, measured, [90], checkBudgets(budgets, measured));
+    expect(markdown).toContain('- job (over the ceiling, slope not asserted): a background job');
+    expect(markdown).toContain('- read (slope not asserted): its cache scans history');
+    expect(markdown).toContain('- noted (within the ceiling, scoped): measured twice');
+    expect(markdown).not.toContain('- plain (');
   });
 });
 
@@ -184,6 +205,31 @@ describe('the group read, evaluator write and notification RPCs the lane budgets
     }
   });
 
+  test('no entry is baseline: every RPC is held to the ceiling', () => {
+    expect(READ_PATH_RPCS.filter((rpc) => rpc.budget.kind !== 'budgeted').map((rpc) => rpc.fn)).toEqual([]);
+  });
+
+  test('the exceptions are exactly the ones the operator approved', () => {
+    const over = READ_PATH_RPCS.filter((rpc) => rpc.budget.pages > PAGE_CEILING).map((rpc) => [rpc.fn, rpc.budget.pages]);
+    expect(Object.fromEntries(over)).toEqual({
+      group_metric_eval_publish: 61_000,
+      notification_workout_prepare: 6_500,
+      notification_workout_enqueue: 6_500,
+      notification_begin_send: 6_500,
+    });
+    const unscopedReads = READ_PATH_RPCS.filter((rpc) => rpc.via === 'member' && !rpc.budget.scoped).map((rpc) => [rpc.fn, rpc.budget.pages]);
+    expect(Object.fromEntries(unscopedReads)).toEqual({ group_cow_summary: 1_200, group_cow_previous_summary: 1_300 });
+    expect(unscopedReadChecks()).toEqual([]);
+  });
+
+  test('a screen read with scoped: false and no justification fails the set; a cascade write may be unscoped', () => {
+    const read = { fn: 'r', via: 'member' as const, args: () => ({}), budget: { kind: 'budgeted' as const, pages: 100, scoped: false } };
+    const write = { fn: 'w', via: 'cascade' as const, budget: { kind: 'budgeted' as const, pages: 100, scoped: false } };
+    expect(unscopedReadChecks([read, write])).toEqual([
+      { fn: 'r', level: 'fail', message: 'a screen read with `scoped: false` has no justification giving its slope and cause' }]);
+    expect(unscopedReadChecks([{ ...read, budget: { ...read.budget, justification: 'grows 1.5x: its cache scans history' } }])).toEqual([]);
+  });
+
   test('the set measures two history points, smallest first', () => {
     expect(READ_PATH_DAYS).toEqual([90, 180]);
   });
@@ -221,8 +267,20 @@ describe('read-path results', () => {
     expect(pointCost(90, undefined)).toMatchObject({ calls: 0, error: 'not called' });
   });
 
+  test('a baseline entry, or an unjustified unscoped screen read, fails the set though its calls are within budget', () => {
+    const passing = { fn: 'f', compared: 2, differences: [], plantDetected: true, error: null };
+    const points = [point(90, { calls: { f: [record(50)] }, parity: [passing] }), point(180, { calls: { f: [record(60)] } })];
+    const rpc = { fn: 'f', via: 'member' as const, args: () => ({}) };
+    expect(summarizeReadPath(points, [{ ...rpc, budget: { kind: 'baseline' as const, pages: 100, scoped: true } }]).failures).toEqual([
+      'f: a `baseline` entry is refused: measure it and make it `budgeted`']);
+    const unscoped = summarizeReadPath(points, [{ ...rpc, budget: { kind: 'budgeted' as const, pages: 100, scoped: false } }]);
+    expect(unscoped.failures).toEqual(['f: a screen read with `scoped: false` has no justification giving its slope and cause']);
+    expect(unscoped.markdown).toContain('| f | budgeted | 100 |');
+    expect(unscoped.markdown).toContain('FAIL |');
+  });
+
   test('an incomplete point, a failed parity case or no parity at all fails the set', () => {
-    const rpcs = [{ fn: 'f', via: 'member' as const, args: () => ({}), budget: { kind: 'baseline' as const, pages: 100, scoped: true } }];
+    const rpcs = [{ fn: 'f', via: 'member' as const, args: () => ({}), budget: { kind: 'budgeted' as const, pages: 100, scoped: true } }];
     const passing = { fn: 'f', compared: 2, differences: [], plantDetected: true, error: null };
     const ok = summarizeReadPath([point(90, { calls: { f: [record(50)] }, parity: [passing] }), point(180, { calls: { f: [record(60)] } })], rpcs);
     expect(ok.failures).toEqual([]);
@@ -240,7 +298,7 @@ describe('read-path results', () => {
   });
 
   test('a parity case whose calls never returned a required outcome fails, and the table shows the outcomes it saw', () => {
-    const rpcs = [{ fn: 'f', via: 'member' as const, args: () => ({}), budget: { kind: 'baseline' as const, pages: 100, scoped: true } }];
+    const rpcs = [{ fn: 'f', via: 'member' as const, args: () => ({}), budget: { kind: 'budgeted' as const, pages: 100, scoped: true } }];
     const blind = { fn: 'f', compared: 3, differences: [], plantDetected: null, error: null, observed: { true: 3 }, missing: ['false'] };
     const result = summarizeReadPath([point(90, { calls: { f: [record(50)] }, parity: [blind] }), point(180, { calls: { f: [record(60)] } })], rpcs);
     expect(result.failures).toEqual(['parity f: no call returned false']);
