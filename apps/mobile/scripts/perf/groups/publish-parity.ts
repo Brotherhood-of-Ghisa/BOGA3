@@ -32,8 +32,12 @@ export const PUBLISH_PARITY_CASE: PublishParityCase = {
     group_metric_eval_source_graph: '20261023091259_group_metric_graph_referenced_sets.sql',
     group_metric_eval_publish_without_notifications: 'parity-definitions/20261023091259_group_metric_graph_referenced_sets.sql',
   },
-  // Every call returns the inner publisher's result; the plant adds a field to it.
-  plant: { from: '  return result;', to: "  return result||jsonb_build_object('planted',true);" },
+  // A write the result does not show: a publication's stored source digest.
+  // Only the published rows and the row writes can tell it apart.
+  plant: {
+    from: 'update notification_comparison_publications set source_digest=current_digest',
+    to: "update notification_comparison_publications set source_digest=current_digest||'-planted'",
+  },
 };
 
 /**

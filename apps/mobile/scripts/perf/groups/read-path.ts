@@ -808,25 +808,30 @@ const measureWorkout = async (
   return [started, logged, confirmed];
 };
 
-export const runReadPathPoint = async (historyDays: number, options: Tier1Options & { parity: boolean }): Promise<ReadPathPoint> => {
-  const startedAt = Date.now();
-  const name = `read-m${READ_PATH_MEMBERS}-h${historyDays}d`;
+/** A point's connection and run, opened after a full vacuum, and its empty record. */
+const openPoint = async (historyDays: number, options: Tier1Options) => {
   // Compact first: strict per-call budgets need the same pages run after run.
   await vacuum(options.adminDbUrl, true);
   const client = new Client({ connectionString: options.dbUrl });
   await client.connect();
   const session = new Tier1Session(client, options.callBudgetMs);
-  const run = new Tier1Run(session);
   const point: ReadPathPoint = {
-    name, members: READ_PATH_MEMBERS, historyDays, fixture: { members: 0, sessions: 0, sets: 0 }, plants: {}, calls: {},
+    name: `read-m${READ_PATH_MEMBERS}-h${historyDays}d`, members: READ_PATH_MEMBERS, historyDays,
+    fixture: { members: 0, sessions: 0, sets: 0 }, plants: {}, calls: {},
     errors: {}, cascade: null, walPerLoggedSet: null, parity: [], incomplete: null, setupMs: 0,
   };
+  return { client, session, run: new Tier1Run(session), point };
+};
+
+export const runReadPathPoint = async (historyDays: number, options: Tier1Options & { parity: boolean }): Promise<ReadPathPoint> => {
+  const startedAt = Date.now();
+  const { client, session, run, point } = await openPoint(historyDays, options);
+  const { name } = point;
   const recordFailure: RecordFailure = (fn) => (error) => {
     point.errors[fn] = error.message;
   };
-  const publishParity = options.parity ? new PublishParity(session) : null;
   try {
-    const context = await buildPoint(session, run, point, publishParity);
+    const context = await buildPoint(session, run, point, null);
     if (!context) return point;
     options.log(`[${name}] steady state after ${Math.round((Date.now() - startedAt) / 1000)} s: ${point.fixture.sets} sets`);
     // Reads first, against the steady state the planted cases left.
@@ -837,7 +842,7 @@ export const runReadPathPoint = async (historyDays: number, options: Tier1Option
     const reads = session.take();
     const steps = await measureWorkout(session, run, context, viewer, recordFailure);
     // Parity last, so its many unmeasured calls cannot touch a measured one.
-    if (options.parity) point.parity = [...await runParityCases(session, context), publishParity!.outcome];
+    if (options.parity) point.parity = await runParityCases(session, context);
     point.walPerLoggedSet = steps[1].total.walBytes;
     point.cascade = sumCascades(steps);
     const measuredFns = new Set(READ_PATH_RPCS.map((rpc) => rpc.fn));
@@ -848,6 +853,37 @@ export const runReadPathPoint = async (historyDays: number, options: Tier1Option
     return point;
   } finally {
     point.setupMs = Date.now() - startedAt;
+    await session.rollback().catch(() => undefined);
+    await client.end();
+  }
+};
+
+/**
+ * Publish parity, on a build of the point of its own that nothing measures:
+ * every publication of its steady state and of the owner's workout runs the
+ * old and new definitions side by side. The old runs are rolled back, but
+ * the rows they wrote stay behind as dead rows the transaction cannot vacuum,
+ * so a measured call on the same build would pay for them.
+ */
+export const runPublishParity = async (historyDays: number, options: Tier1Options): Promise<ParityOutcome> => {
+  const startedAt = Date.now();
+  const { client, session, run, point } = await openPoint(historyDays, options);
+  const parity = new PublishParity(session);
+  try {
+    const context = await buildPoint(session, run, point, parity);
+    if (context) {
+      const viewer: Viewer = { role: 'authenticated', userId: context.viewer, sessionId: context.viewerSession };
+      const steps = await measureWorkout(session, run, context, viewer, () => () => undefined);
+      const failures = steps.flatMap((step) => step.failures.map((failure) => `${step.label}: ${failure}`));
+      if (failures.length > 0) point.incomplete = failures.join('; ');
+    }
+    if (point.incomplete) parity.outcome.error ??= `publish parity point incomplete: ${point.incomplete}`;
+    options.log(`[${point.name} publish parity] ${parity.outcome.compared} publications compared in ${Math.round((Date.now() - startedAt) / 1000)} s`);
+    return parity.outcome;
+  } catch (failure) {
+    parity.outcome.error ??= (failure as Error).message;
+    return parity.outcome;
+  } finally {
     await session.rollback().catch(() => undefined);
     await client.end();
   }
@@ -891,5 +927,8 @@ export const summarizeReadPath = (points: readonly ReadPathPoint[], rpcs: readon
 export const runReadPath = async (options: Tier1Options): Promise<ReadPathResult> => {
   const points: ReadPathPoint[] = [];
   for (const days of READ_PATH_DAYS) points.push(await runReadPathPoint(days, { ...options, parity: days === PARITY_DAYS }));
+  // Last, so its leftovers are vacuumed before anything is measured again.
+  const parityPoint = points.find((point) => point.historyDays === PARITY_DAYS && !point.incomplete);
+  if (parityPoint) parityPoint.parity.push(await runPublishParity(PARITY_DAYS, options));
   return summarizeReadPath(points);
 };

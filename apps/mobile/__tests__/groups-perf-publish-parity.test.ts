@@ -70,6 +70,15 @@ describe('publish parity helpers', () => {
     expect(sql[3]).toContain(PUBLISH_PARITY_CASE.plant!.to);
     expect(sql[2]).not.toContain(PUBLISH_PARITY_CASE.plant!.to);
   });
+
+  test('the plant changes a stored row, not the result, so only the database comparison can catch it', () => {
+    const { from, to } = PUBLISH_PARITY_CASE.plant!;
+    expect(from).toMatch(/^update notification_comparison_publications set /);
+    expect(`${from} ${to}`).not.toMatch(/\breturn\b/);
+    const sql = new PublishParity({ exec: async () => [] }).installStatements();
+    const returns = (statement: string) => statement.match(/^\s*return .*$/gm);
+    expect(returns(sql[3])).toEqual(returns(sql[2]));
+  });
 });
 
 /**

@@ -16,7 +16,8 @@
 -- rule changes and management, never for a publisher, and never block one.
 -- Each statement of a reader sees its own snapshot, so a publication that
 -- commits during a multi-statement read shows only in its later statements
--- (a board's count or own row one publication ahead of its page). Every
+-- (podiums: an exercise's rebuilding flag one publication ahead of its
+-- board). Every
 -- statement still reads the one rules revision the read began with, so
 -- revisions never mix, and the next refresh agrees.
 

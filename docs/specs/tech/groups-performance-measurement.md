@@ -162,13 +162,14 @@ and new must agree under every one. `observe` names each live outcome and
 same way does not pass. A helper shared by several cases installs once.
 
 **Publish parity** (`publish-parity.ts`) does the same for the comparison
-publisher, a write: on the H=90 point every `group_metric_eval_publish` call,
-in both steady-state drains and the measured workout, first runs the old
+publisher, a write: on its own unmeasured build of the H=90 point (rolled-back
+runs leave dead rows), every `group_metric_eval_publish` call, in both
+steady-state drains and the workout, first runs the old
 definition (with the old helpers it calls) inside a savepoint that is rolled
 back, then the live one, from the same state. Their results, rows written per
 table, and the group's published rows and queue state must match; new event
 ids compare by stream position. A planted change to the old publisher must be
-caught.
+caught: its plant changes only a stored row.
 
 ## Tier 2 — `./boga test groups-perf-load`
 
