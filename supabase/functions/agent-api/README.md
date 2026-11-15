@@ -445,15 +445,13 @@ next read and no derived value is persisted.
 
 ## Plan permission and write routes
 
-The base OAuth grant is read-only. Reading the upcoming plan queue, creating
-plans/programmes, editing exercises, setting muscle targets and writing notes additionally
-require a current-grant row in `public.agent_plan_permissions`
-(`plan_access_enabled = true` and `granted_at` equal to the live OAuth grant
-timestamp). A missing, false or grant-mismatched row returns `403
-PLAN_PERMISSION_REQUIRED` before any referenced resource is resolved. Mutating plans or
-programmes (`PATCH`) additionally requires `plan_edit_enabled = true`
-(`403 PLAN_EDIT_PERMISSION_REQUIRED`). The person enables it per client on the
-Connected Agents screen ([[agents.write-access]]).
+The base OAuth grant is read-only. Upcoming plans, creating plans/programmes,
+editing exercises, muscle targets and notes require a current-grant
+`public.agent_plan_permissions` row (`plan_access_enabled = true`, matching
+`granted_at`); missing or mismatched rows return `403 PLAN_PERMISSION_REQUIRED`
+before resource resolution. Mutating plans/programmes (`PATCH`) also requires
+`plan_edit_enabled = true` (`403 PLAN_EDIT_PERMISSION_REQUIRED`). Enabled per
+client on Connected Agents ([[agents.write-access]]).
 
 ### `GET /v1/agent/session-plans` and `GET /v1/agent/programmes/{id}`
 
@@ -473,17 +471,17 @@ Both require `Idempotency-Key` (1..128 characters) and strict JSON body. Plan bo
 Programme body: `{name, description?, plans:[<plan>...]}` (2..50 plans, 1..30 blocks/plan, 1..30
 sets/block). Referenced exercise/gym IDs must be owned (`400 FOREIGN_RESOURCE_REFERENCE`).
 
-Each creates the whole graph in one transaction with `provenance = 'agent'` and `pending` blocks;
-child failure rolls back every row. Replaying key and payload returns cached IDs
-(`idempotent_replay: true`); differing payload returns `409 IDEMPOTENCY_CONFLICT`. No performed
-session or set is created; agents cannot attach, complete, or skip plans.
+Each creates the graph atomically with `provenance = 'agent'` and `pending` blocks;
+child failure rolls back all rows. Replaying key and payload returns cached IDs
+(`idempotent_replay: true`); differing payload returns `409 IDEMPOTENCY_CONFLICT`.
+No performed session/set is created; agents cannot attach, complete, or skip plans.
 
 ### `PATCH /v1/agent/session-plans/{id}` and `PATCH /v1/agent/programmes/{id}`
 
 Both require `Idempotency-Key` and `plan_edit_enabled = true` ([[agents.write-access]]).
-Replaying key and payload returns cached receipt; reusing the key across different targets or with
-differing payloads returns `409 IDEMPOTENCY_CONFLICT`. All mutations require `base_version`; a stale
-version returns `409 PLAN_CONCURRENT_MODIFICATION`.
+Replaying key and payload returns the cached receipt; cross-target or differing-payload
+reuse returns `409 IDEMPOTENCY_CONFLICT`. All mutations require `base_version`; stale
+versions return `409 PLAN_CONCURRENT_MODIFICATION`.
 
 Plan mutations (`PATCH /v1/agent/session-plans/{id}`):
 - `update_plan_meta`: `{base_version, patch: {title?, gym_id?, scheduled_for?}}`.
@@ -523,23 +521,21 @@ FOREIGN_RESOURCE_REFERENCE`; a missing or foreign exercise `404`; a stale
 `expected_revision` `409 REVISION_CONFLICT`; editing a deleted exercise `409
 EXERCISE_DELETED`. Exercise writes have their own 30-per-minute window.
 
-The service-role-only `agent_*_exercise` RPCs stamp each touched row at or past the
-wall clock and past every stamp the exercise holds, so devices pull it under LWW. A
-re-added muscle revives its row, a new one takes the id
-`map_<exercise>__<muscle>`, a dropped one is tombstoned, and a `load_input_mode`
-change re-scores linked group exercises. The response is the RPC result
-(`exercise_id`, `revision`, `idempotent_replay`, plus `deleted`/`changed`) and
-`exercise`, the catalog view after the write.
+Service-role `agent_*_exercise` RPCs stamp touched rows past the wall clock and
+exercise stamps for LWW pull. Re-added muscles revive; new ones use
+`map_<exercise>__<muscle>`; dropped ones tombstone; `load_input_mode` changes
+re-score linked group exercises. Returns the RPC result (`exercise_id`, `revision`,
+`idempotent_replay`, `deleted`/`changed`) and updated `exercise`.
 
 ## Status contract
 
 - `400` invalid argument, cursor, foreign reference, or active block edit (`IMMUTABLE_BLOCK_MUTATION`).
 - `401` missing, invalid, expired, normal-app, or revoked authorization.
-- `403` write access missing, disabled or bound to a stale grant (`PLAN_PERMISSION_REQUIRED`, `PLAN_EDIT_PERMISSION_REQUIRED`).
-- `404` unknown route or inaccessible/nonexistent resource, exercise, or note.
-- `405` unsupported method for the route (`GET, POST, PUT, PATCH`).
-- `409` idempotency conflict, stale revision or version (`PLAN_CONCURRENT_MODIFICATION`), or edit of a deleted exercise.
-- `413` the request body exceeds its bound, or the generated response exceeds its 256 KiB safety bound.
+- `403` missing, disabled, or stale write access (`PLAN_PERMISSION_REQUIRED`, `PLAN_EDIT_PERMISSION_REQUIRED`).
+- `404` unknown route or nonexistent resource, exercise, or note.
+- `405` unsupported method (`GET, POST, PUT, PATCH`).
+- `409` idempotency conflict, stale revision/version (`PLAN_CONCURRENT_MODIFICATION`), or deleted exercise.
+- `413` request or response exceeds size bound (256 KiB response cap).
 - `429` request rate exceeded.
 - `500` internal/database failure with no sensitive detail.
 - `503` `UPSTREAM_UNAVAILABLE` with `Retry-After`: Supabase Auth unavailable.
