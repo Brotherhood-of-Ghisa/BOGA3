@@ -92,6 +92,7 @@ supabase/tests/lib/**	groups-contract,groups-leaderboards,groups-competitions,gr
 supabase/tests/groups-api-live.sh	groups-api-live	the groups client live lane body
 supabase/migrations/*competition*	groups-competitions	protocol-4 representation
 supabase/tests/groups-competitions.sh	groups-competitions	the protocol-4 competition lane body
+supabase/tests/groups-cow-zones.sh	groups-competitions	the CoW calendar zone validation lane body
 supabase/tests/groups-competition-live.sh	groups-api-live	the protocol-4 client live lane body
 apps/mobile/src/groups/competition-*.ts	groups-api-live,groups-competitions	protocol-4 scoring / wire / reader guards
 apps/mobile/__tests__/groups-competition-api-live.test.ts	groups-api-live	the protocol-4 client live suite

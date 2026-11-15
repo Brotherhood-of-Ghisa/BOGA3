@@ -100,7 +100,12 @@ sealed boundary, even when scoring has not yet run.
 calendar validation and RPCs. `group_create` has one defaulted zone argument:
 old calls create an unset calendar; the typed client supplies its creator's
 device zone. Existing summary payloads remain exact. Legacy calendars require
-an explicit manager choice through the separate calendar RPCs.
+an explicit manager choice through the separate calendar RPCs. A zone is valid
+when `pg_timezone_names` lists it outside `posix/` and `right/` and it is
+`UTC` or `Area/Location`-shaped; the names the database listed when the
+migration ran are recognised without reading that view, which only a name
+outside them reaches; a name the tz data later drops stays recognised until a
+migration regenerates the list.
 
 Calendar, create, edit and cancel serialize on the existing group lock. Create
 uses a caller-held UUID and immutable request identity; an identical authorized
