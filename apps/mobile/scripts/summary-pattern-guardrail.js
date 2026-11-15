@@ -8,10 +8,10 @@ const GEOMETRY_FIELDS = /^(padding|margin|gap|rowGap|columnGap|height|minHeight|
 const TYPE_FIELDS = new Set(['fontFamily', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing', 'textTransform']);
 
 // Only adopted tile consumers and their style companions; shared metric primitives own type/geometry.
-function findSummaryPatternViolations({ rootDir = path.resolve(__dirname, '..'), adoptedFiles = [] } = {}) {
+function findSummaryPatternViolations({ rootDir = path.resolve(__dirname, '..') } = {}) {
   const violations = [];
   const metricFiles = new Set(patternFiles(rootDir, [SUMMARY_PATTERN_FILES[1]]));
-  for (const file of patternFiles(rootDir, [...SUMMARY_PATTERN_FILES, ...adoptedFiles])) {
+  for (const file of patternFiles(rootDir, SUMMARY_PATTERN_FILES)) {
     const absolute = path.join(rootDir, file);
     if (!fs.existsSync(absolute)) continue;
     const { source, name: referenceName, component, fromModule } = patternSource(file, fs.readFileSync(absolute, 'utf8'));

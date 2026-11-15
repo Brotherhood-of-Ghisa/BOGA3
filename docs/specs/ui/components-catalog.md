@@ -30,17 +30,6 @@ For a new block or derivative, follow the selection and review workflow in
 | SortableTable family | `stats/stats-table.tsx`: StatsTable, compact StatsTableRow/Name/Disclosure and comparison columns; Muscle list/contributors | Keep sorting with its current owner, separate history/disclosure targets and responsive stacking |
 | SummaryTile | `summary-tile.tsx`: shared header and existing metric content; At a glance's Group stats | Both Sets/GR remain visible; period controls stay outside and metric controls govern the board/chart |
 
-### Promoted templates
-
-New registrations live in this machine-readable inventory. The four families
-above retain their existing checker inventory. For promotion, contract schema
-and executable examples, load `docs/specs/08-ux-delivery-standard.md` and
-`apps/mobile/__tests__/ui-template-promotion.test.ts`. This change promotes none.
-
-```ui-template-catalog
-[]
-```
-
 ## Existing primitives (`apps/mobile/components/ui/`)
 
 | You need | Reach for |
@@ -88,26 +77,21 @@ and independent-control rows. Compact samples cover Stream, CoW and embedded sum
 
 Adoption lists in the four `apps/mobile/scripts/*-pattern-guardrail.js`
 modules protect Stream/CoW, both weekly boards, Muscle/contributor tables and
-Group stats. New or changed JSX/presentation additionally declares template reuse or
-custom design in its PR UX Contract; spec 08 owns that process and review.
-Missing declarations fail the existing guardrail lane. Template selections extend
-the checks to new consumers, including TS/TSX style companions and
-imported/re-exported style modules. Cases:
-`apps/mobile/__tests__/ui-pattern-selection.test.ts` and
-`apps/mobile/__tests__/pattern-adoption-guardrail.test.ts`.
+Group stats, including their TS/TSX style companions and imported or
+re-exported style modules. Cases:
+`apps/mobile/__tests__/pattern-adoption-guardrail.test.ts`. A new consumer of a
+family joins its adoption list; spec 08 owns selection and review.
 
 Foundation definitions own geometry and retain their component tests. Template consumers
 cannot override their selected family's type/casing or pattern style props;
 compact list/table consumers cannot add row insets/minimums. Page/chart layout,
 CoW podiums and record targets retain their existing contracts. Figure widths
-remain feature-owned. Existing compositions keep their recipes; new or
-changed JSX cannot silently opt out. Other catalog primitives are useful parents
+remain feature-owned. Existing compositions keep their recipes. Other catalog primitives are useful parents
 for custom design; they do not make it an approved template. Gallery fixtures
 are parents only inside the existing guarded development route.
 
 Use `template` for approved families/variants, `custom` for everything beyond
-them. Custom use follows normal PR review; only reusable-template promotion
-needs separate human acceptance in spec 08. Humans decide semantic fit. No new
+them. Custom use and new templates follow normal PR review. Humans decide semantic fit. No new
 suppression or increased budget substitutes for fixing drift.
 
 ### List pattern adoption

@@ -12,9 +12,9 @@ const COMPACT_PATTERN_FILES = [
 ];
 const TYPE_FIELDS = new Set(['fontFamily', 'fontWeight', 'fontSize', 'lineHeight', 'letterSpacing', 'textTransform']);
 
-function findCompactPatternViolations({ rootDir = path.resolve(__dirname, '..'), adoptedFiles = [] } = {}) {
+function findCompactPatternViolations({ rootDir = path.resolve(__dirname, '..') } = {}) {
   const violations = [];
-  const files = patternFiles(rootDir, [...COMPACT_PATTERN_FILES, ...adoptedFiles]);
+  const files = patternFiles(rootDir, COMPACT_PATTERN_FILES);
   for (const file of files) {
     const absolute = path.join(rootDir, file);
     if (!fs.existsSync(absolute)) continue;

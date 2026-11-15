@@ -83,4 +83,4 @@ function attributeValue(attribute) {
   return value && ts.isStringLiteralLike(value) ? value.text : null;
 }
 
-module.exports = { PATTERN_FOUNDATIONS, propertyName, patternSource, patternFiles, attributeValue };
+module.exports = { propertyName, patternSource, patternFiles, attributeValue };
