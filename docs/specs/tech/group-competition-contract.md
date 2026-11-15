@@ -238,8 +238,8 @@ reader one per CoW, the records history a pair map.
 The stream page takes, per kind, the first `limit + 1` items after the
 cursor and merges them. Session cards are selected by their item's
 `sort_at_ms`, the session trigger's copy of `started_at`; their position is
-the live `started_at`. A failed trigger leaves the copy stale, misplacing that
-card in paging until the session's next accepted write. Records sort at their
+the live `started_at`. A failed trigger leaves the copy stale, and paging can
+then skip that card on every page until the session's next accepted write. Records sort at their
 session's live start, which their item does not hold, so they are ranked
 whole.
 

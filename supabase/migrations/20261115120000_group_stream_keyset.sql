@@ -22,9 +22,10 @@
 --   group's events, merges them in stream order and builds only the items it
 --   returns, all in one statement: candidates, cache and items see one
 --   snapshot, so a publication between statements (readers take no lock that
---   holds one off) cannot split a card's event, record and group records. Sessions page by their stream event's sort_at_ms, which the
---   session trigger keeps equal to the session's started_at on every
---   accepted write; positions are still the live started_at. Records sort at
+--   holds one off) cannot split a card's event, record and group records.
+--   Sessions page by their stream event's sort_at_ms, which the session
+--   trigger keeps equal to the session's started_at on every accepted write;
+--   positions are still the live started_at. Records sort at
 --   their session's live start, which their event does not track, so a
 --   group's records are ranked whole (the record-only index).
 -- - v2-v5 build each item once at their own level (v2/v3 add `record`, v4

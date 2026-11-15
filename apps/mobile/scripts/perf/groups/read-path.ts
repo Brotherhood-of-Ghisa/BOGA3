@@ -134,7 +134,8 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'budgeted', pages: 350, scoped: true } },
   { fn: 'group_cow_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'baseline', pages: 2_200, scoped: true } },
+    budget: { kind: 'budgeted', pages: 2_200, scoped: true } },
+  // Still `baseline`: under the ceiling, but its cost grows 1.36-1.38x per doubling of history.
   { fn: 'group_cow_previous_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'baseline', pages: 2_500, scoped: true } },
   { fn: 'group_cow_calendar_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }),

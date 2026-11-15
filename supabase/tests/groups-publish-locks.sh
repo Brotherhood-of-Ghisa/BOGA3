@@ -25,7 +25,10 @@
 #     in a later one sees a publication committed in between (readers no longer
 #     hold it off). A record card's event, record and group records must still
 #     agree: the old decoration listed a newly led board in the group records
-#     that the card's event did not hold, which the client rejects.
+#     that the card's event did not hold, which the client rejects. The
+#     stream now builds its page and every card in one statement, so no
+#     publication falls between them: checked by its definition, and by its
+#     cards agreeing when read after the publication.
 #
 # Direct-drain mode: the kick URL is unset and the sweep paused for the run.
 # Hermetic: per-run users, deleted on exit with everything they own.
@@ -418,6 +421,7 @@ begin
   return page;
 end \$f\$;
 ${OLD_STREAM_SQL}
+${2:-}
 select '$1' as which;
 with page as (select $1('${GID}', null, 20) as p),
   cards as (select i from page, jsonb_array_elements(page.p->'items') i where jsonb_typeof(i->'record') = 'object')
@@ -430,9 +434,15 @@ rollback;"
 }
 old_agrees="$(run_psql "$(stream_case_sql pg_temp.group_competition_stream_v4__legacy)" | tail -1)"
 [[ "${old_agrees}" == f ]] || fail "old stream decoration: expected a card whose group records its event does not hold (got '${old_agrees}')"
-new_agrees="$(run_psql "$(stream_case_sql app_public.group_competition_stream_v4)" | tail -1)"
+# The new stream builds its page and every card's event, record and group
+# records in one statement (one snapshot), never through stream_v3's page:
+# no publication can fall between them. Read after the publication, its
+# cards agree and show the newly led board.
+expect_sql_eq "stream v4 builds page and decoration in one statement, not through stream_v3" \
+  "select position('group_competition_stream_v3(' in pg_get_functiondef('app_public.group_competition_stream_v4(uuid,text,integer)'::regprocedure)) = 0;" t
+new_agrees="$(run_psql "$(stream_case_sql app_public.group_competition_stream_v4 "update app_public.group_events e set payload = jsonb_set(e.payload, '{boards}', b.boards) from locks_boards b where b.id = e.id;")" | tail -1)"
 [[ "${new_agrees}" == t ]] || fail "stream decoration: a card's event, record and group records disagree after a publication (got '${new_agrees}')"
-pass "stream (old decoration): a newly led board in the group records only; (new): card agrees"
+pass "stream (old decoration): a newly led board in the group records only; (new, one statement): card agrees"
 
 COMPLETED=1
 echo "[${LANE_LABEL}] all publish-lock checks passed"
