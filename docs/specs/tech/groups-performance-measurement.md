@@ -125,6 +125,13 @@ still `baseline`. A change that moves an RPC's cost re-measures it and
 updates its entry in the same PR, and a rewrite that meets the ceiling turns
 its entry `budgeted`.
 
+**Warm reads.** Before any read is measured, each is called once, unmeasured
+and rolled back, on the same connection. A connection's first call of a read
+also loads the catalog entries and compiled functions it uses, once per
+backend: the stream's v5 first page cost 5,240 pages cold and 3,035 warm
+(H=90). Pooled PostgREST connections are always warm, and a budget must not
+depend on which read the list measures first, so every read is measured warm.
+
 **Parity** (`parity.ts`) proves a rewritten RPC returns the same JSON as the
 definition it replaces. Before the rewrite, add a case to `PARITY_CASES`
 naming the migration that holds the old definition, plus argument sets that
@@ -139,16 +146,21 @@ before the rewrite, as `apps/mobile/scripts/perf/groups/parity-definitions/<migr
 (named after the migration whose result it captures) and name it as
 `parity-definitions/<migration>.sql`; it is never applied. The
 `group_competition_week_summary` case also proves the helper itself: a
-planted one-field change must be caught.
+planted one-field change must be caught. A paged RPC's case walks every page
+(`walk`): old and new each follow their own cursor to the end, so a moved
+page boundary is a difference. A case may leave out a clock reading
+(`ignoreKeys`).
 
 Internal helpers readers share (redaction, session counts) are compared the
 same way in `HELPER_PARITY_CASES`, old against new, as the table owner, for
-every argument row the fixture holds; a cache is compared with the live
-function it caches. Before parity, after every measured call,
-`PARITY_PLANT_STATEMENTS` plants retained CoW refs that redact through each
-branch, un-shares the group's latest completed session, and leaves facts the
-evaluator has not caught up with (a deleted set, a deleted exercise, a moved
-set), so both kinds of case cover them.
+every argument row the fixture holds; a cache, or a builder that reads one,
+is compared with the live function it stands for. Before parity, after every
+measured call, `PARITY_PLANT_STATEMENTS` plants retained CoW refs that redact
+through each branch, un-shares the group's latest completed session, leaves
+facts the evaluator has not caught up with (a deleted set, a deleted
+exercise, a moved set), and moves a session with records to another member's
+start (its records then sort where their events do not say, tied with that
+card), so both kinds of case cover them.
 
 An RPC that writes sets `state` (SQL returning the rows it may change, with
 generated ids and clock-timed columns left out) and `caller` (its worker's
