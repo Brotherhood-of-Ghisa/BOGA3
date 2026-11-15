@@ -93,14 +93,11 @@ const stream = (fn: string, budget: BudgetEntry): ReadPathRpc => ({
 });
 
 /**
- * Why the two CoW summaries are not slope-asserted (`scoped: false`) though far
- * under the ceiling. Their rows are built once per metric, which halved their
- * pages; what is left is one bodyweight-redaction cache build over each
- * participant's counting scores, events and sets, which grows with history
- * (about 1.3-1.5x per doubling: summary 737 -> 964 pages, previous summary
- * 709 -> 1,060 at H=90 -> 180). Flattening it needs a stored current definition
- * per score (a table change), which is outside this plan; a covering index on
- * the score tables was measured and made both reads cost more pages.
+ * The two CoW summaries are not slope-asserted (`scoped: false`) though far
+ * under the ceiling: each builds its rows once per metric and one
+ * bodyweight-redaction cache over the participants' counting scores, events and
+ * sets, and that cache's reads grow with history (about 1.3-1.5x per doubling:
+ * summary 737 -> 964 pages, previous summary 709 -> 1,060 at H=90 -> 180).
  */
 const COW_REDACTION_SLOPE = 'One bodyweight-redaction cache build per call reads each participant\'s counting scores, events and sets, '
   + 'so it grows with history: summary 737 -> 964 pages and previous summary 709 -> 1,060 pages from H=90 to H=180 '

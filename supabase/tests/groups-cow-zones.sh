@@ -9,7 +9,9 @@
 # the real local stack, with the original validator installed in pg_temp from
 # the migration that created it:
 #
-#   - every name pg_timezone_names lists gets the same answer from both;
+#   - the accepted names are exactly the catalog's well-formed ones, and a
+#     sample of every name (the original reads the whole view per call) gets the
+#     same answer from both;
 #   - a set of names that are not zones (abbreviations, offsets, POSIX
 #     strings, other cases, padding, a directory, a path escape, the posix/ and
 #     right/ trees, null) is rejected by both with the same error, and the
@@ -63,26 +65,38 @@ exception when others then return 'error: ' || sqlstate || ' ' || sqlerrm;
 end \$\$;
 "
 
-# Every catalog name: both validators agree, and many are accepted.
+# Every catalog name. The original validator reads the whole view per call, so
+# it answers every 25th name (and the well-formed ones named below); the whole
+# catalog is checked as a set: the accepted names are exactly the catalog's
+# names outside posix/ and right/ that are UTC or Area/Location-shaped.
 run_psql_once "${HELPERS_SQL}
 do \$\$
-declare n int := 0; accepted int := 0; z text;
+declare n int := 0; accepted int := 0; sampled int := 0; z text; expected text[]; got text[];
 begin
-  for z in select name from pg_catalog.pg_timezone_names loop
-    n := n + 1;
+  select coalesce(array_agg(name order by name), '{}') into expected from pg_catalog.pg_timezone_names
+   where name !~ '^(posix|right)/' and (name = 'UTC' or name ~ '^[A-Za-z_]+(/[A-Za-z0-9_+.-]+)+\$');
+  select coalesce(array_agg(name order by name), '{}') into got from pg_catalog.pg_timezone_names
+   where pg_temp.answer('current', name) = name;
+  if got is distinct from expected then raise exception 'accepted zones differ from the expected set'; end if;
+  for z in select name from (select name, row_number() over (order by name) as r from pg_catalog.pg_timezone_names) x
+           where r % 25 = 0 or name in ('UTC', 'Europe/London', 'America/Argentina/Buenos_Aires', 'Etc/GMT+5') loop
+    sampled := sampled + 1;
     if pg_temp.answer('legacy', z) is distinct from pg_temp.answer('current', z) then
       raise exception 'zone % answers % before and % now', z, pg_temp.answer('legacy', z), pg_temp.answer('current', z);
     end if;
-    if pg_temp.answer('current', z) = z then accepted := accepted + 1; end if;
   end loop;
-  if n < 500 or accepted < 300 then raise exception 'too few zones compared: % names, % accepted', n, accepted; end if;
+  n := (select count(*) from pg_catalog.pg_timezone_names);
+  accepted := cardinality(got);
+  if n < 500 or accepted < 300 or sampled < 40 then
+    raise exception 'too few zones compared: % names, % accepted, % sampled', n, accepted, sampled;
+  end if;
   if pg_temp.answer('current', 'UTC') <> 'UTC' or pg_temp.answer('current', 'Europe/London') <> 'Europe/London'
      or pg_temp.answer('current', 'America/Argentina/Buenos_Aires') <> 'America/Argentina/Buenos_Aires'
      or pg_temp.answer('current', 'Etc/GMT+5') <> 'Etc/GMT+5' then
     raise exception 'a well-formed zone was rejected';
   end if;
 end \$\$;" >/dev/null
-pass "every pg_timezone_names name gets the same answer as before"
+pass "every pg_timezone_names name is accepted or rejected as before"
 
 # Names that are not accepted zones: the same error, and rejected.
 run_psql_once "${HELPERS_SQL}
@@ -130,15 +144,17 @@ run_psql_once "begin;
 ${HELPERS_SQL}
 create or replace function app_public.group_cow_zone_known(p_zone text) returns boolean language sql immutable as \$f\$ select false \$f\$;
 do \$\$
-declare z text; n int := 0;
+declare z text; n int := 0; sampled int := 0;
 begin
-  for z in select name from pg_catalog.pg_timezone_names loop
+  select count(*) into n from pg_catalog.pg_timezone_names where pg_temp.answer('current', name) = name and name = 'UTC';
+  for z in select name from (select name, row_number() over (order by name) as r from pg_catalog.pg_timezone_names) x
+           where r % 10 = 0 or name in ('UTC', 'Europe/London', 'Etc/GMT+5') loop
+    sampled := sampled + 1;
     if pg_temp.answer('legacy', z) is distinct from pg_temp.answer('current', z) then
       raise exception 'fallback: zone % answers % before and % now', z, pg_temp.answer('legacy', z), pg_temp.answer('current', z);
     end if;
-    if pg_temp.answer('current', z) = z then n := n + 1; end if;
   end loop;
-  if n < 300 then raise exception 'fallback accepted only % zones', n; end if;
+  if n <> 1 or sampled < 100 then raise exception 'fallback compared too little: UTC accepted % times, % sampled', n, sampled; end if;
   if pg_temp.answer('current', 'Europe/Nowhere') not like 'error: P0001 VALIDATION%' then
     raise exception 'fallback accepted a name that is not a zone';
   end if;
