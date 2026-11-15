@@ -172,6 +172,18 @@ describe('the group read, evaluator write and notification RPCs the lane budgets
     }
   });
 
+  test('a screen read that is budgeted but not slope-asserted says why, and the CoW summaries are such reads', () => {
+    for (const rpc of READ_PATH_RPCS) {
+      if (rpc.via === 'member' && rpc.budget.kind === 'budgeted' && !rpc.budget.scoped) expect(rpc.budget.justification?.trim()).toBeTruthy();
+    }
+    for (const fn of ['group_cow_summary', 'group_cow_previous_summary']) {
+      const budget = READ_PATH_RPCS.find((rpc) => rpc.fn === fn)!.budget;
+      expect(budget).toMatchObject({ kind: 'budgeted', scoped: false });
+      expect(budget.pages).toBeLessThan(PAGE_CEILING / 2);
+      expect(budget.justification).toContain('1.2x');
+    }
+  });
+
   test('the set measures two history points, smallest first', () => {
     expect(READ_PATH_DAYS).toEqual([90, 180]);
   });
@@ -408,6 +420,12 @@ begin return jsonb_build_object('a', p_a); end $function$
     expect(cowResultsWalk({ p_limit: 1 }, { rankings: [{ next_cursor: 'n' }] })).toEqual({ p_limit: 1, p_before: 'n' });
     expect(cowResultsWalk({ p_limit: 1 }, { rankings: [{ next_cursor: null }] })).toBeNull();
     expect(PARITY_CASES.find((item) => item.fn === 'group_cow_results')?.walk).toBe(cowResultsWalk);
+    // The calendar is compared against its own definition and the zone validators it calls, callees first.
+    const calendar = PARITY_CASES.find((item) => item.fn === 'group_cow_calendar_get')!;
+    expect(Object.keys(calendar.helpers ?? {})).toEqual(['group_cow_zone', 'group_cow_week', 'group_cow_calendar_json']);
+    const install = parityInstallStatements(calendar).sql;
+    expect(install[0]).toContain('pg_timezone_names');
+    expect(install.at(-1)).toContain('pg_temp.group_cow_calendar_json');
     for (const item of PARITY_CASES) {
       const helpers = Object.keys(item.helpers ?? {});
       const { sql } = parityInstallStatements(item);

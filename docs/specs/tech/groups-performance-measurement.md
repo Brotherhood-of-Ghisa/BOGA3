@@ -116,7 +116,10 @@ costliest call measured at either point plus about 25%. There are two kinds:
   the 5,000-page ceiling, and its slope is reported, not asserted.
 - `budgeted` must stay at or under the ceiling unless the entry carries a
   written justification. For a week-, period-, page- or single-item-scoped
-  RPC its growth per doubling of history must stay at or under 1.2×.
+  RPC its growth per doubling of history must stay at or under 1.2×, unless
+  the entry is `scoped: false` and its justification gives the measured slope
+  and the cause (the two CoW summaries: one redaction cache build that reads
+  history).
 
 The set fails when a call exceeds its budget, a call fails, or a budgeted
 scoped RPC grows too fast. A slope is asserted only above 100 pages per
