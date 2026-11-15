@@ -439,7 +439,9 @@ old_agrees="$(run_psql "$(stream_case_sql pg_temp.group_competition_stream_v4__l
 # no publication can fall between them. Read after the publication, its
 # cards agree and show the newly led board.
 expect_sql_eq "stream v4 builds page and decoration in one statement, not through stream_v3" \
-  "select position('group_competition_stream_v3(' in pg_get_functiondef('app_public.group_competition_stream_v4(uuid,text,integer)'::regprocedure)) = 0;" t
+  "select position('group_competition_stream_v3(' in pg_get_functiondef('app_public.group_competition_stream_v4(uuid,text,integer)'::regprocedure)) = 0
+     and position('group_competition_stream_v3(' in pg_get_functiondef('app_public.group_competition_stream_v3_level(uuid,text,integer,integer)'::regprocedure)) = 0
+     and position('group_competition_stream_page_core(' in pg_get_functiondef('app_public.group_competition_stream_v3_level(uuid,text,integer,integer)'::regprocedure)) > 0;" t
 new_agrees="$(run_psql "$(stream_case_sql app_public.group_competition_stream_v4 "update app_public.group_events e set payload = jsonb_set(e.payload, '{boards}', b.boards) from locks_boards b where b.id = e.id;")" | tail -1)"
 [[ "${new_agrees}" == t ]] || fail "stream decoration: a card's event, record and group records disagree after a publication (got '${new_agrees}')"
 pass "stream (old decoration): a newly led board in the group records only; (new, one statement): card agrees"
