@@ -14,11 +14,19 @@ import {
   jsonDifference,
   legacyDefinition,
   migrationDefinition,
+  missingOutcomes,
   parityInstallStatements,
   parityPassed,
   plantDifference,
   type ParityCase,
 } from '../scripts/perf/groups/parity';
+import {
+  notificationParityCases,
+  NOTIFICATION_STATE_SQL,
+  SCENARIOS,
+  scenarioStatements,
+  type NotificationFixture,
+} from '../scripts/perf/groups/notification-parity';
 import {
   HELPER_PARITY_CASES,
   PARITY_CASES,
@@ -195,6 +203,14 @@ describe('read-path results', () => {
     ]);
     expect(summarizeReadPath([point(90, { calls: { f: [record(50)] } })], rpcs).failures).toEqual(['parity: no case ran']);
   });
+
+  test('a parity case whose calls never returned a required outcome fails, and the table shows the outcomes it saw', () => {
+    const rpcs = [{ fn: 'f', via: 'member' as const, args: () => ({}), budget: { kind: 'baseline' as const, pages: 100, scoped: true } }];
+    const blind = { fn: 'f', compared: 3, differences: [], plantDetected: null, error: null, observed: { true: 3 }, missing: ['false'] };
+    const result = summarizeReadPath([point(90, { calls: { f: [record(50)] }, parity: [blind] }), point(180, { calls: { f: [record(60)] } })], rpcs);
+    expect(result.failures).toEqual(['parity f: no call returned false']);
+    expect(result.markdown).toContain('FAIL parity f: 3 calls compared, 0 differences, no plant, outcomes {"true":3}');
+  });
 });
 
 describe('parity helper', () => {
@@ -299,7 +315,7 @@ begin return jsonb_build_object('a', p_a); end $function$
     expect(PARITY_CASES.length).toBeGreaterThan(0);
     for (const parityCase of PARITY_CASES) {
       const { legacy, planted, sql } = parityInstallStatements(parityCase);
-      expect(sql.at(-2)?.startsWith(`create function pg_temp.${legacy}(`)).toBe(parityCase.plant !== undefined);
+      expect(Boolean(sql.at(-2)?.startsWith(`create function pg_temp.${legacy}(`))).toBe(parityCase.plant !== undefined);
       expect(sql.at(-1)?.startsWith(`create function pg_temp.${planted ?? legacy}(`)).toBe(true);
       expect(sql.at(-1)).not.toContain(`app_public.${parityCase.fn}(`);
     }
@@ -399,7 +415,7 @@ describe('helper parity', () => {
     const now = 1_800_000_000_000;
     const weeks = Array.from({ length: 6 }, (_, index) => ({ start_ms: now - (6 - index) * 7 * day, end_ms: now - (5 - index) * 7 * day }));
     const context = { groupId: 'g', weeks } as unknown as ReadPathContext;
-    const sets = PARITY_CASES.find((item) => item.fn === 'group_competition_period_totals')!.argumentSets(context);
+    const sets = PARITY_CASES.find((item) => item.fn === 'group_competition_period_totals')!.argumentSets!(context);
     expect(sets).toHaveLength(weeks.length + 2);
     for (const { p_windows: windows } of sets as { p_windows: { start_ms: number; end_ms: number }[] }[]) {
       expect(windows.length).toBeGreaterThanOrEqual(1);
@@ -412,5 +428,139 @@ describe('helper parity', () => {
     }
     const months = (sets.at(-1) as { p_windows: { start_ms: number }[] }).p_windows;
     expect(Math.min(...months.map((window) => window.start_ms))).toBeLessThanOrEqual(now - PARITY_DAYS * day);
+  });
+});
+
+describe('parity of calls that write, and of outcomes', () => {
+  type Context = { args: Record<string, unknown>[] };
+  const installed = { legacy: 'f__legacy', planted: null };
+
+  test('exact calls replace the viewer × argument-set grid, and each live outcome is named', async () => {
+    const item: ParityCase<Context> = {
+      fn: 'f', migration: 'm',
+      calls: () => [{ viewer: 'v1', args: { p: 1 } }, { viewer: 'v2', args: { p: 2 } }],
+      observe: (live) => String((live as { ok: boolean }).ok), requires: ['true', 'false'],
+    };
+    const seen: string[] = [];
+    const outcome = await compareParity(item, { args: [{ p: 9 }] }, ['ignored'], async (viewer, _fn, args) => {
+      seen.push(viewer);
+      return { ok: args.p === 1 };
+    }, installed);
+    expect(seen).toEqual(['v1', 'v1', 'v2', 'v2']);
+    expect(outcome).toMatchObject({ compared: 2, observed: { true: 1, false: 1 }, missing: [], differences: [] });
+    expect(parityPassed(outcome)).toBe(true);
+  });
+
+  test('a case whose live calls never returned a required outcome does not pass, whatever it compared', async () => {
+    const item: ParityCase<Context> = {
+      fn: 'f', migration: 'm', calls: () => [{ viewer: 'v', args: {} }],
+      observe: () => 'refused', requires: ['refused', 'payload'],
+    };
+    const outcome = await compareParity(item, { args: [] }, [], async () => null, installed);
+    expect(outcome.missing).toEqual(['payload']);
+    expect(parityPassed(outcome)).toBe(false);
+    expect(missingOutcomes(undefined, undefined)).toEqual([]);
+    expect(missingOutcomes(['a', 'b'], { a: 2 })).toEqual(['b']);
+  });
+});
+
+describe('notification parity cases', () => {
+  const cases = notificationParityCases<{ notification: NotificationFixture | null }>();
+  const named = (fn: string) => cases.find((item) => item.fn === fn)!;
+  const fixture: NotificationFixture = {
+    groupId: 'g1',
+    workouts: [
+      { member: 'm1', session: 's1', generation: 3, eligible: true, contributions: [], auth: 'a1', manifest: ['e1', 'e2'] },
+      { member: 'm2', session: 's2', generation: 1, eligible: false, contributions: [], auth: 'a2', manifest: [] },
+    ],
+    sessions: [{ member: 'm1', session: 's1' }, { member: 'm3', session: 's3' }],
+    deliveries: [{ id: 7, generation: 3, claim: 'c7' }],
+    peerSet: { member: 'm4', set: "o'set" },
+    ownSet: { member: 'm1', set: 'x0' },
+  };
+  const context = { notification: fixture };
+
+  test('they cover the four RPCs and the two helpers they share, each from its saved pre-migration definition', () => {
+    expect(cases.map((item) => item.fn)).toEqual([
+      'notification_workout_ready', 'notification_context_digest', 'notification_workout_enqueue',
+      'notification_workout_prepare', 'notification_begin_send', 'notification_confirm_completion']);
+    for (const item of cases) {
+      expect(item.migration.startsWith('parity-definitions/')).toBe(true);
+      expect(migrationDefinition(item.migration, item.fn)).toContain(`app_public.${item.fn}(`);
+    }
+    expect(PARITY_CASES.map((item) => item.fn)).toEqual(expect.arrayContaining(cases.map((item) => item.fn)));
+  });
+
+  test('every old RPC calls the old helpers, never the new ones', () => {
+    for (const fn of ['notification_workout_enqueue', 'notification_workout_prepare', 'notification_begin_send']) {
+      const old = parityInstallStatements(named(fn)).sql.at(-1)!;
+      expect(old).toContain('pg_temp.notification_workout_ready__legacy(');
+      expect(old).not.toMatch(/app_public\.notification_workout_ready\(/);
+    }
+    const confirm = parityInstallStatements(named('notification_confirm_completion')).sql.at(-1)!;
+    expect(confirm).toContain('pg_temp.notification_context_digest__legacy(');
+    expect(confirm).not.toMatch(/app_public\.notification_context_digest\(/);
+    const ready = parityInstallStatements(named('notification_workout_ready')).sql;
+    expect(ready).toHaveLength(2);
+    expect(ready[1]).toContain('pg_temp.notification_context_digest__legacy(');
+    expect(parityInstallStatements(named('notification_context_digest')).sql).toHaveLength(1);
+  });
+
+  test('a helper several cases share installs the same text each time, so the runner can install it once', () => {
+    const texts = cases.flatMap((item) => parityInstallStatements(item).sql).map((sql) => sql.replace(/^create function pg_temp\./, 'create or replace function pg_temp.')).filter((sql) => /function pg_temp\.notification_context_digest__legacy\(/.test(sql));
+    expect(texts.length).toBeGreaterThan(1);
+    expect(new Set(texts).size).toBe(1);
+  });
+
+  test('every RPC that writes compares what it changed, under a role its worker uses', () => {
+    for (const fn of ['notification_workout_enqueue', 'notification_workout_prepare', 'notification_begin_send', 'notification_confirm_completion']) {
+      expect(named(fn).state).toBe(NOTIFICATION_STATE_SQL);
+    }
+    expect(named('notification_workout_ready').state).toBeUndefined();
+    expect(named('notification_workout_prepare').caller!('m1', context)).toEqual({ role: 'service_role' });
+    expect(named('notification_workout_ready').caller!('m1', context)).toEqual({ role: 'postgres' });
+    expect(named('notification_confirm_completion').caller!('m1', context)).toEqual({ role: 'authenticated', userId: 'm1', sessionId: 'a1' });
+    expect(NOTIFICATION_STATE_SQL).toContain("-array['id','intent_id','lease_until'");
+  });
+
+  test('calls come from the fixture: every workout, the stale and invalid variants, every delivery', () => {
+    expect(named('notification_workout_ready').calls!(context)).toHaveLength(2);
+    expect(named('notification_context_digest').calls!(context).map((call) => call.args.p_session)).toEqual(['s1', 's2', 's3']);
+    const enqueues = named('notification_workout_enqueue').calls!(context);
+    expect(enqueues.map((call) => [call.args.p_generation, JSON.stringify(call.args.p_contributions)])).toEqual([
+      [3, '[]'], [3, '[{"group_id":"g1","best_count":1,"rank_count":2}]'], [4, '[{"group_id":"g1","best_count":1,"rank_count":2}]'], [3, '[{}]']]);
+    expect(named('notification_workout_prepare').calls!(context).map((call) => call.args.p_limit)).toEqual([20, 1, 0]);
+    const sends = named('notification_begin_send').calls!(context);
+    expect(sends.map((call) => call.args.p_claim_id)).toEqual(['c7', '00000000-0000-4000-8000-0000000000ff']);
+    const confirmations = named('notification_confirm_completion').calls!(context);
+    expect(confirmations.map((call) => (call.args.p_entities as unknown[]).length)).toEqual([2, 1, 2]);
+    expect(confirmations.at(-1)!.args.p_session_id).toBe('s1-unknown');
+    expect(() => named('notification_workout_ready').calls!({ notification: null })).toThrow('notification fixture was not read');
+  });
+
+  test('a case names what its live call returned, so one that always fails the same way cannot pass', () => {
+    const observe = (fn: string, live: unknown) => named(fn).observe!(live);
+    expect(observe('notification_workout_ready', { result: true })).toBe('true');
+    expect(observe('notification_workout_enqueue', { error: '42 VALIDATION' })).toBe('error 42 VALIDATION');
+    expect(observe('notification_workout_prepare', { result: { jobs: [{}] } })).toBe('jobs>0');
+    expect(observe('notification_workout_prepare', { result: { jobs: [] } })).toBe('jobs=0');
+    expect(observe('notification_begin_send', { result: null })).toBe('refused');
+    expect(observe('notification_begin_send', { result: { token: 't' } })).toBe('payload');
+    expect(observe('notification_confirm_completion', { result: { confirmed: true } })).toBe('confirmed=true');
+    expect(observe('notification_confirm_completion', { result: { confirmed: false } })).toBe('confirmed=false');
+    for (const item of cases.filter((candidate) => candidate.requires)) expect(item.requires!.length).toBeGreaterThan(1);
+  });
+
+  test('each scenario changes one fact of the fixture; base changes none, and ids are quoted', () => {
+    expect(SCENARIOS[0]).toBe('base');
+    expect(scenarioStatements('base', fixture)).toEqual([]);
+    for (const scenario of SCENARIOS.slice(1)) expect(scenarioStatements(scenario, fixture).length).toBeGreaterThan(0);
+    const edit = scenarioStatements('peer-set-edited', fixture);
+    expect(edit).toHaveLength(3);
+    expect(edit[1]).toContain("es.id='o''set'");
+    expect(scenarioStatements('own-set-edited', fixture)[1]).toContain("owner_user_id='m1'");
+    expect(scenarioStatements('final-ranks-stale', fixture)).toEqual(["update app_public.notification_workout_targets set final_ranks='[]'::jsonb"]);
+    expect(scenarioStatements('unenqueued', fixture)[0]).toContain('enqueued_generation=0');
+    for (const item of cases) for (const scenario of item.scenarios ?? []) expect(SCENARIOS).toContain(scenario);
   });
 });
