@@ -414,3 +414,47 @@ describe('helper parity', () => {
     expect(Math.min(...months.map((window) => window.start_ms))).toBeLessThanOrEqual(now - PARITY_DAYS * day);
   });
 });
+
+describe('board, podiums, history and session parity cases', () => {
+  const context = {
+    groupId: 'g', exercises: ['x1', 'x2'], sessions: [{ member: 'm1', sessionId: 's1' }, { member: 'm2', sessionId: 's2' }],
+  } as unknown as ReadPathContext;
+  const caseFor = (fn: string) => PARITY_CASES.find((item) => item.fn === fn)!;
+
+  test('each installs every old helper before the statement that calls it', () => {
+    for (const fn of ['group_competition_podiums', 'group_competition_records_history', 'group_competition_session_detail',
+      'group_competition_session_records']) {
+      const { sql } = parityInstallStatements(caseFor(fn));
+      const defined = new Set<string>();
+      for (const statement of sql) {
+        for (const [, called] of statement.matchAll(/pg_temp\.([a-z0-9_]+__legacy)\(/g)) {
+          if (!statement.startsWith(`create or replace function pg_temp.${called}(`) && !statement.startsWith(`create function pg_temp.${called}(`)) {
+            expect(defined.has(called)).toBe(true);
+          }
+        }
+        const created = /create (?:or replace )?function pg_temp\.([a-z0-9_]+)\(/.exec(statement);
+        if (created) defined.add(created[1]);
+      }
+    }
+  });
+
+  test('the board and history arguments cover every exercise, metric, scope and a short page', () => {
+    for (const fn of ['group_competition_board', 'group_competition_records_history']) {
+      const sets = caseFor(fn).argumentSets(context) as { p_group_exercise_id: string; p_metric: string; p_certified: boolean; p_limit: number }[];
+      expect(sets).toHaveLength(2 * 2 * 2 * 2);
+      expect(new Set(sets.map((set) => set.p_group_exercise_id))).toEqual(new Set(context.exercises));
+      expect(new Set(sets.map((set) => set.p_metric))).toEqual(new Set(['e1rm', 'volume']));
+      expect(new Set(sets.map((set) => set.p_certified))).toEqual(new Set([true, false]));
+      expect(sets.some((set) => set.p_limit <= 3)).toBe(true);
+    }
+  });
+
+  test('the podium arguments cover both scopes and the session arguments every opened session', () => {
+    expect(caseFor('group_competition_podiums').argumentSets(context)).toEqual([
+      { p_group_id: 'g', p_certified: true }, { p_group_id: 'g', p_certified: false }]);
+    for (const fn of ['group_competition_session_detail', 'group_competition_session_records']) {
+      expect(caseFor(fn).argumentSets(context)).toEqual([
+        { p_group_id: 'g', p_member_user_id: 'm1', p_session_id: 's1' }, { p_group_id: 'g', p_member_user_id: 'm2', p_session_id: 's2' }]);
+    }
+  });
+});
