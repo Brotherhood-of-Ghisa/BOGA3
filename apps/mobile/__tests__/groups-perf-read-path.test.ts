@@ -78,7 +78,7 @@ describe('budget checks', () => {
 
   test('a baseline entry fails, even with every call within its pages', () => {
     expect(checkBudget('f', { ...baseline, justification: 'today\'s cost' }, [cost(90, 10), cost(180, 20)])).toEqual([
-      { fn: 'f', level: 'fail', message: 'a `baseline` entry is no longer accepted: measure it and make it `budgeted`' }]);
+      { fn: 'f', level: 'fail', message: 'a `baseline` entry is refused: measure it and make it `budgeted`' }]);
   });
 
   test('a budgeted scoped RPC growing over 1.2x per doubling of history fails', () => {
@@ -103,7 +103,7 @@ describe('budget checks', () => {
     expect(levels(checkBudget('f', { ...over, justification: '  ' }, [cost(180, 10)]))).toEqual(['fail']);
     expect(levels(checkBudget('f', { ...over, justification: 'a background job, never on a screen' }, [cost(180, 10)]))).toEqual(['pass']);
     expect(checkBudget('f', { ...baseline, scoped: false, pages: PAGE_CEILING * 20 }, [cost(180, 10)]).map((check) => check.message)).toEqual([
-      'a `baseline` entry is no longer accepted: measure it and make it `budgeted`',
+      'a `baseline` entry is refused: measure it and make it `budgeted`',
       'budget 100000 pages is over the 5000-page ceiling without a justification']);
   });
 
@@ -138,7 +138,7 @@ describe('budget checks', () => {
     const markdown = readPathMarkdown(budgets, measured, [90, 180], checkBudgets(budgets, measured));
     expect(markdown).toContain('| a | budgeted, scoped | 1000 | 100 | 0 | 0 | 100 | 0 | 0 | 1.00× | PASS |');
     expect(markdown).toContain('| b | baseline, scoped | 90.0k | 1 | 0 | 0 | error 57014 | — | — | — | FAIL |');
-    expect(markdown).toContain('- FAIL b: a `baseline` entry is no longer accepted: measure it and make it `budgeted`');
+    expect(markdown).toContain('- FAIL b: a `baseline` entry is refused: measure it and make it `budgeted`');
     expect(markdown).not.toContain('Still `baseline`');
     expect(markdown).toContain('Ceiling 5000 pages per call; a scoped RPC grows at most 1.2× per doubling of history.');
     expect(markdown).not.toMatch(/^- a \(/m);
@@ -148,12 +148,14 @@ describe('budget checks', () => {
     const budgets: Record<string, BudgetEntry> = {
       job: { kind: 'budgeted', pages: PAGE_CEILING * 2, scoped: false, justification: ' a background job ' },
       read: { kind: 'budgeted', pages: 900, scoped: false, justification: 'its cache scans history' },
+      noted: { ...budgeted, justification: 'measured twice' },
       plain: budgeted,
     };
-    const measured = { job: [cost(90, 10)], read: [cost(90, 10)], plain: [cost(90, 10)] };
+    const measured = { job: [cost(90, 10)], read: [cost(90, 10)], noted: [cost(90, 10)], plain: [cost(90, 10)] };
     const markdown = readPathMarkdown(budgets, measured, [90], checkBudgets(budgets, measured));
-    expect(markdown).toContain('- job (over the ceiling): a background job');
+    expect(markdown).toContain('- job (over the ceiling, slope not asserted): a background job');
     expect(markdown).toContain('- read (slope not asserted): its cache scans history');
+    expect(markdown).toContain('- noted (within the ceiling, scoped): measured twice');
     expect(markdown).not.toContain('- plain (');
   });
 });
@@ -270,7 +272,7 @@ describe('read-path results', () => {
     const points = [point(90, { calls: { f: [record(50)] }, parity: [passing] }), point(180, { calls: { f: [record(60)] } })];
     const rpc = { fn: 'f', via: 'member' as const, args: () => ({}) };
     expect(summarizeReadPath(points, [{ ...rpc, budget: { kind: 'baseline' as const, pages: 100, scoped: true } }]).failures).toEqual([
-      'f: a `baseline` entry is no longer accepted: measure it and make it `budgeted`']);
+      'f: a `baseline` entry is refused: measure it and make it `budgeted`']);
     const unscoped = summarizeReadPath(points, [{ ...rpc, budget: { kind: 'budgeted' as const, pages: 100, scoped: false } }]);
     expect(unscoped.failures).toEqual(['f: a screen read with `scoped: false` has no justification giving its slope and cause']);
     expect(unscoped.markdown).toContain('| f | budgeted | 100 |');

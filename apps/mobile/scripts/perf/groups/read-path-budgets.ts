@@ -20,8 +20,8 @@ export const BUDGET_HEADROOM = 1.25;
 /**
  * `budgeted`: at or under the ceiling unless `justification` says why not; a
  * scoped entry's slope is asserted. `baseline` (a recorded cost with no
- * ceiling or slope held) is retired: the set refuses one, so every RPC it
- * measures is held to the ceiling.
+ * ceiling or slope held) is refused: every entry the set measures must be
+ * `budgeted`, so every RPC is held to the ceiling.
  */
 export type BudgetKind = 'baseline' | 'budgeted';
 
@@ -82,7 +82,7 @@ export const checkBudget = (fn: string, entry: BudgetEntry | undefined, points: 
   if (!entry) return [{ fn, level: 'fail', message: 'measured but has no budget entry' }];
   const checks: BudgetCheck[] = [];
   if (entry.kind !== 'budgeted') {
-    checks.push({ fn, level: 'fail', message: `a \`${entry.kind}\` entry is no longer accepted: measure it and make it \`budgeted\`` });
+    checks.push({ fn, level: 'fail', message: `a \`${entry.kind}\` entry is refused: measure it and make it \`budgeted\`` });
   }
   if (entry.pages > PAGE_CEILING && !entry.justification?.trim()) {
     checks.push({ fn, level: 'fail', message: `budget ${entry.pages} pages is over the ${PAGE_CEILING}-page ceiling without a justification` });
@@ -119,6 +119,11 @@ const fmt = (value: number | undefined): string => {
   return `${Math.round(value)}`;
 };
 
+/** What a justified entry is excused from: the ceiling, the slope check, both, or neither. */
+const exceptionLabel = (entry: BudgetEntry): string => [
+  entry.pages > PAGE_CEILING ? 'over the ceiling' : null, entry.scoped ? null : 'slope not asserted',
+].filter(Boolean).join(', ') || 'within the ceiling, scoped';
+
 /**
  * The read-path table: one row per RPC, its cost at each point, its slope,
  * budget and verdict, against the ceiling; then why each justified entry is
@@ -151,7 +156,7 @@ export const readPathMarkdown = (
     `Ceiling ${PAGE_CEILING} pages per call; a scoped RPC grows at most ${SLOPE_LIMIT}× per doubling of history.`,
     '',
     ...Object.entries(budgets).filter(([, entry]) => entry.justification?.trim())
-      .map(([fn, entry]) => `- ${fn} (${entry.pages > PAGE_CEILING ? 'over the ceiling' : 'slope not asserted'}): ${entry.justification!.trim()}`),
+      .map(([fn, entry]) => `- ${fn} (${exceptionLabel(entry)}): ${entry.justification!.trim()}`),
     ...checks.filter((check) => check.level !== 'pass').map((check) => `- ${check.level.toUpperCase()} ${check.fn}: ${check.message}`),
   ];
   return `${lines.join('\n')}\n`;
