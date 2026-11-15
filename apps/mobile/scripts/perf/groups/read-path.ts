@@ -93,46 +93,35 @@ const stream = (fn: string, budget: BudgetEntry): ReadPathRpc => ({
 });
 
 /**
- * The stream's first page. v5 is the set's first read on its connection, so
- * its one call also loads the catalog entries and compiled functions every
- * stream builder needs, once per backend: about 2,200 pages of its cost. A
- * repeat call on the same connection (as PostgREST's pooled connections make
- * it) costs 3.0k pages at H=90 and 3.3k at H=180; v4, measured next on the
- * same builders, 2.9k-3.2k.
- */
-const STREAM_V5_JUSTIFICATION = 'first read on a fresh connection: ~2.2k of its pages are one-time catalog and function '
-  + 'loading; a warm call costs 3.0k-3.3k pages, under the ceiling';
-
-/**
  * Every RPC the set measures, with its budget beside it. A budget is the
- * costliest call measured at either point plus ~25% (`suggestBudget`);
+ * costliest call measured at either point (reads warm: `warmUp`) plus ~25% (`suggestBudget`);
  * `baseline` entries record today's cost, `budgeted` ones hold an RPC to the
  * ceiling. Re-measure and update an entry in the change that moves its cost.
  */
 export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
-  stream('group_competition_stream_v5', { kind: 'budgeted', pages: 6_600, scoped: true, justification: STREAM_V5_JUSTIFICATION }),
-  stream('group_competition_stream_v4', { kind: 'budgeted', pages: 4_100, scoped: true }),
+  stream('group_competition_stream_v5', { kind: 'budgeted', pages: 4_000, scoped: true }),
+  stream('group_competition_stream_v4', { kind: 'budgeted', pages: 3_900, scoped: true }),
   stream('group_competition_stream_v3', { kind: 'budgeted', pages: 3_800, scoped: true }),
   stream('group_competition_stream_v2', { kind: 'budgeted', pages: 2_300, scoped: true }),
   { fn: 'group_competition_period_totals', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_windows: c.weeks }),
-    budget: { kind: 'budgeted', pages: 3_800, scoped: true } },
+    budget: { kind: 'budgeted', pages: 3_600, scoped: true } },
   { fn: 'group_competition_week_summary', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_window_start_ms: c.weeks.at(-1)!.start_ms, p_window_end_ms: c.weeks.at(-1)!.end_ms }),
-    budget: { kind: 'budgeted', pages: 1_100, scoped: true } },
+    budget: { kind: 'budgeted', pages: 1_000, scoped: true } },
   { fn: 'group_competition_podiums', via: 'member', args: (c) => ({ p_group_id: c.groupId, p_certified: false }),
-    budget: { kind: 'budgeted', pages: 3_100, scoped: true } },
+    budget: { kind: 'budgeted', pages: 3_000, scoped: true } },
   { fn: 'group_competition_board', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_limit: 50, p_cursor: null }),
     budget: { kind: 'budgeted', pages: 1_500, scoped: true } },
   { fn: 'group_competition_records_history', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_before: null, p_limit: 50 }),
-    budget: { kind: 'budgeted', pages: 2_300, scoped: true } },
+    budget: { kind: 'budgeted', pages: 2_100, scoped: true } },
   { fn: 'group_competition_session_detail', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
-    budget: { kind: 'budgeted', pages: 1_150, scoped: true } },
+    budget: { kind: 'budgeted', pages: 1_100, scoped: true } },
   { fn: 'group_competition_session_records', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
-    budget: { kind: 'budgeted', pages: 350, scoped: true } },
+    budget: { kind: 'budgeted', pages: 360, scoped: true } },
   { fn: 'group_cow_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 2_200, scoped: true } },
   // Still `baseline`: under the ceiling, but its cost grows 1.36-1.38x per doubling of history.
@@ -141,11 +130,11 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   { fn: 'group_cow_calendar_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_list_mine', via: 'member', args: () => ({}), budget: { kind: 'budgeted', pages: 20, scoped: true } },
-  { fn: 'group_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }), budget: { kind: 'budgeted', pages: 40, scoped: true } },
+  { fn: 'group_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }), budget: { kind: 'budgeted', pages: 30, scoped: true } },
   { fn: 'group_competition_exercise_list', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_eval_complete', via: 'cascade', budget: { kind: 'budgeted', pages: 400, scoped: true } },
-  { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'budgeted', pages: 4_200, scoped: false } },
+  { fn: 'group_metric_eval_prepare', via: 'cascade', budget: { kind: 'budgeted', pages: 3_600, scoped: false } },
   { fn: 'group_metric_eval_publish', via: 'cascade', budget: { kind: 'budgeted', pages: 110_000, scoped: false,
     justification: 'A background evaluator job, never a screen read. Most of its pages are the notification capture it runs '
       + 'before and after publishing: every source session\'s boards with and without its workout. Its source graph, score '
@@ -154,9 +143,9 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   // reads the group's shared history once (the source graph) and ranks the
   // exercise twice: its cost grows with that history until the graph build
   // and the per-entry redaction answers get cheaper.
-  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 48_000, scoped: true } },
-  { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 48_000, scoped: true } },
-  { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 48_000, scoped: true } },
+  { fn: 'notification_workout_prepare', via: 'cascade', budget: { kind: 'baseline', pages: 12_000, scoped: true } },
+  { fn: 'notification_workout_enqueue', via: 'cascade', budget: { kind: 'baseline', pages: 12_000, scoped: true } },
+  { fn: 'notification_begin_send', via: 'cascade', budget: { kind: 'baseline', pages: 12_000, scoped: true } },
   { fn: 'notification_confirm_completion', via: 'member',
     args: (c) => ({ p_session_id: c.completion!.sessionId, p_entities: c.completion!.entities }),
     budget: { kind: 'budgeted', pages: 280, scoped: true } },
@@ -1017,6 +1006,21 @@ const openPoint = async (historyDays: number, options: Tier1Options) => {
   return { client, session, run: new Tier1Run(session), point };
 };
 
+/**
+ * One unmeasured call of each read before any is measured, rolled back: the
+ * connection then holds the catalog entries and compiled functions the reads
+ * use, as a pooled PostgREST connection always does, so no read's cost
+ * depends on which ran first on the connection.
+ */
+export const warmUp = async (
+  session: Pick<Tier1Session, 'exec' | 'call'>, viewer: Viewer, reads: readonly ReadPathRpc[], context: ReadPathContext,
+): Promise<void> => {
+  await session.exec('savepoint perf_warm_up');
+  for (const rpc of reads) await session.call(viewer, rpc.fn, rpc.args!(context), false).catch(() => undefined);
+  await session.exec('rollback to savepoint perf_warm_up');
+  await session.exec('release savepoint perf_warm_up');
+};
+
 export const runReadPathPoint = async (historyDays: number, options: Tier1Options & { parity: boolean }): Promise<ReadPathPoint> => {
   const startedAt = Date.now();
   const { client, session, run, point } = await openPoint(historyDays, options);
@@ -1030,17 +1034,19 @@ export const runReadPathPoint = async (historyDays: number, options: Tier1Option
     options.log(`[${name}] steady state after ${Math.round((Date.now() - startedAt) / 1000)} s: ${point.fixture.sets} sets`);
     // Reads first, against the steady state the planted cases left.
     const viewer: Viewer = { role: 'authenticated', userId: context.viewer, sessionId: context.viewerSession };
-    for (const rpc of READ_PATH_RPCS.filter((item) => item.via === 'member' && item.fn !== 'notification_confirm_completion')) {
+    const reads = READ_PATH_RPCS.filter((item) => item.via === 'member' && item.fn !== 'notification_confirm_completion');
+    await warmUp(session, viewer, reads, context);
+    for (const rpc of reads) {
       await session.call(viewer, rpc.fn, rpc.args!(context), true).catch(recordFailure(rpc.fn));
     }
-    const reads = session.take();
+    const measuredReads = session.take();
     const steps = await measureWorkout(session, run, context, viewer, recordFailure);
     // Parity last, so its many unmeasured calls cannot touch a measured one.
     if (options.parity) point.parity = await runParityCases(session, context);
     point.walPerLoggedSet = steps[1].total.walBytes;
     point.cascade = sumCascades(steps);
     const measuredFns = new Set(READ_PATH_RPCS.map((rpc) => rpc.fn));
-    point.calls = Object.fromEntries(Object.entries(groupByFn([...reads, ...steps.flatMap((step) => step.calls)]))
+    point.calls = Object.fromEntries(Object.entries(groupByFn([...measuredReads, ...steps.flatMap((step) => step.calls)]))
       .filter(([fn]) => measuredFns.has(fn)));
     const failures = steps.flatMap((step) => step.failures.map((failure) => `${step.label}: ${failure}`));
     if (failures.length > 0) point.incomplete = failures.join('; ');

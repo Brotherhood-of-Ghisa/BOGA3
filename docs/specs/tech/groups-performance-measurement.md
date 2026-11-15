@@ -123,9 +123,14 @@ scoped RPC grows too fast. A slope is asserted only above 100 pages per
 call, where a few pages of noise cannot move it. The lane lists the entries
 still `baseline`. A change that moves an RPC's cost re-measures it and
 updates its entry in the same PR, and a rewrite that meets the ceiling turns
-its entry `budgeted`. Reads run in one connection, so the first one also pays
-for loading the catalog entries and functions it shares with later ones
-(about 2,200 pages for the stream); a justification may cite its warm cost.
+its entry `budgeted`.
+
+**Warm reads.** Before any read is measured, each is called once, unmeasured
+and rolled back, on the same connection. A connection's first call of a read
+also loads the catalog entries and compiled functions it uses, once per
+backend: the stream's v5 first page cost 5,240 pages cold and 3,035 warm
+(H=90). Pooled PostgREST connections are always warm, and a budget must not
+depend on which read the list measures first, so every read is measured warm.
 
 **Parity** (`parity.ts`) proves a rewritten RPC returns the same JSON as the
 definition it replaces. Before the rewrite, add a case to `PARITY_CASES`

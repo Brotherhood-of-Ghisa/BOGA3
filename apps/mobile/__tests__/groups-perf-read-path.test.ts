@@ -41,6 +41,7 @@ import {
   READ_PATH_RPCS,
   readPathBudgets,
   summarizeReadPath,
+  warmUp,
   type ReadPathContext,
   type ReadPathPoint,
 } from '../scripts/perf/groups/read-path';
@@ -173,6 +174,25 @@ describe('the group read, evaluator write and notification RPCs the lane budgets
 
   test('the set measures two history points, smallest first', () => {
     expect(READ_PATH_DAYS).toEqual([90, 180]);
+  });
+});
+
+describe('warm reads', () => {
+  test('each read is called once, unmeasured, inside a savepoint that is rolled back, before any is measured', async () => {
+    const log: string[] = [];
+    const session = {
+      exec: async (sql: string) => { log.push(sql); return []; },
+      call: async (_caller: unknown, fn: string, _args: Record<string, unknown>, measured: boolean) => {
+        log.push(`${fn}:${measured ? 'measured' : 'unmeasured'}`);
+        if (fn === 'b') throw new Error('refused');
+        return null;
+      },
+    } as unknown as Parameters<typeof warmUp>[0];
+    const reads = ['a', 'b'].map((fn) => ({ fn, via: 'member' as const, args: () => ({}),
+      budget: { kind: 'budgeted' as const, pages: 10, scoped: true } }));
+    await warmUp(session, { role: 'authenticated', userId: 'u', sessionId: 's' }, reads, {} as ReadPathContext);
+    expect(log).toEqual(['savepoint perf_warm_up', 'a:unmeasured', 'b:unmeasured',
+      'rollback to savepoint perf_warm_up', 'release savepoint perf_warm_up']);
   });
 });
 
