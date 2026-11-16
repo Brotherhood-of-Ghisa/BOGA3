@@ -567,8 +567,21 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(repeatButton.props.accessibilityState?.disabled).toBe(true);
     // The wait shows on the button and in the preview area.
     expect(repeatButton).toHaveTextContent('Loading...');
+    expect(repeatButton.props.accessibilityLabel).toBe('Loading last workout for Barbell Squat');
     expect(screen.getByTestId('exercise-picker-plan-status')).toHaveTextContent('Loading last workout...');
     expect(screen.queryByTestId('exercise-picker-plan-source')).toBeNull();
+  });
+
+  it('says in the preview area when the last workout could not be read', async () => {
+    jest.spyOn(blockHistory, 'loadSuggestedExercisePlan').mockRejectedValueOnce(new Error('read failed'));
+
+    await openInteractions(true, logSquatHistory);
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+
+    expect(await screen.findByText("Couldn't load the last workout.")).toBeTruthy();
+    const repeatButton = screen.getByTestId('exercise-picker-repeat-last-button');
+    expect(repeatButton.props.accessibilityState?.disabled).toBe(true);
+    expect(repeatButton).toHaveTextContent('Repeat last');
   });
 
   it('holds the preview area at one height from loading to ready, so the actions never move', async () => {

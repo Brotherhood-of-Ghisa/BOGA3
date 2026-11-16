@@ -83,7 +83,9 @@ export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, o
         </View>
         <View style={styles.action}>
           <ActionButton
-            accessibilityLabel={`Repeat last workout for ${state.exercise.name}`}
+            accessibilityLabel={state.status === 'loading'
+              ? `Loading last workout for ${state.exercise.name}`
+              : `Repeat last workout for ${state.exercise.name}`}
             disabled={repeatDisabled}
             label={state.status === 'loading' ? 'Loading...' : 'Repeat last'}
             onPress={onRepeat}
@@ -98,7 +100,9 @@ export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, o
 
 // The source line plus the rows' scroll area: one height whether the plan is
 // loading, short, long, absent or failed.
-const PLAN_AREA_HEIGHT = 238 + uiTypography.lineHeight.xxs + uiSpace.xs + uiSpace.md;
+// The rows' area is the old preview's longest (a long plan scrolls inside it).
+const PLAN_ROWS_HEIGHT = 238;
+const PLAN_AREA_HEIGHT = PLAN_ROWS_HEIGHT + uiTypography.lineHeight.xxs + uiSpace.xs + uiSpace.md;
 
 // Without a suggestion the preview area says why; it still holds its height.
 const PLAN_STATUS_TEXT: Record<ExercisePickerPreselectionState['status'], string> = {
