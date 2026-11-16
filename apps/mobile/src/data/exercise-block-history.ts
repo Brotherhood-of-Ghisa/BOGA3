@@ -256,25 +256,14 @@ export const aggregateExerciseBlockHistory = (
 };
 
 /**
- * The newest session with a performed set to repeat. Sessions in
- * `preferredSessionIds` (a split exercise's gym book) come first; with none of
- * them qualifying, the whole exercise's newest does ([[gym.split]]).
+ * The newest of `sessions` with a performed set to repeat. The caller narrows
+ * `sessions` to a split exercise's gym book first ([[gym.split]]).
  */
 export const selectSuggestedExercisePlanFromHistory = (input: {
   sessions: ExerciseBlockHistorySessionRow[];
   sessionExercises: ExerciseBlockHistorySessionExerciseRow[];
   setsBySessionExerciseId: Record<string, ExerciseBlockHistorySetRow[]>;
-  preferredSessionIds?: ReadonlySet<string> | null;
 }): ExerciseBlockHistorySuggestedPlan | null => {
-  const preferred = input.preferredSessionIds;
-  if (preferred) {
-    const inBook = selectSuggestedExercisePlanFromHistory({
-      ...input,
-      sessions: input.sessions.filter((session) => preferred.has(session.sessionId)),
-      preferredSessionIds: null,
-    });
-    if (inBook) return inBook;
-  }
   const sessionExercisesBySessionId = groupSessionExercisesBySessionId(input.sessionExercises);
   const orderedSessions = [...input.sessions].sort(compareCompletedDesc);
 
