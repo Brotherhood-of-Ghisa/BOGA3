@@ -20,6 +20,8 @@ import {
   customSeed,
   DEPTH_MAX,
   gamutColour,
+  HIGHLIGHT_CONTRAST_MAX,
+  highlightFromAccent,
   INK_RANGE,
   inkDefault,
   LIGHTNESS_MAX,
@@ -64,6 +66,7 @@ const PART_ROLE: Record<CustomPart, keyof UiRoles> = {
   ink: 'ink',
   text: 'inkMuted',
   accent: 'accent',
+  highlight: 'accentWash',
   record: 'record',
   viz: 'viz4',
 };
@@ -191,6 +194,34 @@ function BordersControls(controls: Controls) {
   );
 }
 
+// The highlight: matching the accent or a hue and strength of its own, and
+// how far it steps from the page. Unmatching starts from the band the accent
+// draws, so nothing jumps.
+function HighlightControls(controls: Controls) {
+  const { colours, change, end, save } = controls;
+  const { highlight } = colours;
+  const match = (on: boolean) =>
+    save(({ accent, background }) => ({
+      highlight: on ? { ...highlight, match: true } : { ...highlight, match: false, ...highlightFromAccent(customSeed('accent', accent), background.mode) },
+    }));
+  return (
+    <>
+      <SwitchRow density="list" label="Match accent" onValueChange={match} testID="theme-custom-match" value={highlight.match} />
+      {highlight.match ? null : <HueStrengthRows {...controls} colour={highlight} divider />}
+      <SliderRow
+        divider
+        format={percent}
+        label="Contrast"
+        max={HIGHLIGHT_CONTRAST_MAX}
+        onChange={change('contrast')}
+        onChangeEnd={end('contrast')}
+        testID="theme-custom-contrast"
+        value={highlight.contrast}
+      />
+    </>
+  );
+}
+
 // Primary text: a hue and strength, and its L* over its mode's range.
 function InkControls(controls: Controls) {
   const { colours, change, end } = controls;
@@ -244,6 +275,8 @@ function PartControls(controls: Controls) {
       return <InkControls {...controls} />;
     case 'text':
       return <TextControls {...controls} />;
+    case 'highlight':
+      return <HighlightControls {...controls} />;
     default:
       return <HueStrengthRows {...controls} colour={controls.colours[controls.part]} divider={false} />;
   }
@@ -256,9 +289,9 @@ const editOf = (part: CustomPart, draft: Draft, field: Field, value: number): Dr
   ({ ...draft, [field]: value, ...(part === 'viz' ? { gamut: true } : {}) }) as Draft;
 
 // Settings → Appearance → Custom → one part (background, borders, primary
-// text, secondary text, accent, best ever, charts): a hue on a painted bar and
+// text, secondary text, accent, highlight, best ever, charts): a hue on a painted bar and
 // a strength, and the part's own controls — the page's mode, lightness and
-// depth; the borders' match and contrast; the texts' lightness or contrast.
+// depth; the borders' and the highlight's match and contrast; the texts' lightness or contrast.
 // Then the part's roles alone (`PartSpotlight`) and the whole theme on a
 // small mock, both live while a control is held. A part saves when a slider
 // is let go (or a VoiceOver step is made) or a switch is flipped, and the app

@@ -72,6 +72,7 @@ export const CUSTOM_PART_LABELS: Record<CustomPart, string> = {
   ink: 'Primary text',
   text: 'Secondary text',
   accent: 'Accent',
+  highlight: 'Highlight',
   record: 'Best ever',
   viz: 'Charts',
 };
@@ -96,11 +97,12 @@ export function themeLabel(appearance: AppearanceChoice): string {
 
 // A custom part's value as a row shows it: its hue's name and strength; for
 // the background its mode and lightness first; borders that match the page
-// say so.
+// and a highlight that matches the accent say so.
 export function customPartLabel(appearance: AppearanceChoice, part: CustomPart): string {
   const colours = appearance.custom;
   if (!colours) return '';
   if (part === 'borders' && colours.borders.match) return 'Match background';
+  if (part === 'highlight' && colours.highlight.match) return 'Match accent';
   const { hue, strength } = colours[part];
   const words = [hueName(hue), `${strength}%`];
   if (part !== 'background') return words.join(', ');
