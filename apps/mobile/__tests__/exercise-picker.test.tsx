@@ -530,7 +530,9 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(screen.getByText('Add empty set')).toBeTruthy();
     const repeatButton = screen.getByTestId('exercise-picker-repeat-last-button');
     await waitForGone(() => screen.queryByTestId('exercise-picker-plan-source'));
+    expect(await screen.findByText('No earlier workout to repeat.')).toBeTruthy();
     expect(repeatButton.props.accessibilityState?.disabled).toBe(true);
+    expect(repeatButton).toHaveTextContent('Repeat last');
     expect(screen.queryByText(/Unable/i)).toBeNull();
     // Choosing a row only preselects; nothing reaches the host yet.
     expect(onSelectExercise).not.toHaveBeenCalled();
@@ -563,7 +565,50 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
 
     const repeatButton = await screen.findByTestId('exercise-picker-repeat-last-button');
     expect(repeatButton.props.accessibilityState?.disabled).toBe(true);
+    // The wait shows on the button and in the preview area.
+    expect(repeatButton).toHaveTextContent('Loading...');
+    expect(repeatButton.props.accessibilityLabel).toBe('Loading last workout for Barbell Squat');
+    expect(screen.getByTestId('exercise-picker-plan-status')).toHaveTextContent('Loading last workout...');
     expect(screen.queryByTestId('exercise-picker-plan-source')).toBeNull();
+  });
+
+  it('says in the preview area when the last workout could not be read', async () => {
+    jest.spyOn(blockHistory, 'loadSuggestedExercisePlan').mockRejectedValueOnce(new Error('read failed'));
+
+    await openInteractions(true, logSquatHistory);
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+
+    expect(await screen.findByText("Couldn't load the last workout.")).toBeTruthy();
+    const repeatButton = screen.getByTestId('exercise-picker-repeat-last-button');
+    expect(repeatButton.props.accessibilityState?.disabled).toBe(true);
+    expect(repeatButton).toHaveTextContent('Repeat last');
+  });
+
+  it('holds the preview area at one height from loading to ready, so the actions never move', async () => {
+    // The real read, held until the loading state has been measured.
+    type Plan = Awaited<ReturnType<typeof blockHistory.loadSuggestedExercisePlan>>;
+    const readHistory = blockHistory.loadSuggestedExercisePlan;
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((done) => { release = done; });
+    jest.spyOn(blockHistory, 'loadSuggestedExercisePlan').mockImplementationOnce(
+      async (options): Promise<Plan> => {
+        const plan = await readHistory(options);
+        await held;
+        return plan;
+      },
+    );
+
+    await openInteractions(true, logSquatHistory);
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    const areaHeight = () => StyleSheet.flatten(screen.getByTestId('exercise-picker-plan-area').props.style).height;
+    await screen.findByTestId('exercise-picker-plan-status');
+    const loadingHeight = areaHeight();
+    await act(async () => release());
+
+    expect(await screen.findByTestId('exercise-picker-plan-source')).toBeTruthy();
+    expect(typeof loadingHeight).toBe('number');
+    expect(areaHeight()).toBe(loadingHeight);
+    expect(screen.getByTestId('exercise-picker-repeat-last-button')).toHaveTextContent('Repeat last');
   });
 
   it('previews the last session as a plan and hands it to the host to append', async () => {

@@ -132,6 +132,28 @@ describe('Repeat last and plan prefill', () => {
   });
 });
 
+describe('Repeat last over a history longer than one read', () => {
+  const repeated = async (options: Parameters<typeof loadSuggestedExercisePlan>[0]) =>
+    (await loadSuggestedExercisePlan(options))?.sessionId ?? null;
+  // Newer than every fixture session, so they fill the newest reads first.
+  const insertNewer = (count: number, gymId: string | null, sets: [string, string][]) => {
+    for (let index = 0; index < count; index += 1) insertSession(`newer-${index}`, 10 + index, BENCH, sets, gymId);
+  };
+
+  it('walks past newer sessions with nothing performed to the newest that has a set', async () => {
+    insertNewer(23, 'home', [['', '']]);
+    expect(await repeated({ exerciseDefinitionId: BENCH })).toBe('home-2');
+  });
+
+  it('on a split exercise finds the gym\'s newest session behind many newer ones elsewhere', async () => {
+    split();
+    insertNewer(23, 'home', [['90', '5']]);
+    expect(await repeated({ exerciseDefinitionId: BENCH, gymId: 'club' })).toBe('club-2');
+    // A gym with no book of its own still takes the whole exercise's newest.
+    expect(await repeated({ exerciseDefinitionId: BENCH, gymId: 'annex' })).toBe('newer-22');
+  });
+});
+
 describe('the exercise heatmap', () => {
   const window = { start: day(1, 0), end: day(10, 0), timeZone: 'UTC', exerciseDefinitionId: BENCH };
   const prDays = (daily: { dateKey: string; personalRecordCounts: { highestWeight: number } }[]) =>

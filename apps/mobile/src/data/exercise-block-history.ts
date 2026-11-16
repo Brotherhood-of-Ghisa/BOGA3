@@ -87,6 +87,10 @@ export type ExerciseBlockHistoryStore = {
   loadRecentCompletedSessionsForExercise(input: {
     exerciseDefinitionId: string;
     limit?: number;
+    /** Skips this many of the newest sessions; read only with `limit`. */
+    offset?: number;
+    /** Only these sessions (a gym book); absent reads every session. */
+    sessionIds?: readonly string[];
   }): Promise<ExerciseBlockHistorySessionRow[]>;
   loadSessionExercisesForSessions(input: {
     exerciseDefinitionId: string;
@@ -252,25 +256,14 @@ export const aggregateExerciseBlockHistory = (
 };
 
 /**
- * The newest session with a performed set to repeat. Sessions in
- * `preferredSessionIds` (a split exercise's gym book) come first; with none of
- * them qualifying, the whole exercise's newest does ([[gym.split]]).
+ * The newest of `sessions` with a performed set to repeat. The caller narrows
+ * `sessions` to a split exercise's gym book first ([[gym.split]]).
  */
 export const selectSuggestedExercisePlanFromHistory = (input: {
   sessions: ExerciseBlockHistorySessionRow[];
   sessionExercises: ExerciseBlockHistorySessionExerciseRow[];
   setsBySessionExerciseId: Record<string, ExerciseBlockHistorySetRow[]>;
-  preferredSessionIds?: ReadonlySet<string> | null;
 }): ExerciseBlockHistorySuggestedPlan | null => {
-  const preferred = input.preferredSessionIds;
-  if (preferred) {
-    const inBook = selectSuggestedExercisePlanFromHistory({
-      ...input,
-      sessions: input.sessions.filter((session) => preferred.has(session.sessionId)),
-      preferredSessionIds: null,
-    });
-    if (inBook) return inBook;
-  }
   const sessionExercisesBySessionId = groupSessionExercisesBySessionId(input.sessionExercises);
   const orderedSessions = [...input.sessions].sort(compareCompletedDesc);
 
@@ -324,7 +317,7 @@ const groupSetsBySessionExerciseId = (
 };
 
 export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistoryStore => ({
-  async loadRecentCompletedSessionsForExercise({ exerciseDefinitionId, limit }) {
+  async loadRecentCompletedSessionsForExercise({ exerciseDefinitionId, limit, offset = 0, sessionIds }) {
     if (limit === 0) return [];
     const database = await bootstrapLocalDataLayer();
     const resolveWeight = loadAsOfWeightResolver(database);
@@ -347,6 +340,7 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       .where(
         and(
           eq(sessionExercises.exerciseDefinitionId, exerciseDefinitionId),
+          sessionIds ? inArray(sessions.id, [...sessionIds]) : undefined,
           // Exclude exercises the user removed (kept as tombstones).
           isNull(sessionExercises.deletedAt),
           eq(sessions.status, 'completed'),
@@ -356,7 +350,7 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       )
       .groupBy(sessions.id, sessions.completedAt)
       .orderBy(desc(sessions.completedAt), asc(sessions.id));
-    const rows = limit === undefined ? baseQuery.all() : baseQuery.limit(limit).all();
+    const rows = limit === undefined ? baseQuery.all() : baseQuery.limit(limit).offset(offset).all();
 
     return rows
       .filter(
@@ -484,36 +478,52 @@ export const createExerciseBlockHistoryRepository = (
   async loadSuggestedPlan(
     options: LoadSuggestedExercisePlanOptions
   ): Promise<ExerciseBlockHistorySuggestedPlan | null> {
-    const recentSessions = await store.loadRecentCompletedSessionsForExercise({
-      exerciseDefinitionId: options.exerciseDefinitionId,
-      limit: undefined,
+    const { exerciseDefinitionId } = options;
+    const book = await store.loadGymBookSessionIds({
+      exerciseDefinitionId,
+      at: options.inSessionId ? { inSessionId: options.inSessionId } : { gymId: options.gymId ?? null },
     });
-    if (recentSessions.length === 0) {
-      return null;
+    // The book's newest qualifying session wins; else the whole exercise's
+    // newest. Each read pages newest first and stops at the first plan, so a
+    // long history is never read whole.
+    if (book && book.size > 0) {
+      const inBook = await findNewestSuggestedPlan(store, exerciseDefinitionId, [...book]);
+      if (inBook) return inBook;
     }
-
-    const sessionIds = recentSessions.map((session) => session.sessionId);
-    const sessionExerciseRows = await store.loadSessionExercisesForSessions({
-      exerciseDefinitionId: options.exerciseDefinitionId,
-      sessionIds,
-    });
-    const sessionExerciseIds = sessionExerciseRows.map((row) => row.sessionExerciseId);
-    const [setRows, preferredSessionIds] = await Promise.all([
-      store.loadSetsForSessionExercises({ sessionExerciseIds }),
-      store.loadGymBookSessionIds({
-        exerciseDefinitionId: options.exerciseDefinitionId,
-        at: options.inSessionId ? { inSessionId: options.inSessionId } : { gymId: options.gymId ?? null },
-      }),
-    ]);
-
-    return selectSuggestedExercisePlanFromHistory({
-      sessions: recentSessions,
-      sessionExercises: sessionExerciseRows,
-      setsBySessionExerciseId: groupSetsBySessionExerciseId(setRows),
-      preferredSessionIds,
-    });
+    return findNewestSuggestedPlan(store, exerciseDefinitionId);
   },
 });
+
+const SUGGESTED_PLAN_PAGE_SIZE = 10;
+
+const findNewestSuggestedPlan = async (
+  store: ExerciseBlockHistoryStore,
+  exerciseDefinitionId: string,
+  sessionIds?: string[],
+): Promise<ExerciseBlockHistorySuggestedPlan | null> => {
+  for (let offset = 0; ; offset += SUGGESTED_PLAN_PAGE_SIZE) {
+    const sessions = await store.loadRecentCompletedSessionsForExercise({
+      exerciseDefinitionId,
+      limit: SUGGESTED_PLAN_PAGE_SIZE,
+      offset,
+      ...(sessionIds ? { sessionIds } : {}),
+    });
+    if (sessions.length === 0) return null;
+    const sessionExercises = await store.loadSessionExercisesForSessions({
+      exerciseDefinitionId,
+      sessionIds: sessions.map((session) => session.sessionId),
+    });
+    const setRows = await store.loadSetsForSessionExercises({
+      sessionExerciseIds: sessionExercises.map((row) => row.sessionExerciseId),
+    });
+    const plan = selectSuggestedExercisePlanFromHistory({
+      sessions,
+      sessionExercises,
+      setsBySessionExerciseId: groupSetsBySessionExerciseId(setRows),
+    });
+    if (plan || sessions.length < SUGGESTED_PLAN_PAGE_SIZE) return plan;
+  }
+};
 
 const defaultExerciseBlockHistoryRepository = createExerciseBlockHistoryRepository();
 
