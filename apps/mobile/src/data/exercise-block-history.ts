@@ -87,6 +87,8 @@ export type ExerciseBlockHistoryStore = {
   loadRecentCompletedSessionsForExercise(input: {
     exerciseDefinitionId: string;
     limit?: number;
+    /** Skips this many of the newest sessions; read only with `limit`. */
+    offset?: number;
   }): Promise<ExerciseBlockHistorySessionRow[]>;
   loadSessionExercisesForSessions(input: {
     exerciseDefinitionId: string;
@@ -324,7 +326,7 @@ const groupSetsBySessionExerciseId = (
 };
 
 export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistoryStore => ({
-  async loadRecentCompletedSessionsForExercise({ exerciseDefinitionId, limit }) {
+  async loadRecentCompletedSessionsForExercise({ exerciseDefinitionId, limit, offset = 0 }) {
     if (limit === 0) return [];
     const database = await bootstrapLocalDataLayer();
     const resolveWeight = loadAsOfWeightResolver(database);
@@ -356,7 +358,7 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       )
       .groupBy(sessions.id, sessions.completedAt)
       .orderBy(desc(sessions.completedAt), asc(sessions.id));
-    const rows = limit === undefined ? baseQuery.all() : baseQuery.limit(limit).all();
+    const rows = limit === undefined ? baseQuery.all() : baseQuery.limit(limit).offset(offset).all();
 
     return rows
       .filter(
@@ -484,36 +486,61 @@ export const createExerciseBlockHistoryRepository = (
   async loadSuggestedPlan(
     options: LoadSuggestedExercisePlanOptions
   ): Promise<ExerciseBlockHistorySuggestedPlan | null> {
-    const recentSessions = await store.loadRecentCompletedSessionsForExercise({
-      exerciseDefinitionId: options.exerciseDefinitionId,
-      limit: undefined,
-    });
-    if (recentSessions.length === 0) {
-      return null;
-    }
-
-    const sessionIds = recentSessions.map((session) => session.sessionId);
-    const sessionExerciseRows = await store.loadSessionExercisesForSessions({
-      exerciseDefinitionId: options.exerciseDefinitionId,
-      sessionIds,
-    });
-    const sessionExerciseIds = sessionExerciseRows.map((row) => row.sessionExerciseId);
-    const [setRows, preferredSessionIds] = await Promise.all([
-      store.loadSetsForSessionExercises({ sessionExerciseIds }),
+    const { exerciseDefinitionId } = options;
+    const [preferredSessionIds, firstPage] = await Promise.all([
       store.loadGymBookSessionIds({
-        exerciseDefinitionId: options.exerciseDefinitionId,
+        exerciseDefinitionId,
         at: options.inSessionId ? { inSessionId: options.inSessionId } : { gymId: options.gymId ?? null },
       }),
+      loadSuggestedPlanPage(store, exerciseDefinitionId, 0),
     ]);
-
-    return selectSuggestedExercisePlanFromHistory({
-      sessions: recentSessions,
-      sessionExercises: sessionExerciseRows,
-      setsBySessionExerciseId: groupSetsBySessionExerciseId(setRows),
-      preferredSessionIds,
-    });
+    // Newest first, a page at a time: the first page usually holds the plan,
+    // so a long history is never read whole. The book's newest qualifying
+    // session wins; else the whole exercise's newest (the first one seen).
+    let fallback: ExerciseBlockHistorySuggestedPlan | null = null;
+    let page = firstPage;
+    let offset = 0;
+    for (;;) {
+      const inPage = selectSuggestedExercisePlanFromHistory(page);
+      fallback ??= inPage;
+      const inBook = preferredSessionIds
+        ? selectSuggestedExercisePlanFromHistory({
+          ...page,
+          sessions: page.sessions.filter((session) => preferredSessionIds.has(session.sessionId)),
+        })
+        : inPage;
+      if (inBook) return inBook;
+      if (page.sessions.length < SUGGESTED_PLAN_PAGE_SIZE) return fallback;
+      offset += SUGGESTED_PLAN_PAGE_SIZE;
+      page = await loadSuggestedPlanPage(store, exerciseDefinitionId, offset);
+    }
   },
 });
+
+const SUGGESTED_PLAN_PAGE_SIZE = 10;
+
+const loadSuggestedPlanPage = async (
+  store: ExerciseBlockHistoryStore,
+  exerciseDefinitionId: string,
+  offset: number,
+) => {
+  const sessions = await store.loadRecentCompletedSessionsForExercise({
+    exerciseDefinitionId,
+    limit: SUGGESTED_PLAN_PAGE_SIZE,
+    offset,
+  });
+  if (sessions.length === 0) {
+    return { sessions, sessionExercises: [], setsBySessionExerciseId: {} };
+  }
+  const sessionExercises = await store.loadSessionExercisesForSessions({
+    exerciseDefinitionId,
+    sessionIds: sessions.map((session) => session.sessionId),
+  });
+  const setRows = await store.loadSetsForSessionExercises({
+    sessionExerciseIds: sessionExercises.map((row) => row.sessionExerciseId),
+  });
+  return { sessions, sessionExercises, setsBySessionExerciseId: groupSetsBySessionExerciseId(setRows) };
+};
 
 const defaultExerciseBlockHistoryRepository = createExerciseBlockHistoryRepository();
 

@@ -533,6 +533,30 @@ describe('createExerciseBlockHistoryRepository', () => {
     expect(store.loadRecentCompletedSessionsForExercise).not.toHaveBeenCalled();
   });
 
+  it('reads one page of the newest sessions when it holds a plan, never the whole history', async () => {
+    const store = buildStore({
+      loadRecentCompletedSessionsForExercise: jest.fn().mockResolvedValue([
+        sessionRow({ sessionId: 'newest', completedAt: new Date('2026-05-20T12:00:00.000Z') }),
+      ]),
+      loadSessionExercisesForSessions: jest.fn().mockResolvedValue([
+        sessionExerciseRow({ sessionId: 'newest', sessionExerciseId: 'se-newest' }),
+      ]),
+      loadSetsForSessionExercises: jest.fn().mockResolvedValue([
+        setRow({ setId: 'newest-1', sessionExerciseId: 'se-newest', orderIndex: 0 }),
+      ]),
+    });
+
+    const suggestion = await createExerciseBlockHistoryRepository(store).loadSuggestedPlan({ exerciseDefinitionId: 'ex-bench' });
+
+    expect(suggestion?.sessionId).toBe('newest');
+    expect(store.loadRecentCompletedSessionsForExercise).toHaveBeenCalledTimes(1);
+    expect(store.loadRecentCompletedSessionsForExercise).toHaveBeenCalledWith({
+      exerciseDefinitionId: 'ex-bench',
+      limit: 10,
+      offset: 0,
+    });
+  });
+
   it('loads suggested plans from all completed matching sessions independent of caller date ranges', async () => {
     const sessions = [
       sessionRow({ sessionId: 'newer-invalid', completedAt: new Date('2026-05-20T12:00:00.000Z') }),
@@ -556,7 +580,8 @@ describe('createExerciseBlockHistoryRepository', () => {
 
     expect(store.loadRecentCompletedSessionsForExercise).toHaveBeenCalledWith({
       exerciseDefinitionId: 'ex-bench',
-      limit: undefined,
+      limit: 10,
+      offset: 0,
     });
     expect(suggestion?.sessionId).toBe('older-valid');
     expect(suggestion?.sets).toHaveLength(1);
