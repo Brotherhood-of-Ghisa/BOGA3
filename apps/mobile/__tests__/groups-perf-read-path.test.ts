@@ -10,6 +10,7 @@ import {
   compareParity,
   definitionFromMigration,
   definitionPath,
+  helperConflicts,
   helperParityStatements,
   jsonDifference,
   legacyDefinition,
@@ -193,15 +194,15 @@ describe('the group read, evaluator write and notification RPCs the lane budgets
     }
   });
 
-  test('a screen read that is budgeted but not slope-asserted says why, and the previous CoW summary is the only one', () => {
+  test('a screen read that is budgeted but not slope-asserted says why; both CoW summaries are slope-asserted', () => {
     for (const rpc of READ_PATH_RPCS) {
       if (rpc.via === 'member' && rpc.budget.kind === 'budgeted' && !rpc.budget.scoped) expect(rpc.budget.justification?.trim()).toBeTruthy();
     }
-    const budget = READ_PATH_RPCS.find((rpc) => rpc.fn === 'group_cow_previous_summary')!.budget;
-    expect(budget).toMatchObject({ kind: 'budgeted', scoped: false });
-    expect(budget.pages).toBeLessThan(PAGE_CEILING / 2);
-    expect(budget.justification).toContain('1.2x');
-    expect(READ_PATH_RPCS.find((rpc) => rpc.fn === 'group_cow_summary')!.budget).toMatchObject({ kind: 'budgeted', scoped: true });
+    for (const fn of ['group_cow_summary', 'group_cow_previous_summary']) {
+      const budget = READ_PATH_RPCS.find((rpc) => rpc.fn === fn)!.budget;
+      expect(budget).toMatchObject({ kind: 'budgeted', scoped: true });
+      expect(budget.justification).toBeUndefined();
+    }
   });
 
   test('no entry is baseline: every RPC is held to the ceiling', () => {
@@ -217,7 +218,7 @@ describe('the group read, evaluator write and notification RPCs the lane budgets
       notification_begin_send: 5_700,
     });
     const unscopedReads = READ_PATH_RPCS.filter((rpc) => rpc.via === 'member' && !rpc.budget.scoped).map((rpc) => [rpc.fn, rpc.budget.pages]);
-    expect(Object.fromEntries(unscopedReads)).toEqual({ group_cow_previous_summary: 360 });
+    expect(Object.fromEntries(unscopedReads)).toEqual({});
     expect(unscopedReadChecks()).toEqual([]);
   });
 
@@ -401,6 +402,15 @@ begin return jsonb_build_object('a', p_a); end $function$
     expect(blind).toMatchObject({ differences: [], plantDetected: false });
     expect(parityPassed(blind)).toBe(false);
     expect(parityPassed({ ...blind, plantDetected: null, compared: 0 })).toBe(false);
+  });
+
+  test('every case that names a helper names the same old definition, since one alias serves them all', () => {
+    expect(helperConflicts(PARITY_CASES)).toEqual([]);
+    const item = (fn: string, migration: string): ParityCase<unknown> =>
+      ({ fn, migration: 'm.sql', helpers: { shared: migration }, argumentSets: () => [] });
+    expect(helperConflicts([item('a', 'old.sql'), item('b', 'old.sql')])).toEqual([]);
+    expect(helperConflicts([item('a', 'old.sql'), item('b', 'new.sql')]))
+      .toEqual(['shared: a installs old.sql, b installs new.sql']);
   });
 
   test('every registered case installs from its migration: renamed into pg_temp, its plant matching once', () => {
