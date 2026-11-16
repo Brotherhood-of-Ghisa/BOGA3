@@ -146,6 +146,11 @@ export const SPOTLIGHT: Record<CustomPart, readonly Sample[]> = {
     { kind: 'text', role: 'accent', ground: 'surface', label: 'Text' },
     { kind: 'text', role: 'accent', ground: 'accentWash', label: 'Editing' },
   ],
+  highlight: [
+    { kind: 'fill', role: 'accentWash', label: 'Band' },
+    { kind: 'text', role: 'ink', ground: 'accentWash', label: 'Text' },
+    { kind: 'text', role: 'accent', ground: 'accentWash', label: 'Accent' },
+  ],
   record: [
     { kind: 'text', role: 'record', ground: 'surface', label: 'Text' },
     { kind: 'text', role: 'record', ground: 'recordWash', label: 'Band' },

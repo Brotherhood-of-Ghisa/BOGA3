@@ -1,10 +1,10 @@
 import { hexToLch, lchToHex, withAlpha, type Lch } from '@/components/ui/lch';
-import { generateRoles, inkStep, rampLightness, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
+import { generateRoles, inkStep, rampLightness, washLightness, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
 import { normaliseHue } from '@/components/ui/theme-hue';
 
 // A custom theme (`docs/specs/ui/design-language.md` §2, "Custom"): the user
-// picks a hue and a strength for each of the five seeds, for the borders and
-// for the primary text (`ink`, which presets step from the text seed); the
+// picks a hue and a strength for each of the five seeds, for the borders, for
+// the highlight (`accentWash`) and for the primary text (`ink`, which presets step from the text seed); the
 // page's mode, lightness and depth; and the borders' and texts' contrast.
 // Everything else is derived. No readability floor is gated here — only the
 // presets are hand-checked.
@@ -19,6 +19,11 @@ export type CustomBackground = HueStrength & { mode: ThemeMode; lightness: numbe
 // their own; `contrast` (0–300) is a percentage of their shipped steps from
 // the page.
 export type CustomBorders = HueStrength & { match: boolean; contrast: number };
+// The highlight: `accentWash`, the band behind the row being edited, the
+// current set and today's plan. The accent's hue and strength while `match`,
+// else its own, a share of the most chroma its ladder's L* holds; `contrast`
+// (0–300) is a percentage of its shipped step from the page.
+export type CustomHighlight = HueStrength & { match: boolean; contrast: number };
 // Primary text: `ink` alone, at its own L*.
 export type CustomInk = HueStrength & { lightness: number };
 // Secondary text: `inkMuted`, `inkFaint` and `inkGhost`; `contrast` (0–150) is
@@ -34,12 +39,22 @@ export type CustomColours = {
   ink: CustomInk;
   text: CustomText;
   accent: HueStrength;
+  highlight: CustomHighlight;
   record: HueStrength;
   viz: CustomViz;
 };
 
 export type CustomPart = keyof CustomColours;
-export const CUSTOM_PARTS: readonly CustomPart[] = ['background', 'borders', 'ink', 'text', 'accent', 'record', 'viz'];
+export const CUSTOM_PARTS: readonly CustomPart[] = [
+  'background',
+  'borders',
+  'ink',
+  'text',
+  'accent',
+  'highlight',
+  'record',
+  'viz',
+];
 
 export const STRENGTH_MAX = 100;
 export const LIGHTNESS_MAX = 100;
@@ -50,6 +65,7 @@ export const DEPTH_MAX = 300;
 export const DEFAULT_DEPTH = 100;
 export const BORDER_CONTRAST_MAX = 300;
 export const TEXT_CONTRAST_MAX = 150;
+export const HIGHLIGHT_CONTRAST_MAX = 300;
 export const DEFAULT_CONTRAST = 100;
 
 export type LightnessRange = { min: number; max: number };
@@ -66,14 +82,16 @@ export const inkDefault = (mode: ThemeMode): number => inkStep(mode).lightness;
 // Each seed's L* and the chroma a strength of 100 gives it. The L* are the
 // shipped seeds' (the neutral `inkMuted`, the custom accent's 46, the brass's
 // 45, the ramp's strongest step), so a converted preset keeps its look. `ink`'s
-// seed only paints its hue bar: primary text is drawn by `gamutColour`. The
-// borders' is the background's, so matching it changes nothing.
+// seed only paints its hue bar: primary text is drawn by `gamutColour`; so does
+// the highlight's, at the accent's. The borders' is the background's, so
+// matching it changes nothing.
 const SEED: Record<CustomPart, { lightness: number; chroma: number }> = {
   background: { lightness: 42.4, chroma: 40 },
   borders: { lightness: 42.4, chroma: 40 },
   ink: { lightness: 42.4, chroma: 40 },
   text: { lightness: 42.4, chroma: 40 },
   accent: { lightness: 46, chroma: 100 },
+  highlight: { lightness: 46, chroma: 100 },
   record: { lightness: 45, chroma: 100 },
   viz: { lightness: 58, chroma: 60 },
 };
@@ -137,6 +155,23 @@ function gamutRamp({ gamut: own, ...colour }: CustomViz, mode: ThemeMode): Parti
   return Object.fromEntries(RAMP_ROLES.map((role, index) => [role, gamutColour(steps[index], colour)]));
 }
 
+// Seeds read only for the accent's wash: the others are not looked at.
+const accentOnlySeeds = (accent: string): ThemeSeeds => ({ background: accent, text: accent, accent, record: accent, viz: accent });
+
+// The highlight as a hue and a strength (a share of the most chroma the
+// ladder's wash L* holds): the one an accent seed draws, so unmatching it
+// changes nothing.
+export function highlightFromAccent(accentSeed: string, mode: ThemeMode): HueStrength {
+  const { hue, chroma } = hexToLch(generateRoles(accentOnlySeeds(accentSeed), mode).accentWash);
+  const share = chroma / gamut(washLightness(mode), hue);
+  return { hue: normaliseHue(hue), strength: Math.min(STRENGTH_MAX, Math.round(share * STRENGTH_MAX)) };
+}
+
+// A highlight of its own hue and strength, at the ladder's wash L*.
+function ownHighlight({ highlight }: CustomColours, mode: ThemeMode): Partial<UiRoles> {
+  return highlight.match ? {} : { accentWash: gamutColour(washLightness(mode), highlight) };
+}
+
 // Borders of their own hue and strength, on the ladder's `rule` steps.
 function ownBorders(colours: CustomColours, mode: ThemeMode): Partial<UiRoles> {
   if (colours.borders.match) return {};
@@ -148,15 +183,18 @@ function ownBorders(colours: CustomColours, mode: ThemeMode): Partial<UiRoles> {
 const GROUND_ROLES = new Set<keyof UiRoles>(['surface', 'viz0']);
 const BORDER_ROLES = new Set<keyof UiRoles>(['rule', 'ruleSoft']);
 const SECONDARY_ROLES = new Set<keyof UiRoles>(['inkMuted', 'inkFaint', 'inkGhost']);
+const HIGHLIGHT_ROLES = new Set<keyof UiRoles>(['accentWash']);
 // Roles that are the ladder's ends whatever the page: black or white.
 const KEPT_ROLES = new Set<keyof UiRoles>(['selection', 'onAccent', 'onSelection', 'onDanger', 'onInk', 'scrim']);
 
 // How far a role's step from the page is scaled: by depth, the borders'
-// contrast, the secondary text's contrast, or not at all.
+// contrast, the secondary text's contrast, the highlight's contrast, or not
+// at all.
 function roleScale(role: keyof UiRoles, colours: CustomColours): number {
   if (GROUND_ROLES.has(role)) return colours.background.depth / DEFAULT_DEPTH;
   if (BORDER_ROLES.has(role)) return colours.borders.contrast / DEFAULT_CONTRAST;
   if (SECONDARY_ROLES.has(role)) return colours.text.contrast / DEFAULT_CONTRAST;
+  if (HIGHLIGHT_ROLES.has(role)) return colours.highlight.contrast / DEFAULT_CONTRAST;
   return 1;
 }
 
@@ -181,7 +219,7 @@ const short = (lightness: number, page: number, limit: number): number =>
 // Every role for a custom theme. The ladder of its mode is generated from the
 // seeds, then moved onto the chosen page (`moveRole`): depth scales the cards
 // and empty cells, the borders' contrast the hairlines and the secondary
-// text's contrast its inks. `surface` takes the page's hue and chroma, so a
+// text's contrast its inks, the highlight's its band. `surface` takes the page's hue and chroma, so a
 // tinted page has tinted cards. Primary text sits at its own L*; every other
 // role keeps its place measured from the ladder's `ink`.
 export function generateCustomRoles(colours: CustomColours): UiRoles {
@@ -190,6 +228,7 @@ export function generateCustomRoles(colours: CustomColours): UiRoles {
     ...generateRoles(customSeeds(colours), mode),
     ink: customInk(mode, colours.ink),
     ...ownBorders(colours, mode),
+    ...ownHighlight(colours, mode),
     ...gamutRamp(colours.viz, mode),
   };
   const frame: Frame = { paper: hexToLch(reference.paper), end: hexToLch(reference.ink).lightness, page: colours.background.lightness };
@@ -241,6 +280,7 @@ export function customFromSeeds(seeds: ThemeSeeds, mode: ThemeMode): CustomColou
     ink: { ...inkFromTextSeed(mode, seeds.text), lightness: inkDefault(mode) },
     text: { ...pick('text', seeds.text), contrast: DEFAULT_CONTRAST },
     accent: pick('accent', seeds.accent),
+    highlight: { ...highlightFromAccent(seeds.accent, mode), match: true, contrast: DEFAULT_CONTRAST },
     record: pick('record', seeds.record),
     viz: { ...pick('viz', seeds.viz), gamut: false },
   };
@@ -282,6 +322,13 @@ function parseBackground(value: unknown): CustomBackground | null {
   return mode === null ? null : { ...colour, mode, lightness, depth };
 }
 
+function parseHighlight(value: unknown): CustomHighlight | null {
+  const colour = parseHueStrength(value);
+  if (colour === null || !isFields(value)) return null;
+  const { match, contrast } = value;
+  return isBoolean(match) && isInteger(HIGHLIGHT_CONTRAST_MAX)(contrast) ? { ...colour, match, contrast } : null;
+}
+
 function parseBorders(value: unknown): CustomBorders | null {
   const colour = parseHueStrength(value);
   if (colour === null || !isFields(value)) return null;
@@ -307,10 +354,19 @@ function withField<T, K extends string, V>(colour: T | null, value: unknown, key
   return field === null ? null : ({ ...colour, [key]: field } as T & Record<K, V>);
 }
 
+// A highlight that matches the accent: its hue and strength as the wash draws
+// them, at the shipped contrast (how a theme drew it before it was a part).
+export const matchingHighlight = (accent: HueStrength, mode: ThemeMode): CustomHighlight => ({
+  ...highlightFromAccent(customSeed('accent', accent), mode),
+  match: true,
+  contrast: DEFAULT_CONTRAST,
+});
+
 // Custom colours as stored, or null when any part is missing or out of range.
 // Fields added since the first custom themes are optional, and each default
 // draws what the theme drew before the field existed: the mode from the
-// lightness, borders that match the page at its depth, the primary text from
+// lightness, borders that match the page at its depth, a highlight that
+// matches the accent, the primary text from
 // the secondary at its ladder's L*, the shipped text contrast and chart chroma.
 export function parseCustomColours(value: unknown): CustomColours | null {
   if (!isFields(value)) return null;
@@ -321,6 +377,7 @@ export function parseCustomColours(value: unknown): CustomColours | null {
   const ink = parseInk(value, background.mode, text);
   const textColour = withField(text, value.text, 'contrast', isInteger(TEXT_CONTRAST_MAX), DEFAULT_CONTRAST);
   const viz = withField(parseHueStrength(value.viz), value.viz, 'gamut', isBoolean, false);
-  if (borders === null || ink === null || textColour === null || viz === null) return null;
-  return { background, borders, ink, text: textColour, accent, record, viz };
+  const highlight = value.highlight === undefined ? matchingHighlight(accent, background.mode) : parseHighlight(value.highlight);
+  if (borders === null || ink === null || textColour === null || viz === null || highlight === null) return null;
+  return { background, borders, ink, text: textColour, accent, highlight, record, viz };
 }

@@ -3434,6 +3434,11 @@ assert_status "200" "agent direct table read denial"
 # shellcheck source=lib/agent-injury-contract.sh
 source "${SUPABASE_DIR}/tests/lib/agent-injury-contract.sh"
 
+echo "[agent-api-test] letting the per-minute request windows reset before the workout block"
+# The targets, credential and injury sections spend the function's
+# 120-per-minute read window; on a warm runtime (after another lane) they land
+# inside one window, and the workout block's reads then get RATE_LIMITED.
+sleep 61
 # shellcheck source=lib/agent-workout-contract.sh
 source "${SUPABASE_DIR}/tests/lib/agent-workout-contract.sh"
 
