@@ -77,8 +77,7 @@ are revalidated once, after all of its writes, over the sets the rebuilt graph
 still reaches (its writes can end a reference), and the rebuilt graph's digest
 is the one persisted for readiness. Each pass rechecks live
 disclosure per workout and at its final boundary; a mismatch rolls back the
-publication. Within one statement (one snapshot) a capture rank, baseline or
-control asks disclosure once per member and definition, never per score row.
+publication.
 Standalone rank/capture helpers still resolve current sources and
 revalidate them at both boundaries.
 Final net movements are intersected with a same-direction

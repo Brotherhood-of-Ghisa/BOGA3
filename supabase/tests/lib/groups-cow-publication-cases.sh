@@ -246,8 +246,9 @@ run_cow_priority_privacy_cases() {
     [[ "$(run_psql "select bool_and(r->'entries'->0->>'memberId'='${saved}') from app_public.group_cows,
       lateral jsonb_array_elements(final_rankings) r where id='${id}' and r->>'metric' in ('e1rm','volume');")" == t ]] || fail "receipt tie order ${index}"
   done
-  # Ordinary stored results remain fixed while current disclosure can suppress
-  # all their figures, even after their original source has been unlinked.
+  # Ordinary stored results remain fixed while current disclosure hides them:
+  # the CoW's exercise now counts bodyweight, so no kg figure of it shows, even
+  # the owner's after unlinking. The owner's own session follows their exercise.
   rpc "${OWNER_TOKEN}" group_update "$(jq -nc --arg g "${group}" '{p_group_id:$g,p_name:"CoW privacy",p_description:null,p_bodyweight_calculations_enabled:false}')"
   expect_ok 'ordinary CoW context'
   ordinary="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
@@ -275,14 +276,15 @@ run_cow_priority_privacy_cases() {
   expect_ok 'enable current normalized disclosure'
   for index in e1rm volume improvement; do
     rpc "${OWNER_TOKEN}" group_cow_results "$(jq -nc --arg g "${group}" --arg c "${ordinary}" --arg m "${index}" '{p_group_id:$g,p_cow_id:$c,p_metric:$m}')"
-    check 'current disclosure suppresses every unsafe historical counterpart without promoting winners' 'all(.rankings[0].entries[];.value==null and .state=="unavailable") and .rankings[0].entries[0].rank==1'
+    check 'a kg CoW on an exercise that now counts bodyweight hides every figure without promoting winners' \
+      'all(.rankings[0].entries[];.value==null and .state=="unavailable") and .rankings[0].entries[0].rank==1'
   done
   rpc "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${group}" --arg u "${OWNER_UID}" --arg s "cow-pub-ob-${RUN_TAG}" '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"
   expect_ok 'baseline endpoint under current disclosure'
-  check 'a paired baseline endpoint cannot expose the source kg after unlink' 'all(.session.exercises[];.visibility=="normalized" and all(.sets[];has("weight_value")|not))'
+  check "the owner's own unlink shows their baseline kg" 'all(.session.exercises[];.visibility=="ordinary" and all(.sets[];has("weight_value")))'
   local actual; actual="$(run_psql "select md5(final_rankings::text) from app_public.group_cows where id='${ordinary}';")"
   [[ "${actual}" == "${saved}" ]] || fail "privacy change reranked stored outcome (expected ${saved}, got ${actual})"
-  pass 'CoW input revisions/removals and UUID ties; ordinary totals and paired baseline disclosure after unlink'
+  pass 'CoW input revisions/removals and UUID ties; ordinary totals and current disclosure after unlink'
 }
 
 

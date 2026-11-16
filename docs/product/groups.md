@@ -107,3 +107,23 @@ distinct outcomes.
 Why: a finished competition has a durable outcome without weakening current privacy.
 Code: `apps/mobile/src/groups/cow-scoring.ts` classifies context availability.
 Code: automatic publication and immutable results in `supabase/migrations/20261030062725_group_cow_publication.sql`.
+
+### groups.kg-disclosure · definition · accepted
+
+Co-members see a member's kg for an exercise unless the current setup hides
+it, per group:
+
+| Case | Decision |
+| --- | --- |
+| Group bodyweight calculations off | kg shows |
+| A kg score on a group exercise that now counts bodyweight (board, history, CoW) | Hidden |
+| Live links to the group's exercises | kg hidden when one of them has a positive bodyweight contribution |
+| No live link | kg hidden when the member's own exercise has a positive contribution |
+| No exercise definition | kg shows |
+| Tombstoned links, past scores, events, CoW source references, a set's former exercise | Never count |
+
+A member who re-points a link or moves a set chooses what that shows; hidden
+kg reveals only that the exercise counts bodyweight.
+
+Why: disclosure follows the member's current setup, never retained history.
+Code: `group_competition_redacts_exercise` in `supabase/migrations/20261115160000_group_kg_disclosure_current_rule.sql`.
