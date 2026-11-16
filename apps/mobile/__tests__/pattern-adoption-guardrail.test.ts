@@ -65,15 +65,16 @@ it.each([findListPatternViolations, findTablePatternViolations])('rejects comput
   expect(check({ rootDir }).map(item => item.rule)).toEqual([expect.stringMatching(/geometry override/)]);
 });
 
-it('permits legitimate foundation definitions and untouched consumers, while the existing gate rejects an adopted violation', () => {
+it('permits legitimate foundation definitions and untouched consumers, while the static gate rejects an adopted violation with no PR declaration', () => {
   write('components/ui/compact-card.tsx', 'const style = {fontSize: size, paddingVertical: inset};');
   write('components/stats/stats-table.tsx', 'const style = {lineHeight: height, minHeight: target};');
   write('components/groups/untouched.tsx', 'const style = {fontFamily: family};');
   const output: string[] = [];
-  expect(runUiGuardrailCheck({ rootDir, selectionContext: { files: [] }, stdout: { write: (text: string) => output.push(text) } }).ok).toBe(true);
+  expect(runUiGuardrailCheck({ rootDir, stdout: { write: (text: string) => output.push(text) } }).ok).toBe(true);
   write(COMPACT_PATTERN_FILES[2], '<CompactHeader style={custom} label="CoW"/>');
-  expect(runUiGuardrailCheck({ rootDir, selectionContext: { files: [] }, stdout: { write: (text: string) => output.push(text) } }).ok).toBe(false);
+  expect(runUiGuardrailCheck({ rootDir, stdout: { write: (text: string) => output.push(text) } }).ok).toBe(false);
   expect(output.join('')).toContain('compact style override');
+  expect(output.join('')).not.toMatch(/pattern selection/i);
 });
 
 it('keeps every declared adopted production presenter present and clean', () => {
