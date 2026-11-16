@@ -24,7 +24,7 @@ import {
 } from './notification-parity.ts';
 import {
   compareParity, helperParityStatements, missingOutcomes, parityInstallStatements, parityPassed, streamWalk,
-  type HelperParityCase, type ParityCase, type ParityOutcome,
+  helperConflicts, type HelperParityCase, type ParityCase, type ParityOutcome,
 } from './parity.ts';
 import { PublishParity } from './publish-parity.ts';
 import {
@@ -99,14 +99,6 @@ const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 5_700, scoped
     + '(every shared set of the exercise, about 2.2 pages a set, so linear in history) and ranks the exercise from it.' };
 
 /**
- * The previous CoW summary is not slope-asserted (`scoped: false`) though far
- * under the ceiling: it measured 240 -> 285 pages from H=90 to H=180, 1.19x
- * per doubling, at the 1.2x limit, so run-to-run noise would fail the set.
- */
-const COW_PREVIOUS_SLOPE = 'Measured 240 -> 285 pages from H=90 to H=180 (1.19x per doubling, at the 1.2x limit), '
-  + 'so a slope assertion would fail on run-to-run noise; under a tenth of the ceiling. The cause of the growth is not yet traced.';
-
-/**
  * Every RPC the set measures, with its budget beside it. A budget is the
  * costliest call measured at either point (reads warm: `warmUp`) plus ~25% (`suggestBudget`).
  * Every entry is `budgeted`: held to the ceiling, or over it only with a
@@ -137,9 +129,9 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'budgeted', pages: 360, scoped: true } },
   { fn: 'group_cow_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'budgeted', pages: 320, scoped: true } },
+    budget: { kind: 'budgeted', pages: 80, scoped: true } },
   { fn: 'group_cow_previous_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'budgeted', pages: 360, scoped: false, justification: COW_PREVIOUS_SLOPE } },
+    budget: { kind: 'budgeted', pages: 110, scoped: true } },
   { fn: 'group_cow_calendar_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 20, scoped: true } },
   { fn: 'group_list_mine', via: 'member', args: () => ({}), budget: { kind: 'budgeted', pages: 20, scoped: true } },
@@ -180,7 +172,8 @@ const COW_STREAM = '20261030203502_group_cow_stream_events.sql';
  * first: an old SQL body must find the old helpers it calls already there.
  */
 const COW_RESULT_HELPERS = {
-  group_cow_result_rows: READ_DEFINITIONS,
+  // The rows as the kg disclosure rule left them, one rule call per source set.
+  group_cow_result_rows: '20261115160000_group_kg_disclosure_current_rule.sql',
   group_cow_public_result: COW_READERS,
 };
 const STREAM_ITEM_HELPERS = {
@@ -240,9 +233,10 @@ const streamParityCases = (): ParityCase<ReadPathContext>[] => [
 ];
 
 /**
- * The CoW result readers, whose rows are now built once: the summaries
- * (`observed_at_us` is the clock at each call, so it is not compared), and
- * each CoW's results per metric.
+ * The CoW result readers, against the public result from before its rows were
+ * built once and the rows from before the rule ran once per source exercise:
+ * the summaries (`observed_at_us` is the clock at each call, so it is not
+ * compared), and each CoW's results per metric.
  */
 const cowParityCases = (): ParityCase<ReadPathContext>[] => [
   { fn: 'group_cow_summary', migration: COW_READERS, helpers: COW_RESULT_HELPERS, ignoreKeys: ['observed_at_us'],
@@ -817,6 +811,8 @@ const runCaseParity = async (
 };
 
 const runParityCases = async (session: Tier1Session, context: ReadPathContext): Promise<ParityOutcome[]> => {
+  const conflicts = helperConflicts(PARITY_CASES);
+  if (conflicts.length > 0) return [{ fn: 'parity helpers', compared: 0, differences: [], plantDetected: null, error: conflicts.join('; ') }];
   // The notification cases first: the stale-fact plants below edit sessions their proofs read.
   const outcomes: ParityOutcome[] = await runCaseParity(session, context, PARITY_CASES.filter((item) => item.scenarios));
   try {

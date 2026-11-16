@@ -208,6 +208,26 @@ const helperInstalls = (helpers: Record<string, string> = {}): { aliases: Record
   return { aliases, sql };
 };
 
+/**
+ * Helpers two cases name from different migrations. A helper's old definition
+ * is installed under one alias (`<helper>__legacy`) for every case on the
+ * connection, so the later install would silently replace the earlier one.
+ */
+export const helperConflicts = <Context>(cases: readonly ParityCase<Context>[]): string[] => {
+  const seen = new Map<string, { migration: string; fn: string }>();
+  const conflicts: string[] = [];
+  for (const item of cases) {
+    for (const [helper, migration] of Object.entries(item.helpers ?? {})) {
+      const first = seen.get(helper);
+      if (!first) seen.set(helper, { migration, fn: item.fn });
+      else if (first.migration !== migration) {
+        conflicts.push(`${helper}: ${first.fn} installs ${first.migration}, ${item.fn} installs ${migration}`);
+      }
+    }
+  }
+  return conflicts;
+};
+
 /** The statements that install a case's old definitions in pg_temp: helpers first, then the function, then its plant. */
 export const parityInstallStatements = <Context>(item: ParityCase<Context>): { legacy: string; planted: string | null; sql: string[] } => {
   const { aliases: helperAliases, sql } = helperInstalls(item.helpers);
