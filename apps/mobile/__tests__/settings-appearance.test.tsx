@@ -289,6 +289,7 @@ describe('custom', () => {
     ink: { hue: 265, strength: 40, lightness: 95 },
     text: { hue: 60, strength: 10, contrast: 100 },
     accent: { hue: 330, strength: 80 },
+    highlight: { hue: 330, strength: 20, match: true, contrast: 100 },
     record: { hue: 90, strength: 60 },
     viz: { hue: 150, strength: 50, gamut: false },
   };
@@ -330,6 +331,7 @@ describe('custom', () => {
     const rows = screen.getByTestId('settings-appearance-custom');
     expect(within(rows).getByText('Dark, Teal, 30%, lightness 20')).toBeTruthy();
     expect(screen.getByLabelText('Borders, Match background')).toBeTruthy();
+    expect(screen.getByLabelText('Highlight, Match accent')).toBeTruthy();
     expect(within(rows).getByText('Purple, 80%')).toBeTruthy();
     expect(screen.getByLabelText('Primary text, Blue, 40%')).toBeTruthy();
     expect(screen.getByLabelText('Best ever, Olive, 60%')).toBeTruthy();
@@ -338,6 +340,15 @@ describe('custom', () => {
     fireEvent.press(screen.getByTestId('settings-appearance-custom-record'));
 
     expect(mockPush).toHaveBeenCalledWith('/theme-custom?part=record');
+  });
+
+  it('names a highlight of its own by its hue and strength', () => {
+    Storage.setItemSync(
+      APPEARANCE_STORAGE_KEY,
+      JSON.stringify({ theme: 'custom', mode: 'light', custom: { ...CUSTOM, highlight: { hue: 150, strength: 45, match: false, contrast: 100 } } }),
+    );
+    render(<SettingsAppearanceRoute />);
+    expect(screen.getByLabelText('Highlight, Green, 45%')).toBeTruthy();
   });
 
   it('collapses Theme to Custom while it is chosen, and shows or hides the presets on request', () => {

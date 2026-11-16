@@ -38,6 +38,7 @@ import { Storage } from 'expo-sqlite/kv-store';
 import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
 import { SPOTLIGHT } from '@/components/appearance/theme-preview';
+import { hexToLch } from '@/components/ui/lch';
 import { pointToValue } from '@/components/ui/slider-row';
 import {
   CUSTOM_PARTS,
@@ -63,6 +64,8 @@ const CUSTOM: CustomColours = {
   ink: { hue: 265, strength: 30, lightness: 8 },
   text: { hue: 60, strength: 10, contrast: 100 },
   accent: { hue: 30, strength: 70 },
+  // A highlight of its own, so a change to its hue moves the band.
+  highlight: { hue: 300, strength: 40, match: false, contrast: 100 },
   record: { hue: 90, strength: 50 },
   viz: { hue: 150, strength: 40, gamut: true },
 };
@@ -427,6 +430,41 @@ it('gives the borders their own hue and strength, or the page’s, and a contras
     expect(storedCustom()?.borders).toEqual({ hue: CUSTOM.background.hue, strength: CUSTOM.background.strength, match: false, contrast: 115 }),
   );
   expect(hueBar().props.accessibilityValue).toEqual({ text: `${hueName(CUSTOM.background.hue)}, ${CUSTOM.background.hue} degrees` });
+});
+
+it('gives the highlight its own hue and strength, or the accent’s, and a contrast', async () => {
+  store(CUSTOM);
+  mockPart = 'highlight';
+  render(<ThemeCustomRoute />);
+  expect(mockTitles).toContain('Highlight');
+  const match = () => screen.getByRole('switch', { name: 'Match accent' });
+  expect(match().props.accessibilityState).toEqual({ checked: false });
+  // The spotlight's first tile is the band itself.
+  const band = () =>
+    StyleSheet.flatten(screen.getByTestId('theme-custom-spotlight-0', { includeHiddenElements: true }).props.style).backgroundColor;
+  expect(band()).toBe(generateCustomRoles(CUSTOM).accentWash);
+
+  await step(slider('Contrast'), 'increment');
+  await waitFor(() => expect(storedCustom()?.highlight).toEqual({ ...CUSTOM.highlight, contrast: 115 }));
+
+  fireEvent(screen.getByTestId('theme-custom-hue-track'), 'layout', { nativeEvent: { layout: { width: 359 } } });
+  await act(async () => drag(hueBar()).onEnd({ x: 90 }, true));
+  await waitFor(() => expect(storedCustom()?.highlight).toEqual({ ...CUSTOM.highlight, hue: 90, contrast: 115 }));
+  expect(band()).toBe(generateCustomRoles({ ...CUSTOM, highlight: { ...CUSTOM.highlight, hue: 90, contrast: 115 } }).accentWash);
+
+  await act(async () => fireEvent.press(match()));
+  await waitFor(() => expect(storedCustom()?.highlight.match).toBe(true));
+  expect(screen.queryByRole('adjustable', { name: 'Hue' })).toBeNull();
+  const matched = generateCustomRoles({ ...CUSTOM, highlight: { ...CUSTOM.highlight, match: true, contrast: 115 } }).accentWash;
+  expect(band()).toBe(matched);
+
+  // Unmatching starts from the band the accent draws, so nothing jumps.
+  await act(async () => fireEvent.press(match()));
+  await waitFor(() => expect(storedCustom()?.highlight).toMatchObject({ match: false, contrast: 115 }));
+  const [own, accent] = [hexToLch(band()), hexToLch(matched)];
+  expect(own.lightness).toBeCloseTo(accent.lightness, 0);
+  expect(Math.abs(own.chroma - accent.chroma)).toBeLessThan(1);
+  expect(Math.abs(own.hue - accent.hue)).toBeLessThan(3);
 });
 
 it('moves the primary text’s lightness in quarter steps over its mode’s range', async () => {

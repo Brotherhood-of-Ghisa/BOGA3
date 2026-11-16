@@ -85,16 +85,17 @@ phone's, followed live). Native UI is pinned to the drawn mode, unpinned under
 an invalid record or an unreadable store opens in the default and is logged. `record` stays a brass
 across presets, so "your best ever" keeps one look. Its editor: `ux-rules.md` "Appearance".
 
-**Custom** (`theme-custom.ts`): a hue and strength (0–100% of the part's
-chroma cap) per seed, for borders and for `ink`. The page picks its mode,
-L\* (dark 0–35, light 65–100, quarter steps) and depth. Each role
-keeps its hue, chroma and share of the `paper` → `ink` distance, moved onto
-the page; depth (0–300%) scales it for `surface` and `viz0`, border contrast
-(0–300%) for `rule`/`rule-soft` (the page's tint unless unmatched), text
-contrast (0–150%) for the lesser inks, never past `ink`'s chosen L\*. Chart
-strength is a share of each step's sRGB maximum; dark steps reach L\*58.
-Absent newer fields keep the older look. Custom starts from the preset in
-use, ungated against the floors above (`ui-theme-custom.test.ts`).
+**Custom** (`theme-custom.ts`): a hue and strength (0–100% of its
+chroma cap) per seed, borders, highlight and `ink`. The page picks
+its mode, L\* (dark 0–35, light 65–100; quarter steps), depth. Each role
+keeps its hue, chroma and share of the `paper` → `ink` distance on the
+page; depth (0–300%) scales `surface` and `viz0`, border contrast
+(0–300%) `rule`/`rule-soft` (the page's tint unless unmatched), highlight
+contrast (0–300%) `accent-wash` (the accent's band unless unmatched), text
+contrast (0–150%) the lesser inks, never past `ink`'s L\*. Chart and
+highlight strength are a share of each L\*'s sRGB maximum; dark chart steps
+reach L\*58. Absent newer fields draw as before. Custom starts from the
+preset in use, ungated against the floors above (`ui-theme-custom.test.ts`).
 
 The launcher icon follows the drawn theme: one per preset, one
 rainbow icon for every custom theme, Warm as default and fallback. The native boundary,

@@ -31,9 +31,9 @@ import {
 //
 // - `theme`: a preset id, or `custom`.
 // - `mode`: `light`, `dark` or `system`; a custom theme ignores it.
-// - `custom`: null, or `{background, borders, ink, text, accent, record,
-//   viz}`, each a `{hue, strength}`; the background also `{mode, lightness,
-//   depth}`, the borders `{match, contrast}`, `ink` `{lightness}`, `text`
+// - `custom`: null, or `{background, borders, ink, text, accent, highlight,
+//   record, viz}`, each a `{hue, strength}`; the background also `{mode,
+//   lightness, depth}`, the borders and the highlight `{match, contrast}`, `ink` `{lightness}`, `text`
 //   `{contrast}` and `viz` `{gamut}` (`theme-custom.ts`). Never null while
 //   `theme` is `custom`. Every part and field added since the first custom
 //   themes may be absent: its default draws what the theme drew before it
