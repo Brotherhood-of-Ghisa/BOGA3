@@ -252,6 +252,12 @@ export function inkStep(mode: ThemeMode): { lightness: number; chroma: number } 
   return { lightness, chroma };
 }
 
+// The L* of a mode's `accentWash`: where a custom highlight of its own is
+// drawn.
+export function washLightness(mode: ThemeMode): number {
+  return (mode === 'light' ? LIGHT_STEPS : DARK_STEPS).accentWash.lightness;
+}
+
 // The L* of a mode's `viz1`…`viz4`, weakest first.
 export function rampLightness(mode: ThemeMode): number[] {
   const ladder = mode === 'light' ? LIGHT_STEPS : DARK_STEPS;

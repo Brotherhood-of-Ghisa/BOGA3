@@ -53,6 +53,7 @@ const CUSTOM: CustomColours = {
   ink: { hue: 265, strength: 30, lightness: 95 },
   text: { hue: 60, strength: 10, contrast: 100 },
   accent: { hue: 330, strength: 80 },
+  highlight: { hue: 330, strength: 20, match: true, contrast: 100 },
   record: { hue: 90, strength: 60 },
   viz: { hue: 150, strength: 50, gamut: false },
 };

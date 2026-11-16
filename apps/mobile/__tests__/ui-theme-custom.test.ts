@@ -8,6 +8,7 @@ import {
   customSeeds,
   gamutColour,
   generateCustomRoles,
+  highlightFromAccent,
   parseCustomColours,
   type CustomColours,
 } from '@/components/ui/theme-custom';
@@ -19,7 +20,8 @@ import { themePresets } from '@/components/ui/theme-presets';
 // colours keeps its look, that a theme saved before a field existed draws
 // exactly as it did, that the mode is the page's own, that depth, the
 // borders' and the secondary text's contrast each move only their roles, and
-// what a stored value must hold. No readability floor is gated: custom
+// what a stored value must hold. The highlight follows the accent unless it is
+// given its own, and its contrast moves only its band. No readability floor is gated: custom
 // colours are the user's.
 
 const ROLE_COLOURS = (roles: UiRoles) =>
@@ -159,6 +161,55 @@ describe('borders', () => {
   it('change nothing when unmatched at the page’s own hue and strength', () => {
     const { hue, strength } = WARM_LIGHT.background;
     expect(generateCustomRoles(withBorders({ match: false, hue, strength }))).toEqual(generateCustomRoles(withBorders({ match: true })));
+  });
+});
+
+describe('highlight', () => {
+  const withHighlight = (highlight: Partial<CustomColours['highlight']>, base = WARM_LIGHT): CustomColours => ({
+    ...base,
+    highlight: { ...base.highlight, ...highlight },
+  });
+  const gap = (colours: CustomColours) => {
+    const roles = generateCustomRoles(colours);
+    return Math.abs(hexToLch(roles.accentWash).lightness - hexToLch(roles.paper).lightness);
+  };
+
+  it('starts matching the accent when a preset is converted', () => {
+    expect(WARM_LIGHT.highlight).toMatchObject({ match: true, contrast: 100 });
+  });
+
+  it('takes the accent’s band while it matches, whatever its own hue and strength', () => {
+    const matched = generateCustomRoles(withHighlight({ hue: 150, strength: 100 }));
+    expect(matched.accentWash).toBe(generateCustomRoles(WARM_LIGHT).accentWash);
+  });
+
+  it.each(['light', 'dark'] as const)('takes its own hue and strength when it does not match, and moves only the band, in %s', (mode) => {
+    const base = customFromSeeds(defaultThemeSeeds, mode);
+    const before = generateCustomRoles(base);
+    const own = generateCustomRoles(withHighlight({ match: false, hue: 150, strength: 100 }, base));
+    expect(hexToLch(own.accentWash).hue).toBeCloseTo(150, -1);
+    expect(hexToLch(own.accentWash).chroma).toBeGreaterThan(hexToLch(before.accentWash).chroma);
+    expect(hexToLch(own.accentWash).lightness).toBeCloseTo(hexToLch(before.accentWash).lightness, 0);
+    const moved = (Object.keys(before) as (keyof UiRoles)[]).filter((role) => before[role] !== own[role]);
+    expect(moved).toEqual(['accentWash']);
+  });
+
+  it.each(['light', 'dark'] as const)('changes nearly nothing when unmatched at the hue and strength it starts from, in %s', (mode) => {
+    const base = customFromSeeds(defaultThemeSeeds, mode);
+    const { hue, strength } = highlightFromAccent(customSeed('accent', base.accent), mode);
+    const own = generateCustomRoles(withHighlight({ match: false, hue, strength }, base)).accentWash;
+    expect(deltaE(own, generateCustomRoles(base).accentWash)).toBeLessThan(1.5);
+  });
+
+  it('flattens onto the page at a contrast of 0, steps further as it grows, and moves only the band', () => {
+    expect(gap(withHighlight({ contrast: 0 }))).toBeLessThan(0.5);
+    expect(gap(withHighlight({ contrast: 250 }))).toBeGreaterThan(gap(withHighlight({ contrast: 100 })));
+    const [soft, hard] = [generateCustomRoles(withHighlight({ contrast: 30 })), generateCustomRoles(withHighlight({ contrast: 250 }))];
+    expect((Object.keys(soft) as (keyof UiRoles)[]).filter((role) => soft[role] !== hard[role])).toEqual(['accentWash']);
+  });
+
+  it('is a grey at a strength of 0', () => {
+    expect(hexToLch(generateCustomRoles(withHighlight({ match: false, strength: 0 })).accentWash).chroma).toBeLessThan(1);
   });
 });
 
@@ -366,6 +417,7 @@ describe('a theme saved before its mode, borders, contrasts and gamut ramp', () 
     expect(read.ink.lightness).toBe(inkStep('dark').lightness);
     expect(read.text.contrast).toBe(100);
     expect(read.viz.gamut).toBe(false);
+    expect(read.highlight).toMatchObject({ match: true, contrast: 100 });
   });
 });
 
@@ -379,6 +431,7 @@ describe('parseCustomColours', () => {
       ink: { ...WARM_LIGHT.ink, lightness: 88.75 },
       text: { ...WARM_LIGHT.text, contrast: 130 },
       viz: { ...WARM_LIGHT.viz, gamut: true },
+      highlight: { hue: 120, strength: 55, match: false, contrast: 260 },
     };
     expect(parseCustomColours(JSON.parse(JSON.stringify(chosen)))).toEqual(chosen);
   });
@@ -407,6 +460,8 @@ describe('parseCustomColours', () => {
     ['a border contrast over 300', { ...WARM_LIGHT, borders: { ...WARM_LIGHT.borders, contrast: 301 } }],
     ['a primary text lightness over 100', { ...WARM_LIGHT, ink: { ...WARM_LIGHT.ink, lightness: 100.25 } }],
     ['a text contrast over 150', { ...WARM_LIGHT, text: { ...WARM_LIGHT.text, contrast: 151 } }],
+    ['a highlight without a match', { ...WARM_LIGHT, highlight: { hue: 10, strength: 10, contrast: 100 } }],
+    ['a highlight contrast over 300', { ...WARM_LIGHT, highlight: { ...WARM_LIGHT.highlight, contrast: 301 } }],
     ['a gamut that is not a boolean', { ...WARM_LIGHT, viz: { ...WARM_LIGHT.viz, gamut: 1 } }],
   ])('rejects %s', (_name, value) => {
     expect(parseCustomColours(value)).toBeNull();
