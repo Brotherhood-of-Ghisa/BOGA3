@@ -691,6 +691,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(await screen.findByTestId('exercise-picker-preselection-panel')).toBeTruthy();
 
     fireEvent.changeText(search, 'squat');
+    // The read finished into the card: the unchanged report did not cancel it.
     expect(await screen.findByText('No earlier workout to repeat.')).toBeTruthy();
     expect(screen.getByTestId('exercise-picker-preselection-panel')).toBeTruthy();
 

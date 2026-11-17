@@ -150,6 +150,8 @@ export function PlanExercisePickSheet({ request, onPick, onDismiss, gymId = null
           accessibilityLabel="Exercise filter input"
           autoCapitalize="none"
           onChangeText={(text) => {
+            // Only a real edit ends the preselection (see the session picker).
+            if (text === search) return;
             clearPreselection();
             setSearch(text);
           }}

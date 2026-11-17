@@ -211,6 +211,24 @@ describe('plan form: create', () => {
     expect(unscheduled[0]).toMatchObject({ title: 'Heavy Day', progress: 'planned' });
   });
 
+  // iOS can report the unchanged text as a pick's keyboard dismissal blurs the
+  // search; that report must not take the preselection away again.
+  it('the pick sheet keeps the preselection when the search reports its unchanged text', async () => {
+    await seedCatalog();
+    renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    fireEvent.press(screen.getByTestId('plan-form-add-block'));
+    const search = await screen.findByTestId('plan-exercise-pick-search');
+    fireEvent.changeText(search, 'Barbell Squat');
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    expect(await screen.findByTestId('exercise-picker-preselection-panel')).toBeTruthy();
+
+    fireEvent.changeText(search, 'Barbell Squat');
+    expect(screen.getByTestId('exercise-picker-preselection-panel')).toBeTruthy();
+
+    fireEvent.changeText(search, 'Barbell');
+    await waitForGone(() => screen.queryByTestId('exercise-picker-preselection-panel'));
+  });
+
   it('preselects Routine when opened with routine=1 and saves it as a routine', async () => {
     await seedCatalog();
     mockParams = { routine: '1' };
