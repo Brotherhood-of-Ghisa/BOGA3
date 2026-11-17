@@ -681,6 +681,23 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
     expect(await screen.findByTestId('exercise-picker-preselection-panel')).toBeTruthy();
   });
 
+  // iOS can report the field's unchanged text as the pick's keyboard dismissal
+  // blurs it; that report must not take the card away again.
+  it('keeps the preselection when the search reports its unchanged text after a pick', async () => {
+    await openInteractions();
+    const search = screen.getByLabelText('Exercise filter input');
+    fireEvent.changeText(search, 'squat');
+    fireEvent.press(await screen.findByLabelText('Select exercise Barbell Squat'));
+    expect(await screen.findByTestId('exercise-picker-preselection-panel')).toBeTruthy();
+
+    fireEvent.changeText(search, 'squat');
+    expect(await screen.findByText('No earlier workout to repeat.')).toBeTruthy();
+    expect(screen.getByTestId('exercise-picker-preselection-panel')).toBeTruthy();
+
+    fireEvent.changeText(search, 'squa');
+    await waitForGone(() => screen.queryByTestId('exercise-picker-preselection-panel'));
+  });
+
   it('a family with search matches can be collapsed while searching', async () => {
     await openInteractions(false);
     fireEvent.changeText(screen.getByLabelText('Exercise filter input'), 'press');
