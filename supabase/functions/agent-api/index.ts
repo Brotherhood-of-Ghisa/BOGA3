@@ -1,3 +1,4 @@
+import { authTrace, claimFailure, claimObservations, privateTag, type Trace } from './auth-diagnostics.ts';
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.98.0';
 
 import {
@@ -262,7 +263,7 @@ const grantGrantedAt = (grant: JsonObject): string | null => {
 };
 
 const authUnavailable = (step: string, status: unknown): ApiError => {
-  console.error('[agent-api] Supabase Auth unavailable', { step, status: status ?? null });
+  // The caller records the classified failure with its request context.
   return new ApiError(
     503,
     'UPSTREAM_UNAVAILABLE',
@@ -271,56 +272,100 @@ const authUnavailable = (step: string, status: unknown): ApiError => {
   );
 };
 
-const getValidatedUser = async (accessToken: string): Promise<{ id: string }> => {
+const getValidatedUser = async (accessToken: string, trace: Trace, requestId: string): Promise<{ id: string }> => {
+  const start = performance.now();
   let result;
   try {
-    result = await createServerClient(getAnonKey(), authUpstreamFetch).auth.getUser(accessToken);
+    const correlatedFetch: typeof fetch = async (input, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set('x-request-id', requestId);
+      const response = await authUpstreamFetch(input, { ...init, headers });
+      trace('auth.user_response', { upstream_status: response.status });
+      return response;
+    };
+    result = await createServerClient(getAnonKey(), correlatedFetch).auth.getUser(accessToken);
   } catch {
+    trace('auth.user', { latency_ms: Math.round(performance.now() - start), classification: 'auth_user_unavailable', upstream_status: null });
     throw authUnavailable('user', null);
   }
   const { data: { user }, error } = result;
   if (error && !isTokenRejection(error.status)) {
+    trace('auth.user', { latency_ms: Math.round(performance.now() - start), classification: 'auth_user_unavailable', upstream_status: error.status ?? null });
     throw authUnavailable('user', error.status);
   }
+  trace('auth.user', { latency_ms: Math.round(performance.now() - start), classification: error || !user ? 'auth_token_rejected' : 'auth_user_validated',
+    upstream_status: error?.status ?? null,
+    rejection_detail: error?.code === 'session_not_found' ? 'session_not_found'
+      : error?.code === 'user_not_found' ? 'user_not_found'
+      : error?.code === 'bad_jwt' ? 'bad_jwt' : undefined });
   if (error || !user) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Authentication required.');
   }
   return user;
 };
 
-const fetchActiveGrants = async (accessToken: string): Promise<JsonObject[]> => {
+const fetchActiveGrants = async (accessToken: string, trace: Trace, requestId: string): Promise<JsonObject[]> => {
+  const start = performance.now();
   let response: Response;
   try {
     response = await authUpstreamFetch(`${getSupabaseUrl()}/auth/v1/user/oauth/grants`, {
       headers: {
+        'x-request-id': requestId,
         apikey: getAnonKey(),
         authorization: `Bearer ${accessToken}`,
       },
     });
   } catch {
+    trace('auth.grants', { latency_ms: Math.round(performance.now() - start), classification: 'grants_unavailable', upstream_status: null });
     throw authUnavailable('grants', null);
   }
+  trace('auth.grants_response', { latency_ms: Math.round(performance.now() - start), upstream_status: response.status });
   if (isTokenRejection(response.status)) {
+    trace('auth.grants', { latency_ms: Math.round(performance.now() - start), classification: 'grants_token_rejected' });
     throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
   }
   if (!response.ok) {
+    trace('auth.grants', { latency_ms: Math.round(performance.now() - start), classification: 'grants_unavailable', upstream_status: response.status });
     throw authUnavailable('grants', response.status);
   }
   try {
-    return normalizeGrantRows(await response.json());
+    const payload = await response.json();
+    const shapeKnown = Array.isArray(payload) || (typeof payload === 'object' && payload !== null && Array.isArray(payload.grants));
+    if (!shapeKnown) trace('auth.grants', { classification: 'grants_unrecognized_shape' });
+    return normalizeGrantRows(payload);
   } catch {
+    trace('auth.grants', { latency_ms: Math.round(performance.now() - start), classification: 'grants_invalid_response', upstream_status: response.status });
     throw authUnavailable('grants', response.status);
   }
 };
 
-const authenticateAgent = async (request: Request): Promise<AuthenticatedAgent> => {
-  const accessToken = extractBearerToken(request);
-  const user = await getValidatedUser(accessToken);
+const authenticateAgentInner = async (request: Request, requestId: string): Promise<AuthenticatedAgent> => {
+  const trace = authTrace(requestId);
+  trace('auth.verify.start', { authorization_present: request.headers.has('authorization'),
+    bearer_present: /^Bearer [^\s]+$/i.test(request.headers.get('authorization') ?? '') });
+  let accessToken: string;
+  try { accessToken = extractBearerToken(request); } catch (error) {
+    trace('auth.rejected', { classification: request.headers.has('authorization') ? 'malformed_credentials' : 'missing_credentials' });
+    throw error;
+  }
+  trace('auth.credential', { token_tag: await privateTag(Deno.env.get('AUTH_DIAGNOSTIC_HMAC_KEY'), 'token', accessToken) });
+  // Unverified observations help classify Auth rejections, never authorize them.
+  try {
+    const observed = decodeValidatedJwtPayload(accessToken);
+    if (typeof observed === 'object' && observed !== null) {
+      trace('auth.token_observations', { ...claimObservations(observed, `${getSupabaseUrl()}/auth/v1`), provenance: 'unverified' });
+    }
+  } catch { /* Malformed input remains Auth's decision. */ }
+  const user = await getValidatedUser(accessToken, trace, requestId);
 
   // Decode claims only after Supabase Auth has validated the token and live
   // session. Identity still comes from the validated Auth user, never from an
   // unverified caller field.
-  const claims = decodeValidatedJwtPayload(accessToken);
+  let claims: JsonObject;
+  try { claims = decodeValidatedJwtPayload(accessToken); } catch (error) {
+    trace('auth.rejected', { classification: 'malformed_validated_claims' }); throw error;
+  }
+  trace('auth.claim_observations', claimObservations(claims, `${getSupabaseUrl()}/auth/v1`));
   const clientId = claims.client_id;
   const subject = claims.sub;
   const expiry = claims.exp;
@@ -333,12 +378,19 @@ const authenticateAgent = async (request: Request): Promise<AuthenticatedAgent> 
     typeof expiry !== 'number' ||
     expiry * 1000 <= Date.now()
   ) {
+    trace('auth.rejected', { classification: claimFailure(claims, user.id, Date.now()) });
     throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
   }
 
-  const grants = await fetchActiveGrants(accessToken);
+  const grants = await fetchActiveGrants(accessToken, trace, requestId);
   const matchedGrant = grants.find((grant) => grantClientId(grant) === clientId);
   const grantedAt = matchedGrant ? grantGrantedAt(matchedGrant) : null;
+  trace('auth.grant_lookup', { classification: !matchedGrant ? grants.length ? 'grant_client_mismatch' : 'active_grant_absent'
+    : !grantedAt ? 'grant_timestamp_missing' : 'active_grant_found',
+    client_tag: await privateTag(Deno.env.get('AUTH_DIAGNOSTIC_HMAC_KEY'), 'client', clientId),
+    grant_tag: grantedAt ? await privateTag(Deno.env.get('AUTH_DIAGNOSTIC_HMAC_KEY'), 'grant', `${clientId}:${grantedAt}`) : undefined,
+    // Absence in the active list cannot distinguish revocation, expiry or no consent.
+    absent_cause: !matchedGrant ? 'requires_auth_audit_evidence' : undefined });
   if (!grantedAt) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
   }
@@ -353,6 +405,21 @@ const authenticateAgent = async (request: Request): Promise<AuthenticatedAgent> 
       : [],
     userId: user.id,
   };
+};
+
+const authenticateAgent = async (request: Request, requestId: string): Promise<AuthenticatedAgent> => {
+  const trace = authTrace(requestId);
+  const start = performance.now();
+  try {
+    const agent = await authenticateAgentInner(request, requestId);
+    trace('auth.verify.result', { classification: 'accepted', latency_ms: Math.round(performance.now() - start) });
+    return agent;
+  } catch (error) {
+    trace('auth.verify.result', { classification: error instanceof ApiError
+      ? error.status === 401 ? 'credentials_rejected' : error.status === 503 ? 'upstream_unavailable' : 'auth_error'
+      : 'internal_error', latency_ms: Math.round(performance.now() - start) });
+    throw error;
+  }
 };
 
 const requestIdFor = (request: Request): string => {
@@ -605,9 +672,7 @@ const errorResponse = (requestId: string, error: unknown): Response => {
 
 const throwDatabaseError = (error: { message?: string } | null): void => {
   if (error) {
-    console.error('[agent-api] database operation failed', {
-      message: error.message ?? 'unknown database error',
-    });
+    authTrace('unavailable')('database.failure', { classification: 'database_operation_failed' });
     throw new ApiError(500, 'INTERNAL', 'The agent request could not be completed.');
   }
 };
@@ -4079,15 +4144,15 @@ const recordAudit = async (
     duration_ms: Math.max(0, Math.round(durationMs)),
   });
   if (error) {
-    console.error('[agent-api] audit insert failed', {
-      request_id: requestId,
-      message: error.message,
-    });
+    authTrace(/^[0-9a-f-]{36}$/i.test(requestId) ? requestId : 'external_request')('audit.failure', { classification: 'audit_insert_failed' });
   }
 };
 
 const handleRequest = async (request: Request): Promise<Response> => {
   const requestId = requestIdFor(request);
+  // Preserve the public/audit ID contract; only server-shaped UUIDs enter logs.
+  const diagnosticId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)
+    ? requestId : crypto.randomUUID();
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
   }
@@ -4100,23 +4165,23 @@ const handleRequest = async (request: Request): Promise<Response> => {
   let serviceClient: SupabaseClient | null = null;
   let response: Response;
   const path = canonicalAgentPath(new URL(request.url));
+  const trace = authTrace(diagnosticId);
+  trace('http.request', { method: request.method, operation: routeToolName(path, request.method) });
   try {
-    agent = await authenticateAgent(request);
+    agent = await authenticateAgent(request, diagnosticId);
     enforceReadRateLimit(agent);
     serviceClient = createServerClient(getServiceRoleKey());
     const data = await dispatchAgentRequest(request, agent, serviceClient);
     response = successResponse(requestId, data);
   } catch (error) {
     if (!(error instanceof ApiError)) {
-      console.error('[agent-api] request failed', {
-        request_id: requestId,
-        path,
-        message: error instanceof Error ? error.message : 'unknown error',
-      });
+      trace('http.failure', { classification: 'internal_error' });
     }
     response = errorResponse(requestId, error);
   }
 
+  trace('http.response', { status: response.status, authenticated: agent !== null,
+    latency_ms: Math.round(performance.now() - startedAt) });
   if (agent && serviceClient) {
     await recordAudit(
       serviceClient,

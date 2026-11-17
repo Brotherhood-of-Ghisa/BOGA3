@@ -27,6 +27,8 @@ Supabase data credentials, SQL, or service-role key.
 `GET` and `DELETE` on `/mcp` return `405`: this MVP is deliberately stateless
 and does not offer server-sent event sessions.
 
+For repeated consent investigations, load [OAuth diagnostics](AUTH-DIAGNOSTICS.md).
+
 ## Tool surface
 
 Twelve read-only tools:
