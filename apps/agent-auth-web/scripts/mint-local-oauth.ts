@@ -184,6 +184,24 @@ const issued = await tokenRequest(metadata.token_endpoint, {
   redirect_uri: redirectUri,
   resource,
 });
+// Prove consent's initial token is usable, not only its refreshed replacement.
+// Consume the response without printing protocol payloads or credentials.
+const assertMcpToken = async (accessToken: string): Promise<void> => {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const response = await fetch(mcpUrl, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${accessToken}`, 'content-type': 'application/json',
+        accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: attempt + 1, method: 'tools/list', params: {} }),
+    });
+    const body = await response.text();
+    if (!response.ok || response.headers.has('www-authenticate') || !body.includes('"tools"')) {
+      throw new Error(`Issued OAuth token failed repeated MCP verification (HTTP ${response.status}).`);
+    }
+  }
+};
+await assertMcpToken(issued.access_token);
+
 // Clients refresh when the hour-long access token expires; the MCP calls use
 // the refreshed token so a broken refresh fails the smoke.
 const refreshed = await tokenRequest(metadata.token_endpoint, {
@@ -192,6 +210,8 @@ const refreshed = await tokenRequest(metadata.token_endpoint, {
   refresh_token: issued.refresh_token,
   resource,
 });
+
+await assertMcpToken(refreshed.access_token);
 
 process.stdout.write(JSON.stringify({
   accessToken: refreshed.access_token,

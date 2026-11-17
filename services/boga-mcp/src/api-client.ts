@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { diagnostic, requestContext } from './diagnostics.js';
 
 export type AgentSession = {
   access: 'training_read_only';
@@ -457,7 +458,8 @@ export class BogaAgentApi {
         if (value !== undefined) url.searchParams.set(key, String(value));
       }
     }
-    const requestId = randomUUID();
+    const requestId = requestContext.getStore()?.request_id ?? randomUUID();
+    const startedAt = performance.now();
     const abortController = new AbortController();
     const timeout = setTimeout(() => abortController.abort(), this.#timeoutMs);
 
@@ -484,6 +486,9 @@ export class BogaAgentApi {
         signal: abortController.signal,
       });
 
+      diagnostic('upstream.response', { upstream_request_id: requestId,
+        operation: relativePath === 'v1/agent/session' ? 'verify_session' : 'tool_api',
+        status: response.status, latency_ms: Math.round(performance.now() - startedAt) });
       try {
         payload = await response.json();
       } catch (bodyError) {
@@ -501,6 +506,9 @@ export class BogaAgentApi {
       if (error instanceof BogaAgentApiError) {
         throw error;
       }
+      diagnostic('upstream.failure', { upstream_request_id: requestId,
+        classification: abortController.signal.aborted ? 'timeout' : 'network_failure',
+        latency_ms: Math.round(performance.now() - startedAt) });
       const isAbort = abortController.signal.aborted ||
         (error instanceof Error && error.name === 'AbortError');
       const message = isAbort

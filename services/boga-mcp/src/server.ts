@@ -1,3 +1,4 @@
+import express from 'express';
 import type { Express, NextFunction, Request, Response } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
@@ -9,6 +10,7 @@ import type { OAuthMetadata } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { OAuthMetadataSchema } from '@modelcontextprotocol/sdk/shared/auth.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
+import { diagnostic, requestDiagnostics } from './diagnostics.js';
 import { BogaAgentApi } from './api-client.js';
 import { bogaBearerAuth } from './auth.js';
 import type { BogaMcpConfig } from './config.js';
@@ -79,13 +81,22 @@ export const createBogaMcpApp = async (
     timeoutMs: config.requestTimeoutMs,
   });
   const oauthMetadata = options.oauthMetadata ?? await loadOAuthMetadata(config);
-  const app = createMcpExpressApp({
+  const app = express();
+  app.use(requestDiagnostics);
+  const protocolApp = createMcpExpressApp({
     allowedHosts: config.allowedHosts,
     host: config.host,
   });
+  protocolApp.disable('x-powered-by');
+  app.use(protocolApp);
 
   const scopes = advertisedScopes(oauthMetadata);
 
+  diagnostic('oauth.configuration', { issuer: config.oauthIssuer.origin + config.oauthIssuer.pathname,
+    resource: config.resourceUrl.origin + config.resourceUrl.pathname, scopes,
+    refresh_grant_advertised: oauthMetadata.grant_types_supported?.includes('refresh_token') ?? false,
+    offline_access_advertised: scopes.includes(BOGA_OFFLINE_SCOPE),
+    token_endpoint_owner: 'supabase_auth', token_tags_enabled: Boolean(process.env.AUTH_DIAGNOSTIC_HMAC_KEY?.length && process.env.AUTH_DIAGNOSTIC_HMAC_KEY.length >= 32) });
   app.disable('x-powered-by');
   app.use(mcpAuthMetadataRouter({
     oauthMetadata,
@@ -129,8 +140,7 @@ export const createBogaMcpApp = async (
       await server.connect(transport);
       await transport.handleRequest(request, response, request.body);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown error';
-      console.error('[boga-mcp] request failed', { message });
+      diagnostic('mcp.failure', { classification: 'transport_failure' });
       if (!response.headersSent) {
         response.status(500).json({
           jsonrpc: '2.0',
@@ -148,8 +158,7 @@ export const createBogaMcpApp = async (
 
   app.use(
     (error: unknown, _request: Request, response: Response, _next: NextFunction) => {
-      const message = error instanceof Error ? error.message : 'invalid request';
-      console.error('[boga-mcp] transport rejected request', { message });
+      diagnostic('mcp.failure', { classification: 'invalid_request' });
       if (!response.headersSent) {
         response.status(400).json({
           error: {

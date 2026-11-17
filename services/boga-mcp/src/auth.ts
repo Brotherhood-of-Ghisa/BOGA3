@@ -4,6 +4,7 @@ import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 // Brings the SDK's `Request.auth` augmentation into scope.
 import type {} from '@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js';
 
+import { diagnostic, privateTag } from './diagnostics.js';
 import { BogaAgentApiError, type BogaAgentApi } from './api-client.js';
 
 export type BogaBearerAuthOptions = {
@@ -42,12 +43,24 @@ const verify = async (
   token: string,
 ): Promise<AuthInfo> => {
   let session;
+  const start = performance.now();
+  diagnostic('auth.verify.start', { token_tag: privateTag('token', token) });
   try {
     session = await api.verifySession(token);
   } catch (error) {
+    diagnostic('auth.verify.result', { result: 'failed',
+      classification: error instanceof BogaAgentApiError
+        ? error.status === 401 ? 'upstream_unauthorized' : error.status === 403 ? 'upstream_forbidden'
+          : isUpstreamUnavailable(error) ? 'upstream_unavailable' : 'upstream_error' : 'internal_error',
+      upstream_status: error instanceof BogaAgentApiError ? error.status : undefined,
+      latency_ms: Math.round(performance.now() - start) });
     if (isRejectedToken(error)) throw new InvalidTokenError('The access token is invalid or expired');
     throw error;
   }
+  diagnostic('auth.verify.result', { result: session.expires_at < Date.now() / 1000 ? 'expired' : 'accepted',
+    classification: session.expires_at < Date.now() / 1000 ? 'session_expired' : 'accepted',
+    client_tag: privateTag('client', session.client_id),
+    latency_ms: Math.round(performance.now() - start) });
   if (session.expires_at < Date.now() / 1000) {
     throw new InvalidTokenError('Token has expired');
   }
@@ -77,12 +90,14 @@ export const bogaBearerAuth = (options: BogaBearerAuthOptions): RequestHandler =
       request.auth = await verify(options.api, bearerToken(request));
     } catch (error) {
       if (error instanceof InvalidTokenError) {
+        diagnostic('auth.challenge', { classification: !request.headers.authorization ? 'missing_credentials'
+          : error.message.startsWith('Invalid Authorization') ? 'malformed_credentials'
+          : error.message === 'Token has expired' ? 'session_expired' : 'upstream_token_rejected', status: 401 });
         response.set('WWW-Authenticate', challenge(error));
         response.status(401).json(error.toResponseObject());
         return;
       }
-      const message = error instanceof Error ? error.message : 'unknown error';
-      console.error('[boga-mcp] token verification failed', { message });
+      diagnostic('auth.failure', { classification: isUpstreamUnavailable(error) ? 'upstream_unavailable' : 'internal_error' });
       if (isUpstreamUnavailable(error)) {
         response.set('Retry-After', String(UPSTREAM_RETRY_AFTER_SECONDS));
         response.status(503).json({
