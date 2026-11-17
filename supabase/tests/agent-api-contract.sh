@@ -448,6 +448,8 @@ require_command openssl
 
 load_supabase_status_env
 DB_CONTAINER="$(resolve_db_container)"
+# Service-role grant lookup ACLs and live consent transitions (transactional).
+docker exec -i "${DB_CONTAINER}" psql -U postgres -v ON_ERROR_STOP=1 -q < "${SCRIPT_DIR}/agent-active-oauth-grant.sql"
 AGENT_API_BASE="${API_URL}/functions/v1/agent-api/v1/agent"
 OAUTH_REDIRECT_URI="http://127.0.0.1:43123/callback"
 RUN_TAG="${AGENT_API_RUN_TAG:-$(date +%s)-$$-$RANDOM}"
@@ -549,6 +551,17 @@ echo "[agent-api-test] minting a real OAuth access token through PKCE + consent"
 mint_agent_token "${USER_A_EMAIL}" "${USER_A_PASSWORD}" "BoGa contract agent ${RUN_TAG}"
 [[ -n "${AGENT_ACCESS_TOKEN}" && -n "${AGENT_CLIENT_ID}" && -n "${APP_ACCESS_TOKEN}" ]] ||
   fail "OAuth fixture did not produce required credentials"
+
+echo "[agent-api-test] checking grant RPC isolation and repeated OAuth sessions"
+GRANT_CHECK_BODY="$(jq -nc --arg owner "${USER_A_UUID}" --arg client "${AGENT_CLIENT_ID}" '{p_owner:$owner,p_client_id:$client}')"
+for GRANT_CALLER in "${ANON_KEY}" "${APP_ACCESS_TOKEN}" "${AGENT_ACCESS_TOKEN}"; do
+  public_request POST "rpc/agent_active_oauth_grant" "${GRANT_CALLER}" "${GRANT_CHECK_BODY}"
+  assert_non_2xx "direct grant RPC access is server-only"
+done
+for _ in 1 2 3; do
+  agent_get "session"
+  assert_status "200" "repeated freshly-issued OAuth session"
+done
 
 echo "[agent-api-test] verifying profile privacy and user A exercise retrieval"
 agent_get "profile"

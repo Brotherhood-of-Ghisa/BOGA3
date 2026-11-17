@@ -11,7 +11,7 @@ Filter `service=boga-mcp` or `service=agent-api`, then `request_id`.
 Render generates a UUID for every HTTP request and returns `x-request-id`.
 Its async request context passes the same UUID to every Agent API call, including
 session verification and tool execution. Agent API propagates it to Auth user
-and grants requests; Auth/gateway logs may use their own IDs, so retention of the
+validation and the service-role grant RPC; Auth/gateway logs may use their own IDs, so retention of the
 supplied header there must be verified. Never assume correlation reaches the
 OAuth token endpoint: that endpoint belongs to Supabase Auth and is called by
 the client directly.
@@ -59,16 +59,16 @@ advertised refresh/offline support, not actual token issuance.
 | Edge user | auth_token_rejected | 401 |
 | Edge user | auth_user_unavailable | 503 |
 | Edge claims | malformed_validated_claims, oauth_client_missing, subject_mismatch, expiry_missing, token_expired | 401 |
-| Edge grants | grants_token_rejected | 401 |
 | Edge grants | grants_unavailable, grants_invalid_response | 503 |
-| Edge lookup | active_grant_absent, grant_client_mismatch, grant_timestamp_missing | 401 |
-| Edge grants | grants_unrecognized_shape | Observes existing normalization; may subsequently reject as absent |
+| Edge lookup | active_grant_absent | 401; no active owner/client consent or client deleted |
 | Edge lookup | active_grant_found | Continue existing authorization |
 
 Edge `auth.verify.result` records final outcome and total latency on both
 success and failure. `auth.user_response` records actual Auth HTTP status;
 `auth.user` records outcomes/latency and error status (null on success).
-`auth.grants_response` records grants status and latency; `http.response` records final status even when validation fails.
+`auth.grants_response` records service-role RPC status and latency with
+`verification_source=service_role_rpc`; RPC errors (including 401/403 from
+server credentials) are classified as unavailable, not invalid OAuth tokens; `http.response` records final status even when validation fails.
 `auth.token_observations` is explicitly **unverified**, bounded boolean/enum
 metadata (including a coarse issued-within-five-minutes observation) useful when Auth rejects a token before validated claims are available.
 `auth.claim_observations` follows successful Auth validation. Issuer/audience
@@ -96,7 +96,7 @@ Auth audit evidence. No local grant-expiry/revocation rule has been added.
 5. Validated-claim failures identify missing OAuth client, subject mismatch or
    expiry. Observed issuer/audience mismatch warrants checking Auth settings and
    discovery, without changing local validation based on these logs.
-6. Grant absence/mismatch/timestamp failure: compare client/grant tags across
+6. Active grant absence: compare client/grant tags across
    authorizations and inspect Auth grant audit events. BoGa consent delegates to
    Supabase approval and does not itself replace grants. Establish whether a
    repeat consent changed grant timestamps or revoked previous credentials.
@@ -116,8 +116,7 @@ Public production metadata observed on 2026-11-17 advertised resource
 This proves advertisement, not granted scopes or delivery to ChatGPT. The MCP
 adds offline_access only when issuer discovery supports it; consent accepts it
 and delegates issuance to Supabase. Review Auth token-endpoint events to prove
-issuance and usable refresh in production. No production root cause is yet
-established by repository inspection or public metadata.
+issuance and usable refresh in production. Public metadata alone does not establish a production root cause.
 
 Read-only production log queries on 2026-11-17 (rolling previous 24 hours)
 found 118 GET grant-list 403 responses with OAuth JWTs whose expiry was in the
@@ -134,6 +133,20 @@ then an MCP challenge. Per-request diagnostics and Auth audit evidence are still
 needed to explain the rejection and link it to a particular consent prompt.
 No credentials or user/client identifiers were selected by these queries.
 
+The 15:16 UTC reproduction on 2026-11-17 confirmed the failure on four
+correlated session requests: token issued within five minutes, future expiry,
+matching issuer/audience, Auth user validation 200, grant-list 403, then Agent API
+401. Auth logs classified all four as `no_authorization` with the specific
+restriction that OAuth client access tokens are not allowed on that endpoint.
+This is a server verification defect; the reconnect label is not proof of expiry.
+
+The correction replaces the grant-management call with the service-role-only
+`public.agent_active_oauth_grant` RPC. Its fully qualified lookup requires the
+validated owner/client pair, non-revoked consent and non-deleted client, returning
+only `granted_at`. It retains permission binding and fails closed. Apply its
+migration before deploying the corrected Edge Function; the existing Render
+build needs no change. An RPC failure produces 503 without demanding consent.
+
 The local `mcp-smoke` lane uses the consent frontend's
 `apps/agent-auth-web/scripts/mint-local-oauth.ts` harness: challenge/discovery, registration, consent,
 code exchange, three initial-token MCP requests, OAuth token-endpoint refresh,
@@ -145,7 +158,7 @@ actual handler branches with only Auth/data network boundaries replaced.
 Run `./boga test fast`, `./boga test backend`, and `./boga test mcp-smoke` from a
 leased checkout. Never run these against production to create diagnostic grants.
 
-## Validation recorded for this change
+## Diagnostics PR validation (before the grant-verification correction)
 
 Local Jest: 494 suites, 7,953 tests passed (three pre-existing skips); coverage
 88.54% branches and 95.79% lines. MCP: 95 tests and TypeScript build passed.
@@ -160,3 +173,27 @@ failed to register the Postgres image with `no space left on device` in the
 real OAuth `mcp-smoke` remain unverified here; rerun both in a disk-capable
 leased environment before treating real consent/refresh as validated. No
 production deployment or speculative authentication fix was performed.
+
+## Grant-verification correction validation
+
+The correction passed 47 focused handler/diagnostic/migration tests and the full
+coverage run: 494 suites, 7,961 tests (three skips), 88.54% branches and 95.79%
+lines. The first fast run hit an unrelated Today date-navigation assertion;
+that suite passed in isolation and the full coverage run passed afterward.
+Typecheck, complexity, dependency, documentation, MCP unit/build and UI
+guardrail gates passed. Repository meta-tests reported unrelated release-run
+status-file and orphan-process cleanup failures; those harness files are unchanged.
+
+The new transactional SQL regression passed on isolated PostgreSQL 17 with
+Auth-shaped fixture tables: service-only ACLs and guards, exact timestamp,
+owner/client mismatch, revoked consent, replacement timestamp and deleted client.
+It also runs inside the existing Agent API contract lane on a full Supabase
+stack. The handler tests use the real Supabase client for service-RPC headers,
+verify that an OAuth token is never sent to the grant-management endpoint, and
+check current-grant write binding and 503 behavior for RPC failures.
+
+Full local Supabase and real consent/refresh smoke remain unverified after the
+container disk-capacity failure documented above. Isolated SQL fixtures do not
+establish complete Supabase compatibility. Review and apply the migration,
+then deploy the Edge Function and repeat the hosted ChatGPT request to verify
+the actual fix; no production authentication correction has been deployed yet.

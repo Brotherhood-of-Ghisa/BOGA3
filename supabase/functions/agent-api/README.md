@@ -6,12 +6,15 @@ Authenticated Virtual Coach boundary. Public deployment prefix:
 https://<project>.supabase.co/functions/v1/agent-api
 ```
 
-Every route below validates the bearer token live with Supabase Auth, requires
-its OAuth `client_id` and an active matching grant, derives the owner from the
-validated subject, and performs an explicit owner-filtered read. The read routes
-accept `GET` only; the write routes accept `POST` (`PUT` for muscle targets, `PATCH`
-for plan mutations) and require their current-grant permission. GET bodies and caller identity
-fields (`user_id`, `userId`, `owner_user_id`) are rejected.
+Every route validates its bearer live with Supabase Auth and checks matching
+active consent using the service-only `public.agent_active_oauth_grant` RPC.
+The validated subject determines owner-filtered reads. Read routes accept `GET`;
+writes accept `POST` (`PUT` for muscle targets, `PATCH` for plan mutations) and
+require current-grant permission. GET bodies and caller identity fields
+(`user_id`, `userId`, `owner_user_id`) are rejected.
+
+For server verification and deployment order, load
+[OAuth diagnostics](../../../services/boga-mcp/AUTH-DIAGNOSTICS.md).
 
 Load [workout logging](../../../docs/specs/tech/agent-workout-contract.md) for
 active workouts, and [health activities](../../../docs/specs/tech/health-activities-contract.md)
