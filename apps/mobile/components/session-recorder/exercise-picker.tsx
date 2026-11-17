@@ -172,7 +172,12 @@ export function ExercisePicker({
     onSelectExercise(exerciseDefinitionId, exerciseName);
   };
 
+  // Only a real edit ends the preselection: iOS can report the unchanged text
+  // as a pick's Keyboard.dismiss() blurs the field, after the card is shown.
   const updateSearchValue = (value: string) => {
+    if (value === searchValue) {
+      return;
+    }
     clearPreselection();
     setSearchValue(value);
   };
