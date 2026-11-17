@@ -231,37 +231,6 @@ const decodeValidatedJwtPayload = (token: string): JsonObject => {
   }
 };
 
-const normalizeGrantRows = (value: unknown): JsonObject[] => {
-  if (Array.isArray(value)) {
-    return value.filter((entry): entry is JsonObject =>
-      typeof entry === 'object' && entry !== null
-    );
-  }
-  if (typeof value === 'object' && value !== null) {
-    const candidates = (value as JsonObject).grants;
-    if (Array.isArray(candidates)) {
-      return normalizeGrantRows(candidates);
-    }
-  }
-  return [];
-};
-
-const grantClientId = (grant: JsonObject): string | null => {
-  if (typeof grant.client_id === 'string') {
-    return grant.client_id;
-  }
-  if (typeof grant.client === 'object' && grant.client !== null) {
-    const id = (grant.client as JsonObject).id;
-    return typeof id === 'string' ? id : null;
-  }
-  return null;
-};
-
-const grantGrantedAt = (grant: JsonObject): string | null => {
-  const value = grant.granted_at;
-  return typeof value === 'string' && value.trim().length > 0 ? value : null;
-};
-
 const authUnavailable = (step: string, status: unknown): ApiError => {
   // The caller records the classified failure with its request context.
   return new ApiError(
@@ -304,39 +273,40 @@ const getValidatedUser = async (accessToken: string, trace: Trace, requestId: st
   return user;
 };
 
-const fetchActiveGrants = async (accessToken: string, trace: Trace, requestId: string): Promise<JsonObject[]> => {
+const fetchActiveGrant = async (
+  userId: string, clientId: string, trace: Trace, requestId: string,
+): Promise<string | null> => {
   const start = performance.now();
-  let response: Response;
+  let result;
   try {
-    response = await authUpstreamFetch(`${getSupabaseUrl()}/auth/v1/user/oauth/grants`, {
-      headers: {
-        'x-request-id': requestId,
-        apikey: getAnonKey(),
-        authorization: `Bearer ${accessToken}`,
-      },
-    });
+    const correlatedFetch: typeof fetch = (input, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set('x-request-id', requestId);
+      return authUpstreamFetch(input, { ...init, headers });
+    };
+    // This client has only server credentials. Never forward the OAuth bearer
+    // to the grant-management endpoint or to this service-only RPC.
+    result = await createServerClient(getServiceRoleKey(), correlatedFetch)
+      .rpc('agent_active_oauth_grant', { p_owner: userId, p_client_id: clientId });
   } catch {
-    trace('auth.grants', { latency_ms: Math.round(performance.now() - start), classification: 'grants_unavailable', upstream_status: null });
+    trace('auth.grants', { classification: 'grants_unavailable',
+      latency_ms: Math.round(performance.now() - start) });
     throw authUnavailable('grants', null);
   }
-  trace('auth.grants_response', { latency_ms: Math.round(performance.now() - start), upstream_status: response.status });
-  if (isTokenRejection(response.status)) {
-    trace('auth.grants', { latency_ms: Math.round(performance.now() - start), classification: 'grants_token_rejected' });
-    throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
+  trace('auth.grants_response', { upstream_status: result.status,
+    verification_source: 'service_role_rpc', latency_ms: Math.round(performance.now() - start) });
+  // A failed server-credential/database request says nothing about the OAuth
+  // token. Do not turn infrastructure or deployment failures into re-consent.
+  if (result.error) {
+    trace('auth.grants', { classification: 'grants_unavailable', upstream_status: result.status });
+    throw authUnavailable('grants', result.status);
   }
-  if (!response.ok) {
-    trace('auth.grants', { latency_ms: Math.round(performance.now() - start), classification: 'grants_unavailable', upstream_status: response.status });
-    throw authUnavailable('grants', response.status);
+  if (result.data === null) return null;
+  if (typeof result.data !== 'string' || !Number.isFinite(Date.parse(result.data))) {
+    trace('auth.grants', { classification: 'grants_invalid_response' });
+    throw authUnavailable('grants', result.status);
   }
-  try {
-    const payload = await response.json();
-    const shapeKnown = Array.isArray(payload) || (typeof payload === 'object' && payload !== null && Array.isArray(payload.grants));
-    if (!shapeKnown) trace('auth.grants', { classification: 'grants_unrecognized_shape' });
-    return normalizeGrantRows(payload);
-  } catch {
-    trace('auth.grants', { latency_ms: Math.round(performance.now() - start), classification: 'grants_invalid_response', upstream_status: response.status });
-    throw authUnavailable('grants', response.status);
-  }
+  return result.data;
 };
 
 const authenticateAgentInner = async (request: Request, requestId: string): Promise<AuthenticatedAgent> => {
@@ -382,15 +352,12 @@ const authenticateAgentInner = async (request: Request, requestId: string): Prom
     throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
   }
 
-  const grants = await fetchActiveGrants(accessToken, trace, requestId);
-  const matchedGrant = grants.find((grant) => grantClientId(grant) === clientId);
-  const grantedAt = matchedGrant ? grantGrantedAt(matchedGrant) : null;
-  trace('auth.grant_lookup', { classification: !matchedGrant ? grants.length ? 'grant_client_mismatch' : 'active_grant_absent'
-    : !grantedAt ? 'grant_timestamp_missing' : 'active_grant_found',
+  const grantedAt = await fetchActiveGrant(user.id, clientId, trace, requestId);
+  trace('auth.grant_lookup', { classification: grantedAt ? 'active_grant_found' : 'active_grant_absent',
+    verification_source: 'service_role_rpc',
     client_tag: await privateTag(Deno.env.get('AUTH_DIAGNOSTIC_HMAC_KEY'), 'client', clientId),
     grant_tag: grantedAt ? await privateTag(Deno.env.get('AUTH_DIAGNOSTIC_HMAC_KEY'), 'grant', `${clientId}:${grantedAt}`) : undefined,
-    // Absence in the active list cannot distinguish revocation, expiry or no consent.
-    absent_cause: !matchedGrant ? 'requires_auth_audit_evidence' : undefined });
+    absent_cause: !grantedAt ? 'requires_auth_audit_evidence' : undefined });
   if (!grantedAt) {
     throw new ApiError(401, 'UNAUTHORIZED', 'Agent authorization required.');
   }
