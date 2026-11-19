@@ -7,7 +7,8 @@ Delete this task and its mocks in the PR that implements or abandons it.
 
 Log a hold as one manually entered duration, with optional weight, in the
 existing exercise and workout flow. Plank and Hollow Hold are the demo exercises.
-Use the existing Effort selector and explicit set confirmation.
+Use the existing editable Effort selector, default new holds to RIR-0, and
+retain explicit set confirmation.
 
 Context: [discussion](https://github.com/Brotherhood-of-Ghisa/BOGA3/discussions/1238).
 The operator's subsequent decisions below supersede conflicting suggestions in
@@ -21,10 +22,17 @@ have neither Volume nor 1RM.
   separately from repetitions; reject a performed set containing both. Blank
   Weight follows the existing zero-load convention. No repetitions are entered
   or fabricated for holds.
-- Effort logging and its selections remain unchanged, including RIR. Normal
-  eligibility applies: a qualifying confirmed hold is one physical working set,
-  with the existing primary/secondary muscle attribution, weekly targets and
-  counted-session rules. Planned, invalid and unchecked rows do not count.
+- New hold rows default to `rir_0` (RIR-0) when no Effort is explicitly supplied.
+  Keep the existing Effort selector editable and preserve supplied/saved values,
+  including explicitly chosen Unspecified; this is a creation default, not a
+  read-time replacement or a history rewrite. Repetition-set defaults stay unchanged.
+- Normal Effort eligibility applies: holds count by default, not unconditionally.
+  A qualifying confirmed hold is one physical working set with the existing
+  primary/secondary muscle attribution, weekly targets and counted-session rules.
+  Choosing Warm-up, Technique, Cooldown or Rehab follows normal exclusions;
+  a personal policy excluding RIR-0 excludes RIR-0 holds too. Planned, invalid
+  and unchecked rows do not count. Defaulting Effort does not confirm performance
+  or establish that the hold was taken to failure.
 - No hold contributes Volume, estimated 1RM, their PRs, RM-curve observations
   or strength-board scores, including when bodyweight calculations are enabled.
   Keep entered Weight visible in personal views; group projections retain
@@ -51,14 +59,16 @@ Target: the attached editor and session-logger mocks, derived from the existing
 React Native screens and the repository's design language; these are mock
 screens, not screenshots of an implemented feature.
 
-Human agreement: **approved on 2026-11-19**. The operator replied "Agreed" in
-Codex after reviewing the editor and session logger with the Plank/Hollow Hold
-demo selector. Later material changes to either screen require renewed review.
+Human agreement: **approved on 2026-11-19**. The operator approved the editor
+and session logger with the Plank/Hollow Hold demo selector, then agreed to
+RIR-0 as the default while keeping Effort editable and normal counting rules.
+The approved composition is unchanged; the mock's initial/new-row Effort is
+now RIR-0. Later material changes to either screen require renewed review.
 
 Approved preview source SHA-256:
-`ff5a8e3912e4139b3719b8f0fa17d69c27a659e600f806a59680eabe6e2ee5c4`.
+`2114a58d1f66159ed90094c87c6f293bd8e8b9b4bff5e9bf53de173bf44e2878`.
 Standalone export SHA-256:
-`ac16607975febe188ed8afdb029a41885126303038a7ebf82e54cdd1bdd75d36`.
+`c1270fe0330f57b27ea5e79761518655aeb20bfe96843f9f44b626d5e1e6bf55`.
 
 Mock source: [editable preview](manual-holds-mock.html).
 The standalone preview contains both screens and both demo exercises. Its
@@ -71,8 +81,9 @@ rendering or device behavior; those remain implementation acceptance work.
   mode is Hold in both demos. Reuse `FormSection` and `SegmentedControl` rather
   than creating a new control family.
 - Logger: adapt the existing in-place row logger and confirmation pattern:
-  Effort, Weight, Time (s), commit. Show recorded duration with `s` in closed
-  rows; leave out 1RM/Volume columns, previews and hold record panels entirely.
+  editable Effort (default RIR-0), Weight, Time (s), commit. Show recorded duration
+  with `s` in closed rows; leave out 1RM/Volume columns, previews and hold record
+  panels entirely.
   Preserve independent row editing and confirmation, keyboard access, accessible
   labels, minimum tap targets and visible disabled/invalid states.
 - Approval covers the composition and the proposed field labels, with both
@@ -127,14 +138,20 @@ owners instead of leaving the decisions only in this ephemeral task:
 - Change `[[set.row-figures]]` for duration rows and `[[planner.block-completion]]`
   only where timed prefills require clarification; preserve the existing rule.
 - Record exercise recording-mode/history meaning and the hold duration wording
-  in the owning exercise/copy facts where needed. Apply `[[muscle.set-count]]`
-  unchanged to qualifying holds; update the training-metrics and sync contracts
+  in the owning exercise/copy facts where needed, including the hold-only RIR-0
+  creation default and its normal Effort-policy eligibility. Apply
+  `[[muscle.set-count]]` unchanged to qualifying holds; update the training-metrics and sync contracts
   for the new representation and eligibility boundary.
 
 ## Acceptance and verification
 
 - Manually record and confirm Plank at zero external load and Hollow Hold with
-  positive Weight; change Effort using the normal selector. Reopen/edit both.
+  positive Weight. New hold rows start at RIR-0; change Effort using the normal
+  selector and reopen/edit both without resetting saved values. Explicit plan,
+  routine and coaching Effort values remain intact; absent values default to RIR-0.
+- Verify normal Effort exclusions and a custom personal policy excluding RIR-0:
+  the matching confirmed holds add no working-set/muscle/session credit. With
+  the default policy they count normally. Repetition-set defaults are unchanged.
 - A plan/routine suggests 45 seconds, the person logs/confirms 38, and the block
   resolves from confirmed source work. No retained target comparison or failure
   marker appears. A new routine use starts unchecked.
