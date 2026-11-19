@@ -17,6 +17,50 @@ const account = async (id: string | null = 'A', configured = true) => {
 const values = () => getAccountLocalPreferenceState().values;
 afterEach(() => jest.restoreAllMocks());
 
+it.each([4, 7] as const)('persists %s Recovery days across relaunch with separate account and local choices', async recoveryDays => {
+  await account();
+  expect(values().recoveryDays).toBe(4);
+  setAccountLocalPreferences({ recoveryDays });
+  expect(Storage.getItemSync(preferenceKey('account:A', 'recoveryDays'))).toBe(String(recoveryDays));
+  __resetAccountLocalPreferencesForTests();
+  await account();
+  expect(values().recoveryDays).toBe(recoveryDays);
+  await account('B');
+  expect(values().recoveryDays).toBe(4);
+  await account(null, false);
+  expect(values().recoveryDays).toBe(4);
+  setAccountLocalPreferences({ recoveryDays: 7 });
+  await account('A');
+  expect(values().recoveryDays).toBe(recoveryDays);
+  await account(null, false);
+  expect(values().recoveryDays).toBe(7);
+});
+
+it.each([null, '3', '6', '8', '0', '7.5', '"7"', 'null', 'true', 'garbage'])(
+  'defaults missing/invalid Recovery storage %s to four without overwriting it', async raw => {
+    const key = preferenceKey('account:A', 'recoveryDays');
+    if (raw !== null) Storage.setItemSync(key, raw);
+    await account();
+    expect(values().recoveryDays).toBe(4);
+    expect(Storage.getItemSync(key)).toBe(raw);
+    setAccountLocalPreferences({ recoveryDays: 6 as never });
+    expect(getAccountLocalPreferenceState().error).toBe(preferenceValidationMessages.recoveryDays);
+    expect(values().recoveryDays).toBe(4);
+  },
+);
+
+it('keeps the saved Recovery period on write failure and retries the pending choice', async () => {
+  await account();
+  const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
+  setAccountLocalPreferences({ recoveryDays: 7 });
+  expect(values().recoveryDays).toBe(4);
+  expect(getAccountLocalPreferenceState()).toMatchObject({ pending: { recoveryDays: 7 }, error: expect.stringMatching(/could not be saved/) });
+  write.mockRestore();
+  await retryAccountLocalPreferences();
+  expect(values().recoveryDays).toBe(7);
+  expect(getAccountLocalPreferenceState().error).toBeNull();
+});
+
 it('extends existing scoped browsing choices and restores all five settings after relaunch', async () => {
   Storage.setItemSync(preferenceKey('account:A', 'dateFormat'), 'MM-DD-YYYY');
   await account();

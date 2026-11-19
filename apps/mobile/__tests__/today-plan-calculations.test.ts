@@ -24,6 +24,24 @@ const TARGETS = { weeklyTarget: 8, overrides: {} };
 const muscle = (id: string, sortOrder: number) => ({ id, displayName: id[0].toUpperCase() + id.slice(1), familyName: 'F', sortOrder });
 
 describe('todayPlanWindow', () => {
+  it.each([
+    [local(2026, 3, 31, 14), [25, 26, 27, 28, 29, 30], 167],
+    [local(2026, 10, 27, 14), [21, 22, 23, 24, 25, 26], 169],
+    [local(2027, 1, 2, 14), [27, 28, 29, 30, 31, 1], 168],
+  ])('covers exactly seven local calendar days across DST/month/year boundaries at %s', (now, dates, hours) => {
+    const extended = todayPlanWindow(now as Date, 7);
+    expect(extended.recoveryDays.map(day => day.getDate())).toEqual(dates);
+    expect(extended.recoveryDays.map(day => day.getHours())).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(extended.recoveryDays.every(day => day < extended.today)).toBe(true);
+    expect((extended.read.end.getTime() - extended.read.start.getTime()) / 3_600_000).toBe(hours);
+    expect(extended.week).toEqual(todayPlanWindow(now as Date, 4).week);
+  });
+
+  it('reads the full week even when four displayed days start after Monday', () => {
+    const sunday = local(2026, 11, 1, 12);
+    expect(todayPlanWindow(sunday).read).toEqual(todayPlanWindow(sunday, 7).read);
+    expect(todayPlanWindow(sunday).read.start).toEqual(local(2026, 10, 26));
+  });
   it('covers the three days before today, this calendar week and today', () => {
     expect(window.recoveryDays).toEqual([local(2026, 10, 28), local(2026, 10, 29), local(2026, 10, 30)]);
     expect(window.week).toEqual({ start: local(2026, 10, 26), end: local(2026, 11, 2) });
@@ -45,6 +63,19 @@ describe('todayPlanWindow', () => {
 });
 
 describe('deriveRecoveryRows', () => {
+  it('extends only daily figures and the recent-work tie-break, preserving weekly totals and targets', () => {
+    const daily: MuscleDailySets = {
+      muscles: [muscle('a', 1), muscle('b', 2)],
+      sets: { a: { '2026-10-25': 2.5, '2026-10-30': 1 }, b: { '2026-10-30': 1 } }, sessionDays: [],
+    };
+    const short = deriveRecoveryRows(daily, window, TARGETS);
+    const long = deriveRecoveryRows(daily, todayPlanWindow(NOW, 7), TARGETS);
+    expect(short.map(row => row.muscleGroupId)).toEqual(['a', 'b']);
+    expect(long.map(row => row.muscleGroupId)).toEqual(['b', 'a']);
+    expect(long.find(row => row.muscleGroupId === 'a')).toMatchObject({ days: [2.5, null, null, null, null, 1], weekSets: 1, target: 8 });
+    expect(long.map(({ weekSets, target }) => ({ weekSets, target }))).toEqual(short.map(({ weekSets, target }) => ({ weekSets, target })));
+    expect(groupRecoveryRows(long)[0]).toMatchObject({ days: [2.5, 0, 0, 0, 0, 2], weekSets: 2, today: 0 });
+  });
   const daily: MuscleDailySets = {
     muscles: [muscle('chest', 1), muscle('back', 2), muscle('biceps', 3), muscle('quads', 4), muscle('calves', 5)],
     sets: {

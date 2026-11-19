@@ -62,6 +62,10 @@ function SettingsScreen() {
           divider icon="progress" label="Progress" route={SETTINGS_SUB_PAGES.progress} testID="settings-progress-row"
           value={progressStatus(values)}
         />
+        <DestinationRow
+          divider icon="refresh" label="Recovery" route={SETTINGS_SUB_PAGES.recovery} testID="settings-recovery-row"
+          value={`${preferences.values.recoveryDays} days`}
+        />
       </FormSection>
       <FormSection title="App">
         <AppearanceSettingsRow />

@@ -43,7 +43,7 @@ export type TodayPlan = {
   next: NextPlannedSession[];
 };
 
-export type TodayPlanOptions = RecoveryTargets & { countSecondary: boolean };
+export type TodayPlanOptions = RecoveryTargets & { countSecondary: boolean; recoveryDays?: 4 | 7 };
 
 export type TodayPlanDependencies = {
   computeMuscleDailySets: (options: ComputeMuscleDailySetsOptions) => Promise<MuscleDailySets>;
@@ -93,7 +93,7 @@ export const createTodayPlanRepository = (
   dependencies: TodayPlanDependencies = { computeMuscleDailySets: defaultComputeMuscleDailySets, planQueries: defaultPlanQueries, loadCatalog },
 ) => ({
   async loadTodayPlan(now: Date, options: TodayPlanOptions): Promise<TodayPlan> {
-    const window = todayPlanWindow(now);
+    const window = todayPlanWindow(now, options.recoveryDays);
     const [daily, upcoming] = await Promise.all([
       // The workout in progress counts today (§2).
       dependencies.computeMuscleDailySets({ ...window.read, now, countSecondary: options.countSecondary }),

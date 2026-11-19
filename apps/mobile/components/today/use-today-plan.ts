@@ -26,14 +26,14 @@ const systemNow = () => new Date();
 
 /**
  * The Plan page's read, again on every focus, at local midnight, on return to
- * the foreground and when a weekly target or the secondary-set default changes.
+ * the foreground and when Recovery days, a weekly target or the secondary-set default changes.
  * Per-muscle targets ([[muscle.weekly-targets]]) wait for the catalogue, which
  * holds the muscle setup whose reported ids they are keyed by.
  * The first read shows loading; a re-read keeps the page until it lands.
  */
 export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow }: UseTodayPlanInput) {
   const { accountRevision: context, values } = useAccountLocalPreferenceState();
-  const { weeklyWorkingSetTarget: weeklyTarget, progressCountSecondary: countSecondary } = values;
+  const { weeklyWorkingSetTarget: weeklyTarget, progressCountSecondary: countSecondary, recoveryDays } = values;
   const catalog = useExerciseCatalog();
   const calculationRevision = useBodyWeightContextRevision();
   const calculationInputs = [calculationRevision, catalog.exercises, catalog.muscleGroups] as const;
@@ -56,7 +56,7 @@ export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow 
     const generation = generationRef.current + 1;
     generationRef.current = generation;
     const isCurrent = () => generationRef.current === generation;
-    return loadRef.current(nowRef.current(), { weeklyTarget, overrides: JSON.parse(overridesKey) as Record<string, number>, countSecondary }).then(
+    return loadRef.current(nowRef.current(), { weeklyTarget, overrides: JSON.parse(overridesKey) as Record<string, number>, countSecondary, recoveryDays }).then(
       (plan) => {
         if (isCurrent()) setResult({ context, state: { status: 'loaded', plan } });
       },
@@ -66,7 +66,7 @@ export function useTodayPlan({ isFocused, load = loadTodayPlan, now = systemNow 
         }
       },
     );
-  }, [context, weeklyTarget, overridesKey, countSecondary]);
+  }, [context, weeklyTarget, overridesKey, countSecondary, recoveryDays]);
 
   const readNow = useCallback(() => {
     if (targetsReady) void read();

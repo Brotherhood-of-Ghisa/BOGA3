@@ -51,6 +51,7 @@ export type AccountLocalPreferences = {
   progressMuscleLayout: ProgressMuscleLayout;
   progressMetric: ProgressMetric;
   todayProgressMetric: ProgressMetric;
+  recoveryDays: 4 | 7;
   progressExerciseMetric: ProgressExerciseMetric;
   restTimerAutoStart: boolean;
   restTimerDurationSec: number;
@@ -86,6 +87,7 @@ export const DEFAULT_ACCOUNT_LOCAL_PREFERENCES: AccountLocalPreferences = {
   progressMuscleLayout: 'list',
   progressMetric: 'workingSetCount',
   todayProgressMetric: 'workingSetCount',
+  recoveryDays: 4,
   progressExerciseMetric: 'workingSetCount',
   restTimerAutoStart: true,
   restTimerDurationSec: DEFAULT_REST_TIMER_SECONDS,
@@ -132,6 +134,7 @@ export const preferenceValidationMessages: Record<keyof AccountLocalPreferences,
   progressMuscleLayout: 'Choose List or 3D for Progress muscles.',
   progressMetric: 'Choose Sets or Volume for Progress.',
   todayProgressMetric: 'Choose Sets or Tons for Today.',
+  recoveryDays: 'Choose 4 or 7 Recovery days.',
   progressExerciseMetric: 'Choose Sets, Volume or 1RM for Progress.',
   restTimerAutoStart: 'Choose whether to start the rest timer automatically.',
   restTimerDurationSec: REST_TIMER_RANGE_MESSAGE,
@@ -165,6 +168,7 @@ export function isPreferenceValue<K extends keyof AccountLocalPreferences>(
     case 'heatmapView': return value === 'daily' || value === 'weekly' || value === 'timeline';
     case 'progressBreakdown': return value === 'exercise' || value === 'muscle';
     case 'progressPeriod': return value === 'window' || value === 'this-week';
+    case 'recoveryDays': return value === 4 || value === 7;
     case 'progressMuscleLayout': return value === 'list' || value === '3d';
     case 'todayProgressMetric':
     case 'progressMetric': return value === 'workingSetCount' || value === 'totalVolume';

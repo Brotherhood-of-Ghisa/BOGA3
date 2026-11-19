@@ -1,7 +1,7 @@
-// Today's Plan page, derived: each muscle's sets over the last three days,
+// Today's Plan page, derived: each muscle's sets over the selected Recovery days,
 // today and this week, the week's trained and planned days, and the next planned
-// sessions. Pure — the repository reads, this decides. The three days are a
-// fixed period of their own ([[comparison.allowed-periods]]); the week is
+// sessions. Pure — the repository reads, this decides. Recovery has a
+// period of its own ([[comparison.allowed-periods]]); the week is
 // [[comparison.window]]'s.
 
 import { sumNumbers } from '../utils/sum.ts';
@@ -9,13 +9,11 @@ import type { MuscleDailySets } from '../data/muscle-daily-sets.ts';
 import { localDateKey } from '../utils/calendar-weeks.ts';
 import { localWeekWindow, startOfLocalDay, type LocalWindow } from '../utils/local-calendar.ts';
 
-/** The days before today a muscle's recent sets cover. */
-export const RECOVERY_DAYS = 3;
 /** The most planned sessions the page lists. */
 export const NEXT_PLANNED_LIMIT = 3;
 
 export type TodayPlanWindow = {
-  /** The last three local days before today, oldest first (each its 00:00). */
+  /** The three or six local days before today, oldest first (each its 00:00). */
   recoveryDays: Date[];
   /** This calendar week ([[comparison.window]]). */
   week: LocalWindow;
@@ -25,9 +23,10 @@ export type TodayPlanWindow = {
   read: LocalWindow;
 };
 
-export const todayPlanWindow = (now: Date): TodayPlanWindow => {
+export const todayPlanWindow = (now: Date, displayedDays: 4 | 7 = 4): TodayPlanWindow => {
   const today = startOfLocalDay(now);
-  const recoveryDays = Array.from({ length: RECOVERY_DAYS }, (_, index) => startOfLocalDay(now, index - RECOVERY_DAYS));
+  const previousDays = displayedDays - 1;
+  const recoveryDays = Array.from({ length: previousDays }, (_, index) => startOfLocalDay(now, index - previousDays));
   const week = localWeekWindow(now);
   const start = recoveryDays[0] < week.start ? recoveryDays[0] : week.start;
   return { recoveryDays, week, today, read: { start, end: startOfLocalDay(now, 1) } };

@@ -24,6 +24,7 @@ export const plannerHref = (): Href => PLANNER_ROUTE as Href;
 export const SETTINGS_SUB_PAGES = {
   restTimer: '/settings-rest-timer',
   progress: '/settings-progress',
+  recovery: '/settings-recovery',
   muscles: '/settings-muscles',
   muscleTargets: '/settings-muscle-targets',
   muscleList: '/settings-muscle-list',
