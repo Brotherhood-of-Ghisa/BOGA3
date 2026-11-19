@@ -16,6 +16,7 @@ export type PlanExercisePick = {
   id: string;
   name: string;
   loadInputMode: 'total_load' | 'per_side_load';
+  recordingMode?: 'reps' | 'hold';
 };
 
 export type PlanExercisePickResult = {
@@ -125,6 +126,7 @@ export function PlanExercisePickSheet({ request, onPick, onDismiss, gymId = null
         id: exercise.id,
         name: exercise.name,
         loadInputMode: exercise.loadInputMode ?? 'total_load',
+        ...(exercise.recordingMode === 'hold' ? { recordingMode: exercise.recordingMode } : {}),
       },
       suggestion,
     });

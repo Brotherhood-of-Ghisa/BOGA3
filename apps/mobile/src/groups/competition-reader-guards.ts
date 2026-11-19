@@ -102,10 +102,13 @@ export function isCompetitionHistoryWire(v: unknown): v is CompetitionHistoryWir
 }
 function sessionSet(v: unknown, normalized: boolean): boolean {
   const fields = ['set_id','order_index','reps_value','set_type','performance_status'];
+  const timed = v !== null && typeof v === 'object' && Object.hasOwn(v, 'recording_mode');
+  if (timed) fields.push('recording_mode', 'duration_sec', 'performed');
   const extended = normalized && v !== null && typeof v === 'object' && Object.hasOwn(v, 'normalized_metrics');
   return exact(v,normalized ? [...fields, ...(extended ? ['normalized_metrics'] : [])] : [...fields,'weight_value']) &&
     (!extended || isNormalizedSetMetrics(v.normalized_metrics)) && id(v.set_id) && count(v.order_index) && text(v.reps_value) &&
-    nullableText(v.set_type) && nullableText(v.performance_status) && (normalized || text(v.weight_value));
+    nullableText(v.set_type) && nullableText(v.performance_status) && (normalized || text(v.weight_value)) &&
+    (!timed || (['reps','hold'].includes(String(v.recording_mode)) && nullableInteger(v.duration_sec) && typeof v.performed === 'boolean'));
 }
 function sessionExercise(v: unknown): boolean {
   return exact(v,['session_exercise_id','exercise_definition_id','load_input_mode','name','machine_name','order_index','visibility','sets']) &&

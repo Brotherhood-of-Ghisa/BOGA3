@@ -36,6 +36,8 @@ export type ExerciseBlockHistorySetRow = {
   sessionExerciseId: string;
   orderIndex: number;
   weightValue: string;
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   repsValue: string;
   setType: string | null;
   performanceStatus?: SessionSetPerformanceStatus;
@@ -62,6 +64,8 @@ export type ExerciseBlockHistorySuggestedSet = {
   setId: string;
   sessionExerciseId: string;
   weightValue: string;
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   repsValue: string;
   setType: string | null;
 };
@@ -189,6 +193,7 @@ const computeDaysAgo = (completedAt: Date, now: Date): number => {
 
 const isValidSuggestedPlanSet = (row: ExerciseBlockHistorySetRow): boolean =>
   isConfirmedPerformedSet({
+    ...row,
     reps: row.repsValue,
     weight: row.weightValue,
     performanceStatus: row.performanceStatus,
@@ -216,6 +221,7 @@ export const aggregateExerciseBlockHistory = (
       .flatMap((row) => input.setsBySessionExerciseId[row.sessionExerciseId] ?? [])
       .filter((set) =>
         isConfirmedPerformedSet({
+          ...set,
           reps: set.repsValue,
           weight: set.weightValue,
           performanceStatus: set.performanceStatus,
@@ -227,12 +233,13 @@ export const aggregateExerciseBlockHistory = (
     // Every aggregate reads working sets (the 1RM and top weight are the PR
     // baseline); a session that does not count for the exercise is no block.
     const readSet = (row: ExerciseBlockHistorySetRow) => ({
+      ...row,
       weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
     });
     if (!isCountedSession(setRows, readSet, session.loadContext?.effortPolicy)) continue;
     const workingRows = setRows.filter((row) => isWorkingSet(readSet(row), session.loadContext?.effortPolicy));
     const summary = summarizeExerciseLoad(
-      setRows.map((row) => ({ weightValue: row.weightValue, repsValue: row.repsValue, setType: row.setType })),
+      setRows.map((row) => ({ ...row, weightValue: row.weightValue, repsValue: row.repsValue, setType: row.setType })),
       session.loadContext ?? ordinaryLoadContext(),
     );
 
@@ -282,6 +289,8 @@ export const selectSuggestedExercisePlanFromHistory = (input: {
           setId: set.setId,
           sessionExerciseId: set.sessionExerciseId,
           weightValue: set.weightValue,
+          recordingMode: set.recordingMode,
+          durationSec: set.durationSec,
           repsValue: set.repsValue,
           setType: normalizeSessionSetType(set.setType),
         }))
@@ -404,6 +413,8 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
         sessionExerciseId: exerciseSets.sessionExerciseId,
         orderIndex: exerciseSets.orderIndex,
         weightValue: exerciseSets.weightValue,
+        recordingMode: exerciseSets.recordingMode,
+        durationSec: exerciseSets.durationSec,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
         performanceStatus: exerciseSets.performanceStatus,
@@ -424,6 +435,8 @@ export const createDrizzleExerciseBlockHistoryStore = (): ExerciseBlockHistorySt
       sessionExerciseId: row.sessionExerciseId,
       orderIndex: row.orderIndex,
       weightValue: row.weightValue,
+      recordingMode: row.recordingMode,
+      durationSec: row.durationSec,
       repsValue: row.repsValue,
       setType: row.setType ?? null,
       performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),

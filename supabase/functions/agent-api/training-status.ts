@@ -189,6 +189,7 @@ export const statusMuscleInput = (
   })),
   exerciseSets: training.sets.map((set) => ({
     id: set.id, sessionExerciseId: set.session_exercise_id, orderIndex: set.order_index,
+    recordingMode: set.recording_mode, durationSec: set.duration_sec,
     setType: set.set_type, weightValue: set.weight_value, repsValue: set.reps_value,
     performanceStatus: set.performance_status as SessionSetPerformanceStatus,
   })),

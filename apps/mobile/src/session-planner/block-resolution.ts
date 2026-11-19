@@ -37,6 +37,7 @@ const confirmedSourceDerivedSets = async (
       set.sourcePlanSetId !== null &&
       blockSetIds.has(set.sourcePlanSetId) &&
       isConfirmedPerformedSet({
+              ...set,
         reps: set.repsValue,
         weight: set.weightValue,
         performanceStatus: (set.performanceStatus as never) ?? null,

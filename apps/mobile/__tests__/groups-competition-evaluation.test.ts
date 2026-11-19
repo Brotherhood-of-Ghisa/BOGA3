@@ -127,3 +127,12 @@ it('fails whole publication on unsupported rules, incomplete sources, missing pi
   expect(() => evaluate({ counting: undefined } as unknown as CompetitionSourceSet)).toThrow('eligibility');
   expect(() => evaluate({ set_type: undefined } as unknown as CompetitionSourceSet)).toThrow('set type');
 });
+
+
+it('publishes no strength or certification candidate for a hold, even with malformed reps', () => {
+  for (const reps_value of ['', '5']) {
+    const hold = { ...source, recording_mode: 'hold' as const, duration_sec: 38, reps_value };
+    Object.defineProperty(hold, 'body_weight_kg', { get: () => { throw new Error('private lookup'); } });
+    expect(evaluateCompetitionGraph({ ...graph, sets: [hold] }).scores).toEqual([]);
+  }
+});

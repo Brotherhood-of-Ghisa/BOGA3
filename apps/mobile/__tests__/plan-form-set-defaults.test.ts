@@ -71,3 +71,14 @@ describe('Add set(s)', () => {
     expect(addPlanFormSets(empty, '1')).toBe(empty);
   });
 });
+
+
+it('edits and copies one hold duration without fabricating reps or resetting explicit effort', () => {
+  const hold = { ...exercise, recordingMode: 'hold' as const };
+  const empty = planFormBlockFromEmptySet(hold);
+  expect(empty.sets[0]).toMatchObject({ recordingMode: 'hold', targetRepsText: '', targetDurationText: '', targetSetType: 'rir_0' });
+  const suggested = planFormBlockFromSuggestion(hold, [{ recordingMode: 'hold', durationSec: 45,
+    weightValue: '5', repsValue: '', setType: null }]);
+  expect(suggested.sets[0]).toMatchObject({ recordingMode: 'hold', targetDurationText: '45', targetRepsText: '', targetSetType: null });
+  expect(addPlanFormSets(suggested.sets, '1')[1]).toEqual({ ...suggested.sets[0], id: expect.any(String) });
+});

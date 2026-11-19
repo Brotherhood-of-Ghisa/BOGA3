@@ -12,7 +12,7 @@ import {
   type SessionViewSetRow,
 } from './session-view-model';
 import {
-  canonicalizeWeightForReps, isConfirmedPerformedSet, isWorkingSet, isVolumeSet, type SessionSetPerformanceStatus,
+  canonicalizeSetValues, isConfirmedPerformedSet, isWorkingSet, isVolumeSet, type SessionSetPerformanceStatus,
 } from '@/src/exercise-calculations/set-semantics';
 
 /**
@@ -24,6 +24,8 @@ import {
  */
 
 export type CompletedSessionDetailSetInput = {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   id: string;
   weight: string;
   reps: string;
@@ -57,12 +59,12 @@ export type CompletedSessionDetailModel = {
 };
 
 const performedFigures = (set: CompletedSessionDetailSetInput) => {
-  if (!isConfirmedPerformedSet({ weight: set.weight, reps: set.reps, performanceStatus: set.performanceStatus })) {
+  if (!isConfirmedPerformedSet(set)) {
     return null;
   }
-  const weight = parseSetWeight(canonicalizeWeightForReps(set.weight, set.reps));
+  const weight = parseSetWeight(canonicalizeSetValues(set).weight);
   const reps = parseSetReps(set.reps);
-  return weight === null || reps === null ? null : { weight, reps };
+  return weight === null ? null : { weight, reps };
 };
 
 // The volume-included performed sets of every exercise, as metrics. Shared by
@@ -73,9 +75,11 @@ const volumeMetrics = (exercises: CompletedSessionDetailExerciseInput[]): SetMet
       .filter((set) => performedFigures(set) !== null && isVolumeSet(set, exercise.loadContext?.effortPolicy))
       .map((set) =>
         calculateAnalyticsSetMetrics({
+          ...set,
           ...(exercise.loadContext ?? ordinaryLoadContext()),
           weightValue: set.weight,
           repsValue: set.reps,
+          setType: typeof set.setType === 'string' ? set.setType : null,
           performanceStatus: set.performanceStatus,
         })
       )
@@ -86,8 +90,12 @@ const volumeMetrics = (exercises: CompletedSessionDetailExerciseInput[]): SetMet
  * formatted once (`training-metrics-contract.md` §4). The completion summary
  * shows this without building the whole detail model.
  */
-export const sessionVolumeFigure = (exercises: CompletedSessionDetailExerciseInput[]): string =>
-  formatVolumeFigure(sumVolume(volumeMetrics(exercises)));
+export const sessionVolumeFigure = (exercises: CompletedSessionDetailExerciseInput[]): string => {
+  const sets = exercises.flatMap(exercise => exercise.sets);
+  const holdOnly = sets.some(set => set.recordingMode === 'hold') &&
+    !sets.some(set => set.recordingMode !== 'hold' && isConfirmedPerformedSet(set));
+  return formatVolumeFigure(holdOnly ? null : sumVolume(volumeMetrics(exercises)));
+};
 
 const toInsightExercises = (exercises: CompletedSessionDetailExerciseInput[]): SessionInsightExerciseInput[] =>
   exercises.map((exercise, exerciseIndex) => ({
@@ -98,6 +106,8 @@ const toInsightExercises = (exercises: CompletedSessionDetailExerciseInput[]): S
     loadContext: exercise.loadContext,
     sets: exercise.sets.map((set, setIndex) => ({
       id: set.id,
+      recordingMode: set.recordingMode,
+      durationSec: set.durationSec,
       orderIndex: setIndex,
       weightValue: set.weight,
       repsValue: set.reps,
@@ -145,6 +155,8 @@ export const buildCompletedSessionDetailModel = (
         rows: performed.map(({ set, weight, reps }) =>
           formatSetRow({
             id: set.id,
+            recordingMode: set.recordingMode,
+            durationSec: set.durationSec,
             weight,
             reps,
             loadContext: exercise.loadContext,

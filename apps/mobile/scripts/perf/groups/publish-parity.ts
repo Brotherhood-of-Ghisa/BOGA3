@@ -29,7 +29,7 @@ export const PUBLISH_PARITY_CASE: PublishParityCase = {
   fn: 'group_metric_eval_publish',
   migration: '20261023091259_group_metric_graph_referenced_sets.sql',
   helpers: {
-    group_metric_eval_source_graph: '20261023091259_group_metric_graph_referenced_sets.sql',
+    group_metric_eval_source_graph: 'parity-definitions/20261119183619_manual_holds.sql',
     group_metric_eval_publish_without_notifications: 'parity-definitions/20261023091259_group_metric_graph_referenced_sets.sql',
   },
   // A write the result does not show: every published call also rewrites its

@@ -393,7 +393,7 @@ describe('exercise session facts — rules version', () => {
   // kernel (1RM formula, set eligibility, working-set rule). If this test
   // fails, a rule changed: bump the version, then update the literals.
   it('pins the derived values the current rules version stands for', () => {
-    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(10);
+    expect(EXERCISE_SESSION_FACTS_RULES_VERSION).toBe(11);
     expect(summarizeFactSession(DEFINITION, session('per-side', 1, [
       block('side', 0, [['10', '8']], ordinaryLoadContext('per_side_load')),
     ]))).toMatchObject({ volumeKg: 160, topWeightKg: 10, bestE1rmKg: estimateOneRepMax(10, 8), workingSets: 1 });

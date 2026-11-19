@@ -1,5 +1,6 @@
+import type { RecordingMode } from '@/src/exercise-core/recording-mode';
 import type { Session, SessionExercise, SessionSet } from '@/components/session-recorder/types';
-import type { ExerciseBlockHistorySuggestedSet, SessionDraftSnapshot } from '@/src/data';
+import type { ExerciseBlockHistorySuggestedSet, SessionDraftSnapshot, SessionDraftExerciseInput } from '@/src/data';
 import type { SessionInsightExerciseInput } from '@/src/session-insights';
 import { defaultSessionSetType, formatSessionSetType, normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { getDisplayEfforts } from '@/src/config/personal-effort';
@@ -34,10 +35,13 @@ export function mapDraftSnapshotToSession(
       name: exercise.name,
       machineName: exercise.machineName ?? '',
       loadContext: exercise.loadContext,
+      recordingMode: exercise.recordingMode,
       sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
       ...(exercise.sourcePlanUseId ? { sourcePlanUseId: exercise.sourcePlanUseId } : {}),
       sets: exercise.sets.map((set) => ({
         id: set.id,
+        recordingMode: set.recordingMode,
+        durationSec: set.durationSec,
         reps: set.repsValue,
         weight: set.weightValue,
         setType: normalizeSessionSetType(set.setType),
@@ -52,7 +56,7 @@ export function mapDraftSnapshotToSession(
   };
 }
 
-export const toPersistDraftExercises = (session: Session) =>
+export const toPersistDraftExercises = (session: Session): SessionDraftExerciseInput[] =>
   session.exercises.map((exercise) => ({
     id: exercise.id,
     exerciseDefinitionId: exercise.exerciseDefinitionId,
@@ -65,6 +69,8 @@ export const toPersistDraftExercises = (session: Session) =>
       const committedSet = canonicalizeSetValues(set);
       return {
         id: committedSet.id,
+        recordingMode: committedSet.recordingMode,
+        durationSec: committedSet.durationSec,
         repsValue: committedSet.reps,
         weightValue: committedSet.weight,
         setType: committedSet.setType,
@@ -109,12 +115,14 @@ function createSetId(): string {
 
 type SetFieldName = keyof Pick<SessionSet, 'reps' | 'weight'>;
 
-function createEmptySet(): SessionSet {
+function createEmptySet(recordingMode: RecordingMode = 'reps'): SessionSet {
   return {
     id: createSetId(),
     reps: '',
     weight: '',
-    setType: defaultSessionSetType(undefined, getDisplayEfforts()),
+    recordingMode,
+    durationSec: null,
+    setType: defaultSessionSetType(undefined, getDisplayEfforts(), recordingMode),
     plannedReps: null,
     plannedWeight: null,
     plannedSetType: null,
@@ -125,9 +133,11 @@ function createEmptySet(): SessionSet {
 function createPlannedSetFromSuggestedSet(set: ExerciseBlockHistorySuggestedSet): SessionSet {
   return {
     id: createSetId(),
+    recordingMode: set.recordingMode,
+    durationSec: set.durationSec,
     reps: '',
-    weight: '',
-    setType: null,
+    weight: set.recordingMode === 'hold' ? set.weightValue : '',
+    setType: set.recordingMode === 'hold' ? normalizeSessionSetType(set.setType) : null,
     plannedReps: set.repsValue,
     plannedWeight: set.weightValue,
     plannedSetType: normalizeSessionSetType(set.setType),
@@ -151,7 +161,7 @@ type PlannedSetMatchMode = 'volume' | 'quality' | 'volume-and-quality';
 const PLANNED_SET_MATCH_MODE: PlannedSetMatchMode = 'volume';
 
 export const hasPlannedTarget = (set: SessionSet): boolean =>
-  set.plannedReps !== null || set.plannedWeight !== null || set.plannedSetType !== null;
+  set.performanceStatus === 'planned' || set.plannedReps !== null || set.plannedWeight !== null || set.plannedSetType !== null;
 
 const hasPerformedActual = (set: SessionSet): boolean => isConfirmedPerformedSet(set);
 
@@ -173,7 +183,7 @@ const plannedSetMatches = (
     case 'volume-and-quality':
       return plannedSetVolumeMatches(set) && plannedSetQualityMatches(set);
     case 'volume':
-      return plannedSetVolumeMatches(set);
+      return set.recordingMode === 'hold' || plannedSetVolumeMatches(set);
   }
 };
 
@@ -219,13 +229,14 @@ const toCompletedHistorySession = (session: Session): Session => ({
 export const toPersistCompletedExercises = (session: Session) =>
   toPersistDraftExercises(toCompletedHistorySession(session));
 
-export function createExercise(exerciseDefinitionId: string, name: string): SessionExercise {
+export function createExercise(exerciseDefinitionId: string, name: string, recordingMode: RecordingMode = 'reps'): SessionExercise {
   return {
     id: createExerciseId(),
     exerciseDefinitionId,
     name,
     machineName: '',
-    sets: [createEmptySet()],
+    recordingMode,
+    sets: [createEmptySet(recordingMode)],
   };
 }
 
@@ -468,6 +479,8 @@ export const toSessionInsightExercises = (
       id: set.id,
       orderIndex: setIndex,
       weightValue: set.weight,
+      recordingMode: set.recordingMode,
+      durationSec: set.durationSec,
       repsValue: set.reps,
       setType: set.setType,
       performanceStatus: set.performanceStatus,

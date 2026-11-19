@@ -15,7 +15,7 @@
 #     (<table>_touch_server_received_at, <table>_owner_user_id_immutable).
 #   - The twenty-four cross-entity FKs are present with condeferrable=true,
 #     condeferred=true, and the expected on-delete actions.
-#   - Only the load-input-mode CHECK exists; all other entity CHECKs are absent.
+#   - Entity CHECKs match the explicit contract allowlist.
 #
 # Run via `./boga test sync-v2-schema` (run-suite.sh ensures the local
 # runtime is up + baseline applied before this script runs). For local
@@ -320,7 +320,7 @@ done
 pass "twenty-four composite FKs present with condeferrable=t, condeferred=t, expected on-delete actions"
 
 # -----------------------------------------------------------------------------
-# 6. Only the load-input-mode CHECK is allowed (contract, "Ground rules").
+# 6. Only the contract's explicit CHECKs are allowed ("Ground rules").
 # -----------------------------------------------------------------------------
 
 for entity in "${ENTITIES[@]}"; do
@@ -335,7 +335,11 @@ for entity in "${ENTITIES[@]}"; do
   ")"
   expected=""
   if [[ "${entity}" == "exercise_definitions" ]]; then
-    expected="exercise_definitions_load_input_mode_valid"
+    expected="exercise_definitions_load_input_mode_valid,exercise_definitions_recording_mode_check"
+  elif [[ "${entity}" == "exercise_sets" ]]; then
+    expected="exercise_sets_recording_mode_check"
+  elif [[ "${entity}" == "session_plan_sets" ]]; then
+    expected="session_plan_sets_recording_mode_check,session_plan_sets_target_measurement_valid"
   elif [[ "${entity}" == "session_plans" ]]; then
     expected="session_plans_routine_standalone"
   elif [[ "${entity}" == "user_settings" ]]; then
@@ -345,6 +349,6 @@ for entity in "${ENTITIES[@]}"; do
     fail "app_public.${entity} CHECK constraints '${names}'; expected '${expected}' per docs/specs/tech/sync-v2-server-contract.md (Ground rules)"
   fi
 done
-pass "only the load-input-mode, settings-shape and standalone-Routine CHECKs are present across v2 entity tables"
+pass "only the contracted load, measurement, settings-shape and standalone-Routine CHECKs are present across v2 entity tables"
 
 echo "[sync-v2-smoke] all assertions passed"

@@ -175,7 +175,7 @@ export const createAuthedTestClient = async (
 
   const client = createClient(config.url, config.anonKey, {
     auth: NO_TIMER_AUTH,
-    global: { headers: { 'x-boga-sync-protocol': '7', Authorization: `Bearer ${jwt}` } },
+    global: { headers: { 'x-boga-sync-protocol': '8', Authorization: `Bearer ${jwt}` } },
   });
 
   client.auth.getSession = () => authClient.auth.getSession();
@@ -216,11 +216,17 @@ const SYNC_TABLES_CHILD_FIRST = [
   'session_exercise_tags',
   'exercise_sets',
   'session_exercises',
+  'sessions',
+  'session_plan_uses',
+  'session_plan_sets',
+  'session_plan_exercises',
+  'session_plans',
+  'training_programmes',
   'exercise_muscle_mappings',
   'exercise_tag_definitions',
-  'sessions',
   'exercise_group_links',
   'exercise_definitions',
+  'training_notes',
   'injuries',
   'muscle_groups',
   'gyms',

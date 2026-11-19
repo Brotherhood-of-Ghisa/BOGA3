@@ -2,7 +2,7 @@ import { useAccountLocalPreferenceState, useDateFormat } from '@/src/preferences
 import { formatLocalDateTime } from '@/src/utils/local-time';
 import { formatOneRepMax, formatWeight } from '@/src/exercise-calculations/format';
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
-import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
+import { canonicalizeSetValues } from '@/src/exercise-calculations/set-semantics';
 import { formatVolumeFigure } from '@/src/exercise-calculations/analytics';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
@@ -378,7 +378,9 @@ function SessionCard({
   const rows = entry.sets.map((set) =>
     formatSetRow({
       id: set.setId,
-      weight: parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)),
+      recordingMode: set.recordingMode,
+      durationSec: set.durationSec,
+      weight: parseSetWeight(canonicalizeSetValues({ ...set, weight: set.weightValue, reps: set.repsValue }).weight),
       loadContext: entry.loadContext,
       reps: parseSetReps(set.repsValue),
       setType: set.setType,

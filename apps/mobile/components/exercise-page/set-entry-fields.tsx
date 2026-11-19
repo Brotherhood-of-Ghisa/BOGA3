@@ -9,6 +9,10 @@ import { formatSessionSetType, type SessionSetTypeValue } from '@/src/data/set-t
 import { formatEffort } from '@/src/session-recorder/exercise-page-model';
 
 type SetEntryFieldsProps = {
+  recordingMode?: 'reps' | 'hold';
+  durationValue?: string;
+  durationError?: string;
+  onChangeDuration?: (value: string) => void;
   number: number;
   weightValue: string;
   repsValue: string;
@@ -26,7 +30,7 @@ type SetEntryFieldsProps = {
 /** Recorder entry fields reused by plan/programme targets: `Effort`, `Weight`, `Reps`; total-load
  * and per-side share `Weight`, spoken as `Set N weight`. */
 export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>(function SetEntryFields(
-  { number, weightValue, repsValue, setType, weightError, repsError,
+  { number, weightValue, repsValue, setType, weightError, repsError, recordingMode, durationValue, durationError, onChangeDuration,
     onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, testID, children },
   weightInputRef,
 ) {
@@ -68,17 +72,17 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
           value={weightValue}
         />
       </View>
-      <View style={[styles.field, styles.repsField, repsError ? styles.invalid : null]}>
-        <Text allowFontScaling={false} style={[text.label, tone.faint]}>Reps</Text>
+      <View style={[styles.field, recordingMode === 'hold' ? styles.durationField : styles.repsField, (recordingMode === 'hold' ? durationError : repsError) ? styles.invalid : null]}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.faint]}>{recordingMode === 'hold' ? 'Time (s)' : 'Reps'}</Text>
         <TextInput
           allowFontScaling={false}
-          accessibilityLabel={`Set ${number} reps`}
+          accessibilityLabel={`Set ${number} ${recordingMode === 'hold' ? 'time in seconds' : 'reps'}`}
           keyboardType="number-pad"
-          onChangeText={onChangeReps}
+          onChangeText={recordingMode === 'hold' ? onChangeDuration : onChangeReps}
           selectTextOnFocus
           style={[text.figureHero, styles.input]}
-          testID={`${testID}-reps`}
-          value={repsValue}
+          testID={`${testID}-${recordingMode === 'hold' ? 'duration' : 'reps'}`}
+          value={recordingMode === 'hold' ? durationValue ?? '' : repsValue}
         />
       </View>
       {children}
@@ -100,6 +104,7 @@ const useStyles = makeStyles((roles) => ({
   invalid: { borderColor: roles.danger },
   effortField: { width: uiGeometry.tapTarget * 2 },
   weightField: { flex: 1, maxWidth: uiGeometry.tapTarget * 2 + uiSpace.xl },
+  durationField: { width: uiGeometry.tapTarget * 2 },
   repsField: { width: uiGeometry.fieldHeight + uiSpace.md },
   input: {
     flex: 1,

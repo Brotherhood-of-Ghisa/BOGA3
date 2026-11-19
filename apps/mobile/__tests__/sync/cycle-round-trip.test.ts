@@ -102,7 +102,7 @@ import {
   muscleGroups,
   sessionExercises,
   sessions,
-  syncRuntimeState,
+  syncRuntimeState, sessionPlans, sessionPlanExercises, sessionPlanSets,
 } from '@/src/data/schema';
 import { runSyncCycle } from '@/src/sync/cycle';
 import { loadAsOfWeightResolver } from '@/src/data/bodyweight';
@@ -312,6 +312,36 @@ describe('sync cycle round-trip against a live endpoint', () => {
     fixture?.close();
     mockBootstrapState.database = null;
     mockClientState.client = null;
+  });
+
+  it('restores hold definitions, nullable-rep targets and corrected seconds after a real sync and reinstall', async () => {
+    seedDirtyChain();
+    const stamp = Date.now() + 10;
+    database.insert(exerciseDefinitions).values({ id: ids.exerciseDefinition, name: 'Plank', recordingMode: 'hold',
+      localDirty: true, localUpdatedAtMs: stamp }).run();
+    database.update(sessionExercises).set({ exerciseDefinitionId: ids.exerciseDefinition }).where(eq(sessionExercises.id, ids.sessionExercise)).run();
+    database.update(exerciseSets).set({ recordingMode: 'hold', durationSec: 45, repsValue: '', weightValue: '5',
+      setType: null, performanceStatus: null }).where(eq(exerciseSets.id, ids.exerciseSet)).run();
+    const plan = ids.session + '-plan', block = plan + '-block', target = plan + '-target';
+    database.insert(sessionPlans).values({ id: plan, title: 'Hold routine', isRoutine: true,
+      localDirty: true, localUpdatedAtMs: stamp }).run();
+    database.insert(sessionPlanExercises).values({ id: block, sessionPlanId: plan, exerciseDefinitionId: ids.exerciseDefinition,
+      name: 'Plank', orderIndex: 0, localDirty: true, localUpdatedAtMs: stamp }).run();
+    database.insert(sessionPlanSets).values({ id: target, sessionPlanExerciseId: block, orderIndex: 0,
+      recordingMode: 'hold', targetDurationSec: 45, targetReps: null, targetWeightValue: '5', targetSetType: 'rehab',
+      localDirty: true, localUpdatedAtMs: stamp }).run();
+    await expect(runSyncCycle()).resolves.toBe('converged');
+    database.update(exerciseSets).set({ durationSec: 38, localDirty: true, localUpdatedAtMs: stamp + 1000 })
+      .where(eq(exerciseSets.id, ids.exerciseSet)).run();
+    await expect(runSyncCycle()).resolves.toBe('converged');
+    wipeLocalStore();
+    await expect(runSyncCycle()).resolves.toBe('converged');
+    expect(database.select().from(exerciseDefinitions).where(eq(exerciseDefinitions.id, ids.exerciseDefinition)).get())
+      .toMatchObject({ recordingMode: 'hold', localDirty: false });
+    expect(database.select().from(exerciseSets).where(eq(exerciseSets.id, ids.exerciseSet)).get())
+      .toMatchObject({ recordingMode: 'hold', durationSec: 38, repsValue: '', weightValue: '5', setType: null, performanceStatus: null, localDirty: false });
+    expect(database.select().from(sessionPlanSets).where(eq(sessionPlanSets.id, target)).get())
+      .toMatchObject({ recordingMode: 'hold', targetDurationSec: 45, targetReps: null, targetSetType: 'rehab', localDirty: false });
   });
 
   it('pushes the dirty chain, clears every dirty bit, and the server holds all four rows', async () => {

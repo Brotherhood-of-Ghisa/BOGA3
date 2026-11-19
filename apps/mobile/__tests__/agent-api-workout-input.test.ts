@@ -5,6 +5,34 @@ const revision = 'a'.repeat(32);
 const base = { session_id: 'workout', expected_revision: revision };
 const set = { weight_kg: '80', reps: 8 };
 
+it('creates holds with RIR-0 only for absent effort and preserves saved effort on corrections', () => {
+  const hold = { recording_mode: 'hold', duration_sec: 45 };
+  const log = (performance: object) => normalizeWorkoutInput('log_sets', { ...base, exercise_id: 'plank', sets: [performance] });
+  expect(log(hold)).toHaveProperty('sets', [{ ...hold, weight_kg: '0', set_type: 'rir_0' }]);
+  for (const set_type of [null, 'warm_up', 'rehab', 'rir_3']) {
+    expect(log({ ...hold, weight_kg: '5', set_type })).toHaveProperty('sets', [{ ...hold, weight_kg: '5', set_type }]);
+  }
+  expect(normalizeWorkoutInput('update_set', { ...base, set_id: 'set', set: { ...hold, duration_sec: 38 } }))
+    .toHaveProperty('set', { recording_mode: 'hold', duration_sec: 38, weight_kg: '0' });
+  expect(log({ ...hold, duration_sec: 300 })).toHaveProperty('sets.0.duration_sec', 300);
+});
+
+it.each([0, -1, 0.5, 301, '45', null, NaN, Infinity])('rejects invalid hold seconds %p', duration_sec => {
+  expect(() => normalizeWorkoutInput('log_sets', { ...base, exercise_id: 'plank',
+    sets: [{ recording_mode: 'hold', duration_sec }],
+  })).toThrow(WorkoutInputError);
+});
+
+it('rejects ambiguous recording mode and combined reps and seconds', () => {
+  for (const performance of [
+    { recording_mode: 'hold', duration_sec: 45, reps: 12 },
+    { recording_mode: 'reps', duration_sec: 45, reps: 12, weight_kg: '5' },
+    { recording_mode: 'seconds', duration_sec: 45 },
+  ]) {
+    expect(() => normalizeWorkoutInput('log_sets', { ...base, exercise_id: 'plank', sets: [performance] })).toThrow(WorkoutInputError);
+  }
+});
+
 it('canonicalizes dated creation across offsets and the repeated DST hour', () => {
   expect(normalizeWorkoutInput('create_workout', {
     started_at: '2026-10-25T01:30:00+01:00', completed_at: '2026-10-25T01:30:00Z',

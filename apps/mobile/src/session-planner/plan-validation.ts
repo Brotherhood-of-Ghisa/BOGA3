@@ -1,3 +1,4 @@
+import { MAX_SET_DURATION_SEC, parseSetDuration } from '@/src/exercise-calculations/parse';
 import { isSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import {
   type NormalizedPlan,
@@ -91,8 +92,16 @@ export const validatePlanSetDraft = (
 ): PlanValidationResult<NormalizedPlanSet> => {
   const errors: PlanFieldError[] = [];
 
-  const reps = parseTargetReps(draft.targetRepsText);
-  if (reps === null) {
+  const isHold = draft.recordingMode === 'hold';
+  const reps = isHold ? null : parseTargetReps(draft.targetRepsText);
+  const seconds = /^\d+$/.test(draft.targetDurationText?.trim() ?? '') ? parseSetDuration(Number(draft.targetDurationText)) : null;
+  if (draft.recordingMode !== undefined && draft.recordingMode !== 'reps' && !isHold) {
+    errors.push(error(`${path}.recordingMode`, 'invalid_recording_mode', 'Choose Reps or Hold.'));
+  }
+  if (isHold && (seconds === null || draft.targetRepsText.trim() !== '')) {
+    errors.push(error(`${path}.targetDuration`, 'invalid_duration', `Time must be whole seconds from 1 to ${MAX_SET_DURATION_SEC}, without reps.`));
+  }
+  if (!isHold && (reps === null || (draft.targetDurationText ?? '').trim() !== '')) {
     errors.push(error(`${path}.targetReps`, 'invalid_reps', 'Reps must be a whole number from 1 to 999.'));
   }
 
@@ -117,7 +126,8 @@ export const validatePlanSetDraft = (
     ok: true,
     value: {
       targetWeightValue: weight.ok ? weight.value : null,
-      targetReps: reps as number,
+      targetReps: reps,
+      ...(isHold ? { recordingMode: 'hold' as const, targetDurationSec: seconds } : {}),
       targetSetType: setType,
     },
   };

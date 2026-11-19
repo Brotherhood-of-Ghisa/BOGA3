@@ -17,7 +17,8 @@ describe('exercise-editor-model', () => {
     it('creates prefill data with (Copy) suffix, preserving load mode, bodyweight contribution, and mappings', () => {
       const source: ExerciseCatalogExercise = {
         id: 'bench-1',
-        name: 'Barbell Bench Press',
+        name: 'Plank',
+        recordingMode: 'hold',
         loadInputMode: 'total_load',
         bodyweightContribution: 0.15,
         splitByGym: false,
@@ -32,7 +33,8 @@ describe('exercise-editor-model', () => {
       const prefill = buildDuplicateExercisePrefill(source);
 
       expect(prefill).toEqual({
-        name: 'Barbell Bench Press (Copy)',
+        name: 'Plank (Copy)',
+        recordingMode: 'hold',
         loadInputMode: 'total_load',
         bodyweightContribution: 0.15,
         splitByGym: false,

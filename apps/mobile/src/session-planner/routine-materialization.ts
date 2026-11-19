@@ -32,8 +32,10 @@ export const startRoutineWorkout = async (graph: PlanGraph, now: Date): Promise<
         sourcePlanUseId: useId,
         sets: block.sets.map(target => ({
           id: `${useId}:${target.id}:start`,
-          repsValue: '', weightValue: '', setType: null,
-          plannedRepsValue: String(target.targetReps),
+          repsValue: '', weightValue: target.recordingMode === 'hold' ? target.targetWeightValue ?? '' : '', setType: target.recordingMode === 'hold' ? normalizeSessionSetType(target.targetSetType) : null,
+          recordingMode: target.recordingMode ?? 'reps',
+          durationSec: target.recordingMode === 'hold' ? target.targetDurationSec ?? null : null,
+          plannedRepsValue: target.targetReps === null ? null : String(target.targetReps),
           plannedWeightValue: target.targetWeightValue,
           plannedSetType: normalizeSessionSetType(target.targetSetType),
           performanceStatus: 'planned',

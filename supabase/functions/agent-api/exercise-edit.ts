@@ -10,6 +10,7 @@
 // and re-check only what needs the database: owner rows and revisions.
 
 import { validateBodyweightContribution } from '../../../apps/mobile/src/exercise-core/bodyweight-contribution.ts';
+import { isRecordingMode, type RecordingMode } from '../../../apps/mobile/src/exercise-core/recording-mode.ts';
 import { isLoadInputMode, LOAD_INPUT_MODES } from '../../../apps/mobile/src/exercise-core/index.ts';
 import {
   MAX_REST_TIMER_SECONDS,
@@ -32,6 +33,7 @@ export type ExerciseMuscleInput = {
 };
 
 export type ExerciseCreate = {
+  recording_mode?: RecordingMode;
   name: string;
   load_input_mode: string;
   bodyweight_contribution: number;
@@ -51,7 +53,7 @@ export type ExerciseUpdate = {
 /** A rejected exercise write; the Edge Function answers it as 400 INVALID_ARGUMENT. */
 export class ExerciseEditError extends Error {}
 
-const CREATE_KEYS = new Set(['name', 'load_input_mode', 'bodyweight_contribution', 'split_by_gym', 'rest_timer_sec', 'muscles']);
+const CREATE_KEYS = new Set(['recording_mode', 'name', 'load_input_mode', 'bodyweight_contribution', 'split_by_gym', 'rest_timer_sec', 'muscles']);
 const UPDATE_KEYS = new Set([...CREATE_KEYS, 'expected_revision']);
 const REVISION_KEYS = new Set(['expected_revision']);
 
@@ -78,6 +80,11 @@ const readName = (value: unknown): string => {
 const readLoadInputMode = (value: unknown): string => {
   if (!isLoadInputMode(value)) fail(`load_input_mode must be one of: ${LOAD_INPUT_MODES.join(', ')}.`);
   return value as string;
+};
+
+const readRecordingMode = (value: unknown): RecordingMode => {
+  if (!isRecordingMode(value)) return fail('recording_mode must be reps or hold.');
+  return value;
 };
 
 const readContribution = (value: unknown): number => {
@@ -147,6 +154,7 @@ export const normalizeExerciseCreate = (body: JsonObject): ExerciseCreate => {
   rejectUnknownKeys(body, CREATE_KEYS);
   return {
     name: readName(body.name),
+    ...(body.recording_mode === undefined ? {} : { recording_mode: readRecordingMode(body.recording_mode) }),
     load_input_mode: body.load_input_mode === undefined ? 'total_load' : readLoadInputMode(body.load_input_mode),
     bodyweight_contribution: body.bodyweight_contribution === undefined ? 0 : readContribution(body.bodyweight_contribution),
     split_by_gym: body.split_by_gym === undefined ? false : readSplitByGym(body.split_by_gym),
@@ -162,6 +170,7 @@ export const normalizeExerciseUpdate = (body: JsonObject): ExerciseUpdate => {
   rejectUnknownKeys(body, UPDATE_KEYS);
   const expected_revision = readRevision(body.expected_revision);
   const changes: ExerciseChanges = {};
+  if (body.recording_mode !== undefined) changes.recording_mode = readRecordingMode(body.recording_mode);
   if (body.name !== undefined) changes.name = readName(body.name);
   if (body.load_input_mode !== undefined) changes.load_input_mode = readLoadInputMode(body.load_input_mode);
   if (body.bodyweight_contribution !== undefined) {

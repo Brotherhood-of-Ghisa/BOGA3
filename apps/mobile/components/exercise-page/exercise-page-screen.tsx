@@ -403,7 +403,7 @@ export function ExercisePageScreen({
     [applyDraftUpdate]
   );
 
-  const onChangeLogger = (values: { weightValue?: string; repsValue?: string }) => {
+  const onChangeLogger = (values: { weightValue?: string; repsValue?: string; durationSec?: number | null }) => {
     if (!openSet) return;
     updateSets((current) => updateLoggerValues(current, openSet.id, values), 'text');
   };
@@ -435,7 +435,7 @@ export function ExercisePageScreen({
   };
 
   const onAddSet = () => {
-    const next = addSet(sets, undefined, trainingPreferences.displayEfforts);
+    const next = addSet(sets, undefined, trainingPreferences.displayEfforts, editingExercise?.recordingMode ?? exercise?.recordingMode ?? 'reps');
     const added = next[next.length - 1];
     updateSets(() => next, 'structural');
     setOpenSetId(added?.id ?? null);
@@ -462,7 +462,7 @@ export function ExercisePageScreen({
       if (isTargetOpen) setOpenSetId(null);
       return;
     }
-    const next = addSet(committed, undefined, trainingPreferences.displayEfforts);
+    const next = addSet(committed, undefined, trainingPreferences.displayEfforts, editingExercise?.recordingMode ?? exercise?.recordingMode ?? 'reps');
     updateSets(() => next, 'structural');
     setOpenSetId(next[next.length - 1]?.id ?? null);
     requestAnimationFrame(() => weightInputRef.current?.focus());
@@ -622,7 +622,8 @@ export function ExercisePageScreen({
         {/* Page gutter: the target's 14 snaps to `md` 12, the same inset as a
             card's content, so page and card share one rhythm. */}
         <ScreenScroll gutter="md" keyboardShouldPersistTaps="handled" testID="exercise-page-scroll">
-          <RecordsPanel
+          {!(sets.length > 0 ? sets.every(set => set.recordingMode === 'hold') :
+            (editingExercise?.recordingMode ?? exercise.recordingMode) === 'hold') ? <RecordsPanel
             dateFormat={listPreferences.dateFormat}
             expanded={recordsExpanded}
             isFilteredByGym={isFilteredByGym}
@@ -633,7 +634,7 @@ export function ExercisePageScreen({
             onToggleExpanded={() => setRecordsExpanded((current) => !current)}
             state={records}
             view={recordsView}
-          />
+          /> : null}
           <ExerciseInjuryBanner
             activeWarning={activeWarning}
             dismissWarning={dismissWarning}

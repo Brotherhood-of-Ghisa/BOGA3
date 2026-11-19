@@ -14,6 +14,8 @@ import type { SessionSetTypeValue } from '@/src/data/set-types';
 
 /** Raw editor-facing target set; strings exactly as the editor holds them. */
 export type PlanSetDraft = {
+  recordingMode?: 'reps' | 'hold';
+  targetDurationText?: string;
   /** '' or blank means "choose during the workout". */
   targetWeightText: string;
   targetRepsText: string;
@@ -48,7 +50,7 @@ export type ProgrammeDraft = {
 /** Normalized, validated values — exactly what the store writes. */
 export type NormalizedPlanSet = {
   targetWeightValue: string | null;
-  targetReps: number;
+  targetReps: number | null; recordingMode?: 'reps' | 'hold'; targetDurationSec?: number | null;
   targetSetType: SessionSetTypeValue;
 };
 
@@ -81,6 +83,8 @@ export type PlanFieldErrorCode =
   | 'too_few'
   | 'too_many'
   | 'invalid_reps'
+  | 'invalid_duration'
+  | 'invalid_recording_mode'
   | 'invalid_weight'
   | 'unknown_set_type'
   | 'invalid_schedule'

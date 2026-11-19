@@ -80,3 +80,13 @@ year, even across New Year.
   date order and language. App-owned labels follow Date format.
 
 Code: `apps/mobile/src/utils/local-time.ts`.
+
+### copy.hold-duration · presentation · accepted
+
+Hold entry uses `Time (s)`; closed rows use `s` and spoken labels say seconds.
+The exercise choice is `Recording` / `Log as` with `Reps` and `Hold`.
+There is one editable duration, without a timer, failure label or retained
+suggested-versus-actual comparison.
+
+Why: record the duration the person confirms, without inferring how the hold ended.
+Code: `apps/mobile/components/exercise-page/set-entry-fields.tsx`; `apps/mobile/components/exercise-catalog/exercise-editor-screen.tsx`.

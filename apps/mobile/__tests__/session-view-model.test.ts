@@ -393,3 +393,11 @@ describe('active session entry', () => {
     expect(sessionExerciseHref('s1', 'e 1')).toBe('/session/s1/exercise/e%201');
   });
 });
+
+
+it('keeps a planned hold row timed when its one editable duration is cleared', () => {
+  const input = session([{ ...bench, sets: [{ ...plannedSet('hold', '5', '', 'rir_0'),
+    recordingMode: 'hold', durationSec: null, weight: '5', reps: '', setType: 'rir_0' }] }]);
+  const model = buildSessionViewModel(input, new Map());
+  expect(model.cards[0].rows[0]).toMatchObject({ recordingMode: 'hold', weightReps: '5.0 × — s', oneRepMax: '—', volume: '—', done: false });
+});

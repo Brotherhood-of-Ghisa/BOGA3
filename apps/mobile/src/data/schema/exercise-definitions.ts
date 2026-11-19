@@ -9,6 +9,7 @@ export const exerciseDefinitions = sqliteTable(
       .notNull()
       .default(sql`(lower(hex(randomblob(16))))`),
     name: text('name').notNull(),
+    recordingMode: text('recording_mode', { enum: ['reps', 'hold'] }).notNull().default('reps'),
     loadInputMode: text('load_input_mode', { enum: ['total_load', 'per_side_load'] })
       .notNull()
       .default('total_load'),
@@ -35,6 +36,7 @@ export const exerciseDefinitions = sqliteTable(
     nameIdx: index('exercise_definitions_name_idx').on(table.name),
     deletedAtIdx: index('exercise_definitions_deleted_at_idx').on(table.deletedAt),
     nameNonEmptyGuard: check('exercise_definitions_name_non_empty', sql`${table.name} <> ''`),
+    recordingModeGuard: check('exercise_definitions_recording_mode_valid', sql`${table.recordingMode} in ('reps', 'hold')`),
     loadInputModeGuard: check(
       'exercise_definitions_load_input_mode_valid',
       sql`${table.loadInputMode} in ('total_load', 'per_side_load')`

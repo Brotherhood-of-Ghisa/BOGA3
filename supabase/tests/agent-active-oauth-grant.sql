@@ -8,7 +8,7 @@ select gen_random_uuid() as owner, gen_random_uuid() as other_owner,
 insert into auth.users(id) select owner from grant_check_fixture
 union all select other_owner from grant_check_fixture;
 insert into auth.oauth_clients(id,registration_type,redirect_uris,grant_types,token_endpoint_auth_method)
-select client,'dynamic','https://example.invalid/callback','authorization_code,refresh_token','none' from grant_check_fixture
+select client,'dynamic'::auth.oauth_registration_type,'https://example.invalid/callback','authorization_code,refresh_token','none' from grant_check_fixture
 union all select other_client,'dynamic','https://example.invalid/callback','authorization_code,refresh_token','none' from grant_check_fixture;
 insert into auth.oauth_consents(id,user_id,client_id,scopes,granted_at)
 select gen_random_uuid(),owner,client,'openid profile',stamp from grant_check_fixture;

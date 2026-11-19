@@ -104,12 +104,17 @@ export function PlanBlockEditor({
       {block.sets.map((set, setIndex) => {
         const weightError = errors.get(`${blockPath}.sets.${setIndex}.targetWeight`);
         const repsError = errors.get(`${blockPath}.sets.${setIndex}.targetReps`);
+        const durationError = errors.get(`${blockPath}.sets.${setIndex}.targetDuration`);
         return (
           <View key={set.id} style={styles.setBlock}>
             <SetEntryFields
               number={setIndex + 1}
               weightValue={set.targetWeightText}
               repsValue={set.targetRepsText}
+              recordingMode={set.recordingMode}
+              durationValue={set.targetDurationText}
+              durationError={durationError}
+              onChangeDuration={(targetDurationText) => onChangeSet(block.id, set.id, { targetDurationText })}
               setType={set.targetSetType}
               weightError={weightError}
               repsError={repsError}
@@ -143,6 +148,7 @@ export function PlanBlockEditor({
                 {weightError}
               </Text>
             ) : null}
+            {durationError ? <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.meta, tone.danger]}>{durationError}</Text> : null}
             {repsError ? (
               <Text
                 allowFontScaling={false}

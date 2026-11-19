@@ -229,8 +229,10 @@ the same zero rule.
 
 ## 4. Calculations
 
+**Hold metrics:** [[set.row-figures]].
+
 **Parsing** (`parse.ts`) implements the validity of [[set.performed]]; blank
-Weight becomes `0` in `canonicalizeWeightForReps`. Invalid input never becomes
+Weight becomes `0` in `canonicalizeSetValues`. Invalid input never becomes
 zero. The parser is the only one: field validation, the performed check (§1)
 and every figure call it.
 

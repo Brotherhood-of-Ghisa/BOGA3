@@ -344,7 +344,7 @@ describe('picker: group exercises (E0.1)', () => {
     fireEvent.press(screen.getByTestId('exercise-picker-group-row-gx-tue-squat'));
 
     expect(onSelectExercise).toHaveBeenCalledTimes(1);
-    expect(onSelectExercise).toHaveBeenCalledWith('seed_barbell_back_squat', 'Barbell Squat');
+    expect(onSelectExercise).toHaveBeenCalledWith('seed_barbell_back_squat', 'Barbell Squat', 'reps');
     expect(screen.queryByTestId('group-pick-sheet')).toBeNull();
     expect(liveLinks()).toEqual(linksBefore);
   });
@@ -362,7 +362,7 @@ describe('picker: group exercises (E0.1)', () => {
     fireEvent.press(await screen.findByTestId('group-pick-sheet-linked-ex-hotel'));
 
     expect(onSelectExercise).toHaveBeenCalledTimes(1);
-    expect(onSelectExercise).toHaveBeenCalledWith('ex-hotel', 'Hotel Bench');
+    expect(onSelectExercise).toHaveBeenCalledWith('ex-hotel', 'Hotel Bench', 'reps');
     expect(screen.queryByTestId('group-pick-sheet')).toBeNull();
     expect(liveLinks()).toEqual(linksBefore);
   });
@@ -390,7 +390,7 @@ describe('pick sheet (E0.2)', () => {
       groupExerciseId: 'gx-bench',
     });
     expect(screen.queryByTestId('group-pick-sheet')).toBeNull();
-    expect(onSelectExercise).toHaveBeenCalledWith('seed_barbell_bench_press', 'Bench Press');
+    expect(onSelectExercise).toHaveBeenCalledWith('seed_barbell_bench_press', 'Bench Press', 'reps');
     // The links reload: the row now reads as linked.
     expect(await screen.findByLabelText('Group exercise Bench Press in Iron Brotherhood, linked: Bench Press')).toBeTruthy();
   });
@@ -414,7 +414,7 @@ describe('pick sheet (E0.2)', () => {
       groupId: 'g-iron',
       groupExerciseId: 'gx-bench',
     });
-    expect(onSelectExercise).toHaveBeenCalledWith('seed_barbell_bench_press', 'Bench Press');
+    expect(onSelectExercise).toHaveBeenCalledWith('seed_barbell_bench_press', 'Bench Press', 'reps');
     // The link is a local write: nothing asks the server.
     expect(api.listMyGroups.mock.calls.length).toBe(serverReadsBefore);
   });
@@ -488,7 +488,7 @@ describe('pick sheet (E0.2)', () => {
       { exerciseDefinitionId: 'seed_barbell_back_squat', groupId: 'g-tue', groupExerciseId: 'gx-tue-squat' },
     ]);
     await waitFor(() => {
-      expect(onSelectExercise).toHaveBeenCalledWith(created!.id, 'Bench Press');
+      expect(onSelectExercise).toHaveBeenCalledWith(created!.id, 'Bench Press', 'reps');
     });
   });
 });
@@ -506,7 +506,7 @@ describe('signed out', () => {
 
     fireEvent.press(screen.getByLabelText('Select exercise Bench Press'));
     fireEvent.press(await screen.findByTestId('exercise-picker-add-empty-set-button'));
-    expect(onSelectExercise).toHaveBeenCalledWith('seed_barbell_bench_press', 'Bench Press');
+    expect(onSelectExercise).toHaveBeenCalledWith('seed_barbell_bench_press', 'Bench Press', 'reps');
   });
 });
 
@@ -783,7 +783,7 @@ describe('picker: list, preselection, create, Manage and dismiss', () => {
         .all()
     ).toEqual([{ muscleGroupId: 'chest', role: 'primary' }]);
     await waitFor(() => {
-      expect(onSelectExercise).toHaveBeenCalledWith(created.id, 'Custom Press');
+      expect(onSelectExercise).toHaveBeenCalledWith(created.id, 'Custom Press', 'reps');
     });
     expect(onSelectExercise).toHaveBeenCalledTimes(1);
   });

@@ -177,10 +177,10 @@ export const setSessionGym = async (sessionId: string, gym: { id: string; name: 
  */
 export const addExerciseToSession = async (
   sessionId: string,
-  exercise: { id: string; name: string }
+  exercise: { id: string; name: string; recordingMode?: 'reps' | 'hold' }
 ): Promise<string> => {
   const graph = await requireEditableSessionGraph(sessionId);
-  const added = createExercise(exercise.id, exercise.name);
+  const added = createExercise(exercise.id, exercise.name, exercise.recordingMode);
   await persistSessionGraph(graph, {
     ...graph.session,
     exercises: [...graph.session.exercises, added],

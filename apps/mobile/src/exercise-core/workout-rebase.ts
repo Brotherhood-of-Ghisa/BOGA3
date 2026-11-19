@@ -1,11 +1,11 @@
 import { mergeBlockId, type MergeWireEntity } from './merge-types';
 
 const identity = (row: MergeWireEntity) => row.type + ':' + row.id;
-const ignored = new Set(['merge_revision', 'client_updated_at_ms', 'created_at', 'updated_at', 'duration_sec']);
+const ignored = new Set(['merge_revision', 'client_updated_at_ms', 'created_at', 'updated_at']);
 export function sameWorkoutRow(left: MergeWireEntity | undefined, right: MergeWireEntity | undefined): boolean {
   if (!left || !right) return left === right;
   return [...new Set([...Object.keys(left.fields), ...Object.keys(right.fields)])]
-    .every(key => ignored.has(key) || left.fields[key] === right.fields[key]);
+    .every(key => ignored.has(key) || (key === 'duration_sec' && left.type === 'sessions') || left.fields[key] === right.fields[key]);
 }
 
 function lifecycleChanged(before: MergeWireEntity[], current: MergeWireEntity[]): boolean {

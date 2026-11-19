@@ -4,11 +4,12 @@ import { calculateSetMetrics, type LoadContext } from '@/src/exercise-calculatio
 import type { SessionDraftSetSnapshot } from '@/src/data/session-drafts';
 import { defaultSessionSetType, formatSessionSetType, SESSION_SET_TYPE_CYCLE, type SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
+import type { RecordingMode } from '@/src/exercise-core/recording-mode';
 import { deriveExercisePersonalRecord, type ExercisePersonalRecord } from '@/src/session-insights';
 import { recordBandLines, type RecordLine } from '@/src/session-insights/record-band';
 
 import {
-  canonicalizeSetValues, canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet,
+  canonicalizeSetValues, hasValidActualValues, isConfirmedPerformedSet,
 } from '@/src/exercise-calculations/set-semantics';
 
 /**
@@ -24,6 +25,8 @@ export type ExercisePageSet = SessionDraftSetSnapshot;
 export type SetRowKind = 'performed' | 'pending';
 
 export type SetRowView = {
+  recordingMode?: RecordingMode;
+  durationSec?: number | null;
   id: string;
   // 1-based position in the list, for `Set N` and accessibility labels.
   number: number;
@@ -57,10 +60,11 @@ export const hasPlannedValues = (set: ExercisePageSet): boolean =>
   !isBlank(set.plannedWeightValue) || !isBlank(set.plannedRepsValue);
 
 const hasEnteredValues = (set: ExercisePageSet): boolean =>
-  !isBlank(set.weightValue) || !isBlank(set.repsValue);
+  !isBlank(set.weightValue) || !isBlank(set.repsValue) || set.durationSec != null;
 
 export const isPerformed = (set: ExercisePageSet): boolean =>
   isConfirmedPerformedSet({
+    ...set,
     weight: set.weightValue,
     reps: set.repsValue,
     performanceStatus: set.performanceStatus,
@@ -75,12 +79,16 @@ export const displayedValues = (
 ): LoggerValues => {
   if (isPerformed(set) || hasEnteredValues(set) || !hasPlannedValues(set)) {
     return {
+      recordingMode: set.recordingMode,
+      durationSec: set.durationSec,
       weightValue: set.weightValue,
       repsValue: set.repsValue,
       setType: set.setType,
     };
   }
   return {
+    recordingMode: set.recordingMode,
+    durationSec: set.durationSec,
     weightValue: set.plannedWeightValue ?? '',
     repsValue: set.plannedRepsValue ?? '',
     setType: set.plannedSetType ?? set.setType ?? null,
@@ -93,19 +101,21 @@ export const findCursorIndex = (sets: ExercisePageSet[]): number | null => {
 };
 
 export type LoggerValues = {
+  recordingMode?: RecordingMode;
+  durationSec?: number | null;
   weightValue: string;
   repsValue: string;
   setType: SessionSetTypeValue;
 };
 
-const metricsOf = (weightValue: string, repsValue: string, context: LoadContext) => {
-  weightValue = canonicalizeWeightForReps(weightValue, repsValue);
+const metricsOf = (weightValue: string, repsValue: string, context: LoadContext, measurement: Pick<LoggerValues, 'recordingMode' | 'durationSec'> = {}) => {
+  weightValue = canonicalizeSetValues({ ...measurement, weight: weightValue, reps: repsValue }).weight;
   const weight = parseSetWeight(weightValue);
   const reps = parseSetReps(repsValue);
   if (weight === null || reps === null) {
     return { weight, reps, oneRepMax: null, volume: null };
   }
-  const resolved = calculateSetMetrics({ ...context, weightValue, repsValue, performanceStatus: null });
+  const resolved = calculateSetMetrics({ ...context, ...measurement, weightValue, repsValue, performanceStatus: null });
   return { weight, reps, oneRepMax: resolved.estimatedOneRepMaxKg, volume: resolved.volumeKgReps };
 };
 
@@ -163,6 +173,7 @@ const pageRecordOf = (
       exerciseName: '',
       loadContext: context,
       sets: block.sets.map((set, setIndex) => ({
+        ...set,
         id: set.id,
         orderIndex: setIndex,
         weightValue: set.weightValue,
@@ -198,7 +209,9 @@ export const buildSetRows = (
       kind: isPerformed(set) ? 'performed' : 'pending',
       isCursor: index === cursorIndex,
       setType: values.setType,
-      ...metricsOf(values.weightValue, values.repsValue, context),
+      recordingMode: values.recordingMode,
+      durationSec: values.durationSec,
+      ...metricsOf(values.weightValue, values.repsValue, context, values),
       weightRecord: recordSet?.topWeight ?? false,
       oneRepMaxRecord: recordSet?.oneRepMax ?? false,
     };
@@ -223,8 +236,8 @@ export const recordBandFor = (
 /** The values the logger opens with: the row as displayed. */
 export const loggerValuesFor = (set: ExercisePageSet) => displayedValues(set);
 
-export const canCommitLogger = (values: { weightValue: string; repsValue: string }): boolean =>
-  hasValidActualValues({ weight: values.weightValue, reps: values.repsValue });
+export const canCommitLogger = (values: Pick<LoggerValues, 'weightValue' | 'repsValue' | 'recordingMode' | 'durationSec'>): boolean =>
+  hasValidActualValues({ ...values, weight: values.weightValue, reps: values.repsValue });
 
 const replaceSet = (
   sets: ExercisePageSet[],
@@ -243,6 +256,7 @@ export const updateLoggerValues = (
   values: {
     weightValue?: string;
     repsValue?: string;
+    durationSec?: number | null;
     setType?: SessionSetTypeValue;
   }
 ): ExercisePageSet[] =>
@@ -252,6 +266,8 @@ export const updateLoggerValues = (
       ...set,
       weightValue: values.weightValue ?? current.weightValue,
       repsValue: values.repsValue ?? current.repsValue,
+      durationSec: values.durationSec === undefined ? current.durationSec : values.durationSec,
+      performanceStatus: set.recordingMode === 'hold' && set.performanceStatus === 'planned' ? 'unperformed' : set.performanceStatus,
       setType: values.setType !== undefined ? values.setType : current.setType,
     };
   });
@@ -264,6 +280,7 @@ export const commitSet = (
 ): ExercisePageSet[] => {
   if (!canCommitLogger(values)) return sets;
   const canonical = canonicalizeSetValues({
+    ...values,
     weight: values.weightValue,
     reps: values.repsValue,
   });
@@ -271,6 +288,7 @@ export const commitSet = (
     ...set,
     weightValue: canonical.weight.trim(),
     repsValue: canonical.reps.trim(),
+    durationSec: canonical.durationSec,
     setType: values.setType,
     performanceStatus: null,
   }));
@@ -327,8 +345,9 @@ export const createLocalSetId = () =>
  * `+ Add set`: copies the last row's values and applies effort defaults, not
  * performed until ticked.
  */
-export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId(), displayEfforts?: readonly EffortChoice[]): ExercisePageSet[] => {
-  const last = sets[sets.length - 1];
+export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId(), displayEfforts?: readonly EffortChoice[], recordingMode: RecordingMode = 'reps'): ExercisePageSet[] => {
+  const candidate = sets[sets.length - 1];
+  const last = (candidate?.recordingMode ?? 'reps') === recordingMode ? candidate : undefined;
   const copied = last ? displayedValues(last) : { weightValue: '', repsValue: '', setType: null };
   return [
     ...sets,
@@ -336,7 +355,9 @@ export const addSet = (sets: ExercisePageSet[], id: string = createLocalSetId(),
       id,
       weightValue: copied.weightValue,
       repsValue: copied.repsValue,
-      setType: defaultSessionSetType(last ? copied.setType : undefined, displayEfforts),
+      recordingMode,
+      durationSec: 'durationSec' in copied ? copied.durationSec ?? null : null,
+      setType: defaultSessionSetType(last ? copied.setType : undefined, displayEfforts, recordingMode),
       plannedWeightValue: null,
       plannedRepsValue: null,
       plannedSetType: null,

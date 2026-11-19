@@ -8,6 +8,7 @@ import { selectDatedInProgressSession } from './in-progress-session';
 import { exerciseHistoryGymOptions } from './exercise-analytics';
 import { aggregateMuscleDailySets, type MuscleDailySets } from './muscle-daily-sets';
 import {
+  accumulateContributionVolume,
   aggregateSelectedMuscleDailyEffort,
   aggregateSelectedMuscleDailyEffortMetrics,
   aggregateSelectedMuscleWeeklyEffort,
@@ -206,7 +207,7 @@ const inputInScope = (input: StatsAggregationInput,
   options: { gymId?: string | null; countSecondary?: boolean; countSecondaryVolume?: boolean }) =>
   inputInGym(inputReportingMuscles(inputCountingSecondary(input, options)), options.gymId);
 
-type StatsMuscleAccumulator = { setCounter: MuscleSetCounter; totalVolume: number | null };
+type StatsMuscleAccumulator = { setCounter: MuscleSetCounter; totalVolume: number | null; hasRepetitionSets: boolean };
 
 /**
  * Per-muscle and per-family [[muscle.set-count]] and Volume, from one pass over
@@ -221,11 +222,11 @@ const accumulateMuscleTotals = (input: StatsAggregationInput) => {
 
   for (const contribution of collectMuscleSetContributions(input)) {
     const accumulator = byMuscleId.get(contribution.muscleGroupId)
-      ?? { setCounter: createMuscleSetCounter(), totalVolume: 0 };
+      ?? { setCounter: createMuscleSetCounter(), totalVolume: 0, hasRepetitionSets: false };
     byMuscleId.set(contribution.muscleGroupId, accumulator);
     countMuscleSet(accumulator.setCounter, contribution);
     // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
-    accumulator.totalVolume = addFiniteVolume(accumulator.totalVolume, contribution.weightedVolume ?? 0);
+    accumulateContributionVolume(accumulator, contribution);
 
     const familyName = familyNameByMuscleId.get(contribution.muscleGroupId);
     if (familyName === undefined) continue;
@@ -259,9 +260,11 @@ export const aggregateStats = (input: StatsAggregationInput): StatsTotals => {
   const muscleFamilies: StatsMuscleFamilyPerformance[] = Array.from(musclesByFamily.entries())
     .map(([familyName, muscles]) => {
       let familyTotalVolume: number | null = 0;
+      const supported = muscles.filter(muscle => byMuscleId.get(muscle.muscleGroupId)?.hasRepetitionSets);
+      if (supported.length === 0 && muscles.some(muscle => muscle.workingSetCount > 0)) familyTotalVolume = null;
       let familySortOrder = Number.POSITIVE_INFINITY;
       for (const muscle of muscles) {
-        familyTotalVolume = addFiniteVolume(familyTotalVolume, muscle.totalVolume);
+        if (supported.includes(muscle)) familyTotalVolume = addFiniteVolume(familyTotalVolume, muscle.totalVolume);
         if (muscle.sortOrder < familySortOrder) familySortOrder = muscle.sortOrder;
       }
       const sortedMuscles = [...muscles].sort((left, right) => {
@@ -367,6 +370,8 @@ export const createDrizzleStatsStore = (): StatsStore => ({
                 orderIndex: exerciseSets.orderIndex,
                 setType: exerciseSets.setType,
                 weightValue: exerciseSets.weightValue,
+                recordingMode: exerciseSets.recordingMode,
+                durationSec: exerciseSets.durationSec,
                 repsValue: exerciseSets.repsValue,
                 performanceStatus: exerciseSets.performanceStatus,
               })

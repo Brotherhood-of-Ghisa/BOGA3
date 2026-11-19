@@ -9,6 +9,7 @@ import type { SessionDraftExerciseInput, WorkoutEditInput } from './session-inpu
 import { hydrateSessionSetPerformanceStatus, type SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 import { normalizeSessionSetType } from './set-types';
 import type { MergeValue, MergeWireEntity } from '@/src/exercise-core/merge-types';
+import type { RecordingMode } from '@/src/exercise-core/recording-mode';
 import { rebaseWorkoutEdit } from '@/src/exercise-core/workout-rebase';
 import { workoutLoggingClientId } from '@/src/exercise-core/workout-control';
 import { assertWorkoutWritable } from './workout-control';
@@ -47,9 +48,13 @@ function editedRows(input: WorkoutEditInput): MergeWireEntity[] {
       const setId = set.id ?? newId('set');
       const old = rows.get('exercise_sets:' + setId);
       const hydrated = hydrateSessionSetPerformanceStatus(old?.fields.performance_status as SessionSetPerformanceStatus, {
+        recordingMode: old?.fields.recording_mode as RecordingMode | undefined,
+        durationSec: old?.fields.duration_sec as number | null,
         reps: String(old?.fields.reps_value ?? ''), weight: String(old?.fields.weight_value ?? ''),
       });
       put('exercise_sets', setId, { session_exercise_id: id, order_index: order,
+        recording_mode: set.recordingMode ?? old?.fields.recording_mode ?? 'reps',
+        duration_sec: set.durationSec === undefined ? old?.fields.duration_sec ?? null : set.durationSec,
         weight_value: set.weightValue, reps_value: set.repsValue, set_type: set.setType ?? null,
         planned_weight_value: set.plannedWeightValue ?? null, planned_reps_value: set.plannedRepsValue ?? null,
         planned_set_type: set.plannedSetType ?? null,
@@ -77,6 +82,8 @@ function exercisesFromRows(rows: MergeWireEntity[]): SessionDraftExerciseInput[]
     sourcePlanUseId: block.fields.source_plan_use_id as string | null,
     sets: ordered('exercise_sets').filter(set => set.fields.session_exercise_id === block.id).map(set => ({
       id: set.id, weightValue: String(set.fields.weight_value), repsValue: String(set.fields.reps_value),
+      recordingMode: (set.fields.recording_mode ?? 'reps') as RecordingMode,
+      durationSec: set.fields.duration_sec as number | null,
       setType: normalizeSessionSetType(set.fields.set_type),
       plannedWeightValue: set.fields.planned_weight_value as string | null,
       plannedRepsValue: set.fields.planned_reps_value as string | null,

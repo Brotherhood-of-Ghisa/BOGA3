@@ -13,6 +13,7 @@ import {
   type ReportedMuscle,
 } from '@/src/data/muscle-analytics';
 import { validateExerciseCore } from '@/src/exercise-core';
+import type { RecordingMode } from '@/src/exercise-core/recording-mode';
 import { isRestTimerSec, validateExerciseRestTimerSec, type ExerciseRestTimerValidation } from '@/src/exercise-core/rest-timer';
 
 import { isUntrackedEntry, muscleIdOfEntry, reportedMappings, writableEntryOf } from './muscle-setup';
@@ -34,6 +35,7 @@ export type ExerciseEditorPrefill = {
   bodyweightContribution?: number;
   name: string;
   loadInputMode: EditorLoadInputMode;
+  recordingMode?: RecordingMode;
   splitByGym?: boolean;
   restTimerSec?: number | null;
   mappings: Pick<ExerciseCatalogExerciseMuscleMapping, 'muscleGroupId' | 'weight' | 'role'>[];
@@ -45,6 +47,7 @@ export const buildDuplicateExercisePrefill = (
 ): ExerciseEditorPrefill => ({
   name: `${exercise.name} (Copy)`,
   loadInputMode: exercise.loadInputMode ?? 'total_load',
+  recordingMode: exercise.recordingMode ?? 'reps',
   bodyweightContribution: exercise.bodyweightContribution,
   splitByGym: exercise.splitByGym,
   restTimerSec: exercise.restTimerSec,
@@ -103,6 +106,7 @@ export const buildEditorMuscleSelectionsFromExercise = (
 export type EditorOpenState = {
   name: string;
   loadInputMode: EditorLoadInputMode;
+  recordingMode?: RecordingMode;
   primaryMuscleGroupIds: string[];
   secondaryMuscleRows: EditableSecondaryMuscleRow[];
   contributionPercentage: string;
@@ -115,6 +119,7 @@ const prefillAsExercise = (prefill: ExerciseEditorPrefill): ExerciseCatalogExerc
   id: '',
   name: prefill.name,
   loadInputMode: prefill.loadInputMode,
+  recordingMode: prefill.recordingMode ?? 'reps',
   bodyweightContribution: 0,
   splitByGym: prefill.splitByGym ?? false,
   restTimerSec: prefill.restTimerSec ?? null,
@@ -134,6 +139,7 @@ export const editorOpenState = (
     return {
       name: editingExercise.name,
       loadInputMode: editingExercise.loadInputMode ?? 'total_load',
+      recordingMode: editingExercise.recordingMode ?? 'reps',
       ...buildEditorMuscleSelectionsFromExercise(editingExercise, assignment),
       contributionPercentage,
       splitByGym: editingExercise.splitByGym,
@@ -145,6 +151,7 @@ export const editorOpenState = (
     return {
       name: prefill.name,
       loadInputMode: prefill.loadInputMode,
+  recordingMode: prefill.recordingMode ?? 'reps',
       ...buildEditorMuscleSelectionsFromExercise(prefilled, assignment),
       contributionPercentage,
       splitByGym: prefilled.splitByGym,
@@ -154,6 +161,7 @@ export const editorOpenState = (
   return {
     name: '',
     loadInputMode: 'total_load',
+    recordingMode: 'reps',
     primaryMuscleGroupIds: [],
     secondaryMuscleRows: [],
     contributionPercentage,
@@ -254,6 +262,7 @@ export const validateEditorInput = ({
 }: {
   name: string;
   loadInputMode: EditorLoadInputMode;
+  recordingMode?: RecordingMode;
   primaryMuscleGroupIds: string[];
   secondaryMuscleRows: EditableSecondaryMuscleRow[];
   /** The mappings the form opened with: the edited exercise's, else the prefill's. */

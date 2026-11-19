@@ -403,7 +403,7 @@ stream_case_sql() {
 do \$set\$ begin
   perform set_config('request.jwt.claims', json_build_object('sub','${OWNER_UID}','role','authenticated')::text, true);
   perform set_config('request.jwt.claim.sub', '${OWNER_UID}', true);
-  perform set_config('request.headers', '{\"x-boga-sync-protocol\":\"7\",\"x-boga-group-contract\":\"4\"}', true);
+  perform set_config('request.headers', '{\"x-boga-sync-protocol\":\"8\",\"x-boga-group-contract\":\"4\"}', true);
   execute replace(pg_get_functiondef('app_public.group_competition_stream_v3(uuid,text,integer)'::regprocedure),
     'FUNCTION app_public.group_competition_stream_v3(', 'FUNCTION pg_temp.stream_v3_page(');
   create temp table locks_boards on commit drop as select id, payload->'boards' as boards

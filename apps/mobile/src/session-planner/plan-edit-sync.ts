@@ -199,7 +199,7 @@ const planBlockOperations = (
 
 const blockDiffers = (
   existing: PlanDetailView['blocks'][number],
-  draft: { name: string; exerciseDefinitionId: string | null; sets: { targetWeightValue: string | null; targetReps: number; targetSetType: unknown }[] },
+  draft: { name: string; exerciseDefinitionId: string | null; sets: { targetWeightValue: string | null; targetReps: number | null; recordingMode?: 'reps' | 'hold'; targetDurationSec?: number | null; targetSetType: unknown }[] },
 ): boolean =>
   existing.name !== draft.name ||
   existing.exerciseDefinitionId !== draft.exerciseDefinitionId ||
@@ -208,5 +208,7 @@ const blockDiffers = (
     (target, index) =>
       target.targetWeightValue !== draft.sets[index].targetWeightValue ||
       target.targetReps !== draft.sets[index].targetReps ||
+      target.recordingMode !== (draft.sets[index].recordingMode ?? 'reps') ||
+      target.targetDurationSec !== (draft.sets[index].targetDurationSec ?? null) ||
       target.targetSetType !== draft.sets[index].targetSetType,
   );

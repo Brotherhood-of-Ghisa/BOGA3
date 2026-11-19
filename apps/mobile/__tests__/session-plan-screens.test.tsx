@@ -55,6 +55,7 @@ import { sessions, sessionPlanExercises, sessionPlans, sessionPlanUses } from '@
 import * as routineUseStore from '@/src/data/session-plan-use-store';
 import { eq } from 'drizzle-orm';
 import { PlanCardChoiceSheet } from '@/components/session-planner/plan-card-choice-sheet';
+import { PlanDetailBlocks } from '@/components/session-planner/plan-detail-blocks';
 import { PlanFormScreen } from '@/components/session-planner/plan-form-screen';
 import { planRepository, savePlanEdits, skipSessionPlanUse, startSessionPlan } from '@/src/session-planner';
 import { planFormFromDetail, type PlanFormState } from '@/src/session-planner/plan-form-model';
@@ -1461,5 +1462,40 @@ describe('Routine screens over real data', () => {
     expect(active.exercises).toHaveLength(2);
     expect(active.exercises.every(block => block.sets.every(set => set.weightValue === '' && set.performanceStatus === 'planned'))).toBe(true);
     expect(await loadSessionSnapshotById(started.sessionId)).toEqual(history);
+  });
+});
+
+
+describe('hold plan forms over real data', () => {
+  it.each(['new', 'replace'])('keeps seconds through %s exercise selection, save and reload', async mode => {
+    await seedCatalog();
+    await saveExerciseCatalogExercise({ id: 'hold-plan', name: 'Hollow Hold', recordingMode: 'hold', loadInputMode: 'total_load',
+      mappings: [{ muscleGroupId: 'abs_rectus', role: 'primary', weight: 1 }] });
+    const view = renderWithTheme(<SessionPlanNewScreen editPlanId={null} fromPlanId={null} />);
+    await screen.findByTestId('plan-form-title');
+    fillTitle('Timed plan');
+    if (mode === 'replace') {
+      await addExerciseBlock('Bench Press');
+      await fillBlockName(1, 'Hollow Hold');
+    } else await addExerciseBlock('Hollow Hold');
+    expect(screen.getByLabelText('Set 1 time in seconds')).toBeTruthy();
+    expect(screen.queryByLabelText('Set 1 reps')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-duration'), '301');
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    expect(screen.getByText('Time must be whole seconds from 1 to 300, without reps.')).toBeTruthy();
+    expect(mockReplace).not.toHaveBeenCalled();
+    fireEvent.changeText(screen.getByTestId('plan-form-block-1-set-1-duration'), '45');
+    fireEvent.press(screen.getByTestId('plan-form-save'));
+    await waitFor(() => expect(mockReplace).toHaveBeenCalledTimes(1));
+    const plan = (await planQueries.listUnscheduledPlans()).find(plan => plan.title === 'Timed plan')!;
+    const detail = await planQueries.loadPlanDetail(plan.id);
+    expect(detail?.blocks[0].targets[0]).toMatchObject({ recordingMode: 'hold', targetDurationSec: 45, targetReps: null, targetSetType: 'rir_0' });
+    view.unmount();
+    const preview = renderWithTheme(<PlanDetailBlocks detail={detail!} onAdd={jest.fn()} onSkip={jest.fn()} onOpenSession={jest.fn()} />);
+    expect(screen.getByTestId('plan-detail-block-1-targets')).toHaveProp('accessibilityLabel', expect.stringContaining('45 seconds'));
+    preview.unmount();
+    renderWithTheme(<SessionPlanNewScreen editPlanId={plan.id} fromPlanId={null} />);
+    expect(await screen.findByTestId('plan-form-block-1-set-1-duration')).toHaveProp('value', '45');
+    expect(screen.queryByLabelText('Set 1 reps')).toBeNull();
   });
 });

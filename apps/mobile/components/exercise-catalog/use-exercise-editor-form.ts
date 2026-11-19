@@ -16,6 +16,7 @@ import {
   type ExerciseEditorPrefill,
   type MuscleSelectorMode,
 } from '@/src/exercise-catalog/editor-model';
+import type { RecordingMode } from '@/src/exercise-core/recording-mode';
 import type { MuscleSetup } from '@/src/exercise-catalog/muscle-setup';
 import { validateBodyweightContribution } from '@/src/exercise-core/bodyweight-contribution';
 
@@ -23,6 +24,7 @@ export type ExerciseEditorSaveInput = {
   bodyweightContribution?: number;
   name: string;
   loadInputMode: EditorLoadInputMode;
+  recordingMode: RecordingMode;
   splitByGym: boolean;
   /** Null uses the global rest timer. */
   restTimerSec: number | null;
@@ -54,6 +56,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
   const [exerciseName, setExerciseName] = useState('');
   const [bodyweightContributionField, setBodyweightContributionField] = useState<BodyweightContributionFieldValue>({ percentage: '0' });
   const [bodyweightContributionError, setBodyweightContributionError] = useState<string | null>(null);
+  const [recordingMode, setRecordingMode] = useState<RecordingMode>('reps');
   const [loadInputMode, setLoadInputMode] = useState<EditorLoadInputMode>('total_load');
   const [splitByGym, setSplitByGym] = useState(false);
   const [restTimerText, setRestTimerText] = useState('');
@@ -83,6 +86,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
       const open = editorOpenState(editingExercise, prefill, muscleSetup.assignment);
       setExerciseName(open.name);
       setLoadInputMode(open.loadInputMode);
+      setRecordingMode(open.recordingMode ?? 'reps');
       setSplitByGym(open.splitByGym);
       setRestTimerText(open.restTimerText);
       setRestTimerError(null);
@@ -180,7 +184,7 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     Keyboard.dismiss();
     setIsSaving(true);
     try {
-      const input = { bodyweightContribution: contribution.value, name: exerciseName, loadInputMode, splitByGym, restTimerSec: restTimer.value, mappings: checked.mappings };
+      const input = { bodyweightContribution: contribution.value, name: exerciseName, loadInputMode, recordingMode, splitByGym, restTimerSec: restTimer.value, mappings: checked.mappings };
       const savedExercise = onSave
         ? await onSave(input)
         : await saveExerciseCatalogExercise({ id: editingExercise?.id ?? undefined, ...input });
@@ -199,6 +203,8 @@ export function useExerciseEditorForm({ visible, editingExercise, prefill, muscl
     bodyweightContributionField,
     bodyweightContributionError,
     loadInputMode,
+    recordingMode,
+    setRecordingMode,
     splitByGym,
     restTimerText,
     restTimerError,

@@ -63,7 +63,10 @@ export const fixtureStatements = (input: FixtureSpec): string[] => {
     `drop table if exists perf_fx, perf_members, perf_exercises, perf_group_exercises, perf_splits, perf_sessions`,
     `create temporary table perf_fx as select '${tag}'::text as tag, gen_random_uuid() as group_id,
        floor(extract(epoch from now())*1000)::bigint as now_ms, ${days}::int as days`,
-    `create temporary table perf_members as select n as idx, gen_random_uuid() as uid from generate_series(1,${members}) n`,
+    // Stable member order keeps initial publication/previous-leader work comparable between history points.
+    `create temporary table perf_members as select n as idx,
+       (substr(md5('perf-member-${tag}'),1,12)||'40008000'||lpad(to_hex(n),12,'0'))::uuid as uid
+       from generate_series(1,${members}) n`,
     `create temporary table perf_exercises(ex int, name text, linked boolean, bodyweight double precision, base numeric)`,
     `insert into perf_exercises values ${exercises}`,
     `create temporary table perf_group_exercises as select ex, gen_random_uuid() as id from perf_exercises where linked`,

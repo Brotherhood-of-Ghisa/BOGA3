@@ -301,3 +301,46 @@ describe('independent tonnage totals', () => {
     expect(workingSetsBySession(input)).toEqual([]);
   });
 });
+
+
+it('keeps lifting Volume when holds share a workout, a week, or cumulative period days', () => {
+  const at = local(2026, 3, 17, 12);
+  const input: StatsAggregationInput = { sessions: [{ id: 'mixed', completedAt: at }, { id: 'hold', completedAt: local(2026, 3, 18, 9) }],
+    sessionExercises: [{ id: 'bench', sessionId: 'mixed', exerciseDefinitionId: null }, { id: 'plank', sessionId: 'mixed', exerciseDefinitionId: null },
+      { id: 'hollow', sessionId: 'hold', exerciseDefinitionId: null }],
+    exerciseSets: [{ sessionExerciseId: 'bench', weightValue: '100', repsValue: '10', setType: 'rir_2' },
+      ...['plank', 'hollow'].map(sessionExerciseId => ({ sessionExerciseId, recordingMode: 'hold' as const, durationSec: 38,
+        weightValue: '5', repsValue: '', setType: 'rir_0' }))], muscleMappings: [], muscleGroups: [] };
+  const sessions = progressMetricsBySession(input);
+  expect(sessions).toMatchObject([{ workingSets: 2, volumeKgReps: 1000 }, { workingSets: 1, volumeKgReps: null, volumeUnsupported: true }]);
+  const result = ready(deriveTodayProgress({ now: local(2026, 3, 18, 12), periodWeeks: 4, sessions, latest: LATEST, prAchievedAt: [] }));
+  expect(result.week.current).toMatchObject({ sessions: 2, workingSets: 3, volumeKgReps: 1000 });
+  expect(result.period.toDate.volumeKgReps).toBe(1000);
+  expect(result.period.cumulativeVolumeKgReps.at(-1)).toBe(1000);
+  const holdOnly = ready(deriveTodayProgress({ now: local(2026, 3, 18, 12), periodWeeks: 4, sessions: [sessions[1]], latest: LATEST, prAchievedAt: [] }));
+  expect(holdOnly.week.current.volumeKgReps).toBeNull();
+  expect(holdOnly.period.cumulativeVolumeKgReps.at(-1)).toBeNull();
+  const overflow = ready(deriveTodayProgress({ now: local(2026, 3, 18, 12), periodWeeks: 4,
+    sessions: [sessions[1], session('overflow', at, 1, null)], latest: LATEST, prAchievedAt: [] }));
+  expect(overflow.period.toDate.volumeKgReps).toBeNull();
+  expect(overflow.period.cumulativeVolumeKgReps.at(-1)).toBeNull();
+});
+
+
+it('keeps empty and unchecked workouts neutral beside hold-only Volume, while empty-only remains zero', () => {
+  const at = local(2026, 3, 17, 12);
+  const input: StatsAggregationInput = { sessions: ['hold', 'empty', 'unchecked'].map(id => ({ id, completedAt: at })),
+    sessionExercises: ['hold', 'unchecked'].map(id => ({ id, sessionId: id, exerciseDefinitionId: null })),
+    exerciseSets: [{ sessionExerciseId: 'hold', recordingMode: 'hold', durationSec: 38, weightValue: '', repsValue: '', setType: 'rir_0' },
+      { sessionExerciseId: 'unchecked', weightValue: '100', repsValue: '10', setType: 'rir_2', performanceStatus: 'unperformed' }],
+    muscleMappings: [], muscleGroups: [] };
+  const sessions = progressMetricsBySession(input);
+  const result = ready(deriveTodayProgress({ now: local(2026, 3, 18, 12), periodWeeks: 4, sessions, latest: LATEST, prAchievedAt: [] }));
+  expect(result.week.current).toMatchObject({ sessions: 1, workingSets: 1, volumeKgReps: null });
+  expect(result.period.toDate.volumeKgReps).toBeNull();
+  expect(result.period.cumulativeVolumeKgReps.at(-1)).toBeNull();
+  const empty = ready(deriveTodayProgress({ now: local(2026, 3, 18, 12), periodWeeks: 4,
+    sessions: sessions.slice(1), latest: LATEST, prAchievedAt: [] }));
+  expect(empty.week.current.volumeKgReps).toBe(0);
+  expect(empty.period.cumulativeVolumeKgReps.at(-1)).toBe(0);
+});

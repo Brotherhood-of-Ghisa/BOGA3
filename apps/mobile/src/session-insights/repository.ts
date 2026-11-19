@@ -240,6 +240,8 @@ export const createDrizzleSessionInsightsStore = (): SessionInsightsStore => ({
         sessionExerciseId: exerciseSets.sessionExerciseId,
         orderIndex: exerciseSets.orderIndex,
         weightValue: exerciseSets.weightValue,
+        recordingMode: exerciseSets.recordingMode,
+        durationSec: exerciseSets.durationSec,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
         performanceStatus: exerciseSets.performanceStatus,

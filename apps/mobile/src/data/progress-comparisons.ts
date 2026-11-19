@@ -1,6 +1,5 @@
-import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import {
-  collectMuscleSetContributions, countMuscleSet, createMuscleSetCounter,
+  accumulateContributionVolume, collectMuscleSetContributions, countMuscleSet, createMuscleSetCounter,
   type MuscleAnalyticsInput, type MuscleSetContribution, type MuscleSetCounter,
 } from './muscle-analytics';
 
@@ -56,21 +55,21 @@ export const compareProgressVolume = (current: number | null, previous: number |
   return Number.isFinite(percent) ? { kind: 'percent', percent } : { kind: 'increased' };
 };
 
-type PeriodAccumulator = ProgressPeriodValues & { setCounter: MuscleSetCounter };
+type PeriodAccumulator = ProgressPeriodValues & { setCounter: MuscleSetCounter; hasRepetitionSets: boolean };
 const emptyPeriod = (): PeriodAccumulator => ({
-  workingSetCount: 0, totalVolume: 0, volumeSetCount: 0, setCounter: createMuscleSetCounter(),
+  workingSetCount: 0, totalVolume: 0, volumeSetCount: 0, setCounter: createMuscleSetCounter(), hasRepetitionSets: false,
 });
 
 const accumulate = (values: PeriodAccumulator, contribution: MuscleSetContribution): void => {
   countMuscleSet(values.setCounter, contribution);
   values.workingSetCount = values.setCounter.counts.weightedSetCount;
+  accumulateContributionVolume(values, contribution);
   if (!contribution.volumeIncluded) return;
   values.volumeSetCount += 1;
   // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
-  values.totalVolume = addFiniteVolume(values.totalVolume, contribution.weightedVolume ?? 0);
 };
 
-const periodValues = ({ setCounter: _counter, ...values }: PeriodAccumulator): ProgressPeriodValues => values;
+const periodValues = ({ setCounter: _counter, hasRepetitionSets: _supported, ...values }: PeriodAccumulator): ProgressPeriodValues => values;
 type ComparisonAccumulator = { current: PeriodAccumulator; previous: PeriodAccumulator };
 const emptyComparison = (): ComparisonAccumulator => ({ current: emptyPeriod(), previous: emptyPeriod() });
 const comparison = (values: ComparisonAccumulator): ProgressComparison => ({

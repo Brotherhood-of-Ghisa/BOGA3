@@ -115,11 +115,13 @@ export const startSessionPlan = async (planId: string, now: Date = new Date()): 
         sets: block.sets.map((target) => ({
           id: planStartSetId(ownerId, target.id),
           repsValue: '',
-          weightValue: '',
+          weightValue: target.recordingMode === 'hold' ? target.targetWeightValue ?? '' : '',
           // The working default in the recorder's set vocabulary; the target's
           // own type stays in planned_set_type.
-          setType: null,
-          plannedRepsValue: String(target.targetReps),
+          setType: target.recordingMode === 'hold' ? normalizeSessionSetType(target.targetSetType) : null,
+          recordingMode: target.recordingMode ?? 'reps',
+          durationSec: target.recordingMode === 'hold' ? target.targetDurationSec ?? null : null,
+          plannedRepsValue: target.targetReps === null ? null : String(target.targetReps),
           plannedWeightValue: target.targetWeightValue,
           plannedSetType: normalizeSessionSetType(target.targetSetType),
           performanceStatus: 'planned',
@@ -145,6 +147,8 @@ const toDraftExerciseInput = (exercise: SessionDraftExerciseSnapshot): SessionDr
   sets: exercise.sets.map((set) => ({
     id: set.id,
     repsValue: set.repsValue,
+    recordingMode: set.recordingMode,
+    durationSec: set.durationSec,
     weightValue: set.weightValue,
     setType: set.setType,
     plannedRepsValue: set.plannedRepsValue ?? null,
@@ -158,15 +162,17 @@ const toDraftExerciseInput = (exercise: SessionDraftExerciseSnapshot): SessionDr
 
 const plannedSetInput = (
   cardId: string,
-  target: { id: string; targetWeightValue: string | null; targetReps: number; targetSetType: string | null },
+  target: { id: string; targetWeightValue: string | null; targetReps: number | null; recordingMode?: 'reps' | 'hold'; targetDurationSec?: number | null; targetSetType: string | null },
 ): SessionDraftExerciseInput['sets'][number] => ({
   id: planAttachedSetId(cardId, target.id),
   repsValue: '',
-  weightValue: '',
+  weightValue: target.recordingMode === 'hold' ? target.targetWeightValue ?? '' : '',
   // The working default in the recorder's set vocabulary; the target's own
   // type stays in planned_set_type.
-  setType: null,
-  plannedRepsValue: String(target.targetReps),
+  setType: target.recordingMode === 'hold' ? normalizeSessionSetType(target.targetSetType) : null,
+  recordingMode: target.recordingMode ?? 'reps',
+          durationSec: target.recordingMode === 'hold' ? target.targetDurationSec ?? null : null,
+          plannedRepsValue: target.targetReps === null ? null : String(target.targetReps),
   plannedWeightValue: target.targetWeightValue,
   plannedSetType: normalizeSessionSetType(target.targetSetType),
   performanceStatus: 'planned',

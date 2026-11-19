@@ -113,7 +113,15 @@ Legacy requests keep their exact shapes. Updated readers accept both and show
 unavailable when this projection is absent; zero remains numeric. Disposable
 cache generation 8 retires earlier displays.
 
-Group session rows implement [[set.row-figures]] with public added-load Weight
+Duration-aware session detail v2 and stream v6 expose set mode, seconds and a
+current performed fact. Earlier endpoints retain exact legacy shapes. A hidden-kg
+hold displays only seconds, validated by a matching rules-8 set fingerprint;
+pending evaluation fails closed. Holds count under [[set.eligibility]] and
+produce no score or certification candidate. Cache generation 9 retires prior
+session/count projections. CoW scorer 7 remains independently pinned; new timed
+receipts are ineligible without changing retained repetition arithmetic.
+
+Group repetition session rows implement [[set.row-figures]] with public added-load Weight
 and the added 1RM projection; Volume remains total work. Unit labels follow
 [[copy.no-weight-unit]].
 

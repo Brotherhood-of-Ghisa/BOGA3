@@ -21,11 +21,11 @@ const blockStateWord = (block: PlanBlockView): string => {
   return 'Ready';
 };
 
-const blockTargetsLine = (block: PlanBlockView): string => {
+const blockTargetsLine = (block: PlanBlockView, timeUnit = 's'): string => {
   const parts = block.targets.map((target) => {
     const weight = target.targetWeightValue !== null ? target.targetWeightValue : '—';
     const effort = formatSessionSetType(target.targetSetType);
-    return `${weight} × ${target.targetReps}${effort ? ` (${effort})` : ''}`;
+    return `${weight} × ${target.recordingMode === 'hold' ? `${target.targetDurationSec} ${timeUnit}` : target.targetReps}${effort ? ` (${effort})` : ''}`;
   });
   return parts.join(' · ');
 };
@@ -50,7 +50,7 @@ export function PlanDetailBlocks({ detail, onAdd, onSkip, onOpenSession }: PlanD
             <Text allowFontScaling={false} style={text.meta} testID={`plan-detail-block-${index + 1}-state`}>
               <FigureText>{`${detail.isRoutine ? '' : `${blockStateWord(block)} · `}Block ${index + 1} of ${detail.blocks.length}`}</FigureText>
             </Text>
-            <Text allowFontScaling={false} style={[text.meta, tone.ink]} testID={`plan-detail-block-${index + 1}-targets`}>
+            <Text allowFontScaling={false} accessibilityLabel={blockTargetsLine(block, 'seconds')} style={[text.meta, tone.ink]} testID={`plan-detail-block-${index + 1}-targets`}>
               <FigureText>{blockTargetsLine(block)}</FigureText>
             </Text>
           </View>

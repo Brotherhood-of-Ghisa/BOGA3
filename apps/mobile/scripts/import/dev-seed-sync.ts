@@ -114,7 +114,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
       accept: 'application/json',
       'accept-profile': 'app_public',
       'content-profile': 'app_public',
-      'x-boga-sync-protocol': '7',
+      'x-boga-sync-protocol': '8',
     },
     body: JSON.stringify({ entities: batch }),
   });

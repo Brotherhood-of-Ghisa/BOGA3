@@ -167,3 +167,16 @@ describe('agent exercise delete and restore', () => {
     expect(rejection(() => normalizeExerciseRevision({ expected_revision: 42, name: 'x' }))).toBe('Unsupported field: name');
   });
 });
+
+
+it('validates recording mode while omitted edits preserve the saved choice', () => {
+  for (const recording_mode of ['reps', 'hold']) {
+    expect(normalizeExerciseCreate({ name: 'Plank', muscles: [primary], recording_mode }).recording_mode).toBe(recording_mode);
+    expect(normalizeExerciseUpdate({ expected_revision: 5, recording_mode }).changes).toEqual({ recording_mode });
+  }
+  expect(normalizeExerciseUpdate({ expected_revision: 5, name: 'Plank' }).changes).not.toHaveProperty('recording_mode');
+  for (const recording_mode of [null, '', 'timer']) {
+    expect(() => normalizeExerciseCreate({ name: 'Plank', muscles: [primary], recording_mode })).toThrow(ExerciseEditError);
+    expect(() => normalizeExerciseUpdate({ expected_revision: 5, recording_mode })).toThrow(ExerciseEditError);
+  }
+});

@@ -15,7 +15,9 @@ export const sessionPlanSets = sqliteTable(
       .references(() => sessionPlanExercises.id, { onDelete: 'cascade' }),
     orderIndex: integer('order_index').notNull(),
     targetWeightValue: text('target_weight_value'),
-    targetReps: integer('target_reps').notNull(),
+    recordingMode: text('recording_mode', { enum: ['reps', 'hold'] }).notNull().default('reps'),
+    targetReps: integer('target_reps'),
+    targetDurationSec: integer('target_duration_sec'),
     targetSetType: text('target_set_type'),
     lastModifiedBy: text('last_modified_by', { enum: ['human', 'agent'] })
       .notNull()
@@ -39,7 +41,10 @@ export const sessionPlanSets = sqliteTable(
       'session_plan_sets_plan_exercise_id_order_index_unique'
     ).on(table.sessionPlanExerciseId, table.orderIndex),
     orderGuard: check('session_plan_sets_order_index_non_negative', sql`${table.orderIndex} >= 0`),
-    targetRepsGuard: check('session_plan_sets_target_reps_positive', sql`${table.targetReps} > 0`),
+    targetMeasurementGuard: check('session_plan_sets_target_measurement_valid', sql`
+      (${table.recordingMode} = 'reps' and ${table.targetReps} is not null and ${table.targetReps} > 0 and ${table.targetDurationSec} is null)
+      or (${table.recordingMode} = 'hold' and ${table.targetReps} is null and ${table.targetDurationSec} is not null and ${table.targetDurationSec} between 1 and 300 and ${table.targetDurationSec} = cast(${table.targetDurationSec} as integer))
+    `),
     lastModifiedByGuard: check(
       'session_plan_sets_last_modified_by_valid',
       sql`${table.lastModifiedBy} in ('human', 'agent')`

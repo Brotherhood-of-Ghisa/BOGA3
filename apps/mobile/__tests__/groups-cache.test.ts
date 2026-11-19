@@ -19,8 +19,8 @@ afterEach(() => fixture.close());
 
 it('uses generation eight and binds sessions to the authorized group', () => {
   expect(groupCacheKeys).toBe(competitionCacheKeys);
-  expect(groupCacheKeys.mine).toBe('groups:v8:mine');
-  expect(groupCacheKeys.session('g1','other','s1')).toBe('session:v8:g1:other:s1');
+  expect(groupCacheKeys.mine).toBe('groups:v9:mine');
+  expect(groupCacheKeys.session('g1','other','s1')).toBe('session:v9:g1:other:s1');
   expect(groupCacheKeys.session('g2','other','s1')).not.toBe(groupCacheKeys.session('g1','other','s1'));
   expect(groupCacheKeys).not.toHaveProperty('streamAll');
 });
@@ -52,12 +52,12 @@ it.each([
   expect(readGroupCache(fixture.database,key,'u1')).toBeNull();
 });
 it('keeps podiums under the All scope only', () => {
-  expect(groupCacheKeys.boards('g1')).toBe('boards:v8:g1:all');
+  expect(groupCacheKeys.boards('g1')).toBe('boards:v9:g1:all');
   const certified={ contract_version: 4,certified: true,podiums: [] };
   expect(() => put(groupCacheKeys.boards('g1'),certified)).toThrow('Unsafe group cache payload.');
   // The key podiums used before they read All is never read again.
-  raw('boards:v8:g1',{ ...certified,certified: false });
-  expect(readGroupCache(fixture.database,'boards:v8:g1','u1')).toBeNull();
+  raw('boards:v9:g1',{ ...certified,certified: false });
+  expect(readGroupCache(fixture.database,'boards:v9:g1','u1')).toBeNull();
 });
 it('upserts owner and fetch time without exposing the earlier account', () => {
   put(groupCacheKeys.mine,{ groups: [competitionGroup] });
@@ -115,7 +115,7 @@ it('access loss drops group projections and every session join; local links rema
   put(groupCacheKeys.glance('g10','week',0),periodTotals('g10'));
   put(groupCacheKeys.boards('g1'),{ contract_version: 4,certified: false,podiums: [] });
   // Certified podiums cached before the page read All.
-  raw('boards:v8:g1',{ contract_version: 4,certified: true,podiums: [] });
+  raw('boards:v9:g1',{ contract_version: 4,certified: true,podiums: [] });
   put(groupCacheKeys.mine,{ groups: [competitionGroup] });
   evictGroup(fixture.database,'g1');
   // Every At a glance entry of g1 goes; g10's (a longer id with the same prefix) stays.

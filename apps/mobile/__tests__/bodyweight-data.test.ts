@@ -206,6 +206,6 @@ it('puts only the final preference and contribution fields on the sync wire', ()
   });
   expect(Object.keys(definition.fields).sort()).toEqual([
     'bodyweight_contribution', 'created_at', 'deleted_at', 'load_input_mode', 'name',
-    'rest_timer_sec', 'split_by_gym', 'updated_at',
+    'recording_mode', 'rest_timer_sec', 'split_by_gym', 'updated_at',
   ]);
 });

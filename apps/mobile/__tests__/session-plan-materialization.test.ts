@@ -45,6 +45,9 @@ import {
 } from '@/src/data/schema';
 import { addPlanBlockToSession, planRepository, startSessionPlan } from '@/src/session-planner';
 import type { PlanDraft } from '@/src/session-planner/types';
+import { completeActiveSession } from '@/src/session-recorder/session-lifecycle';
+import { mapDraftSnapshotToSession } from '@/src/session-recorder/session-model';
+import { readRoutineHistory } from '@/src/data/routine-history';
 
 let fixture: InMemoryDatabaseFixture;
 
@@ -106,6 +109,39 @@ afterEach(() => {
 });
 
 describe('startSessionPlan', () => {
+  it.each([false, true])('completes confirmed 38-second work from a 45-second target, routine=%s', async isRoutine => {
+    db().update(exerciseDefinitions).set({ recordingMode: 'hold' }).where(eq(exerciseDefinitions.id, 'def-squat')).run();
+    const created = await planRepository.createPlan({ ...planDraft(), isRoutine, exercises: [exercise('Plank', {
+      sets: [set({ recordingMode: 'hold', targetDurationText: '45', targetRepsText: '', targetWeightText: '5', targetSetType: 'rir_0' })],
+    })] }, T0);
+    if (created.status !== 'saved') throw new Error('seed failed');
+    const start = await startSessionPlan(created.id, T1);
+    if (start.status !== 'started') throw new Error('start failed');
+    const snapshot = await loadSessionSnapshotById(start.sessionId);
+    expect(snapshot?.exercises[0].sets[0]).toMatchObject({
+      recordingMode: 'hold', durationSec: 45, repsValue: '', plannedRepsValue: null,
+      weightValue: '5', setType: 'rir_0', performanceStatus: 'planned',
+    });
+    const exercises = snapshot!.exercises.map(block => ({ ...block, sets: block.sets.map(row => ({
+      ...row, durationSec: 38, performanceStatus: null,
+    })) }));
+    await persistSessionDraftSnapshot({ sessionId: start.sessionId, gymId: snapshot!.gymId, startedAt: T1, exercises });
+    const confirmed = await loadSessionSnapshotById(start.sessionId);
+    await completeActiveSession({ sessionId: start.sessionId, gymId: snapshot!.gymId, startedAt: T1,
+      completedHistorySession: mapDraftSnapshotToSession(confirmed!),
+    });
+    expect(db().select().from(sessionPlanExercises).get()?.progressStatus).toBe(isRoutine ? 'pending' : 'completed');
+    expect((await loadSessionSnapshotById(start.sessionId))?.exercises[0].sets[0]).toMatchObject({ durationSec: 38, performanceStatus: null });
+    if (isRoutine) {
+      expect((await readRoutineHistory([created.id])).workouts).toMatchObject([{ status: 'completed', hasConfirmedSourceWork: true }]);
+      const again = await startSessionPlan(created.id, new Date(T1.getTime() + 1000));
+      if (again.status !== 'started') throw new Error('reuse failed');
+      expect(again.sessionId).not.toBe(start.sessionId);
+      expect((await loadSessionSnapshotById(again.sessionId))?.exercises[0].sets[0])
+        .toMatchObject({ durationSec: 45, repsValue: '', setType: 'rir_0', performanceStatus: 'planned' });
+    }
+  });
+
   it('materializes every available block into one active, dirty, recorder-readable graph', async () => {
     const created = await planRepository.createPlan(planDraft(), T0);
     if (created.status !== 'saved') throw new Error('seed failed');

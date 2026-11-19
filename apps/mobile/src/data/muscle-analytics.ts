@@ -42,6 +42,8 @@ export type MuscleAnalyticsInput = {
     orderIndex?: number;
     setType: string | null;
     weightValue: string;
+    recordingMode?: 'reps' | 'hold';
+    durationSec?: number | null;
     repsValue: string;
     performanceStatus?: SessionSetPerformanceStatus;
   }[];
@@ -88,6 +90,8 @@ export type MuscleSetContribution = {
   setOrderIndex: number | null;
   setType: string | null;
   weightValue: string;
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   repsValue: string;
 };
 
@@ -261,6 +265,7 @@ const isMuscleAnalyticsWorkingSet = (
   set: MuscleAnalyticsInput['exerciseSets'][number], policy?: EffortCalculationPolicy,
 ): boolean =>
   isWorkingSet({
+    ...set,
     reps: set.repsValue,
     weight: set.weightValue,
     performanceStatus: set.performanceStatus,
@@ -287,6 +292,7 @@ export const countMuscleAnalyticsWorkingSets = (input: MuscleAnalyticsInput): nu
 export const countedMuscleAnalyticsSessionIds = (input: MuscleAnalyticsInput): Set<string> => {
   const sessionIdOf = sessionIdByExerciseId(input);
   return countedSessionIds(input.exerciseSets, (set) => ({
+    ...set,
     sessionId: sessionIdOf.get(set.sessionExerciseId),
     reps: set.repsValue,
     weight: set.weightValue,
@@ -369,9 +375,10 @@ export const collectMuscleSetContributions = (
   // Emit either contribution, carrying settled eligibility for each column.
   for (const [setIndex, set] of input.exerciseSets.entries()) {
     const working = isMuscleAnalyticsWorkingSet(set, input.effortPolicy);
-    const volumeIncluded = isVolumeSet({ reps: set.repsValue, weight: set.weightValue,
+    const volumeIncluded = isVolumeSet({ ...set, reps: set.repsValue, weight: set.weightValue,
       performanceStatus: set.performanceStatus, setType: set.setType }, input.effortPolicy);
     const isRehab = isRehabSessionSetType(set.setType) && isConfirmedPerformedSet({
+      ...set,
       reps: set.repsValue, weight: set.weightValue, performanceStatus: set.performanceStatus,
     });
     if (!working && !volumeIncluded && (!input.includeRehabSets || !isRehab)) continue;
@@ -392,7 +399,7 @@ export const collectMuscleSetContributions = (
       input.effortPolicy,
     );
     const metrics = calculateAnalyticsSetMetrics({ ...set, ...context });
-    const rawSetVolume = (!volumeIncluded && !isRehab) ? 0 : metrics.eligible && metrics.load.status === 'known'
+    const rawSetVolume = set.recordingMode === 'hold' ? null : (!volumeIncluded && !isRehab) ? 0 : metrics.eligible && metrics.load.status === 'known'
       ? metrics.load.perSideCalculatedLoadKg * metrics.reps : null;
     const setVolume = rawSetVolume !== null && Number.isFinite(rawSetVolume) ? rawSetVolume : null;
 
@@ -410,7 +417,7 @@ export const collectMuscleSetContributions = (
         muscleGroupId: mapping.muscleGroupId,
         role: mapping.role,
         roleWeight, allocation: mapping.allocation,
-        weightedVolume: !volumeIncluded || volumeWeight === 0 ? 0 : setVolume === null ? null : setVolume * volumeWeight,
+        weightedVolume: set.recordingMode === 'hold' ? null : !volumeIncluded || volumeWeight === 0 ? 0 : setVolume === null ? null : setVolume * volumeWeight,
         metrics, enteredWeightKg: enteredWeightKg(set),
         setVolume,
         sessionId: exercise.sessionId,
@@ -422,6 +429,8 @@ export const collectMuscleSetContributions = (
         setOrderIndex: set.orderIndex ?? null,
         setType: set.setType,
         weightValue: set.weightValue,
+        recordingMode: set.recordingMode,
+        durationSec: set.durationSec,
         repsValue: set.repsValue,
       });
     }
@@ -533,6 +542,7 @@ export type DailyEffortMetrics = {
 };
 
 type EffortMetricAccumulator = {
+  hasRepetitionSets: boolean;
   totalVolume: number | null;
   volumeSetCount: number;
   /** The bucket's [[muscle.set-count]]; `setCounter` keeps it weighted. */
@@ -543,6 +553,7 @@ type EffortMetricAccumulator = {
 };
 
 export const createEffortMetricAccumulator = (): EffortMetricAccumulator => ({
+  hasRepetitionSets: false,
   totalVolume: 0,
   volumeSetCount: 0,
   workingSetCount: 0,
@@ -551,18 +562,33 @@ export const createEffortMetricAccumulator = (): EffortMetricAccumulator => ({
   highestWeight: null,
 });
 
+/** Hold-only and mixed totals follow [[set.row-figures]]. */
+export const accumulateContributionVolume = (
+  acc: { totalVolume: number | null; hasRepetitionSets: boolean }, contribution: MuscleSetContribution,
+): void => {
+  if (contribution.recordingMode === 'hold') {
+    if (!acc.hasRepetitionSets) acc.totalVolume = null;
+    return;
+  }
+  if (!acc.hasRepetitionSets) acc.totalVolume ??= 0;
+  acc.hasRepetitionSets = true;
+  acc.totalVolume = addFiniteVolume(acc.totalVolume, contribution.weightedVolume ?? 0);
+};
+
 /** Fold a single muscle set contribution into a metric accumulator. */
 export const accumulateContributionMetrics = (
   acc: EffortMetricAccumulator,
   contribution: MuscleSetContribution
 ): void => {
   // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
-  acc.totalVolume = addFiniteVolume(acc.totalVolume, contribution.weightedVolume ?? 0);
+  accumulateContributionVolume(acc, contribution);
   if (contribution.volumeIncluded) acc.volumeSetCount += 1;
 
   if (contribution.working === false) return;
   countMuscleSet(acc.setCounter, contribution);
   acc.workingSetCount = acc.setCounter.counts.weightedSetCount;
+
+  if (contribution.recordingMode === 'hold') return;
 
   const weight = contribution.enteredWeightKg;
   if (weight !== null) acc.highestWeight = Math.max(acc.highestWeight ?? 0, weight);

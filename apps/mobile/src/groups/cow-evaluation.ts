@@ -1,7 +1,7 @@
 // Service-only adapter: retained receipts feed the same scorer as group boards.
 import type { LoadInputMode } from '../exercise-core/index.ts';
 import { isWorkingSet } from '../exercise-calculations/set-semantics.ts';
-import { projectCompetitionPerformance } from './competition-score.ts';
+import { projectCompetitionRepetitionV7 } from './competition-score.ts';
 import { scoreCoW, type CoWMetric, type CoWParticipant, type CoWSetVersion, type CoWWindow } from './cow-scoring.ts';
 // Preserve this scorer and its arithmetic dependencies when adding a new version.
 export const COW_SCORER_VERSION = 7;
@@ -10,6 +10,7 @@ type Context = { load_input_mode: LoadInputMode; bodyweight_contribution: number
   bodyweight_calculations_enabled: boolean; scorer_version: number };
 type RetainedSource = { memberId: string; setId: string; version: number; receivedAtUs: number;
   contextKey: string; input: { session_started_at_ms: number; completed: boolean; shared: boolean; eligible: boolean;
+    recording_mode?: 'reps' | 'hold'; duration_sec?: number | null;
     weight_value: string; reps_value: string; performance_status: string | null; set_type: string | null;
     source_load_input_mode: LoadInputMode; exercise_definition_id: string;
     body_weight_context: { body_weight_kg: number | null; body_weight_source: string | null;
@@ -25,9 +26,10 @@ function evaluateSource(row: RetainedSource, graph: CoWEvaluationGraph): CoWSetV
   const input = row.input;
   const context = graph.context!;
   const normalized = graph.window.context!.normalized;
-  const body = normalized ? input.body_weight_context : null;
-  const values = projectCompetitionPerformance({ weightValue: input.weight_value, repsValue: input.reps_value,
-    performanceStatus: input.performance_status, live: input.eligible, source: { loadInputMode: input.source_load_input_mode },
+  const strengthInput = input.recording_mode !== 'hold' && input.duration_sec == null;
+  const body = normalized && input.eligible && strengthInput ? input.body_weight_context : null;
+  const values = projectCompetitionRepetitionV7({ weightValue: input.weight_value, repsValue: input.reps_value,
+    performanceStatus: input.performance_status, live: input.eligible && strengthInput, source: { loadInputMode: input.source_load_input_mode },
     bodyWeightKg: body?.body_weight_kg ?? null, bodyWeightSource: body?.body_weight_source === 'reading' ? 'reading' : null,
     bodyWeightMeasurementId: body?.body_weight_measurement_id ?? null,
     bodyWeightMeasuredAt: body?.body_weight_measured_at === null || body?.body_weight_measured_at === undefined
@@ -39,7 +41,7 @@ function evaluateSource(row: RetainedSource, graph: CoWEvaluationGraph): CoWSetV
     : input.session_started_at_ms >= graph.window.endUs / 1000 ? graph.window.endUs : input.session_started_at_ms * 1000;
   return { memberId: row.memberId, setId: row.setId, version: row.version, receivedAtUs: row.receivedAtUs,
     contextKey: row.contextKey, sessionStartedAtUs, completed: input.completed, shared: input.shared,
-    eligible: input.eligible && isWorkingSet({ weight: input.weight_value, reps: input.reps_value,
+    eligible: input.eligible && strengthInput && isWorkingSet({ weight: input.weight_value, reps: input.reps_value,
       performanceStatus: input.performance_status === null ? null : 'unperformed', setType: input.set_type }), scores: values };
 }
 

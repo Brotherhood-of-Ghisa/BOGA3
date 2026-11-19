@@ -17,7 +17,7 @@ import {
   MAX_PROGRAMME_PLANS,
   MIN_PROGRAMME_PLANS,
   PlanEditError,
-  normalizePlanMutation,
+  normalizePlanMutation, normalizeSetInput,
   normalizeProgrammeMutation,
   readBaseVersion,
 } from '../../../supabase/functions/agent-api/plan-edit.ts';
@@ -445,5 +445,20 @@ describe('agent programme mutations', () => {
         base_version: BASE_VERSION,
       });
     });
+  });
+});
+
+
+describe('hold plan target validation', () => {
+  const target = { recording_mode: 'hold', target_duration_sec: 45 };
+  it('defaults only new targets and preserves explicit or saved effort', () => {
+    expect(normalizeSetInput(target, 'set')).toMatchObject({ target_reps: null, target_duration_sec: 45, target_set_type: 'rir_0' });
+    expect(normalizeSetInput({ ...target, target_set_type: null }, 'set')).toHaveProperty('target_set_type', null);
+    expect(normalizeSetInput({ ...target, target_set_type: 'rehab' }, 'set')).toHaveProperty('target_set_type', 'rehab');
+    expect(normalizeSetInput({ ...target, id: 'saved' }, 'set')).not.toHaveProperty('target_set_type');
+  });
+  it.each([0, 301, 1.5, null])('rejects invalid seconds %p and mixed measurements', (target_duration_sec) => {
+    expect(() => normalizeSetInput({ ...target, target_duration_sec }, 'set')).toThrow(PlanEditError);
+    expect(() => normalizeSetInput({ ...target, target_reps: 5 }, 'set')).toThrow(PlanEditError);
   });
 });

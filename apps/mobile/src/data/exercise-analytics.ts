@@ -21,6 +21,8 @@ export type SelectedExerciseWeeklyEffort = SelectedMuscleWeeklyEffort;
 type ExerciseRawSet = {
   setType: string | null;
   weightValue: string;
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   repsValue: string;
   performanceStatus?: SessionSetPerformanceStatus;
 };
@@ -71,6 +73,8 @@ const startOfMondayWeek = (date: Date): Date => {
 };
 
 type DayAccumulator = {
+  hasRepetitionSets: boolean;
+  volumeSetCount: number;
   sessionIds: string[];
   totalVolume: number | null;
   workingSetCount: number;
@@ -79,6 +83,7 @@ type DayAccumulator = {
 };
 
 type WeekAccumulator = {
+  hasRepetitionSets: boolean;
   weekStartDateKey: string;
   monthKey: string;
   totalVolume: number | null;
@@ -96,6 +101,8 @@ export const aggregateExerciseDailyEffort = (
   for (const session of rawSessions) {
     const dateKey = formatLocalDateKey(session.completedAt, timeZone);
     const day: DayAccumulator = dayMap.get(dateKey) ?? {
+      hasRepetitionSets: false,
+      volumeSetCount: 0,
       sessionIds: [],
       totalVolume: 0,
       workingSetCount: 0,
@@ -107,7 +114,15 @@ export const aggregateExerciseDailyEffort = (
     const working = workingSetsOnly(session.sets, context.effortPolicy);
     const summary = summarizeExerciseLoad(session.sets, context);
     if (summary.volumeCoverage.eligibleSetCount === 0 && working.length === 0) continue;
-    day.totalVolume = addFiniteVolume(day.totalVolume, summary.volumeKgReps);
+    const unsupported = summary.volumeCoverage.eligibleSetCount === 0 && summary.volumeKgReps === null;
+    if (unsupported) {
+      if (!day.hasRepetitionSets) day.totalVolume = null;
+    } else {
+      if (!day.hasRepetitionSets) day.totalVolume ??= 0;
+      day.hasRepetitionSets = true;
+      day.totalVolume = addFiniteVolume(day.totalVolume, summary.volumeKgReps);
+    }
+    day.volumeSetCount += summary.volumeCoverage.eligibleSetCount;
     day.workingSetCount += working.length;
     if (summary.topWeightSet !== null) day.highestWeight = Math.max(day.highestWeight ?? 0, summary.topWeightSet.weight);
     if (summary.estimatedOneRepMax !== null) day.bestRM1 = Math.max(day.bestRM1 ?? 0, summary.estimatedOneRepMax);
@@ -120,6 +135,7 @@ export const aggregateExerciseDailyEffort = (
       dateKey,
       sessionIds: day.sessionIds,
       totalVolume: day.totalVolume,
+      ...(day.totalVolume === null ? { volumeSetCount: day.volumeSetCount } : {}),
       workingSetCount: day.workingSetCount,
       estimatedRM1: day.bestRM1,
       highestWeight: day.highestWeight,
@@ -144,6 +160,7 @@ const aggregateExerciseWeeksFromDaily = (dailyEffort: DailyEffortMetrics[]): Sel
     const monthKey = `${weekStart.getUTCFullYear().toString().padStart(4, '0')}-${(weekStart.getUTCMonth() + 1).toString().padStart(2, '0')}`;
 
     const acc: WeekAccumulator = weekMap.get(weekStartDateKey) ?? {
+      hasRepetitionSets: false,
       weekStartDateKey,
       monthKey,
       totalVolume: 0,
@@ -152,7 +169,13 @@ const aggregateExerciseWeeksFromDaily = (dailyEffort: DailyEffortMetrics[]): Sel
       highestWeight: null,
     };
 
-    acc.totalVolume = addFiniteVolume(acc.totalVolume, day.totalVolume);
+    if (day.totalVolume === null && day.volumeSetCount === 0) {
+      if (!acc.hasRepetitionSets) acc.totalVolume = null;
+    } else {
+      if (!acc.hasRepetitionSets) acc.totalVolume ??= 0;
+      acc.hasRepetitionSets = true;
+      acc.totalVolume = addFiniteVolume(acc.totalVolume, day.totalVolume);
+    }
     acc.workingSetCount += day.workingSetCount;
 
     if (day.highestWeight !== null) {
@@ -272,6 +295,8 @@ const loadExerciseRawSessions = async (
       sessionExerciseId: exerciseSets.sessionExerciseId,
       setType: exerciseSets.setType,
       weightValue: exerciseSets.weightValue,
+      recordingMode: exerciseSets.recordingMode,
+      durationSec: exerciseSets.durationSec,
       repsValue: exerciseSets.repsValue,
       performanceStatus: exerciseSets.performanceStatus,
     })
@@ -297,6 +322,8 @@ const loadExerciseRawSessions = async (
     existing.push({
       setType: set.setType ?? null,
       weightValue: set.weightValue,
+      recordingMode: set.recordingMode,
+      durationSec: set.durationSec,
       repsValue: set.repsValue,
       performanceStatus: normalizeSessionSetPerformanceStatus(set.performanceStatus),
     });

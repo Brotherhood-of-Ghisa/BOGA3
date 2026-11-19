@@ -18,7 +18,7 @@ import {
 export type ProgressCounts = { sessions: number; workingSets: number; prs: number; volumeKgReps: number | null };
 
 /** A completed session and its working sets. */
-export type ProgressSession = { id: string; completedAt: Date; workingSets: number; volumeKgReps: number | null };
+export type ProgressSession = { id: string; completedAt: Date; workingSets: number; volumeKgReps: number | null; volumeUnsupported?: boolean; volumeSetCount?: number };
 
 export type TodayProgressWeek = {
   window: LocalWindow;
@@ -203,27 +203,38 @@ export const progressMetricsBySession = (input: StatsAggregationInput): Progress
   const setsBySession = groupBy(input.exerciseSets, (set) => sessionIdByExercise.get(set.sessionExerciseId));
   const setsByExercise = groupBy(input.exerciseSets, (set) => set.sessionExerciseId);
   const definitions = new Map(input.exerciseDefinitions?.map((definition) => [definition.id, definition]));
-  return input.sessions.map((session) => ({
-    id: session.id,
-    completedAt: session.completedAt,
-    workingSets: countMuscleAnalyticsWorkingSets({
-      ...input,
-      sessions: [session],
-      sessionExercises: exercisesBySession.get(session.id) ?? [],
-      exerciseSets: setsBySession.get(session.id) ?? [],
-    }),
-    volumeKgReps: (exercisesBySession.get(session.id) ?? []).reduce<number | null>((total, exercise) => {
+  return input.sessions.map((session) => {
+    const summaries = (exercisesBySession.get(session.id) ?? []).map(exercise => {
       const context = personalLoadContext(input.bodyweightCalculationsEnabled ?? false,
         definitions.get(exercise.exerciseDefinitionId ?? ''), session, input.effortPolicy);
-      const { volumeKgReps } = summarizeExerciseLoad(setsByExercise.get(exercise.id) ?? [], context);
-      return addFiniteVolume(total, volumeKgReps);
-    }, 0),
-  }));
+      return summarizeExerciseLoad(setsByExercise.get(exercise.id) ?? [], context);
+    });
+    const supported = summaries.filter(summary => summary.metrics.some(metric => metric.eligible));
+    const volumeUnsupported = supported.length === 0 && summaries.some(summary => summary.volumeKgReps === null);
+    return {
+      id: session.id,
+      completedAt: session.completedAt,
+      workingSets: countMuscleAnalyticsWorkingSets({
+        ...input, sessions: [session], sessionExercises: exercisesBySession.get(session.id) ?? [],
+        exerciseSets: setsBySession.get(session.id) ?? [],
+      }),
+      volumeKgReps: volumeUnsupported ? null : supported.reduce<number | null>((total, summary) =>
+        addFiniteVolume(total, summary.volumeKgReps), 0),
+      ...(volumeUnsupported ? { volumeUnsupported: true } : {}),
+      ...(supported.length === 0 ? { volumeSetCount: 0 } : {}),
+    };
+  });
 };
 
 /** The counted subset, retained for consumers that ask only for working sets. */
 export const workingSetsBySession = (input: StatsAggregationInput): ProgressSession[] =>
   progressMetricsBySession(input).filter((session) => session.workingSets > 0);
+
+const sumProgressVolume = (sessions: ProgressSession[]): number | null => {
+  const supported = sessions.filter(session => !session.volumeUnsupported && session.volumeSetCount !== 0);
+  if (supported.length === 0 && sessions.some(session => session.volumeUnsupported)) return null;
+  return supported.reduce<number | null>((total, session) => addFiniteVolume(total, session.volumeKgReps), 0);
+};
 
 const countIn = (input: TodayProgressInput, window: LocalWindow): ProgressCounts => {
   const sessions = input.sessions.filter((session) => isInWindow(session.completedAt, window));
@@ -231,7 +242,7 @@ const countIn = (input: TodayProgressInput, window: LocalWindow): ProgressCounts
     sessions: sessions.filter((session) => session.workingSets > 0).length,
     workingSets: sessions.reduce((total, session) => total + session.workingSets, 0),
     prs: input.prAchievedAt.filter((achievedAt) => isInWindow(achievedAt, window)).length,
-    volumeKgReps: sessions.reduce<number | null>((total, session) => addFiniteVolume(total, session.volumeKgReps), 0),
+    volumeKgReps: sumProgressVolume(sessions),
   };
 };
 
@@ -245,14 +256,22 @@ const cumulativeByDay = (sessions: ProgressSession[], period: LocalWindow, days:
 };
 
 const cumulativeVolumeByDay = (sessions: ProgressSession[], period: LocalWindow, days: number): (number | null)[] => {
-  const perDay = new Array<number | null>(days).fill(0);
+  const perDay = Array.from({ length: days }, (): ProgressSession[] => []);
   for (const session of sessions) {
-    if (!isInWindow(session.completedAt, period)) continue;
-    const day = localDaysBetween(period.start, session.completedAt);
-    perDay[day] = addFiniteVolume(perDay[day], session.volumeKgReps);
+    if (isInWindow(session.completedAt, period)) perDay[localDaysBetween(period.start, session.completedAt)].push(session);
   }
   let running: number | null = 0;
-  return perDay.map((volume) => (running = addFiniteVolume(running, volume)));
+  let hasSupportedVolume = false;
+  let hasTraining = false;
+  return perDay.map(day => {
+    hasTraining ||= day.some(session => session.volumeUnsupported || session.volumeSetCount !== 0);
+    for (const session of day) {
+      if (session.volumeUnsupported || session.volumeSetCount === 0) continue;
+      hasSupportedVolume = true;
+      running = addFiniteVolume(running, session.volumeKgReps);
+    }
+    return hasTraining && !hasSupportedVolume ? null : running;
+  });
 };
 
 /** Linear volume keeps full precision; a non-finite projection stays absent. */

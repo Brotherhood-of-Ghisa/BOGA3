@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sourced while the real OAuth fixture has logging permission and a live workout.
-# Proves dated incremental entry, revision/control fences and fixed historical times.
+# Proves dated hold entry/correction, revision/control fences and fixed historical times.
 echo '[agent-api-test] verifying dated workout entry'
 # The live lifecycle/control cases share this client's independent write window.
 # Give dated entry its own window without relaxing the production rate limit.
@@ -30,7 +30,7 @@ agent_post 'workouts/create' "$(jq -c '.gym_id=null' <<<"${DATED_BODY}")" "${RUN
 assert_status 409 'changed dated creation payload conflicts'
 agent_get 'workouts/active'
 jq -e --arg dated "${DATED_ID}" --arg live "${WORKOUT_ID}" '(.data.workouts|map(.id)|index($dated))==null and (.data.workouts|map(.id)|index($live))!=null' <<<"${RESPONSE_BODY}" >/dev/null || fail 'dated entry occupied or replaced live training'
-DATED_LOG="$(jq -nc --arg id "${DATED_ID}" --arg rev "${DATED_REV}" --arg ex "${EXERCISE_A}" '{session_id:$id,expected_revision:$rev,exercise_id:$ex,sets:[{weight_kg:"81",reps:8}]}')"
+DATED_LOG="$(jq -nc --arg id "${DATED_ID}" --arg rev "${DATED_REV}" --arg ex "${EXERCISE_A}" '{session_id:$id,expected_revision:$rev,exercise_id:$ex,sets:[{recording_mode:"hold",duration_sec:45,weight_kg:"81"}]}')"
 agent_post 'workouts/log-sets' "${DATED_LOG}" "${RUN_TAG}-dated-log"
 assert_status 200 'incrementally log dated performance'
 DATED_SET="$(jq -er '.data.set_ids[0]' <<<"${RESPONSE_BODY}")"
@@ -46,7 +46,7 @@ DATED_MANIFEST="$(run_psql "select app_public.notification_source_manifest('${US
 app_public_request POST 'rpc/notification_confirm_completion' "${APP_ACCESS_TOKEN}" "$(jq -nc --arg id "${DATED_ID}" --argjson graph "${DATED_MANIFEST}" '{p_session_id:$id,p_entities:$graph}')"
 assert_status 200 'app may attempt exact dated completion proof'
 jq -e '.confirmed==false' <<<"${RESPONSE_BODY}" >/dev/null || fail 'partial dated entry was confirmed for notifications'
-agent_post 'workouts/update-set' "$(jq -nc --arg id "${DATED_ID}" --arg rev "${DATED_REV}" --arg set "${DATED_SET}" '{session_id:$id,expected_revision:$rev,set_id:$set,set:{weight_kg:"82",reps:7,set_type:"rir_2"}}')" "${RUN_TAG}-dated-edit"
+agent_post 'workouts/update-set' "$(jq -nc --arg id "${DATED_ID}" --arg rev "${DATED_REV}" --arg set "${DATED_SET}" '{session_id:$id,expected_revision:$rev,set_id:$set,set:{recording_mode:"hold",duration_sec:38,weight_kg:"82"}}')" "${RUN_TAG}-dated-edit"
 assert_status 200 'correct dated performance'
 DATED_REV="$(jq -er '.data.revision' <<<"${RESPONSE_BODY}")"
 agent_post 'workouts/log-sets' "$(jq -c --arg rev "${DATED_REV}" '.expected_revision=$rev' <<<"${DATED_LOG}")" "${RUN_TAG}-dated-extra"
@@ -59,6 +59,16 @@ DATED_REV="$(jq -er '.data.revision' <<<"${RESPONSE_BODY}")"
 agent_get "workouts/active?session_id=${DATED_ID}"
 assert_status 200 'resume dated entry by stable session ID'
 jq -e '.data.workout.status=="completed" and .data.workout.control.can_edit and (.data.rows|map(select(.type=="set"))|.[0].weight_kg)=="82"' <<<"${RESPONSE_BODY}" >/dev/null || fail 'resumed historical graph lost edits'
+jq -e '(.data.rows|map(select(.type=="set" and .deleted_at==null))|.[0]) as $set |
+  $set.recording_mode=="hold" and $set.duration_sec==38 and $set.reps=="" and $set.set_type=="rir_0"' <<<"${RESPONSE_BODY}" >/dev/null || fail 'hold correction lost seconds or creation-only effort'
+agent_get "workouts/${DATED_ID}"
+assert_status 200 'completed hold projection'
+jq -e '.data.workout.completed_set_count==1 and .data.workout.total_volume==null and
+  (.data.workout.sets[0].recording_mode=="hold") and (.data.workout.sets[0]|has("calculated_load")|not) and
+  (.data.workout.sets[0]|has("estimated_one_rep_max")|not) and (.data.workout.sets[0]|has("volume")|not)' <<<"${RESPONSE_BODY}" >/dev/null || fail 'hold projection fabricated metrics or lost its count'
+agent_get "exercises/${EXERCISE_A}/context"
+assert_status 200 'hold exercise context'
+jq -e --arg end "${DATED_END}" '[.data.volume_series[]|select(.completed_at==$end)]|length==0' <<<"${RESPONSE_BODY}" >/dev/null || fail 'unsupported hold entered volume series'
 DATED_FINISH="$(jq -nc --arg id "${DATED_ID}" --arg rev "${DATED_REV}" '{session_id:$id,expected_revision:$rev}')"
 agent_post 'workouts/finish' "${DATED_FINISH}" "${RUN_TAG}-dated-finish"
 assert_status 200 'finish entering dated workout'

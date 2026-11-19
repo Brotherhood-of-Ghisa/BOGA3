@@ -38,6 +38,8 @@ export type ExerciseHistorySetEntry = {
   setId: string;
   orderIndex: number;
   weightValue: string;
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   repsValue: string;
   setType: SessionSetTypeValue;
   isWorking: boolean;
@@ -145,6 +147,8 @@ export type ExerciseHistorySetRow = {
   sessionExerciseId: string;
   orderIndex: number;
   weightValue: string;
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   repsValue: string;
   setType: string | null;
   performanceStatus?: SessionSetPerformanceStatus;
@@ -275,6 +279,7 @@ const buildSessionEntry = (
   const orderedSets = setRows
     .filter((set) =>
       isConfirmedPerformedSet({
+        ...set,
         reps: set.repsValue,
         weight: set.weightValue,
         performanceStatus: set.performanceStatus,
@@ -286,9 +291,12 @@ const buildSessionEntry = (
     setId: row.setId,
     orderIndex: row.orderIndex,
     weightValue: row.weightValue,
+    recordingMode: row.recordingMode,
+    durationSec: row.durationSec,
     repsValue: row.repsValue,
     setType: normalizeSessionSetType(row.setType),
     isWorking: isWorkingSet({
+      ...row,
       weight: row.weightValue, reps: row.repsValue, performanceStatus: row.performanceStatus, setType: row.setType,
     }, loadContext.effortPolicy),
   }));
@@ -419,6 +427,7 @@ export const aggregateExerciseHistory = (
   // A chip counts the cards it shows: rows with at least one performed set.
   const listedRows = input.sessionsInPeriod.filter((row) =>
     (input.setsBySessionExerciseId[row.sessionExerciseId] ?? []).some((set) => isConfirmedPerformedSet({
+      ...set,
       reps: set.repsValue, weight: set.weightValue, performanceStatus: set.performanceStatus,
     })));
   const tagOptions = buildTagOptions(listedRows, input.tagsBySessionExerciseId);
@@ -571,6 +580,8 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
         sessionExerciseId: exerciseSets.sessionExerciseId,
         orderIndex: exerciseSets.orderIndex,
         weightValue: exerciseSets.weightValue,
+        recordingMode: exerciseSets.recordingMode,
+        durationSec: exerciseSets.durationSec,
         repsValue: exerciseSets.repsValue,
         setType: exerciseSets.setType,
         performanceStatus: exerciseSets.performanceStatus,
@@ -590,6 +601,8 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       sessionExerciseId: row.sessionExerciseId,
       orderIndex: row.orderIndex,
       weightValue: row.weightValue,
+      recordingMode: row.recordingMode,
+      durationSec: row.durationSec,
       repsValue: row.repsValue,
       setType: row.setType ?? null,
       performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),

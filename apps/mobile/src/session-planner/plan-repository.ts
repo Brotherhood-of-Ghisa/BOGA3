@@ -89,6 +89,8 @@ const toStoreExercise = (exercise: NormalizedPlan['exercises'][number]): SavePla
   sets: exercise.sets.map((set) => ({
     targetWeightValue: set.targetWeightValue,
     targetReps: set.targetReps,
+    recordingMode: set.recordingMode,
+    targetDurationSec: set.targetDurationSec,
     targetSetType: set.targetSetType,
   })),
 });
@@ -166,6 +168,8 @@ const toDuplicatePlanInput = (
       sets: exercise.sets.map((set) => ({
         targetWeightValue: set.targetWeightValue,
         targetReps: set.targetReps,
+    recordingMode: set.recordingMode,
+    targetDurationSec: set.targetDurationSec,
         targetSetType: normalizeSessionSetType(set.targetSetType),
       })),
     })),

@@ -1,3 +1,4 @@
+import type { RecordingMode } from '@/src/exercise-core/recording-mode';
 import { and, eq } from 'drizzle-orm';
 
 import type { LocalDatabase } from './bootstrap';
@@ -36,6 +37,7 @@ export function preserveMergeEntity(tx: Transaction, owner: string, entity: Merg
 }
 
 type SavedSet = {
+  recordingMode?: RecordingMode; durationSec?: number | null;
   id?: string; weightValue: string; repsValue: string; setType?: string | null;
   plannedWeightValue?: string | null; plannedRepsValue?: string | null;
   plannedSetType?: string | null; performanceStatus?: string | null; sourcePlanSetId?: string | null;
@@ -63,6 +65,8 @@ function savedSetEnvelope(row: typeof exerciseSets.$inferSelect | undefined, inp
     client_updated_at_ms: now, fields: {
       session_exercise_id: block, source_plan_set_id: input.sourcePlanSetId ?? row?.sourcePlanSetId ?? null,
       merge_revision: revision, order_index: index, weight_value: input.weightValue, reps_value: input.repsValue,
+      recording_mode: input.recordingMode ?? row?.recordingMode ?? 'reps',
+      duration_sec: input.durationSec === undefined ? row?.durationSec ?? null : input.durationSec,
       set_type: input.setType ?? null, planned_weight_value: input.plannedWeightValue ?? null,
       planned_reps_value: input.plannedRepsValue ?? null, planned_set_type: input.plannedSetType ?? null,
       performance_status: input.performanceStatus ?? null, created_at: row?.createdAt.getTime() ?? now,

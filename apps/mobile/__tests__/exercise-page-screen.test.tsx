@@ -195,6 +195,49 @@ describe('ExercisePageScreen', () => {
     expect((await readSession())?.status).toBe('completed');
   });
 
+  it.each([['Plank', ''], ['Hollow Hold', '5']])('logs and reopens %s with seconds, editable effort and no strength figures', async (name, weightValue) => {
+    await seedPage(() => {
+      const db = localDatabase();
+      db.update(exerciseDefinitions).set({ name, recordingMode: 'hold' }).where(eq(exerciseDefinitions.id, BENCH_DEF)).run();
+      db.update(sessionExercises).set({ name }).where(eq(sessionExercises.id, BENCH)).run();
+      db.delete(exerciseSets).where(eq(exerciseSets.sessionExerciseId, BENCH)).run();
+      db.insert(exerciseSets).values([
+        { id: 'hold-first', sessionExerciseId: BENCH, orderIndex: 0, recordingMode: 'hold', durationSec: 30,
+          repsValue: '', weightValue: weightValue || '0', setType: 'rir_2', performanceStatus: null },
+        { id: 'hold-next', sessionExerciseId: BENCH, orderIndex: 1, recordingMode: 'hold', durationSec: 45,
+          repsValue: '', weightValue, setType: 'rir_0', performanceStatus: 'unperformed' },
+      ]).run();
+    });
+    renderWithTheme(<ExercisePageScreen sessionExerciseId={BENCH} sessionId={SESSION} />);
+    await screen.findByTestId('exercise-set-logger-duration');
+    expect(screen.getByTestId('exercise-set-logger-effort')).toHaveTextContent('RIR 0', { exact: false });
+    expect(screen.getByLabelText('Set 2 time in seconds')).toHaveProp('value', '45');
+    expect(screen.getByTestId('exercise-set-1-values')).toHaveTextContent('30 s', { exact: false });
+    expect(screen.queryByTestId('exercise-records-1rm')).toBeNull();
+    expect(screen.queryByTestId('exercise-set-logger-reps')).toBeNull();
+    expect(screen.queryByTestId('exercise-set-logger-preview')).toBeNull();
+    expect(screen.queryByTestId('exercise-set-1-1rm')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-duration'), '0');
+    expect(screen.getByTestId('exercise-set-logger-commit')).toBeDisabled();
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-duration'), '');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-duration'), '1.5');
+    expect(screen.getByTestId('exercise-set-logger-commit')).toBeDisabled();
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-duration'), '301');
+    expect(screen.getByText('Enter whole seconds from 1 to 300.')).toBeTruthy();
+    expect(screen.getByTestId('exercise-set-logger-commit')).toBeDisabled();
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-duration'), '38');
+    fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
+    fireEvent.press(await screen.findByTestId('exercise-effort-option-none'));
+    fireEvent.press(screen.getByTestId('exercise-set-logger-commit'));
+    await screen.findByTestId('exercise-set-2-open');
+    expect(screen.getByTestId('exercise-set-2-values')).toHaveTextContent('38 s', { exact: false });
+    expect((await benchSets())[1]).toMatchObject({ recordingMode: 'hold', durationSec: 38, repsValue: '',
+      weightValue: weightValue || '0', setType: null, performanceStatus: null });
+    fireEvent.press(screen.getByTestId('exercise-set-2-open'));
+    expect(screen.getByTestId('exercise-set-logger-duration')).toHaveProp('value', '38');
+    expect(screen.getByLabelText('Change effort, currently none')).toBeTruthy();
+  });
+
   it('renders the default state: records collapsed, set list, logger on the current set', async () => {
     await openPage();
 

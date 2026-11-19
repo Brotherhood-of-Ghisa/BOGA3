@@ -195,3 +195,13 @@ describe('expanded last-session view', () => {
     expect(screen.getByTestId('exercise-records-empty')).toHaveTextContent(message);
   });
 });
+
+
+it('keeps a historical hold readable with spoken seconds and no derived columns in Last', () => {
+  renderPanel(ready(NO_RECORDS, lastSession({ oneRepMax: null, maxWeight: null, volume: null,
+    sets: [{ recordingMode: 'hold', durationSec: 38, setType: null, weight: 5, reps: null, oneRepMax: null, volume: null }],
+  })), { view: 'last', expanded: true });
+  expect(screen.getByLabelText('5.0 × 38 seconds')).toHaveTextContent('5.0 × 38 s');
+  expect(within(screen.getByTestId('exercise-records-last-set-0')).queryByText('1RM')).toBeNull();
+  expect(within(screen.getByTestId('exercise-records-last-set-0')).queryByText('Vol')).toBeNull();
+});

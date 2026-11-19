@@ -1,7 +1,9 @@
-import { parseSetReps, parseSetWeight } from './parse.ts';
+import { parseSetDuration, parseSetReps, parseSetWeight } from './parse.ts';
 import { includesEffort, SHARED_EFFORT_POLICY, type EffortCalculationPolicy } from './effort-policy.ts';
 
 export type SetValueInput = {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   reps: string;
   weight: string;
 };
@@ -18,14 +20,19 @@ export const canonicalizeWeightForReps = (weight: string, reps: string): string 
   weight.trim().length === 0 && hasPositiveIntegerReps(reps) ? '0' : weight;
 
 export const canonicalizeSetValues = <T extends SetValueInput>(set: T): T => {
-  const weight = canonicalizeWeightForReps(set.weight, set.reps);
+  const weight = set.weight.trim().length === 0 && hasValidMeasurement(set) ? '0' : set.weight;
   return weight === set.weight ? set : { ...set, weight };
 };
 
-/** Valid reps and Weight under the one parser (`parse.ts`); blank Weight with valid reps is `0`. */
+const hasValidMeasurement = (set: SetValueInput): boolean => {
+  if (set.recordingMode === 'hold') return set.reps.trim() === '' && parseSetDuration(set.durationSec) !== null;
+  return (set.recordingMode === undefined || set.recordingMode === 'reps') &&
+    set.durationSec == null && hasPositiveIntegerReps(set.reps);
+};
+
+/** Valid actual values under [[set.performed]]. */
 export const hasValidActualValues = (set: SetValueInput): boolean =>
-  hasPositiveIntegerReps(set.reps) &&
-  parseSetWeight(canonicalizeWeightForReps(set.weight, set.reps)) !== null;
+  hasValidMeasurement(set) && parseSetWeight(canonicalizeSetValues(set).weight) !== null;
 
 /**
  * A valid legacy row with no explicit status is confirmed. Every non-null
@@ -57,7 +64,7 @@ export const isWorkingSet = (set: WorkingSetInput, policy?: EffortCalculationPol
 
 /** Volume eligibility is independent of working-set eligibility in personal calculations. */
 export const isVolumeSet = (set: WorkingSetInput, policy: EffortCalculationPolicy = SHARED_EFFORT_POLICY): boolean =>
-  isConfirmedPerformedSet(set) && includesEffort(policy.volumeEfforts, set.setType);
+  set.recordingMode !== 'hold' && isConfirmedPerformedSet(set) && includesEffort(policy.volumeEfforts, set.setType);
 
 /**
  * The counted-session rule (`training-metrics-contract.md` §2): a session —

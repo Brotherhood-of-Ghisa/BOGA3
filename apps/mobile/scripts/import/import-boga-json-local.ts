@@ -110,6 +110,7 @@ export type BogaLocalImportPlan = {
     bodyWeightMeasurements: { id: string; source: ImportedWeightReading }[];
     exerciseDefinitions: {
       loadInputMode: ImportedExerciseDefinition['loadInputMode'];
+      recordingMode?: ImportedExerciseDefinition['recordingMode'];
       bodyweightContribution: number;
       id: string;
       name: string;
@@ -463,6 +464,7 @@ export const planBogaLocalImport = (
         id: exerciseDefinitionId,
         name: decision.exerciseName,
         loadInputMode: decision.loadInputMode,
+        recordingMode: decision.recordingMode ?? 'reps',
         bodyweightContribution: decision.bodyweightContribution,
         createdAt: generatedAt,
         updatedAt: generatedAt,
@@ -694,6 +696,7 @@ export const importBogaSessionPackageToLocalDb = (
           id: row.id,
           name: row.name,
           loadInputMode: row.loadInputMode,
+          recordingMode: row.recordingMode ?? 'reps',
           bodyweightContribution: row.bodyweightContribution,
           deletedAt: null,
           createdAt: row.createdAt,
@@ -769,6 +772,8 @@ export const importBogaSessionPackageToLocalDb = (
           orderIndex: row.source.orderIndex,
           weightValue: row.source.weightValue,
           repsValue: row.source.repsValue,
+          recordingMode: row.source.recordingMode ?? 'reps',
+          durationSec: row.source.durationSec ?? null,
           setType: row.source.setType,
           plannedWeightValue: row.source.plannedWeightValue,
           plannedRepsValue: row.source.plannedRepsValue,

@@ -348,7 +348,7 @@ it('rejects the formerly supported protocol before a stale client can write or p
   for (const name of ['sync_push', 'sync_pull']) {
     const response = await fetch(endpoint.url + '/rest/v1/rpc/' + name, { method: 'POST',
       headers: { apikey: endpoint.anonKey, Authorization: 'Bearer ' + account.jwt, 'Content-Profile': 'app_public',
-        'Content-Type': 'application/json', 'x-boga-sync-protocol': '6' },
+        'Content-Type': 'application/json', 'x-boga-sync-protocol': '7' },
       body: JSON.stringify(name === 'sync_push' ? { entities: [] } : { layer: 0, limit: 1 }),
     });
     expect(response.ok).toBe(false);
@@ -839,4 +839,36 @@ it('moves the source exercise’s notes to the destination, raising their clock 
   } finally {
     local.close();
   }
+});
+
+
+it('keeps hold seconds through a definition merge and explicit recovery of a stale duration correction', async () => {
+  const c = await chain({ weight: '10' });
+  const hold = { ...c.sets[0], client_updated_at_ms: Date.now() + 100,
+    fields: { ...c.sets[0].fields, recording_mode: 'hold', duration_sec: 45, reps_value: '', set_type: 'rir_0' } };
+  await push([hold]);
+  await merge(c);
+  expect(await row('exercise_sets', hold.id)).toMatchObject({ recording_mode: 'hold', duration_sec: 45, reps_value: '', weight_value: '5' });
+  const stale = { ...hold, client_updated_at_ms: Date.now() + 1000, fields: { ...hold.fields, duration_sec: 38 } };
+  expect((await push([stale])).outcomes).toContainEqual({ type: 'exercise_sets', id: hold.id, outcome: 'preserved' });
+  const review = (await reviews()).find(item => item.entityId === hold.id)!;
+  expect(review.saved).toMatchObject({ recording_mode: 'hold', duration_sec: 38, reps_value: '' });
+  await rpc('exercise_merge_resolve', { p_id: review.id, p_keep: false, p_token: review.token });
+  expect(await row('exercise_sets', hold.id)).toMatchObject({ recording_mode: 'hold', duration_sec: 38, reps_value: '', weight_value: '5' });
+});
+
+it('coaching logs and corrects a hold without replacing saved effort, then restores the released history', async () => {
+  const c = await chain();
+  const end = Date.now() - 3600000;
+  const created = await workoutWrite('create_workout', { started_at: end - 60000, completed_at: end, gym_id: null });
+  const logged = await workoutWrite('log_sets', { session_id: created.session_id, expected_revision: created.revision,
+    exercise_id: c.source, sets: [{ recording_mode: 'hold', duration_sec: 45, weight_kg: '5', reps: '', set_type: null }] });
+  const updated = await workoutWrite('update_set', { session_id: created.session_id, expected_revision: logged.revision,
+    set_id: logged.set_ids[0], set: { recording_mode: 'hold', duration_sec: 38, weight_kg: '5', reps: '' } });
+  expect(await row('exercise_sets', logged.set_ids[0])).toMatchObject({ recording_mode: 'hold', duration_sec: 38,
+    reps_value: '', weight_value: '5', set_type: null });
+  await workoutWrite('finish_workout', { session_id: created.session_id, expected_revision: updated.revision });
+  const snapshot = await rpc<{ rows: Entity[] }>('exercise_merge_snapshot', { p_after: 0 });
+  expect(snapshot.rows.find(item => item.id === logged.set_ids[0])?.fields).toMatchObject({
+    recording_mode: 'hold', duration_sec: 38, reps_value: '', weight_value: '5', set_type: null });
 });

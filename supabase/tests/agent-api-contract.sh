@@ -71,7 +71,7 @@ app_public_request() {
     -w "%{http_code}"
   )
   if [[ -n "${body}" ]]; then
-    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-7}" -H "Content-Type: application/json" --data "${body}")
+    request_args+=(-H "x-boga-sync-protocol: ${BOGA_TEST_SYNC_PROTOCOL:-8}" -H "Content-Type: application/json" --data "${body}")
   fi
   RESPONSE_STATUS="$(curl "${request_args[@]}" "${API_URL}/rest/v1/${route}")"
   RESPONSE_BODY="$(cat "${response_file}")"
@@ -449,7 +449,7 @@ require_command openssl
 load_supabase_status_env
 DB_CONTAINER="$(resolve_db_container)"
 # Service-role grant lookup ACLs and live consent transitions (transactional).
-docker exec -i "${DB_CONTAINER}" psql -U postgres -v ON_ERROR_STOP=1 -q < "${SCRIPT_DIR}/agent-active-oauth-grant.sql"
+docker exec -i "${DB_CONTAINER}" psql -U postgres -v ON_ERROR_STOP=1 -q < "${SUPABASE_DIR}/tests/agent-active-oauth-grant.sql"
 AGENT_API_BASE="${API_URL}/functions/v1/agent-api/v1/agent"
 OAUTH_REDIRECT_URI="http://127.0.0.1:43123/callback"
 RUN_TAG="${AGENT_API_RUN_TAG:-$(date +%s)-$$-$RANDOM}"
@@ -626,7 +626,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     .data as $s
     | ($s.muscles | map(select(.id == $muscle)) | first) as $m
     | ($s.favourite_exercises | map(select(.exercise_id == $exercise)) | first) as $f
-    | $s.metric_revision == "working_sets_v10"
+    | $s.metric_revision == "working_sets_v11"
     and $s.time_zone == "UTC"
     and $s.complete == true
     and ($s.today | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))
@@ -816,7 +816,7 @@ echo "[agent-api-test] verifying warm-ups are listed but feed no derived figure"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_status "200" "working-set exercise context"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v10"
+  .data.metric_revision == "working_sets_v11"
   and .data.recent_performances[0].volume.value == 1325
   and .data.recent_performances[0].volume.eligible_set_count == 2
   and .data.recent_performances[0].estimated_one_rep_max.value < 140
@@ -842,7 +842,7 @@ printf '%s' "${RESPONSE_BODY}" | jq -e '
 agent_get "workouts/recent?limit=1"
 assert_status "200" "working-set recent workouts"
 printf '%s' "${RESPONSE_BODY}" | jq -e '
-  .data.metric_revision == "working_sets_v10"
+  .data.metric_revision == "working_sets_v11"
   and .data.workouts[0].exercise_count == 1
   and (.data.workouts[0].exercises | length) == 2
   and .data.workouts[0].completed_set_count == 2
@@ -1073,7 +1073,7 @@ assert_training_payload() {
 echo "[agent-api-test] verifying conventional response compatibility"
 agent_get "exercises/${EXERCISE_A}/context"
 assert_training_payload '
-  .data.metric_revision == "working_sets_v10"
+  .data.metric_revision == "working_sets_v11"
   and (.data.exercise | has("bodyweight_contribution") | not)
   and (.data.recent_performances[0] | has("session_body_weight") | not)
   and .data.recent_performances[0].volume.value == 1325
@@ -1184,7 +1184,7 @@ PLAN_BODY="$(jq -nc --arg gym "${GYM_A}" --arg ex "${EXERCISE_A}" --argjson now 
   {title:"Agent upcoming plan",gym_id:$gym,scheduled_for:($now + 86400000),
    exercises:[{exercise_definition_id:$ex,name:"Bench press",
      sets:[{target_reps:5,target_weight_value:"100",target_set_type:"rir_2"},
-           {target_reps:8,target_weight_value:null}]}]}')"
+           {recording_mode:"hold",target_duration_sec:45,target_weight_value:null,target_set_type:null}]}]}')"
 UNSCHEDULED_BODY="$(jq -nc --arg ex "${EXERCISE_A}" '
   {title:"Agent unscheduled plan",
    exercises:[{exercise_definition_id:$ex,name:"Bench press",sets:[{target_reps:10}]}]}')"
@@ -1304,6 +1304,8 @@ printf '%s' "${RESPONSE_BODY}" | jq -e \
     and (.data.plans[] | select(.id == $plan) | .progress) == "planned"
     and (.data.plans[] | select(.id == $plan) | .next_block_id) != null
     and (.data.plans[] | select(.id == $plan) | .exercises[0].sets | length) == 2
+    and (.data.plans[] | select(.id == $plan) | .exercises[0].sets[1] |
+      .recording_mode=="hold" and .target_duration_sec==45 and .target_reps==null and .target_set_type==null)
   ' >/dev/null || fail "upcoming plan read is missing provenance, progress or snapshots"
 agent_get "session-plans?include_unscheduled=true"
 assert_status "200" "unscheduled plan read"
@@ -2524,7 +2526,7 @@ assert_status "200" "co-primary historical training status"
 printf '%s' "${RESPONSE_BODY}" | jq -e --arg muscle "${MUSCLE_A}" --arg hidden "${MUSCLE_A2}" '
   .data as $s
   | ($s.muscles | map(select(.id == $muscle)) | first) as $m
-  | $s.metric_revision == "working_sets_v10"
+  | $s.metric_revision == "working_sets_v11"
   and ([$m.recovery_days[].sets // 0] | add) + ($m.today_sets // 0) == 1
   and ($s.muscles | map(.id) | index($hidden)) == null
 ' >/dev/null || fail "co-primary history redistributed the hidden muscle share"

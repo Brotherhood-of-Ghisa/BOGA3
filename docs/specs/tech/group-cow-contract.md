@@ -163,8 +163,8 @@ sanitized SQLSTATE and bounded backoff. Lost intermediate intake remains
 Finalizing until an explicit evidence-based recovery; later success cannot repair it.
 Final rows reject updates. The existing kick and sweep discover work without reads.
 
-`cow-evaluation.ts` supports pinned scorer 7 independently of lifetime rebuild
-versions. Before changing its arithmetic imports, retain a callable implementation
+`cow-evaluation.ts` pins scorer 7 through `projectCompetitionRepetitionV7` and
+`calculateRepetitionMetricCandidates`, independently of lifetime rebuilds. Before changing its arithmetic imports, retain a callable implementation
 for every unfinished pinned version (load `docs/procedures/rule-upgrade.md`).
 Original set/definition references remain service-only. A kg CoW hides every
 figure while its group exercise counts bodyweight; otherwise disclosure asks

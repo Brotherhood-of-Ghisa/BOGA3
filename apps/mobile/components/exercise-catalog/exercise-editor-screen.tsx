@@ -17,6 +17,7 @@ import {
   StatePanel,
   SwitchRow,
   FormSection,
+  SegmentedControl,
   uiSpace,
 } from '@/components/ui';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
@@ -136,6 +137,21 @@ function EditorForm({ editingExercise, request, title }: {
         />
         {editingExercise && linkingUserId ? <ExerciseLinksSection exercise={editingExercise} userId={linkingUserId} /> : null}
         <MusclesSection error={muscleError} form={form} />
+        <FormSection title="Recording">
+          <ListRow density="list" label="Log as" meta={
+            <SegmentedControl
+              disabled={form.isSaving}
+              layout="fit"
+              onChange={form.setRecordingMode}
+              options={[
+                { value: 'reps', label: 'Reps', accessibilityLabel: 'Record repetitions' },
+                { value: 'hold', label: 'Hold', accessibilityLabel: 'Record hold duration' },
+              ]}
+              testIDPrefix="exercise-editor-recording-mode"
+              value={form.recordingMode}
+            />
+          } />
+        </FormSection>
         <ExerciseWeightSection
           bodyweightContribution={bodyweightCalculationsEnabled ? {
             value: form.bodyweightContributionField,

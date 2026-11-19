@@ -1,10 +1,8 @@
 # Session Planning and Programmes Technical Contract
 
-Load when you are building or changing authored plans and programmes: their
-schema, the Sync v2 17-entity topology, materialization onto performed rows,
-block lifecycle, or the agent plan-write API and MCP tools.
+Load when you are building or changing authored plans and programmes: their schema, sync, materialization, lifecycle or coaching API.
 
-## 1. Architectural Decisions and Principles
+## 1. Architectural decisions
 
 1. **Blueprint vs performed.** Plans and programmes are authored intent, never
    live workout state; `sessions.status` stays strictly `active | completed`.
@@ -13,7 +11,7 @@ block lifecycle, or the agent plan-write API and MCP tools.
    count, as [[set.performed]] says.
 2. **Materialization uses standard entities.** Starting a plan or consuming a
    block creates ordinary `session_exercises` and `exercise_sets` rows. There is
-   no recorder "planning mode", so draft and autosave mechanics are unchanged.
+   no recorder "planning mode". Hold prefills follow [[planner.block-completion]].
 3. **Ordinary plans consume exercise blocks.** A
    `session_plan_exercises` row plus its ordered `session_plan_sets` is
    independently consumable: a user can attach one block (e.g. the squat block of
@@ -40,10 +38,8 @@ block lifecycle, or the agent plan-write API and MCP tools.
 
 ### 2.1 Synced Entity Tables (Sync v2)
 
-Five entities, all user-owned, composite-keyed `(owner_user_id, id)` with text
-`id`, carrying standard Sync v2 server fields plus client
-`createdAt` / `updatedAt` / `deletedAt` epoch-ms columns; foreign keys are
-`DEFERRABLE INITIALLY DEFERRED`.
+User-owned entities use composite `(owner_user_id, id)` text keys, standard sync
+clocks and deferred foreign keys.
 Every composite FK below is `(owner_user_id, <col>) -> <parent>(owner_user_id,
 id)`; camelCase ↔ snake_case mapping follows `apps/mobile/src/data/schema/`.
 
@@ -82,7 +78,9 @@ wave, a split): `name` required 1..100 chars, `description` nullable max 500,
 - `order_index` — 0-based dense sequence within the block
 - `target_weight_value` — nullable non-negative numeric text in kg; null means
   "choose during workout"
-- `target_reps` — required positive integer, `CHECK (target_reps > 0)`
+- `recording_mode` — `reps` (default) or `hold`; exactly one measurement
+- `target_reps` — positive integer for Reps; null for Hold
+- `target_duration_sec` — whole 1–300 seconds for Hold; null for Reps
 - `target_set_type` — nullable standard set type (`'warm_up'`,
   `'rir_1'`, …)
 - `last_modified_by` — `'human' | 'agent'`, default `'human'`
@@ -208,7 +206,7 @@ stateDiagram-v2
    then per eligible pending block create a `session_exercises` row
    (`source_plan_exercise_id`, snapshots), and per non-deleted plan set an
    `exercise_sets` row with `source_plan_set_id`, targets copied to planned
-   columns, blank actuals, and `performance_status = 'planned'`.
+   columns, unchecked actuals (hold prefills follow [[planner.block-completion]]), and `performance_status = 'planned'`.
    Completed and skipped blocks are never re-materialized.
 3. **Deterministic IDs.** Reuse the deterministic text-ID pattern
    (`exerciseGroupLinkId` in `apps/mobile/src/data/exercise-group-links.ts`),
