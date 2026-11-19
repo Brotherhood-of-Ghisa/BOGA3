@@ -81,6 +81,7 @@ const render = async (initialUrl: string) =>
       '(tabs)/_layout': () => <Stack screenOptions={{ headerShown: false }} />,
       '(tabs)/today': () => <Text testID="today-stub">Today</Text>,
       profile: () => <Text testID="profile-stub">Profile</Text>,
+      'settings-recovery': () => <Text testID="recovery-stub">Recovery settings</Text>,
       'rm-curve': () => <Text testID="curve-stub">RM curve</Text>,
       'maestro-harness': () => <Text testID="harness-stub">Harness</Text>,
       'ui-gallery': () => <Text testID="gallery-stub">Gallery</Text>,
@@ -148,13 +149,22 @@ it('lands a signed-out launch on sign-in', async () => {
   expect(router.getPathname()).toBe('/sign-in');
 });
 
-it.each(['/profile', '/rm-curve?exerciseDefinitionId=curve'])('keeps a signed-out app link %s on sign-in', async href => {
+it.each(['/profile', '/rm-curve?exerciseDefinitionId=curve', '/settings-recovery'])('keeps a signed-out app link %s on sign-in', async href => {
   const router = await render(href);
 
   expect(await screen.findByTestId('sign-in-screen')).toBeTruthy();
   expect(router.getPathname()).toBe('/sign-in');
   expect(screen.queryByTestId('profile-stub')).toBeNull();
   expect(screen.queryByTestId('curve-stub')).toBeNull();
+  expect(screen.queryByTestId('recovery-stub')).toBeNull();
+});
+
+it('opens Recovery settings behind the app gate with its exact native title', async () => {
+  mockAuth = { ...mockAuth, isConfigured: false };
+  const router = await render('/settings-recovery');
+  expect(await screen.findByTestId('recovery-stub')).toBeTruthy();
+  expect(screen.UNSAFE_getAllByProps({ title: 'Recovery' }).length).toBeGreaterThan(0);
+  expect(router.getPathname()).toBe('/settings-recovery');
 });
 
 it('keeps the RM chart behind first sync until the app is available', async () => {

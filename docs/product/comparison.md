@@ -20,8 +20,11 @@ Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/m
 ### comparison.allowed-periods · principle · accepted
 
 Personal analytics use Settings’ Progress period or History look-back. Fixed
-alternatives: one calendar week, Today’s periods and the Plan page's three
-days before today, plus today so far (it never reorders the rows). Comparisons
+alternatives: one calendar week, Today’s periods and Recovery's four days
+(default) or seven days, including today so far. Settings → Recovery saves
+that account's device-local choice; it affects only Recovery's daily columns
+and recent-work ordering tie-break. Weekly totals remain Monday through today.
+Comparisons
 default to Progress or Settings' This week; history, reference samples and Favourites to History.
 Groups use calendar weeks only.
 

@@ -172,6 +172,7 @@ describe('every Settings page speaks the Settings language', () => {
       'components/notifications/notification-settings-screen.tsx', 'components/notifications/settings-row.tsx',
       'components/preferences/effort-settings.tsx', 'components/preferences/muscle-settings.tsx',
       'components/preferences/progress-settings.tsx', 'components/preferences/rest-timer-settings.tsx',
+      'components/preferences/recovery-settings.tsx',
       'components/sync-status/sync-status-panel.tsx', 'components/sync-status/exercise-merge-review.tsx',
     ];
     expect(files).toEqual(expect.arrayContaining(expected));

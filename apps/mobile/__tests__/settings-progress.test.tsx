@@ -17,6 +17,7 @@ import {
   DataSyncSettingsScreen,
   EffortSettingsScreen,
   ProgressSettingsScreen,
+  RecoverySettingsScreen,
   RestTimerSettingsScreen,
 } from '@/components/settings/sub-pages';
 import { EverythingElseSettingsScreen } from '@/components/settings/everything-else';
@@ -40,6 +41,7 @@ const values = () => getAccountLocalPreferenceState().values;
 const SettingsPages = () => (
   <>
     <ProgressSettingsScreen />
+    <RecoverySettingsScreen />
     <EffortSettingsScreen />
     <RestTimerSettingsScreen />
     <DataSyncSettingsScreen />
@@ -66,6 +68,24 @@ beforeEach(() => { mockUserId = 'A'; resetLocalData(); });
 afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
 
 const LABEL = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.xxs, textTransform: 'uppercase' } as const;
+
+it('offers Recovery Days above the two segments and keeps a failed choice on the saved value until Refresh', async () => {
+  await openSettings();
+  const recovery = within(screen.getByTestId('settings-recovery-screen'));
+  expect(recovery.getByText('Recovery Days')).toBeTruthy();
+  expect(recovery.getAllByRole('tab').map(tab => tab.props.accessibilityLabel)).toEqual(['4 days', '7 days']);
+  expect(recovery.getByTestId('settings-recovery-days-4')).toHaveProp('accessibilityState', { selected: true });
+  const write = jest.spyOn(Storage, 'setItemSync').mockImplementationOnce(() => { throw Error('disk full'); });
+  fireEvent.press(recovery.getByTestId('settings-recovery-days-7'));
+  expect(recovery.getByTestId('settings-recovery-days-4')).toHaveProp('accessibilityState', { selected: true });
+  expect(screen.getByTestId('settings-sync-status-error')).toHaveTextContent(/could not be saved/);
+  expect(values().recoveryDays).toBe(4);
+  write.mockRestore();
+  fireEvent.press(screen.getByTestId('settings-sync-status-refresh-button'));
+  await waitFor(() => expect(recovery.getByTestId('settings-recovery-days-7')).toHaveProp('accessibilityState', { selected: true }));
+  fireEvent.press(recovery.getByTestId('settings-recovery-days-4'));
+  expect(values().recoveryDays).toBe(4);
+});
 
 it('keeps adjacent Primary only settings independent and persists their choices', async () => {
   await openSettings();

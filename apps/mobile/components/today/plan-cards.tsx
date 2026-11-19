@@ -7,6 +7,7 @@ import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
+import { statsTableColumnWidth } from '@/components/stats/stats-table';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
@@ -58,12 +59,12 @@ const recoveryGroupLabel = (section: RecoverySection, days: Date[], dateFormat: 
   ].join(', ');
 
 // A wider gutter only at the Monday boundary; the line stays centred in it.
-function RecoveryDayColumn({ children, weekStart = false, heading = false, edge }: {
-  children: ReactNode; weekStart?: boolean; heading?: boolean; edge?: 'start' | 'end';
+function RecoveryDayColumn({ children, weekStart = false, heading = false, compact = false, edge, width }: {
+  children: ReactNode; weekStart?: boolean; heading?: boolean; compact?: boolean; edge?: 'start' | 'end'; width?: number;
 }) {
   const styles = useStyles();
   return (
-    <View style={[styles.dayColumn, weekStart ? styles.weekStartColumn : null]}>
+    <View style={[styles.dayColumn, compact ? styles.compactDayColumn : null, weekStart ? styles.weekStartColumn : null, width === undefined ? null : { width }]}>
       {children}
       {edge ? <View pointerEvents="none" style={[styles.gridEdge, edge === 'start' ? styles.gridStart : styles.gridEnd]} /> : null}
       {weekStart ? (
@@ -77,15 +78,15 @@ function RecoveryDayColumn({ children, weekStart = false, heading = false, edge 
   );
 }
 
-function DayCell({ count, weekStart, testID, aggregate = false, edge }: {
-  count: number | null; weekStart: boolean; testID: string; aggregate?: boolean; edge?: 'start' | 'end';
+function DayCell({ count, weekStart, testID, aggregate = false, compact = false, edge, width }: {
+  count: number | null; weekStart: boolean; testID: string; aggregate?: boolean; compact?: boolean; edge?: 'start' | 'end'; width?: number;
 }) {
   const styles = useStyles();
   const text = useUiText();
   const tone = useUiTextTone();
   return (
-    <RecoveryDayColumn edge={edge} weekStart={weekStart}>
-      <View style={[styles.dayCell, aggregate ? (count ? styles.groupCellTrained : styles.groupCellZero)
+    <RecoveryDayColumn compact={compact} edge={edge} weekStart={weekStart} width={width}>
+      <View style={[styles.dayCell, compact ? styles.compactDayCell : null, aggregate ? (count ? styles.groupCellTrained : styles.groupCellZero)
         : count === null ? styles.dayCellRest : styles.dayCellTrained]} testID={testID}>
         <Text allowFontScaling={false} style={[text.figureSmall, tone.ink,
           aggregate ? [uiTextEmphasis.strong, count ? styles.groupFigureTrained : tone.accent] : null]}>
@@ -96,8 +97,8 @@ function DayCell({ count, weekStart, testID, aggregate = false, edge }: {
   );
 }
 
-function RecoveryMuscleRow({ row, days, weekStartIndex, grouped, onPress }: {
-  row: RecoveryRow; days: Date[]; weekStartIndex: number; grouped: boolean; onPress: () => void;
+function RecoveryMuscleRow({ row, days, weekStartIndex, grouped, onPress, dayWidths }: {
+  row: RecoveryRow; days: Date[]; weekStartIndex: number; grouped: boolean; onPress: () => void; dayWidths?: number[];
 }) {
   const dateFormat = useDateFormat();
   const styles = useStyles();
@@ -105,26 +106,27 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, grouped, onPress }: {
   const tone = useUiTextTone();
   const testID = `today-plan-muscle-${row.muscleGroupId}`;
   const met = row.weekSets >= row.target;
+  const compact = days.length === 6;
   return (
     <Pressable
       accessibilityHint="Opens its progress"
       accessibilityLabel={recoveryRowLabel(row, days, dateFormat)}
       accessibilityRole="button"
       onPress={onPress}
-      style={styles.muscleRow}
+      style={[styles.muscleRow, compact ? styles.compactRow : null]}
       testID={testID}>
-      <Text allowFontScaling={false} style={[text.body, styles.nameCell, grouped ? styles.childName : null]}>
+      <Text allowFontScaling={false} style={[text.body, styles.nameCell, compact ? styles.compactName : null, grouped ? styles.childName : null]}>
         {row.name}
       </Text>
       {row.days.map((count, index) => (
-        <DayCell count={count} edge={grouped && index === 0 ? 'start' : undefined} key={days[index].getTime()}
-          testID={`${testID}-day-${index}`} weekStart={index === weekStartIndex} />
+        <DayCell compact={compact} count={count} edge={grouped && index === 0 ? 'start' : undefined} key={days[index].getTime()}
+          testID={`${testID}-day-${index}`} weekStart={index === weekStartIndex} width={dayWidths?.[index]} />
       ))}
-      <DayCell count={row.today} edge={grouped ? 'end' : undefined} testID={`${testID}-today`} weekStart={days.length === weekStartIndex} />
-      <Text allowFontScaling={false} style={[text.figure, styles.weekCell]} testID={`${testID}-week`}>
-        <Text allowFontScaling={false} style={met ? tone.gain : tone.ink}>{wholeSets(row.weekSets)}</Text>
-        <Text allowFontScaling={false} style={tone.muted}>{`/${row.target}`}</Text>
-      </Text>
+      <DayCell compact={compact} count={row.today} edge={grouped ? 'end' : undefined} testID={`${testID}-today`} weekStart={days.length === weekStartIndex} width={dayWidths?.[days.length]} />
+      <View style={[styles.weekCell, styles.weekFigures, compact ? styles.compactWeek : null]} testID={`${testID}-week`}>
+        <Text allowFontScaling={false} style={[text.figure, met ? tone.gain : tone.ink]}>{wholeSets(row.weekSets)}</Text>
+        <Text allowFontScaling={false} style={[text.figure, tone.muted, styles.targetFigure]}>{`/${row.target}`}</Text>
+      </View>
       {grouped ? <View style={styles.chevronGutter} /> : null}
     </Pressable>
   );
@@ -132,16 +134,17 @@ function RecoveryMuscleRow({ row, days, weekStartIndex, grouped, onPress }: {
 
 // A full-width header owns expansion, never child navigation. Collapsed children
 // unmount, so neither touch nor accessibility can reach them. All start collapsed.
-function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
-  plan: TodayPlan; weekStartIndex: number; grouped: boolean; onOpenMuscle: TodayPlanCardsProps['onOpenMuscle'];
+function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle, dayWidths }: {
+  plan: TodayPlan; weekStartIndex: number; grouped: boolean; onOpenMuscle: TodayPlanCardsProps['onOpenMuscle']; dayWidths?: number[];
 }) {
   const styles = useStyles();
   const text = useUiText();
   const tone = useUiTextTone();
   const dateFormat = useDateFormat();
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(new Set());
+  const compact = plan.recoveryDays.length === 6;
   const renderRow = (row: RecoveryRow) => <RecoveryMuscleRow
-    days={plan.recoveryDays} grouped={grouped} key={row.muscleGroupId}
+    days={plan.recoveryDays} dayWidths={dayWidths} grouped={grouped} key={row.muscleGroupId}
     onPress={() => onOpenMuscle(row.muscleGroupId)} row={row} weekStartIndex={weekStartIndex} />;
   if (!grouped) return <>{plan.muscles.map(renderRow)}</>;
   return <>{groupRecoveryRows(plan.muscles).map(section => {
@@ -157,12 +160,12 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
           else next.add(section.name);
           return next;
         })}
-        style={styles.groupHeader}>
-        <Text allowFontScaling={false} style={[text.label, tone.ink, styles.nameCell]}>{section.name}</Text>
-        {section.days.map((count, index) => <DayCell aggregate count={count} edge={index === 0 ? 'start' : undefined}
-          key={plan.recoveryDays[index].getTime()} testID={`${testID}-day-${index}`} weekStart={index === weekStartIndex} />)}
-        <DayCell aggregate count={section.today} edge="end" testID={`${testID}-today`} weekStart={plan.recoveryDays.length === weekStartIndex} />
-        <Text allowFontScaling={false} style={styles.weekCell} testID={`${testID}-total`}>
+        style={[styles.groupHeader, compact ? styles.compactRow : null]}>
+        <Text allowFontScaling={false} style={[text.label, tone.ink, styles.nameCell, compact ? styles.compactName : null]}>{section.name}</Text>
+        {section.days.map((count, index) => <DayCell aggregate compact={compact} count={count} edge={index === 0 ? 'start' : undefined}
+          key={plan.recoveryDays[index].getTime()} testID={`${testID}-day-${index}`} weekStart={index === weekStartIndex} width={dayWidths?.[index]} />)}
+        <DayCell aggregate compact={compact} count={section.today} edge="end" testID={`${testID}-today`} weekStart={plan.recoveryDays.length === weekStartIndex} width={dayWidths?.[plan.recoveryDays.length]} />
+        <Text allowFontScaling={false} style={[styles.weekCell, compact ? styles.compactWeek : null]} testID={`${testID}-total`}>
           <Text allowFontScaling={false} style={text.figure}>{figure}</Text>
           <Text allowFontScaling={false} style={[text.body, tone.muted]}>{figure === '1' ? ' set' : ' sets'}</Text>
         </Text>
@@ -176,7 +179,7 @@ function RecoveryRows({ plan, weekStartIndex, grouped, onOpenMuscle }: {
   })}</>;
 }
 
-// Each muscle's sets on the last three days, today so far, and this week
+// Each muscle's sets on the selected Recovery days, today so far, and this week
 // against its weekly Target ([[muscle.weekly-targets]]): under target first,
 // then fewest this week.
 // Settings' family grouping adds initially collapsed sections over the same
@@ -196,6 +199,13 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
   const weekStart = localWeekWindow(plan.today).start;
   const firstCurrentDay = [...plan.recoveryDays, plan.today].findIndex((day) => day >= weekStart);
   const weekStartIndex = firstCurrentDay > 0 ? firstCurrentDay : -1;
+  const compact = plan.recoveryDays.length === 6;
+  const rows = [...plan.muscles, ...(grouped ? groupRecoveryRows(plan.muscles) : [])];
+  const dayWidths = compact ? [...plan.recoveryDays, plan.today].map((_, index) => {
+    const figures = rows.map(row => wholeSets((index === plan.recoveryDays.length ? row.today : row.days[index]) ?? 0));
+    // Reserve three-digit figures where needed, keeping the grid bounded on small phones.
+    return Math.min(DAY_CELL, Math.max(20, statsTableColumnWidth('', figures)));
+  }) : undefined;
   return (
     <Card style={[styles.card, styles.fillCard]} testID="today-plan-recovery-card">
       <View style={styles.header}>
@@ -204,25 +214,27 @@ function RecoveryCard({ plan, onOpenMuscle, onOpenProgress }: Omit<TodayPlanCard
         </Text>
         <ActionButton label="Progress" onPress={onOpenProgress} testID="today-plan-progress-button" variant="link" />
       </View>
-      <View style={[styles.columns, styles.muscleRowLayout]}>
-        <Text allowFontScaling={false} style={[...label, styles.nameCell]}>Muscle</Text>
+      <View style={[styles.columns, styles.muscleRowLayout, compact ? styles.compactRow : null]}>
+        <Text allowFontScaling={false} style={[...label, styles.nameCell, compact ? styles.compactName : null]}>Muscle</Text>
         {plan.recoveryDays.map((day, index) => (
-          <RecoveryDayColumn edge={grouped && index === 0 ? 'start' : undefined} heading key={day.getTime()} weekStart={index === weekStartIndex}>
+          <RecoveryDayColumn compact={compact} edge={grouped && index === 0 ? 'start' : undefined} heading key={day.getTime()} weekStart={index === weekStartIndex} width={dayWidths?.[index]}>
             <Text allowFontScaling={false} style={[...label, styles.dayLabel]}>{weekdayLetter(day)}</Text>
+            {compact ? <Text allowFontScaling={false} style={[text.figureSmall, tone.faint, styles.dayLabel]}>{day.getDate()}</Text> : null}
           </RecoveryDayColumn>
         ))}
-        <RecoveryDayColumn edge={grouped ? 'end' : undefined} heading weekStart={plan.recoveryDays.length === weekStartIndex}>
+        <RecoveryDayColumn compact={compact} edge={grouped ? 'end' : undefined} heading weekStart={plan.recoveryDays.length === weekStartIndex} width={dayWidths?.[plan.recoveryDays.length]}>
           <Text allowFontScaling={false} style={[...label, styles.dayLabel, tone.accent]} testID="today-plan-recovery-today">
             {weekdayLetter(plan.today)}
           </Text>
+          {compact ? <Text allowFontScaling={false} style={[text.figureSmall, tone.accent, styles.dayLabel]}>{plan.today.getDate()}</Text> : null}
         </RecoveryDayColumn>
-        <Text allowFontScaling={false} style={[...label, styles.weekCell]}>Target</Text>
+        <Text allowFontScaling={false} style={[...label, styles.weekCell, compact ? styles.compactWeek : null]}>Target</Text>
         {grouped ? <View style={styles.chevronGutter} /> : null}
       </View>
       <ScrollView alwaysBounceVertical={false} contentContainerStyle={styles.rowsContent} nestedScrollEnabled
         showsVerticalScrollIndicator={false} style={styles.fillRows} testID="today-plan-recovery-rows">
         <RecoveryRows grouped={grouped} key={`${accountRevision}-${grouped}`} onOpenMuscle={onOpenMuscle}
-          plan={plan} weekStartIndex={weekStartIndex} />
+          dayWidths={dayWidths} plan={plan} weekStartIndex={weekStartIndex} />
       </ScrollView>
     </Card>
   );
@@ -369,7 +381,7 @@ const useStyles = makeStyles((roles) => ({
     flexShrink: 1,
     minHeight: 0,
   },
-  // A fixed row height, so the rows that show are exactly `VISIBLE_MUSCLE_ROWS * ROW_HEIGHT`.
+  // Cap the scroller at ten single-line rows; wrapped names and figures may be taller.
   // The scroller reaches into the card's side padding, so a group header's wash
   // can too (a clipped scroller would cut it); the rows' own width is unchanged.
   fillRows: {
@@ -465,7 +477,6 @@ const useStyles = makeStyles((roles) => ({
     bottom: -uiSpace.xs,
   },
   dayLabel: {
-    width: DAY_CELL,
     textAlign: 'center',
   },
   dayCell: {
@@ -495,6 +506,14 @@ const useStyles = makeStyles((roles) => ({
     marginLeft: uiSpace.md,
     textAlign: 'right',
   },
+  weekFigures: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end' },
+  targetFigure: { flexShrink: 1 },
+  // Seven days trade gutters for columns, retaining the existing type and full wrapping names/figures.
+  compactRow: { gap: uiSpace.xs / 4 },
+  compactName: { marginRight: uiSpace.xs / 2 },
+  compactDayColumn: { width: 20 },
+  compactDayCell: { width: '100%', height: 'auto', minHeight: DAY_CELL_HEIGHT },
+  compactWeek: { width: 52, marginLeft: uiSpace.xs },
   week: {
     flexDirection: 'row',
     gap: uiSpace.xs,

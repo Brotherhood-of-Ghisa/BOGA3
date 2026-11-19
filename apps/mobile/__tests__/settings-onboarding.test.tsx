@@ -97,6 +97,7 @@ const ROW_ORDER = [
   'settings-muscles-row',
   'settings-effort-row',
   'settings-progress-row',
+  'settings-recovery-row',
   'settings-appearance-row',
   'settings-notifications-row',
   'settings-data-sync-row',
@@ -155,6 +156,7 @@ describe('the Settings home', () => {
     ['settings-body-weight-row', '/body-weight'],
     ['settings-rest-timer-row', '/settings-rest-timer'],
     ['settings-progress-row', '/settings-progress'],
+    ['settings-recovery-row', '/settings-recovery'],
     ['settings-muscles-row', '/settings-muscles'],
     ['settings-effort-row', '/settings-effort'],
     ['settings-data-sync-row', '/settings-data-sync'],
@@ -177,6 +179,7 @@ describe('the Settings home', () => {
 
     expect(statusOf('settings-rest-timer-row')).toBe('Rest timer, 90 s · Auto-start on');
     expect(statusOf('settings-progress-row')).toBe('Progress, List · 4-week period');
+    expect(statusOf('settings-recovery-row')).toBe('Recovery, 4 days');
     expect(statusOf('settings-muscles-row')).toBe('Muscles, Single target');
     expect(statusOf('settings-effort-row')).toBe('Effort, Default');
     expect(statusOf('settings-everything-else-row')).toBe('Everything else, DD-MM-YYYY');

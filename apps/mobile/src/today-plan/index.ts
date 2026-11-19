@@ -3,7 +3,6 @@ export {
   groupRecoveryRows,
   derivePlanWeek,
   NEXT_PLANNED_LIMIT,
-  RECOVERY_DAYS,
   selectNextPlans,
   todayPlanWindow,
   type PlannedSessionInput,

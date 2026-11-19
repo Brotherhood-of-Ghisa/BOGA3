@@ -124,8 +124,8 @@ Define the canonical repository structure, path ownership, and placement convent
   - derived-only, like `session-insights`: no schema, no sync, no history replay.
   - drawn by Today's You page, `apps/mobile/components/today/`.
 - `apps/mobile/src/today-plan/`
-  - owns Today's Plan read (`loadTodayPlan`): each muscle's working sets on
-    the three days before today, today and this calendar week
+  - owns Today's Plan read (`loadTodayPlan`): each muscle's working sets over
+    Recovery's selected days and this calendar week
     ([[comparison.allowed-periods]]), the week's trained and planned days, and
     the next planned sessions, from the stats aggregation and
     `src/session-planner`. Derived-only.

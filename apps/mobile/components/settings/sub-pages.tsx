@@ -2,6 +2,7 @@ import { AppleHealthSection } from '@/components/settings/apple-health-section';
 import { BackupPanel } from '@/components/settings/backup-panel';
 import { EffortSettings } from '@/components/preferences/effort-settings';
 import { ProgressSettings } from '@/components/preferences/progress-settings';
+import { RecoverySettings } from '@/components/preferences/recovery-settings';
 import { RestTimerSettings } from '@/components/preferences/rest-timer-settings';
 import { SubPage } from '@/components/settings/sub-page';
 import { SyncStatusPanel } from '@/components/sync-status/sync-status-panel';
@@ -28,6 +29,13 @@ export function ProgressSettingsScreen() {
       <ProgressSettings key={user ? `account:${user.id}` : 'local'} state={preferences} />
     </SubPage>
   );
+}
+
+export function RecoverySettingsScreen() {
+  const preferences = useAccountLocalPreferenceState();
+  return <SubPage testID="settings-recovery-screen">
+    <RecoverySettings state={preferences} />
+  </SubPage>;
 }
 
 export function EffortSettingsScreen() {

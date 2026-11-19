@@ -10,6 +10,7 @@
  */
 
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { AppState, StyleSheet, type AppStateStatus } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -39,7 +40,7 @@ import { updatePreferences } from '@/src/preferences/hooks';
 import { applyPullPage } from '@/src/sync/cycle';
 import '@/src/sync/synced-preferences-store';
 import { planRepository, type PlanDraft } from '@/src/session-planner';
-import type { TodayPlan } from '@/src/today-plan';
+import { loadTodayPlan, type TodayPlan, type TodayPlanOptions } from '@/src/today-plan';
 
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -104,6 +105,11 @@ const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
 };
 
 const text = (testID: string) => screen.getByTestId(testID);
+const columnWidth = (node: ReturnType<typeof text>) => {
+  let column = node.parent;
+  while (column && typeof column.type !== 'string') column = column.parent;
+  return StyleSheet.flatten(column?.props.style).width as number;
+};
 // The planned rows, not their parts or the empty line.
 const plannedRows = () =>
   screen.getAllByTestId(/^today-plan-next-/).map((row) => row.props.testID as string)
@@ -117,6 +123,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  jest.useRealTimers();
+  jest.restoreAllMocks();
   closeLocalData();
 });
 
@@ -131,6 +139,126 @@ const expectNoPressedFill = (testID: string, resting: object) => {
 };
 
 describe('Today: the Plan page over real data', () => {
+  it('retains three-digit daily counts and complete large targets in seven-day families and muscles', async () => {
+    await bootLocalApp();
+    act(() => updatePreferences({ progressGrouped: true, recoveryDays: 7, weeklyWorkingSetTarget: 1024 }));
+    await logSession('fri-large', local(2026, 10, 30, 9), [{ ...BENCH, count: 128 }]);
+    await renderToday();
+    expect(text('today-plan-group-Chest-day-5')).toHaveTextContent('128');
+    fireEvent.press(text('today-plan-group-Chest'));
+    expect(text('today-plan-muscle-chest-day-5')).toHaveTextContent('128');
+    const width = columnWidth(text('today-plan-muscle-chest-day-5'));
+    expect(width).toBeGreaterThan(columnWidth(text('today-plan-muscle-chest-day-0')));
+    expect(columnWidth(text('today-plan-group-Chest-day-5'))).toBe(width);
+    expect(columnWidth(within(text('today-plan-recovery-card')).getByText('F'))).toBe(width);
+    const week = text('today-plan-muscle-chest-week');
+    expect(week).toHaveTextContent('128/1024');
+    expect(week).toHaveStyle({ flexWrap: 'wrap' });
+    expect(within(week).getByText('/1024')).toBeTruthy();
+    expect(text('today-plan-muscle-chest').props.accessibilityLabel).toContain('Friday 30-10-2026: 128 sets');
+    expect(text('today-plan-muscle-chest').props.accessibilityLabel).toContain('this week 128 of 1024 sets');
+  });
+
+  it('switches both ways over real older work, keeping weekly figures, full names and expanded families', async () => {
+    await bootLocalApp();
+    act(() => updatePreferences({ progressGrouped: true, progressCountSecondary: true }));
+    await exerciseCatalogData.saveExerciseCatalogExercise({ id: BENCH.id, name: BENCH.name,
+      mappings: ['biceps', 'triceps'].map(muscleGroupId => ({ muscleGroupId, role: 'secondary', weight: 1 })),
+    });
+    await logSession('sun', local(2026, 10, 25, 9), [{ ...BENCH, count: 3 }]);
+    await logSession('fri', local(2026, 10, 30, 9), [{ ...BENCH, count: 1 }]);
+    await renderToday();
+    fireEvent.press(text('today-plan-group-Arms'));
+    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('½/8');
+
+    act(() => updatePreferences({ recoveryDays: 7 }));
+    await waitFor(() => expect(text('today-plan-muscle-triceps-day-5')).toHaveTextContent('½'));
+    expect(text('today-plan-muscle-triceps-day-0')).toHaveTextContent('1');
+    expect(text('today-plan-muscle-triceps-day-1')).toHaveTextContent('');
+    expect(text('today-plan-group-Arms-day-0')).toHaveTextContent('3');
+    expect(text('today-plan-group-Arms-day-1')).toHaveTextContent('0');
+    expect(text('today-plan-group-Arms-total')).toHaveTextContent('1 set');
+    expect(text('today-plan-muscle-triceps-week')).toHaveTextContent('½/8');
+    expect(text('today-plan-muscle-triceps').props.accessibilityLabel).toContain('Sunday 25-10-2026: 1.5 sets');
+    for (const header of screen.getAllByRole('button').filter(button => button.props.testID?.startsWith('today-plan-group-'))) {
+      if (!header.props.accessibilityState.expanded) fireEvent.press(header);
+    }
+    const longName = within(text('today-plan-muscle-serratus_anterior')).getByText('Serratus Anterior');
+    expect(longName.props.numberOfLines).toBeUndefined();
+    expect(text('today-plan-muscle-serratus_anterior').props.accessibilityLabel).toContain('Serratus Anterior');
+    fireEvent.press(text('today-plan-muscle-triceps'));
+    expect(mockPush).toHaveBeenCalledWith('/progress-history?muscleGroupId=triceps&metric=sets&secondary=shown');
+    expect(text('today-plan-week-card')).toBeTruthy();
+
+    act(() => updatePreferences({ recoveryDays: 4 }));
+    await waitForGone(() => screen.queryByTestId('today-plan-muscle-triceps-day-5'));
+    expect(text('today-plan-muscle-triceps-day-2')).toHaveTextContent('½');
+    expect(text('today-plan-group-Arms')).toHaveProp('accessibilityState', { expanded: true });
+  });
+
+  it('uses seven days ungrouped and restores each account’s saved period while mounted', async () => {
+    await renderToday();
+    Storage.setItemSync(preferenceKey('account:B', 'recoveryDays'), '7');
+    Storage.setItemSync(preferenceKey('account:B', 'progressGrouped'), 'false');
+    await act(async () => setAccountLocalPreferenceAccount('B', true));
+    await waitFor(() => expect(text('today-plan-muscle-quads-day-5')).toBeTruthy());
+    expect(screen.queryByTestId('today-plan-group-Arms')).toBeNull();
+    await act(async () => setAccountLocalPreferenceAccount(null, false));
+    await waitForGone(() => screen.queryByTestId('today-plan-muscle-quads-day-5'));
+  });
+
+  it.each(['resolve', 'reject'] as const)('keeps a coherent previous model and ignores a stale seven-day %s after rapid changes', async outcome => {
+    await bootLocalApp();
+    const short = await loadTodayPlan(NOW, { weeklyTarget: 8, overrides: {}, countSecondary: false });
+    const long = await loadTodayPlan(NOW, { weeklyTarget: 8, overrides: {}, countSecondary: false, recoveryDays: 7 });
+    let resolveOld!: (plan: TodayPlan) => void;
+    let rejectOld!: (error: Error) => void;
+    const loadPlan = jest.fn((_now: Date, options: TodayPlanOptions) => options.recoveryDays === 7
+      ? new Promise<TodayPlan>((resolve, reject) => { resolveOld = resolve; rejectOld = reject; })
+      : Promise.resolve(short));
+    await renderToday({ loadPlan });
+    const row = text('today-plan-muscle-quads');
+    act(() => updatePreferences({ recoveryDays: 7 }));
+    expect(text('today-plan-muscle-quads')).toBe(row);
+    expect(row.props.accessibilityLabel).toContain('Wednesday 28-10-2026:');
+    expect(screen.queryByTestId('today-plan-muscle-quads-day-5')).toBeNull();
+    act(() => updatePreferences({ recoveryDays: 4 }));
+    await act(async () => {
+      if (outcome === 'resolve') resolveOld(long);
+      else rejectOld(new Error('old read failed'));
+    });
+    expect(screen.queryByTestId('today-plan-error')).toBeNull();
+    expect(screen.queryByTestId('today-plan-muscle-quads-day-5')).toBeNull();
+    expect(text('today-plan-muscle-quads').props.accessibilityLabel).toContain('Wednesday 28-10-2026:');
+    expect(loadPlan.mock.calls.map(([, options]) => options.recoveryDays)).toEqual([4, 7, 4]);
+  });
+
+  it('re-reads the selected seven days on focus, foreground and local midnight into Monday', async () => {
+    const listeners: ((state: AppStateStatus) => void)[] = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      listeners.push(listener);
+      return { remove: jest.fn() };
+    });
+    await bootLocalApp();
+    await logSession('sun', local(2026, 11, 1, 9), [{ ...BENCH, count: 3 }]);
+    act(() => updatePreferences({ recoveryDays: 7 }));
+    jest.useFakeTimers({ now: local(2026, 11, 1, 23, 59) });
+    const loadPlan = jest.fn(loadTodayPlan);
+    const now = () => new Date();
+    const view = renderWithTheme(<TodayScreen groupState={signedOut} loadPlan={loadPlan} now={now} />);
+    await waitFor(() => expect(text('today-plan-muscle-chest-week')).toHaveTextContent('3/8'));
+    expect(text('today-plan-muscle-chest-week')).toHaveTextContent('3/8');
+    await act(async () => { jest.advanceTimersByTime(60_000); });
+    await waitFor(() => expect(text('today-plan-muscle-chest-week')).toHaveTextContent('0/8'));
+    expect(text('today-plan-muscle-chest-day-5')).toHaveTextContent('3');
+    expect(text('today-plan-muscle-chest').props.accessibilityLabel).toContain('Sunday 01-11-2026: 3 sets');
+    expect(text('today-plan-recovery-today')).toHaveTextContent('M');
+    act(() => listeners.forEach(listener => listener('active')));
+    view.rerender(<TodayScreen groupState={signedOut} isFocused={false} loadPlan={loadPlan} now={now} />);
+    view.rerender(<TodayScreen groupState={signedOut} isFocused loadPlan={loadPlan} now={now} />);
+    expect(loadPlan).toHaveBeenCalledTimes(4);
+    expect(loadPlan.mock.calls.every(([, options]) => options.recoveryDays === 7)).toBe(true);
+  });
   it('starts every family collapsed, keeps its totals, and toggles only the pressed header', async () => {
     await bootLocalApp();
     act(() => updatePreferences({ progressGrouped: true, progressCountSecondary: true }));
