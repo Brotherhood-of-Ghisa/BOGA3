@@ -509,7 +509,7 @@ const useStyles = makeStyles((roles) => ({
   weekFigures: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end' },
   targetFigure: { flexShrink: 1 },
   // Seven days trade gutters for columns, retaining the existing type and full wrapping names/figures.
-  compactRow: { gap: uiSpace.xs / 2 },
+  compactRow: { gap: uiSpace.xs / 4 },
   compactName: { marginRight: uiSpace.xs / 2 },
   compactDayColumn: { width: 20 },
   compactDayCell: { width: '100%', height: 'auto', minHeight: DAY_CELL_HEIGHT },
