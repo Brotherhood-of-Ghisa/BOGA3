@@ -10,7 +10,7 @@
  */
 
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, StyleSheet, type AppStateStatus } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -105,6 +105,11 @@ const renderToday = async (props: Partial<TodayScreenProps> = {}) => {
 };
 
 const text = (testID: string) => screen.getByTestId(testID);
+const columnWidth = (node: ReturnType<typeof text>) => {
+  let column = node.parent;
+  while (column && typeof column.type !== 'string') column = column.parent;
+  return StyleSheet.flatten(column?.props.style).width as number;
+};
 // The planned rows, not their parts or the empty line.
 const plannedRows = () =>
   screen.getAllByTestId(/^today-plan-next-/).map((row) => row.props.testID as string)
@@ -134,6 +139,26 @@ const expectNoPressedFill = (testID: string, resting: object) => {
 };
 
 describe('Today: the Plan page over real data', () => {
+  it('retains three-digit daily counts and complete large targets in seven-day families and muscles', async () => {
+    await bootLocalApp();
+    act(() => updatePreferences({ progressGrouped: true, recoveryDays: 7, weeklyWorkingSetTarget: 1024 }));
+    await logSession('fri-large', local(2026, 10, 30, 9), [{ ...BENCH, count: 128 }]);
+    await renderToday();
+    expect(text('today-plan-group-Chest-day-5')).toHaveTextContent('128');
+    fireEvent.press(text('today-plan-group-Chest'));
+    expect(text('today-plan-muscle-chest-day-5')).toHaveTextContent('128');
+    const width = columnWidth(text('today-plan-muscle-chest-day-5'));
+    expect(width).toBeGreaterThan(columnWidth(text('today-plan-muscle-chest-day-0')));
+    expect(columnWidth(text('today-plan-group-Chest-day-5'))).toBe(width);
+    expect(columnWidth(within(text('today-plan-recovery-card')).getByText('F'))).toBe(width);
+    const week = text('today-plan-muscle-chest-week');
+    expect(week).toHaveTextContent('128/1024');
+    expect(week).toHaveStyle({ flexWrap: 'wrap' });
+    expect(within(week).getByText('/1024')).toBeTruthy();
+    expect(text('today-plan-muscle-chest').props.accessibilityLabel).toContain('Friday 30-10-2026: 128 sets');
+    expect(text('today-plan-muscle-chest').props.accessibilityLabel).toContain('this week 128 of 1024 sets');
+  });
+
   it('switches both ways over real older work, keeping weekly figures, full names and expanded families', async () => {
     await bootLocalApp();
     act(() => updatePreferences({ progressGrouped: true, progressCountSecondary: true }));
