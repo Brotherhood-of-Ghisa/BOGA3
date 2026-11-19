@@ -145,11 +145,11 @@ function frameColours(frame: WireframeFrame) {
     body: BODY_WIRE_INSTANCES.map(mesh => {
       const reported = reportedMaterial(mesh.group as MuscleBodyMaterialId, frame.report);
       const score = frame.scores.get(reported) ?? null;
-      if (reported === 'neutral' || score === null || !Number.isFinite(score)) return grey(.20);
+      if (reported === 'neutral' || score === null || !Number.isFinite(score)) return { colour: grey(.20), width: .45 };
       const colour = hexToLch(buildMuscleShadeRamp(score, frame.palette)[6]);
       const grade = Math.max(0, Math.min(1, (score + 1) / 2));
       // Thin wires need a wider contrast range than patches, clear of the neutral body shading.
-      return lchToHex({ ...colour, lightness: paper + (ink - paper) * (.38 + .44 * grade) });
+      return { colour: lchToHex({ ...colour, lightness: paper + (ink - paper) * (.38 + .44 * grade) }), width: .95 };
     }),
     ramps,
   };
@@ -226,8 +226,10 @@ export function createMuscleWireframeRenderer(gl: ExpoWebGLRenderingContext): Mu
       if (wires) {
         gl.depthMask(false); gl.enable(gl.BLEND);
         gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-        gl.uniform1f(uniforms.fillAlpha, 0); gl.uniform1f(uniforms.wireWidth, .65 * ratio);
-        body.forEach((mesh, i) => { colour('wireColour', colours.body[i]); paint(mesh); });
+        gl.uniform1f(uniforms.fillAlpha, 0);
+        body.forEach((mesh, i) => {
+          colour('wireColour', colours.body[i].colour); gl.uniform1f(uniforms.wireWidth, colours.body[i].width * ratio); paint(mesh);
+        });
       }
       if (selection) {
         overlay!.begin(); gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.depthMask(true);

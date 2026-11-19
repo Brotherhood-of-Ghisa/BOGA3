@@ -160,6 +160,31 @@ const lightnessOf = (vector: readonly number[]) => hexToLch(
   `#${vector.map(channel => Math.round(channel * 255).toString(16).padStart(2, '0')).join('')}`,
 ).lightness;
 
+it('gives every finite metric grade heavier wires than neutral anatomy at the device pixel ratio', () => {
+  const { context, gl, calls } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
+  gl.drawingBufferWidth = 840;
+  const muscle = { id: 'triceps', displayName: 'Triceps', familyName: 'Arms', sortOrder: 0 };
+  const frame = wireframeFixture({ selected: [], scores: new Map([
+    ['chest', -1], ['biceps', 0], ['quads', 1], ['triceps', .5],
+    ['calves', Infinity], ['back_lats', NaN], ['glutes_max', -Infinity], ['forearms_grip', null],
+  ]), report: new Map([['triceps', { muscle, tracked: false }]]) });
+  const ratio = gl.drawingBufferWidth / frame.camera.width;
+  for (const scores of [frame.scores, new Map()]) {
+    calls.length = 0;
+    renderer.draw({ ...frame, scores });
+    let alpha = 1, width = 0;
+    const wireWidths: number[] = [];
+    for (const call of calls) {
+      if (call.name === 'uniform1f' && call.args[0] === 'fillAlpha') alpha = call.args[1] as number;
+      if (call.name === 'uniform1f' && call.args[0] === 'wireWidth') width = call.args[1] as number;
+      if (call.name === 'drawArrays' && alpha === 0) wireWidths.push(width);
+    }
+    expect(wireWidths).toEqual(BODY_WIRE_INSTANCES.map(mesh =>
+      (scores.size && ['chest', 'biceps', 'quads'].includes(mesh.group) ? .95 : .45) * ratio));
+  }
+  renderer.dispose();
+});
+
 it.each(themePresets.flatMap(preset => (['light', 'dark'] as const).map(mode => ({
   name: preset.id, seeds: preset.seeds, mode,
 }))))('keeps neutral wires quieter than distinct activity grades in $name / $mode', ({ seeds, mode }) => {
