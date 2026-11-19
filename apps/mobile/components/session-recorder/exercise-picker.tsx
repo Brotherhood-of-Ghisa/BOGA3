@@ -41,7 +41,7 @@ import { useGroupExerciseLinking, useGroupLinkingUserId } from '@/src/groups/use
 
 export type ExercisePickerProps = {
   onClose: () => void;
-  onSelectExercise: (exerciseDefinitionId: string, exerciseName: string) => void;
+  onSelectExercise: (exerciseDefinitionId: string, exerciseName: string, recordingMode?: 'reps' | 'hold') => void;
   onAppendPlan: (
     exercise: { id: string; name: string },
     suggestion: ExerciseBlockHistorySuggestedPlan
@@ -167,9 +167,9 @@ export function ExercisePicker({
     preselectionRequestKeyRef.current = null;
   };
 
-  const selectExercise = (exerciseDefinitionId: string, exerciseName: string) => {
+  const selectExercise = (exerciseDefinitionId: string, exerciseName: string, recordingMode?: 'reps' | 'hold') => {
     clearPreselection();
-    onSelectExercise(exerciseDefinitionId, exerciseName);
+    onSelectExercise(exerciseDefinitionId, exerciseName, recordingMode ?? exerciseOptions.find(exercise => exercise.id === exerciseDefinitionId)?.recordingMode ?? 'reps');
   };
 
   // Only a real edit ends the preselection: iOS can report the unchanged text
@@ -227,7 +227,7 @@ export function ExercisePicker({
     Keyboard.dismiss();
     clearPreselection();
     // The editor page opens over the picker; a saved exercise is added as if picked.
-    openExerciseEditor({ onSaved: (exercise) => selectExercise(exercise.id, exercise.name) });
+    openExerciseEditor({ onSaved: (exercise) => selectExercise(exercise.id, exercise.name, exercise.recordingMode) });
   };
 
   // ---- Group exercises in the picker (E0.1) and the pick sheet (E0.2).

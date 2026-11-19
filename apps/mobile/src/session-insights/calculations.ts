@@ -14,6 +14,7 @@ import {
   type RecordBaseline,
 } from '@/src/exercise-calculations/records';
 import {
+  accumulateContributionVolume,
   collectMuscleSetContributions,
   countMuscleAnalyticsWorkingSets,
   countMuscleSet,
@@ -30,6 +31,8 @@ export type SessionInsightSetInput = {
   id: string;
   orderIndex: number;
   weightValue: string;
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   repsValue: string;
   setType: string | null;
   performanceStatus?: SessionSetPerformanceStatus;
@@ -209,6 +212,7 @@ const ensureValidDate = (value: Date, label: string): void => {
 const isEligiblePerformedSet = (set: SessionInsightSetInput): boolean =>
   (set.deletedAt ?? null) === null &&
   isConfirmedPerformedSet({
+    ...set,
     reps: set.repsValue,
     weight: set.weightValue,
     performanceStatus: set.performanceStatus,
@@ -270,6 +274,8 @@ export const adaptCurrentSessionToMuscleAnalyticsInput = (
           orderIndex: set.orderIndex,
           setType: set.setType,
           weightValue: set.weightValue,
+          recordingMode: set.recordingMode,
+          durationSec: set.durationSec,
           repsValue: set.repsValue,
           performanceStatus: set.performanceStatus,
         })),
@@ -568,6 +574,7 @@ type ExerciseVolumeObservation = {
   sessionExerciseOrderIndex: number;
   workingSetCount: number;
   volume: number | null;
+  hasRepetitionSets: boolean;
 };
 
 const collectExerciseVolumeObservations = (
@@ -594,13 +601,17 @@ const collectExerciseVolumeObservations = (
       sessionExerciseOrderIndex: exercise.orderIndex,
       workingSetCount: 0,
       volume: 0,
+      hasRepetitionSets: false,
     };
 
     current.sessionExerciseIds.push(exercise.id);
     current.workingSetCount += workingSets.length;
-    current.volume = addFiniteVolume(
-      current.volume, summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? ordinaryLoadContext()).volumeKgReps,
-    );
+    if (eligibleSets.some(set => set.recordingMode !== 'hold')) {
+      if (!current.hasRepetitionSets) current.volume ??= 0;
+      current.hasRepetitionSets = true;
+      current.volume = addFiniteVolume(current.volume,
+        summarizeExerciseLoad(eligibleSets, exercise.loadContext ?? ordinaryLoadContext()).volumeKgReps);
+    } else if (!current.hasRepetitionSets) current.volume = null;
     observationsByIdentity.set(identity, current);
   }
 
@@ -663,7 +674,7 @@ export const deriveSessionExerciseVolumeComparisons = (
 
   return collectExerciseVolumeObservations(target.exercises).map(
     (observation) => {
-      const { volume, ...exerciseSummary } = observation;
+      const { volume, hasRepetitionSets: _supported, ...exerciseSummary } = observation;
       const historicalVolumes = observation.exerciseDefinitionId
         ? [
             ...(historicalVolumesByDefinition.get(
@@ -751,19 +762,21 @@ export const deriveSessionMuscleVolumeComparisons = (
       }),
     );
     const byMuscle = new Map<string, {
-      weightedVolume: number | null;
+      totalVolume: number | null;
+      hasRepetitionSets: boolean;
       setCounter: MuscleSetCounter;
       primary: boolean;
     }>();
     for (const contribution of contributions) {
       if (!groupById.has(contribution.muscleGroupId)) continue;
       const observation = byMuscle.get(contribution.muscleGroupId) ?? {
-        weightedVolume: 0,
+        totalVolume: 0,
+        hasRepetitionSets: false,
         setCounter: createMuscleSetCounter(),
         primary: false,
       };
       byMuscle.set(contribution.muscleGroupId, observation);
-      observation.weightedVolume = addFiniteVolume(observation.weightedVolume, contribution.weightedVolume ?? 0);
+      accumulateContributionVolume(observation, contribution);
       if (contribution.working !== false) {
         countMuscleSet(observation.setCounter, contribution);
         if (contribution.role === 'primary') observation.primary = true;
@@ -771,7 +784,7 @@ export const deriveSessionMuscleVolumeComparisons = (
     }
     return Array.from(byMuscle, ([id, observation]) => ({
       ...groupById.get(id)!,
-      weightedVolume: observation.weightedVolume,
+      weightedVolume: observation.totalVolume,
       workingSetCount: observation.setCounter.counts.weightedSetCount,
       primary: observation.primary,
     })).filter((muscle) => muscle.primary).sort((left, right) =>

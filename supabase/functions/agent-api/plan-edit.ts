@@ -2,6 +2,7 @@
 // Pure functions with no database or HTTP access, mirroring domain validation.
 
 import { isSessionSetType } from '../../../apps/mobile/src/data/set-types.ts';
+import { MAX_SET_DURATION_SEC, parseSetDuration } from '../../../apps/mobile/src/exercise-calculations/parse.ts';
 
 export const MAX_PLAN_TITLE_LENGTH = 100;
 export const MAX_PROGRAMME_NAME_LENGTH = 100;
@@ -127,24 +128,33 @@ export const readTargetSetType = (value: unknown, label: string): string | null 
 
 export type PlanSetInput = {
   id?: string;
-  target_reps: number;
+  recording_mode?: 'reps' | 'hold';
+  target_duration_sec?: number;
+  target_reps: number | null;
   target_set_type?: string | null;
   target_weight_value?: string | null;
 };
 
 export const normalizeSetInput = (value: unknown, label: string): PlanSetInput => {
   const obj = asObject(value, label);
-  rejectUnknownKeys(obj, new Set(['id', 'target_reps', 'target_set_type', 'target_weight_value', 'target_weight']));
-  const targetReps = readTargetReps(obj.target_reps, `${label}.target_reps`);
+  rejectUnknownKeys(obj, new Set(['id', 'target_reps', 'target_set_type', 'target_weight_value', 'target_weight', 'recording_mode', 'target_duration_sec']));
+  const isHold = obj.recording_mode === 'hold';
+  if (obj.recording_mode !== undefined && obj.recording_mode !== 'reps' && !isHold) return fail(`${label}.recording_mode must be reps or hold.`);
+  const duration = parseSetDuration(obj.target_duration_sec);
+  if (isHold && (duration === null || obj.target_reps != null)) return fail(`${label} needs whole target_duration_sec from 1 to ${MAX_SET_DURATION_SEC}, without target_reps.`);
+  if (!isHold && obj.target_duration_sec != null) return fail(`${label} cannot contain both reps and duration.`);
+  const targetReps = isHold ? null : readTargetReps(obj.target_reps, `${label}.target_reps`);
   const rawWeight = obj.target_weight_value ?? obj.target_weight;
   const targetWeight = readTargetWeight(rawWeight, `${label}.target_weight_value`);
-  const targetSetType = readTargetSetType(obj.target_set_type, `${label}.target_set_type`);
   const id = readOptionalId(obj.id, `${label}.id`);
+  const preserveEffort = isHold && id !== null && obj.target_set_type === undefined;
+  const targetSetType = readTargetSetType(isHold && !preserveEffort && obj.target_set_type === undefined ? 'rir_0' : obj.target_set_type, `${label}.target_set_type`);
   return {
     ...(id ? { id } : {}),
     target_reps: targetReps,
+    ...(isHold ? { recording_mode: 'hold' as const, target_duration_sec: duration! } : {}),
     ...(targetWeight !== null ? { target_weight_value: targetWeight } : {}),
-    ...(targetSetType !== null ? { target_set_type: targetSetType } : {}),
+    ...(!preserveEffort && (targetSetType !== null || isHold) ? { target_set_type: targetSetType } : {}),
   };
 };
 

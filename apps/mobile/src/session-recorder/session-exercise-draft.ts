@@ -97,6 +97,8 @@ export const toSessionExerciseInput = (exercise: SessionDraftExerciseSnapshot): 
     id: set.id,
     weightValue: set.weightValue,
     repsValue: set.repsValue,
+    recordingMode: set.recordingMode,
+    durationSec: set.durationSec,
     setType: set.setType,
     plannedWeightValue: set.plannedWeightValue,
     plannedRepsValue: set.plannedRepsValue,

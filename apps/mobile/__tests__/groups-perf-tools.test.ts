@@ -79,6 +79,15 @@ describe('fixture', () => {
     expect(sql).toContain('generate_series(0,2+(s.n+p.block+s.idx)%3) k');
   });
 
+  test('member UUIDs keep index order while separate run tags keep separate namespaces', () => {
+    const members = (tag: string) => fixtureStatements({ members: 7, historyDays: 56, tag })
+      .find((sql) => sql.startsWith('create temporary table perf_members'))!;
+    expect(members('abc1')).toBe(members('abc1'));
+    expect(members('abc1')).not.toBe(members('abc2'));
+    expect(members('abc1')).toContain("substr(md5('perf-member-abc1'),1,12)||'40008000'||lpad(to_hex(n),12,'0')");
+    expect(members('abc1')).not.toContain('gen_random_uuid');
+  });
+
   test.each([
     [{ members: 0, historyDays: 28, tag: 'a' }, 'members'],
     [{ members: 101, historyDays: 28, tag: 'a' }, 'members'],

@@ -43,8 +43,9 @@ instants; audit and sync clocks remain current server time. Response times are I
 A performed input is `{weight_kg: "80", reps: 8, set_type: "rir_2"}`.
 Weight is explicit nonnegative decimal text in canonical kg; `"0"` means no
 external load. It retains the definition's total/per-side input meaning.
-Effort is optional (null), or one of the current selectable app efforts. Reps
-use the shared parser's cap. No targets, units, owner fields or performance
+Holds instead send `{recording_mode: "hold", duration_sec: 38, weight_kg: "5"}`,
+with no reps; Weight may be omitted for zero. Seconds are whole 1–300.
+Effort follows [[exercise.recording-mode]]; reps retain their shared parser cap. No targets, units, owner fields or performance
 status can be supplied. A batch has 1–30 sets. Corrections replace explicit
 performance only; planned values/provenance remain unchanged.
 

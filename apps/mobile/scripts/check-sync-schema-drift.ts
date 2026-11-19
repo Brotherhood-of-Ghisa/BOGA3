@@ -15,7 +15,7 @@
  *      walk client→server and server→client; run the step-4f sanity checks
  *      (universal index, two triggers, four owner RLS policies plus the
  *      restrictive direct-app-only policy, all w/ body hashes,
- *      no CHECK, no `extras`, no `deleted` boolean).
+ *      only contracted CHECKs, no `extras`, no `deleted` boolean).
  *   5. Run the topological-layer assertion against TOPO_LAYERS.
  *
  * Exit codes:
@@ -648,7 +648,9 @@ interface EntityContext {
 // The CHECK exceptions docs/specs/tech/sync-v2-server-contract.md ("Ground
 // rules") names; every other entity has none.
 const ALLOWED_CHECK_NAMES: Readonly<Record<string, readonly string[]>> = {
-  exercise_definitions: ['exercise_definitions_load_input_mode_valid'],
+  exercise_definitions: ['exercise_definitions_load_input_mode_valid', 'exercise_definitions_recording_mode_check'],
+  exercise_sets: ['exercise_sets_recording_mode_check'],
+  session_plan_sets: ['session_plan_sets_recording_mode_check', 'session_plan_sets_target_measurement_valid'],
   session_plans: ['session_plans_routine_standalone'],
   user_settings: [
     'user_settings_combined_muscles_valid',

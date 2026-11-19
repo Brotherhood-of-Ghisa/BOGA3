@@ -329,8 +329,10 @@ export class BogaAgentApi {
           exercise_definition_id?: string;
           name: string;
           sets: Array<{
-            target_reps: number;
-            target_set_type?: string;
+            target_reps?: number | null;
+            recording_mode?: 'reps' | 'hold';
+            target_duration_sec?: number | null;
+            target_set_type?: string | null;
             target_weight_value?: string;
           }>;
         }>;
@@ -360,8 +362,10 @@ export class BogaAgentApi {
             exercise_definition_id?: string;
             name: string;
             sets: Array<{
-              target_reps: number;
-              target_set_type?: string;
+              target_reps?: number | null;
+            recording_mode?: 'reps' | 'hold';
+            target_duration_sec?: number | null;
+              target_set_type?: string | null;
               target_weight_value?: string;
             }>;
           }>;

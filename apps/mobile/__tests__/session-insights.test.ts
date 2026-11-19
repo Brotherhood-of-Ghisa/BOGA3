@@ -1,6 +1,6 @@
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import {
-  calculateLinearPercentile,
+  calculateLinearPercentile, buildSessionBreakdownExerciseRows,
   captureSessionShareImage,
   createCompletedSessionInsightsRepository,
   deriveExercisePersonalRecord,
@@ -1360,4 +1360,21 @@ describe("createCompletedSessionInsightsRepository", () => {
       ],
     });
   });
+});
+
+
+it('retains hold completion rows and counts without inventing a volume comparison or changing lifting work', () => {
+  const hold = insightExercise({ id: 'hold', exerciseDefinitionId: 'plank', exerciseName: 'Plank', sets: [
+    insightSet('hold-set', { recordingMode: 'hold', durationSec: 38, weightValue: '5', repsValue: '', setType: 'rir_0' }),
+  ] });
+  const target = completedSession({ sessionId: 'target', exercises: [hold] });
+  const comparisons = deriveSessionExerciseVolumeComparisons({ targetSession: target, historicalSessions: [] });
+  expect(comparisons).toMatchObject([{ exerciseName: 'Plank', workingSetCount: 1, currentVolume: null, historicalSessionCount: 0, state: 'unavailable' }]);
+  expect(buildSessionBreakdownExerciseRows({ comparisons, exercises: target.exercises, personalRecords: [] }))
+    .toMatchObject([{ name: 'Plank', workingSetCount: 1, volume: null, topWeight: null, recordCount: 0 }]);
+  const lift = insightExercise({ id: 'lift', exerciseDefinitionId: 'plank', sets: [insightSet('lift-set', { weightValue: '100', repsValue: '10' })] });
+  for (const exercises of [[hold, lift], [lift, hold]]) {
+    expect(deriveSessionExerciseVolumeComparisons({ targetSession: { ...target, exercises }, historicalSessions: [] }))
+      .toMatchObject([{ workingSetCount: 2, currentVolume: 1000 }]);
+  }
 });

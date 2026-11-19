@@ -38,6 +38,7 @@ export type BogaImportExerciseDecision =
       sourceExerciseName: string;
       decision: 'create_new';
       loadInputMode: ImportedExerciseDefinition['loadInputMode'];
+      recordingMode?: ImportedExerciseDefinition['recordingMode'];
       bodyweightContribution: number;
       importExerciseKey: string;
       exerciseName: string;
@@ -281,7 +282,7 @@ export const validateBogaSessionImportPackage = (
           errors.push(`exercise decision ${decision.sourceExerciseName} needs exerciseDefinitionId`);
         }
       } else if (decision.decision === 'create_new') {
-        if (!hasOnlyKeys(decision, ['sourceExerciseName', 'decision', 'loadInputMode',
+        if (!hasOnlyKeys(decision, ['sourceExerciseName', 'decision', 'loadInputMode', 'recordingMode',
           'bodyweightContribution', 'importExerciseKey', 'exerciseName', 'muscleMappings', 'warnings'])) {
           errors.push(`exercise decision ${decision.sourceExerciseName} contains unsupported fields`);
         }
@@ -358,7 +359,7 @@ export const validateBogaSessionImportPackage = (
             if (!validateImportedSetMeaning(set)) {
               errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}] needs explicit planned values and performance status`);
             }
-            if (!hasOnlyKeys(set, ['orderIndex', 'repsValue', 'weightValue', 'setType',
+            if (!hasOnlyKeys(set, ['orderIndex', 'repsValue', 'weightValue', 'setType', 'recordingMode', 'durationSec',
               'plannedRepsValue', 'plannedWeightValue', 'plannedSetType', 'performanceStatus', 'source', 'warnings'])) {
               errors.push(`sessions[${sessionIndex}].exercises[${exerciseIndex}].sets[${setIndex}] contains unsupported fields`);
             }

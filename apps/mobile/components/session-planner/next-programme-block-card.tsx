@@ -32,7 +32,7 @@ const formatTargetLine = (targets: PlanTargetView[]): string => {
   const first = targets[0];
   const weightStr = first.targetWeightValue ? ` @ ${first.targetWeightValue}` : '';
   const effort = formatSessionSetType(first.targetSetType);
-  const firstPreview = `${first.targetReps} reps${weightStr}${effort ? ` (${effort})` : ''}`;
+  const firstPreview = `${first.recordingMode === 'hold' ? `${first.targetDurationSec} seconds` : `${first.targetReps} reps`}${weightStr}${effort ? ` (${effort})` : ''}`;
   return targets.length === 1 ? firstPreview : `${setsStr} · starts at ${firstPreview}`;
 };
 

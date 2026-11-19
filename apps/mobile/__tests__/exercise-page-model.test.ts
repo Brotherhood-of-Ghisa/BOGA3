@@ -406,6 +406,8 @@ describe('exercise page model', () => {
     const next = addSet(quietSets(), 'new');
     expect(next[5]).toEqual({
       id: 'new',
+      recordingMode: 'reps',
+      durationSec: null,
       weightValue: '85',
       repsValue: '5',
       setType: 'rir_0',

@@ -153,6 +153,7 @@ describe('editing an existing exercise', () => {
     expect(onSave).toHaveBeenCalledWith({
       bodyweightContribution: 0.25,
       name: 'Bench Press',
+      recordingMode: 'reps',
       loadInputMode: 'total_load',
       splitByGym: false,
       restTimerSec: null,

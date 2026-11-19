@@ -169,7 +169,7 @@ Tool schemas reject unknown fields and never accept a user identifier. Tool
 definitions and server instructions are static; names and other user-controlled
 values remain untrusted JSON output.
 
-Training projections with `metric_revision: "working_sets_v10"` pass through
+Training projections with `metric_revision: "working_sets_v11"` pass through
 unchanged in structured and text JSON output. Tool names and strict input
 schemas remain compatible. Every derived figure and count reads working sets
 only: a set that is not a working set ([[set.eligibility]]) is listed with its own per-set figures but feeds no record,
@@ -319,3 +319,9 @@ refresh. Complete the supported-client walkthrough separately from local proof.
 Dynamic client registration is controlled by Supabase Auth. If it is disabled,
 pre-register each supported client and its exact callback URLs in Supabase
 before connecting it.
+
+For timed holds, workout tools accept `recording_mode: "hold"` and
+`duration_sec` (whole 1–300), optional zero-default `weight_kg`, and editable
+Effort. Plan targets use `target_duration_sec` instead of `target_reps`.
+Effort follows [[exercise.recording-mode]]. Reads retain seconds/load and omit unsupported derived
+fields; null encodes unavailable Volume ([[set.row-figures]]). Holds count under [[set.eligibility]].

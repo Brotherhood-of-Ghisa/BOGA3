@@ -61,7 +61,7 @@ confirm() {
 }
 bounded_rpc() {
   http_call --max-time 12 -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer $1" \
-    -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-sync-protocol: 7' -H 'Content-Type: application/json' \
+    -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-sync-protocol: 8' -H 'Content-Type: application/json' \
     -H 'Content-Profile: app_public' --data "$3" "${API_URL}/rest/v1/rpc/$2"
 }
 drain_eval() { eval_drain; expect_ok 'comparison evaluator'; }
@@ -482,6 +482,51 @@ assert_sql 'matching publications ready' "select app_public.notification_workout
 run_psql "update app_public.group_exercises set name='Renamed bench',default_metric='volume' where id='${X1}';
   update app_public.groups set name='Current group name' where id='${G1}';" >/dev/null
 assert_sql 'name/default-tab metadata preserves readiness' "select app_public.notification_workout_ready('${B_UID}','${SESSION}');"
+# Exercise the migration's real capture/restamp SQL against valid and stale seals.
+HOLD_MIGRATION="${SUPABASE_DIR}/migrations/20261119183619_manual_holds.sql"
+HOLD_CAPTURE_SQL="$(sed -n '/^create temporary table manual_hold_current_contexts as$/,/^-- End pending-confirmation capture\.$/p' "${HOLD_MIGRATION}")"
+HOLD_RESTAMP_SQL="$(sed -n '/^update app_public.notification_workouts w$/,/^-- End pending-confirmation restamp\.$/p' "${HOLD_MIGRATION}")"
+OLD_CONTEXT_SQL="$(sed -n '/^create function app_public.notification_context_source(/,/^\$\$;$/p' \
+  "${SUPABASE_DIR}/migrations/20261114210000_notification_ready_single_graph.sql" | sed 's/^create function /create or replace function /')"
+CURRENT_CONTEXT_SQL="$(run_psql "select pg_get_functiondef('app_public.notification_context_source(uuid,uuid,uuid,text)'::regprocedure);")"
+CURRENT_MANIFEST_SQL="$(run_psql "select pg_get_functiondef('app_public.notification_source_manifest(uuid,text)'::regprocedure);")"
+[[ -n "${HOLD_CAPTURE_SQL}" && -n "${HOLD_RESTAMP_SQL}" && -n "${OLD_CONTEXT_SQL}" ]] || fail 'missing hold upgrade SQL'
+for hold_stale in none context manifest; do
+  run_psql "begin;
+    ${OLD_CONTEXT_SQL}
+    do \$\$ declare def text:=pg_get_functiondef('app_public.notification_source_manifest(uuid,text)'::regprocedure); begin
+      if strpos(def,'to_jsonb(es)')=0 or strpos(def,'to_jsonb(ed)')=0 then raise exception 'missing old manifest shape'; end if;
+      execute replace(replace(def,'to_jsonb(es)','(to_jsonb(es)-array[''recording_mode'',''duration_sec''])'),
+        'to_jsonb(ed)','(to_jsonb(ed)-''recording_mode'')');
+    end \$\$;
+    update app_public.notification_workouts set
+      context_digest=case when '${hold_stale}'='context' then 'hold-upgrade-stale'
+        else app_public.notification_context_digest(member_user_id,session_id) end,
+      manifest_digest=case when '${hold_stale}'='manifest' then 'hold-upgrade-stale'
+        else app_public.notification_manifest_digest(member_user_id,session_id) end
+      where member_user_id='${B_UID}' and session_id='${SESSION}';
+    create temporary table hold_upgrade_before as select context_digest,manifest_digest,generation,confirmed_at
+      from app_public.notification_workouts where member_user_id='${B_UID}' and session_id='${SESSION}';
+    ${HOLD_CAPTURE_SQL}
+    ${CURRENT_CONTEXT_SQL};
+    ${CURRENT_MANIFEST_SQL};
+    ${HOLD_RESTAMP_SQL}
+    do \$\$ begin
+      if not exists(select 1 from app_public.notification_workouts w cross join hold_upgrade_before b
+        where w.member_user_id='${B_UID}' and w.session_id='${SESSION}'
+          and w.generation=b.generation and w.confirmed_at=b.confirmed_at
+          and case when '${hold_stale}'='none' then
+            w.context_digest=app_public.notification_context_digest(w.member_user_id,w.session_id)
+              and w.manifest_digest=app_public.notification_manifest_digest(w.member_user_id,w.session_id)
+              and w.context_digest<>b.context_digest and w.manifest_digest<>b.manifest_digest
+              and app_public.notification_workout_ready(w.member_user_id,w.session_id)
+          else w.context_digest=b.context_digest and w.manifest_digest=b.manifest_digest
+            and not app_public.notification_workout_ready(w.member_user_id,w.session_id) end)
+      then raise exception 'hold upgrade changed confirmation validity or clocks'; end if;
+    end \$\$;
+    rollback;" >/dev/null
+  pass "hold upgrade preserves pending confirmation validity (${hold_stale})"
+done
 # Claim first, then mutate a descendant: preparation must defer, never permanently cancel or send stale counts.
 prepare_outcome "${B_UID}" "${SESSION}"
 enqueue_outcome "${B_UID}" "${SESSION}"
@@ -973,7 +1018,7 @@ while IFS= read -r line <&10; do [[ "${line}" != held ]] || break; done
 [[ "${line}" == held ]] || fail 'common-board holder did not acknowledge its lock'
 (
   trap - EXIT
-  http_call --max-time 20 -X POST -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-sync-protocol: 7' -H 'Content-Type: application/json' \
+  http_call --max-time 20 -X POST -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-sync-protocol: 8' -H 'Content-Type: application/json' \
     -H "x-group-eval-secret: ${EVAL_SECRET}" --data '{}' "${API_URL}/functions/v1/group-eval"
   printf '%s\n%s\n' "${STATUS}" "${BODY}" >"${RACE_DIR}/result"
 ) &

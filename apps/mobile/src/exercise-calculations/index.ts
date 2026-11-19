@@ -12,6 +12,8 @@ import { parseSetReps, parseSetWeight } from './parse.ts';
 export { parseSetReps, parseSetWeight };
 
 export type CalculationSetInput = {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   weightValue: string | null | undefined;
   repsValue: string | null | undefined;
   setType?: string | null | undefined;
@@ -24,6 +26,7 @@ export type ParsedCalculationSet = {
 };
 
 export const parseCalculationSet = (set: CalculationSetInput): ParsedCalculationSet | null => {
+  if (set.recordingMode === 'hold' || set.durationSec != null) return null;
   const weight = parseSetWeight(set.weightValue);
   const reps = parseSetReps(set.repsValue);
   if (weight === null || reps === null) return null;

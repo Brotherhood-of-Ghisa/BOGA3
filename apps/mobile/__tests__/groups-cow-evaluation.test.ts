@@ -79,3 +79,16 @@ it('never runs an unsupported retained scorer through the current math, but can 
   input.window.contextChangedAtUs = 1_200_000;
   expect(evaluateCoWGraph(input)).toEqual({ state: 'unavailable', rankings: [] });
 });
+
+
+it('finishes retained scorer-7 receipts unchanged after a lifetime rules upgrade and ignores new hold receipts', () => {
+  const retained = graph();
+  retained.context!.scorer_version = 7;
+  const before = evaluateCoWGraph(retained);
+  const hold = { ...retained.sources[0], setId: 'hold', version: 3,
+    input: { ...retained.sources[0].input, recording_mode: 'hold' as const, duration_sec: 38, eligible: false } };
+  Object.defineProperty(hold.input, 'body_weight_context', { get: () => { throw new Error('private hold lookup'); } });
+  retained.sources.push(hold);
+  expect(COW_SCORER_VERSION).toBe(7);
+  expect(evaluateCoWGraph(retained)).toEqual(before);
+});

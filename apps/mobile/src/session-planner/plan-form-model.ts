@@ -1,3 +1,4 @@
+import type { RecordingMode } from '@/src/exercise-core/recording-mode';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { defaultSessionSetType, normalizeSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
@@ -14,6 +15,8 @@ import type { PlanDraft, PlanFieldError } from './types';
  */
 
 export type PlanFormSet = {
+  recordingMode?: RecordingMode;
+  targetDurationText?: string;
   /** Client-side key only; the store assigns real ids on save. */
   id: string;
   sourceSetId?: string;
@@ -50,11 +53,12 @@ let formKey = 0;
 const nextKey = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${formKey++}`;
 
 /** The first target starts with the recorder's visible effort default. */
-export const createPlanFormSet = (displayEfforts?: readonly EffortChoice[]): PlanFormSet => ({
+export const createPlanFormSet = (displayEfforts?: readonly EffortChoice[], recordingMode: RecordingMode = 'reps'): PlanFormSet => ({
   id: nextKey('set'),
   targetWeightText: '',
   targetRepsText: '',
-  targetSetType: defaultSessionSetType(undefined, displayEfforts),
+  ...(recordingMode === 'hold' ? { recordingMode, targetDurationText: '' } : {}),
+  targetSetType: defaultSessionSetType(undefined, displayEfforts, recordingMode),
 });
 
 /** The whole Add set(s) request must fit the block. */
@@ -82,7 +86,7 @@ export const addPlanFormSets = (sets: PlanFormSet[], countText: string): PlanFor
 };
 
 export const planFormBlockFromEmptySet = (
-  exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null },
+  exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null; recordingMode?: RecordingMode },
   displayEfforts?: readonly EffortChoice[],
 ): PlanFormBlock => ({
   id: nextKey('block'),
@@ -90,12 +94,12 @@ export const planFormBlockFromEmptySet = (
   exerciseDefinitionId: exercise.id,
   name: exercise.name,
   loadInputMode: exercise.loadInputMode ?? null,
-  sets: [createPlanFormSet(displayEfforts)],
+  sets: [createPlanFormSet(displayEfforts, exercise.recordingMode)],
 });
 
 export const planFormBlockFromSuggestion = (
-  exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null },
-  suggestedSets: { weightValue: string; repsValue: string; setType: string | null }[],
+  exercise: { id: string; name: string; loadInputMode?: 'total_load' | 'per_side_load' | null; recordingMode?: RecordingMode },
+  suggestedSets: { weightValue: string; repsValue: string; setType: string | null; recordingMode?: RecordingMode; durationSec?: number | null }[],
   displayEfforts?: readonly EffortChoice[],
 ): PlanFormBlock => ({
   id: nextKey('block'),
@@ -109,9 +113,10 @@ export const planFormBlockFromSuggestion = (
           id: nextKey('set'),
           targetWeightText: s.weightValue,
           targetRepsText: s.repsValue,
+          ...(s.recordingMode === 'hold' ? { recordingMode: s.recordingMode, targetDurationText: String(s.durationSec ?? '') } : {}),
           targetSetType: normalizeSessionSetType(s.setType),
         }))
-      : [createPlanFormSet(displayEfforts)],
+      : [createPlanFormSet(displayEfforts, exercise.recordingMode)],
 });
 
 export const emptyPlanForm = (options?: { isRoutine?: boolean }): PlanFormState => ({
@@ -165,7 +170,8 @@ export const planFormFromDetail = (
       id: nextKey('set'),
       sourceSetId: target.id,
       targetWeightText: target.targetWeightValue ?? '',
-      targetRepsText: String(target.targetReps),
+      targetRepsText: target.targetReps === null ? '' : String(target.targetReps),
+      ...(target.recordingMode === 'hold' ? { recordingMode: target.recordingMode, targetDurationText: String(target.targetDurationSec ?? '') } : {}),
       targetSetType: target.targetSetType,
     })),
   })),
@@ -214,6 +220,8 @@ export const planFormToDraft = (
         sets: block.sets.map((set) => ({
           targetWeightText: set.targetWeightText,
           targetRepsText: set.targetRepsText,
+          recordingMode: set.recordingMode,
+          targetDurationText: set.targetDurationText,
           targetSetType: set.targetSetType,
         })),
       })),

@@ -66,6 +66,8 @@ export type ExerciseCatalogStatsRawHistory = {
   exerciseSets: {
     sessionExerciseId: string;
     weightValue: string;
+    recordingMode?: 'reps' | 'hold';
+    durationSec?: number | null;
     repsValue: string;
     setType: string | null;
     performanceStatus?: SessionSetPerformanceStatus;
@@ -136,6 +138,8 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
             .select({
               sessionExerciseId: exerciseSets.sessionExerciseId,
               weightValue: exerciseSets.weightValue,
+              recordingMode: exerciseSets.recordingMode,
+              durationSec: exerciseSets.durationSec,
               repsValue: exerciseSets.repsValue,
               setType: exerciseSets.setType,
               performanceStatus: exerciseSets.performanceStatus,
@@ -164,6 +168,8 @@ export const createDrizzleExerciseCatalogStatsStore = (): ExerciseCatalogStatsSt
       exerciseSets: exerciseSetRows.map((row) => ({
         sessionExerciseId: row.sessionExerciseId,
         weightValue: row.weightValue,
+        recordingMode: row.recordingMode,
+        durationSec: row.durationSec,
         repsValue: row.repsValue,
         setType: row.setType ?? null,
         performanceStatus: normalizeSessionSetPerformanceStatus(row.performanceStatus),
@@ -292,6 +298,22 @@ const collectBrowserHistoryIds = (
   return ids;
 };
 
+const addAggregateVolume = (
+  aggregate: ExerciseAggregate, set: ExerciseCatalogStatsRawHistory['exerciseSets'][number],
+  volume: number | null, included: boolean, repetitionDefinitions: Set<string>,
+): void => {
+  const id = aggregate.exerciseDefinitionId;
+  if (set.recordingMode === 'hold') {
+    if (!repetitionDefinitions.has(id)) aggregate.totalVolume = null;
+  } else {
+    if (!repetitionDefinitions.has(id)) aggregate.totalVolume ??= 0;
+    repetitionDefinitions.add(id);
+  }
+  if (!included) return;
+  aggregate.volumeSetCount += 1;
+  aggregate.totalVolume = addFiniteVolume(aggregate.totalVolume, volume ?? 0);
+};
+
 /**
  * Entry history settles "done" ([[exercise.browser-history]]). Working sets settle
  * `Last:`, favourite recency, session count and 1RM. Volume independently includes
@@ -315,6 +337,7 @@ export const aggregateExerciseCatalogStats = (
   const lastCompletedAtById = new Map<string, Date>();
   const sessionsSeenByDef = new Map<string, Set<string>>();
   const favouriteStart = scope.historyStart?.getTime() ?? window.start?.getTime() ?? -Infinity;
+  const repetitionDefinitions = new Set<string>();
 
   for (const set of raw.exerciseSets) {
     const link = sessionExerciseById.get(set.sessionExerciseId);
@@ -324,6 +347,7 @@ export const aggregateExerciseCatalogStats = (
     if (!session || !inGymScope(session, scope)) continue;
     // Working sets settle recency/counts/strength; volume is independent.
     const values = {
+      ...set,
       reps: set.repsValue, weight: set.weightValue, performanceStatus: set.performanceStatus, setType: set.setType,
     };
     const working = isWorkingSet(values, raw.effortPolicy);
@@ -350,11 +374,7 @@ export const aggregateExerciseCatalogStats = (
     });
     const aggregate = aggregatesById.get(defId) ?? emptyAggregate(defId);
     aggregatesById.set(defId, aggregate);
-    if (volumeIncluded) {
-      // A set whose load cannot be calculated is left out ([[copy.no-inline-explanation]]).
-      aggregate.volumeSetCount += 1;
-      aggregate.totalVolume = addFiniteVolume(aggregate.totalVolume, metric.volumeKgReps ?? 0);
-    }
+    addAggregateVolume(aggregate, set, metric.volumeKgReps, volumeIncluded, repetitionDefinitions);
     if (!working) continue;
     addWorkingSetToAggregate(aggregate, metric);
     const sessionsSeen = sessionsSeenByDef.get(defId) ?? new Set<string>();

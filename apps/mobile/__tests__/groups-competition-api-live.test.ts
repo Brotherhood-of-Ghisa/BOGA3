@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
  * stack (supabase/tests/groups-competition-live.sh, lane groups-api-live), whose
  * baseline runs protocol 4. Server arithmetic/privacy vectors remain in
  * backend fixtures. */
+import { buildCompetitionSession } from '@/src/groups/competition-session-view-model';
 import { readGroupsLiveEnv, signInLiveClient, type LiveClient } from './helpers/groups-live-endpoint';
 let mockActiveClient: LiveClient['client'] | null = null;
 jest.mock('@/src/auth/supabase', () => ({ getRequiredSupabaseMobileClient: () => {
@@ -53,13 +54,13 @@ it('reuses capture graphs without accepting stale sources or exposing private he
     standalone_rejection: true,single_workout_graph_calls: 4,helpers_private: true });
 },60000);
 
-async function pushPerformance(groupId: string,exerciseId: string,startedAt: number) {
-  const stamp=Date.now();const sessionId=`competition-live-${env.runTag}`;
+async function pushPerformance(groupId: string,exerciseId: string,startedAt: number, hold = false) {
+  const stamp=Date.now();const sessionId=`competition-live-${env.runTag}${hold ? '-hold' : ''}`;
   const definitionId=`${sessionId}-def`;const sessionExerciseId=`${sessionId}-ex`;const setId=`${sessionId}-set`;
   const entity=(type: string,id: string,fields: Record<string,unknown>) => ({ type,id,client_updated_at_ms: stamp,
     fields: { created_at: stamp,updated_at: stamp,deleted_at: null,...fields } });
   const entities=[
-    entity('exercise_definitions',definitionId,{ name: 'Pull-up',load_input_mode: 'total_load',bodyweight_contribution: 0 }),
+    entity('exercise_definitions',definitionId,{ name: hold ? 'Hollow Hold' : 'Pull-up',recording_mode: hold ? 'hold' : 'reps',load_input_mode: 'total_load',bodyweight_contribution: 0 }),
     entity('body_weight_measurements',`${sessionId}-reading`,{ weight_kg: 80,measured_at: startedAt-1 }),
     entity('exercise_group_links',`${groupId}:${definitionId}`,{ exercise_definition_id: definitionId,
       group_id: groupId,group_exercise_id: exerciseId }),
@@ -67,8 +68,8 @@ async function pushPerformance(groupId: string,exerciseId: string,startedAt: num
       completed_at: startedAt+60_000,duration_sec: 60 }),
     entity('session_exercises',sessionExerciseId,{ session_id: sessionId,exercise_definition_id: definitionId,
       order_index: 0,name: 'Pull-up',machine_name: null }),
-    entity('exercise_sets',setId,{ session_exercise_id: sessionExerciseId,order_index: 0,weight_value: '20',reps_value: '5',
-      set_type: 'working',performance_status: null,planned_weight_value: null,planned_reps_value: null,planned_set_type: null }),
+    entity('exercise_sets',setId,{ session_exercise_id: sessionExerciseId,order_index: 0,weight_value: hold ? '5' : '20',reps_value: hold ? '' : '5',
+      recording_mode: hold ? 'hold' : 'reps',duration_sec: hold ? 38 : null,set_type: 'rir_0',performance_status: null,planned_weight_value: null,planned_reps_value: null,planned_set_type: null }),
   ];
   const pushed=await member.client.schema('app_public').rpc('sync_push',{ entities });
   expect(pushed.error).toBeNull();expect(pushed.data).toMatchObject({ ok: true });
@@ -189,3 +190,36 @@ it('decodes stored CoW pages, independent podium units, fallback and empty curre
   expect(previous.week_start).toBe(current.week_start);
   expect(previous.valid_until_us).toBeGreaterThan(previous.observed_at_us);
 });
+
+
+it('shares timed activity and counts while keeping normalized kg and strength boards absent', async () => {
+  const { group_id: groupId } = await as(owner, () => createGroup({ name: 'Hold activity', description: null }));
+  const { code } = await as(owner, () => getGroupInviteCode(groupId));
+  await as(member, () => joinGroup(code));
+  await as(owner, () => updateGroup(groupId, { name: 'Hold activity', description: null, bodyweightCalculationsEnabled: true }));
+  const { exercise } = await as(owner, () => createCompetitionExercise({ groupId, name: 'Hollow Hold', mode: 'total_load', contribution: 1, metric: 'e1rm' }));
+  const started = Date.now();
+  const { sessionId, setId } = await pushPerformance(groupId, exercise.group_exercise_id, started, true);
+  const detail = await poll(() => as(owner, () => getCompetitionSession(groupId, member.userId, sessionId)),
+    value => value.session.exercises[0]?.sets[0]?.performed === true);
+  const set = detail.session.exercises[0].sets[0];
+  expect(set).toMatchObject({ recording_mode: 'hold', duration_sec: 38, reps_value: '', performed: true });
+  expect(set).not.toHaveProperty('weight_value');
+  expect(set).not.toHaveProperty('normalized_metrics');
+  expect(buildCompetitionSession(detail.session)).toMatchObject({ setCount: 1, volume: '—', cards: [{ rows: [{ weightReps: '38 s' }] }] });
+  for (const metric of ['e1rm', 'volume'] as const) {
+    const board = await poll(() => as(owner, () => getCompetitionBoard({ groupId, exerciseId: exercise.group_exercise_id, metric, certified: false })),
+      value => value.state === 'ready');
+    expect(board.entries).toEqual([]);
+  }
+  const totals = await poll(() => as(owner, () => getCompetitionPeriodTotals(groupId, [{ start_ms: started - 1000, end_ms: started + 120000 }])),
+    value => value.periods[0].members.some(row => row.member.user_id === member.userId && row.working_sets === 1));
+  expect(totals.periods[0].members.find(row => row.member.user_id === member.userId)).toMatchObject({ working_sets: 1, group_records: 0 });
+  const stream = await as(owner, () => getCompetitionStream(groupId));
+  const item = stream.items.find(item => item.kind === 'session' && item.session.session_id === sessionId);
+  expect(item?.kind === 'session' && item.session.exercises[0].sets[0]).toMatchObject({ set_id: setId, duration_sec: 38 });
+  await as(owner, () => updateGroup(groupId, { name: 'Hold activity', description: null, bodyweightCalculationsEnabled: false }));
+  const ordinary = await as(owner, () => getCompetitionSession(groupId, member.userId, sessionId));
+  expect(ordinary.session.exercises[0].sets[0]).toMatchObject({ recording_mode: 'hold', duration_sec: 38, weight_value: '5' });
+  expect(buildCompetitionSession(ordinary.session)).toMatchObject({ setCount: 1, volume: '—', cards: [{ rows: [{ weightReps: '5.0 × 38 s' }] }] });
+}, 840000);

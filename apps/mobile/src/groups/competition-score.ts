@@ -4,12 +4,14 @@
 // SAME dated B.
 import { isValidSessionWeight, type ResolvedSessionWeight } from '../bodyweight/as-of.ts';
 import { groupLoadContext } from '../exercise-calculations/analytics.ts';
-import { calculateSetMetricCandidates } from '../exercise-calculations/load-metrics.ts';
+import { calculateRepetitionMetricCandidates } from '../exercise-calculations/load-metrics.ts';
 import { checkGroupLinkCompatibility, type GroupLinkSource } from './link-compatibility.ts';
 import { isCompetitionValue, isNormalizedCompetition, validateCompetitionRules,
   type CompetitionRules, type CompetitionValue } from './competition-contract.ts';
 
 export type CompetitionPerformanceInput = ResolvedSessionWeight & {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   weightValue: string;
   repsValue: string;
   performanceStatus: string | null;
@@ -21,6 +23,14 @@ export type CompetitionPerformanceInput = ResolvedSessionWeight & {
  * make the affected member/metric unavailable, rather than sum a partial total. */
 export function projectCompetitionPerformance(performance: CompetitionPerformanceInput, rules: CompetitionRules):
   { values: CompetitionValue[]; kernelOverflow: boolean } {
+  if (performance.recordingMode === 'hold' || performance.durationSec != null) return { values: [], kernelOverflow: false };
+  return projectCompetitionRepetitionV7(performance, rules);
+}
+
+/** Retained CoW scorer 7 and its repetition-kernel entrypoint stay callable. */
+export function projectCompetitionRepetitionV7(
+  performance: Omit<CompetitionPerformanceInput, 'recordingMode' | 'durationSec'>, rules: CompetitionRules,
+): { values: CompetitionValue[]; kernelOverflow: boolean } {
   const absent = { values: [], kernelOverflow: false };
   if (!validateCompetitionRules(rules).ok) return absent;
   const compatibility = checkGroupLinkCompatibility(performance.source, rules);
@@ -29,7 +39,7 @@ export function projectCompetitionPerformance(performance: CompetitionPerformanc
   // Off/zero must not even read a private context, including malformed input.
   const bodyweight = normalized && isValidSessionWeight(performance) ? performance.bodyWeightKg : null;
   if (normalized && bodyweight === null) return absent;
-  const metrics = calculateSetMetricCandidates({ ...groupLoadContext(normalized, {
+  const metrics = calculateRepetitionMetricCandidates({ ...groupLoadContext(normalized, {
     bodyweightContribution: rules.bodyweightContribution,
     loadInputMode: performance.source.loadInputMode as 'total_load' | 'per_side_load',
   }, bodyweight), weightValue: performance.weightValue, repsValue: performance.repsValue, performanceStatus: null });

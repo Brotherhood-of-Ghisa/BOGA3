@@ -11,6 +11,8 @@ import { isWorkingSet, isVolumeSet, type SessionSetPerformanceStatus } from './s
 type Ordered = { orderIndex: number; id: string };
 
 export type BestSetSetInput = Ordered & {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   weightValue: string;
   repsValue: string;
   setType: string | null;
@@ -42,6 +44,7 @@ export const eligibleSetsByBlockInSessionOrder = <S extends BestSetSetInput, B e
     [...block.sets].sort(compareSessionPosition).flatMap((set) => {
       if ((set.deletedAt ?? null) !== null) return [];
       if (!isWorkingSet({
+        ...set,
         weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
       }, block.loadContext.effortPolicy)) return [];
       const metric = calculateAnalyticsSetMetrics({ ...set, ...block.loadContext });
@@ -103,18 +106,23 @@ export const summarizeSessionBests = <S extends BestSetSetInput, B extends BestS
 ) => {
   const byBlock = eligibleSetsByBlockInSessionOrder<S, B>(blocks);
   const sets = byBlock.flat();
+  const workingSets = blocks.reduce((count, block) => count + block.sets.filter(set =>
+    (set.deletedAt ?? null) === null && isWorkingSet({
+      ...set, weight: set.weightValue, reps: set.repsValue,
+    }, block.loadContext.effortPolicy)).length, 0);
   const volumeByBlock = blocks.map(block => block.sets.filter(set => (set.deletedAt ?? null) === null && isVolumeSet({
+    ...set,
     weight: set.weightValue, reps: set.repsValue, performanceStatus: set.performanceStatus, setType: set.setType,
   }, block.loadContext.effortPolicy)).map(set => calculateAnalyticsSetMetrics({ ...set, ...block.loadContext })));
-  if (sets.length === 0 && volumeByBlock.every(metrics => metrics.length === 0)) return null;
-  let volumeKg: number | null = 0;
+  if (workingSets === 0 && volumeByBlock.every(metrics => metrics.length === 0)) return null;
+  let volumeKg: number | null = sets.length === 0 && volumeByBlock.every(metrics => metrics.length === 0) ? null : 0;
   // Each block sums alone, as the completed-session volume comparison does.
   for (const metrics of volumeByBlock) volumeKg = addFiniteVolume(volumeKg, sumVolume(metrics));
   return {
     oneRepMax: pickBestEstimatedOneRepMaxSet(sets),
     topWeight: pickTopWeightSet(sets),
     volumeKg,
-    workingSets: sets.length,
+    workingSets,
     volumeSets: volumeByBlock.reduce((count, metrics) => count + metrics.length, 0),
   };
 };

@@ -90,6 +90,30 @@ it('emits only final owner-scoped sync fields', () => {
   expect(entities.find(entity => entity.type === 'sessions')?.fields).not.toHaveProperty('body_weight_kg');
 });
 
+it('exports and imports hold measurements without converting seconds to repetitions', () => {
+  const pkg = makePackage();
+  const decision = pkg.exerciseDecisions[0];
+  if (decision.decision !== 'create_new') throw new Error('Expected a new exercise');
+  decision.recordingMode = 'hold';
+  const set = pkg.sessions[0].exercises[0].sets[0];
+  Object.assign(set, { recordingMode: 'hold', durationSec: 38, repsValue: '', weightValue: '5',
+    plannedRepsValue: null, plannedWeightValue: null, plannedSetType: null, setType: null, performanceStatus: null });
+  const decoded = JSON.parse(serializeBogaSessionImportPackage(pkg)) as BogaSessionImportPackage;
+  expect(importBogaSessionPackageToLocalDb(fixture.database, decoded, { importingProfileLabel: 'test' }).wrote).toBe(true);
+  expect(fixture.database.select().from(exerciseDefinitions).get()).toMatchObject({ recordingMode: 'hold' });
+  expect(fixture.database.select().from(exerciseSets).get()).toMatchObject({
+    recordingMode: 'hold', durationSec: 38, repsValue: '', weightValue: '5', setType: null, performanceStatus: null,
+  });
+  expect(buildRemoteImportWireEntities(decoded).find(row => row.type === 'exercise_sets')?.fields).toMatchObject({
+    recording_mode: 'hold', duration_sec: 38, reps_value: '', weight_value: '5', set_type: null,
+  });
+  for (const invalid of [{ durationSec: 0 }, { durationSec: 301 }, { durationSec: 1.5 }, { repsValue: '12' }]) {
+    expect(validateBogaSessionImportPackage({ ...pkg, sessions: [{ ...pkg.sessions[0], exercises: [{
+      ...pkg.sessions[0].exercises[0], sets: [{ ...set, ...invalid }],
+    }] }] }).ok).toBe(false);
+  }
+});
+
 it.each([
   ['reading metadata', (pkg: BogaSessionImportPackage) => Object.assign(pkg.bodyWeightMeasurements[0], { weightUnit: 'lb' })],
   ['exercise metadata', (pkg: BogaSessionImportPackage) => Object.assign(pkg.exerciseDecisions[0], { loadRules: {} })],

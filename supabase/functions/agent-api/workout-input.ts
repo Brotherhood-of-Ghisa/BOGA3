@@ -1,4 +1,4 @@
-import { MAX_SET_REPS, parseSetWeight } from '../../../apps/mobile/src/exercise-calculations/parse.ts';
+import { MAX_SET_DURATION_SEC, MAX_SET_REPS, parseSetDuration, parseSetWeight } from '../../../apps/mobile/src/exercise-calculations/parse.ts';
 import { SESSION_SET_TYPES } from '../../../apps/mobile/src/data/set-types.ts';
 import { strictInstantMs } from './activities.ts';
 
@@ -20,20 +20,35 @@ function id(value: unknown, label: string): string {
   return value;
 }
 
-function performedSet(value: unknown): ObjectValue {
-  const input = object(value, ['weight_kg', 'reps', 'set_type']);
+function performedSet(value: unknown, creating: boolean): ObjectValue {
+  const input = object(value, ['weight_kg', 'reps', 'set_type', 'recording_mode', 'duration_sec']);
+  const isHold = input.recording_mode === 'hold';
+  if (input.recording_mode !== undefined && input.recording_mode !== 'reps' && !isHold) {
+    throw new WorkoutInputError('recording_mode must be reps or hold.');
+  }
+  if (isHold) {
+    if (parseSetDuration(input.duration_sec) === null || input.reps != null) {
+      throw new WorkoutInputError(`A hold needs whole duration_sec from 1 to ${MAX_SET_DURATION_SEC}, without reps.`);
+    }
+  } else if (input.duration_sec != null) {
+    throw new WorkoutInputError('A repetition set cannot contain duration_sec.');
+  }
+  const weight = isHold && (input.weight_kg === undefined || input.weight_kg === '') ? '0' : input.weight_kg;
   // Use entered decimal text: exponent notation is not an app Weight input.
-  if (typeof input.weight_kg !== 'string' || input.weight_kg.length > 100 || parseSetWeight(input.weight_kg) === null) {
+  if (typeof weight !== 'string' || weight.length > 100 || parseSetWeight(weight) === null) {
     throw new WorkoutInputError('weight_kg must be a non-negative decimal string in kg (use "0" for no load).');
   }
-  if (!Number.isInteger(input.reps) || Number(input.reps) < 1 || Number(input.reps) > MAX_SET_REPS) {
+  if (!isHold && (!Number.isInteger(input.reps) || Number(input.reps) < 1 || Number(input.reps) > MAX_SET_REPS)) {
     throw new WorkoutInputError(`reps must be a whole number from 1 to ${MAX_SET_REPS}.`);
   }
   if (input.set_type !== undefined && input.set_type !== null &&
       !(SESSION_SET_TYPES as readonly unknown[]).includes(input.set_type)) {
-    throw new WorkoutInputError('set_type must be null, warm_up, technique, cooldown or rir_0 through rir_4.');
+    throw new WorkoutInputError('set_type must be null, warm_up, technique, cooldown, rehab or rir_0 through rir_4.');
   }
-  return { weight_kg: input.weight_kg.trim(), reps: input.reps, set_type: input.set_type ?? null };
+  if (isHold) return { recording_mode: 'hold', duration_sec: input.duration_sec, weight_kg: weight.trim(),
+    ...(input.set_type !== undefined ? { set_type: input.set_type } : creating ? { set_type: 'rir_0' } : {}),
+  };
+  return { weight_kg: weight.trim(), reps: input.reps, set_type: input.set_type ?? null };
 }
 
 /** Strict normalized input also gives retries a stable hash independent of JSON key order. */
@@ -72,9 +87,9 @@ export function normalizeWorkoutInput(operation: WorkoutOperation, value: unknow
     }
     result[body.exercise_id === undefined ? 'session_exercise_id' : 'exercise_id'] =
       id(body.exercise_id ?? body.session_exercise_id, 'exercise reference');
-    result.sets = body.sets.map(performedSet);
+    result.sets = body.sets.map(set => performedSet(set, true));
   }
   if (operation === 'update_set' || operation === 'delete_set') result.set_id = id(body.set_id, 'set_id');
-  if (operation === 'update_set') result.set = performedSet(body.set);
+  if (operation === 'update_set') result.set = performedSet(body.set, false);
   return result;
 }

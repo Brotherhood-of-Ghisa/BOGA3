@@ -11,7 +11,7 @@ export type RmCurveValues = {
 
 /** Chart-only projection; logged reps and the ordinary displayed 1RM stay intact. */
 export function projectRmCurveSet(input: SetMetricInput): RmCurveValues | RmCurveExclusion {
-  if (!isWorkingSet({ weight: input.weightValue ?? '', reps: input.repsValue ?? '',
+  if (!isWorkingSet({ ...input, weight: input.weightValue ?? '', reps: input.repsValue ?? '',
     setType: input.setType, performanceStatus: input.performanceStatus }, input.effortPolicy)) return 'not_working';
   const rir = getSessionSetRir(input.setType);
   if (rir === null) return input.setType == null || isEffortChoice(input.setType) ? 'missing_effort' : 'unknown_effort';

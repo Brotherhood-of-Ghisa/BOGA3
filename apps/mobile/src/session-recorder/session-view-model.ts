@@ -12,7 +12,7 @@ import { recordBandLines, type BandRecord, type RecordLine } from '@/src/session
 
 import { hasPlannedTarget, toSessionInsightExercises } from './session-model';
 import {
-  canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet, isWorkingSet, isVolumeSet,
+  canonicalizeSetValues, canonicalizeWeightForReps, hasValidActualValues, isConfirmedPerformedSet, isWorkingSet, isVolumeSet,
 } from '@/src/exercise-calculations/set-semantics';
 
 /**
@@ -25,6 +25,7 @@ import {
 export const EMPTY_FIGURE = '—';
 
 export type SessionViewSetRow = {
+  recordingMode?: 'reps' | 'hold';
   id: string;
   // `W-Up`, `RIR 2`; the em dash when no effort is set.
   typeLabel: string;
@@ -60,6 +61,8 @@ export type SessionViewModel = {
 
 
 export type SetRowInput = {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   id: string;
   weight: number | null;
   reps: number | null;
@@ -76,11 +79,11 @@ export type SetRowInput = {
  * all format a row here, so a set reads the same on each.
  */
 export const formatSetRow = ({
-  id, weight, reps, setType, done, oneRepMaxRecord = false, weightRecord = false, loadContext = ordinaryLoadContext(),
+  id, weight, reps, setType, done, oneRepMaxRecord = false, weightRecord = false, loadContext = ordinaryLoadContext(), recordingMode, durationSec,
 }: SetRowInput): SessionViewSetRow => {
   let oneRepMax = EMPTY_FIGURE;
   let volume = EMPTY_FIGURE;
-  if (weight !== null && reps !== null) {
+  if (recordingMode !== 'hold' && weight !== null && reps !== null) {
     const metric = calculateAnalyticsSetMetrics({
       ...loadContext,
       weightValue: String(weight),
@@ -92,9 +95,10 @@ export const formatSetRow = ({
   }
   return {
     id,
+    recordingMode,
     typeLabel: formatSessionSetType(setType) ?? EMPTY_FIGURE,
     // Bodyweight changes derived metrics, never entered-load copy or geometry.
-    weightReps: `${weight === null ? EMPTY_FIGURE : formatWeight(weight)} × ${reps === null ? EMPTY_FIGURE : reps}`,
+    weightReps: `${weight === null ? EMPTY_FIGURE : formatWeight(weight)} × ${recordingMode === 'hold' ? `${durationSec ?? EMPTY_FIGURE} s` : reps ?? EMPTY_FIGURE}`,
     oneRepMax,
     volume,
     done,
@@ -119,14 +123,16 @@ export const recordFlagsFor = (
 export const cardRecordBand = (record: BandRecord | null, blockId: string): RecordLine[] =>
   record === null ? [] : recordBandLines(record, blockId);
 
-type ShownValues = { weight: number | null; reps: number | null; setType: string | null };
+type ShownValues = { weight: number | null; reps: number | null; setType: string | null; recordingMode?: 'reps' | 'hold'; durationSec?: number | null };
 
 // A done or entered row shows what was lifted; an untouched planned row its
 // prescription; a blank row nothing.
 const shownValues = (set: SessionSet): ShownValues => {
-  if (hasValidActualValues(set) || !hasPlannedTarget(set)) {
+  if (set.recordingMode === 'hold' || hasValidActualValues(set) || !hasPlannedTarget(set)) {
     return {
-      weight: parseSetWeight(canonicalizeWeightForReps(set.weight, set.reps)),
+      recordingMode: set.recordingMode,
+      durationSec: set.durationSec,
+      weight: parseSetWeight(canonicalizeSetValues(set).weight),
       reps: parseSetReps(set.reps),
       setType: normalizeSessionSetType(set.setType),
     };
@@ -152,6 +158,7 @@ const toRowFigures = (set: SessionSet, context: LoadContext): RowFigures => {
     done: isConfirmedPerformedSet(set),
     shown,
     metric: calculateAnalyticsSetMetrics({
+      ...set,
       ...context,
       weightValue: set.weight,
       repsValue: set.reps,
@@ -205,7 +212,10 @@ export const buildSessionViewModel = (
     };
   });
 
-  return { cards, workingSetCount, volume: formatVolumeFigure(sumVolume(volumeMetrics)) };
+  const sets = session.exercises.flatMap(exercise => exercise.sets);
+  const holdOnly = sets.some(set => set.recordingMode === 'hold') &&
+    !sets.some(set => set.recordingMode !== 'hold' && isConfirmedPerformedSet(set));
+  return { cards, workingSetCount, volume: formatVolumeFigure(holdOnly ? null : sumVolume(volumeMetrics)) };
 };
 
 /** Elapsed time as `m:ss`, or `h:mm:ss` from an hour. */

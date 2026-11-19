@@ -144,6 +144,8 @@ const mapStoreSessionRow = (row: typeof sessions.$inferSelect, gymName: string |
 
 export type SessionListSetCountRow = {
   sessionExerciseId: string;
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   repsValue: string;
   weightValue: string;
   performanceStatus: string | null;
@@ -160,6 +162,7 @@ export const countWorkingSessionSets = (
   for (const setRow of setRows) {
     if (
       !isWorkingSet({
+        ...setRow,
         reps: setRow.repsValue,
         weight: setRow.weightValue,
         performanceStatus: normalizeSessionSetPerformanceStatus(setRow.performanceStatus),
@@ -227,6 +230,8 @@ export const createDrizzleSessionListStore = (): SessionListStore => ({
         ? database
             .select({
               sessionExerciseId: exerciseSets.sessionExerciseId,
+              recordingMode: exerciseSets.recordingMode,
+              durationSec: exerciseSets.durationSec,
               repsValue: exerciseSets.repsValue,
               weightValue: exerciseSets.weightValue,
               performanceStatus: exerciseSets.performanceStatus,

@@ -192,3 +192,21 @@ test('an unavailable normalized projection retains reps without inventing a zero
   expect(buildCompetitionSession(input)).toMatchObject({ volume: '—', cards: [{ hideDerivedMetrics: true,
     rows: [{ weightReps: '5 reps', oneRepMax: '—', volume: '—' }] }] });
 });
+
+
+test('hold sessions show seconds and normal effort counts without derived figures or hidden kg', () => {
+  const exercise = competitionSession.session.exercises[0];
+  const set = { ...exercise.sets[0], recording_mode: 'hold' as const, duration_sec: 38,
+    reps_value: '', set_type: 'rir_0', performed: true };
+  const session = { ...competitionSession.session, exercises: [{ ...exercise, visibility: 'ordinary' as const,
+    sets: [{ ...set, weight_value: '5' }] }] };
+  expect(buildCompetitionSession(session)).toMatchObject({ setCount: 1, exerciseCount: 1, volume: '—',
+    cards: [{ hideDerivedMetrics: true, rows: [{ weightReps: '5.0 × 38 s', oneRepMax: '—', volume: '—' }] }] });
+  const hidden = { ...session, exercises: [{ ...exercise, visibility: 'normalized' as const, sets: [set] }] };
+  expect(buildCompetitionSession(hidden)).toMatchObject({ setCount: 1, volume: '—',
+    cards: [{ hideDerivedMetrics: true, rows: [{ weightReps: '38 s', oneRepMax: '—', volume: '—' }] }] });
+  for (const patch of [{ performed: false }, { duration_sec: 301 }, { reps_value: '5' }, { performance_status: 'planned' }]) {
+    expect(buildCompetitionSession({ ...hidden, exercises: [{ ...hidden.exercises[0], sets: [{ ...set, ...patch }] }] }).setCount).toBe(0);
+  }
+  expect(buildCompetitionSession({ ...hidden, exercises: [{ ...hidden.exercises[0], sets: [{ ...set, set_type: 'rehab' }] }] }).setCount).toBe(0);
+});

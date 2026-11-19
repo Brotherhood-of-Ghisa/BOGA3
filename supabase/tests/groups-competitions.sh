@@ -307,6 +307,20 @@ rpc "${OWNER_TOKEN}" group_competition_session_detail "$(jq -nc --arg g "${GID}"
   '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_error NOT_FOUND 'unshared member/session pair'
 rpc "${OWNER_TOKEN}" group_competition_session_records "$(jq -nc --arg g "${GID}" --arg u "${OUTSIDER_UID}" --arg s "${T}-ATHLETE" \
   '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"; expect_error NOT_FOUND 'unshared member/session pair records'
+# New duration-aware readers retain their own exact response boundary and denial behavior.
+for name in group_competition_session_detail_v2 group_competition_stream_v6; do
+  args="$(jq -nc --arg g "${GID}" --arg u "${ATHLETE_UID}" --arg s "${T}-ATHLETE" '{p_group_id:$g,p_member_user_id:$u,p_session_id:$s}')"
+  [[ "${name}" != group_competition_stream_v6 ]] || args="$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:10}')"
+  for protocol in '' 3 invalid; do
+    rpc_with_contract "${protocol}" "${OWNER_TOKEN}" "${name}" "${args}"
+    expect_error UPDATE_REQUIRED "${name} contract '${protocol}'"
+  done
+  rpc "${OUTSIDER_TOKEN}" "${name}" "${args}"; expect_error NOT_FOUND "outsider ${name}"
+  denial="$(jq -er .message <<<"${BODY}")"
+  missing="$(jq -c --arg g "$(run_psql "select gen_random_uuid();")" '.p_group_id=$g' <<<"${args}")"
+  rpc "${OWNER_TOKEN}" "${name}" "${missing}"; expect_error NOT_FOUND "missing group ${name}"
+  [[ "$(jq -er .message <<<"${BODY}")" == "${denial}" ]] || fail "${name} reveals group existence"
+done
 pass 'every current reader/write denies anonymous, OAuth and outsider before payload validation'
 
 rpc "${OWNER_TOKEN}" group_competition_exercise_list "$(jq -nc --arg g "${GID}" '{p_group_id:$g}')"; expect_ok catalog; assert_wire isCompetitionExerciseListWire

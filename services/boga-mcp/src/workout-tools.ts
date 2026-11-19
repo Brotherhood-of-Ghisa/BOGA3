@@ -7,18 +7,21 @@ import { hasOneWorkoutExerciseReference, isWorkoutOperationKey, isWorkoutWeight 
 const id = z.string().min(1).max(200).refine(value => value.trim().length > 0);
 const revision = z.string().regex(/^[a-f0-9]{32}$/);
 const operationKey = z.string().refine(isWorkoutOperationKey, 'Use 1–128 printable ASCII characters without whitespace.');
-const performance = z.object({
-  weight_kg: z.string().refine(isWorkoutWeight, 'Use non-negative decimal text in kg, without exponent notation.'),
-  reps: z.number().int().min(1).max(999),
-  set_type: z.enum(['warm_up', 'technique', 'cooldown', 'rir_0', 'rir_1', 'rir_2', 'rir_3', 'rir_4']).nullable().optional(),
-}).strict();
+const effort = z.enum(['warm_up', 'technique', 'cooldown', 'rehab', 'rir_0', 'rir_1', 'rir_2', 'rir_3', 'rir_4']).nullable().optional();
+const weight = z.string().refine(isWorkoutWeight, 'Use non-negative decimal text in kg, without exponent notation.');
+const performance = z.union([
+  z.object({ weight_kg: weight, reps: z.number().int().min(1).max(999), set_type: effort,
+    recording_mode: z.literal('reps').optional(), duration_sec: z.null().optional() }).strict(),
+  z.object({ recording_mode: z.literal('hold'), duration_sec: z.number().int().min(1).max(300),
+    weight_kg: z.union([weight, z.literal('')]).optional(), reps: z.null().optional(), set_type: effort }).strict(),
+]);
 const writeShape = { session_id: id, expected_revision: revision, idempotency_key: operationKey };
 const additive = { destructiveHint: false, idempotentHint: true, openWorldHint: false, readOnlyHint: false } as const;
 const replacing = { ...additive, destructiveHint: true } as const;
 const readOnly = { ...additive, readOnlyHint: true } as const;
 
 const WRITE_RULES = ' Requires the separate workout logging switch in Connected Agents AND control of this session. start_workout and create_workout give this client control immediately. Inspect control.can_edit before editing. If false on an active workout, the person must choose Let AI log this session in BoGa and select this client. Released or taken-over completed history can only be edited in BoGa; MCP cannot reclaim it. WORKOUT_CONTROL_REQUIRED means control was taken over or belongs elsewhere: stop writes, read current control and never reclaim automatically. Active ad-hoc workouts and completed workouts still controlled by this client are writable; requires_app means continue in BoGa. Use IDs and the current expected_revision from a read/write. A lost-response retry repeats the exact payload and idempotency_key; a new intentional set, even identical, needs a fresh key and current revision. On REVISION_CONFLICT read again and confirm the intended change; never silently replay it with a new revision. Outputs are synced server state, not unsynced phone data.';
-const PERFORMANCE_RULES = ' Enter performed values only, never plan targets. weight_kg is explicit decimal kg ("0" for no external load), retaining the exercise’s total/per-side input meaning; resolve exercise identity and units with search_exercises/profile before logging, never guess from a name. set_type is null when unspecified, warm_up/technique/cooldown or rir_0..rir_4 when stated. Do not infer effort or turn a target into performance.';
+const PERFORMANCE_RULES = ' Enter performed values only, never plan targets. weight_kg is explicit decimal kg ("0" for no external load), retaining the exercise’s total/per-side input meaning; resolve exercise identity and units with search_exercises/profile before logging, never guess from a name. set_type is null when unspecified, warm_up/technique/cooldown or rir_0..rir_4 when stated. Holds use recording_mode hold and duration_sec 1–300 whole seconds, without reps. Blank or absent hold weight is zero. New holds default missing set_type to rir_0; explicit null remains Unspecified. Holds follow normal set counting but have no Volume, 1RM or strength records. Do not turn a target into performance.';
 
 export function registerWorkoutTools(server: McpServer, api: BogaAgentApi): void {
   server.registerTool('get_active_workout', {
@@ -56,7 +59,7 @@ export function registerWorkoutTools(server: McpServer, api: BogaAgentApi): void
   server.registerTool('update_set', {
     annotations: replacing,
     title: 'Correct performed set',
-    description: 'Replace explicit performance on one stable set_id in the selected controlled workout. Read the current row first; retain its reps, weight and effort unless the person changes them. Omitting set_type means unspecified, so preserve it explicitly for a weight-only correction. Planned fields and provenance are unchanged.' + PERFORMANCE_RULES + WRITE_RULES,
+    description: 'Replace explicit performance on one stable set_id in the selected controlled workout. Read the current row first; retain its reps, weight and effort unless the person changes them. Omitting set_type means unspecified for reps and preserves saved effort for holds; preserve it explicitly for a weight-only correction. Planned fields and provenance are unchanged.' + PERFORMANCE_RULES + WRITE_RULES,
     inputSchema: z.object({ ...writeShape, set_id: id, set: performance }).strict(),
   }, async (input, extra) => invoke(() => api.writeWorkout(tokenFrom(extra), 'update-set', input)));
 

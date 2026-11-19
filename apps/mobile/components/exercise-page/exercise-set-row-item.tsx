@@ -26,7 +26,7 @@ export type ExerciseSetRowItemProps = {
   /** The card's live sets, for the open row's per-side offers. */
   allSets: ExercisePageSet[];
   nextSessionSetType: (value: SessionSetTypeValue) => SessionSetTypeValue;
-  onChangeLogger: (values: { weightValue?: string; repsValue?: string }) => void;
+  onChangeLogger: (values: { weightValue?: string; repsValue?: string; durationSec?: number | null }) => void;
   onCommit: () => void;
   onOpenEffort: () => void;
   onCycleEffort: (setType: SessionSetTypeValue) => void;
@@ -88,6 +88,9 @@ export function ExerciseSetRowItem({
           onOpenEffort={onOpenEffort}
           ref={weightInputRef}
           repsValue={loggerValues.repsValue}
+          recordingMode={loggerValues.recordingMode}
+          durationSec={loggerValues.durationSec}
+          onChangeDuration={(durationSec) => onChangeLogger({ durationSec })}
           setType={loggerValues.setType}
           weightValue={loggerValues.weightValue}
         />

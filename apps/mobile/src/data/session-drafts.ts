@@ -1,3 +1,4 @@
+import type { RecordingMode } from '@/src/exercise-core/recording-mode';
 import { personalCalculationContext } from '@/src/config/personal-effort';
 import { invalidateBodyWeightContext } from '@/src/bodyweight/invalidation';
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
@@ -9,7 +10,7 @@ import { selectInProgressSessionRow } from './in-progress-session';
 import { loadAsOfWeightResolver, resolveSessionWeights } from './bodyweight';
 import type { ResolvedSessionWeight } from '@/src/bodyweight/as-of';
 import { exerciseDefinitions, exerciseSets, sessionExercises, sessionExerciseTags, sessionPlanSets, sessionPlanUses, sessions, syncRuntimeState, userSettings } from './schema';
-import { normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
+import { defaultSessionSetType, normalizeSessionSetType, type SessionSetTypeValue } from './set-types';
 import {
   hydrateSessionSetPerformanceStatus,
   normalizeSessionSetPerformanceStatus,
@@ -60,7 +61,17 @@ export type PersistCompletedSessionResult = {
   durationSec: number;
 };
 
+const setEffort = (
+  set: { setType?: SessionSetTypeValue; recordingMode?: 'reps' | 'hold' }, existing?: { setType: unknown },
+): SessionSetTypeValue => {
+  if (set.setType !== undefined) return normalizeSessionSetType(set.setType);
+  if (existing) return normalizeSessionSetType(existing.setType);
+  return set.recordingMode === 'hold' ? defaultSessionSetType(undefined, undefined, 'hold') : null;
+};
+
 export type SessionDraftSetSnapshot = {
+  recordingMode?: RecordingMode;
+  durationSec?: number | null;
   id: string;
   repsValue: string;
   weightValue: string;
@@ -74,6 +85,7 @@ export type SessionDraftSetSnapshot = {
 };
 
 export type SessionDraftExerciseSnapshot = {
+  recordingMode?: RecordingMode;
   loadContext?: LoadContext;
   id: string;
   exerciseDefinitionId: string;
@@ -185,6 +197,8 @@ export type SessionPersistenceRecord = ResolvedSessionWeight & {
 };
 
 type StoredDraftSetRecord = {
+  recordingMode?: RecordingMode;
+  durationSec?: number | null;
   id: string;
   sessionExerciseId: string;
   orderIndex: number;
@@ -200,6 +214,7 @@ type StoredDraftSetRecord = {
 };
 
 type StoredDraftExerciseRecord = {
+  recordingMode?: RecordingMode;
   loadContext?: LoadContext;
   id: string;
   sessionId: string;
@@ -375,11 +390,14 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
     name: exercise.name,
     machineName: exercise.machineName,
     loadContext: exercise.loadContext,
+    recordingMode: exercise.recordingMode,
     sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
     sourcePlanUseId: exercise.sourcePlanUseId ?? null,
     sets: exercise.sets.map((set) => ({
       id: set.id,
       repsValue: set.repsValue,
+      recordingMode: set.recordingMode ?? 'reps',
+      durationSec: set.durationSec ?? null,
       weightValue: set.weightValue,
       setType: set.setType,
       plannedRepsValue: set.plannedRepsValue ?? null,
@@ -387,10 +405,12 @@ const mapDraftSnapshot = (graph: StoredDraftGraph): SessionDraftSnapshot => ({
       plannedSetType: normalizeSessionSetType(set.plannedSetType),
       performanceStatus: hydrateSessionSetPerformanceStatus(set.performanceStatus, {
         reps: set.repsValue,
+        recordingMode: set.recordingMode,
+        durationSec: set.durationSec,
         weight: set.weightValue,
       }),
       sourcePlanSetId: set.sourcePlanSetId ?? null,
-      sourcePlanUseId: set.sourcePlanUseId ?? null,
+            sourcePlanUseId: set.sourcePlanUseId ?? null,
     })),
   })),
 });
@@ -420,11 +440,14 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
     name: exercise.name,
     machineName: exercise.machineName,
     loadContext: exercise.loadContext,
+    recordingMode: exercise.recordingMode,
     sourcePlanExerciseId: exercise.sourcePlanExerciseId ?? null,
     sourcePlanUseId: exercise.sourcePlanUseId ?? null,
     sets: exercise.sets.map((set) => ({
       id: set.id,
       repsValue: set.repsValue,
+      recordingMode: set.recordingMode ?? 'reps',
+      durationSec: set.durationSec ?? null,
       weightValue: set.weightValue,
       setType: set.setType,
       plannedRepsValue: set.plannedRepsValue ?? null,
@@ -432,10 +455,12 @@ const mapSessionGraphSnapshot = (graph: StoredDraftGraph): SessionGraphSnapshot 
       plannedSetType: normalizeSessionSetType(set.plannedSetType),
       performanceStatus: hydrateSessionSetPerformanceStatus(set.performanceStatus, {
         reps: set.repsValue,
+        recordingMode: set.recordingMode,
+        durationSec: set.durationSec,
         weight: set.weightValue,
       }),
       sourcePlanSetId: set.sourcePlanSetId ?? null,
-      sourcePlanUseId: set.sourcePlanUseId ?? null,
+            sourcePlanUseId: set.sourcePlanUseId ?? null,
     })),
   })),
 });
@@ -493,6 +518,8 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
       sessionExerciseId: row.sessionExerciseId,
       orderIndex: row.orderIndex,
       repsValue: row.repsValue,
+      recordingMode: row.recordingMode ?? 'reps',
+      durationSec: row.durationSec ?? null,
       weightValue: row.weightValue,
       setType: normalizeSessionSetType(row.setType),
       plannedRepsValue: row.plannedRepsValue,
@@ -500,6 +527,8 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
       plannedSetType: normalizeSessionSetType(row.plannedSetType),
       performanceStatus: hydrateSessionSetPerformanceStatus(row.performanceStatus, {
         reps: row.repsValue,
+        recordingMode: row.recordingMode,
+        durationSec: row.durationSec,
         weight: row.weightValue,
       }),
       sourcePlanSetId: row.sourcePlanSetId,
@@ -527,6 +556,7 @@ const loadDraftGraphBySessionId = (database: LocalDatabase, sessionId: string): 
         machineName: exercise.machineName,
         sourcePlanExerciseId: exercise.sourcePlanExerciseId,
         sourcePlanUseId: exercise.sourcePlanUseId,
+        recordingMode: definitionById.get(exercise.exerciseDefinitionId)?.recordingMode ?? 'reps',
         loadContext: personalCalculationContext(
           bodyweightCalculationsEnabled,
           definitionById.get(exercise.exerciseDefinitionId),
@@ -612,6 +642,8 @@ const replaceSessionExerciseGraph = (
             sessionExerciseId: exerciseSets.sessionExerciseId,
             orderIndex: exerciseSets.orderIndex,
             repsValue: exerciseSets.repsValue,
+            recordingMode: exerciseSets.recordingMode,
+            durationSec: exerciseSets.durationSec,
             weightValue: exerciseSets.weightValue,
             setType: exerciseSets.setType,
             plannedRepsValue: exerciseSets.plannedRepsValue,
@@ -793,8 +825,7 @@ const replaceSessionExerciseGraph = (
         : !requestedSetId || existingSet !== undefined || foreignSet !== undefined
           ? createLocalEntityId('set')
           : requestedSetId;
-      const nextSetType =
-        set.setType === undefined ? normalizeSessionSetType(existingSet?.setType) : normalizeSessionSetType(set.setType);
+      const nextSetType = setEffort(set, existingSet);
       const nextPlannedSetType =
         set.plannedSetType === undefined
           ? normalizeSessionSetType(existingSet?.plannedSetType)
@@ -804,6 +835,8 @@ const replaceSessionExerciseGraph = (
           ? existingSet
             ? hydrateSessionSetPerformanceStatus(existingSet.performanceStatus, {
                 reps: existingSet.repsValue,
+                recordingMode: existingSet.recordingMode,
+                durationSec: existingSet.durationSec,
                 weight: existingSet.weightValue,
               })
             : 'unperformed'
@@ -817,6 +850,8 @@ const replaceSessionExerciseGraph = (
             orderIndex: setIndex,
             mergeRevision: exercise.mergeRevision ?? 0,
             repsValue: set.repsValue,
+            recordingMode: set.recordingMode ?? existingSet?.recordingMode ?? 'reps',
+            durationSec: set.durationSec === undefined ? existingSet?.durationSec ?? null : set.durationSec,
             weightValue: set.weightValue,
             setType: nextSetType,
             plannedRepsValue:
@@ -846,6 +881,8 @@ const replaceSessionExerciseGraph = (
             orderIndex: setIndex,
             mergeRevision: exercise.mergeRevision ?? 0,
             repsValue: set.repsValue,
+            recordingMode: set.recordingMode ?? existingSet?.recordingMode ?? 'reps',
+            durationSec: set.durationSec === undefined ? existingSet?.durationSec ?? null : set.durationSec,
             weightValue: set.weightValue,
             setType: nextSetType,
             plannedRepsValue: set.plannedRepsValue ?? null,
@@ -853,7 +890,7 @@ const replaceSessionExerciseGraph = (
             plannedSetType: nextPlannedSetType,
             performanceStatus: nextPerformanceStatus,
             sourcePlanSetId: set.sourcePlanSetId ?? null,
-      sourcePlanUseId: set.sourcePlanUseId ?? null,
+            sourcePlanUseId: set.sourcePlanUseId ?? null,
             deletedAt: null,
             localDirty: true,
             localUpdatedAtMs: input.localUpdatedAtMs,

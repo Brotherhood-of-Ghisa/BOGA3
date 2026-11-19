@@ -20,6 +20,8 @@ export type LoadContext = {
 };
 
 export type SetMetricInput = LoadContext & {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   weightValue: string | null | undefined;
   repsValue: string | null | undefined;
   setType?: string | null;
@@ -134,6 +136,16 @@ export const resolveCalculatedLoad = (input: LoadContext & {
 /** Performed projections before the finite guard, for aggregators that isolate
  * overflow by metric. The ordinary reader below keeps its all-or-none result. */
 export const calculateSetMetricCandidates = (input: SetMetricInput): SetMetrics => {
+  if (input.recordingMode === 'hold' || input.durationSec != null) {
+    return { eligible: false, reps: null, load: null, ...unavailableMetrics };
+  }
+  return calculateRepetitionMetricCandidates(input);
+};
+
+/** Pinned scorer-7 arithmetic: callers supply the legacy repetition shape. */
+export const calculateRepetitionMetricCandidates = (
+  input: Omit<SetMetricInput, 'recordingMode' | 'durationSec'>,
+): SetMetrics => {
   const weight = canonicalizeWeightForReps(input.weightValue ?? '', input.repsValue ?? '');
   const reps = parseSetReps(input.repsValue);
   if (reps === null || parseSetWeight(weight) === null || !isConfirmedPerformedSet({

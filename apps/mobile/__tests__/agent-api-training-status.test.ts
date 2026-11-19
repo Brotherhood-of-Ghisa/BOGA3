@@ -161,7 +161,7 @@ describe('training status: muscles', () => {
       definitions: definitionsOf(definition('bench', { name: 'Machine Dips' })),
       training: training([benchSession('dips', daysAgo(1), 3)]),
     });
-    expect(result.metric_revision).toBe('working_sets_v10');
+    expect(result.metric_revision).toBe('working_sets_v11');
     expect(result.muscles.find((muscle) => muscle.id === 'chest')).toMatchObject({ week_sets: 3, weekly_target: 10,
       recovery_days: [{ sets: null }, { sets: null }, { sets: 3 }] });
     expect(result.muscles.find((muscle) => muscle.id === 'triceps')?.week_sets).toBe(3);

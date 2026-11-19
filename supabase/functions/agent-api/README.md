@@ -42,7 +42,7 @@ Error envelope:
 ```
 
 All responses are JSON with `Cache-Control: no-store` and `x-request-id`.
-Timestamps are ISO 8601, weights kg, load-volume `kg_reps`. A success response
+Timestamps are ISO 8601, weights kg, load-volume `kg_reps`. A response
 is limited to 256 KiB and a validated user/client pair to 120 requests per
 minute per function instance.
 
@@ -278,7 +278,7 @@ returns one bounded object; days and Monday-start weeks are the profile
 
 ```json
 {
-  "metric_revision": "working_sets_v10", "as_of": "2026-10-28T12:00:00.000Z",
+  "metric_revision": "working_sets_v11", "as_of": "2026-10-28T12:00:00.000Z",
   "time_zone": "Europe/London", "today": "2026-10-28", "week_start": "2026-10-26",
   "muscle_setup": "combined", "counts_secondary_sets": true, "volume_primary_only": false,
   "targets": { "mode": "per_muscle", "default_weekly_sets": 8, "uploaded": true, "revision": 1761650000000 },
@@ -374,9 +374,9 @@ never a device's effort settings.
   rest).
 - Every count does too: `completed_set_count`, `exercises[].set_count`, and
   `exercise_count` (blocks with at least one working set).
-- A set that is not a working set ([[set.eligibility]]) stays in the raw per-set
-  output with its `set_type` and its own `calculated_load`,
-  `estimated_one_rep_max` and `volume`. Those describe that set only.
+- Confirmed holds retain `recording_mode`, `duration_sec`, load and Effort,
+  without reps or derived fields; null Volume follows [[set.row-figures]]. [[set.eligibility]]
+  governs counts; nonworking rows remain readable.
 - In exercise context, a session where the exercise had no working set has no
   stat footprint: it is absent from `recent_performances` and `volume_series`,
   sets no `last_performed_at`, and is not an excluded-volume session.
@@ -387,14 +387,14 @@ never a device's effort settings.
 tie keeps the earliest session; a zero result is never a record
 ([[1rm.formula]] for a zero 1RM).
 
-`metric_revision: "working_sets_v10"` reports a split exercise as the whole
+`metric_revision: "working_sets_v11"` reports a split exercise as the whole
 exercise unless `gym_bucket` names a gym ([gym buckets](#gym-buckets)). For what
 an earlier `metric_revision` meant, see the
 [revision history](../../../docs/procedures/rule-upgrade.md#revision-history).
 
 ## Optional bodyweight calculation response
 
-Exercise-context and workout responses (`metric_revision: "working_sets_v10"`)
+Exercise-context and workout responses (`metric_revision: "working_sets_v11"`)
 carry this contract. Weights are kg; set `load` and `top_weight` are the raw
 entered Weight, never including bodyweight. The API reads the owner-synced
 private preference first:

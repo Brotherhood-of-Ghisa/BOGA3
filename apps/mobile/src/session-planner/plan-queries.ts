@@ -30,7 +30,7 @@ export type PlanTargetView = {
   id: string;
   orderIndex: number;
   targetWeightValue: string | null;
-  targetReps: number;
+  targetReps: number | null; recordingMode?: 'reps' | 'hold'; targetDurationSec?: number | null;
   targetSetType: SessionSetTypeValue;
 };
 
@@ -128,6 +128,8 @@ type ClaimingCard = {
   sets: {
     id: string;
     sourcePlanSetId: string | null;
+    recordingMode?: 'reps' | 'hold';
+    durationSec?: number | null;
     repsValue: string;
     weightValue: string;
     performanceStatus: string | null;
@@ -166,6 +168,7 @@ const toBlockViews = (
             set.sourcePlanSetId !== null &&
             blockSetIds.has(set.sourcePlanSetId) &&
             isConfirmedPerformedSet({
+              ...set,
               reps: set.repsValue,
               weight: set.weightValue,
               performanceStatus: (set.performanceStatus as never) ?? null,
@@ -200,6 +203,8 @@ const toBlockViews = (
         orderIndex: set.orderIndex,
         targetWeightValue: set.targetWeightValue,
         targetReps: set.targetReps,
+        recordingMode: set.recordingMode,
+        targetDurationSec: set.targetDurationSec,
         targetSetType: normalizeSessionSetType(set.targetSetType),
       })),
     };

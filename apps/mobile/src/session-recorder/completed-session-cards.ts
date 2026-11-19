@@ -20,6 +20,8 @@ export const toCompletedSessionDetailExercises = (exercises: SessionDraftExercis
     loadContext: exercise.loadContext,
     sets: exercise.sets.map((set) => ({
       id: set.id,
+      recordingMode: set.recordingMode,
+      durationSec: set.durationSec,
       weight: set.weightValue,
       reps: set.repsValue,
       setType: normalizeSessionSetType(set.setType),

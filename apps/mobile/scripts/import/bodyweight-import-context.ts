@@ -1,3 +1,5 @@
+import { isRecordingMode } from '../../src/exercise-core/recording-mode';
+import { hasValidActualValues } from '../../src/exercise-calculations/set-semantics';
 import { parseSetWeight } from '../../src/exercise-calculations';
 import { validateBodyweightContribution } from '../../src/exercise-core/bodyweight-contribution';
 import { isSessionSetType, type SessionSetTypeValue } from '../../src/data/set-types';
@@ -5,6 +7,8 @@ import { isSessionSetType, type SessionSetTypeValue } from '../../src/data/set-t
 export const BOGA_SESSION_IMPORT_SCHEMA_V4 = 'boga.session-import.v4' as const;
 
 export type ImportedSetMeaning = {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   plannedWeightValue: string | null;
   plannedRepsValue: string | null;
   plannedSetType: SessionSetTypeValue;
@@ -16,6 +20,7 @@ export type ImportedWeightReading = {
   measuredAt: string;
 };
 export type ImportedExerciseDefinition = {
+  recordingMode?: 'reps' | 'hold';
   loadInputMode: 'total_load' | 'per_side_load';
   bodyweightContribution: number;
 };
@@ -27,11 +32,19 @@ const date = (value: unknown): value is string => typeof value === 'string' &&
 
 export const validateImportedSetMeaning = (value: Record<string, unknown>): boolean => {
   if (value.performanceStatus !== null && value.performanceStatus !== 'planned' && value.performanceStatus !== 'unperformed') return false;
+  if (value.recordingMode !== undefined && !isRecordingMode(value.recordingMode)) return false;
+  if (value.recordingMode === 'hold') {
+    if (value.repsValue !== '' || (value.plannedRepsValue !== null && value.plannedRepsValue !== '')) return false;
+    if (value.durationSec != null && !Number.isSafeInteger(value.durationSec)) return false;
+    if (value.performanceStatus === null && (typeof value.weightValue !== 'string' || !hasValidActualValues({
+      recordingMode: 'hold', durationSec: value.durationSec as number | null, reps: '', weight: value.weightValue,
+    }))) return false;
+  } else if (value.durationSec != null) return false;
   if (value.plannedSetType !== null && !isSessionSetType(value.plannedSetType)) return false;
   return (value.plannedWeightValue === null || (typeof value.plannedWeightValue === 'string' &&
       (value.plannedWeightValue === '' || parseSetWeight(value.plannedWeightValue) !== null))) &&
     (value.plannedRepsValue === null || typeof value.plannedRepsValue === 'string') &&
-    (value.plannedWeightValue !== null || value.plannedRepsValue !== null ||
+    (value.recordingMode === 'hold' || value.plannedWeightValue !== null || value.plannedRepsValue !== null ||
       (value.plannedSetType === null && value.performanceStatus === null));
 };
 
@@ -42,6 +55,7 @@ export const validateImportedWeightReading = (value: unknown): value is Imported
 };
 
 export const validateImportedExerciseDefinition = (value: Record<string, unknown>): boolean => {
+  if (value.recordingMode !== undefined && !isRecordingMode(value.recordingMode)) return false;
   if (value.loadInputMode !== 'total_load' && value.loadInputMode !== 'per_side_load') return false;
   return validateBodyweightContribution(value.bodyweightContribution).ok;
 };

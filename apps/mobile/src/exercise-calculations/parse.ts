@@ -43,3 +43,9 @@ export const parseSetReps = (value: string | null | undefined): number | null =>
   if (!Number.isInteger(parsed) || parsed <= 0 || parsed > MAX_SET_REPS) return null;
   return parsed;
 };
+
+/** Duration is stored as whole seconds, independently of repetition text. */
+export const MAX_SET_DURATION_SEC = 300;
+
+export const parseSetDuration = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= MAX_SET_DURATION_SEC ? value : null;

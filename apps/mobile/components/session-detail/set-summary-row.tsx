@@ -23,13 +23,13 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
       </Text>
       <Text
         allowFontScaling={false}
-        accessibilityLabel={percentageMetrics ? row.weightReps : undefined}
+        accessibilityLabel={row.recordingMode === 'hold' ? row.weightReps.replace(/ s$/, ' seconds') : percentageMetrics ? row.weightReps : undefined}
         numberOfLines={1}
         style={[text.figure, row.done ? (row.weightRecord ? tone.record : null) : tone.faint, styles.weightReps]}
         testID={`${testID}-values`}>
         {percentageMetrics ? row.weightReps.replace(' %BW', '%') : row.weightReps}
       </Text>
-      {!hideDerivedMetrics ? <>
+      {!hideDerivedMetrics && row.recordingMode !== 'hold' ? <>
       <View style={[styles.metricColumn, styles.oneRepMaxColumn]} testID={`${testID}-1rm-column`}>
         <Stat
           emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}

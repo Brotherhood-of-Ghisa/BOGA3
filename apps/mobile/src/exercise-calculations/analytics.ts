@@ -2,7 +2,7 @@ import { sessionBodyWeightForCalculation, type SessionWeightContext } from '../b
 import { parseSetWeight } from './index.ts';
 import { formatVolume } from './format.ts';
 import { compareWeightRecord } from './records.ts';
-import { canonicalizeWeightForReps, isWorkingSet, isVolumeSet } from './set-semantics.ts';
+import { canonicalizeSetValues, isConfirmedPerformedSet, isWorkingSet, isVolumeSet } from './set-semantics.ts';
 import type { EffortCalculationPolicy } from './effort-policy.ts';
 import {
   calculateSetMetrics, summarizeVolume,
@@ -50,6 +50,7 @@ export type AnalyticsSetInput = Omit<SetMetricInput, keyof LoadContext>;
  */
 export const workingSetsOnly = <T extends AnalyticsSetInput>(sets: readonly T[], policy?: EffortCalculationPolicy): T[] =>
   sets.filter(set => isWorkingSet({
+    ...set,
     weight: set.weightValue ?? '', reps: set.repsValue ?? '',
     performanceStatus: set.performanceStatus, setType: set.setType,
   }, policy));
@@ -61,7 +62,7 @@ export function calculateAnalyticsSetMetrics(input: SetMetricInput) {
 
 /** Raw entered Weight is already kg; bodyweight contribution never changes it. */
 export function enteredWeightKg(set: AnalyticsSetInput): number | null {
-  const value = parseSetWeight(canonicalizeWeightForReps(set.weightValue ?? '', set.repsValue ?? ''));
+  const value = parseSetWeight(canonicalizeSetValues({ ...set, weight: set.weightValue ?? '', reps: set.repsValue ?? '' }).weight);
   return value;
 }
 
@@ -70,14 +71,18 @@ export function summarizeExerciseLoad(
   context: LoadContext = ordinaryLoadContext(),
 ) {
   const metrics = sets.map(set => calculateAnalyticsSetMetrics({ ...set, ...context }));
-  const volumeCoverage = summarizeVolume(metrics.filter((_, index) => isVolumeSet({
+  const rawCoverage = summarizeVolume(metrics.filter((_, index) => isVolumeSet({
+    ...sets[index],
     weight: sets[index].weightValue ?? '', reps: sets[index].repsValue ?? '',
     performanceStatus: sets[index].performanceStatus, setType: sets[index].setType,
   }, context.effortPolicy)));
+  const holdOnly = sets.some(set => set.recordingMode === 'hold') && !sets.some(set =>
+    set.recordingMode !== 'hold' && isConfirmedPerformedSet({ ...set, weight: set.weightValue ?? '', reps: set.repsValue ?? '' }));
+  const volumeCoverage = holdOnly ? { ...rawCoverage, knownVolumeKgReps: null, totalVolumeKgReps: null } : rawCoverage;
   let estimatedOneRepMax: number | null = null;
   let topWeightSet: { weight: number; reps: number } | null = null;
   for (const [index, metric] of metrics.entries()) {
-    if (!metric.eligible || !isWorkingSet({ weight: sets[index].weightValue ?? '', reps: sets[index].repsValue ?? '',
+    if (!metric.eligible || !isWorkingSet({ ...sets[index], weight: sets[index].weightValue ?? '', reps: sets[index].repsValue ?? '',
       performanceStatus: sets[index].performanceStatus, setType: sets[index].setType }, context.effortPolicy)) continue;
     if (metric.estimatedOneRepMaxKg !== null) {
       estimatedOneRepMax = Math.max(estimatedOneRepMax ?? 0, metric.estimatedOneRepMaxKg);

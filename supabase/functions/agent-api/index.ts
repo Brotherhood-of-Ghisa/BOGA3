@@ -6,9 +6,7 @@ import {
   overlapReadWindows,
   parseActivityRange, projectActivity, type ActivityRow, type OverlapSessionRow,
 } from './activities.ts';
-import { summarizeVolume } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { createRecordBook } from '../../../apps/mobile/src/exercise-calculations/records.ts';
-import { isSessionSetType } from '../../../apps/mobile/src/data/set-types.ts';
 import { isRestTimerSec } from '../../../apps/mobile/src/exercise-core/rest-timer.ts';
 import {
   parseStoredCombinedMuscles, resolveCombinedMuscleSetup,
@@ -20,7 +18,7 @@ import {
   ExerciseEditError, normalizeExerciseCreate, normalizeExerciseRevision, normalizeExerciseUpdate,
 } from './exercise-edit.ts';
 import {
-  normalizePlanMutation, normalizeProgrammeMutation, PlanEditError,
+  normalizePlanMutation, normalizeProgrammeMutation, normalizeSetInput, PlanEditError,
   type PlanMutation, type ProgrammeMutation,
 } from './plan-edit.ts';
 import {
@@ -48,7 +46,7 @@ import {
   type StatusSessionRow, type StatusSetRow, type StatusSettingsRow, type StatusTraining, type TrainingStatusWindow,
 } from './training-status.ts';
 import {
-  METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, volumePayload,
+  METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, summarizeTrainingVolume, volumePayload,
   type ExerciseLoadRow, type SessionWeightRow, type EnteredSetRow,
 } from './training-metrics.ts';
 import { normalizeWorkoutInput, WorkoutInputError, type WorkoutOperation } from './workout-input.ts';
@@ -154,7 +152,7 @@ type SetRow = EnteredSetRow & { session_exercise_id: string };
 /** An out-of-range stored value reads as null, as the app ignores it ([[timer.rest-default]]). */
 const projectRestTimerSec = (value: number | null): number | null => (isRestTimerSec(value) ? value : null);
 
-const EXERCISE_COLUMNS = 'id,name,load_input_mode,bodyweight_contribution,split_by_gym,rest_timer_sec';
+const EXERCISE_COLUMNS = 'id,name,recording_mode,load_input_mode,bodyweight_contribution,split_by_gym,rest_timer_sec';
 /** Catalog reads add what an exercise edit needs: its revision and deleted state. */
 const CATALOG_EXERCISE_COLUMNS = `${EXERCISE_COLUMNS},client_updated_at_ms,deleted_at`;
 const SESSION_COLUMNS = 'id,gym_id,started_at,completed_at,duration_sec';
@@ -1069,7 +1067,7 @@ const loadSetsByBlock = async (
       .schema('app_public')
       .from('exercise_sets')
       .select(
-        'id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status',
+        'id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status,recording_mode,duration_sec',
       )
       .eq('owner_user_id', userId)
       .is('deleted_at', null)
@@ -1100,7 +1098,7 @@ const loadAllSetsForBlocks = async (
         .schema('app_public')
         .from('exercise_sets')
         .select(
-          'id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status',
+          'id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status,recording_mode,duration_sec',
         )
         .eq('owner_user_id', userId)
         .is('deleted_at', null)
@@ -1422,7 +1420,7 @@ const getExerciseContext = async (
       history_truncated: historyIncomplete,
       excluded_incomplete_volume_sessions: bucketRows.filter(row => !row.volumeCoverage.complete || historyIncomplete).length,
     },
-    volume_series: seriesRows.map((row) => ({
+    volume_series: seriesRows.filter(row => row.volumeCoverage.eligibleSetCount > 0 || row.volumeCoverage.knownVolumeKgReps !== null).map((row) => ({
       completed_at: toIsoTimestamp(row.session.completed_at),
       ...gymOf(row),
       ...volumePayload(row.volumeCoverage, historyIncomplete),
@@ -1525,7 +1523,7 @@ const getRecentWorkouts = async (
         setsByBlock.get(block.id) ?? [], definitionsById.get(block.exercise_definition_id ?? '') ?? null, session,
         bodyweightCalculationsEnabled,
       ));
-      const coverage = summarizeVolume(projections.flatMap(row => row.workingMetrics));
+      const coverage = summarizeTrainingVolume(projections);
       const usesBodyweightContext = projections.some(row => row.usesBodyweightContext);
       return {
         id: session.id,
@@ -1536,7 +1534,7 @@ const getRecentWorkouts = async (
           ? { id: session.gym_id, name: gymById.get(session.gym_id) ?? null }
           : null,
         exercise_count: projections.filter(row => row.workingSetCount > 0).length,
-        completed_set_count: coverage.eligibleSetCount,
+        completed_set_count: projections.reduce((count, row) => count + row.workingSetCount, 0),
         ...(usesBodyweightContext ? { session_body_weight: sessionWeightPayload(session) } : {}),
         total_volume: volumePayload(coverage, blocksTruncated || setResult.truncated),
         exercises: workoutBlocks.slice(0, 50).map((block, index) => ({
@@ -1858,7 +1856,7 @@ const loadStatusSets = (
 ): Promise<StatusRead<StatusSetRow>> =>
   readChunks(blockIds, 40, (ids) =>
     client.schema('app_public').from('exercise_sets')
-      .select('id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status')
+      .select('id,session_exercise_id,order_index,weight_value,reps_value,set_type,performance_status,recording_mode,duration_sec')
       .eq('owner_user_id', userId).is('deleted_at', null).is('performance_status', null)
       .in('session_exercise_id', ids).order('order_index').order('id').limit(STATUS_ROW_LIMIT)
       .returns<StatusSetRow[]>());
@@ -1869,7 +1867,7 @@ const loadStatusDefinitions = async (
 ): Promise<Map<string, StatusDefinitionRow>> => {
   const { rows } = await readChunks(exerciseIds, 100, (ids) =>
     client.schema('app_public').from('exercise_definitions')
-      .select('id,name,load_input_mode,bodyweight_contribution,deleted_at').eq('owner_user_id', userId)
+      .select('id,name,recording_mode,load_input_mode,bodyweight_contribution,deleted_at').eq('owner_user_id', userId)
       .in('id', ids).limit(100).returns<StatusDefinitionRow[]>());
   return new Map(rows.map((row) => [row.id, row]));
 };
@@ -2518,7 +2516,7 @@ const getWorkoutDetail = async (
       bodyweightCalculationsEnabled,
     )
   );
-  const coverage = summarizeVolume(projections.flatMap((row) => row.workingMetrics));
+  const coverage = summarizeTrainingVolume(projections);
   const usesBodyweightContext = projections.some((row) => row.usesBodyweightContext);
 
   type WorkoutDetailSortableSet = {
@@ -2584,7 +2582,7 @@ const getWorkoutDetail = async (
         ? { id: sessionWithContext.gym_id, name: gymName }
         : null,
       exercise_count: projections.filter((row) => row.workingSetCount > 0).length,
-      completed_set_count: coverage.eligibleSetCount,
+      completed_set_count: projections.reduce((count, row) => count + row.workingSetCount, 0),
       ...(usesBodyweightContext ? { session_body_weight: sessionWeightPayload(sessionWithContext) } : {}),
       total_volume: volumePayload(coverage, setResult.truncated),
       exercises: workoutBlocks.map((block, index) => ({
@@ -2863,33 +2861,6 @@ const readOptionalEpochMs = (value: unknown, label: string): number | null => {
   return value;
 };
 
-const readTargetWeight = (value: unknown, label: string): string | null => {
-  if (value === undefined || value === null) return null;
-  const text = typeof value === 'number'
-    ? String(value)
-    : typeof value === 'string' ? value.trim() : null;
-  if (text === null || !/^\d{1,4}(\.\d{1,2})?$/.test(text)) {
-    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} must be a non-negative decimal up to 9999.99.`);
-  }
-  return text;
-};
-
-const readTargetReps = (value: unknown, label: string): number => {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > 999) {
-    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} must be an integer between 1 and 999.`);
-  }
-  return value;
-};
-
-const readTargetSetType = (value: unknown, label: string): string | null => {
-  const text = readOptionalText(value, 40, label);
-  if (text === null) return null;
-  if (!isSessionSetType(text)) {
-    throw new ApiError(400, 'INVALID_ARGUMENT', `${label} is not a supported set type.`);
-  }
-  return text;
-};
-
 const normalizePlanInput = (value: unknown): JsonObject => {
   const input = asObject(value, 'plan');
   const title = readRequiredTitle(input.title, 'title');
@@ -2912,18 +2883,18 @@ const normalizePlanInput = (value: unknown): JsonObject => {
       throw new ApiError(400, 'INVALID_ARGUMENT', `exercises[${index}].sets must contain 1 to ${MAX_PLAN_SETS} sets.`);
     }
     const sets = setsRaw.map((setEntry, setIndex) => {
-      const set = asObject(setEntry, `exercises[${index}].sets[${setIndex}]`);
-      return {
-        target_reps: readTargetReps(set.target_reps, `exercises[${index}].sets[${setIndex}].target_reps`),
-        target_weight_value: readTargetWeight(
-          set.target_weight_value,
-          `exercises[${index}].sets[${setIndex}].target_weight_value`,
-        ),
-        target_set_type: readTargetSetType(
-          set.target_set_type,
-          `exercises[${index}].sets[${setIndex}].target_set_type`,
-        ),
-      };
+      try {
+        const set = normalizeSetInput(setEntry, `exercises[${index}].sets[${setIndex}]`);
+        return {
+          target_reps: set.target_reps,
+          ...(set.recording_mode === 'hold' ? { recording_mode: 'hold', target_duration_sec: set.target_duration_sec } : {}),
+          target_weight_value: set.target_weight_value ?? null,
+          target_set_type: set.target_set_type ?? null,
+        };
+      } catch (error) {
+        if (error instanceof PlanEditError) throw new ApiError(400, 'INVALID_ARGUMENT', error.message);
+        throw error;
+      }
     });
     return { exercise_definition_id: exerciseDefinitionId, name, sets };
   });
@@ -3030,7 +3001,9 @@ type PlanSetRow = {
   id: string;
   order_index: number;
   session_plan_exercise_id: string;
-  target_reps: number;
+  target_reps: number | null;
+  recording_mode: 'reps' | 'hold';
+  target_duration_sec: number | null;
   target_set_type: string | null;
   target_weight_value: string | null;
 };
@@ -3366,7 +3339,7 @@ const getUpcomingSessionPlans = async (
       const { data: batch, error: setError } = await client
         .schema('app_public')
         .from('session_plan_sets')
-        .select('id,session_plan_exercise_id,order_index,target_weight_value,target_reps,target_set_type')
+        .select('id,session_plan_exercise_id,order_index,target_weight_value,target_reps,target_set_type,recording_mode,target_duration_sec')
         .eq('owner_user_id', agent.userId)
         .is('deleted_at', null)
         .in('session_plan_exercise_id', ids)
@@ -3485,6 +3458,9 @@ const getUpcomingSessionPlans = async (
               order_index: set.order_index,
               target_weight_value: set.target_weight_value,
               target_reps: set.target_reps,
+            recording_mode: set.recording_mode,
+            target_duration_sec: set.target_duration_sec,
+
               target_set_type: set.target_set_type,
             })),
             truncated: blockSets.length > MAX_PLAN_SETS,
@@ -3594,7 +3570,7 @@ const getProgrammeDetail = async (
       const { data: batch, error: setError } = await client
         .schema('app_public')
         .from('session_plan_sets')
-        .select('id,session_plan_exercise_id,order_index,target_weight_value,target_reps,target_set_type')
+        .select('id,session_plan_exercise_id,order_index,target_weight_value,target_reps,target_set_type,recording_mode,target_duration_sec')
         .eq('owner_user_id', agent.userId)
         .is('deleted_at', null)
         .in('session_plan_exercise_id', ids)
@@ -3711,6 +3687,8 @@ const getProgrammeDetail = async (
             order_index: set.order_index,
             target_weight_value: set.target_weight_value,
             target_reps: set.target_reps,
+            recording_mode: set.recording_mode,
+            target_duration_sec: set.target_duration_sec,
             target_set_type: set.target_set_type,
           })),
           truncated: blockSets.length > MAX_PLAN_SETS,

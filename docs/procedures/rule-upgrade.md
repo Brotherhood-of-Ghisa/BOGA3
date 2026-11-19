@@ -69,6 +69,8 @@ Test delayed publication across the upgrade before deploying it.
 
 Agent API `metric_revision` values, newest first.
 
+- `working_sets_v11` counts confirmed timed holds, retaining seconds and load
+  without strength metrics ([[set.eligibility]]).
 - `working_sets_v10` separates muscle Sets credit from Volume allocation and
   publishes independent counting choices ([[muscle.set-count]], [[muscle.secondary-filter]]).
 - `working_sets_v9` gives each Secondary mapping ½ ([[muscle.set-count]])

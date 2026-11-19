@@ -39,12 +39,14 @@ export const readRoutineHistory = async (planIds: string[]) => {
       if (!workouts.has(id)) workouts.set(id, { ...row, hasConfirmedSourceWork: false });
     }
     const sets = liveCards.length ? tx.select({ cardId: exerciseSets.sessionExerciseId,
+      recordingMode: exerciseSets.recordingMode, durationSec: exerciseSets.durationSec,
       reps: exerciseSets.repsValue, weight: exerciseSets.weightValue, performanceStatus: exerciseSets.performanceStatus })
       .from(exerciseSets).innerJoin(sessionPlanSets, eq(sessionPlanSets.id, exerciseSets.sourcePlanSetId))
       .innerJoin(sessionExercises, and(eq(sessionExercises.id, exerciseSets.sessionExerciseId),
         eq(sessionExercises.sourcePlanExerciseId, sessionPlanSets.sessionPlanExerciseId)))
       .where(and(inArray(exerciseSets.sessionExerciseId, liveCards.map(card => card.cardId)), isNull(exerciseSets.deletedAt))).all() : [];
     const confirmedCards = new Set(sets.filter(set => isConfirmedPerformedSet({
+      ...set,
       reps: set.reps, weight: set.weight, performanceStatus: set.performanceStatus as SessionSetPerformanceStatus,
     })).map(set => set.cardId));
     for (const card of liveCards) {

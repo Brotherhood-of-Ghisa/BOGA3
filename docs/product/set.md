@@ -2,10 +2,11 @@
 
 ### set.performed · definition · accepted
 
-A set counts for any figure only when it is **confirmed performed**: valid
-reps (a positive integer, at most 999), valid Weight (digits with an optional
-decimal point; blank Weight with valid reps is `0`), and no performance status.
-Planned, unperformed and skipped rows never count for any figure.
+A set counts only when **confirmed performed**: exactly one valid measurement
+(reps or hold seconds), valid nonnegative Weight, and no performance status.
+Blank Weight is zero. Planned, unperformed and skipped rows never count.
+Holds use whole seconds within the shared parser's bound; reps are never
+fabricated from time.
 
 Why: one validity rule; the reps cap keeps counts exact on every device and server.
 Code: `isConfirmedPerformedSet` in `apps/mobile/src/exercise-calculations/set-semantics.ts`; the parser and `MAX_SET_REPS` in `apps/mobile/src/exercise-calculations/parse.ts`.
@@ -13,13 +14,14 @@ Code: `isConfirmedPerformedSet` in `apps/mobile/src/exercise-calculations/set-se
 ### set.eligibility · definition · accepted
 
 Which confirmed performed sets feed which figure. A **working set** feeds set
-and session counts and 1RM and Weight records. A **volume-included set** feeds
-Volume and Volume records. The two are independent.
+and session counts. Repetition working sets also feed 1RM and Weight records;
+repetition **volume-included sets** feed Volume and its records independently.
+Holds follow normal Effort eligibility for counts and muscle credit, but never
+feed Volume, 1RM, Weight records, RM observations or strength scores.
 
 Personal figures follow the account's effort policy (Settings → Effort:
 Working set and Volume, chosen independently); the table gives its defaults.
-Group and coaching figures use one fixed rule — the personal defaults — and
-never read a device's policy.
+Groups and coaching use those fixed defaults.
 
 <!-- fact-table: set.eligibility -->
 
@@ -34,7 +36,7 @@ never read a device's policy.
 | Rehab | no | no | no |
 | Unknown stored label | as Unspecified | as Unspecified | yes |
 
-A session counts toward a figure when it holds at least one working set.
+A session counts when it holds at least one working set.
 
 Why: warm-ups, technique, cooldown, and rehab work is logged but is not training
 stimulus; groups compare people, so they use one rule nobody can tune.
@@ -53,14 +55,17 @@ Signature: `n of m sets done`
 
 ### set.row-figures · presentation · accepted
 
-Every set row shows every figure it can compute (Weight, reps, 1RM, Volume),
+Repetition rows show every computable figure (Weight, reps, 1RM, Volume),
 planned and warm-up rows included; unrealised figures are faded. A warm-up
 row's real 1RM and Volume describe that row only; [[set.eligibility]] decides
 which sets can be records, never what a row shows. The only highlights on a set
 list are the session's record sets (`docs/specs/tech/training-metrics-contract.md`
 §3). The group session view highlights instead the set that took #1 on a group
 1RM board: one `GR` band per set.
-In a shared group session, normalized Weight is added load as `%BW`;
+Hold rows show entered Weight and seconds, with no derived columns or hold
+record panel. Hold-only aggregates report unavailable Volume. Shared normalized
+holds show seconds without hidden Weight.
+In a shared group repetition row, normalized Weight is added load as `%BW`;
 ordinary and personal Weight retain their existing meaning.
 
 Why: the row is a record of what was lifted; eligibility decides what counts,

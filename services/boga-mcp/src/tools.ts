@@ -41,6 +41,7 @@ const muscleSchema = z.object({
 
 const exerciseFieldShape = {
   bodyweight_contribution: z.number().min(0).max(1).optional(),
+  recording_mode: z.enum(['reps', 'hold']).optional(),
   load_input_mode: z.enum(['total_load', 'per_side_load']).optional(),
   muscles: z.array(muscleSchema).min(1).max(12).optional(),
   name: z.string().trim().min(1).max(100).optional(),
@@ -48,6 +49,15 @@ const exerciseFieldShape = {
   rest_timer_sec: z.number().int().min(15).max(600).nullable().optional(),
   split_by_gym: z.boolean().optional(),
 };
+
+const targetSet = z.union([
+  z.object({ target_reps: z.number().int().min(1).max(999), recording_mode: z.literal('reps').optional(),
+    target_duration_sec: z.null().optional(), target_set_type: z.string().trim().min(1).max(40).nullable().optional(),
+    target_weight_value: z.string().trim().max(20).optional() }).strict(),
+  z.object({ recording_mode: z.literal('hold'), target_duration_sec: z.number().int().min(1).max(300),
+    target_reps: z.null().optional(), target_set_type: z.string().trim().min(1).max(40).nullable().optional(),
+    target_weight_value: z.string().trim().max(20).optional() }).strict(),
+]);
 
 const revisionInput = {
   exercise_id: z.string().min(1).max(200),
@@ -492,11 +502,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
           exercises: z.array(z.object({
             exercise_definition_id: z.string().min(1).max(200).optional(),
             name: z.string().trim().min(1).max(100),
-            sets: z.array(z.object({
-              target_reps: z.number().int().min(1).max(999),
-              target_set_type: z.string().trim().min(1).max(40).optional(),
-              target_weight_value: z.string().trim().max(20).optional(),
-            })).min(1).max(30),
+            sets: z.array(targetSet).min(1).max(30),
           })).min(1).max(30),
           gym_id: z.string().min(1).max(200).optional(),
           scheduled_for: z.number().int().optional(),
@@ -524,11 +530,7 @@ export const buildBogaMcpServer = (api: BogaAgentApi): McpServer => {
             exercises: z.array(z.object({
               exercise_definition_id: z.string().min(1).max(200).optional(),
               name: z.string().trim().min(1).max(100),
-              sets: z.array(z.object({
-                target_reps: z.number().int().min(1).max(999),
-                target_set_type: z.string().trim().min(1).max(40).optional(),
-                target_weight_value: z.string().trim().max(20).optional(),
-              })).min(1).max(30),
+              sets: z.array(targetSet).min(1).max(30),
             })).min(1).max(30),
             gym_id: z.string().min(1).max(200).optional(),
             scheduled_for: z.number().int().optional(),

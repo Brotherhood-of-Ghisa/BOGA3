@@ -15,6 +15,8 @@ export type ExercisePickerPreselectionState = {
 export type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
 
 export type SessionSet = {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   id: string;
   reps: string;
   weight: string;
@@ -29,6 +31,7 @@ export type SessionSet = {
 };
 
 export type SessionExercise = {
+  recordingMode?: 'reps' | 'hold';
   mergeRevision?: number;
   loadContext?: LoadContext;
   id: string;

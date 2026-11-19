@@ -138,3 +138,12 @@ it('rejects wrong units, unsafe row metadata, legacy/unsupported boards and mixe
     { entry_count: 0 },{ me: {} },{ next_cursor: 5 }]) expect(isCompetitionBoardWire({ ...board,...patch })).toBe(false);
   expect(isCompetitionPerformanceWire({ ...publicSet, visibility: 'ordinary' },false)).toBe(false);
 });
+
+
+it('omits timed and ambiguous measurements before touching a private reading', () => {
+  for (const patch of [{ recordingMode: 'hold' as const, durationSec: 38 }, { durationSec: 38 }]) {
+    const timed = { ...performance, ...patch };
+    Object.defineProperty(timed, 'bodyWeightKg', { get: () => { throw new Error('private lookup'); } });
+    expect(scoreCompetitionPerformance(timed, rules)).toEqual([]);
+  }
+});

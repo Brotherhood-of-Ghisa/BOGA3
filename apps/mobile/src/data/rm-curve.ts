@@ -11,6 +11,7 @@ import { exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions, us
 export type RmCurveRow = ResolvedSessionWeight & {
   setId: string; sessionId: string; sessionExerciseId: string; blockOrder: number; setOrder: number;
   startedAt: Date; completedAt: Date; gymId: string | null; gymName: string | null;
+  recordingMode?: 'reps' | 'hold'; durationSec?: number | null;
   weightValue: string; repsValue: string; setType: string | null; performanceStatus: string | null;
   loadContext: LoadContext;
 };
@@ -40,6 +41,7 @@ export async function loadRmCurveGraph(input: RmCurveRead): Promise<RmCurveGraph
       blockOrder: sessionExercises.orderIndex, setOrder: exerciseSets.orderIndex,
       startedAt: sessions.startedAt, completedAt: sessions.completedAt,
       gymId: sessions.gymId, gymName: gyms.name,
+      recordingMode: exerciseSets.recordingMode, durationSec: exerciseSets.durationSec,
       weightValue: exerciseSets.weightValue, repsValue: exerciseSets.repsValue,
       setType: exerciseSets.setType, performanceStatus: exerciseSets.performanceStatus,
     }).from(exerciseSets).innerJoin(sessionExercises, eq(exerciseSets.sessionExerciseId, sessionExercises.id))

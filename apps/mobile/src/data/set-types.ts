@@ -1,6 +1,7 @@
 // The group-eval Edge Function loads this file (via src/groups/set-facts.ts), so
 // its imports name their .ts files.
 import { DEFAULT_DISPLAY_EFFORTS, getSessionSetRir, type EffortChoice } from '../exercise-calculations/effort-policy.ts';
+import type { RecordingMode } from '../exercise-core/recording-mode.ts';
 export { getSessionSetRir } from '../exercise-calculations/effort-policy.ts';
 
 export type RirSessionSetType = `rir_${number}`;
@@ -42,7 +43,8 @@ export const nextSessionSetType = (value: SessionSetTypeValue, display?: readonl
 };
 
 /** New rows inherit visible effort, advance hidden RIR, or use a visible fallback. */
-export const defaultSessionSetType = (previous: SessionSetTypeValue | undefined, display: readonly EffortChoice[] = DEFAULT_DISPLAY_EFFORTS): SessionSetTypeValue => {
+export const defaultSessionSetType = (previous: SessionSetTypeValue | undefined, display: readonly EffortChoice[] = DEFAULT_DISPLAY_EFFORTS, recordingMode: RecordingMode = 'reps'): SessionSetTypeValue => {
+  if (recordingMode === 'hold') return previous === undefined ? 'rir_0' : previous;
   const cycle = getSessionSetTypeCycle(display);
   if (previous === undefined) return cycle[0] ?? null;
   if (cycle.includes(previous) && previous !== 'warm_up') return previous;

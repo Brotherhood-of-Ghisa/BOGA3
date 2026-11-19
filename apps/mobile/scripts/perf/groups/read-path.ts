@@ -105,6 +105,7 @@ const NOTIFICATION_PROOF: BudgetEntry = { kind: 'budgeted', pages: 5_700, scoped
  * justification. Re-measure and update an entry in the change that moves its cost.
  */
 export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
+  stream('group_competition_stream_v6', { kind: 'budgeted', pages: 2_800, scoped: true }),
   stream('group_competition_stream_v5', { kind: 'budgeted', pages: 2_300, scoped: true }),
   stream('group_competition_stream_v4', { kind: 'budgeted', pages: 2_200, scoped: true }),
   stream('group_competition_stream_v3', { kind: 'budgeted', pages: 2_200, scoped: true }),
@@ -122,6 +123,9 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
   { fn: 'group_competition_records_history', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_group_exercise_id: c.bench, p_metric: 'e1rm', p_certified: false, p_before: null, p_limit: 50 }),
     budget: { kind: 'budgeted', pages: 650, scoped: true } },
+  { fn: 'group_competition_session_detail_v2', via: 'member',
+    args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
+    budget: { kind: 'budgeted', pages: 150, scoped: true } },
   { fn: 'group_competition_session_detail', via: 'member',
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'budgeted', pages: 70, scoped: true } },
@@ -129,7 +133,7 @@ export const READ_PATH_RPCS: readonly ReadPathRpc[] = [
     args: (c) => ({ p_group_id: c.groupId, p_member_user_id: c.session.member, p_session_id: c.session.sessionId }),
     budget: { kind: 'budgeted', pages: 360, scoped: true } },
   { fn: 'group_cow_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
-    budget: { kind: 'budgeted', pages: 80, scoped: true } },
+    budget: { kind: 'budgeted', pages: 110, scoped: true } },
   { fn: 'group_cow_previous_summary', via: 'member', args: (c) => ({ p_group_id: c.groupId }),
     budget: { kind: 'budgeted', pages: 110, scoped: true } },
   { fn: 'group_cow_calendar_get', via: 'member', args: (c) => ({ p_group_id: c.groupId }),

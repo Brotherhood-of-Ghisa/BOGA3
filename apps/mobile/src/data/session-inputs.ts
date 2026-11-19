@@ -1,3 +1,4 @@
+import type { RecordingMode } from '@/src/exercise-core/recording-mode';
 import type { MergeWireEntity } from '@/src/exercise-core/merge-types';
 import type { SessionSetTypeValue } from './set-types';
 import type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/set-semantics';
@@ -5,6 +6,7 @@ import type { SessionSetPerformanceStatus } from '@/src/exercise-calculations/se
 export type SessionDraftStatus = 'active';
 export type SessionTimingBaseline = { revision: number; startedAt: Date; completedAt: Date };
 export type SessionDraftSetInput = {
+  recordingMode?: RecordingMode; durationSec?: number | null;
   id?: string; repsValue: string; weightValue: string; setType?: SessionSetTypeValue;
   plannedRepsValue?: string | null; plannedWeightValue?: string | null; plannedSetType?: SessionSetTypeValue;
   performanceStatus?: SessionSetPerformanceStatus;

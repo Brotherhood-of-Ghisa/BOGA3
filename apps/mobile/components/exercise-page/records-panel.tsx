@@ -285,15 +285,17 @@ function LastSetLine({ set, index }: { set: RecordSet; index: number }) {
   return (
     <View style={styles.lastSet} testID={`exercise-records-last-set-${index}`}>
       <Text allowFontScaling={false} style={[text.label, tone.ink, styles.typeLabel]}>{formatEffort(set.setType)}</Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[text.figure, styles.lastSetFigure]}>
-        {`${formatWeight(set.weight)} × ${set.reps}`}
+      <Text allowFontScaling={false} numberOfLines={1}
+        accessibilityLabel={set.recordingMode === 'hold' ? `${formatWeight(set.weight)} × ${set.durationSec} seconds` : undefined}
+        style={[text.figure, styles.lastSetFigure]}>
+        {`${formatWeight(set.weight)} × ${set.recordingMode === 'hold' ? `${set.durationSec} s` : set.reps}`}
       </Text>
-      <Stat
+      {set.recordingMode !== 'hold' && <><Stat
         label="1RM"
         layout="inline"
         value={set.oneRepMax !== null ? formatOneRepMax(set.oneRepMax) : DASH}
       />
-      <Stat label="Vol" layout="inline" rank="secondary" value={set.volume === null ? DASH : formatVolume(set.volume)} />
+      <Stat label="Vol" layout="inline" rank="secondary" value={set.volume === null ? DASH : formatVolume(set.volume)} /></>}
     </View>
   );
 }

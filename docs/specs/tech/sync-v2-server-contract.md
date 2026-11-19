@@ -13,7 +13,7 @@ disagreement):
 migrations, `apps/mobile/src/sync/` and
 `apps/mobile/scripts/check-sync-schema-drift.ts`.
 
-Authenticated app push and pull require the header `x-boga-sync-protocol: 7`
+Authenticated app push and pull require the header `x-boga-sync-protocol: 8`
 (see `sync_push`, "Update-required cutoff").
 
 ---
@@ -35,10 +35,8 @@ sequence discovery and atomic merge/recovery RPCs, load
 - **Minimal sync validation.** App sync payloads mirror the client schema.
   Dedicated agent operations validate their own inputs separately; when changing
   workout writes, load [their contract](agent-workout-contract.md).
-  - No CHECK constraints on enum text, numeric ranges or text content, except
-    `exercise_definitions_load_input_mode_valid` (`total_load |
-    per_side_load`; analytics read it, so both stores reject invalid values)
-    and the three `user_settings_*_valid` JSON-shape checks. The Routine standalone CHECK protects provenance.
+  - Allowed CHECKs mirror the client: load-input mode, recording modes,
+    plan-target measurement, settings JSON shapes, and standalone Routine provenance.
   - Domain columns are nullable wherever the client may write NULL; only the
     PK, `owner_user_id` and `client_updated_at_ms` are NOT NULL.
   - Provenance guards and merge revision fences add to structural triggers; group triggers: "Out of scope".
@@ -269,16 +267,15 @@ in one transaction with deferred constraints, forces the FK check before it
 returns (so it can raise `FK_VIOLATION`), and commits or rolls back the whole
 batch.
 
-**`fields`.** Protocol-6 writers send every typed column. A key the server does
-not know is ignored, not stored. Local-only columns are never sent.
-LWW stays per row; there are no per-field clocks.
+**`fields`.** Writers send typed columns; unknown/local-only keys are not stored.
+LWW stays per row. Recording mode and nullable seconds travel on saved sets and
+plan targets; definitions default to Reps. The protocol-8 cutover prevents older
+clients interpreting nullable hold targets as repetitions.
 
 **Update-required cutoff.** A normal authenticated call whose
 `x-boga-sync-protocol` is missing, old or malformed fails with `P0001`
-`UPDATE_REQUIRED: …` before it touches any row. The cutoff is compatibility
-enforcement, not authorization; auth and OAuth denial are unchanged. The app
-client (`apps/mobile/src/auth/supabase.ts`) and the import CLI send
-protocol 7.
+`UPDATE_REQUIRED: …` before it touches any row. Auth and OAuth denial remain unchanged. App and import writers send protocol 8;
+activation is coordinated with release, separately from code integration.
 
 **Batch building.** The client takes dirty rows layer by layer up to the cap,
 so no child ships without its parent: each FK target of a batched row is in an

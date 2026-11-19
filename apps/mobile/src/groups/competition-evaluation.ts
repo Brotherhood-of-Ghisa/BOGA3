@@ -25,6 +25,8 @@ export type CompetitionPerformanceSnapshot = {
 /** Service-only graph row. Private reading fields are consumed here and never
  * copied into the public performance snapshot or persisted group payloads. */
 export type CompetitionSourceSet = Omit<CompetitionPerformanceSnapshot, 'reps'> & {
+  recording_mode?: 'reps' | 'hold';
+  duration_sec?: number | null;
   member_user_id: string;
   body_weight_kg: number | null;
   body_weight_source: string | null;
@@ -122,6 +124,7 @@ export function evaluateCompetitionGraph(graph: CompetitionEvaluationGraph): Com
     const key = JSON.stringify([row.member_user_id, row.set_id]);
     if (keys.has(key)) throw new Error('Duplicate competition evaluation source set');
     keys.add(key);
+    if (row.recording_mode === 'hold' || row.duration_sec != null) continue;
     const values = scoreCompetitionPerformance({ weightValue: row.weight_value, repsValue: row.reps_value,
       performanceStatus: row.performance_status, live: row.live, source: { loadInputMode: row.source_load_input_mode },
       ...privateContext(row, isNormalizedCompetition(checked.value)) }, checked.value);

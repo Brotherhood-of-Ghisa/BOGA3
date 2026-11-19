@@ -134,8 +134,8 @@ export function AddExerciseScreen({ sessionId }: AddExerciseScreenProps) {
         }}
         onClose={() => router.back()}
         onOpenManage={() => router.push(EXERCISE_CATALOG_MANAGE_ROUTE)}
-        onSelectExercise={(exerciseDefinitionId, exerciseName) => {
-          void runWrite((id) => addExerciseToSession(id, { id: exerciseDefinitionId, name: exerciseName }));
+        onSelectExercise={(exerciseDefinitionId, exerciseName, recordingMode) => {
+          void runWrite((id) => addExerciseToSession(id, { id: exerciseDefinitionId, name: exerciseName, recordingMode }));
         }}
       />
       <PlanCardChoiceSheet

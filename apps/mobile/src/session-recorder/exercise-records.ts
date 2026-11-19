@@ -4,7 +4,7 @@ import type { SessionSetTypeValue } from '@/src/data/set-types';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
 import { addFiniteVolume, calculateAnalyticsSetMetrics, ordinaryLoadContext } from '@/src/exercise-calculations/analytics';
 
-import { canonicalizeWeightForReps, isWorkingSet, isVolumeSet } from '@/src/exercise-calculations/set-semantics';
+import { canonicalizeSetValues, isConfirmedPerformedSet, isWorkingSet, isVolumeSet } from '@/src/exercise-calculations/set-semantics';
 
 import type { ExerciseRecordBaseline } from './exercise-page-model';
 
@@ -19,9 +19,11 @@ import type { ExerciseRecordBaseline } from './exercise-page-model';
  */
 
 export type RecordSet = {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   setType: SessionSetTypeValue;
   weight: number;
-  reps: number;
+  reps: number | null;
   oneRepMax: number | null;
   volume: number | null;
 };
@@ -83,12 +85,14 @@ type SessionBlock = {
 type HistorySet = ExerciseHistorySessionEntry['sets'][number];
 
 const toRecordSet = (set: HistorySet, entry: ExerciseHistorySessionEntry): RecordSet | null => {
-  const rawWeight = parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue));
-  const reps = parseSetReps(set.repsValue);
-  if (rawWeight === null || reps === null) return null;
+  const values = { ...set, weight: set.weightValue, reps: set.repsValue };
+  if (!isConfirmedPerformedSet(values)) return null;
+  const rawWeight = parseSetWeight(canonicalizeSetValues(values).weight)!;
+  const reps = set.recordingMode === 'hold' ? null : parseSetReps(set.repsValue);
   const context = entry.loadContext ?? ordinaryLoadContext();
   const metric = calculateAnalyticsSetMetrics({ ...set, ...context });
   return {
+    ...(set.recordingMode === 'hold' ? { recordingMode: set.recordingMode, durationSec: set.durationSec } : {}),
     setType: set.setType,
     weight: rawWeight,
     reps,
@@ -115,10 +119,10 @@ const groupBySession = (entries: ExerciseHistorySessionEntry[]): SessionBlock[] 
       const recordSet = toRecordSet(set, entry);
       if (!recordSet) continue;
       block.sets.push(recordSet);
-      if (isWorkingSet({ weight: set.weightValue, reps: set.repsValue, setType: set.setType }, entry.loadContext?.effortPolicy)) {
+      if (isWorkingSet({ ...set, weight: set.weightValue, reps: set.repsValue }, entry.loadContext?.effortPolicy)) {
         block.workingSets.push(recordSet);
       }
-      if (isVolumeSet({ weight: set.weightValue, reps: set.repsValue, setType: set.setType }, entry.loadContext?.effortPolicy)) {
+      if (isVolumeSet({ ...set, weight: set.weightValue, reps: set.repsValue }, entry.loadContext?.effortPolicy)) {
         block.volumeSets.push(recordSet);
       }
     }
@@ -166,8 +170,9 @@ export const deriveLastSession = (entries: ExerciseHistorySessionEntry[]): LastS
     gymId: newest.gymId,
     gymName: newest.gymName,
     oneRepMax: bestOneRepMax(newest.workingSets),
-    maxWeight: Math.max(...newest.workingSets.map((set) => set.weight)),
-    volume: sumVolume(newest.volumeSets),
+    maxWeight: newest.workingSets.some(set => set.recordingMode !== 'hold')
+      ? Math.max(...newest.workingSets.filter(set => set.recordingMode !== 'hold').map(set => set.weight)) : null,
+    volume: newest.volumeSets.length || newest.sets.some(set => set.recordingMode !== 'hold') ? sumVolume(newest.volumeSets) : null,
     sets: newest.sets,
   };
 };

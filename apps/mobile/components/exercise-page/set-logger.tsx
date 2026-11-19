@@ -4,6 +4,8 @@ import { Pressable, Text, type TextInputInstance, View } from 'react-native';
 
 import type { LoadContext } from '@/src/exercise-calculations/load-metrics';
 import { canonicalizeWeightForReps } from '@/src/exercise-calculations/set-semantics';
+import { MAX_SET_DURATION_SEC, parseSetDuration } from '@/src/exercise-calculations/parse';
+import { Notice } from '@/components/ui/notice';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
@@ -22,6 +24,9 @@ import {
 import { SetEntryFields } from './set-entry-fields';
 
 type SetLoggerProps = {
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
+  onChangeDuration?: (value: number | null) => void;
   loadContext: LoadContext;
   number: number;
   weightValue: string;
@@ -63,7 +68,7 @@ const actionsHint = (canConfirm: boolean, canDrop: boolean): string | undefined 
  * values are a valid set.
  */
 export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function SetLogger(
-  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, onConfirm, onDrop, loadContext },
+  { number, weightValue, repsValue, setType, onChangeWeight, onChangeReps, onCycleEffort, onOpenEffort, onCommit, onConfirm, onDrop, loadContext, recordingMode, durationSec, onChangeDuration },
   weightInputRef
 ) {
   const styles = useStyles();
@@ -71,7 +76,8 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
   const tone = useUiTextTone();
   const canonicalWeight = canonicalizeWeightForReps(weightValue, repsValue);
   const { oneRepMax, volume } = previewMetrics(canonicalWeight, repsValue, loadContext);
-  const canCommit = canCommitLogger({ weightValue, repsValue });
+  const canCommit = canCommitLogger({ weightValue, repsValue, recordingMode, durationSec });
+  const durationError = durationSec != null && parseSetDuration(durationSec) === null ? `Enter whole seconds from 1 to ${MAX_SET_DURATION_SEC}.` : undefined;
 
   return (
     <View style={styles.logger} testID="exercise-set-logger">
@@ -90,14 +96,18 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
         style={styles.header}
         testID="exercise-set-logger-header">
         <Text allowFontScaling={false} style={[text.label, tone.accent]}>{`Set ${number}`}</Text>
-        <Text allowFontScaling={false} style={text.meta} testID="exercise-set-logger-preview">
+        {recordingMode !== 'hold' ? <Text allowFontScaling={false} style={text.meta} testID="exercise-set-logger-preview">
           <FigureText>{`1RM ${oneRepMax !== null ? formatOneRepMax(oneRepMax) : DASH} · VOL ${volume !== null ? formatVolume(volume) : DASH}`}</FigureText>
-        </Text>
+        </Text> : null}
       </View>
       <SetEntryFields
         number={number}
         weightValue={weightValue}
         repsValue={repsValue}
+        recordingMode={recordingMode}
+        durationValue={durationSec == null ? '' : String(durationSec)}
+        durationError={durationError}
+        onChangeDuration={(value) => { if (/^\d*$/.test(value) && value.length <= String(MAX_SET_DURATION_SEC).length) onChangeDuration?.(value === '' ? null : Number(value)); }}
         setType={setType}
         onChangeWeight={(value) => { if (isWeightInput(value)) onChangeWeight(value); }}
         onChangeReps={(value) => { if (REPS_PATTERN.test(value)) onChangeReps(value); }}
@@ -118,6 +128,7 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
           </Pressable>
         </View>
       </SetEntryFields>
+      {durationError ? <Notice live message={durationError} tone="danger" /> : null}
     </View>
   );
 });

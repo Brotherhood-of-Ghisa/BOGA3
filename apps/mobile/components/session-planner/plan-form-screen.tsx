@@ -170,7 +170,7 @@ export function PlanFormScreen({ initialForm, onSave, saveLabel }: PlanFormScree
       const newSets =
         suggestion && suggestion.sets.length > 0
           ? planFormBlockFromSuggestion(exercise, suggestion.sets, trainingPreferences.displayEfforts).sets
-          : [createPlanFormSet(trainingPreferences.displayEfforts)];
+          : [createPlanFormSet(trainingPreferences.displayEfforts, exercise.recordingMode)];
       patchBlock(blockId, {
         exerciseDefinitionId: exercise.id,
         name: exercise.name,

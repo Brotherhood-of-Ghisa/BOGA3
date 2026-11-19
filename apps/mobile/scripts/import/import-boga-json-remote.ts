@@ -239,6 +239,7 @@ export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): Wi
       fields: {
         name: decision.exerciseName,
         load_input_mode: decision.loadInputMode,
+        recording_mode: decision.recordingMode ?? 'reps',
         bodyweight_contribution: decision.bodyweightContribution,
         split_by_gym: false,
         created_at: generatedAtMs,
@@ -321,6 +322,8 @@ export const buildRemoteImportWireEntities = (pkg: BogaSessionImportPackage): Wi
             order_index: set.orderIndex,
             weight_value: set.weightValue,
             reps_value: set.repsValue,
+            recording_mode: set.recordingMode ?? 'reps',
+            duration_sec: set.durationSec ?? null,
             set_type: set.setType,
             planned_weight_value: set.plannedWeightValue,
             planned_reps_value: set.plannedRepsValue,
@@ -342,7 +345,7 @@ const signIn = async (apiUrl: string, anonKey: string, email: string, password: 
   const response = await fetch(`${apiUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: {
-      'x-boga-sync-protocol': '7',
+      'x-boga-sync-protocol': '8',
       apikey: anonKey,
       'content-type': 'application/json',
     },
@@ -359,7 +362,7 @@ const verifyTokenEmail = async (apiUrl: string, anonKey: string, token: string, 
   const response = await fetch(`${apiUrl}/auth/v1/user`, {
     method: 'GET',
     headers: {
-      'x-boga-sync-protocol': '7',
+      'x-boga-sync-protocol': '8',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       accept: 'application/json',
@@ -379,7 +382,7 @@ const pushBatch = async (apiUrl: string, anonKey: string, token: string, batch: 
   const response = await fetch(`${apiUrl}/rest/v1/rpc/sync_push`, {
     method: 'POST',
     headers: {
-      'x-boga-sync-protocol': '7',
+      'x-boga-sync-protocol': '8',
       apikey: anonKey,
       authorization: `Bearer ${token}`,
       'content-type': 'application/json',

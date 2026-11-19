@@ -39,7 +39,7 @@ BW_BODY="$(jq -nc --arg reading "${BW_ID}" --arg session "${BW_SESSION_ID}" \
      fields: {gym_id: null, source_plan_id: null, status: "completed", started_at: $ts, completed_at: ($ts+60000), duration_sec: 60,
               created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_definitions", id: $def, client_updated_at_ms: $ts,
-     fields: {name: "Pull-Up", load_input_mode: "total_load", bodyweight_contribution: 1,
+     fields: {name: "Pull-Up", recording_mode: "reps", load_input_mode: "total_load", bodyweight_contribution: 1,
               split_by_gym: false, rest_timer_sec: 90, created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "session_exercises", id: $sx, client_updated_at_ms: $ts,
      fields: {session_id: $session, exercise_definition_id: $def, source_plan_exercise_id: null,
@@ -47,6 +47,7 @@ BW_BODY="$(jq -nc --arg reading "${BW_ID}" --arg session "${BW_SESSION_ID}" \
               order_index: 0, created_at: $ts, updated_at: $ts, deleted_at: null}},
     {type: "exercise_sets", id: $set, client_updated_at_ms: $ts,
      fields: {session_exercise_id: $sx, source_plan_set_id: null, order_index: 0, weight_value: "20", reps_value: "8", set_type: null,
+              recording_mode: "reps", duration_sec: null,
               planned_weight_value: "10", planned_reps_value: "10", planned_set_type: null,
               performance_status: null, created_at: $ts, updated_at: $ts, deleted_at: null}}
   ]}')"
@@ -204,9 +205,9 @@ for projection in \
   assert_non_2xx "superseded column ${projection} is absent"
 done
 
-# Protocol 7 is the shipping contract. Older clients (including 6) fail
+# Protocol 8 is the shipping contract. Older clients (including 7) fail
 # before rows move.
-for old_protocol in "" 1 2 3 4 5 6 invalid; do
+for old_protocol in "" 1 2 3 4 5 6 7 invalid; do
   BOGA_TEST_SYNC_PROTOCOL="${old_protocol}" sync_push "${USER_A_TOKEN}" "${BW_BODY}"
   assert_non_2xx 'old client push rejected'
   assert_json_expr '.message | startswith("UPDATE_REQUIRED:")' 'actionable update-required push error'

@@ -1,5 +1,5 @@
 import {
-  METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload,
+  METRIC_REVISION, exerciseLoadPayload, projectTrainingSets, sessionWeightPayload, summarizeTrainingVolume, volumePayload,
   type EnteredSetRow, type SessionWeightRow,
 } from '../../../supabase/functions/agent-api/training-metrics.ts';
 import { GROUP_COACHING_ELIGIBILITY } from './helpers/set-eligibility';
@@ -21,8 +21,28 @@ const set = (id: string, weight: string, reps: string, setType: string | null,
 });
 
 describe('agent-api training projection', () => {
+  it('counts holds and retains their entered duration/load without strength measurements', () => {
+    const hold = { ...set('s0', '5', '', 'rir_0'), recording_mode: 'hold' as const, duration_sec: 38 };
+    const projection = projectTrainingSets([hold], perSide, reading80, true);
+    expect(projection.workingSetCount).toBe(1);
+    expect(volumePayload(summarizeTrainingVolume([projection]))).toBeNull();
+    const lift = projectTrainingSets([set('lift', '100', '8', 'rir_2')], ordinary, noReading, false);
+    expect(volumePayload(summarizeTrainingVolume([lift, projection]))?.value).toBe(800);
+    expect(projection.volumeCoverage).toMatchObject({ totalVolumeKgReps: null, knownVolumeKgReps: null, eligibleSetCount: 0 });
+    expect(projection.estimatedOneRepMax).toBeNull();
+    expect(projection.topWeightSet).toBeNull();
+    expect(projection.sets).toEqual([{
+      id: 's0', order_index: 0, recording_mode: 'hold', duration_sec: 38, load: { value: 5, unit: 'kg' },
+      set_type: 'rir_0', performance_status: null, outcome: 'completed',
+    }]);
+    expect(projectTrainingSets([{ ...hold, set_type: 'rehab' }], perSide, reading80, true).workingSetCount).toBe(0);
+    expect(projectTrainingSets([{ ...hold, performance_status: 'unperformed' }], perSide, reading80, true).sets).toEqual([]);
+    expect(projectTrainingSets([set('s1', '100', '8', 'rir_2'), hold], ordinary, noReading, false))
+      .toMatchObject({ workingSetCount: 2, volumeCoverage: { totalVolumeKgReps: 800, eligibleSetCount: 1 } });
+  });
+
   it('labels the working-set meaning of its figures', () => {
-    expect(METRIC_REVISION).toBe('working_sets_v10');
+    expect(METRIC_REVISION).toBe('working_sets_v11');
   });
 
   it.each(GROUP_COACHING_ELIGIBILITY)("applies set.eligibility's fixed coaching rule to %s", (_label, setType, counts) => {
@@ -58,7 +78,9 @@ describe('agent-api training projection', () => {
     expect(projection.sets[0]).toMatchObject({
       load: { value: 140, unit: 'kg' }, volume: { value: 700, unit: 'kg_reps' },
     });
-    expect(projection.sets[0].estimated_one_rep_max!.value).toBeGreaterThan(projection.estimatedOneRepMax!);
+    const first = projection.sets[0];
+    if (!('estimated_one_rep_max' in first)) throw new Error('Expected repetition metrics');
+    expect(first.estimated_one_rep_max!.value).toBeGreaterThan(projection.estimatedOneRepMax!);
   });
 
   it('gives a warm-up-only block no stat footprint while keeping its rows', () => {
@@ -98,8 +120,7 @@ describe('agent-api training projection', () => {
     expect(projection.usesBodyweightContext).toBe(true);
     expect(projection.volumeCoverage.totalVolumeKgReps).toBe(800);
     expect(projection.topWeightSet).toEqual({ weight: 20, reps: 8 });
-    expect(projection.sets[0].calculated_load.value).toBe(120);
-    expect(projection.sets[0].volume.value).toBe(600);
+    expect(projection.sets[0]).toMatchObject({ calculated_load: { value: 120 }, volume: { value: 600 } });
   });
 
   it('counts the body contribution once before the per-side external adjustment', () => {
@@ -121,7 +142,7 @@ describe('agent-api training projection', () => {
     const projection = projectTrainingSets([set('s0', '10', '8', null)], perSide, noReading, true);
 
     expect(projection.usesBodyweightContext).toBe(true);
-    expect(projection.sets[0].calculated_load.value).toBe(20);
+    expect(projection.sets[0]).toMatchObject({ calculated_load: { value: 20 } });
     expect(projection.volumeCoverage).toMatchObject({
       totalVolumeKgReps: 160, knownVolumeKgReps: 160, eligibleSetCount: 1, knownSetCount: 1, complete: true,
     });

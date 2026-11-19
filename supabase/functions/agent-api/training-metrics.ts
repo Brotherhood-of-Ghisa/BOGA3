@@ -3,18 +3,19 @@
 import {
   personalLoadContext, summarizeExerciseLoad, workingSetsOnly,
 } from '../../../apps/mobile/src/exercise-calculations/analytics.ts';
-import type { VolumeCoverage } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
+import { summarizeVolume, type VolumeCoverage } from '../../../apps/mobile/src/exercise-calculations/load-metrics.ts';
 import { parseSetWeight } from '../../../apps/mobile/src/exercise-calculations/index.ts';
 import {
-  canonicalizeWeightForReps, type SessionSetPerformanceStatus,
+  canonicalizeSetValues, isConfirmedPerformedSet, type SessionSetPerformanceStatus,
 } from '../../../apps/mobile/src/exercise-calculations/set-semantics.ts';
 import {
   isValidSessionWeight, type ResolvedSessionWeight,
 } from '../../../apps/mobile/src/bodyweight/as-of.ts';
 
-export const METRIC_REVISION = 'working_sets_v10';
+export const METRIC_REVISION = 'working_sets_v11';
 
 export type ExerciseLoadRow = {
+  recording_mode?: 'reps' | 'hold';
   bodyweight_contribution: number;
   load_input_mode: string;
 };
@@ -26,6 +27,8 @@ export type SessionWeightRow = {
   body_weight_measured_at: number | null;
 };
 export type EnteredSetRow = {
+  recording_mode?: 'reps' | 'hold';
+  duration_sec?: number | null;
   id: string;
   order_index: number;
   weight_value: string;
@@ -58,6 +61,7 @@ export function sessionWeightPayload(row: SessionWeightRow) {
 export function exerciseLoadPayload(row: ExerciseLoadRow, calculationsEnabled: boolean) {
   return {
     load_input_mode: row.load_input_mode,
+    ...(row.recording_mode === 'hold' ? { recording_mode: row.recording_mode } : {}),
     ...(calculationsEnabled && row.bodyweight_contribution > 0
       ? { bodyweight_contribution: row.bodyweight_contribution }
       : {}),
@@ -65,6 +69,7 @@ export function exerciseLoadPayload(row: ExerciseLoadRow, calculationsEnabled: b
 }
 
 export function volumePayload(coverage: VolumeCoverage, inputTruncated = false) {
+  if (coverage.eligibleSetCount === 0 && coverage.knownVolumeKgReps === null) return null;
   return {
     value: inputTruncated ? null : coverage.totalVolumeKgReps,
     unit: 'kg_reps',
@@ -79,17 +84,25 @@ export function volumePayload(coverage: VolumeCoverage, inputTruncated = false) 
   };
 }
 
+export function summarizeTrainingVolume(projections: readonly ReturnType<typeof projectTrainingSets>[]): VolumeCoverage {
+  const coverage = summarizeVolume(projections.flatMap(row => row.workingMetrics));
+  return coverage.eligibleSetCount === 0 && projections.some(row => row.volumeCoverage.knownVolumeKgReps === null)
+    ? { ...coverage, knownVolumeKgReps: null, totalVolumeKgReps: null } : coverage;
+}
+
 export function projectTrainingSets(
   sets: readonly EnteredSetRow[], definition: ExerciseLoadRow | null, session: SessionWeightRow,
   calculationsEnabled: boolean,
 ) {
   const bodyweightContribution = definition?.bodyweight_contribution ?? 0;
-  const usesBodyweightContext = calculationsEnabled && bodyweightContribution > 0;
+  const usesBodyweightContext = calculationsEnabled && bodyweightContribution > 0 &&
+    sets.some(set => set.recording_mode !== 'hold' && set.duration_sec == null);
   const context = personalLoadContext(calculationsEnabled, definition ? {
     bodyweightContribution,
     loadInputMode: definition.load_input_mode === 'per_side_load' ? 'per_side_load' : 'total_load',
   } : null, usesBodyweightContext ? contextFor(session) : null);
   const inputs = sets.map(set => ({
+    recordingMode: set.recording_mode, durationSec: set.duration_sec,
     weightValue: set.weight_value, repsValue: set.reps_value,
     setType: set.set_type,
     // Every non-null wire status is ineligible, including unknown future values.
@@ -98,24 +111,28 @@ export function projectTrainingSets(
   // Every performed row keeps its own figures; only working sets feed the
   // aggregates and counts (a non-working set is listed but never a stat).
   const perSet = summarizeExerciseLoad(inputs, context);
-  const summary = summarizeExerciseLoad(workingSetsOnly(inputs), context);
+  const working = workingSetsOnly(inputs);
+  const summary = summarizeExerciseLoad(working, context);
   return {
     volumeCoverage: summary.volumeCoverage,
     estimatedOneRepMax: summary.estimatedOneRepMax,
     topWeightSet: summary.topWeightSet,
     // Working sets only: not aligned with the input rows or `sets`.
     workingMetrics: summary.metrics,
-    workingSetCount: summary.volumeCoverage.eligibleSetCount,
+    workingSetCount: working.length,
     usesBodyweightContext,
     sets: sets.flatMap((set, index) => {
       const metric = perSet.metrics[index];
-      if (!metric.eligible) return [];
-      const amount = parseSetWeight(canonicalizeWeightForReps(set.weight_value, set.reps_value));
+      const values = { ...inputs[index], weight: set.weight_value, reps: set.reps_value };
+      if (!isConfirmedPerformedSet(values)) return [];
+      const amount = parseSetWeight(canonicalizeSetValues(values).weight);
       return [{
         id: set.id, order_index: set.order_index,
         load: amount === null ? null : { value: amount, unit: 'kg' },
-        reps: metric.reps, set_type: set.set_type, performance_status: set.performance_status,
+        set_type: set.set_type, performance_status: set.performance_status,
         outcome: 'completed',
+        ...(set.recording_mode === 'hold' ? { recording_mode: 'hold' as const, duration_sec: set.duration_sec } : metric.eligible ? {
+        reps: metric.reps,
         calculated_load: {
           status: metric.load.status,
           reason: metric.load.status === 'known' ? null : metric.load.reason,
@@ -125,6 +142,7 @@ export function projectTrainingSets(
         estimated_one_rep_max: metric.estimatedOneRepMaxKg === null
           ? null : { value: metric.estimatedOneRepMaxKg, unit: 'kg' },
         volume: { value: metric.volumeKgReps, unit: 'kg_reps' },
+        } : {}),
       }];
     }),
   };

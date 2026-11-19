@@ -115,7 +115,7 @@ export function isCoWSummaryWire(value: unknown): value is CoWSummaryWire {
 /** The read alias is group-scoped; the stored key also pins the server's selection and publication. */
 export function coWSummaryCacheKey(value: CoWSummaryWire, previous = false): string {
   const result = value.result;
-  return `${previous ? 'cow-previous-summary' : 'cow-summary'}:v8:${value.group_id}:${value.week_start ?? 'unset'}:${value.calendar_revision}:` +
+  return `${previous ? 'cow-previous-summary' : 'cow-summary'}:v9:${value.group_id}:${value.week_start ?? 'unset'}:${value.calendar_revision}:` +
     `${result?.cow.cow_id ?? 'none'}:${result?.cow.revision ?? 0}:${result?.publication_id ?? 'pending'}:` +
     `${result?.exercise?.rules.rules_revision ?? 0}:${result?.bodyweight_calculations_enabled ?? 'unset'}`;
 }

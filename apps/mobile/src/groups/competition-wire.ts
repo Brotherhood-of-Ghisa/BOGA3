@@ -106,6 +106,7 @@ export type CompetitionHistoryWire = {
 };
 export type CompetitionRevisionsWire = { contract_version: 4; exercise: CompetitionExerciseWire; revisions: CompetitionRevisionWire[] };
 export type CompetitionSessionSetWire = {
+  recording_mode?: 'reps' | 'hold'; duration_sec?: number | null; performed?: boolean;
   set_id: string; order_index: number; reps_value: string; set_type: string | null;
   performance_status: string | null;
 };

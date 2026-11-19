@@ -249,7 +249,11 @@ for entity in "${ENTITIES[@]}"; do
   ")"
   expected=""
   if [[ "${entity}" == "exercise_definitions" ]]; then
-    expected="exercise_definitions_load_input_mode_valid"
+    expected="exercise_definitions_load_input_mode_valid,exercise_definitions_recording_mode_check"
+  elif [[ "${entity}" == "exercise_sets" ]]; then
+    expected="exercise_sets_recording_mode_check"
+  elif [[ "${entity}" == "session_plan_sets" ]]; then
+    expected="session_plan_sets_recording_mode_check,session_plan_sets_target_measurement_valid"
   elif [[ "${entity}" == "session_plans" ]]; then
     expected="session_plans_routine_standalone"
   elif [[ "${entity}" == "user_settings" ]]; then

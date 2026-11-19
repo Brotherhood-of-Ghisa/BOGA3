@@ -43,7 +43,7 @@ export type ProgrammeRow = typeof trainingProgrammes.$inferSelect;
 export type SavePlanSetGraphInput = {
   id?: string;
   targetWeightValue: string | null;
-  targetReps: number;
+  targetReps: number | null; recordingMode?: 'reps' | 'hold'; targetDurationSec?: number | null;
   targetSetType: SessionSetTypeValue;
 };
 
@@ -285,6 +285,8 @@ const savePlanGraphInTransaction = (
         orderIndex: setIndex,
         targetWeightValue: setInput.targetWeightValue,
         targetReps: setInput.targetReps,
+        recordingMode: setInput.recordingMode ?? 'reps',
+        targetDurationSec: setInput.targetDurationSec ?? null,
         targetSetType: setInput.targetSetType,
         lastModifiedBy: 'human' as const,
         deletedAt: null,
@@ -363,6 +365,8 @@ const findLiveSourcedCardForBlockInTransaction = (tx: Transaction, planExerciseI
 export type SourcedCardSet = {
   id: string;
   sourcePlanSetId: string | null;
+  recordingMode?: 'reps' | 'hold';
+  durationSec?: number | null;
   repsValue: string;
   weightValue: string;
   performanceStatus: string | null;
@@ -416,6 +420,8 @@ const listSourcedCardsForBlocksInTransaction = (
       id: exerciseSets.id,
       sessionExerciseId: exerciseSets.sessionExerciseId,
       sourcePlanSetId: exerciseSets.sourcePlanSetId,
+      recordingMode: exerciseSets.recordingMode,
+      durationSec: exerciseSets.durationSec,
       repsValue: exerciseSets.repsValue,
       weightValue: exerciseSets.weightValue,
       performanceStatus: exerciseSets.performanceStatus,
@@ -431,6 +437,8 @@ const listSourcedCardsForBlocksInTransaction = (
     list.push({
       id: set.id,
       sourcePlanSetId: set.sourcePlanSetId,
+      recordingMode: set.recordingMode,
+      durationSec: set.durationSec,
       repsValue: set.repsValue,
       weightValue: set.weightValue,
       performanceStatus: set.performanceStatus,
@@ -525,6 +533,8 @@ export type SessionPlanStore = {
     sets: {
       id: string;
       sourcePlanSetId: string | null;
+      recordingMode?: 'reps' | 'hold';
+      durationSec?: number | null;
       repsValue: string;
       weightValue: string;
       performanceStatus: string | null;
@@ -732,6 +742,8 @@ const savePlanExerciseGraph = async (input: { planExerciseId: string; exerciseDe
           orderIndex: setIndex,
           targetWeightValue: setInput.targetWeightValue,
           targetReps: setInput.targetReps,
+        recordingMode: setInput.recordingMode ?? 'reps',
+        targetDurationSec: setInput.targetDurationSec ?? null,
           targetSetType: setInput.targetSetType,
           lastModifiedBy: 'human' as const,
           deletedAt: null,
@@ -816,6 +828,8 @@ const insertPlanExercise = async (input: { planId: string; exercise: SavePlanExe
             orderIndex: setIndex,
             targetWeightValue: setInput.targetWeightValue,
             targetReps: setInput.targetReps,
+        recordingMode: setInput.recordingMode ?? 'reps',
+        targetDurationSec: setInput.targetDurationSec ?? null,
             targetSetType: setInput.targetSetType,
             lastModifiedBy: 'human',
             deletedAt: null,
@@ -910,6 +924,8 @@ const findSourcedCardPerformances = async (planExerciseId: string): Promise<{ ca
       sets: {
         id: string;
         sourcePlanSetId: string | null;
+        recordingMode?: 'reps' | 'hold';
+        durationSec?: number | null;
         repsValue: string;
         weightValue: string;
         performanceStatus: string | null;
@@ -927,6 +943,8 @@ const findSourcedCardPerformances = async (planExerciseId: string): Promise<{ ca
           .select({
             id: exerciseSets.id,
             sourcePlanSetId: exerciseSets.sourcePlanSetId,
+            recordingMode: exerciseSets.recordingMode,
+            durationSec: exerciseSets.durationSec,
             repsValue: exerciseSets.repsValue,
             weightValue: exerciseSets.weightValue,
             performanceStatus: exerciseSets.performanceStatus,

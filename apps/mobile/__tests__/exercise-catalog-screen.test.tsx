@@ -255,12 +255,14 @@ describe('ExerciseCatalogScreen', () => {
     expect(exerciseEditorHrefs(mockPush)).toHaveLength(1);
   });
 
-  it('creates a new exercise with primary and secondary muscles', async () => {
+  it('creates a hold exercise with primary and secondary muscles', async () => {
     await openCatalog();
 
     await createExercise('Incline Press');
     expect(exerciseEditorParams(lastEditorHref()).exerciseDefinitionId).toBeNull();
     expect(mockHeaderTitles.at(-1)).toBe('New exercise');
+    expect(screen.getByLabelText('Record repetitions').props.accessibilityState.selected).toBe(true);
+    fireEvent.press(screen.getByLabelText('Record hold duration'));
     fireEvent.press(screen.getByLabelText('Per side weight entry'));
     openPrimaryPicker();
     fireEvent.press(await screen.findByLabelText('Select primary muscle Pectoralis'));
@@ -271,7 +273,7 @@ describe('ExerciseCatalogScreen', () => {
     expect(await screen.findByText('Exercise created.')).toBeTruthy();
     expect(screen.queryByTestId('exercise-editor')).toBeNull();
     const saved = definitionNamed('Incline Press');
-    expect(saved).toMatchObject({ loadInputMode: 'per_side_load', deletedAt: null });
+    expect(saved).toMatchObject({ loadInputMode: 'per_side_load', recordingMode: 'hold', deletedAt: null });
     expect(activeMappingsOf(saved!.id)).toEqual([
       { muscleGroupId: 'chest', role: 'primary', weight: 1 },
       { muscleGroupId: 'triceps', role: 'secondary', weight: 0.5 },

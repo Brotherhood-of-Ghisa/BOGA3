@@ -10,8 +10,8 @@ appId: com.dinoderek.mobile
 #      lists the newer fixture session; Back returns through Progress to the page;
 #   2. the logger takes reps on the keyboard, commits set 3 as `82.5 × 5`, and
 #      marks it performed;
-#   3. the ⋮ menu (a `Sheet`) springs back from a short drag of its title row
-#      and its rows still tap; Swap opens a page sheet that closes on a swipe
+#   3. the ⋮ menu (a `Sheet`) dismisses from a drag of its title row
+#      and its rows still tap after reopening; Swap opens a page sheet that closes on a swipe
 #      down and presents again afterwards.
 # Why device:
 #   1. a stack push and the native back button;
@@ -107,7 +107,7 @@ appId: com.dinoderek.mobile
     id: "exercise-set-3-values"
     text: "82.5 × 5"
 
-# --- 3. ⋮ menu: a short drag springs back; Swap's page sheet swipes closed and reopens ---
+# --- 3. ⋮ menu: drag dismisses; Swap's page sheet swipes closed and reopens ---
 - tapOn:
     id: "exercise-page-options"
 - extendedWaitUntil:
@@ -116,17 +116,18 @@ appId: com.dinoderek.mobile
     timeout: 5000
 - waitForAnimationToEnd:
     timeout: 4000
-# Short and slow: under the 120pt release distance and the flick velocity.
-# The title row sits at ~45% with the sheet's seven rows (signed out,
-# unsourced); a start on a row taps it instead.
+# Anchor to the title: the same sheet starts higher on a small phone.
 - swipe:
-    start: "50%,45%"
-    end: "50%,49%"
+    from: { id: "exercise-options-sheet-header" }
+    direction: DOWN
     duration: 900
-- waitForAnimationToEnd:
-    timeout: 4000
-- assertVisible:
-    id: "exercise-options-sheet-header"
+- extendedWaitUntil:
+    notVisible: { id: "exercise-options-sheet-header" }
+    timeout: 5000
+- tapOn: { id: "exercise-page-options" }
+- extendedWaitUntil:
+    visible: { id: "exercise-options-sheet-header" }
+    timeout: 5000
 - tapOn:
     id: "exercise-options-swap"
 - extendedWaitUntil:
@@ -161,3 +162,197 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "exercise-page-title"
     text: "Barbell Bench Press"
+
+# --- 4. Timed holds: approved native keyboard/confirmation proof ---
+# Jest counterparts: manual-holds-data/semantics, exercise-editor-screen and
+# exercise-page-screen. This uses the real editor rather than altering seeds.
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-page&teleport=session-view&sessionId=maestro_exercise_page_session"
+- extendedWaitUntil:
+    visible: { id: "session-view-add-exercise" }
+    timeout: 30000
+
+# Native proof for the approved hold editor/logger: keyboard focus, long-press
+# Effort selection, explicit confirmation with the number pad up, and native
+# navigation/autosave. Validation/counting math stays in Jest.
+- scrollUntilVisible:
+    element: { id: "session-view-add-exercise" }
+    direction: DOWN
+- tapOn: { id: "session-view-add-exercise" }
+- extendedWaitUntil:
+    visible: { id: "exercise-picker-create-button" }
+    timeout: 15000
+- tapOn: { id: "exercise-picker-create-button" }
+- extendedWaitUntil:
+    visible: { id: "exercise-editor-name-input" }
+    timeout: 10000
+- tapOn: { id: "exercise-editor-name-input" }
+- inputText: "Plank"
+- pressKey: Enter
+- tapOn: { id: "exercise-editor-primary-muscle-trigger" }
+- scrollUntilVisible:
+    element: { id: "exercise-editor-muscle-option-abs_rectus" }
+    direction: DOWN
+- tapOn: { id: "exercise-editor-muscle-option-abs_rectus" }
+- tapOn: { point: "50%,8%" }
+- extendedWaitUntil:
+    notVisible: { id: "exercise-editor-muscle-selector-list" }
+    timeout: 10000
+- scrollUntilVisible:
+    element: { id: "exercise-editor-recording-mode-hold" }
+    direction: DOWN
+- tapOn: { id: "exercise-editor-recording-mode-hold" }
+- takeScreenshot: "hold-0-editor"
+- scrollUntilVisible:
+    element: { id: "exercise-editor-save" }
+    direction: DOWN
+- tapOn: { id: "exercise-editor-save" }
+- extendedWaitUntil:
+    visible: { text: "Plank, 0 of 1 sets done" }
+    timeout: 15000
+- tapOn: { text: "Plank, 0 of 1 sets done" }
+- extendedWaitUntil:
+    visible: { id: "exercise-set-logger-duration" }
+    timeout: 15000
+- assertVisible: "Change effort, currently RIR 0"
+- assertNotVisible: { id: "exercise-set-logger-reps" }
+- assertNotVisible: { id: "exercise-records-panel" }
+- tapOn: { id: "exercise-set-logger-weight" }
+- inputText: "0"
+- tapOn: { id: "exercise-set-logger-duration" }
+- inputText: "301"
+- assertVisible: "Enter whole seconds from 1 to 300."
+- assertVisible: { id: "exercise-set-logger-commit", enabled: false }
+- takeScreenshot: "hold-0-invalid-keyboard"
+- eraseText
+- inputText: "38"
+- takeScreenshot: "hold-0-unchecked-keyboard"
+- longPressOn: { id: "exercise-set-logger-effort" }
+- tapOn: { id: "exercise-effort-option-none" }
+- extendedWaitUntil:
+    notVisible: { id: "exercise-effort-sheet" }
+    timeout: 10000
+- tapOn: { id: "exercise-set-logger-commit" }
+- extendedWaitUntil:
+    visible: { id: "exercise-set-1-toggle", text: "Mark set 1 not performed" }
+    timeout: 10000
+- assertVisible: { id: "exercise-set-1-values", text: "0.0 × 38 s" }
+- assertNotVisible: { id: "exercise-set-1-1rm" }
+- assertNotVisible: { id: "exercise-set-1-vol" }
+- takeScreenshot: "hold-0-confirmed"
+- tapOn: { id: "exercise-page-back" }
+- extendedWaitUntil:
+    visible: { text: "Plank, 1 of 1 sets done" }
+    timeout: 15000
+- tapOn: { text: "Plank, 1 of 1 sets done" }
+- extendedWaitUntil:
+    visible: { id: "exercise-set-1-values", text: "0.0 × 38 s" }
+    timeout: 15000
+- tapOn: { id: "exercise-set-1-open" }
+- assertVisible: { id: "exercise-set-logger-duration", text: "38" }
+- assertVisible: "Change effort, currently none"
+- takeScreenshot: "hold-0-reopened"
+- tapOn: { id: "exercise-page-back" }
+
+# Native proof for the approved hold editor/logger: keyboard focus, long-press
+# Effort selection, explicit confirmation with the number pad up, and native
+# navigation/autosave. Validation/counting math stays in Jest.
+- scrollUntilVisible:
+    element: { id: "session-view-add-exercise" }
+    direction: DOWN
+- tapOn: { id: "session-view-add-exercise" }
+- extendedWaitUntil:
+    visible: { id: "exercise-picker-create-button" }
+    timeout: 15000
+- tapOn: { id: "exercise-picker-create-button" }
+- extendedWaitUntil:
+    visible: { id: "exercise-editor-name-input" }
+    timeout: 10000
+- tapOn: { id: "exercise-editor-name-input" }
+- inputText: "Hollow Hold"
+- pressKey: Enter
+- tapOn: { id: "exercise-editor-primary-muscle-trigger" }
+- scrollUntilVisible:
+    element: { id: "exercise-editor-muscle-option-abs_rectus" }
+    direction: DOWN
+- tapOn: { id: "exercise-editor-muscle-option-abs_rectus" }
+- tapOn: { point: "50%,8%" }
+- extendedWaitUntil:
+    notVisible: { id: "exercise-editor-muscle-selector-list" }
+    timeout: 10000
+- scrollUntilVisible:
+    element: { id: "exercise-editor-recording-mode-hold" }
+    direction: DOWN
+- tapOn: { id: "exercise-editor-recording-mode-hold" }
+- takeScreenshot: "hold-5-editor"
+- scrollUntilVisible:
+    element: { id: "exercise-editor-save" }
+    direction: DOWN
+- tapOn: { id: "exercise-editor-save" }
+- extendedWaitUntil:
+    visible: { text: "Hollow Hold, 0 of 1 sets done" }
+    timeout: 15000
+- tapOn: { text: "Hollow Hold, 0 of 1 sets done" }
+- extendedWaitUntil:
+    visible: { id: "exercise-set-logger-duration" }
+    timeout: 15000
+- assertVisible: "Change effort, currently RIR 0"
+- assertNotVisible: { id: "exercise-set-logger-reps" }
+- assertNotVisible: { id: "exercise-records-panel" }
+- tapOn: { id: "exercise-set-logger-weight" }
+- inputText: "5"
+- tapOn: { id: "exercise-set-logger-duration" }
+- inputText: "301"
+- assertVisible: "Enter whole seconds from 1 to 300."
+- assertVisible: { id: "exercise-set-logger-commit", enabled: false }
+- takeScreenshot: "hold-5-invalid-keyboard"
+- eraseText
+- inputText: "38"
+- takeScreenshot: "hold-5-unchecked-keyboard"
+- longPressOn: { id: "exercise-set-logger-effort" }
+- tapOn: { id: "exercise-effort-option-none" }
+- extendedWaitUntil:
+    notVisible: { id: "exercise-effort-sheet" }
+    timeout: 10000
+- tapOn: { id: "exercise-set-logger-commit" }
+- extendedWaitUntil:
+    visible: { id: "exercise-set-1-toggle", text: "Mark set 1 not performed" }
+    timeout: 10000
+- assertVisible: { id: "exercise-set-1-values", text: "5.0 × 38 s" }
+- assertNotVisible: { id: "exercise-set-1-1rm" }
+- assertNotVisible: { id: "exercise-set-1-vol" }
+- takeScreenshot: "hold-5-confirmed"
+- tapOn: { id: "exercise-page-back" }
+- extendedWaitUntil:
+    visible: { text: "Hollow Hold, 1 of 1 sets done" }
+    timeout: 15000
+- tapOn: { text: "Hollow Hold, 1 of 1 sets done" }
+- extendedWaitUntil:
+    visible: { id: "exercise-set-1-values", text: "5.0 × 38 s" }
+    timeout: 15000
+- tapOn: { id: "exercise-set-1-open" }
+- assertVisible: { id: "exercise-set-logger-duration", text: "38" }
+- assertVisible: "Change effort, currently none"
+- takeScreenshot: "hold-5-reopened"
+- tapOn: { id: "exercise-page-back" }
+
+# Native long-content acceptance: editing metadata keeps the saved measurement.
+- tapOn: { text: "Hollow Hold, 1 of 1 sets done" }
+- tapOn: { id: "exercise-page-options" }
+- tapOn: { id: "exercise-options-edit" }
+- extendedWaitUntil:
+    visible: { id: "exercise-editor-name-input" }
+    timeout: 10000
+- tapOn: { id: "exercise-editor-name-input" }
+- eraseText
+- inputText: "Hollow Hold with arms overhead and legs fully extended"
+- takeScreenshot: "hold-long-name-editor-keyboard"
+- pressKey: Enter
+- scrollUntilVisible:
+    element: { id: "exercise-editor-save" }
+    direction: DOWN
+- tapOn: { id: "exercise-editor-save" }
+- extendedWaitUntil:
+    visible: { id: "exercise-page-title", text: "Hollow Hold with arms overhead and legs fully extended" }
+    timeout: 15000
+- assertVisible: { id: "exercise-set-1-values", text: "5.0 × 38 s" }
+- takeScreenshot: "hold-long-name-saved-seconds"

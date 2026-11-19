@@ -2,23 +2,25 @@
 // are derived separately by competition-score.ts.
 // Deno imports stay relative and explicitly name their .ts files.
 
-import { estimateOneRepMax, parseCalculationSet } from '../exercise-calculations/index.ts';
+import { estimateOneRepMax, parseSetReps, parseSetWeight } from '../exercise-calculations/index.ts';
 import {
-  canonicalizeWeightForReps,
+  canonicalizeSetValues,
   isConfirmedPerformedSet,
   isWorkingSetType,
 } from '../exercise-calculations/set-semantics.ts';
 
 /** Bump when a rule below changes: every older fact is re-normalized, silently. */
-export const GROUP_EVAL_RULES_VERSION = 7;
+export const GROUP_EVAL_RULES_VERSION = 8;
 
 export type GroupRawSetValues = {
+  recording_mode?: 'reps' | 'hold';
+  duration_sec?: number | null;
   weight_value: string;
   reps_value: string;
   performance_status: string | null;
 };
 
-export type GroupParsedSet = { weightKg: number; reps: number };
+export type GroupParsedSet = { weightKg: number; reps: number | null };
 
 /**
  * The parsed kg and reps of a confirmed performed set, else null. A blank
@@ -27,16 +29,13 @@ export type GroupParsedSet = { weightKg: number; reps: number };
  */
 export const parseGroupPerformedSet = (set: GroupRawSetValues): GroupParsedSet | null => {
   if (set.performance_status !== null) return null;
-  const performanceStatus = null;
-  if (!isConfirmedPerformedSet({ weight: set.weight_value, reps: set.reps_value, performanceStatus })) {
+  const values = { weight: set.weight_value, reps: set.reps_value, performanceStatus: null,
+    recordingMode: set.recording_mode, durationSec: set.duration_sec };
+  if (!isConfirmedPerformedSet(values)) {
     return null;
   }
-  const parsed = parseCalculationSet({
-    weightValue: canonicalizeWeightForReps(set.weight_value, set.reps_value),
-    repsValue: set.reps_value,
-  });
-  if (parsed === null) return null;
-  return { weightKg: parsed.weight, reps: parsed.reps };
+  return { weightKg: parseSetWeight(canonicalizeSetValues(values).weight)!,
+    reps: set.recording_mode === 'hold' ? null : parseSetReps(set.reps_value) };
 };
 
 /** One raw set row as `group_eval_session_rows` returns it. */
@@ -100,7 +99,7 @@ export const normalizeGroupSetFacts = (rows: GroupEvalSessionRows): GroupSetFact
       live: set.live,
       weight_kg: parsed?.weightKg ?? null,
       reps: parsed?.reps ?? null,
-      e1rm_kg: parsed === null || parsed.weightKg <= 0 ? null : estimateOneRepMax(parsed.weightKg, parsed.reps),
+      e1rm_kg: parsed === null || parsed.reps === null || parsed.weightKg <= 0 ? null : estimateOneRepMax(parsed.weightKg, parsed.reps),
       working: isWorkingSetType(set.set_type),
       achieved_at_ms: startedAtMs,
       fingerprint: set.fingerprint,

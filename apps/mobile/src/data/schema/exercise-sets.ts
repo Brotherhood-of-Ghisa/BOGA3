@@ -23,6 +23,8 @@ export const exerciseSets = sqliteTable(
     orderIndex: integer('order_index').notNull(),
     weightValue: text('weight_value').notNull().default(''),
     repsValue: text('reps_value').notNull().default(''),
+    recordingMode: text('recording_mode', { enum: ['reps', 'hold'] }).notNull().default('reps'),
+    durationSec: integer('duration_sec'),
     setType: text('set_type'),
     plannedWeightValue: text('planned_weight_value'),
     plannedRepsValue: text('planned_reps_value'),
@@ -53,6 +55,7 @@ export const exerciseSets = sqliteTable(
       .on(table.sourcePlanUseId, table.sourcePlanSetId)
       .where(sql`${table.deletedAt} is null and ${table.sourcePlanUseId} is not null and ${table.sourcePlanSetId} is not null`),
     orderGuard: check('exercise_sets_order_index_non_negative', sql`${table.orderIndex} >= 0`),
+    recordingModeGuard: check('exercise_sets_recording_mode_valid', sql`${table.recordingMode} in ('reps', 'hold')`),
   })
 );
 

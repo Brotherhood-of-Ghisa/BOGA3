@@ -24,9 +24,19 @@ type SetRowProps = {
 const DASH = '—';
 
 const describeValues = (row: SetRowView) =>
+  row.recordingMode === 'hold'
+    ? `${row.weight !== null ? formatWeight(row.weight) : DASH} × ${row.durationSec ?? DASH} seconds`
+    :
   row.weight === null && row.reps === null
     ? 'no values'
     : `${row.weight !== null ? formatWeight(row.weight) : DASH} × ${row.reps ?? DASH}`;
+
+const rowValues = (row: SetRowView): string => {
+  const weight = row.weight === null ? DASH : formatWeight(row.weight);
+  if (row.recordingMode === 'hold') return `${weight} × ${row.durationSec ?? DASH} s`;
+  if (row.weight === null && row.reps === null) return DASH;
+  return `${weight} × ${row.reps ?? DASH}`;
+};
 
 /**
  * The set row: `[type 44][weight × reps][1RM / VOL][control 44]`.
@@ -57,7 +67,7 @@ export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) 
         </Text>
       }
       meta={
-        <View>
+        row.recordingMode !== 'hold' ? <View>
           <Stat
             emphasis={row.oneRepMaxRecord ? 'record' : 'none'}
             label="1RM"
@@ -75,7 +85,7 @@ export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) 
             testID={`exercise-set-${row.number}-vol`}
             value={row.volume !== null ? formatVolume(row.volume) : DASH}
           />
-        </View>
+        </View> : undefined
       }
       testID={`exercise-set-${row.number}`}
       trailing={
@@ -110,9 +120,7 @@ export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) 
             performed ? (row.weightRecord ? tone.record : null) : tone.faint,
           ]}
           testID={`exercise-set-${row.number}-values`}>
-          {row.weight === null && row.reps === null
-            ? DASH
-            : `${row.weight !== null ? formatWeight(row.weight) : DASH} × ${row.reps ?? DASH}`}
+          {rowValues(row)}
         </Text>
       </Pressable>
     </ListRow>

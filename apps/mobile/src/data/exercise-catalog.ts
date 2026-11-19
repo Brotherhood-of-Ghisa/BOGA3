@@ -5,6 +5,7 @@ import { nowMonotonic, type Transaction } from './clock';
 import { exerciseDefinitions, exerciseMuscleMappings, muscleGroups } from './schema';
 import { invalidateExerciseCatalogCache } from '@/src/exercise-catalog/invalidation';
 import { validateExerciseCore, type LoadInputMode } from '@/src/exercise-core';
+import { isRecordingMode, type RecordingMode } from '@/src/exercise-core/recording-mode';
 import { validateBodyweightContribution } from '@/src/exercise-core/bodyweight-contribution';
 import { validateExerciseRestTimerSec } from '@/src/exercise-core/rest-timer';
 import { notifyLocalWrite } from '@/src/sync/write-nudge';
@@ -32,6 +33,7 @@ export type ExerciseCatalogExercise = {
   id: string;
   name: string;
   loadInputMode?: LoadInputMode;
+  recordingMode?: RecordingMode;
   /** `Track each gym separately` ([[gym.split]]). */
   splitByGym: boolean;
   /** Rest timer default in seconds; null uses the global timer ([[timer.rest-default]]). */
@@ -50,6 +52,7 @@ export type SaveExerciseCatalogExerciseInput = {
   id?: string;
   name: string;
   loadInputMode?: LoadInputMode;
+  recordingMode?: RecordingMode;
   /** Omission preserves the stored value (a new exercise starts whole). */
   splitByGym?: boolean;
   /** Null clears it back to the global timer; omission preserves the stored value. */
@@ -73,6 +76,7 @@ type DrizzleExerciseRow = {
   id: string;
   name: string;
   loadInputMode: LoadInputMode;
+  recordingMode?: RecordingMode;
   splitByGym: boolean;
   restTimerSec: number | null;
   deletedAt: Date | null;
@@ -86,6 +90,7 @@ export type ExerciseCatalogStore = {
     id?: string;
     name: string;
     loadInputMode?: LoadInputMode;
+  recordingMode?: RecordingMode;
     splitByGym?: boolean;
     restTimerSec?: number | null;
     mappings: {
@@ -135,6 +140,7 @@ const mapExerciseGraph = (
     id: exerciseRow.id,
     name: exerciseRow.name,
     loadInputMode: exerciseRow.loadInputMode,
+    recordingMode: exerciseRow.recordingMode ?? 'reps',
     bodyweightContribution: exerciseRow.bodyweightContribution,
     splitByGym: exerciseRow.splitByGym,
     restTimerSec: exerciseRow.restTimerSec,
@@ -159,6 +165,7 @@ const listExerciseGraphs = async (
       id: exerciseDefinitions.id,
       name: exerciseDefinitions.name,
       loadInputMode: exerciseDefinitions.loadInputMode,
+      recordingMode: exerciseDefinitions.recordingMode,
       bodyweightContribution: exerciseDefinitions.bodyweightContribution,
       splitByGym: exerciseDefinitions.splitByGym,
       restTimerSec: exerciseDefinitions.restTimerSec,
@@ -206,6 +213,7 @@ export type ExerciseGraphWrite = {
   id: string;
   name: string;
   loadInputMode: LoadInputMode;
+  recordingMode?: RecordingMode;
   /** Omission preserves the stored value. */
   splitByGym?: boolean;
   /** Omission preserves the stored value; null clears it. */
@@ -229,6 +237,9 @@ export const createLocalExerciseId = (): string => createLocalId('exercise-defin
  */
 export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): void => {
   const exerciseId = input.id;
+  if (input.recordingMode !== undefined && !isRecordingMode(input.recordingMode)) {
+    throw new Error('Recording must be Reps or Hold');
+  }
   const checkedContribution = input.bodyweightContribution === undefined
     ? null
     : validateBodyweightContribution(input.bodyweightContribution);
@@ -251,6 +262,7 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
         restTimerSec: input.restTimerSec,
         name: input.name,
         loadInputMode: input.loadInputMode,
+        recordingMode: input.recordingMode,
         deletedAt: null,
         updatedAt: input.now,
         localDirty: true,
@@ -267,6 +279,7 @@ export const writeExerciseGraph = (tx: Transaction, input: ExerciseGraphWrite): 
         restTimerSec: input.restTimerSec,
         name: input.name,
         loadInputMode: input.loadInputMode,
+        recordingMode: input.recordingMode,
         deletedAt: null,
         createdAt: input.now,
         updatedAt: input.now,
@@ -352,6 +365,7 @@ export const readExerciseGraph = (database: LocalDatabase, exerciseId: string): 
       id: exerciseDefinitions.id,
       name: exerciseDefinitions.name,
       loadInputMode: exerciseDefinitions.loadInputMode,
+      recordingMode: exerciseDefinitions.recordingMode,
       bodyweightContribution: exerciseDefinitions.bodyweightContribution,
       splitByGym: exerciseDefinitions.splitByGym,
       restTimerSec: exerciseDefinitions.restTimerSec,
@@ -412,6 +426,7 @@ export const createDrizzleExerciseCatalogStore = (): ExerciseCatalogStore => ({
         id: exerciseId,
         name: input.name,
         loadInputMode: input.loadInputMode ?? 'total_load',
+        recordingMode: input.recordingMode,
         bodyweightContribution: input.bodyweightContribution,
         splitByGym: input.splitByGym,
         restTimerSec: input.restTimerSec,
@@ -480,6 +495,9 @@ export const normalizeExerciseGraphInput = (
   knownMuscleIds: ReadonlySet<string>
 ): Omit<ExerciseGraphWrite, 'id'> => {
   const { name, loadInputMode } = normalizeExerciseCoreForSave(input);
+  if (input.recordingMode !== undefined && !isRecordingMode(input.recordingMode)) {
+    throw new Error('Recording must be Reps or Hold');
+  }
 
   const now = input.now ?? new Date();
   assertFiniteDate(now);
@@ -515,6 +533,7 @@ export const normalizeExerciseGraphInput = (
   return {
     name,
     loadInputMode,
+    recordingMode: input.recordingMode,
     mappings,
     now,
     ...(checkedContribution?.ok ? { bodyweightContribution: checkedContribution.value } : {}),

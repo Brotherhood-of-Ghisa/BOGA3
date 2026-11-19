@@ -164,9 +164,9 @@ describe('budget checks', () => {
 describe('the group read, evaluator write and notification RPCs the lane budgets are each measured', () => {
   /** The group read RPCs, the evaluator's write RPCs and the notification RPCs whose cost the lane holds. */
   const SURFACE_RPCS = [
-    'group_competition_stream_v5', 'group_competition_stream_v4', 'group_competition_stream_v3', 'group_competition_stream_v2',
+    'group_competition_stream_v6', 'group_competition_stream_v5', 'group_competition_stream_v4', 'group_competition_stream_v3', 'group_competition_stream_v2',
     'group_competition_period_totals', 'group_competition_week_summary', 'group_competition_podiums', 'group_competition_board',
-    'group_competition_records_history', 'group_competition_session_detail', 'group_competition_session_records',
+    'group_competition_records_history', 'group_competition_session_detail_v2', 'group_competition_session_detail', 'group_competition_session_records',
     'group_cow_summary', 'group_cow_previous_summary', 'group_cow_calendar_get',
     'group_list_mine', 'group_get', 'group_competition_exercise_list',
     'group_metric_eval_publish', 'group_metric_eval_prepare', 'group_eval_complete',

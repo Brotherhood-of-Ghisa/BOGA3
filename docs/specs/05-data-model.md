@@ -253,12 +253,13 @@ the data-model-level invariants.
 3. Restore/bootstrap is a full `sync_pull` drain across all six topological
    layers (first sign-in, or a wiped-client reinstall), coherent across every
    user-owned entity, parents draining before children at each layer.
-4. **Effort labels cost nothing to add.** `exercise_sets.set_type` and
-   `planned_set_type` are nullable text in sync scope, so a new label needs no
-   wire or server migration, and hidden historical or prescribed labels stay
-   readable. Personal Working set and Volume choices are device-local (above;
+4. **Effort labels are extensible.** `exercise_sets.set_type` and
+   `planned_set_type` are nullable text in sync scope, so hidden historical or prescribed labels stay readable. Personal Working set and Volume choices are device-local (above;
    [[set.eligibility]]).
-5. **Planned targets and performance state are `in sync scope`** —
+5. **Measurements, targets and performance state are `in sync scope`** —
+   definitions/sets retain `recording_mode`; holds use nullable `duration_sec`,
+   plans `target_duration_sec` instead of `target_reps`. Saved row modes survive
+   definition edits and merges ([[exercise.recording-mode]]).
    `exercise_sets.planned_weight_value`, `planned_reps_value`,
    `planned_set_type` and `performance_status` ride the existing envelope.
    `performance_status`
@@ -267,11 +268,9 @@ the data-model-level invariants.
    ([[set.performed]]).
    Legacy `skipped` is still read, as an untouched `planned` row, and never
    written again. On upgrade a valid pre-existing row with legacy `null` stays
-   confirmed, while a blank or partial legacy draft row with `null` reads as
-   `unperformed`, so later entry cannot silently confirm it.
+   confirmed, while an incomplete legacy draft reads as `unperformed`.
 6. **Performed-set history and metric readers filter by [[set.performed]]** —
-   planned, legacy-skipped, unperformed, blank, partial, invalid, deleted and
-   tombstoned sets contribute to no metric, performed-set list or coaching API.
+   planned, legacy-skipped, unperformed, invalid or deleted sets contribute to no metric, performed-set list or coaching API.
    Entry-based browsing follows [[exercise.browser-history]] independently. Blank and partial active
    rows are lossless drafts keeping their ids and order across save, hydration
    and navigation, and a blank `weight_value` with positive `reps_value`
