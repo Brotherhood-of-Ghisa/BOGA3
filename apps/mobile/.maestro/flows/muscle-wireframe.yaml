@@ -104,8 +104,6 @@ appId: com.dinoderek.mobile
 - assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-07-focused-arm-patches-far"
-# The swipe can already select Back; switch through Front so Back snaps to 180°.
-- tapOn: { id: "stats-muscle-body-angle-front" }
 - tapOn: { id: "stats-muscle-body-angle-back" }
 - assertVisible:
     id: "stats-muscle-body-viewport"
@@ -127,7 +125,6 @@ appId: com.dinoderek.mobile
 - assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-10-focused-arm-patches-near"
-- tapOn: { id: "stats-muscle-body-angle-front" }
 - tapOn: { id: "stats-muscle-body-angle-back" }
 - takeScreenshot: "patches-02-brachialis-back"
 - assertNotVisible: { id: "stats-muscle-wireframe-error" }
