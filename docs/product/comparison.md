@@ -73,11 +73,10 @@ percentage changes against body-wide finite extrema: middle-to-strong gains,
 middle-to-weak losses; displayed −100% neutral while scaling losses. Filters
 may rescale Volume; rotation/selection cannot. Unchanged middle;
 empty/unavailable neutral; `new`/overflow strongest, outside extrema.
-Strong darkens in light mode, lightens in dark. Wireframe uses translucent effort
-fills and thin neutral edges; selected anatomy keeps its effort colour and
-shows through covering layers. Patches uses opaque fills and a separate
-selection colour, attenuated through covering layers. Both keep Now/Prev/Change;
-no legend.
+Strong darkens in light mode, lightens in dark. Both views use opaque effort
+fills and a separate selection colour, attenuated through covering layers.
+Wireframe adds contrasting triangle edges over the fills and selected anatomy.
+Both keep Now/Prev/Change; no legend.
 
 History legends precede charts: muscle Sets `% of target`, capped at the
 effective weekly target; others `% of max` over History look-back, daily Grid
