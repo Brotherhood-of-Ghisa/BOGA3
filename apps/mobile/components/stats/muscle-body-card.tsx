@@ -460,9 +460,10 @@ function MuscleBodyComparison({ selectedMuscle, metric, viewportWidth }: Compari
  * Interactive 3D low-poly anatomical muscle model for the Progress Muscle breakdown.
  * Colours follow [[comparison.colour-scale]], with CIE LCh lighting,
  * supports horizontal drag-to-rotate across 360° plus Front/Back toggle,
- * and selects a reported muscle group on tap. Wireframe uses depth-tested mesh
- * edges on an opaque grey body; selected anatomy fades through covering muscle layers with
- * a distinct colour and light fill. Filled patches share the coarse anatomy,
+ * and selects a reported muscle group on tap. Wireframe layers depth-tested
+ * translucent face colours over a neutral body with thin neutral triangle edges;
+ * selected anatomy edges fade through covering muscle layers without repainting effort.
+ * Filled patches share the coarse anatomy,
  * camera, focus and hit testing; switching view changes only its material.
  * Decoration follows [[appearance.november]] without changing hit testing.
  */
