@@ -245,6 +245,16 @@ it('ranks and certifies Holds by seconds, ignores weight for ties, and retains d
   expect(board.entries[0].performance).toMatchObject({ recording_mode: 'hold', duration_sec: 30, reps: null });
   expect(board.entries[0].performance).not.toHaveProperty('weight_value');
   expect(board.entries[0].performance).not.toHaveProperty('normalized_metrics');
+  const contextParity = execFileSync('docker', ['exec', '-i', process.env.GROUPS_LIVE_DB_CONTAINER!, 'psql', '-X', '-U', 'postgres', '-d', 'postgres', '-Atq'], {
+    input: `with full_graph as (select app_public.group_metric_eval_source_graph('${groupId}','${exerciseId}') g),
+      context as (select app_public.notification_context_source('${groupId}','${exerciseId}','${owner.userId}','${unweighted.sessionId}') c)
+      select jsonb_build_object('same_sets',c->'sets'=(select jsonb_agg(s order by s->>'member_user_id',s->>'set_id')
+        from jsonb_array_elements(g->'sets') s where s->>'member_user_id'='${owner.userId}' and s->>'session_id'='${unweighted.sessionId}'),
+        'seconds_pin',c->'sets'->0->'fingerprints' ? 'seconds',
+        'no_reading',c->'sets'->0->>'body_weight_kg' is null and c->'sets'->0->>'reading_pin' is null)
+      from full_graph,context;`, encoding: 'utf8',
+  });
+  expect(JSON.parse(contextParity)).toEqual({ same_sets: true, seconds_pin: true, no_reading: true });
   await pushPerformance(groupId, exerciseId, started + 1, true,
     { suffix: '-seconds-loaded', seconds: 30, weight: '24', noReading: true });
   const tied = await poll(readBoard, result => result.entries[1]?.value === 30);

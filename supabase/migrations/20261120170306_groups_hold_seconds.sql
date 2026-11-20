@@ -1,5 +1,17 @@
 -- Seconds is a separate Hold comparison domain. Weight never affects its score or ordering.
 -- Retained repetition scores, witnesses and CoW arithmetic keep their existing meaning.
+-- Preserve only pending confirmations whose source context is valid before this upgrade.
+create temporary table hold_seconds_current_contexts as
+select w.member_user_id,w.session_id from app_public.notification_workouts w
+where w.eligible and w.confirmed_at is not null and w.completion_at+interval '24 hours'>now()
+  and (w.enqueued_generation<w.generation or exists(select 1 from app_public.notification_intents n
+    join app_public.notification_deliveries d on d.intent_id=n.id
+    where n.lifter_user_id=w.member_user_id and n.session_id=w.session_id and n.kind='completion'
+      and d.state in ('pending','retry','disabled','leased','sending')))
+  and w.manifest_digest=app_public.notification_manifest_digest(w.member_user_id,w.session_id)
+  and w.context_digest=app_public.notification_context_digest(w.member_user_id,w.session_id);
+-- End pending-confirmation capture.
+
 create or replace function app_public.group_competition_require_seconds(p_group uuid)
 returns void language plpgsql stable set search_path=app_public,pg_temp as $$
 begin
@@ -73,8 +85,15 @@ begin
     ('app_public.group_metric_eval_source_graph(uuid,uuid)',$anchor$t.bodyweight_calculations_enabled and t.bodyweight_contribution>0$anchor$,$replacement$t.default_metric<>'seconds' and es.recording_mode='reps' and t.bodyweight_calculations_enabled and t.bodyweight_contribution>0$replacement$),
     ('app_public.group_metric_eval_source_graph(uuid,uuid)',$anchor$'reps_value',es.reps_value,'performance_status',es.performance_status),es.set_type)$anchor$,$replacement$'reps_value',es.reps_value,'performance_status',es.performance_status)
           ||case when es.recording_mode='hold' then jsonb_build_object('recording_mode','hold','duration_sec',es.duration_sec) else '{}'::jsonb end,es.set_type)$replacement$),
-    ('app_public.group_metric_eval_source_graph(uuid,uuid)',$anchor$'volume',app_public.group_metric_graph_fingerprint(r,_graph->'rules','volume',r->>'source_load_input_mode')$anchor$,$replacement$'volume',app_public.group_metric_graph_fingerprint(r,_graph->'rules','volume',r->>'source_load_input_mode'),
-    'seconds',app_public.group_metric_graph_fingerprint(r,_graph->'rules','seconds',r->>'source_load_input_mode')$replacement$),
+    ('app_public.group_metric_eval_source_graph(uuid,uuid)',$anchor$'volume',app_public.group_metric_graph_fingerprint(r,_graph->'rules','volume',r->>'source_load_input_mode')))$anchor$,$replacement$'volume',app_public.group_metric_graph_fingerprint(r,_graph->'rules','volume',r->>'source_load_input_mode'))
+    ||case when _graph->'rules'->>'default_metric'='seconds' then jsonb_build_object(
+      'seconds',app_public.group_metric_graph_fingerprint(r,_graph->'rules','seconds',r->>'source_load_input_mode')) else '{}'::jsonb end)$replacement$),
+    ('app_public.notification_context_source(uuid,uuid,uuid,text)',$anchor$t.bodyweight_calculations_enabled and t.bodyweight_contribution>0$anchor$,$replacement$t.default_metric<>'seconds' and es.recording_mode='reps' and t.bodyweight_calculations_enabled and t.bodyweight_contribution>0$replacement$),
+    ('app_public.notification_context_source(uuid,uuid,uuid,text)',$anchor$'reps_value',es.reps_value,'performance_status',es.performance_status),es.set_type)$anchor$,$replacement$'reps_value',es.reps_value,'performance_status',es.performance_status)
+          ||case when es.recording_mode='hold' then jsonb_build_object('recording_mode','hold','duration_sec',es.duration_sec) else '{}'::jsonb end,es.set_type)$replacement$),
+    ('app_public.notification_context_source(uuid,uuid,uuid,text)',$anchor$'volume',app_public.group_metric_graph_fingerprint(r,_graph->'rules','volume',r->>'source_load_input_mode')))$anchor$,$replacement$'volume',app_public.group_metric_graph_fingerprint(r,_graph->'rules','volume',r->>'source_load_input_mode'))
+    ||case when _graph->'rules'->>'default_metric'='seconds' then jsonb_build_object(
+      'seconds',app_public.group_metric_graph_fingerprint(r,_graph->'rules','seconds',r->>'source_load_input_mode')) else '{}'::jsonb end)$replacement$),
     ('app_public.group_metric_observed_set_pin(uuid,jsonb,text)',$anchor$  select encode(extensions.digest(jsonb_build_array($anchor$,$replacement$  select encode(extensions.digest((jsonb_build_array($replacement$),
     ('app_public.group_metric_observed_set_pin(uuid,jsonb,text)',$anchor$  )::text,'sha256'),'hex');$anchor$,$replacement$  ) ||case when p_performance->>'recording_mode'='hold' then
     jsonb_build_array('hold',p_performance->'duration_sec') else '[]'::jsonb end)::text,'sha256'),'hex');$replacement$),
@@ -126,3 +145,9 @@ $replacement$),
   end loop;
   for target,definition in select * from jsonb_each_text(definitions) loop execute definition; end loop;
 end $migration$;
+
+update app_public.notification_workouts w
+  set context_digest=app_public.notification_context_digest(w.member_user_id,w.session_id)
+  from hold_seconds_current_contexts c where w.member_user_id=c.member_user_id and w.session_id=c.session_id;
+drop table hold_seconds_current_contexts;
+-- End pending-confirmation restamp.
