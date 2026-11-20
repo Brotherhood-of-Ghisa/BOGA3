@@ -2101,12 +2101,13 @@ set_username "${H_UID}" MemberH
 rpc "${H_TOKEN}" group_create '{"p_name":"Hold summary","p_description":""}'; expect_ok 'create Hold summary group'
 HOLD_GROUP="$(jq -r '.group_id' <<<"${BODY}")"; GROUP_IDS+=("${HOLD_GROUP}")
 run_psql "insert into app_public.group_memberships(group_id,user_id,role,joined_at)
-  values('${HOLD_GROUP}','${B_UID}','member',now()-interval '3 days');" >/dev/null
+  values('${HOLD_GROUP}','${B_UID}','member',now()-interval '3 days');
+  update app_public.group_memberships set joined_at=now()-interval '3 days' where group_id='${HOLD_GROUP}';" >/dev/null
 rpc "${H_TOKEN}" group_update "$(jq -nc --arg g "${HOLD_GROUP}" '{p_group_id:$g,p_name:"Hold summary",p_description:"",p_bodyweight_calculations_enabled:true}')"
 expect_ok 'enable Hold disclosure policy'
 http_call -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${H_TOKEN}" \
   -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-group-seconds: 1' -H 'Content-Type: application/json' -H 'Content-Profile: app_public' \
-  --data "$(jq -nc --arg g "${HOLD_GROUP}" '{p_group_id:$g,p_name:"Plank",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"seconds"}')" \
+  --data "$(jq -nc --arg g "${HOLD_GROUP}" '{p_group_id:$g,p_name:"Plank",p_load_input_mode:"total_load",p_bodyweight_contribution:1,p_default_metric:"seconds"}')" \
   "${API_URL}/rest/v1/rpc/group_competition_exercise_create"
 expect_ok 'create Seconds comparison'; HOLD_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
 HOLD_NOW="$(node -e 'process.stdout.write(String(Date.now()))')"
@@ -2117,7 +2118,7 @@ for label in H B; do
   push "${!token_var}" 'Hold summary baseline' \
     "$(e_def "hold-${label}-${RUN_TAG}" Plank "${CUAM}" total_load 1 | jq '.fields.recording_mode="hold"')" \
     "$(e_link "hold-${label}-${RUN_TAG}" "${HOLD_GROUP}" "${HOLD_EXERCISE}" "${CUAM}")" \
-    "$(e_session "hold-base-${label}-${RUN_TAG}" "${HOLD_NOW}" completed "$((HOLD_NOW+1000))" 1 null "${CUAM}")" \
+    "$(e_session "hold-base-${label}-${RUN_TAG}" "$((HOLD_NOW-120000))" completed "$((HOLD_NOW-60000))" 60 null "${CUAM}")" \
     "$(e_se "hold-base-${label}-ex-${RUN_TAG}" "hold-base-${label}-${RUN_TAG}" "hold-${label}-${RUN_TAG}" 0 Plank "${CUAM}")" \
     "$(e_set "hold-base-${label}-set-${RUN_TAG}" "hold-base-${label}-ex-${RUN_TAG}" 0 "${weight}" '' '' "${CUAM}" \
       | jq --argjson d "${duration}" '.fields.recording_mode="hold" | .fields.duration_sec=$d')"
@@ -2132,15 +2133,18 @@ expect_ok 'register Hold summary recipient'
 HOLD_SESSION="hold-summary-${RUN_TAG}"
 next_cuam
 push "${B_TOKEN}" '30 second bodyweight Hold' \
-  "$(e_session "${HOLD_SESSION}" "$((HOLD_NOW+2000))" active null null null "${CUAM}")" \
+  "$(e_session "${HOLD_SESSION}" "$((HOLD_NOW-30000))" active null null null "${CUAM}")" \
   "$(e_se "${HOLD_SESSION}-ex" "${HOLD_SESSION}" "hold-B-${RUN_TAG}" 0 Plank "${CUAM}")" \
   "$(e_set "${HOLD_SESSION}-set" "${HOLD_SESSION}-ex" 0 '' '' '' "${CUAM}" \
     | jq '.fields.recording_mode="hold" | .fields.duration_sec=30')"
 drain_eval
 next_cuam
-push "${B_TOKEN}" 'complete Hold workout' "$(e_session "${HOLD_SESSION}" "$((HOLD_NOW+2000))" completed "$((HOLD_NOW+5000))" 3 null "${CUAM}")"
+push "${B_TOKEN}" 'complete Hold workout' "$(e_session "${HOLD_SESSION}" "$((HOLD_NOW-30000))" completed "${HOLD_NOW}" 30 null "${CUAM}")"
 confirm "${B_TOKEN}" "${HOLD_SESSION}" "$(manifest "${B_UID}" "${HOLD_SESSION}")"
 drain_eval
+assert_sql 'Hold notification board keeps duration and hides logged weight' "select count(*)=2 and bool_and(
+  row_json->'performance'->>'duration_sec' is not null and not(row_json->'performance' ? 'weight_value'))
+  from app_public.group_competition_board_rows('${HOLD_GROUP}','${HOLD_EXERCISE}',1,'seconds',false);"
 prepare_outcome "${B_UID}" "${HOLD_SESSION}"
 check 'Seconds best and private counterfactual retain both members' '.jobs[]|select(.session_id==$s)|.targets[]|select(.group_exercise_id==$x)|
   .best_metrics==["seconds"] and .before==.without_workout and .before!=.final and
