@@ -111,7 +111,7 @@ it('versions cached event payloads and isolates account/group, including foreign
     expect(readGroupCache(db.database,groupCacheKeys.stream('g2'),'u1')).toBeNull();
     const foreign=stream(); (foreign.items[0] as ReturnType<typeof cowStreamItem>).definition.group_id='g2';
     expect(() => writeGroupCache(db.database,{ cacheKey: key,userId: 'u1',payload: foreign,fetchedAtMs: 1 })).toThrow('Unsafe group cache payload.');
-    expect(readGroupCache(db.database,'stream:v9:g1','u1')).toBeNull();
+    expect(readGroupCache(db.database,'stream:v10:g1','u1')).toBeNull();
   } finally { db.close(); }
 });
 
@@ -119,9 +119,9 @@ it('drops a stream page cached before withdrawals carried their records, keeping
   const db=createInMemoryDatabase();
   try {
     const current=groupCacheKeys.stream('g1');
-    expect(current).toBe('stream:v9:g1:withdrawn-records-v1');
+    expect(current).toBe('stream:v10:g1:withdrawn-records-v1');
     writeGroupCache(db.database,{ cacheKey: current,userId: 'u1',payload: stream(),fetchedAtMs: 1 });
-    for (const old of ['stream:v9:g1:cow-events-v1','stream:v9:g1:group-records-v1'])
+    for (const old of ['stream:v10:g1:cow-events-v1','stream:v10:g1:group-records-v1'])
       db.database.insert(groupCache).values({ cacheKey: old,userId: 'u1',payloadJson: JSON.stringify(stream()),fetchedAtMs: 1 }).run();
     evictObsoleteGroupCache(db.database,'u1');
     const keys=db.database.select().from(groupCache).all().map(row => row.cacheKey);

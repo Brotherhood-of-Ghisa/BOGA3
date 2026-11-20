@@ -6,7 +6,7 @@ import { Text, FlatList, RefreshControl, View } from 'react-native';
 import { Icon, IconButton, ListRow, Sheet, uiSpace, useUiText } from '@/components/ui';
 import { canManageGroup, getGroup, groupCacheKeys, useGroupOnlinePages, useGroupResource, type GroupBoardScope, type GroupGetResult } from '@/src/groups';
 import { getCompetitionBoard } from '@/src/groups/api';
-import { GROUP_COMPETITION_METRICS as GROUP_METRICS,isCompetitionMetric as isGroupMetric,type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
+import { competitionMetrics,isCompetitionMetric as isGroupMetric,type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
 import { buildCompetitionRow as buildGroupMetricRow,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS,competitionViewLabel } from '@/src/groups/competition-view-model';
 import type { CompetitionBoardRowWire as GroupMetricBoardRowWire,CompetitionBoardWire as GroupMetricBoardWire,CompetitionExerciseWire as GroupMetricExerciseWire } from '@/src/groups/competition-wire';
 import { GroupBoardRow } from './group-board-row';
@@ -24,7 +24,6 @@ const selectCursor = (page: GroupMetricBoardWire) => page.next_cursor;
 const selectHasMore = (page: GroupMetricBoardWire) => page.next_cursor !== null;
 const itemKey = (row: GroupMetricBoardRowWire) => row.member.user_id;
 const SCOPE_OPTIONS = [{ value: 'all', label: 'All sets' }, { value: 'certified', label: 'Certified' }] as const;
-const METRIC_OPTIONS = GROUP_METRICS.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }));
 
 export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, initialMetric, initialScope }: {
   userId: string; groupId: string; exercise: GroupMetricExerciseWire; initialMetric: string | null; initialScope: GroupBoardScope;
@@ -33,7 +32,8 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const router = useRouter();
   const text = useUiText();
   const groupScreenStyles = useGroupScreenStyles();
-  const allowed = GROUP_METRICS;
+  const allowed = competitionMetrics({ defaultMetric: initialExercise.rules.default_metric });
+  const metricOptions = allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }));
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [pickedMetric, setPickedMetric] = useState<GroupMetric | null>(isGroupMetric(initialMetric) ? initialMetric : null);
   const metric = pickedMetric && allowed.includes(pickedMetric) ? pickedMetric : initialExercise.rules.default_metric;
@@ -84,7 +84,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
         onPress={() => setOptionsVisible(true)} testID="group-board-options-button" /> }} />
     {exercise.archived_at_ms !== null || board.firstPage?.state === 'archived' ? <Text allowFontScaling={false} style={text.body} testID="group-board-archived">Archived · read-only</Text> : null}
     <View style={{ flexDirection: 'row', gap: uiSpace.sm }} testID="group-board-filters">
-      <GroupCycleButton accessibilityLabel="Metric" options={METRIC_OPTIONS} value={metric}
+      <GroupCycleButton accessibilityLabel="Metric" options={metricOptions} value={metric}
         onChange={value => selectView(value, scope)} testID="group-board-metric" />
       <GroupCycleButton accessibilityLabel="Sets" options={SCOPE_OPTIONS} value={scope}
         onChange={value => selectView(metric, value)} testID="group-board-scope" />

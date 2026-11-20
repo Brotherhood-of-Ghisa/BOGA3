@@ -8,7 +8,7 @@ import type { RecordLine } from '@/src/session-insights/record-band';
 import { formatBoardDate, YOU_LABEL } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
 import type { CompetitionSessionExerciseCard } from './competition-session-view-model';
-import { formatCompetitionHistoricalFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
+import { formatCompetitionHistoricalFigure, HISTORICAL_METRIC_LABELS, speakHoldSeconds } from './competition-view-model';
 import type { CompetitionCertificationWire, CompetitionEventWire, CompetitionExerciseWire, CompetitionHistoricalMetric,
   CompetitionSessionRecordWire, CompetitionSessionWire } from './competition-wire';
 import type { MetricCertificationTarget } from './metric-record-sheet-view-model';
@@ -138,7 +138,7 @@ export function buildSessionRecordRows({ records, places, groupId, userId }: {
           title: `${exercise.name} · ${HISTORICAL_METRIC_LABELS[board.metric]}`,
           value: recordValue(record, board.metric),
           detail: [GROUP_RECORD_LABEL, place?.figure ?? null, passedBy].filter(Boolean).join(' · '),
-          spokenDetail: ['Group record', place?.figure ?? null, passedBy].filter(Boolean).join(', '),
+          spokenDetail: speakHoldSeconds(['Group record', place?.figure ?? null, passedBy].filter(Boolean).join(', ')),
           boardHref: `/group/${encodeURIComponent(groupId)}/leaderboards/${encodeURIComponent(exercise.group_exercise_id)}${metricQuery}`,
           certification: recordCertification(record.event, board.metric),
         },
@@ -161,7 +161,7 @@ export function buildSessionRecordBands(records: readonly CompetitionSessionReco
       key: record.event.event_id,
       label: `${GROUP_RECORD_LABEL} · ${labels.join(' + ')}`,
       set: place.figure,
-      spoken: `Group record on ${labels.join(' and ')}, ${place.figure}`,
+      spoken: speakHoldSeconds(`Group record on ${labels.join(' and ')}, ${place.figure}`),
     };
     bands.set(place.cardId, [...(bands.get(place.cardId) ?? []), line]);
   }

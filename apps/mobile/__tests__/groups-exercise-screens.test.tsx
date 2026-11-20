@@ -421,6 +421,19 @@ describe('Add exercise route', () => {
     });
   };
 
+  it('defaults a selected personal Hold to a Seconds comparison', async () => {
+    fixture.database.insert(exerciseDefinitions).values({ id: 'hold-plank', name: 'Plank', recordingMode: 'hold' }).run();
+    __resetExerciseCatalogCacheForTests();
+    api.createCompetitionExercise.mockResolvedValue({ contract_version: 4, exercise: { ...BENCH,
+      rules: { ...BENCH.rules, default_metric: 'seconds' } } });
+    await renderNew();
+    fireEvent.changeText(screen.getByTestId('group-personal-exercise-search'), 'Plank');
+    fireEvent.press(screen.getByTestId('group-personal-exercise-hold-plank'));
+    expect(screen.getByTestId('group-exercise-default-metric-seconds').props.accessibilityState).toMatchObject({ selected: true });
+    await submit();
+    expect(api.createCompetitionExercise).toHaveBeenCalledWith(expect.objectContaining({ metric: 'seconds' }));
+  });
+
   it('copies a personal exercise: name, load mode, and auto-links on success', async () => {
     addMyExercise('ex-incline', 'My Incline Press');
     __resetExerciseCatalogCacheForTests();

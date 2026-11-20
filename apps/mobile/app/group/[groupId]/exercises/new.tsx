@@ -213,7 +213,7 @@ function NewGroupExerciseContent({ userId, groupId }: { userId: string; groupId:
                   loadInputMode: pickedPersonal.loadInputMode ?? 'total_load',
                   bodyweightCalculationsEnabled: group.data.group.bodyweight_calculations_enabled,
                   bodyweightContribution: pickedPersonal.bodyweightContribution ?? 0,
-                  defaultMetric: 'e1rm',
+                  defaultMetric: pickedPersonal.recordingMode === 'hold' ? 'seconds' : 'e1rm',
                 }}
                 key={pickedPersonal.id}
                 {...formProps}

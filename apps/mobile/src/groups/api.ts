@@ -158,6 +158,7 @@ const callGroupRpc = async (name: GroupRpcName, args: Record<string, unknown>): 
   try {
     response = (await client.schema('app_public').rpc(name, args).setHeader('x-boga-group-contract','4')
       .setHeader('x-boga-group-set-metrics','1')
+      .setHeader('x-boga-group-seconds','1')
       .setHeader('x-boga-group-added-load','1')) as RpcResponse;
   } catch (error) {
     throw new GroupApiError('NETWORK', describeUnknownError(error, 'Network request failed.'));
@@ -189,11 +190,11 @@ const isString = (value: unknown): value is string => typeof value === 'string';
 // ---- Reads --------------------------------------------------------------------
 
 export const listMyGroups = async (): Promise<GroupListMineResult> =>
-  expectShape('group_list_mine', await callGroupRpc('group_list_mine', {}), (r) => isCompetitionCachePayload('groups:v9:mine',r));
+  expectShape('group_list_mine', await callGroupRpc('group_list_mine', {}), (r) => isCompetitionCachePayload('groups:v10:mine',r));
 
 export const getGroup = async (groupId: string): Promise<GroupGetResult> =>
   expectShape('group_get', await callGroupRpc('group_get', { p_group_id: groupId }), (r) =>
-    isCompetitionCachePayload(`group:v9:${groupId}`,r),
+    isCompetitionCachePayload(`group:v10:${groupId}`,r),
   );
 
 export const previewGroupInvite = async (code: string): Promise<GroupInvitePreviewResult> =>

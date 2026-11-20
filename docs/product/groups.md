@@ -8,7 +8,7 @@ or set a record) on a live group exercise. One certification per set:
 
 | Case | Decision |
 | --- | --- |
-| What it covers | The set: it counts on every Certified board of that exercise (1RM and Volume) |
+| What it covers | The set: it counts on every eligible Certified board of that exercise |
 | Repeat certification of the same set | The first witness stands |
 | Withdraw, cancel, or an edit or deletion of the set | Ends the whole certification, on every board |
 | Member exercise's per-side/total entry mode changes | Ends affected certifications; switching back restores none |
@@ -18,6 +18,16 @@ or set a record) on a live group exercise. One certification per set:
 
 Why: one witness attests one performance.
 Code: `supabase/migrations/20261008160000_group_competition_set_certification.sql`; `apps/mobile/src/groups/competition-session-records-view-model.ts`; `DEFAULT_BOARD_SCOPE` in `apps/mobile/src/groups/board-view-model.ts`.
+
+### groups.hold-ranking · calculation · accepted
+
+Hold comparisons rank members' best qualifying single sets by seconds.
+Weight affects neither score nor ties. Existing Effort, certification and tie
+rules apply. Duration is never normalized by bodyweight. Repetition comparisons
+exclude Holds; CoWs remain repetition-only.
+
+Why: longer Holds win regardless of weight.
+Code: `apps/mobile/src/groups/competition-score.ts`.
 
 ### groups.cow-metrics · calculation · accepted
 
@@ -36,9 +46,8 @@ Code: server adapter in `apps/mobile/src/groups/cow-evaluation.ts`; public reade
 
 ### groups.cow-baseline · calculation · accepted
 
-Improvement compares the weekly best with the lifetime best qualifying
-group-shared 1RM strictly before the week, frozen from the latest eligible
-source/dependency states accepted before start. Resolve removals before
+Improvement compares the weekly best with the pre-week lifetime best qualifying
+group-shared 1RM, frozen from latest eligible source/dependency states accepted before start. Resolve removals before
 filtering eligibility. Private history and late historical uploads or
 corrections never supply this denominator. Both attained values must be
 positive; otherwise improvement is unranked. Signed negative and zero
@@ -71,7 +80,7 @@ further contributions but preserves results already accepted while that
 membership was active; rejoining cannot resume this week. Current group
 authorization still controls reads, including former members' loss of access.
 
-Why: membership changes cannot recruit a different field halfway through a week.
+Why: membership changes cannot alter the starting field.
 Code: `apps/mobile/src/groups/cow-scoring.ts` consumes the starting roster and first membership end.
 Code: admission barrier in `supabase/migrations/20261030062725_group_cow_publication.sql`.
 
@@ -88,7 +97,7 @@ revision or removal. Scoring-input edits revise priority even at equal values;
 identical retries and unrelated writes do not. Client and worker clocks never
 decide ties.
 
-Why: timely submissions remain deterministic through offline sync and evaluator delays.
+Why: offline sync and evaluator delays preserve deterministic submissions.
 Code: `apps/mobile/src/groups/cow-scoring.ts`; receipt intake in `supabase/migrations/20261029205006_group_cow_intake.sql`.
 Code: publication in `supabase/functions/group-eval/`.
 
@@ -104,7 +113,7 @@ Current disclosure can suppress unsafe stored figures without promoting a
 different winner. Finalizing, unavailable final, and valid empty final are
 distinct outcomes.
 
-Why: a finished competition has a durable outcome without weakening current privacy.
+Why: final outcomes preserve current privacy.
 Code: `apps/mobile/src/groups/cow-scoring.ts` classifies context availability.
 Code: automatic publication and immutable results in `supabase/migrations/20261030062725_group_cow_publication.sql`.
 

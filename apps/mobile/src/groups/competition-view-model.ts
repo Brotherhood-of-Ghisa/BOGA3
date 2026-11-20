@@ -10,18 +10,20 @@ import type { CompetitionBoardRowWire, CompetitionEventWire,CompetitionHistoryVa
 import { formatMemberName, formatMetricFigure } from './stream-view-model';
 import type { GroupExercise } from './types';
 
-export const COMPETITION_LABELS = { volume: 'Volume', e1rm: '1RM' } as const;
+export const COMPETITION_LABELS = { volume: 'Volume', e1rm: '1RM', seconds: 'Seconds' } as const;
 // Unit labels follow [[copy.no-weight-unit]]; wire units remain unchanged.
-export const COMPETITION_UNIT_LABELS = { kg_reps: '', kg: '', percent_bw_reps: '%BW', percent_bw: '%BW' } as const;
+export const COMPETITION_UNIT_LABELS = { kg_reps: '', kg: '', percent_bw_reps: '%BW', percent_bw: '%BW', seconds: 's' } as const;
 const withUnit = (text: string, unit: string): string => unit ? `${text} ${unit}` : text;
+export const speakHoldSeconds = (text: string): string => text.replace(/\b(\d+) s\b/g, '$1 seconds');
 /** A competition figure with its unit label: `213.3`, `142.5 %BW`. */
 export const formatCompetitionFigure = (value: number, unit: string): string =>
-  withUnit(formatMetricFigure('e1rm',value), COMPETITION_UNIT_LABELS[unit as keyof typeof COMPETITION_UNIT_LABELS] ?? unit);
+  withUnit(unit === 'seconds' ? String(value) : formatMetricFigure('e1rm',value), COMPETITION_UNIT_LABELS[unit as keyof typeof COMPETITION_UNIT_LABELS] ?? unit);
 export const HISTORICAL_METRIC_LABELS: Record<CompetitionHistoricalMetric,string> = {
-  weight: 'Weight',volume: 'Volume',e1rm: '1RM',bodyweight_reps: 'Bodyweight reps',
+  weight: 'Weight',volume: 'Volume',e1rm: '1RM',seconds: 'Seconds',bodyweight_reps: 'Bodyweight reps',
   relative_strength: 'Relative strength',absolute_strength: 'Absolute strength',
 };
 export function competitionViewLabel(metric: CompetitionMetric,rules: CompetitionRulesWire): string {
+  if (metric === 'seconds') return COMPETITION_LABELS.seconds;
   return withUnit(COMPETITION_LABELS[metric], COMPETITION_UNIT_LABELS[competitionUnit(metric,
     rules.bodyweight_calculations_enabled && rules.bodyweight_contribution > 0)]);
 }
@@ -34,6 +36,7 @@ export function formatCompetitionValue(score: Pick<CompetitionValue,'metric'|'un
   return value === null || !Number.isFinite(value) ? 'Score unavailable' : formatCompetitionFigure(value,score.unit);
 }
 export function formatCompetitionPerformance(performance: CompetitionPerformanceWire): string {
+  if (performance.recording_mode === 'hold') return formatSetFigure(performance);
   if (performance.visibility === 'normalized') return formatSetFigure(performance);
   const distribution = performance.source_load_input_mode === 'per_side_load' ? ' per side' : '';
   const value = Number(performance.weight_value);
@@ -41,6 +44,12 @@ export function formatCompetitionPerformance(performance: CompetitionPerformance
 }
 /** A performed set as the session cards show it: `120.0 × 5`, `20.0 × 5 per side`; `5 reps` where the group hides loads. */
 export function formatSetFigure(performance: CompetitionPerformanceWire): string {
+  if (performance.recording_mode === 'hold') {
+    const time = `${performance.duration_sec} s`;
+    if (performance.visibility === 'normalized') return time;
+    const distribution = performance.source_load_input_mode === 'per_side_load' ? ' per side' : '';
+    return `${formatWeight(Number(performance.weight_value))}${distribution} × ${time}`;
+  }
   if (performance.visibility === 'normalized') {
     const added = performance.normalized_metrics?.added_load_percent_bw;
     return added === null || added === undefined ? `${performance.reps} reps`
@@ -62,8 +71,8 @@ export function buildCompetitionRow(row: CompetitionBoardRowWire,scope: GroupBoa
   const certification=scope === 'all' ? row.certification ? 'certified' : 'uncertified' : null;
   return { key: row.member.user_id,rank: row.rank,rankLabel: String(row.rank),memberLabel,
     isMe: row.member.user_id === userId,former: row.former,valueLabel,detailLabel,dateLabel,certification,
-    accessibilityLabel: [formatOrdinal(row.rank),memberLabel,COMPETITION_LABELS[row.metric],valueLabel,
-      detailLabel,dateLabel,certification].filter(Boolean).join(', ') };
+    accessibilityLabel: speakHoldSeconds([formatOrdinal(row.rank),memberLabel,COMPETITION_LABELS[row.metric],valueLabel,
+      detailLabel,dateLabel,certification].filter(Boolean).join(', ')) };
 }
 export function buildCompetitionPodiums(payload: CompetitionPodiumsWire,userId: string | null,
   dateFormat: ExerciseDateFormat): PodiumCardViewModel[] {
@@ -80,8 +89,8 @@ export function buildCompetitionPodiums(payload: CompetitionPodiumsWire,userId: 
     const archived=exercise.archived_at_ms !== null;
     const latestRecordAtMs=podium.length > 0 ? Math.max(...podium.map(row => row.performance.achieved_at_ms)) : null;
     return { exerciseId: exercise.group_exercise_id,name: exercise.name,archived,viewLabel,rows,emptyLabel,youLabel,latestRecordAtMs,
-      accessibilityLabel: [exercise.name,archived ? 'archived' : null,viewLabel,
-        ...rows.map(row => `${formatOrdinal(row.rank)} ${row.memberLabel} ${row.valueLabel} ${row.dateLabel}`),emptyLabel,youLabel].filter(Boolean).join(', ') };
+      accessibilityLabel: speakHoldSeconds([exercise.name,archived ? 'archived' : null,viewLabel,
+        ...rows.map(row => `${formatOrdinal(row.rank)} ${row.memberLabel} ${row.valueLabel} ${row.dateLabel}`),emptyLabel,youLabel].filter(Boolean).join(', ')) };
   });
 }
 export function describeCompetitionEvent(event: CompetitionEventWire,userId: string | null = null): string {
@@ -110,6 +119,7 @@ export function formatCompetitionHistoricalFigure(value: CompetitionHistoryValue
 /** Linking consumes public catalogue identity; it never copies personal settings. */
 export function competitionLinkExercise(exercise: CompetitionExerciseWire): GroupExercise {
   return { group_exercise_id: exercise.group_exercise_id,name: exercise.name,
+    ...(exercise.rules.default_metric === 'seconds' ? { recording_mode: 'hold' as const } : {}),
     load_input_mode: exercise.rules.load_input_mode,source_exercise_id: exercise.source_exercise_id,
     archived_at_ms: exercise.archived_at_ms };
 }

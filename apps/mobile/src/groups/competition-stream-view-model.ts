@@ -3,7 +3,7 @@ import { formatBoardDate } from './board-view-model';
 import { isCompetitionMetric } from './competition-contract';
 import { buildCompetitionSession } from './competition-session-view-model';
 import { sessionRecordCertificationStatus, setCertification } from './competition-session-records-view-model';
-import { describeCompetitionEvent, formatCompetitionHistoricalFigure, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS } from './competition-view-model';
+import { describeCompetitionEvent, formatCompetitionHistoricalFigure, formatCompetitionHistoricalValue, formatSetFigure, HISTORICAL_METRIC_LABELS, speakHoldSeconds } from './competition-view-model';
 import type { CompetitionEventWire, CompetitionStreamItemWire, CompetitionHistoryValueWire, CompetitionHistoricalMetric,
   CompetitionStreamRecordWire, CompetitionStreamSharedExerciseWire, CompetitionStreamWithdrawnWire, CoWStreamItemWire } from './competition-wire';
 import { formatMemberName, formatMembershipSentence, formatSessionStatusLabel, formatSetCount,
@@ -120,9 +120,11 @@ export function buildCompetitionEventCard(event: CompetitionEventWire,userId: st
   const { label,source,set,certification,details,date } = eventCardBody(event,userId,record,withdrawn,dateFormat);
   const context = source.group_exercise.name;
   const groupName = showGroup ? event.group.name : null;
+  const metric = isCompetitionMetric(source.metric) ? source.metric
+    : source.values.some(value => value.metric === 'seconds') ? 'seconds' : 'e1rm';
   return { label,context,set,certification,details,groupName,date,
-    accessibilityLabel: [groupName,label,context,set,certification?.label,...details,date].filter(Boolean).join(', '),
-    historyPath: `/group/${event.group.group_id}/leaderboards/${event.group_exercise.group_exercise_id}/history?metric=${isCompetitionMetric(source.metric) ? source.metric : 'e1rm'}&scope=all` as const };
+    accessibilityLabel: speakHoldSeconds([groupName,label,context,set,certification?.label,...details,date].filter(Boolean).join(', ')),
+    historyPath: `/group/${event.group.group_id}/leaderboards/${event.group_exercise.group_exercise_id}/history?metric=${metric}&scope=all` as const };
 }
 
 export type StreamRecordMetric = { metric: CompetitionHistoricalMetric; label: string; value: string };
@@ -156,7 +158,7 @@ function sessionRecordLine(key: string,event: CompetitionEventWire,boards: Recor
   const certified = (event.record_context?.metrics ?? [])
     .some(entry => entry.certification !== null && entry.certification.ended_at_ms === null);
   return { key,exercise: event.group_exercise.name,value,certified,
-    accessibilityLabel: [event.group_exercise.name,value,certified ? 'certified' : null].filter(Boolean).join(', ') };
+    accessibilityLabel: speakHoldSeconds([event.group_exercise.name,value,certified ? 'certified' : null].filter(Boolean).join(', ')) };
 }
 
 type CompetitionEventModel = Extract<CompetitionStreamModel,{ kind: 'competition' }>;

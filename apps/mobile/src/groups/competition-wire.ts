@@ -17,7 +17,9 @@ export type CompetitionPerformanceWire = {
   session_exercise_id: string;
   exercise_definition_id: string;
   set_id: string;
-  reps: number;
+  reps: number | null;
+  recording_mode?: 'hold';
+  duration_sec?: number;
   performance_status: null;
   source_load_input_mode: LoadInputMode;
   achieved_at_ms: number;
@@ -73,7 +75,7 @@ export type CompetitionPodiumsWire = {
   podiums: { exercise: CompetitionExerciseWire; board: CompetitionBoardWire }[];
 };
 /** Historical metric labels never migrate into the current metric domain. */
-export type CompetitionHistoricalMetric = 'weight' | 'volume' | 'e1rm' | 'bodyweight_reps' | 'relative_strength' | 'absolute_strength';
+export type CompetitionHistoricalMetric = 'weight' | 'volume' | 'e1rm' | 'seconds' | 'bodyweight_reps' | 'relative_strength' | 'absolute_strength';
 export type CompetitionRevisionWire = {
   rules_revision: number; representation_version: 3 | 4;
   rules: Omit<CompetitionRulesWire, 'rules_revision' | 'default_metric'> & { default_metric: CompetitionHistoricalMetric };

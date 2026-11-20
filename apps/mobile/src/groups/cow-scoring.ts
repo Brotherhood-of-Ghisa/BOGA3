@@ -1,7 +1,7 @@
 // Service-only aggregation of authorized group projections; no raw workout or reading inputs.
 import { competitionUnit, type CompetitionMetric, type CompetitionValue } from './competition-contract.ts';
 
-export type CoWMetric = CompetitionMetric | 'improvement';
+export type CoWMetric = Exclude<CompetitionMetric, 'seconds'> | 'improvement';
 export type CoWContext = { key: string; normalized: boolean };
 export type CoWWindow = { startUs: number; endUs: number; readBeforeUs: number;
   context: CoWContext | null; contextChangedAtUs: number | null };

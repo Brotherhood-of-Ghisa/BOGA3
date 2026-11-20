@@ -2,10 +2,11 @@
 // owner's private Sync v2 protocol.
 import { validateExerciseCore, type ExerciseCore } from '../exercise-core/index.ts';
 import { validateBodyweightContribution } from '../exercise-core/bodyweight-contribution.ts';
+import { parseSetDuration } from '../exercise-calculations/parse.ts';
 
 export const GROUP_COMPETITION_VERSION = 4;
-export const GROUP_COMPETITION_CACHE_VERSION = 8;
-export const GROUP_COMPETITION_METRICS = ['volume', 'e1rm'] as const;
+export const GROUP_COMPETITION_CACHE_VERSION = 10;
+export const GROUP_COMPETITION_METRICS = ['volume', 'e1rm', 'seconds'] as const;
 export type CompetitionMetric = typeof GROUP_COMPETITION_METRICS[number];
 /** Rules revision is server-owned; a client may send its expected revision for concurrency. */
 export type CompetitionRules = ExerciseCore & {
@@ -15,15 +16,19 @@ export type CompetitionRules = ExerciseCore & {
 };
 export type CompetitionValue =
   | { metric: 'volume'; value: number; unit: 'kg_reps' | 'percent_bw_reps' }
-  | { metric: 'e1rm'; value: number; unit: 'kg' | 'percent_bw' };
+  | { metric: 'e1rm'; value: number; unit: 'kg' | 'percent_bw' }
+  | { metric: 'seconds'; value: number; unit: 'seconds' };
 
 export const isCompetitionMetric = (value: unknown): value is CompetitionMetric =>
-  value === 'volume' || value === 'e1rm';
+  value === 'volume' || value === 'e1rm' || value === 'seconds';
+export const competitionMetrics = (rules: Pick<CompetitionRules, 'defaultMetric'>): readonly CompetitionMetric[] =>
+  rules.defaultMetric === 'seconds' ? ['seconds'] : ['volume', 'e1rm'];
 export const isNormalizedCompetition = (rules: Pick<CompetitionRules,
   'bodyweightCalculationsEnabled' | 'bodyweightContribution'>): boolean =>
   rules.bodyweightCalculationsEnabled && rules.bodyweightContribution > 0;
 
 export function competitionUnit(metric: CompetitionMetric, normalized: boolean): CompetitionValue['unit'] {
+  if (metric === 'seconds') return 'seconds';
   if (metric === 'volume') return normalized ? 'percent_bw_reps' : 'kg_reps';
   return normalized ? 'percent_bw' : 'kg';
 }
@@ -44,5 +49,5 @@ export function isCompetitionValue(value: unknown, normalized: boolean): value i
   const row = value as Record<string, unknown>;
   return Object.keys(row).length === 3 && Object.keys(row).every(key => ['metric','value','unit'].includes(key)) && isCompetitionMetric(row.metric) &&
     row.unit === competitionUnit(row.metric, normalized) && typeof row.value === 'number' &&
-    Number.isFinite(row.value) && row.value > 0;
+    Number.isFinite(row.value) && row.value > 0 && (row.metric !== 'seconds' || parseSetDuration(row.value) !== null);
 }

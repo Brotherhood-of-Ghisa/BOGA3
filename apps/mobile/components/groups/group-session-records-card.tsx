@@ -4,6 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { FigureText, makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { GroupRole } from '@/src/groups';
 import type { SessionRecordRow } from '@/src/groups/competition-session-records-view-model';
+import { speakHoldSeconds } from '@/src/groups/competition-view-model';
 
 import { scoreHasFigure, useScoreStyle } from './score-style';
 import { GroupSetCertification } from './set-certification';
@@ -54,7 +55,7 @@ function RecordRow({ row, ...rest }: { row: SessionRecordRow } & Omit<CardProps,
     <View style={styles.row} testID={testID}>
       <Pressable
         accessibilityHint="Opens the leaderboard"
-        accessibilityLabel={`${row.title}, ${row.value}, ${row.spokenDetail}`}
+        accessibilityLabel={speakHoldSeconds(`${row.title}, ${row.value}, ${row.spokenDetail}`)}
         accessibilityRole="link"
         onPress={() => router.push(row.boardHref as Href)}
         style={({ pressed }) => [styles.link, pressed ? styles.pressed : null]}

@@ -6,7 +6,7 @@ import { FlatList, RefreshControl, View } from 'react-native';
 import { uiSpace } from '@/components/ui';
 import { useGroupOnlinePages, type GroupBoardScope } from '@/src/groups';
 import { getCompetitionRecordsHistory } from '@/src/groups/api';
-import { GROUP_COMPETITION_METRICS, isCompetitionMetric, type CompetitionMetric } from '@/src/groups/competition-contract';
+import { competitionMetrics, isCompetitionMetric, type CompetitionMetric } from '@/src/groups/competition-contract';
 import { COMPETITION_LABELS, competitionViewLabel } from '@/src/groups/competition-view-model';
 import type { CompetitionExerciseWire, CompetitionRecordsHistoryItemWire, CompetitionRecordsHistoryWire } from '@/src/groups/competition-wire';
 import { buildRecordsLog } from '@/src/groups/records-history-view-model';
@@ -23,7 +23,6 @@ const selectItems = (page: CompetitionRecordsHistoryWire) => page.items;
 const selectCursor = (page: CompetitionRecordsHistoryWire) => page.next_cursor;
 const selectHasMore = (page: CompetitionRecordsHistoryWire) => page.next_cursor !== null;
 const itemKey = (item: CompetitionRecordsHistoryItemWire) => item.event.event_id;
-const METRIC_OPTIONS = GROUP_COMPETITION_METRICS.map(value => ({ value, label: COMPETITION_LABELS[value] }));
 const SCOPE_OPTIONS = [{ value: 'all', label: 'All sets' }, { value: 'certified', label: 'Certified' }] as const;
 
 /**
@@ -39,6 +38,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
   const dateFormat = useDateFormat();
   const router = useRouter();
   const exerciseId = exercise.group_exercise_id;
+  const metricOptions = competitionMetrics({ defaultMetric: exercise.rules.default_metric }).map(value => ({ value, label: COMPETITION_LABELS[value] }));
   const requestedMetric = isCompetitionMetric(initialMetric) ? initialMetric : exercise.rules.default_metric;
   const [metric, setMetric] = useState<CompetitionMetric>(requestedMetric);
   const [scope, setScope] = useState(initialScope);
@@ -70,7 +70,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
     <Stack.Screen options={{ title: exercise.name,
       headerTitle: () => <GroupBoardTitle name={exercise.name} view={`${competitionViewLabel(metric, rules)} history`} testID="group-history-title" /> }} />
     <View style={{ flexDirection: 'row', gap: uiSpace.sm }} testID="group-history-filters">
-      <GroupCycleButton accessibilityLabel="Metric" options={METRIC_OPTIONS} value={metric}
+      <GroupCycleButton accessibilityLabel="Metric" options={metricOptions} value={metric}
         onChange={next => select(next, scope)} testID="group-history-metric" />
       <GroupCycleButton accessibilityLabel="Sets" options={SCOPE_OPTIONS} value={scope}
         onChange={next => select(metric, next)} testID="group-history-scope" />
