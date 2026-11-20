@@ -6,8 +6,10 @@ import { MuscleBodyCard } from '@/components/stats/muscle-body-card';
 import {
   buildThemeShadePalette,
   projectMuscleBody,
+  resolveFocusedInjurySide,
   type ActiveInjuryOverlay,
 } from '@/components/stats/muscle-body-projection';
+import { selectMuscleMeshes, wireframeCamera } from '@/components/stats/muscle-wireframe-scene';
 import { testPalette, testRoles } from './helpers/muscle-body-palette';
 import type { ProgressMuscleComparison } from '@/src/data';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
@@ -179,9 +181,179 @@ describe('Muscle body injury overlay', () => {
       expect(leftBadge).toBeDefined();
       expect(rightBadge).toBeDefined();
 
-      // In anatomy mesh, left and right centroids must be distinct horizontally.
-      expect(leftBadge!.x).not.toBe(rightBadge!.x);
+      // Facing the viewer at 0° (front view), anatomical left is on the viewer's right (x > width/2)
+      // and anatomical right is on the viewer's left (x < width/2).
+      expect(leftBadge!.x).toBeGreaterThan(150);
+      expect(rightBadge!.x).toBeLessThan(150);
+      expect(leftBadge!.x).toBeGreaterThan(rightBadge!.x);
       expect(projLeft.injuryContours?.[0].d).not.toBe(projRight.injuryContours?.[0].d);
+
+      // Viewed from behind at 180° (back view), anatomical left is on the viewer's left (x < width/2)
+      // and anatomical right is on the viewer's right (x > width/2).
+      const projLeftBack = projectMuscleBody({
+        scores,
+        selectedId: null,
+        width: 300,
+        height: 300,
+        angleDeg: 180,
+        palette: testPalette,
+        activeInjuries: [{ id: 'inj-lats-left', muscleGroupId: 'back_lats', status: 'acute', side: 'left' }],
+      });
+      const projRightBack = projectMuscleBody({
+        scores,
+        selectedId: null,
+        width: 300,
+        height: 300,
+        angleDeg: 180,
+        palette: testPalette,
+        activeInjuries: [{ id: 'inj-lats-right', muscleGroupId: 'back_lats', status: 'acute', side: 'right' }],
+      });
+      const leftBackBadge = projLeftBack.injuryBadges?.find(b => b.injuryId === 'inj-lats-left');
+      const rightBackBadge = projRightBack.injuryBadges?.find(b => b.injuryId === 'inj-lats-right');
+      expect(leftBackBadge!.x).toBeLessThan(150);
+      expect(rightBackBadge!.x).toBeGreaterThan(150);
+    });
+
+    it('projects injury contours and badges using the focused 3D camera and hides off-screen badges', () => {
+      const chestInjury: ActiveInjuryOverlay = {
+        id: 'inj-chest-left',
+        muscleGroupId: 'chest',
+        status: 'acute',
+        side: 'left',
+      };
+      const quadsInjury: ActiveInjuryOverlay = {
+        id: 'inj-quads-right',
+        muscleGroupId: 'quads',
+        status: 'managing',
+        side: 'right',
+      };
+
+      const wholeBodyCamera = wireframeCamera({
+        angle: 0,
+        width: 300,
+        height: 300,
+        selected: selectMuscleMeshes('chest', undefined, false),
+        focus: false,
+      });
+      const focusedCamera = wireframeCamera({
+        angle: 0,
+        width: 300,
+        height: 300,
+        selected: selectMuscleMeshes('chest', undefined, true),
+        focus: true,
+      });
+
+      const wholeBody = projectMuscleBody({
+        scores,
+        selectedId: 'chest',
+        width: 300,
+        height: 300,
+        camera: wholeBodyCamera,
+        angleDeg: 0,
+        palette: testPalette,
+        activeInjuries: [chestInjury, quadsInjury],
+      });
+      const focused = projectMuscleBody({
+        scores,
+        selectedId: 'chest',
+        width: 300,
+        height: 300,
+        camera: focusedCamera,
+        angleDeg: 0,
+        palette: testPalette,
+        activeInjuries: [chestInjury, quadsInjury],
+      });
+
+      const wholeChestContour = wholeBody.injuryContours?.find(c => c.injuryId === 'inj-chest-left');
+      const focusedChestContour = focused.injuryContours?.find(c => c.injuryId === 'inj-chest-left');
+      expect(focusedChestContour?.d).toBeTruthy();
+      expect(focusedChestContour?.d).not.toBe(wholeChestContour?.d);
+
+      const wholeChestBadge = wholeBody.injuryBadges?.find(b => b.injuryId === 'inj-chest-left');
+      const focusedChestBadge = focused.injuryBadges?.find(b => b.injuryId === 'inj-chest-left');
+      expect(focusedChestBadge?.visible).toBe(true);
+      expect(focusedChestBadge?.x).not.toBe(wholeChestBadge?.x);
+      expect(focusedChestBadge?.y).not.toBe(wholeChestBadge?.y);
+
+      // Quads are zoomed off-screen when focused on chest, so their badge is hidden.
+      const wholeQuadsBadge = wholeBody.injuryBadges?.find(b => b.injuryId === 'inj-quads-right');
+      const focusedQuadsBadge = focused.injuryBadges?.find(b => b.injuryId === 'inj-quads-right');
+      expect(wholeQuadsBadge?.visible).toBe(true);
+      expect(focusedQuadsBadge?.visible).toBe(false);
+    });
+
+    it('keeps bilateral arm injury badges visible on the focused limb in single-limb focus mode', () => {
+      const bicepsCamera = wireframeCamera({
+        angle: 0,
+        width: 300,
+        height: 280,
+        selected: selectMuscleMeshes('biceps', undefined, true),
+        focus: true,
+      });
+      const projectedBiceps = projectMuscleBody({
+        scores,
+        selectedId: 'biceps',
+        width: 300,
+        height: 280,
+        camera: bicepsCamera,
+        angleDeg: 0,
+        palette: testPalette,
+        activeInjuries: [{ id: 'inj-biceps-bi', muscleGroupId: 'biceps', status: 'acute', side: 'bilateral' }],
+      });
+      const bicepsBadge = projectedBiceps.injuryBadges?.find(b => b.injuryId === 'inj-biceps-bi');
+      expect(bicepsBadge?.visible).toBe(true);
+      expect(bicepsBadge!.x).toBeGreaterThan(0);
+      expect(bicepsBadge!.x).toBeLessThan(300);
+
+      const tricepsCamera = wireframeCamera({
+        angle: 180,
+        width: 300,
+        height: 280,
+        selected: selectMuscleMeshes('triceps', undefined, true),
+        focus: true,
+      });
+      const projectedTriceps = projectMuscleBody({
+        scores,
+        selectedId: 'triceps',
+        width: 300,
+        height: 280,
+        camera: tricepsCamera,
+        angleDeg: 180,
+        palette: testPalette,
+        activeInjuries: [{ id: 'inj-triceps-bi', muscleGroupId: 'triceps', status: 'managing', side: 'bilateral' }],
+      });
+      const tricepsBadge = projectedTriceps.injuryBadges?.find(b => b.injuryId === 'inj-triceps-bi');
+      expect(tricepsBadge?.visible).toBe(true);
+      expect(tricepsBadge!.x).toBeGreaterThan(0);
+      expect(tricepsBadge!.x).toBeLessThan(300);
+    });
+
+    it('resolves the highest-priority unilateral injury side for limb focus', () => {
+      const injuries: ActiveInjuryOverlay[] = [
+        { id: 'inj-res-left', muscleGroupId: 'quads', status: 'resolved', side: 'left', painScore: 9 },
+        { id: 'inj-mon-left', muscleGroupId: 'quads', status: 'monitoring', side: 'left', painScore: 2 },
+        { id: 'inj-acute-right', muscleGroupId: 'quads', status: 'acute', side: 'right', painScore: 7 },
+        { id: 'inj-acute-left-low', muscleGroupId: 'quads', status: 'acute', side: 'left', painScore: 4 },
+        { id: 'inj-biceps-bi', muscleGroupId: 'biceps', status: 'acute', side: 'bilateral', painScore: 6 },
+      ];
+      expect(resolveFocusedInjurySide('quads', injuries)).toBe('right');
+      expect(resolveFocusedInjurySide('biceps', injuries)).toBeNull();
+      expect(resolveFocusedInjurySide('chest', injuries)).toBeNull();
+
+      const combinedReport: MuscleReportAssignment = new Map([
+        [
+          'quads',
+          {
+            muscle: { id: 'cm_legs', displayName: 'Legs', familyName: 'Legs', sortOrder: 1 },
+            tracked: true,
+          },
+        ],
+      ]);
+      expect(resolveFocusedInjurySide('cm_legs', injuries, combinedReport)).toBe('right');
+
+      const focusedRight = selectMuscleMeshes('quads', undefined, true, 'right');
+      expect(focusedRight.length).toBeGreaterThan(0);
+      expect(focusedRight.every(inst => inst.side === -1)).toBe(true);
     });
 
     it('adjusts badge visibility between front and back view angles', () => {
@@ -595,6 +767,55 @@ describe('Muscle body injury overlay', () => {
 
       fireEvent.press(badge);
       expect(onSelect).toHaveBeenCalledWith('quads');
+    });
+
+    it('updates injury overlay projection in focus mode and targets the injured limb side', () => {
+      const rightQuadInjury: ActiveInjuryOverlay = {
+        id: 'inj-quads-right',
+        muscleGroupId: 'quads',
+        label: 'Right Quad Strain',
+        status: 'acute',
+        side: 'right',
+      };
+      const chestInjury: ActiveInjuryOverlay = {
+        id: 'inj-chest-left',
+        muscleGroupId: 'chest',
+        label: 'Left Pec Strain',
+        status: 'managing',
+        side: 'left',
+      };
+
+      render(
+        <MuscleBodyCard
+          activeInjuries={[rightQuadInjury, chestInjury]}
+          defaultOverlay="wireframe"
+          metric="workingSetCount"
+          muscles={muscles}
+          onSelect={jest.fn()}
+          selectedId="quads"
+        />
+      );
+
+      const contourBefore = within(screen.getByTestId('stats-muscle-injury-contours'))
+        .UNSAFE_getAllByType(Path)
+        .map(p => p.props.d);
+      expect(screen.getByTestId('stats-muscle-injury-badge-inj-quads-right')).toBeTruthy();
+      expect(screen.getByTestId('stats-muscle-injury-badge-inj-chest-left')).toBeTruthy();
+
+      // Enable Focus mode on quads — should zoom onto the injured right quad and hide off-screen chest badge.
+      fireEvent.press(screen.getByTestId('stats-muscle-body-focus'));
+
+      const canvas = screen.getByTestId('stats-muscle-body-wireframe');
+      expect(canvas.props.frame.selected.every((inst: { side: number }) => inst.side === -1)).toBe(true);
+
+      const contourAfter = within(screen.getByTestId('stats-muscle-injury-contours'))
+        .UNSAFE_getAllByType(Path)
+        .map(p => p.props.d);
+      expect(contourAfter).not.toEqual(contourBefore);
+
+      // Right quad badge stays visible in the focused viewport; chest is off-screen and hidden.
+      expect(screen.getByTestId('stats-muscle-injury-badge-inj-quads-right')).toBeTruthy();
+      expect(screen.queryByTestId('stats-muscle-injury-badge-inj-chest-left')).toBeNull();
     });
   });
 });
