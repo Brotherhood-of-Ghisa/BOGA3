@@ -30,6 +30,13 @@ begin
       case when name='group_metric_certifications_competition_audit' then 'observed_value' else 'value' end,
       case when name='group_metric_certifications_competition_audit' then 'observed_value' else 'value' end);
   end loop;
+  target:='app_public.group_events'::regclass; name:='group_events_lead_change_shape_check';
+  select pg_get_constraintdef(oid) into strict definition from pg_constraint where conrelid=target and conname=name;
+  if position($anchor$'absolute_strength'::text]$anchor$ in definition)=0 then
+    raise exception 'Hold lead-change constraint anchor missing';
+  end if;
+  definition:=replace(definition,$anchor$'absolute_strength'::text]$anchor$,$replacement$'absolute_strength'::text, 'seconds'::text]$replacement$);
+  execute format('alter table %s drop constraint %I, add constraint %I %s',target,name,name,definition);
 end $constraints$;
 
 -- Guard patches against drift; keep authorization, locks and publication fences in their owning bodies.
