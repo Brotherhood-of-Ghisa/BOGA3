@@ -26,7 +26,7 @@ export const buildCompletionManifest = (entities: readonly CompletionEntity[]): 
   return manifest.sort((a, b) => a.type === b.type ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : (a.type < b.type ? -1 : 1));
 };
 
-export type NotificationRank = { metric: 'volume' | 'e1rm'; certified: boolean; member_user_id: string; rank: number };
+export type NotificationRank = { metric: 'volume' | 'e1rm' | 'seconds'; certified: boolean; member_user_id: string; rank: number };
 const rankKey = (row: NotificationRank): string => JSON.stringify([row.metric, row.certified, row.member_user_id]);
 const direction = (before: number | undefined, after: number | undefined): number => {
   if (before === after) return 0;
@@ -72,7 +72,7 @@ export const workoutContributions = (targets: readonly WorkoutTarget[], lifterId
     if (group.targets.has(target.group_exercise_id)) throw new Error('Duplicate workout comparison');
     group.targets.add(target.group_exercise_id);
     for (const metric of target.best_metrics) {
-      if (metric !== 'volume' && metric !== 'e1rm') throw new Error('Invalid workout metric');
+      if (metric !== 'volume' && metric !== 'e1rm' && metric !== 'seconds') throw new Error('Invalid workout metric');
       group.bests.add(JSON.stringify([target.group_exercise_id, metric]));
     }
     group.ranks += countWorkoutRankChanges(target.before, target.final, target.without_workout, lifterId);

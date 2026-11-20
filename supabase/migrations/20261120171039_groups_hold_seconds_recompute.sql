@@ -1,4 +1,4 @@
--- Apply after deploying and kicking group-eval rules 9. Rebuild live projections
+-- Apply after deploying notification-worker and kicking group-eval rules 9. Rebuild live projections
 -- silently; preserve raw workouts and immutable record/certification audits.
 do $rebuild$
 declare e record; evaluator_rules integer;

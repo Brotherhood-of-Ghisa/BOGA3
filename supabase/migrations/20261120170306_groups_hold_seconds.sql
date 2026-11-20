@@ -82,6 +82,17 @@ begin
   end if;
   _rules:=$replacement$),
     ('app_public.group_metric_apply_member(uuid,uuid,uuid,bigint,jsonb,boolean)',$anchor$_metrics := array['volume','e1rm'];$anchor$,$replacement$_metrics := case when p_graph->'rules'->>'default_metric'='seconds' then array['seconds'] else array['volume','e1rm'] end;$replacement$),
+    ('app_public.notification_best_evidence(uuid,text,uuid,bigint,boolean)',$anchor$metric in ('volume','e1rm')$anchor$,$replacement$metric in ('volume','e1rm','seconds')$replacement$),
+    ('app_public.notification_ranks_from_graph(uuid,uuid,bigint,app_public.notification_workout_targets,jsonb)',$anchor$unnest(array['volume','e1rm'])$anchor$,$replacement$unnest(case when p_graph->'rules'->>'default_metric'='seconds' then array['seconds'] else array['volume','e1rm'] end)$replacement$),
+    ('app_public.notification_ranks_from_graph(uuid,uuid,bigint,app_public.notification_workout_targets,jsonb)',$anchor$(g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
+        not (select h.redacted from hidden h where h.definition is not distinct from b->>'exercise_definition_id'))$anchor$,$replacement$(b->>'metric'='seconds' or g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
+        not (select h.redacted from hidden h where h.definition is not distinct from b->>'exercise_definition_id'))$replacement$),
+    ('app_public.notification_ranks_from_graph(uuid,uuid,bigint,app_public.notification_workout_targets,jsonb)',$anchor$(g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
+        not (select h.redacted from hidden h where h.definition is not distinct from s.exercise_definition_id))$anchor$,$replacement$(d.metric='seconds' or g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or
+        not (select h.redacted from hidden h where h.definition is not distinct from s.exercise_definition_id))$replacement$),
+    ('app_public.notification_baseline_scores(uuid,text,uuid,bigint,jsonb)',$anchor$unnest(array['volume','e1rm'])$anchor$,$replacement$unnest(case when p_graph->'rules'->>'default_metric'='seconds' then array['seconds'] else array['volume','e1rm'] end)$replacement$),
+    ('app_public.notification_baseline_scores(uuid,text,uuid,bigint,jsonb)',$anchor$(g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or$anchor$,$replacement$(d.metric='seconds' or g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or$replacement$),
+    ('app_public.notification_source_controls(app_public.notification_workout_targets,jsonb)',$anchor$(g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or$anchor$,$replacement$(s.metric='seconds' or g.bodyweight_calculations_enabled and ge.bodyweight_contribution>0 or$replacement$),
     ('app_public.group_metric_eval_source_graph(uuid,uuid)',$anchor$t.bodyweight_calculations_enabled and t.bodyweight_contribution>0$anchor$,$replacement$t.default_metric<>'seconds' and es.recording_mode='reps' and t.bodyweight_calculations_enabled and t.bodyweight_contribution>0$replacement$),
     ('app_public.group_metric_eval_source_graph(uuid,uuid)',$anchor$'reps_value',es.reps_value,'performance_status',es.performance_status),es.set_type)$anchor$,$replacement$'reps_value',es.reps_value,'performance_status',es.performance_status)
           ||case when es.recording_mode='hold' then jsonb_build_object('recording_mode','hold','duration_sec',es.duration_sec) else '{}'::jsonb end,es.set_type)$replacement$),

@@ -2095,5 +2095,62 @@ assert_sql 'the context source stays private to the proofs that read it' "select
   and not has_function_privilege('anon',p.oid,'execute') and not has_function_privilege('authenticated',p.oid,'execute')
   and not has_function_privilege('service_role',p.oid,'execute')
   from pg_proc p where p.oid='app_public.notification_context_source(uuid,uuid,uuid,text)'::regprocedure;"
+# A hidden-weight Hold still contributes safe duration bests and both net positions.
+provision H hold-recipient
+set_username "${H_UID}" MemberH
+rpc "${H_TOKEN}" group_create '{"p_name":"Hold summary","p_description":""}'; expect_ok 'create Hold summary group'
+HOLD_GROUP="$(jq -r '.group_id' <<<"${BODY}")"; GROUP_IDS+=("${HOLD_GROUP}")
+run_psql "insert into app_public.group_memberships(group_id,user_id,role,joined_at)
+  values('${HOLD_GROUP}','${B_UID}','member',now()-interval '3 days');" >/dev/null
+rpc "${H_TOKEN}" group_update "$(jq -nc --arg g "${HOLD_GROUP}" '{p_group_id:$g,p_name:"Hold summary",p_description:"",p_bodyweight_calculations_enabled:true}')"
+expect_ok 'enable Hold disclosure policy'
+http_call -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${H_TOKEN}" \
+  -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-group-seconds: 1' -H 'Content-Type: application/json' -H 'Content-Profile: app_public' \
+  --data "$(jq -nc --arg g "${HOLD_GROUP}" '{p_group_id:$g,p_name:"Plank",p_load_input_mode:"total_load",p_bodyweight_contribution:0,p_default_metric:"seconds"}')" \
+  "${API_URL}/rest/v1/rpc/group_competition_exercise_create"
+expect_ok 'create Seconds comparison'; HOLD_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+HOLD_NOW="$(node -e 'process.stdout.write(String(Date.now()))')"
+for label in H B; do
+  token_var="${label}_TOKEN"; duration=28; weight=''
+  [[ "${label}" != H ]] || { duration=29; weight=24; }
+  next_cuam
+  push "${!token_var}" 'Hold summary baseline' \
+    "$(e_def "hold-${label}-${RUN_TAG}" Plank "${CUAM}" total_load 1 | jq '.fields.recording_mode="hold"')" \
+    "$(e_link "hold-${label}-${RUN_TAG}" "${HOLD_GROUP}" "${HOLD_EXERCISE}" "${CUAM}")" \
+    "$(e_session "hold-base-${label}-${RUN_TAG}" "${HOLD_NOW}" completed "$((HOLD_NOW+1000))" 1 null "${CUAM}")" \
+    "$(e_se "hold-base-${label}-ex-${RUN_TAG}" "hold-base-${label}-${RUN_TAG}" "hold-${label}-${RUN_TAG}" 0 Plank "${CUAM}")" \
+    "$(e_set "hold-base-${label}-set-${RUN_TAG}" "hold-base-${label}-ex-${RUN_TAG}" 0 "${weight}" '' '' "${CUAM}" \
+      | jq --argjson d "${duration}" '.fields.recording_mode="hold" | .fields.duration_sec=$d')"
+done
+drain_eval
+HOLD_INSTALL="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+HOLD_CAPABILITY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+HOLD_KEY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+rpc "${H_TOKEN}" notification_register "$(jq -nc --arg i "${HOLD_INSTALL}" --arg c "${HOLD_CAPABILITY}" --arg k "${HOLD_KEY}" \
+  '{p_installation_id:$i,p_capability:$c,p_encryption_key:$k,p_token:"LocalPushToken[hold]",p_environment:"local",p_project_id:"3c00cd23-0946-4eb6-bbf0-4542879cd314",p_bundle_id:"com.phano.boga3.dev",p_permission:true,p_opted_in:true}')"
+expect_ok 'register Hold summary recipient'
+HOLD_SESSION="hold-summary-${RUN_TAG}"
+next_cuam
+push "${B_TOKEN}" '30 second bodyweight Hold' \
+  "$(e_session "${HOLD_SESSION}" "$((HOLD_NOW+2000))" active null null null "${CUAM}")" \
+  "$(e_se "${HOLD_SESSION}-ex" "${HOLD_SESSION}" "hold-B-${RUN_TAG}" 0 Plank "${CUAM}")" \
+  "$(e_set "${HOLD_SESSION}-set" "${HOLD_SESSION}-ex" 0 '' '' '' "${CUAM}" \
+    | jq '.fields.recording_mode="hold" | .fields.duration_sec=30')"
+drain_eval
+next_cuam
+push "${B_TOKEN}" 'complete Hold workout' "$(e_session "${HOLD_SESSION}" "$((HOLD_NOW+2000))" completed "$((HOLD_NOW+5000))" 3 null "${CUAM}")"
+confirm "${B_TOKEN}" "${HOLD_SESSION}" "$(manifest "${B_UID}" "${HOLD_SESSION}")"
+drain_eval
+prepare_outcome "${B_UID}" "${HOLD_SESSION}"
+check 'Seconds best and private counterfactual retain both members' '.jobs[]|select(.session_id==$s)|.targets[]|select(.group_exercise_id==$x)|
+  .best_metrics==["seconds"] and .before==.without_workout and .before!=.final and
+  ([.without_workout[]|select(.metric=="seconds" and .certified==false)]|length==2)' --arg s "${HOLD_SESSION}" --arg x "${HOLD_EXERCISE}"
+[[ "${COUNTS}" == "$(jq -nc --arg g "${HOLD_GROUP}" '[{group_id:$g,best_count:1,rank_count:2}]')" ]] || fail 'Hold completion counts'
+enqueue_outcome "${B_UID}" "${HOLD_SESSION}"
+drain_worker
+HOLD_INTENT="$(run_psql "select id from app_public.notification_intents where recipient_user_id='${H_UID}' and lifter_user_id='${B_UID}' and session_id='${HOLD_SESSION}' and kind='completion';")"
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${HOLD_INTENT}}"; expect_ok 'project Hold completion summary'
+check 'Hold completion summary counts one best and two net rank changes' '.kind=="completion" and .bestCount==1 and .rankCount==2'
+pass 'Seconds completion summary retains achievements without disclosing weight'
 COMPLETED=1
 pass 'workout graph, full-rank publication, overlap, ownership, expiry, clamp, sink and admission contracts'

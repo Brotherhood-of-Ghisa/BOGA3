@@ -36,6 +36,8 @@ witness/aggregation window; personal session Volume records keep their contract.
 the timed domain; crossing into or out of it retires the current revision and
 rebuilds, while Volume/1RM default changes keep their revision. No private reading
 is resolved or bound for Seconds. Weight remains subject to current disclosure.
+Rollout: support SQL, deploy `group-eval` rules 9 and `notification-worker`, kick
+evaluation, apply recompute SQL, then release the app.
 
 New comparisons default to 1RM. The cutover turned a legacy Weight default
 into Volume on a new revision; an existing 1RM default stayed 1RM. Retired

@@ -9,6 +9,13 @@ const target = (group_id = 'group-a'): WorkoutTarget => ({ group_id, group_exerc
   final: ranks(['a', 'lifter', 'b', 'c']), without_workout: ranks(['a', 'b', 'c', 'lifter']) });
 
 describe('workout notification final outcomes', () => {
+  test('counts a Seconds best once and both affected duration-board positions', () => {
+    const seconds = (members: string[]) => ranks(members).map(row => ({ ...row, metric: 'seconds' as const }));
+    const hold = { ...target(), group_exercise_id: 'plank', best_metrics: ['seconds', 'seconds'],
+      before: seconds(['peer', 'lifter']), final: seconds(['lifter', 'peer']), without_workout: seconds(['peer', 'lifter']) };
+    expect(workoutContributions([hold], 'lifter')).toEqual([{ group_id: 'group-a', best_count: 1, rank_count: 2 }]);
+    expect(workoutContributions([hold, target()], 'lifter')).toEqual([{ group_id: 'group-a', best_count: 3, rank_count: 5 }]);
+  });
   test('counts every affected position, including downward non-first movement', () => {
     const result = target();
     expect(countWorkoutRankChanges(result.before, result.final, result.without_workout, 'lifter')).toBe(3);
