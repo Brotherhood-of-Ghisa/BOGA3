@@ -25,7 +25,7 @@ const member = (v: unknown) => exact(v,['user_id','username']) && id(v.user_id) 
 const group = (v: unknown) => exact(v,['group_id','name']) && id(v.group_id) && id(v.name);
 const mode = (v: unknown) => v === 'total_load' || v === 'per_side_load';
 const arrayOf = (v: unknown, guard: (entry: unknown) => boolean) => Array.isArray(v) && v.every(guard);
-const historicalMetric = (v: unknown) => ['weight','volume','e1rm','bodyweight_reps','relative_strength','absolute_strength'].includes(String(v));
+const historicalMetric = (v: unknown) => ['weight','volume','e1rm','seconds','bodyweight_reps','relative_strength','absolute_strength'].includes(String(v));
 const nullableCertification = (v: unknown) => v === null || isCompetitionCertificationWire(v);
 
 
@@ -67,7 +67,8 @@ function historyValue(v: unknown, normalized: boolean): boolean {
     !['record','leader','previous','before','after'].includes(String(v.role)) || !historicalMetric(v.metric) || !id(v.unit) ||
     typeof v.unavailable !== 'boolean' || !(v.member === null || member(v.member))) return false;
   return v.unavailable ? v.value === null : typeof v.value === 'number' && Number.isFinite(v.value) && v.value > 0 &&
-    (normalized ? ['percent_bw','percent_bw_reps'] : ['kg','kg_reps','percent_bw','percent_bw_reps']).includes(v.unit);
+    (v.metric === 'seconds' ? v.unit === 'seconds' && Number.isSafeInteger(v.value)
+      : (normalized ? ['percent_bw','percent_bw_reps'] : ['kg','kg_reps','percent_bw','percent_bw_reps']).includes(v.unit));
 }
 function recordContext(v: unknown): boolean {
   return v === null || exact(v,['exercise','former','metrics']) && isCompetitionExerciseWire(v.exercise) && typeof v.former === 'boolean' &&

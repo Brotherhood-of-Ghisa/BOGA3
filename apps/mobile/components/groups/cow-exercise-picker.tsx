@@ -12,7 +12,7 @@ export function CoWExercisePicker({ visible, onDismiss, onDismissed, exercises, 
 }) {
   const text = useUiText();
   const [query, setQuery] = useState('');
-  const active = exercises?.filter(row => row.archived_at_ms === null);
+  const active = exercises?.filter(row => row.archived_at_ms === null && row.rules.default_metric !== 'seconds');
   const matches = active?.filter(row => row.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   return <Sheet visible={visible} onDismiss={onDismiss} onDismissed={onDismissed} dismissLabel="Dismiss exercise choices" title="Choose exercise" keyboardAvoiding testID="cow-exercise-picker">
     <View style={{ padding: uiSpace.md, gap: uiSpace.md }}>

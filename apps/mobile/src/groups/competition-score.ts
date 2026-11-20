@@ -1,10 +1,11 @@
 // Pure competition scorer; protocol-4 publication calls it. This boundary
 // receives no personal contribution or personal 1RM: every target supplies its
-// own declared rules. Every numerator comes from the existing kernel, with the
+// own declared rules. Repetition numerators come from the existing kernel, with the
 // SAME dated B.
 import { isValidSessionWeight, type ResolvedSessionWeight } from '../bodyweight/as-of.ts';
 import { groupLoadContext } from '../exercise-calculations/analytics.ts';
 import { calculateRepetitionMetricCandidates } from '../exercise-calculations/load-metrics.ts';
+import { isConfirmedPerformedSet } from '../exercise-calculations/set-semantics.ts';
 import { checkGroupLinkCompatibility, type GroupLinkSource } from './link-compatibility.ts';
 import { isCompetitionValue, isNormalizedCompetition, validateCompetitionRules,
   type CompetitionRules, type CompetitionValue } from './competition-contract.ts';
@@ -23,6 +24,13 @@ export type CompetitionPerformanceInput = ResolvedSessionWeight & {
  * make the affected member/metric unavailable, rather than sum a partial total. */
 export function projectCompetitionPerformance(performance: CompetitionPerformanceInput, rules: CompetitionRules):
   { values: CompetitionValue[]; kernelOverflow: boolean } {
+  if (rules.defaultMetric === 'seconds') {
+    const eligible = validateCompetitionRules(rules).ok && performance.live && performance.performanceStatus === null &&
+      checkGroupLinkCompatibility(performance.source, rules).compatible && performance.recordingMode === 'hold' &&
+      isConfirmedPerformedSet({ weight: performance.weightValue, reps: performance.repsValue,
+        recordingMode: performance.recordingMode, durationSec: performance.durationSec, performanceStatus: null });
+    return { values: eligible ? [{ metric: 'seconds', value: performance.durationSec!, unit: 'seconds' }] : [], kernelOverflow: false };
+  }
   if (performance.recordingMode === 'hold' || performance.durationSec != null) return { values: [], kernelOverflow: false };
   return projectCompetitionRepetitionV7(performance, rules);
 }

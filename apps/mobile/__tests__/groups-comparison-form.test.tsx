@@ -8,6 +8,14 @@ const props = { existing, bodyweightCalculationsEnabled: true,
 const turnOnBodyweight = () => fireEvent(screen.getByTestId('group-exercise-form-uses-bodyweight'), 'valueChange', true);
 
 describe('group comparison rule editor', () => {
+  it('offers Seconds for a Hold comparison and preserves its weight settings', () => {
+    const onSubmit = jest.fn();
+    render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);
+    fireEvent.press(screen.getByTestId('group-exercise-default-metric-seconds'));
+    fireEvent.press(screen.getByTestId('group-exercise-form-submit'));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ defaultMetric: 'seconds',
+      loadInputMode: 'total_load', bodyweightContribution: 1 }), 2);
+  });
   it('submits a calculation change in one press, with the rules and the original revision', () => {
     const onSubmit = jest.fn();
     render(<GroupComparisonForm {...props} onSubmit={onSubmit} />);

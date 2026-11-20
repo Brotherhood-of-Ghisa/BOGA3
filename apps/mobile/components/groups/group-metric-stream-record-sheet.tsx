@@ -6,6 +6,7 @@ import { FigureText, Icon, ListRow, Sheet, makeStyles, uiBorder, uiSpace, useUiT
 import { groupBoardPath, useNetworkOnline, type GroupRole } from '@/src/groups';
 import { isCompetitionMetric } from '@/src/groups/competition-contract';
 import { buildStreamRecordSheet } from '@/src/groups/competition-stream-view-model';
+import { speakHoldSeconds } from '@/src/groups/competition-view-model';
 import type { CompetitionEventWire, CompetitionStreamRecordWire } from '@/src/groups/competition-wire';
 import { scoreHasFigure, useScoreStyle } from './score-style';
 import { GroupSetCertification } from './set-certification';
@@ -37,23 +38,23 @@ export function GroupMetricStreamRecordSheet({ record, detail, userId, myRole, o
       <Text allowFontScaling={false} style={[text.label, tone.record]}>New record</Text>
       <Text allowFontScaling={false} style={text.bodyStrong} testID="group-metric-record-who"><FigureText strong>{model.who}</FigureText></Text>
       <View style={styles.setLine}>
-        {model.set ? <Text allowFontScaling={false} style={[text.body, styles.set]} testID="group-metric-record-set"><FigureText>{model.set}</FigureText></Text> : null}
+        {model.set ? <Text allowFontScaling={false} accessibilityLabel={speakHoldSeconds(model.set)} style={[text.body, styles.set]} testID="group-metric-record-set"><FigureText>{model.set}</FigureText></Text> : null}
         {model.certification ? <GroupSetCertification align="end" certification={model.certification}
           groupId={record.group.group_id} myRole={myRole} onChanged={onChanged} online={online} testID="group-metric-record"
           readOnlyReason={model.certification.eligible ? undefined : 'Score unavailable'} userId={userId} /> : null}
       </View>
       {model.metrics.map(entry => <View key={entry.metric} style={styles.valueLine} testID={`group-metric-record-${entry.metric}`}>
         <Text allowFontScaling={false} style={[text.bodyStrong, styles.metricLabel]}>{entry.label}</Text>
-        <Text allowFontScaling={false} style={[scoreStyle(entry.value, 'large'), scoreHasFigure(entry.value) ? tone.record : null]} testID={`group-metric-record-${entry.metric}-value`}><FigureText figureStyle={[scoreStyle(entry.value, 'large'), scoreHasFigure(entry.value) ? tone.record : null]}>{entry.value}</FigureText></Text>
+        <Text allowFontScaling={false} accessibilityLabel={speakHoldSeconds(entry.value)} style={[scoreStyle(entry.value, 'large'), scoreHasFigure(entry.value) ? tone.record : null]} testID={`group-metric-record-${entry.metric}-value`}><FigureText figureStyle={[scoreStyle(entry.value, 'large'), scoreHasFigure(entry.value) ? tone.record : null]}>{entry.value}</FigureText></Text>
       </View>)}
       {model.previous.length > 0 ? <View style={styles.previous} testID="group-metric-record-previous">
         <Text allowFontScaling={false} style={text.label}>Previous #1</Text>
         {model.previous.map(entry => <View key={entry.metric} style={styles.previousRow} testID={`group-metric-record-previous-${entry.metric}`}>
           <View style={styles.valueLine}>
             <Text allowFontScaling={false} style={[text.bodyStrong, styles.metricLabel]}>{entry.label}</Text>
-            <Text allowFontScaling={false} style={scoreStyle(entry.value, 'base')}><FigureText figureStyle={scoreStyle(entry.value, 'base')}>{entry.value}</FigureText></Text>
+            <Text allowFontScaling={false} accessibilityLabel={speakHoldSeconds(entry.value)} style={scoreStyle(entry.value, 'base')}><FigureText figureStyle={scoreStyle(entry.value, 'base')}>{entry.value}</FigureText></Text>
           </View>
-          <Text allowFontScaling={false} style={text.meta}><FigureText>{[entry.holder, entry.set].filter(Boolean).join(' · ')}</FigureText></Text>
+          <Text allowFontScaling={false} accessibilityLabel={speakHoldSeconds([entry.holder, entry.set].filter(Boolean).join(' · '))} style={text.meta}><FigureText>{[entry.holder, entry.set].filter(Boolean).join(' · ')}</FigureText></Text>
         </View>)}
       </View> : null}
       <View style={styles.links}>

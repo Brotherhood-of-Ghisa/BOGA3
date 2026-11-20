@@ -15,7 +15,9 @@ export type CompetitionPerformanceSnapshot = {
   set_id: string;
   weight_value: string;
   reps_value: string;
-  reps: number;
+  reps: number | null;
+  recording_mode?: 'reps' | 'hold';
+  duration_sec?: number | null;
   performance_status: string | null;
   source_load_input_mode: LoadInputMode;
   achieved_at_ms: number;
@@ -24,7 +26,7 @@ export type CompetitionPerformanceSnapshot = {
 };
 /** Service-only graph row. Private reading fields are consumed here and never
  * copied into the public performance snapshot or persisted group payloads. */
-export type CompetitionSourceSet = Omit<CompetitionPerformanceSnapshot, 'reps'> & {
+export type CompetitionSourceSet = Omit<CompetitionPerformanceSnapshot, 'reps' | 'recording_mode' | 'duration_sec'> & {
   recording_mode?: 'reps' | 'hold';
   duration_sec?: number | null;
   member_user_id: string;
@@ -104,7 +106,8 @@ function privateContext(row: CompetitionSourceSet, normalized: boolean) {
 function performanceSnapshot(row: CompetitionSourceSet): CompetitionPerformanceSnapshot {
   return { session_id: row.session_id, session_exercise_id: row.session_exercise_id,
     exercise_definition_id: row.exercise_definition_id, set_id: row.set_id,
-    weight_value: row.weight_value, reps_value: row.reps_value, reps: Number(row.reps_value),
+    weight_value: row.weight_value, reps_value: row.reps_value, reps: row.recording_mode === 'hold' ? null : Number(row.reps_value),
+    ...(row.recording_mode === 'hold' ? { recording_mode: 'hold' as const, duration_sec: row.duration_sec! } : {}),
     performance_status: row.performance_status, source_load_input_mode: row.source_load_input_mode,
     achieved_at_ms: row.achieved_at_ms, exercise_order_index: row.exercise_order_index, set_order_index: row.set_order_index };
 }
@@ -124,10 +127,11 @@ export function evaluateCompetitionGraph(graph: CompetitionEvaluationGraph): Com
     const key = JSON.stringify([row.member_user_id, row.set_id]);
     if (keys.has(key)) throw new Error('Duplicate competition evaluation source set');
     keys.add(key);
-    if (row.recording_mode === 'hold' || row.duration_sec != null) continue;
-    const values = scoreCompetitionPerformance({ weightValue: row.weight_value, repsValue: row.reps_value,
+    const values = scoreCompetitionPerformance({ recordingMode: row.recording_mode, durationSec: row.duration_sec,
+      weightValue: row.weight_value, repsValue: row.reps_value,
       performanceStatus: row.performance_status, live: row.live, source: { loadInputMode: row.source_load_input_mode },
-      ...privateContext(row, isNormalizedCompetition(checked.value)) }, checked.value);
+      ...privateContext(row, checked.value.defaultMetric !== 'seconds' && row.recording_mode !== 'hold' &&
+        row.duration_sec == null && isNormalizedCompetition(checked.value)) }, checked.value);
     for (const value of values) {
       const fingerprint = row.fingerprints[value.metric];
       if (!fingerprint) throw new Error('Missing dependency fingerprint for an eligible competition score');
@@ -144,6 +148,7 @@ export function evaluateCompetitionGraph(graph: CompetitionEvaluationGraph): Com
     const mode = graph.sets.find(current => current.member_user_id === previous.member_user_id &&
       current.exercise_definition_id === row.exercise_definition_id)?.source_load_input_mode ?? row.source_load_input_mode;
     return scoreCompetitionPerformance({ live: true, performanceStatus: row.performance_status,
+      recordingMode: row.recording_mode, durationSec: row.duration_sec,
       weightValue: row.weight_value, repsValue: row.reps_value, source: { loadInputMode: mode },
       bodyWeightKg: null, bodyWeightSource: null, bodyWeightMeasurementId: null, bodyWeightMeasuredAt: null,
     }, checked.value).filter(value => value.metric === previous.metric)

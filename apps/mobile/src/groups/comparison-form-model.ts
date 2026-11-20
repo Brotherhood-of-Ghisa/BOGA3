@@ -12,7 +12,7 @@ export function validateCompetitionFormRules(input: Record<keyof GroupExerciseRu
   const contribution=validateBodyweightContribution(input.bodyweightContribution);
   if (!contribution.ok) return contribution;
   if (typeof input.bodyweightCalculationsEnabled !== 'boolean') return { ok: false,field: 'bodyweightCalculationsEnabled',message: 'Bodyweight calculations state is required.' };
-  if (!isCompetitionMetric(input.defaultMetric)) return { ok: false,field: 'defaultMetric',message: 'Choose Volume or 1RM.' };
+  if (!isCompetitionMetric(input.defaultMetric)) return { ok: false,field: 'defaultMetric',message: 'Choose Volume, 1RM or Seconds.' };
   return { ok: true,value: { ...core.value,bodyweightContribution: contribution.value,bodyweightCalculationsEnabled: input.bodyweightCalculationsEnabled,defaultMetric: input.defaultMetric } };
 }
 

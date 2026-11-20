@@ -13,7 +13,7 @@
 #     migration re-pins under the observed rules and keeps a pending reading
 #     correction; a reading-free witness survives temporary ineligibility;
 #   - the personal preference never changes a group score or queues evaluation;
-#   - only Volume and 1RM are read and stored, in their units;
+#   - repetition comparisons read and store only Volume and 1RM, in their units;
 #   - working sets only: a warm-up never ranks, records or certifies, and a
 #     stored warm-up record stands while its board falls silently;
 #   - zero-contribution rule metadata canonicalizes without touching clocks and
@@ -439,7 +439,7 @@ check 'group policy off restores ordinary 1RM even without a reading' '
   [.entries[]|select(.member.user_id==$r and .unit=="kg")]|length==1' --arg r "${RIVAL_UID}"
 pass 'personal and group calculation policies remain independent'
 
-# Only Volume and 1RM are accepted by current readers and storage.
+# These repetition comparisons accept only Volume and 1RM; other groups may use Seconds.
 for metric in weight reps relative absolute; do
   competition_board "${metric}"
   expect_error VALIDATION "unsupported metric ${metric}"
@@ -449,12 +449,12 @@ done
 # observed value of its own (its kg audit is the referenced Weight witness).
 COMPETITION_VALUE="(metric='volume' and unit in ('kg_reps','percent_bw_reps')) or (metric='e1rm' and unit in ('kg','percent_bw'))
   or (metric='weight' and unit='kg')"
-expect_sql 'score storage accepts only Volume/1RM units (and stored Weight)' \
-  "select count(*) from app_public.group_metric_set_scores where (${COMPETITION_VALUE}) is not true;" 0
-expect_sql 'board storage accepts only Volume/1RM units (and stored Weight)' \
-  "select count(*) from app_public.group_metric_board_entries where (${COMPETITION_VALUE}) is not true;" 0
-expect_sql 'certification storage accepts only Volume/1RM units (and stored Weight)' \
-  "select count(*) from app_public.group_metric_certifications where (${COMPETITION_VALUE}
+expect_sql 'repetition score storage accepts only Volume/1RM units (and stored Weight)' \
+  "select count(*) from app_public.group_metric_set_scores where group_id='${GID}' and (${COMPETITION_VALUE}) is not true;" 0
+expect_sql 'repetition board storage accepts only Volume/1RM units (and stored Weight)' \
+  "select count(*) from app_public.group_metric_board_entries where group_id='${GID}' and (${COMPETITION_VALUE}) is not true;" 0
+expect_sql 'repetition certification storage accepts only Volume/1RM units (and stored Weight)' \
+  "select count(*) from app_public.group_metric_certifications where group_id='${GID}' and (${COMPETITION_VALUE}
     or (witness_certification_id is not null and metric='volume' and unit is null)) is not true;" 0
 
 rpc "${OWNER_TOKEN}" group_competition_stream "$(jq -nc --arg g "${GID}" '{p_group_id:$g,p_limit:50}')"

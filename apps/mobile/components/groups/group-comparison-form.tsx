@@ -30,7 +30,7 @@ export const comparisonRulesFromWire = (exercise: GroupMetricExerciseWire): Grou
   defaultMetric: exercise.rules.default_metric,
 });
 const metricLabels: Record<GroupMetric, string> = {
-  volume: 'Volume', e1rm: '1RM',
+  volume: 'Volume', e1rm: '1RM', seconds: 'Seconds',
 };
 const METRIC_OPTIONS = GROUP_METRICS.map(metric => ({
   value: metric, label: metricLabels[metric], accessibilityLabel: metricLabels[metric],

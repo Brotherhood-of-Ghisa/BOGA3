@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { FigureText, Icon, makeStyles, uiBorder, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { RecordsLogRow } from '@/src/groups/records-history-view-model';
+import { speakHoldSeconds } from '@/src/groups/competition-view-model';
 
 import { useCardListItemStyles } from './screen-styles';
 
@@ -30,8 +31,8 @@ export function GroupRecordsLogRow({ row, testID }: { row: RecordsLogRow; testID
   const lead = row.mark === 'lead';
   return (
     <View style={[cardListItemStyles(row.index, row.count), row.earlierRules ? styles.earlier : null]}>
-      <View accessibilityLabel={[lead ? 'New number one' : 'New best', row.title, row.figure, row.detail, row.date,
-        row.earlierRules ? 'earlier rules' : null].filter(Boolean).join(', ')}
+      <View accessibilityLabel={speakHoldSeconds([lead ? 'New number one' : 'New best', row.title, row.figure, row.detail, row.date,
+        row.earlierRules ? 'earlier rules' : null].filter(Boolean).join(', '))}
         accessible style={[styles.entry, row.index > 0 ? styles.rule : null]} testID={testID}>
         <View style={[styles.mark, lead ? styles.markLead : styles.markBest]} testID={`${testID}-${row.mark}`}>
           <Icon colorRole={lead ? 'record' : 'accent'} name={lead ? 'star' : 'arrow-up'} size="sm" />

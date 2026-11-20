@@ -3,6 +3,7 @@
 // describe payloads exactly as they arrive and are cached.
 
 import type { LoadInputMode } from '../exercise-core/index.ts';
+import type { RecordingMode } from '../exercise-core/recording-mode.ts';
 
 export type GroupRole = 'owner' | 'admin' | 'member';
 
@@ -110,6 +111,8 @@ export type GroupExercise = {
   group_exercise_id: string;
   name: string;
   load_input_mode: LoadInputMode;
+  /** Linking projection: Seconds comparisons create personal Hold exercises. */
+  recording_mode?: RecordingMode;
   /** The standard-catalogue id it was copied from (e.g. `seed_barbell_bench_press`); null for a custom exercise. */
   source_exercise_id: string | null;
   /** Null while active. Archived: keeps its links and a read-only board, not offered for new links (D8). */

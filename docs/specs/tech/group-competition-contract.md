@@ -30,6 +30,14 @@ witness/aggregation window; personal session Volume records keep their contract.
 | --- | --- | --- |
 | `volume` | `kg_reps`: physical total external load × reps, independent of target mode | `percent_bw_reps`: 100 × effective physical total-load set volume / B |
 | `e1rm` (default) | `kg`: ordinary source 1RM converted to group target mode | `percent_bw`: 100 × effective physical total-load estimated 1RM / B |
+| `seconds` | `seconds`: confirmed Hold duration | Same duration; no bodyweight dependency |
+
+[[groups.hold-ranking]] governs Hold comparisons. A Seconds default selects
+the timed domain; crossing into or out of it retires the current revision and
+rebuilds, while Volume/1RM default changes keep their revision. No private reading
+is resolved or bound for Seconds. Weight remains subject to current disclosure.
+Rollout: support SQL, deploy `group-eval` rules 9 and `notification-worker`, kick
+evaluation, apply recompute SQL, then release the app.
 
 New comparisons default to 1RM. The cutover turned a legacy Weight default
 into Volume on a new revision; an existing 1RM default stayed 1RM. Retired
@@ -44,7 +52,7 @@ Stored scores and ordering retain that numerator. Public 1RM display follows
 [[1rm.added-load-display]] through the opt-in reader projection below.
 
 `scoreCompetitionPerformance` uses the existing parser/load/Wathan kernel.
-For every score, source per-side external kg is doubled once; normalized
+For repetition scores, source per-side external kg is doubled once; normalized
 scoring then adds c×B. Both metrics divide by the same valid as-of B used in that addition.
 The physical total-load representation makes target distribution cancel: an
 alternative target-per-side numerator and B/2 would give the same percentage.
@@ -55,8 +63,8 @@ metrics, with no zero or kg fallback. Unweighted performed sets with positive
 contribution can rank; zero ordinary projections do not.
 
 Each member's board entry is their best qualifying **single set**, independently
-for Volume/1RM and Certified/All. Qualifying means live shared/linked/performed,
-valid parsed Weight/reps, working under the shared group effort rule, eligible
+for each metric and Certified/All. Qualifying means live shared/linked/performed,
+valid parsed measurement and Weight, working under the shared group effort rule, eligible
 under that scope and positive finite score. The pure scorer also computes
 nonworking performed projections for audit validation; the publisher applies
 working/counting. A Volume witness covers that set's performance, never
@@ -116,9 +124,12 @@ cache generation 8 retires earlier displays.
 Duration-aware session detail v2 and stream v6 expose set mode, seconds and a
 current performed fact. Earlier endpoints retain exact legacy shapes. A hidden-kg
 hold displays only seconds, validated by a matching rules-8 set fingerprint;
-pending evaluation fails closed. Holds count under [[set.eligibility]] and
-produce no score or certification candidate. Cache generation 9 retires prior
-session/count projections. CoW scorer 7 remains independently pinned; new timed
+pending evaluation fails closed. [[groups.hold-ranking]] enables Seconds scores
+and certification. Cache generation 10 retires earlier group projections.
+`x-boga-group-seconds: 1` opts into timed competitive shapes. After membership
+checks, clients without it receive `UPDATE_REQUIRED` for groups with any retained
+Seconds revision, including after archive or switching back to repetitions.
+CoW scorer 7 remains independently pinned; timed
 receipts are ineligible without changing retained repetition arithmetic.
 
 Group repetition session rows implement [[set.row-figures]] with public added-load Weight

@@ -120,6 +120,23 @@ beforeEach(() => {
 });
 afterEach(() => fixture.close());
 const settleReads=()=>act(async()=>{});
+it('shows a Hold Seconds board with no repetition metrics and keeps the Certified toggle', async () => {
+  const holdExercise = { ...exercise, name: 'Plank', rules: { ...exercise.rules, default_metric: 'seconds' as const } };
+  api.listCompetitionExercises.mockResolvedValue({ contract_version: 4, exercises: [holdExercise] });
+  const holdRow = { ...uncertifiedRow, metric: 'seconds' as const, unit: 'seconds' as const, value: 30,
+    performance: { ...uncertifiedRow.performance, recording_mode: 'hold' as const, duration_sec: 30, reps: null } };
+  api.getCompetitionBoard.mockResolvedValue({ ...board, rules: holdExercise.rules, metric: 'seconds', certified: false, entries: [holdRow] });
+  render(<GroupBoardRoute />);
+  await waitFor(() => expect(screen.getByTestId('group-board-row-1-value')).toHaveTextContent('30 s'));
+  expect(screen.getByTestId('group-board-title')).toHaveTextContent(/Seconds leaderboard/);
+  fireEvent.press(screen.getByTestId('group-board-metric'));
+  expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'seconds' }));
+  fireEvent.press(screen.getByTestId('group-board-scope'));
+  await waitFor(() => {
+    expect(screen.getByTestId('group-board-scope')).toHaveTextContent('Certified');
+    expect(api.getCompetitionBoard).toHaveBeenLastCalledWith(expect.objectContaining({ metric: 'seconds', certified: true }));
+  });
+});
 it('shows normalized 1RM and Volume with explicit units and independent Certified/All controls',async()=>{
   mockParams={ ...mockParams,scope: 'certified' };
   render(<GroupBoardRoute />);await settleReads();

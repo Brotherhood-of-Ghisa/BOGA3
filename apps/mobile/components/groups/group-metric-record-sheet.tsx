@@ -4,7 +4,7 @@ import { Text, Alert, ScrollView } from 'react-native';
 
 import { ActionButton, FigureText, ListRow, SegmentedControl, Sheet, Stat, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { formatBoardDate, formatBoardMemberLabel, useNetworkOnline, type GroupRole } from '@/src/groups';
-import { formatCompetitionValue as formatGroupMetricValue,formatSetFigure,COMPETITION_LABELS as GROUP_METRIC_LABELS,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS } from '@/src/groups/competition-view-model';
+import { formatCompetitionValue as formatGroupMetricValue,formatSetFigure,speakHoldSeconds,COMPETITION_LABELS as GROUP_METRIC_LABELS,COMPETITION_LABELS as GROUP_METRIC_SHORT_LABELS } from '@/src/groups/competition-view-model';
 import type { CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
 import {
   buildMetricRecordSheetModel,
@@ -45,9 +45,9 @@ export function GroupMetricRecordSheet({ row, exercise, groupId, userId, myRole,
       {metricOptions && onSelectMetric ? <SegmentedControl accessibilityLabel="Record metric" value={row.metric}
         options={metricOptions.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }))}
         onChange={onSelectMetric} testIDPrefix="group-metric-record-metric" /> : null}
-      <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} />
+      <Stat emphasis="record" label={GROUP_METRIC_LABELS[row.metric]} value={formatGroupMetricValue(row)} spokenValue={speakHoldSeconds(formatGroupMetricValue(row))} />
       <Text allowFontScaling={false} style={text.body} testID="group-metric-record-who">{formatBoardMemberLabel(row.member, row.former, userId)} · <FigureText>{formatBoardDate(row.performance.achieved_at_ms, dateFormat)}</FigureText></Text>
-      <Text allowFontScaling={false} style={text.body} testID="group-metric-record-raw"><FigureText>{formatSetFigure(row.performance)}</FigureText></Text>
+      <Text allowFontScaling={false} accessibilityLabel={speakHoldSeconds(formatSetFigure(row.performance))} style={text.body} testID="group-metric-record-raw"><FigureText>{formatSetFigure(row.performance)}</FigureText></Text>
       <Text allowFontScaling={false} style={text.body} testID="group-metric-record-status"><FigureText>{model.statusText}</FigureText></Text>
       <MutedLine text={model.readOnlyNote} />
       <MutedLine text={model.offlineNote} />

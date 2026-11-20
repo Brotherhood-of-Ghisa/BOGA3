@@ -67,7 +67,7 @@ it('binds the summary to account, group, week, revision and publication; full re
   writeGroupCache(fixture.database, { cacheKey: alias, userId: 'u1', payload: newer, fetchedAtMs: fetchedAtMs + 1 });
   expect(readGroupCache(fixture.database, alias, 'u1')?.payload).toEqual(newer);
   expect(fixture.database.select().from(groupCache).all().filter(row => row.cacheKey.startsWith('cow-summary:'))).toHaveLength(1);
-  expect(() => writeGroupCache(fixture.database, { cacheKey: 'cow-results:v9:g1', userId: 'u1', payload: cowResult(), fetchedAtMs })).toThrow();
+  expect(() => writeGroupCache(fixture.database, { cacheKey: 'cow-results:v10:g1', userId: 'u1', payload: cowResult(), fetchedAtMs })).toThrow();
   evictGroup(fixture.database, 'g1');
   expect(readGroupCache(fixture.database, alias, 'u1')).toBeNull();
 });

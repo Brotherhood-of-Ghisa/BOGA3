@@ -7,6 +7,7 @@
 
 import { STANDARD_EXERCISE_MUSCLE_MAPPING_SEEDS } from '@/src/data/exercise-catalog-seeds';
 import type { LoadInputMode } from '@/src/exercise-core';
+import type { RecordingMode } from '@/src/exercise-core/recording-mode';
 
 import { groupExerciseCore } from './api';
 import type { GroupExercise } from './types';
@@ -14,6 +15,7 @@ import type { GroupExercise } from './types';
 export type AddAsNewPrefill = {
   name: string;
   loadInputMode: LoadInputMode;
+  recordingMode?: RecordingMode;
   mappings: { muscleGroupId: string; weight: number; role: 'primary' | 'secondary' }[];
 };
 
@@ -25,5 +27,6 @@ export const buildAddAsNewPrefill = (groupExercise: GroupExercise): AddAsNewPref
         ({ muscleGroupId, weight, role }) => ({ muscleGroupId, weight, role }),
       )
     : [];
-  return { name, loadInputMode, mappings };
+  return { name, loadInputMode, mappings,
+    ...(groupExercise.recording_mode ? { recordingMode: groupExercise.recording_mode } : {}) };
 };

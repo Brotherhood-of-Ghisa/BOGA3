@@ -863,7 +863,7 @@ expect_csince "link:volume@R,link:e1rm@R" "relink moves #1 with reason link"
 
 run_psql "update app_public.group_set_facts set rules_version=6
   where member_user_id='${RIVAL_UID}' and session_id like '${T}-%';" >/dev/null
-expect_sql "a rules bump requeues older evaluated sessions" "select app_public.group_eval_requeue_rules(8, 1000) >= 1;" "t"
+expect_sql "a rules bump requeues older evaluated sessions" "select app_public.group_eval_requeue_rules(9, 1000) >= 1;" "t"
 drain "rules"
 [[ "$(active_certs r3)" == "1:1" ]] || fail "a rules requeue voids nothing that still matches"
 expect_centry R volume "97@r3" "a rules requeue keeps the Certified entry"

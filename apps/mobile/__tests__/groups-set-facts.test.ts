@@ -97,7 +97,7 @@ describe('group evaluator set facts', () => {
       fingerprint: 'fp-s1',
       rules_version: GROUP_EVAL_RULES_VERSION,
     });
-    expect(GROUP_EVAL_RULES_VERSION).toBe(8);
+    expect(GROUP_EVAL_RULES_VERSION).toBe(9);
   });
 
   it('stores e1rm_kg per [[1rm.formula]], singles included', () => {
@@ -163,7 +163,7 @@ describe('group evaluator set facts', () => {
 
 it('normalizes confirmed hold activity without inventing reps or 1RM', () => {
   const hold = row('hold', '', '', { recording_mode: 'hold', duration_sec: 38, set_type: 'rir_0' });
-  expect(factOf(hold)).toMatchObject({ performed: true, working: true, weight_kg: 0, reps: null, e1rm_kg: null, rules_version: 8 });
+  expect(factOf(hold)).toMatchObject({ performed: true, working: true, weight_kg: 0, reps: null, e1rm_kg: null, rules_version: GROUP_EVAL_RULES_VERSION });
   expect(factOf({ ...hold, weight_value: '5' })).toMatchObject({ weight_kg: 5, e1rm_kg: null });
   for (const duration_sec of [null, 0, 301, 1.5]) expect(factOf({ ...hold, duration_sec }).performed).toBe(false);
   expect(factOf({ ...hold, reps_value: '5' }).performed).toBe(false);

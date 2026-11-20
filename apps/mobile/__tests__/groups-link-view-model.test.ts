@@ -406,6 +406,12 @@ describe('competition exercise linking', () => {
   it('prefills the shared exercise core for a linked creation', () => {
     expect(buildAddAsNewPrefill(target)).toMatchObject({ name: 'Pull-up', loadInputMode: 'per_side_load' });
   });
+  it('creates a personal Hold from a Seconds comparison so its sets can rank', () => {
+    const hold = competitionLinkExercise({ ...wire, name: 'Plank', rules: { ...wire.rules, default_metric: 'seconds' } });
+    expect(hold.recording_mode).toBe('hold');
+    expect(buildAddAsNewPrefill(hold)).toMatchObject({ name: 'Plank', recordingMode: 'hold' });
+    expect(buildAddAsNewPrefill(target)).not.toHaveProperty('recordingMode');
+  });
 });
 
 describe('group searches match the user\'s muscles ([[muscle.no-breakdown]])', () => {

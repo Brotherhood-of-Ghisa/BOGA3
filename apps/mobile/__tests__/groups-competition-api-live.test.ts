@@ -54,24 +54,25 @@ it('reuses capture graphs without accepting stale sources or exposing private he
     standalone_rejection: true,single_workout_graph_calls: 4,helpers_private: true });
 },60000);
 
-async function pushPerformance(groupId: string,exerciseId: string,startedAt: number, hold = false) {
-  const stamp=Date.now();const sessionId=`competition-live-${env.runTag}${hold ? '-hold' : ''}`;
+async function pushPerformance(groupId: string,exerciseId: string,startedAt: number, hold = false,
+  options: { suffix?: string; lifter?: LiveClient; seconds?: number; weight?: string; noReading?: boolean } = {}) {
+  const stamp=Date.now();const sessionId=`competition-live-${env.runTag}${options.suffix ?? (hold ? '-hold' : '')}`;
   const definitionId=`${sessionId}-def`;const sessionExerciseId=`${sessionId}-ex`;const setId=`${sessionId}-set`;
   const entity=(type: string,id: string,fields: Record<string,unknown>) => ({ type,id,client_updated_at_ms: stamp,
     fields: { created_at: stamp,updated_at: stamp,deleted_at: null,...fields } });
   const entities=[
     entity('exercise_definitions',definitionId,{ name: hold ? 'Hollow Hold' : 'Pull-up',recording_mode: hold ? 'hold' : 'reps',load_input_mode: 'total_load',bodyweight_contribution: 0 }),
-    entity('body_weight_measurements',`${sessionId}-reading`,{ weight_kg: 80,measured_at: startedAt-1 }),
+    ...options.noReading ? [] : [entity('body_weight_measurements',`${sessionId}-reading`,{ weight_kg: 80,measured_at: startedAt-1 })],
     entity('exercise_group_links',`${groupId}:${definitionId}`,{ exercise_definition_id: definitionId,
       group_id: groupId,group_exercise_id: exerciseId }),
     entity('sessions',sessionId,{ gym_id: null,status: 'completed',started_at: startedAt,
       completed_at: startedAt+60_000,duration_sec: 60 }),
     entity('session_exercises',sessionExerciseId,{ session_id: sessionId,exercise_definition_id: definitionId,
       order_index: 0,name: 'Pull-up',machine_name: null }),
-    entity('exercise_sets',setId,{ session_exercise_id: sessionExerciseId,order_index: 0,weight_value: hold ? '5' : '20',reps_value: hold ? '' : '5',
-      recording_mode: hold ? 'hold' : 'reps',duration_sec: hold ? 38 : null,set_type: 'rir_0',performance_status: null,planned_weight_value: null,planned_reps_value: null,planned_set_type: null }),
+    entity('exercise_sets',setId,{ session_exercise_id: sessionExerciseId,order_index: 0,weight_value: options.weight ?? (hold ? '5' : '20'),reps_value: hold ? '' : '5',
+      recording_mode: hold ? 'hold' : 'reps',duration_sec: hold ? options.seconds ?? 38 : null,set_type: 'rir_0',performance_status: null,planned_weight_value: null,planned_reps_value: null,planned_set_type: null }),
   ];
-  const pushed=await member.client.schema('app_public').rpc('sync_push',{ entities });
+  const pushed=await (options.lifter ?? member).client.schema('app_public').rpc('sync_push',{ entities });
   expect(pushed.error).toBeNull();expect(pushed.data).toMatchObject({ ok: true });
   return { sessionId,setId };
 }
@@ -222,4 +223,77 @@ it('shares timed activity and counts while keeping normalized kg and strength bo
   const ordinary = await as(owner, () => getCompetitionSession(groupId, member.userId, sessionId));
   expect(ordinary.session.exercises[0].sets[0]).toMatchObject({ recording_mode: 'hold', duration_sec: 38, weight_value: '5' });
   expect(buildCompetitionSession(ordinary.session)).toMatchObject({ setCount: 1, volume: '—', cards: [{ rows: [{ weightReps: '5.0 × 38 s' }] }] });
+}, 840000);
+
+it('ranks and certifies Holds by seconds, ignores weight for ties, and retains duration history safely', async () => {
+  const { group_id: groupId } = await as(owner, () => createGroup({ name: 'Seconds only', description: null }));
+  const { code } = await as(owner, () => getGroupInviteCode(groupId));
+  await as(member, () => joinGroup(code));
+  await as(owner, () => updateGroup(groupId, { name: 'Seconds only', description: null, bodyweightCalculationsEnabled: true }));
+  const { exercise } = await as(owner, () => createCompetitionExercise({ groupId, name: 'Plank', mode: 'total_load', contribution: 1, metric: 'seconds' }));
+  const exerciseId = exercise.group_exercise_id;
+  const readBoard = () => as(owner, () => getCompetitionBoard({ groupId, exerciseId, metric: 'seconds', certified: false }));
+  await poll(readBoard, result => result.state === 'ready');
+  const started = Date.now();
+  const unweighted = await pushPerformance(groupId, exerciseId, started, true,
+    { suffix: '-seconds-bw', lifter: owner, seconds: 30, weight: '', noReading: true });
+  const weighted = await pushPerformance(groupId, exerciseId, started + 1, true,
+    { suffix: '-seconds-loaded', seconds: 29, weight: '24', noReading: true });
+  const board = await poll(readBoard, result => result.entries.length === 2);
+  expect(board.entries.map(row => [row.member.user_id, row.value, row.unit])).toEqual([
+    [owner.userId, 30, 'seconds'], [member.userId, 29, 'seconds']]);
+  expect(board.entries[0].performance).toMatchObject({ recording_mode: 'hold', duration_sec: 30, reps: null });
+  expect(board.entries[0].performance).not.toHaveProperty('weight_value');
+  expect(board.entries[0].performance).not.toHaveProperty('normalized_metrics');
+  const contextParity = execFileSync('docker', ['exec', '-i', process.env.GROUPS_LIVE_DB_CONTAINER!, 'psql', '-X', '-U', 'postgres', '-d', 'postgres', '-Atq'], {
+    input: `with full_graph as (select app_public.group_metric_eval_source_graph('${groupId}','${exerciseId}') g),
+      context as (select app_public.notification_context_source('${groupId}','${exerciseId}','${owner.userId}','${unweighted.sessionId}') c)
+      select jsonb_build_object('same_sets',c->'sets'=(select jsonb_agg(s order by s->>'member_user_id',s->>'set_id')
+        from jsonb_array_elements(g->'sets') s where s->>'member_user_id'='${owner.userId}' and s->>'session_id'='${unweighted.sessionId}'),
+        'seconds_pin',c->'sets'->0->'fingerprints' ? 'seconds',
+        'no_reading',c->'sets'->0->>'body_weight_kg' is null and c->'sets'->0->>'reading_pin' is null)
+      from full_graph,context;`, encoding: 'utf8',
+  });
+  expect(JSON.parse(contextParity)).toEqual({ same_sets: true, seconds_pin: true, no_reading: true });
+  await pushPerformance(groupId, exerciseId, started + 1, true,
+    { suffix: '-seconds-loaded', seconds: 30, weight: '24', noReading: true });
+  const tied = await poll(readBoard, result => result.entries[1]?.value === 30);
+  expect(tied.entries.map(row => row.member.user_id)).toEqual([owner.userId, member.userId]);
+  const { certification } = await as(member, () => certifyCompetition({ groupId, exerciseId, memberId: owner.userId,
+    setId: unweighted.setId, metric: 'seconds', revision: tied.rules.rules_revision, token: tied.entries[0].write_token }));
+  const readCertified = () => as(member, () => getCompetitionBoard({ groupId, exerciseId, metric: 'seconds', certified: true }));
+  const certified = await poll(readCertified, result => result.entries.length === 1);
+  expect(certified.entries[0].certification?.certification_id).toBe(certification.certification_id);
+  const log = await as(owner, () => getCompetitionRecordsHistory({ groupId, exerciseId, metric: 'seconds', certified: false }));
+  expect(log.items.some(item => item.event.values.some(value => value.metric === 'seconds' && value.value === 30))).toBe(true);
+  const stream = await as(owner, () => getCompetitionStream(groupId));
+  expect(stream.items.some(item => item.kind === 'competition' && item.event.values.some(value => value.metric === 'seconds'))).toBe(true);
+  expect((await as(owner, () => getCompetitionSessionRecords(groupId, owner.userId, unweighted.sessionId))).records.length).toBeGreaterThan(0);
+  const readLegacy = () => fetch(`${env.url}/rest/v1/rpc/group_competition_exercise_list`, { method: 'POST',
+    headers: { apikey: env.anonKey, Authorization: `Bearer ${owner.session.access_token}`, 'Content-Type': 'application/json',
+      'Content-Profile': 'app_public', 'x-boga-group-contract': '4' }, body: JSON.stringify({ p_group_id: groupId }) });
+  expect((await (await readLegacy()).json()).message).toMatch(/^UPDATE_REQUIRED:/);
+  const calendar = await as(owner, () => getCoWCalendar(groupId));
+  const cowInput = { cowId: randomUUID(), groupExerciseId: exerciseId, metrics: ['e1rm' as const],
+    calendarRevision: calendar.revision, weekStart: calendar.next_week_start! };
+  await expect(as(owner, () => createCoW(groupId, cowInput))).rejects.toMatchObject({ code: 'VALIDATION' });
+  await pushPerformance(groupId, exerciseId, started, true,
+    { suffix: '-seconds-bw', lifter: owner, seconds: 28, weight: '', noReading: true });
+  await poll(readBoard, result => result.entries[0]?.member.user_id === member.userId);
+  await poll(readCertified, result => result.entries.length === 0);
+  expect((await as(member, () => getCompetitionCertification(groupId, certification.certification_id, 'seconds'))).certification.end_reason).toBe('voided');
+  const switched = await as(owner, () => updateCompetitionExercise({ groupId, exerciseId, revision: exercise.rules.rules_revision,
+    name: 'Plank', mode: 'total_load', contribution: 1, metric: 'e1rm' }));
+  expect(switched.exercise.rules.rules_revision).toBe(exercise.rules.rules_revision + 1);
+  const retained = await as(owner, () => getCompetitionRecordsHistory({ groupId, exerciseId, metric: 'seconds', certified: false }));
+  expect(retained.items.some(item => item.event.values.some(value => value.unit === 'seconds'))).toBe(true);
+  expect((await (await readLegacy()).json()).message).toMatch(/^UPDATE_REQUIRED:/);
+  await as(owner, () => createCoW(groupId, cowInput));
+  await as(owner, () => updateCompetitionExercise({ groupId, exerciseId, revision: switched.exercise.rules.rules_revision,
+    name: 'Plank', mode: 'total_load', contribution: 1, metric: 'seconds' }));
+  const context = execFileSync('docker', ['exec', '-i', process.env.GROUPS_LIVE_DB_CONTAINER!, 'psql', '-X', '-U', 'postgres', '-d', 'postgres', '-Atq'], {
+    input: `select app_public.group_cow_context(c) from app_public.group_cows c where id='${cowInput.cowId}';`, encoding: 'utf8',
+  });
+  expect(JSON.parse(context)).toMatchObject({ available: false, normalized: false, bodyweight_calculations_enabled: false });
+  expect(weighted.setId).not.toBe(unweighted.setId);
 }, 840000);

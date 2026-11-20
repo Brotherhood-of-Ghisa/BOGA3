@@ -18,27 +18,27 @@ const { groupCache } = schema;
 export type GroupCacheDatabase = BaseSQLiteDatabase<'sync', unknown, typeof schema>;
 
 export const groupCacheKeys = {
-  mine: 'groups:v9:mine',
-  group: (groupId: string) => `group:v9:${groupId}`,
-  stream: (groupId: string) => `stream:v9:${groupId}:withdrawn-records-v1`,
-  session: (groupId: string, memberUserId: string, sessionId: string) => `session:v9:${groupId}:${memberUserId}:${sessionId}`,
+  mine: 'groups:v10:mine',
+  group: (groupId: string) => `group:v10:${groupId}`,
+  stream: (groupId: string) => `stream:v10:${groupId}:withdrawn-records-v1`,
+  session: (groupId: string, memberUserId: string, sessionId: string) => `session:v10:${groupId}:${memberUserId}:${sessionId}`,
   /** Versioned comparison catalogue; v1 cache entries are not reused. */
-  groupExercises: (groupId: string) => `group-exercises:v9:${groupId}`,
+  groupExercises: (groupId: string) => `group-exercises:v10:${groupId}`,
   /** Group shared exercises list (Option C persistent library). */
-  sharedExercises: (groupId: string) => `shared-exercises:v9:${groupId}`,
+  sharedExercises: (groupId: string) => `shared-exercises:v10:${groupId}`,
   /** Versioned podium payload, All scope. Full boards and history are never cached. */
-  boards: (groupId: string) => `boards:v9:${groupId}:all`,
+  boards: (groupId: string) => `boards:v10:${groupId}:all`,
   /** Today's group card: the latest week read, stamped with its window (one entry per group). */
-  weekSummary: (groupId: string) => `week:v9:${groupId}`,
+  weekSummary: (groupId: string) => `week:v10:${groupId}`,
   /** At a glance: one period-totals read per period and stepper offset (0 the current period, -1 the one before). */
-  glance: (groupId: string, period: 'week', offset: number) => `glance:v9:${groupId}:${period}:${offset}`,
+  glance: (groupId: string, period: 'week', offset: number) => `glance:v10:${groupId}:${period}:${offset}`,
   /** Read alias; stored summaries also pin server week, CoW/revision and publication. */
-  cowSummary: (groupId: string, previous = false) => `${previous ? 'cow-previous-summary' : 'cow-summary'}:v9:${groupId}`,
+  cowSummary: (groupId: string, previous = false) => `${previous ? 'cow-previous-summary' : 'cow-summary'}:v10:${groupId}`,
 } as const;
 
 const SESSION_KEY_PATTERN = 'session:%';
 const isCoWSummaryKey = (key: string) => key.startsWith('cow-summary:') || key.startsWith('cow-previous-summary:');
-const glanceKeyPattern = (groupId: string) => `glance:v9:${groupId}:%`;
+const glanceKeyPattern = (groupId: string) => `glance:v10:${groupId}:%`;
 
 export type GroupCacheEntry<T> = {
   payload: T;
@@ -164,7 +164,7 @@ export const deleteGroupCacheEntry = (database: GroupCacheDatabase, cacheKey: st
  */
 export const evictGroup = (database: GroupCacheDatabase, groupId: string): void => {
   const scope = or(inArray(groupCache.cacheKey,[groupCacheKeys.group(groupId),groupCacheKeys.stream(groupId),
-    groupCacheKeys.groupExercises(groupId),groupCacheKeys.boards(groupId),`boards:v9:${groupId}`,groupCacheKeys.weekSummary(groupId),`group-policy:v9:${groupId}`]),
+    groupCacheKeys.groupExercises(groupId),groupCacheKeys.boards(groupId),`boards:v10:${groupId}`,groupCacheKeys.weekSummary(groupId),`group-policy:v10:${groupId}`]),
     like(groupCache.cacheKey,glanceKeyPattern(groupId)),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId)}:%`),like(groupCache.cacheKey,`${groupCacheKeys.cowSummary(groupId, true)}:%`),like(groupCache.cacheKey,SESSION_KEY_PATTERN));
   const accounts = new Set(database.select({ userId: groupCache.userId }).from(groupCache).where(scope).all().map(row => row.userId));
   database.delete(groupCache).where(scope).run();
@@ -199,8 +199,8 @@ export const subscribeCompetitionCache = (listener: () => void): (() => void) =>
 };
 /** Upgrade removes all prior generations for this account before hydration. */
 export const evictObsoleteGroupCache = (database: GroupCacheDatabase,userId: string): void => {
-  database.delete(groupCache).where(and(eq(groupCache.userId,userId),notLike(groupCache.cacheKey,'%:v9:%'))).run();
-  database.delete(groupCache).where(and(eq(groupCache.userId,userId),like(groupCache.cacheKey,'stream:v9:%'),
+  database.delete(groupCache).where(and(eq(groupCache.userId,userId),notLike(groupCache.cacheKey,'%:v10:%'))).run();
+  database.delete(groupCache).where(and(eq(groupCache.userId,userId),like(groupCache.cacheKey,'stream:v10:%'),
     notLike(groupCache.cacheKey,'%:withdrawn-records-v1'))).run();
 };
 
@@ -248,11 +248,11 @@ function observeCompetitionPolicyUnchecked(database: GroupCacheDatabase,key: str
   }
   if (changed) {
     quarantineCompetitionCache(userId);
-    database.delete(groupCache).where(and(eq(groupCache.userId,userId),notLike(groupCache.cacheKey,'group-policy:v9:%'))).run();
+    database.delete(groupCache).where(and(eq(groupCache.userId,userId),notLike(groupCache.cacheKey,'group-policy:v10:%'))).run();
     for (const [groupId,policy] of policies) policies.set(groupId,{ ...policy,absolute_projection_seen: incomingAbsoluteGroups.has(groupId) });
   }
   for (const [groupId,policy] of policies) {
-    const cacheKey=`group-policy:v9:${groupId}`;
+    const cacheKey=`group-policy:v10:${groupId}`;
     const values={ cacheKey,userId,payloadJson: JSON.stringify({ ...policy,sessions: policy.sessions.slice(-256) }),fetchedAtMs };
     database.insert(groupCache).values(values).onConflictDoUpdate({ target: groupCache.cacheKey,set: values }).run();
   }
@@ -272,8 +272,8 @@ function readClosedAccountCache(database: GroupCacheDatabase,userId: string) {
 /** Online-only readers publish their current public policy before displaying a page. */
 export function observeGroupCompetitionPolicy(database: GroupCacheDatabase,groupId: string,userId: string,payload: unknown): number {
   if (quarantinedAccounts.has(userId)) deleteAccountCompetitionCache(database,userId);
-  observeCompetitionPolicy(database,`group-read:v9:${groupId}`,userId,payload,Date.now());
-  clearObservedGroupLoss(userId,`group-read:v9:${groupId}`,payload);
+  observeCompetitionPolicy(database,`group-read:v10:${groupId}`,userId,payload,Date.now());
+  clearObservedGroupLoss(userId,`group-read:v10:${groupId}`,payload);
   return getCompetitionCacheGeneration(userId);
 }
 

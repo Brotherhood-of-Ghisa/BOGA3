@@ -483,8 +483,11 @@ run_psql "update app_public.group_exercises set name='Renamed bench',default_met
   update app_public.groups set name='Current group name' where id='${G1}';" >/dev/null
 assert_sql 'name/default-tab metadata preserves readiness' "select app_public.notification_workout_ready('${B_UID}','${SESSION}');"
 # Exercise the migration's real capture/restamp SQL against valid and stale seals.
-HOLD_MIGRATION="${SUPABASE_DIR}/migrations/20261119183619_manual_holds.sql"
-HOLD_CAPTURE_SQL="$(sed -n '/^create temporary table manual_hold_current_contexts as$/,/^-- End pending-confirmation capture\.$/p' "${HOLD_MIGRATION}")"
+for HOLD_MIGRATION in "${SUPABASE_DIR}/migrations/20261119183619_manual_holds.sql" \
+  "${SUPABASE_DIR}/migrations/20261120170306_groups_hold_seconds.sql"; do
+hold_manifest_changes=false
+[[ "${HOLD_MIGRATION}" != *manual_holds.sql ]] || hold_manifest_changes=true
+HOLD_CAPTURE_SQL="$(sed -n '/^create temporary table .*_current_contexts as$/,/^-- End pending-confirmation capture\.$/p' "${HOLD_MIGRATION}")"
 HOLD_RESTAMP_SQL="$(sed -n '/^update app_public.notification_workouts w$/,/^-- End pending-confirmation restamp\.$/p' "${HOLD_MIGRATION}")"
 OLD_CONTEXT_SQL="$(sed -n '/^create function app_public.notification_context_source(/,/^\$\$;$/p' \
   "${SUPABASE_DIR}/migrations/20261114210000_notification_ready_single_graph.sql" | sed 's/^create function /create or replace function /')"
@@ -496,8 +499,10 @@ for hold_stale in none context manifest; do
     ${OLD_CONTEXT_SQL}
     do \$\$ declare def text:=pg_get_functiondef('app_public.notification_source_manifest(uuid,text)'::regprocedure); begin
       if strpos(def,'to_jsonb(es)')=0 or strpos(def,'to_jsonb(ed)')=0 then raise exception 'missing old manifest shape'; end if;
-      execute replace(replace(def,'to_jsonb(es)','(to_jsonb(es)-array[''recording_mode'',''duration_sec''])'),
-        'to_jsonb(ed)','(to_jsonb(ed)-''recording_mode'')');
+      if ${hold_manifest_changes} then
+        execute replace(replace(def,'to_jsonb(es)','(to_jsonb(es)-array[''recording_mode'',''duration_sec''])'),
+          'to_jsonb(ed)','(to_jsonb(ed)-''recording_mode'')');
+      end if;
     end \$\$;
     update app_public.notification_workouts set
       context_digest=case when '${hold_stale}'='context' then 'hold-upgrade-stale'
@@ -518,14 +523,15 @@ for hold_stale in none context manifest; do
           and case when '${hold_stale}'='none' then
             w.context_digest=app_public.notification_context_digest(w.member_user_id,w.session_id)
               and w.manifest_digest=app_public.notification_manifest_digest(w.member_user_id,w.session_id)
-              and w.context_digest<>b.context_digest and w.manifest_digest<>b.manifest_digest
+              and w.context_digest<>b.context_digest and (w.manifest_digest<>b.manifest_digest)=${hold_manifest_changes}
               and app_public.notification_workout_ready(w.member_user_id,w.session_id)
           else w.context_digest=b.context_digest and w.manifest_digest=b.manifest_digest
             and not app_public.notification_workout_ready(w.member_user_id,w.session_id) end)
       then raise exception 'hold upgrade changed confirmation validity or clocks'; end if;
     end \$\$;
     rollback;" >/dev/null
-  pass "hold upgrade preserves pending confirmation validity (${hold_stale})"
+  pass "$(basename "${HOLD_MIGRATION}") preserves pending confirmation validity (${hold_stale})"
+done
 done
 # Claim first, then mutate a descendant: preparation must defer, never permanently cancel or send stale counts.
 prepare_outcome "${B_UID}" "${SESSION}"
@@ -2089,5 +2095,66 @@ assert_sql 'the context source stays private to the proofs that read it' "select
   and not has_function_privilege('anon',p.oid,'execute') and not has_function_privilege('authenticated',p.oid,'execute')
   and not has_function_privilege('service_role',p.oid,'execute')
   from pg_proc p where p.oid='app_public.notification_context_source(uuid,uuid,uuid,text)'::regprocedure;"
+# A hidden-weight Hold still contributes safe duration bests and both net positions.
+provision H hold-recipient
+set_username "${H_UID}" MemberH
+rpc "${H_TOKEN}" group_create '{"p_name":"Hold summary","p_description":""}'; expect_ok 'create Hold summary group'
+HOLD_GROUP="$(jq -r '.group_id' <<<"${BODY}")"; GROUP_IDS+=("${HOLD_GROUP}")
+run_psql "insert into app_public.group_memberships(group_id,user_id,role,joined_at)
+  values('${HOLD_GROUP}','${B_UID}','member',now()-interval '3 days');
+  update app_public.group_memberships set joined_at=now()-interval '3 days' where group_id='${HOLD_GROUP}';" >/dev/null
+rpc "${H_TOKEN}" group_update "$(jq -nc --arg g "${HOLD_GROUP}" '{p_group_id:$g,p_name:"Hold summary",p_description:"",p_bodyweight_calculations_enabled:true}')"
+expect_ok 'enable Hold disclosure policy'
+http_call -X POST -H "apikey: ${ANON_KEY}" -H "Authorization: Bearer ${H_TOKEN}" \
+  -H "${GROUP_CONTRACT_HEADER}" -H 'x-boga-group-seconds: 1' -H 'Content-Type: application/json' -H 'Content-Profile: app_public' \
+  --data "$(jq -nc --arg g "${HOLD_GROUP}" '{p_group_id:$g,p_name:"Plank",p_load_input_mode:"total_load",p_bodyweight_contribution:1,p_default_metric:"seconds"}')" \
+  "${API_URL}/rest/v1/rpc/group_competition_exercise_create"
+expect_ok 'create Seconds comparison'; HOLD_EXERCISE="$(jq -r '.exercise.group_exercise_id' <<<"${BODY}")"
+HOLD_NOW="$(node -e 'process.stdout.write(String(Date.now()))')"
+for label in H B; do
+  token_var="${label}_TOKEN"; duration=28; weight=''
+  [[ "${label}" != H ]] || { duration=29; weight=24; }
+  next_cuam
+  push "${!token_var}" 'Hold summary baseline' \
+    "$(e_def "hold-${label}-${RUN_TAG}" Plank "${CUAM}" total_load 1 | jq '.fields.recording_mode="hold"')" \
+    "$(e_link "hold-${label}-${RUN_TAG}" "${HOLD_GROUP}" "${HOLD_EXERCISE}" "${CUAM}")" \
+    "$(e_session "hold-base-${label}-${RUN_TAG}" "$((HOLD_NOW-120000))" completed "$((HOLD_NOW-60000))" 60 null "${CUAM}")" \
+    "$(e_se "hold-base-${label}-ex-${RUN_TAG}" "hold-base-${label}-${RUN_TAG}" "hold-${label}-${RUN_TAG}" 0 Plank "${CUAM}")" \
+    "$(e_set "hold-base-${label}-set-${RUN_TAG}" "hold-base-${label}-ex-${RUN_TAG}" 0 "${weight}" '' '' "${CUAM}" \
+      | jq --argjson d "${duration}" '.fields.recording_mode="hold" | .fields.duration_sec=$d')"
+done
+drain_eval
+HOLD_INSTALL="$(node -e 'process.stdout.write(require("node:crypto").randomUUID())')"
+HOLD_CAPABILITY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+HOLD_KEY="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64"))')"
+rpc "${H_TOKEN}" notification_register "$(jq -nc --arg i "${HOLD_INSTALL}" --arg c "${HOLD_CAPABILITY}" --arg k "${HOLD_KEY}" \
+  '{p_installation_id:$i,p_capability:$c,p_encryption_key:$k,p_token:"LocalPushToken[hold]",p_environment:"local",p_project_id:"3c00cd23-0946-4eb6-bbf0-4542879cd314",p_bundle_id:"com.phano.boga3.dev",p_permission:true,p_opted_in:true}')"
+expect_ok 'register Hold summary recipient'
+HOLD_SESSION="hold-summary-${RUN_TAG}"
+next_cuam
+push "${B_TOKEN}" '30 second bodyweight Hold' \
+  "$(e_session "${HOLD_SESSION}" "$((HOLD_NOW-30000))" active null null null "${CUAM}")" \
+  "$(e_se "${HOLD_SESSION}-ex" "${HOLD_SESSION}" "hold-B-${RUN_TAG}" 0 Plank "${CUAM}")" \
+  "$(e_set "${HOLD_SESSION}-set" "${HOLD_SESSION}-ex" 0 '' '' '' "${CUAM}" \
+    | jq '.fields.recording_mode="hold" | .fields.duration_sec=30')"
+drain_eval
+next_cuam
+push "${B_TOKEN}" 'complete Hold workout' "$(e_session "${HOLD_SESSION}" "$((HOLD_NOW-30000))" completed "${HOLD_NOW}" 30 null "${CUAM}")"
+confirm "${B_TOKEN}" "${HOLD_SESSION}" "$(manifest "${B_UID}" "${HOLD_SESSION}")"
+drain_eval
+assert_sql 'Hold notification board keeps duration and hides logged weight' "select count(*)=2 and bool_and(
+  row_json->'performance'->>'duration_sec' is not null and not(row_json->'performance' ? 'weight_value'))
+  from app_public.group_competition_board_rows('${HOLD_GROUP}','${HOLD_EXERCISE}',1,'seconds',false);"
+prepare_outcome "${B_UID}" "${HOLD_SESSION}"
+check 'Seconds best and private counterfactual retain both members' '.jobs[]|select(.session_id==$s)|.targets[]|select(.group_exercise_id==$x)|
+  .best_metrics==["seconds"] and .before==.without_workout and .before!=.final and
+  ([.without_workout[]|select(.metric=="seconds" and .certified==false)]|length==2)' --arg s "${HOLD_SESSION}" --arg x "${HOLD_EXERCISE}"
+[[ "${COUNTS}" == "$(jq -nc --arg g "${HOLD_GROUP}" '[{group_id:$g,best_count:1,rank_count:2}]')" ]] || fail 'Hold completion counts'
+enqueue_outcome "${B_UID}" "${HOLD_SESSION}"
+drain_worker
+HOLD_INTENT="$(run_psql "select id from app_public.notification_intents where recipient_user_id='${H_UID}' and lifter_user_id='${B_UID}' and session_id='${HOLD_SESSION}' and kind='completion';")"
+rpc "${SERVICE_ROLE_KEY}" notification_projection "{\"p_intent_id\":${HOLD_INTENT}}"; expect_ok 'project Hold completion summary'
+check 'Hold completion summary counts one best and two net rank changes' '.kind=="completion" and .bestCount==1 and .rankCount==2'
+pass 'Seconds completion summary retains achievements without disclosing weight'
 COMPLETED=1
 pass 'workout graph, full-rank publication, overlap, ownership, expiry, clamp, sink and admission contracts'
