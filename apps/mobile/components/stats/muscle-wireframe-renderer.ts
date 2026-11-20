@@ -18,8 +18,6 @@ export type WireframeFrame = {
   readonly november: boolean;
 };
 
-const WIREFRAME_FACE_ALPHA = .4;
-
 const VERTEX_SHADER = `
 attribute vec3 position;
 attribute vec3 normal;
@@ -136,31 +134,13 @@ export type MuscleWireframeRenderer = { draw(frame: WireframeFrame): void; dispo
 
 function frameColours(frame: WireframeFrame) {
   const paper = hexToLch(frame.roles.paper).lightness, ink = hexToLch(frame.roles.ink).lightness;
-  const dark = paper < ink;
   const grey = (amount: number) => lchToHex({ lightness: paper + (ink - paper) * amount, chroma: 0, hue: 0 });
-  // Compensate the colour lost when translucent faces blend over neutral anatomy.
-  const faceAnchor = (index: number) => ({ ...frame.palette.anchors[index],
-    lightness: paper + (ink - paper) * (.4 + .2 * index), chroma: frame.palette.anchors[index].chroma * 2 });
-  const palette: ThemeShadePalette = frame.overlay === 'wireframe'
-    ? { ...frame.palette, anchors: [faceAnchor(0), faceAnchor(1), faceAnchor(2)] }
-    : frame.palette;
-  const rampFor = (group: string) => {
-    const reported = reportedMaterial(group as MuscleBodyMaterialId, frame.report);
-    return buildMuscleShadeRamp(reported === 'neutral' ? null : frame.scores.get(reported) ?? null, palette);
-  };
-  const low = grey(.08), high = grey(dark ? .14 : .03);
-  const selectedRamp = frame.overlay === 'wireframe' ? rampFor(frame.selected[0]?.group ?? 'neutral') : [frame.roles.accent];
-  // Match the displayed body shade so selection cannot add another effort coat.
-  const selected = [selectedRamp[0], selectedRamp[selectedRamp.length - 1]].map((hex, index) => {
-    const base = colourVector(index === 0 ? low : high);
-    const fill = colourVector(hex);
-    return frame.overlay === 'wireframe' ? fill.map((channel, i) => WIREFRAME_FACE_ALPHA * channel + (1 - WIREFRAME_FACE_ALPHA) * base[i]) : fill;
-  });
   return {
-    low, high,
-    wire: grey(.32), selectedWire: grey(.4),
-    ramps: BODY_WIRE_INSTANCES.map(mesh => rampFor(mesh.group)),
-    selected,
+    wire: grey(.32),
+    ramps: BODY_WIRE_INSTANCES.map(mesh => {
+      const reported = reportedMaterial(mesh.group as MuscleBodyMaterialId, frame.report);
+      return buildMuscleShadeRamp(reported === 'neutral' ? null : frame.scores.get(reported) ?? null, frame.palette);
+    }),
   };
 }
 
@@ -220,37 +200,32 @@ export function createMuscleWireframeRenderer(gl: ExpoWebGLRenderingContext): Mu
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK); gl.disable(gl.BLEND);
       gl.uniform2f(uniforms.rotation, camera.cos, camera.sin); gl.uniform2f(uniforms.centre, camera.centreX, camera.centreY);
       gl.uniform2f(uniforms.viewport, camera.width, camera.height); gl.uniform1f(uniforms.scale, camera.scale);
-      gl.uniform1f(uniforms.fillAlpha, 1); gl.uniform1f(uniforms.wireWidth, 0);
+      gl.uniform1f(uniforms.fillAlpha, 1); gl.uniform1f(uniforms.wireWidth, wires ? .45 * ratio : 0);
+      colour('wireColour', colours.wire);
       body.forEach((mesh, i) => {
         const ramp = colours.ramps[i];
         gl.stencilFunc(gl.ALWAYS, mesh.group === 'neutral' ? 0 : 1, 0xff);
-        colour('fillLow', wires ? colours.low : ramp[0]); colour('fillHigh', wires ? colours.high : ramp[ramp.length - 1]);
+        colour('fillLow', ramp[0]); colour('fillHigh', ramp[ramp.length - 1]);
         paint(mesh);
       });
       if (frame.november) {
         gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+        gl.uniform1f(uniforms.wireWidth, 0);
         colour('fillLow', palette.moustache); colour('fillHigh', palette.moustache); colour('wireColour', palette.moustache); paint(moustache);
       }
       gl.stencilMask(0);
-      if (wires) {
-        gl.depthMask(false); gl.enable(gl.BLEND);
-        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-        gl.uniform1f(uniforms.fillAlpha, WIREFRAME_FACE_ALPHA); gl.uniform1f(uniforms.wireWidth, .45 * ratio);
-        colour('wireColour', colours.wire);
-        body.forEach((mesh, i) => {
-          const ramp = colours.ramps[i];
-          colour('fillLow', ramp[0]); colour('fillHigh', ramp[ramp.length - 1]); paint(mesh);
-        });
-      }
       if (selection) {
         overlay!.begin(); gl.disable(gl.STENCIL_TEST); gl.disable(gl.BLEND); gl.depthMask(true);
         gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         // Resolve only the selected surfaces, then write straight RGBA for their nearest visible detail.
         gl.colorMask(false, false, false, false); paint(selection);
         gl.colorMask(true, true, true, true); gl.depthMask(false);
-        const selectionColour = wires ? colours.selectedWire : roles.accent;
-        gl.uniform3fv(uniforms.fillLow, colours.selected[0]); gl.uniform3fv(uniforms.fillHigh, colours.selected[1]); colour('wireColour', selectionColour);
-        gl.uniform1f(uniforms.fillAlpha, wires ? WIREFRAME_FACE_ALPHA : 1); gl.uniform1f(uniforms.wireWidth, wires ? .55 * ratio : 0); paint(selection);
+        const accent = colourVector(roles.accent);
+        gl.uniform3fv(uniforms.fillLow, accent); gl.uniform3fv(uniforms.fillHigh, accent);
+        // Dense selected meshes need softer edges so the accent fill stays dominant.
+        gl.uniform3fv(uniforms.wireColour, wires
+          ? colourVector(roles.onAccent).map((channel, i) => .6 * channel + .4 * accent[i]) : accent);
+        gl.uniform1f(uniforms.fillAlpha, 1); gl.uniform1f(uniforms.wireWidth, wires ? .35 * ratio : 0); paint(selection);
         // Each closer muscle surface transmits half the remaining highlight; surfaces behind it do nothing.
         gl.depthFunc(gl.LESS); gl.enable(gl.BLEND); gl.colorMask(false, false, false, true);
         gl.blendFuncSeparate(gl.ZERO, gl.ONE, gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);

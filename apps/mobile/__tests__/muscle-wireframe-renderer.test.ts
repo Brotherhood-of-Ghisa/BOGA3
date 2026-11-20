@@ -114,8 +114,8 @@ it('repaints live theme colours without rebuilding geometry and preserves the se
   renderer.draw({ ...frame, roles, palette, november: true });
   expect(gl.bufferData).toHaveBeenCalledTimes(uploads);
   const selectionWire = gl.uniform3fv.mock.calls.filter(call => call[0] === 'wireColour').at(-1)![1];
-  expect(Math.max(...selectionWire) - Math.min(...selectionWire)).toBeLessThanOrEqual(1 / 255);
-  expect(selectionWire).not.toEqual(colourVector(roles.accent));
+  expect(Math.abs(lightnessOf(selectionWire) - lightnessOf(colourVector(roles.accent)))).toBeGreaterThan(20);
+  expect(gl.uniform3fv).toHaveBeenCalledWith('fillHigh', colourVector(roles.accent));
   expect(gl.uniform3fv).toHaveBeenCalledWith('fillLow', colourVector(palette.moustache));
   expect(gl.clearColor.mock.calls.at(-2)).toEqual([...colourVector(roles.surface), 1]);
   expect(gl.clearColor).toHaveBeenLastCalledWith(0, 0, 0, 0);
@@ -142,22 +142,23 @@ it.each(['shader', 'link', 'buffer', 'texture', 'framebuffer', 'renderbuffer'])(
   if (failure === 'buffer') expect(gl.deleteBuffer).toHaveBeenCalledTimes(1);
 });
 
-it('colours translucent faces by reported effort, keeps merged grades together and untracked or invalid regions neutral', () => {
+it('uses opaque Patches effort fills, keeps merged grades together and untracked or invalid regions neutral', () => {
   const { context, gl } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
   const muscle = { id: 'cm_arms', displayName: 'Arms', familyName: 'Arms', sortOrder: 0 };
   const frame = wireframeFixture({ selected: [], scores: new Map([['cm_arms', .5], ['chest', 1], ['calves', Infinity], ['quads', NaN], ['back_lats', -Infinity]]),
     report: new Map([['biceps', { muscle, tracked: true }], ['triceps', { muscle, tracked: true }], ['chest', { muscle, tracked: false }]]) });
   renderer.draw(frame);
-  const fills = gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillLow').slice(BODY_WIRE_INSTANCES.length).map(call => call[1]);
+  const fills = gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillLow').map(call => call[1]);
   const colourOf = (id: string) => fills[BODY_WIRE_INSTANCES.findIndex(mesh => mesh.group === id)];
   expect(colourOf('biceps')).toEqual(colourOf('triceps'));
-  expect(lightnessOf(colourOf('biceps'))).toBeLessThan(lightnessOf(colourVector(buildMuscleShadeRamp(.5, frame.palette)[0])));
+  expect(colourOf('biceps')).toEqual(colourVector(buildMuscleShadeRamp(.5, frame.palette)[0]));
   expect(colourOf('biceps')).not.toEqual(colourOf('neutral'));
   for (const id of ['chest', 'calves', 'quads', 'back_lats', 'forearms_grip']) {
     expect(colourOf(id)).toEqual(colourOf('neutral'));
   }
   expect(colourOf('neutral')).toEqual(colourVector(frame.palette.neutral[0]));
-  expect(gl.uniform1f).toHaveBeenCalledWith('fillAlpha', .4);
+  expect(gl.uniform1f.mock.calls.filter(call => call[0] === 'fillAlpha')).toEqual([['fillAlpha', 1]]);
+  expect(gl.drawArrays).toHaveBeenCalledTimes(BODY_WIRE_INSTANCES.length);
   const wires = gl.uniform3fv.mock.calls.filter(call => call[0] === 'wireColour');
   expect(wires).toHaveLength(1);
   expect(Math.max(...wires[0][1]) - Math.min(...wires[0][1])).toBeLessThanOrEqual(1 / 255);
@@ -186,7 +187,7 @@ it('keeps every effort and neutral region on the same thin wire width at the dev
     for (const call of calls) {
       if (call.name === 'uniform1f' && call.args[0] === 'fillAlpha') alpha = call.args[1] as number;
       if (call.name === 'uniform1f' && call.args[0] === 'wireWidth') width = call.args[1] as number;
-      if (call.name === 'drawArrays' && alpha === .4) wireWidths.push(width);
+      if (call.name === 'drawArrays' && alpha === 1) wireWidths.push(width);
     }
     expect(wireWidths).toEqual(BODY_WIRE_INSTANCES.map(() => .45 * ratio));
   }
@@ -195,52 +196,51 @@ it('keeps every effort and neutral region on the same thin wire width at the dev
 
 it.each(themePresets.flatMap(preset => (['light', 'dark'] as const).map(mode => ({
   name: preset.id, seeds: preset.seeds, mode,
-}))))('keeps translucent effort grades ordered with neutral wires in $name / $mode', ({ seeds, mode }) => {
+}))))('shares opaque Patches colours and accent selection with visible wires in $name / $mode', ({ seeds, mode }) => {
   const { context, gl } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
   const roles = generateRoles(seeds, mode);
   const muscleIds = ['chest', 'biceps', 'quads', 'calves', 'back_lats'];
   const scores = new Map(muscleIds.map((id, index) => [id, index / 2 - 1]));
-  const frame = wireframeFixture({ selected: [], roles, palette: buildThemeShadePalette(roles, mode), scores });
+  const frame = wireframeFixture({ selected: selectMuscleMeshes('quads'), roles, palette: buildThemeShadePalette(roles, mode), scores });
   renderer.draw(frame);
   const bodyCount = BODY_WIRE_INSTANCES.length;
   const low: readonly (readonly number[])[] = gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillLow').map(call => call[1]);
   const high: readonly (readonly number[])[] = gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillHigh').map(call => call[1]);
-  const base = low[0].map((value, i) => (value + high[0][i]) / 2);
   const direction = mode === 'dark' ? 1 : -1;
-  const blendedFace = (id: string) => {
-    const index = bodyCount + BODY_WIRE_INSTANCES.findIndex(mesh => mesh.group === id);
-    return base.map((value, i) => .6 * value + .4 * (low[index][i] + high[index][i]) / 2);
+  const face = (id: string) => {
+    const index = BODY_WIRE_INSTANCES.findIndex(mesh => mesh.group === id);
+    return low[index].map((value, i) => (value + high[index][i]) / 2);
   };
-  const grades = ['neutral', ...muscleIds].map(id => direction * lightnessOf(blendedFace(id)));
+  const grades = muscleIds.map(id => direction * lightnessOf(face(id)));
   for (let index = 1; index < grades.length; index++) {
-    expect(grades[index] - grades[index - 1]).toBeGreaterThan(index === 1 ? 8 : 2);
+    expect(grades[index]).toBeGreaterThan(grades[index - 1]);
   }
-  // The composited surface must retain the data hue rather than washing out to grey.
-  expect(lchOf(blendedFace('back_lats')).chroma).toBeGreaterThan(frame.palette.anchors[2].chroma * .45);
+  expect(low.at(-1)).toEqual(colourVector(roles.accent));
+  expect(high.at(-1)).toEqual(colourVector(roles.accent));
   const wires = gl.uniform3fv.mock.calls.filter(call => call[0] === 'wireColour');
-  expect(wires).toHaveLength(1);
+  expect(wires).toHaveLength(2);
   expect(wires[0][1]).not.toEqual(colourVector(roles.accent));
-  for (const vector of [...low.slice(0, bodyCount), ...high.slice(0, bodyCount), wires[0][1]]) {
-    expect(Math.max(...vector) - Math.min(...vector)).toBeLessThanOrEqual(1 / 255);
-  }
+  const selectionContrast = Math.abs(lightnessOf(wires[1][1]) - lightnessOf(colourVector(roles.accent)));
+  expect(selectionContrast).toBeGreaterThan(20);
+  expect(selectionContrast).toBeLessThan(Math.abs(lightnessOf(colourVector(roles.onAccent)) - lightnessOf(colourVector(roles.accent))));
+  expect(gl.uniform1f.mock.calls.filter(call => call[0] === 'wireWidth').map(call => call[1]))
+    .toEqual([.45 * gl.drawingBufferWidth / frame.camera.width, .35 * gl.drawingBufferWidth / frame.camera.width, 0]);
+  const uploads = gl.bufferData.mock.calls.length;
+  gl.uniform3fv.mockClear(); gl.uniform1f.mockClear();
+  renderer.draw({ ...frame, overlay: 'contour' });
+  expect(gl.bufferData).toHaveBeenCalledTimes(uploads);
+  expect(gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillLow').map(call => call[1])).toEqual(low);
+  expect(gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillHigh').map(call => call[1])).toEqual(high);
+  expect(gl.uniform1f.mock.calls.filter(call => call[0] === 'wireWidth').every(call => call[1] === 0)).toBe(true);
   gl.uniform3fv.mockClear();
-  renderer.draw({ ...frame, scores: new Map() });
+  renderer.draw({ ...frame, selected: [], scores: new Map() });
   const repainted = gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillLow').map(call => call[1]);
-  expect(repainted.slice(0, bodyCount)).toEqual(low.slice(0, bodyCount));
-  expect(repainted.slice(bodyCount)).toEqual(BODY_WIRE_INSTANCES.map(() => colourVector(frame.palette.neutral[0])));
-  for (const id of ['quads', 'back_lats']) {
-    gl.uniform3fv.mockClear();
-    renderer.draw({ ...frame, selected: selectMuscleMeshes(id) });
-    const selectedLow = gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillLow').at(-1)![1];
-    const selectedHigh = gl.uniform3fv.mock.calls.filter(call => call[0] === 'fillHigh').at(-1)![1];
-    const body = blendedFace(id);
-    const selected = body.map((channel, i) => .6 * channel + .4 * (selectedLow[i] + selectedHigh[i]) / 2);
-    expect(lightnessOf(selected)).toBeCloseTo(lightnessOf(body), 1);
-  }
+  expect(repainted).toEqual(BODY_WIRE_INSTANCES.map(() => colourVector(frame.palette.neutral[0])));
+  expect(repainted).toHaveLength(bodyCount);
   renderer.dispose();
 });
 
-it.each([.5, null, NaN, Infinity])('fills selected anatomical polygons with their reported effort (%s) and thin neutral edges', score => {
+it.each([.5, null, NaN, Infinity])('keeps selected anatomy accent-coloured with contrasting wires regardless of effort (%s)', score => {
   const { context, gl, calls } = recordingGL(), renderer = createMuscleWireframeRenderer(context);
   const muscle = { id: 'cm_chest', displayName: 'Chest', familyName: 'Chest', sortOrder: 0 };
   const report = new Map([['chest', { muscle, tracked: true }]]);
@@ -248,25 +248,20 @@ it.each([.5, null, NaN, Infinity])('fills selected anatomical polygons with thei
     scores: new Map([['cm_chest', score]]) });
   renderer.draw(frame);
   const selectionPaint = calls.findIndex(call => call.name === 'uniform1f'
-    && call.args[0] === 'wireWidth' && call.args[1] === .55 * gl.drawingBufferWidth / frame.camera.width);
+    && call.args[0] === 'wireWidth' && call.args[1] === .35 * gl.drawingBufferWidth / frame.camera.width);
   expect(selectionPaint).toBeGreaterThan(0);
-  expect(calls[selectionPaint - 1]).toEqual({ name: 'uniform1f', args: ['fillAlpha', .4] });
+  expect(calls[selectionPaint - 1]).toEqual({ name: 'uniform1f', args: ['fillAlpha', 1] });
   expect(calls[selectionPaint + 1].name).toBe('bindBuffer');
   for (const name of ['fillLow', 'fillHigh']) {
     const fills = gl.uniform3fv.mock.calls.filter(call => call[0] === name).map(call => call[1]);
     const chest = BODY_WIRE_INSTANCES.findIndex(mesh => mesh.group === 'chest');
-    const bodyFill: readonly number[] = fills[BODY_WIRE_INSTANCES.length + chest];
-    const displayed = bodyFill.map((channel, i) => .4 * channel + .6 * fills[chest][i]);
-    expect(fills.at(-1)).toEqual(displayed);
-    if (score === .5) expect(lchOf(fills.at(-1)!).chroma).toBeGreaterThan(8);
-    else expect(bodyFill).toEqual(colourVector(name === 'fillLow' ? frame.palette.neutral[0] : frame.palette.neutral.at(-1)!));
+    const ramp = buildMuscleShadeRamp(score, frame.palette);
+    expect(fills[chest]).toEqual(colourVector(name === 'fillLow' ? ramp[0] : ramp.at(-1)!));
+    expect(fills.at(-1)).toEqual(colourVector(frame.roles.accent));
   }
   const wires = gl.uniform3fv.mock.calls.filter(call => call[0] === 'wireColour').map(call => call[1]);
   expect(wires).toHaveLength(2);
-  for (const vector of wires) {
-    expect(Math.max(...vector) - Math.min(...vector)).toBeLessThanOrEqual(1 / 255);
-    expect(vector).not.toEqual(colourVector(frame.roles.accent));
-  }
-  expect(lightnessOf(wires[1])).toBeLessThan(lightnessOf(wires[0]));
+  expect(Math.abs(lightnessOf(wires[1]) - lightnessOf(colourVector(frame.roles.accent)))).toBeGreaterThan(20);
+  expect(wires[1]).not.toEqual(colourVector(frame.roles.accent));
   renderer.dispose();
 });
