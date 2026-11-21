@@ -537,6 +537,7 @@ function ProgrammeChildPlanCard({
   );
 }
 
+/** Programme fields and session cards, with add/save actions above the list. */
 export function ProgrammeFormScreen({
   initialForm,
   onSave,
@@ -621,13 +622,23 @@ export function ProgrammeFormScreen({
             Sessions ({form.plans.length})
           </Text>
         </View>
-        <ActionButton
-          accessibilityLabel="Add session to programme"
-          label="+ Add session"
-          onPress={addSession}
-          testID="programme-form-add-session"
-          variant="outline"
-        />
+        <View style={styles.sessionsActions} testID="programme-form-actions">
+          <ActionButton
+            accessibilityLabel="Add session to programme"
+            label="Add session"
+            onPress={addSession}
+            testID="programme-form-add-session"
+            variant="outline"
+          />
+          <ActionButton
+            accessibilityLabel={saveLabel}
+            disabled={busy}
+            label={busy ? 'Saving...' : saveLabel}
+            onPress={handleSave}
+            testID="programme-form-save"
+            variant="primary"
+          />
+        </View>
       </View>
 
       <FormError message={errors.get('plans')} testID="programme-form-plans-error" />
@@ -646,17 +657,6 @@ export function ProgrammeFormScreen({
             total={form.plans.length}
           />
         ))}
-      </View>
-
-      <View style={styles.saveSection}>
-        <ActionButton
-          accessibilityLabel={saveLabel}
-          disabled={busy}
-          label={busy ? 'Saving...' : saveLabel}
-          onPress={handleSave}
-          testID="programme-form-save"
-          variant="primary"
-        />
       </View>
 
       <ProgrammeSessionEditSheet
@@ -683,12 +683,19 @@ const styles = StyleSheet.create({
   },
   sessionsHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: uiSpace.sm,
     paddingHorizontal: uiSpace.xs,
   },
   sessionsHeaderTitle: {
-    flex: 1,
+    flexGrow: 1,
+  },
+  sessionsActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: uiSpace.sm,
   },
   plansList: {
     gap: uiSpace.sm,
@@ -719,9 +726,6 @@ const styles = StyleSheet.create({
   },
   planCardErrorText: {
     marginTop: uiSpace.xs,
-  },
-  saveSection: {
-    paddingTop: uiSpace.md,
   },
   childEditorScroll: {
     flex: 1,
