@@ -1,20 +1,31 @@
 # Groups
 
+### groups.medals · calculation · accepted
+
+Medals count current podium ownership across unarchived exercises' default-metric
+All boards, preserving server places and former holders. Rank stable identities
+by gold, silver, bronze; equal tuples share competition rank, ordered by name
+then ID. Zero-medal members remain unranked. Search never narrows the tally;
+rebuilding withholds it entirely. Corrections, overtakes, archival and metric
+changes can redistribute medals. CoWs confer none; there is no award ledger.
+
+Why: compare podium breadth.
+Code: `apps/mobile/src/groups/medal-view-model.ts`.
+
 ### groups.certification · definition · accepted
 
-Certification attests a **set**, not a score. Another current group member,
-never the lifter, certifies a record set (one that holds a board entry
-or set a record) on a live group exercise. One certification per set:
+Another current member, never the lifter, certifies a **set** holding a board
+entry or record on a live group exercise. One certification per set covers
+every eligible Certified board:
 
 | Case | Decision |
 | --- | --- |
-| What it covers | The set: it counts on every eligible Certified board of that exercise |
-| Repeat certification of the same set | The first witness stands |
-| Withdraw, cancel, or an edit or deletion of the set | Ends the whole certification, on every board |
+| Repeat | First witness stands |
+| Withdrawal, cancellation, set edit/deletion | Ends it on every board |
 | Member exercise's per-side/total entry mode changes | Ends affected certifications; switching back restores none |
 | Group target-mode, formula or bodyweight preference/contribution/reading changes | Preserve unchanged witnesses |
-| After it ends | Only a new certification re-certifies the set |
-| Which boards open first | All; Certified is a toggle |
+| Ended | Requires a new certification |
+| Default scope | All; Certified is a toggle |
 
 Why: one witness attests one performance.
 Code: `supabase/migrations/20261008160000_group_competition_set_certification.sql`; `apps/mobile/src/groups/competition-session-records-view-model.ts`; `DEFAULT_BOARD_SCOPE` in `apps/mobile/src/groups/board-view-model.ts`.
@@ -40,7 +51,7 @@ one All ranking; [[groups.certification]] adds context, never eligibility.
 Nonpositive attained scores are unranked; non-finite arithmetic makes only
 that member's affected metric unavailable, with no partial score.
 
-Why: compare the same performances without inventing another scoring system.
+Why: preserve independent comparisons.
 Code: `apps/mobile/src/groups/cow-scoring.ts`.
 Code: server adapter in `apps/mobile/src/groups/cow-evaluation.ts`; public readers in `apps/mobile/src/groups/cow-wire.ts`.
 
@@ -54,7 +65,7 @@ positive; otherwise improvement is unranked. Signed negative and zero
 improvements rank normally, descending. Settings periods cannot shorten the
 baseline.
 
-Why: reward personal progress against a stable shared reference.
+Why: freeze the denominator.
 Code: `apps/mobile/src/groups/cow-scoring.ts`.
 Code: start checkpoint and retained baseline in `supabase/migrations/20261030062725_group_cow_publication.sql`.
 
@@ -69,7 +80,7 @@ Cancellation retains audit and releases the slot for replacement. Every current
 member sees the saved group zone on group management; only owners/admins get
 its setup entry there, through group Edit. CoW flows have no zone setup controls.
 
-Why: every member competes in the same week, independently of viewer location.
+Why: share one competitive week.
 Code: `supabase/migrations/20261029204606_group_cow_lifecycle.sql`; `apps/mobile/src/groups/api.ts`.
 
 ### groups.cow-participation · definition · accepted
@@ -80,7 +91,7 @@ further contributions but preserves results already accepted while that
 membership was active; rejoining cannot resume this week. Current group
 authorization still controls reads, including former members' loss of access.
 
-Why: membership changes cannot alter the starting field.
+Why: preserve the starting field.
 Code: `apps/mobile/src/groups/cow-scoring.ts` consumes the starting roster and first membership end.
 Code: admission barrier in `supabase/migrations/20261030062725_group_cow_publication.sql`.
 
@@ -97,7 +108,7 @@ revision or removal. Scoring-input edits revise priority even at equal values;
 identical retries and unrelated writes do not. Client and worker clocks never
 decide ties.
 
-Why: offline sync and evaluator delays preserve deterministic submissions.
+Why: sync latency cannot decide ties.
 Code: `apps/mobile/src/groups/cow-scoring.ts`; receipt intake in `supabase/migrations/20261029205006_group_cow_intake.sql`.
 Code: publication in `supabase/functions/group-eval/`.
 
@@ -113,7 +124,7 @@ Current disclosure can suppress unsafe stored figures without promoting a
 different winner. Finalizing, unavailable final, and valid empty final are
 distinct outcomes.
 
-Why: final outcomes preserve current privacy.
+Why: preserve outcomes and privacy.
 Code: `apps/mobile/src/groups/cow-scoring.ts` classifies context availability.
 Code: automatic publication and immutable results in `supabase/migrations/20261030062725_group_cow_publication.sql`.
 
@@ -134,5 +145,5 @@ it, per group:
 A member who re-points a link or moves a set chooses what that shows; hidden
 kg reveals only that the exercise counts bodyweight.
 
-Why: disclosure follows the member's current setup, never retained history.
+Why: disclose by current setup.
 Code: `group_competition_redacts_exercise` in `supabase/migrations/20261115160000_group_kg_disclosure_current_rule.sql`.
