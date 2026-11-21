@@ -28,7 +28,7 @@ export function InjuryWarningBanner({
   const { injury, onsetText, contraindicationsText } = warning;
   const painLabel =
     injury.painScore !== null && injury.painScore !== undefined
-      ? `Pain ${injury.painScore}/10 (${describePainScore(injury.painScore)})`
+      ? `Pain ${injury.painScore}/10 (${describePainScore(injury.painScore).bandLabel})`
       : null;
 
   return (
