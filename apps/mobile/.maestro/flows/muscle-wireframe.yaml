@@ -3,6 +3,7 @@ appId: com.dinoderek.mobile
 # Proves: native GL wires and filled patches fade selected anatomy through translucent muscle layers,
 # and composes with the muscle picker, focus and rotation gestures. Screenshots
 # are inspected for front/back/oblique body occlusion, the one-hand outline and spinal columns.
+# Strip paging is separate from body rotation and vertical page scrolling; Jest cannot prove native arbitration.
 # Why device: shader compilation, depth-tested pixels and native gesture-handler
 # composition and a material switch are unavailable behind the Jest native boundary.
 # Jest counterpart: muscle-wireframe-scene, muscle-wireframe-renderer,
@@ -31,6 +32,66 @@ appId: com.dinoderek.mobile
     timeout: 20000
 - assertNotVisible: { id: "stats-muscle-wireframe-error" }
 - takeScreenshot: "wireframe-01-whole-body"
+# Native strip paging must not rotate; a body drag must not page.
+- tapOn: { id: "stats-muscle-body-picker-trigger" }
+- waitForAnimationToEnd
+- takeScreenshot: "controls-sets-picker"
+- tapOn: { id: "stats-muscle-picker-row-chest" }
+- tapOn: { id: "stats-muscle-body-angle-front" }
+- swipe:
+    from: { id: "stats-muscle-body-picker-trigger" }
+    direction: RIGHT
+    duration: 500
+- assertNotVisible: { id: "stats-muscle-body-selected", text: "Pectoralis" }
+- swipe:
+    from: { id: "stats-muscle-body-picker-trigger" }
+    direction: LEFT
+    duration: 500
+- assertVisible: { id: "stats-muscle-body-selected", text: "Pectoralis" }
+- assertVisible: { id: "stats-muscle-body-viewport", text: ".*view, 0 degrees" }
+- swipe:
+    from: { id: "stats-muscle-body-viewport" }
+    direction: LEFT
+    duration: 500
+- assertVisible: { id: "stats-muscle-body-selected", text: "Pectoralis" }
+- tapOn: { id: "stats-muscle-body-angle-back" }
+- tapOn: { id: "stats-muscle-body-angle-front" }
+# A vertical strip gesture must yield to page scrolling and retain the muscle.
+- swipe:
+    from: { id: "stats-muscle-body-picker-trigger" }
+    direction: UP
+    duration: 500
+- takeScreenshot: "controls-vertical-scroll"
+# Maestro counts a header behind the pinned filters as visible; return fully to the top.
+- swipe:
+    start: "45%, 50%"
+    end: "45%, 85%"
+    duration: 500
+- swipe:
+    start: "45%, 50%"
+    end: "45%, 85%"
+    duration: 500
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-selected", text: "Pectoralis" }
+- assertVisible: { id: "stats-muscle-body-viewport", text: ".*view, 0 degrees" }
+# Nested native sheets must return to View without changing the selected data.
+- tapOn: { id: "stats-muscle-body-view" }
+- assertVisible: { id: "stats-muscle-body-view-sheet" }
+- tapOn: "About the model"
+- assertVisible: "Wireframe lines are triangle edges.*"
+- takeScreenshot: "controls-about-model"
+- swipe:
+    from: { id: "stats-muscle-body-help-drag-zone" }
+    direction: DOWN
+    duration: 500
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-view-sheet" }
+- swipe:
+    from: { id: "stats-muscle-body-view-sheet-drag-zone" }
+    direction: DOWN
+    duration: 500
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-selected", text: "Pectoralis" }
 # Regression: Jest cannot prove GPU alpha/depth pixels; layers must fade back-side quads while retaining front detail.
 - tapOn: { id: "stats-muscle-body-picker-trigger" }
 - waitForAnimationToEnd
@@ -42,11 +103,15 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd
 - assertVisible: { id: "stats-muscle-body-selected", text: "Quads" }
 - takeScreenshot: "occlusion-01-quads-wireframe-front"
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-contour" }
+- waitForAnimationToEnd
 - takeScreenshot: "occlusion-02-quads-patches-front"
 - tapOn: { id: "stats-muscle-body-angle-back" }
 - takeScreenshot: "occlusion-03-quads-patches-back"
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-wireframe" }
+- waitForAnimationToEnd
 - takeScreenshot: "occlusion-04-quads-wireframe-back"
 # From Back, about 45 degrees toward the side stacks several leg muscles along the view ray.
 - swipe:
@@ -57,12 +122,16 @@ appId: com.dinoderek.mobile
     id: "stats-muscle-body-viewport"
     text: ".*view, 1[234][0-9] degrees"
 - waitForAnimationToEnd
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-contour" }
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-patches" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-06-quads-patches-oblique"
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Wireframe" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-wireframe" }
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-wireframe" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-05-quads-wireframe-oblique"
 - tapOn: { id: "stats-muscle-body-angle-front" }
@@ -78,13 +147,19 @@ appId: com.dinoderek.mobile
 - assertVisible: { id: "stats-muscle-body-selected", text: "Brachialis" }
 - takeScreenshot: "wireframe-02-brachialis"
 # Deep anatomy must remain partially visible under the biceps, in both materials.
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-contour" }
+- waitForAnimationToEnd
 - takeScreenshot: "layers-02-brachialis-patches-front"
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- tapOn: { id: "stats-muscle-body-focus" }
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
-- assertVisible: { id: "stats-muscle-body-focus", text: "Show whole body" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-wireframe" }
+- waitForAnimationToEnd
+- tapOn: { id: "stats-muscle-body-framing-focus" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-contour" }
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-patches" }
+- assertVisible: { id: "stats-muscle-body-framing-focus", text: "Focus" }
 - takeScreenshot: "patches-01-brachialis-focus"
 # Focus keeps one limb: rotate it behind and ahead of its counterpart to prove cumulative layer attenuation.
 - swipe:
@@ -96,12 +171,16 @@ appId: com.dinoderek.mobile
     text: ".*view, (8[0-9]|9[0-9]) degrees"
 - waitForAnimationToEnd
 # Cycle materials at a settled pose so native GL presentation catches up before capture.
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Wireframe" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-wireframe" }
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-wireframe" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-08-focused-arm-wireframe-far"
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-contour" }
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-patches" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-07-focused-arm-patches-far"
 # The swipe can already select Back; switch through Front so Back snaps to 180°.
@@ -119,12 +198,16 @@ appId: com.dinoderek.mobile
     id: "stats-muscle-body-viewport"
     text: ".*view, (26[0-9]|27[0-9]|280) degrees"
 - waitForAnimationToEnd
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Wireframe" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-wireframe" }
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-wireframe" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-09-focused-arm-wireframe-near"
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-contour" }
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-patches" }
 - waitForAnimationToEnd
 - takeScreenshot: "occlusion-10-focused-arm-patches-near"
 - tapOn: { id: "stats-muscle-body-angle-front" }
@@ -132,8 +215,10 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "patches-02-brachialis-back"
 - assertNotVisible: { id: "stats-muscle-wireframe-error" }
 - tapOn: { id: "stats-muscle-body-angle-front" }
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- tapOn: { id: "stats-muscle-body-focus" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-wireframe" }
+- waitForAnimationToEnd
+- tapOn: { id: "stats-muscle-body-framing-body" }
 - tapOn: { id: "stats-muscle-body-picker-trigger" }
 - waitForAnimationToEnd
 - scrollUntilVisible:
@@ -142,12 +227,16 @@ appId: com.dinoderek.mobile
 - waitForAnimationToEnd
 - tapOn: { id: "stats-muscle-picker-row-forearms_grip" }
 - waitForAnimationToEnd
-- tapOn: { id: "stats-muscle-body-focus" }
+- tapOn: { id: "stats-muscle-body-framing-focus" }
 - takeScreenshot: "wireframe-03-forearm-hand-focus"
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-contour" }
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-patches" }
 - takeScreenshot: "patches-03-forearm-hand-focus"
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-wireframe" }
+- waitForAnimationToEnd
 - tapOn: { id: "stats-muscle-body-picker-trigger" }
 - waitForAnimationToEnd
 - scrollUntilVisible:
@@ -157,10 +246,14 @@ appId: com.dinoderek.mobile
 - tapOn: { id: "stats-muscle-picker-row-spinal_erectors" }
 - waitForAnimationToEnd
 - takeScreenshot: "wireframe-04-spinal-focus"
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
-- assertVisible: { id: "stats-muscle-body-overlay-toggle", text: "Muscle overlay: Patches" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-contour" }
+- waitForAnimationToEnd
+- assertVisible: { id: "stats-muscle-body-patches" }
 - takeScreenshot: "patches-04-spinal-focus"
-- tapOn: { id: "stats-muscle-body-overlay-toggle" }
+- tapOn: { id: "stats-muscle-body-view" }
+- tapOn: { id: "stats-muscle-body-material-wireframe" }
+- waitForAnimationToEnd
 - assertNotVisible: { id: "stats-muscle-wireframe-error" }
 
 - swipe:

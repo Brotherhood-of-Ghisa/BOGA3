@@ -47,7 +47,7 @@ For a new block or derivative, follow the selection and review workflow in
 | The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action; `variant="link"` for a heading's link | `ActionButton` (`action-button.tsx`) |
 | A line of words with figures in it (`2 exercises · 3 sets`) | `FigureText` (`figure-text.tsx`) |
 | An icon-only control | `IconButton` (`icon-button.tsx`); optional `nativeHeader` uses the native button host |
-| An on-demand explanation, optionally beside a heading | `Information` (`information.tsx`) — owns the info trigger, prose and standard `Sheet` |
+| An on-demand explanation, optionally beside a heading | `Information` (`information.tsx`) — owns the info or menu-entry trigger, prose and standard `Sheet` |
 | A glyph | `Icon` (`icon.tsx`, geometry in `icon-glyphs.ts`) |
 | A filter, breakdown, view or compact history links | `SegmentedControl` (`segmented-control.tsx`) — `fill` / `fit` / `inline`, `density="compact"` and icon segments for two controls sharing a row; navigation mode reuses the frame as links |
 | A loading, empty, message or error state — whole-screen or inside a card | `StatePanel` (`state-panel.tsx`) |
@@ -107,7 +107,7 @@ geometry, load `design-language.md` §4. Enforcement scope is above.
 Muscle list and single-muscle contributors reuse StatsTableRow on compact
 ListRow, with StatsTableName and StatsTableDisclosure owning their presentation.
 Now / Prev / Δ headers reserve only the active sort arrow; nested contributors
-inherit them, while standalone contributors keep a passive header. Stacked
+inherit them, while standalone contributors keep a passive header. The 3D muscle footer shares its measured comparison layout and row insets with those contributors. Stacked
 history targets speak their figures. The Exercise table retains its existing density.
 Enforcement scope is above.
 

@@ -145,9 +145,11 @@ export type ComparisonLayout = { columns: number[]; stacked: boolean };
  */
 export const resolveComparisonLayout = (
   width: number, rows: ComparisonRow[], metric: ComparisonMetric, axis = true,
-  sortable: boolean | { compact: true; activeSort?: 'name' | ComparisonColumnKey } = false,
+  sortable: boolean | { compact: true; activeSort?: 'name' | ComparisonColumnKey; outerInset?: number } = false,
 ): ComparisonLayout => {
-  const rowContent = width - uiSpace.lg * 2 - uiBorder.width * 2 - uiSpace.md * 2;
+  // A measured card container already excludes the screen's content margins.
+  const outerInset = typeof sortable === 'object' ? sortable.outerInset ?? uiSpace.lg * 2 : uiSpace.lg * 2;
+  const rowContent = width - outerInset - uiBorder.width * 2 - uiSpace.md * 2;
   const gaps = uiSpace.sm * (COLUMN_LABELS.length - 1);
   const axisWidth = axis ? uiGeometry.tapTarget : 0;
   const compact = typeof sortable === 'object';

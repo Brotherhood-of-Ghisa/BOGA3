@@ -83,8 +83,14 @@ describe('live theme: Progress', () => {
     </>);
     expect(style(screen.getByTestId('week-empty')).color).toBe(before.inkMuted);
     expect(style(screen.getByTestId('stats-muscle-body-selected')).color).toBe(before.ink);
+    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
+    expect(screen.getByTestId('stats-muscle-body-view-sheet')).toHaveStyle({ backgroundColor: before.surface });
     await switchTheme(SLATE_DARK);
     expect(style(screen.getByTestId('week-empty')).color).toBe(after.inkMuted);
     expect(style(screen.getByTestId('stats-muscle-body-selected')).color).toBe(after.ink);
+    expect(screen.getByTestId('stats-muscle-body-view-sheet')).toHaveStyle({ backgroundColor: after.surface });
+    fireEvent(screen.getByTestId('stats-muscle-body-view-sheet'), 'accessibilityEscape');
+    fireEvent.press(screen.getByTestId('stats-muscle-body-picker-trigger'));
+    expect(style(screen.getByTestId('stats-muscle-picker-value-back_lats')).color).toBe(after.ink);
   });
 });

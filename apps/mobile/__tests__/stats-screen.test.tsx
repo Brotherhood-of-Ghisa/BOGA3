@@ -11,7 +11,7 @@ import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import * as ReactNative from 'react-native';
 import { Modal, StyleSheet } from 'react-native';
 import type { ReactTestInstance } from 'react-test-renderer';
-import { uiFonts, uiTypography } from '@/components/ui/tokens';
+import { uiFonts, uiTypography, uiSpace } from '@/components/ui/tokens';
 
 import {
   default as StatsRoute,
@@ -27,7 +27,7 @@ import {
   nextExerciseSortMode,
   sortExerciseListItems,
 } from '../app/(tabs)/stats-history';
-import { ComparisonHeaders, comparisonFigures } from '@/components/stats/comparison-columns';
+import { ComparisonHeaders, ComparisonValues, comparisonFigures } from '@/components/stats/comparison-columns';
 import { formatWholeSetCount } from '@/src/exercise-calculations/format';
 import { compareProgressFamilies, nextMuscleSortMode, sortProgressMuscles } from '@/components/stats/progress-tables';
 import { ProgressMuscleView } from '@/components/stats/progress-muscle-view';
@@ -1337,4 +1337,32 @@ describe('Progress table ordering', () => {
     expect(nextMuscleSortMode('previous-desc', 'previous')).toBe('previous-asc');
     expect(nextMuscleSortMode('previous-asc', 'change')).toBe('change-desc');
   });
+});
+
+it.each([320, 390])('shares every comparison column and the stacking decision across the 3D footer and exercises at %ipt', width => {
+  const dimensions = ReactNative.Dimensions.get('window');
+  act(() => ReactNative.Dimensions.set({ window: { width, height: 900, scale: 1, fontScale: 1 } }));
+  try {
+    const muscle = buildSummary().muscles[0];
+    muscle.current = { workingSetCount: 12345678, totalVolume: 188271603422374, volumeSetCount: 1 };
+    muscle.exercises = [{ ...muscle, exerciseDefinitionId: 'bench', displayName: 'Long exercise name', role: 'primary',
+      current: { workingSetCount: 1, totalVolume: 120, volumeSetCount: 1 } }];
+    const props = { muscles: [muscle], selectedId: muscle.muscleGroupId, muscleLayout: '3d' as const,
+      onSelect: jest.fn(), onMuscleHistory: jest.fn(), onExerciseHistory: jest.fn() };
+    const view = renderWithTheme(<ProgressMuscleView {...props} metric="workingSetCount" />);
+    fireEvent(screen.getByTestId('stats-muscle-3d'), 'layout', { nativeEvent: { layout: { width: width - uiSpace.lg * 2 } } });
+    for (const metric of ['workingSetCount', 'totalVolume'] as const) {
+      view.rerender(<ProgressMuscleView {...props} metric={metric} />);
+      const headers = screen.UNSAFE_getAllByType(ComparisonHeaders);
+      const footer = headers.find(node => node.props.testID === 'stats-muscle-body-comparison-header')!;
+      const table = headers.find(node => node.props.testID === 'stats-contributions-header')!;
+      expect(footer.props.layout).toBe(table.props.layout);
+      expect(footer.props.layout.columns[0]).toBeGreaterThan(44);
+      const values = screen.UNSAFE_getAllByType(ComparisonValues);
+      expect(values.find(node => node.props.prefix === 'stats-muscle-body-comparison')!.props.layout)
+        .toBe(values.find(node => node.props.prefix === 'stats-contribution-bench')!.props.layout);
+      expect(within(screen.getByTestId('stats-muscle-body-comparison-header')).getByText('Δ')).toBeTruthy();
+      expect(within(screen.getByTestId('stats-contributions-header')).getByText('Δ')).toBeTruthy();
+    }
+  } finally { act(() => ReactNative.Dimensions.set({ window: dimensions })); }
 });

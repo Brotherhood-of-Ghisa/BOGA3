@@ -13,13 +13,14 @@ import {
   Sheet,
   StatePanel,
   uiSpace,
+  uiGeometry,
+  uiBorder,
   useUiMode,
   useUiRoles,
   type SegmentedControlOption,
 } from '@/components/ui';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { useNovemberAppearance } from '@/components/appearance/use-november-appearance';
-import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import Svg, { Path } from 'react-native-svg';
 import { InjuryBadge } from '@/components/injuries/injury-badge';
 import type { ProgressMuscleComparison } from '@/src/data';
@@ -27,7 +28,8 @@ import type { InjuryView } from '@/src/data/injuries';
 import { resolveInjuryMuscleGroupId } from '@/src/injuries/injury-warning-engine';
 import type { MuscleReportAssignment } from '@/src/data/muscle-analytics';
 import type { ProgressMetric } from '@/src/preferences/model';
-import { COLUMN_LABELS, ComparisonValues, comparisonFigures, metricUnit } from './comparison-columns';
+import { ComparisonHeaders, ComparisonValues, comparisonFigures, metricUnit, resolveComparisonLayout, type ComparisonLayout } from './comparison-columns';
+import { StatsTableRow, StatsTableName } from './stats-table';
 import {
   bodyOrientationForAngle,
   buildThemeShadePalette,
@@ -58,6 +60,7 @@ type Props = {
   readonly overlay?: MuscleOverlayStyle;
   readonly onOverlayChange?: (next: MuscleOverlayStyle) => void;
   readonly activeInjuries?: readonly (ActiveInjuryOverlay | InjuryView)[];
+  readonly comparisonLayout?: ComparisonLayout;
 };
 
 const ORIENTATION_OPTIONS: readonly SegmentedControlOption<BodyOrientation>[] = [
@@ -94,88 +97,81 @@ const resolveDatasetMuscleId = (
 type HeaderProps = {
   readonly orientation: BodyOrientation;
   readonly onOrientationChange: (next: BodyOrientation) => void;
-  readonly overlay: MuscleOverlayStyle;
-  readonly onOverlayChange: (next: MuscleOverlayStyle) => void;
+  readonly focus: boolean;
+  readonly focusAvailable: boolean;
+  readonly onFocusChange: (focus: boolean) => void;
   readonly selectedMuscle: ProgressMuscleComparison | null;
   readonly onPrev: () => void;
   readonly onNext: () => void;
   readonly onOpenPicker: () => void;
+  readonly onOpenView: () => void;
 };
 
-function MuscleBodyHeader({
-  orientation,
-  onOrientationChange,
-  overlay,
-  onOverlayChange,
-  selectedMuscle,
-  onPrev,
-  onNext,
-  onOpenPicker,
-}: HeaderProps) {
+function MuscleBodyHeader({ orientation, onOrientationChange, focus, focusAvailable, onFocusChange,
+  selectedMuscle, onPrev, onNext, onOpenPicker, onOpenView }: HeaderProps) {
   const text = useUiText();
-  const tone = useUiTextTone();
-  return (
-    <View style={styles.headerRow}>
-      <View style={styles.controlsLeft}>
-        <SegmentedControl
-          accessibilityLabel="Body orientation"
-          density="compact"
-          layout="inline"
-          onChange={onOrientationChange}
-          options={ORIENTATION_OPTIONS}
-          selectedGround="selection"
-          testIDPrefix="stats-muscle-body-angle"
-          value={orientation}
-        />
-        <ActionButton
-          accessibilityHint="Switches between wireframe and filled patch views"
-          accessibilityLabel={`Muscle overlay: ${overlay === 'contour' ? 'Patches' : 'Wireframe'}`}
-          label={overlay === 'contour' ? 'Patches' : 'Wireframe'}
-          onPress={() => onOverlayChange(overlay === 'contour' ? 'wireframe' : 'contour')}
-          size="compact"
-          variant="outline"
-          testID="stats-muscle-body-overlay-toggle"
-        />
-      </View>
-      <View style={styles.stepperContainer}>
+  const roles = useUiRoles();
+  const swipe = Gesture.Pan().runOnJS(true)
+    .activeOffsetX([-PAN_ACTIVATION_X, PAN_ACTIVATION_X])
+    .failOffsetY([-PAN_FAIL_Y, PAN_FAIL_Y])
+    .onEnd((event, success) => {
+      if (!success || Math.abs(event.translationX) < uiSpace.xl * 2 ||
+        Math.abs(event.translationX) <= Math.abs(event.translationY)) return;
+      if (event.translationX < 0) onNext();
+      else onPrev();
+    });
+  return <>
+    <View style={[styles.headerRow, { borderBottomColor: roles.rule }]}>
+      <GestureDetector gesture={swipe}>
         <Pressable
-          accessibilityLabel="Previous muscle"
-          accessibilityRole="button"
-          hitSlop={uiSpace.sm}
-          onPress={onPrev}
-          style={styles.stepperButton}
-          testID="stats-muscle-body-prev">
-          <Icon name="chevron-left" size="sm" />
-        </Pressable>
-        <Pressable
-          accessibilityHint="Opens muscle list sheet"
+          accessibilityActions={[{ name: 'previous', label: 'Previous muscle' }, { name: 'next', label: 'Next muscle' }]}
+          accessibilityHint="Opens muscle list. Swipe left for next muscle or right for previous muscle."
           accessibilityLabel={`Selected muscle: ${selectedMuscle?.displayName ?? 'None'}. Tap to choose another muscle.`}
           accessibilityRole="button"
-          hitSlop={uiSpace.xs}
+          onAccessibilityAction={event => {
+            if (event.nativeEvent.actionName === 'next') onNext();
+            if (event.nativeEvent.actionName === 'previous') onPrev();
+          }}
           onPress={onOpenPicker}
           style={styles.pickerTrigger}
           testID="stats-muscle-body-picker-trigger">
-          <Text
-            allowFontScaling={false}
-            numberOfLines={1}
-            style={[text.label, tone.ink]}
-            testID="stats-muscle-body-selected">
-            {selectedMuscle?.displayName ?? 'Select'}
-          </Text>
-          <Icon name="chevron-down" size="xs" />
+          <Text allowFontScaling={false} style={[text.title, styles.muscleName]}
+            testID="stats-muscle-body-selected">{selectedMuscle?.displayName ?? 'Select'}</Text>
+          <Icon name="chevron-down" size="sm" />
         </Pressable>
-        <Pressable
-          accessibilityLabel="Next muscle"
-          accessibilityRole="button"
-          hitSlop={uiSpace.sm}
-          onPress={onNext}
-          style={styles.stepperButton}
-          testID="stats-muscle-body-next">
-          <Icon name="chevron-right" size="sm" />
-        </Pressable>
-      </View>
+      </GestureDetector>
+      <ActionButton accessibilityLabel="Model view options" label="View" onPress={onOpenView}
+        size="compact" variant="text" testID="stats-muscle-body-view" />
     </View>
-  );
+    <View style={styles.toolbar}>
+      <SegmentedControl accessibilityLabel="Body orientation" density="compact" layout="inline"
+        onChange={onOrientationChange} options={ORIENTATION_OPTIONS} selectedGround="selection"
+        testIDPrefix="stats-muscle-body-angle" value={orientation} />
+      <SegmentedControl accessibilityLabel="Body framing" density="compact" layout="inline"
+        onChange={next => onFocusChange(next === 'focus')}
+        options={[{ value: 'body', label: 'Whole body' }, { value: 'focus', label: 'Focus', disabled: !focusAvailable }]}
+        selectedGround="selection" testIDPrefix="stats-muscle-body-framing" value={focus ? 'focus' : 'body'} />
+    </View>
+  </>;
+}
+
+function MuscleBodyViewSheet({ visible, onDismiss, overlay, onOverlayChange }: {
+  visible: boolean; onDismiss: () => void; overlay: MuscleOverlayStyle;
+  onOverlayChange: (next: MuscleOverlayStyle) => void;
+}) {
+  return <Sheet visible={visible} onDismiss={onDismiss} dismissLabel="Dismiss model view options"
+    title="View" testID="stats-muscle-body-view-sheet">
+    {([{ value: 'contour', label: 'Patches' }, { value: 'wireframe', label: 'Wireframe' }] as const).map(option =>
+      <ListRow key={option.value} label={option.label} checked={overlay === option.value}
+        onPress={() => { onOverlayChange(option.value); onDismiss(); }}
+        trailing={<Icon name={overlay === option.value ? 'radio-on' : 'radio-off'} size="md" />}
+        testID={`stats-muscle-body-material-${option.value}`} />)}
+    <Information title="About the muscle model" testIDPrefix="stats-muscle-body"
+      renderTrigger={open => <ListRow label="About the model" onPress={open}
+        trailing={<Icon name="chevron-right" size="sm" />} />}
+      body="Wireframe lines are triangle edges. Both views share the same coarse muscle surfaces. Muscle layers partially cover selected anatomy; several layers make it faint. Taps select the foreground body region. Shapes are visually fitted: Forearms use an outer group envelope with hand tendons; spinal erectors use smoothed columns; Abs and Lats use body-surface approximations."
+      sections={[[ 'Anatomical source', 'BodyParts3D © The Database Center for Life Science, CC BY 4.0. Adapted by pose alignment, forearm/hand fitting, bilateral mirroring and simplified surface envelopes. Source and licence: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html' ]]} />
+  </Sheet>;
 }
 
 type PickerSheetProps = {
@@ -203,7 +199,7 @@ function MusclePickerSheet({
       dismissLabel="Dismiss muscle picker"
       onDismiss={onDismiss}
       testID="stats-muscle-picker-sheet"
-      title="Select Muscle"
+      title="Select muscle"
       visible={visible}>
       <ScrollView contentContainerStyle={styles.sheetList} style={styles.sheetScroll}>
         {muscles.map(row => {
@@ -218,15 +214,16 @@ function MusclePickerSheet({
               onPress={() => onSelectMuscle(row.muscleGroupId)}
               selected={isSelected}
               testID={`stats-muscle-picker-row-${row.muscleGroupId}`}
-              trailing={isSelected ? <Icon name="check" size="md" /> : undefined}>
+              trailing={isSelected ? <Icon name="check" size="md" testID={`stats-muscle-picker-check-${row.muscleGroupId}`} /> : null}>
               <View style={styles.sheetRowContent}>
                 <Text
                   allowFontScaling={false}
-                  style={[text.bodyStrong, isSelected && tone.accent]}>
+                  style={[text.bodyStrong, styles.sheetMuscleName, isSelected && tone.accent]}>
                   {row.displayName}
                 </Text>
-                <Text allowFontScaling={false} style={text.meta}>
-                  <FigureText>{`${figures.now} ${unit}`}</FigureText>
+                <Text allowFontScaling={false} style={[text.body, styles.pickerValue]}
+                  testID={`stats-muscle-picker-value-${row.muscleGroupId}`}>
+                  <FigureText>{`${figures.now} ${metric === 'workingSetCount' ? 'sets' : unit}`}</FigureText>
                 </Text>
               </View>
             </ListRow>
@@ -424,36 +421,20 @@ function MuscleBodyViewportArea({
   );
 }
 
-type ComparisonSectionProps = {
-  readonly selectedMuscle: ProgressMuscleComparison;
-  readonly metric: ProgressMetric;
-  readonly viewportWidth: number;
-};
-
-function MuscleBodyComparison({ selectedMuscle, metric, viewportWidth }: ComparisonSectionProps) {
-  const text = useUiText();
-  const tone = useUiTextTone();
-  const colWidth = (viewportWidth - uiSpace.sm * 2) / 3;
-  return (
-    <View testID="stats-muscle-body-comparison">
-      <View style={styles.comparisonLabels}>
-        {COLUMN_LABELS.map(label => (
-          <Text
-            key={label}
-            allowFontScaling={false}
-            style={[text.label, tone.muted, { width: colWidth, textAlign: 'right' }]}>
-            {label}
-          </Text>
-        ))}
-      </View>
-      <ComparisonValues
-        layout={{ columns: Array(3).fill(colWidth), stacked: false }}
-        metric={metric}
-        prefix="stats-muscle-body-comparison"
-        row={selectedMuscle}
-      />
-    </View>
-  );
+function MuscleBodyComparison({ selectedMuscle, metric, layout }: {
+  selectedMuscle: ProgressMuscleComparison; metric: ProgressMetric; layout: ComparisonLayout;
+}) {
+  const roles = useUiRoles();
+  const values = <ComparisonValues compact row={selectedMuscle} metric={metric} layout={layout}
+    prefix="stats-muscle-body-comparison" />;
+  return <View style={[styles.comparison, { borderTopColor: roles.rule }]} testID="stats-muscle-body-comparison">
+    <ComparisonHeaders compact axis={false} layout={layout} metric={metric} name={null}
+      testID="stats-muscle-body-comparison-header" />
+    <StatsTableRow divider={false} meta={layout.stacked ? undefined : values}>
+      <StatsTableName name={metric === 'workingSetCount' ? 'Sets' : 'Volume'} />
+      {layout.stacked ? values : null}
+    </StatsTableRow>
+  </View>;
 }
 
 /**
@@ -464,6 +445,9 @@ function MuscleBodyComparison({ selectedMuscle, metric, viewportWidth }: Compari
  * and accent selection, attenuated through covering muscles. Wireframe adds
  * contrasting triangle edges over body and selected anatomy. Filled patches share the coarse anatomy,
  * camera, focus and hit testing; switching view changes only its material.
+ * The separate muscle strip pages horizontally or opens the metric-aware picker.
+ * View owns material/help; the toolbar owns orientation and framing. The footer
+ * shares its comparison layout and content insets with the Exercises table.
  * Decoration follows [[appearance.november]] without changing hit testing.
  */
 export function MuscleBodyCard({
@@ -477,6 +461,7 @@ export function MuscleBodyCard({
   overlay: controlledOverlay,
   onOverlayChange,
   activeInjuries,
+  comparisonLayout,
 }: Props) {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const november = useNovemberAppearance();
@@ -549,6 +534,9 @@ export function MuscleBodyCard({
   );
 
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [viewVisible, setViewVisible] = useState(false);
+  const layout = comparisonLayout ?? resolveComparisonLayout(windowWidth, selectedMuscle ? [selectedMuscle] : [],
+    metric, false, { compact: true });
 
   const selectWithAutoOrientation = (targetId: string) => {
     onSelect(targetId);
@@ -560,14 +548,14 @@ export function MuscleBodyCard({
   };
 
   const handleNextMuscle = () => {
-    if (muscles.length === 0) return;
+    if (muscles.length < 2) return;
     const currentIndex = muscles.findIndex(row => row.muscleGroupId === selectedId);
     const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % muscles.length;
     selectWithAutoOrientation(muscles[nextIndex].muscleGroupId);
   };
 
   const handlePrevMuscle = () => {
-    if (muscles.length === 0) return;
+    if (muscles.length < 2) return;
     const currentIndex = muscles.findIndex(row => row.muscleGroupId === selectedId);
     const prevIndex =
       currentIndex < 0 ? muscles.length - 1 : (currentIndex - 1 + muscles.length) % muscles.length;
@@ -609,21 +597,23 @@ export function MuscleBodyCard({
   const gesture = Gesture.Exclusive(pan, tap);
 
   return (
-    <Card style={styles.card} testID="stats-muscle-body-card">
-      <MuscleBodyHeader
-        onNext={handleNextMuscle}
-        onOpenPicker={() => setSheetVisible(true)}
-        onOrientationChange={next => {
-          setDragOffsetDeg(0);
-          setBaseAngleDeg(next === 'front' ? 0 : 180);
-        }}
-        onOverlayChange={handleOverlayChange}
-        onPrev={handlePrevMuscle}
-        orientation={orientation}
-        overlay={overlay}
-        selectedMuscle={selectedMuscle}
-      />
-      <View>
+    <Card testID="stats-muscle-body-card">
+      <View style={styles.viewer}>
+        <MuscleBodyHeader
+          onNext={handleNextMuscle}
+          onOpenPicker={() => setSheetVisible(true)}
+          onOrientationChange={next => {
+            setDragOffsetDeg(0);
+            setBaseAngleDeg(next === 'front' ? 0 : 180);
+          }}
+          onOpenView={() => setViewVisible(true)}
+          focus={focus}
+          focusAvailable={!canvasFailed && selectedMeshes.length > 0}
+          onFocusChange={setFocus}
+          onPrev={handlePrevMuscle}
+          orientation={orientation}
+          selectedMuscle={selectedMuscle}
+        />
         <MuscleBodyViewportArea
           angleDeg={angleDeg}
           canvasFailed={canvasFailed}
@@ -644,22 +634,12 @@ export function MuscleBodyCard({
           viewportWidth={viewportWidth}
           wireframe={wireframe}
         />
-        {!canvasFailed && selectedMeshes.length > 0 ? <View style={styles.viewerActions}>
-          <FilterChip label={focus ? 'Whole body' : 'Focus'} on={focus} size="compact"
-            accessibilityLabel={focus ? 'Show whole body' : 'Focus selected muscle'} accessibilityRole="button"
-            onPress={() => setFocus(value => !value)} testID="stats-muscle-body-focus" />
-        </View> : null}
-        <View style={styles.information}>
-          <Information title="About the muscle model" testIDPrefix="stats-muscle-body"
-            body="Wireframe lines are triangle edges. Both views share the same coarse muscle surfaces. Muscle layers partially cover selected anatomy; several layers make it faint. Taps select the foreground body region. Shapes are visually fitted: Forearms use an outer group envelope with hand tendons; spinal erectors use smoothed columns; Abs and Lats use body-surface approximations."
-            sections={[[ 'Anatomical source', 'BodyParts3D © The Database Center for Life Science, CC BY 4.0. Adapted by pose alignment, forearm/hand fitting, bilateral mirroring and simplified surface envelopes. Source and licence: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html' ]]} />
-        </View>
       </View>
       {selectedMuscle ? (
         <MuscleBodyComparison
           metric={metric}
           selectedMuscle={selectedMuscle}
-          viewportWidth={viewportWidth}
+          layout={layout}
         />
       ) : null}
       <MuscleAccessibilityTargets
@@ -669,6 +649,8 @@ export function MuscleBodyCard({
         onSelect={onSelect}
         selectedId={selectedId}
       />
+      <MuscleBodyViewSheet visible={viewVisible} onDismiss={() => setViewVisible(false)}
+        overlay={overlay} onOverlayChange={handleOverlayChange} />
       <MusclePickerSheet
         metric={metric}
         muscles={muscles}
@@ -685,50 +667,18 @@ export function MuscleBodyCard({
 }
 
 const styles = StyleSheet.create({
-  viewerActions: { flexDirection: 'row', justifyContent: 'flex-end' },
-  information: { position: 'absolute', top: 0, right: 0 },
-  comparisonLabels: { flexDirection: 'row', gap: uiSpace.sm },
-  card: {
-    padding: uiSpace.md,
-    gap: uiSpace.sm,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: uiSpace.sm,
-  },
-  controlsLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-    flexShrink: 0,
-  },
-  stepperContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  stepperButton: {
-    padding: uiSpace.xs,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 28,
-    minHeight: 28,
-  },
+  viewer: { padding: uiSpace.md, gap: uiSpace.sm },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm,
+    borderBottomWidth: uiBorder.width, paddingBottom: uiSpace.sm },
+  comparison: { borderTopWidth: uiBorder.width, paddingTop: uiSpace.xs, paddingBottom: uiSpace.sm },
+  toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
   pickerTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: uiSpace.xs,
-    paddingHorizontal: uiSpace.xs,
-    paddingVertical: uiSpace.xs,
-    flexShrink: 1,
-    minWidth: 0,
-    maxWidth: 160,
+    flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget,
+    flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm,
   },
+  muscleName: { flexShrink: 1, textTransform: 'capitalize' },
+  sheetMuscleName: { flex: 1, minWidth: 0 },
+  pickerValue: { flexShrink: 1, maxWidth: '50%', textAlign: 'right' },
   sheetScroll: {
     maxHeight: 460,
   },
@@ -739,8 +689,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingRight: uiSpace.sm,
+    gap: uiSpace.md,
   },
   viewport: {
     alignItems: 'center',
