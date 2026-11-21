@@ -1,7 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react-native';
 import { Modal, ScrollView, StyleSheet, Text } from 'react-native';
 
-import { Icon, IconButton, Information, uiFonts, uiGeometry, uiIconSize, uiSpace } from '@/components/ui';
+import { Icon, IconButton, Information, ListRow, uiFonts, uiGeometry, uiIconSize, uiSpace } from '@/components/ui';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 
 import { renderWithTheme as render, rolesFor } from './helpers/theme';
@@ -59,4 +59,14 @@ it('supports sections alone without adding an empty introductory paragraph', () 
   expect(screen.getByText('Short explanation.')).toBeTruthy();
   expect(screen.UNSAFE_getByType(ScrollView).findAllByType(Text).map(node => node.props.children))
     .toEqual(['Only section', 'Short explanation.']);
+});
+
+it('opens the same explainer from a menu row without a floating info button', () => {
+  render(<Information title="About Example" body="Source and licence."
+    renderTrigger={open => <ListRow label="About the model" onPress={open} />} testIDPrefix="menu" />);
+  expect(screen.queryByTestId('menu-info')).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: 'About the model' }));
+  expect(screen.getByText('Source and licence.')).toBeTruthy();
+  fireEvent(screen.getByTestId('menu-help'), 'accessibilityEscape');
+  expect(screen.queryByTestId('menu-help')).toBeNull();
 });

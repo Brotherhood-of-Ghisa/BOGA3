@@ -14,6 +14,7 @@ export type SegmentedControlOption<TValue extends string | number> = {
   // share its row (the history view switch beside the metric selector).
   icon?: IconName;
   accessibilityLabel?: string;
+  disabled?: boolean;
 };
 
 // `fill`: equal-width segments across the row (a screen's selector). `inline`:
@@ -85,13 +86,14 @@ export function SegmentedControl<TValue extends string | number>({
       testID={`${testIDPrefix}-row`}>
       {options.map((option, index) => {
         const selected = option.value === value;
+        const optionDisabled = disabled || option.disabled === true;
         return (
           <Pressable
             accessibilityLabel={option.accessibilityLabel ?? option.label}
             accessibilityRole={onNavigate ? 'link' : 'tab'}
-            accessibilityState={onNavigate ? (disabled ? { disabled } : undefined) : disabled ? { selected, disabled } : { selected }}
+            accessibilityState={onNavigate ? (optionDisabled ? { disabled: optionDisabled } : undefined) : optionDisabled ? { selected, disabled: optionDisabled } : { selected }}
             // Only when set: Pressable folds an explicit `false` into the state.
-            disabled={disabled || undefined}
+            disabled={optionDisabled || undefined}
             hitSlop={hitSlop}
             key={String(option.value)}
             onPress={event => {
@@ -106,12 +108,12 @@ export function SegmentedControl<TValue extends string | number>({
               fit ? styles.segmentFit : null,
               index > 0 ? styles.segmentDivider : null,
               selected ? selectedStyles[selectedGround] : null,
-              disabled && selected ? styles.segmentSelectedDisabled : null,
+              optionDisabled && selected ? styles.segmentSelectedDisabled : null,
             ]}
             testID={`${testIDPrefix}-${option.value}`}>
             {option.icon ? (
               <Icon
-                colorRole={labelRole(selected, disabled, selectedGround)}
+                colorRole={labelRole(selected, optionDisabled, selectedGround)}
                 name={option.icon}
                 size="sm"
               />
@@ -120,7 +122,7 @@ export function SegmentedControl<TValue extends string | number>({
                 allowFontScaling={false}
                 numberOfLines={1}
                 style={[textRoles.label, selected ? selectedLabelStyles[selectedGround] : null,
-                  disabled && !selected ? styles.labelDisabled : null]}>
+                  optionDisabled && !selected ? styles.labelDisabled : null]}>
                 {option.label}
               </Text>
             )}
