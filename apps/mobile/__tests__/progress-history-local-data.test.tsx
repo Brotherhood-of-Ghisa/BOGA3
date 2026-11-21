@@ -821,7 +821,7 @@ describe('Muscle day/week details over real data', () => {
     await act(async () => { fireEvent.press(screen.getByTestId('muscle-period-detail-metric')); });
     await waitFor(() => expect(screen.getByTestId(`${detailCardId('detail-one')}-contribution`)).toHaveTextContent(/volume/));
     expect(detailRows('detail-one')).toHaveLength(1);
-    expect(screen.getByText('Technique')).toBeTruthy();
+    expect(screen.getByLabelText('Technique')).toHaveTextContent('Tech');
   });
 
   it('refreshes the detail after returning from a session edit', async () => {

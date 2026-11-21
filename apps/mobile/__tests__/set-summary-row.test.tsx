@@ -11,6 +11,23 @@ const roles = rolesFor(DEFAULT_APPEARANCE);
 
 const row = formatSetRow({ id: 'set', weight: 60, reps: 8, setType: null, done: true });
 
+it.each([true, false])('uses Tech in the fixed effort column while speaking Technique (done=%s)', (done) => {
+  const technique = formatSetRow({ id: 'technique', weight: 25, reps: 10, setType: 'technique', done });
+  renderWithTheme(<SetSummaryRow row={technique} testID="technique" />);
+
+  expect(screen.getByLabelText('Technique')).toHaveTextContent('Tech');
+  expect(screen.queryByText('Technique')).toBeNull();
+  expect(screen.getByText('Tech')).toHaveStyle({ color: done ? roles.ink : roles.inkFaint });
+  expect(screen.getByTestId('technique-values')).toHaveTextContent('25.0 × 10');
+  expect(screen.getByLabelText('1RM 33.7')).toBeTruthy();
+  expect(screen.getByLabelText('Vol 250')).toBeTruthy();
+});
+
+it('retains the full RIR label in the effort column', () => {
+  renderWithTheme(<SetSummaryRow row={formatSetRow({ id: 'rir', weight: 60, reps: 8, setType: 'rir_2', done: true })} testID="rir" />);
+  expect(screen.getByLabelText('RIR 2')).toHaveTextContent('RIR 2');
+});
+
 it('uses the ordinary inline row layout for BW values with visible % and no column headings', () => {
   const normalized = { ...row, weightReps: '0.0 %BW × 8', oneRepMax: '27.7 %BW', volume: '800.0 %BW' };
   renderWithTheme(<ExerciseSetsCard name="Bodyweight Bulgarian Split Squat" count="2 sets" percentageMetrics testID="card" rows={[
