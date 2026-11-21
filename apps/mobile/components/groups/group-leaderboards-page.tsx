@@ -1,5 +1,6 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { buildCompetitionPodiums as buildGroupMetricPodiums } from '@/src/groups/competition-view-model';
+import { buildMedalBoard } from '@/src/groups/medal-view-model';
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -14,6 +15,7 @@ import {
 } from '@/src/groups';
 
 import { GroupCycleButton } from './group-cycle-button';
+import { GroupMedalBoard } from './group-medal-board';
 import { GroupMissingDataState, GroupStateView } from './group-state-view';
 import { useScoreStyle } from './score-style';
 
@@ -36,8 +38,9 @@ const ORDER_OPTIONS = [
 ];
 
 /**
- * The Groups screen's Leaderboards page (product E1.1, P8, D11): one podium
- * card per group exercise on All · its default metric, under a search box
+ * The Groups screen's Leaderboards page (product E1.1, P8, D11): a
+ * group-wide Medals board above one podium card per group exercise on All ·
+ * its default metric, under a search box
  * that narrows them by exercise name and a pill that orders them by name or
  * by most recent record. A card opens its full board.
  */
@@ -46,6 +49,7 @@ export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error,
   const dateFormat = useDateFormat();
   const router = useRouter();
   const cards = useMemo(() => (boards.data ? buildGroupMetricPodiums(boards.data, userId, dateFormat) : null), [boards.data, userId, dateFormat]);
+  const medals = useMemo(() => boards.data ? buildMedalBoard(boards.data, userId) : null, [boards.data, userId]);
   const [query, setQuery] = useState('');
   const [order, setOrder] = useState<PodiumOrder>('name');
 
@@ -64,6 +68,7 @@ export function GroupLeaderboardsPage({ groupId, userId, boards, offline, error,
   const shown = sortPodiumCards(filterPodiumCards(cards, query), order);
   return (
     <View style={styles.list} testID="group-leaderboards-page">
+      {medals ? <GroupMedalBoard key={groupId} board={medals} /> : null}
       <View style={styles.controls}>
         <View style={styles.search}>
           <SearchField

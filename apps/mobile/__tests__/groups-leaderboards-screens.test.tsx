@@ -10,10 +10,11 @@ import { setExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
  */
 
 import * as mockReact from 'react';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
-import { StyleSheet, type ViewStyle } from 'react-native';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { RefreshControl, StyleSheet, type ViewStyle } from 'react-native';
 
 import { createInMemoryDatabase, type InMemoryDatabaseFixture } from './helpers/in-memory-db';
+import { waitForGone } from './helpers/wait-for-gone';
 
 let fixture: InMemoryDatabaseFixture;
 const mockCurrentDatabase = () => fixture.database;
@@ -257,6 +258,7 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     expect(screen.getByTestId('group-podium-card-ge-old')).toBeTruthy();
     fireEvent.changeText(screen.getByTestId('group-leaderboards-search'), 'deadlift');
     expect(screen.getByTestId('group-leaderboards-no-match')).toHaveTextContent('No exercises match');
+    expect(screen.getByTestId('group-medals-row-u1').props.accessibilityLabel).toBe('1st, Dave, Gold 1, Silver 0, Bronze 0');
     expect(screen.queryByTestId('group-podium-card-ge-old')).toBeNull();
     fireEvent.changeText(screen.getByTestId('group-leaderboards-search'), '');
     expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}`)).toBeTruthy();
@@ -286,6 +288,7 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     fireEvent.press(screen.getByTestId('group-leaderboards-order'));
     expect(screen.getByTestId('group-leaderboards-order')).toHaveTextContent('Recent');
     expect(names()).toEqual(['deadlift', 'Bench Press', 'Squat']);
+    expect(screen.getByTestId('group-medals-row-u1').props.accessibilityLabel).toContain('Gold 2');
     // The search narrows the ordered cards.
     fireEvent.changeText(screen.getByTestId('group-leaderboards-search'), 'e');
     expect(names()).toEqual(['deadlift', 'Bench Press']);
@@ -296,6 +299,7 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     await openLeaderboards();
     expect(await screen.findByTestId('group-leaderboards-empty')).toHaveTextContent(/No group exercises yet/);
     expect(screen.queryByTestId('group-leaderboards-search')).toBeNull();
+    expect(screen.queryByTestId('group-medals')).toBeNull();
   });
 
   it('offline: renders cached podiums with the offline marker, and requests nothing', async () => {
@@ -306,6 +310,8 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
 
     expect(await screen.findByTestId(`group-podium-card-${EXERCISE_ID}`)).toBeTruthy();
     expect(screen.getByTestId('groups-offline-banner')).toHaveTextContent('Offline · last updated 09:05');
+    expect(screen.getByTestId('group-medals-row-u1').props.accessibilityLabel).toContain('Gold 1');
+    expect(screen.getByTestId('group-medals-unranked')).toHaveTextContent('You · Not ranked');
     expect(api.getCompetitionPodiums).not.toHaveBeenCalled();
   });
 
@@ -314,6 +320,62 @@ describe('Groups screen Leaderboards segment (E1.1)', () => {
     mockInitialOnline = false;
     await openLeaderboards();
     expect(await screen.findByTestId('group-leaderboards-offline-empty-state')).toBeTruthy();
+    expect(screen.queryByTestId('group-medals')).toBeNull();
+  });
+
+  it('expands and collapses medal holders without fetching or duplicating the own-row footer', async () => {
+    api.getCompetitionPodiums.mockResolvedValue({ ...METRIC_PODIUMS, podiums: [METRIC_PODIUMS.podiums[0],
+      { exercise: exercise('second', 'Row'), board: boardPage([row(1, 'u1', 'Dave'), row(2, 'u3', 'Kim'), row(3, USER_ID, 'My full name')],
+        { group_exercise_id: 'second', certified: false }) }] });
+    await openLeaderboards();
+    const own = await screen.findByTestId('group-medals-me');
+    expect(own.props.accessibilityLabel).toBe('4th, You, My full name, Gold 0, Silver 0, Bronze 1');
+    expect(within(screen.getByTestId('group-medals')).getAllByText('You')).toHaveLength(1);
+    fireEvent.press(screen.getByTestId('group-medals-toggle'));
+    expect(screen.queryByTestId('group-medals-me')).toBeNull();
+    expect(screen.getByTestId(`group-medals-row-${USER_ID}`)).toHaveTextContent(/You/);
+    expect(screen.getByTestId('group-medals-toggle')).toHaveTextContent('Show less');
+    fireEvent.press(screen.getByTestId('group-medals-toggle'));
+    expect(screen.getByTestId('group-medals-me')).toBeTruthy();
+    expect(screen.queryByTestId(`group-medals-row-${USER_ID}`)).toBeNull();
+    expect(api.getCompetitionPodiums).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates medals and cards together on refresh, withholding partial rebuilding results', async () => {
+    await openLeaderboards();
+    await screen.findByTestId('group-medals-row-u1');
+    const refresh = async () => {
+      await act(async () => screen.UNSAFE_getAllByType(RefreshControl)[0].props.onRefresh());
+    };
+    const rebuilt = { ...METRIC_PODIUMS, podiums: [{ exercise: BENCH,
+      board: boardPage([row(1, USER_ID, 'me')], { certified: false }) }] };
+    api.getCompetitionPodiums.mockResolvedValue({ ...rebuilt, podiums: [...rebuilt.podiums,
+      { exercise: { ...exercise('rebuilding', 'Squat'), rebuilding: true, published_revision: 1 },
+        board: boardPage([], { group_exercise_id: 'rebuilding', state: 'rebuilding', certified: false }) }] });
+    await refresh();
+    await waitFor(() => expect(screen.getByTestId('group-medals-empty')).toHaveTextContent('Recalculating…'));
+    expect(screen.queryByTestId(`group-medals-row-${USER_ID}`)).toBeNull();
+    expect(screen.queryByTestId('group-medals-unranked')).toBeNull();
+    api.getCompetitionPodiums.mockResolvedValue(rebuilt);
+    await refresh();
+    await waitFor(() => expect(screen.getByTestId(`group-medals-row-${USER_ID}`).props.accessibilityLabel).toContain('Gold 1'));
+    expect(screen.queryByTestId('group-medals-me')).toBeNull();
+    expect(screen.getByTestId(`group-podium-card-${EXERCISE_ID}-row-1`)).toHaveTextContent(/You/);
+    api.getCompetitionPodiums.mockResolvedValue({ ...rebuilt, podiums: [{ exercise: BENCH, board: boardPage([], { certified: false }) }] });
+    await refresh();
+    await waitFor(() => expect(screen.getByTestId('group-medals-empty')).toHaveTextContent('No medals yet'));
+    expect(screen.getByTestId('group-medals-unranked')).toHaveTextContent('You · Not ranked');
+  });
+
+  it('keeps medals on a failed refresh and retries through the existing inline error', async () => {
+    await openLeaderboards();
+    await screen.findByTestId('group-medals-row-u1');
+    api.getCompetitionPodiums.mockRejectedValueOnce(new GroupApiError('INTERNAL', 'read failed'));
+    await act(async () => screen.UNSAFE_getAllByType(RefreshControl)[0].props.onRefresh());
+    await screen.findByTestId('groups-inline-error');
+    expect(screen.getByTestId('group-medals-row-u1').props.accessibilityLabel).toContain('Gold 1');
+    fireEvent.press(screen.getByTestId('groups-inline-error-retry'));
+    await waitForGone(() => screen.queryByTestId('groups-inline-error'));
   });
 
   it('NOT_FOUND evicts the podiums and re-reads My groups, which drops the group', async () => {
