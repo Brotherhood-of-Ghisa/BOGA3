@@ -656,10 +656,10 @@ describe('ExercisePageScreen', () => {
   });
 
   it.each([
-    ['technique', 'Technique', 'Tech'],
-    ['cooldown', 'Cooldown', 'CD'],
-    ['rehab', 'Rehab', 'Rehab'],
-  ])('shows a compact %s label in the logger and keeps its full accessible and picker names', async (setType, fullLabel, compactLabel) => {
+    ['technique', 'Technique', 'Tech', 'Tech'],
+    ['cooldown', 'Cooldown', 'CD', 'Cooldown'],
+    ['rehab', 'Rehab', 'Rehab', 'Rehab'],
+  ])('shows the %s logger and row labels and keeps its full accessible and picker names', async (setType, fullLabel, compactLabel, rowLabel) => {
     await openPage();
     fireEvent(screen.getByTestId('exercise-set-logger-effort'), 'longPress');
     const option = await screen.findByTestId(`exercise-effort-option-${setType}`);
@@ -669,6 +669,11 @@ describe('ExercisePageScreen', () => {
     expect(screen.getByTestId('exercise-set-logger-effort')).toHaveTextContent(`Effort${compactLabel}`);
     expect(screen.getByLabelText(`Change effort, currently ${fullLabel}`)).toBeTruthy();
     await waitFor(async () => expect((await benchSets())[2].setType).toBe(setType));
+
+    fireEvent.press(screen.getByTestId('exercise-set-1-open'));
+    const closedRow = within(screen.getByTestId('exercise-set-3'));
+    expect(closedRow.getByText(rowLabel)).toBeTruthy();
+    expect(closedRow.getByRole('button', { name: new RegExp(`^Set 3, ${fullLabel},`) })).toBeTruthy();
   });
 
   it('cycles effort in descending RIR order, including blank, and persists the selection', async () => {
