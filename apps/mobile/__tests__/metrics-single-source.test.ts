@@ -66,8 +66,9 @@ describe('training-metric rules have one implementation', () => {
     expect(offenders(comparison, [
       // Effort labels and the picker cycle, not a statistic.
       'apps/mobile/src/data/set-types.ts',
-      // The shared entry fields' compact effort text, not a statistic.
+      // Entry fields and closed rows compact effort text, not a statistic.
       'apps/mobile/components/exercise-page/set-entry-fields.tsx',
+      'apps/mobile/components/exercise-page/set-row.tsx',
     ])).toEqual([]);
   });
 
