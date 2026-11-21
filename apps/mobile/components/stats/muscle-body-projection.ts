@@ -754,6 +754,76 @@ const matchesInjurySide = (rawCenterX: number, side?: 'left' | 'right' | 'bilate
   return true;
 };
 
+type Point2D = readonly [number, number];
+
+const clipSegmentToBound = (
+  a: Point2D,
+  b: Point2D,
+  axis: 0 | 1,
+  bound: number
+): Point2D => {
+  const denom = b[axis] - a[axis];
+  const t = Math.abs(denom) < 1e-9 ? 0 : (bound - a[axis]) / denom;
+  return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
+};
+
+const clipPolygonToHalfPlane = (
+  polygon: readonly Point2D[],
+  axis: 0 | 1,
+  bound: number,
+  keepGreater: boolean
+): Point2D[] => {
+  const result: Point2D[] = [];
+  const count = polygon.length;
+  for (let i = 0; i < count; i += 1) {
+    const prev = polygon[(i + count - 1) % count];
+    const curr = polygon[i];
+    const prevIn = keepGreater ? prev[axis] >= bound : prev[axis] <= bound;
+    const currIn = keepGreater ? curr[axis] >= bound : curr[axis] <= bound;
+    if (currIn !== prevIn) {
+      result.push(clipSegmentToBound(prev, curr, axis, bound));
+    }
+    if (currIn) {
+      result.push(curr);
+    }
+  }
+  return result;
+};
+
+const clippedTriangleCentroid = (
+  projected: ProjectedTriangle,
+  viewportWidth: number,
+  viewportHeight: number
+): Point2D | null => {
+  const minX = Math.min(projected.x0, projected.x1, projected.x2);
+  const maxX = Math.max(projected.x0, projected.x1, projected.x2);
+  const minY = Math.min(projected.y0, projected.y1, projected.y2);
+  const maxY = Math.max(projected.y0, projected.y1, projected.y2);
+  if (maxX < 0 || minX > viewportWidth || maxY < 0 || minY > viewportHeight) return null;
+  if (minX >= 0 && maxX <= viewportWidth && minY >= 0 && maxY <= viewportHeight) {
+    return [(projected.x0 + projected.x1 + projected.x2) / 3, (projected.y0 + projected.y1 + projected.y2) / 3];
+  }
+
+  let poly: Point2D[] = [
+    [projected.x0, projected.y0],
+    [projected.x1, projected.y1],
+    [projected.x2, projected.y2],
+  ];
+  poly = clipPolygonToHalfPlane(poly, 0, 0, true);
+  poly = clipPolygonToHalfPlane(poly, 0, viewportWidth, false);
+  poly = clipPolygonToHalfPlane(poly, 1, 0, true);
+  poly = clipPolygonToHalfPlane(poly, 1, viewportHeight, false);
+  if (poly.length < 3) return null;
+
+  let sx = 0;
+  let sy = 0;
+  for (const [x, y] of poly) {
+    sx += x;
+    sy += y;
+  }
+  return [sx / poly.length, sy / poly.length];
+};
+
 type AccumulateInjuryFaceInput = {
   readonly projected: ProjectedTriangle;
   readonly face: MuscleBodyFace;
@@ -779,7 +849,7 @@ const accumulateInjuryFace = ({
     baseMaterial && baseMaterial !== 'neutral' ? canonicalMuscleId(baseMaterial) : null;
   const cx = (projected.x0 + projected.x1 + projected.x2) / 3;
   const cy = (projected.y0 + projected.y1 + projected.y2) / 3;
-  const inViewport = cx >= 0 && cx <= viewportWidth && cy >= 0 && cy <= viewportHeight;
+  const clippedCenter = clippedTriangleCentroid(projected, viewportWidth, viewportHeight);
 
   for (const acc of accumulators) {
     const matchesTarget =
@@ -791,9 +861,9 @@ const accumulateInjuryFace = ({
       acc.sumX += cx;
       acc.sumY += cy;
       acc.triangleCount += 1;
-      if (inViewport) {
-        acc.inViewportSumX += cx;
-        acc.inViewportSumY += cy;
+      if (clippedCenter) {
+        acc.inViewportSumX += clippedCenter[0];
+        acc.inViewportSumY += clippedCenter[1];
         acc.inViewportTriangleCount += 1;
       }
     }

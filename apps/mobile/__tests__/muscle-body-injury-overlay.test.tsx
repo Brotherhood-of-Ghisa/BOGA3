@@ -231,14 +231,14 @@ describe('Muscle body injury overlay', () => {
       const wholeBodyCamera = wireframeCamera({
         angle: 0,
         width: 300,
-        height: 300,
+        height: 280,
         selected: selectMuscleMeshes('chest', undefined, false),
         focus: false,
       });
       const focusedCamera = wireframeCamera({
         angle: 0,
         width: 300,
-        height: 300,
+        height: 280,
         selected: selectMuscleMeshes('chest', undefined, true),
         focus: true,
       });
@@ -247,7 +247,7 @@ describe('Muscle body injury overlay', () => {
         scores,
         selectedId: 'chest',
         width: 300,
-        height: 300,
+        height: 280,
         camera: wholeBodyCamera,
         angleDeg: 0,
         palette: testPalette,
@@ -257,7 +257,7 @@ describe('Muscle body injury overlay', () => {
         scores,
         selectedId: 'chest',
         width: 300,
-        height: 300,
+        height: 280,
         camera: focusedCamera,
         angleDeg: 0,
         palette: testPalette,
@@ -280,6 +280,37 @@ describe('Muscle body injury overlay', () => {
       const focusedQuadsBadge = focused.injuryBadges?.find(b => b.injuryId === 'inj-quads-right');
       expect(wholeQuadsBadge?.visible).toBe(true);
       expect(focusedQuadsBadge?.visible).toBe(false);
+    });
+
+    it('keeps injury badge visible and anchored in-viewport when triangles only partially intersect the viewport', () => {
+      // Concrete real-mesh partial-visibility case: 300×280 Front (0°), Brachialis focused
+      // with an acute left abs_rectus injury whose triangles cross the viewport edge even
+      // though their unclipped centres lie outside the viewport.
+      const brachialisCamera = wireframeCamera({
+        angle: 0,
+        width: 300,
+        height: 280,
+        selected: selectMuscleMeshes('brachialis', undefined, true),
+        focus: true,
+      });
+      const projected = projectMuscleBody({
+        scores,
+        selectedId: 'brachialis',
+        width: 300,
+        height: 280,
+        camera: brachialisCamera,
+        angleDeg: 0,
+        palette: testPalette,
+        activeInjuries: [{ id: 'inj-abs-left', muscleGroupId: 'abs_rectus', status: 'acute', side: 'left' }],
+      });
+
+      const absBadge = projected.injuryBadges?.find(b => b.injuryId === 'inj-abs-left');
+      expect(absBadge).toBeDefined();
+      expect(absBadge?.visible).toBe(true);
+      expect(absBadge!.x).toBeGreaterThanOrEqual(0);
+      expect(absBadge!.x).toBeLessThanOrEqual(300);
+      expect(absBadge!.y).toBeGreaterThanOrEqual(0);
+      expect(absBadge!.y).toBeLessThanOrEqual(280);
     });
 
     it('keeps bilateral arm injury badges visible on the focused limb in single-limb focus mode', () => {
