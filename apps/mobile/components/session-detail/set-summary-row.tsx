@@ -18,8 +18,8 @@ export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percent
   const state = row.done ? 'realised' : 'planned';
   return (
     <View style={[styles.setRow, percentageMetrics && styles.percentageRow]} testID={testID}>
-      <Text allowFontScaling={false} numberOfLines={1} style={[text.label, row.done ? tone.ink : tone.faint, styles.effortColumn]}>
-        <FigureText>{row.typeLabel}</FigureText>
+      <Text accessibilityLabel={row.typeLabel} allowFontScaling={false} numberOfLines={1} style={[text.label, row.done ? tone.ink : tone.faint, styles.effortColumn]}>
+        <FigureText>{row.typeLabel === 'Technique' ? 'Tech' : row.typeLabel}</FigureText>
       </Text>
       <Text
         allowFontScaling={false}
