@@ -67,9 +67,8 @@ type SteppedRole =
   | 'viz4';
 
 // The light ladder. The inks, washes and ramp are the values the shipped roles
-// were picked at (calibrated 2026-10-01). The grounds were re-stepped
-// 2026-11-22 into a ladder, `well` < `paper` < `surface` < `raised`: a card
-// stands off the page by 4 L*, and the page stays light enough for every
+// were picked at. The grounds are a ladder, `well` < `paper` < `surface` <
+// `raised`: a card stands off the page by 4 L*, and the page stays light enough for every
 // preset's `accent`, used as given, to clear 4.5:1 on it. The hairlines are
 // about 8% ink over a card.
 const LIGHT_STEPS: Record<SteppedRole, Step> = {

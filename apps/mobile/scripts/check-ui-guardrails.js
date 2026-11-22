@@ -78,7 +78,8 @@ const LEGACY_VOCABULARY_REMEDY =
 // the one edge, so every card and control lifts the same way. Like the
 // legacy rule it blocks on sight, scans `src/**` and `.ts` too, and has no
 // budget or allowlist: the owner is the one file the edge lives in.
-const EDGE_SHADOW_REGEX = /\b(?:shadow[A-Z]\w*|boxShadow|elevation)\s*[:=]/g;
+// `=` as a prop, never `==` / `===` (a comparison sets no style).
+const EDGE_SHADOW_REGEX = /\b(?:shadow[A-Z]\w*|boxShadow|elevation)\s*(?::|=(?!=))/g;
 
 const EDGE_SHADOW_REMEDY =
   'spread uiEdge / uiWell (or uiHairline) from @/components/ui into the style instead of setting a shadow';

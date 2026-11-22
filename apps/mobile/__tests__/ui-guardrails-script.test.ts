@@ -237,6 +237,7 @@ describe('UI guardrail edge shadow rule', () => {
       'src/health/mapping.ts',
       `// Depth is a ground change, never an elevation.
 export const row = { elevation_gain_m: 3, elevationAscended: 2, textShadowColor: 'x' };
+if (style.elevation === 2 || boxShadow == null) {}
 `
     );
 

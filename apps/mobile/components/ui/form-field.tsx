@@ -30,7 +30,7 @@ export type FormFieldProps = Omit<TextInputProps, 'style' | 'placeholderTextColo
 // A labelled input field (`design-language.md` §4): the micro-label inside the
 // field above the value, one field height, `radius.control`, `raised` inside
 // the edge, its hairline turning `danger` while the value is invalid. The logger's figure
-// fields are the same recipe drawn larger (`exercise-page/set-logger.tsx`).
+// fields are the same recipe drawn larger (`exercise-page/set-entry-fields.tsx`).
 export function FormField({
   label,
   error,

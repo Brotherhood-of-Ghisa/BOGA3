@@ -16,9 +16,8 @@ import themeRolesLight from './fixtures/theme-roles-light.json';
 // and `record` — used as given in light mode — meet their own floors. Custom
 // themes are not gated (`ui-theme-custom.test.ts`).
 
-// The palette as rationalised and picked on device, 2026-09-27, with the
-// grounds and hairlines re-stepped into the ground ladder 2026-11-22. The
-// generator is calibrated to it; a role drifting further than ΔE*ab 3 from it
+// The palette as picked on device, its grounds and hairlines on the ground
+// ladder. The generator is calibrated to it; a role drifting further than ΔE*ab 3 from it
 // is a visible change and needs its own design decision.
 const PICKED_PALETTE: Omit<UiRoles, 'scrim' | OnColourRole> = {
   ink: '#1B1712',
@@ -405,8 +404,8 @@ describe('hue seeds', () => {
 // Every role as each preset and custom hue drew it before background and
 // text were separate seeds (`fixtures/theme-roles-light.json`, generated from
 // the one-`ground` generator). An untouched choice must draw the same theme,
-// but for the grounds and hairlines the ground ladder re-stepped (2026-11-22),
-// which the calibration above pins instead. `digest` covers the other roles.
+// but for the grounds and hairlines the ground ladder re-stepped, which the
+// calibration above pins instead. `digest` covers the other roles.
 const RESTEPPED_ROLES: readonly string[] = ['paper', 'surface', 'rule', 'ruleSoft'];
 const LEGACY_ROLES = (Object.keys(themeRolesLight.presets.warm) as (keyof UiRoles)[]).filter(
   (role) => !RESTEPPED_ROLES.includes(role),

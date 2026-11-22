@@ -1,10 +1,11 @@
 import { forwardRef, type ReactNode } from 'react';
 import { Pressable, Text, TextInput, type TextInputInstance, View } from 'react-native';
 
+import { uiEdge } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatSessionSetType, type SessionSetTypeValue } from '@/src/data/set-types';
 import { formatEffort } from '@/src/session-recorder/exercise-page-model';
 
@@ -90,15 +91,15 @@ export const SetEntryFields = forwardRef<TextInputInstance, SetEntryFieldsProps>
   );
 });
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   fields: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   field: {
     height: uiGeometry.fieldHeight,
     paddingHorizontal: uiSpace.sm,
     paddingTop: uiSpace.xs,
-    backgroundColor: roles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    // A field on a card: `raised` inside the edge, as `FormField`.
+    backgroundColor: roles.raised,
+    ...uiEdge(roles, mode),
     borderRadius: uiGeometry.radius.control,
   },
   invalid: { borderColor: roles.danger },
