@@ -15,6 +15,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { randomUUID } from 'node:crypto';
 
 import { createClientMockState } from '../helpers/sync-cycle-mocks';
 import { fakeHealthStore, healthWorkout } from '../helpers/health-import-fakes';
@@ -34,6 +35,11 @@ jest.mock('@/src/auth/supabase', () =>
 import { healthImportApi } from '@/src/health-import/api';
 import { BACKFILL_DAYS, runHealthImport } from '@/src/health-import/importer';
 import { healthImportStore } from '@/src/health-import/storage';
+import { applyImportedBodyWeights } from '@/src/data/bodyweight';
+import type { Transaction } from '@/src/data/clock';
+import { bodyWeightMeasurements } from '@/src/data/schema';
+import { applyPullPage, entityToWire, type WireEntity, type PullCursor } from '@/src/sync/cycle';
+import { createInMemoryDatabase } from '../helpers/in-memory-db';
 
 const config = readSyncTestEndpoint();
 const RUN = `health-live-${Date.now()}`;
@@ -104,4 +110,74 @@ it('backfills, applies a deletion, and fails loud on a batch the server rejects'
   await expect(run(store)).rejects.toMatchObject({ code: 'UPLOAD_FAILED', message: expect.stringContaining('INVALID_ARGUMENT') });
   expect(healthImportStore.readAnchor(user.userId)?.anchor).toBe('anchor-2');
   expect((await serverRows()).map((row: ActivityRow) => row.external_id)).toEqual([`${RUN}-run`]);
+});
+
+it('syncs Health bodyweight identity and preserves Ignore/deletion against a later stale device import', async () => {
+  const device = createInMemoryDatabase();
+  const uuid = randomUUID();
+  const id = `apple-health-weight:${uuid}`;
+  const measuredAt = new Date(Date.now() - 60_000);
+  const scoped = user.client.schema(SYNC_RPC_SCHEMA);
+  const push = async (entity: ReturnType<typeof entityToWire>) => {
+    const response = await scoped.rpc('sync_push', { payload: { entities: [entity] } }) as { error: unknown };
+    expect(response.error).toBeNull();
+  };
+  const read = async () => {
+    const response = await service.schema(SYNC_RPC_SCHEMA).from('body_weight_measurements')
+      .select('*').eq('owner_user_id', user.userId).eq('id', id).single();
+    if (response.error) throw new Error(response.error.message);
+    return response.data;
+  };
+  const expectRestored = async (ignored: boolean, deletedAt: number | null) => {
+    let cursor: PullCursor = null;
+    let found: WireEntity | undefined;
+    do {
+      const result = await scoped.rpc('sync_pull', { layer: 5, cursor, limit: 200 }) as {
+        error: unknown; data: { entities: WireEntity[]; next_cursor: PullCursor; has_more: boolean };
+      };
+      expect(result.error).toBeNull();
+      found = result.data.entities.find(entity => entity.type === 'body_weight_measurements' && entity.id === id) ?? found;
+      cursor = result.data.has_more ? result.data.next_cursor : null;
+    } while (cursor !== null);
+    expect(found?.fields).toMatchObject({ source: 'apple_health', external_id: uuid, ignored, deleted_at: deletedAt });
+    const restored = createInMemoryDatabase();
+    try {
+      restored.database.transaction(tx => applyPullPage(tx as Transaction, [found!], 'body_weight_measurements'));
+      expect(restored.database.select().from(bodyWeightMeasurements).get()).toMatchObject({
+        source: 'apple_health', externalId: uuid, ignored, deletedAt: deletedAt === null ? null : new Date(deletedAt),
+      });
+    } finally { restored.close(); }
+  };
+  try {
+    device.database.transaction(tx => applyImportedBodyWeights(tx as Transaction,
+      [{ uuid, weightKg: 81.25, measuredAt }], [], new Date()));
+    const sample = device.database.select().from(bodyWeightMeasurements).get()!;
+    const initial = entityToWire(sample, 'body_weight_measurements');
+    await push(initial);
+    expect(await read()).toMatchObject({ source: 'apple_health', external_id: uuid, ignored: false, deleted_at: null, client_updated_at_ms: 1 });
+    await expectRestored(false, null);
+    const choiceVersion = Date.now();
+    const ignored = { ...initial, client_updated_at_ms: choiceVersion,
+      fields: { ...initial.fields, ignored: true, deleted_at: choiceVersion } };
+    await push(ignored);
+    // Another phone imports the old native sample much later: its source
+    // version is still 1, irrespective of that phone's clock.
+    await push(initial);
+    expect(await read()).toMatchObject({ ignored: true, deleted_at: choiceVersion });
+    await expectRestored(true, choiceVersion);
+    const legacy = { ...ignored, client_updated_at_ms: choiceVersion + 1, fields: { ...initial.fields } };
+    delete legacy.fields.source; delete legacy.fields.external_id; delete legacy.fields.ignored;
+    await push(legacy);
+    expect(await read()).toMatchObject({ source: 'apple_health', external_id: uuid, ignored: true, deleted_at: choiceVersion });
+    const deleted = { ...ignored, client_updated_at_ms: choiceVersion + 2,
+      fields: { ...ignored.fields, ignored: false, deleted_at: choiceVersion + 2 } };
+    await push(deleted); await push(initial);
+    expect(await read()).toMatchObject({ ignored: false, deleted_at: choiceVersion + 2 });
+    await expectRestored(false, choiceVersion + 2);
+  } finally {
+    device.close();
+    const result = await service.schema(SYNC_RPC_SCHEMA).from('body_weight_measurements')
+      .delete().eq('owner_user_id', user.userId).eq('id', id);
+    if (result.error) throw new Error(result.error.message);
+  }
 });

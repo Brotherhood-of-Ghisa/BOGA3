@@ -6,14 +6,19 @@ import { Text, View } from 'react-native';
 import { ActionButton, Card, FigureText, FormSection, Icon, ListRow, Notice, ScreenScroll, StatePanel, Stat } from '@/components/ui';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { deleteBodyWeightReading, listBodyWeightReadings, saveBodyWeightReading } from '@/src/data/bodyweight';
+import { getAuthSnapshot } from '@/src/auth/service';
+import { setImportedBodyWeightIgnored } from '@/src/health-import/bodyweight-actions';
 import type { BodyWeightMeasurement } from '@/src/data/schema';
 import { isValidBodyWeightReading } from '@/src/bodyweight/weight-entry';
 import { formatLocalDateTime } from '@/src/utils/local-time';
 import { BodyweightCalculationsRow } from './settings-row';
 import { WeightEntrySheet } from './weight-entry-sheet';
 import { weightStyles as styles } from './styles';
+import { BodyWeightHealthImportSection } from './health-import-section';
+import { ImportedWeightSheet } from './imported-weight-sheet';
 
-type Editor = { reading: BodyWeightMeasurement | null; measuredAt: Date };
+type Editor = { reading: BodyWeightMeasurement | null; measuredAt: Date; owner?: string | null };
+/** Dated weight history: manual rows edit; labelled Health rows open inclusion-only details. */
 export function BodyWeightScreen() {
   const text = useUiText();
   const tone = useUiTextTone();
@@ -23,16 +28,20 @@ export function BodyWeightScreen() {
   const [error, setError] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [editorVisible, setEditorVisible] = useState(false);
-  const openEditor = (value: Editor) => { setEditor(value); setEditorVisible(true); };
+  const [readingsOwner, setReadingsOwner] = useState<string | null>(null);
+  const openEditor = (value: Editor) => { setEditor({ ...value, owner: readingsOwner }); setEditorVisible(true); };
   const [feedback, setFeedback] = useState<string | null>(null);
   const datedWeightRevision = useBodyWeightContextRevision();
   const generation = useRef(0);
   const load = useCallback(async () => {
     const current = ++generation.current;
+    const owner = getAuthSnapshot().user?.id ?? null;
     setError(false);
     try {
       const rows = await listBodyWeightReadings();
-      if (current === generation.current) { setReadings(rows); setLoadedAtMs(Date.now()); }
+      if (current === generation.current && owner === (getAuthSnapshot().user?.id ?? null)) {
+        setReadings(rows); setReadingsOwner(owner); setLoadedAtMs(Date.now());
+      }
     }
     catch { if (current === generation.current) setError(true); }
   }, []);
@@ -41,7 +50,7 @@ export function BodyWeightScreen() {
     return () => { generation.current += 1; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- A committed timeline change must reload the focused projection.
   }, [load, datedWeightRevision]));
-  const current = readings?.find(row => row.measuredAt.getTime() <= loadedAtMs);
+  const current = readings?.find(row => !row.deletedAt && row.measuredAt.getTime() <= loadedAtMs);
   const currentValid = current && isValidBodyWeightReading(current);
   const displayKg = (weightKg: number) => String(Number(weightKg.toFixed(6)));
   return <>
@@ -49,6 +58,7 @@ export function BodyWeightScreen() {
       <FormSection footnote="Each session uses the latest reading on or before its start." title="Calculations">
         <BodyweightCalculationsRow />
       </FormSection>
+      <BodyWeightHealthImportSection />
       {feedback ? <Notice live message={feedback} testID="body-weight-feedback" /> : null}
       {error ? <StatePanel kind="error" title="Could not load weight history."
         action={{ label: 'Retry', onPress: () => void load() }} testID="body-weight-error" />
@@ -59,7 +69,8 @@ export function BodyWeightScreen() {
               testID="body-weight-current" />
             <Text allowFontScaling={false} style={[text.body, tone.muted]}>
               <FigureText>{currentValid ? `Measured ${formatLocalDateTime(current.measuredAt.getTime(), dateFormat)}` : current
-                ? 'Your latest reading needs review before it can be used.' : 'No weight recorded. Add your first reading below.'}</FigureText>
+                ? 'Your latest reading needs review before it can be used.' : readings?.some(row => row.ignored)
+                  ? 'No reading in use.' : 'No weight recorded. Add your first reading below.'}</FigureText>
             </Text>
           </View></Card>
           <ActionButton label="Add reading" variant="primary" testID="body-weight-add"
@@ -72,17 +83,28 @@ export function BodyWeightScreen() {
             </ListRow>
               : readings.map((reading, index) => <ListRow key={reading.id}
                 divider={index > 0} density="list" testID={`body-weight-reading-${reading.id}`}
-                accessibilityLabel={`Edit ${displayKg(reading.weightKg)}, ${formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)}`}
+                accessibilityLabel={`${reading.source === 'apple_health' ? 'Apple Health, read-only' : 'Edit manual reading'}, ${displayKg(reading.weightKg)}, ${formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)}${reading.ignored ? ', Ignored' : ''}`}
                 onPress={() => openEditor({ reading, measuredAt: reading.measuredAt })}
                 trailing={<Icon name="chevron-right" size="sm" colorRole="inkFaint" />}>
                 <Stat label={formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)} value={displayKg(reading.weightKg)}
                   rank="secondary" />
+                <Text allowFontScaling={false} style={[text.body, tone.muted]}>
+                  {reading.source === 'apple_health'
+                    ? reading.ignored ? 'Apple Health · Read-only · Ignored' : 'Apple Health · Read-only'
+                    : 'Manual'}
+                </Text>
                 {!isValidBodyWeightReading(reading) ? <Text allowFontScaling={false} style={[text.body, tone.muted]}>Needs review</Text> : null}
               </ListRow>)}
           </FormSection>
         </>}
     </ScreenScroll>
-    {editor ? <WeightEntrySheet visible={editorVisible} title={editor.reading ? 'Edit reading' : 'Add reading'}
+    {editor?.reading?.source === 'apple_health' ? <ImportedWeightSheet reading={editor.reading} displayValue={displayKg(editor.reading.weightKg)}
+      visible={editorVisible} onDismiss={() => setEditorVisible(false)}
+      onSetIgnored={async ignored => {
+        await setImportedBodyWeightIgnored(editor.reading!.id, ignored, editor.owner ?? null);
+        setFeedback(ignored ? 'Reading ignored.' : 'Reading used.');
+        await load();
+      }} /> : editor ? <WeightEntrySheet visible={editorVisible} title={editor.reading ? 'Edit reading' : 'Add reading'}
       autoFocus={!editor.reading}
       initial={editor.reading ? { weightValue: displayKg(editor.reading.weightKg) }
         : { weightValue: '' }} measuredAt={editor.measuredAt}

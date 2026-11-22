@@ -223,6 +223,18 @@ export const generatedMigrationBundle = {
     tag: "0035_fluffy_stranger",
     breakpoints: true,
   },
+  {
+    idx: 36,
+    when: 1795368971709,
+    tag: "0036_sweet_blazing_skull",
+    breakpoints: true,
+  },
+  {
+    idx: 37,
+    when: 1795369371332,
+    tag: "0037_health_weight_repull",
+    breakpoints: true,
+  },
     ],
   },
   migrations: {
@@ -1116,6 +1128,17 @@ BEGIN
   WHERE se.\`id\` IN (OLD.\`session_exercise_id\`, NEW.\`session_exercise_id\`)
     AND se.\`exercise_definition_id\` IS NOT NULL AND s.\`status\` = 'completed';
 END;
+--> statement-breakpoint
+UPDATE sync_runtime_state SET pull_cursor = '{}';
+`,
+  m0036: `ALTER TABLE \`body_weight_measurements\` ADD \`source\` text DEFAULT 'manual' NOT NULL;--> statement-breakpoint
+ALTER TABLE \`body_weight_measurements\` ADD \`external_id\` text;--> statement-breakpoint
+ALTER TABLE \`body_weight_measurements\` ADD \`ignored\` integer DEFAULT false NOT NULL;`,
+  m0037: `-- Older builds could have pulled Health rows before understanding their new
+-- source fields. Mark them read-only immediately. Pull hydrates missing source
+-- metadata even beside an unsent value edit, retaining its clock and dirty bit.
+UPDATE body_weight_measurements SET source = 'apple_health'
+WHERE id LIKE 'apple-health-weight:%' AND external_id IS NULL;
 --> statement-breakpoint
 UPDATE sync_runtime_state SET pull_cursor = '{}';
 `,

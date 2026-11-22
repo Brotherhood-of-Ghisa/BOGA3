@@ -33,6 +33,18 @@ export type HealthWorkoutChanges = {
   newAnchor: string;
 };
 
+export type HealthBodyWeightChanges = {
+  samples: { uuid: string; weightKg: number; measuredAt: Date }[];
+  deletedIds: string[];
+  newAnchor: string;
+};
+
+export type BodyWeightHealthStoreAdapter = {
+  readonly supported: boolean;
+  requestAuthorization(): Promise<void>;
+  readChanges(input: { anchor: string | null; since: Date }): Promise<HealthBodyWeightChanges>;
+};
+
 export type HealthStoreAdapter = {
   /** False where the store does not exist (Android, web, a device without Health). */
   readonly supported: boolean;

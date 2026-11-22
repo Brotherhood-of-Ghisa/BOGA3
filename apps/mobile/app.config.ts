@@ -159,16 +159,16 @@ export default ({ config }: { config: ExpoConfig }) => ({
             }
         ],
         "expo-background-task",
-        // Apple Health: read workouts only, imported on foreground. No write
+        // Apple Health: read workouts and optional bodyweight on foreground. No write
         // access and no background delivery (the plugin's default adds it).
         [
             "@kingstinct/react-native-healthkit",
             {
                 NSHealthShareUsageDescription:
-                    "Allow Boga3 to read your workouts so your coach can include them in its advice.",
+                    "Allow Boga3 to read your workouts for coaching and new weight readings for your bodyweight history.",
                 // App Store validation requires this for the SDK's write APIs, even with read-only authorization.
                 NSHealthUpdateUsageDescription:
-                    "Boga3 reads workouts for coaching advice and does not write or update Apple Health data.",
+                    "Boga3 reads workouts and weight readings and does not write or update Apple Health data.",
                 background: false
             }
         ],

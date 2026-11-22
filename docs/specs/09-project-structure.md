@@ -95,8 +95,8 @@ Define the canonical repository structure, path ownership, and placement convent
     newest 30; rules in `snapshots.ts`) and share-sheet Export. No permission
     or server; they outlive an account wipe or a bad sync.
 - `apps/mobile/src/health-import/`
-  - owns the Apple Health import, outside the sync cycle
-    (`docs/specs/tech/health-activities-contract.md`); its adapter is the only HealthKit code.
+  - owns native Health reads: workouts (`docs/specs/tech/health-activities-contract.md`)
+    and weights (`docs/specs/tech/bodyweight-load-contract.md`). Only its adapter uses HealthKit.
 - `apps/mobile/src/auth/`
   - owns shared mobile auth integration modules such as the Supabase client bootstrap, auth storage adapter, session service, and React provider/hook surface.
 - `apps/mobile/src/session-planner/`

@@ -96,6 +96,8 @@ ordering, paging and `cardio`; `./boga test mcp-smoke` the MCP-to-API path.
 
 ## Phone import
 
+Bodyweight uses the separate flow in `bodyweight-load-contract.md` (Apple Health readings).
+
 iOS reads Apple Health through `@kingstinct/react-native-healthkit` (config
 plugin in `apps/mobile/app.config.ts`: both usage strings for SDK validation,
 read-only authorization, no background-delivery entitlement). `src/health-import/native-adapter.ts` is

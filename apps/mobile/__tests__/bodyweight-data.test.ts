@@ -166,7 +166,7 @@ it('round-trips a clean kg reading through sync and applies tombstone/undelete b
   const wire = entityToWire(original, 'body_weight_measurements');
   expect(wire.fields).toMatchObject({ weight_kg: 79.8, measured_at: 1000 });
   expect(Object.keys(wire.fields).sort()).toEqual([
-    'created_at', 'deleted_at', 'measured_at', 'updated_at', 'weight_kg',
+    'created_at', 'deleted_at', 'external_id', 'ignored', 'measured_at', 'source', 'updated_at', 'weight_kg',
   ]);
   const apply = () => db.transaction(tx => applyPullPage(tx as Transaction, [wire], 'body_weight_measurements'));
   expect(apply()).toBe(1);

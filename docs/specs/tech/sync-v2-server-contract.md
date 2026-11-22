@@ -96,6 +96,8 @@ Every table also has the index `<table>_owner_received_idx` on
 
 Drizzle and migrations own columns; drift checks enforce parity. Additional rules:
 
+- Health reading identity, inclusion and source clocks: `bodyweight-load-contract.md`.
+
 - **`training_notes`** metadata compatibility: when changing note sync, load
   [`training-notes-contract.md`](training-notes-contract.md).
 

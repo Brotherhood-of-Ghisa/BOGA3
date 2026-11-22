@@ -9,6 +9,7 @@ const mockKit = {
   isHealthDataAvailable: jest.fn(() => true),
   requestAuthorization: jest.fn(async (_request: unknown) => true),
   queryWorkoutSamplesWithAnchor: jest.fn(),
+  queryQuantitySamplesWithAnchor: jest.fn(),
   WorkoutActivityType: { 37: 'running', 50: 'traditionalStrengthTraining', running: 37, traditionalStrengthTraining: 50 } as Record<string | number, string | number>,
 };
 jest.mock('@kingstinct/react-native-healthkit', () => mockKit);
@@ -28,14 +29,16 @@ const proxy = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-const loadAdapter = () => {
+const loadAdapters = () => {
   let adapter: typeof import('@/src/health-import/native-adapter') | undefined;
   jest.isolateModules(() => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- a fresh module per case, after Platform.OS is set.
     adapter = require('@/src/health-import/native-adapter');
   });
-  return adapter!.getHealthStoreAdapter();
+  return adapter!;
 };
+
+const loadAdapter = () => loadAdapters().getHealthStoreAdapter();
 
 const originalOS = Platform.OS;
 afterEach(() => {
@@ -58,6 +61,24 @@ describe('on iOS', () => {
   it('reports availability from HealthKit', () => {
     mockKit.isHealthDataAvailable.mockReturnValueOnce(false);
     expect(loadAdapter().supported).toBe(false);
+  });
+
+  it('requests body mass independently and reads exact dates converted by HealthKit to kg', async () => {
+    const adapter = loadAdapters().getBodyWeightHealthStoreAdapter();
+    await adapter.requestAuthorization();
+    expect(mockKit.requestAuthorization).toHaveBeenCalledWith({ toRead: ['HKQuantityTypeIdentifierBodyMass'] });
+    const since = new Date('2026-11-22T12:00:00.123Z');
+    mockKit.queryQuantitySamplesWithAnchor.mockResolvedValueOnce({
+      samples: [{ uuid: 'weight', quantity: 80.123456789, unit: 'kg', startDate: since }],
+      deletedSamples: [{ uuid: 'gone' }], newAnchor: 'weight-next',
+    });
+    await expect(adapter.readChanges({ since, anchor: 'weight-old' })).resolves.toEqual({
+      samples: [{ uuid: 'weight', weightKg: 80.123456789, measuredAt: since }],
+      deletedIds: ['gone'], newAnchor: 'weight-next',
+    });
+    expect(mockKit.queryQuantitySamplesWithAnchor).toHaveBeenCalledWith('HKQuantityTypeIdentifierBodyMass', {
+      unit: 'kg', limit: 0, filter: { date: { startDate: since } }, anchor: 'weight-old',
+    });
   });
 
   it('queries every workout since the backfill start after the anchor, and maps each summary', async () => {
@@ -117,4 +138,8 @@ it('is unsupported off iOS and never loads HealthKit', async () => {
   await expect(adapter.requestAuthorization()).rejects.toThrow('only available on iPhone');
   await expect(adapter.readWorkoutChanges({ anchor: null, since: new Date() })).rejects.toThrow('only available on iPhone');
   expect(mockKit.isHealthDataAvailable).not.toHaveBeenCalled();
+  const weight = loadAdapters().getBodyWeightHealthStoreAdapter();
+  expect(weight.supported).toBe(false);
+  await expect(weight.requestAuthorization()).rejects.toThrow('only available on iPhone');
+  await expect(weight.readChanges({ anchor: null, since: new Date() })).rejects.toThrow('only available on iPhone');
 });

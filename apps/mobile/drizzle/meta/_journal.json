@@ -253,6 +253,20 @@
       "when": 1795111939590,
       "tag": "0035_fluffy_stranger",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1795368971709,
+      "tag": "0036_sweet_blazing_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1795369371332,
+      "tag": "0037_health_weight_repull",
+      "breakpoints": true
     }
   ]
 }
