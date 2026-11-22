@@ -1,9 +1,10 @@
 # Default build
 
-The default build process, for work started with no other process. When you
-run under a skill (engine's `build`, or the `engine` skill's server executor
-mode) or the user gives you another process, follow that process and ignore
-this procedure entirely. The test gates in `AGENTS.md`
+Use this process when no other process applies, including the missing-Engine
+fallback in `AGENTS.md`, even if an Engine build skill was already loaded.
+When Engine is available, follow its selected skill (`build` or the `engine`
+skill's server executor mode). Follow any other user-given process instead.
+The test gates in `AGENTS.md`
 apply under every process (Jest always, chosen lanes green, quality targets);
 only which lanes to run and how to merge come from the process: the agent's
 judgement, or the lanes agreed on the ticket for unattended work.
