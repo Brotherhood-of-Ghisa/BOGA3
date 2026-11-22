@@ -7,7 +7,7 @@ import { historyWeekBounds } from '@/src/utils/calendar-weeks';
 import { encodeGymRouteParam, type GymScopeOption } from '@/src/utils/gym-scope-route';
 
 /**
- * One exercise or muscle at a three-state gym scope; unset means every gym.
+ * One exercise, a bounded selection, or a muscle at a three-state gym scope.
  * A muscle's `countSecondary: false` counts its primary work only.
  */
 export type HistorySubject =

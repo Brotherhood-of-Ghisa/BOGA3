@@ -383,12 +383,7 @@ export const computeSelectedExerciseDailyEffort = async (
   return aggregateExerciseDailyEffort(rawSessions, options.timeZone);
 };
 
-/**
- * Both chart views share one graph read and one daily aggregation. A day's PR
- * marks are the whole exercise's (`pr_*`) while every gym is in view; with a
- * gym chosen they are each session's own (`own_pr_*`) — on a split exercise
- * that gym's book, and for no gym the whole exercise's ([[gym.split]]). `gyms` lists the window's choices, unfiltered.
- */
+/** One bounded workload scope, sharing a graph read across all three chart views. */
 export const computeSelectedExercisesHistoryEffort = async (options: ComputeSelectedExerciseDailyEffortOptions & { exerciseDefinitionIds: readonly string[] }) => {
   const allSessions = await loadExerciseRawSessions(options);
   const rawSessions = inGymScope(allSessions, options.gymId);
@@ -398,6 +393,12 @@ export const computeSelectedExercisesHistoryEffort = async (options: ComputeSele
   return { daily, weekly: aggregateExerciseWeeksFromDaily(daily), gyms: exerciseHistoryGymOptions(allSessions) };
 };
 
+/**
+ * All chart views share one graph read and one daily aggregation. A day's PR
+ * marks are the whole exercise's (`pr_*`) while every gym is in view; with a
+ * gym chosen they are each session's own (`own_pr_*`) — on a split exercise
+ * that gym's book, and for no gym the whole exercise's ([[gym.split]]). `gyms` lists the window's choices, unfiltered.
+ */
 export const computeSelectedExerciseHistoryEffort = async (options: ComputeSelectedExerciseDailyEffortOptions & { exerciseDefinitionId: string }) => {
   const allSessions = await loadExerciseRawSessions(options);
   const rawSessions = inGymScope(allSessions, options.gymId);

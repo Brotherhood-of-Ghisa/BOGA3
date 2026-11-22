@@ -104,7 +104,7 @@ function WeekSetCard({ group, onOpenSession, exerciseLink, testID, contributionM
     </> : undefined}
     count={group.detail}
     summary={<>
-      {group.exerciseName ? <Text allowFontScaling={false} style={text.bodyStrong} testID={`${testID}-exercise-name`}>{group.exerciseName}</Text> : null}
+      {group.exerciseName ? <Text allowFontScaling={false} style={[text.bodyStrong, styles.contribution]} testID={`${testID}-exercise-name`}>{group.exerciseName}</Text> : null}
       <ContributionLine credit={credit} role={group.role} testID={testID} />
     </>}
     name={group.title} onPress={() => onOpenSession(group.sessionId)} rows={group.rows} record={group.record}

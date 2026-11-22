@@ -55,6 +55,8 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "injury-form-label"
 - inputText: "Knee pain"
+# The native hierarchy can expose Save behind the keyboard; dismiss it first.
+- hideKeyboard
 - tapOn: "Right"
 
 # Save the injury

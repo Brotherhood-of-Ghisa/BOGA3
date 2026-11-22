@@ -125,3 +125,12 @@ calendar and isometric/repetition rules.
 - Native selection and hold/scroll/release checks passed. The names-sheet
   dismissal step was corrected to the existing backdrop-tap pattern; the full
   native lane and final visual comparison remain outstanding.
+- The complete combined native journey passed, including all three charts,
+  menu roles, chronological History, Back and Cancel. Screenshot review found
+  the Timeline name lacked its card inset; the exact existing summary spacing
+  was applied. Reviewer agreed it is cosmetic: repeat fast and fresh small/
+  normal screenshots, reuse unchanged behavioral/quality checks.
+- The full data-smoke run also exposed an existing injury-flow test tapping
+  Save behind the software keyboard. Its failure screenshot shows the editor
+  still open and a stray typed character. Added explicit keyboard dismissal
+  after entry; no injury app behavior changed. The chosen lane set is unchanged.

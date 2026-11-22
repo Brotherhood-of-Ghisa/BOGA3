@@ -424,6 +424,8 @@ appId: com.dinoderek.mobile
 - longPressOn: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
 - assertVisible: { id: "stats-exercise-selection-controls" }
 - assertNotVisible: { id: "stats-exercise-history-view-chip-row" }
+- assertVisible: { id: "stats-exercise-selection-show", enabled: false }
+- takeScreenshot: "09a-combined-one-selected"
 - tapOn: { id: "stats-exercise-row-seed_barbell_back_squat" }
 - assertVisible: { id: "stats-exercise-selection-count", text: ".*2.*" }
 - takeScreenshot: "10-combined-selection"
@@ -441,10 +443,17 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     notVisible: { id: "selected-exercises-sheet" }
     timeout: 10000
+- takeScreenshot: "11a-combined-grid"
 - tapOn: { id: "stats-exercise-history-view-chip-weekly" }
 - takeScreenshot: "12-combined-weekly"
+- tapOn: { id: "stats-exercise-history-view-chip-timeline" }
+- extendedWaitUntil:
+    visible: { id: "stats-exercise-history-week-sets" }
+    timeout: 15000
+- takeScreenshot: "12b-combined-timeline"
 - tapOn: { id: "progress-history-options-button" }
 - assertNotVisible: { id: "progress-history-rm-curve" }
+- takeScreenshot: "12c-combined-options"
 - tapOn: { id: "progress-history-exercise-history" }
 - extendedWaitUntil:
     visible: { id: "exercise-history-exercise-name-maestro_m24_completion_unmapped_exercise" }
