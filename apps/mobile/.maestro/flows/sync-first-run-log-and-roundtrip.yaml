@@ -272,7 +272,7 @@ appId: com.dinoderek.mobile
 # After the wipe the server is the only place this reading exists.
 - openLink: "boga3://body-weight"
 - extendedWaitUntil:
-    visible: { id: "body-weight-reading-.*", text: "Edit 80, .*" }
+    visible: { id: "body-weight-reading-.*", text: "Edit manual reading, 80, .*" }
     timeout: 30000
 - takeScreenshot: "19-first-run-roundtrip-reading-restored"
 # Restored reporting is Broad's combined muscles; Calves and Tibialis stay Off.
