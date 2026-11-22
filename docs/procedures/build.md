@@ -1,8 +1,7 @@
 # Default build
 
 The default build process, for work started with no other process. When you
-run under a skill (engine's `build`, or the `engine` skill's server executor
-mode) or the user gives you another process, follow that process and ignore
+run under a build skill or the user gives you another process, follow that process and ignore
 this procedure entirely. The test gates in `AGENTS.md`
 apply under every process (Jest always, chosen lanes green, quality targets);
 only which lanes to run and how to merge come from the process: the agent's
@@ -13,5 +12,6 @@ judgement, or the lanes agreed on the ticket for unattended work.
   `./boga test for`, lowered or raised by judgement (spec `02`, "Choosing
   lanes"). Run what you agree to green before opening the PR, and put the
   agreement on the PR's **Tests** section.
+- **Security:** add `/security-review` for auth/RLS/API changes.
 - **Merge:** after opening the PR, report the evidence. Merge only on the
   user's explicit approval of that PR. Never auto-merge.

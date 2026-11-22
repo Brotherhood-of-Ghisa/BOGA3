@@ -28,8 +28,6 @@ Constraints:
 Planning (optional — pick one):
 - No plan: go straight to a PR.
 - A single plan doc under docs/plans/, for one PR.
-- Multi-PR work: an engine server plan (the engine skill's `plan <ask>`
-  mode), never repo files.
 - If this affects shared behavior, update the relevant project-level specs too.
 
 Verification:
@@ -58,5 +56,4 @@ Update tests and docs/specs as needed.
 - This template is intentionally plain and beginner-friendly.
 - Planning is optional and ephemeral (`docs/plans/README.md`): you choose
   whether and how the work is planned.
-- For larger work, ask for an engine server plan, then build it as several
-  small PRs.
+- For larger work, split it into several small PRs.
