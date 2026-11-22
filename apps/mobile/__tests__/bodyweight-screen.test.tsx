@@ -103,7 +103,7 @@ describe('Apple Health reading controls', () => {
     await waitFor(() => expect(within(screen.getByTestId('body-weight-current')).getByText('80')).toBeTruthy(), AFTER_WRITE);
   });
 
-  it('keeps inclusion and the sheet intact after a failed write', async () => {
+  it('keeps inclusion intact after a failed write and allows retry', async () => {
     const id = await importReading();
     renderWithTheme(<BodyWeightScreen />);
     await screen.findByTestId('body-weight-current');
@@ -114,6 +114,9 @@ describe('Apple Health reading controls', () => {
     expect(screen.queryByText(/SQLite error code/)).toBeNull();
     expect(readings().find(row => row.id === id)).toMatchObject({ ignored: false, deletedAt: null });
     expect(screen.getByTestId('imported-weight-sheet').props.visible).not.toBe(false);
+    fireEvent.press(within(screen.getByTestId('imported-weight-sheet')).getByText('Ignore'));
+    await screen.findByText('Apple Health · Read-only · Ignored');
+    expect(readings().find(row => row.id === id)?.ignored).toBe(true);
   });
 
   it('shows an honest current-reading state when every imported reading is ignored', async () => {
