@@ -75,9 +75,9 @@ cross-year endpoints retain both years.
 Calendar-week headings retain selected order and only the end date's four-digit
 year, even across New Year.
 
-- **Exception — schedule picker:** iOS uses preference-mapped
-  locales with abbreviations and omitted years; Android uses system
-  date order and language. App-owned labels follow Date format.
+- **Exception — native pickers:** iOS stays English: month/day for
+  `MM-DD-YYYY`, day/month otherwise, including ISO. Android uses system date
+  order and language. App-owned labels follow Date format.
 
 Code: `apps/mobile/src/utils/local-time.ts`.
 

@@ -168,6 +168,7 @@ function resolveSwitcherRows(
 }
 
 type ExercisePageScreenProps = {
+  initialSetId?: string;
   sessionId: string;
   sessionExerciseId: string;
   // Injected by tests; production uses the session repositories.
@@ -241,6 +242,7 @@ const consumablePlanSourceId = (exercise: { sourcePlanUseId?: string | null; sou
   exercise?.sourcePlanUseId ? null : exercise?.sourcePlanExerciseId ?? null;
 
 export function ExercisePageScreen({
+  initialSetId,
   sessionId,
   sessionExerciseId,
   draftClient,
@@ -326,7 +328,7 @@ export function ExercisePageScreen({
   const { activeWarning, isAcute, nonAcuteWarning } = resolveActiveWarning(warningResult);
 
   // `null` follows the cursor: the logger sits on the first set not performed.
-  const [openSetId, setOpenSetId] = useState<string | null>(null);
+  const [openSetId, setOpenSetId] = useState<string | null>(initialSetId ?? null);
   const [isCompleting, setIsCompleting] = useState(false);
   const [blockNotice, setBlockNotice] = useState<string | null>(null);
   // The sourced card's block state: Complete block is offered while the

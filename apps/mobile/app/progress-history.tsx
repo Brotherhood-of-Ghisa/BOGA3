@@ -2,6 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { ExerciseSessionEntrySheet } from '@/components/session-recorder/exercise-session-entry-sheet';
 import type { FocusedTimelineWeek } from '@/components/heatmaps';
 import {
   EXERCISE_HISTORY_METRIC_OPTIONS,
@@ -138,7 +139,7 @@ const invalidDetailPeriod = (subject: HistorySubject | null, period: SetPeriod |
 
 // The page's ⋮ offers applicable week, muscle and exercise-chart actions.
 // With no applicable action, hide the button rather than opening an empty sheet.
-function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, detailPeriod }: {
+function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, entryExercise, detailPeriod }: {
   title: string;
   /** A muscle page's title switches between the user's muscles. */
   titleSwitch?: { muscles: readonly HistoryTitleMuscle[]; currentId: string; onChoose: (muscleGroupId: string) => void };
@@ -148,9 +149,13 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
   onOpenMuscle: (muscleGroupId: string) => void;
   onOpenHistory?: () => void;
   onOpenCurve?: () => void;
+  entryExercise?: { id: string; name: string; deletedAt: Date | null } | null;
   detailPeriod?: SetPeriod | null;
 }) {
   const [optionsVisible, setOptionsVisible] = useState(false);
+  const [queuedSessionEntry, setQueuedSessionEntry] = useState(false);
+  const [sessionEntryVisible, setSessionEntryVisible] = useState(false);
+  const liveExercise = entryExercise?.deletedAt ? undefined : entryExercise;
   const sessionsWeek = !detailPeriod && week?.hasTraining ? week : null;
   const openWeek = () => {
     setOptionsVisible(false);
@@ -163,6 +168,8 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
   const hasOptions = sessionsWeek !== null || muscles.length > 0 || onOpenHistory !== undefined || onOpenCurve !== undefined;
   return (
     <>
+      <ExerciseSessionEntrySheet exercise={sessionEntryVisible ? liveExercise ?? null : null}
+        onDismiss={() => setSessionEntryVisible(false)} />
       <Stack.Screen
         options={{
           title,
@@ -183,9 +190,15 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
       <Sheet
         dismissLabel="Dismiss history options"
         onDismiss={() => setOptionsVisible(false)}
+        onDismissed={() => {
+          if (queuedSessionEntry) { setQueuedSessionEntry(false); setSessionEntryVisible(true); }
+        }}
         testID="progress-history-options-sheet"
         title={title}
         visible={optionsVisible}>
+        {liveExercise ? <ListRow label="Add to session…" leading={<Icon colorRole="ink" name="plus" size="md" />}
+          onPress={() => { setQueuedSessionEntry(true); setOptionsVisible(false); }}
+          testID="progress-history-add-to-session" /> : null}
         {onOpenHistory ? (
           <ListRow
             label="History"
@@ -381,6 +394,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   return (
     <Screen testID="progress-history-screen">
       <HistoryHeader
+        entryExercise={exercise}
         muscles={muscleLinks}
         onOpenHistory={exercise ? () => router.push(exerciseHistoryHref(exercise.id, gymId)) : undefined}
         onOpenCurve={exercise && !exercise.deletedAt ? () => router.push(rmCurveHref(exercise.id)) : undefined}

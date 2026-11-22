@@ -4,7 +4,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 import { ActionButton, Card, ListRow, Sheet, uiSpace, useUiMode } from '@/components/ui';
-import { formatClockTime, formatShortDate } from '@/src/utils/local-time';
+import { formatClockTime, formatShortDate, iosDatePickerLocale } from '@/src/utils/local-time';
 
 export type PlanScheduleSheetProps = {
   visible: boolean;
@@ -59,7 +59,7 @@ function PlanScheduleSheetBody({
         <View style={styles.iosPickerContainer}>
           <DateTimePicker
             display="spinner"
-            locale={dateFormat === 'MM-DD-YYYY' ? 'en-US' : dateFormat === 'YYYY-MM-DD' ? 'sv-SE' : 'en-GB'}
+            locale={iosDatePickerLocale(dateFormat)}
             mode="datetime"
             onChange={(_event, date) => {
               if (date) setSelectedDate(date);

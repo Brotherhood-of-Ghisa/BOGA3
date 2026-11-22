@@ -297,18 +297,49 @@ describe('plan repository — meta, duplicate and delete lifecycle', () => {
   it('refuses to delete a plan while a block is attached to a live card', async () => {
     attachBlockToCard(blockId);
     const result = await planRepository.deletePlan(planId, T1);
-    expect(result).toEqual({ status: 'immutable-block' });
+    expect(result).toEqual({ status: 'active-conflict', activeSessionId: 'sess-1' });
     expect(livePlanRows().some((row) => row.id === planId)).toBe(true);
   });
 
-  it('refuses to delete a plan while a block is resolved', async () => {
+  it.each(['completed', 'skipped'] as const)('deletes a plan with a %s block', async progressStatus => {
     db()
       .update(sessionPlanExercises)
-      .set({ progressStatus: 'completed', resolvedAt: T1 })
+      .set({ progressStatus, resolvedAt: T1 })
       .where(eq(sessionPlanExercises.id, blockId))
       .run();
     const result = await planRepository.deletePlan(planId, T1);
-    expect(result).toEqual({ status: 'immutable-block' });
+    expect(result).toEqual({ status: 'updated' });
+    expect(await store.loadPlanGraph(planId)).toBeNull();
+  });
+
+  it('blocks deletion of an active whole-plan workout with no exercise cards', async () => {
+    db().insert(sessions).values({ id: 'empty-workout', sourcePlanId: planId, startedAt: T0 }).run();
+    const before = planRows();
+    expect(await planRepository.deletePlan(planId, T1))
+      .toEqual({ status: 'active-conflict', activeSessionId: 'empty-workout' });
+    expect(planRows()).toEqual(before);
+  });
+
+  it.each(['completed', 'skipped'] as const)('blocks deletion when a %s block still belongs to an active workout', async progressStatus => {
+    attachBlockToCard(blockId);
+    db().update(sessionPlanExercises).set({ progressStatus, deletedAt: T0 })
+      .where(eq(sessionPlanExercises.id, blockId)).run();
+    expect(await planRepository.deletePlan(planId, T1))
+      .toEqual({ status: 'active-conflict', activeSessionId: 'sess-1' });
+    expect(await store.findActiveSessionIdUsingPlan(planId)).toBe('sess-1');
+  });
+
+  it.each(['completed', 'deleted-card', 'deleted-session'] as const)('permits deletion after an attachment is %s and retains its workout rows', async state => {
+    attachBlockToCard(blockId);
+    if (state === 'completed') db().update(sessions).set({ status: 'completed', completedAt: T1 }).run();
+    if (state === 'deleted-card') db().update(sessionExercises).set({ deletedAt: T1 }).run();
+    if (state === 'deleted-session') db().update(sessions).set({ deletedAt: T1 }).run();
+    const before = { sessions: db().select().from(sessions).all(), cards: db().select().from(sessionExercises).all() };
+    expect(await planRepository.deletePlan(planId, T1)).toEqual({ status: 'updated' });
+    expect(db().select().from(sessions).all()).toEqual(before.sessions);
+    expect(db().select().from(sessionExercises).all()).toEqual(before.cards);
+    expect(await planRepository.deletePlan(planId, T1)).toEqual({ status: 'not-found' });
+    expect(await planRepository.deletePlan('missing-plan', T1)).toEqual({ status: 'not-found' });
   });
 
   it('refuses to edit a consumed block but keeps future unattached blocks editable', async () => {

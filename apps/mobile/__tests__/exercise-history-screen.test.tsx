@@ -211,6 +211,16 @@ describe('ExerciseHistoryRoute over real data', () => {
     );
   };
 
+  it('offers quick entry from history without changing the viewed history', async () => {
+    await openHistory({ exerciseDefinitionId: SQUAT });
+    const previousCards = sessionCards();
+    fireEvent.press(screen.getByTestId('exercise-history-add-to-session'));
+    expect(await screen.findByTestId('exercise-session-entry-sheet')).toHaveTextContent(/Barbell Back Squat/);
+    await screen.findByTestId('exercise-picker-plan-source');
+    fireEvent.press(screen.getByLabelText('Dismiss add to session', { includeHiddenElements: true }));
+    expect(sessionCards()).toEqual(previousCards);
+  });
+
   // One more squat session, 2 days ago at another gym, through the draft → complete path.
   const logSquatElsewhere = async () => {
     const completedAt = new Date(Date.now() - 2 * DAY_MS);

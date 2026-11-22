@@ -147,7 +147,7 @@ describe('domain schema and runtime migrations', () => {
     // m0031 adds combined muscles and the single target map, and re-pulls every row once;
     // m0031 adds combined muscles and the single target map, and re-pulls every row once;
     // m0032 adds training notes; m0033 adds injuries schema.
-    expect(localRuntimeMigrations.journal.entries).toHaveLength(36);
+    expect(localRuntimeMigrations.journal.entries).toHaveLength(38);
     expect(localRuntimeMigrations.journal.entries[0]).toMatchObject({
       idx: 0,
       tag: expect.stringMatching(/^0000_/),
@@ -213,6 +213,8 @@ describe('domain schema and runtime migrations', () => {
       'm0033',
       'm0034',
       'm0035',
+      'm0036',
+      'm0037',
     ]);
   });
 

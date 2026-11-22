@@ -11,7 +11,7 @@ import { planRepository, type PlanMutationResult } from './plan-repository';
  *
  * The form's child sessions carry the plan id they came from (`sourcePlanId`).
  * The diff is by membership: children removed from the form are deleted
- * (refused when a consumed block pins them), kept children persist through
+ * (refused during active use), kept children persist through
  * `savePlanEdits` (which refuses on consumed blocks before writing), new children
  * are created attached to the programme, and the form's full order is written as
  * one programme reorder. Every mutation result is checked before reporting
@@ -48,7 +48,7 @@ export const saveProgrammeEdits = async (
   );
 
   // Remove first: a deleted child detaches from the programme, so the final
-  // reorder sees exactly the kept and created children. A consumed block refuses.
+  // reorder sees exactly the kept and created children. Active use refuses.
   for (const plan of detail.plans) {
     if (keptSourceIds.has(plan.id)) {
       continue;

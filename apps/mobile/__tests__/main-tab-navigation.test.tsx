@@ -87,3 +87,14 @@ describe('useOpenActiveWorkout', () => {
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
 });
+
+
+it('delivers an exercise target with a lazily opened workout', () => {
+  const { result } = renderHook(() => useOpenActiveWorkout());
+  result.current('s1', { sessionExerciseId: 'e1', setId: 'new-set' });
+  const shown = jest.fn();
+  subscribeOpenedWorkout(shown)();
+  expect(shown).toHaveBeenCalledWith('s1', { sessionExerciseId: 'e1', setId: 'new-set' });
+  expect(mockRouter.dismissTo).toHaveBeenCalledWith('/train');
+  expect(mockRouter.push).not.toHaveBeenCalled();
+});

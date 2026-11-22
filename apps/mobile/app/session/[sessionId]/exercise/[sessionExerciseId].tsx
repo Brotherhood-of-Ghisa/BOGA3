@@ -13,6 +13,7 @@ export default function ExercisePageRoute() {
   const params = useLocalSearchParams<{
     sessionId?: string | string[];
     sessionExerciseId?: string | string[];
+    setId?: string | string[];
   }>();
   const sessionId = firstParam(params.sessionId);
   const sessionExerciseId = firstParam(params.sessionExerciseId);
@@ -20,6 +21,7 @@ export default function ExercisePageRoute() {
   return (
     <ExercisePageScreen
       key={`${sessionId}:${sessionExerciseId}`}
+      initialSetId={firstParam(params.setId) || undefined}
       sessionExerciseId={sessionExerciseId}
       sessionId={sessionId}
     />

@@ -12,7 +12,7 @@ import { renderWithTheme } from './helpers/theme';
 const dateFormats = [
   { dateFormat: 'DD-MM-YYYY', locale: 'en-GB' },
   { dateFormat: 'MM-DD-YYYY', locale: 'en-US' },
-  { dateFormat: 'YYYY-MM-DD', locale: 'sv-SE' },
+  { dateFormat: 'YYYY-MM-DD', locale: 'en-GB' },
 ] as const;
 
 describe('PlanScheduleSheet', () => {
@@ -44,7 +44,7 @@ describe('PlanScheduleSheet', () => {
       Platform.OS = 'ios';
     });
 
-    it('updates the native locale for every Date format while preserving the edited instant', () => {
+    it('keeps the picker in English for every Date format while preserving the edited instant', () => {
       const onConfirm = jest.fn();
       const onDismiss = jest.fn();
       const initial = new Date(2026, 0, 5, 8, 10);

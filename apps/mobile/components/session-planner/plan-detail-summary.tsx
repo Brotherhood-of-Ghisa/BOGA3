@@ -2,7 +2,7 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import { formatLocalDateTime, formatShortDate } from '@/src/utils/local-time';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, Card, FigureText, IconButton, Tag, uiSpace, useUiText } from '@/components/ui';
+import { ActionButton, Card, FigureText, IconButton, Notice, Tag, uiSpace, useUiText } from '@/components/ui';
 import type { PlanDetailView } from '@/src/session-planner';
 import { blockCountsLabel, planOutcomeLabel } from './progress-labels';
 import { routineDateLabel, routineOutcomeLine } from './progress-labels';
@@ -10,8 +10,6 @@ import type { ReactNode } from 'react';
 
 export type PlanDetailSummaryProps = {
   detail: PlanDetailView;
-  /** Delete shows while no block pins the plan. */
-  deletable: boolean;
   onStartAll: () => void;
   onEdit: () => void;
   onDuplicate: () => void;
@@ -28,10 +26,10 @@ const PROVENANCE_LABEL: Record<PlanDetailView['provenance'], string | null> = {
 
 /**
  * The plan detail's summary card: title, schedule, derived progress and the
- * quiet provenance line, with the plan's actions — Start all, and Delete
- * while lifecycle permits; Edit and Duplicate sit on the header row.
+ * quiet provenance line, with Start all and Delete per [[planner.deletion]];
+ * Edit and Duplicate sit on the header row.
  */
-export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDuplicate, onDelete, onSkipRoutine, busy, notice }: PlanDetailSummaryProps) {
+export function PlanDetailSummary({ detail, onStartAll, onEdit, onDuplicate, onDelete, onSkipRoutine, busy, notice }: PlanDetailSummaryProps) {
   const text = useUiText();
   const dateFormat = useDateFormat();
   const setCount = detail.blocks.reduce((count, block) => count + block.targets.length, 0);
@@ -104,15 +102,18 @@ export function PlanDetailSummary({ detail, deletable, onStartAll, onEdit, onDup
         testID="plan-detail-skip-routine"
         variant="outline"
       /> : null}
-      {deletable ? (
-        <ActionButton
-          accessibilityLabel="Delete this plan"
-          label="Delete"
-          onPress={onDelete}
-          testID="plan-detail-delete"
-          variant="outline"
-        />
-      ) : null}
+      {detail.deleteBlockedBySessionId ? <Notice
+        message="This plan is in use by an active workout. Finish or discard it before deleting."
+        testID="plan-detail-delete-blocked" tone="neutral"
+      /> : null}
+      <ActionButton
+        accessibilityLabel="Delete this plan"
+        disabled={busy || !!detail.deleteBlockedBySessionId}
+        label="Delete"
+        onPress={onDelete}
+        testID="plan-detail-delete"
+        variant="outline"
+      />
     </Card>
   );
 }

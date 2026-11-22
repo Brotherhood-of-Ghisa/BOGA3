@@ -477,6 +477,10 @@ const listSetsForBlocksInTransaction = (tx: Transaction, planExerciseIds: string
         .orderBy(asc(sessionPlanSets.orderIndex))
         .all();
 
+export type DeletePlanResult =
+  | { status: 'updated' | 'not-found' }
+  | { status: 'active-conflict'; activeSessionId: string };
+
 export type SessionPlanStore = {
   /** Creates or rewrites one plan graph in one transaction. */
   savePlanGraph(input: SaveSessionPlanGraphInput, now?: Date): Promise<string>;
@@ -509,7 +513,8 @@ export type SessionPlanStore = {
   reorderProgrammePlans(input: { programmeId: string; orderedPlanIds: string[]; now: Date }): Promise<void>;
   reorderPlanExercises(input: { planId: string; orderedExerciseIds: string[]; now: Date }): Promise<void>;
   reorderPlanSets(input: { planExerciseId: string; orderedSetIds: string[]; now: Date }): Promise<void>;
-  tombstonePlan(input: { planId: string; now: Date }): Promise<boolean>;
+  /** Checks active uses and tombstones only the authored graph in one transaction. */
+  tombstonePlan(input: { planId: string; now: Date }): Promise<DeletePlanResult>;
   /** Tombstones the programme and detaches its live plans (they become standalone). */
   tombstoneProgramme(input: { programmeId: string; now: Date }): Promise<boolean>;
   /** Tombstones one block and its live target sets. */
@@ -520,6 +525,8 @@ export type SessionPlanStore = {
   releaseDiscardedBlockClaims(planExerciseIds: string[], now?: Date): Promise<void>;
   /** The active, undeleted session started from this whole plan, when one exists. */
   findActiveSessionIdBySourcePlan(planId: string): Promise<string | null>;
+  /** Includes ordinary per-block attachments and tombstoned authored ancestors. */
+  findActiveSessionIdUsingPlan(planId: string): Promise<string | null>;
   /** Any active, undeleted session — the Start-all conflict check. */
   findActiveSessionId(): Promise<string | null>;
   /**
@@ -901,6 +908,11 @@ const findActiveSessionIdBySourcePlan = async (planId: string): Promise<string |
     return database.transaction(tx => findActivePlanSession(tx, planId));
   };
 
+const findActiveSessionIdUsingPlan = async (planId: string): Promise<string | null> => {
+  const database = await bootstrapLocalDataLayer();
+  return database.transaction(tx => findActivePlanSession(tx, planId, true));
+};
+
 
 /** See {@link SessionPlanStore}. */
 const findActiveSessionId = async (): Promise<string | null> => {
@@ -1140,12 +1152,16 @@ const reorderPlanSets = async (input: { planExerciseId: string; orderedSetIds: s
 
 
 /** See {@link SessionPlanStore}. */
-const tombstonePlan = async (input: { planId: string; now: Date }): Promise<boolean> => {
+const tombstonePlan = async (input: { planId: string; now: Date }): Promise<DeletePlanResult> => {
     const database = await bootstrapLocalDataLayer();
-    let tombstoned = false;
-    database.transaction((tx) => {
+    const outcome = database.transaction((tx): DeletePlanResult => {
+      const plan = tx.select({ id: sessionPlans.id }).from(sessionPlans)
+        .where(and(eq(sessionPlans.id, input.planId), isNull(sessionPlans.deletedAt))).get();
+      if (!plan) return { status: 'not-found' };
+      const activeSessionId = findActivePlanSession(tx, input.planId, true);
+      if (activeSessionId) return { status: 'active-conflict', activeSessionId };
       const localUpdatedAtMs = nowMonotonic(tx);
-      const result = tx
+      tx
         .update(sessionPlans)
         .set({
           deletedAt: input.now,
@@ -1161,10 +1177,6 @@ const tombstonePlan = async (input: { planId: string; now: Date }): Promise<bool
         })
         .where(and(eq(sessionPlans.id, input.planId), isNull(sessionPlans.deletedAt)))
         .run();
-      tombstoned = result.changes > 0;
-      if (!tombstoned) {
-        return;
-      }
       for (const exercise of tx
         .select({ id: sessionPlanExercises.id })
         .from(sessionPlanExercises)
@@ -1185,11 +1197,12 @@ const tombstonePlan = async (input: { planId: string; now: Date }): Promise<bool
             .run();
         }
       }
+      return { status: 'updated' };
     });
-    if (tombstoned) {
+    if (outcome.status === 'updated') {
       notifyLocalWrite();
     }
-    return tombstoned;
+    return outcome;
   };
 
 
@@ -1399,6 +1412,7 @@ export const createDrizzleSessionPlanStore = (): SessionPlanStore => ({
   findLiveSourcedCardForBlock,
   releaseDiscardedBlockClaims,
   findActiveSessionIdBySourcePlan,
+  findActiveSessionIdUsingPlan,
   findActiveSessionId,
   findSourcedCardPerformances,
   resolvePlanBlock,

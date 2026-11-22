@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 
-import type { HealthQuantity, HealthStoreAdapter, HealthWorkout, HealthWorkoutChanges } from './types';
+import type { BodyWeightHealthStoreAdapter, HealthQuantity, HealthStoreAdapter, HealthWorkout, HealthWorkoutChanges } from './types';
 
 // The only module that touches Apple Health (`@kingstinct/react-native-healthkit`).
 // It loads the library on iOS only, so Android, web and Jest never evaluate it;
@@ -109,3 +109,24 @@ export const getHealthStoreAdapter = (): HealthStoreAdapter =>
 export const setHealthStoreAdapterForTests = (adapter: HealthStoreAdapter | null): void => {
   override = adapter;
 };
+
+const bodyWeightAdapter: BodyWeightHealthStoreAdapter = {
+  get supported() { return Platform.OS === 'ios' && healthDataAvailable(); },
+  requestAuthorization: async () => {
+    if (Platform.OS !== 'ios') throw new Error('Apple Health is only available on iPhone.');
+    await loadHealthKit().requestAuthorization({ toRead: ['HKQuantityTypeIdentifierBodyMass'] });
+  },
+  readChanges: async ({ anchor, since }) => {
+    if (Platform.OS !== 'ios') throw new Error('Apple Health is only available on iPhone.');
+    const response = await loadHealthKit().queryQuantitySamplesWithAnchor('HKQuantityTypeIdentifierBodyMass', {
+      unit: 'kg', limit: 0, filter: { date: { startDate: since } },
+      ...(anchor !== null ? { anchor } : {}),
+    });
+    return {
+      samples: response.samples.map(sample => ({ uuid: sample.uuid, weightKg: sample.quantity, measuredAt: sample.startDate })),
+      deletedIds: response.deletedSamples.map(sample => sample.uuid), newAnchor: response.newAnchor,
+    };
+  },
+};
+
+export const getBodyWeightHealthStoreAdapter = (): BodyWeightHealthStoreAdapter => bodyWeightAdapter;

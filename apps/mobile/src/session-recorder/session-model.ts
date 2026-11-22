@@ -130,7 +130,7 @@ function createEmptySet(recordingMode: RecordingMode = 'reps'): SessionSet {
   };
 }
 
-function createPlannedSetFromSuggestedSet(set: ExerciseBlockHistorySuggestedSet): SessionSet {
+export function createPlannedSetFromSuggestedSet(set: ExerciseBlockHistorySuggestedSet): SessionSet {
   return {
     id: createSetId(),
     recordingMode: set.recordingMode,

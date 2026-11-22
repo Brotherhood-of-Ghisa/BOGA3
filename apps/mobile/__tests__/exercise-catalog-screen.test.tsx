@@ -604,6 +604,18 @@ describe('ExerciseCatalogScreen', () => {
     expect(definitionNamed('Barbell Bench Press')?.deletedAt).toBeNull();
   });
 
+  it('opens quick entry only after the action menu dismisses', async () => {
+    await openCatalog();
+    await expandFamily('Chest');
+    fireEvent.press(await screen.findByLabelText('Exercise actions Barbell Bench Press'));
+    fireEvent.press(screen.getByTestId('exercise-action-add-to-session'));
+    expect(screen.queryByTestId('exercise-session-entry-sheet')).toBeNull();
+    act(() => screen.UNSAFE_getAllByType(Sheet).find(node => node.props.testID === 'exercise-catalog-actions-sheet')?.props.onDismissed());
+    expect(await screen.findByTestId('exercise-session-entry-sheet')).toHaveTextContent(/Barbell Bench Press/);
+    await screen.findByText('No earlier workout to repeat.');
+    expect(screen.getByTestId('exercise-picker-add-empty-set-button')).toBeEnabled();
+  });
+
   it('opens unfiltered exercise history from its actions and dismisses the menu', async () => {
     await openCatalog();
     await expandFamily('Chest');
