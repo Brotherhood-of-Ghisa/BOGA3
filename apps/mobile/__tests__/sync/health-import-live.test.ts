@@ -119,7 +119,7 @@ it('syncs Health bodyweight identity and preserves Ignore/deletion against a lat
   const measuredAt = new Date(Date.now() - 60_000);
   const scoped = user.client.schema(SYNC_RPC_SCHEMA);
   const push = async (entity: ReturnType<typeof entityToWire>) => {
-    const response = await scoped.rpc('sync_push', { payload: { entities: [entity] } }) as { error: unknown };
+    const response = await scoped.rpc('sync_push', { entities: [entity] }) as { error: unknown };
     expect(response.error).toBeNull();
   };
   const read = async () => {
