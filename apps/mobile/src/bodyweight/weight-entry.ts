@@ -8,6 +8,15 @@ export type WeightEntry = { weightValue: string };
 export type WeightReadingInput = WeightEntry & { id?: string; measuredAt: Date; now?: Date };
 export { EMPTY_SESSION_WEIGHT, isValidBodyWeightReading } from './as-of';
 
+/** Health samples are immutable; the same UUID identifies one reading on every phone. */
+export function healthWeightIdentity(uuid: string): { id: string; externalId: string } {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid)) {
+    throw new Error('Apple Health returned an invalid measurement identifier.');
+  }
+  const externalId = uuid.toLowerCase();
+  return { id: `apple-health-weight:${externalId}`, externalId };
+}
+
 export const validateBodyWeight = (input: WeightEntry): {
   weightKg: number;
 } => {

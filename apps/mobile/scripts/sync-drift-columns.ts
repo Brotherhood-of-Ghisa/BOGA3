@@ -47,6 +47,7 @@ export const WIRE_ENVELOPE_COLUMNS: ReadonlySet<string> = new Set([
  * with a server bool.
  */
 const SQLITE_BOOLEAN_COLUMNS: ReadonlySet<string> = new Set([
+  'body_weight_measurements.ignored',
   'user_settings.bodyweight_calculations_enabled',
   'user_settings.count_secondary_muscles',
   'user_settings.volume_primary_only',

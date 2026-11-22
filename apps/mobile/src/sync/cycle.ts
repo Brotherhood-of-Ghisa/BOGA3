@@ -611,6 +611,9 @@ const ENTITY_FIELDS: Record<EntityTableName, FieldSpec[]> = {
   body_weight_measurements: [
     SC('weight_kg', 'weightKg'),
     TS('measured_at', 'measuredAt'),
+    TARGET('source', 'source'),
+    KEEP('external_id', 'externalId'),
+    TARGET('ignored', 'ignored'),
     TS('created_at', 'createdAt'),
     TS('updated_at', 'updatedAt'),
     TS('deleted_at', 'deletedAt'),
@@ -1438,6 +1441,17 @@ const applyOrderedPullPage = (
   return changed;
 };
 
+/** Upgrade legacy source rows without discarding their pending value edits or clocks. */
+const hydrateHealthWeightMetadata = (tx: Transaction, envelope: WireEntity, existing: EntityRow | undefined): boolean => {
+  if (!existing || existing.externalId != null || !envelope.id.startsWith('apple-health-weight:') ||
+    envelope.fields.source !== 'apple_health' || envelope.fields.external_id == null) return false;
+  tx.update(schema.bodyWeightMeasurements).set({ source: 'apple_health',
+    externalId: String(envelope.fields.external_id), ignored: envelope.fields.ignored === true,
+    deletedAt: envelope.fields.deleted_at == null ? null : new Date(Number(envelope.fields.deleted_at)),
+  }).where(eq(schema.bodyWeightMeasurements.id, envelope.id)).run();
+  return true;
+};
+
 const applyUnorderedPullPage = (
   tx: Transaction,
   entities: WireEntity[],
@@ -1454,6 +1468,8 @@ const applyUnorderedPullPage = (
       .where(eq(table.id, envelope.id))
       .get() as EntityRow | undefined;
 
+    if (type === 'body_weight_measurements' && hydrateHealthWeightMetadata(tx, envelope, existing)) changed += 1;
+
     if (type === 'training_notes' && existing && !force
       && envelope.client_updated_at_ms <= Number(existing.localUpdatedAtMs)) {
       const metadata = Object.fromEntries(NOTE_METADATA_FIELDS.flatMap(spec =>
@@ -1467,6 +1483,9 @@ const applyUnorderedPullPage = (
 
     if (!force && !mergePullCanApply(tx, envelope, existing)) continue;
     const values = wireToEntity(envelope, type);
+    if (type === 'body_weight_measurements' && existing?.source === 'apple_health' && envelope.fields.ignored == null) {
+      delete values.deletedAt;
+    }
 
     if (!existing) {
       tx.insert(table).values(values as never).run();

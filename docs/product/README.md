@@ -21,3 +21,4 @@ facts as needed. Authoring: load `docs/procedures/product-facts-authoring.md`.
 | `planner.md` | session plans, programmes, block completion or consumption |
 | `notes.md` | training notes, in the app or through a coaching agent |
 | `injury.md` | injuries, discomfort, rehab or tissue reloading |
+| `bodyweight.md` | Health weight imports, reading sources and inclusion |

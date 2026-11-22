@@ -5,7 +5,7 @@
  * screen, weight editor, reading repository and private calculation
  * preference over the migrated in-memory SQLite database
  * (helpers/local-data.ts). Only the native database open and the router are
- * replaced. Three tests force one rejection on the real module with
+ * replaced. Failure tests force one rejection on the real module with
  * `jest.spyOn` — a failed reading save, a failed delete and a failed
  * preference write — the only states real data cannot produce.
  */
@@ -33,6 +33,7 @@ import { WeightEntrySheet } from '@/components/bodyweight/weight-entry-sheet';
 import { __resetBodyweightCalculationPreferenceForTests } from '@/src/bodyweight/calculation-preference';
 import * as bodyweightRepository from '@/src/data/bodyweight';
 import { bodyWeightMeasurements, userSettings } from '@/src/data/schema';
+import type { Transaction } from '@/src/data/clock';
 import * as userSettingsRepository from '@/src/data/user-settings';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
@@ -69,6 +70,66 @@ const openScreen = async () => {
   renderWithTheme(<BodyWeightScreen />);
   await screen.findByTestId('body-weight-current');
 };
+
+describe('Apple Health reading controls', () => {
+  beforeEach(async () => { jest.clearAllMocks(); resetLocalData(); await bootLocalApp(); });
+  afterEach(() => { jest.restoreAllMocks(); closeLocalData(); });
+
+  const importReading = async () => {
+    const measuredAt = new Date(Date.now() - 1_000);
+    await bodyweightRepository.saveBodyWeightReading({ weightValue: '77', measuredAt: new Date(measuredAt.getTime() - 1) });
+    localDatabase().transaction(tx => bodyweightRepository.applyImportedBodyWeights(tx as Transaction, [{
+      uuid: 'aaaaaaaa-1111-2222-3333-444444444444', weightKg: 80, measuredAt,
+    }], [], new Date()));
+    return 'apple-health-weight:aaaaaaaa-1111-2222-3333-444444444444';
+  };
+
+  it('labels manual/editable and Health/read-only rows and reversibly ignores imported readings', async () => {
+    const id = await importReading();
+    renderWithTheme(<BodyWeightScreen />);
+    await screen.findByTestId('body-weight-current');
+    expect(screen.getByText('Manual')).toBeTruthy();
+    expect(screen.getByText('Apple Health · Read-only')).toBeTruthy();
+    fireEvent.press(screen.getByTestId(`body-weight-reading-${id}`));
+    const detail = await screen.findByTestId('imported-weight-sheet');
+    expect(within(detail).queryByTestId('weight-entry-value')).toBeNull();
+    expect(within(detail).queryByText('Delete reading')).toBeNull();
+    fireEvent.press(within(detail).getByText('Ignore'));
+    await screen.findByText('Apple Health · Read-only · Ignored');
+    await waitFor(() => expect(within(screen.getByTestId('body-weight-current')).getByText('77')).toBeTruthy(), AFTER_WRITE);
+    fireEvent.press(screen.getByTestId(`body-weight-reading-${id}`));
+    fireEvent.press(within(screen.getByTestId('imported-weight-sheet')).getByText('Use reading'));
+    await screen.findByText('Apple Health · Read-only');
+    await waitFor(() => expect(within(screen.getByTestId('body-weight-current')).getByText('80')).toBeTruthy(), AFTER_WRITE);
+  });
+
+  it('keeps inclusion intact after a failed write and allows retry', async () => {
+    const id = await importReading();
+    renderWithTheme(<BodyWeightScreen />);
+    await screen.findByTestId('body-weight-current');
+    fireEvent.press(screen.getByTestId(`body-weight-reading-${id}`));
+    jest.spyOn(bodyweightRepository, 'setBodyWeightReadingIgnored').mockRejectedValueOnce(new Error('SQLite error code 19: private diagnostic'));
+    fireEvent.press(within(screen.getByTestId('imported-weight-sheet')).getByText('Ignore'));
+    await screen.findByText('Could not update this reading. Reopen it and try again.');
+    expect(screen.queryByText(/SQLite error code/)).toBeNull();
+    expect(readings().find(row => row.id === id)).toMatchObject({ ignored: false, deletedAt: null });
+    expect(screen.getByTestId('imported-weight-sheet').props.visible).not.toBe(false);
+    fireEvent.press(within(screen.getByTestId('imported-weight-sheet')).getByText('Ignore'));
+    await screen.findByText('Apple Health · Read-only · Ignored');
+    expect(readings().find(row => row.id === id)?.ignored).toBe(true);
+  });
+
+  it('shows an honest current-reading state when every imported reading is ignored', async () => {
+    const id = await importReading();
+    const manual = readings().find(row => row.source === 'manual')!;
+    await bodyweightRepository.deleteBodyWeightReading(manual.id);
+    await bodyweightRepository.setBodyWeightReadingIgnored(id, true);
+    renderWithTheme(<BodyWeightScreen />);
+    await screen.findByText('No reading in use.');
+    expect(screen.getByText('Apple Health · Read-only · Ignored')).toBeTruthy();
+    expect(within(screen.getByTestId('body-weight-current')).getByText('Unknown')).toBeTruthy();
+  });
+});
 
 const pressAlertButton = (style: AlertButton['style']) => {
   const buttons = jest.mocked(Alert.alert).mock.calls.at(-1)?.[2] as AlertButton[] | undefined;

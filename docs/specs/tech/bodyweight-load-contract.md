@@ -24,7 +24,7 @@ tombstones and dirty/LWW bookkeeping apply.
 | Entity | Final representation | Sync decision |
 | --- | --- | --- |
 | `user_settings` | Singleton id `settings`; `bodyweightCalculationsEnabled: boolean`, default false | Owner-private Sync v2 root entity |
-| `body_weight_measurements` | `id`, positive finite `weightKg: number`, `measuredAt`; normal timestamps/tombstone | Owner-private Sync v2 root entity; never a profile or group field |
+| `body_weight_measurements` | `id`, positive finite `weightKg`, `measuredAt`, `source` (`manual`/`apple_health`), nullable `externalId`, `ignored` (false); timestamps/tombstone | Owner-private Sync v2 root entity; never a profile or group field |
 | Session read context | Selected measurement and kg for internal calculation | Derived only; absent from session storage and sync |
 | `exercise_definitions` | `bodyweightContribution: number`, fraction in `[0,1]`, default 0 | In Sync v2 scope; current personal metadata reinterprets history |
 | `exercise_sets` | Actual/planned Weight text is kg | In Sync v2 scope; raw Weight remains the source value |
@@ -96,6 +96,51 @@ dependent score, but must not reveal whether omission resulted from a missing,
 invalid or otherwise ineligible private reading.
 
 ## 4. Contributions, seeds and history
+
+### Apple Health readings
+
+Product behavior is [[bodyweight.health-import]]. The bodyweight screen and
+detail sheet reuse existing form/list/sheet primitives. Rows state their source
+and read-only status; imported details offer only inclusion, never value/date
+editing or deletion. `src/data/bodyweight.ts` also rejects imported value edits.
+
+`src/health-import/bodyweight-lifecycle.ts` owns a separate opt-in, cutoff,
+cursor and retry state. The native adapter requests only body mass for this
+flow and asks HealthKit for kg. Exact measurement instants survive import.
+Foreground and initial-restore completion trigger reads; no background delivery
+or write permission is added. Account changes and local resets discard the
+cursor, retaining the account/device's original cutoff. Empty reads retain
+progress because iOS conceals denied read access.
+
+Native reads happen outside the shared account/sync lock. Commits hold it and
+verify the authenticated account, local owner, bootstrap completion and enable
+generation. Each batch's durable writes precede its cursor advance. Readings
+then use ordinary owner-private sync, including offline pending writes.
+
+Canonical lowercase UUIDs map to `apple-health-weight:<uuid>`. Immutable source
+inserts use canonical source dates and fixed initial sync version **1**, an
+exception to monotonic creation clocks. Every subsequent inclusion choice and
+source deletion uses `nowMonotonic`, so a later offline import cannot overwrite
+it. Re-import is insert-only, including against existing tombstones.
+
+| State | `ignored` | `deletedAt` | History |
+| --- | --- | --- | --- |
+| Used | false | null | visible |
+| Ignored | true | choice time | visible |
+| Source-deleted | false | deletion time | hidden |
+
+All existing resolvers and facts triggers already skip/react to `deletedAt`.
+No calculation rule changes. Source deletion clears Ignore, and inclusion
+actions re-read the row transactionally to reject stale attempts to restore a
+source-deleted sample. An unseen deletion creates a hidden invalid tombstone
+(zero weight, epoch measurement) at a normal monotonic version; it can never
+become a calculation candidate. Only explicit Health deletions remove samples.
+
+Sync push/pull carries the three new fields. Omitted source/inclusion metadata
+keeps its stored value; legacy Health writes also preserve the paired tombstone.
+The upgrade re-pulls metadata and rehydrates clean source copies. Imported
+read-only controls require the updated app. Real permissions need device QA;
+foreground-only delivery can miss old Health deletion notifications.
 
 The exact personal seed identities below receive curated defaults:
 
