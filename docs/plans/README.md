@@ -9,7 +9,6 @@ they are **optional**: the user chooses how each piece of work is planned.
 | --- | --- | --- |
 | No plan | Small or obvious work | Go straight to a PR; the PR body carries the evidence. |
 | Single plan doc | One PR that needs design notes | `docs/plans/<short-name>.md`, in whatever structure helps. |
-| Engine server plan | Multi-PR work | The engine plugin's `engine` skill, `plan <ask>` mode. The plan lives only on the engine server, never in repo files (`AGENTS.md`, "Engine plugin"). |
 | Anything else | One PR, the user's call | Keep it under `docs/plans/`. |
 
 ## Lifecycle
