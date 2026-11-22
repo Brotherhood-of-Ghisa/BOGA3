@@ -20,13 +20,21 @@ export const MUSCLE_COVER_INSTANCES: readonly AnatomyInstance[] = Object.entries
     : [{ part, group, side: 1 as const }]));
 const aliases: Readonly<Record<string, string>> = { front_delts: 'delts_front', side_delts: 'delts_lateral', rear_delts: 'delts_rear' };
 
-export function selectMuscleMeshes(selectedId: string | null, report?: MuscleReportAssignment, focus = false): readonly AnatomyInstance[] {
+export function selectMuscleMeshes(
+  selectedId: string | null,
+  report?: MuscleReportAssignment,
+  focus = false,
+  preferredSide?: 'left' | 'right' | null
+): readonly AnatomyInstance[] {
   if (!selectedId) return [];
   const id = aliases[selectedId] ?? selectedId;
   const groups = Object.entries(MUSCLE_ANATOMY).filter(([group]) => reportedMaterial(group as MuscleBodyMaterialId, report) === id);
   const singleSide = focus && groups.every(([group]) => ['Arms', 'Legs', 'Lower Legs'].includes(families.get(group) ?? ''));
+  const focusSide: 1 | -1 = preferredSide === 'right' ? -1 : 1;
   return groups.flatMap(([group, mesh]) => mesh.parts.flatMap(part =>
-    mesh.mirror && !singleSide ? [{ part, side: 1 as const, group }, { part, side: -1 as const, group }] : [{ part, side: 1 as const, group }]));
+    mesh.mirror && !singleSide
+      ? [{ part, side: 1 as const, group }, { part, side: -1 as const, group }]
+      : [{ part, side: mesh.mirror ? focusSide : (1 as const), group }]));
 }
 
 export type WireframeCamera = {

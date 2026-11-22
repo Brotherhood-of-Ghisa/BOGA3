@@ -38,6 +38,7 @@ import {
   INJURY_STATUS_PRIORITY,
   normaliseBodyAngle,
   projectMuscleBody,
+  resolveFocusedInjurySide,
   type ActiveInjuryOverlay,
   type BodyOrientation,
   type MuscleOverlayStyle,
@@ -437,6 +438,20 @@ function MuscleBodyComparison({ selectedMuscle, metric, layout }: {
   </View>;
 }
 
+const toActiveInjuryOverlays = (
+  activeInjuries?: readonly (ActiveInjuryOverlay | InjuryView)[]
+): readonly ActiveInjuryOverlay[] | undefined => {
+  if (!activeInjuries || activeInjuries.length === 0) return undefined;
+  return activeInjuries.map(injury => ({
+    id: injury.id,
+    muscleGroupId: injury.muscleGroupId ?? null,
+    side: injury.side ?? null,
+    status: injury.status,
+    painScore: injury.painScore ?? null,
+    label: injury.label,
+  }));
+};
+
 /**
  * Interactive 3D low-poly anatomical muscle model for the Progress Muscle breakdown.
  * Colours follow [[comparison.colour-scale]], with CIE LCh lighting,
@@ -491,26 +506,23 @@ export function MuscleBodyCard({
       ? measuredWidth
       : Math.max(MIN_VIEWPORT_WIDTH, windowWidth - CARD_HORIZONTAL_INSET);
 
+  const activeInjuryOverlays = useMemo(() => toActiveInjuryOverlays(activeInjuries), [activeInjuries]);
+  const focusedInjurySide = useMemo(
+    () => resolveFocusedInjurySide(selectedId, activeInjuryOverlays, report),
+    [selectedId, activeInjuryOverlays, report]
+  );
+
   const orientation = bodyOrientationForAngle(angleDeg);
   const scores = useMemo(() => computeMuscleScores(muscles, metric, setTargets), [muscles, metric, setTargets]);
   const palette = useMemo(() => buildThemeShadePalette(roles, mode), [roles, mode]);
-  const selectedMeshes = useMemo(() => selectMuscleMeshes(selectedId, report, focus), [selectedId, report, focus]);
+  const selectedMeshes = useMemo(
+    () => selectMuscleMeshes(selectedId, report, focus, focusedInjurySide),
+    [selectedId, report, focus, focusedInjurySide]
+  );
   const camera = useMemo(() => wireframeCamera({ angle: angleDeg, width: viewportWidth, height: viewportHeight,
     selected: selectedMeshes, focus }), [angleDeg, viewportWidth, viewportHeight, selectedMeshes, focus]);
   const wireframe = useMemo(() => ({ overlay, camera, selected: selectedMeshes, scores, report, palette, roles, november }),
     [overlay, camera, selectedMeshes, scores, report, palette, roles, november]);
-
-  const activeInjuryOverlays = useMemo<readonly ActiveInjuryOverlay[] | undefined>(() => {
-    if (!activeInjuries || activeInjuries.length === 0) return undefined;
-    return activeInjuries.map(injury => ({
-      id: injury.id,
-      muscleGroupId: injury.muscleGroupId ?? null,
-      side: injury.side ?? null,
-      status: injury.status,
-      painScore: injury.painScore ?? null,
-      label: injury.label,
-    }));
-  }, [activeInjuries]);
 
   const projected = useMemo(
     () =>
@@ -518,6 +530,7 @@ export function MuscleBodyCard({
         angleDeg,
         width: viewportWidth,
         height: viewportHeight,
+        camera,
         scores,
         selectedId,
         report,
@@ -525,7 +538,7 @@ export function MuscleBodyCard({
         overlay,
         activeInjuries: activeInjuryOverlays,
       }),
-    [angleDeg, viewportWidth, viewportHeight, scores, selectedId, report, palette, overlay, activeInjuryOverlays]
+    [angleDeg, viewportWidth, viewportHeight, camera, scores, selectedId, report, palette, overlay, activeInjuryOverlays]
   );
 
   const selectedMuscle = useMemo(
@@ -695,6 +708,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: VIEWPORT_HEIGHT,
+    overflow: 'hidden',
   },
   srTargets: {
     position: 'absolute',
