@@ -531,13 +531,13 @@ describe('MuscleBodyCard', () => {
       expanded: true,
     });
 
-    // Next button cycles to back_lats and auto-orients to Back view (180°).
-    fireEvent.press(screen.getByTestId('stats-muscle-body-next'));
+    // Next accessibility action cycles to back_lats and auto-orients to Back view (180°).
+    fireEvent(screen.getByTestId('stats-muscle-body-picker-trigger'), 'accessibilityAction', { nativeEvent: { actionName: 'next' } });
     expect(onSelect).toHaveBeenCalledWith('back_lats');
     expect(viewport.props.accessibilityValue).toEqual({ text: 'Back view, 180 degrees' });
 
-    // Prev button cycles backwards to quads.
-    fireEvent.press(screen.getByTestId('stats-muscle-body-prev'));
+    // Previous accessibility action cycles backwards to quads.
+    fireEvent(screen.getByTestId('stats-muscle-body-picker-trigger'), 'accessibilityAction', { nativeEvent: { actionName: 'previous' } });
     expect(onSelect).toHaveBeenCalledWith('quads');
 
     // Tapping the picker trigger opens the bottom sheet.
@@ -555,7 +555,8 @@ describe('MuscleBodyCard', () => {
     render(<MuscleBodyCard defaultOverlay="contour" metric="workingSetCount" muscles={muscles} selectedId="chest" onSelect={onSelect} />);
     const viewport = screen.getByTestId('stats-muscle-body-viewport');
     fireEvent.press(screen.getByTestId('stats-muscle-body-angle-back'));
-    fireEvent.press(screen.getByLabelText('About the muscle model'));
+    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
+    fireEvent.press(screen.getByText('About the model'));
     expect(screen.getByText(/Wireframe lines are triangle edges/)).toBeTruthy();
     expect(screen.getByText(/spinal erectors use smoothed columns/)).toBeTruthy();
     expect(screen.getByText(/BodyParts3D.*CC BY 4.0/)).toBeTruthy();
@@ -687,11 +688,11 @@ describe('MuscleBodyCard', () => {
       />
     );
 
-    const toggle = screen.getByTestId('stats-muscle-body-overlay-toggle');
-    expect(toggle).toHaveTextContent('Patches');
+    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
+    expect(screen.getByTestId('stats-muscle-body-material-contour').props.accessibilityState).toMatchObject({ checked: true });
     expect(screen.getByTestId('stats-muscle-body-patches')).toBeTruthy();
 
-    fireEvent.press(toggle);
+    fireEvent.press(screen.getByTestId('stats-muscle-body-material-wireframe'));
     expect(onOverlayChange).toHaveBeenCalledWith('wireframe');
 
     rerender(
@@ -704,7 +705,8 @@ describe('MuscleBodyCard', () => {
         selectedId="chest"
       />
     );
-    expect(toggle).toHaveTextContent('Wireframe');
+    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
+    expect(screen.getByTestId('stats-muscle-body-material-wireframe').props.accessibilityState).toMatchObject({ checked: true });
     expect(screen.queryByTestId('stats-muscle-body-svg')).toBeNull();
   });
 
@@ -778,13 +780,12 @@ describe('MuscleBodyCard', () => {
     const rows = [makeMuscle('chest', 'Chest', 8), makeMuscle('back_lats', 'Lats', 6)];
     render(<MuscleBodyCard metric="workingSetCount" muscles={rows} selectedId="chest" onSelect={jest.fn()} defaultOverlay="wireframe" />);
 
-    const toggle = screen.getByTestId('stats-muscle-body-overlay-toggle');
-    expect(toggle).toHaveTextContent('Wireframe');
+    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
+    expect(screen.getByTestId('stats-muscle-body-material-wireframe').props.accessibilityState).toMatchObject({ checked: true });
     expect(screen.queryByTestId('stats-muscle-body-svg')).toBeNull();
     expect(screen.getByTestId('stats-muscle-body-wireframe')).toBeTruthy();
 
-    fireEvent.press(toggle);
-    expect(toggle).toHaveTextContent('Patches');
+    fireEvent.press(screen.getByTestId('stats-muscle-body-material-contour'));
     expect(screen.getByTestId('stats-muscle-body-patches')).toBeTruthy();
     expect(screen.queryByTestId('stats-muscle-body-wireframe')).toBeNull();
 
@@ -792,8 +793,9 @@ describe('MuscleBodyCard', () => {
     expect(patchFrame().selected.length).toBeGreaterThan(0);
     expect(patchFrame().camera.cos).toBeCloseTo(-1);
 
-    fireEvent.press(toggle);
-    expect(toggle).toHaveTextContent('Wireframe');
+    fireEvent.press(screen.getByTestId('stats-muscle-body-view'));
+    fireEvent.press(screen.getByTestId('stats-muscle-body-material-wireframe'));
+    expect(screen.getByTestId('stats-muscle-body-wireframe')).toBeTruthy();
   });
 
 });

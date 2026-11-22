@@ -118,7 +118,7 @@ it('retains a passive column header and compact role groups in the standalone co
   const header = screen.getByTestId('stats-contributions-header');
   expect(within(header).getByText('Δ')).toBeTruthy();
   expect(within(header).queryAllByRole('button')).toHaveLength(0);
-  expect(screen.getByRole('header', { name: 'Change, working sets' })).toBeTruthy();
+  expect(within(header).getByRole('header', { name: 'Change, working sets' })).toBeTruthy();
   for (const family of screen.UNSAFE_getAllByType(StatsTableFamily)) expect(family.props.compact).toBe(true);
   expect(screen.getByText('Lat Pulldown')).toHaveStyle(uiText.body);
 });

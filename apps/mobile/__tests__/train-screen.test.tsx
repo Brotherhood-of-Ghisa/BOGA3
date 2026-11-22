@@ -10,14 +10,14 @@
  * view (`session-view-screen.test.tsx` owns it) are replaced: the stand-in
  * names the workout Train shows and ends it when pressed.
  *
- * Planning has no data source yet (the route offers none), so planned launches
- * are driven through the `planningState` prop with a materializer that writes
- * a real draft. Named states real data cannot produce: a launch still pending,
+ * Planning uses real scheduled plans; isolated launch-state tests use the
+ * `planningState` prop with a materializer that writes a real draft.
+ * Named states real data cannot produce: a launch still pending,
  * a failed draft write, a failed plan write and a failed active-session read.
  */
 
 import { act, fireEvent, renderHook, screen, waitFor } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { AppState, StyleSheet, type AppStateStatus } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -27,9 +27,10 @@ jest.mock('@/src/data/bootstrap', () =>
 const mockDismissTo = jest.fn();
 const mockPush = jest.fn();
 const mockRouter = { dismissTo: mockDismissTo, push: mockPush };
+let mockIsFocused = true;
 
 jest.mock('expo-router', () => ({
-  useIsFocused: () => true,
+  useIsFocused: () => mockIsFocused,
   useRouter: () => mockRouter,
 }));
 
@@ -45,7 +46,9 @@ jest.mock('@/components/session-view/session-view-screen', () => {
 });
 
 import TrainRoute, { TrainScreen, type TrainPlanningState } from '../app/(tabs)/train';
-import { planRepository, startSessionPlan } from '@/src/session-planner';
+import { planQueries, planRepository, startSessionPlan } from '@/src/session-planner';
+import { updatePreferences } from '@/src/preferences/hooks';
+import type { ExerciseDateFormat } from '@/src/preferences/model';
 import { useOpenActiveWorkout } from '@/components/navigation/use-open-main-tab';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
@@ -133,6 +136,7 @@ const plannedDraft = () =>
 const readyPlan = (overrides: Partial<Extract<TrainPlanningState, { status: 'ready' }>> = {}): TrainPlanningState => ({
   status: 'ready',
   title: 'Upper body',
+  scheduledFor: new Date(2026, 9, 11, 8),
   detail: 'Bench press',
   materialize: jest.fn(plannedDraft),
   openManager: jest.fn(),
@@ -145,7 +149,9 @@ const renderWithPlan = async (planningState: TrainPlanningState, sessionEntry?: 
 };
 
 beforeEach(() => {
+  jest.useFakeTimers({ now: new Date(2026, 9, 10, 12), doNotFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate', 'nextTick', 'performance', 'queueMicrotask', 'hrtime'] });
   resetLocalData();
+  mockIsFocused = true;
   mockDismissTo.mockClear();
   mockPush.mockClear();
 });
@@ -153,6 +159,7 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
   closeLocalData();
+  jest.useRealTimers();
 });
 
 describe('Train over real data', () => {
@@ -371,7 +378,7 @@ describe('Train over real data', () => {
     await renderWithPlan(plan);
 
     expect(screen.getByTestId('train-start-empty-button')).toHaveTextContent('Start');
-    expect(screen.getByTestId('train-planned-session-card')).toHaveTextContent('Upper bodyBench pressStart');
+    expect(screen.getByTestId('train-planned-session-card')).toHaveTextContent('Upper body11 Oct 26 · Bench pressStart');
     // The plan reads as a list row: a micro-label above, its title in
     // bodyStrong and its detail in meta.
     expect(StyleSheet.flatten(screen.getByText('Planned').props.style)).toMatchObject({
@@ -380,7 +387,7 @@ describe('Train over real data', () => {
     expect(StyleSheet.flatten(screen.getByText('Upper body').props.style)).toMatchObject({
       fontFamily: uiFonts.body.family, fontWeight: '600', fontSize: uiTypography.size.base,
     });
-    expect(StyleSheet.flatten(screen.getByText('Bench press').props.style)).toMatchObject({
+    expect(StyleSheet.flatten(screen.getByLabelText('11-10-2026 · Bench press').props.style)).toMatchObject({
       fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm, color: roles.inkMuted,
     });
     fireEvent.press(screen.getByRole('button', { name: 'Start Upper body' }));
@@ -399,7 +406,7 @@ describe('Train over real data', () => {
       {
         title: 'Heavy Deadlift Day',
         gymId: null,
-        scheduledFor: new Date(2026, 10, 5, 10),
+        scheduledFor: new Date(2026, 9, 11, 10),
         exercises: [
           {
             exerciseDefinitionId: 'seed_barbell_bench_press',
@@ -417,7 +424,7 @@ describe('Train over real data', () => {
       expect(screen.queryByTestId('train-planned-session-card')).toBeTruthy();
     });
 
-    expect(screen.getByTestId('train-planned-session-card')).toHaveTextContent('Heavy Deadlift Day1 exerciseStart');
+    expect(screen.getByTestId('train-planned-session-card')).toHaveTextContent('Heavy Deadlift Day11 Oct 26 · 1 exerciseStart');
     expect(screen.getByTestId('train-start-planned-button')).toBeTruthy();
 
     fireEvent.press(screen.getByTestId('train-manage-planning-button'));
@@ -460,6 +467,126 @@ describe('Train over real data', () => {
 });
 
 describe('Train planning states', () => {
+  const schedulePlan = (title: string, scheduledFor: Date) => createDrizzleSessionPlanStore().savePlanGraph({
+    title, gymId: null, scheduledFor,
+    exercises: [{ exerciseDefinitionId: 'seed_barbell_bench_press', name: 'Bench Press',
+      sets: [{ targetWeightValue: '100', targetReps: 5, targetSetType: null }] }],
+  }, new Date());
+
+  it.each<[string, Date, Date, boolean]>([
+    ['yesterday just before midnight', new Date(2026, 9, 10, 12), new Date(2026, 9, 9, 23, 59, 59, 999), false],
+    ['today at midnight, before the current time', new Date(2026, 9, 10, 12), new Date(2026, 9, 10), true],
+    ['the third day at its last millisecond', new Date(2026, 9, 10, 12), new Date(2026, 9, 13, 23, 59, 59, 999), true],
+    ['the fourth day at midnight', new Date(2026, 9, 10, 12), new Date(2026, 9, 14), false],
+    ['the third day across spring DST', new Date(2026, 2, 27, 12), new Date(2026, 2, 30, 23, 59), true],
+    ['the fourth day across spring DST', new Date(2026, 2, 27, 12), new Date(2026, 2, 31), false],
+    ['the third day across autumn DST', new Date(2026, 9, 23, 12), new Date(2026, 9, 26, 23, 59), true],
+    ['the fourth day across year end', new Date(2026, 11, 29, 12), new Date(2027, 0, 2), false],
+  ])('limits the Train suggestion to today and the next three local days: %s', async (_label, now, scheduledFor, visible) => {
+    jest.setSystemTime(now);
+    await seed();
+    await schedulePlan('Scheduled workout', scheduledFor);
+
+    renderWithTheme(<TrainRoute />);
+    await checked();
+    if (visible) {
+      expect(await screen.findByText('Scheduled workout')).toBeTruthy();
+    } else {
+      expect(await screen.findByRole('button', { name: 'Plan a workout' })).toBeTruthy();
+      expect(screen.queryByTestId('train-planned-session-card')).toBeNull();
+    }
+    // Train's suggestion window never removes schedules from the planner.
+    expect(await planQueries.listUpcomingPlans()).toEqual([expect.objectContaining({ title: 'Scheduled workout', scheduledFor })]);
+  });
+
+  it('skips an overdue plan and offers the next eligible plan in the window', async () => {
+    await seed();
+    await schedulePlan('Overdue workout', new Date(2026, 9, 9, 23, 59));
+    await schedulePlan('Next workout', new Date(2026, 9, 11, 8));
+
+    renderWithTheme(<TrainRoute />);
+
+    expect(await screen.findByText('Next workout')).toBeTruthy();
+    expect(screen.queryByText('Overdue workout')).toBeNull();
+  });
+
+  it('shows a plan that enters the three-day window when Train is refocused the next day', async () => {
+    await seed();
+    await schedulePlan('Later workout', new Date(2026, 9, 14));
+    const view = renderWithTheme(<TrainRoute />);
+    expect(await screen.findByRole('button', { name: 'Plan a workout' })).toBeTruthy();
+
+    mockIsFocused = false;
+    view.rerender(<TrainRoute />);
+    jest.setSystemTime(new Date(2026, 9, 11));
+    mockIsFocused = true;
+    view.rerender(<TrainRoute />);
+
+    expect(await screen.findByText('Later workout')).toBeTruthy();
+  });
+
+  it('replaces an overdue suggestion at local midnight without a tab switch', async () => {
+    await seed();
+    await schedulePlan('Today workout', new Date(2026, 9, 10, 8));
+    await schedulePlan('Later workout', new Date(2026, 9, 14, 8));
+    jest.useFakeTimers({ now: new Date(2026, 9, 10, 23, 59), doNotFake: ['nextTick', 'queueMicrotask', 'setImmediate'] });
+    renderWithTheme(<TrainRoute />);
+    expect(await screen.findByText('Today workout')).toBeTruthy();
+
+    await act(async () => { jest.advanceTimersByTime(60_000); });
+
+    expect(await screen.findByText('Later workout')).toBeTruthy();
+    expect(screen.queryByText('Today workout')).toBeNull();
+  });
+
+  it('refreshes the suggestion after the app was suspended into the next day', async () => {
+    const listeners: ((state: AppStateStatus) => void)[] = [];
+    jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      listeners.push(listener);
+      return { remove: jest.fn() };
+    });
+    await seed();
+    await schedulePlan('Today workout', new Date(2026, 9, 10, 8));
+    await schedulePlan('Later workout', new Date(2026, 9, 14, 8));
+    renderWithTheme(<TrainRoute />);
+    expect(await screen.findByText('Today workout')).toBeTruthy();
+
+    act(() => listeners.forEach(listener => listener('background')));
+    jest.setSystemTime(new Date(2026, 9, 11, 8));
+    act(() => listeners.forEach(listener => listener('active')));
+
+    expect(await screen.findByText('Later workout')).toBeTruthy();
+    expect(screen.queryByText('Today workout')).toBeNull();
+  });
+
+  it('retries a failed planning read and shows the scheduled suggestion', async () => {
+    await seed();
+    await schedulePlan('Today workout', new Date(2026, 9, 10, 8));
+    jest.spyOn(planQueries, 'listUpcomingPlans').mockRejectedValueOnce(new Error('Read failed'));
+    renderWithTheme(<TrainRoute />);
+    expect(await screen.findByTestId('train-planning-error')).toHaveTextContent(/Couldn't load your plans\./);
+
+    fireEvent.press(screen.getByTestId('train-planning-error-retry'));
+
+    expect(await screen.findByText('Today workout')).toBeTruthy();
+  });
+
+  it('keeps the scheduled date visible and spoken in the current date preference without remounting', async () => {
+    await seed();
+    await renderWithPlan(readyPlan());
+    const formats: [ExerciseDateFormat, string, string][] = [
+      ['DD-MM-YYYY', '11 Oct 26', '11-10-2026'],
+      ['MM-DD-YYYY', 'Oct 11 26', '10-11-2026'],
+      ['YYYY-MM-DD', '2026 Oct 11', '2026-10-11'],
+    ];
+    for (const [dateFormat, visible, spoken] of formats) {
+      await act(async () => { updatePreferences({ dateFormat }); });
+      expect(screen.getByTestId('train-planned-session-card')).toHaveTextContent(`Upper body${visible} · Bench pressStart`);
+      expect(screen.getByLabelText(`${spoken} · Bench press`)).toBeTruthy();
+    }
+    await act(async () => { updatePreferences({ dateFormat: 'DD-MM-YYYY' }); });
+  });
+
   it('shows nothing beneath the disc while planning loads', async () => {
     await seed();
     await renderWithPlan({ status: 'loading' });

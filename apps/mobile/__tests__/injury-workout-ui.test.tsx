@@ -109,9 +109,33 @@ describe('injury workout UI components', () => {
       );
 
       expect(screen.getByText('Left Quad Strain')).toBeTruthy();
-      expect(screen.getByText(/3 days ago/)).toBeTruthy();
-      expect(screen.getByText(/Pain 7\/10/)).toBeTruthy();
+      expect(screen.getByText('3 days ago · Pain 7/10 (Severe / Cannot load)')).toBeTruthy();
       expect(screen.getByText('Avoid deep knee flexion beyond 90 degrees')).toBeTruthy();
+      expect(screen.getByTestId('test-warning-banner').props.accessibilityLabel).toBe(
+        'Injury warning: Left Quad Strain. 3 days ago. Pain 7/10 (Severe / Cannot load).'
+      );
+    });
+
+    it('omits pain label when painScore is null', () => {
+      const warningWithoutPain: InjuryWarning = {
+        ...mockWarning,
+        injury: { ...mockInjury, painScore: null },
+      };
+
+      renderWithTheme(
+        <InjuryWarningBanner
+          onDismiss={jest.fn()}
+          onSwap={jest.fn()}
+          testID="test-warning-banner-no-pain"
+          warning={warningWithoutPain}
+        />
+      );
+
+      expect(screen.getByText('3 days ago')).toBeTruthy();
+      expect(screen.queryByText(/Pain /)).toBeNull();
+      expect(screen.getByTestId('test-warning-banner-no-pain').props.accessibilityLabel).toBe(
+        'Injury warning: Left Quad Strain. 3 days ago.'
+      );
     });
 
     it('triggers onSwap when Swap exercise is pressed', () => {

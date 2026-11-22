@@ -76,7 +76,7 @@ empty/unavailable neutral; `new`/overflow strongest, outside extrema.
 Strong darkens in light mode, lightens in dark. Both views use opaque effort
 fills and a separate selection colour, attenuated through covering layers.
 Wireframe adds contrasting triangle edges over the fills and selected anatomy.
-Both keep Now/Prev/Change; no legend.
+Both keep the selected comparison; no legend.
 
 History legends precede charts: muscle Sets `% of target`, capped at the
 effective weekly target; others `% of max` over History look-back, daily Grid

@@ -83,22 +83,22 @@ describe('Progress tables', () => {
 describe('Progress muscle views', () => {
   const muscles = [lats, muscle('quads', 'Quads', 4, 2)];
 
-  it('labels the picker trigger as a control in ink, and names its sheet rows in bodyStrong with a meta figure line', () => {
+  it('titles the muscle strip and keeps the picker’s current figure beside each name', () => {
     renderWithTheme(<MuscleBodyCard metric="workingSetCount" muscles={muscles} selectedId="back_lats" onSelect={jest.fn()} />);
-    expect(style(screen.getByTestId('stats-muscle-body-selected'))).toMatchObject({ ...LABEL, color: roles.ink });
+    expect(style(screen.getByTestId('stats-muscle-body-selected'))).toMatchObject({ ...TITLE, color: roles.ink });
     fireEvent.press(screen.getByTestId('stats-muscle-body-picker-trigger'));
     const row = screen.getByTestId('stats-muscle-picker-row-back_lats');
     expect(style(within(row).getByText('Lats'))).toMatchObject({ ...BODY_STRONG, color: roles.accent });
     expect(style(within(screen.getByTestId('stats-muscle-picker-row-quads')).getByText('Quads'))).toMatchObject({ ...BODY_STRONG, color: roles.ink });
-    const meta = within(row).getByText(/working sets/);
-    expect(style(meta)).toMatchObject(META);
+    const meta = within(row).getByText(/sets/);
+    expect(style(meta)).toMatchObject({ ...BODY, textAlign: 'right' });
     expect(style(within(meta).getByText('3'))).toMatchObject({ fontFamily: uiFonts.figure.family });
   });
 
-  it('titles the selected muscle on the muscle view', () => {
+  it('titles the contribution card Exercises while retaining the selected muscle’s history links', () => {
     renderWithTheme(<ProgressMuscleView muscles={muscles} metric="workingSetCount" selectedId="back_lats" muscleLayout="3d"
       onSelect={jest.fn()} onMuscleHistory={jest.fn()} onExerciseHistory={jest.fn()} />);
-    expect(style(screen.getByRole('header', { name: 'Lats' }))).toMatchObject({ ...TITLE, flex: 1 });
+    expect(style(screen.getByRole('header', { name: 'Exercises' }))).toMatchObject({ ...TITLE, flex: 1 });
   });
 });
 

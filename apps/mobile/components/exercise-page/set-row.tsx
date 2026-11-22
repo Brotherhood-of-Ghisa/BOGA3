@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatOneRepMax, formatVolume, formatWeight } from '@/src/exercise-calculations/format';
+import { formatSessionSetType } from '@/src/data/set-types';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Stat } from '@/components/ui/stat';
@@ -63,7 +64,7 @@ export function SetRow({ row, divider, onOpen, onToggle, onDrop }: SetRowProps) 
       divider={divider}
       leading={
         <Text allowFontScaling={false} style={[text.label, performed ? tone.ink : tone.faint, styles.type]}>
-          {effort}
+          {row.setType === 'technique' ? formatSessionSetType(row.setType, 'compact') : effort}
         </Text>
       }
       meta={

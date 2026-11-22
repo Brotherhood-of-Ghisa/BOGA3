@@ -761,7 +761,8 @@ describe('Stats over real data', () => {
     for (const view of ['timeline', 'daily', 'weekly'] as const) {
       fireEvent.press(screen.getByTestId(`stats-contributions-view-${view}`));
       expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?muscleGroupId=quads&metric=${metric === 'Sets' ? 'sets' : 'volume'}&secondary=hidden&secondaryVolume=shown&view=${view}`);
-      expect(screen.getByTestId('stats-contributions')).toHaveTextContent(/Quads/);
+      expect(screen.getByTestId('stats-contributions')).toHaveTextContent(/Exercises/);
+      expect(screen.getByTestId('stats-muscle-body-selected')).toHaveTextContent('Quads');
     }
   });
 

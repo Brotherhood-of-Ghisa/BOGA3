@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SegmentedControl, uiSpace } from '@/components/ui';
 import { useUiText } from '@/components/ui/text-roles';
@@ -24,6 +25,7 @@ type Props = ProgressTablesProps & {
 };
 
 // Settings chooses the layout; both share contribution rows and selection.
+// In 3D, one measured container and all displayed figures size both surfaces.
 export function ProgressMuscleView(props: Props) {
   const {
     muscles,
@@ -39,16 +41,20 @@ export function ProgressMuscleView(props: Props) {
   } = props;
   const text = useUiText();
   const { width } = useWindowDimensions();
+  const [containerWidth, setContainerWidth] = useState(0);
   const activeInjuries = propInjuries ?? [];
   const reloadMetrics = useTissueReloadMetrics(activeInjuries, propMetrics);
 
   if (muscleLayout === 'list') return <ProgressTables {...props} />;
   const selected = muscles.find(row => row.muscleGroupId === selectedId);
   const exercises = selected?.exercises.filter(row => hasComparisonMetric(row, metric)) ?? [];
-  const layout = resolveComparisonLayout(width, exercises, metric, false, { compact: true });
+  const layout = resolveComparisonLayout(containerWidth || width - uiSpace.lg * 2,
+    selected ? [selected, ...exercises] : [], metric, false, { compact: true, outerInset: 0 });
   return (
-    <View style={styles.body}>
+    <View style={styles.body} testID="stats-muscle-3d"
+      onLayout={event => setContainerWidth(event.nativeEvent.layout.width)}>
       <MuscleBodyCard
+        comparisonLayout={layout}
         activeInjuries={activeInjuries}
         metric={metric}
         muscles={muscles}
@@ -68,7 +74,7 @@ export function ProgressMuscleView(props: Props) {
         <StatsTable testID="stats-contributions">
           <View style={statsTableStyles.sectionHeader}>
             <Text accessibilityRole="header" allowFontScaling={false} style={[text.title, styles.heading]}>
-              {selected.displayName}
+              Exercises
             </Text>
             <SegmentedControl
               accessibilityLabel={`Open ${selected.displayName} history`}

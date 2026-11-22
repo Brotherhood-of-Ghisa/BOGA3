@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { IconButton } from '@/components/ui/icon-button';
@@ -13,24 +13,26 @@ export type InformationProps = {
   sections?: readonly (readonly [title: string, body: string])[];
   /** Optional heading beside the glyph, with a 4pt visual gap. */
   label?: string;
+  /** A menu entry can open the same explainer instead of the info glyph. */
+  renderTrigger?: (open: () => void) => ReactNode;
   /** `<prefix>-info` on the trigger; `<prefix>-help` on the sheet. */
   testIDPrefix?: string;
 };
 
 /** On-demand prose in a content-height Sheet; long explanations scroll. */
-export function Information({ title, body, sections = [], label, testIDPrefix }: InformationProps) {
+export function Information({ title, body, sections = [], label, renderTrigger, testIDPrefix }: InformationProps) {
   const [visible, setVisible] = useState(false);
   const styles = useStyles();
   const textRoles = useUiText();
   const textTones = useUiTextTone();
   return <>
-    <View style={styles.row}>
+    {renderTrigger ? renderTrigger(() => setVisible(true)) : <View style={styles.row}>
       {label ? <Text allowFontScaling={false} accessibilityRole="header" style={styles.label}>{label}</Text> : null}
       <View style={label ? styles.besideLabel : undefined}>
         <IconButton name="info" tone="muted" size="sm" accessibilityLabel={title}
           testID={testIDPrefix ? `${testIDPrefix}-info` : undefined} onPress={() => setVisible(true)} />
       </View>
-    </View>
+    </View>}
     <Sheet visible={visible} title={title} dismissLabel={`Dismiss ${title}`}
       testID={testIDPrefix ? `${testIDPrefix}-help` : undefined} onDismiss={() => setVisible(false)}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>

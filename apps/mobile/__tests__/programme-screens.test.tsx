@@ -108,6 +108,12 @@ describe('programme screens', () => {
     it('saves a valid programme with two sessions offline and navigates to its detail', async () => {
       renderWithTheme(<ProgrammeNewScreen editProgrammeId={null} fromProgrammeId={null} />);
 
+      const actions = within(screen.getByTestId('programme-form-actions'));
+      expect(actions.getByTestId('programme-form-add-session')).toHaveTextContent(/^Add session$/);
+      expect(actions.getByTestId('programme-form-save')).toHaveTextContent('Add programme');
+      expect(screen.getAllByRole('button').slice(0, 2)).toEqual(actions.getAllByRole('button'));
+      expect(screen.getAllByTestId('programme-form-save')).toHaveLength(1);
+
       // Enter programme name and description
       fireEvent.changeText(screen.getByTestId('programme-form-name'), '6-Week Wave');
       fireEvent.changeText(screen.getByTestId('programme-form-description'), 'Squat emphasis block');
@@ -376,6 +382,10 @@ describe('programme screens', () => {
     it('persists an edited child session title', async () => {
       renderWithTheme(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
       await screen.findByTestId('programme-form-name');
+
+      const actions = within(screen.getByTestId('programme-form-actions'));
+      expect(actions.getByTestId('programme-form-save')).toHaveTextContent(/^Save$/);
+      expect(screen.getAllByRole('button').slice(0, 2)).toEqual(actions.getAllByRole('button'));
 
       fireEvent.press(screen.getByTestId('programme-form-plan-1-edit'));
       fireEvent.changeText(screen.getByTestId('programme-child-plan-title-input'), 'Lower A+');

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { subscribeOpenedWorkout } from '@/components/navigation/use-open-main-tab';
 import { SessionViewScreen, type WorkoutEndMoment } from '@/components/session-view/session-view-screen';
+import { useDailyReread } from '@/components/today/use-daily-reread';
 import { StartDisc } from '@/components/train';
 import {
   ActionButton,
@@ -23,6 +24,9 @@ import {
   type SessionEntryResult,
 } from '@/src/session-entry';
 import { isPlanEligibleToStart, planQueries, startSessionPlan } from '@/src/session-planner';
+import { useDateFormat } from '@/src/preferences/hooks';
+import { isInWindow, startOfLocalDay } from '@/src/utils/local-calendar';
+import { formatCompactDate, formatShortDate } from '@/src/utils/local-time';
 
 export type TrainPlanningState =
   | { status: 'unavailable' }
@@ -32,6 +36,7 @@ export type TrainPlanningState =
   | {
       status: 'ready';
       title: string;
+      scheduledFor: Date;
       detail: string;
       materialize: PlannedSessionMaterializer;
       openManager: () => void;
@@ -284,6 +289,7 @@ function TrainPlanning({
   onStart: (materialize: PlannedSessionMaterializer) => void;
   planningState: TrainPlanningState;
 }) {
+  const dateFormat = useDateFormat();
   const text = useUiText();
   const tone = useUiTextTone();
   if (planningState.status === 'unavailable' || planningState.status === 'loading') {
@@ -328,8 +334,10 @@ function TrainPlanning({
           <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong}>
             <FigureText strong>{planningState.title}</FigureText>
           </Text>
-          <Text allowFontScaling={false} numberOfLines={1} style={text.meta}>
-            <FigureText>{planningState.detail}</FigureText>
+          <Text
+            accessibilityLabel={`${formatShortDate(planningState.scheduledFor, dateFormat)} · ${planningState.detail}`}
+            allowFontScaling={false} numberOfLines={1} style={text.meta}>
+            <FigureText>{`${formatCompactDate(planningState.scheduledFor, dateFormat)} · ${planningState.detail}`}</FigureText>
           </Text>
         </View>
         <ActionButton
@@ -366,29 +374,34 @@ export function useTrainPlanningState({
 } = {}): TrainPlanningState {
   const router = useRouter();
   const [state, setState] = useState<TrainPlanningState>({ status: 'loading' });
-  const [attempt, setAttempt] = useState(0);
+  const generationRef = useRef(0);
+  const nowRef = useRef(() => new Date());
+  const previousReload = useRef(reloadToken);
 
-  useEffect(() => {
-    if (!isFocused) return;
-    let cancelled = false;
+  const read = useCallback(function readPlanning() {
+    const generation = ++generationRef.current;
+    const isCurrent = () => generationRef.current === generation;
+    const now = nowRef.current();
+    const window = { start: startOfLocalDay(now), end: startOfLocalDay(now, 4) };
 
     planQueries
       .listUpcomingPlans()
       .then(async (upcoming) => {
-        if (cancelled) return;
-        const pending = upcoming.filter((plan) => plan.progress !== 'completed');
+        if (!isCurrent()) return;
+        const pending = upcoming.filter((plan) => plan.progress !== 'completed'
+          && plan.scheduledFor !== null && isInWindow(plan.scheduledFor, window));
 
         let nextPlan: (typeof pending)[number] | null = null;
         for (const plan of pending) {
           const eligible = await isPlanEligibleToStart(plan.id);
-          if (cancelled) return;
+          if (!isCurrent()) return;
           if (eligible) {
             nextPlan = plan;
             break;
           }
         }
 
-        if (!nextPlan) {
+        if (!nextPlan?.scheduledFor) {
           setState({
             status: 'empty',
             openManager: () => router.push('/planner' as Href),
@@ -403,6 +416,7 @@ export function useTrainPlanningState({
         setState({
           status: 'ready',
           title: nextPlan.title,
+          scheduledFor: nextPlan.scheduledFor,
           detail,
           materialize: async () => {
             const result = await startSessionPlan(nextPlan.id);
@@ -415,21 +429,25 @@ export function useTrainPlanningState({
         });
       })
       .catch(() => {
-        if (cancelled) return;
+        if (!isCurrent()) return;
         setState({
           status: 'error',
           message: "Couldn't load your plans.",
           retry: () => {
             setState({ status: 'loading' });
-            setAttempt((prev) => prev + 1);
+            readPlanning();
           },
         });
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [attempt, isFocused, reloadToken, router]);
+  }, [router]);
+
+  useDailyReread(isFocused, read, nowRef, generationRef);
+  useEffect(() => {
+    if (previousReload.current === reloadToken) return;
+    previousReload.current = reloadToken;
+    if (isFocused) read();
+  }, [isFocused, read, reloadToken]);
 
   return state;
 }
