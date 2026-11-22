@@ -47,6 +47,7 @@ import * as trainingNotesData from '@/src/data/training-notes';
 import { addTrainingNote, toLocalDateKey } from '@/src/data/training-notes';
 import { exerciseDefinitions, trainingNotes } from '@/src/data/schema';
 import { formatCompactDate, formatShortDate } from '@/src/utils/local-time';
+import { ensurePreferencesLoaded, updatePreferences } from '@/src/preferences/hooks';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
 import { renderWithTheme } from './helpers/theme';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -241,6 +242,36 @@ describe('All notes (More → Notes)', () => {
     expect(noteRows()[0]).toMatchObject({ notedOn: toLocalDateKey(daysAgo(5)) });
     // Saving resets the next note to today, picker closed.
     expect(screen.getByTestId('note-date-row')).toHaveTextContent(new RegExp(compact(new Date())));
+  });
+
+  it('keeps the iOS picker in English across Date formats without changing the selected day', async () => {
+    Platform.OS = 'ios';
+    await ensurePreferencesLoaded();
+    await seedExercises();
+    await renderNotes();
+    await screen.findByTestId('notes-empty');
+
+    fireEvent.press(screen.getByTestId('note-date-row'));
+    const selected = daysAgo(5);
+    fireEvent(screen.getByTestId('note-date-picker'), 'onChange', { type: 'set' }, selected);
+
+    for (const [dateFormat, locale] of [
+      ['DD-MM-YYYY', 'en-GB'], ['MM-DD-YYYY', 'en-US'], ['YYYY-MM-DD', 'en-GB'],
+    ] as const) {
+      act(() => updatePreferences({ dateFormat }));
+      const picker = screen.getByTestId('note-date-picker');
+      expect(picker.props.locale).toBe(locale);
+      expect(toLocalDateKey(picker.props.value)).toBe(toLocalDateKey(selected));
+      expect(toLocalDateKey(picker.props.maximumDate)).toBe(today());
+      expect(within(screen.getByTestId('note-date-row')).getByText(formatCompactDate(selected, dateFormat))).toBeVisible();
+      expect(screen.getByTestId('note-date-row').props.accessibilityLabel)
+        .toBe(`Date: ${formatShortDate(selected, dateFormat)}`);
+    }
+
+    fireEvent.changeText(screen.getByTestId('note-form-body'), 'Date format keeps the day');
+    fireEvent.press(screen.getByTestId('note-form-save'));
+    await screen.findByText('Date format keeps the day');
+    expect(noteRows()[0]).toMatchObject({ notedOn: toLocalDateKey(selected) });
   });
 
   it('opens the system date dialog on Android, capped at today', async () => {

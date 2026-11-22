@@ -7,6 +7,10 @@ import type { ExerciseDateFormat } from '@/src/preferences/model';
 
 const pad2 = (value: number): string => `${value}`.padStart(2, '0');
 
+/** Native iOS picker locale for [[copy.calendar-dates]]. */
+export const iosDatePickerLocale = (dateFormat: ExerciseDateFormat): string =>
+  dateFormat === 'MM-DD-YYYY' ? 'en-US' : 'en-GB';
+
 /** Local `HH:MM`. */
 export const formatClockTime = (epochMs: number): string => {
   const date = new Date(epochMs);
