@@ -34,9 +34,9 @@ appId: com.dinoderek.mobile
 - tapOn:
     id: "plan-exercise-pick-search"
 - inputText: "Barbell Back Squat"
-- hideKeyboard
+- pressKey: Enter
 
-# iOS keyboard dismissal can already open the matching exercise's preselection.
+# Search submission blurs without hideKeyboard's swipes dismissing the sheet.
 - tapOn:
     text: "Select exercise Barbell Back Squat"
     optional: true

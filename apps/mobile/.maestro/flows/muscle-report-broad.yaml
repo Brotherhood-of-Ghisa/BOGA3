@@ -233,7 +233,7 @@ appId: com.dinoderek.mobile
 - extendedWaitUntil:
     visible: "Exercise actions Lat Pulldown"
     timeout: 10000
-- hideKeyboard
+- pressKey: Enter
 - tapOn: "Exercise actions Lat Pulldown"
 - tapOn: { id: "exercise-action-edit" }
 - extendedWaitUntil:
