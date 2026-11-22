@@ -154,7 +154,7 @@ Custom/derived UI follows ordinary PR review.
 | Data import (GymBook / JSON) | `apps/mobile/scripts/import/BOGA_IMPORT_JSON_CONTRACT.md` |
 | Human local-dev ops (run/build/debug, logs, reset) | `RUNBOOK.md` |
 | iOS release (build, database migration, submission, optional tag) | `docs/procedures/ios-release.md` (agree profile, name/version and tagging upfront) |
-| You were given no build process (no skill such as engine's `build`, no user-given process) | `docs/procedures/build.md` (the default; any other process replaces it, the test gates still apply) |
+| You were given no build process (no build skill, no user-given process) | `docs/procedures/build.md` (the default; any other process replaces it, the test gates still apply) |
 | Product/domain context | `docs/specs/00-product.md`, `docs/specs/README.md` (full spec index) |
 
 **Editing tests in a directory ⇒ read that directory's `README.md` first** —
@@ -184,13 +184,6 @@ task/milestone ID (`M<n>-T<nn>`, `T-<YYYYMMDD>-<nn>`) in code, tests, flows,
 migrations, specs, or other docs — state the rule itself in the owning spec.
 Commit messages and PR bodies may cite them. `docs-check` enforces both halves;
 already-applied migrations are exempt (`scripts/plan-ref-exempt.txt`).
-
-**Engine plugin** (enabled in `.claude/settings.json`). Asked to build a task
-or card, use its `build` skill, gated unless asked for hands-off; agree the
-lane set with a separate agent first, and add `/security-review` for
-auth/RLS/API changes. Plan multi-PR work as an engine server plan (the
-`engine` skill's `plan <ask>`): the engine server is its only source, never
-repo files.
 
 `docs/plans/**` and `docs/brainstorms/**` are working notes, not
 source-of-truth, and may be stale. **Do not read them, and do not let them
