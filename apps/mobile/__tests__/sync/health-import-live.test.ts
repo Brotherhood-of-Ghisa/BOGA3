@@ -147,6 +147,12 @@ it('syncs Health bodyweight identity and preserves Ignore/deletion against a lat
         source: 'apple_health', externalId: uuid, ignored, deletedAt: deletedAt === null ? null : new Date(deletedAt),
       });
     } finally { restored.close(); }
+    const context = await service.schema(SYNC_RPC_SCHEMA).rpc('session_weight_as_of', {
+      p_owner: user.userId, p_started_at: measuredAt.getTime(),
+    });
+    expect(context.error).toBeNull();
+    if (deletedAt === null) expect(context.data.body_weight_measurement_id).toBe(id);
+    else expect(context.data.body_weight_measurement_id).not.toBe(id);
   };
   try {
     device.database.transaction(tx => applyImportedBodyWeights(tx as Transaction,
