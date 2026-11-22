@@ -154,6 +154,13 @@ describe('sync drift column rules', () => {
     expect(isTypeCompatible('real', 'int8', 'gyms', 'n')).toBe(false);
   });
 
+  it('accepts the imported-reading boolean only on its owned wire column', () => {
+    expect(diffEntityColumns('body_weight_measurements', [{ name: 'ignored', type: 'INTEGER' }],
+      [{ column_name: 'ignored', udt_name: 'bool' }], noExemptions)).toEqual([]);
+    expect(isTypeCompatible('integer', 'bool', 'gyms', 'ignored')).toBe(false);
+    expect(isTypeCompatible('text', 'bool', 'body_weight_measurements', 'ignored')).toBe(false);
+  });
+
   it('wraps the server column list at the width, keeping a trailing comma on every broken line', () => {
     expect(wrapColumns(['aaaa', 'bbbb', 'cccc'], 10)).toEqual(['aaaa, bbbb,', 'cccc']);
     // A single column longer than the width still gets its own line.
