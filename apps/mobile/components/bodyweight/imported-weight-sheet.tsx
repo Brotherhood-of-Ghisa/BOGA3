@@ -29,7 +29,7 @@ export function ImportedWeightSheet({ reading, displayValue, visible, onDismiss,
     if (saving.current) return;
     saving.current = true; setBusy(true); setError(null);
     try { await onSetIgnored(!reading.ignored); onDismiss(); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not update this reading.'); }
+    catch { setError('Could not update this reading. Reopen it and try again.'); }
     finally { saving.current = false; setBusy(false); }
   };
   return <Sheet title="Weight reading" visible={visible} testID="imported-weight-sheet"

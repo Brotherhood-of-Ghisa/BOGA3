@@ -5,7 +5,7 @@
  * screen, weight editor, reading repository and private calculation
  * preference over the migrated in-memory SQLite database
  * (helpers/local-data.ts). Only the native database open and the router are
- * replaced. Three tests force one rejection on the real module with
+ * replaced. Failure tests force one rejection on the real module with
  * `jest.spyOn` — a failed reading save, a failed delete and a failed
  * preference write — the only states real data cannot produce.
  */
@@ -108,9 +108,10 @@ describe('Apple Health reading controls', () => {
     renderWithTheme(<BodyWeightScreen />);
     await screen.findByTestId('body-weight-current');
     fireEvent.press(screen.getByTestId(`body-weight-reading-${id}`));
-    jest.spyOn(bodyweightRepository, 'setBodyWeightReadingIgnored').mockRejectedValueOnce(new Error('Storage unavailable.'));
+    jest.spyOn(bodyweightRepository, 'setBodyWeightReadingIgnored').mockRejectedValueOnce(new Error('SQLite error code 19: private diagnostic'));
     fireEvent.press(within(screen.getByTestId('imported-weight-sheet')).getByText('Ignore'));
-    await screen.findByText('Storage unavailable.');
+    await screen.findByText('Could not update this reading. Reopen it and try again.');
+    expect(screen.queryByText(/SQLite error code/)).toBeNull();
     expect(readings().find(row => row.id === id)).toMatchObject({ ignored: false, deletedAt: null });
     expect(screen.getByTestId('imported-weight-sheet').props.visible).not.toBe(false);
   });
