@@ -104,7 +104,8 @@
   these or does not ship. It also sweeps every floor over the background ×
   text × accent grid (`components/ui/theme-neutrals.ts`), and checks that an
   untouched background and text draw every preset and custom hue as
-  `fixtures/theme-roles-light.json` records. `ui-theme-launch.test.ts` covers
+  `fixtures/theme-roles-light.json` records, but for the grounds and hairlines
+  the ground ladder re-stepped, which its calibration pins instead. `ui-theme-launch.test.ts` covers
   the stored choice: the appearance record's parser, the older accent id read
   while no record exists and left in place, the default fallback for an
   unknown id, an invalid record or an unreadable store, and that each
@@ -141,6 +142,9 @@
 - `ui-on-colour-guard.test.ts` keeps `surface` a ground: any use in `app/` or
   `components/` other than a `backgroundColor`, a shape's `fill` or a role set
   handed on fails, with self-tests for what it rejects and allows.
+- `ui-design-primitives.test.tsx` pins the edge (`components/ui/edge.ts`) and
+  that each bordered primitive and the tab pill draws it, tracks a well and
+  sheets neither; the `edgeShadow` guardrail rule blocks any other shadow.
 - The retired legacy vocabulary (the `uiColors` / `uiRadius` / `uiElevation`
   scales and the `UiText` / `UiSurface` / `UiButton` / `SegmentedChips`
   primitives, removed 2026-09-26) is blocked by the `legacyVocabulary` rule in

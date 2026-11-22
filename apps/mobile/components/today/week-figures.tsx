@@ -5,6 +5,7 @@ import { Icon } from '@/components/ui/icon';
 import { FigureText } from '@/components/ui/figure-text';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import type { UiRoles } from '@/components/ui/theme';
+import { uiWell } from '@/components/ui/edge';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
 import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
@@ -16,7 +17,7 @@ type ShareBarProps = { current: number | null; previous: number | null; testID?:
 
 // One `viz` step per lap of `previous` (`weekShare`): `viz2` up to it, `viz3`
 // up to twice it, `viz4` beyond. A lap fills over the one before, full; the
-// first over the `viz0` track.
+// first over the empty `well` track.
 const lapFills = (roles: UiRoles) => [roles.viz2, roles.viz3, roles.viz4] as const;
 
 // A thin bar on the `viz` ramp: `current` as a share of `previous`, in laps.
@@ -162,7 +163,7 @@ export const weekFigureStyles = StyleSheet.create({
   },
 });
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   block: {
     gap: uiSpace.md,
   },
@@ -186,7 +187,7 @@ const useStyles = makeStyles((roles) => ({
   track: {
     height: BAR_HEIGHT,
     borderRadius: uiGeometry.radius.control,
-    backgroundColor: roles.viz0,
+    ...uiWell(roles, mode),
     marginTop: uiSpace.xs,
     overflow: 'hidden',
   },

@@ -1,5 +1,5 @@
 import { hexToLch, lchToHex, withAlpha, type Lch } from '@/components/ui/lch';
-import { generateRoles, inkStep, rampLightness, washLightness, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
+import { generateRoles, inkStep, paperLightness, rampLightness, washLightness, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
 import { normaliseHue } from '@/components/ui/theme-hue';
 
 // A custom theme (`docs/specs/ui/design-language.md` §2, "Custom"): the user
@@ -12,8 +12,8 @@ import { normaliseHue } from '@/components/ui/theme-hue';
 // A hue (0–359) and a strength (0–100, a share of the part's most chroma).
 export type HueStrength = { hue: number; strength: number };
 // The page: its mode (the ladder it draws on), its L* (in steps of 0.25) and
-// its depth (0–300, a percentage of the shipped steps from the page to its
-// cards and empty cells).
+// its depth (0–300, a percentage of the shipped steps from the page to the
+// other grounds — wells, cards, fields on a card — and empty cells).
 export type CustomBackground = HueStrength & { mode: ThemeMode; lightness: number; depth: number };
 // `rule` and `ruleSoft`: the background's hue and strength while `match`, else
 // their own; `contrast` (0–300) is a percentage of their shipped steps from
@@ -74,8 +74,9 @@ export type LightnessRange = { min: number; max: number };
 // its value until it is moved.
 export const PAGE_RANGE: Record<ThemeMode, LightnessRange> = { dark: { min: 0, max: 35 }, light: { min: 65, max: 100 } };
 export const INK_RANGE: Record<ThemeMode, LightnessRange> = { dark: { min: 60, max: 100 }, light: { min: 0, max: 40 } };
-// Where a page lands when its mode is switched: near the ladder's `paper`.
-export const PAGE_DEFAULT: Record<ThemeMode, number> = { dark: 10, light: 96.25 };
+// Where a page lands when its mode is switched, or a preset is first made
+// custom: the ladder's `paper`.
+export const PAGE_DEFAULT: Record<ThemeMode, number> = { dark: paperLightness('dark'), light: paperLightness('light') };
 // The primary text's L* by default: the ladder's `ink` (8 light, 95 dark).
 export const inkDefault = (mode: ThemeMode): number => inkStep(mode).lightness;
 
@@ -179,8 +180,11 @@ function ownBorders(colours: CustomColours, mode: ThemeMode): Partial<UiRoles> {
   return { rule, ruleSoft };
 }
 
-// Cards and empty cells: depth spreads or flattens them.
-const GROUND_ROLES = new Set<keyof UiRoles>(['surface', 'viz0']);
+// The other grounds and empty cells: depth spreads or flattens them.
+const GROUND_ROLES = new Set<keyof UiRoles>(['well', 'surface', 'raised', 'viz0']);
+// Grounds that take the page's hue and chroma, so a tinted page has tinted
+// cards and fields (the light ladder's `raised` is white, with no hue of its own).
+const PAGE_TINTED_ROLES = new Set<keyof UiRoles>(['surface', 'raised']);
 const BORDER_ROLES = new Set<keyof UiRoles>(['rule', 'ruleSoft']);
 const SECONDARY_ROLES = new Set<keyof UiRoles>(['inkMuted', 'inkFaint', 'inkGhost']);
 const HIGHLIGHT_ROLES = new Set<keyof UiRoles>(['accentWash']);
@@ -206,7 +210,7 @@ type Frame = { paper: Lch; end: number; page: number };
 // L* it does not pass (the drawn `ink`, for the secondary text).
 function moveRole(role: keyof UiRoles, value: string, frame: Frame, scale: number, limit: number | null): string {
   const { paper, end, page } = frame;
-  const lch = role === 'surface' ? { ...hexToLch(value), chroma: paper.chroma, hue: paper.hue } : hexToLch(value);
+  const lch = PAGE_TINTED_ROLES.has(role) ? { ...hexToLch(value), chroma: paper.chroma, hue: paper.hue } : hexToLch(value);
   const share = ((lch.lightness - paper.lightness) / (end - paper.lightness)) * scale;
   const lightness = clamp(page + share * (end - page));
   return lchToHex({ ...lch, lightness: limit === null ? lightness : short(lightness, page, limit) });
@@ -217,10 +221,10 @@ const short = (lightness: number, page: number, limit: number): number =>
   page <= limit ? Math.min(lightness, limit) : Math.max(lightness, limit);
 
 // Every role for a custom theme. The ladder of its mode is generated from the
-// seeds, then moved onto the chosen page (`moveRole`): depth scales the cards
-// and empty cells, the borders' contrast the hairlines and the secondary
-// text's contrast its inks, the highlight's its band. `surface` takes the page's hue and chroma, so a
-// tinted page has tinted cards. Primary text sits at its own L*; every other
+// seeds, then moved onto the chosen page (`moveRole`): depth scales the
+// grounds and empty cells, the borders' contrast the hairlines and the secondary
+// text's contrast its inks, the highlight's its band. `surface` and `raised`
+// take the page's hue and chroma. Primary text sits at its own L*; every other
 // role keeps its place measured from the ladder's `ink`.
 export function generateCustomRoles(colours: CustomColours): UiRoles {
   const mode = customMode(colours);
@@ -272,8 +276,7 @@ export function customFromSeeds(seeds: ThemeSeeds, mode: ThemeMode): CustomColou
     const { hue, chroma } = hexToLch(seed);
     return { hue: normaliseHue(hue), strength: Math.min(STRENGTH_MAX, Math.round((chroma / SEED[part].chroma) * STRENGTH_MAX)) };
   };
-  const paper = hexToLch(generateRoles(seeds, mode).paper).lightness;
-  const background: CustomBackground = { ...pick('background', seeds.background), mode, lightness: Math.round(paper), depth: DEFAULT_DEPTH };
+  const background: CustomBackground = { ...pick('background', seeds.background), mode, lightness: PAGE_DEFAULT[mode], depth: DEFAULT_DEPTH };
   return {
     background,
     borders: matchingBorders(background),

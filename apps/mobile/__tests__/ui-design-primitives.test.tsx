@@ -10,8 +10,11 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { ActionButton, Card, ChipGroup, Icon, FormField, IconButton, ListRow, Notice, PageHeader, ScreenScroll, SearchField, SectionHeader, SegmentedControl, Sheet, Stat, StatePanel, SwitchRow, Tag, ToggleChip, uiGeometry, uiSpace, uiTypography } from '@/components/ui';
+import { MainTabs } from '@/components/navigation/main-tabs';
+import { ActionButton, Card, ChipGroup, Icon, FormField, FormSection, IconButton, InputRow, ListRow, Notice, PageHeader, ScreenScroll, SearchField, SectionHeader, SegmentedControl, Sheet, SliderRow, Stat, StatePanel, SwitchRow, Tag, ToggleChip, uiEdge, uiGeometry, uiHairline, uiSpace, uiTypography, uiWell } from '@/components/ui';
+import { withAlpha } from '@/components/ui/lch';
 import { uiTextFor } from '@/components/ui/text-roles';
+import { generateRoles, defaultThemeSeeds } from '@/components/ui/theme';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 
 import { renderWithTheme as render, rolesFor } from './helpers/theme';
@@ -25,25 +28,77 @@ const textRoles = uiTextFor(roles);
 const flatStyle = (node: { props: { style?: unknown } }): ViewStyle & TextStyle =>
   (StyleSheet.flatten(node.props.style as any) ?? {}) as ViewStyle & TextStyle;
 
+// The edge in the default light theme: a 1pt `rule` hairline and a lift 1pt
+// down and 2pt soft in `ink` at 5%; a well is `well` with an inner shade in
+// `ink` at 9% from its top edge.
+const LIFT = [{ offsetX: 0, offsetY: 1, blurRadius: 2, color: withAlpha(roles.ink, 0.05) }];
+const WELL_SHADE = [{ offsetX: 0, offsetY: 1, blurRadius: 2, inset: true, color: withAlpha(roles.ink, 0.09) }];
+
+// A node draws the edge: the hairline and the lift.
+function expectEdge(node: { props: { style?: unknown } }) {
+  expect(flatStyle(node)).toMatchObject({ borderWidth: 1, borderColor: roles.rule, boxShadow: LIFT });
+}
+
+// The nearest of a node and its ancestors that draws a shadow: the frame a
+// field's input or a row's label sits in.
+type HostNode = { props: { style?: unknown }; parent: HostNode | null };
+function framed(node: HostNode): HostNode {
+  let at: HostNode | null = node;
+  while (at && flatStyle(at).boxShadow === undefined) at = at.parent;
+  if (!at) throw new Error('no framed ancestor');
+  return at;
+}
+
+// A node draws a sunken well.
+function expectWell(node: { props: { style?: unknown } }) {
+  expect(flatStyle(node)).toMatchObject({ backgroundColor: roles.well, boxShadow: WELL_SHADE });
+}
+
+describe('the edge (`edge.ts`)', () => {
+  it('lifts in light mode by 1pt in ink at 5%, behind a rule hairline', () => {
+    expect(uiEdge(roles, 'light')).toEqual({ borderWidth: 1, borderColor: roles.rule, boxShadow: LIFT });
+  });
+
+  it('lifts in dark mode with black at 45%, since a shadow reads less on a dark ground', () => {
+    const dark = generateRoles(defaultThemeSeeds, 'dark');
+    expect(uiEdge(dark, 'dark')).toEqual({
+      borderWidth: 1,
+      borderColor: dark.rule,
+      boxShadow: [{ offsetX: 0, offsetY: 1, blurRadius: 2, color: 'rgba(0, 0, 0, 0.45)' }],
+    });
+  });
+
+  it('sinks a well with an inner shade from its top edge, stronger and softer in dark', () => {
+    expect(uiWell(roles, 'light')).toEqual({ backgroundColor: roles.well, boxShadow: WELL_SHADE });
+    const dark = generateRoles(defaultThemeSeeds, 'dark');
+    expect(uiWell(dark, 'dark')).toEqual({
+      backgroundColor: dark.well,
+      boxShadow: [{ offsetX: 0, offsetY: 1, blurRadius: 3, inset: true, color: 'rgba(0, 0, 0, 0.6)' }],
+    });
+  });
+
+  it('offers the hairline alone, with no shadow', () => {
+    expect(uiHairline(roles)).toEqual({ borderWidth: 1, borderColor: roles.rule });
+  });
+});
+
 describe('Card', () => {
-  it('is a surface on a rule hairline at the card radius, with no shadow', () => {
+  it('is a surface inside the edge at the card radius: a rule hairline and a lift', () => {
     render(
       <Card testID="card">
         <Text>Body</Text>
       </Card>,
     );
 
-    const style = flatStyle(screen.getByTestId('card'));
-    expect(style).toMatchObject({
+    const card = screen.getByTestId('card');
+    expect(flatStyle(card)).toMatchObject({
       backgroundColor: roles.surface,
-      borderColor: roles.rule,
-      borderWidth: 1,
       borderRadius: uiGeometry.radius.card,
       overflow: 'hidden',
     });
-    expect(style.shadowOpacity).toBeUndefined();
-    expect(style.elevation).toBeUndefined();
-    expect(screen.getByTestId('card').props.accessibilityRole).toBeUndefined();
+    expectEdge(card);
+    expect(flatStyle(card).elevation).toBeUndefined();
+    expect(card.props.accessibilityRole).toBeUndefined();
   });
 
   it('becomes one labelled link target when given onPress', () => {
@@ -318,6 +373,10 @@ describe('Sheet', () => {
       borderTopLeftRadius: uiGeometry.radius.sheet,
       borderTopRightRadius: uiGeometry.radius.sheet,
     });
+    // A sheet keeps its 16 top corners and draws no hairline or lift: the
+    // scrim sets it apart.
+    expect(flatStyle(panel).borderWidth).toBeUndefined();
+    expect(flatStyle(panel).boxShadow).toBeUndefined();
     expect(screen.getByRole('header', { name: 'Barbell Bench Press' })).toBeTruthy();
     expect(screen.queryByText('Cancel')).toBeNull();
 
@@ -483,12 +542,14 @@ describe('ActionButton', () => {
       minHeight: uiGeometry.tapTarget,
     });
     expect(button.props.accessibilityRole).toBe('button');
-    expect(flatStyle(screen.getByText('Edit'))).toMatchObject({ color: roles.surface, textTransform: 'uppercase' });
+    expect(flatStyle(screen.getByText('Edit'))).toMatchObject({ color: roles.onAccent, textTransform: 'uppercase' });
+    // A filled primary has no edge.
+    expect(flatStyle(button).boxShadow).toBeUndefined();
     fireEvent.press(button);
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('draws a secondary action as a rule outline with an ink label, and a danger one in danger', () => {
+  it('draws a secondary action inside the edge with an ink label, and a danger one in danger', () => {
     render(
       <>
         <ActionButton label="+ Add exercise" onPress={jest.fn()} testID="outline" variant="outline" />
@@ -496,8 +557,9 @@ describe('ActionButton', () => {
       </>,
     );
 
-    expect(flatStyle(screen.getByTestId('outline'))).toMatchObject({ borderColor: roles.rule, borderWidth: 1 });
-    expect(flatStyle(screen.getByTestId('danger')).borderColor).toBe(roles.danger);
+    expectEdge(screen.getByTestId('outline'));
+    expect(flatStyle(screen.getByTestId('outline')).backgroundColor).toBe(roles.surface);
+    expect(flatStyle(screen.getByTestId('danger'))).toMatchObject({ borderColor: roles.danger, boxShadow: LIFT });
     expect(flatStyle(screen.getByText('Archive')).color).toBe(roles.danger);
   });
 
@@ -649,9 +711,18 @@ describe('FormField', () => {
     const field = screen.getByTestId('start').parent?.parent;
     expect(field && flatStyle(field)).toMatchObject({
       height: uiGeometry.fieldHeight,
+      backgroundColor: roles.raised,
       borderColor: roles.danger,
       borderRadius: uiGeometry.radius.control,
+      boxShadow: LIFT,
     });
+  });
+
+  it('draws a valid field raised inside the edge', () => {
+    render(<FormField label="Start" onChangeText={jest.fn()} testID="start" value="" />);
+    const field = screen.getByTestId('start').parent!.parent!;
+    expect(flatStyle(field).backgroundColor).toBe(roles.raised);
+    expectEdge(field);
   });
 
   it('takes an explicit error testID and a hint', () => {
@@ -684,6 +755,29 @@ describe('SearchField', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Clear search' }));
     expect(onChangeText).toHaveBeenCalledWith('');
   });
+
+  it('is raised inside the edge', () => {
+    render(<SearchField accessibilityLabel="Exercise filter input" onChangeText={jest.fn()} testID="search" value="" />);
+    const field = framed(screen.getByTestId('search') as never);
+    expect(flatStyle(field).backgroundColor).toBe(roles.raised);
+    expectEdge(field);
+  });
+});
+
+describe('FormSection', () => {
+  it('draws its rows on a card inside the edge, and a typed figure raised inside the edge', () => {
+    render(
+      <FormSection testID="section" title="Rest">
+        <InputRow label="Seconds" onChangeText={jest.fn()} testID="seconds" value="90" />
+      </FormSection>,
+    );
+    const card = framed(screen.getByText('Seconds') as never);
+    expect(flatStyle(card).backgroundColor).toBe(roles.surface);
+    expectEdge(card);
+    const input = screen.getByTestId('seconds');
+    expect(flatStyle(input).backgroundColor).toBe(roles.raised);
+    expectEdge(input);
+  });
 });
 
 describe('SegmentedControl', () => {
@@ -699,7 +793,11 @@ describe('SegmentedControl', () => {
     expect(screen.getByTestId('view-row').props.accessibilityRole).toBe('tablist');
     expect(screen.getByTestId('view-records').props.accessibilityState).toEqual({ selected: true });
     expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(roles.ink);
-    expect(flatStyle(screen.getByTestId('view-last')).backgroundColor).toBe(roles.surface);
+    // The others show the track: a sunken well inside the rule hairline.
+    expect(flatStyle(screen.getByTestId('view-last')).backgroundColor).toBeUndefined();
+    const track = screen.getByTestId('view-row');
+    expectWell(track);
+    expect(flatStyle(track)).toMatchObject({ borderWidth: 1, borderColor: roles.rule, borderRadius: uiGeometry.radius.control });
 
     fireEvent.press(screen.getByTestId('view-records'));
     expect(onChange).not.toHaveBeenCalled();
@@ -757,8 +855,8 @@ describe('SegmentedControl', () => {
     const { rerender } = render(<SegmentedControl selectedGround="selection" onChange={onChange}
       options={OPTIONS} testIDPrefix="view" value="records" />);
     expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe('#000000');
-    expect(flatStyle(within(screen.getByTestId('view-records')).getByText('Records')).color).toBe(roles.surface);
-    expect(flatStyle(screen.getByTestId('view-last')).backgroundColor).toBe(roles.surface);
+    expect(flatStyle(within(screen.getByTestId('view-records')).getByText('Records')).color).toBe(roles.onSelection);
+    expect(flatStyle(screen.getByTestId('view-last')).backgroundColor).toBeUndefined();
     expect(screen.getByTestId('view-records')).toHaveProp('accessibilityState', { selected: true });
     fireEvent.press(screen.getByTestId('view-last'));
     expect(onChange).toHaveBeenCalledWith('last');
@@ -841,8 +939,9 @@ describe('ToggleChip', () => {
     const chip = screen.getByTestId('metric');
     expect(flatStyle(chip)).toMatchObject({
       flex: 1, minHeight: uiGeometry.compactControlHeight,
-      backgroundColor: roles.surface, borderColor: roles.rule,
+      backgroundColor: roles.surface,
     });
+    expectEdge(chip);
     expect(chip.props.hitSlop).toBe((uiGeometry.tapTarget - uiGeometry.compactControlHeight) / 2);
     expect(flatStyle(within(chip).getByText('Sets')).color).toBe(roles.ink);
     expect(within(chip).getByText('Sets').props.allowFontScaling).toBe(false);
@@ -882,7 +981,11 @@ describe('ChipGroup', () => {
     expect(flatStyle(screen.getByTestId('filter-a'))).toMatchObject({
       backgroundColor: roles.ink,
       borderRadius: uiGeometry.radius.pill,
+      boxShadow: LIFT,
     });
+    // Every pill is a control inside the edge; the one on fills with `ink`.
+    expectEdge(screen.getByTestId('filter-b'));
+    expect(flatStyle(screen.getByTestId('filter-b')).backgroundColor).toBe(roles.surface);
     fireEvent.press(screen.getByTestId('filter-a'));
     expect(onChange).not.toHaveBeenCalled();
     fireEvent.press(screen.getByLabelText('Turn bravo on'));
@@ -921,14 +1024,15 @@ describe('ChipGroup', () => {
     expect(flatStyle(within(screen.getByTestId('tags-old')).getByText('Old (deleted)')).color).toBe(roles.inkFaint);
 
     rerender(<ChipGroup mode="single" onChange={jest.fn()} options={options} testIDPrefix="tags" value="old" />);
-    expect(flatStyle(within(screen.getByTestId('tags-old')).getByText('Old (deleted)')).color).toBe(roles.surface);
+    expect(flatStyle(within(screen.getByTestId('tags-old')).getByText('Old (deleted)')).color).toBe(roles.onInk);
   });
 });
 
 describe('Tag', () => {
-  it('names a state in a micro-label pill', () => {
+  it('names a state in a micro-label pill on the hairline alone, never lifted like a control', () => {
     render(<Tag label="Archived" testID="tag" />);
-    expect(flatStyle(screen.getByTestId('tag'))).toMatchObject({ borderRadius: uiGeometry.radius.pill, borderColor: roles.rule });
+    expect(flatStyle(screen.getByTestId('tag'))).toMatchObject({ borderRadius: uiGeometry.radius.pill, borderWidth: 1, borderColor: roles.rule });
+    expect(flatStyle(screen.getByTestId('tag')).boxShadow).toBeUndefined();
     expect(flatStyle(screen.getByText('Archived'))).toMatchObject({ textTransform: 'uppercase', color: roles.inkMuted });
   });
 });
@@ -957,7 +1061,8 @@ describe('Notice', () => {
     render(<Notice icon="offline" live message="Offline · last updated 09:41" testID="notice" />);
 
     const band = screen.getByTestId('notice');
-    expect(flatStyle(band)).toMatchObject({ backgroundColor: roles.paper, borderColor: roles.rule });
+    expect(flatStyle(band)).toMatchObject({ backgroundColor: roles.paper, borderRadius: uiGeometry.radius.card });
+    expectEdge(band);
     expect(band.props.accessibilityLiveRegion).toBe('polite');
     expect(band.props.accessibilityRole).toBeUndefined();
     expect(flatStyle(screen.getByText('Offline · last updated 09:41')).color).toBe(roles.ink);
@@ -998,5 +1103,22 @@ describe('PageHeader / SectionHeader', () => {
     expect(flatStyle(screen.getByTestId('view')).backgroundColor).toBeUndefined();
     fireEvent.press(screen.getByTestId('view'));
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SliderRow', () => {
+  it('draws its plain track as a sunken well, filled in ink', () => {
+    render(<SliderRow format={String} label="Depth" max={300} onChange={jest.fn()} onChangeEnd={jest.fn()} testID="depth" value={100} />);
+    const track = screen.getByTestId('depth-track').children[0] as never;
+    expectWell(track);
+  });
+});
+
+describe('the floating tab pill', () => {
+  it('is a surface inside the edge at the card radius', () => {
+    render(<MainTabs activeTab="today" onSelect={jest.fn()} />);
+    const shell = screen.getByTestId('main-bottom-tabs');
+    expect(flatStyle(shell)).toMatchObject({ backgroundColor: roles.surface, borderRadius: uiGeometry.radius.card });
+    expectEdge(shell);
   });
 });

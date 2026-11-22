@@ -32,6 +32,7 @@ import { CHART_RIGHT_GUTTER } from '@/components/today/progress-format';
 import { Storage } from 'expo-sqlite/kv-store';
 import { uiFonts, uiGeometry, uiIconSize, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { uiWell } from '@/components/ui/edge';
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
 const roles = rolesFor(DEFAULT_APPEARANCE);
@@ -797,7 +798,8 @@ describe('Today: the share bar', () => {
   it('fills the first lap over the empty track up to last week', () => {
     const { track, fill } = bar(2, 3);
 
-    expect(track).toHaveStyle({ backgroundColor: roles.viz0 });
+    // An empty track is a sunken well.
+    expect(track).toHaveStyle({ backgroundColor: roles.well, boxShadow: uiWell(roles, 'light').boxShadow });
     expect(fill).toHaveStyle({ width: '67%', backgroundColor: roles.viz2 });
   });
 

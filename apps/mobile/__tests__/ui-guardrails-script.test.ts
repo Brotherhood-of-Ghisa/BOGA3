@@ -11,12 +11,17 @@ type ScanResult = {
 };
 
 const {
+  findEdgeShadowViolations,
   findLegacyVocabularyViolations,
   findRawColorLiteralViolations,
   findRatchetRuleViolations,
   evaluateRatchet,
   updateConfigBudgets,
 } = guardrailScript as {
+  findEdgeShadowViolations: (options?: { rootDir?: string; ownerFile?: string }) => ScanResult & {
+    filesScanned: number;
+    ownerFile: string;
+  };
   findLegacyVocabularyViolations: (options?: { rootDir?: string }) => ScanResult & {
     filesScanned: number;
   };
@@ -193,6 +198,54 @@ describe('UI guardrail legacy vocabulary rule', () => {
     writeFile(tempRoot, 'scripts/tool.ts', `const t = uiColors;\n`);
 
     expect(literalsOf(findLegacyVocabularyViolations({ rootDir: tempRoot }))).toEqual([]);
+  });
+});
+
+describe('UI guardrail edge shadow rule', () => {
+  const OWNER = 'components/ui/edge.ts';
+
+  it.each(['app', 'components', 'src'])('flags any shadow, boxShadow or elevation under %s/ outside the edge helper', (root) => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-guardrail-edge-'));
+
+    writeFile(
+      tempRoot,
+      `${root}/card.tsx`,
+      `const styles = { card: { shadowColor: roles.ink, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 } };
+`
+    );
+    writeFile(tempRoot, `${root}/lifted.ts`, `export const lifted = { boxShadow: [{ offsetY: 1, blurRadius: 2 }], elevation: 2 };
+`);
+    writeFile(tempRoot, `${root}/prop.tsx`, `<View elevation={2} />;
+`);
+
+    const result = findEdgeShadowViolations({ rootDir: tempRoot, ownerFile: OWNER });
+
+    expect(literalsOf(result).map((literal) => literal.replace(/\s*[:=]$/, '')).sort()).toEqual(
+      ['boxShadow', 'elevation', 'elevation', 'shadowColor', 'shadowOffset', 'shadowOpacity', 'shadowRadius'].sort()
+    );
+  });
+
+  it('lets the edge helper set its shadows, and ignores tests, comments without a key and longer names', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-guardrail-edge-'));
+
+    writeFile(tempRoot, OWNER, `export const uiEdge = () => ({ boxShadow: [] });
+`);
+    writeFile(tempRoot, 'components/__tests__/card.test.tsx', `expect(style.boxShadow).toBeUndefined(); const s = { elevation: 1 };
+`);
+    writeFile(
+      tempRoot,
+      'src/health/mapping.ts',
+      `// Depth is a ground change, never an elevation.
+export const row = { elevation_gain_m: 3, elevationAscended: 2, textShadowColor: 'x' };
+`
+    );
+
+    expect(literalsOf(findEdgeShadowViolations({ rootDir: tempRoot, ownerFile: OWNER }))).toEqual([]);
+  });
+
+  it('names the edge helper in the shipped config, so nothing else may own a shadow', () => {
+    expect(findEdgeShadowViolations().ownerFile).toBe(OWNER);
+    expect(literalsOf(findEdgeShadowViolations())).toEqual([]);
   });
 });
 

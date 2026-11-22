@@ -45,6 +45,7 @@ describe('design-language tokens', () => {
         'onInk',
         'onSelection',
         'paper',
+        'raised',
         'record',
         'recordRule',
         'recordWash',
@@ -60,13 +61,15 @@ describe('design-language tokens', () => {
         'viz2',
         'viz3',
         'viz4',
+        'well',
       ].sort(),
     );
   });
 
   it('carries the geometry of §4', () => {
+    // Cards and controls share one corner, 4; a sheet's top corners stay 16.
     expect(uiGeometry).toEqual({
-      radius: { card: 6, sheet: 16, control: 4, pill: 999 },
+      radius: { card: 4, sheet: 16, control: 4, pill: 999 },
       tapTarget: 44,
       compactControlHeight: 28,
       metricValueWidth: 38,
@@ -147,13 +150,14 @@ describe('design-language tokens', () => {
 
         it('keeps each neutral family on one hue: the inks on `text`\'s, the ground on `background`\'s', () => {
           // Background and text are picked apart, so the neutrals are two ramps,
-          // each one hue. Light `surface` is pure white and has no hue; dark
-          // `surface` is a step of the ground.
+          // each one hue. The four grounds are steps of the ground; a light
+          // field is pure white, and a light card all but, so neither carries
+          // a hue worth checking (the chroma test skips them).
           const families = [
             { seed: seeds.text, roles: [seeded.ink, seeded.inkMuted, seeded.inkFaint, seeded.inkGhost] },
             {
               seed: seeds.background,
-              roles: [seeded.paper, seeded.rule, seeded.ruleSoft, seeded.viz0, ...(mode === 'dark' ? [seeded.surface] : [])],
+              roles: [seeded.well, seeded.paper, seeded.surface, seeded.raised, seeded.rule, seeded.ruleSoft, seeded.viz0],
             },
           ];
           for (const family of families) {

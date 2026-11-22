@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
+import { uiWell } from '@/components/ui/edge';
 import { ListRow } from '@/components/ui/list-row';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -128,7 +129,7 @@ export function SliderRow({ label, value, min = 0, max, step = 1, format, onChan
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   control: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -139,11 +140,12 @@ const useStyles = makeStyles((roles) => ({
     height: uiGeometry.tapTarget,
     justifyContent: 'center',
   },
+  // A sunken well, filled in `ink` up to the value.
   track: {
     height: TRACK,
     borderRadius: TRACK / 2,
     overflow: 'hidden',
-    backgroundColor: roles.rule,
+    ...uiWell(roles, mode),
   },
   fill: {
     height: TRACK,
@@ -157,7 +159,7 @@ const useStyles = makeStyles((roles) => ({
   paint: {
     flex: 1,
   },
-  // Depth is a rule plus a ground change, never a shadow.
+  // An `ink` ring on the card's ground, over the track.
   thumb: {
     position: 'absolute',
     width: THUMB,

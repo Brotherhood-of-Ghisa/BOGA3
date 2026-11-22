@@ -63,7 +63,7 @@ describe('a preset converted to custom colours', () => {
   );
 
   it('starts on the ladder’s page at the shipped depth', () => {
-    expect(WARM_LIGHT.background).toMatchObject({ lightness: 96, depth: 100 });
+    expect(WARM_LIGHT.background).toMatchObject({ lightness: 95.5, depth: 100 });
     expect(customFromSeeds(defaultThemeSeeds, 'dark').background).toMatchObject({ lightness: 10, depth: 100 });
   });
 });
@@ -98,14 +98,14 @@ describe('depth', () => {
   };
   const atDepth = (depth: number) => withBackground(WARM_LIGHT, { lightness: 70, depth });
 
-  it('flattens the cards and empty cells onto the page at 0', () => {
+  it('flattens the grounds and empty cells onto the page at 0', () => {
     const roles = generateCustomRoles(atDepth(0));
-    expect([roles.surface, roles.viz0].map((hex) => hexToLch(hex).lightness)).toEqual(
-      Array(2).fill(expect.closeTo(hexToLch(roles.paper).lightness, 0)),
+    expect([roles.well, roles.surface, roles.raised, roles.viz0].map((hex) => hexToLch(hex).lightness)).toEqual(
+      Array(4).fill(expect.closeTo(hexToLch(roles.paper).lightness, 0)),
     );
   });
 
-  it.each(['surface', 'viz0'] as const)('spreads %s further from the page as it grows', (role) => {
+  it.each(['well', 'surface', 'raised', 'viz0'] as const)('spreads %s further from the page as it grows', (role) => {
     expect(gap(atDepth(200), role)).toBeGreaterThan(gap(atDepth(100), role));
     expect(gap(atDepth(100), role)).toBeGreaterThan(gap(atDepth(50), role));
   });
@@ -116,6 +116,20 @@ describe('depth', () => {
     (['rule', 'ruleSoft', 'ink', 'inkMuted', 'inkFaint', 'inkGhost', 'accent', 'record', 'viz1', 'viz4', 'danger'] as const).forEach((role) =>
       expect(deep[role]).toBe(flat[role]),
     );
+  });
+});
+
+describe('the ground ladder on a custom page', () => {
+  it.each(['light', 'dark'] as ThemeMode[])('keeps well < paper < surface < raised in %s, each tinted by the page', (mode) => {
+    const colours = withBackground(customFromSeeds(defaultThemeSeeds, mode), { hue: 200, strength: 60 });
+    const roles = generateCustomRoles(colours);
+    const ladder = [roles.well, roles.paper, roles.surface, roles.raised].map((hex) => hexToLch(hex));
+    ladder.slice(1).forEach((ground, index) => expect(ground.lightness).toBeGreaterThan(ladder[index].lightness));
+    // A tinted page has tinted cards and fields, and a tinted well under it,
+    // where the ground's L* holds enough chroma to carry a hue.
+    const tinted = ladder.filter(({ chroma }) => chroma >= 2);
+    expect(tinted.length).toBeGreaterThanOrEqual(mode === 'dark' ? 4 : 2);
+    for (const ground of tinted) expect(Math.abs(ground.hue - hexToLch(roles.paper).hue)).toBeLessThanOrEqual(10);
   });
 });
 
@@ -363,12 +377,14 @@ function rolesBefore(saved: SavedBefore, ink: { hue: number; strength: number })
   const end = hexToLch(reference.ink).lightness;
   const { lightness: page, depth } = saved.background;
   const paper = hexToLch(reference.paper);
-  const ground = new Set(['surface', 'rule', 'ruleSoft', 'viz0']);
+  // The grounds added since (`well`, `raised`) step by depth like `surface`.
+  const ground = new Set(['well', 'surface', 'raised', 'rule', 'ruleSoft', 'viz0']);
+  const pageTinted = new Set(['surface', 'raised']);
   const kept = new Set(['selection', 'onAccent', 'onSelection', 'onDanger', 'onInk']);
   const moved = Object.fromEntries(
     Object.entries(reference).map(([role, value]) => {
       if (kept.has(role) || role === 'scrim') return [role, value];
-      const lch = role === 'surface' ? { ...hexToLch(value), chroma: paper.chroma, hue: paper.hue } : hexToLch(value);
+      const lch = pageTinted.has(role) ? { ...hexToLch(value), chroma: paper.chroma, hue: paper.hue } : hexToLch(value);
       const share = ((lch.lightness - paperRef) / (end - paperRef)) * (ground.has(role) ? depth / 100 : 1);
       return [role, lchToHex({ ...lch, lightness: Math.min(100, Math.max(0, page + share * (end - page))) })];
     }),

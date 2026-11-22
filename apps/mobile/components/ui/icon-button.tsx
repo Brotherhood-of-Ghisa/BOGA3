@@ -99,7 +99,7 @@ const useStyles = makeStyles((roles) => ({
   accentPressed: {
     opacity: 0.85,
   },
-  // Depth is a ground change, never an elevation.
+  // Pressed sinks to the page's ground.
   pressed: {
     backgroundColor: roles.paper,
     opacity: 0.7,

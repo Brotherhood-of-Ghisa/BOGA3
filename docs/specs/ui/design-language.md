@@ -21,9 +21,8 @@ obvious action, large figures, no decoration. **Out-of-workout** is exploratory:
 dense, information-rich, scannable. The split is carried by *density and
 emphasis*, never by a different visual vocabulary.
 
-The voice is a brotherhood of geeks — the numbers are the point. Estimated 1RM,
-volume and effort are shown wherever they are known, not hidden behind a detail
-tap.
+The voice is a brotherhood of geeks — the numbers are the point: 1RM, volume
+and effort show wherever known, never behind a detail tap.
 
 ## 2. Colour roles
 
@@ -43,7 +42,7 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   button that commits" must not read as the same mark.
 - **Each neutral family is one hue.** The inks (`ink` → `ink-muted` →
   `ink-faint` → `ink-ghost`) take the `text` seed's; in light mode `scrim`
-  follows `ink`, at 42%. The ground (`paper`, `rule`, `rule-soft`, `viz0`) takes the
+  follows `ink`, at 42%. The grounds, rules and `viz0` take the
   `background` seed's. The shipped default keeps both at 75–95, chroma ≤ 10.
 - **`surface` is a ground, never a foreground.** A label, glyph, ring or
   stroke on a filled role takes that fill's on-colour role: `onAccent`,
@@ -65,8 +64,10 @@ role sets its own fixed L\* — contrast depends on lightness, so the text floor
 hold whatever the seed. In light mode `accent` and `record` are used as given, so
 their floors are the seed's to meet.
 
-**Two ladders, one set of seeds:** `generateRoles(seeds, mode)`. Dark puts
-`paper` at L\*10, lifts `surface` to L\*15 (never a shadow) and `ink` to L\*95.
+**Two ladders, one set of seeds:** `generateRoles(seeds, mode)`. Each steps
+four grounds, `well` < `paper` < `surface` < `raised` (tracks, page, cards,
+fields on a card), a card ≥ 4 L\* off the page, the light page light enough
+for every preset's `accent` at 4.5:1. Dark puts `paper` at L\*10, `ink` at L\*95.
 `accent` (L\*72, `onAccent` black) and `record` (L\*66) take their seed's hue;
 `danger`, `gain`, `loss` and the regimes keep their light hues at L\*64;
 `selection` turns white, `scrim` 60% black. The `viz` ramp lightens in even
@@ -82,14 +83,14 @@ anything else becomes the custom theme it drew — and before it the accent id
 place. A preset takes `mode`: `light` (default), `dark` or `system` (the
 phone's, followed live). Native UI is pinned to the drawn mode, unpinned under
 `system`, since a pinned OS reports the pin (`theme-native.ts`). An unknown id,
-an invalid record or an unreadable store opens in the default and is logged. `record` stays a brass
-across presets, so "your best ever" keeps one look. Its editor: `ux-rules.md` "Appearance".
+an invalid record or an unreadable store opens, logged, in the default. `record`
+stays brass across presets. Its editor: `ux-rules.md` "Appearance".
 
 **Custom** (`theme-custom.ts`): a hue and strength (0–100% of its
 chroma cap) per seed, borders, highlight and `ink`. The page picks
 its mode, L\* (dark 0–35, light 65–100; quarter steps), depth. Each role
 keeps its hue, chroma and share of the `paper` → `ink` distance on the
-page; depth (0–300%) scales `surface` and `viz0`, border contrast
+page; depth (0–300%) scales the grounds and `viz0`, border contrast
 (0–300%) `rule`/`rule-soft` (the page's tint unless unmatched), highlight
 contrast (0–300%) `accent-wash` (the accent's band unless unmatched), text
 contrast (0–150%) the lesser inks, never past `ink`'s L\*. Chart and
@@ -113,13 +114,13 @@ are even in lightness, so each bucket reads as "more" without relying on hue,
 and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included (`ink-muted` is about 3.2:1 on `viz2`); `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
-labels still say how much. An empty `viz0` cell takes a `rule` hairline,
-being only about 1.15:1 against `surface`. A filter showing all its values at once marks the one in
+labels still say how much. An empty `viz0` cell takes a `rule` hairline; a
+bar's empty track is a well. A filter showing all its values at once marks the one in
 force in `selection` (black; white in dark) with `onSelection` text
 (`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`
 shows one value and has no unselected peer, so it carries `ink` on `surface`
-(Progress's filter row, the history metric). Heatmap tiles/bars have no `selection` current/selected
-outlines. Weekly selection uses a caret and accessible state.
+(Progress's filter row, the history metric). Heatmap tiles and bars take no `selection` outline;
+weekly selection is a caret and accessible state.
 
 ## 3. Typography
 
@@ -133,15 +134,12 @@ Figures are monospaced so digits align down a column — any list of measurement
 depends on it. Micro-labels are Archivo 700 at **10px**
 (`uiTypography.size.xxs`), tracked 0.1em, and carry units and legends.
 
-**Embedded in the binary**, never loaded at runtime: the eight faces ship inside
-the app via the `expo-font` config plugin (`apps/mobile/app.config.ts`), so the
-OS registers them before JS runs — no loading step, no splash gate, no flash of
-the system font reflowing a numeric column. A screen names a face as
-`{ fontFamily, fontWeight }` from `uiFonts`, the same pair on iOS and Android.
-Only the weights above are embedded; any other weight silently lands on the
-nearest one that is. **Web gets system fonts** — config-plugin embedding is
-iOS/Android only. That is accepted, not a bug: web is a dev convenience with no
-gate, and this spec promises no web parity.
+**Embedded in the binary** via the `expo-font` config plugin
+(`apps/mobile/app.config.ts`), so the OS registers the eight faces before JS
+runs: no loading step, no flash of the system font. A screen names a face as
+`{ fontFamily, fontWeight }` from `uiFonts`, the same pair on iOS and Android;
+any weight not listed lands on the nearest embedded one. **Web gets system
+fonts**, accepted: web is a dev convenience with no gate or parity promise.
 
 **The type scale is eight ordinary rungs plus `timer` (104/124pt)** for a
 fullscreen countdown (`uiTypography.size` / `lineHeight`), and the raw-literal
@@ -150,14 +148,12 @@ screen cannot express is a case for revising the scale, here and in `tokens.ts`,
 never for an exception (`ux-rules.md` "Styling guardrails"); a design drawn off
 the scale snaps onto it.
 
-**The 38pt metric column holds** (`uiGeometry.metricValueWidth`, measured on
-device at 390pt): a 1RM up to `999.9` and a five-digit volume both fit with
-their 10px legends, and only a four-digit 1RM overflows, which no lifter
-produces.
+**The 38pt metric column** (`uiGeometry.metricValueWidth`, measured on device
+at 390pt) fits a 1RM up to `999.9` and a five-digit volume with their 10px
+legends; only a four-digit 1RM, which no lifter produces, overflows.
 
 **Weight per figure.** Realised figures and option labels sit one embedded
-weight lighter than the design mocks drew them, which read too heavy on iOS,
-keeping sizes on the scale. Running figures (weight × reps, the inline 1RM, VOL)
+weight lighter than the mocks drew them (too heavy on iOS), sizes on the scale. Running figures (weight × reps, the inline 1RM, VOL)
 are Plex Mono **500**; a `record` figure is **700**. Sheet option labels are
 Archivo **600**, the selected one **700**; headline figures stay Plex Mono 700,
 micro-labels Archivo 700, sheet titles Archivo 800.
@@ -207,11 +203,14 @@ style object, read their role's fields.
 
 ## 4. Surfaces
 
-- **No shadows.** Depth is a hairline plus a ground-colour change, never an
-  elevation ramp; there is no elevation token.
-- Cards are `surface` on `paper`, 1px `rule`, radius 6.
-- Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16
-  and a `rule` handle. **Tapping outside or dragging the handle down
+- **One edge, the only shadow** (`apps/mobile/components/ui/edge.ts`): a card
+  or control takes `uiEdge`, a `rule` hairline and a 1pt lift; a track
+  `uiWell`, sunken; a static `Tag` the hairline alone. A guardrail blocks any
+  other shadow.
+- Cards are `surface` on `paper`, fields on a card `raised`; cards and
+  controls take radius 4.
+- Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16,
+  no hairline, and a `rule` handle. **Tapping outside or dragging the handle down
   dismisses; sheets carry no Cancel button.** A sub-page is the native iOS
   page sheet instead: grabber, title, X (`ux-rules.md` "Sheets").
 - Tap targets ≥44; a compact control draws 28 (`compactControlHeight`) and

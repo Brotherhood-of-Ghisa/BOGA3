@@ -133,21 +133,25 @@ export function useUiMode(): ThemeMode {
 //   const useStyles = makeStyles((roles) => ({ card: { backgroundColor: roles.surface } }));
 //   function Card() { const styles = useStyles(); … }
 //
-// Each sheet is built once per set of roles, so a theme switch builds it once
-// however many components use it, and it is the same object between switches.
+// The drawn mode comes second, for a style that differs by mode rather than by
+// role: the edge's shadows (`edge.ts`). Each sheet is built once per set of
+// roles, so a theme switch builds it once however many components use it, and
+// it is the same object between switches.
 // What `StyleSheet.create` takes: named view, text and image styles.
 type NamedStyles = Parameters<typeof StyleSheet.create>[0];
 
-export function makeStyles<S extends NamedStyles>(build: (roles: UiRoles) => S & NamedStyles): () => Readonly<S> {
-  const sheets = new WeakMap<UiRoles, Readonly<S>>();
-  const sheetFor = (roles: UiRoles): Readonly<S> => {
-    const cached = sheets.get(roles);
+export function makeStyles<S extends NamedStyles>(build: (roles: UiRoles, mode: ThemeMode) => S & NamedStyles): () => Readonly<S> {
+  const sheets = new WeakMap<UiRoles, Partial<Record<ThemeMode, Readonly<S>>>>();
+  const sheetFor = (roles: UiRoles, mode: ThemeMode): Readonly<S> => {
+    const byMode = sheets.get(roles) ?? {};
+    const cached = byMode[mode];
     if (cached) return cached;
-    const sheet = StyleSheet.create<S>(build(roles));
-    sheets.set(roles, sheet);
+    const sheet = StyleSheet.create<S>(build(roles, mode));
+    sheets.set(roles, { ...byMode, [mode]: sheet });
     return sheet;
   };
   return function useStyles(): Readonly<S> {
-    return sheetFor(useUiRoles());
+    const { roles, mode } = useContext(AppThemeContext);
+    return sheetFor(roles, mode);
   };
 }

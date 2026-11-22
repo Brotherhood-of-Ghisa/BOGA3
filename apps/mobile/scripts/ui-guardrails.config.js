@@ -1,6 +1,6 @@
 // Configuration for scripts/check-ui-guardrails.js.
 //
-// Three kinds of rule:
+// Four kinds of rule:
 //
 // 1. `rawColorLiteralRule` — already at zero. Any raw hex / rgb(a) in
 //    `app/**` or `components/**` blocks on sight. `allowlistedFiles` is the
@@ -14,7 +14,13 @@
 //    `useUiRoles()` / `makeStyles`, `uiGeometry.radius` and the `@/components/ui` primitives
 //    (`docs/specs/ui/components-catalog.md`).
 //
-// 3. `ratchetRules` — type, spacing and radius. These started at 196 / 416 /
+// 3. `edgeShadowRule` — depth is the ground ladder plus one edge. Any
+//    `shadow*`, `boxShadow` or `elevation` in `app/**`, `components/**` or
+//    `src/**` (`.ts` and `.tsx`, tests excluded) outside `ownerFile`, the edge
+//    helper, blocks on sight. There is no budget and no allowlist
+//    (`docs/specs/ui/design-language.md` §4).
+//
+// 4. `ratchetRules` — type, spacing and radius. These started at 196 / 416 /
 //    130 and have reached 0, so in practice all four rules are now
 //    zero-tolerance. The mechanism stays: the check fails when a change puts
 //    the count OVER budget, and equally when it drops UNDER budget without
@@ -33,6 +39,10 @@
 module.exports = {
   rawColorLiteralRule: {
     allowlistedFiles: [],
+  },
+
+  edgeShadowRule: {
+    ownerFile: 'components/ui/edge.ts',
   },
 
   legacyVocabularyRule: {

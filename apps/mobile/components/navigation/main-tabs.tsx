@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 
+import { uiEdge } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -84,12 +85,11 @@ export function MainTabs({ activeTab, onSelect }: MainTabsProps) {
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   shell: {
     flexDirection: 'row',
     overflow: 'hidden',
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    ...uiEdge(roles, mode),
     borderRadius: uiGeometry.radius.card,
     backgroundColor: roles.surface,
   },
@@ -110,7 +110,7 @@ const useStyles = makeStyles((roles) => ({
     gap: uiSpace.xs,
     paddingTop: uiSpace.sm,
   },
-  // Depth is a ground change, never an elevation.
+  // Pressed sinks to the page's ground.
   pressed: {
     backgroundColor: roles.paper,
   },

@@ -8,8 +8,9 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { uiEdge } from '@/components/ui/edge';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry } from '@/components/ui/tokens';
+import { uiGeometry } from '@/components/ui/tokens';
 
 type CardBaseProps = {
   children: ReactNode;
@@ -31,8 +32,8 @@ type CardProps = CardBaseProps &
       }
   );
 
-// Design-language card (`design-language.md` §4): `surface` on `paper`, 1px
-// `rule`, no shadow. It clips its content so a band or divider meets the
+// Design-language card (`design-language.md` §4): `surface` on `paper`, the
+// edge (`rule` hairline and a lift). It clips its content so a band or divider meets the
 // rounded corners, and carries no padding — the content owns its insets.
 export function Card({ children, style, testID, onPress, accessibilityLabel, accessibilityActions, onAccessibilityAction }: CardProps) {
   const styles = useStyles();
@@ -58,15 +59,14 @@ export function Card({ children, style, testID, onPress, accessibilityLabel, acc
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   card: {
     overflow: 'hidden',
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    ...uiEdge(roles, mode),
     borderRadius: uiGeometry.radius.card,
     backgroundColor: roles.surface,
   },
-  // Depth is a ground change, never an elevation.
+  // Pressed sinks to the page's ground.
   pressed: {
     backgroundColor: roles.paper,
   },

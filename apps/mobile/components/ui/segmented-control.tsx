@@ -1,6 +1,7 @@
 import type { ComponentRef } from 'react';
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { uiHairline, uiWell } from '@/components/ui/edge';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -54,7 +55,8 @@ export type SegmentedControlProps<TValue extends string | number> = {
 });
 
 // One choice from a few, joined in a single `rule` frame at the control
-// radius; the selected segment defaults to `ink` (`design-language.md` §4).
+// radius around a sunken `well` track; the selected segment defaults to `ink`
+// (`design-language.md` §4).
 // Selection exposes tabs; navigation exposes links with no active segment.
 export function SegmentedControl<TValue extends string | number>({
   options,
@@ -133,12 +135,12 @@ export function SegmentedControl<TValue extends string | number>({
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   control: {
     flexDirection: 'row',
     overflow: 'hidden',
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    ...uiHairline(roles),
+    ...uiWell(roles, mode),
     borderRadius: uiGeometry.radius.control,
   },
   controlFill: {
@@ -148,7 +150,6 @@ const useStyles = makeStyles((roles) => ({
     justifyContent: 'center',
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.xs,
-    backgroundColor: roles.surface,
   },
   segmentCompact: {
     paddingHorizontal: uiSpace.sm,

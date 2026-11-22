@@ -16,19 +16,22 @@ import themeRolesLight from './fixtures/theme-roles-light.json';
 // and `record` — used as given in light mode — meet their own floors. Custom
 // themes are not gated (`ui-theme-custom.test.ts`).
 
-// The palette as rationalised and picked on device, 2026-09-27. The generator
-// was calibrated to it; a role drifting further than ΔE*ab 3 from it is a
-// visible change and needs its own design decision.
+// The palette as rationalised and picked on device, 2026-09-27, with the
+// grounds and hairlines re-stepped into the ground ladder 2026-11-22. The
+// generator is calibrated to it; a role drifting further than ΔE*ab 3 from it
+// is a visible change and needs its own design decision.
 const PICKED_PALETTE: Omit<UiRoles, 'scrim' | OnColourRole> = {
   ink: '#1B1712',
   inkMuted: '#6B6358',
   inkFaint: '#9B948A',
   inkGhost: '#BAB2A7',
-  paper: '#F6F4EF',
-  surface: '#FFFFFF',
+  well: '#ECE8E2',
+  paper: '#F5F2ED',
+  surface: '#FFFEFD',
+  raised: '#FFFFFF',
   selection: '#000000',
-  rule: '#E2DCD0',
-  ruleSoft: '#EFEAE0',
+  rule: '#EAE3DA',
+  ruleSoft: '#F0EAE2',
   accent: '#C2410C',
   accentWash: '#FFF4EF',
   record: '#8A6516',
@@ -135,13 +138,15 @@ describe('theme generator', () => {
     expect(drift).toEqual([]);
   });
 
-  it('in light mode, uses the accent and record seeds as given, and never themes danger, surface, filter selection or the on-colour roles', () => {
+  it('in light mode, uses the accent and record seeds as given, and never themes danger, a field, filter selection or the on-colour roles', () => {
     for (const seeds of [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS)]) {
       const roles = generateRoles(seeds);
       expect(roles.accent).toBe(seeds.accent);
       expect(roles.record).toBe(seeds.record);
       expect(roles.danger).toBe('#A4262C');
-      expect(roles.surface).toBe('#FFFFFF');
+      // A card is a ground of its own, no longer white; a field on it is.
+      expect(roles.surface).not.toBe('#FFFFFF');
+      expect(roles.raised).toBe('#FFFFFF');
       expect(roles.selection).toBe('#000000');
       expect(roles.scrim).toBe(withAlpha(roles.ink, 0.42));
       for (const role of ON_COLOUR_ROLES) expect(roles[role]).toBe('#FFFFFF');
@@ -151,7 +156,7 @@ describe('theme generator', () => {
   it('tints the ground family from `background` and the ink family from `text`', () => {
     const { split } = OTHER_SEEDS;
     const roles = generateRoles(split);
-    for (const role of ['paper', 'rule', 'ruleSoft', 'viz0'] as const) {
+    for (const role of ['well', 'paper', 'rule', 'ruleSoft', 'viz0'] as const) {
       expect(hueDistance(hexToLch(roles[role]).hue, hexToLch(split.background).hue)).toBeLessThanOrEqual(10);
     }
     for (const role of ['ink', 'inkMuted', 'inkFaint', 'inkGhost'] as const) {
@@ -195,8 +200,9 @@ describe('theme generator', () => {
       expect(hueDistance(hexToLch(roles.rule).hue, hexToLch(seeds.background).hue)).toBeLessThanOrEqual(10);
     });
 
-    it('keeps text legible: `ink` and `ink-muted` on both grounds, `ink` on every viz step', () => {
-      for (const background of [roles.paper, roles.surface]) {
+    it('keeps text legible: `ink` and `ink-muted` on every ground, `ink` on every viz step', () => {
+      // A segment's label sits in a well, typed text in a raised field.
+      for (const background of [roles.well, roles.paper, roles.surface, roles.raised]) {
         expect(contrastRatio(roles.ink, background)).toBeGreaterThanOrEqual(4.5);
         expect(contrastRatio(roles.inkMuted, background)).toBeGreaterThanOrEqual(4.5);
       }
@@ -220,11 +226,13 @@ describe('theme generator', () => {
 describe('the dark ladder', () => {
   const SEEDS = [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS), ...Object.values(HUE_SEEDS)];
 
-  it('lays the page at L* 10, lifts a card to L* 15, and draws `ink` at L* 95', () => {
+  it('sinks a well to L* 7, lays the page at L* 10, lifts a card to L* 15 and a field on it to L* 21.5, and draws `ink` at L* 95', () => {
     for (const seeds of SEEDS) {
       const roles = generateRoles(seeds, 'dark');
+      expect(hexToLch(roles.well).lightness).toBeCloseTo(7, 0);
       expect(hexToLch(roles.paper).lightness).toBeCloseTo(10, 0);
       expect(hexToLch(roles.surface).lightness).toBeCloseTo(15, 0);
+      expect(hexToLch(roles.raised).lightness).toBeCloseTo(21.5, 0);
       expect(hexToLch(roles.ink).lightness).toBeCloseTo(95, 0);
     }
   });
@@ -269,6 +277,27 @@ describe('the dark ladder', () => {
       const [, ...rampSteps] = vizSteps(generateRoles(seeds, 'dark'), 'dark');
       expect(Math.max(...rampSteps) - Math.min(...rampSteps)).toBeLessThanOrEqual(0.7);
     }
+  });
+});
+
+// The ground ladder (`design-language.md` §2): a sunken well, the page, a
+// card and a field on a card, in that order of lightness in both modes, for
+// every preset and every one of the 360 hue themes.
+describe('the ground ladder', () => {
+  const everyHue = Array.from({ length: 360 }, (_, hue) => [`hue ${hue}°`, seedsFromHue(hue)] as const);
+  const cases = MODES.flatMap((mode) =>
+    [...Object.entries(PRESET_SEEDS), ...everyHue].map(([name, seeds]) => ({ name, mode, roles: generateRoles(seeds, mode) })),
+  );
+
+  it('runs well < paper < surface < raised, with a card at least 4 L* off the page', () => {
+    const broken = cases
+      .filter(({ roles }) => !isAscending([roles.well, roles.paper, roles.surface, roles.raised]) || lightnessOf(roles.surface) - lightnessOf(roles.paper) < 4)
+      .map(({ name, mode }) => `${name} ${mode}`);
+    expect(broken).toEqual([]);
+  });
+
+  it('no longer draws a light card white', () => {
+    expect(cases.filter(({ mode, roles }) => mode === 'light' && roles.surface === '#FFFFFF').map(({ name }) => name)).toEqual([]);
   });
 });
 
@@ -375,8 +404,13 @@ describe('hue seeds', () => {
 
 // Every role as each preset and custom hue drew it before background and
 // text were separate seeds (`fixtures/theme-roles-light.json`, generated from
-// the one-`ground` generator). An untouched choice must draw the same theme.
-const LEGACY_ROLES = Object.keys(themeRolesLight.presets.warm) as (keyof UiRoles)[];
+// the one-`ground` generator). An untouched choice must draw the same theme,
+// but for the grounds and hairlines the ground ladder re-stepped (2026-11-22),
+// which the calibration above pins instead. `digest` covers the other roles.
+const RESTEPPED_ROLES: readonly string[] = ['paper', 'surface', 'rule', 'ruleSoft'];
+const LEGACY_ROLES = (Object.keys(themeRolesLight.presets.warm) as (keyof UiRoles)[]).filter(
+  (role) => !RESTEPPED_ROLES.includes(role),
+);
 
 function legacyRoles(roles: UiRoles): Record<string, string> {
   return Object.fromEntries(LEGACY_ROLES.map((role) => [role, roles[role]]));
@@ -418,8 +452,10 @@ function brokenFloors(roles: UiRoles, mode: ThemeMode): string[] {
     backgrounds.every((ground) => contrastRatio(foreground, ground) >= 4.5);
   const textRoles = ['accent', 'danger', 'gain', 'loss', 'regimeOlder', 'regimeNewer'] as const;
   const floors: [string, boolean][] = [
-    ['ink on paper/surface', legible(roles.ink, [roles.paper, roles.surface])],
-    ['inkMuted on paper/surface', legible(roles.inkMuted, [roles.paper, roles.surface])],
+    ['ink on every ground', legible(roles.ink, [roles.well, roles.paper, roles.surface, roles.raised])],
+    ['inkMuted on every ground', legible(roles.inkMuted, [roles.well, roles.paper, roles.surface, roles.raised])],
+    ['ground ladder well < paper < surface < raised', isAscending([roles.well, roles.paper, roles.surface, roles.raised])],
+    ['a card 4 L* off the page', lightnessOf(roles.surface) - lightnessOf(roles.paper) >= 4],
     ['ink on viz4', contrastRatio(roles.ink, roles.viz4) >= 4.5],
     ['ink on viz1', contrastRatio(roles.ink, roles.viz1) >= 3],
     ['record on paper/surface/recordWash', legible(roles.record, [roles.paper, roles.surface, roles.recordWash])],
@@ -442,13 +478,18 @@ function brokenFloors(roles: UiRoles, mode: ThemeMode): string[] {
   return floors.filter(([, holds]) => !holds).map(([name]) => name);
 }
 
-// The neutrals from darkest to lightest. Light mode runs from `ink` up to the
-// white card; dark mode from the dark page up to `ink`, with a card lifted a
-// step above the page.
+// The neutrals from darkest to lightest. Light mode runs from `ink` up through
+// the hairlines and the four grounds to the white field; dark mode from the
+// sunken well up the grounds, then the empty cell, the hairlines and the inks
+// to `ink`.
 function neutralLadder(roles: UiRoles, mode: ThemeMode): string[] {
-  const inkToGround = [roles.ink, roles.inkMuted, roles.inkFaint, roles.inkGhost, roles.rule, roles.ruleSoft, roles.viz0];
-  return mode === 'light' ? [...inkToGround, roles.paper, roles.surface] : [roles.paper, roles.surface, ...inkToGround.reverse()];
+  if (mode === 'light') {
+    return [roles.ink, roles.inkMuted, roles.inkFaint, roles.inkGhost, roles.rule, roles.well, roles.ruleSoft, roles.viz0, roles.paper, roles.surface, roles.raised];
+  }
+  return [roles.well, roles.paper, roles.surface, roles.viz0, roles.raised, roles.ruleSoft, roles.rule, roles.inkGhost, roles.inkFaint, roles.inkMuted, roles.ink];
 }
+
+const lightnessOf = (hex: string): number => hexToLch(hex).lightness;
 
 // How far each step of the ramp moves away from the page in L*, `viz0` →
 // `viz4`: darker on the light page, lighter on the dark one.

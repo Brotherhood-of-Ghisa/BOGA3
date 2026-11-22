@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const { legacyVocabularyRule, rawColorLiteralRule, ratchetRules } = require('./ui-guardrails.config');
+const { edgeShadowRule, legacyVocabularyRule, rawColorLiteralRule, ratchetRules } = require('./ui-guardrails.config');
 const { findCompactPatternViolations } = require('./compact-pattern-guardrail');
 const { findListPatternViolations } = require('./list-pattern-guardrail');
 const { findTablePatternViolations } = require('./table-pattern-guardrail');
@@ -71,6 +71,17 @@ const LEGACY_VOCABULARY_SCOPE = { targets: ['app', 'components', 'src'], extensi
 const LEGACY_VOCABULARY_REMEDY =
   'use useUiRoles() or a makeStyles sheet (colour) from @/components/ui, uiGeometry.radius (radii) from @/components/ui/tokens, and Card / Stat / ' +
   'ListRow / ActionButton / SegmentedControl / ChipGroup from @/components/ui for the retired primitives';
+
+// A shadow set anywhere but the edge helper (`edgeShadowRule.ownerFile`): a
+// `shadow*` style (`shadowColor`, `shadowOffset`…), a `boxShadow` or an
+// Android `elevation`, as a style key or a prop. Depth is the ground ladder plus
+// the one edge, so every card and control lifts the same way. Like the
+// legacy rule it blocks on sight, scans `src/**` and `.ts` too, and has no
+// budget or allowlist: the owner is the one file the edge lives in.
+const EDGE_SHADOW_REGEX = /\b(?:shadow[A-Z]\w*|boxShadow|elevation)\s*[:=]/g;
+
+const EDGE_SHADOW_REMEDY =
+  'spread uiEdge / uiWell (or uiHairline) from @/components/ui into the style instead of setting a shadow';
 
 const UI_SCOPE = { targets: ['app', 'components'], extensions: ['.tsx'] };
 
@@ -238,6 +249,20 @@ function findLegacyVocabularyViolations({ rootDir, identifiers } = {}) {
   });
 }
 
+function findEdgeShadowViolations({ rootDir, ownerFile = edgeShadowRule?.ownerFile } = {}) {
+  if (!ownerFile) {
+    throw new Error('edgeShadowRule.ownerFile is not set in scripts/ui-guardrails.config.js');
+  }
+  const result = findViolations({
+    rootDir,
+    regex: EDGE_SHADOW_REGEX,
+    matchLiteral: (match) => match[0],
+    scope: LEGACY_VOCABULARY_SCOPE,
+  });
+  const violations = result.violations.filter((violation) => violation.file !== ownerFile);
+  return { ...result, ownerFile, violations, blockingViolations: violations };
+}
+
 function findRatchetRuleViolations({
   ruleId,
   rootDir,
@@ -351,6 +376,22 @@ function formatLegacyVocabularySummary(result) {
   return lines.join('\n');
 }
 
+function formatEdgeShadowSummary(result) {
+  const lines = [];
+  lines.push(`UI guardrail: shadow outside the edge helper (${result.ownerFile})`);
+  lines.push(`Files scanned: ${result.filesScanned}`);
+  lines.push(`Blocking violations: ${result.blockingViolations.length}`);
+
+  if (result.blockingViolations.length > 0) {
+    lines.push('');
+    lines.push(`FAIL a shadow is set outside the edge helper — ${EDGE_SHADOW_REMEDY}.`);
+    lines.push('');
+    formatViolationGroups(lines, result.blockingViolations);
+  }
+
+  return lines.join('\n');
+}
+
 function formatRatchetSummary(result, ratchet, { verbose = false } = {}) {
   const lines = [];
   lines.push(`UI guardrail: ${result.definition.title}`);
@@ -423,6 +464,10 @@ function runUiGuardrailCheck(options = {}) {
   write('');
   write(formatLegacyVocabularySummary(legacyResult));
 
+  const edgeShadowResult = findEdgeShadowViolations(options);
+  write('');
+  write(formatEdgeShadowSummary(edgeShadowResult));
+
   const compactViolations = findCompactPatternViolations(options);
   write('');
   write(`Compact patterns: ${compactViolations.length === 0 ? 'PASS' : 'FAIL'}`);
@@ -461,7 +506,7 @@ function runUiGuardrailCheck(options = {}) {
       write(`${BUDGET_LINE_INDENT}${ruleId}: ${count}`);
     }
 
-    return { color: colorResult, legacy: legacyResult, ratchets: ratchetResults, counts, ok: true };
+    return { color: colorResult, legacy: legacyResult, edgeShadow: edgeShadowResult, ratchets: ratchetResults, counts, ok: true };
   }
 
   const ok =
@@ -471,9 +516,10 @@ function runUiGuardrailCheck(options = {}) {
     summaryViolations.length === 0 &&
     colorResult.blockingViolations.length === 0 &&
     legacyResult.blockingViolations.length === 0 &&
+    edgeShadowResult.blockingViolations.length === 0 &&
     ratchetResults.every((entry) => entry.ratchet.ok);
 
-  return { color: colorResult, legacy: legacyResult, ratchets: ratchetResults, counts, ok };
+  return { color: colorResult, legacy: legacyResult, edgeShadow: edgeShadowResult, ratchets: ratchetResults, counts, ok };
 }
 
 function parseArgs(argv) {
@@ -491,6 +537,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  EDGE_SHADOW_REGEX,
   RAW_COLOR_LITERAL_REGEX,
   RAW_FONT_SIZE_REGEX,
   RAW_SPACING_REGEX,
@@ -499,9 +546,11 @@ module.exports = {
   buildLegacyVocabularyRegex,
   collectUiFiles,
   evaluateRatchet,
+  findEdgeShadowViolations,
   findLegacyVocabularyViolations,
   findRawColorLiteralViolations,
   findRatchetRuleViolations,
+  formatEdgeShadowSummary,
   formatLegacyVocabularySummary,
   formatRatchetSummary,
   formatSummary,

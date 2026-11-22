@@ -63,7 +63,8 @@ For a new block or derivative, follow the selection and review workflow in
 | One option or setting on or off, in a sheet (`Show deleted sessions`) or a form card (`Track each gym separately`, `density="list"`, optional `description`) | `SwitchRow` (`switch-row.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`); every other page takes the native header (`ux-rules.md` "Pages") |
-| Live theme colours: a stylesheet, a colour prop, the mode | `makeStyles`, `useUiRoles`, `useUiMode` (`theme-context.tsx`), `useUiText` (`text-roles.ts`) |
+| Live theme colours: a stylesheet (its builder also gets the mode), a colour prop, the mode | `makeStyles`, `useUiRoles`, `useUiMode` (`theme-context.tsx`), `useUiText` (`text-roles.ts`) |
+| A card's or control's edge, or a sunken track: the only shadows | `uiEdge` (hairline + lift), `uiWell`, `uiHairline` (`edge.ts`). `uiEdge`: Card, Notice, FormField, SearchField, InputRow, outline ActionButton, ToggleChip, ChipGroup, the tab pill. `uiWell`: SegmentedControl (inside its hairline), SliderRow, bar tracks. `Tag`: `uiHairline` |
 | Fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
 
 ### Gallery and adoption scope

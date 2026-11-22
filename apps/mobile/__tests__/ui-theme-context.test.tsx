@@ -377,7 +377,8 @@ describe('makeStyles', () => {
 
     await switchTheme(SLATE_DARK);
     expect(build).toHaveBeenCalledTimes(2);
-    expect(build).toHaveBeenLastCalledWith(rolesFor(SLATE_DARK));
+    // The drawn mode comes with the roles, for the edge's shadows.
+    expect(build).toHaveBeenLastCalledWith(rolesFor(SLATE_DARK), 'dark');
     const [first, second] = sheets.slice(-2);
     expect(first).toBe(second);
     expect(first).not.toBe(launchSheet);

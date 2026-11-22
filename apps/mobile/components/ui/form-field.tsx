@@ -1,8 +1,9 @@
 import { Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
+import { uiEdge } from '@/components/ui/edge';
 import { uiTextFor, useUiText } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 // `figure`: a number, date or code in Plex Mono (`design-language.md` §3).
 // `text`: words (a name, an email) in Source Sans.
@@ -27,8 +28,8 @@ export type FormFieldProps = Omit<TextInputProps, 'style' | 'placeholderTextColo
 };
 
 // A labelled input field (`design-language.md` §4): the micro-label inside the
-// field above the value, one field height, `radius.control`, a `rule`
-// hairline that turns `danger` while the value is invalid. The logger's figure
+// field above the value, one field height, `radius.control`, `raised` inside
+// the edge, its hairline turning `danger` while the value is invalid. The logger's figure
 // fields are the same recipe drawn larger (`exercise-page/set-logger.tsx`).
 export function FormField({
   label,
@@ -72,7 +73,7 @@ export function FormField({
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   column: {
     gap: uiSpace.xs,
   },
@@ -80,9 +81,8 @@ const useStyles = makeStyles((roles) => ({
     height: uiGeometry.fieldHeight,
     paddingHorizontal: uiSpace.sm,
     paddingTop: uiSpace.xs,
-    backgroundColor: roles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    backgroundColor: roles.raised,
+    ...uiEdge(roles, mode),
     borderRadius: uiGeometry.radius.control,
   },
   // Grows with its text from one field height.

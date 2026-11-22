@@ -20,13 +20,13 @@ describe('Today on a saved appearance', () => {
   it('repaints the share bar track and lap fill', async () => {
     renderWithTheme(<ShareBar current={2} previous={3} testID="bar" />);
     const before = rolesFor(DEFAULT_APPEARANCE);
-    expect(screen.getByTestId('bar')).toHaveStyle({ backgroundColor: before.viz0 });
+    expect(screen.getByTestId('bar')).toHaveStyle({ backgroundColor: before.well });
     expect(screen.getByTestId('bar-fill')).toHaveStyle({ backgroundColor: before.viz2 });
 
     await switchTheme(SLATE_DARK);
     const after = rolesFor(SLATE_DARK);
-    expect(after.viz0).not.toBe(before.viz0);
-    expect(screen.getByTestId('bar')).toHaveStyle({ backgroundColor: after.viz0 });
+    expect(after.well).not.toBe(before.well);
+    expect(screen.getByTestId('bar')).toHaveStyle({ backgroundColor: after.well });
     expect(screen.getByTestId('bar-fill')).toHaveStyle({ backgroundColor: after.viz2 });
   });
 
