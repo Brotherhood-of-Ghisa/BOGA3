@@ -139,7 +139,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | the workout | `/completed-session/<id>?presentation=completion` | Finish, after its cleanup prompts and the completion write (`push` over the tabs, a fade); Train shows its disc beneath |
 | the workout | Train's disc | Abandon after its confirmation, in place |
 | `/session/<id>` (completed edit) | the previous screen | `Done`: `back()`, else `replace('/completed-session/<id>')`; completion is never replayed |
-| the workout | `/session/<id>/exercise/<sessionExerciseId>` | an exercise card (`push`); Back, `Complete exercise`, `Remove from session` and the title switcher's `All exercises` return `back()`, or `replace('/train')` with no history; its other rows `replace`, so Back still returns here |
+| the workout | `/session/<id>/exercise/<sessionExerciseId>` | an exercise card (`push`); Back, `Complete exercise`, `Remove from session` and the title switcher's `All exercises` return `back()`, or `replace('/train')` with no history; its other rows save, then swap params in place (`setParams`), so Back still returns here |
 | the workout | `/session/<id>/add-exercise` | `+ Add exercise` (`push`, a modal page sheet); Close, swipe-down and a successful add return `back()`, a failed add stays |
 | `/session/<id>/add-exercise` | `/exercise-catalog?source=session&intent=manage` | the picker's Manage (`push`, a second sheet over it); the catalogue's post-save `back()` returns the picker as left |
 | the workout | `/session/<id>/compare`, `/gyms` | the ⋮ sheet's `Session vs history` and the gym sheet's `Manage gyms` (sheet closes, then `push`) |

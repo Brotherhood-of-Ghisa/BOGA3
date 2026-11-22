@@ -25,6 +25,8 @@ const mockRouter = {
   push: jest.fn(),
   replace: jest.fn(),
 };
+// The switcher swaps this route's params through the screen's own navigation.
+const mockSetParams = jest.fn();
 let mockRouteParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => {
@@ -32,7 +34,7 @@ jest.mock('expo-router', () => {
   return {
     useRouter: () => mockRouter,
     // No beforeRemove listener; `getState` for the exercise editor page's stack read.
-    useNavigation: () => ({ getState: () => ({ routes: [] }), isFocused: () => true }),
+    useNavigation: () => ({ getState: () => ({ routes: [] }), isFocused: () => true, setParams: mockSetParams }),
     useLocalSearchParams: () => mockRouteParams,
     // The exercise editor page's title (helpers/exercise-editor-page.tsx).
     Stack: { Screen: () => null },
@@ -1325,31 +1327,101 @@ describe('exercise page title switcher', () => {
     expect(screen.getByTestId(`exercise-switcher-progress-${BENCH}`)).toHaveTextContent('3/5');
   });
 
-  it('replaces the page with the chosen exercise, never pushing, and writes nothing — even with an unsaved edit', async () => {
+  it('swaps to the chosen exercise in place, never navigating, after saving an unsaved edit', async () => {
     await seedPage();
     const client: SessionExerciseDraftClient = {
       ...defaultSessionExerciseDraftClient,
       persistSessionDraftSnapshot: jest.fn(defaultSessionExerciseDraftClient.persistSessionDraftSnapshot),
-      persistCompletedSessionSnapshot: jest.fn(defaultSessionExerciseDraftClient.persistCompletedSessionSnapshot),
     };
     renderWithTheme(<ExercisePageScreen draftClient={client} sessionExerciseId={BENCH} sessionId={SESSION} />);
     await screen.findByTestId('exercise-page');
-    // Dirty but inside the autosave debounce: only leaving the page saves it.
+    // Dirty but inside the autosave debounce: only the switch can save it in time.
     fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '85');
     await openSwitcher();
 
     fireEvent.press(screen.getByTestId(`exercise-switcher-row-${SQUAT}`));
-    // Let any write the switch started settle (well inside the autosave debounce).
+
+    // A stack replace or push waits for the sheet's native modal and slides;
+    // new route params re-key the page at once, after the edit is written.
+    await waitFor(() => expect(mockSetParams).toHaveBeenCalledWith({ sessionExerciseId: SQUAT }));
+    expect(client.persistSessionDraftSnapshot).toHaveBeenCalledTimes(1);
+    const savedOrder = (client.persistSessionDraftSnapshot as jest.Mock).mock.invocationCallOrder[0];
+    expect(savedOrder).toBeLessThan(mockSetParams.mock.invocationCallOrder[0]);
+    expect(mockRouter.replace).not.toHaveBeenCalled();
+    expect(mockRouter.push).not.toHaveBeenCalled();
+    expect(mockRouter.back).not.toHaveBeenCalled();
+    await waitForGone(() => screen.queryByTestId('exercise-switcher-sheet'));
+  });
+
+  it('swaps without writing when nothing is pending', async () => {
+    const client: SessionExerciseDraftClient = {
+      ...defaultSessionExerciseDraftClient,
+      persistSessionDraftSnapshot: jest.fn(defaultSessionExerciseDraftClient.persistSessionDraftSnapshot),
+    };
+    await seedPage();
+    renderWithTheme(<ExercisePageScreen draftClient={client} sessionExerciseId={BENCH} sessionId={SESSION} />);
+    await screen.findByTestId('exercise-page');
+    await openSwitcher();
+
+    fireEvent.press(screen.getByTestId(`exercise-switcher-row-${SQUAT}`));
+
+    await waitFor(() => expect(mockSetParams).toHaveBeenCalledWith({ sessionExerciseId: SQUAT }));
+    expect(client.persistSessionDraftSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('stays on the page, without swapping, when saving the pending edit fails', async () => {
+    await seedPage();
+    const client: SessionExerciseDraftClient = {
+      ...defaultSessionExerciseDraftClient,
+      persistSessionDraftSnapshot: jest.fn(async () => {
+        throw new Error('database is locked');
+      }),
+    };
+    renderWithTheme(<ExercisePageScreen draftClient={client} sessionExerciseId={BENCH} sessionId={SESSION} />);
+    await screen.findByTestId('exercise-page');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '85');
+    await openSwitcher();
+
+    fireEvent.press(screen.getByTestId(`exercise-switcher-row-${SQUAT}`));
+
+    await waitFor(() => expect(client.persistSessionDraftSnapshot).toHaveBeenCalled());
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
+    expect(mockSetParams).not.toHaveBeenCalled();
+    expect(screen.getByTestId('exercise-page')).toBeOnTheScreen();
+  });
 
-    expect(mockRouter.replace).toHaveBeenCalledWith(`/session/${SESSION}/exercise/${SQUAT}`);
-    expect(mockRouter.push).not.toHaveBeenCalled();
-    expect(mockRouter.back).not.toHaveBeenCalled();
-    expect(client.persistSessionDraftSnapshot).not.toHaveBeenCalled();
-    expect(client.persistCompletedSessionSnapshot).not.toHaveBeenCalled();
-    await waitForGone(() => screen.queryByTestId('exercise-switcher-sheet'));
+  it('ignores a second pick while the first switch is still saving', async () => {
+    await seedPage();
+    let release: () => void = () => {};
+    const client: SessionExerciseDraftClient = {
+      ...defaultSessionExerciseDraftClient,
+      persistSessionDraftSnapshot: jest.fn(async (...args: Parameters<typeof defaultSessionExerciseDraftClient.persistSessionDraftSnapshot>) => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return defaultSessionExerciseDraftClient.persistSessionDraftSnapshot(...args);
+      }),
+    };
+    renderWithTheme(<ExercisePageScreen draftClient={client} sessionExerciseId={BENCH} sessionId={SESSION} />);
+    await screen.findByTestId('exercise-page');
+    fireEvent.changeText(screen.getByTestId('exercise-set-logger-weight'), '85');
+    await openSwitcher();
+    fireEvent.press(screen.getByTestId(`exercise-switcher-row-${SQUAT}`));
+    await waitFor(() => expect(client.persistSessionDraftSnapshot).toHaveBeenCalledTimes(1));
+
+    await openSwitcher();
+    fireEvent.press(screen.getByTestId(`exercise-switcher-row-${SQUAT}`));
+    await act(async () => {
+      release();
+    });
+
+    await waitFor(() => expect(mockSetParams).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(mockSetParams).toHaveBeenCalledTimes(1);
   });
 
   it('closes without navigating when the open exercise is chosen', async () => {
@@ -1359,6 +1431,7 @@ describe('exercise page title switcher', () => {
     fireEvent.press(screen.getByTestId(`exercise-switcher-row-${BENCH}`));
 
     await waitForGone(() => screen.queryByTestId('exercise-switcher-sheet'));
+    expect(mockSetParams).not.toHaveBeenCalled();
     expect(mockRouter.replace).not.toHaveBeenCalled();
     expect(mockRouter.push).not.toHaveBeenCalled();
   });
