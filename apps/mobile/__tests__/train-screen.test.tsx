@@ -624,7 +624,7 @@ describe('Train launch states', () => {
     renderWithTheme(
       <TrainScreen
         loadActiveSessionId={() => new Promise(() => undefined)}
-        sessionEntry={{ startEmptyOrResume: start, startPlannedOrResume: jest.fn(), resumeCompletedSession: jest.fn() }}
+        sessionEntry={{ startFromExercise: jest.fn(), startEmptyOrResume: start, startPlannedOrResume: jest.fn(), resumeCompletedSession: jest.fn() }}
       />,
     );
 
@@ -637,6 +637,7 @@ describe('Train launch states', () => {
 
   it('ignores a planned start while an empty start is pending, relabelling nothing (a pending launch)', async () => {
     const pending: SessionEntryCoordinator = {
+      startFromExercise: jest.fn(),
       resumeCompletedSession: jest.fn(),
       startEmptyOrResume: jest.fn(() => new Promise<never>(() => undefined)),
       startPlannedOrResume: jest.fn(() => new Promise<never>(() => undefined)),
@@ -820,4 +821,17 @@ describe('Train launch states', () => {
     });
     expect(screen.queryByText('First Plan')).toBeNull();
   });
+});
+
+
+it('opens an exercise only after Train receives focus, keeping the workout beneath it', async () => {
+  await seed('session-view');
+  const opener = renderHook(() => useOpenActiveWorkout());
+  const { rerender } = renderWithTheme(<TrainScreen isFocused={false} />);
+  act(() => opener.result.current(ACTIVE, { sessionExerciseId: 'bench/card', setId: 'new set' }));
+  expect(mockPush).not.toHaveBeenCalled();
+  rerender(<TrainScreen isFocused />);
+  await waitFor(() => expect(mockPush).toHaveBeenCalledWith(`/session/${ACTIVE}/exercise/bench%2Fcard?setId=new%20set`));
+  expect(shownWorkout()).toBe(`tab workout ${ACTIVE}`);
+  expect(mockPush).toHaveBeenCalledTimes(1);
 });

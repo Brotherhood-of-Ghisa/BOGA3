@@ -1,7 +1,7 @@
 import { useNavigation, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 
-import { ACTIVE_WORKOUT_HREF } from '@/src/navigation/active-session-entry';
+import { ACTIVE_WORKOUT_HREF, type ActiveWorkoutExercise } from '@/src/navigation/active-session-entry';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 import { getAccountLocalPreferenceAccountRevision } from '@/src/preferences/account-local';
 
@@ -25,9 +25,9 @@ export function useOpenMainTabFromPage(): (tab: MainTabKey) => void {
   );
 }
 
-type OpenedWorkoutListener = (sessionId: string) => void;
+type OpenedWorkoutListener = (sessionId: string, exercise?: ActiveWorkoutExercise) => void;
 const openedWorkoutListeners = new Set<OpenedWorkoutListener>();
-let pendingWorkout: { sessionId: string; accountRevision: number } | null = null;
+let pendingWorkout: { sessionId: string; exercise?: ActiveWorkoutExercise; accountRevision: number } | null = null;
 
 /**
  * Train's subscription to workouts opened from elsewhere, so it shows one
@@ -38,7 +38,10 @@ export function subscribeOpenedWorkout(listener: OpenedWorkoutListener): () => v
   // Tabs mount lazily: the first Resume can arrive before Train exists.
   const pending = pendingWorkout;
   pendingWorkout = null;
-  if (pending?.accountRevision === getAccountLocalPreferenceAccountRevision()) listener(pending.sessionId);
+  if (pending?.accountRevision === getAccountLocalPreferenceAccountRevision()) {
+    if (pending.exercise) listener(pending.sessionId, pending.exercise);
+    else listener(pending.sessionId);
+  }
   return () => {
     openedWorkoutListeners.delete(listener);
   };
@@ -49,13 +52,16 @@ export function subscribeOpenedWorkout(listener: OpenedWorkoutListener): () => v
  * plan, a programme, History, a group session). The workout lives on Train, so
  * Train is told which one and the pages on top close as Back would.
  */
-export function useOpenActiveWorkout(): (sessionId: string) => void {
+export function useOpenActiveWorkout(): (sessionId: string, exercise?: ActiveWorkoutExercise) => void {
   const router = useRouter();
   return useCallback(
-    (sessionId: string) => {
+    (sessionId: string, exercise?: ActiveWorkoutExercise) => {
       pendingWorkout = openedWorkoutListeners.size === 0
-        ? { sessionId, accountRevision: getAccountLocalPreferenceAccountRevision() } : null;
-      openedWorkoutListeners.forEach((listener) => listener(sessionId));
+        ? { sessionId, exercise, accountRevision: getAccountLocalPreferenceAccountRevision() } : null;
+      openedWorkoutListeners.forEach((listener) => {
+        if (exercise) listener(sessionId, exercise);
+        else listener(sessionId);
+      });
       router.dismissTo(ACTIVE_WORKOUT_HREF);
     },
     [router],

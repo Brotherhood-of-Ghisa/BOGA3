@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, Keyboard, ScrollView, StyleSheet, View } from 'react-native';
 
+import { ExerciseSessionEntrySheet } from '@/components/session-recorder/exercise-session-entry-sheet';
 import { ExerciseMerge } from '@/components/exercise-catalog/exercise-merge';
 import { useOpenExerciseEditor, type ExerciseEditorRequest } from '@/components/exercise-catalog/exercise-editor-request';
 import { TabOwnedPage } from '@/components/navigation/tab-owned-page';
@@ -89,6 +90,8 @@ function ExerciseCatalogScreen() {
   const [isCatalogOptionsMenuVisible, setIsCatalogOptionsMenuVisible] = useState(false);
   const [showDeleted, setShowDeleted] = useState(false);
   const didHandleInitialIntent = useRef(false);
+  const [sessionEntryTarget, setSessionEntryTarget] = useState<ExerciseCatalogExercise | null>(null);
+  const [queuedSessionEntry, setQueuedSessionEntry] = useState<ExerciseCatalogExercise | null>(null);
   const [exerciseActionMenuTarget, setExerciseActionMenuTarget] = useState<ExerciseCatalogExercise | null>(null);
   const [queuedMerge, setQueuedMerge] = useState<ExerciseCatalogExercise | null>(null);
   const [mergeSource, setMergeSource] = useState<ExerciseCatalogExercise | null>(null);
@@ -392,15 +395,26 @@ function ExerciseCatalogScreen() {
         </View>
       </Sheet>
 
+      <ExerciseSessionEntrySheet exercise={sessionEntryTarget} onDismiss={() => setSessionEntryTarget(null)} />
+
       {/* A row's actions. Delete does not confirm: it is a soft delete,
           undone from this same sheet with Undelete once Show deleted is on. */}
       <Sheet
         dismissLabel="Dismiss exercise action menu overlay"
         onDismiss={() => setExerciseActionMenuTarget(null)}
-        onDismissed={() => { if (queuedMerge) { setMergeSource(queuedMerge); setQueuedMerge(null); } }}
+        onDismissed={() => {
+          if (queuedMerge) { setMergeSource(queuedMerge); setQueuedMerge(null); }
+          if (queuedSessionEntry) { setSessionEntryTarget(queuedSessionEntry); setQueuedSessionEntry(null); }
+        }}
         testID="exercise-catalog-actions-sheet"
         title={actionTarget?.name}
         visible={actionTarget !== null}>
+        <ListRow accessibilityLabel="Add exercise to session" disabled={isActionTargetDeleted}
+          label="Add to session…" leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'ink'} name="plus" size="md" />}
+          onPress={() => {
+            if (actionTarget && !actionTarget.deletedAt) setQueuedSessionEntry(actionTarget);
+            setExerciseActionMenuTarget(null);
+          }} testID="exercise-action-add-to-session" />
         <ListRow
           accessibilityLabel="Edit exercise from actions"
           disabled={isActionTargetDeleted}

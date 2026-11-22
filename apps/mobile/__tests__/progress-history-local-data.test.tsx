@@ -1,3 +1,4 @@
+import { Sheet } from '@/components/ui/sheet';
 import { formatWholeSetCount } from '@/src/exercise-calculations/format';
 /* eslint-disable import/first */
 
@@ -898,4 +899,15 @@ describe('Muscle day/week details over real data', () => {
     expect(screen.queryByTestId('muscle-period-detail-sets-empty')).toBeNull();
     expect(mockDismissTo).not.toHaveBeenCalled();
   });
+});
+
+
+it('offers quick entry for an exercise after the history options dismiss', async () => {
+  await loadMaestroFixture('exercise-block-history');
+  await openHistory({ exerciseDefinitionId: SQUAT });
+  fireEvent.press(await screen.findByTestId('progress-history-options-button'));
+  fireEvent.press(screen.getByTestId('progress-history-add-to-session'));
+  act(() => screen.UNSAFE_getAllByType(Sheet).find(node => node.props.testID === 'progress-history-options-sheet')?.props.onDismissed());
+  expect(await screen.findByTestId('exercise-session-entry-sheet')).toHaveTextContent(/Barbell Back Squat/);
+  await screen.findByTestId('exercise-picker-plan-source');
 });

@@ -1481,3 +1481,13 @@ describe('exercise page route', () => {
     await waitFor(() => expect(screen.getByTestId('exercise-page-title')).toHaveTextContent('Barbell Bench Press'));
   });
 });
+
+
+it('opens the newly added target row even when an earlier planned row is unfinished', async () => {
+  await seedPage();
+  renderWithTheme(<ExercisePageScreen initialSetId={`${BENCH}_set_5`} sessionExerciseId={BENCH} sessionId={SESSION} />);
+  await screen.findByTestId('exercise-set-logger');
+  expect(within(screen.getByTestId('exercise-set-logger')).getByText('Set 5')).toBeTruthy();
+  expect(screen.getByTestId('exercise-set-logger-weight')).toHaveProp('value', '85');
+  await screen.findByTestId('exercise-records-1rm');
+});

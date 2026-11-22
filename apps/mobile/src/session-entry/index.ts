@@ -7,3 +7,5 @@ export {
   type SessionEntryDependencies,
   type SessionEntryResult,
 } from './coordinator';
+
+export type { ExerciseEntryInput, ExerciseEntryMode, ExerciseEntryResult } from './exercise-entry';
