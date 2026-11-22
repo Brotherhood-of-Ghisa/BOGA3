@@ -32,7 +32,6 @@ import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferen
 import { resolveRestTimerSec } from '@/src/exercise-core/rest-timer';
 import { useAccountLocalPreferenceState } from '@/src/preferences/hooks';
 import { useGroupLinkingUserId } from '@/src/groups/use-group-exercise-linking';
-import { sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { exerciseHistoryHref, exerciseLinkHref, notesHref, progressHistoryHref } from '@/src/navigation/routes';
 import { loadOwnBookGymId } from '@/src/data/exercise-session-facts';
 import { exerciseHistoryOpeningGym } from '@/src/session-recorder/exercise-history-view';
@@ -69,6 +68,7 @@ import {
   ExerciseSwitcherSheet,
 } from './exercise-sheets';
 import { ExerciseSwapSheet } from './exercise-swap-sheet';
+import { ExercisePageLoading } from './exercise-page-loading';
 import { ExerciseTopBar } from './exercise-top-bar';
 import { RecordsPanel, type RecordsView } from './records-panel';
 import { ExerciseSetRowItem } from './exercise-set-row-item';
@@ -355,12 +355,15 @@ export function ExercisePageScreen({
     else router.replace(FALLBACK_BACK_ROUTE);
   }, [router]);
 
-  // Replace, never push: Back from any exercise reached this way returns to
-  // the session in one step. The switch itself writes nothing; leaving the
-  // page saves pending edits exactly as Back does.
+  // Swap the route's params in place, never navigate: a stack replace waits
+  // for the sheet's native modal to finish dismissing and then slides the new
+  // page in (about a second on device), while new params re-key the page at
+  // once. The history is untouched, so Back still returns to the session in
+  // one step. Pending edits are saved first, exactly as leaving the page does.
   const switchExercise = (targetId: string) => {
     setOpenSheet('none');
-    if (targetId !== sessionExerciseId) router.replace(sessionExerciseHref(sessionId, targetId));
+    if (targetId === sessionExerciseId) return;
+    void draft.flush().finally(() => router.setParams({ sessionExerciseId: targetId }));
   };
 
   const sets = useMemo(() => exercise?.sets ?? [], [exercise]);
@@ -588,7 +591,7 @@ export function ExercisePageScreen({
         {draft.state.status === 'error' ? (
           <StatePanel kind="error" testID="exercise-page-state" title={LOAD_ERROR_MESSAGES[draft.state.reason]} />
         ) : (
-          <StatePanel kind="loading" testID="exercise-page-state" title="Loading…" />
+          <ExercisePageLoading />
         )}
       </SafeAreaView>
     );

@@ -6,8 +6,8 @@ const firstParam = (value: string | string[] | undefined) => (Array.isArray(valu
 
 /**
  * The exercise page. It is reached from the session view, or from another
- * exercise's title switcher (which replaces it), for an active session or a
- * completed one being edited.
+ * exercise's title switcher (which swaps these params in place, re-keying the
+ * page), for an active session or a completed one being edited.
  */
 export default function ExercisePageRoute() {
   const params = useLocalSearchParams<{
