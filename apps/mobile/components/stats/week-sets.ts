@@ -25,12 +25,15 @@ import { inProgressSessionDate } from '@/src/data/in-progress-session';
 import { loadActiveSessionId } from '@/src/session-entry';
 import { addFiniteVolume } from '@/src/exercise-calculations/analytics';
 import { encodeGymRouteParam, NO_GYM_LABEL } from '@/src/utils/gym-scope-route';
+import { exerciseScopeIds, type ExerciseReadScope } from '@/src/utils/exercise-selection';
+import { compareExerciseHistoryOrder } from '@/src/data/exercise-history';
 
 export type WeekSetGroup = {
   key: string;
   sessionId: string;
   title: string;
   detail: string;
+  exerciseName?: string;
   rows: SessionViewSetRow[];
   record: RecordLine[];
   // The block's exercise, on a muscle's list only: the card links to its progress.
@@ -48,6 +51,8 @@ export type WeekBlock = {
   sessionId: string;
   sessionExerciseId: string;
   completedAt: Date;
+  orderIndex?: number;
+  exerciseName?: string;
   title?: string;
   detail: string;
   exerciseDefinitionId?: string;
@@ -56,7 +61,7 @@ export type WeekBlock = {
 };
 
 /** Each list follows its page's three-state gym scope. */
-export type WeekSetsTarget = ({ exerciseDefinitionId: string } | { muscleGroupIds: string[]; countSecondary?: boolean;
+export type WeekSetsTarget = (ExerciseReadScope | { muscleGroupIds: string[]; countSecondary?: boolean;
   countSecondaryVolume?: boolean; metric?: 'workingSetCount' | 'totalVolume' })
   & { gymId?: string | null; includeInProgress?: boolean };
 
@@ -64,11 +69,13 @@ export const formatWeekDay = (date: Date, dateFormat: ExerciseDateFormat): strin
   formatShortDate(date, dateFormat);
 
 /** An exercise's blocks, titled by their day, with their gym. */
-export const exerciseWeekBlocks = (entries: ExerciseHistorySessionEntry[], dateFormat: ExerciseDateFormat): WeekBlock[] =>
+export const exerciseWeekBlocks = (entries: ExerciseHistorySessionEntry[], dateFormat: ExerciseDateFormat, combined = false): WeekBlock[] =>
   entries.map((entry) => ({
     sessionId: entry.sessionId,
     sessionExerciseId: entry.sessionExerciseId,
     completedAt: entry.completedAt,
+    orderIndex: entry.orderIndex,
+    ...(combined ? { exerciseName: entry.exerciseName, exerciseDefinitionId: entry.exerciseDefinitionId } : {}),
     title: formatWeekDay(entry.completedAt, dateFormat),
     detail: entry.gymName?.trim() ? entry.gymName : NO_GYM_LABEL,
   }));
@@ -103,7 +110,7 @@ export const weekSetGroups = (
   cardsBySessionId: ReadonlyMap<string, CompletedSessionDetailCard[]>
 ): WeekSetGroup[] =>
   [...blocks]
-    .sort((left, right) => right.completedAt.getTime() - left.completedAt.getTime())
+    .sort(compareExerciseHistoryOrder)
     .flatMap((block) => {
       const card = cardsBySessionId.get(block.sessionId)?.find((candidate) => candidate.id === block.sessionExerciseId);
       const ids = block.contributions ? new Set(block.contributions.map(row => row.setId)) : null;
@@ -113,6 +120,7 @@ export const weekSetGroups = (
         sessionId: block.sessionId,
         title: block.title ?? card.name,
         detail: block.detail,
+        ...(block.exerciseName ? { exerciseName: card.name } : {}),
         rows,
         // A whole-exercise Volume band can include sets hidden in this muscle view.
         record: ids ? card.record.filter(line => ids.has(line.key)) : card.record,
@@ -136,7 +144,7 @@ export const setPeriodBounds = (period: SetPeriod, lookbackWeeks?: number, now =
     end: new Date(Math.min(bounds.end.getTime(), history.end.getTime())) };
 };
 
-const inProgressExerciseBlocks = async (target: Extract<WeekSetsTarget, { exerciseDefinitionId: string }>,
+const inProgressExerciseBlocks = async (target: Exclude<WeekSetsTarget, { muscleGroupIds: string[] }>,
   bounds: { start: Date; end: Date }, dateFormat: ExerciseDateFormat, now: Date): Promise<WeekBlock[]> => {
   if (!target.includeInProgress) return [];
   const completedAt = inProgressSessionDate(now);
@@ -145,18 +153,20 @@ const inProgressExerciseBlocks = async (target: Extract<WeekSetsTarget, { exerci
   const graph = sessionId ? await loadSessionSnapshotById(sessionId) : null;
   if (!graph || graph.status !== 'active' || (target.gymId !== undefined && (graph.gymId ?? null) !== target.gymId)) return [];
   const gymName = graph.gymId ? (await loadLocalGymById(graph.gymId))?.name : null;
-  return graph.exercises.filter(exercise => exercise.exerciseDefinitionId === target.exerciseDefinitionId)
-    .map(exercise => ({ sessionId: graph.sessionId, sessionExerciseId: exercise.id, completedAt,
-      title: formatWeekDay(completedAt, dateFormat), detail: gymName?.trim() || NO_GYM_LABEL }));
+  const ids = exerciseScopeIds(target);
+  return graph.exercises.flatMap((exercise, orderIndex) => exercise.exerciseDefinitionId && ids.includes(exercise.exerciseDefinitionId)
+    ? [{ sessionId: graph.sessionId, sessionExerciseId: exercise.id, completedAt, orderIndex,
+      ...(target.exerciseDefinitionIds ? { exerciseName: exercise.name, exerciseDefinitionId: exercise.exerciseDefinitionId } : {}),
+      title: formatWeekDay(completedAt, dateFormat), detail: gymName?.trim() || NO_GYM_LABEL }] : []);
 };
 
 const loadWeekBlocks = async (target: WeekSetsTarget, period: SetPeriod, dateFormat: ExerciseDateFormat, lookbackWeeks?: number): Promise<WeekBlock[]> => {
   const now = new Date();
   const bounds = setPeriodBounds(period, lookbackWeeks, now);
-  if ('exerciseDefinitionId' in target) {
-    const entries = await loadExerciseRangeEntries({ ...bounds, exerciseDefinitionId: target.exerciseDefinitionId });
+  if (!('muscleGroupIds' in target)) {
+    const entries = (await Promise.all(exerciseScopeIds(target).map(exerciseDefinitionId => loadExerciseRangeEntries({ ...bounds, exerciseDefinitionId })))).flat();
     const { gymId } = target;
-    return [...exerciseWeekBlocks(gymId === undefined ? entries : entries.filter((entry) => (entry.gymId ?? null) === gymId), dateFormat),
+    return [...exerciseWeekBlocks(gymId === undefined ? entries : entries.filter((entry) => (entry.gymId ?? null) === gymId), dateFormat, target.exerciseDefinitionIds !== undefined),
       ...await inProgressExerciseBlocks(target, bounds, dateFormat, now)];
   }
   const days = await computeSelectedMuscleDailyEffort({ ...bounds, muscleGroupIds: target.muscleGroupIds, gymId: target.gymId,
@@ -192,9 +202,9 @@ export function usePeriodSets(target: WeekSetsTarget | null, period: SetPeriod |
   // The last read and the request it answered; a newer request is loading until its read lands.
   const [read, setRead] = useState<{ groups: WeekSetGroup[]; error: string | null; for: string | null; subject: string | null; scope: string | null }>(
     { groups: [], error: null, for: null, subject: null, scope: null });
-  const subjectKey = target === null ? null : 'exerciseDefinitionId' in target
-    ? `exercise:${target.exerciseDefinitionId}:${accountRevision}` : `muscle:${target.muscleGroupIds.join(',')}:${accountRevision}`;
-  const targetKey = target === null ? null : 'exerciseDefinitionId' in target
+  const subjectKey = target === null ? null : !('muscleGroupIds' in target)
+    ? `exercise:${JSON.stringify(exerciseScopeIds(target))}:${accountRevision}` : `muscle:${target.muscleGroupIds.join(',')}:${accountRevision}`;
+  const targetKey = target === null ? null : !('muscleGroupIds' in target)
     ? `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}` : `${subjectKey}:${encodeGymRouteParam(target.gymId) ?? ''}:${target.countSecondary}:${target.countSecondaryVolume}:${target.metric}`;
   const scopeKey = target === null || period === null ? null : `${targetKey}:${target.includeInProgress}|${period.weekKey}:${period.dayKey ?? ''}|${dateFormat}|${lookbackWeeks}`;
   const requestKey = scopeKey === null ? null : `${scopeKey}|${revision}`;

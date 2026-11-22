@@ -3,6 +3,7 @@ import type { Href } from 'expo-router';
 import type { HeatmapView } from '@/src/preferences/model';
 import type { CalendarHeatmapMetric } from '@/src/data/muscle-analytics';
 import { encodeGymRouteParam } from '@/src/utils/gym-scope-route';
+import { exerciseScopeIds, type ExerciseReadScope } from '@/src/utils/exercise-selection';
 
 export const SIGN_IN_ROUTE = '/sign-in';
 export const EXERCISE_LINK_ROUTE = '/exercise-link';
@@ -80,10 +81,15 @@ export const themeCustomHref = (part: string): Href => `${THEME_CUSTOM_ROUTE}?pa
 export const PROGRESS_HISTORY_ROUTE = '/progress-history';
 
 /** Session-by-session exercise history, carrying Progress's selected gym. */
-export const exerciseHistoryHref = (exerciseDefinitionId: string, gymId?: string | null): Href => {
+export const exerciseHistoryHref = (exerciseDefinitionId: string | readonly string[], gymId?: string | null): Href => {
   const gym = encodeGymRouteParam(gymId);
-  return `/exercise-history?exerciseDefinitionId=${encodeURIComponent(exerciseDefinitionId)}${gym === undefined ? '' : `&gymId=${encodeURIComponent(gym)}`}` as Href;
+  const scope = typeof exerciseDefinitionId === 'string' ? { exerciseDefinitionId } : { exerciseDefinitionIds: exerciseDefinitionId };
+  return `/exercise-history?${exerciseScopeParam(scope)}${gym === undefined ? '' : `&gymId=${encodeURIComponent(gym)}`}` as Href;
 };
+
+const exerciseScopeParam = (scope: ExerciseReadScope): string => scope.exerciseDefinitionIds === undefined
+  ? `exerciseDefinitionId=${encodeURIComponent(scope.exerciseDefinitionId)}`
+  : `exerciseDefinitionIds=${encodeURIComponent(JSON.stringify(exerciseScopeIds(scope)))}`;
 
 /** The selected exercise's descriptive RM chart, pushed from History. */
 export const rmCurveHref = (exerciseDefinitionId: string): Href =>
@@ -106,13 +112,13 @@ export const PROGRESS_HISTORY_PRIMARY_ONLY_PARAM = 'hidden';
  * A muscle may open counting primary work only; counting secondary sends none.
  */
 export const progressHistoryHref = (
-  subject: ({ muscleGroupId: string; countSecondary?: boolean; countSecondaryVolume?: boolean } | { exerciseDefinitionId: string }) & { gymId?: string | null },
+  subject: ({ muscleGroupId: string; countSecondary?: boolean; countSecondaryVolume?: boolean } | ExerciseReadScope) & { gymId?: string | null },
   metric?: CalendarHeatmapMetric,
   view?: HeatmapView
 ): Href => {
   const id = 'muscleGroupId' in subject
     ? `muscleGroupId=${encodeURIComponent(subject.muscleGroupId)}`
-    : `exerciseDefinitionId=${encodeURIComponent(subject.exerciseDefinitionId)}`;
+    : exerciseScopeParam(subject);
   const gym = encodeGymRouteParam(subject.gymId);
   const carried = metric ? `&metric=${PROGRESS_HISTORY_METRIC_PARAMS[metric]}` : '';
   const secondary = 'muscleGroupId' in subject && subject.countSecondary !== undefined

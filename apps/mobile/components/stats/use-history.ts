@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  computeSelectedExerciseHistoryEffort, computeSelectedMuscleHistoryEffort,
+  computeSelectedExerciseHistoryEffort, computeSelectedExercisesHistoryEffort, computeSelectedMuscleHistoryEffort,
   type DailyEffortMetrics, type SelectedMuscleWeeklyEffort,
 } from '@/src/data';
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
@@ -12,9 +12,11 @@ import { encodeGymRouteParam, type GymScopeOption } from '@/src/utils/gym-scope-
  */
 export type HistorySubject =
   | { kind: 'exercise'; id: string; gymId?: string | null }
+  | { kind: 'exercises'; ids: readonly string[]; gymId?: string | null }
   | { kind: 'muscle'; id: string; gymId?: string | null; countSecondary?: boolean; countSecondaryVolume?: boolean };
 
 const historySubjectId = (subject: HistorySubject | null): string | null => {
+  if (subject?.kind === 'exercises') return JSON.stringify(subject.ids);
   const id = subject?.id.trim();
   return id ? id : null;
 };
@@ -29,9 +31,10 @@ const loadHistory = async (subject: HistorySubject, id: string, weeks: number) =
     return computeSelectedMuscleHistoryEffort({ ...bounds, muscleGroupIds: [id], ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }),
       countSecondary: subject.countSecondary, countSecondaryVolume: subject.countSecondaryVolume });
   }
-  return computeSelectedExerciseHistoryEffort({
-    ...bounds, exerciseDefinitionId: id, ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }),
-  });
+  const scope = { ...bounds, ...(subject.gymId === undefined ? {} : { gymId: subject.gymId }) };
+  return subject.kind === 'exercises'
+    ? computeSelectedExercisesHistoryEffort({ ...scope, exerciseDefinitionIds: subject.ids })
+    : computeSelectedExerciseHistoryEffort({ ...scope, exerciseDefinitionId: id });
 };
 
 /**

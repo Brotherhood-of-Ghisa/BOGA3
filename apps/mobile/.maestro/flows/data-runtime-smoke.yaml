@@ -21,6 +21,9 @@ appId: com.dinoderek.mobile
 #      page, and native back returns to Progress;
 #   7. Grid and Weekly open scoped set cards; only the card opens its workout.
 #      Native Back returns through the detail to the unchanged chart.
+#   8. dragging an exercise cancels selection; a native hold selects without
+#      navigating on release. Combined charts, names and chronological History
+#      open on the native stack; Back retains selection and Cancel restores search.
 # Why device:
 #   1. and 5. the on-device expo-sqlite runtime and boot data layer;
 #   2. and 3. a real sheet and the keyboard;
@@ -28,6 +31,8 @@ appId: com.dinoderek.mobile
 #   6. the chart's own scroll inside a pushed page, and UIKit's back;
 #   7. native-stack pushes from the page and back to it, and the Sessions list
 #      positioned at the week (Jest mocks scrolling).
+#   8. native responder cancellation/long-press release, sheet reachability,
+#      and stack/scroll restoration cannot be established by Jest events.
 # Jest counterpart: __tests__/exercise-picker.test.tsx,
 #   __tests__/exercise-page-screen.test.tsx (logger),
 #   __tests__/set-effort-defaults.test.ts (first-set warm-up),
@@ -36,6 +41,8 @@ appId: com.dinoderek.mobile
 #   __tests__/stats-screen-local-data.test.tsx, __tests__/sessions-screen.test.tsx.
 #   __tests__/progress-history-local-data.test.tsx (the openers' hrefs),
 #   __tests__/history-navigation.test.ts (jump positions).
+#   __tests__/combined-exercise-progress-local-data.test.tsx (selection and
+#   route state), __tests__/combined-exercise-history.test.ts (merged reads).
 #
 # maestro-ios-launch.sh has already opened the dev-client URL and blocks until
 # Metro serves the entry bundle. Opening that URL again here races the harness
@@ -396,3 +403,69 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "stats-exercise-row-seed_barbell_back_squat"
 - takeScreenshot: "08-history-back-to-progress"
+# 8. Seed two recently performed exercises. Catalogue is a distinct landing
+# surface, so waiting for its create action proves reset/fixture finished before
+# navigating back to Progress (no same-screen openLink race).
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=exercise-catalog"
+- extendedWaitUntil:
+    visible: { id: "create-new-exercise-button" }
+    timeout: 30000
+- openLink: "boga3://progress?breakdown=exercise"
+- extendedWaitUntil:
+    visible: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
+    timeout: 15000
+- assertNotVisible: { id: "stats-exercise-selection-controls" }
+- takeScreenshot: "09-combined-browsing"
+- swipe:
+    from: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
+    direction: UP
+    duration: 650
+- assertNotVisible: { id: "stats-exercise-selection-controls" }
+- longPressOn: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
+- assertVisible: { id: "stats-exercise-selection-controls" }
+- assertNotVisible: { id: "stats-exercise-history-view-chip-row" }
+- tapOn: { id: "stats-exercise-row-seed_barbell_back_squat" }
+- assertVisible: { id: "stats-exercise-selection-count", text: ".*2.*" }
+- takeScreenshot: "10-combined-selection"
+- tapOn: { id: "stats-exercise-selection-show" }
+- extendedWaitUntil:
+    visible: { id: "stats-exercise-history-view-chip-row" }
+    timeout: 15000
+- assertVisible: { id: "progress-history-title-text", text: "2 exercises" }
+- tapOn: { id: "progress-history-title" }
+- assertVisible: { id: "selected-exercise-seed_barbell_back_squat" }
+- assertVisible: { id: "selected-exercise-maestro_m24_unmapped_exercise" }
+- takeScreenshot: "11-combined-names"
+# The modal hides its backdrop from the accessibility tree; tap above the panel.
+- tapOn: { point: "50%,8%" }
+- extendedWaitUntil:
+    notVisible: { id: "selected-exercises-sheet" }
+    timeout: 10000
+- tapOn: { id: "stats-exercise-history-view-chip-weekly" }
+- takeScreenshot: "12-combined-weekly"
+- tapOn: { id: "progress-history-options-button" }
+- assertNotVisible: { id: "progress-history-rm-curve" }
+- tapOn: { id: "progress-history-exercise-history" }
+- extendedWaitUntil:
+    visible: { id: "exercise-history-exercise-name-maestro_m24_completion_unmapped_exercise" }
+    timeout: 15000
+- assertNotVisible: { id: "exercise-history-best-card" }
+- takeScreenshot: "13-combined-chronological-history"
+- tapOn: { id: "exercise-history-back" }
+- extendedWaitUntil:
+    visible: { id: "progress-history-title-text", text: "2 exercises" }
+    timeout: 10000
+- runFlow:
+    when: { platform: iOS }
+    commands:
+      - tapOn: { id: "BackButton" }
+- runFlow:
+    when: { platform: Android }
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: { id: "stats-exercise-selection-count", text: ".*2.*" }
+    timeout: 10000
+- tapOn: { id: "stats-exercise-selection-cancel" }
+- assertVisible: { id: "stats-search-input" }
+- assertNotVisible: { id: "stats-exercise-selection-controls" }
