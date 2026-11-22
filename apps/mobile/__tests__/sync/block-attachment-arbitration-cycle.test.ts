@@ -460,4 +460,43 @@ describe('block-attachment arbitration across devices against a live endpoint', 
     expect(await runCycleOn(wiped)).toBe('converged');
   }, 120_000);
 
+  it.each([false, true])('syncs deletion of a used plan (Routine=%s) to a peer and reinstall without changing performed history', async isRoutine => {
+    const ids = makeIds(), original = makeDevice(), peer = makeDevice();
+    seedPlanGraph(original.database, ids, true, true);
+    original.database.update(sessionPlans).set({ isRoutine }).where(eq(sessionPlans.id, ids.plan)).run();
+    mockBootstrapState.database = original.database;
+    if (isRoutine) expect((await skipSessionPlanUse(ids.plan, `${ids.plan}-skip`)).status).toBe('skipped');
+    const opened = await startOn(original, ids.plan);
+    await enterWorkOn(original, opened);
+    await completeSessionDraft(opened.sessionId, { completedAt: new Date() });
+    expect(await runCycleOn(original)).toBe('converged');
+    const history = await loadSessionSnapshotById(opened.sessionId);
+    const performed = {
+      session: original.database.select().from(sessions).where(eq(sessions.id, opened.sessionId)).get(),
+      card: original.database.select().from(sessionExercises).where(eq(sessionExercises.id, opened.exercises[0].id)).get(),
+      set: original.database.select().from(exerciseSets).where(eq(exerciseSets.id, opened.exercises[0].sets[0].id)).get(),
+    };
+    expect(await runCycleOn(peer)).toBe('converged');
+    expect(await planQueries.loadPlanDetail(ids.plan)).not.toBeNull();
+    mockBootstrapState.database = original.database;
+    expect(await planRepository.deletePlan(ids.plan)).toEqual({ status: 'updated' });
+    expect(original.database.select().from(sessions).where(eq(sessions.id, opened.sessionId)).get()).toEqual(performed.session);
+    expect(original.database.select().from(sessionExercises).where(eq(sessionExercises.id, opened.exercises[0].id)).get()).toEqual(performed.card);
+    expect(original.database.select().from(exerciseSets).where(eq(exerciseSets.id, opened.exercises[0].sets[0].id)).get()).toEqual(performed.set);
+    expect(await runCycleOn(original)).toBe('converged');
+    const reinstalled = makeDevice();
+    for (const device of [peer, reinstalled]) {
+      expect(await runCycleOn(device)).toBe('converged');
+      expect(await planQueries.loadPlanDetail(ids.plan)).toBeNull();
+      expect(await loadSessionSnapshotById(opened.sessionId)).toEqual(history);
+      expect(device.database.select().from(sessionPlans).where(eq(sessionPlans.id, ids.plan)).get())
+        .toMatchObject({ deletedAt: expect.any(Date), localDirty: false });
+      expect(device.database.select().from(sessionPlanExercises).where(eq(sessionPlanExercises.id, ids.block)).get()?.deletedAt).not.toBeNull();
+      expect(device.database.select().from(sessionPlanSets).where(eq(sessionPlanSets.id, ids.targetA)).get()?.deletedAt).not.toBeNull();
+      if (isRoutine) expect(device.database.select().from(sessionPlanUses).all().filter(use => use.sessionPlanId === ids.plan))
+        .toHaveLength(2);
+      expect(device.fixture.client.pragma('foreign_key_check')).toEqual([]);
+    }
+  }, 120_000);
+
 });

@@ -65,7 +65,12 @@ export type PlanSummaryView = {
   blockCounts: { pending: number; attached: number; completed: number; skipped: number };
 };
 
-export type PlanDetailView = PlanSummaryView & { blocks: PlanBlockView[]; editVersion?: string };
+export type PlanDetailView = PlanSummaryView & {
+  blocks: PlanBlockView[];
+  editVersion?: string;
+  /** The detail route's deletion guard; the write checks again atomically. */
+  deleteBlockedBySessionId?: string | null;
+};
 
 export type ProgrammeSummaryView = {
   id: string;
@@ -366,6 +371,7 @@ export const createPlanQueries = (store: SessionPlanStore = createDrizzleSession
         ...(uses ? { routine: uses.get(planId) } : {}),
         blocks,
         editVersion: planGraphVersion(graph),
+        deleteBlockedBySessionId: await store.findActiveSessionIdUsingPlan(planId),
       };
     },
 

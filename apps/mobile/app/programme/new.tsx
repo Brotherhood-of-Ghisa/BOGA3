@@ -26,6 +26,8 @@ const programmeEditErrorMessage = (result: PlanMutationResult): string => {
       return result.errors[0]?.message ?? "Couldn't save changes. Try again.";
     case 'immutable-block':
       return 'A block in this programme has already been used, so those changes can’t be saved.';
+    case 'active-conflict':
+      return 'A session in this programme is in use by an active workout. Finish or discard it before removing the session.';
     case 'limit-exceeded':
       return 'This programme has reached its session limit.';
     case 'invalid-order':

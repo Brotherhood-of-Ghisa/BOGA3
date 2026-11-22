@@ -205,7 +205,7 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
   };
 
   const confirmDelete = () => {
-    Alert.alert('Delete plan?', 'The plan and its unused blocks will be removed.', [
+    Alert.alert('Delete plan?', 'The plan will be removed.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -218,8 +218,10 @@ export const usePlanDetail = (planId: string | null): PlanDetailController => {
               router.back();
               return;
             }
-            if (result.status === 'immutable-block') {
-              setNotice('A used block pins this plan; it cannot be deleted.');
+            if (result.status === 'active-conflict') {
+              await reload();
+              setResumeSessionId(result.activeSessionId);
+              setNotice('This plan is in use by an active workout. Finish or discard it before deleting.');
               return;
             }
             setNotice("Couldn't delete the plan. Try again.");

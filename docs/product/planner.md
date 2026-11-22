@@ -39,3 +39,14 @@ Future definition edits preserve active and historical workout snapshots.
 
 Why: Reusable intent must survive each use without consuming future availability or rewriting what the lifter logged.
 Code: `apps/mobile/src/session-planner/routine-materialization.ts`; `apps/mobile/src/data/session-plan-store.ts`.
+
+### planner.deletion · definition · accepted
+
+In the app, plans and Routines remain deletable after use or Skip. Delete stays visible,
+disabled with a reason only while an active workout uses the plan or its blocks.
+Deletion removes authored intent from planning; performed workouts, values,
+records and source links survive. Confirmation does not explain this implicit
+history preservation.
+
+Why: Past use must not make an unwanted plan permanent or put logged work at risk.
+Code: `apps/mobile/src/data/session-plan-store.ts`; `apps/mobile/components/session-planner/plan-detail-summary.tsx`.

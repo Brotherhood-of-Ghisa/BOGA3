@@ -24,7 +24,7 @@ export type SessionPlanDetailScreenProps = {
 /**
  * One session plan: its targets, progress and provenance, with the plan's
  * actions — Start all, per-block Add to session, Skip, Duplicate, Edit and
- * confirmed Delete while lifecycle permits. Consumed blocks are read-only
+ * confirmed Delete per [[planner.deletion]]. Consumed blocks are read-only
  * and link to their performed session. State and writes live in
  * `usePlanDetail`; this route renders what it returns.
  */
@@ -52,9 +52,6 @@ export function SessionPlanDetailScreen({ planId }: SessionPlanDetailScreenProps
     );
   }
 
-  const deletable =
-    !detail.routine?.hasKnownUse && detail.blockCounts.attached + detail.blockCounts.completed + detail.blockCounts.skipped === 0;
-
   const noticeView = notice ? <Notice
     action={resumeSessionId !== null ? <ActionButton
       accessibilityLabel="Resume the active session" label="Resume"
@@ -73,7 +70,6 @@ export function SessionPlanDetailScreen({ planId }: SessionPlanDetailScreenProps
         {!detail.isRoutine ? noticeView : null}
         <PlanDetailSummary
           busy={controller.busy}
-          deletable={deletable}
           detail={detail}
           onDelete={controller.confirmDelete}
           onDuplicate={controller.duplicate}
