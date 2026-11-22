@@ -116,6 +116,7 @@ it('uses all three charts and only additive metrics, with a names sheet and dire
   fireEvent.press(screen.getByTestId('progress-history-options-button'));
   expect(screen.queryByTestId('progress-history-rm-curve')).toBeNull();
   expect(screen.queryByTestId('progress-history-add-to-session')).toBeNull();
+  expect(screen.getAllByTestId(/^progress-history-muscle-/)).toHaveLength(7);
   expect(screen.getByTestId('progress-history-muscle-chest')).toHaveTextContent(/Primary/);
   expect(screen.getAllByTestId('progress-history-muscle-triceps')).toHaveLength(1);
   expect(screen.getByTestId('progress-history-muscle-triceps')).toHaveTextContent(/Secondary/);

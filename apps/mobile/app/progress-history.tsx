@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { ExerciseSessionEntrySheet } from '@/components/session-recorder/exercise-session-entry-sheet';
 import type { FocusedTimelineWeek } from '@/components/heatmaps';
@@ -203,48 +203,50 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
         testID="progress-history-options-sheet"
         title={title}
         visible={optionsVisible}>
-        {liveExercise ? <ListRow label="Add to session…" leading={<Icon colorRole="ink" name="plus" size="md" />}
-          onPress={() => { setQueuedSessionEntry(true); setOptionsVisible(false); }}
-          testID="progress-history-add-to-session" /> : null}
-        {onOpenHistory ? (
-          <ListRow
-            label="History"
-            leading={<Icon colorRole="inkMuted" name="list" size="md" />}
-            onPress={() => { setOptionsVisible(false); onOpenHistory(); }}
-            testID="progress-history-exercise-history"
-            trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
-          />
-        ) : null}
-        {onOpenCurve ? (
-          <ListRow
-            label="RM curve"
-            leading={<Icon colorRole="inkMuted" name="timeline-columns" size="md" />}
-            onPress={() => { setOptionsVisible(false); onOpenCurve(); }}
-            testID="progress-history-rm-curve"
-            trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
-          />
-        ) : null}
-        {sessionsWeek ? (
-          <ListRow
-            description={sessionsWeek.label}
-            label="View sets"
-            leading={<Icon colorRole="inkMuted" name="list" size="md" />}
-            onPress={openWeek}
-            testID="progress-history-view-sessions"
-            trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
-          />
-        ) : null}
-        {muscles.map(muscle => (
-          <ListRow
-            description={ROLE_LABELS[muscle.role]}
-            key={muscle.id}
-            label={muscle.name}
-            leading={<Icon colorRole="inkMuted" name="timeline-columns" size="md" />}
-            onPress={() => openMuscle(muscle.id)}
-            testID={`progress-history-muscle-${muscle.id}`}
-            trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
-          />
-        ))}
+        <ScrollView testID="progress-history-options-scroll">
+          {liveExercise ? <ListRow label="Add to session…" leading={<Icon colorRole="ink" name="plus" size="md" />}
+            onPress={() => { setQueuedSessionEntry(true); setOptionsVisible(false); }}
+            testID="progress-history-add-to-session" /> : null}
+          {onOpenHistory ? (
+            <ListRow
+              label="History"
+              leading={<Icon colorRole="inkMuted" name="list" size="md" />}
+              onPress={() => { setOptionsVisible(false); onOpenHistory(); }}
+              testID="progress-history-exercise-history"
+              trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
+            />
+          ) : null}
+          {onOpenCurve ? (
+            <ListRow
+              label="RM curve"
+              leading={<Icon colorRole="inkMuted" name="timeline-columns" size="md" />}
+              onPress={() => { setOptionsVisible(false); onOpenCurve(); }}
+              testID="progress-history-rm-curve"
+              trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
+            />
+          ) : null}
+          {sessionsWeek ? (
+            <ListRow
+              description={sessionsWeek.label}
+              label="View sets"
+              leading={<Icon colorRole="inkMuted" name="list" size="md" />}
+              onPress={openWeek}
+              testID="progress-history-view-sessions"
+              trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
+            />
+          ) : null}
+          {muscles.map(muscle => (
+            <ListRow
+              description={ROLE_LABELS[muscle.role]}
+              key={muscle.id}
+              label={muscle.name}
+              leading={<Icon colorRole="inkMuted" name="timeline-columns" size="md" />}
+              onPress={() => openMuscle(muscle.id)}
+              testID={`progress-history-muscle-${muscle.id}`}
+              trailing={<Icon colorRole="inkMuted" name="chevron-right" size="sm" />}
+            />
+          ))}
+        </ScrollView>
       </Sheet>
     </>
   );

@@ -134,3 +134,15 @@ calendar and isometric/repetition rules.
   Save behind the software keyboard. Its failure screenshot shows the editor
   still open and a stray typed character. Added explicit keyboard dismissal
   after entry; no injury app behavior changed. The chosen lane set is unchanged.
+- Large muscle unions can exceed a phone viewport. Reuse the existing scrolling
+  sheet body for Options. Native justification: Jest proves the complete union
+  and destinations, but cannot prove that the last link and History remain
+  reachable through a bounded native modal. Extend the same native journey to
+  three exercises and scroll to the last secondary link, then back to History;
+  capture small/normal layouts and long current exercise names.
+- Reviewer agreed the final menu delta gates: fast, data-smoke on normal/small,
+  and exercise-page on normal. Earlier RM-curve and quality passes remain
+  applicable: handlers/data/metrics are unchanged, while fresh combined and
+  single-exercise journeys exercise the changed Options wrapper. Final product
+  review is clean. Fast and the additional final Jest run (511 suites / 8,219
+  tests) passed; normal data-smoke passed all seven flows. Small is running.

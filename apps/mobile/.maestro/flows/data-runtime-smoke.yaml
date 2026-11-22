@@ -403,17 +403,36 @@ appId: com.dinoderek.mobile
 - assertVisible:
     id: "stats-exercise-row-seed_barbell_back_squat"
 - takeScreenshot: "08-history-back-to-progress"
-# 8. Seed two recently performed exercises. Catalogue is a distinct landing
+# 8. Seed recently performed exercises, including a long current name. Catalogue is a distinct landing
 # surface, so waiting for its create action proves reset/fixture finished before
 # navigating back to Progress (no same-screen openLink race).
 - openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=exercise-catalog"
 - extendedWaitUntil:
     visible: { id: "create-new-exercise-button" }
     timeout: 30000
+- openLink: "boga3://exercise-edit?exerciseDefinitionId=seed_barbell_back_squat"
+- extendedWaitUntil:
+    visible: { id: "exercise-editor-name-input" }
+    timeout: 15000
+- tapOn: { id: "exercise-editor-name-input" }
+- eraseText
+- inputText: "Barbell Back Squat with a deliberately long exercise name"
+- hideKeyboard
+- scrollUntilVisible:
+    element: { id: "exercise-editor-save" }
+    direction: DOWN
+    centerElement: true
+- tapOn: "Save exercise definition"
+- extendedWaitUntil:
+    notVisible: { id: "exercise-editor-name-input" }
+    timeout: 15000
 - openLink: "boga3://progress?breakdown=exercise"
 - extendedWaitUntil:
-    visible: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
+    visible: { id: "stats-search-input" }
     timeout: 15000
+- scrollUntilVisible:
+    element: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
+    direction: DOWN
 - assertNotVisible: { id: "stats-exercise-selection-controls" }
 - takeScreenshot: "09-combined-browsing"
 - swipe:
@@ -421,22 +440,33 @@ appId: com.dinoderek.mobile
     direction: UP
     duration: 650
 - assertNotVisible: { id: "stats-exercise-selection-controls" }
+- scrollUntilVisible:
+    element: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
+    direction: DOWN
 - longPressOn: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
 - assertVisible: { id: "stats-exercise-selection-controls" }
 - assertNotVisible: { id: "stats-exercise-history-view-chip-row" }
 - assertVisible: { id: "stats-exercise-selection-show", enabled: false }
 - takeScreenshot: "09a-combined-one-selected"
+- scrollUntilVisible:
+    element: { id: "stats-exercise-row-seed_barbell_back_squat" }
+    direction: UP
 - tapOn: { id: "stats-exercise-row-seed_barbell_back_squat" }
-- assertVisible: { id: "stats-exercise-selection-count", text: ".*2.*" }
+- scrollUntilVisible:
+    element: { id: "stats-exercise-row-seed_barbell_bench_press" }
+    direction: UP
+- tapOn: { id: "stats-exercise-row-seed_barbell_bench_press" }
+- assertVisible: { id: "stats-exercise-selection-count", text: ".*3.*" }
 - takeScreenshot: "10-combined-selection"
 - tapOn: { id: "stats-exercise-selection-show" }
 - extendedWaitUntil:
     visible: { id: "stats-exercise-history-view-chip-row" }
     timeout: 15000
-- assertVisible: { id: "progress-history-title-text", text: "2 exercises" }
+- assertVisible: { id: "progress-history-title-text", text: "3 exercises" }
 - tapOn: { id: "progress-history-title" }
 - assertVisible: { id: "selected-exercise-seed_barbell_back_squat" }
 - assertVisible: { id: "selected-exercise-maestro_m24_unmapped_exercise" }
+- assertVisible: { id: "selected-exercise-seed_barbell_bench_press" }
 - takeScreenshot: "11-combined-names"
 # The modal hides its backdrop from the accessibility tree; tap above the panel.
 - tapOn: { point: "50%,8%" }
@@ -454,6 +484,13 @@ appId: com.dinoderek.mobile
 - tapOn: { id: "progress-history-options-button" }
 - assertNotVisible: { id: "progress-history-rm-curve" }
 - takeScreenshot: "12c-combined-options"
+- scrollUntilVisible:
+    element: { id: "progress-history-muscle-triceps" }
+    direction: DOWN
+- takeScreenshot: "12d-combined-last-muscle"
+- scrollUntilVisible:
+    element: { id: "progress-history-exercise-history" }
+    direction: UP
 - tapOn: { id: "progress-history-exercise-history" }
 - extendedWaitUntil:
     visible: { id: "exercise-history-exercise-name-maestro_m24_completion_unmapped_exercise" }
@@ -462,7 +499,7 @@ appId: com.dinoderek.mobile
 - takeScreenshot: "13-combined-chronological-history"
 - tapOn: { id: "exercise-history-back" }
 - extendedWaitUntil:
-    visible: { id: "progress-history-title-text", text: "2 exercises" }
+    visible: { id: "progress-history-title-text", text: "3 exercises" }
     timeout: 10000
 - runFlow:
     when: { platform: iOS }
@@ -473,7 +510,7 @@ appId: com.dinoderek.mobile
     commands:
       - back
 - extendedWaitUntil:
-    visible: { id: "stats-exercise-selection-count", text: ".*2.*" }
+    visible: { id: "stats-exercise-selection-count", text: ".*3.*" }
     timeout: 10000
 - tapOn: { id: "stats-exercise-selection-cancel" }
 - assertVisible: { id: "stats-search-input" }
