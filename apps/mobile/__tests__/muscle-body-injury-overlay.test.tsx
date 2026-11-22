@@ -834,7 +834,7 @@ describe('Muscle body injury overlay', () => {
       expect(screen.getByTestId('stats-muscle-injury-badge-inj-chest-left')).toBeTruthy();
 
       // Enable Focus mode on quads — should zoom onto the injured right quad and hide off-screen chest badge.
-      fireEvent.press(screen.getByTestId('stats-muscle-body-focus'));
+      fireEvent.press(screen.getByTestId('stats-muscle-body-framing-focus'));
 
       const canvas = screen.getByTestId('stats-muscle-body-wireframe');
       expect(canvas.props.frame.selected.every((inst: { side: number }) => inst.side === -1)).toBe(true);
