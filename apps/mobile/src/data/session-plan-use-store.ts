@@ -9,13 +9,13 @@ export const createPlanUseId = (): string =>
   `planuse-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
 
 /** Includes ordinary block attachments converted while their workout is active. */
-export const findActivePlanSession = (tx: Transaction, planId: string): string | null => {
+export const findActivePlanSession = (tx: Transaction, planId: string, includeBlockAttachments = false): string | null => {
   const plan = tx.select({ isRoutine: sessionPlans.isRoutine }).from(sessionPlans).where(eq(sessionPlans.id, planId)).get();
   const row = tx.select({ id: sessions.id }).from(sessions)
     .leftJoin(sessionExercises, and(eq(sessionExercises.sessionId, sessions.id), isNull(sessionExercises.deletedAt)))
     .leftJoin(sessionPlanExercises, eq(sessionPlanExercises.id, sessionExercises.sourcePlanExerciseId))
     .where(and(eq(sessions.status, 'active'), isNull(sessions.deletedAt),
-      or(eq(sessions.sourcePlanId, planId), plan?.isRoutine ? eq(sessionPlanExercises.sessionPlanId, planId) : sql`false`)))
+      or(eq(sessions.sourcePlanId, planId), plan?.isRoutine || includeBlockAttachments ? eq(sessionPlanExercises.sessionPlanId, planId) : sql`false`)))
     .orderBy(desc(sessions.updatedAt)).get();
   return row?.id ?? null;
 };

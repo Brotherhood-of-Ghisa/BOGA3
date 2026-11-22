@@ -47,7 +47,7 @@ import { formatShortDate } from '@/src/utils/local-time';
 import { uiSpace } from '@/components/ui';
 import { ProgrammeNewScreen } from '@/app/programme/new';
 import { ProgrammeDetailScreen } from '@/app/programme/[programmeId]';
-import { planQueries, planRepository, addPlanBlockToSession, skipPlanBlock } from '@/src/session-planner';
+import { planQueries, planRepository, addPlanBlockToSession, skipPlanBlock, startSessionPlan } from '@/src/session-planner';
 import { completeSessionDraft, loadSessionSnapshotById, persistSessionDraftSnapshot } from '@/src/data/session-drafts';
 import { saveExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { bootLocalApp, closeLocalData, localDatabase, resetLocalData } from './helpers/local-data';
@@ -458,6 +458,21 @@ describe('programme screens', () => {
 
       const detail = await planQueries.loadProgrammeDetail(editProgrammeId);
       expect(detail?.plans.map((plan) => plan.title)).toEqual(['Upper A', 'Lower B']);
+    });
+
+    it('explains active use when removing a child session and keeps the form open', async () => {
+      const before = (await planQueries.loadProgrammeDetail(editProgrammeId))!;
+      await startSessionPlan(before.plans[0].id);
+      renderWithTheme(<ProgrammeNewScreen editProgrammeId={editProgrammeId} fromProgrammeId={null} />);
+      await screen.findByTestId('programme-form-name');
+      fireEvent.press(screen.getByTestId('programme-form-plan-1-remove'));
+      fireEvent.press(screen.getByTestId('programme-form-save'));
+      expect(await screen.findByTestId('programme-form-notice')).toHaveTextContent(
+        'A session in this programme is in use by an active workout. Finish or discard it before removing the session.'
+      );
+      expect(mockBack).not.toHaveBeenCalled();
+      expect((await planQueries.loadProgrammeDetail(editProgrammeId))?.plans.map(plan => plan.id))
+        .toEqual(before.plans.map(plan => plan.id));
     });
 
     it('persists a reordered child session list', async () => {

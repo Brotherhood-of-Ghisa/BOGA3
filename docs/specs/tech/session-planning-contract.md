@@ -310,7 +310,7 @@ queues exclude flagged plans; programme storage rejects the flag.
 | :--- | :--- |
 | `/sessions` (Planning Hub) | **Active**, **Routines**, unfinished **Upcoming** (scheduled plans by date) and **Unscheduled** (standalone plans/programmes by updated time), optional **Completed plans**, then weekly performed history. Queue management and authoring live here; screen rules in `docs/specs/ui/screen-map.md`. |
 | `/session-plan/new` | Author a plan with standalone Routine property (edit/duplicate prefill); target entry follows the recorder through shared fields. |
-| `/session-plan/[planId]` | View/edit: Start all, Duplicate, Delete (unused/eligible only), Add block. Ordinary consumed blocks link to history; Routine detail offers Start/Resume, confirmed Skip and independent dates. |
+| `/session-plan/[planId]` | View/edit: Start all, Duplicate, Delete ([[planner.deletion]]), Add block. Ordinary consumed blocks link to history; Routine detail offers Start/Resume, confirmed Skip and independent dates. |
 | `/programme/new` | Author an ordered programme; minimum 2 child plans; target entry uses the recorder's shared fields. |
 | `/programme/[programmeId]` | Resolution badge and session outcomes per [[planner.progress-outcomes]], next unresolved block in sequence, child plan summaries. |
 

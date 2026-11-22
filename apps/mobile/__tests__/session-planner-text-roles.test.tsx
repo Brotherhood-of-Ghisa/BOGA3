@@ -84,7 +84,7 @@ const plan = (overrides: Partial<PlanDetailView> = {}): PlanDetailView => ({
 
 describe('Plan detail', () => {
   it('titles the plan in title, its supporting lines in meta with figures in Plex Mono', () => {
-    renderWithTheme(<PlanDetailSummary deletable detail={plan()} onDelete={jest.fn()} onDuplicate={jest.fn()} onEdit={jest.fn()} onStartAll={jest.fn()} />);
+    renderWithTheme(<PlanDetailSummary detail={plan()} onDelete={jest.fn()} onDuplicate={jest.fn()} onEdit={jest.fn()} onStartAll={jest.fn()} />);
     expect(style(screen.getByTestId('plan-detail-title'))).toMatchObject({ ...TITLE, color: roles.ink });
     expectFigureInWords(screen.getByTestId('plan-detail-schedule'), '28-10-2026');
     expectFigureInWords(screen.getByTestId('plan-detail-progress'), '3');

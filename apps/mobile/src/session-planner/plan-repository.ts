@@ -34,9 +34,8 @@ import type {
  *   read-only snapshots; future unattached pending blocks stay fully editable.
  * - Plan meta (title, gym, schedule) is authored intent, not block state, and
  *   stays editable at any time.
- * - A plan whose blocks are all unconsumed can be deleted; a consumed block
- *   pins its plan against deletion. Deleting a programme detaches its plans
- *   (they become standalone) and destroys nothing.
+ * - Plan deletion follows [[planner.deletion]]. Deleting a programme detaches
+ *   its plans (they become standalone).
  *
  * Screens never touch the store or the tables directly.
  */
@@ -46,6 +45,7 @@ export type PlanMutationResult =
   | { status: 'updated' }
   | { status: 'not-found' }
   | { status: 'immutable-block' }
+  | { status: 'active-conflict'; activeSessionId: string }
   | { status: 'limit-exceeded' }
   | { status: 'invalid-order' }
   | { status: 'stale-edit' }
@@ -289,15 +289,7 @@ export const createPlanRepository = (): PlanRepository => ({
   },
 
   async deletePlan(planId, now = new Date()) {
-    const graph = await planStore.loadPlanGraph(planId);
-    if (!graph) {
-      return { status: 'not-found' };
-    }
-    if ((await consumedBlockIdsInGraph(graph)).size > 0) {
-      return { status: 'immutable-block' };
-    }
-    const tombstoned = await planStore.tombstonePlan({ planId, now });
-    return tombstoned ? { status: 'updated' } : { status: 'not-found' };
+    return planStore.tombstonePlan({ planId, now });
   },
 
   async deletePlanBlock(planExerciseId, now = new Date()) {

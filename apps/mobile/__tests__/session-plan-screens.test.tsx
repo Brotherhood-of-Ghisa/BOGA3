@@ -69,6 +69,7 @@ import { bootLocalApp, closeLocalData, loadMaestroFixture, localDatabase, resetL
 import { updatePreferences } from '@/src/preferences/hooks';
 import { waitForGone } from './helpers/wait-for-gone';
 import * as blockHistory from '@/src/data/exercise-block-history';
+import { loadSessionExerciseFacts } from '@/src/data/exercise-session-facts';
 
 let alertSpy: jest.SpyInstance;
 
@@ -483,6 +484,95 @@ describe('plan detail', () => {
     await screen.findByTestId('plan-detail');
   };
 
+  it.each([false, true])('deletes a previously used plan (Routine=%s) after confirmation, preserving its workout', async isRoutine => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    await planRepository.updatePlanMeta(planId, { isRoutine });
+    const started = await startSessionPlan(planId);
+    if (started.status !== 'started') throw new Error(started.status);
+    const snapshot = (await loadSessionSnapshotById(started.sessionId))!;
+    await persistSessionDraftSnapshot({ sessionId: snapshot.sessionId, gymId: snapshot.gymId, startedAt: snapshot.startedAt,
+      sourcePlanId: snapshot.sourcePlanId, sourcePlanUseId: snapshot.sourcePlanUseId,
+      exercises: snapshot.exercises.map(card => ({ ...card,
+      sets: card.sets.map(set => ({ ...set, weightValue: '95', repsValue: '4', performanceStatus: null })),
+    })) });
+    await completeSessionDraft(started.sessionId, { completedAt: new Date() });
+    const before = await loadSessionSnapshotById(started.sessionId);
+    const factsBefore = await loadSessionExerciseFacts(started.sessionId);
+    expect(factsBefore).toHaveLength(1);
+    await openDetail(planId);
+    expect(screen.getByTestId('plan-detail-delete')).toBeEnabled();
+    fireEvent.press(screen.getByTestId('plan-detail-delete'));
+    expect(alertSpy).toHaveBeenLastCalledWith('Delete plan?', 'The plan will be removed.', expect.any(Array));
+    pressAlertButton('Cancel');
+    expect(await planQueries.loadPlanDetail(planId)).not.toBeNull();
+    fireEvent.press(screen.getByTestId('plan-detail-delete'));
+    pressAlertButton('Delete');
+    await waitFor(() => expect(mockBack).toHaveBeenCalledTimes(1));
+    expect(await planQueries.loadPlanDetail(planId)).toBeNull();
+    expect(await loadSessionSnapshotById(started.sessionId)).toEqual(before);
+    expect(await loadSessionExerciseFacts(started.sessionId)).toEqual(factsBefore);
+    expect(isRoutine ? await planQueries.listRoutines() : await planQueries.listUnscheduledPlans()).toEqual([]);
+  });
+
+  it.each([false, true])('keeps Delete visible and explains why it is disabled during active use (Routine=%s)', async isRoutine => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    await planRepository.updatePlanMeta(planId, { isRoutine });
+    await startSessionPlan(planId);
+    await openDetail(planId);
+    expect(screen.getByTestId('plan-detail-delete')).toBeDisabled();
+    expect(screen.getByTestId('plan-detail-delete-blocked')).toHaveTextContent('This plan is in use by an active workout. Finish or discard it before deleting.');
+    fireEvent.press(screen.getByTestId('plan-detail-delete'));
+    expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('can delete a skipped plan while an unrelated workout is active (Routine=%s)', async isRoutine => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    if (isRoutine) {
+      await planRepository.updatePlanMeta(planId, { isRoutine });
+      await skipSessionPlanUse(planId, 'skip-use');
+    } else {
+      localDatabase().update(sessionPlanExercises).set({ progressStatus: 'skipped' })
+        .where(eq(sessionPlanExercises.sessionPlanId, planId)).run();
+    }
+    await persistSessionDraftSnapshot({ sessionId: 'unrelated', gymId: null, startedAt: new Date(), exercises: [] });
+    await openDetail(planId);
+    expect(screen.getByTestId('plan-detail-delete')).toBeEnabled();
+    fireEvent.press(screen.getByTestId('plan-detail-delete'));
+    pressAlertButton('Delete');
+    await waitFor(() => expect(mockBack).toHaveBeenCalled());
+    expect(await planQueries.loadPlanDetail(planId)).toBeNull();
+    expect((await loadSessionSnapshotById('unrelated'))?.status).toBe('active');
+  });
+
+  it('refuses a stale confirmation when a workout started after the detail loaded', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    await openDetail(planId);
+    fireEvent.press(screen.getByTestId('plan-detail-delete'));
+    await startSessionPlan(planId);
+    pressAlertButton('Delete');
+    expect(await screen.findByTestId('plan-detail-notice')).toHaveTextContent(/This plan is in use by an active workout\./);
+    expect(screen.getByTestId('plan-detail-delete')).toBeDisabled();
+    expect(screen.getByTestId('plan-detail-resume')).toBeTruthy();
+    expect(await planQueries.loadPlanDetail(planId)).not.toBeNull();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('retains the plan and reports a failed delete without navigating away', async () => {
+    await seedCatalog();
+    const planId = await createPlanThroughRepository();
+    await openDetail(planId);
+    jest.spyOn(planRepository, 'deletePlan').mockRejectedValueOnce(new Error('write failed'));
+    fireEvent.press(screen.getByTestId('plan-detail-delete'));
+    pressAlertButton('Delete');
+    expect(await screen.findByTestId('plan-detail-notice')).toHaveTextContent("Couldn't update the plan. Try again.");
+    expect(await planQueries.loadPlanDetail(planId)).not.toBeNull();
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
   it('reads the plan: title, schedule, blocks with targets and states', async () => {
     await seedCatalog();
     const planId = await createPlanThroughRepository({
@@ -498,8 +588,7 @@ describe('plan detail', () => {
     expect(screen.getByTestId('plan-detail-schedule')).toHaveTextContent('Unscheduled');
     expect(screen.getByTestId('plan-detail-block-1-state')).toHaveTextContent('Ready · Block 1 of 1');
     expect(screen.getByTestId('plan-detail-block-1-targets')).toHaveTextContent('100 × 5 · — × 8');
-    // Deletable while nothing is consumed.
-    expect(screen.getByTestId('plan-detail-delete')).toBeTruthy();
+    expect(screen.getByTestId('plan-detail-delete')).toBeEnabled();
   });
 
   it('shows the completion day and retains the original schedule, omitting an unknown completion day', async () => {
