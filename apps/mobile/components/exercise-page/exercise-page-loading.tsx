@@ -17,6 +17,6 @@ export function ExercisePageLoading() {
   return shown ? (
     <StatePanel kind="loading" testID="exercise-page-state" title="Loading…" />
   ) : (
-    <View style={{ flex: 1 }} testID="exercise-page-state" />
+    <View accessibilityLabel="Loading…" style={{ flex: 1 }} testID="exercise-page-state-pending" />
   );
 }

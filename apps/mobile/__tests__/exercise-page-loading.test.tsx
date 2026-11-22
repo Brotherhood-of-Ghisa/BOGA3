@@ -11,7 +11,7 @@ describe('exercise page loading state', () => {
   it('stays blank for a quick load, so an in-place exercise switch never flashes a spinner', () => {
     renderWithTheme(<ExercisePageLoading />);
 
-    expect(screen.getByTestId('exercise-page-state')).toBeOnTheScreen();
+    expect(screen.getByTestId('exercise-page-state-pending')).toHaveProp('accessibilityLabel', 'Loading…');
     expect(screen.queryByText('Loading…')).toBeNull();
     act(() => jest.advanceTimersByTime(EXERCISE_PAGE_LOADING_DELAY_MS - 1));
     expect(screen.queryByText('Loading…')).toBeNull();

@@ -1,5 +1,5 @@
 import { personalCalculationContext } from '@/src/config/personal-effort';
-import { useFocusEffect, useRouter, type Href } from 'expo-router';
+import { useFocusEffect, useNavigation, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
@@ -250,6 +250,8 @@ export function ExercisePageScreen({
   const text = useUiText();
   const tone = useUiTextTone();
   const router = useRouter();
+  const navigation = useNavigation<{ setParams: (params: { sessionExerciseId: string }) => void }>();
+  const switching = useRef(false);
   const bodyweightCalculationsEnabled = useBodyweightCalculationsEnabled();
   const [, setPreferenceFocusRevision] = useState(0);
   useFocusEffect(useCallback(() => {
@@ -360,10 +362,17 @@ export function ExercisePageScreen({
   // page in (about a second on device), while new params re-key the page at
   // once. The history is untouched, so Back still returns to the session in
   // one step. Pending edits are saved first, exactly as leaving the page does.
+  // A failed save stays on the page with its error, as every other exit does;
+  // a second pick while the save is in flight is ignored. `navigation` targets
+  // this route even if focus moves during the save.
   const switchExercise = (targetId: string) => {
     setOpenSheet('none');
-    if (targetId === sessionExerciseId) return;
-    void draft.flush().finally(() => router.setParams({ sessionExerciseId: targetId }));
+    if (targetId === sessionExerciseId || switching.current) return;
+    switching.current = true;
+    void draft.flush().then((saved) => {
+      switching.current = false;
+      if (saved) navigation.setParams({ sessionExerciseId: targetId });
+    });
   };
 
   const sets = useMemo(() => exercise?.sets ?? [], [exercise]);

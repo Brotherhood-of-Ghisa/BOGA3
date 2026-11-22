@@ -134,7 +134,7 @@ the tab bar (`TabOwnedPage`), owned by More.
 - A completed session's records compare against **the completed sessions
   before it** — never itself, never later ones.
 - The exercise page opens from the session view, another exercise's title
-  switcher (`replace`) or the Maestro teleport; with no history, back goes to `/train`.
+  switcher (params swapped in place) or the Maestro teleport; with no history, back goes to `/train`.
 - `presentation=completion` does **not** link to muscle analytics, its share
   image excludes gym and location, and optional historical enrichment can
   never block it.
