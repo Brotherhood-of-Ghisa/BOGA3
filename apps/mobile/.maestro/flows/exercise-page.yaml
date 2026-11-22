@@ -13,13 +13,19 @@ appId: com.dinoderek.mobile
 #   3. the ⋮ menu (a `Sheet`) dismisses from a drag of its title row
 #      and its rows still tap after reopening; Swap opens a page sheet that closes on a swipe
 #      down and presents again afterwards.
+#   4. exercise-first quick entry dismisses a native sheet, starts or continues
+#      the workout on Train, opens the added row and returns to Train.
 # Why device:
 #   1. a stack push and the native back button;
 #   2. the keyboard;
 #   3. the drag runs as a UI-thread worklet, which Jest's reanimated mock runs
 #      on JS (a worklet calling JS crashed only on device), and a swiped native
 #      page sheet must be re-created to present again.
-# Jest counterpart: __tests__/exercise-page-screen.test.tsx (the page over
+#   4. native Modal dismissal, tab focus, stacked navigation and keyboard input.
+# Jest counterpart: __tests__/exercise-session-entry.test.ts,
+#   __tests__/exercise-session-entry-sheet.test.tsx,
+#   __tests__/main-tab-navigation.test.tsx, __tests__/train-screen.test.tsx,
+#   plus __tests__/exercise-page-screen.test.tsx (the page over
 #   the same fixture: records, Last, effort cycle and sheet, menu, swap,
 #   `+ Add set`, Complete's warning, the sets it keeps read back from the
 #   database), __tests__/ui-sheet-drag.test.tsx, __tests__/ui-page-sheet.test.tsx,
@@ -356,3 +362,81 @@ appId: com.dinoderek.mobile
     timeout: 15000
 - assertVisible: { id: "exercise-set-1-values", text: "5.0 × 38 s" }
 - takeScreenshot: "hold-long-name-saved-seconds"
+
+
+# --- 5. Exercise-first start and continue: real sheets, tab focus and Back ---
+# Written justification: native Modal dismissal and tab/stack parenting are not
+# implemented by Jest's router/Modal mocks; arithmetic and write failures stay there.
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=exercise-catalog"
+- extendedWaitUntil:
+    visible: { id: "exercise-catalog-screen" }
+    timeout: 30000
+- tapOn: "Search exercises or muscles"
+- inputText: "Barbell Back Squat"
+- tapOn: "Exercise actions Barbell Back Squat"
+- tapOn: { id: "exercise-action-add-to-session" }
+- extendedWaitUntil:
+    visible: { id: "exercise-picker-plan-source" }
+    timeout: 10000
+- waitForAnimationToEnd: { timeout: 4000 }
+- takeScreenshot: "quick-entry-repeat-choice"
+- tapOn: { id: "exercise-picker-add-empty-set-button" }
+- extendedWaitUntil:
+    visible: { id: "exercise-set-logger-reps" }
+    timeout: 15000
+- assertVisible: { id: "exercise-page-title", text: "Barbell Back Squat" }
+- waitForAnimationToEnd: { timeout: 4000 }
+- takeScreenshot: "quick-entry-empty-logger"
+- tapOn: { id: "exercise-set-logger-weight" }
+- inputText: "100"
+- tapOn: { id: "exercise-set-logger-reps" }
+- inputText: "5"
+- tapOn: { id: "exercise-set-logger-commit" }
+- tapOn: { id: "exercise-page-back" }
+- extendedWaitUntil:
+    visible: { id: "session-view-add-exercise" }
+    timeout: 10000
+- assertVisible: "Barbell Back Squat, 1 of 1 sets done.*"
+- takeScreenshot: "quick-entry-back-to-train"
+
+# Continue the same exercise from its History header: this appends a row to
+# the existing card, rather than editing history or starting another workout.
+- openLink: "boga3://exercise-history?exerciseDefinitionId=seed_barbell_back_squat"
+- extendedWaitUntil:
+    visible: { id: "exercise-history-add-to-session" }
+    timeout: 10000
+- tapOn: { id: "exercise-history-add-to-session" }
+- extendedWaitUntil:
+    visible: { id: "exercise-picker-repeat-last-button", enabled: true }
+    timeout: 10000
+- tapOn: { id: "exercise-picker-repeat-last-button" }
+- extendedWaitUntil:
+    visible: { id: "exercise-set-logger" }
+    timeout: 15000
+- assertVisible: { id: "exercise-set-logger-header", text: "Set 2, in progress" }
+- waitForAnimationToEnd: { timeout: 4000 }
+- takeScreenshot: "quick-entry-repeat-logger"
+- tapOn: { id: "exercise-page-back" }
+- extendedWaitUntil:
+    visible: { id: "session-view-add-exercise" }
+    timeout: 10000
+- takeScreenshot: "quick-entry-continued-workout"
+
+# Visual counterpart to Jest's no-history state; dismissal leaves training intact.
+- openLink: "boga3://exercise-history?exerciseDefinitionId=seed_lat_pulldown"
+- extendedWaitUntil:
+    visible: { id: "exercise-history-add-to-session" }
+    timeout: 10000
+- tapOn: { id: "exercise-history-add-to-session" }
+- extendedWaitUntil:
+    visible: "No earlier workout to repeat."
+    timeout: 10000
+- waitForAnimationToEnd: { timeout: 4000 }
+- takeScreenshot: "quick-entry-no-history"
+- swipe:
+    from: { id: "exercise-session-entry-sheet-header" }
+    direction: DOWN
+    duration: 900
+- extendedWaitUntil:
+    notVisible: { id: "exercise-session-entry-sheet-header" }
+    timeout: 5000

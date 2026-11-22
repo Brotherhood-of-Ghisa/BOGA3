@@ -3,6 +3,8 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { sessionExerciseHref, type ActiveWorkoutExercise } from '@/src/navigation/active-session-entry';
+import { getAccountLocalPreferenceAccountRevision } from '@/src/preferences/account-local';
 import { subscribeOpenedWorkout } from '@/components/navigation/use-open-main-tab';
 import { SessionViewScreen, type WorkoutEndMoment } from '@/components/session-view/session-view-screen';
 import { useDailyReread } from '@/components/today/use-daily-reread';
@@ -173,8 +175,22 @@ export function TrainScreen({
     message: string;
   } | null>(null);
   const { check, end, retry, show, workoutId } = useActiveSessionCheck(isFocused, loadActiveSessionId, onWorkoutEnded);
+  const router = useRouter();
+  const [openedExercise, setOpenedExercise] = useState<(ActiveWorkoutExercise & { sessionId: string; accountRevision: number }) | null>(null);
   // Opened from a page over the tabs: shown before that page slides away.
-  useEffect(() => subscribeOpenedWorkout(show), [show]);
+  useEffect(() => subscribeOpenedWorkout((sessionId, exercise) => {
+    show(sessionId);
+    setOpenedExercise(exercise ? { ...exercise, sessionId, accountRevision: getAccountLocalPreferenceAccountRevision() } : null);
+  }), [show]);
+  const handledExercise = useRef<typeof openedExercise>(null);
+  // Push only once Train owns focus, so the exercise's Back returns to the workout.
+  useEffect(() => {
+    if (!isFocused || !openedExercise || handledExercise.current === openedExercise) return;
+    handledExercise.current = openedExercise;
+    if (openedExercise.accountRevision === getAccountLocalPreferenceAccountRevision()) {
+      router.push(sessionExerciseHref(openedExercise.sessionId, openedExercise.sessionExerciseId, openedExercise.setId));
+    }
+  }, [isFocused, openedExercise, router]);
 
   // Nothing on screen changes while a workout starts: the press is simply
   // ignored until the session view replaces the disc (or the start fails).

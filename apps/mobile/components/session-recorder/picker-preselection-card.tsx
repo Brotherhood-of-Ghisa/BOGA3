@@ -15,9 +15,10 @@ import { formatSetRow } from '@/src/session-recorder/session-view-model';
 import type { ExercisePickerPreselectionState } from '@/components/session-recorder/types';
 
 export type PickerPreselectionCardProps = {
-  state: ExercisePickerPreselectionState;
+  state: Omit<ExercisePickerPreselectionState, 'exercise'> & { exercise: { id: string; name: string } };
   /** Repeat last stays disabled until a valid historical plan is ready. */
   repeatDisabled: boolean;
+  disabled?: boolean;
   onAddEmptySet: () => void;
   onRepeat: () => void;
 };
@@ -27,7 +28,7 @@ export type PickerPreselectionCardProps = {
  * preview (the last session's sets), and the two add actions — Add empty
  * set and Repeat last, the card's one `accent`.
  */
-export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, onRepeat }: PickerPreselectionCardProps) {
+export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, onRepeat, disabled = false }: PickerPreselectionCardProps) {
   const dateFormat = useDateFormat();
   const styles = useStyles();
   const text = useUiText();
@@ -53,6 +54,8 @@ export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, o
                   key={set.setId}
                   row={formatSetRow({
                     id: set.setId,
+                    recordingMode: set.recordingMode,
+                    durationSec: set.durationSec,
                     weight: parseSetWeight(canonicalizeWeightForReps(set.weightValue, set.repsValue)),
                     reps: parseSetReps(set.repsValue),
                     setType: set.setType,
@@ -75,6 +78,7 @@ export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, o
         <View style={styles.action}>
           <ActionButton
             accessibilityLabel={`Add empty set for ${state.exercise.name}`}
+            disabled={disabled}
             label="Add empty set"
             onPress={onAddEmptySet}
             testID="exercise-picker-add-empty-set-button"
@@ -86,7 +90,7 @@ export function PickerPreselectionCard({ state, repeatDisabled, onAddEmptySet, o
             accessibilityLabel={state.status === 'loading'
               ? `Loading last workout for ${state.exercise.name}`
               : `Repeat last workout for ${state.exercise.name}`}
-            disabled={repeatDisabled}
+            disabled={disabled || repeatDisabled}
             label={state.status === 'loading' ? 'Loading...' : 'Repeat last'}
             onPress={onRepeat}
             testID="exercise-picker-repeat-last-button"

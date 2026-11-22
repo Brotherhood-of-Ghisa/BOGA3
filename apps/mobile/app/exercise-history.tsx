@@ -8,6 +8,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import { Fragment, useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
+import { ExerciseSessionEntrySheet } from '@/components/session-recorder/exercise-session-entry-sheet';
 import { ExerciseSetsCard } from '@/components/session-detail';
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
 import { useOpenMainTabFromPage } from '@/components/navigation/use-open-main-tab';
@@ -424,6 +425,7 @@ function SessionCard({
 }
 
 export default function ExerciseHistoryRoute() {
+  const styles = useStyles();
   const router = useRouter();
   const openMainTab = useOpenMainTabFromPage();
   const params = useLocalSearchParams<{
@@ -524,6 +526,7 @@ export default function ExerciseHistoryRoute() {
 
   const handleSelectGym = useCallback((gymId: string | null | undefined) => setChosenGym({ gymId }), []);
 
+  const [sessionEntryVisible, setSessionEntryVisible] = useState(false);
   const [gymSheetVisible, setGymSheetVisible] = useState(false);
   const gymOptions = useMemo(() => (summary?.gymOptions ?? []).map((option) => ({
     gymId: option.gymId,
@@ -555,11 +558,17 @@ export default function ExerciseHistoryRoute() {
           // The gym button ([[gym.view-filter]]) lives in the header, so the
           // page adds no row for it. Named either way: options merge across renders.
           headerRight: summary ? () => (
-            <GymPickerButton onPress={() => setGymSheetVisible(true)} options={gymOptions} size="compact"
-              testID="exercise-history-gym" value={appliedGymId} />
+            <View style={styles.headerActions}>
+              <GymPickerButton onPress={() => setGymSheetVisible(true)} options={gymOptions} size="compact"
+                testID="exercise-history-gym" value={appliedGymId} />
+              {!summary.exerciseDeletedAt ? <IconButton accessibilityLabel="Add exercise to session" name="plus"
+                onPress={() => setSessionEntryVisible(true)} testID="exercise-history-add-to-session" /> : null}
+            </View>
           ) : undefined,
         }}
       />
+      <ExerciseSessionEntrySheet exercise={sessionEntryVisible && summary && !summary.exerciseDeletedAt
+        ? { id: summary.exerciseDefinitionId, name: summary.exerciseName } : null} onDismiss={() => setSessionEntryVisible(false)} />
       <GymPickerSheet onChange={handleSelectGym} onClose={() => setGymSheetVisible(false)} options={gymOptions}
         testID="exercise-history-gym" value={appliedGymId} visible={gymSheetVisible} />
       <ExerciseHistoryScreenShell
@@ -581,6 +590,7 @@ export default function ExerciseHistoryRoute() {
 }
 
 const useStyles = makeStyles((roles) => ({
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
   olderDivider: {
     flexDirection: 'row',
     alignItems: 'center',

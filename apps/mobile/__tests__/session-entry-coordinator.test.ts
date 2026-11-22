@@ -1,3 +1,4 @@
+import * as accountPreferences from '@/src/preferences/account-local';
 import {
   createSessionEntryCoordinator,
   type SessionEntryDependencies,
@@ -14,6 +15,7 @@ const deferred = <T,>() => {
 };
 
 const dependencies = (): jest.Mocked<SessionEntryDependencies> => ({
+  enterExercise: jest.fn(),
   reopenCompletedSession: jest.fn().mockImplementation(async (sessionId) => ({ sessionId })),
   loadActiveSessionId: jest.fn().mockResolvedValue(null),
   createEmptySession: jest.fn().mockResolvedValue({ sessionId: 'new-session' }),
@@ -133,4 +135,63 @@ describe('session-entry coordinator', () => {
     expect(deps.loadActiveSessionId).toHaveBeenCalledTimes(1);
     expect(materialize).toHaveBeenCalledTimes(1);
   });
+});
+
+
+describe('exercise entry coordination', () => {
+  it('coalesces duplicate taps through the complete exercise write', async () => {
+    const deps = dependencies();
+    const save = deferred<{ kind: 'started'; sessionId: string; sessionExerciseId: string; setId: string }>();
+    deps.enterExercise.mockReturnValue(save.promise);
+    const coordinator = createSessionEntryCoordinator(deps);
+    const input = { exerciseDefinitionId: 'squat', mode: 'empty' as const };
+    const first = coordinator.startFromExercise(input);
+    const second = coordinator.startFromExercise(input);
+    expect(second).toBe(first);
+    save.resolve({ kind: 'started', sessionId: 's', sessionExerciseId: 'e', setId: 'set' });
+    await first;
+    expect(deps.enterExercise).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for Start and then adds the requested exercise to that workout', async () => {
+    const deps = dependencies();
+    const create = deferred<{ sessionId: string }>();
+    deps.createEmptySession.mockReturnValue(create.promise);
+    deps.loadActiveSessionId.mockResolvedValueOnce(null).mockResolvedValue('started');
+    deps.enterExercise.mockResolvedValue({ kind: 'resumed', sessionId: 'started', sessionExerciseId: 'e', setId: 'set' });
+    const coordinator = createSessionEntryCoordinator(deps);
+    const start = coordinator.startEmptyOrResume();
+    const add = coordinator.startFromExercise({ exerciseDefinitionId: 'squat', mode: 'empty' });
+    create.resolve({ sessionId: 'started' });
+    await start;
+    await add;
+    expect(deps.enterExercise).toHaveBeenCalledWith({ exerciseDefinitionId: 'squat', mode: 'empty' }, 'started');
+  });
+
+  it('releases a failed exercise request and still processes a different exercise', async () => {
+    const deps = dependencies();
+    deps.enterExercise.mockRejectedValueOnce(new Error('disk')).mockResolvedValue({ kind: 'started', sessionId: 's', sessionExerciseId: 'e', setId: 'set' });
+    const coordinator = createSessionEntryCoordinator(deps);
+    const first = coordinator.startFromExercise({ exerciseDefinitionId: 'squat', mode: 'empty' });
+    const next = coordinator.startFromExercise({ exerciseDefinitionId: 'press', mode: 'repeat' });
+    await expect(first).rejects.toThrow('disk');
+    await expect(next).resolves.toMatchObject({ sessionId: 's' });
+    await coordinator.startFromExercise({ exerciseDefinitionId: 'squat', mode: 'empty' });
+    expect(deps.enterExercise).toHaveBeenCalledTimes(3);
+  });
+});
+
+
+it('rejects a queued exercise when the account changes before its active-session read finishes', async () => {
+  const deps = dependencies();
+  const read = deferred<string | null>();
+  deps.loadActiveSessionId.mockReturnValue(read.promise);
+  const revision = jest.spyOn(accountPreferences, 'getAccountLocalPreferenceAccountRevision').mockReturnValue(1);
+  const coordinator = createSessionEntryCoordinator(deps);
+  const add = coordinator.startFromExercise({ exerciseDefinitionId: 'squat', mode: 'empty' });
+  revision.mockReturnValue(2);
+  read.resolve(null);
+  await expect(add).rejects.toThrow('account changed');
+  expect(deps.enterExercise).not.toHaveBeenCalled();
+  revision.mockRestore();
 });

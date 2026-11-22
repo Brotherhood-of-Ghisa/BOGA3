@@ -24,15 +24,16 @@ Code: `supabase/migrations/20261027163253_exercise_merge.sql`.
 
 ### exercise.merge-recovery · principle · accepted
 
-An edit from an older merged history context is preserved for explicit review
-before applying it. A newer device clock cannot bypass this rule.
-Review compares current history with saved values in the current exercise's units.
+Concurrent workout or merged-history edits retain non-conflicting changes together;
+conflicting edits are preserved for explicit review before applying them.
+A newer device clock cannot bypass this rule. Review compares current history
+with saved values in the current exercise's units.
 Keep current changes nothing; Apply writes only the reviewed change against
 freshly checked context. Unresolved changes remain visible in sync status.
 Unacknowledged recovery stays private to its account across account switches.
 
 Why: merging must never silently discard an offline edit, reverse an identity transfer or mix weight units.
-Code: `apps/mobile/src/sync/exercise-merge.ts`; `apps/mobile/src/data/exercise-merge-store.ts`.
+Code: `apps/mobile/src/sync/exercise-merge.ts`; `apps/mobile/src/data/exercise-merge-store.ts`; `apps/mobile/src/data/session-edit-rebase.ts`.
 
 ### exercise.browser-history · definition · accepted
 
@@ -55,3 +56,16 @@ defaults stay unchanged.
 
 Why: creating timed work must not reinterpret history or claim failure.
 Code: `apps/mobile/src/data/set-types.ts`; `apps/mobile/src/exercise-core/recording-mode.ts`.
+
+
+### exercise.quick-entry · definition · accepted
+
+Starting from an exercise adds to the current workout, or starts one now when
+none is active. It continues the most recent matching exercise card. Opening
+or dismissing the choice creates nothing. Empty and repeated rows need explicit
+performance confirmation; repeating history never edits the source workout or
+copies its planner attribution. A history view's filters do not set a workout's
+gym; [[gym.split]] governs the repeated targets.
+
+Why: a quick log should continue training without creating competing workouts or claiming sets were performed.
+Code: `apps/mobile/src/session-entry/exercise-entry.ts`.

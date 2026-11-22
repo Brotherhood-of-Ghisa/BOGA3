@@ -164,7 +164,7 @@ when changing activation, `docs/procedures/rule-upgrade.md`.
 
 Canonical snapshots preserve stale dirty headers, absent offline blocks and
 their children before replacement, even across split batches or future clocks.
-Editors retain the graph they loaded. Independent changes rebase; unseen
+Editors retain the graph they loaded ([[exercise.merge-recovery]]). Independent changes rebase; unseen
 remote rows survive; conflicting actual input is saved for explicit review.
 A saved-for-review outcome refreshes the editor and stops stale resubmission.
 Recovery metadata retains canonical lifecycle; missing parents apply before

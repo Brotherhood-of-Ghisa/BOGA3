@@ -125,9 +125,7 @@ export function rebaseSessionEdit<T extends WorkoutEditInput>(database: LocalDat
   input = { ...input, exercises: input.exercises.map(block => ({ ...block,
     mergeRevision: Number(known.get('session_exercises:' + block.id)?.fields.merge_revision ?? loadedRevision),
   })) };
-  const advanced = current.some(row => Number(row.fields.merge_revision ?? 0) >
-    Number(known.get(row.type + ':' + row.id)?.fields.merge_revision ?? 0));
-  if (!advanced) return input;
+  // Ordinary sync writes share a revision too: preserve their rows against this edit's baseline.
   const result = rebaseWorkoutEdit(baseline, editedRows(input), current);
   const before = baseline.find(row => row.type === 'sessions');
   const header = current.find(row => row.type === 'sessions');

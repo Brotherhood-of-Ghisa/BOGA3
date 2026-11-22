@@ -6,9 +6,11 @@ import { mainTabHref } from '@/src/navigation/main-tabs';
 export const sessionViewHref = (sessionId: string): Href =>
   `/session/${encodeURIComponent(sessionId)}` as Href;
 
+export type ActiveWorkoutExercise = { sessionExerciseId: string; setId: string };
+
 /** The exercise page for one exercise of a session. */
-export const sessionExerciseHref = (sessionId: string, sessionExerciseId: string): Href =>
-  `/session/${encodeURIComponent(sessionId)}/exercise/${encodeURIComponent(sessionExerciseId)}` as Href;
+export const sessionExerciseHref = (sessionId: string, sessionExerciseId: string, setId?: string): Href =>
+  `/session/${encodeURIComponent(sessionId)}/exercise/${encodeURIComponent(sessionExerciseId)}${setId ? `?setId=${encodeURIComponent(setId)}` : ''}` as Href;
 
 /** The exercise picker that adds an exercise to a session (an iOS page sheet). */
 export const sessionAddExerciseHref = (sessionId: string): Href =>

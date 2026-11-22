@@ -1,18 +1,15 @@
 # Navigation contract
 
-Load when changing routes, params, guards or transitions; update with code.
-For route owners, load `screen-map.md`.
+Load for routes; update with code. Route owners: `screen-map.md`.
 
 ## Router baseline
 
-- `expo-router`, file-based. Root layout `apps/mobile/app/_layout.tsx`; the root
-  stack and every root screen declaration
+- File-based `expo-router`: layout `apps/mobile/app/_layout.tsx`, root declarations
   `apps/mobile/components/navigation/root-stack.tsx`.
-- Encoding builders in `apps/mobile/src/navigation/routes.ts` and
-  `apps/mobile/src/navigation/active-session-entry.ts` build parameterized links.
-- Tab roots live in the `(tabs)` group (`apps/mobile/app/(tabs)/`), whose
-  parenthesised name never appears in a URL (`/stats-history` is
-  `app/(tabs)/stats-history.tsx`). Every other screen is a root-stack route.
+- Encode links with `apps/mobile/src/navigation/routes.ts` or
+  `apps/mobile/src/navigation/active-session-entry.ts`.
+- Tab roots live in `apps/mobile/app/(tabs)/`; `(tabs)` never appears in URLs.
+  Other screens are root-stack routes.
 - **Two kinds of page.** Tabs use `PageHeader` (Groups: a tab header), without Back. Other pages use native headers; Back returns to origin.
   `/exercise-catalog` and `/settings` also keep the tab bar
   (`apps/mobile/components/navigation/tab-owned-page.tsx`).
@@ -94,6 +91,7 @@ one access level. Screens never redirect to gate themselves:
 | | `day`, `week` | Muscle/exercise detail: one valid local day/week within History look-back. Invalid/ambiguous links render unavailable |
 | `/rm-curve` | `exerciseDefinitionId` | required; trimmed first value when repeated. A changed id remounts chart scope; invalid targets stay unavailable in route. The window anchors on focus |
 | `/sessions` | `week`, `day` | where the list opens; malformed: the top |
+| session exercise | `setId` | optional initial row; invalid: first unfinished |
 | `/exercise-history` | `exerciseDefinitionId` | required |
 | | `period` | `week` (legacy `7`), `progress`, `history`; otherwise History look-back ([[comparison.allowed-periods]]) |
 | | `tagDefinitionId`, `gymId`, `currentGymId` | pre-applied filters; `currentGymId` applies only under the current-gym past-records preference |
@@ -139,6 +137,7 @@ Only the transitions below navigate; other routes never navigate on their own.
 | the workout | `/completed-session/<id>?presentation=completion` | Finish, after its cleanup prompts and the completion write (`push` over the tabs, a fade); Train shows its disc beneath |
 | the workout | Train's disc | Abandon after its confirmation, in place |
 | `/session/<id>` (completed edit) | the previous screen | `Done`: `back()`, else `replace('/completed-session/<id>')`; completion is never replayed |
+| catalogue / exercise histories | `/train` → exercise | [[exercise.quick-entry]]: dismiss sheet, focus Train, push logger; Back returns to Train |
 | the workout | `/session/<id>/exercise/<sessionExerciseId>` | an exercise card (`push`); Back, `Complete exercise`, `Remove from session` and the title switcher's `All exercises` return `back()`, or `replace('/train')` with no history; its other rows save, then swap params in place (`setParams`), so Back still returns here |
 | the workout | `/session/<id>/add-exercise` | `+ Add exercise` (`push`, a modal page sheet); Close, swipe-down and a successful add return `back()`, a failed add stays |
 | `/session/<id>/add-exercise` | `/exercise-catalog?source=session&intent=manage` | the picker's Manage (`push`, a second sheet over it); the catalogue's post-save `back()` returns the picker as left |
