@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { ScrollView, Text } from 'react-native';
 import { ActionButton, Notice, Sheet, Stat } from '@/components/ui';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import type { BodyWeightMeasurement } from '@/src/data/schema';
@@ -34,7 +34,7 @@ export function ImportedWeightSheet({ reading, displayValue, visible, onDismiss,
   };
   return <Sheet title="Weight reading" visible={visible} testID="imported-weight-sheet"
     dismissLabel="Dismiss weight reading" onDismiss={() => { if (!saving.current) onDismiss(); }}>
-    <View style={styles.form}>
+    <ScrollView contentContainerStyle={styles.form}>
       <Stat label={formatLocalDateTime(reading.measuredAt.getTime(), dateFormat)}
         value={displayValue} />
       <Text allowFontScaling={false} style={[text.body, tone.muted]}>
@@ -43,6 +43,6 @@ export function ImportedWeightSheet({ reading, displayValue, visible, onDismiss,
       {error ? <Notice live tone="danger" message={error} testID="imported-weight-error" /> : null}
       <ActionButton label={reading.ignored ? 'Use reading' : 'Ignore'} variant="primary" disabled={busy}
         testID="imported-weight-toggle" onPress={() => void run()} />
-    </View>
+    </ScrollView>
   </Sheet>;
 }
