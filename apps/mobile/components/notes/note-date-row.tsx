@@ -6,6 +6,7 @@ import { ChoiceRow } from '@/components/ui/form-section';
 import { useUiMode } from '@/components/ui/theme-context';
 import { parseLocalDateKey, toLocalDateKey } from '@/src/data/training-notes';
 import { useDateFormat } from '@/src/preferences/hooks';
+import { iosDatePickerLocale } from '@/src/utils/local-time';
 import { noteDateLabels } from './note-row';
 
 type NoteDateRowProps = {
@@ -65,7 +66,7 @@ export function NoteDateRow({ value, onChange, disabled }: NoteDateRowProps) {
         <View style={styles.picker}>
           <DateTimePicker
             display="spinner"
-            locale={dateFormat === 'MM-DD-YYYY' ? 'en-US' : dateFormat === 'YYYY-MM-DD' ? 'sv-SE' : 'en-GB'}
+            locale={iosDatePickerLocale(dateFormat)}
             maximumDate={pickerMax}
             mode="date"
             onChange={(_event, picked) => {
