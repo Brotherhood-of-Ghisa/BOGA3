@@ -288,7 +288,7 @@ describe('Stat', () => {
       fontWeight: '500',
       color: roles.inkFaint,
     });
-    expect(flatStyle(screen.getByText('1RM')).color).toBe(roles.inkGhost);
+    expect(flatStyle(screen.getByText('1RM')).color).toBe(roles.inkFaint);
   });
 });
 
@@ -661,7 +661,7 @@ describe('ActionButton', () => {
     render(<ActionButton disabled label="Done" onPress={onPress} testID="button" variant="primary" />);
 
     const button = screen.getByTestId('button');
-    expect(flatStyle(button).backgroundColor).toBe(roles.inkGhost);
+    expect(flatStyle(button).backgroundColor).toBe(roles.inkFaint);
     expect(button.props.accessibilityState).toMatchObject({ disabled: true });
     fireEvent.press(button);
     expect(onPress).not.toHaveBeenCalled();
@@ -766,7 +766,7 @@ describe('FormField', () => {
   it('labels a field one field-height tall and shows its error below in danger', () => {
     const { rerender } = render(<FormField label="Start" onChangeText={jest.fn()} testID="start" value="" />);
     expect(flatStyle(screen.getByText('Start'))).toMatchObject({ textTransform: 'uppercase', color: roles.inkFaint });
-    expect(screen.getByTestId('start').props.placeholderTextColor).toBe(roles.inkGhost);
+    expect(screen.getByTestId('start').props.placeholderTextColor).toBe(roles.inkFaint);
     expect(flatStyle(screen.getByTestId('start')).fontFamily).toBe('IBM Plex Mono');
     expect(screen.queryByTestId('start-error')).toBeNull();
 
@@ -929,7 +929,7 @@ describe('SegmentedControl', () => {
     onChange.mockClear();
     rerender(<SegmentedControl disabled selectedGround="selection" onChange={onChange}
       options={OPTIONS} testIDPrefix="view" value="records" />);
-    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(roles.inkGhost);
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(roles.inkFaint);
     fireEvent.press(screen.getByTestId('view-last'));
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -947,7 +947,7 @@ describe('SegmentedControl', () => {
 
     expect(screen.getByTestId('view-records').props.accessibilityState).toEqual({ selected: true, disabled: true });
     expect(screen.getByTestId('view-last').props.accessibilityState).toEqual({ selected: false, disabled: true });
-    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(roles.inkGhost);
+    expect(flatStyle(screen.getByTestId('view-records')).backgroundColor).toBe(roles.inkFaint);
     fireEvent.press(screen.getByTestId('view-last'));
     expect(onChange).not.toHaveBeenCalled();
   });

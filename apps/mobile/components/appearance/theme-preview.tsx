@@ -59,7 +59,7 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
           <Text allowFontScaling={false} style={[type.figure, styles.figureCell, text(roles.ink)]}>
             82.5 × 8
           </Text>
-          <Text allowFontScaling={false} style={[type.meta, text(roles.inkGhost)]}>
+          <Text allowFontScaling={false} style={[type.meta, text(roles.inkFaint)]}>
             <FigureText>{`1RM ${PREVIEW_ONE_REP_MAX.planned}`}</FigureText>
           </Text>
         </View>
@@ -141,7 +141,6 @@ export const SPOTLIGHT: Record<CustomPart, readonly Sample[]> = {
     { kind: 'text', role: 'inkMuted', ground: 'paper', label: 'Page' },
     { kind: 'text', role: 'inkMuted', ground: 'surface', label: 'Card' },
     { kind: 'text', role: 'inkFaint', ground: 'surface', label: 'Faint' },
-    { kind: 'text', role: 'inkGhost', ground: 'surface', label: 'Ghost' },
   ],
   accent: [
     { kind: 'text', role: 'onAccent', ground: 'accent', label: 'Button' },

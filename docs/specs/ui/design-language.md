@@ -38,10 +38,10 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   `accent` and `record` stay ΔE\*ab ≥ 5 from `danger`, `gain`, `loss` and the
   regimes.
 - **`record` is never `accent`**, and clears 4.5:1 as text on `paper` and
-  `surface` — it marks figures, not just a band, so "your best ever" and "the
-  button that commits" must not read as the same mark.
-- **Each neutral family is one hue.** The inks (`ink` → `ink-muted` →
-  `ink-faint` → `ink-ghost`) take the `text` seed's; in light mode `scrim`
+  `surface`: "your best ever" and "the button that commits" must not read as
+  the same mark.
+- **Each neutral family is one hue.** The three inks (`ink` → `ink-muted` →
+  `ink-faint`) take the `text` seed's; in light mode `scrim`
   follows `ink`, at 42%. The grounds, rules and ramp take the
   `background` seed's. The shipped default keeps both at 75–95, chroma ≤ 10.
 - **`surface` is a ground, never a foreground.** A label, glyph, ring or
@@ -49,8 +49,7 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   `onSelection`, `onDanger`, or `onInk` on `ink` used as a fill. All four are
   white in light mode and black in dark. `apps/mobile/__tests__/ui-on-colour-guard.test.ts`
   rejects `surface` anywhere but a ground.
-- **A wash is a tint of its role**, within 10° of its hue, so the edited row
-  carries the accent's hue rather than the ground's.
+- **A wash is a tint of its role**, within 10° of its hue.
 - **`danger` is fixed; `direction` sets `gain`/`loss`** (§6): `green-crimson`
   (presets), `blue-orange`, or `ink` (sign only). Each pair shares one L\*,
   clearing 4.5:1 on `paper`/`surface`; `loss` stays off `danger`'s hue.
@@ -67,15 +66,18 @@ their floors are the seed's to meet.
 
 **Two ladders, one set of seeds:** `generateRoles(seeds, mode)`. Each steps
 four grounds, `well` < `paper` < `surface` < `raised` (tracks, page, cards,
-fields on a card), a card ≥ 4 L\* off the page, the light page light enough
-for every preset's `accent` at 4.5:1. Dark puts `paper` at L\*10, `ink` at L\*95.
+fields on a card), a card ≥ 4 L\* off the page. Light ≈ 90 / 92 / 97 / 100, so
+`accent` and `record` (L\* ≤ 43) clear 4.5:1 on `paper`; `ink-faint` clears 3:1
+on it and `surface`. Dark ≈ 7 / 10 / 15 / 20, `ink` at L\*95.
 `accent` (L\*72, `onAccent` black) and `record` (L\*66) take their seed's hue;
 `danger`, `gain`, `loss` and the regimes keep their light hues at L\*64;
 `selection` turns white, `scrim` 60% black. The `viz` ramp lightens in even
 steps on `background`'s hue (chroma ≥ 12), ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
 The roles take the drawn mode's ladder; `useUiMode()` reads that mode.
 
-**Choosing one.** A theme — four presets or Custom — per device, stored as
+**Choosing one.** A theme — Warm (default), Slate, Forest, Plum, Graphite
+(neutral ground), Sage (tinted ground, deepest-step accent, `blue-orange`) or
+Custom — per device, stored as
 `boga3.appearance.v3`, `{theme, mode, custom}` (`theme-record.ts`). Each save
 repaints every mounted screen (`theme-context.tsx`). With no record, the older
 `boga3.appearance.v2` is converted — a preset left to match stays that preset,
@@ -98,12 +100,12 @@ strength is a share of its L\*'s sRGB maximum. Absent newer fields draw as
 before; stored `borders`/`viz` parts are ignored. Custom starts from the
 preset in use, ungated against the floors above (`ui-theme-custom.test.ts`).
 
-The launcher icon follows the drawn theme: one per preset, one
-rainbow icon for every custom theme, Warm as default and fallback. The native boundary,
+The launcher icon follows the drawn theme: each preset's `appIcon` field
+names one (Graphite → Slate, Sage → Forest), one rainbow icon serves every
+custom theme, Warm is default and fallback. The native boundary,
 `apps/mobile/components/appearance/theme-app-icon.ts`, serializes requests while
 active and retries interruptions after foregrounding. Other native failures
-attempt the primary icon and are logged. Matching icons are left alone, avoiding
-repeated OS alerts. `app.config.ts` bundles the PNGs in
+attempt the primary icon and are logged. Matching icons are left alone. `app.config.ts` bundles the PNGs in
 `apps/mobile/assets/images/app-icons/` and supplies Android scheme filters to
 every launcher alias. Seasonal identity follows [[appearance.november]]; its
 alternates require a native build, while ordinary Warm remains primary.
@@ -118,8 +120,7 @@ labels still say how much. An empty `viz0` cell takes a `rule` hairline; a
 bar's empty track is a well. A filter showing all its values at once marks the one in
 force in `selection` (black; white in dark) with `onSelection` text
 (`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`
-shows one value and has no unselected peer, so it carries `ink` on `surface`
-(Progress's filter row, the history metric). Heatmap tiles and bars take no `selection` outline;
+shows one value and has no unselected peer, so it carries `ink` on `surface`. Heatmap tiles and bars take no `selection` outline;
 weekly selection is a caret and accessible state.
 
 ## 3. Typography
@@ -307,6 +308,4 @@ additionally render faded ([[set.row-figures]], §6).
   Mono column.
 - **No unit suffix inside an input.** The unit belongs in the field label.
 - **Which figures a set row shows**, warm-ups and planned rows included, is
-  [[set.row-figures]]. Unrealised figures are faded: values in `ink-faint`,
-  legends in `ink-ghost` (the faintest ink read too faint for the values
-  themselves).
+  [[set.row-figures]]. Unrealised figures are faded: values and legends in `ink-faint`.

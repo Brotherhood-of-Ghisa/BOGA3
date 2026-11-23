@@ -54,7 +54,7 @@ export function FormField({
           {...inputProps}
           allowFontScaling={false}
           multiline={multiline}
-          placeholderTextColor={roles.inkGhost}
+          placeholderTextColor={roles.inkFaint}
           style={[textRoles.input, face === 'figure' ? textRoles.inlineFigure : null, styles.input]}
           testID={testID}
         />

@@ -10,7 +10,7 @@ export type ThemeSeeds = {
   // page reads as one warm (or cool) family. The chart ramp takes its hue too.
   background: string;
   // A mid neutral. Its hue and chroma tint the ink family, `ink` to
-  // `inkGhost`, and `scrim`. A theme that has not split them gives both
+  // `inkFaint`, and `scrim`. A theme that has not split them gives both
   // families the same neutral.
   text: string;
   // The one primary action, used as given.
@@ -28,13 +28,14 @@ export const THEME_DIRECTIONS: readonly ThemeDirection[] = ['green-crimson', 'bl
 export const DEFAULT_DIRECTION: ThemeDirection = 'green-crimson';
 
 // The shipped theme. `background` and `text` are both `inkMuted`, the mid
-// neutral the others were picked around; `accent` and `record` are those
-// roles as picked on device (2026-09-22).
+// neutral the others were picked around; `accent` and `record` are the roles
+// picked on device (2026-09-22), darkened to L* 43 so each clears 4.5:1 on the
+// light `paper`.
 export const defaultThemeSeeds: ThemeSeeds = {
   background: '#6B6358',
   text: '#6B6358',
-  accent: '#C2410C',
-  record: '#8A6516',
+  accent: '#B83902',
+  record: '#845F0F',
   direction: DEFAULT_DIRECTION,
 };
 
@@ -57,7 +58,6 @@ type SteppedRole =
   | 'ink'
   | 'inkMuted'
   | 'inkFaint'
-  | 'inkGhost'
   | 'well'
   | 'paper'
   | 'surface'
@@ -73,28 +73,28 @@ type SteppedRole =
   | 'viz3'
   | 'viz4';
 
-// The light ladder. The inks, washes and ramp are the values the shipped roles
-// were picked at. The grounds are a ladder, `well` < `paper` < `surface` <
-// `raised`: a card stands off the page by 4 L*, and the page stays light enough for every
-// preset's `accent`, used as given, to clear 4.5:1 on it. The hairlines are
-// about 8% ink over a card.
+// The light ladder. The washes and ramp are the values the shipped roles were
+// picked at. The grounds are a ladder, `well` 90 < `paper` 92 < `surface` 97 <
+// `raised` 100: a card stands off the page by 5 L*, and every preset's `accent`,
+// used as given, clears 4.5:1 on that page. `inkFaint` clears 3:1 on `paper` and
+// `surface`. The hairlines are about 8% ink over a card.
 const LIGHT_STEPS: Record<SteppedRole, Step> = {
   ink: step('text', 8, 0.53),
   inkMuted: step('text', 42.4, 1),
-  inkFaint: step('text', 61.6, 0.83),
-  inkGhost: step('text', 72.9, 0.89),
+  inkFaint: step('text', 55, 0.83),
   // Sunken: the track of a segmented control, a slider or a bar.
-  well: step('background', 92, 0.4),
-  paper: step('background', 95.5, 0.35),
-  surface: step('background', 99.8, 0.1),
+  well: step('background', 90, 0.4),
+  paper: step('background', 92, 0.35),
+  surface: step('background', 97, 0.2),
   // An input or field on a card: white.
   raised: step('background', 100, 0),
   // Hairlines sit on the grounds, so they belong to the ground they divide,
   // not to the text drawn on it.
-  rule: step('background', 90.5, 0.7),
-  ruleSoft: step('background', 93, 0.6),
-  accentWash: step('accent', 96.9, 0.064),
-  recordWash: step('record', 96, 0.19),
+  rule: step('background', 88, 0.7),
+  ruleSoft: step('background', 91.2, 0.6),
+  // Washes are a tinted band, a step off both the page and a card.
+  accentWash: step('accent', 95.6, 0.075),
+  recordWash: step('record', 95.6, 0.19),
   recordRule: step('record', 89, 0.38),
   // Empty / rest is a neutral, not a step of the ramp's hue.
   viz0: step('background', 93.6, 0.39),
@@ -113,7 +113,6 @@ const DARK_STEPS: Record<SteppedRole, Step> = {
   ink: step('text', 95, 0.3),
   inkMuted: step('text', 65, 0.8),
   inkFaint: step('text', 49, 0.75),
-  inkGhost: step('text', 37, 0.7),
   well: step('background', 7, 0.35),
   paper: step('background', 10, 0.35),
   surface: step('background', 15, 0.35),
@@ -251,12 +250,9 @@ export type UiRoles = {
   ink: string;
   // Secondary text.
   inkMuted: string;
-  // Mini legends, tertiary labels, and not-yet-realised values.
+  // The faintest ink: mini legends, tertiary labels, not-yet-realised values
+  // and their legends, absent values, placeholders and disabled controls.
   inkFaint: string;
-  // The faintest ink: legends of not-yet-realised values (the values
-  // themselves use `inkFaint`, §6), absent values, placeholders and disabled
-  // controls.
-  inkGhost: string;
   // The four grounds, lightest last in light mode and in dark: `well` is
   // sunken (the track of a segmented control, a slider or a bar); `paper` the
   // page, a pressed control and an action strip inside a card; `surface`

@@ -70,7 +70,7 @@ function PeriodChart({ geometry }: { geometry: PeriodChartGeometry }) {
         testID="today-progress-chart-previous"
       />
       {projection ? <Line
-        stroke={roles.inkGhost}
+        stroke={roles.inkFaint}
         strokeDasharray="2 4"
         strokeLinecap="round"
         strokeWidth={2}

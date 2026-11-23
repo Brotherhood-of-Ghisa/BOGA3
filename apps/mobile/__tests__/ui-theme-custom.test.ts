@@ -68,8 +68,9 @@ describe('a preset converted to custom colours', () => {
       const preset = generateRoles(seeds, mode);
       const custom = generateCustomRoles(customFromSeeds(seeds, mode));
       // A light preset's accent is its seed as given; a custom accent is drawn
-      // at the custom L* 46, which a darker preset accent (Plum's) is 7 from.
-      const limit = (role: keyof UiRoles) => (mode === 'light' && role === 'accent' ? 7 : 3);
+      // at the custom L* 43, which a darker preset accent (Plum's L* 39, Sage's
+      // deepest step at 33) is up to 14 from.
+      const limit = (role: keyof UiRoles) => (mode === 'light' && role === 'accent' ? 14 : 3);
       const drift = ROLE_COLOURS(preset)
         .map(([role, hex]) => ({ role, delta: deltaE(hex, custom[role]) }))
         .filter(({ role, delta }) => delta > limit(role));
@@ -78,7 +79,7 @@ describe('a preset converted to custom colours', () => {
   );
 
   it('starts on the ladder’s page at the shipped depth', () => {
-    expect(WARM_LIGHT.background).toMatchObject({ lightness: 95.5, depth: 100 });
+    expect(WARM_LIGHT.background).toMatchObject({ lightness: 92, depth: 100 });
     expect(customFromSeeds(defaultThemeSeeds, 'dark').background).toMatchObject({ lightness: 10, depth: 100 });
   });
 });
@@ -101,7 +102,7 @@ describe('the page’s lightness', () => {
 
   it('keeps every ink between the page and the ink, in order', () => {
     const roles = generateCustomRoles(withBackground(WARM_LIGHT, { lightness: 70 }));
-    const lightness = (['paper', 'inkGhost', 'inkFaint', 'inkMuted', 'ink'] as const).map((role) => hexToLch(roles[role]).lightness);
+    const lightness = (['paper', 'inkFaint', 'inkMuted', 'ink'] as const).map((role) => hexToLch(roles[role]).lightness);
     expect([...lightness].sort((a, b) => b - a)).toEqual(lightness);
   });
 });
@@ -130,7 +131,7 @@ describe('depth', () => {
   it('leaves the inks, accent and ramp where they are', () => {
     const flat = generateCustomRoles(withBackground(WARM_LIGHT, { depth: 0 }));
     const deep = generateCustomRoles(withBackground(WARM_LIGHT, { depth: 300 }));
-    (['ink', 'inkMuted', 'inkFaint', 'inkGhost', 'accent', 'record', 'viz1', 'viz4', 'danger', 'gain'] as const).forEach((role) =>
+    (['ink', 'inkMuted', 'inkFaint', 'accent', 'record', 'viz1', 'viz4', 'danger', 'gain'] as const).forEach((role) =>
       expect(deep[role]).toBe(flat[role]),
     );
   });
@@ -260,7 +261,7 @@ describe('primary text', () => {
     expect(hexToLch(navy.ink).hue).toBeCloseTo(280, -1);
     expect(hexToLch(navy.ink).chroma).toBeGreaterThan(hexToLch(base.ink).chroma + 10);
     expect(hexToLch(navy.ink).lightness).toBeCloseTo(hexToLch(base.ink).lightness, 0);
-    (['inkMuted', 'inkFaint', 'inkGhost', 'paper', 'accent'] as const).forEach((role) => expect(navy[role]).toBe(base[role]));
+    (['inkMuted', 'inkFaint', 'paper', 'accent'] as const).forEach((role) => expect(navy[role]).toBe(base[role]));
   });
 
   it.each([30, 140, 200, 280])('strengthens hue %i over the whole slider, to the most its L* holds', (hue) => {
@@ -302,7 +303,7 @@ describe('secondary text’s contrast', () => {
   const atContrast = (contrast: number) => generateCustomRoles({ ...WARM_LIGHT, text: { ...WARM_LIGHT.text, contrast } });
   const gap = (roles: UiRoles, role: keyof UiRoles) => Math.abs(hexToLch(roles[role]).lightness - hexToLch(roles.paper).lightness);
 
-  it.each(['inkMuted', 'inkFaint', 'inkGhost'] as const)('moves %s toward the page below 100 and away above', (role) => {
+  it.each(['inkMuted', 'inkFaint'] as const)('moves %s toward the page below 100 and away above', (role) => {
     expect(gap(atContrast(50), role)).toBeLessThan(gap(atContrast(100), role));
     expect(gap(atContrast(150), role)).toBeGreaterThan(gap(atContrast(100), role));
     expect(gap(atContrast(0), role)).toBeLessThan(0.5);
@@ -311,7 +312,7 @@ describe('secondary text’s contrast', () => {
   it('moves the secondary inks alone', () => {
     const [low, high] = [atContrast(40), atContrast(140)];
     const moved = (Object.keys(low) as (keyof UiRoles)[]).filter((role) => low[role] !== high[role]);
-    expect(moved.sort()).toEqual(['inkFaint', 'inkGhost', 'inkMuted']);
+    expect(moved.sort()).toEqual(['inkFaint', 'inkMuted']);
   });
 
   it('never takes them past the primary text', () => {
@@ -324,8 +325,8 @@ describe('secondary text’s contrast', () => {
 describe('direction', () => {
   const directed = (direction: ThemeDirection, base = WARM_LIGHT): CustomColours => ({ ...base, direction });
 
-  it('starts as the preset’s, green and crimson', () => {
-    for (const preset of themePresets) expect(customFromSeeds(preset.seeds, 'light').direction).toBe('green-crimson');
+  it('starts as the preset’s own direction', () => {
+    for (const preset of themePresets) expect(customFromSeeds(preset.seeds, 'light').direction).toBe(preset.seeds.direction);
   });
 
   it.each(['light', 'dark'] as ThemeMode[])('moves only `gain` and `loss`, onto their hues, in %s', (mode) => {

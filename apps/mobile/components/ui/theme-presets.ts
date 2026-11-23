@@ -13,25 +13,47 @@ export type ThemePreset = {
   id: ThemePresetId;
   label: string;
   seeds: ThemeSeeds;
+  // The launcher icon it draws, by the name the config plugin registers
+  // (`app.config.ts`). A preset with no artwork of its own names another's.
+  appIcon: AppIconName;
 };
 
-export type ThemePresetId = 'warm' | 'slate' | 'forest' | 'plum';
+export type ThemePresetId = 'warm' | 'slate' | 'forest' | 'plum' | 'graphite' | 'sage';
+
+// The icons the app bundles, as `app.config.ts` names them; each also has a
+// `…November` variant.
+export type AppIconName = 'Warm' | 'Slate' | 'Forest' | 'Plum' | 'Rainbow';
 
 export const DEFAULT_THEME_PRESET_ID: ThemePresetId = 'warm';
 
+// The shipped brass, darkened to L* 43 (see the default seeds).
+const BRASS = defaultThemeSeeds.record;
+
 // In the order the Appearance page lists them. `record` stays a brass in every
 // preset: "your best ever" keeps one look whatever the accent. A preset names
-// one mid neutral, which its background and text both take.
+// one mid neutral, which its background and text both take. Every light
+// `accent` and `record` sits at L* 43 or darker, so it clears 4.5:1 on the
+// light `paper` (`ui-theme.test.ts`).
 export const themePresets: readonly ThemePreset[] = [
-  { id: 'warm', label: 'Warm', seeds: defaultThemeSeeds },
-  { id: 'slate', label: 'Slate', seeds: oneNeutral('#5B6470', { accent: '#1F6FB2', record: '#8A6516' }) },
-  { id: 'forest', label: 'Forest', seeds: oneNeutral('#5E6659', { accent: '#2F7D4F', record: '#8C5A12' }) },
-  { id: 'plum', label: 'Plum', seeds: oneNeutral('#665D66', { accent: '#8E3B8A', record: '#7A6A12' }) },
+  { id: 'warm', label: 'Warm', seeds: defaultThemeSeeds, appIcon: 'Warm' },
+  { id: 'slate', label: 'Slate', seeds: oneNeutral('#5B6470', { accent: '#1069AB', record: BRASS }), appIcon: 'Slate' },
+  { id: 'forest', label: 'Forest', seeds: oneNeutral('#5E6659', { accent: '#477032', record: '#8C5A12' }), appIcon: 'Forest' },
+  { id: 'plum', label: 'Plum', seeds: oneNeutral('#665D66', { accent: '#8E3B8A', record: '#75650C' }), appIcon: 'Plum' },
+  // A neutral ground with next to no chroma, under an orange accent.
+  { id: 'graphite', label: 'Graphite', seeds: oneNeutral('#6B6B6C', { accent: '#AE4410', record: BRASS }), appIcon: 'Slate' },
+  // A green-tinted ground; the accent is the deepest step of the ground's own
+  // hue, and a change reads blue and orange.
+  {
+    id: 'sage',
+    label: 'Sage',
+    seeds: oneNeutral('#5A6E5E', { accent: '#30563A', record: BRASS }, 'blue-orange'),
+    appIcon: 'Forest',
+  },
 ];
 
-// A preset fixes its own direction: each shipped one draws green and crimson.
-function oneNeutral(neutral: string, rest: Pick<ThemeSeeds, 'accent' | 'record'>): ThemeSeeds {
-  return { background: neutral, text: neutral, ...rest, direction: DEFAULT_DIRECTION };
+// A preset's direction is its own: most draw green and crimson.
+function oneNeutral(neutral: string, rest: Pick<ThemeSeeds, 'accent' | 'record'>, direction = DEFAULT_DIRECTION): ThemeSeeds {
+  return { background: neutral, text: neutral, ...rest, direction };
 }
 
 export function findThemePreset(id: string): ThemePreset | undefined {
@@ -57,8 +79,8 @@ export type ThemeLaunchProblem =
 export type AppearanceRecordField = 'json' | 'theme' | 'mode' | 'custom' | 'accent' | 'background' | 'text';
 
 // What the launcher icon is chosen by: every custom theme shares one icon.
-export type CustomTheme = { id: 'custom'; label: string };
-export const CUSTOM_THEME: CustomTheme = { id: 'custom', label: 'Custom' };
+export type CustomTheme = { id: 'custom'; label: string; appIcon: AppIconName };
+export const CUSTOM_THEME: CustomTheme = { id: 'custom', label: 'Custom', appIcon: 'Rainbow' };
 
 // Light, dark, or the phone's mode, followed while the app runs, for a preset. A custom theme's page
 // lightness sets its mode.

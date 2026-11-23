@@ -25,26 +25,26 @@ import themeRolesLight from './fixtures/theme-roles-light.json';
 // themes are not gated (`ui-theme-custom.test.ts`).
 
 // The palette as picked on device, its grounds and hairlines on the ground
-// ladder and its chart ramp on the background's hue. The generator is
-// calibrated to it; a role drifting further than ΔE*ab 3 from it
-// is a visible change and needs its own design decision.
+// ladder (L* 90 / 92 / 97 / 100), its `accent` and `record` darkened to L* 43
+// so each clears 4.5:1 on that page, and its chart ramp on the background's
+// hue. The generator is calibrated to it; a role drifting further than ΔE*ab 3
+// from it is a visible change and needs its own design decision.
 const PICKED_PALETTE: Omit<UiRoles, 'scrim' | OnColourRole> = {
   ink: '#1B1712',
   inkMuted: '#6B6358',
-  inkFaint: '#9B948A',
-  inkGhost: '#BAB2A7',
-  well: '#ECE8E2',
-  paper: '#F5F2ED',
-  surface: '#FFFEFD',
+  inkFaint: '#8A8379',
+  well: '#E6E2DD',
+  paper: '#EBE8E3',
+  surface: '#F8F6F3',
   raised: '#FFFFFF',
   selection: '#000000',
-  rule: '#EAE3DA',
-  ruleSoft: '#F0EAE2',
-  accent: '#C2410C',
+  rule: '#E3DCD3',
+  ruleSoft: '#EBE5DD',
+  accent: '#B83902',
   accentWash: '#FFF4EF',
-  record: '#8A6516',
+  record: '#845F0F',
   recordWash: '#FBF3E2',
-  recordRule: '#EEDFBE',
+  recordRule: '#F3DCBE',
   danger: '#A4262C',
   regimeOlder: '#006C70',
   regimeNewer: '#7A286B',
@@ -106,9 +106,9 @@ describe('lch colour space', () => {
   it('converts known colours to CIE LCh', () => {
     expect(hexToLch('#FFFFFF')).toMatchObject({ lightness: expect.closeTo(100, 1), chroma: expect.closeTo(0, 1) });
     expect(hexToLch('#000000').lightness).toBeCloseTo(0, 1);
-    const accent = hexToLch('#C2410C');
-    expect(accent.lightness).toBeCloseTo(46.0, 0);
-    expect(accent.chroma).toBeCloseTo(73.3, 0);
+    const accent = hexToLch('#B83902');
+    expect(accent.lightness).toBeCloseTo(43.0, 0);
+    expect(accent.chroma).toBeCloseTo(73.3, -1);
     expect(accent.hue).toBeCloseTo(47, -1);
   });
 
@@ -189,19 +189,14 @@ describe('theme generator', () => {
     for (const role of ['well', 'paper', 'rule', 'ruleSoft', 'viz0'] as const) {
       expect(hueDistance(hexToLch(roles[role]).hue, hexToLch(split.background).hue)).toBeLessThanOrEqual(10);
     }
-    for (const role of ['ink', 'inkMuted', 'inkFaint', 'inkGhost'] as const) {
+    for (const role of ['ink', 'inkMuted', 'inkFaint'] as const) {
       expect(hueDistance(hexToLch(roles[role]).hue, hexToLch(split.text).hue)).toBeLessThanOrEqual(10);
     }
     expect(roles.scrim).toBe(withAlpha(roles.ink, 0.42));
     // Moving one seed leaves the other family where it was.
     const warm = generateRoles(defaultThemeSeeds);
     const coolPage = generateRoles({ ...defaultThemeSeeds, background: split.background });
-    expect([coolPage.ink, coolPage.inkMuted, coolPage.inkFaint, coolPage.inkGhost]).toEqual([
-      warm.ink,
-      warm.inkMuted,
-      warm.inkFaint,
-      warm.inkGhost,
-    ]);
+    expect([coolPage.ink, coolPage.inkMuted, coolPage.inkFaint]).toEqual([warm.ink, warm.inkMuted, warm.inkFaint]);
     expect(coolPage.paper).not.toBe(warm.paper);
   });
 
@@ -224,7 +219,7 @@ describe('theme generator', () => {
     it('steps the neutrals in a fixed lightness order, each family on its own seed\'s hue', () => {
       expect(isAscending(neutralLadder(roles, mode))).toBe(true);
       // Hue is only meaningful where there is chroma to carry it.
-      for (const neutral of [roles.inkMuted, roles.inkFaint, roles.inkGhost]) {
+      for (const neutral of [roles.inkMuted, roles.inkFaint]) {
         expect(hueDistance(hexToLch(neutral).hue, hexToLch(seeds.text).hue)).toBeLessThanOrEqual(10);
       }
       expect(hueDistance(hexToLch(roles.rule).hue, hexToLch(seeds.background).hue)).toBeLessThanOrEqual(10);
@@ -273,8 +268,7 @@ describe('the dark ladder', () => {
       expect(roles).toMatchObject({
         selection: '#FFFFFF',
         danger: '#F7716B',
-        gain: '#58AC76',
-        loss: '#FF6881',
+        ...DIRECTION_PAIRS[seeds.direction as 'green-crimson' | 'blue-orange'].dark,
         regimeOlder: '#54A8AC',
         regimeNewer: '#D57DC1',
         scrim: 'rgba(0, 0, 0, 0.6)',
@@ -334,8 +328,10 @@ describe('the change directions', () => {
     }
   });
 
-  it('draws green and crimson by default: every preset, and the values shipped before directions', () => {
-    for (const seeds of Object.values(PRESET_SEEDS)) expect(seeds.direction).toBe('green-crimson');
+  it('draws green and crimson by default: every preset but Sage, and the values shipped before directions', () => {
+    for (const [name, seeds] of Object.entries(PRESET_SEEDS)) {
+      expect(seeds.direction).toBe(name === 'sage preset' ? 'blue-orange' : 'green-crimson');
+    }
     expect(generateRoles(defaultThemeSeeds)).toMatchObject({ gain: '#15703F', loss: '#C01048' });
     expect(generateRoles(defaultThemeSeeds, 'dark')).toMatchObject({ gain: '#58AC76', loss: '#FF6881' });
   });
@@ -386,6 +382,15 @@ describe('the ground ladder', () => {
     expect(broken).toEqual([]);
   });
 
+  it('sits within ±1 L* of 90 / 92 / 97 / 100 in light mode, every preset and hue', () => {
+    const target = { well: 90, paper: 92, surface: 97, raised: 100 } as const;
+    const off = cases
+      .filter(({ mode }) => mode === 'light')
+      .filter(({ roles }) => (Object.keys(target) as (keyof typeof target)[]).some((role) => Math.abs(lightnessOf(roles[role]) - target[role]) > 1))
+      .map(({ name }) => name);
+    expect(off).toEqual([]);
+  });
+
   it('no longer draws a light card white', () => {
     expect(cases.filter(({ mode, roles }) => mode === 'light' && roles.surface === '#FFFFFF').map(({ name }) => name)).toEqual([]);
   });
@@ -402,6 +407,56 @@ describe('theme presets', () => {
       expect(new Set(themePresets.map((preset) => preset[key])).size).toBe(themePresets.length);
     }
     expect(new Set(themePresets.map((preset) => preset.seeds.accent)).size).toBe(themePresets.length);
+  });
+
+  it('lists Graphite and Sage after the four it re-tunes', () => {
+    expect(themePresets.map((preset) => preset.id)).toEqual(['warm', 'slate', 'forest', 'plum', 'graphite', 'sage']);
+  });
+
+  it('gives Graphite a ground with next to no chroma, and Sage a tinted one with its deepest step as the accent', () => {
+    const graphite = getThemePreset('graphite').seeds;
+    expect(hexToLch(graphite.background).chroma).toBeLessThan(1);
+    const sage = getThemePreset('sage').seeds;
+    expect(sage.direction).toBe('blue-orange');
+    expect(hexToLch(sage.background).chroma).toBeGreaterThan(8);
+    expect(hueDistance(hexToLch(sage.accent).hue, hexToLch(sage.background).hue)).toBeLessThanOrEqual(10);
+    for (const other of themePresets.filter((preset) => preset.id !== 'sage')) {
+      expect(hexToLch(sage.accent).lightness).toBeLessThan(hexToLch(other.seeds.accent).lightness);
+    }
+  });
+
+  it('is the three inks: `inkGhost` is gone from every theme', () => {
+    for (const mode of MODES) {
+      for (const seeds of [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS)]) {
+        expect(Object.keys(generateRoles(seeds, mode))).not.toContain('inkGhost');
+        expect(Object.keys(generateRoles(seeds, mode)).filter((role) => role.startsWith('ink')).sort()).toEqual(['ink', 'inkFaint', 'inkMuted']);
+      }
+    }
+  });
+
+  it.each(MODES)('clears 3:1 for `inkFaint` on `surface` and `paper`, below `inkMuted`, in %s mode', (mode) => {
+    const seeds = [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS), ...Object.values(HUE_SEEDS)];
+    const failures = seeds
+      .map((one) => generateRoles(one, mode))
+      .filter((roles) =>
+        [roles.surface, roles.paper].some((ground) => contrastRatio(roles.inkFaint, ground) < 3) ||
+        contrastRatio(roles.inkFaint, roles.paper) >= contrastRatio(roles.inkMuted, roles.paper));
+    expect(failures).toEqual([]);
+  });
+
+  it.each(MODES.flatMap((mode) => themePresets.map((preset) => [preset.id, mode] as const)))(
+    'passes every preset gate: the %s preset in %s mode',
+    (id, mode) => {
+      expect(brokenFloors(generateRoles(getThemePreset(id).seeds, mode), mode)).toEqual([]);
+    },
+  );
+
+  it('clears 4.5:1 for every preset’s light `accent` on the light `paper`', () => {
+    const failing = themePresets.filter((preset) => {
+      const roles = generateRoles(preset.seeds);
+      return contrastRatio(roles.accent, roles.paper) < 4.5;
+    });
+    expect(failing.map((preset) => preset.id)).toEqual([]);
   });
 
   describe.each(themePresets.map((preset) => [preset.id, preset.seeds] as const))(
@@ -495,10 +550,15 @@ describe('hue seeds', () => {
 // Every role as each preset and custom hue drew it before background and
 // text were separate seeds (`fixtures/theme-roles-light.json`, generated from
 // the one-`ground` generator). An untouched choice must draw the same theme,
-// but for the grounds and hairlines the ground ladder re-stepped and the
-// ramp that now follows the background, which the calibration above pins
-// instead. `digest` covers the other roles.
-const RESTEPPED_ROLES: readonly string[] = ['paper', 'surface', 'rule', 'ruleSoft', 'viz1', 'viz2', 'viz3', 'viz4'];
+// but for the roles since re-stepped on purpose: the grounds and hairlines
+// (the ground ladder), `inkFaint` (three inks), `accent`, `record` and the
+// washes (darkened to clear 4.5:1 on the lower `paper`) and the ramp that now
+// follows the background. The calibration above pins those instead; `digest`
+// covers the other roles.
+const RESTEPPED_ROLES: readonly string[] = [
+  'inkFaint', 'paper', 'surface', 'rule', 'ruleSoft', 'accent', 'accentWash', 'record', 'recordWash', 'recordRule',
+  'viz1', 'viz2', 'viz3', 'viz4',
+];
 const LEGACY_ROLES = (Object.keys(themeRolesLight.presets.warm) as (keyof UiRoles)[]).filter(
   (role) => !RESTEPPED_ROLES.includes(role),
 );
@@ -514,7 +574,7 @@ function drift(roles: UiRoles, before: Record<string, string>): string[] {
 }
 
 describe('the presets and hue seeds', () => {
-  it.each(themePresets.map((preset) => [preset.id] as const))('draws the %s preset as before (ΔE*ab ≤ 1)', (id) => {
+  it.each(Object.keys(themeRolesLight.presets) as (keyof typeof themeRolesLight.presets)[])('draws the %s preset as before (ΔE*ab ≤ 1)', (id) => {
     const roles = generateRoles(getThemePreset(id).seeds);
     expect(drift(roles, themeRolesLight.presets[id])).toEqual([]);
     expect(roles.scrim).toBe(themeRolesLight.presets[id].scrim);
@@ -570,14 +630,15 @@ function brokenFloors(roles: UiRoles, mode: ThemeMode): string[] {
 }
 
 // The neutrals from darkest to lightest. Light mode runs from `ink` up through
-// the hairlines and the four grounds to the white field; dark mode from the
+// the hairlines and the grounds to the white field (the empty cell between the
+// page and a card); dark mode from the
 // sunken well up the grounds, then the empty cell, the hairlines and the inks
 // to `ink`.
 function neutralLadder(roles: UiRoles, mode: ThemeMode): string[] {
   if (mode === 'light') {
-    return [roles.ink, roles.inkMuted, roles.inkFaint, roles.inkGhost, roles.rule, roles.well, roles.ruleSoft, roles.viz0, roles.paper, roles.surface, roles.raised];
+    return [roles.ink, roles.inkMuted, roles.inkFaint, roles.rule, roles.well, roles.ruleSoft, roles.paper, roles.viz0, roles.surface, roles.raised];
   }
-  return [roles.well, roles.paper, roles.surface, roles.viz0, roles.raised, roles.ruleSoft, roles.rule, roles.inkGhost, roles.inkFaint, roles.inkMuted, roles.ink];
+  return [roles.well, roles.paper, roles.surface, roles.viz0, roles.raised, roles.ruleSoft, roles.rule, roles.inkFaint, roles.inkMuted, roles.ink];
 }
 
 const lightnessOf = (hex: string): number => hexToLch(hex).lightness;

@@ -86,7 +86,7 @@ export function ActionButton({
         ]}>
         {label}
       </Text>
-      {variant === 'link' ? <Icon color={disabled ? roles.inkGhost : roles.inkMuted} name="chevron-right" size="xs" /> : null}
+      {variant === 'link' ? <Icon color={disabled ? roles.inkFaint : roles.inkMuted} name="chevron-right" size="xs" /> : null}
     </Pressable>
   );
 }
@@ -117,7 +117,7 @@ const useStyles = makeStyles((roles, mode) => ({
     backgroundColor: roles.accent,
   },
   primaryDisabled: {
-    backgroundColor: roles.inkGhost,
+    backgroundColor: roles.inkFaint,
   },
   primaryPressed: {
     opacity: 0.85,
@@ -150,6 +150,6 @@ const useStyles = makeStyles((roles, mode) => ({
     color: roles.danger,
   },
   labelDisabled: {
-    color: roles.inkGhost,
+    color: roles.inkFaint,
   },
 }));

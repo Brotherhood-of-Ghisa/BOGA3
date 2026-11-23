@@ -61,7 +61,7 @@ describe('components/ui repaints when the theme changes', () => {
 
   it('FormField: the placeholder, the field and its error', async () => {
     renderWithTheme(<FormField error="Required" label="Weight" onChangeText={() => {}} testID="weight" value="" />);
-    await repaints(() => screen.getByTestId('weight').props.placeholderTextColor, (roles) => roles.inkGhost);
+    await repaints(() => screen.getByTestId('weight').props.placeholderTextColor, (roles) => roles.inkFaint);
     expect(StyleSheet.flatten(screen.getByText('Required').props.style).color).toBe(rolesFor(SLATE_DARK).danger);
   });
 

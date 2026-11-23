@@ -285,7 +285,7 @@ const useStyles = makeStyles((roles) => ({
   },
   dot: {
     ...uiMark.round(uiSpace.sm),
-    backgroundColor: roles.inkGhost,
+    backgroundColor: roles.inkFaint,
   },
   dotActive: {
     backgroundColor: roles.ink,

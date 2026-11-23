@@ -93,7 +93,7 @@ export function ChoiceRow({ label, description, value, placeholder, icon, onPres
       disabled={disabled}
       divider={divider}
       label={label}
-      leading={icon ? <Icon colorRole={disabled ? 'inkGhost' : 'inkMuted'} name={icon} size="md" /> : undefined}
+      leading={icon ? <Icon colorRole={disabled ? 'inkFaint' : 'inkMuted'} name={icon} size="md" /> : undefined}
       meta={
         <Text
           allowFontScaling={false}
@@ -146,7 +146,7 @@ export function InputRow({
           onChangeText={onChangeText}
           onEndEditing={onEndEditing}
           placeholder={placeholder}
-          placeholderTextColor={roles.inkGhost}
+          placeholderTextColor={roles.inkFaint}
           selectTextOnFocus
           style={[textRoles.input, textRoles.inlineFigure, styles.input, invalid ? styles.inputInvalid : null]}
           testID={testID}
@@ -178,7 +178,7 @@ export type ActionRowProps = {
 export function ActionRow({ label, kind = 'navigate', icon, onPress, divider = false, disabled, accessibilityLabel, testID }: ActionRowProps) {
   const roles = useUiRoles();
   const textRoles = useUiText();
-  const colourRole = disabled ? 'inkGhost' : kind === 'danger' ? 'danger' : 'accent';
+  const colourRole = disabled ? 'inkFaint' : kind === 'danger' ? 'danger' : 'accent';
   const colour = roles[colourRole];
   return (
     <ListRow

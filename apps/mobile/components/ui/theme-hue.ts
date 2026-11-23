@@ -1,23 +1,31 @@
-import { hexToLch, lchToHex } from '@/components/ui/lch';
-import { DEFAULT_DIRECTION, type ThemeSeeds } from '@/components/ui/theme';
+import { colourDistance, hexToLch, lchToHex } from '@/components/ui/lch';
+import { DEFAULT_DIRECTION, defaultThemeSeeds, generateRoles, type ThemeSeeds } from '@/components/ui/theme';
 
 // The hue names a picker shows, and the seeds of the older custom theme that
 // was one hue (stored as `hue:<deg>`), read only to convert such a choice into
 // custom colours (`theme-presets.ts`, `theme-record.ts`). The hue ring draws
 // its default colours from those seeds.
 
-// `accent` at the default's L* 46: a `surface` (white) label clears 5.1:1 on
-// it at every hue. Chroma 60 is a little under the default's 73 so the
-// greens and magentas do not glare; out-of-gamut hues lose chroma.
-const ACCENT = { lightness: 46, chroma: 60 };
+// `accent` at L* 43 or darker: it clears 4.5:1 on `paper` (L* 92), and a white
+// label clears 5.6:1 on it at every hue. Chroma 60 is a little under the
+// default's 73 so the greens and magentas do not glare; out-of-gamut hues lose
+// chroma. Near the green of `gain` and the teal of `regimeOlder` the accent
+// steps darker, to stay `ACCENT_APART` from every fixed mark.
+const ACCENT = { lightness: 43, chroma: 60 };
+const ACCENT_APART = 6;
+const ACCENT_DARKEST = 30;
+const FIXED_MARKS = (() => {
+  const { danger, gain, loss, regimeOlder, regimeNewer } = generateRoles(defaultThemeSeeds);
+  return [danger, gain, loss, regimeOlder, regimeNewer];
+})();
 // The neutrals (background and text alike) take the accent's hue at the
 // shipped seeds' L* and chroma, so a hue reads as one family, as the presets
 // do; the chart ramp follows the background.
 const NEUTRAL = { lightness: 42.4, chroma: 8 };
 // `record` stays the shipped brass unless the accent comes within
 // `RECORD_GAP` of it; then it steps that far away, on the side away from the
-// accent. L* 45 keeps it ≥ 4.5:1 on `paper`, `surface` and `record-wash`.
-const RECORD = { lightness: 45, chroma: 47, hue: hexToLch('#8A6516').hue };
+// accent. L* 43 keeps it ≥ 4.5:1 on `paper`, `surface` and `record-wash`.
+const RECORD = { lightness: 43, chroma: 47, hue: hexToLch('#8A6516').hue };
 const RECORD_GAP = 35;
 
 export function normaliseHue(hue: number): number {
@@ -49,10 +57,18 @@ export function seedsFromHue(hue: number): ThemeSeeds {
   return {
     background: neutral,
     text: neutral,
-    accent: lchToHex({ ...ACCENT, hue: h }),
+    accent: accentColour(h),
     record: lchToHex({ ...RECORD, hue: recordHue(h) }),
     direction: DEFAULT_DIRECTION,
   };
+}
+
+function accentColour(hue: number): string {
+  for (let lightness: number = ACCENT.lightness; lightness > ACCENT_DARKEST; lightness -= 0.5) {
+    const accent = lchToHex({ ...ACCENT, lightness, hue });
+    if (FIXED_MARKS.every((mark) => colourDistance(accent, mark) >= ACCENT_APART)) return accent;
+  }
+  return lchToHex({ ...ACCENT, lightness: ACCENT_DARKEST, hue });
 }
 
 function recordHue(accentHue: number): number {

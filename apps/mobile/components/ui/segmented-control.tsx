@@ -173,7 +173,7 @@ const useStyles = makeStyles((roles, mode) => ({
     backgroundColor: roles.selection,
   },
   segmentSelectedDisabled: {
-    backgroundColor: roles.inkGhost,
+    backgroundColor: roles.inkFaint,
   },
   labelOnInk: {
     color: roles.onInk,
@@ -182,7 +182,7 @@ const useStyles = makeStyles((roles, mode) => ({
     color: roles.onSelection,
   },
   labelDisabled: {
-    color: roles.inkGhost,
+    color: roles.inkFaint,
   },
 }));
 
@@ -191,4 +191,4 @@ const ON_SELECTED_GROUND: Record<'ink' | 'selection', UiRoleToken> = { ink: 'onI
 // An icon segment takes the label's colour, so the selected and disabled
 // states read the same whichever a segment draws.
 const labelRole = (selected: boolean, disabled: boolean, ground: 'ink' | 'selection'): UiRoleToken =>
-  selected ? ON_SELECTED_GROUND[ground] : disabled ? 'inkGhost' : 'inkMuted';
+  selected ? ON_SELECTED_GROUND[ground] : disabled ? 'inkFaint' : 'inkMuted';

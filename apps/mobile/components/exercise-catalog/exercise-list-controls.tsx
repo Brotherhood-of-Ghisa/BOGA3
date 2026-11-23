@@ -201,7 +201,7 @@ export function ExerciseListContent({
               testID={getFamilyGroupTestId(section.familyName)}
               trailing={
                 <Icon
-                  colorRole={empty ? 'inkGhost' : 'inkMuted'}
+                  colorRole={empty ? 'inkFaint' : 'inkMuted'}
                   name={isExpanded ? 'chevron-down' : 'chevron-right'}
                   size="sm"
                 />

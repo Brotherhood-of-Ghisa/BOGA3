@@ -83,3 +83,22 @@ describe('`surface` is never a foreground', () => {
     expect(foregroundUses(source)).toEqual([]);
   });
 });
+
+// The app has three inks (`docs/specs/ui/design-language.md` §2): the fourth,
+// `inkGhost`, is merged into `inkFaint`, and nothing may name it again.
+describe('there is no `inkGhost`', () => {
+  const GHOST = /\bink-?ghost\b/i;
+
+  it('is named nowhere in app/, components/ or src/', () => {
+    const offences = [...SCANNED, 'src'].flatMap((directory) => sourceFiles(join(MOBILE_ROOT, directory))).flatMap((path) =>
+      readFileSync(path, 'utf8')
+        .split('\n')
+        .flatMap((text, index) => (GHOST.test(text) ? [`${relative(MOBILE_ROOT, path)}:${index + 1}`] : [])),
+    );
+    expect(offences).toEqual([]);
+  });
+
+  it.each(['roles.inkGhost', "colorRole: 'inkGhost'", 'ink-ghost'])('rejects %s', (source) => {
+    expect(GHOST.test(source)).toBe(true);
+  });
+});

@@ -178,6 +178,6 @@ const useStyles = makeStyles((roles) => ({
     backgroundColor: roles.accent,
   },
   tickDisabled: {
-    backgroundColor: roles.inkGhost,
+    backgroundColor: roles.inkFaint,
   },
 }));
