@@ -38,12 +38,12 @@ const PICKED_PALETTE: Omit<UiRoles, 'scrim' | OnColourRole> = {
   surface: '#F8F6F3',
   raised: '#FFFFFF',
   selection: '#000000',
-  rule: '#E3DCD3',
-  ruleSoft: '#EBE5DD',
+  rule: '#E0D9D0',
+  ruleSoft: '#E6E0D8',
   accent: '#B83902',
-  accentWash: '#FFF4EF',
+  accentWash: '#FFECE5',
   record: '#845F0F',
-  recordWash: '#FBF3E2',
+  recordWash: '#FFEED7',
   recordRule: '#F3DCBE',
   danger: '#A4262C',
   regimeOlder: '#006C70',
@@ -108,7 +108,7 @@ describe('lch colour space', () => {
     expect(hexToLch('#000000').lightness).toBeCloseTo(0, 1);
     const accent = hexToLch('#B83902');
     expect(accent.lightness).toBeCloseTo(43.0, 0);
-    expect(accent.chroma).toBeCloseTo(73.3, -1);
+    expect(accent.chroma).toBeCloseTo(73.3, 0);
     expect(accent.hue).toBeCloseTo(47, -1);
   });
 
@@ -242,7 +242,7 @@ describe('theme generator', () => {
     it('tints each wash from its own role, close to the page', () => {
       expect(hueDistance(hexToLch(roles.accentWash).hue, hexToLch(roles.accent).hue)).toBeLessThanOrEqual(10);
       expect(hueDistance(hexToLch(roles.recordWash).hue, hexToLch(roles.record).hue)).toBeLessThanOrEqual(10);
-      if (mode === 'light') expect(hexToLch(roles.accentWash).lightness).toBeGreaterThanOrEqual(95);
+      if (mode === 'light') expect(hexToLch(roles.accentWash).lightness).toBeGreaterThanOrEqual(94);
       else expect(Math.abs(hexToLch(roles.accentWash).lightness - hexToLch(roles.paper).lightness)).toBeLessThanOrEqual(10);
     });
   });
@@ -623,6 +623,13 @@ function brokenFloors(roles: UiRoles, mode: ThemeMode): string[] {
     ]),
     ...textRoles.map((role): [string, boolean] => [`${role} on paper/surface`, legible(roles[role], [roles.paper, roles.surface])]),
     ['neutral ladder order', isAscending(neutralLadder(roles, mode))],
+    // A band and a row divider stay a visible step from the page and a card.
+    ...(['accentWash', 'recordWash', 'ruleSoft'] as const).flatMap((role) =>
+      (['paper', 'surface'] as const).map((ground): [string, boolean] => [
+        `${role} ΔE*ab ≥ 2.5 from ${ground}`,
+        deltaE(roles[role], roles[ground]) >= 2.5,
+      ]),
+    ),
     ['viz steps of 6 L*', vizSteps(roles, mode).every((stepSize) => stepSize >= 6)],
     ['one value per role', new Set(grounds(roles)).size === grounds(roles).length],
   ];
@@ -630,13 +637,14 @@ function brokenFloors(roles: UiRoles, mode: ThemeMode): string[] {
 }
 
 // The neutrals from darkest to lightest. Light mode runs from `ink` up through
-// the hairlines and the grounds to the white field (the empty cell between the
-// page and a card); dark mode from the
+// the hairlines and the grounds to the white field (`ruleSoft` below the well,
+// so a divider on the page still shows; the empty cell between the page and a
+// card); dark mode from the
 // sunken well up the grounds, then the empty cell, the hairlines and the inks
 // to `ink`.
 function neutralLadder(roles: UiRoles, mode: ThemeMode): string[] {
   if (mode === 'light') {
-    return [roles.ink, roles.inkMuted, roles.inkFaint, roles.rule, roles.well, roles.ruleSoft, roles.paper, roles.viz0, roles.surface, roles.raised];
+    return [roles.ink, roles.inkMuted, roles.inkFaint, roles.rule, roles.ruleSoft, roles.well, roles.paper, roles.viz0, roles.surface, roles.raised];
   }
   return [roles.well, roles.paper, roles.surface, roles.viz0, roles.raised, roles.ruleSoft, roles.rule, roles.inkFaint, roles.inkMuted, roles.ink];
 }

@@ -51,7 +51,7 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   rejects `surface` anywhere but a ground.
 - **A wash is a tint of its role**, within 10° of its hue.
 - **`danger` is fixed; `direction` sets `gain`/`loss`** (§6): `green-crimson`
-  (presets), `blue-orange`, or `ink` (sign only). Each pair shares one L\*,
+  (default), `blue-orange` (Sage), or `ink` (sign only). Each pair shares one L\*,
   clearing 4.5:1 on `paper`/`surface`; `loss` stays off `danger`'s hue.
 
 `regimeOlder` / `regimeNewer` are fixed categorical hues for the RM chart's fitted periods,

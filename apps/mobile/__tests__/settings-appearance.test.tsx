@@ -90,7 +90,7 @@ it('names the theme in use on Settings home and pushes the Appearance page', () 
 
 it('lists every preset as a radio row with its swatch, the current one checked', () => {
   render(<SettingsAppearanceRoute />);
-  for (const id of ['warm', 'slate', 'forest', 'plum']) {
+  for (const id of ['warm', 'slate', 'forest', 'plum', 'graphite', 'sage']) {
     expect(screen.getByTestId(`settings-appearance-option-${id}`)).toBeTruthy();
     // Decoration: hidden from accessibility, the label names the preset.
     expect(screen.getByTestId(`settings-appearance-swatch-${id}`, { includeHiddenElements: true })).toBeTruthy();

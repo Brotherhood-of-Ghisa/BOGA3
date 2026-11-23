@@ -90,11 +90,11 @@ const LIGHT_STEPS: Record<SteppedRole, Step> = {
   raised: step('background', 100, 0),
   // Hairlines sit on the grounds, so they belong to the ground they divide,
   // not to the text drawn on it.
-  rule: step('background', 88, 0.7),
-  ruleSoft: step('background', 91.2, 0.6),
-  // Washes are a tinted band, a step off both the page and a card.
-  accentWash: step('accent', 95.6, 0.075),
-  recordWash: step('record', 95.6, 0.19),
+  rule: step('background', 87, 0.7),
+  ruleSoft: step('background', 89.3, 0.6),
+  // Washes are a tinted band, ΔE*ab 2.5 off both the page and a card.
+  accentWash: step('accent', 94.8, 0.15),
+  recordWash: step('record', 94.8, 0.3),
   recordRule: step('record', 89, 0.38),
   // Empty / rest is a neutral, not a step of the ramp's hue.
   viz0: step('background', 93.6, 0.39),
