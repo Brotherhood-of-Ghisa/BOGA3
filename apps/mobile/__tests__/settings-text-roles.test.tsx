@@ -65,8 +65,8 @@ describe('PartSpotlight', () => {
   const roles = generateRoles(seedsFromHue(200));
 
   it('names each sample in meta words, in the previewed theme’s muted ink', () => {
-    renderWithTheme(<PartSpotlight part="text" roles={roles} testID="spotlight" />);
-    expect(screen.getByText('Faint')).toHaveStyle({ ...META, color: roles.inkMuted });
+    renderWithTheme(<PartSpotlight part="muted" roles={roles} testID="spotlight" />);
+    expect(screen.getByText('Field')).toHaveStyle({ ...META, color: roles.inkMuted });
   });
 });
 

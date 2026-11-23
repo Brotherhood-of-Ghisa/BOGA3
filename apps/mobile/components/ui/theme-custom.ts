@@ -15,9 +15,9 @@ import { normaliseHue } from '@/components/ui/theme-hue';
 
 // A custom theme (`docs/specs/ui/design-language.md` §2, "Custom"): the user
 // picks a hue and a strength for each of the four colour seeds, for the
-// highlight (`accentWash`) and for the primary text (`ink`, which presets step
-// from the text seed); the page's mode, lightness, depth and borders; the texts' and
-// the highlight's contrast; and the direction. Everything else is derived:
+// highlight (`accentWash`) and for the three inks (which presets step from the
+// text seed); the page's mode, lightness, depth and borders; the inks' L*; the
+// highlight's contrast; and the direction. Everything else is derived:
 // the chart ramp from the page. No readability floor is gated here — only the
 // presets are hand-checked.
 
@@ -35,13 +35,25 @@ export type CustomBackground = HueStrength & { mode: ThemeMode; lightness: numbe
 export type CustomHighlight = HueStrength & { match: boolean; contrast: number };
 // Primary text: `ink` alone, at its own L*.
 export type CustomInk = HueStrength & { lightness: number };
-// Secondary text: `inkMuted` and `inkFaint`; `contrast` (0–150) is a
-// percentage of their shipped steps from the page.
+// The text seed, which no page edits any more: its hue and strength, and
+// `contrast` (0–150, a percentage of the shipped steps of `inkMuted` and
+// `inkFaint` from the page). It draws the secondary and the muted text of a
+// theme saved before they were parts, until one of them is moved.
 export type CustomText = HueStrength & { contrast: number };
+// Secondary (`inkMuted`) or muted text (`inkFaint`: planned, not-yet-done,
+// placeholder and disabled values) at its own L*. Hue (0 to under 360),
+// strength (a share of the most chroma there) and lightness (0–100) are
+// stored unrounded, so storing the inks a theme draws repaints neither
+// (`ownInks`).
+export type OwnInk = HueStrength & { lightness: number };
 export type CustomColours = {
   background: CustomBackground;
   ink: CustomInk;
   text: CustomText;
+  // Absent (a theme saved before they were parts): stepped from the text
+  // seed. The editor stores both at once.
+  secondary?: OwnInk;
+  muted?: OwnInk;
   accent: HueStrength;
   highlight: CustomHighlight;
   record: HueStrength;
@@ -49,11 +61,14 @@ export type CustomColours = {
 };
 
 // What the editor offers, one page each: the colour parts, then the direction.
-export type CustomPart = keyof CustomColours;
+export type CustomPart = Exclude<keyof CustomColours, 'text'>;
 export type CustomColourPart = Exclude<CustomPart, 'direction'>;
-export const CUSTOM_COLOUR_PARTS: readonly CustomColourPart[] = ['background', 'ink', 'text', 'accent', 'highlight', 'record'];
+export const CUSTOM_COLOUR_PARTS: readonly CustomColourPart[] = ['background', 'ink', 'secondary', 'muted', 'accent', 'highlight', 'record'];
 export const CUSTOM_PARTS: readonly CustomPart[] = [...CUSTOM_COLOUR_PARTS, 'direction'];
 export const isColourPart = (part: CustomPart): part is CustomColourPart => part !== 'direction';
+// The secondary and the muted text: stored together, at their own L*.
+export type OwnInkPart = 'secondary' | 'muted';
+export const isOwnInkPart = (part: CustomPart): part is OwnInkPart => part === 'secondary' || part === 'muted';
 
 export const STRENGTH_MAX = 100;
 export const LIGHTNESS_MAX = 100;
@@ -82,19 +97,22 @@ export const inkDefault = (mode: ThemeMode): number => inkStep(mode).lightness;
 // Each seed's L* and the chroma a strength of 100 gives it. The L* are the
 // shipped seeds' (the neutral `inkMuted`, the accent's and the brass's 43,
 // which clear 4.5:1 on the light `paper`), so a converted preset keeps its
-// look. `ink`'s seed only paints its hue bar: primary text is drawn by
-// `gamutColour`; so does the highlight's, at the accent's.
-const SEED: Record<CustomColourPart, { lightness: number; chroma: number }> = {
+// look. The inks' seeds only paint their hue bars, at the text seed's (they
+// are drawn by `gamutColour`); so does the highlight's, at the accent's.
+type SeedPart = CustomColourPart | 'text';
+const SEED: Record<SeedPart, { lightness: number; chroma: number }> = {
   background: { lightness: 42.4, chroma: 40 },
   ink: { lightness: 42.4, chroma: 40 },
   text: { lightness: 42.4, chroma: 40 },
+  secondary: { lightness: 42.4, chroma: 40 },
+  muted: { lightness: 42.4, chroma: 40 },
   accent: { lightness: 43, chroma: 100 },
   highlight: { lightness: 43, chroma: 100 },
   record: { lightness: 43, chroma: 100 },
 };
 
 // The seed a part's hue and strength make. Out-of-gamut chroma is reduced.
-export function customSeed(part: CustomColourPart, { hue, strength }: HueStrength): string {
+export function customSeed(part: SeedPart, { hue, strength }: HueStrength): string {
   const { lightness, chroma } = SEED[part];
   return lchToHex({ lightness, chroma: (chroma * strength) / STRENGTH_MAX, hue });
 }
@@ -115,8 +133,8 @@ export function customSeeds(colours: CustomColours): ThemeSeeds {
 const gamut = (lightness: number, hue: number): number => hexToLch(lchToHex({ lightness, chroma: 150, hue })).chroma;
 
 // A colour at an L* whose strength is a share of the most that hue holds
-// there, so the whole slider changes the colour: primary text (where sRGB
-// holds little chroma) and the highlight.
+// there, so the whole slider changes the colour: the inks (where sRGB holds
+// little chroma) and the highlight.
 export function gamutColour(lightness: number, { hue, strength }: HueStrength): string {
   return lchToHex({ lightness, chroma: (gamut(lightness, hue) * strength) / STRENGTH_MAX, hue });
 }
@@ -131,6 +149,35 @@ function inkFromTextSeed(mode: ThemeMode, seed: string): HueStrength {
   const { hue, chroma } = hexToLch(seed);
   const share = (chroma * inkStep(mode).chroma) / gamut(inkDefault(mode), hue);
   return { hue: normaliseHue(hue), strength: Math.min(STRENGTH_MAX, Math.round(share * STRENGTH_MAX)) };
+}
+
+// A drawn colour as an ink at its own L*, unrounded: `gamutColour` draws the
+// same hex again. An L* that holds no chroma (black, white) has strength 0.
+function ownInkOf(colour: string): OwnInk {
+  const { lightness, chroma, hue } = hexToLch(colour);
+  const at = clamp(lightness);
+  const most = gamut(at, hue);
+  return { hue, strength: most > 0 ? Math.min(STRENGTH_MAX, (chroma / most) * STRENGTH_MAX) : 0, lightness: at };
+}
+
+// The secondary and the muted text, each at its own L*: as stored, else as
+// the theme draws them now. The editor stores both on the first move of
+// either, so neither jumps.
+export function ownInks(colours: CustomColours): Record<OwnInkPart, OwnInk> {
+  const { secondary, muted } = colours;
+  let roles: UiRoles | undefined;
+  const drawn = (): UiRoles => (roles ??= generateCustomRoles(colours));
+  return { secondary: secondary ?? ownInkOf(drawn().inkMuted), muted: muted ?? ownInkOf(drawn().inkFaint) };
+}
+
+// The secondary and the muted text on a newly chosen mode: those stored go to
+// that ladder's L* (as primary text goes to its `ink`); those not yet stored
+// stay absent, stepped from the new page.
+export function inksInMode({ secondary, muted }: CustomColours, mode: ThemeMode): Partial<Record<OwnInkPart, OwnInk>> {
+  return {
+    ...(secondary === undefined ? {} : { secondary: { ...secondary, lightness: inkStep(mode, 'inkMuted').lightness } }),
+    ...(muted === undefined ? {} : { muted: { ...muted, lightness: inkStep(mode, 'inkFaint').lightness } }),
+  };
 }
 
 // The ladder a custom theme draws on: its page's chosen mode.
@@ -203,9 +250,10 @@ const short = (lightness: number, page: number, limit: number): number =>
 // seeds, then moved onto the chosen page (`moveRole`): depth scales the
 // grounds and empty cells, borders the hairlines, the secondary text's contrast its inks,
 // the highlight's its band. `surface` and `raised` take the page's hue and
-// chroma. Primary text sits at its own L*; every other role keeps its place
-// measured from the ladder's `ink`. The `ink` direction draws both changes in
-// the drawn `ink`.
+// chroma. Primary text sits at its own L*, and so do the secondary and the
+// muted text once they have one (`ownInkRoles`); every other role keeps its
+// place measured from the ladder's `ink`. The `ink` direction draws both
+// changes in the drawn `ink`.
 export function generateCustomRoles(colours: CustomColours): UiRoles {
   const mode = customMode(colours);
   const reference: UiRoles = {
@@ -228,7 +276,7 @@ export function generateCustomRoles(colours: CustomColours): UiRoles {
       return [role, moveRole(role, value, frame, roleScale(role, colours), SECONDARY_ROLES.has(role) ? inkLightness : null)];
     }),
   ) as UiRoles;
-  const inked = atLadder ? moved : { ...moved, ink: gamutColour(colours.ink.lightness, colours.ink) };
+  const inked = { ...moved, ...(atLadder ? {} : { ink: gamutColour(colours.ink.lightness, colours.ink) }), ...ownInkRoles(colours) };
   // A custom page and its cards are one family of lightness: text on the page
   // is drawn in the inks, and the step below a card is the page.
   const paged = { ...inked, pageInk: inked.ink, pageInkMuted: inked.inkMuted, pageInkFaint: inked.inkFaint, inset: inked.paper };
@@ -240,12 +288,21 @@ export function generateCustomRoles(colours: CustomColours): UiRoles {
 
 const clamp = (lightness: number): number => Math.min(LIGHTNESS_MAX, Math.max(0, lightness));
 
+// The secondary and the muted text drawn at their own L*, with no limit
+// against `ink` or each other.
+function ownInkRoles({ secondary, muted }: CustomColours): Partial<UiRoles> {
+  return {
+    ...(secondary === undefined ? {} : { inkMuted: gamutColour(secondary.lightness, secondary) }),
+    ...(muted === undefined ? {} : { inkFaint: gamutColour(muted.lightness, muted) }),
+  };
+}
+
 // The custom colours nearest a theme's seeds, drawn on a mode: each seed's hue
 // and strength, the page at that ladder's `paper`, the shipped depth and
 // contrasts, and the seeds' direction. Used when the user first picks
 // Custom, starting from the theme they were on.
 export function customFromSeeds(seeds: ThemeSeeds, mode: ThemeMode): CustomColours {
-  const pick = (part: CustomColourPart, seed: string): HueStrength => {
+  const pick = (part: SeedPart, seed: string): HueStrength => {
     const { hue, chroma } = hexToLch(seed);
     return { hue: normaliseHue(hue), strength: Math.min(STRENGTH_MAX, Math.round((chroma / SEED[part].chroma) * STRENGTH_MAX)) };
   };
@@ -270,6 +327,10 @@ const isInteger =
     typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max;
 const isLightness = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value / LIGHTNESS_STEP) && value >= 0 && value <= LIGHTNESS_MAX;
+const isWithin =
+  (max: number, below = false) =>
+  (value: unknown): value is number =>
+    typeof value === 'number' && Number.isFinite(value) && value >= 0 && (below ? value < max : value <= max);
 const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
 const isMode = (value: unknown): value is ThemeMode => value === 'light' || value === 'dark';
 const isDirection = (value: unknown): value is ThemeDirection => THEME_DIRECTIONS.includes(value as ThemeDirection);
@@ -298,6 +359,25 @@ function parseBackground(value: unknown): CustomBackground | null {
   if (mode === null) return null;
   if (value.borders === undefined) return { ...colour, mode, lightness, depth };
   return isInteger(BORDERS_MAX)(value.borders) ? { ...colour, mode, lightness, depth, borders: value.borders } : null;
+}
+
+// An ink at its own L*, its values unrounded (`OwnInk`).
+function parseOwnInk(value: unknown): OwnInk | null {
+  if (!isFields(value)) return null;
+  const { hue, strength, lightness } = value;
+  return isWithin(360, true)(hue) && isWithin(STRENGTH_MAX)(strength) && isWithin(LIGHTNESS_MAX)(lightness) ? { hue, strength, lightness } : null;
+}
+
+// The secondary and the muted text, each absent or at its own L*.
+function parseOwnInks(stored: Fields): Partial<Record<OwnInkPart, OwnInk>> | null {
+  const inks: Partial<Record<OwnInkPart, OwnInk>> = {};
+  for (const part of ['secondary', 'muted'] as const) {
+    if (stored[part] === undefined) continue;
+    const ink = parseOwnInk(stored[part]);
+    if (ink === null) return null;
+    inks[part] = ink;
+  }
+  return inks;
 }
 
 function parseHighlight(value: unknown): CustomHighlight | null {
@@ -337,7 +417,9 @@ export const matchingHighlight = (accent: HueStrength, mode: ThemeMode): CustomH
 // Fields added since the first custom themes are optional, and each default
 // draws what the theme drew before the field existed: the mode from the
 // lightness, a highlight that matches the accent, the primary text from the
-// secondary at its ladder's L*, the shipped text contrast, green and crimson.
+// secondary at its ladder's L*, the shipped text contrast, the secondary and
+// muted text stepped from the page by it (absent `secondary`, `muted`), green
+// and crimson.
 // The top-level parts since removed — `borders` (it is `background.borders`
 // now, absent following the depth) and `viz` (the ramp follows the page) — are
 // ignored like any unknown field.
@@ -348,8 +430,9 @@ export function parseCustomColours(value: unknown): CustomColours | null {
   if (background === null || text === null || accent === null || record === null) return null;
   const ink = parseInk(value, background.mode, text);
   const textColour = withField(text, value.text, 'contrast', isInteger(TEXT_CONTRAST_MAX), DEFAULT_CONTRAST);
+  const inks = parseOwnInks(value);
   const highlight = value.highlight === undefined ? matchingHighlight(accent, background.mode) : parseHighlight(value.highlight);
   const direction = optional(value.direction, isDirection, DEFAULT_DIRECTION);
-  if (ink === null || textColour === null || highlight === null || direction === null) return null;
-  return { background, ink, text: textColour, accent, highlight, record, direction };
+  if (ink === null || textColour === null || inks === null || highlight === null || direction === null) return null;
+  return { background, ink, text: textColour, ...inks, accent, highlight, record, direction };
 }

@@ -137,10 +137,15 @@ export const SPOTLIGHT: Record<CustomPart, readonly Sample[]> = {
     // A light page dims behind a sheet with `ink`.
     { kind: 'fill', role: 'scrim', label: 'Backdrop' },
   ],
-  text: [
+  secondary: [
     { kind: 'text', role: 'inkMuted', ground: 'paper', label: 'Page' },
     { kind: 'text', role: 'inkMuted', ground: 'surface', label: 'Card' },
-    { kind: 'text', role: 'inkFaint', ground: 'surface', label: 'Faint' },
+  ],
+  // Planned and not-yet-done values on the page and a card; a placeholder in a field.
+  muted: [
+    { kind: 'text', role: 'inkFaint', ground: 'paper', label: 'Page' },
+    { kind: 'text', role: 'inkFaint', ground: 'surface', label: 'Card' },
+    { kind: 'text', role: 'inkFaint', ground: 'raised', label: 'Field' },
   ],
   accent: [
     { kind: 'text', role: 'onAccent', ground: 'accent', label: 'Button' },

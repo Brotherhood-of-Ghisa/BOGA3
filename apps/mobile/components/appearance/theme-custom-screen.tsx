@@ -26,26 +26,31 @@ import {
   highlightFromAccent,
   INK_RANGE,
   inkDefault,
+  inksInMode,
+  isOwnInkPart,
   LIGHTNESS_MAX,
   LIGHTNESS_STEP,
+  ownInks,
   PAGE_DEFAULT,
   isColourPart,
   PAGE_RANGE,
   STRENGTH_MAX,
-  TEXT_CONTRAST_MAX,
   type CustomColourPart,
   type CustomColours,
   type CustomPart,
   type HueStrength,
+  type OwnInk,
 } from '@/components/ui/theme-custom';
-import { hueName } from '@/components/ui/theme-hue';
+import { hueName, normaliseHue } from '@/components/ui/theme-hue';
 import { startingCustom, type AppearanceChoice } from '@/components/ui/theme-presets';
 
-type Draft = CustomColours[CustomPart];
+type Draft = NonNullable<CustomColours[CustomPart]>;
 // A slider's field of a part.
 type Field = 'hue' | 'strength' | 'lightness' | 'depth' | 'borders' | 'contrast';
 
-const percent = (value: number): string => `${value}%`;
+// The secondary and the muted text store unrounded values (`OwnInk`): shown
+// whole.
+const percent = (value: number): string => `${Math.round(value)}%`;
 const HUE_MAX = 359;
 const HUE_SEGMENTS = 36;
 // The hue bar's paint for each colour part: each segment the colour its hue
@@ -64,20 +69,30 @@ const HUE_PAINT = Object.fromEntries(
 const PART_ROLE: Record<CustomColourPart, keyof UiRoles> = {
   background: 'paper',
   ink: 'ink',
-  text: 'inkMuted',
+  secondary: 'inkMuted',
+  muted: 'inkFaint',
   accent: 'accent',
   highlight: 'accentWash',
   record: 'record',
 };
 const PART_OPTIONS = CUSTOM_PARTS.map((id) => ({ id, label: CUSTOM_PART_LABELS[id] }));
 // What VoiceOver hears for a hue; the bar itself shows no words.
-const hueLabel = (hue: number): string => `${hueName(hue)}, ${hue} degrees`;
-const lightnessLabel = (value: number): string => (value === 0 ? 'Black' : value === LIGHTNESS_MAX ? 'White' : `${value}`);
+const hueLabel = (hue: number): string => `${hueName(hue)}, ${normaliseHue(hue)} degrees`;
+const lightnessLabel = (value: number): string =>
+  value === 0 ? 'Black' : value === LIGHTNESS_MAX ? 'White' : `${Math.round(value / LIGHTNESS_STEP) * LIGHTNESS_STEP}`;
 
 // The custom colours a choice draws, or the ones it would start from.
 function customOf(appearance: AppearanceChoice, phoneScheme: ColorSchemeName | null): CustomColours {
   return startingCustom(appearance, previewMode(appearance, phoneScheme));
 }
+
+// The colours a part's page shows: the secondary's and the muted text's
+// pages show both at their own L*, as the theme draws them now (`ownInks`).
+const shownFor = (part: CustomPart, colours: CustomColours): CustomColours =>
+  isOwnInkPart(part) ? { ...colours, ...ownInks(colours) } : colours;
+
+// A part's value; the muted text's drawn when not yet stored.
+const partOf = (colours: CustomColours, part: CustomPart): Draft => colours[part] ?? ownInks(colours).muted;
 
 // What a part's controls are given: the colours being made (the draft in
 // place), a live and a let-go handler per slider, a save of several parts at
@@ -122,8 +137,8 @@ function HueStrengthRows({ change, end, swatch, part, colour, divider }: Control
 }
 
 // The page: its mode, hue and strength, lightness over the mode's range, and
-// depth and borders. Switching the mode puts the page and the primary text at that
-// ladder's defaults.
+// depth and borders. Switching the mode puts the page and the inks at that
+// ladder's defaults (`inksInMode`).
 function BackgroundControls(controls: Controls) {
   const { colours, change, end, save } = controls;
   const { background } = colours;
@@ -132,6 +147,7 @@ function BackgroundControls(controls: Controls) {
     save((intended) => ({
       background: { ...background, mode, lightness: PAGE_DEFAULT[mode] },
       ink: { ...intended.ink, lightness: inkDefault(mode) },
+      ...inksInMode(intended, mode),
     }));
   };
   const range = PAGE_RANGE[background.mode];
@@ -226,21 +242,23 @@ function InkControls(controls: Controls) {
   );
 }
 
-// Secondary text: a hue and strength, and how far its inks step from the page.
-function TextControls(controls: Controls) {
-  const { colours, change, end } = controls;
+// Secondary or muted text: a hue and strength, and its L* over the whole
+// range, with no limit against the other inks.
+function OwnInkControls(controls: Controls & { colour: OwnInk }) {
+  const { colour, change, end } = controls;
   return (
     <>
-      <HueStrengthRows {...controls} colour={colours.text} divider={false} />
+      <HueStrengthRows {...controls} colour={colour} divider={false} />
       <SliderRow
         divider
-        format={percent}
-        label="Contrast"
-        max={TEXT_CONTRAST_MAX}
-        onChange={change('contrast')}
-        onChangeEnd={end('contrast')}
-        testID="theme-custom-contrast"
-        value={colours.text.contrast}
+        format={lightnessLabel}
+        label="Lightness"
+        max={LIGHTNESS_MAX}
+        onChange={change('lightness')}
+        onChangeEnd={end('lightness')}
+        step={LIGHTNESS_STEP}
+        testID="theme-custom-lightness"
+        value={colour.lightness}
       />
     </>
   );
@@ -272,8 +290,11 @@ function PartControls(controls: Controls) {
       return <DirectionControls {...controls} />;
     case 'ink':
       return <InkControls {...controls} />;
-    case 'text':
-      return <TextControls {...controls} />;
+    case 'secondary':
+    case 'muted': {
+      const inks = ownInks(controls.colours);
+      return <OwnInkControls {...controls} colour={inks[controls.part]} />;
+    }
     case 'highlight':
       return <HighlightControls {...controls} />;
     default:
@@ -290,10 +311,12 @@ const editOf = (draft: Draft, field: Field, value: number): Draft => {
   return { ...draft, ...pinned, [field]: value } as Draft;
 };
 
-// Settings → Appearance → Custom → one part (background, primary text,
-// secondary text, accent, highlight, best ever): a hue on a painted bar and
+// Settings → Appearance → Custom → one part (background, primary, secondary
+// and muted text, accent, highlight, best ever): a hue on a painted bar and
 // a strength, and the part's own controls — the page's mode, lightness,
-// depth and borders; the highlight's match and contrast; the texts' lightness or contrast.
+// depth and borders; the highlight's match and contrast; the inks' lightness.
+// The secondary and the muted text are stored together: the first move of
+// either stores both as drawn (`ownInks`), so the other does not jump.
 // The direction's page offers its three choices instead.
 // Then the part's roles alone (`PartSpotlight`) and the whole theme on a
 // small mock, both live while a control is held. A part saves when a slider
@@ -303,8 +326,8 @@ const editOf = (draft: Draft, field: Field, value: number): Draft => {
 export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; onChoosePart: (part: CustomPart) => void }) {
   const { appearance, saveError, commit, applying } = useAppearanceCommit();
   const phoneScheme = usePhoneScheme();
-  const [draft, setDraft] = useState<Draft>(() => customOf(appearance, phoneScheme)[part]);
-  const colours: CustomColours = { ...customOf(appearance, phoneScheme), [part]: draft };
+  const [draft, setDraft] = useState<Draft>(() => partOf(shownFor(part, customOf(appearance, phoneScheme)), part));
+  const colours: CustomColours = { ...shownFor(part, customOf(appearance, phoneScheme)), [part]: draft };
   const chosen: AppearanceChoice = { ...appearance, theme: 'custom', custom: colours };
   const roles = appearanceRoles(chosen, phoneScheme);
   const liveRoles = useUiRoles();
@@ -327,7 +350,10 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
     colours,
     change: (field) => (value) => setDraft((current) => editOf(current, field, value)),
     end: (field) => (value) => {
-      void save(() => ({ [part]: editOf(draft, field, value) }));
+      const edited = editOf(draft, field, value);
+      // A secondary or muted text let go where it was stores nothing new.
+      const moved = !isOwnInkPart(part) || (draft as OwnInk)[field as keyof OwnInk] !== value;
+      void save((intended) => (moved ? { ...(isOwnInkPart(part) ? ownInks(intended) : {}), [part]: edited } : {}));
     },
     save: (patchOf) => {
       void save(patchOf);

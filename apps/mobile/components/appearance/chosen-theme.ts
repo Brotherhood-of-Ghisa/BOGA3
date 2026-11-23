@@ -4,7 +4,7 @@ import type { ColorSchemeName } from 'react-native';
 import type { ThemeDirection, ThemeMode, UiRoles } from '@/components/ui/theme';
 import { useAppTheme } from '@/components/ui/theme-context';
 import { followsPhone } from '@/components/ui/theme-native';
-import type { CustomPart } from '@/components/ui/theme-custom';
+import { isOwnInkPart, ownInks, type CustomPart } from '@/components/ui/theme-custom';
 import { hueName } from '@/components/ui/theme-hue';
 import { readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
 import {
@@ -70,7 +70,8 @@ export const MODE_LABELS: Record<AppearanceMode, string> = { light: 'Light', dar
 export const CUSTOM_PART_LABELS: Record<CustomPart, string> = {
   background: 'Background',
   ink: 'Primary text',
-  text: 'Secondary text',
+  secondary: 'Secondary text',
+  muted: 'Muted text',
   accent: 'Accent',
   highlight: 'Highlight',
   record: 'Best ever',
@@ -102,7 +103,8 @@ export function themeLabel(appearance: AppearanceChoice): string {
   return appearance.theme === 'custom' ? 'Custom' : getThemePreset(appearance.theme as ThemePresetId).label;
 }
 
-// A custom part's value as a row shows it: its hue's name and strength; for
+// A custom part's value as a row shows it: its hue's name and strength (the
+// secondary's and muted text's as drawn); for
 // the background its mode and lightness first; a highlight that matches the
 // accent says so; the direction its name.
 export function customPartLabel(appearance: AppearanceChoice, part: CustomPart): string {
@@ -110,8 +112,9 @@ export function customPartLabel(appearance: AppearanceChoice, part: CustomPart):
   if (!colours) return '';
   if (part === 'direction') return DIRECTION_LABELS[colours.direction];
   if (part === 'highlight' && colours.highlight.match) return 'Match accent';
-  const { hue, strength } = colours[part];
-  const words = [hueName(hue), `${strength}%`];
+  // The secondary and the muted text as their pages show them (unrounded).
+  const { hue, strength } = isOwnInkPart(part) ? ownInks(colours)[part] : colours[part];
+  const words = [hueName(hue), `${Math.round(strength)}%`];
   if (part !== 'background') return words.join(', ');
   const { mode, lightness } = colours.background;
   return [MODE_LABELS[mode], ...words, `lightness ${lightness}`].join(', ');

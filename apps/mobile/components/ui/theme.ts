@@ -366,10 +366,11 @@ export type UiRoles = {
   onInk: string;
 };
 
-// The `ink` step of a mode's ladder: its L* and the share of the text seed's
-// chroma it takes. A custom theme draws its primary text there.
-export function inkStep(mode: ThemeMode): { lightness: number; chroma: number } {
-  const { lightness, chroma } = (mode === 'light' ? LIGHT_STEPS : DARK_STEPS).ink;
+// An ink's step on a mode's ladder (`ink` unless named): its L* and the share
+// of the text seed's chroma it takes. A custom theme draws its primary text
+// there, and its other inks when the mode is switched.
+export function inkStep(mode: ThemeMode, role: 'ink' | 'inkMuted' | 'inkFaint' = 'ink'): { lightness: number; chroma: number } {
+  const { lightness, chroma } = (mode === 'light' ? LIGHT_STEPS : DARK_STEPS)[role];
   return { lightness, chroma };
 }
 

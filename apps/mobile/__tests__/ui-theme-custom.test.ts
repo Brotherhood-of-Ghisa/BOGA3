@@ -18,10 +18,14 @@ import {
   gamutColour,
   generateCustomRoles,
   highlightFromAccent,
+  inksInMode,
+  ownInks,
   parseCustomColours,
   type CustomColours,
+  type OwnInk,
 } from '@/components/ui/theme-custom';
 import { themePresets } from '@/components/ui/theme-presets';
+import TEXT_CONTRAST_ROLES from './fixtures/custom-text-contrast-roles.json';
 
 // A custom theme (`docs/specs/ui/design-language.md` §2, "Custom"): a hue and
 // strength per colour seed, the page's mode, lightness and depth, the texts'
@@ -31,8 +35,10 @@ import { themePresets } from '@/components/ui/theme-presets';
 // that depth and the secondary text's contrast each move only their roles,
 // that the hairlines and the chart ramp follow the page, and what a stored
 // value must hold. The highlight follows the accent unless it is given its
-// own, and its contrast moves only its band. No readability floor is gated:
-// custom colours are the user's.
+// own, and its contrast moves only its band. The secondary and the muted text
+// step from the text seed until they are stored at their own L*, which then
+// moves each alone. No readability floor is gated: custom colours are the
+// user's.
 
 const ROLE_COLOURS = (roles: UiRoles) =>
   Object.entries(roles).filter(([role]) => role !== 'scrim') as [keyof UiRoles, string][];
@@ -371,6 +377,96 @@ describe('secondary text’s contrast', () => {
   });
 });
 
+describe('secondary and muted text', () => {
+  // Every role but the scrim (`ROLE_COLOURS`) that differs between two themes.
+  const changed = (before: CustomColours, after: CustomColours) => {
+    const [a, b] = [generateCustomRoles(before), generateCustomRoles(after)];
+    return (Object.keys(a) as (keyof UiRoles)[]).filter((role) => a[role] !== b[role]).sort();
+  };
+  // Stored at their own L*, as the editor's first move stores them.
+  const owned = (colours: CustomColours): CustomColours => ({ ...colours, ...ownInks(colours) });
+  const DARK = customFromSeeds(themePresets[1].seeds, 'dark');
+
+  it('draws a theme stored with only the text contrast byte for byte as the build before them', () => {
+    const drift = TEXT_CONTRAST_ROLES.cases.filter(({ stored, roles }) => {
+      const read = parseCustomColours(JSON.parse(JSON.stringify(stored)))!;
+      return JSON.stringify(generateCustomRoles(read)) !== JSON.stringify(roles);
+    });
+    expect(TEXT_CONTRAST_ROLES.cases.length).toBeGreaterThanOrEqual(48);
+    expect(new Set(TEXT_CONTRAST_ROLES.cases.map(({ stored }) => stored.background.mode))).toEqual(new Set(['light', 'dark']));
+    expect(new Set(TEXT_CONTRAST_ROLES.cases.map(({ stored }) => stored.text.contrast))).toEqual(new Set([0, 40, 100, 150]));
+    expect(drift).toEqual([]);
+  });
+
+  it('stores the inks as drawn: the conversion repaints nothing, on any preset, mode, page or contrast', () => {
+    const drift = TEXT_CONTRAST_ROLES.cases.filter(({ stored }) => {
+      const read = parseCustomColours(JSON.parse(JSON.stringify(stored)))!;
+      const converted = parseCustomColours(JSON.parse(JSON.stringify(owned(read))))!;
+      return JSON.stringify(generateCustomRoles(converted)) !== JSON.stringify(generateCustomRoles(read));
+    });
+    expect(drift).toEqual([]);
+  });
+
+  it('keeps what is already stored when converting', () => {
+    const secondary: OwnInk = { hue: 12.5, strength: 33.3, lightness: 61 };
+    expect(ownInks({ ...WARM_LIGHT, secondary })).toEqual({ secondary, muted: ownInks(WARM_LIGHT).muted });
+  });
+
+  it.each([
+    ['light', WARM_LIGHT],
+    ['dark', DARK],
+  ] as const)('on a %s page, moves each control of each only its own role and its page ink', (_mode, base) => {
+    const start = owned(base);
+    const edits: [keyof OwnInk, number][] = [
+      ['hue', (start.secondary!.hue + 120) % 360],
+      ['strength', 100],
+      ['lightness', 50],
+    ];
+    edits.forEach(([field, value]) => {
+      expect(changed(start, { ...start, secondary: { ...start.secondary!, [field]: value } })).toEqual(['inkMuted', 'pageInkMuted']);
+      expect(changed(start, { ...start, muted: { ...start.muted!, [field]: value } })).toEqual(['inkFaint', 'pageInkFaint']);
+    });
+  });
+
+  it('draws each at its own hue and strength, a share of the most chroma its L* holds', () => {
+    const roles = generateCustomRoles({ ...WARM_LIGHT, secondary: { hue: 140, strength: 100, lightness: 55 }, muted: { hue: 20, strength: 50, lightness: 70 } });
+    expect(roles.inkMuted).toBe(gamutColour(55, { hue: 140, strength: 100 }));
+    expect(roles.inkFaint).toBe(gamutColour(70, { hue: 20, strength: 50 }));
+    expect([roles.pageInkMuted, roles.pageInkFaint]).toEqual([roles.inkMuted, roles.inkFaint]);
+  });
+
+  it.each(['light', 'dark'] as const)('accepts a lightness of 0 and 100 on a %s page, with no limit against `ink` or each other', (mode) => {
+    const base = customFromSeeds(defaultThemeSeeds, mode);
+    [0, 100].forEach((lightness) => {
+      const colours = { ...base, secondary: { hue: 50, strength: 40, lightness }, muted: { hue: 50, strength: 40, lightness: 100 - lightness } };
+      const read = parseCustomColours(JSON.parse(JSON.stringify(colours)))!;
+      expect(read).toEqual(colours);
+      const roles = generateCustomRoles(read);
+      expect(hexToLch(roles.inkMuted).lightness).toBeCloseTo(lightness, 0);
+      expect(hexToLch(roles.inkFaint).lightness).toBeCloseTo(100 - lightness, 0);
+    });
+  });
+
+  it('ignores the text contrast once both are stored', () => {
+    const start = owned(WARM_LIGHT);
+    expect(changed(start, { ...start, text: { ...start.text, contrast: 150 } })).toEqual([]);
+  });
+
+  it('puts the stored ones at the new ladder’s L* when the mode is switched, and leaves the rest absent', () => {
+    const start = owned(WARM_LIGHT);
+    expect(inksInMode(start, 'dark')).toEqual({
+      secondary: { ...start.secondary, lightness: inkStep('dark', 'inkMuted').lightness },
+      muted: { ...start.muted, lightness: inkStep('dark', 'inkFaint').lightness },
+    });
+    expect(inksInMode(WARM_LIGHT, 'dark')).toEqual({});
+  });
+
+  it('starts absent when a preset is converted', () => {
+    expect(WARM_LIGHT.secondary).toBeUndefined();
+    expect(WARM_LIGHT.muted).toBeUndefined();
+  });
+});
+
 describe('direction', () => {
   const directed = (direction: ThemeDirection, base = WARM_LIGHT): CustomColours => ({ ...base, direction });
 
@@ -498,6 +594,8 @@ describe('parseCustomColours', () => {
       ink: { ...WARM_LIGHT.ink, lightness: 88.75 },
       text: { ...WARM_LIGHT.text, contrast: 130 },
       highlight: { hue: 120, strength: 55, match: false, contrast: 260 },
+      secondary: { hue: 359.75, strength: 0, lightness: 0 },
+      muted: { hue: 0, strength: 87.123456789, lightness: 63.0000001 },
       direction: 'blue-orange',
     };
     expect(parseCustomColours(JSON.parse(JSON.stringify(chosen)))).toEqual(chosen);
@@ -543,6 +641,15 @@ describe('parseCustomColours', () => {
     ['a highlight without a match', { ...WARM_LIGHT, highlight: { hue: 10, strength: 10, contrast: 100 } }],
     ['a highlight contrast over 300', { ...WARM_LIGHT, highlight: { ...WARM_LIGHT.highlight, contrast: 301 } }],
     ['an unknown direction', { ...WARM_LIGHT, direction: 'red-green' }],
+    ['a secondary text hue of 360', { ...WARM_LIGHT, secondary: { hue: 360, strength: 10, lightness: 50 } }],
+    ['a negative muted text hue', { ...WARM_LIGHT, muted: { hue: -0.5, strength: 10, lightness: 50 } }],
+    ['a secondary text strength over 100', { ...WARM_LIGHT, secondary: { hue: 10, strength: 100.5, lightness: 50 } }],
+    ['a muted text lightness over 100', { ...WARM_LIGHT, muted: { hue: 10, strength: 10, lightness: 100.01 } }],
+    ['a negative secondary text lightness', { ...WARM_LIGHT, secondary: { hue: 10, strength: 10, lightness: -1 } }],
+    ['a muted text without a lightness', { ...WARM_LIGHT, muted: { hue: 10, strength: 10 } }],
+    ['a secondary text lightness that is not a number', { ...WARM_LIGHT, secondary: { hue: 10, strength: 10, lightness: '50' } }],
+    ['a muted text that is not an object', { ...WARM_LIGHT, muted: 50 }],
+    ['a secondary text of null', { ...WARM_LIGHT, secondary: null }],
     ['a direction that is not a string', { ...WARM_LIGHT, direction: 1 }],
   ])('rejects %s', (_name, value) => {
     expect(parseCustomColours(value)).toBeNull();

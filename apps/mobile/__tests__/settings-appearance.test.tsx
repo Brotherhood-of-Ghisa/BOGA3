@@ -44,7 +44,8 @@ import { Appearance, StyleSheet } from 'react-native';
 
 import { appearanceRoles } from '@/components/appearance/chosen-theme';
 import { generateRoles } from '@/components/ui/theme';
-import { customFromSeeds, generateCustomRoles, type CustomColours } from '@/components/ui/theme-custom';
+import { customFromSeeds, generateCustomRoles, ownInks, type CustomColours } from '@/components/ui/theme-custom';
+import { hueName } from '@/components/ui/theme-hue';
 import { DEFAULT_APPEARANCE, getThemePreset } from '@/components/ui/theme-presets';
 import { APPEARANCE_STORAGE_KEY, saveAppearance, THEME_PRESET_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
@@ -312,7 +313,7 @@ describe('custom', () => {
     expect(radio('Custom').props.accessibilityState).toEqual({ checked: true });
     expect(previewGround()).toBe(generateCustomRoles(WARM_CUSTOM).paper);
     expect(screen.queryByTestId('settings-appearance-mode')).toBeNull();
-    for (const label of ['Background', 'Primary text', 'Secondary text', 'Accent', 'Best ever', 'Direction']) {
+    for (const label of ['Background', 'Primary text', 'Secondary text', 'Muted text', 'Accent', 'Best ever', 'Direction']) {
       expect(within(screen.getByTestId('settings-appearance-custom')).getByText(label)).toBeTruthy();
     }
     for (const gone of ['Borders', 'Charts']) {
@@ -342,6 +343,17 @@ describe('custom', () => {
     fireEvent.press(screen.getByTestId('settings-appearance-custom-record'));
 
     expect(mockPush).toHaveBeenCalledWith('/theme-custom?part=record');
+  });
+
+  it('names the secondary and muted text by their whole hue and strength, as stored or as drawn', () => {
+    Storage.setItemSync(
+      APPEARANCE_STORAGE_KEY,
+      JSON.stringify({ theme: 'custom', mode: 'light', custom: { ...CUSTOM, secondary: { hue: 140.4, strength: 33.6, lightness: 40 } } }),
+    );
+    render(<SettingsAppearanceRoute />);
+    expect(screen.getByLabelText('Secondary text, Green, 34%')).toBeTruthy();
+    const muted = ownInks(CUSTOM).muted;
+    expect(screen.getByLabelText(`Muted text, ${hueName(muted.hue)}, ${Math.round(muted.strength)}%`)).toBeTruthy();
   });
 
   it('names a highlight of its own by its hue and strength', () => {
