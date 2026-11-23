@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from 'react';
-import { Pressable, StyleSheet, Text, View, type AccessibilityValue, type ViewInstance } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type AccessibilityValue, type ViewInstance, type PressableProps } from 'react-native';
 
 import { uiTextFor, useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -52,6 +52,9 @@ type ListRowBaseProps = {
   // Makes the whole row one target (sheet options). Leave unset when the
   // trailing control owns the action (set rows).
   onPress?: () => void;
+  onLongPress?: () => void;
+  accessibilityActions?: PressableProps['accessibilityActions'];
+  onAccessibilityAction?: PressableProps['onAccessibilityAction'];
   disabled?: boolean;
   accessibilityLabel?: string;
   // What pressing the row does, when the label does not say (`Opens the
@@ -91,6 +94,9 @@ export function ListRow({
   expanded,
   checked,
   onPress,
+  onLongPress,
+  accessibilityActions,
+  onAccessibilityAction,
   disabled = false,
   accessibilityLabel,
   accessibilityHint,
@@ -136,6 +142,9 @@ export function ListRow({
       // Only when set: Pressable folds an explicit `false` into the state.
       disabled={disabled || undefined}
       onPress={onPress}
+      onLongPress={onLongPress}
+      accessibilityActions={accessibilityActions}
+      onAccessibilityAction={onAccessibilityAction}
       ref={ref}
       style={({ pressed }) => [rowStyle, pressed && !disabled ? styles.pressed : null]}
       testID={testID}>

@@ -77,13 +77,14 @@ function WeekSetCard({ group, onOpenSession, exerciseLink, testID, contributionM
   testID: string;
   contributionMetric?: Props['contributionMetric'];
 }) {
+  const text = useUiText();
   const credit = contributionCredit(group, contributionMetric);
   const exerciseId = group.exerciseDefinitionId;
   const openExercise = exerciseLink && exerciseId !== null && exerciseLink.canOpen(exerciseId)
     ? () => exerciseLink.open(exerciseId)
     : null;
   const exerciseLabel = `Open ${group.title} progress`;
-  const described = [group.title, group.detail === group.title ? null : group.detail, group.role ? ROLE_LABELS[group.role] : null]
+  const described = [group.title, group.exerciseName, group.detail === group.title ? null : group.detail, group.role ? ROLE_LABELS[group.role] : null]
     .filter(Boolean).join(', ');
   const roleMark = group.role ? <Icon colorRole="inkMuted"
     name={`role-${group.role}`} size="xs" testID={`${testID}-role-${group.role}`} /> : null;
@@ -102,7 +103,10 @@ function WeekSetCard({ group, onOpenSession, exerciseLink, testID, contributionM
       </View> : null}
     </> : undefined}
     count={group.detail}
-    summary={<ContributionLine credit={credit} role={group.role} testID={testID} />}
+    summary={<>
+      {group.exerciseName ? <Text allowFontScaling={false} style={[text.bodyStrong, styles.contribution]} testID={`${testID}-exercise-name`}>{group.exerciseName}</Text> : null}
+      <ContributionLine credit={credit} role={group.role} testID={testID} />
+    </>}
     name={group.title} onPress={() => onOpenSession(group.sessionId)} rows={group.rows} record={group.record}
     testID={testID} />;
 }

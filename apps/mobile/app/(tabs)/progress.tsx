@@ -1,6 +1,6 @@
 import { useBodyWeightContextRevision } from '@/src/bodyweight/use-context-revision';
 import { useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
-import { Fragment, type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, type ComponentProps, type ComponentRef, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   findNodeHandle,
@@ -68,6 +68,7 @@ import { ensureExerciseCatalogLoaded, useExerciseCatalog } from '@/src/exercise-
 import { exerciseSearchTextMatches, normalizeExerciseSearchWords } from '@/src/exercise-catalog/search';
 import { useExerciseCatalogComparison } from '@/src/exercise-catalog/stats-cache';
 import { ProgressFilters } from '@/components/stats/progress-filters';
+import { ExerciseSelectionControls, useExerciseSelection, type SelectedExercise } from '@/components/stats/exercise-selection';
 import type { GymScopeOption } from '@/src/utils/gym-scope-route';
 
 export type MuscleHistoryTarget = { muscleGroupId: string };
@@ -212,6 +213,7 @@ export type StatsScreenShellProps = {
   // state and scroll behind it.
   onOpenMuscleHistory: (muscle: MuscleHistoryTarget, view?: HeatmapView) => void;
   onOpenExerciseHistory: (exercise: ExerciseHeatmapTarget) => void;
+  onOpenSelectedExerciseHistory?: (exerciseDefinitionIds: readonly string[]) => void;
   isLoading: boolean;
   errorMessage: string | null;
   viewMode: StatsViewMode;
@@ -282,6 +284,42 @@ function ProgressSearchControls({ viewMode, tableVisible, grouped, onToggleGroup
   </View>;
 }
 
+type ProgressControlsProps = Pick<StatsScreenShellProps, 'viewMode' | 'onSelectViewMode' | 'period' | 'targetWindowWeeks'
+  | 'onSelectPeriod' | 'tableMetric' | 'onSelectTableMetric' | 'exerciseMetric' | 'onSelectExerciseMetric'> & {
+  search: ComponentProps<typeof ProgressSearchControls>;
+  selection: ReturnType<typeof useExerciseSelection>;
+  onShowSelected: () => void;
+};
+
+function ProgressControls({ viewMode, onSelectViewMode, period, targetWindowWeeks = 4, onSelectPeriod,
+  tableMetric, onSelectTableMetric, exerciseMetric, onSelectExerciseMetric, search, selection, onShowSelected }: ProgressControlsProps) {
+  return <View style={styles.controls} testID="stats-controls">
+    <View style={styles.filters} testID="stats-view-switch">
+      <ToggleChip accessibilityLabel="Stats breakdown" options={VIEW_MODE_OPTIONS}
+        value={viewMode} onChange={mode => { selection.cancel(); onSelectViewMode(mode); }} testID="stats-view-mode-chip" />
+      <ToggleChip accessibilityLabel="Stats period" options={periodOptions(targetWindowWeeks)}
+        value={targetWindowWeeks === 1 ? 'this-week' : period} onChange={onSelectPeriod} testID="stats-period-chip" />
+      {viewMode === 'muscle' ? (
+        <ToggleChip accessibilityLabel="Progress metric" options={METRIC_OPTIONS}
+          value={tableMetric} onChange={onSelectTableMetric} testID="stats-metric-chip" />
+      ) : (
+        <ToggleChip accessibilityLabel="Progress metric" options={EXERCISE_METRIC_OPTIONS}
+          value={exerciseMetric} onChange={onSelectExerciseMetric} testID="stats-metric-chip" />
+      )}
+    </View>
+    {viewMode === 'exercise' && selection.selected !== null ? <ExerciseSelectionControls exercises={selection.selected}
+      error={selection.error} onCancel={selection.cancel} onShow={onShowSelected} /> : <ProgressSearchControls {...search} /> }
+      </View>;
+}
+
+function ProgressLoadState({ error, loading, onRetry }: { error: string | null; loading: boolean; onRetry?: () => void }) {
+  return <>
+    {error ? <StatePanel fill={false} kind="error" title="Could not load progress"
+      testID="stats-error-state" action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'stats-retry' } : undefined} /> : null}
+    {loading ? <StatePanel body="Loading progress…" fill={false} kind="loading" testID="stats-loading-state" /> : null}
+  </>;
+}
+
 // Exercise lists full exercise figures; Muscle owns the saved List/3D layout and its contributors.
 export function StatsScreenShell({
   summary,
@@ -292,6 +330,7 @@ export function StatsScreenShell({
   onPressSessionsCard,
   onOpenMuscleHistory,
   onOpenExerciseHistory,
+  onOpenSelectedExerciseHistory,
   isLoading,
   errorMessage,
   viewMode,
@@ -325,6 +364,8 @@ export function StatsScreenShell({
   activeInjuries,
 }: StatsScreenShellProps) {
   const text = useUiText();
+  const selection = useExerciseSelection();
+  const selectionLaunchTarget = useRef<ComponentRef<typeof View> | null>(null);
   const [exerciseSortMode, setExerciseSortMode] = useState<ExerciseSortMode>(
     DEFAULT_EXERCISE_SORT_MODE
   );
@@ -419,38 +460,27 @@ export function StatsScreenShell({
 
   return (
     <Screen testID="stats-history-screen">
-      <View style={styles.controls} testID="stats-controls">
-        <View style={styles.filters} testID="stats-view-switch">
-          <ToggleChip accessibilityLabel="Stats breakdown" options={VIEW_MODE_OPTIONS}
-            value={viewMode} onChange={onSelectViewMode} testID="stats-view-mode-chip" />
-          <ToggleChip accessibilityLabel="Stats period" options={periodOptions(targetWindowWeeks)}
-            value={targetWindowWeeks === 1 ? 'this-week' : period} onChange={onSelectPeriod} testID="stats-period-chip" />
-          {viewMode === 'muscle' ? (
-            <ToggleChip accessibilityLabel="Progress metric" options={METRIC_OPTIONS}
-              value={tableMetric} onChange={onSelectTableMetric} testID="stats-metric-chip" />
-          ) : (
-            <ToggleChip accessibilityLabel="Progress metric" options={EXERCISE_METRIC_OPTIONS}
-              value={exerciseMetric} onChange={onSelectExerciseMetric} testID="stats-metric-chip" />
-          )}
-        </View>
-        <ProgressSearchControls viewMode={viewMode} tableVisible={tableVisible} grouped={grouped[viewMode]}
-          onToggleGroup={() => setGrouped(current => ({ ...current, [viewMode]: !current[viewMode] }))}
-          query={viewMode === 'exercise' ? searchQuery : muscleSearch}
-          onChangeQuery={viewMode === 'exercise' ? onSearchQueryChange : setMuscleSearch}
-          gymId={gymId} gymOptions={gymOptions} onSelectGym={onSelectGym}
-          countSecondary={countSecondary} onChangeCountSecondary={onChangeCountSecondary}
-          countSecondaryVolume={countSecondaryVolume} onChangeCountSecondaryVolume={onChangeCountSecondaryVolume}
-          defaultCountSecondaryVolume={defaultCountSecondaryVolume}
-          defaultCountSecondary={defaultCountSecondary} defaultGrouped={defaultGrouped} />
-      </View>
+      <ProgressControls viewMode={viewMode} onSelectViewMode={onSelectViewMode} period={period}
+        targetWindowWeeks={targetWindowWeeks} onSelectPeriod={onSelectPeriod} tableMetric={tableMetric}
+        onSelectTableMetric={onSelectTableMetric} exerciseMetric={exerciseMetric} onSelectExerciseMetric={onSelectExerciseMetric}
+        selection={selection} onShowSelected={() => { if (onOpenSelectedExerciseHistory && selection.selected) openHistory(
+          onOpenSelectedExerciseHistory, selection.selected.map(exercise => exercise.id), selectionLaunchTarget.current); }}
+        search={{ viewMode, tableVisible, grouped: grouped[viewMode],
+          onToggleGroup: () => setGrouped(current => ({ ...current, [viewMode]: !current[viewMode] })),
+          query: viewMode === 'exercise' ? searchQuery : muscleSearch,
+          onChangeQuery: viewMode === 'exercise' ? onSearchQueryChange : setMuscleSearch,
+          gymId, gymOptions, onSelectGym, countSecondary, onChangeCountSecondary,
+          countSecondaryVolume, onChangeCountSecondaryVolume, defaultCountSecondaryVolume, defaultCountSecondary, defaultGrouped }} />
       <ScreenScroll key={viewMode === 'exercise' ? 'exercise' : muscleLayout} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" testID={scrollTestID}>
-        {activeError ? <StatePanel fill={false} kind="error" title="Could not load progress"
-          testID="stats-error-state" action={onRetry ? { label: 'Retry', onPress: onRetry, testID: 'stats-retry' } : undefined} /> : null}
-        {showLoading ? <StatePanel body="Loading progress…" fill={false}
-          kind="loading" testID="stats-loading-state" /> : null}
+        <ProgressLoadState error={activeError} loading={showLoading} onRetry={onRetry} />
         {viewMode === 'exercise' ? exerciseDataReady ? <ExerciseListView items={filteredExerciseListItems} metric={exerciseMetric}
           grouped={grouped.exercise} families={exerciseFamilies} familyMuscleCounts={familyMuscleCounts}
           onPressExercise={(row, target) => openHistory(onOpenExerciseHistory, row, target)}
+          selected={selection.selected}
+          onSelectExercise={onOpenSelectedExerciseHistory ? (exercise, target) => {
+            Keyboard.dismiss(); selectionLaunchTarget.current = target; selection.add(exercise);
+          } : undefined}
+          onToggleExercise={selection.toggle}
           emptyBody={exerciseEmptyBody(exerciseListItems, exerciseMetric)}
           sortMode={exerciseSortMode} onPressSortHeader={handlePressExerciseSortHeader} /> : null : summary ? <ProgressMuscleView muscles={summary.muscles} metric={tableMetric} selectedId={effectiveContributionId} muscleLayout={muscleLayout}
           report={muscleReport}
@@ -495,6 +525,9 @@ function ExerciseListView({
   grouped,
   families,
   familyMuscleCounts,
+  selected,
+  onSelectExercise,
+  onToggleExercise,
 }: {
   items: ExerciseListItem[];
   grouped: boolean;
@@ -506,6 +539,9 @@ function ExerciseListView({
   emptyBody: string;
   sortMode: ExerciseSortMode;
   onPressSortHeader: (header: ExerciseSortHeader) => void;
+  selected?: readonly SelectedExercise[] | null;
+  onSelectExercise?: (exercise: SelectedExercise, target: ComponentRef<typeof View> | null) => void;
+  onToggleExercise?: (exercise: SelectedExercise) => void;
 }) {
   const text = useUiText();
   const links = useRef(new Map<string, ComponentRef<typeof View>>());
@@ -520,7 +556,8 @@ function ExerciseListView({
 
   // The rows carry no trailing control, so no axis is reserved for one; the
   // headers sort, so each column keeps room for its indicator.
-  const layout = resolveComparisonLayout(width, items, metric, false, true);
+  const selecting = selected !== undefined && selected !== null;
+  const layout = resolveComparisonLayout(width - (selecting ? uiSpace.xl : 0), items, metric, false, true);
   const familyName = (item: ExerciseListItem) => families?.get(item.id) ?? 'Other';
   const rows = grouped ? [...items].sort((left, right) => compareFamilySections(familyName(left), familyName(right), familyMuscleCounts)) : items;
   return (
@@ -568,10 +605,19 @@ function ExerciseListView({
             <StatsTableFamily name={familyName(item)} testID={`stats-exercise-family-header-${familyName(item)}`} /> : null}
           <ListRow
             ref={target => { if (target) links.current.set(item.id, target); else links.current.delete(item.id); }}
-            accessibilityLabel={exerciseRowLabel(item, metric)}
+            accessibilityLabel={selecting ? item.name : exerciseRowLabel(item, metric)}
+            accessibilityRole={selecting ? 'checkbox' : 'button'}
+            checked={selecting ? selected.some(exercise => exercise.id === item.id) : undefined}
+            selected={selecting && selected.some(exercise => exercise.id === item.id)}
+            leading={selecting ? <Icon colorRole="ink" name={selected.some(exercise => exercise.id === item.id) ? 'set-done' : 'set-current'} size="sm" /> : undefined}
+            accessibilityActions={onSelectExercise ? [{ name: 'selectExercise', label: 'Select for combined progress' }] : undefined}
+            onAccessibilityAction={onSelectExercise ? event => {
+              if (event.nativeEvent.actionName === 'selectExercise') onSelectExercise(item, links.current.get(item.id) ?? null);
+            } : undefined}
             density="list"
             meta={layout.stacked ? undefined : values}
-            onPress={() => onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
+            onPress={() => selecting ? onToggleExercise?.(item) : onPressExercise({ exerciseDefinitionId: item.id }, links.current.get(item.id) ?? null)}
+            onLongPress={onSelectExercise ? () => onSelectExercise(item, links.current.get(item.id) ?? null) : undefined}
             testID={`stats-exercise-row-${item.id}`}>
             <Text allowFontScaling={false} style={[text.bodyStrong, statsTableStyles.name]} testID={`stats-exercise-name-${item.id}`}>
               {item.name}
@@ -663,6 +709,8 @@ function StatsContent() {
       { ...exercise, gymId: filters.breakdown === 'exercise' ? gymId : summaryGymId },
       filters.breakdown === 'exercise' && filters.exerciseMetric !== 'estimatedOneRepMax' ? filters.exerciseMetric : filters.metric,
       filters.breakdown === 'muscle' ? 'timeline' : undefined))}
+    onOpenSelectedExerciseHistory={exerciseDefinitionIds => router.push(progressHistoryHref(
+      { exerciseDefinitionIds, gymId }, filters.exerciseMetric === 'workingSetCount' ? 'workingSetCount' : 'totalVolume'))}
     viewMode={filters.breakdown} onSelectViewMode={filters.selectBreakdown}
     muscleLayout={values.progressMuscleLayout}
     muscleTargets={{ weeklyTarget: values.weeklyWorkingSetTarget, weeklyTargets }}

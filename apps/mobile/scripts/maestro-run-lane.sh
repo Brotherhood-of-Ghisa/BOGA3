@@ -11,7 +11,7 @@
 #
 #   ./scripts/maestro-run-lane.sh <lane>
 #
-# Lanes: iOS (smoke, data-smoke, exercise-page, rm-curve, session-view, auth-profile,
+# Lanes: iOS (smoke, data-smoke, combined-progress, exercise-page, rm-curve, session-view, auth-profile,
 # sync-e2e, groups-e2e) and Android (android-smoke, android-data-smoke). The
 # platform decides only which provision/launch/teardown runner is used
 # (maestro-<platform>-run-flow.sh / -run-flows.sh); the lane data is shared. The
@@ -29,7 +29,7 @@ APP_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd -- "$APP_DIR/../.." && pwd)"
 
 lane="${1:-}"
-LANES="smoke|data-smoke|exercise-page|rm-curve|session-view|auth-profile|sync-e2e|groups-e2e|android-smoke|android-data-smoke"
+LANES="smoke|data-smoke|combined-progress|exercise-page|rm-curve|session-view|auth-profile|sync-e2e|groups-e2e|android-smoke|android-data-smoke"
 [[ -n "$lane" ]] || { echo "usage: $0 $LANES" >&2; exit 2; }
 
 case "$lane" in
@@ -103,6 +103,11 @@ case "$lane" in
     run_flow full "Smoke" smoke-launch.yaml
     ;;
 
+  # Focused viewport/gesture check; the aggregate data lanes retain this flow.
+  combined-progress)
+    run_flow data "Combined exercise progress" combined-exercise-progress.yaml
+    ;;
+
   # Infra-free, no Supabase. data-runtime-smoke: real expo-sqlite migration +
   # smoke write/read, and the backend-less build seeds its own starter catalog
   # at boot. Then the two screen flows whose device claims need no backend:
@@ -118,6 +123,7 @@ case "$lane" in
     "$RUN_FLOWS" \
       --session "Data runtime smoke" \
       --scenario "Data runtime smoke" --flow "$APP_DIR/.maestro/flows/data-runtime-smoke.yaml" \
+      --scenario "Combined exercise progress" --flow "$APP_DIR/.maestro/flows/combined-exercise-progress.yaml" \
       --scenario "Session completion share" --flow "$APP_DIR/.maestro/flows/session-completion-states-fixture.yaml" \
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml" \
       --scenario "Session plan" --flow "$APP_DIR/.maestro/flows/session-plan.yaml" \
@@ -139,6 +145,7 @@ case "$lane" in
     "$RUN_FLOWS" \
       --session "Data runtime smoke" \
       --scenario "Data runtime smoke" --flow "$APP_DIR/.maestro/flows/data-runtime-smoke.yaml" \
+      --scenario "Combined exercise progress" --flow "$APP_DIR/.maestro/flows/combined-exercise-progress.yaml" \
       --scenario "Exercise catalogue" --flow "$APP_DIR/.maestro/flows/exercise-catalogue.yaml" \
       --scenario "Session plan" --flow "$APP_DIR/.maestro/flows/session-plan.yaml" \
       --scenario "Injuries lifecycle" --flow "$APP_DIR/.maestro/flows/injuries-lifecycle.yaml"

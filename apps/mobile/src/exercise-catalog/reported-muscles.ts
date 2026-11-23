@@ -28,6 +28,19 @@ export const reportedExerciseMuscles = (
   return muscles;
 };
 
+/** A selection's reported muscles follow [[muscle.no-breakdown]]. */
+export const reportedExercisesMuscles = (
+  exercises: readonly Pick<ExerciseCatalogExercise, 'mappings'>[], report: MuscleReportAssignment,
+): ExerciseMuscle[] => {
+  const muscles = new Map<string, ExerciseMuscle>();
+  for (const exercise of exercises) {
+    for (const muscle of reportedExerciseMuscles(exercise, report)) {
+      if (!muscles.has(muscle.muscleGroupId) || muscle.role === 'primary') muscles.set(muscle.muscleGroupId, muscle);
+    }
+  }
+  return [...muscles.values()].sort((a, b) => Number(b.role === 'primary') - Number(a.role === 'primary'));
+};
+
 /**
  * The name of the muscle whose history `id` opens, or null when the user has no
  * such muscle: an entry merged into another's id, or one nothing tracked

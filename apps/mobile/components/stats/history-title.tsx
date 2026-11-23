@@ -7,6 +7,7 @@ import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
 import { useUiText } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
+import { ExerciseSelectionSheet, type SelectedExercise } from './exercise-selection';
 
 /** A muscle the title can switch to, as the user's muscle setup names and groups it. */
 export type HistoryTitleMuscle = { id: string; displayName: string; familyName: string };
@@ -22,16 +23,25 @@ const TITLE_MAX_WIDTH = 220;
  * sheet of the user's muscles in Progress's family sections, with the current
  * muscle checked.
  */
-export function HistoryTitle({ title, muscles, currentId, onChoose }: {
+export function HistoryTitle({ title, muscles, currentId, onChoose, exercises }: {
   title: string;
   muscles?: readonly HistoryTitleMuscle[];
   currentId?: string;
   onChoose?: (muscleGroupId: string) => void;
+  exercises?: readonly SelectedExercise[];
 }) {
   const text = useUiText();
   const [open, setOpen] = useState(false);
   const label = <Text adjustsFontSizeToFit allowFontScaling={false} minimumFontScale={0.75} numberOfLines={1}
     style={[text.sheetTitle, styles.text]} testID="progress-history-title-text">{title}</Text>;
+  if (exercises) return <>
+    <Pressable accessibilityHint="Shows the selected exercises" accessibilityLabel={`${title}, show names`}
+      accessibilityRole="button" hitSlop={uiSpace.sm} onPress={() => setOpen(true)}
+      style={({ pressed }) => [styles.root, pressed ? styles.pressed : null]} testID="progress-history-title">
+      {label}<Icon colorRole="inkMuted" name="chevron-down" size="sm" />
+    </Pressable>
+    <ExerciseSelectionSheet exercises={exercises} visible={open} onDismiss={() => setOpen(false)} />
+  </>;
   if (!muscles || muscles.length < 2 || !onChoose) {
     return <View accessibilityRole="header" accessible style={styles.root} testID="progress-history-title">{label}</View>;
   }
