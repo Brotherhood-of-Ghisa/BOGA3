@@ -1,5 +1,14 @@
 import { hexToLch, lchToHex, withAlpha } from '@/components/ui/lch';
-import { defaultThemeSeeds, generateRoles, inkStep, type ThemeMode, type UiRoles } from '@/components/ui/theme';
+import {
+  defaultThemeSeeds,
+  DIRECTION_PAIRS,
+  generateRoles,
+  inkStep,
+  THEME_DIRECTIONS,
+  type ThemeDirection,
+  type ThemeMode,
+  type UiRoles,
+} from '@/components/ui/theme';
 import {
   customFromSeeds,
   customInk,
@@ -15,14 +24,15 @@ import {
 import { themePresets } from '@/components/ui/theme-presets';
 
 // A custom theme (`docs/specs/ui/design-language.md` §2, "Custom"): a hue and
-// strength per seed, the page's mode, lightness and depth, the borders and
-// the texts' contrast. These tests pin that a preset converted to custom
-// colours keeps its look, that a theme saved before a field existed draws
-// exactly as it did, that the mode is the page's own, that depth, the
-// borders' and the secondary text's contrast each move only their roles, and
-// what a stored value must hold. The highlight follows the accent unless it is
-// given its own, and its contrast moves only its band. No readability floor is gated: custom
-// colours are the user's.
+// strength per colour seed, the page's mode, lightness and depth, the texts'
+// contrast and the direction. These tests pin that a preset converted to custom
+// colours keeps its look, that a theme saved before a field existed draws as
+// it did (but for the parts since removed), that the mode is the page's own,
+// that depth and the secondary text's contrast each move only their roles,
+// that the hairlines and the chart ramp follow the page, and what a stored
+// value must hold. The highlight follows the accent unless it is given its
+// own, and its contrast moves only its band. No readability floor is gated:
+// custom colours are the user's.
 
 const ROLE_COLOURS = (roles: UiRoles) =>
   Object.entries(roles).filter(([role]) => role !== 'scrim') as [keyof UiRoles, string][];
@@ -40,6 +50,11 @@ function deltaE(a: string, b: string): number {
 }
 
 const WARM_LIGHT = customFromSeeds(defaultThemeSeeds, 'light');
+
+function hueDistance(a: number, b: number): number {
+  const distance = Math.abs(a - b) % 360;
+  return distance > 180 ? 360 - distance : distance;
+}
 
 const withBackground = (colours: CustomColours, background: Partial<CustomColours['background']>): CustomColours => ({
   ...colours,
@@ -98,22 +113,24 @@ describe('depth', () => {
   };
   const atDepth = (depth: number) => withBackground(WARM_LIGHT, { lightness: 70, depth });
 
-  it('flattens the grounds and empty cells onto the page at 0', () => {
+  const spread = ['well', 'surface', 'raised', 'rule', 'ruleSoft', 'viz0'] as const;
+
+  it('flattens the grounds, hairlines and empty cells onto the page at 0', () => {
     const roles = generateCustomRoles(atDepth(0));
-    expect([roles.well, roles.surface, roles.raised, roles.viz0].map((hex) => hexToLch(hex).lightness)).toEqual(
-      Array(4).fill(expect.closeTo(hexToLch(roles.paper).lightness, 0)),
+    expect(spread.map((role) => hexToLch(roles[role]).lightness)).toEqual(
+      Array(spread.length).fill(expect.closeTo(hexToLch(roles.paper).lightness, 0)),
     );
   });
 
-  it.each(['well', 'surface', 'raised', 'viz0'] as const)('spreads %s further from the page as it grows', (role) => {
+  it.each(spread)('spreads %s further from the page as it grows', (role) => {
     expect(gap(atDepth(200), role)).toBeGreaterThan(gap(atDepth(100), role));
     expect(gap(atDepth(100), role)).toBeGreaterThan(gap(atDepth(50), role));
   });
 
-  it('leaves the borders, inks, accent and ramp where they are', () => {
+  it('leaves the inks, accent and ramp where they are', () => {
     const flat = generateCustomRoles(withBackground(WARM_LIGHT, { depth: 0 }));
     const deep = generateCustomRoles(withBackground(WARM_LIGHT, { depth: 300 }));
-    (['rule', 'ruleSoft', 'ink', 'inkMuted', 'inkFaint', 'inkGhost', 'accent', 'record', 'viz1', 'viz4', 'danger'] as const).forEach((role) =>
+    (['ink', 'inkMuted', 'inkFaint', 'inkGhost', 'accent', 'record', 'viz1', 'viz4', 'danger', 'gain'] as const).forEach((role) =>
       expect(deep[role]).toBe(flat[role]),
     );
   });
@@ -133,48 +150,36 @@ describe('the ground ladder on a custom page', () => {
   });
 });
 
-describe('borders', () => {
-  const withBorders = (borders: Partial<CustomColours['borders']>): CustomColours => ({
-    ...withBackground(WARM_LIGHT, { lightness: 70 }),
-    borders: { ...WARM_LIGHT.borders, ...borders },
-  });
-  const gap = (colours: CustomColours, role: 'rule' | 'ruleSoft') => {
+describe('the hairlines and the chart ramp', () => {
+  it.each(['light', 'dark'] as ThemeMode[])('take the page’s hue in %s, and are no part of their own', (mode) => {
+    const colours = withBackground(customFromSeeds(defaultThemeSeeds, mode), { hue: 200, strength: 60 });
     const roles = generateCustomRoles(colours);
-    return Math.abs(hexToLch(roles[role]).lightness - hexToLch(roles.paper).lightness);
-  };
-
-  it('flattens onto the page at a contrast of 0, and steps further as it grows', () => {
-    (['rule', 'ruleSoft'] as const).forEach((role) => {
-      expect(gap(withBorders({ contrast: 0 }), role)).toBeLessThan(0.5);
-      expect(gap(withBorders({ contrast: 200 }), role)).toBeGreaterThan(gap(withBorders({ contrast: 100 }), role));
-    });
+    const offHue = (['rule', 'ruleSoft', 'viz1', 'viz2', 'viz3', 'viz4'] as const).filter((role) => hueDistance(hexToLch(roles[role]).hue, 200) > 10);
+    expect(offHue).toEqual([]);
+    expect(Object.keys(colours)).not.toContain('borders');
+    expect(Object.keys(colours)).not.toContain('viz');
   });
 
-  it('moves only the borders with their contrast', () => {
-    const soft = generateCustomRoles(withBorders({ contrast: 30 }));
-    const hard = generateCustomRoles(withBorders({ contrast: 250 }));
-    const moved = (Object.keys(soft) as (keyof UiRoles)[]).filter((role) => soft[role] !== hard[role]);
-    expect(moved.sort()).toEqual(['rule', 'ruleSoft']);
+  it.each(['light', 'dark'] as ThemeMode[])('keep “more” stronger on a custom page in %s: each step further from the page', (mode) => {
+    const roles = generateCustomRoles(customFromSeeds(defaultThemeSeeds, mode));
+    const gaps = (['viz0', 'viz1', 'viz2', 'viz3', 'viz4'] as const).map((role) => Math.abs(hexToLch(roles[role]).lightness - hexToLch(roles.paper).lightness));
+    expect([...gaps].sort((a, b) => a - b)).toEqual(gaps);
   });
 
-  it('take the page’s colour while they match it, whatever their own', () => {
-    const matched = generateCustomRoles(withBorders({ match: true, hue: 300, strength: 100 }));
-    expect(matched.rule).toBe(generateCustomRoles(withBorders({ match: true })).rule);
+  it('keep the ramp on the picked hue at a low strength, where the page’s hex holds none', () => {
+    for (const hue of [30, 80, 200, 330]) {
+      const offHue = [0, 1, 2, 3, 5].filter((strength) => {
+        const roles = generateCustomRoles(withBackground(WARM_LIGHT, { hue, strength }));
+        return hueDistance(hexToLch(roles.viz4).hue, hue) > 10;
+      });
+      expect({ hue, offHue }).toEqual({ hue, offHue: [] });
+    }
   });
 
-  it('take their own hue and strength when they do not match, and leave every other role alone', () => {
-    const base = generateCustomRoles(withBorders({ match: true }));
-    const own = generateCustomRoles(withBorders({ match: false, hue: 150, strength: 100 }));
-    expect(hexToLch(own.rule).hue).toBeCloseTo(150, -1);
-    expect(hexToLch(own.rule).chroma).toBeGreaterThan(20);
-    expect(hexToLch(own.rule).lightness).toBeCloseTo(hexToLch(base.rule).lightness, 0);
-    const moved = (Object.keys(base) as (keyof UiRoles)[]).filter((role) => base[role] !== own[role]);
-    expect(moved.sort()).toEqual(['rule', 'ruleSoft']);
-  });
-
-  it('change nothing when unmatched at the page’s own hue and strength', () => {
-    const { hue, strength } = WARM_LIGHT.background;
-    expect(generateCustomRoles(withBorders({ match: false, hue, strength }))).toEqual(generateCustomRoles(withBorders({ match: true })));
+  it('keep a tinted ramp on a grey page', () => {
+    const roles = generateCustomRoles(withBackground(WARM_LIGHT, { strength: 0 }));
+    expect(hexToLch(roles.paper).chroma).toBeLessThan(1);
+    expect(hexToLch(roles.viz4).chroma).toBeGreaterThanOrEqual(10);
   });
 });
 
@@ -229,8 +234,9 @@ describe('highlight', () => {
 
 describe('hue and strength', () => {
   it('takes each part’s hue', () => {
-    const roles = generateCustomRoles({ ...WARM_LIGHT, accent: { hue: 250, strength: 80 }, viz: { hue: 150, strength: 80, gamut: false } });
+    const roles = generateCustomRoles({ ...withBackground(WARM_LIGHT, { hue: 150, strength: 30 }), accent: { hue: 250, strength: 80 } });
     expect(hexToLch(roles.accent).hue).toBeCloseTo(250, -1);
+    expect(hexToLch(roles.paper).hue).toBeCloseTo(150, -1);
     expect(hexToLch(roles.viz4).hue).toBeCloseTo(150, -1);
   });
 
@@ -315,45 +321,37 @@ describe('secondary text’s contrast', () => {
   });
 });
 
-describe('charts on the gamut', () => {
-  const ramp = ['viz1', 'viz2', 'viz3', 'viz4'] as const;
-  const gamutViz = (mode: ThemeMode, strength: number, hue = 150): CustomColours => {
-    const colours = customFromSeeds(defaultThemeSeeds, mode);
-    return { ...colours, viz: { hue, strength, gamut: true } };
-  };
+describe('direction', () => {
+  const directed = (direction: ThemeDirection, base = WARM_LIGHT): CustomColours => ({ ...base, direction });
 
-  it.each(['light', 'dark'] as const)('at a strength of 100 holds more chroma at every step than the shipped ramp, in %s', (mode) => {
-    const shipped = generateCustomRoles({ ...gamutViz(mode, 100), viz: { hue: 150, strength: 100, gamut: false } });
-    const full = generateCustomRoles(gamutViz(mode, 100));
-    ramp.forEach((role) => expect(hexToLch(full[role]).chroma).toBeGreaterThan(hexToLch(shipped[role]).chroma));
+  it('starts as the preset’s, green and crimson', () => {
+    for (const preset of themePresets) expect(customFromSeeds(preset.seeds, 'light').direction).toBe('green-crimson');
   });
 
-  it.each(['light', 'dark'] as const)('keeps “more” stronger: each step further from the page, in %s', (mode) => {
-    const roles = generateCustomRoles(gamutViz(mode, 100));
-    const gaps = ramp.map((role) => Math.abs(hexToLch(roles[role]).lightness - hexToLch(roles.paper).lightness));
-    expect([...gaps].sort((a, b) => a - b)).toEqual(gaps);
+  it.each(['light', 'dark'] as ThemeMode[])('moves only `gain` and `loss`, onto their hues, in %s', (mode) => {
+    const base = customFromSeeds(defaultThemeSeeds, mode);
+    const before = generateCustomRoles(base);
+    const after = generateCustomRoles(directed('blue-orange', base));
+    const moved = (Object.keys(before) as (keyof UiRoles)[]).filter((role) => before[role] !== after[role]);
+    expect(moved.sort()).toEqual(['gain', 'loss']);
+    expect(hueDistance(hexToLch(after.gain).hue, hexToLch(DIRECTION_PAIRS['blue-orange'][mode].gain).hue)).toBeLessThanOrEqual(5);
+    expect(hueDistance(hexToLch(after.loss).hue, hexToLch(DIRECTION_PAIRS['blue-orange'][mode].loss).hue)).toBeLessThanOrEqual(5);
   });
 
-  it('lifts the dark ramp’s strongest step past the shipped cap, to the light ramp’s L*', () => {
-    const roles = generateCustomRoles(withBackground(gamutViz('dark', 100), { lightness: 10 }));
-    expect(hexToLch(roles.viz4).lightness).toBeCloseTo(58, 0);
-  });
-
-  it('is a grey at a strength of 0, and moves only the ramp', () => {
-    const grey = generateCustomRoles(gamutViz('light', 0));
-    ramp.forEach((role) => expect(hexToLch(grey[role]).chroma).toBeLessThan(1));
-    const shipped = generateCustomRoles({ ...gamutViz('light', 40), viz: { hue: 150, strength: 40, gamut: false } });
-    const own = generateCustomRoles(gamutViz('light', 40));
-    const moved = (Object.keys(own) as (keyof UiRoles)[]).filter((role) => own[role] !== shipped[role]);
-    expect(moved.sort()).toEqual([...ramp]);
+  it('draws both changes in the drawn `ink` under `ink`, wherever its lightness is', () => {
+    for (const colours of [directed('ink'), directed('ink', { ...WARM_LIGHT, ink: { ...WARM_LIGHT.ink, lightness: 30 } })]) {
+      const roles = generateCustomRoles(colours);
+      expect([roles.gain, roles.loss]).toEqual([roles.ink, roles.ink]);
+    }
   });
 });
 
-// Every role as a custom theme drew it before the mode, borders, text
-// lightness and contrast, and the gamut ramp were chosen: the page's mode from
-// its lightness, depth scaling the cards, borders and empty cells, `ink` at
-// its ladder's L*. A frozen copy, so a theme saved then is proved to draw the
-// same now.
+// Every role as a custom theme drew it before the mode, text lightness and
+// contrast and the direction were chosen: the page's mode from its lightness,
+// depth scaling the cards, hairlines and empty cells, `ink` at its ladder's
+// L*. A frozen copy, so a theme saved then is proved to draw the same now —
+// but for the chart ramp, which its stored `viz` no longer sets: the ladder
+// draws it from the page.
 type SavedBefore = {
   background: { hue: number; strength: number; lightness: number; depth: number };
   ink?: { hue: number; strength: number };
@@ -370,9 +368,9 @@ function rolesBefore(saved: SavedBefore, ink: { hue: number; strength: number })
     text: customSeed('text', saved.text),
     accent: customSeed('accent', saved.accent),
     record: customSeed('record', saved.record),
-    viz: customSeed('viz', saved.viz),
+    direction: 'green-crimson' as const,
   };
-  const reference = { ...generateRoles(seeds, mode), ink: customInk(mode, ink) };
+  const reference = { ...generateRoles(seeds, mode, saved.background.hue), ink: customInk(mode, ink) };
   const paperRef = hexToLch(reference.paper).lightness;
   const end = hexToLch(reference.ink).lightness;
   const { lightness: page, depth } = saved.background;
@@ -392,14 +390,16 @@ function rolesBefore(saved: SavedBefore, ink: { hue: number; strength: number })
   return mode === 'light' ? { ...moved, scrim: withAlpha(moved.ink, 0.42) } : moved;
 }
 
-describe('a theme saved before its mode, borders, contrasts and gamut ramp', () => {
-  const savedFrom = ({ background, ink, text, accent, record, viz }: CustomColours): SavedBefore => ({
+describe('a theme saved before its mode, contrasts and direction', () => {
+  // The ramp such a theme stored, which nothing reads any more.
+  const viz = { hue: 70, strength: 34 };
+  const savedFrom = ({ background, ink, text, accent, record }: CustomColours): SavedBefore => ({
     background: { hue: background.hue, strength: background.strength, lightness: background.lightness, depth: background.depth },
     ink: { hue: ink.hue, strength: ink.strength },
     text: { hue: text.hue, strength: text.strength },
     accent,
     record,
-    viz: { hue: viz.hue, strength: viz.strength },
+    viz,
   });
   const cases: SavedBefore[] = themePresets.flatMap((preset) =>
     (['light', 'dark'] as ThemeMode[]).flatMap((mode) => {
@@ -429,11 +429,10 @@ describe('a theme saved before its mode, borders, contrasts and gamut ramp', () 
   it('reads the defaults that draw it so', () => {
     const read = parseCustomColours({ ...cases[0], background: { ...cases[0].background, lightness: 20, depth: 40 } })!;
     expect(read.background.mode).toBe('dark');
-    expect(read.borders).toEqual({ hue: cases[0].background.hue, strength: cases[0].background.strength, match: true, contrast: 40 });
     expect(read.ink.lightness).toBe(inkStep('dark').lightness);
     expect(read.text.contrast).toBe(100);
-    expect(read.viz.gamut).toBe(false);
     expect(read.highlight).toMatchObject({ match: true, contrast: 100 });
+    expect(read.direction).toBe('green-crimson');
   });
 });
 
@@ -443,13 +442,27 @@ describe('parseCustomColours', () => {
     const chosen: CustomColours = {
       ...WARM_LIGHT,
       background: { ...WARM_LIGHT.background, mode: 'dark', lightness: 2.25 },
-      borders: { hue: 150, strength: 60, match: false, contrast: 220 },
       ink: { ...WARM_LIGHT.ink, lightness: 88.75 },
       text: { ...WARM_LIGHT.text, contrast: 130 },
-      viz: { ...WARM_LIGHT.viz, gamut: true },
       highlight: { hue: 120, strength: 55, match: false, contrast: 260 },
+      direction: 'blue-orange',
     };
     expect(parseCustomColours(JSON.parse(JSON.stringify(chosen)))).toEqual(chosen);
+  });
+
+  it.each(THEME_DIRECTIONS)('round-trips the %s direction, and reads none as green and crimson', (direction) => {
+    expect(parseCustomColours(JSON.parse(JSON.stringify({ ...WARM_LIGHT, direction })))?.direction).toBe(direction);
+    const { direction: _direction, ...saved } = WARM_LIGHT;
+    expect(parseCustomColours(JSON.parse(JSON.stringify(saved)))?.direction).toBe('green-crimson');
+  });
+
+  it('ignores the borders and charts parts older builds wrote, valid or not', () => {
+    const older = {
+      ...WARM_LIGHT,
+      borders: { hue: 150, strength: 60, match: false, contrast: 999 },
+      viz: { hue: 400, strength: 80, gamut: 'yes' },
+    };
+    expect(parseCustomColours(JSON.parse(JSON.stringify(older)))).toEqual(WARM_LIGHT);
   });
 
   it('takes the primary text from the text for a value saved before it was a part, drawing the same `ink`', () => {
@@ -463,7 +476,7 @@ describe('parseCustomColours', () => {
   it.each([
     ['nothing', null],
     ['a primary text strength over 100', { ...WARM_LIGHT, ink: { hue: 10, strength: 101 } }],
-    ['a missing part', { ...WARM_LIGHT, viz: undefined }],
+    ['a missing part', { ...WARM_LIGHT, record: undefined }],
     ['a hue of 360', { ...WARM_LIGHT, text: { hue: 360, strength: 10 } }],
     ['a strength over 100', { ...WARM_LIGHT, accent: { hue: 10, strength: 101 } }],
     ['a fractional strength', { ...WARM_LIGHT, accent: { hue: 10, strength: 5.5 } }],
@@ -472,13 +485,12 @@ describe('parseCustomColours', () => {
     ['no depth', { ...WARM_LIGHT, background: { hue: 80, strength: 10, lightness: 50 } }],
     ['a page lightness off the quarter steps', withBackground(WARM_LIGHT, { lightness: 50.1 })],
     ['an unknown mode', withBackground(WARM_LIGHT, { mode: 'sepia' as never })],
-    ['borders without a match', { ...WARM_LIGHT, borders: { hue: 10, strength: 10, contrast: 100 } }],
-    ['a border contrast over 300', { ...WARM_LIGHT, borders: { ...WARM_LIGHT.borders, contrast: 301 } }],
     ['a primary text lightness over 100', { ...WARM_LIGHT, ink: { ...WARM_LIGHT.ink, lightness: 100.25 } }],
     ['a text contrast over 150', { ...WARM_LIGHT, text: { ...WARM_LIGHT.text, contrast: 151 } }],
     ['a highlight without a match', { ...WARM_LIGHT, highlight: { hue: 10, strength: 10, contrast: 100 } }],
     ['a highlight contrast over 300', { ...WARM_LIGHT, highlight: { ...WARM_LIGHT.highlight, contrast: 301 } }],
-    ['a gamut that is not a boolean', { ...WARM_LIGHT, viz: { ...WARM_LIGHT.viz, gamut: 1 } }],
+    ['an unknown direction', { ...WARM_LIGHT, direction: 'red-green' }],
+    ['a direction that is not a string', { ...WARM_LIGHT, direction: 1 }],
   ])('rejects %s', (_name, value) => {
     expect(parseCustomColours(value)).toBeNull();
   });

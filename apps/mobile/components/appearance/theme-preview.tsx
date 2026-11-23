@@ -103,31 +103,31 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
 type Role = keyof UiRoles;
 
 // One sample of a role in the use the app gives it: a fill, text (`Aa`) or a
-// hairline, on a ground. A `context` sample is another part's role, shown
-// for comparison (the ramp's empty cell beside its steps).
+// hairline, on a ground, or a ramp of fills side by side. A `context` sample
+// is another part's role, shown for comparison.
 type Sample = { label: string; context?: true } & (
   | { kind: 'fill'; role: Role }
   | { kind: 'text' | 'line'; role: Role; ground: Role }
+  | { kind: 'ramp'; roles: readonly Role[] }
 );
+
+// The roles a sample draws.
+export const sampleRoles = (sample: Sample): Role[] =>
+  sample.kind === 'fill' ? [sample.role] : sample.kind === 'ramp' ? [...sample.roles] : [sample.role, sample.ground];
 
 // Every role a custom part moves (`generateCustomRoles`), each drawn as the
 // app uses it and named by that use. Primary text is also the text on a
-// chart cell and an edited row, so it is shown there.
+// chart cell and an edited row, so it is shown there. The page draws the
+// hairlines and the chart ramp too.
 export const SPOTLIGHT: Record<CustomPart, readonly Sample[]> = {
   background: [
     { kind: 'fill', role: 'well', label: 'Track' },
     { kind: 'fill', role: 'paper', label: 'Page' },
     { kind: 'fill', role: 'surface', label: 'Card' },
     { kind: 'fill', role: 'raised', label: 'Field' },
-    { kind: 'fill', role: 'viz0', label: 'Empty' },
-    // Borders that match the page take its hue and strength.
-    { kind: 'line', role: 'rule', ground: 'surface', label: 'Border', context: true },
-    { kind: 'line', role: 'ruleSoft', ground: 'surface', label: 'Divider', context: true },
-  ],
-  borders: [
     { kind: 'line', role: 'rule', ground: 'surface', label: 'Border' },
     { kind: 'line', role: 'ruleSoft', ground: 'surface', label: 'Divider' },
-    { kind: 'line', role: 'rule', ground: 'paper', label: 'On page' },
+    { kind: 'ramp', roles: ['viz0', 'viz1', 'viz2', 'viz3', 'viz4'], label: 'Chart' },
   ],
   ink: [
     { kind: 'text', role: 'ink', ground: 'paper', label: 'Page' },
@@ -158,14 +158,30 @@ export const SPOTLIGHT: Record<CustomPart, readonly Sample[]> = {
     { kind: 'text', role: 'record', ground: 'recordWash', label: 'Band' },
     { kind: 'line', role: 'recordRule', ground: 'recordWash', label: 'Band line' },
   ],
-  viz: [
-    { kind: 'fill', role: 'viz0', label: 'Empty', context: true },
-    { kind: 'fill', role: 'viz1', label: '1' },
-    { kind: 'fill', role: 'viz2', label: '2' },
-    { kind: 'fill', role: 'viz3', label: '3' },
-    { kind: 'fill', role: 'viz4', label: '4' },
+  direction: [
+    { kind: 'text', role: 'gain', ground: 'surface', label: 'Up' },
+    { kind: 'text', role: 'loss', ground: 'surface', label: 'Down' },
   ],
 };
+
+// A sample's tile: its ground, and the text, hairline or ramp drawn on it.
+function SampleTile({ sample, roles, testID }: { sample: Sample; roles: UiRoles; testID: string }) {
+  const type = useUiText();
+  const ground = sample.kind === 'fill' ? sample.role : sample.kind === 'ramp' ? sample.roles[0] : sample.ground;
+  return (
+    <View style={[styles.tile, sample.kind === 'ramp' ? styles.ramp : null, { backgroundColor: roles[ground], ...uiHairline(roles, { shape: 'control' }) }]} testID={testID}>
+      {sample.kind === 'text' ? (
+        <Text allowFontScaling={false} style={[type.title, { color: roles[sample.role] }]}>
+          Aa
+        </Text>
+      ) : null}
+      {sample.kind === 'line' ? <View style={[styles.line, { backgroundColor: roles[sample.role] }]} /> : null}
+      {sample.kind === 'ramp'
+        ? sample.roles.slice(1).map((role) => <View key={role} style={[styles.rampStep, { backgroundColor: roles[role] }]} />)
+        : null}
+    </View>
+  );
+}
 
 // The part being edited, alone: each role it moves as a tile on the theme's
 // page, named by its use. Drawn above the whole mock on the part's page.
@@ -179,16 +195,7 @@ export function PartSpotlight({ part, roles, testID }: { part: CustomPart; roles
       testID={testID}>
       {SPOTLIGHT[part].map((sample, index) => (
         <View key={index} style={styles.sample}>
-          <View
-            style={[styles.tile, { backgroundColor: roles[sample.kind === 'fill' ? sample.role : sample.ground], ...uiHairline(roles, { shape: 'control' }) }]}
-            testID={`${testID}-${index}`}>
-            {sample.kind === 'text' ? (
-              <Text allowFontScaling={false} style={[type.title, { color: roles[sample.role] }]}>
-                Aa
-              </Text>
-            ) : null}
-            {sample.kind === 'line' ? <View style={[styles.line, { backgroundColor: roles[sample.role] }]} /> : null}
-          </View>
+          <SampleTile roles={roles} sample={sample} testID={`${testID}-${index}`} />
           <Text allowFontScaling={false} numberOfLines={1} style={[type.meta, { color: roles.inkMuted }]}>
             {sample.label}
           </Text>
@@ -216,6 +223,17 @@ const styles = StyleSheet.create({
   line: {
     alignSelf: 'stretch',
     height: uiBorder.width,
+  },
+  // The ramp's empty cell is the tile; its steps stand in it, weakest first.
+  ramp: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: uiSpace.xs,
+    padding: uiSpace.xs,
+  },
+  rampStep: {
+    flex: 1,
+    ...uiMark.bar,
   },
   page: {
     gap: uiSpace.md,

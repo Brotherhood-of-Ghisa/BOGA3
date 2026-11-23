@@ -1,5 +1,5 @@
 import { hexToLch, lchToHex } from '@/components/ui/lch';
-import type { ThemeSeeds } from '@/components/ui/theme';
+import { DEFAULT_DIRECTION, type ThemeSeeds } from '@/components/ui/theme';
 
 // The hue names a picker shows, and the seeds of the older custom theme that
 // was one hue (stored as `hue:<deg>`), read only to convert such a choice into
@@ -10,11 +10,10 @@ import type { ThemeSeeds } from '@/components/ui/theme';
 // it at every hue. Chroma 60 is a little under the default's 73 so the
 // greens and magentas do not glare; out-of-gamut hues lose chroma.
 const ACCENT = { lightness: 46, chroma: 60 };
-// The neutrals (background and text alike) and the ramp take the accent's hue
-// at the shipped seeds' L* and chroma, so a hue reads as one family, as the
-// presets do.
+// The neutrals (background and text alike) take the accent's hue at the
+// shipped seeds' L* and chroma, so a hue reads as one family, as the presets
+// do; the chart ramp follows the background.
 const NEUTRAL = { lightness: 42.4, chroma: 8 };
-const VIZ = { lightness: 58, chroma: 20 };
 // `record` stays the shipped brass unless the accent comes within
 // `RECORD_GAP` of it; then it steps that far away, on the side away from the
 // accent. L* 45 keeps it ≥ 4.5:1 on `paper`, `surface` and `record-wash`.
@@ -52,7 +51,7 @@ export function seedsFromHue(hue: number): ThemeSeeds {
     text: neutral,
     accent: lchToHex({ ...ACCENT, hue: h }),
     record: lchToHex({ ...RECORD, hue: recordHue(h) }),
-    viz: lchToHex({ ...VIZ, hue: h }),
+    direction: DEFAULT_DIRECTION,
   };
 }
 

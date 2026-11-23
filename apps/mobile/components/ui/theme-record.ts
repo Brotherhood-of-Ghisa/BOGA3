@@ -31,13 +31,15 @@ import {
 //
 // - `theme`: a preset id, or `custom`.
 // - `mode`: `light`, `dark` or `system`; a custom theme ignores it.
-// - `custom`: null, or `{background, borders, ink, text, accent, highlight,
-//   record, viz}`, each a `{hue, strength}`; the background also `{mode,
-//   lightness, depth}`, the borders and the highlight `{match, contrast}`, `ink` `{lightness}`, `text`
-//   `{contrast}` and `viz` `{gamut}` (`theme-custom.ts`). Never null while
-//   `theme` is `custom`. Every part and field added since the first custom
-//   themes may be absent: its default draws what the theme drew before it
-//   (`parseCustomColours`).
+// - `custom`: null, or `{background, ink, text, accent, highlight, record,
+//   direction}`, each colour a `{hue, strength}`; the background also `{mode,
+//   lightness, depth}`, the highlight `{match, contrast}`, `ink`
+//   `{lightness}` and `text` `{contrast}`; `direction` a `ThemeDirection`
+//   (`theme-custom.ts`). Never null while `theme` is `custom`. Every part and
+//   field added since the first custom themes may be absent: its default draws
+//   what the theme drew before it (`parseCustomColours`). The `borders` and
+//   `viz` parts older builds wrote are ignored as unknown fields. A preset's
+//   direction is its own: only `custom` stores one.
 //
 // Fields this build does not know are ignored, so a later build may add one
 // without an older build falling back on read. A save writes only the three

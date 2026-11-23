@@ -17,6 +17,18 @@ bar in laps of the previous week's total.
 Why: counts and strength differences read directly; ratios make Volume changes comparable.
 Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColourIn` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/period-pace.tsx`; `apps/mobile/components/groups/group-week-totals.tsx`.
 
+### comparison.change-colour · presentation · accepted
+
+A change's colour follows the theme's direction: `Green / crimson` (every
+preset; Custom's default), `Blue / orange`, or `Ink only`, where both
+directions draw in ink and the sign alone reads
+([[comparison.change-display]]). Only Custom offers the choice. Improvements
+and `new` take the gain colour, decreases the loss colour; no change and
+unavailable stay ink.
+
+Why: some people tell red from green poorly; the sign keeps every choice readable.
+Code: `DIRECTION_PAIRS` in `apps/mobile/components/ui/theme.ts`; `changeToneColourIn` in `apps/mobile/components/ui/change-tone.ts`.
+
 ### comparison.allowed-periods · principle · accepted
 
 Personal analytics use Settings’ Progress period or History look-back. Fixed

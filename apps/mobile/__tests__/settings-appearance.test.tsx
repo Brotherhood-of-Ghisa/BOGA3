@@ -285,13 +285,12 @@ describe('custom', () => {
   const WARM_CUSTOM = customFromSeeds(getThemePreset('warm').seeds, 'light');
   const CUSTOM: CustomColours = {
     background: { hue: 200, strength: 30, mode: 'dark', lightness: 20, depth: 150 },
-    borders: { hue: 200, strength: 30, match: true, contrast: 150 },
     ink: { hue: 265, strength: 40, lightness: 95 },
     text: { hue: 60, strength: 10, contrast: 100 },
     accent: { hue: 330, strength: 80 },
     highlight: { hue: 330, strength: 20, match: true, contrast: 100 },
     record: { hue: 90, strength: 60 },
-    viz: { hue: 150, strength: 50, gamut: false },
+    direction: 'blue-orange',
   };
   const storeCustom = (theme = 'custom') =>
     Storage.setItemSync(APPEARANCE_STORAGE_KEY, JSON.stringify({ theme, mode: 'light', custom: CUSTOM }));
@@ -313,8 +312,11 @@ describe('custom', () => {
     expect(radio('Custom').props.accessibilityState).toEqual({ checked: true });
     expect(previewGround()).toBe(generateCustomRoles(WARM_CUSTOM).paper);
     expect(screen.queryByTestId('settings-appearance-mode')).toBeNull();
-    for (const label of ['Background', 'Primary text', 'Secondary text', 'Accent', 'Best ever', 'Charts']) {
+    for (const label of ['Background', 'Primary text', 'Secondary text', 'Accent', 'Best ever', 'Direction']) {
       expect(within(screen.getByTestId('settings-appearance-custom')).getByText(label)).toBeTruthy();
+    }
+    for (const gone of ['Borders', 'Charts']) {
+      expect(within(screen.getByTestId('settings-appearance-custom')).queryByText(gone)).toBeNull();
     }
   });
 
@@ -325,12 +327,12 @@ describe('custom', () => {
     await waitFor(() => expect(storedRecord()).toEqual({ theme: 'custom', mode: 'light', custom: CUSTOM }));
   });
 
-  it('names each part’s hue and strength, the page’s mode and lightness, and borders that match it, and pushes its picker', () => {
+  it('names each part’s hue and strength, the page’s mode and lightness, a highlight that matches the accent and the direction, and pushes its picker', () => {
     storeCustom();
     render(<SettingsAppearanceRoute />);
     const rows = screen.getByTestId('settings-appearance-custom');
     expect(within(rows).getByText('Dark, Teal, 30%, lightness 20')).toBeTruthy();
-    expect(screen.getByLabelText('Borders, Match background')).toBeTruthy();
+    expect(screen.getByLabelText('Direction, Blue / orange')).toBeTruthy();
     expect(screen.getByLabelText('Highlight, Match accent')).toBeTruthy();
     expect(within(rows).getByText('Purple, 80%')).toBeTruthy();
     expect(screen.getByLabelText('Primary text, Blue, 40%')).toBeTruthy();

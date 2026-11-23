@@ -5,6 +5,7 @@ import { StyleSheet, View, type ColorSchemeName } from 'react-native';
 import {
   appearanceRoles,
   CUSTOM_PART_LABELS,
+  DIRECTION_LABELS,
   previewMode,
   readIntendedAppearance,
   usePhoneScheme,
@@ -12,14 +13,13 @@ import {
 import { applyingHeaderRight } from '@/components/appearance/theme-header';
 import { PartSpotlight, ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
-import { FormSection, HeaderTitleMenu, Notice, Screen, SliderRow, SwitchRow, uiGeometry, uiHairline, uiSpace, useUiRoles } from '@/components/ui';
-import type { ThemeMode, UiRoles } from '@/components/ui/theme';
+import { FormSection, HeaderTitleMenu, Notice, RadioRow, Screen, SliderRow, SwitchRow, uiGeometry, uiHairline, uiSpace, useUiRoles } from '@/components/ui';
+import { THEME_DIRECTIONS, type ThemeMode, type UiRoles } from '@/components/ui/theme';
 import {
-  BORDER_CONTRAST_MAX,
+  CUSTOM_COLOUR_PARTS,
   CUSTOM_PARTS,
   customSeed,
   DEPTH_MAX,
-  gamutColour,
   HIGHLIGHT_CONTRAST_MAX,
   highlightFromAccent,
   INK_RANGE,
@@ -27,10 +27,11 @@ import {
   LIGHTNESS_MAX,
   LIGHTNESS_STEP,
   PAGE_DEFAULT,
+  isColourPart,
   PAGE_RANGE,
-  rampStrongest,
   STRENGTH_MAX,
   TEXT_CONTRAST_MAX,
+  type CustomColourPart,
   type CustomColours,
   type CustomPart,
   type HueStrength,
@@ -45,30 +46,26 @@ type Field = 'hue' | 'strength' | 'lightness' | 'depth' | 'contrast';
 const percent = (value: number): string => `${value}%`;
 const HUE_MAX = 359;
 const HUE_SEGMENTS = 36;
-// What a hue gives a part at full strength: the borders paint as the
-// background, the charts at their strongest step's L*.
-const paintAt = (part: CustomPart, hue: number): string =>
-  part === 'viz' ? gamutColour(rampStrongest, { hue, strength: STRENGTH_MAX }) : customSeed(part, { hue, strength: STRENGTH_MAX });
-// The hue bar's paint for each part: each segment the colour its hue gives at
-// full strength, so the bar shows what each hue can reach (some lose chroma).
-// Computed once, not on every drag move.
+// The hue bar's paint for each colour part: each segment the colour its hue
+// gives at full strength, so the bar shows what each hue can reach (some lose
+// chroma). Computed once, not on every drag move.
 const HUE_PAINT = Object.fromEntries(
-  CUSTOM_PARTS.map((part) => [
+  CUSTOM_COLOUR_PARTS.map((part) => [
     part,
-    Array.from({ length: HUE_SEGMENTS }, (_, index) => paintAt(part, ((index + 0.5) * (HUE_MAX + 1)) / HUE_SEGMENTS)),
+    Array.from({ length: HUE_SEGMENTS }, (_, index) =>
+      customSeed(part, { hue: ((index + 0.5) * (HUE_MAX + 1)) / HUE_SEGMENTS, strength: STRENGTH_MAX }),
+    ),
   ]),
-) as Record<CustomPart, string[]>;
-// The role that stands for a part: what the hue bar's swatch shows, in the
-// theme being made.
-const PART_ROLE: Record<CustomPart, keyof UiRoles> = {
+) as Record<CustomColourPart, string[]>;
+// The role that stands for a colour part: what the hue bar's swatch shows, in
+// the theme being made.
+const PART_ROLE: Record<CustomColourPart, keyof UiRoles> = {
   background: 'paper',
-  borders: 'rule',
   ink: 'ink',
   text: 'inkMuted',
   accent: 'accent',
   highlight: 'accentWash',
   record: 'record',
-  viz: 'viz4',
 };
 const PART_OPTIONS = CUSTOM_PARTS.map((id) => ({ id, label: CUSTOM_PART_LABELS[id] }));
 // What VoiceOver hears for a hue; the bar itself shows no words.
@@ -83,7 +80,7 @@ function customOf(appearance: AppearanceChoice, phoneScheme: ColorSchemeName | n
 // What a part's controls are given: the colours being made (the draft in
 // place), a live and a let-go handler per slider, a save of several parts at
 // once (a switch) built on the colours the saves on their way will store, and
-// the hue bar's swatch.
+// the hue bar's swatch (none for the direction).
 type Controls = {
   part: CustomPart;
   colours: CustomColours;
@@ -104,7 +101,7 @@ function HueStrengthRows({ change, end, swatch, part, colour, divider }: Control
         onChange={change('hue')}
         onChangeEnd={end('hue')}
         testID="theme-custom-hue"
-        trackColours={HUE_PAINT[part]}
+        trackColours={isColourPart(part) ? HUE_PAINT[part] : undefined}
         trailing={swatch}
         value={colour.hue}
       />
@@ -161,34 +158,6 @@ function BackgroundControls(controls: Controls) {
         onChangeEnd={end('depth')}
         testID="theme-custom-depth"
         value={background.depth}
-      />
-    </>
-  );
-}
-
-// The hairlines: matching the page or a hue and strength of their own, and
-// how far they step from the page. Unmatching starts from the page's colour,
-// so nothing jumps.
-function BordersControls(controls: Controls) {
-  const { colours, change, end, save } = controls;
-  const { borders } = colours;
-  const match = (on: boolean) =>
-    save(({ background }) => ({
-      borders: on ? { ...borders, match: true } : { ...borders, match: false, hue: background.hue, strength: background.strength },
-    }));
-  return (
-    <>
-      <SwitchRow density="list" label="Match background" onValueChange={match} testID="theme-custom-match" value={borders.match} />
-      {borders.match ? null : <HueStrengthRows {...controls} colour={borders} divider />}
-      <SliderRow
-        divider
-        format={percent}
-        label="Contrast"
-        max={BORDER_CONTRAST_MAX}
-        onChange={change('contrast')}
-        onChangeEnd={end('contrast')}
-        testID="theme-custom-contrast"
-        value={borders.contrast}
       />
     </>
   );
@@ -265,12 +234,30 @@ function TextControls(controls: Controls) {
   );
 }
 
+// The direction a change is drawn in: one of three, saved on a tap.
+function DirectionControls({ colours, save }: Controls) {
+  return (
+    <>
+      {THEME_DIRECTIONS.map((direction, index) => (
+        <RadioRow
+          checked={colours.direction === direction}
+          divider={index > 0}
+          key={direction}
+          label={DIRECTION_LABELS[direction]}
+          onPress={() => save(() => ({ direction }))}
+          testID={`theme-custom-direction-${direction}`}
+        />
+      ))}
+    </>
+  );
+}
+
 function PartControls(controls: Controls) {
   switch (controls.part) {
     case 'background':
       return <BackgroundControls {...controls} />;
-    case 'borders':
-      return <BordersControls {...controls} />;
+    case 'direction':
+      return <DirectionControls {...controls} />;
     case 'ink':
       return <InkControls {...controls} />;
     case 'text':
@@ -282,16 +269,15 @@ function PartControls(controls: Controls) {
   }
 }
 
-// A part with one field moved. An edit of the charts draws them on the gamut:
-// a strength is then a share of the most chroma each step holds (a theme
-// saved before keeps the shipped ramp until then).
-const editOf = (part: CustomPart, draft: Draft, field: Field, value: number): Draft =>
-  ({ ...draft, [field]: value, ...(part === 'viz' ? { gamut: true } : {}) }) as Draft;
+// A part with one field moved. Only a colour part has sliders; the direction
+// is returned as it is.
+const editOf = (draft: Draft, field: Field, value: number): Draft => (typeof draft === 'string' ? draft : ({ ...draft, [field]: value } as Draft));
 
-// Settings → Appearance → Custom → one part (background, borders, primary
-// text, secondary text, accent, highlight, best ever, charts): a hue on a painted bar and
+// Settings → Appearance → Custom → one part (background, primary text,
+// secondary text, accent, highlight, best ever): a hue on a painted bar and
 // a strength, and the part's own controls — the page's mode, lightness and
-// depth; the borders' and the highlight's match and contrast; the texts' lightness or contrast.
+// depth; the highlight's match and contrast; the texts' lightness or contrast.
+// The direction's page offers its three choices instead.
 // Then the part's roles alone (`PartSpotlight`) and the whole theme on a
 // small mock, both live while a control is held. A part saves when a slider
 // is let go (or a VoiceOver step is made) or a switch is flipped, and the app
@@ -316,20 +302,22 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
     if (next !== undefined) setDraft(next);
     await commit(
       { theme: 'custom', custom: { ...intended, ...patch } },
-      { message: 'Couldn’t save the colour. Nothing changed.', context: { part, value: patch } },
+      { message: `Couldn’t save the ${isColourPart(part) ? 'colour' : 'direction'}. Nothing changed.`, context: { part, value: patch } },
     );
   };
   const controls: Controls = {
     part,
     colours,
-    change: (field) => (value) => setDraft((current) => editOf(part, current, field, value)),
+    change: (field) => (value) => setDraft((current) => editOf(current, field, value)),
     end: (field) => (value) => {
-      void save(() => ({ [part]: editOf(part, draft, field, value) }));
+      void save(() => ({ [part]: editOf(draft, field, value) }));
     },
     save: (patchOf) => {
       void save(patchOf);
     },
-    swatch: <View style={[styles.swatch, { backgroundColor: roles[PART_ROLE[part]], ...uiHairline(liveRoles, { shape: 'control' }) }]} testID="theme-custom-hue-swatch" />,
+    swatch: isColourPart(part) ? (
+      <View style={[styles.swatch, { backgroundColor: roles[PART_ROLE[part]], ...uiHairline(liveRoles, { shape: 'control' }) }]} testID="theme-custom-hue-swatch" />
+    ) : null,
   };
 
   return (

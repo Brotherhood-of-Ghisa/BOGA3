@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ColorSchemeName } from 'react-native';
 
-import type { ThemeMode, UiRoles } from '@/components/ui/theme';
+import type { ThemeDirection, ThemeMode, UiRoles } from '@/components/ui/theme';
 import { useAppTheme } from '@/components/ui/theme-context';
 import { followsPhone } from '@/components/ui/theme-native';
 import type { CustomPart } from '@/components/ui/theme-custom';
@@ -68,13 +68,19 @@ export const MODE_LABELS: Record<AppearanceMode, string> = { light: 'Light', dar
 // The custom parts as the Appearance page names them, in its order.
 export const CUSTOM_PART_LABELS: Record<CustomPart, string> = {
   background: 'Background',
-  borders: 'Borders',
   ink: 'Primary text',
   text: 'Secondary text',
   accent: 'Accent',
   highlight: 'Highlight',
   record: 'Best ever',
-  viz: 'Charts',
+  direction: 'Direction',
+};
+
+// The directions a change is drawn in, as the Direction picker names them.
+export const DIRECTION_LABELS: Record<ThemeDirection, string> = {
+  'green-crimson': 'Green / crimson',
+  'blue-orange': 'Blue / orange',
+  ink: 'Ink only',
 };
 
 // The phone's mode as the OS reports it now (`theme-context.tsx`): what a
@@ -96,12 +102,12 @@ export function themeLabel(appearance: AppearanceChoice): string {
 }
 
 // A custom part's value as a row shows it: its hue's name and strength; for
-// the background its mode and lightness first; borders that match the page
-// and a highlight that matches the accent say so.
+// the background its mode and lightness first; a highlight that matches the
+// accent says so; the direction its name.
 export function customPartLabel(appearance: AppearanceChoice, part: CustomPart): string {
   const colours = appearance.custom;
   if (!colours) return '';
-  if (part === 'borders' && colours.borders.match) return 'Match background';
+  if (part === 'direction') return DIRECTION_LABELS[colours.direction];
   if (part === 'highlight' && colours.highlight.match) return 'Match accent';
   const { hue, strength } = colours[part];
   const words = [hueName(hue), `${strength}%`];
