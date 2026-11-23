@@ -326,8 +326,11 @@ const editOf = (draft: Draft, field: Field, value: number): Draft => {
 export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; onChoosePart: (part: CustomPart) => void }) {
   const { appearance, saveError, commit, applying } = useAppearanceCommit();
   const phoneScheme = usePhoneScheme();
-  const [draft, setDraft] = useState<Draft>(() => partOf(shownFor(part, customOf(appearance, phoneScheme)), part));
-  const colours: CustomColours = { ...shownFor(part, customOf(appearance, phoneScheme)), [part]: draft };
+  // The colours as stored (with the inks as drawn on their pages); the draft
+  // in place of this part while a control is held.
+  const shown = shownFor(part, customOf(appearance, phoneScheme));
+  const [draft, setDraft] = useState<Draft>(() => partOf(shown, part));
+  const colours: CustomColours = { ...shown, [part]: draft };
   const chosen: AppearanceChoice = { ...appearance, theme: 'custom', custom: colours };
   const roles = appearanceRoles(chosen, phoneScheme);
   const liveRoles = useUiRoles();
@@ -351,8 +354,10 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
     change: (field) => (value) => setDraft((current) => editOf(current, field, value)),
     end: (field) => (value) => {
       const edited = editOf(draft, field, value);
-      // A secondary or muted text let go where it was stores nothing new.
-      const moved = !isOwnInkPart(part) || (draft as OwnInk)[field as keyof OwnInk] !== value;
+      // A secondary or muted text let go where it is stored (or drawn) stores
+      // nothing new. Compared with the stored part, not the draft: a drag has
+      // already moved the draft to the value it is let go at.
+      const moved = !isOwnInkPart(part) || (partOf(shown, part) as OwnInk)[field as keyof OwnInk] !== value;
       void save((intended) => (moved ? { ...(isOwnInkPart(part) ? ownInks(intended) : {}), [part]: edited } : {}));
     },
     save: (patchOf) => {

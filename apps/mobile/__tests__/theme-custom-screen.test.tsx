@@ -599,6 +599,36 @@ it('moves a stored muted text to L* 0 and 100, past the primary text, and writes
   await waitFor(() => expect(storedCustom()?.muted?.lightness).toBe(100));
 });
 
+it.each(['secondary', 'muted'] as const)('saves %s text when a drag is let go, and nothing when it is let go where it is stored', async (part) => {
+  store(OWN);
+  mockPart = part;
+  const setItem = jest.spyOn(Storage, 'setItem');
+  render(<ThemeCustomRoute />);
+  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
+  const at = (lightness: number) => lightness * 4;
+
+  // Dragged away and back: let go at the stored L*.
+  act(() => drag(slider('Lightness')).onUpdate({ x: at(10) }));
+  act(() => drag(slider('Lightness')).onUpdate({ x: at(OWN[part]!.lightness) }));
+  await act(async () => drag(slider('Lightness')).onEnd({ x: at(OWN[part]!.lightness) }, true));
+  expect(setItem).not.toHaveBeenCalled();
+
+  act(() => drag(slider('Lightness')).onUpdate({ x: at(80) }));
+  await act(async () => drag(slider('Lightness')).onEnd({ x: at(80) }, true));
+  await waitFor(() => expect(storedCustom()).toEqual({ ...OWN, [part]: { ...OWN[part], lightness: 80 } }));
+});
+
+it('stores both inks on a drag let go on a theme that has not stored them', async () => {
+  store(CUSTOM);
+  mockPart = 'secondary';
+  render(<ThemeCustomRoute />);
+  fireEvent(screen.getByTestId('theme-custom-strength-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
+  act(() => drag(slider('Strength')).onUpdate({ x: 70 }));
+  await act(async () => drag(slider('Strength')).onEnd({ x: 70 }, true));
+  const drawn = ownInks(CUSTOM);
+  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, muted: drawn.muted, secondary: { ...drawn.secondary, strength: 70 } }));
+});
+
 it('puts stored secondary and muted text at the dark ladder’s L* when the page switches to dark', async () => {
   store(OWN);
   render(<ThemeCustomRoute />);
