@@ -28,13 +28,14 @@ export type NoticeProps = {
 };
 
 // A band that states something about the screen: `paper` inside the edge at
-// the card radius, an optional leading glyph and the words.
+// the card radius, an optional leading glyph and the words, in the page inks.
+// A failure stands on a card's `surface`, where `danger` reads in every theme.
 export function Notice({ message, title, tone = 'neutral', icon, live = false, action, testID }: NoticeProps) {
   const styles = useStyles();
   const textRoles = useUiText();
   const danger = tone === 'danger';
   const words = (
-    <Text allowFontScaling={false} style={[textRoles.body, title ? null : styles.fill, danger ? styles.messageDanger : null]}>{message}</Text>
+    <Text allowFontScaling={false} style={[textRoles.body, title ? null : styles.fill, danger ? styles.messageDanger : styles.pageWords]}>{message}</Text>
   );
   return (
     <View
@@ -42,10 +43,10 @@ export function Notice({ message, title, tone = 'neutral', icon, live = false, a
       accessibilityRole={danger ? 'alert' : undefined}
       style={[styles.band, title ? styles.bandTitled : null, danger ? styles.bandDanger : null]}
       testID={testID}>
-      {icon ? <Icon colorRole={danger ? 'danger' : 'inkMuted'} name={icon} size="sm" /> : null}
+      {icon ? <Icon colorRole={danger ? 'danger' : 'pageInkMuted'} name={icon} size="sm" /> : null}
       {title ? (
         <View style={styles.words}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={[textRoles.title, danger ? styles.messageDanger : null]}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[textRoles.title, danger ? styles.messageDanger : styles.pageWords]}>
             {title}
           </Text>
           {words}
@@ -74,7 +75,11 @@ const useStyles = makeStyles((roles, mode) => ({
     alignItems: 'flex-start',
   },
   bandDanger: {
+    backgroundColor: roles.surface,
     borderColor: roles.danger,
+  },
+  pageWords: {
+    color: roles.pageInk,
   },
   words: {
     flex: 1,

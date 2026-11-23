@@ -7,7 +7,7 @@ import { Appearance } from 'react-native';
 import { navigationTheme, statusBarStyleFor, useNavigationTheme } from '@/components/navigation/navigation-theme';
 import { defaultThemeSeeds, generateRoles } from '@/components/ui/theme';
 import { APPEARANCE_STORAGE_KEY } from '@/components/ui/theme-launch';
-import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { DEFAULT_APPEARANCE, getThemePreset, presetRoles } from '@/components/ui/theme-presets';
 import { serialiseAppearanceRecord } from '@/components/ui/theme-record';
 
 import { renderWithTheme } from './helpers/theme';
@@ -25,7 +25,7 @@ describe('navigationTheme', () => {
       primary: roles.accent,
       background: roles.paper,
       card: roles.paper,
-      text: roles.ink,
+      text: roles.pageInk,
       border: roles.rule,
       notification: roles.danger,
     });
@@ -34,9 +34,10 @@ describe('navigationTheme', () => {
 });
 
 describe('statusBarStyleFor', () => {
-  it('draws dark content on a light page and light content on a dark one', () => {
-    expect(statusBarStyleFor('light')).toBe('dark');
-    expect(statusBarStyleFor('dark')).toBe('light');
+  it('draws dark content on a light page and light content on a dark one, whatever the mode', () => {
+    expect(statusBarStyleFor(generateRoles(defaultThemeSeeds, 'light').paper)).toBe('dark');
+    expect(statusBarStyleFor(generateRoles(defaultThemeSeeds, 'dark').paper)).toBe('light');
+    expect(statusBarStyleFor(presetRoles(getThemePreset('ink-paper'), 'light').paper)).toBe('light');
   });
 });
 

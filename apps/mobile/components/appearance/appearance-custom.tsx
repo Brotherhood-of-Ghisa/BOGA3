@@ -55,7 +55,7 @@ export function ChoiceMeta({ details: words, roles, swatchTestID }: { details: s
   );
 }
 
-// A choice as its own colours: `ink`, `accent`, `record` and the ramp's third
+// A choice as its own colours: `pageInk`, `accent`, `record` and the ramp's third
 // step on its `paper`. These are another theme's values, so they cannot be
 // roles of this one.
 function Swatch({ roles, testID }: { roles: UiRoles; testID?: string }) {
@@ -64,7 +64,7 @@ function Swatch({ roles, testID }: { roles: UiRoles; testID?: string }) {
       importantForAccessibility="no-hide-descendants"
       style={[styles.swatch, { backgroundColor: roles.paper, ...uiHairline(roles, { shape: 'control' }) }]}
       testID={testID}>
-      {[roles.ink, roles.accent, roles.record, roles.viz3].map((colour, index) => (
+      {[roles.pageInk, roles.accent, roles.record, roles.viz3].map((colour, index) => (
         <View key={index} style={[styles.swatchMark, uiMark.bar, { backgroundColor: colour }]} />
       ))}
     </View>

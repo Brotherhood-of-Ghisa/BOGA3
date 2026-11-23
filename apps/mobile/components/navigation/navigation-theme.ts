@@ -1,6 +1,7 @@
 import { DarkTheme, DefaultTheme, type Theme } from 'expo-router';
 import { useMemo } from 'react';
 
+import { hexToLch } from '@/components/ui/lch';
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
 import { useUiMode, useUiRoles } from '@/components/ui/theme-context';
 
@@ -18,7 +19,7 @@ export function navigationTheme(roles: UiRoles, mode: ThemeMode): Theme {
       primary: roles.accent,
       background: roles.paper,
       card: roles.paper,
-      text: roles.ink,
+      text: roles.pageInk,
       border: roles.rule,
       notification: roles.danger,
     },
@@ -32,7 +33,8 @@ export function useNavigationTheme(): Theme {
   return useMemo(() => navigationTheme(roles, mode), [roles, mode]);
 }
 
-// The status bar's content: dark on a light page, light on a dark one.
-export function statusBarStyleFor(mode: ThemeMode): 'dark' | 'light' {
-  return mode === 'dark' ? 'light' : 'dark';
+// The status bar's content: dark on a light page, light on a dark one. The
+// page, not the mode: Ink + paper draws a dark page in light mode.
+export function statusBarStyleFor(paper: string): 'dark' | 'light' {
+  return hexToLch(paper).lightness < 50 ? 'light' : 'dark';
 }

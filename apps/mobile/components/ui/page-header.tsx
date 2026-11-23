@@ -30,8 +30,8 @@ type SectionHeaderProps = {
   action?: { label: string; onPress: () => void; testID?: string; accessibilityLabel?: string };
 };
 
-// A section's heading inside a screen: Archivo 700 at `lg`, with an optional
-// text action on the right.
+// A section's heading inside a screen, on the page: Archivo 700 at `lg` in
+// `pageInk`, with an optional text action on the right.
 export function SectionHeader({ title, action }: SectionHeaderProps) {
   const styles = useStyles();
   return (
@@ -64,6 +64,7 @@ const useStyles = makeStyles((roles) => ({
   },
   sectionTitle: {
     ...uiTextFor(roles).title,
+    color: roles.pageInk,
     flex: 1,
   },
 }));

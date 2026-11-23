@@ -12,13 +12,13 @@ import { uiFonts, uiGeometry, uiTypography } from '@/components/ui/tokens';
 // in the screen's own styles, listed after the role.
 const buildText = (roles: UiRoles) =>
   StyleSheet.create({
-    // A page's own title, at the top of its scroll.
+    // A page's own title, at the top of its scroll: on the page, so `pageInk`.
     pageTitle: {
       fontFamily: uiFonts.display.family,
       fontWeight: '800',
       fontSize: uiTypography.size.xxl,
       lineHeight: uiTypography.lineHeight.xxl,
-      color: roles.ink,
+      color: roles.pageInk,
     },
     // A sheet's title, in its header bar.
     sheetTitle: {
@@ -168,6 +168,10 @@ const buildTone = (roles: UiRoles) =>
     ink: { color: roles.ink },
     muted: { color: roles.inkMuted },
     faint: { color: roles.inkFaint },
+    // Text drawn straight on the page, not on a card.
+    page: { color: roles.pageInk },
+    pageMuted: { color: roles.pageInkMuted },
+    pageFaint: { color: roles.pageInkFaint },
     accent: { color: roles.accent },
     gain: { color: roles.gain },
     danger: { color: roles.danger },

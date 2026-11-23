@@ -39,8 +39,8 @@ describe('bundled theme app icons', () => {
     expect(registered).toContain(`${appIcon}November`);
   });
 
-  it('names Graphite’s and Sage’s icons after Slate’s and Forest’s, with their November variants', () => {
-    expect(themePresets.filter(({ id }) => id === 'graphite' || id === 'sage').map(({ appIcon }) => appIcon)).toEqual(['Slate', 'Forest']);
+  it('names Graphite’s, Sage’s and Ink + paper’s icons after Slate’s and Forest’s, with their November variants', () => {
+    expect(themePresets.filter(({ id }) => ['graphite', 'sage', 'ink-paper'].includes(id)).map(({ appIcon }) => appIcon)).toEqual(['Slate', 'Forest', 'Slate']);
   });
 
   it.each([...ordinaryIcons, ...seasonalIcons])('$label has an opaque, square PNG large enough for an iOS icon', ({ id }) => {

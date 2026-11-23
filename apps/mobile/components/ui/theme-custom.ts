@@ -202,7 +202,7 @@ const short = (lightness: number, page: number, limit: number): number =>
 export function generateCustomRoles(colours: CustomColours): UiRoles {
   const mode = customMode(colours);
   const reference: UiRoles = {
-    ...generateRoles(customSeeds(colours), mode, colours.background.hue),
+    ...generateRoles(customSeeds(colours), mode, { rampHue: colours.background.hue }),
     ink: customInk(mode, colours.ink),
     ...ownHighlight(colours, mode),
   };
@@ -222,7 +222,10 @@ export function generateCustomRoles(colours: CustomColours): UiRoles {
     }),
   ) as UiRoles;
   const inked = atLadder ? moved : { ...moved, ink: gamutColour(colours.ink.lightness, colours.ink) };
-  const drawn = colours.direction === 'ink' ? { ...inked, gain: inked.ink, loss: inked.ink } : inked;
+  // A custom page and its cards are one family of lightness: text on the page
+  // is drawn in the inks.
+  const paged = { ...inked, pageInk: inked.ink, pageInkMuted: inked.inkMuted, pageInkFaint: inked.inkFaint };
+  const drawn = colours.direction === 'ink' ? { ...paged, gain: paged.ink, loss: paged.ink } : paged;
   // The backdrop behind a sheet: the drawn `ink` at 42% on a light page, as
   // the light ladder draws it; the dark ladder's black otherwise.
   return mode === 'light' ? { ...drawn, scrim: withAlpha(drawn.ink, 0.42) } : drawn;

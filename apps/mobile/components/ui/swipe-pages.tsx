@@ -151,7 +151,7 @@ function Tab({ label, selected, onPress, testID, compact }: { label: string; sel
         minimumFontScale={0.75}
         ellipsizeMode="tail"
         numberOfLines={1}
-        style={[textRoles.title, selected ? null : textTones.faint]}>
+        style={[textRoles.title, selected ? textTones.page : textTones.pageFaint]}>
         {label}
       </Text>
       <View style={[styles.tabMark, selected ? styles.tabMarkSelected : null]} />
@@ -194,7 +194,7 @@ const useStyles = makeStyles((roles) => ({
     borderRadius: TAB_MARK / 2,
   },
   tabMarkSelected: {
-    backgroundColor: roles.ink,
+    backgroundColor: roles.pageInk,
   },
   pager: {
     flex: 1,

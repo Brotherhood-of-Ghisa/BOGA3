@@ -265,7 +265,9 @@ it('spotlights, for each part, only roles a hue and strength change of that part
     const before = generateCustomRoles(CUSTOM);
     const shifted = { ...CUSTOM, [part]: { ...CUSTOM[part], hue: (CUSTOM[part].hue + 120) % 360, strength: 100 } };
     const after = generateCustomRoles(shifted);
-    return new Set((Object.keys(before) as (keyof typeof before)[]).filter((role) => before[role] !== after[role] && differs(before[role], after[role])));
+    // A custom theme's page inks are its inks under a second name.
+    return new Set((Object.keys(before) as (keyof typeof before)[])
+      .filter((role) => !role.startsWith('pageInk') && before[role] !== after[role] && differs(before[role], after[role])));
   };
   CUSTOM_COLOUR_PARTS.forEach((part) => {
     const roles = SPOTLIGHT[part].flatMap(sampleRoles);

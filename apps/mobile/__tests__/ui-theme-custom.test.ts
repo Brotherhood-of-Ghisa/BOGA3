@@ -289,8 +289,8 @@ describe('primary text’s lightness', () => {
     const paler = generateCustomRoles({ ...WARM_LIGHT, ink: { ...WARM_LIGHT.ink, lightness: 30.25 } });
     expect(hexToLch(paler.ink).lightness).toBeCloseTo(30.25, 0);
     const moved = (Object.keys(base) as (keyof UiRoles)[]).filter((role) => base[role] !== paler[role]);
-    // The light backdrop is `ink` at 42%.
-    expect(moved.sort()).toEqual(['ink', 'scrim']);
+    // The light backdrop is `ink` at 42%; text on the page is the inks.
+    expect(moved.sort()).toEqual(['ink', 'pageInk', 'scrim']);
   });
 
   it('keeps its hue and strength as a share of what its L* holds', () => {
@@ -312,7 +312,7 @@ describe('secondary text’s contrast', () => {
   it('moves the secondary inks alone', () => {
     const [low, high] = [atContrast(40), atContrast(140)];
     const moved = (Object.keys(low) as (keyof UiRoles)[]).filter((role) => low[role] !== high[role]);
-    expect(moved.sort()).toEqual(['inkFaint', 'inkMuted']);
+    expect(moved.sort()).toEqual(['inkFaint', 'inkMuted', 'pageInkFaint', 'pageInkMuted']);
   });
 
   it('never takes them past the primary text', () => {
@@ -371,7 +371,7 @@ function rolesBefore(saved: SavedBefore, ink: { hue: number; strength: number })
     record: customSeed('record', saved.record),
     direction: 'green-crimson' as const,
   };
-  const reference = { ...generateRoles(seeds, mode, saved.background.hue), ink: customInk(mode, ink) };
+  const reference = { ...generateRoles(seeds, mode, { rampHue: saved.background.hue }), ink: customInk(mode, ink) };
   const paperRef = hexToLch(reference.paper).lightness;
   const end = hexToLch(reference.ink).lightness;
   const { lightness: page, depth } = saved.background;
@@ -388,7 +388,9 @@ function rolesBefore(saved: SavedBefore, ink: { hue: number; strength: number })
       return [role, lchToHex({ ...lch, lightness: Math.min(100, Math.max(0, page + share * (end - page))) })];
     }),
   ) as UiRoles;
-  return mode === 'light' ? { ...moved, scrim: withAlpha(moved.ink, 0.42) } : moved;
+  // The page inks came later, as the inks under a second name.
+  const paged = { ...moved, pageInk: moved.ink, pageInkMuted: moved.inkMuted, pageInkFaint: moved.inkFaint };
+  return mode === 'light' ? { ...paged, scrim: withAlpha(paged.ink, 0.42) } : paged;
 }
 
 describe('a theme saved before its mode, contrasts and direction', () => {

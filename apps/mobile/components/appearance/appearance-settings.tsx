@@ -18,9 +18,10 @@ import { ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
 import { SubPage } from '@/components/settings/sub-page';
 import { ActionRow, ChoiceRow, FormSection, Notice, RadioRow, uiSpace, useUiText } from '@/components/ui';
-import { generateRoles, type ThemeMode } from '@/components/ui/theme';
+import type { ThemeMode } from '@/components/ui/theme';
 import {
   DEFAULT_THEME_PRESET_ID,
+  presetRoles,
   startingCustom,
   themePresets,
   type ThemePreset,
@@ -146,15 +147,15 @@ function PreviewBlock({ appearance, phoneScheme }: { appearance: AppearanceChoic
 }
 
 // Each preset's roles in each mode, for its swatch.
-const presetRoles = new Map(
+const presetSwatchRoles = new Map(
   (['light', 'dark'] as const).flatMap((mode) =>
-    themePresets.map((preset) => [`${mode}:${preset.id}`, generateRoles(preset.seeds, mode)] as const),
+    themePresets.map((preset) => [`${mode}:${preset.id}`, presetRoles(preset, mode)] as const),
   ),
 );
 
 function PresetMeta({ details, mode, preset }: { details: string[]; mode: ThemeMode; preset: ThemePreset }) {
   return (
-    <ChoiceMeta details={details} roles={presetRoles.get(`${mode}:${preset.id}`)!} swatchTestID={`settings-appearance-swatch-${preset.id}`} />
+    <ChoiceMeta details={details} roles={presetSwatchRoles.get(`${mode}:${preset.id}`)!} swatchTestID={`settings-appearance-swatch-${preset.id}`} />
   );
 }
 

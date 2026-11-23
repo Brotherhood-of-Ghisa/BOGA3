@@ -9,20 +9,21 @@ import { useUiText } from '@/components/ui/text-roles';
  * One header style on every header (`navigation-contract.md` "Header
  * titles"): the root stack's, and the Groups tab's in the tab layout.
  */
-export function headerStyleOptions(roles: UiRoles, title: Pick<TextStyle, 'fontFamily' | 'fontWeight' | 'fontSize' | 'color'>) {
+export function headerStyleOptions(roles: UiRoles, title: Pick<TextStyle, 'fontFamily' | 'fontWeight' | 'fontSize'>) {
   return {
     // The page's own `paper` ground with no shadow line, so header and
-    // page read as one surface, the `title` role, an `ink` back arrow. The header
-    // takes no line height, so only the role's face, weight, size and colour.
+    // page read as one surface, the `title` role and the back arrow in
+    // `pageInk`. The header takes no line height, so only the role's face,
+    // weight and size.
     headerStyle: { backgroundColor: roles.paper },
     headerShadowVisible: false,
     headerTitleStyle: {
       fontFamily: title.fontFamily,
       fontWeight: title.fontWeight,
       fontSize: title.fontSize,
-      color: title.color,
+      color: roles.pageInk,
     },
-    headerTintColor: roles.ink,
+    headerTintColor: roles.pageInk,
   } as const;
 }
 
