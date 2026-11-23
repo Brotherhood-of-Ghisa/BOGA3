@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import { StyleSheet, Text } from 'react-native';
-import { ActionButton, ChoiceRow, FormSection, Notice, ScreenScroll, SegmentRow, uiSpace, useUiText } from '@/components/ui';
+import { ActionButton, ChoiceRow, FormSection, Notice, ScreenScroll, SegmentRow, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { buildSettingsMuscleSections, type MuscleSetupChange, type SettingsMuscleSection } from '@/src/data/muscle-report-settings';
 import { SETTINGS_SUB_PAGES } from '@/src/navigation/routes';
 import { useAccountLocalPreferenceState, updatePreferences } from '@/src/preferences/hooks';
@@ -32,6 +32,7 @@ export function MuscleSetupShell({ testID, children }: { testID: string; childre
 function ShellBody({ preferences, testID, children }: { preferences: Preferences; testID: string; children: ShellContent }) {
   const setup = useMuscleSetup(preferences.accountRevision);
   const text = useUiText();
+  const tone = useUiTextTone();
   const loaded = setup.rows && setup.definitions ? { rows: setup.rows, definitions: setup.definitions } : null;
   return <ScreenScroll automaticallyAdjustKeyboardInsets contentContainerStyle={styles.content}
     contentInsetAdjustmentBehavior="automatic" keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" testID={testID}>
@@ -39,7 +40,7 @@ function ShellBody({ preferences, testID, children }: { preferences: Preferences
       icon="warning" live message={preferences.error} testID="settings-muscle-preferences-error" tone="danger" /> : null}
     {setup.error ? <Notice action={<ActionButton label="Retry" disabled={setup.busy} onPress={setup.retry} variant="text" />}
       icon="warning" live message={setup.error} testID="settings-muscles-error" tone="danger" /> : null}
-    {!loaded && !setup.error ? <Text allowFontScaling={false} style={text.meta}>Loading muscles…</Text> : null}
+    {!loaded && !setup.error ? <Text allowFontScaling={false} style={[text.meta, tone.pageMuted]}>Loading muscles…</Text> : null}
     {children({ preferences, setup, loaded })}
   </ScreenScroll>;
 }

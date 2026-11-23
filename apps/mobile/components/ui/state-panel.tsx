@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { useUiGround } from '@/components/ui/ground';
 import { uiTextFor } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
@@ -45,14 +46,16 @@ export function StatePanel({
 }: StatePanelProps) {
   const styles = useStyles();
   const roles = useUiRoles();
+  // Centred on the page, or inline inside a card or a sheet.
+  const onPage = useUiGround() === 'page';
   return (
     <View
       accessibilityLiveRegion={kind === 'message' ? undefined : 'polite'}
       style={[styles.panel, fill ? styles.fill : null]}
       testID={testID}>
-      {kind === 'loading' ? <ActivityIndicator color={roles.inkMuted} /> : null}
-      {title ? <Text allowFontScaling={false} style={styles.title}>{title}</Text> : null}
-      {body ? <Text allowFontScaling={false} style={styles.body}>{body}</Text> : null}
+      {kind === 'loading' ? <ActivityIndicator color={onPage ? roles.pageInkMuted : roles.inkMuted} /> : null}
+      {title ? <Text allowFontScaling={false} style={[styles.title, onPage ? styles.titleOnPage : null]}>{title}</Text> : null}
+      {body ? <Text allowFontScaling={false} style={[styles.body, onPage ? styles.bodyOnPage : null]}>{body}</Text> : null}
       {action ? (
         <ActionButton
           accessibilityLabel={action.accessibilityLabel}
@@ -86,4 +89,6 @@ const useStyles = makeStyles((roles) => ({
     color: roles.inkMuted,
     textAlign: 'center',
   },
+  titleOnPage: { color: roles.pageInk },
+  bodyOnPage: { color: roles.pageInkMuted },
 }));

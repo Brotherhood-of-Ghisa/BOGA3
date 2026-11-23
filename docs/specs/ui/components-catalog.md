@@ -13,7 +13,7 @@
 > here.
 
 **Reuse before adding.** Build from `apps/mobile/components/ui/index.ts`.
-Token guardrails apply to every composition (`ux-rules.md`, "Styling guardrails").
+Token guardrails apply everywhere (`ux-rules.md`, "Styling guardrails").
 
 ## Coded compositions
 
@@ -63,7 +63,8 @@ For a new block or derivative, follow the selection and review workflow in
 | One option or setting on or off, in a sheet (`Show deleted sessions`) or a form card (`Track each gym separately`, `density="list"`, optional `description`) | `SwitchRow` (`switch-row.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`); every other page takes the native header (`ux-rules.md` "Pages") |
-| Live theme colours: a stylesheet (its builder also gets the mode), a colour prop, the mode | `makeStyles`, `useUiRoles`, `useUiMode` (`theme-context.tsx`), `useUiText` (`text-roles.ts`) |
+| Words on the page or a card | `useUiGround`, `OnCard` (`ground.tsx`) |
+| Live theme colours: a stylesheet (its builder also gets the mode), a colour prop, the mode | `makeStyles`, `useUiRoles`, `useUiMode` (`theme-context.tsx`), `useUiText`, `useUiGroundTone` (`text-roles.ts`) |
 | Card or control edge, sunken track: the only shadows | `uiEdge` (hairline + lift), `uiWell`, `uiHairline` (`edge.ts`; options `shape`, `tone`). `uiCorner`: corner alone. `uiCardSlice`: list cells as one card. `uiEdge`: Card, Notice, FormField, SearchField, InputRow, outline ActionButton, ToggleChip, ChipGroup, the tab pill. `uiWell`: SegmentedControl, SliderRow, bar tracks. `Tag`: `uiHairline`. Bar fills, dots, rings: `uiMark` (`marks.ts`) |
 | Fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
 
@@ -83,7 +84,7 @@ re-exported style modules. Cases:
 `apps/mobile/__tests__/pattern-adoption-guardrail.test.ts`. A new consumer of a
 family joins its adoption list; spec 08 owns selection and review.
 
-Foundation definitions own geometry and retain their component tests. Template consumers
+Foundation definitions own geometry and their component tests. Template consumers
 cannot override their selected family's type/casing or pattern style props;
 compact list/table consumers cannot add row insets/minimums. Page/chart layout,
 CoW podiums and record targets retain their existing contracts. Figure widths
@@ -91,14 +92,14 @@ remain feature-owned. Existing compositions keep their recipes. Other catalog pr
 for custom design; they do not make it an approved template. Gallery fixtures
 are parents only inside the existing guarded development route.
 
-Use `template` for approved families/variants, `custom` for everything beyond
-them. Custom use and new templates follow normal PR review. Humans decide semantic fit. No new
-suppression or increased budget substitutes for fixing drift.
+Use `template` for approved families/variants, `custom` beyond them; both
+follow normal PR review. Humans decide semantic fit. No new suppression or
+increased budget substitutes for fixing drift.
 
 ### List pattern adoption
 
-`GroupHomeBoard` owns its standalone ListCard; callers do not add another Card.
-Today embeds the list inside its existing card, keeping the group header and
+`GroupHomeBoard` owns its standalone ListCard; callers add no other Card.
+Today embeds the list inside its card, keeping the group header and
 CoW controls outside the board action. Readers retain ranking, ties, formatting
 and full accessible names. Long board names keep one-line ellipses. For row
 geometry, load `design-language.md` §4. Enforcement scope is above.
@@ -109,8 +110,7 @@ Muscle list and single-muscle contributors reuse StatsTableRow on compact
 ListRow, with StatsTableName and StatsTableDisclosure owning their presentation.
 Now / Prev / Δ headers reserve only the active sort arrow; nested contributors
 inherit them, while standalone contributors keep a passive header. The 3D muscle footer shares its measured comparison layout and row insets with those contributors. Stacked
-history targets speak their figures. The Exercise table retains its existing density.
-Enforcement scope is above.
+history targets speak their figures. The Exercise table keeps its density.
 
 Rules the code cannot state for itself:
 

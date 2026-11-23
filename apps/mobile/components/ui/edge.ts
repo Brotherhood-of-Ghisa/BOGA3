@@ -19,7 +19,7 @@ import { uiBorder, uiGeometry } from '@/components/ui/tokens';
 // is not a primitive is `uiEdge(roles, mode, { shape: 'pill' })`.
 
 export type EdgeShape = 'card' | 'control' | 'pill';
-export type EdgeTone = 'rule' | 'ruleSoft' | 'accent' | 'danger' | 'ink' | 'record' | 'recordRule' | 'onInk';
+export type EdgeTone = 'rule' | 'ruleSoft' | 'accent' | 'danger' | 'ink' | 'pageInk' | 'record' | 'recordRule' | 'onInk';
 export type EdgeOptions = {
   shape?: EdgeShape;
   tone?: EdgeTone;

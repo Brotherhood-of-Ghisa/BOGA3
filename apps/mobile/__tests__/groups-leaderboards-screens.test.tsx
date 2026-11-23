@@ -430,8 +430,8 @@ describe('Full board (E1.2)', () => {
     expect(screen.getByTestId('group-board-row-1-mark')).toHaveTextContent('uncertified');
     expect(screen.getByTestId('group-board-row-1-mark-uncertified', { includeHiddenElements: true })).toBeTruthy();
     expect(screen.getByTestId('group-board-row-2-member')).toHaveTextContent('You');
-    // My row sits on paper, the others on the card's surface.
-    expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(roles.paper);
+    // My row sits on the inset, the others on the card's surface.
+    expect(groundOf(screen.getByTestId('group-board-row-2'))).toBe(roles.inset);
     expect(groundOf(screen.getByTestId('group-board-row-1'))).toBe(roles.surface);
     expect(screen.getByTestId('group-board-row-2-mark')).toHaveTextContent('');
     expect(screen.getByTestId('group-board-row-2-mark-certified', { includeHiddenElements: true })).toBeTruthy();

@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 
 import { SessionInsightPresentation, type SessionComparisonMode } from '@/components/session-recorder/session-insight-presentation';
 import { ActionButton } from '@/components/ui/action-button';
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { useUiGroundTone, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
 import { formatWorkingSetCount } from '@/src/exercise-calculations/format';
@@ -114,12 +114,13 @@ export function SessionSummaryContent({
 }: SessionSummaryContentProps) {
   const styles = useStyles();
   const text = useUiText();
+  const groundTone = useUiGroundTone();
   const [isSharePreviewOpen, setIsSharePreviewOpen] = useState(false);
   return (
     <>
       {personalRecords.length > 0 ? (
         <View style={styles.section} testID="session-completion-personal-records">
-          <Text allowFontScaling={false} accessibilityRole="header" style={text.title}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[text.title, groundTone.ink]}>
             Personal records
           </Text>
           {personalRecords.map((personalRecord) => (

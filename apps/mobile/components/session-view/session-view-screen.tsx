@@ -4,6 +4,7 @@ import { Alert, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
+import { statusStripGround } from '@/components/navigation/navigation-theme';
 import { useOpenMainTabFromPage } from '@/components/navigation/use-open-main-tab';
 import { RestTimerBar } from '@/components/session-recorder/rest-timer-bar';
 import { useTitleBarTimer } from '@/components/session-recorder/title-bar-timer';
@@ -595,7 +596,9 @@ export function SessionViewScreen(props: SessionViewScreenProps) {
 }
 
 const useStyles = makeStyles((roles) => ({
+  // Behind the status bar: the bar's `surface`, or the page where the clock
+  // would not read on it.
   statusSpacer: {
-    backgroundColor: roles.surface,
+    backgroundColor: statusStripGround(roles, roles.surface),
   },
 }));

@@ -1,6 +1,8 @@
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { StatusStrip } from '@/components/navigation/status-strip';
+import { OnCard } from '@/components/ui/ground';
 import { ActionButton } from '@/components/ui/action-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { FigureText } from '@/components/ui/figure-text';
@@ -28,32 +30,35 @@ export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit, title = 'View
   const styles = useStyles();
   const text = useUiText();
   return (
-    <View style={[styles.bar, { paddingTop: insets.top }]} testID="completed-session-detail-top-bar">
-      <IconButton accessibilityLabel="Back" name="chevron-left" onPress={onBack} testID="completed-session-detail-back" />
-      {/* Shrinks to fit rather than truncate, as the active session's title does. */}
-      <Text allowFontScaling={false} accessibilityRole="header" adjustsFontSizeToFit minimumFontScale={0.7}
-        numberOfLines={1} style={[text.title, styles.title]} testID="completed-session-detail-title">
-        <FigureText strong>{title}</FigureText>
-      </Text>
-      {onOpenOptions ? (
-        <IconButton
-          accessibilityLabel="Session options"
-          name="more-vertical"
-          onPress={onOpenOptions}
-          testID="completed-session-detail-options-button"
-        />
-      ) : null}
-      {onEdit ? (
-        <ActionButton
-          disabled={busy}
-          accessibilityLabel="Edit session"
-          label="Edit"
-          onPress={onEdit}
-          testID="completed-session-detail-edit-button"
-          variant="primary"
-        />
-      ) : null}
-    </View>
+    <OnCard>
+      <View style={[styles.bar, { paddingTop: insets.top }]} testID="completed-session-detail-top-bar">
+        <StatusStrip height={insets.top} />
+        <IconButton accessibilityLabel="Back" name="chevron-left" onPress={onBack} testID="completed-session-detail-back" />
+        {/* Shrinks to fit rather than truncate, as the active session's title does. */}
+        <Text allowFontScaling={false} accessibilityRole="header" adjustsFontSizeToFit minimumFontScale={0.7}
+          numberOfLines={1} style={[text.title, styles.title]} testID="completed-session-detail-title">
+          <FigureText strong>{title}</FigureText>
+        </Text>
+        {onOpenOptions ? (
+          <IconButton
+            accessibilityLabel="Session options"
+            name="more-vertical"
+            onPress={onOpenOptions}
+            testID="completed-session-detail-options-button"
+          />
+        ) : null}
+        {onEdit ? (
+          <ActionButton
+            disabled={busy}
+            accessibilityLabel="Edit session"
+            label="Edit"
+            onPress={onEdit}
+            testID="completed-session-detail-edit-button"
+            variant="primary"
+          />
+        ) : null}
+      </View>
+    </OnCard>
   );
 }
 

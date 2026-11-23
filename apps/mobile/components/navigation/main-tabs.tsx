@@ -109,9 +109,9 @@ const useStyles = makeStyles((roles, mode) => ({
     gap: uiSpace.xs,
     paddingTop: uiSpace.sm,
   },
-  // Pressed sinks to the page's ground.
+  // Pressed sinks to the inset, inside the card.
   pressed: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.inset,
   },
   // Always laid out, so the labels do not shift when the active tab changes.
   indicator: {

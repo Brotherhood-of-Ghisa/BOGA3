@@ -54,7 +54,28 @@ type Step = { seed: SeedName; lightness: number; chroma: number };
 
 const step = (seed: SeedName, lightness: number, chroma: number): Step => ({ seed, lightness, chroma });
 
+// The lightness ladders a theme can be drawn on. `standard` is the light and
+// the dark ladder, chosen by mode; `ink-paper` is the Ink + paper preset's own:
+// a dark page under light cards, the same in both modes.
+export type ThemeLadder = 'standard' | 'ink-paper';
+
+// Text drawn straight on the page, not on a card: a page's title, its section
+// headings, a pager's tabs, a header's title and glyphs.
+type PageInkRole = 'pageInk' | 'pageInkMuted' | 'pageInkFaint';
+
+// A ladder whose page and cards are one family of lightness: the page inks are
+// the inks, and the step below a card, inside it, is the page.
+const withPageInks = (ladder: Record<Exclude<SteppedRole, PageInkRole | 'inset'>, Step>): Record<SteppedRole, Step> => ({
+  ...ladder,
+  pageInk: ladder.ink,
+  pageInkMuted: ladder.inkMuted,
+  pageInkFaint: ladder.inkFaint,
+  inset: ladder.paper,
+});
+
 type SteppedRole =
+  | PageInkRole
+  | 'inset'
   | 'ink'
   | 'inkMuted'
   | 'inkFaint'
@@ -78,7 +99,7 @@ type SteppedRole =
 // `raised` 100: a card stands off the page by 5 L*, and every preset's `accent`,
 // used as given, clears 4.5:1 on that page. `inkFaint` clears 3:1 on `paper` and
 // `surface`. The hairlines are about 8% ink over a card.
-const LIGHT_STEPS: Record<SteppedRole, Step> = {
+const LIGHT_STEPS = withPageInks({
   ink: step('text', 8, 0.53),
   inkMuted: step('text', 42.4, 1),
   inkFaint: step('text', 55, 0.83),
@@ -103,13 +124,13 @@ const LIGHT_STEPS: Record<SteppedRole, Step> = {
   viz2: step('ramp', 78, 0.64),
   viz3: step('ramp', 68, 0.83),
   viz4: step('ramp', 58, 1),
-};
+});
 
 // The dark ladder mirrors the light one about the page: the inks lighten and
 // the grounds darken, each ground a step lighter than the one below it —
 // `well` (L* 7) under `paper` (10), `surface` (15) over it and `raised` (21.5)
 // over a card. `ink-muted` at L* 65 clears 4.5:1 on `raised`.
-const DARK_STEPS: Record<SteppedRole, Step> = {
+const DARK_STEPS = withPageInks({
   ink: step('text', 95, 0.3),
   inkMuted: step('text', 65, 0.8),
   inkFaint: step('text', 49, 0.75),
@@ -131,6 +152,31 @@ const DARK_STEPS: Record<SteppedRole, Step> = {
   viz2: step('ramp', 32.5, 0.64),
   viz3: step('ramp', 39, 0.83),
   viz4: step('ramp', 45.5, 1),
+});
+
+// Ink + paper's ladder, in both modes: the page is the ink family gone dark
+// (`text` at L* 13) and the cards are paper (`background` at L* 95). Every
+// well and field sits on a card, so here alone the well is lighter than the
+// page: `paper` 13 < `well` 89.5 < `surface` 95 < `raised` 100, with the
+// in-card `inset` at 92, where the light ladder's page sits. What a card holds
+// is drawn as on the light ladder; text on the page takes the page inks, the
+// paper's own colour and two steps of the ink family, each clearing its floor
+// on the dark page.
+const INK_PAPER_STEPS: Record<SteppedRole, Step> = {
+  ...LIGHT_STEPS,
+  ink: step('text', 10, 0.9),
+  inkMuted: step('text', 37, 1),
+  inkFaint: step('text', 51, 0.85),
+  paper: step('text', 13, 1.1),
+  well: step('background', 89.5, 0.8),
+  inset: step('background', 92, 0.7),
+  surface: step('background', 95, 0.57),
+  raised: step('background', 100, 0),
+  rule: step('background', 85, 0.9),
+  ruleSoft: step('background', 87.5, 0.75),
+  pageInk: step('background', 96.5, 0.45),
+  pageInkMuted: step('text', 67, 0.9),
+  pageInkFaint: step('text', 52, 1),
 };
 
 // Roles the dark ladder steps that light mode takes as given: light `accent`
@@ -253,14 +299,25 @@ export type UiRoles = {
   // The faintest ink: mini legends, tertiary labels, not-yet-realised values
   // and their legends, absent values, placeholders and disabled controls.
   inkFaint: string;
-  // The four grounds, lightest last in light mode and in dark: `well` is
-  // sunken (the track of a segmented control, a slider or a bar); `paper` the
-  // page, a pressed control and an action strip inside a card; `surface`
-  // cards, sheets and controls; `raised` an input or field drawn on a card.
+  // The three inks for text drawn straight on the page rather than on a card:
+  // a page's title and section headings, a pager's tabs, a header's title and
+  // glyphs. They are the inks in every theme but Ink + paper, whose page is
+  // dark under light cards.
+  pageInk: string;
+  pageInkMuted: string;
+  pageInkFaint: string;
+  // The four grounds, lightest last in light mode and in dark (Ink + paper
+  // alone lays its dark `paper` lowest): `well` is sunken (the track of a
+  // segmented control, a slider or a bar); `paper` the page; `surface` cards,
+  // sheets and controls; `raised` an input or field drawn on a card.
   well: string;
   paper: string;
   surface: string;
   raised: string;
+  // A step below a card, inside it: a pressed row or control, the row that is
+  // mine, an action strip or a quieter panel. The page's `paper` in every
+  // theme but Ink + paper, whose page is dark under its cards.
+  inset: string;
   // Active Progress/history filters: fixed in every theme, black in light
   // mode and white in dark.
   selection: string;
@@ -327,12 +384,16 @@ export function washLightness(mode: ThemeMode): number {
   return (mode === 'light' ? LIGHT_STEPS : DARK_STEPS).accentWash.lightness;
 }
 
-// Every colour role from the seeds, on the light or the dark ladder. Pure and
-// synchronous: `tokens.ts` calls it once at module load. Throws on a seed that
-// is not `#RRGGBB`. `rampHue` replaces the hue the ramp reads back from
-// `background`: a custom theme passes the hue the user picked, which a
-// near-grey seed's hex no longer holds.
-export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light', rampHue?: number): UiRoles {
+// Every colour role from the seeds, on the light or the dark ladder, or on
+// Ink + paper's (`ladder`), which is the same in both modes and holds light
+// cards, so what they carry is drawn as in light mode. Pure and synchronous:
+// `tokens.ts` calls it once at module load. Throws on a seed that is not
+// `#RRGGBB`. `rampHue` replaces the hue the ramp reads back from `background`:
+// a custom theme passes the hue the user picked, which a near-grey seed's hex
+// no longer holds.
+export type RoleOptions = { rampHue?: number; ladder?: ThemeLadder };
+
+export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light', { rampHue, ladder = 'standard' }: RoleOptions = {}): UiRoles {
   const background = hexToLch(seeds.background);
   const seedLch: Record<SeedName, Lch> = {
     background,
@@ -344,12 +405,13 @@ export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light', ramp
   const at = ({ seed, lightness, chroma }: Step) =>
     lchToHex({ lightness, chroma: seedLch[seed].chroma * chroma, hue: seedLch[seed].hue });
 
-  const ladder = mode === 'light' ? LIGHT_STEPS : DARK_STEPS;
+  const drawn: ThemeMode = ladder === 'ink-paper' ? 'light' : mode;
+  const steps = ladder === 'ink-paper' ? INK_PAPER_STEPS : drawn === 'light' ? LIGHT_STEPS : DARK_STEPS;
   const stepped = Object.fromEntries(
-    Object.entries(ladder).map(([role, roleStep]) => [role, at(roleStep)]),
+    Object.entries(steps).map(([role, roleStep]) => [role, at(roleStep)]),
   ) as Record<SteppedRole, string>;
   const own =
-    mode === 'light'
+    drawn === 'light'
       ? {
           accent: seeds.accent.toUpperCase(),
           record: seeds.record.toUpperCase(),
@@ -358,5 +420,5 @@ export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light', ramp
           scrim: withAlpha(stepped.ink, 0.42),
         }
       : { accent: at(DARK_ACCENT), record: at(DARK_RECORD), scrim: DARK_SCRIM };
-  return { ...stepped, ...own, ...FIXED[mode], ...changePair(seeds.direction, mode, stepped.ink) };
+  return { ...stepped, ...own, ...FIXED[drawn], ...changePair(seeds.direction, drawn, stepped.ink) };
 }

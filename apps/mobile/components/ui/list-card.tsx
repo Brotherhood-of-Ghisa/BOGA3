@@ -51,5 +51,5 @@ const useStyles = makeStyles((roles) => ({
     paddingHorizontal: uiSpace.md, paddingTop: uiSpace.sm, paddingBottom: uiSpace.xs },
   heading: { flex: 1, minWidth: 0 },
   columns: { flexDirection: 'row', justifyContent: 'flex-end', gap: uiSpace.sm, paddingHorizontal: uiSpace.md },
-  pressed: { backgroundColor: roles.paper },
+  pressed: { backgroundColor: roles.inset },
 }));

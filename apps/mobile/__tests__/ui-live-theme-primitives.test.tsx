@@ -52,9 +52,9 @@ describe('components/ui repaints when the theme changes', () => {
     expect(StyleSheet.flatten(screen.getByText('Save').props.style).color).toBe(rolesFor(SLATE_DARK).onAccent);
   });
 
-  it('Notice: the band and a danger message', async () => {
+  it('Notice: the band and a danger message on a card', async () => {
     renderWithTheme(<Notice message="Could not save" testID="notice" tone="danger" />);
-    await repaints(() => style('notice').backgroundColor, (roles) => roles.paper);
+    await repaints(() => style('notice').backgroundColor, (roles) => roles.surface);
     expect(style('notice').borderColor).toBe(rolesFor(SLATE_DARK).danger);
     expect(StyleSheet.flatten(screen.getByText('Could not save').props.style).color).toBe(rolesFor(SLATE_DARK).danger);
   });

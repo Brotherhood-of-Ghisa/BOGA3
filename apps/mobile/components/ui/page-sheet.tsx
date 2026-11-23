@@ -11,6 +11,7 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OnCard } from '@/components/ui/ground';
 import { IconButton } from '@/components/ui/icon-button';
 import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -208,6 +209,7 @@ export function PageSheet({
           onLayout={handleLayout}
           style={[styles.sheet, { paddingBottom: insets.bottom }]}
           testID={testID}>
+          <OnCard>
           <PageSheetHeader
             actions={headerActions}
             closeDisabled={dismissDisabled}
@@ -231,6 +233,7 @@ export function PageSheet({
           ) : (
             children
           )}
+          </OnCard>
         </View>
       </GestureHandlerRootView>
     </Modal>

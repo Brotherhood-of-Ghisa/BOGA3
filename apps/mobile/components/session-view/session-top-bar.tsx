@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { StatusStrip } from '@/components/navigation/status-strip';
+import { OnCard } from '@/components/ui/ground';
 import { TitleBarTimer, type TitleBarTimerProps } from '@/components/session-recorder/title-bar-timer';
 import { ActionButton } from '@/components/ui/action-button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -97,65 +99,68 @@ export function SessionTopBar(props: SessionTopBarProps) {
   const disabled = (props.mode === 'active' ? props.finishDisabled : props.doneDisabled) ?? false;
 
   return (
-    <View
-      style={[styles.bar, { paddingTop: insets.top }]}
-      testID={props.mode === 'complete' ? 'session-completion-top-bar' : 'session-view-top-bar'}>
-      {props.mode === 'active' ? (
-        <ActiveTitle now={props.now ?? systemNow} startedAt={props.startedAt} />
-      ) : (
-        <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[text.title, styles.title]}>
-          {copy.title}
-        </Text>
-      )}
-      {props.mode === 'active' && props.titleBarTimer ? (
-        <TitleBarTimer {...props.titleBarTimer} testID="session-view-rest-timer-button" />
-      ) : props.mode === 'active' && props.onToggleRestTimer ? (
-        <IconButton
-          accessibilityLabel={props.restTimerActive ? 'Dismiss rest timer' : 'Start rest timer'}
-          hitSlop={uiSpace.xs}
-          name="timer"
-          onPress={props.onToggleRestTimer}
-          testID="session-view-rest-timer-button"
-        />
-      ) : null}
-      {props.mode === 'completed' && props.aiControlled && props.onOpenOptions ? (
-        <WorkoutControlButton pending={props.controlPending} onPress={props.onOpenOptions} />
-      ) : null}
-      {props.mode === 'active' ? (
-        <IconButton
-          accessibilityLabel="Session options"
-          hitSlop={uiSpace.xs}
-          name="more-vertical"
-          onPress={props.onOpenOptions}
-          testID="session-view-options-button"
-        />
-      ) : null}
-      {props.mode === 'active' && props.aiControlled ? (
-        <WorkoutControlButton pending={props.controlPending} onPress={props.onOpenOptions} tone="accent" />
-      ) : onPrimary && props.mode === 'active' ? (
-        // Finish is a tick, the screen's one `accent` action as an icon.
-        <IconButton
-          accessibilityLabel={copy.a11y}
-          disabled={disabled}
-          name="check"
-          onPress={onPrimary}
-          testID={copy.testID}
-          tone="accent"
-        />
-      ) : onPrimary ? (
-        <ActionButton
-          accessibilityLabel={copy.a11y}
-          disabled={disabled}
-          label={copy.label}
-          onPress={onPrimary}
-          testID={copy.testID}
-          variant="primary"
-        />
-      ) : (
-        // Keeps the bar's height when there is no Done.
-        <View style={styles.spacer} />
-      )}
-    </View>
+    <OnCard>
+      <View
+        style={[styles.bar, { paddingTop: insets.top }]}
+        testID={props.mode === 'complete' ? 'session-completion-top-bar' : 'session-view-top-bar'}>
+        <StatusStrip height={insets.top} />
+        {props.mode === 'active' ? (
+          <ActiveTitle now={props.now ?? systemNow} startedAt={props.startedAt} />
+        ) : (
+          <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[text.title, styles.title]}>
+            {copy.title}
+          </Text>
+        )}
+        {props.mode === 'active' && props.titleBarTimer ? (
+          <TitleBarTimer {...props.titleBarTimer} testID="session-view-rest-timer-button" />
+        ) : props.mode === 'active' && props.onToggleRestTimer ? (
+          <IconButton
+            accessibilityLabel={props.restTimerActive ? 'Dismiss rest timer' : 'Start rest timer'}
+            hitSlop={uiSpace.xs}
+            name="timer"
+            onPress={props.onToggleRestTimer}
+            testID="session-view-rest-timer-button"
+          />
+        ) : null}
+        {props.mode === 'completed' && props.aiControlled && props.onOpenOptions ? (
+          <WorkoutControlButton pending={props.controlPending} onPress={props.onOpenOptions} />
+        ) : null}
+        {props.mode === 'active' ? (
+          <IconButton
+            accessibilityLabel="Session options"
+            hitSlop={uiSpace.xs}
+            name="more-vertical"
+            onPress={props.onOpenOptions}
+            testID="session-view-options-button"
+          />
+        ) : null}
+        {props.mode === 'active' && props.aiControlled ? (
+          <WorkoutControlButton pending={props.controlPending} onPress={props.onOpenOptions} tone="accent" />
+        ) : onPrimary && props.mode === 'active' ? (
+          // Finish is a tick, the screen's one `accent` action as an icon.
+          <IconButton
+            accessibilityLabel={copy.a11y}
+            disabled={disabled}
+            name="check"
+            onPress={onPrimary}
+            testID={copy.testID}
+            tone="accent"
+          />
+        ) : onPrimary ? (
+          <ActionButton
+            accessibilityLabel={copy.a11y}
+            disabled={disabled}
+            label={copy.label}
+            onPress={onPrimary}
+            testID={copy.testID}
+            variant="primary"
+          />
+        ) : (
+          // Keeps the bar's height when there is no Done.
+          <View style={styles.spacer} />
+        )}
+      </View>
+    </OnCard>
   );
 }
 

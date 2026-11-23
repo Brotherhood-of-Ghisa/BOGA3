@@ -7,7 +7,7 @@ const TITLE_MAX_WIDTH = 220;
 
 /**
  * A board screen's native header title on two rows: the exercise, then which
- * view of it this is (`1RM leaderboard`, `Volume history`).
+ * view of it this is (`1RM leaderboard`, `Volume history`), in the page inks.
  */
 export function GroupBoardTitle({ name, view, testID }: { name: string; view: string; testID: string }) {
   const text = useUiText();
@@ -15,10 +15,10 @@ export function GroupBoardTitle({ name, view, testID }: { name: string; view: st
   return (
     <View accessibilityLabel={`${name}, ${view}`} accessibilityRole="header" accessible style={styles.title} testID={testID}>
       <Text adjustsFontSizeToFit allowFontScaling={false} minimumFontScale={0.75} numberOfLines={1}
-        style={text.sheetTitle} testID={`${testID}-name`}>
+        style={[text.sheetTitle, tone.page]} testID={`${testID}-name`}>
         {name}
       </Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.muted]} testID={`${testID}-view`}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.pageMuted]} testID={`${testID}-view`}>
         {view}
       </Text>
     </View>

@@ -87,7 +87,7 @@ describe('no light-only literal outside the theme files', () => {
 
   it.each([
     ['a mode-following date picker', '<DateTimePicker themeVariant={mode} value={date} />'],
-    ['a mode-following status bar', '<StatusBar style={statusBarStyleFor(mode)} />'],
+    ['a page-following status bar', '<StatusBar style={statusBarStyleFor(paper)} />'],
     ['a role', 'backgroundColor: roles.paper,'],
     ['an id that is not a colour', "const href = `#${definitionId}`;"],
     ['a swatch id that names a colour', "{ id: 'white', label: 'White', hue: 0, chroma: 0 },"],

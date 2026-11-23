@@ -206,12 +206,12 @@ const useStyles = makeStyles((roles) => ({
   compactTarget: { minHeight: uiGeometry.tapTarget },
   contentControl: { minWidth: uiGeometry.tapTarget, justifyContent: 'center' },
   compactSelected: { color: roles.accent },
-  own: { backgroundColor: roles.paper },
+  own: { backgroundColor: roles.inset },
   selected: {
     backgroundColor: roles.accentWash,
   },
   pressed: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.inset,
   },
   content: {
     flex: 1,

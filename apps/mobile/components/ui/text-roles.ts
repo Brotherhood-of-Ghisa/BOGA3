@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 
+import { useUiGround } from '@/components/ui/ground';
 import type { UiRoles } from '@/components/ui/theme';
 import { useUiRoles } from '@/components/ui/theme-context';
 import { uiFonts, uiGeometry, uiTypography } from '@/components/ui/tokens';
@@ -12,13 +13,13 @@ import { uiFonts, uiGeometry, uiTypography } from '@/components/ui/tokens';
 // in the screen's own styles, listed after the role.
 const buildText = (roles: UiRoles) =>
   StyleSheet.create({
-    // A page's own title, at the top of its scroll.
+    // A page's own title, at the top of its scroll: on the page, so `pageInk`.
     pageTitle: {
       fontFamily: uiFonts.display.family,
       fontWeight: '800',
       fontSize: uiTypography.size.xxl,
       lineHeight: uiTypography.lineHeight.xxl,
-      color: roles.ink,
+      color: roles.pageInk,
     },
     // A sheet's title, in its header bar.
     sheetTitle: {
@@ -168,6 +169,10 @@ const buildTone = (roles: UiRoles) =>
     ink: { color: roles.ink },
     muted: { color: roles.inkMuted },
     faint: { color: roles.inkFaint },
+    // Text drawn straight on the page, not on a card.
+    page: { color: roles.pageInk },
+    pageMuted: { color: roles.pageInkMuted },
+    pageFaint: { color: roles.pageInkFaint },
     accent: { color: roles.accent },
     gain: { color: roles.gain },
     danger: { color: roles.danger },
@@ -204,6 +209,15 @@ export function useUiText() {
 // `uiTextToneFor`, in the colours the app is drawn in now.
 export function useUiTextTone() {
   return uiTextToneFor(useUiRoles());
+}
+
+// The three ink tones for words on the ground the caller sits on: the page
+// inks on the page, the inks on a card or a sheet (`ground.tsx`).
+export function useUiGroundTone() {
+  const tone = useUiTextTone();
+  return useUiGround() === 'page'
+    ? { ink: tone.page, muted: tone.pageMuted, faint: tone.pageFaint }
+    : { ink: tone.ink, muted: tone.muted, faint: tone.faint };
 }
 
 // One embedded weight up, for the row that is mine, a live session, the gym.

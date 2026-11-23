@@ -139,7 +139,7 @@ const useStyles = makeStyles((roles) => ({
     flexDirection: 'row',
     gap: uiSpace.sm,
     padding: uiSpace.md,
-    backgroundColor: roles.paper,
+    backgroundColor: roles.inset,
     borderTopWidth: uiBorder.width,
     borderTopColor: roles.ruleSoft,
   },

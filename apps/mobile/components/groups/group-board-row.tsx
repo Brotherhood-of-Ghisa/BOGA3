@@ -87,7 +87,7 @@ export function GroupBoardRow({ row, index, count, onPress }: GroupBoardRowProps
 
 const useStyles = makeStyles((roles) => ({
   mine: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.inset,
   },
   rank: {
     minWidth: 24,

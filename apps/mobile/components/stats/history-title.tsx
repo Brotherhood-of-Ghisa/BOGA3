@@ -5,7 +5,7 @@ import { compareFamilySections, countFamilyMuscles, familyHasHeader } from '@/co
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { useUiText } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import { ExerciseSelectionSheet, type SelectedExercise } from './exercise-selection';
 
@@ -31,14 +31,16 @@ export function HistoryTitle({ title, muscles, currentId, onChoose, exercises }:
   exercises?: readonly SelectedExercise[];
 }) {
   const text = useUiText();
+  const tone = useUiTextTone();
   const [open, setOpen] = useState(false);
+  // A native header title: on the page, in the page inks.
   const label = <Text adjustsFontSizeToFit allowFontScaling={false} minimumFontScale={0.75} numberOfLines={1}
-    style={[text.sheetTitle, styles.text]} testID="progress-history-title-text">{title}</Text>;
+    style={[text.sheetTitle, tone.page, styles.text]} testID="progress-history-title-text">{title}</Text>;
   if (exercises) return <>
     <Pressable accessibilityHint="Shows the selected exercises" accessibilityLabel={`${title}, show names`}
       accessibilityRole="button" hitSlop={uiSpace.sm} onPress={() => setOpen(true)}
       style={({ pressed }) => [styles.root, pressed ? styles.pressed : null]} testID="progress-history-title">
-      {label}<Icon colorRole="inkMuted" name="chevron-down" size="sm" />
+      {label}<Icon colorRole="pageInkMuted" name="chevron-down" size="sm" />
     </Pressable>
     <ExerciseSelectionSheet exercises={exercises} visible={open} onDismiss={() => setOpen(false)} />
   </>;
@@ -55,7 +57,7 @@ export function HistoryTitle({ title, muscles, currentId, onChoose, exercises }:
         accessibilityRole="button" hitSlop={uiSpace.sm} onPress={() => setOpen(true)}
         style={({ pressed }) => [styles.root, pressed ? styles.pressed : null]} testID="progress-history-title">
         {label}
-        <Icon colorRole="inkMuted" name="chevron-down" size="sm" />
+        <Icon colorRole="pageInkMuted" name="chevron-down" size="sm" />
       </Pressable>
       <Sheet dismissLabel="Dismiss muscles" onDismiss={() => setOpen(false)} testID="progress-history-muscle-sheet"
         title="Muscle" visible={open}>

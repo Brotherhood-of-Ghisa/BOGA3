@@ -1,6 +1,14 @@
 import type { ColorSchemeName } from 'react-native';
 
-import { DEFAULT_DIRECTION, defaultThemeSeeds, generateRoles, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
+import {
+  DEFAULT_DIRECTION,
+  defaultThemeSeeds,
+  generateRoles,
+  type ThemeLadder,
+  type ThemeMode,
+  type ThemeSeeds,
+  type UiRoles,
+} from '@/components/ui/theme';
 import { customFromSeeds, customMode, generateCustomRoles, type CustomColours } from '@/components/ui/theme-custom';
 import { parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
 
@@ -16,9 +24,11 @@ export type ThemePreset = {
   // The launcher icon it draws, by the name the config plugin registers
   // (`app.config.ts`). A preset with no artwork of its own names another's.
   appIcon: AppIconName;
+  // The ladder it is drawn on: the light and dark ones unless it names its own.
+  ladder?: ThemeLadder;
 };
 
-export type ThemePresetId = 'warm' | 'slate' | 'forest' | 'plum' | 'graphite' | 'sage';
+export type ThemePresetId = 'warm' | 'slate' | 'forest' | 'plum' | 'graphite' | 'sage' | 'ink-paper';
 
 // The icons the app bundles, as `app.config.ts` names them; each also has a
 // `…November` variant.
@@ -49,6 +59,15 @@ export const themePresets: readonly ThemePreset[] = [
     seeds: oneNeutral('#5A6E5E', { accent: '#30563A', record: BRASS }, 'blue-orange'),
     appIcon: 'Forest',
   },
+  // A dark page under light cards, on its own ladder: the background is the
+  // cards' warm paper, the text the page's navy ink.
+  {
+    id: 'ink-paper',
+    label: 'Ink + paper',
+    seeds: { background: '#6A6358', text: '#5D6373', accent: '#B43C25', record: BRASS, direction: DEFAULT_DIRECTION },
+    appIcon: 'Slate',
+    ladder: 'ink-paper',
+  },
 ];
 
 // A preset's direction is its own: most draw green and crimson.
@@ -64,6 +83,18 @@ export function getThemePreset(id: ThemePresetId): ThemePreset {
   const preset = findThemePreset(id);
   if (!preset) throw new Error(`getThemePreset: no preset "${id}"`);
   return preset;
+}
+
+// Whether a choice's mode changes what it draws: not for a custom theme (its
+// page sets it) nor for Ink + paper, the same in every mode
+// ([[appearance.ink-paper-mode]]).
+export function choiceTakesMode(appearance: AppearanceChoice): boolean {
+  return appearance.theme !== 'custom' && getThemePreset(appearance.theme).ladder !== 'ink-paper';
+}
+
+// Every role a preset draws in a mode, on its own ladder.
+export function presetRoles(preset: ThemePreset, mode: ThemeMode): UiRoles {
+  return generateRoles(preset.seeds, mode, { ladder: preset.ladder });
 }
 
 // Why the launch theme is not the stored choice. The app still opens, in the
@@ -127,18 +158,19 @@ export function resolveMode(mode: AppearanceMode, osScheme: ColorSchemeName | nu
 }
 
 // The mode a choice draws in: a custom theme's from its page, a preset's from
-// the stored mode.
+// the stored mode, except Ink + paper's, whose light cards draw it light in
+// either.
 export function appearanceMode(appearance: AppearanceChoice, osScheme: ColorSchemeName | null | undefined): ThemeMode {
-  return appearance.theme === 'custom' && appearance.custom
-    ? customMode(appearance.custom)
-    : resolveMode(appearance.mode, osScheme);
+  if (appearance.theme === 'custom' && appearance.custom) return customMode(appearance.custom);
+  if (appearance.theme !== 'custom' && getThemePreset(appearance.theme).ladder === 'ink-paper') return 'light';
+  return resolveMode(appearance.mode, osScheme);
 }
 
 // Every role a choice draws, in a mode (a custom theme ignores it: its page
 // sets it).
 export function appearanceRoles(appearance: AppearanceChoice, mode: ThemeMode): UiRoles {
   if (appearance.theme === 'custom' && appearance.custom) return generateCustomRoles(appearance.custom);
-  return generateRoles(getThemePreset(appearance.theme as ThemePresetId).seeds, mode);
+  return presetRoles(getThemePreset(appearance.theme as ThemePresetId), mode);
 }
 
 // Custom colours to start from: the ones already chosen, else the preset in

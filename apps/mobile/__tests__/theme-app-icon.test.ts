@@ -60,14 +60,14 @@ afterEach(async () => {
 });
 
 it.each<[ThemePresetId, string | null]>([
-  ['warm', null], ['slate', 'Slate'], ['forest', 'Forest'], ['plum', 'Plum'], ['graphite', 'Slate'], ['sage', 'Forest'],
+  ['warm', null], ['slate', 'Slate'], ['forest', 'Forest'], ['plum', 'Plum'], ['graphite', 'Slate'], ['sage', 'Forest'], ['ink-paper', 'Slate'],
 ])('applies %s using the native icon name its preset names', async (id, expectedName) => {
   jest.mocked(appIcons.getAppIconName).mockReturnValue('PreviousIcon');
   await applyThemeAppIcon(getThemePreset(id));
   expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith(expectedName);
 });
 
-it.each<[ThemePresetId, string]>([['warm', 'WarmNovember'], ['graphite', 'SlateNovember'], ['sage', 'ForestNovember']])(
+it.each<[ThemePresetId, string]>([['warm', 'WarmNovember'], ['graphite', 'SlateNovember'], ['sage', 'ForestNovember'], ['ink-paper', 'SlateNovember']])(
   'applies the November variant of the icon %s names',
   async (id, expectedName) => {
     jest.useFakeTimers({ now: new Date(2026, 10, 20), doNotFake: ['setImmediate'] });

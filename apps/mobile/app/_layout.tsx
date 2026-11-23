@@ -12,7 +12,7 @@ import { statusBarStyleFor, useNavigationTheme } from '@/components/navigation/n
 import { HealthImportBridge } from '@/components/navigation/health-import-bridge';
 import { NotificationTapBridge } from '@/components/navigation/notification-tap-bridge';
 import { RootStack } from '@/components/navigation/root-stack';
-import { AppThemeProvider, useUiMode } from '@/components/ui/theme-context';
+import { AppThemeProvider, useUiRoles } from '@/components/ui/theme-context';
 import { launchTheme } from '@/components/ui/theme-launch';
 import { reportLaunchThemeProblem } from '@/src/appearance/launch-theme-report';
 import { AuthProvider, bootstrapAuthState } from '@/src/auth';
@@ -105,15 +105,15 @@ export default function RootLayout() {
 // theme the app is drawn in now.
 function ThemedChrome({ children }: { children: ReactNode }) {
   const navigationTheme = useNavigationTheme();
-  const mode = useUiMode();
+  const { paper } = useUiRoles();
   useThemeAppIcon();
   return (
     <>
       <ThemeProvider value={navigationTheme}>{children}</ThemeProvider>
-      {/* The status bar follows the app's mode, never the phone's: `auto`
-          would follow a phone switched to the other mode while the app runs,
-          leaving the clock unreadable on the page. */}
-      <StatusBar style={statusBarStyleFor(mode)} />
+      {/* The status bar follows the app's page, never the phone's mode:
+          `auto` would follow a phone switched to the other mode while the app
+          runs, leaving the clock unreadable on the page. */}
+      <StatusBar style={statusBarStyleFor(paper)} />
     </>
   );
 }

@@ -14,7 +14,7 @@
  */
 
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { Alert, SectionList, type AlertButton } from 'react-native';
+import { Alert, SectionList, StyleSheet, Text, type AlertButton } from 'react-native';
 
 jest.mock('@/src/data/bootstrap', () =>
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- hoisted mock factory.
@@ -66,9 +66,11 @@ import { EXERCISE_BLOCK_HISTORY_FIXTURE } from '@/src/maestro/exercise-block-his
 import { SESSION_VIEW_FIXTURE } from '@/src/maestro/session-view-fixture';
 import { bootLocalApp, closeLocalData, loadMaestroFixture, localDataClient, resetLocalData } from './helpers/local-data';
 import { waitForGone } from './helpers/wait-for-gone';
-import { renderWithTheme } from './helpers/theme';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 
 const ACTIVE = SESSION_VIEW_FIXTURE.sessionId;
+const INK_PAPER = { theme: 'ink-paper', mode: 'light', custom: null } as const;
 const NEWEST_COMPLETED = EXERCISE_BLOCK_HISTORY_FIXTURE.unmappedCompletionSessionId;
 const OLDER_COMPLETED = EXERCISE_BLOCK_HISTORY_FIXTURE.noPrCompletionSessionId;
 
@@ -148,6 +150,19 @@ describe('Sessions over real data', () => {
     expect(screen.getByTestId(`session-summary-${ACTIVE}-sets`)).toHaveTextContent(
       `${SESSION_VIEW_FIXTURE.workingSetCount} sets`
     );
+  });
+
+  it('draws the week headings and the Active heading, on the page, in the page inks on Ink + paper', async () => {
+    await openSessions();
+    await switchTheme(INK_PAPER);
+    const roles = rolesFor(INK_PAPER);
+    const pageInks = [roles.pageInk, roles.pageInkMuted, roles.pageInkFaint];
+    const week = screen.getAllByTestId(/^completed-history-week-/)[0];
+    for (const node of within(week).UNSAFE_getAllByType(Text)) {
+      expect(pageInks).toContain(StyleSheet.flatten(node.props.style).color);
+    }
+    expect(pageInks).toContain(StyleSheet.flatten(screen.getByText('Active').props.style).color);
+    await switchTheme(DEFAULT_APPEARANCE);
   });
 
   it('resumes the active session on Train, where the workout lives', async () => {

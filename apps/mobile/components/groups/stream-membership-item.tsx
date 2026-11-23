@@ -1,6 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { makeStyles, uiBorder, uiGeometry, uiSpace, useUiGroundTone, useUiText } from '@/components/ui';
 import type { StreamMembershipViewModel } from '@/src/groups';
 
 type GroupStreamMembershipItemProps = {
@@ -14,7 +14,8 @@ type GroupStreamMembershipItemProps = {
 export function GroupStreamMembershipItem({ item, showGroupName, onPress }: GroupStreamMembershipItemProps) {
   const streamRowStyles = useStreamRowStyles();
   const text = useUiText();
-  const tone = useUiTextTone();
+  // A light row: its words sit on the ground the stream is drawn on.
+  const tone = useUiGroundTone();
   const testID = `group-stream-membership-${item.key}`;
   const content = (
     <View style={streamRowStyles.row}>
@@ -22,7 +23,7 @@ export function GroupStreamMembershipItem({ item, showGroupName, onPress }: Grou
         {item.sentence}
       </Text>
       {showGroupName ? (
-        <Text allowFontScaling={false} numberOfLines={1} style={text.meta}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, tone.muted]}>
           {item.groupName}
         </Text>
       ) : null}

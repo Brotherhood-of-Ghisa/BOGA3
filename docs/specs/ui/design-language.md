@@ -26,20 +26,19 @@ and effort show wherever known, never behind a detail tap.
 
 ## 2. Colour roles
 
-Semantic roles, not a palette: **a screen names the role, never the hex.** The
-values are generated per theme, so neither a doc nor a screen may hold one —
-`useUiRoles()` is the only source, and `UiRoles` in
-`apps/mobile/components/ui/theme.ts` documents what each role is for.
+Semantic roles, not a palette: **a screen names the role, never the hex.**
+Values are generated per theme; `useUiRoles()` is the only source;
+`UiRoles` (`apps/mobile/components/ui/theme.ts`) documents each.
 
 Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 
 - **One value per role.** Two roles that cannot be told apart are one role.
-  Exempt: the on-colour roles, each named by its fill, and `ink`-direction changes.
+  Exempt: on-colour roles, named by their fill, `ink`-direction changes, and
+  page inks and `inset` off Ink + paper.
   `accent` and `record` stay ΔE\*ab ≥ 5 from `danger`, `gain`, `loss` and the
   regimes.
 - **`record` is never `accent`**, and clears 4.5:1 as text on `paper` and
-  `surface`: "your best ever" and "the button that commits" must not read as
-  the same mark.
+  `surface`.
 - **Each neutral family is one hue.** The three inks (`ink` → `ink-muted` →
   `ink-faint`) take the `text` seed's; in light mode `scrim`
   follows `ink`, at 42%. The grounds, rules and ramp take the
@@ -54,36 +53,41 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   (default), `blue-orange` (Sage), or `ink` (sign only). Each pair shares one L\*,
   clearing 4.5:1 on `paper`/`surface`; `loss` stays off `danger`'s hue.
 
-`regimeOlder` / `regimeNewer` are fixed categorical hues for the RM chart's fitted periods,
-with readable text contrast; they do not reuse the sequential `viz` ramp or
-the gain/loss meanings.
+`regimeOlder` / `regimeNewer` are fixed categorical hues for the RM chart's
+fitted periods, legible, apart from the `viz` ramp and gain/loss.
 
 **Four seeds and `direction` make a theme** (`generateRoles(seeds)`):
 `background`, `text`, `accent`, `record`. A seed sets hue and chroma; the
 role sets its own fixed L\* — contrast depends on lightness, so the text floors
-hold whatever the seed. In light mode `accent` and `record` are used as given, so
-their floors are the seed's to meet.
+hold whatever the seed. In light mode `accent` and `record` are used as given;
+their floors are the seed's.
 
 **Two ladders, one set of seeds:** `generateRoles(seeds, mode)`. Each steps
 four grounds, `well` < `paper` < `surface` < `raised` (tracks, page, cards,
-fields on a card), a card ≥ 4 L\* off the page. Light ≈ 90 / 92 / 97 / 100, so
+fields), a card ≥ 4 L\* off the page; `inset`, inside a card (pressed and own
+rows, strips), is `paper` but on Ink + paper. Ink + paper's third ladder,
+one for both modes: a `text`-hued page (L\*13) under light-mode
+`background` cards: alone, `paper` < `well` < `surface` < `raised`, as every
+well sits on a card; its other floors hold on the cards. Words off a card
+(`ground.tsx`) take `pageInk`, `pageInkMuted`, `pageInkFaint` (4.5 / 4.5 / 3:1
+on it); elsewhere these are the inks (`ui-page-ink-guard.test.tsx`). Light ≈ 90 / 92 / 97 / 100, so
 `accent` and `record` (L\* ≤ 43) clear 4.5:1 on `paper`; `ink-faint` clears 3:1
 on it and `surface`. Dark ≈ 7 / 10 / 15 / 20, `ink` at L\*95.
 `accent` (L\*72, `onAccent` black) and `record` (L\*66) take their seed's hue;
 `danger`, `gain`, `loss` and the regimes keep their light hues at L\*64;
 `selection` turns white, `scrim` 60% black. The `viz` ramp lightens in even
-steps on `background`'s hue (chroma ≥ 12), ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
+steps on `background`'s hue (chroma ≥ 12), ending where `ink` holds 4.5:1.
 The roles take the drawn mode's ladder; `useUiMode()` reads that mode.
 
 **Choosing one.** A theme — Warm (default), Slate, Forest, Plum, Graphite
-(neutral ground), Sage (tinted ground, deepest-step accent, `blue-orange`) or
-Custom — per device, stored as
+(neutral ground), Sage (tinted ground, deepest-step accent, `blue-orange`),
+Ink + paper or Custom — per device, stored as
 `boga3.appearance.v3`, `{theme, mode, custom}` (`theme-record.ts`). Each save
 repaints every mounted screen (`theme-context.tsx`). With no record, the older
-`boga3.appearance.v2` is converted — a preset left to match stays that preset,
-anything else becomes the custom theme it drew — and before it the accent id
-`boga3.themePreset.v1`; the first save writes the record and leaves both in
-place. A preset takes `mode`: `light` (default), `dark` or `system` (the
+`boga3.appearance.v2` converts (a matching preset stays one, anything else
+becomes the custom theme it drew), then the accent id `boga3.themePreset.v1`;
+the first save writes the record, leaving both. A preset takes `mode`
+([[appearance.ink-paper-mode]]): `light` (default), `dark` or `system` (the
 phone's, followed live). Native UI is pinned to the drawn mode, unpinned under
 `system`, since a pinned OS reports the pin (`theme-native.ts`). An unknown id,
 an invalid record or an unreadable store opens, logged, in the default. `record`
@@ -101,26 +105,26 @@ before; stored `borders`/`viz` parts are ignored. Custom starts from the
 preset in use, ungated against the floors above (`ui-theme-custom.test.ts`).
 
 The launcher icon follows the drawn theme: each preset's `appIcon` field
-names one (Graphite → Slate, Sage → Forest), one rainbow icon serves every
+names one (Graphite, Ink + paper → Slate; Sage → Forest), one rainbow icon serves every
 custom theme, Warm is default and fallback. The native boundary,
-`apps/mobile/components/appearance/theme-app-icon.ts`, serializes requests while
-active and retries interruptions after foregrounding. Other native failures
-attempt the primary icon and are logged. Matching icons are left alone. `app.config.ts` bundles the PNGs in
+`apps/mobile/components/appearance/theme-app-icon.ts`, serializes requests,
+retries interruptions after foregrounding, falls back to the primary icon on
+other failures (logged) and leaves a matching icon alone. `app.config.ts` bundles the PNGs in
 `apps/mobile/assets/images/app-icons/` and supplies Android scheme filters to
 every launcher alias. Seasonal identity follows [[appearance.november]]; its
-alternates require a native build, while ordinary Warm remains primary.
+alternates need a native build.
 
 **Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
-empty / rest, `viz1`…`viz4` the weakest to the strongest intensity; the steps
-are even in lightness, so each bucket reads as "more" without relying on hue,
-and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
-legends and deltas included (`ink-muted` is about 3.2:1 on `viz2`); `Stat` takes
+empty / rest, `viz1`…`viz4` the weakest to the strongest intensity; even L\*
+steps, so each bucket reads as "more" without hue; no step is `accent` or
+`record`. **Text on a `viz` ground is `ink`**,
+legends and deltas included; `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
 labels still say how much. An empty `viz0` cell takes a `rule` hairline; a
 bar's empty track is a well. A filter showing all its values at once marks the one in
 force in `selection` (black; white in dark) with `onSelection` text
-(`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`
-shows one value and has no unselected peer, so it carries `ink` on `surface`. Heatmap tiles and bars take no `selection` outline;
+(`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`,
+one value with no unselected peer, carries `ink` on `surface`. Heatmap tiles and bars take no `selection` outline;
 weekly selection is a caret and accessible state.
 
 ## 3. Typography
@@ -271,8 +275,7 @@ slop.
 bold `record`, and earns a band on the containing card where the screen has one
 (the session view's cards, the exercise page's set list). Every other figure
 takes its row's colour and weight — **no screen bolds the best value in the
-current context**, which read as noise on device; `Stat` offers no `best`
-emphasis. Which sets are highlighted is [[set.row-figures]]: the exercise
+current context**; `Stat` offers no `best` emphasis. Which sets are highlighted is [[set.row-figures]]: the exercise
 page's set list and the session cards draw one band line per record. What
 beats a record is `tech/training-metrics-contract.md` §3.
 

@@ -15,3 +15,16 @@ icon-change alert.
 Code: `apps/mobile/src/utils/seasonal-appearance.ts`;
 `apps/mobile/components/appearance/theme-app-icon.ts`;
 `apps/mobile/components/stats/muscle-body-card.tsx`.
+
+### appearance.ink-paper-mode · presentation · accepted
+
+Ink + paper draws the same in light, dark and system mode: a dark page under
+light cards. While it is chosen, Settings → Appearance offers no Mode, and
+Settings home names the preset alone. The stored mode is kept, and a preset
+that takes a mode draws in it again.
+
+Why: a mode choice that changes nothing reads as broken, and a second, darker
+Ink + paper would dim its cards below the text floors.
+Code: `apps/mobile/components/ui/theme-presets.ts` (`choiceTakesMode`);
+`apps/mobile/components/appearance/appearance-settings.tsx`;
+`apps/mobile/components/appearance/chosen-theme.ts`.

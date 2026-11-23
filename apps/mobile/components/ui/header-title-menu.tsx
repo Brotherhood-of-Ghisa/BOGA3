@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { RadioRow } from '@/components/ui/form-rows';
 import { Icon } from '@/components/ui/icon';
 import { Sheet } from '@/components/ui/sheet';
-import { useUiText } from '@/components/ui/text-roles';
+import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 
 export type HeaderTitleOption<Id extends string> = { id: Id; label: string };
@@ -24,13 +24,15 @@ const TITLE_MAX_WIDTH = 220;
 
 /**
  * A native header title that switches the page between sibling options: the
- * current option's label in the sheet-title role and a chevron. A tap opens a
+ * current option's label in the sheet-title role and a chevron, in the page
+ * inks (a header sits on the page). A tap opens a
  * sheet of radio rows, the current one checked; choosing another calls
  * `onChoose` (the caller swaps the page in place), choosing the current one
  * only closes the sheet.
  */
 export function HeaderTitleMenu<Id extends string>({ options, currentId, onChoose, sheetTitle, testID }: HeaderTitleMenuProps<Id>) {
   const text = useUiText();
+  const tone = useUiTextTone();
   const [open, setOpen] = useState(false);
   const title = options.find((option) => option.id === currentId)?.label ?? '';
   const choose = (id: Id) => {
@@ -47,10 +49,10 @@ export function HeaderTitleMenu<Id extends string>({ options, currentId, onChoos
         onPress={() => setOpen(true)}
         style={({ pressed }) => [styles.root, pressed ? styles.pressed : null]}
         testID={testID}>
-        <Text allowFontScaling={false} numberOfLines={1} style={[text.sheetTitle, styles.text]}>
+        <Text allowFontScaling={false} numberOfLines={1} style={[text.sheetTitle, tone.page, styles.text]}>
           {title}
         </Text>
-        <Icon colorRole="inkMuted" name="chevron-down" size="sm" />
+        <Icon colorRole="pageInkMuted" name="chevron-down" size="sm" />
       </Pressable>
       <Sheet dismissLabel={`Dismiss ${sheetTitle.toLowerCase()}`} onDismiss={() => setOpen(false)} testID={`${testID}-sheet`}
         title={sheetTitle} visible={open}>

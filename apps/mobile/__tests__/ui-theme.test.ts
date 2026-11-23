@@ -10,8 +10,9 @@ import {
   type ThemeSeeds,
   type UiRoles,
 } from '@/components/ui/theme';
+import { customFromSeeds, generateCustomRoles } from '@/components/ui/theme-custom';
 import { hueName, hueThemeId, parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
-import { DEFAULT_APPEARANCE, DEFAULT_THEME_PRESET_ID, getThemePreset, themePresets } from '@/components/ui/theme-presets';
+import { DEFAULT_APPEARANCE, DEFAULT_THEME_PRESET_ID, getThemePreset, presetRoles, themePresets } from '@/components/ui/theme-presets';
 
 import { rolesFor } from './helpers/theme';
 import themeRolesLight from './fixtures/theme-roles-light.json';
@@ -29,7 +30,7 @@ import themeRolesLight from './fixtures/theme-roles-light.json';
 // so each clears 4.5:1 on that page, and its chart ramp on the background's
 // hue. The generator is calibrated to it; a role drifting further than ΔE*ab 3
 // from it is a visible change and needs its own design decision.
-const PICKED_PALETTE: Omit<UiRoles, 'scrim' | OnColourRole> = {
+const PICKED_PALETTE: Omit<UiRoles, 'scrim' | OnColourRole | AliasRole> = {
   ink: '#1B1712',
   inkMuted: '#6B6358',
   inkFaint: '#8A8379',
@@ -72,6 +73,16 @@ const OTHER_SEEDS: Record<string, ThemeSeeds> = {
 };
 
 type OnColourRole = 'onAccent' | 'onSelection' | 'onDanger' | 'onInk';
+// Text drawn straight on the page and the step below a card, inside it: the
+// role each one is everywhere but on Ink + paper, whose page is dark.
+type PageInkRole = 'pageInk' | 'pageInkMuted' | 'pageInkFaint';
+type AliasRole = PageInkRole | 'inset';
+const ALIASES: Record<AliasRole, 'ink' | 'inkMuted' | 'inkFaint' | 'paper'> = {
+  pageInk: 'ink',
+  pageInkMuted: 'inkMuted',
+  pageInkFaint: 'inkFaint',
+  inset: 'paper',
+};
 const ON_COLOUR_ROLES: readonly OnColourRole[] = ['onAccent', 'onSelection', 'onDanger', 'onInk'];
 const MODES: readonly ThemeMode[] = ['light', 'dark'];
 // The roles no seed moves that carry a meaning of their own.
@@ -86,14 +97,20 @@ const FILL_OF: Record<OnColourRole, keyof UiRoles> = {
 
 // One value per role, except the on-colour roles: each is named by the fill it
 // sits on, so it may share a value with another role (white, in light mode).
+// A page ink that is its ink, or an inset that is the page, is that role under
+// a second name.
 function grounds(roles: UiRoles): string[] {
   return Object.entries(roles)
     .filter(([role]) => !ON_COLOUR_ROLES.includes(role as OnColourRole))
+    .filter(([role, value]) => !(role in ALIASES) || value !== roles[ALIASES[role as AliasRole]])
     .map(([, value]) => value);
 }
 
+// The presets drawn on the light and dark ladders; Ink + paper has its own
+// (`the Ink + paper preset`).
+const LADDER_PRESETS = themePresets.filter((preset) => preset.ladder === undefined);
 const PRESET_SEEDS: Record<string, ThemeSeeds> = Object.fromEntries(
-  themePresets.map((preset) => [`${preset.id} preset`, preset.seeds]),
+  LADDER_PRESETS.map((preset) => [`${preset.id} preset`, preset.seeds]),
 );
 
 // A custom colour's seeds, around the wheel every 30° (every hue is checked
@@ -346,7 +363,7 @@ describe('the change directions', () => {
     // A custom theme starts from the preset in use, so its direction must not
     // land on that preset's accent or brass.
     for (const preset of themePresets) {
-      const roles = generateRoles(preset.seeds, mode);
+      const roles = presetRoles(preset, mode);
       for (const pair of Object.values(DIRECTION_PAIRS)) {
         for (const change of [pair[mode].gain, pair[mode].loss]) {
           expect(deltaE(change, roles.accent)).toBeGreaterThanOrEqual(5);
@@ -396,6 +413,71 @@ describe('the ground ladder', () => {
   });
 });
 
+// Ink + paper (`design-language.md` §2, "Presets"): a dark page under light
+// cards, on a ladder of its own that is the same in both modes. Every well and
+// field sits on a card, so its well is lighter than its page. Text on the page
+// takes the page inks; everywhere else the page inks are the inks.
+describe('the Ink + paper preset', () => {
+  const preset = getThemePreset('ink-paper');
+  const cardGrounds = (roles: UiRoles) => [roles.well, roles.inset, roles.surface, roles.raised];
+
+  describe.each(MODES)('in %s mode', (mode) => {
+    const roles = presetRoles(preset, mode);
+
+    it('runs paper < well < surface < raised, a dark page under light cards at least 4 L* off it, the inset between well and card', () => {
+      expect(isAscending([roles.paper, roles.well, roles.surface, roles.raised])).toBe(true);
+      expect(isAscending([roles.well, roles.inset, roles.surface])).toBe(true);
+      expect(lightnessOf(roles.paper)).toBeLessThan(20);
+      expect(lightnessOf(roles.surface)).toBeGreaterThan(90);
+      expect(lightnessOf(roles.surface) - lightnessOf(roles.paper)).toBeGreaterThanOrEqual(4);
+    });
+
+    it('keeps `ink` and `inkMuted` legible on every card ground, and `inkFaint` at 3:1 on the card', () => {
+      for (const ground of cardGrounds(roles)) {
+        expect(contrastRatio(roles.ink, ground)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(roles.inkMuted, ground)).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrastRatio(roles.inkFaint, roles.surface)).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(roles.inkFaint, roles.inset)).toBeGreaterThanOrEqual(3);
+    });
+
+    it('draws text on the page in the page inks: `pageInk` and `pageInkMuted` at 4.5:1, `pageInkFaint` at 3:1', () => {
+      expect(contrastRatio(roles.pageInk, roles.paper)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(roles.pageInkMuted, roles.paper)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(roles.pageInkFaint, roles.paper)).toBeGreaterThanOrEqual(3);
+      expect(isAscending([roles.paper, roles.pageInkFaint, roles.pageInkMuted, roles.pageInk])).toBe(true);
+    });
+
+    it('passes the preset gates on its cards', () => {
+      expect(brokenInkPaperFloors(roles)).toEqual([]);
+    });
+  });
+
+  it('draws the same roles in light and dark mode', () => {
+    expect(presetRoles(preset, 'dark')).toEqual(presetRoles(preset, 'light'));
+  });
+
+  it('takes the page from the ink family and the cards from the ground family', () => {
+    const roles = presetRoles(preset, 'light');
+    expect(hueDistance(hexToLch(roles.paper).hue, hexToLch(preset.seeds.text).hue)).toBeLessThanOrEqual(10);
+    for (const role of ['well', 'surface', 'rule', 'ruleSoft'] as const) {
+      expect(hueDistance(hexToLch(roles[role]).hue, hexToLch(preset.seeds.background).hue)).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it('draws the page inks as the inks, and the inset as the page, in every other preset, all 360 hue themes and custom themes', () => {
+    const everyHue = Array.from({ length: 360 }, (_, hue) => seedsFromHue(hue));
+    const themes = MODES.flatMap((mode) => [
+      ...LADDER_PRESETS.map((other) => presetRoles(other, mode)),
+      ...everyHue.map((seeds) => generateRoles(seeds, mode)),
+      ...[...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS), preset.seeds].map((seeds) => generateCustomRoles(customFromSeeds(seeds, mode))),
+    ]);
+    const apart = themes.filter((roles) =>
+      (Object.keys(ALIASES) as AliasRole[]).some((role) => roles[role] !== roles[ALIASES[role]]));
+    expect(apart).toEqual([]);
+  });
+});
+
 describe('theme presets', () => {
   it('ship the default seeds as the default preset, listed first', () => {
     expect(themePresets[0].id).toBe(DEFAULT_THEME_PRESET_ID);
@@ -409,8 +491,8 @@ describe('theme presets', () => {
     expect(new Set(themePresets.map((preset) => preset.seeds.accent)).size).toBe(themePresets.length);
   });
 
-  it('lists Graphite and Sage after the four it re-tunes', () => {
-    expect(themePresets.map((preset) => preset.id)).toEqual(['warm', 'slate', 'forest', 'plum', 'graphite', 'sage']);
+  it('lists Graphite, Sage and Ink + paper after the four it re-tunes', () => {
+    expect(themePresets.map((preset) => preset.id)).toEqual(['warm', 'slate', 'forest', 'plum', 'graphite', 'sage', 'ink-paper']);
   });
 
   it('gives Graphite a ground with next to no chroma, and Sage a tinted one with its deepest step as the accent', () => {
@@ -444,30 +526,30 @@ describe('theme presets', () => {
     expect(failures).toEqual([]);
   });
 
-  it.each(MODES.flatMap((mode) => themePresets.map((preset) => [preset.id, mode] as const)))(
+  it.each(MODES.flatMap((mode) => LADDER_PRESETS.map((preset) => [preset.id, mode] as const)))(
     'passes every preset gate: the %s preset in %s mode',
     (id, mode) => {
-      expect(brokenFloors(generateRoles(getThemePreset(id).seeds, mode), mode)).toEqual([]);
+      expect(brokenFloors(presetRoles(getThemePreset(id), mode), mode)).toEqual([]);
     },
   );
 
   it('clears 4.5:1 for every preset’s light `accent` on the light `paper`', () => {
-    const failing = themePresets.filter((preset) => {
+    const failing = LADDER_PRESETS.filter((preset) => {
       const roles = generateRoles(preset.seeds);
       return contrastRatio(roles.accent, roles.paper) < 4.5;
     });
     expect(failing.map((preset) => preset.id)).toEqual([]);
   });
 
-  describe.each(themePresets.map((preset) => [preset.id, preset.seeds] as const))(
+  describe.each(themePresets.map((preset) => [preset.id, preset] as const))(
     'the %s preset',
-    (_id, seeds) => {
-      const roles = generateRoles(seeds);
+    (_id, preset) => {
+      const roles = presetRoles(preset, 'light');
 
-      it('keeps `record` legible as text on `paper`, `surface` and its own band', () => {
+      it('keeps `record` legible as text on the grounds it is drawn on and its own band', () => {
         // WCAG 2.1 normal text: `record` marks figures, and those figures sit
-        // inside the `record-wash` band too.
-        for (const background of [roles.paper, roles.surface, roles.recordWash]) {
+        // inside the `record-wash` band too. Ink + paper draws them on cards.
+        for (const background of [...(preset.ladder === 'ink-paper' ? [] : [roles.paper]), roles.surface, roles.recordWash]) {
           expect(contrastRatio(roles.record, background)).toBeGreaterThanOrEqual(4.5);
         }
       });
@@ -631,6 +713,35 @@ function brokenFloors(roles: UiRoles, mode: ThemeMode): string[] {
       ]),
     ),
     ['viz steps of 6 L*', vizSteps(roles, mode).every((stepSize) => stepSize >= 6)],
+    ['one value per role', new Set(grounds(roles)).size === grounds(roles).length],
+  ];
+  return floors.filter(([, holds]) => !holds).map(([name]) => name);
+}
+
+// Ink + paper's floors (`brokenFloors`, for a ladder whose page is dark under
+// light cards): text on the cards it is drawn on, every on-colour role on its
+// fill, the bands and dividers apart from a card, the ramp's steps, and one
+// value per role.
+function brokenInkPaperFloors(roles: UiRoles): string[] {
+  const legible = (foreground: string, backgrounds: string[]) =>
+    backgrounds.every((ground) => contrastRatio(foreground, ground) >= 4.5);
+  const textRoles = ['accent', 'record', 'danger', 'gain', 'loss', 'regimeOlder', 'regimeNewer'] as const;
+  const floors: [string, boolean][] = [
+    ['ink on viz4', contrastRatio(roles.ink, roles.viz4) >= 4.5],
+    ['ink on viz1', contrastRatio(roles.ink, roles.viz1) >= 3],
+    ['record on recordWash', legible(roles.record, [roles.recordWash])],
+    ['record hue away from accent', hueDistance(hexToLch(roles.record).hue, hexToLch(roles.accent).hue) >= 30],
+    ...(['accent', 'record'] as const).flatMap((seeded) =>
+      FIXED_HUES.map((fixed): [string, boolean] => [`${seeded} apart from ${fixed}`, deltaE(roles[seeded], roles[fixed]) >= 5]),
+    ),
+    ...ON_COLOUR_ROLES.map((role): [string, boolean] => [`${role} on ${FILL_OF[role]}`, contrastRatio(roles[role], roles[FILL_OF[role]]) >= 4.5]),
+    ...textRoles.map((role): [string, boolean] => [`${role} on surface and inset`, legible(roles[role], [roles.surface, roles.inset])]),
+    ['card neutral ladder order', isAscending([roles.ink, roles.inkMuted, roles.inkFaint, roles.rule, roles.ruleSoft, roles.well, roles.inset, roles.viz0, roles.surface, roles.raised])],
+    ...(['accentWash', 'recordWash', 'ruleSoft'] as const).map((role): [string, boolean] => [
+      `${role} ΔE*ab ≥ 2.5 from surface`,
+      deltaE(roles[role], roles.surface) >= 2.5,
+    ]),
+    ['viz steps of 6 L*', vizSteps(roles, 'light').every((stepSize) => stepSize >= 6)],
     ['one value per role', new Set(grounds(roles)).size === grounds(roles).length],
   ];
   return floors.filter(([, holds]) => !holds).map(([name]) => name);

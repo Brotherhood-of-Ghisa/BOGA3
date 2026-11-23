@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { useUiGround } from '@/components/ui/ground';
 import { uiTextFor, useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiSpace } from '@/components/ui/tokens';
@@ -30,13 +31,14 @@ type SectionHeaderProps = {
   action?: { label: string; onPress: () => void; testID?: string; accessibilityLabel?: string };
 };
 
-// A section's heading inside a screen: Archivo 700 at `lg`, with an optional
-// text action on the right.
+// A section's heading inside a screen: Archivo 700 at `lg`, in `pageInk` on
+// the page, with an optional text action on the right.
 export function SectionHeader({ title, action }: SectionHeaderProps) {
   const styles = useStyles();
+  const onPage = useUiGround() === 'page';
   return (
     <View style={styles.section}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={styles.sectionTitle}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[styles.sectionTitle, onPage ? styles.onPage : null]}>
         {title}
       </Text>
       {action ? (
@@ -66,4 +68,5 @@ const useStyles = makeStyles((roles) => ({
     ...uiTextFor(roles).title,
     flex: 1,
   },
+  onPage: { color: roles.pageInk },
 }));

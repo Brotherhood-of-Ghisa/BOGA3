@@ -6,6 +6,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OnCard } from '@/components/ui/ground';
 import { SHEET_DRAG_SLOP, SHEET_HORIZONTAL_SLOP, shouldDismissSheet } from '@/components/ui/sheet-gesture';
 import { uiTextFor } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -217,10 +218,10 @@ export function Sheet({
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={[styles.root, { paddingTop: insets.top }]}>
-            {content}
+            <OnCard>{content}</OnCard>
           </KeyboardAvoidingView>
         ) : (
-          <View style={[styles.root, { paddingTop: insets.top }]}>{content}</View>
+          <View style={[styles.root, { paddingTop: insets.top }]}><OnCard>{content}</OnCard></View>
         )}
       </GestureHandlerRootView>
     </Modal>

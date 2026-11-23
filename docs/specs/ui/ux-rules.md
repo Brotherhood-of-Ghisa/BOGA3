@@ -245,19 +245,19 @@ after a cleanup).
 
 ## Appearance
 
-Every screen draws in one mode: Light (the default), Dark, or System, which
-follows the phone while the app runs. Native UI (alerts, keyboard, date picker)
+Every screen draws in one mode: Light (the default), Dark, or System, following
+the phone live. Native UI (alerts, keyboard, date picker)
 draws in the same mode (decision register,
 `docs/specs/03-technical-architecture.md`). Presets, seeds and the live rule
-are `design-language.md` "Choosing one". The status bar, the date picker and
-the navigators take `useUiMode()`, never a fixed mode or colour
+are `design-language.md` "Choosing one". The date picker and navigators take
+`useUiMode()`, the status bar the page's lightness (`status-strip.tsx`), never a fixed mode or colour
 (`apps/mobile/__tests__/ui-mode-literal-guard.test.ts`). The splash stays white
-(`app.config.ts`). The stack header takes `paper` (no shadow line) and `ink`, so
-header and page read as one surface ("Pages").
+(`app.config.ts`). The stack header takes `paper` (no shadow line) and `pageInk`,
+so header and page read as one surface ("Pages").
 
-Settings → Appearance: Theme (six presets and Custom as radio rows with
+Settings → Appearance: Theme (seven presets and Custom as radio rows with
 swatches; Custom folds presets behind `Show presets`), then Mode (Light, Dark,
-System) for a preset or one row per Custom part, then a live `ThemePreview`.
+System) for a preset ([[appearance.ink-paper-mode]]) or one row per Custom part, then a live `ThemePreview`.
 A part's picker (its title switches part): a painted hue `SliderRow`,
 strength, then its own controls (background: Dark switch, lightness over the
 mode's range, depth; highlight: Match accent, contrast; texts: lightness or

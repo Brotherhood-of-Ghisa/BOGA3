@@ -12,6 +12,7 @@ import {
   uiGeometry,
   uiSpace,
   useUiText,
+  useUiTextTone,
 } from '@/components/ui';
 import type { ExerciseCatalogExercise } from '@/src/data/exercise-catalog';
 import { createExerciseWithGroupLink, linkExercise } from '@/src/data/exercise-group-links';
@@ -98,6 +99,7 @@ export function GroupExercisesPage({
   userId,
 }: GroupExercisesPageProps) {
   const text = useUiText();
+  const tone = useUiTextTone();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'leaderboards' | 'shared'>('leaderboards');
   const links = useMyGroupExerciseLinks(groupId);
@@ -212,7 +214,7 @@ export function GroupExercisesPage({
   const header = (
     <View style={styles.headerBlock}>
       <View style={styles.header}>
-        <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, styles.microLabel]} testID="group-screen-exercises-title">
+        <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.pageMuted, styles.microLabel]} testID="group-screen-exercises-title">
           Exercises
         </Text>
         {activeTab === 'leaderboards' && canManage ? (

@@ -114,7 +114,7 @@ export function SessionsScreen({
     <>
       {activeSessions.length > 0 ? (
         <View style={styles.block}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.pageFaint]}>
             Active
           </Text>
           {activeSessions.map((activeSession) => (

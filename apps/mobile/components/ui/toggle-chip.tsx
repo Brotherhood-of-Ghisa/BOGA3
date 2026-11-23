@@ -91,7 +91,7 @@ const useStyles = makeStyles((roles, mode) => ({
     backgroundColor: roles.surface,
   },
   chipPressed: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.inset,
   },
   label: {
     ...uiTextFor(roles).label,

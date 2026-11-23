@@ -5,7 +5,7 @@ import { ComparisonUnavailableCard } from '@/components/session-complete/compari
 import { ExerciseVolumeCard } from '@/components/session-complete/exercise-volume-card';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { SectionHeader } from '@/components/ui/page-header';
-import { useUiText } from '@/components/ui/text-roles';
+import { useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import { partitionVolumeComparisons, type ExerciseVolumeComparison } from '@/src/session-insights';
 
@@ -33,6 +33,7 @@ export function SessionInsightPresentation({
   testIdPrefix = 'session-insight',
 }: Props) {
   const text = useUiText();
+  const groundTone = useUiGroundTone();
   const [localMode, setLocalMode] = useState<SessionComparisonMode>('exercise');
   const mode = selectedMode ?? localMode;
   const setMode = onModeChange ?? setLocalMode;
@@ -64,7 +65,7 @@ export function SessionInsightPresentation({
             <ComparisonUnavailableCard names={unavailable} testID={`${testIdPrefix}-comparison-unavailable-${mode}`} />
           </>
         ) : (
-          <Text allowFontScaling={false} style={text.meta} testID="session-insight-empty">
+          <Text allowFontScaling={false} style={[text.meta, groundTone.muted]} testID="session-insight-empty">
             {state === 'loading' ? 'Loading comparisons…'
               : state === 'error' ? unavailableMessage
                 : mode === 'muscle' ? 'No mapped working sets for this session.' : 'No working sets to compare.'}
