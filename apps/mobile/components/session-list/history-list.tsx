@@ -9,8 +9,7 @@ import {
   type SessionSummaryFigures,
 } from '@/components/today/progress-format';
 import { SessionSummaryRow } from '@/components/today/session-summary-row';
-import { Card, StatePanel, Tag, makeStyles, uiBorder, uiSpace, useUiRoles, useUiText, useUiTextTone } from '@/components/ui';
-import { uiCardSlice } from '@/components/ui/marks';
+import { Card, StatePanel, Tag, makeStyles, uiBorder, uiCardSlice, uiSpace, useUiRoles, useUiText, useUiTextTone } from '@/components/ui';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { logEvent } from '@/src/logging';
 import type { ExerciseDateFormat } from '@/src/preferences/model';

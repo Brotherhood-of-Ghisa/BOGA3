@@ -6,7 +6,7 @@ import { formatCalendarWeekHeading, formatDayMonth } from '@/src/utils/local-tim
 import { Pressable, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
-import { uiHairline } from '@/components/ui/edge';
+import { uiCorner, uiHairline } from '@/components/ui/edge';
 import { uiMark } from '@/components/ui/marks';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -159,6 +159,7 @@ const useStyles = makeStyles((roles) => ({
     flex: 1,
     alignItems: 'center',
     paddingVertical: uiSpace.xs,
+    ...uiCorner('control'),
     gap: uiSpace.xs,
   },
   dayToday: uiHairline(roles, { shape: 'control' }),

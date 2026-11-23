@@ -1,7 +1,7 @@
 import { Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
-import { uiEdge } from '@/components/ui/edge';
+import { uiCorner, uiEdge } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -106,6 +106,7 @@ const useStyles = makeStyles((roles, mode) => ({
   contraindicationsBox: {
     backgroundColor: roles.paper,
     padding: uiSpace.sm,
+    ...uiCorner('control'),
     gap: uiSpace.xs,
   },
   contraindicationsLabel: {

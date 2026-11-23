@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, uiBorder, uiGeometry, uiHairline, uiMark, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { FigureText, uiBorder, uiCorner, uiGeometry, uiHairline, uiMark, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
 import type { CustomPart } from '@/components/ui/theme-custom';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
@@ -90,7 +90,7 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
             DELETE
           </Text>
         </View>
-        <View style={[styles.button, styles.buttonPrimary, uiMark.bar, { backgroundColor: roles.accent }]}>
+        <View style={[styles.button, styles.buttonPrimary, uiCorner('control'), { backgroundColor: roles.accent }]}>
           <Text allowFontScaling={false} style={[type.button, text(roles.onAccent)]}>
             LOG SET
           </Text>

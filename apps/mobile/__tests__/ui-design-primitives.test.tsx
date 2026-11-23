@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 
 import { MainTabs } from '@/components/navigation/main-tabs';
-import { ActionButton, Card, ChipGroup, Icon, FormField, FormSection, IconButton, InputRow, ListRow, Notice, PageHeader, ScreenScroll, SearchField, SectionHeader, SegmentedControl, Sheet, SliderRow, Stat, StatePanel, SwitchRow, Tag, ToggleChip, uiEdge, uiMark, uiGeometry, uiHairline, uiSpace, uiTypography, uiWell } from '@/components/ui';
+import { ActionButton, Card, ChipGroup, Icon, FormField, FormSection, IconButton, InputRow, ListRow, Notice, PageHeader, ScreenScroll, SearchField, SectionHeader, SegmentedControl, Sheet, SliderRow, Stat, StatePanel, SwitchRow, Tag, ToggleChip, uiCardSlice, uiCorner, uiEdge, uiMark, uiGeometry, uiHairline, uiSpace, uiTypography, uiWell } from '@/components/ui';
 import { withAlpha } from '@/components/ui/lch';
 import { uiTextFor } from '@/components/ui/text-roles';
 import { generateRoles, defaultThemeSeeds } from '@/components/ui/theme';
@@ -95,6 +95,24 @@ describe('the edge (`edge.ts`)', () => {
       borderColor: roles.ruleSoft,
       borderStyle: 'dashed',
     });
+  });
+});
+
+describe('the corner and the card slice (`edge.ts`)', () => {
+  it('uiCorner is the corner of a shape and nothing else', () => {
+    expect(uiCorner('control')).toEqual({ borderRadius: uiGeometry.radius.control });
+    expect(uiCorner('card')).toEqual({ borderRadius: uiGeometry.radius.card });
+    expect(uiCorner('pill')).toEqual({ borderRadius: uiGeometry.radius.pill });
+  });
+
+  it('uiCardSlice draws the card sides on every cell and the corners and cap on the first and last', () => {
+    const [first, middle, last, only] = [uiCardSlice(roles, 0, 3), uiCardSlice(roles, 1, 3), uiCardSlice(roles, 2, 3), uiCardSlice(roles, 0, 1)];
+    const sides = { overflow: 'hidden', backgroundColor: roles.surface, borderLeftWidth: 1, borderRightWidth: 1, borderColor: roles.rule };
+
+    expect(middle).toEqual(sides);
+    expect(first).toEqual({ ...sides, borderTopWidth: 1, borderTopLeftRadius: 4, borderTopRightRadius: 4 });
+    expect(last).toEqual({ ...sides, borderBottomWidth: 1, borderBottomLeftRadius: 4, borderBottomRightRadius: 4 });
+    expect(only).toMatchObject({ borderTopWidth: 1, borderBottomWidth: 1, borderTopLeftRadius: 4, borderBottomRightRadius: 4 });
   });
 });
 

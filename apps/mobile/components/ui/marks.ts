@@ -1,6 +1,5 @@
 import type { ViewStyle } from 'react-native';
 
-import type { UiRoles } from '@/components/ui/theme';
 import { uiBorder, uiGeometry } from '@/components/ui/tokens';
 
 // The shapes a chart or a status draws (`docs/specs/ui/design-language.md` §4):
@@ -21,25 +20,3 @@ export const uiMark = {
     borderColor: colour,
   }),
 };
-
-/**
- * One cell of a card a list draws across its rows (a paged `FlatList` cannot sit
- * inside one `Card`): the `surface`, the side hairlines, and the card corners and
- * top / bottom hairline on the first / last cell. `index` of `count`.
- */
-export function uiCardSlice(roles: UiRoles, index: number, count: number): ViewStyle {
-  const cap = (side: 'Top' | 'Bottom'): ViewStyle => ({
-    [`border${side}Width`]: uiBorder.width,
-    [`border${side}LeftRadius`]: uiGeometry.radius.card,
-    [`border${side}RightRadius`]: uiGeometry.radius.card,
-  });
-  return {
-    overflow: 'hidden',
-    backgroundColor: roles.surface,
-    borderLeftWidth: uiBorder.width,
-    borderRightWidth: uiBorder.width,
-    borderColor: roles.rule,
-    ...(index === 0 ? cap('Top') : {}),
-    ...(index === count - 1 ? cap('Bottom') : {}),
-  };
-}

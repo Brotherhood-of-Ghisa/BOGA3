@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, View, type Insets } from 'react-native';
 
+import { uiCorner } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
@@ -92,6 +93,7 @@ const useStyles = makeStyles((roles) => ({
     height: ARROW_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
+    ...uiCorner('control'),
   },
   pressed: {
     backgroundColor: roles.paper,

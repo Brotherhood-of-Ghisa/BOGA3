@@ -37,6 +37,9 @@ const WELL: Record<ThemeMode, Omit<BoxShadowValue, 'color'>> = {
 
 const corner = (shape: EdgeShape | undefined): ViewStyle => (shape ? { borderRadius: uiGeometry.radius[shape] } : {});
 
+/** The corner alone, for a container that has a ground but no edge: a wash, a pressed state, a selected tile. */
+export const uiCorner = (shape: EdgeShape): ViewStyle => corner(shape);
+
 /** A card's or a control's edge: the `rule` hairline and a lift. */
 export function uiEdge(roles: UiRoles, mode: ThemeMode, options: EdgeOptions = {}): ViewStyle {
   return { ...uiHairline(roles, options), boxShadow: [{ ...LIFT, color: edgeShades(roles.ink, mode).lift }] };
@@ -58,5 +61,27 @@ export function uiWell(roles: UiRoles, mode: ThemeMode, options: Pick<EdgeOption
     backgroundColor: roles.well,
     boxShadow: [{ ...WELL[mode], color: edgeShades(roles.ink, mode).well }],
     ...corner(options.shape),
+  };
+}
+
+/**
+ * One cell of a card a list draws across its rows (a paged `FlatList` cannot sit
+ * inside one `Card`): the `surface`, the side hairlines, and the card corners and
+ * top / bottom hairline on the first / last cell. `index` of `count`.
+ */
+export function uiCardSlice(roles: UiRoles, index: number, count: number): ViewStyle {
+  const cap = (side: 'Top' | 'Bottom'): ViewStyle => ({
+    [`border${side}Width`]: uiBorder.width,
+    [`border${side}LeftRadius`]: uiGeometry.radius.card,
+    [`border${side}RightRadius`]: uiGeometry.radius.card,
+  });
+  return {
+    overflow: 'hidden',
+    backgroundColor: roles.surface,
+    borderLeftWidth: uiBorder.width,
+    borderRightWidth: uiBorder.width,
+    borderColor: roles.rule,
+    ...(index === 0 ? cap('Top') : {}),
+    ...(index === count - 1 ? cap('Bottom') : {}),
   };
 }

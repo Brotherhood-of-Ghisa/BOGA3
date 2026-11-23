@@ -85,26 +85,29 @@ const EDGE_SHADOW_REMEDY =
   'spread uiEdge / uiWell (or uiHairline) from @/components/ui into the style instead of setting a shadow';
 
 // A container's own edge outside `components/ui` (`borderRule.ownerPrefix`): any
-// `borderColor`, `borderWidth`, `border*Radius`, `borderStyle` or per-side
-// `border*Width` / `border*Color` key, as a style key or an inline override.
-// Exactly one shape passes — the row divider: a single-side `border<Side>Width`
-// whose own object sets `border<Side>Color` to `ruleSoft` (a `0` width or radius is
-// the absence of an edge). A card, field, pill or swatch edge lives in a
-// primitive (`Card`, `Tag`, `ChipGroup`…), `uiEdge` / `uiHairline` or a
-// `uiMark` shape, all under `components/ui`, so the rule needs no per-file list.
-const BORDER_KEY_REGEX =
-  /\b(border(?:Top|Bottom|Left|Right|Start|End|Horizontal|Vertical)?(?:Width|Color)|border(?:Top|Bottom)?(?:Left|Right|Start|End)?Radius|borderStyle)\b\s*:\s*([^,}\n]*)/g;
+// `border*` or `outline*` style key (`borderWidth`, `borderTopColor`,
+// `outlineWidth`…, quoted or computed too), as a style key or an inline override. Exactly one shape passes — the row divider: a single-side
+// `border<Side>Width` of one hairline whose own object sets `border<Side>Color` to
+// `ruleSoft`, with dividers on at most two sides and never both left and right (a
+// box is a container). A `0` width or radius is the absence of an edge. A card,
+// field, pill or swatch edge lives in a primitive (`Card`, `Tag`, `ChipGroup`…),
+// `uiEdge` / `uiHairline` or a `uiMark` shape, all under `components/ui`, so the
+// rule needs no per-file list.
+const BORDER_KEY_REGEX = /(?<![\w.])['"[]?\s*\b(border(?:Top|Bottom|Left|Right|Start|End|Horizontal|Vertical|Block|Inline)*(?:Width|Color|Radius|Style)|outline(?:Width|Color|Style|Offset))\s*['"]?\]?\s*:\s*([^,}\n]*)/g;
 
 const BORDER_REMEDY =
   'draw a container with Card / Notice / Tag / ChipGroup / FormField from @/components/ui, a shape with uiMark, or a row divider as a single-side ' +
-  'border<Side>Width with border<Side>Color: roles.ruleSoft';
+  'border<Side>Width of one hairline with border<Side>Color: roles.ruleSoft';
 
 const SINGLE_SIDE_WIDTH_REGEX = /^border(Top|Bottom|Left|Right|Start|End)Width$/;
 const SINGLE_SIDE_COLOR_REGEX = /^border(Top|Bottom|Left|Right|Start|End)Color$/;
 const RULE_SOFT_VALUE_REGEX = /^\w+\.ruleSoft$/;
+const HAIRLINE_VALUE_REGEX = /^(?:1|uiBorder\.width|(?:StyleSheet\.)?hairlineWidth)$/;
+const LEFT_RIGHT_SIDES = [['Left', 'Right'], ['Start', 'End']];
 
-// The `{ … }` that holds `index`: scan out to the unmatched braces on each side.
-function enclosingObject(source, index) {
+// The `{ … }` that holds `index`, with every nested `{ … }` blanked out so a
+// key nested in a child object is never read as this object's own.
+function ownObject(source, index) {
   let start = index;
   for (let depth = 0; start > 0; start -= 1) {
     const char = source[start - 1];
@@ -114,24 +117,38 @@ function enclosingObject(source, index) {
       depth -= 1;
     }
   }
-  let end = index;
-  for (let depth = 0; end < source.length; end += 1) {
-    const char = source[end];
+  let text = '';
+  let depth = 0;
+  for (let at = start; at < source.length; at += 1) {
+    const char = source[at];
     if (char === '{') depth += 1;
     if (char === '}') {
       if (depth === 0) break;
       depth -= 1;
     }
+    text += depth > 0 && char !== '{' ? ' ' : char;
   }
-  return source.slice(start, end);
+  return text;
+}
+
+function dividerSides(object) {
+  const sides = new Set();
+  for (const [, side, value] of object.matchAll(/\bborder(Top|Bottom|Left|Right|Start|End)Width\s*:\s*([^,}\n]*)/g)) {
+    if (!/^0(?:\.0+)?$/.test(value.trim())) sides.add(side);
+  }
+  return sides;
 }
 
 function isRowDividerKey(source, key, value, index) {
   if (/^0(?:\.0+)?$/.test(value)) return true;
   if (SINGLE_SIDE_COLOR_REGEX.test(key)) return RULE_SOFT_VALUE_REGEX.test(value);
   const side = SINGLE_SIDE_WIDTH_REGEX.exec(key)?.[1];
-  if (!side) return false;
-  return new RegExp(`\\bborder${side}Color\\s*:\\s*\\w+\\.ruleSoft\\b`).test(enclosingObject(source, index));
+  if (!side || !HAIRLINE_VALUE_REGEX.test(value)) return false;
+  const object = ownObject(source, index);
+  if (!new RegExp(`\\bborder${side}Color\\s*:\\s*\\w+\\.ruleSoft\\b`).test(object)) return false;
+  const sides = dividerSides(object);
+  if (sides.size > 2) return false;
+  return !LEFT_RIGHT_SIDES.some(([first, second]) => sides.has(first) && sides.has(second));
 }
 
 const UI_SCOPE = { targets: ['app', 'components'], extensions: ['.tsx'] };

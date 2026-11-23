@@ -106,5 +106,5 @@ export {
   type UiRoleToken,
   type UiSpaceToken,
 } from '@/components/ui/tokens';
-export { uiEdge, uiHairline, uiWell, type EdgeOptions, type EdgeShape, type EdgeTone } from '@/components/ui/edge';
-export { uiCardSlice, uiMark } from '@/components/ui/marks';
+export { uiCardSlice, uiCorner, uiEdge, uiHairline, uiWell, type EdgeOptions, type EdgeShape, type EdgeTone } from '@/components/ui/edge';
+export { uiMark } from '@/components/ui/marks';

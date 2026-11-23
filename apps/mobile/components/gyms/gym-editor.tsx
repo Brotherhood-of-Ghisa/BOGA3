@@ -215,7 +215,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
 
   return (
     <View style={styles.editor} testID="gym-editor">
-      <View style={styles.stripe} testID="gym-editor-stripe" />
+      <View pointerEvents="none" style={styles.stripe} testID="gym-editor-stripe" />
       <ListRow
         accessibilityLabel={`Close editor for ${label}`}
         density="list"
@@ -294,6 +294,7 @@ const useStyles = makeStyles((roles) => ({
     paddingRight: uiSpace.md,
     backgroundColor: roles.accentWash,
   },
+  // A selection mark on the leading edge, not a container edge: never copy it to frame a card.
   stripe: {
     position: 'absolute',
     top: 0,

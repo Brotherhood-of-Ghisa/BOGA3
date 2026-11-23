@@ -6,7 +6,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
-import { uiHairline } from '@/components/ui/edge';
+import { uiCorner, uiHairline } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { uiMark } from '@/components/ui/marks';
 import { statsTableColumnWidth } from '@/components/stats/stats-table';
@@ -430,6 +430,7 @@ const useStyles = makeStyles((roles) => ({
     // the band itself separates the groups, so no hairline.
     marginHorizontal: -GROUP_BLEED,
     paddingHorizontal: GROUP_BLEED,
+    ...uiCorner('card'),
     backgroundColor: roles.accentWash,
   },
   childName: { paddingLeft: uiSpace.md },
@@ -523,6 +524,7 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'center',
     gap: uiSpace.xs,
     paddingVertical: uiSpace.xs,
+    ...uiCorner('control'),
   },
   weekDayToday: {
     backgroundColor: roles.accentWash,

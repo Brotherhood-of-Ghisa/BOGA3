@@ -337,6 +337,51 @@ const styles = { frame: { borderHorizontalWidth: 1, borderLeftWidth: 1, borderRi
     ]);
   });
 
+  it('flags a box built from dividers, a thick bar, an outline, a quoted key and a colour nested one level down', () => {
+    expect(
+      scan({
+        'components/loopholes.tsx': `const styles = {
+  box: {
+    borderTopWidth: 1, borderTopColor: roles.ruleSoft,
+    borderBottomWidth: 1, borderBottomColor: roles.ruleSoft,
+    borderLeftWidth: 1, borderLeftColor: roles.ruleSoft,
+  },
+  sides: { borderLeftWidth: 1, borderLeftColor: roles.ruleSoft, borderRightWidth: 1, borderRightColor: roles.ruleSoft },
+  bar: { borderLeftWidth: 8, borderLeftColor: roles.ruleSoft },
+  ring: { outlineWidth: 1, outlineColor: roles.rule, outlineOffset: 2 },
+  quoted: { 'borderWidth': 1, ["borderRadius"]: 4 },
+  nested: { borderTopWidth: 1, inner: { borderTopColor: roles.ruleSoft } },
+};
+`,
+      })
+    ).toEqual([
+      'borderTopWidth: 1',
+      'borderBottomWidth: 1',
+      'borderLeftWidth: 1',
+      'borderLeftWidth: 1',
+      'borderRightWidth: 1',
+      'borderLeftWidth: 8',
+      'outlineWidth: 1',
+      'outlineColor: roles.rule',
+      'outlineOffset: 2',
+      'borderWidth: 1',
+      'borderRadius: 4',
+      'borderTopWidth: 1',
+    ]);
+  });
+
+  it('passes a top-and-bottom divider pair, a hairline width and a style key that only looks like an edge', () => {
+    expect(
+      scan({
+        'components/pair.tsx': `const styles = {
+  band: { borderTopWidth: 1, borderTopColor: roles.ruleSoft, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: roles.ruleSoft },
+  labels: { borders: 'Borders', outlineAction: {}, border: roles.rule },
+};
+`,
+      })
+    ).toEqual([]);
+  });
+
   it('treats a zero width or radius as the absence of an edge', () => {
     expect(
       scan({
