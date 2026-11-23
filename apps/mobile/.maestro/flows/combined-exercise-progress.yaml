@@ -1,0 +1,145 @@
+appId: com.dinoderek.mobile
+---
+# Combined exercise progress, infra-free and independently reset.
+# Proves: native dragging cancels hold, hold release never navigates, selection
+# survives Back, and names/all three charts/chronological History open normally.
+# A long current name wraps, and every primary/secondary muscle stays reachable
+# in the bounded Options body (scroll to the last link and back to History).
+# Why device: responder cancellation/release, native stack restoration, viewport
+# clipping and sheet scrolling cannot be proved by invoking Jest events.
+# Jest counterparts: __tests__/combined-exercise-progress-local-data.test.tsx,
+# __tests__/combined-exercise-history.test.ts, __tests__/exercise-selection.test.ts.
+# Run alone for focused small/normal checks; both platform data-smoke suites
+# retain this same flow so their aggregate gates continue to cover it.
+# Seed recently performed exercises, including a long current name. Catalogue is a distinct landing
+# surface, so waiting for its create action proves reset/fixture finished before
+# navigating back to Progress (no same-screen openLink race).
+- openLink: "boga3://maestro-harness?reset=data&fixture=exercise-block-history&teleport=exercise-catalog"
+# A fresh simulator may show UIKit's asynchronous icon-change notice.
+# Retry readiness only to acknowledge that known notice; other failures remain.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            platform: iOS
+            visible: "(?s).*changed the icon.*"
+          commands:
+            - tapOn: "OK"
+      - extendedWaitUntil:
+          visible: { id: "create-new-exercise-button" }
+          timeout: 10000
+- openLink: "boga3://exercise-edit?exerciseDefinitionId=seed_barbell_back_squat"
+- extendedWaitUntil:
+    visible: { id: "exercise-editor-name-input" }
+    timeout: 15000
+- tapOn: { id: "exercise-editor-name-input" }
+- eraseText
+- inputText: "Barbell Back Squat with a deliberately long exercise name"
+- hideKeyboard
+- scrollUntilVisible:
+    element: { id: "exercise-editor-save" }
+    direction: DOWN
+    centerElement: true
+- tapOn: "Save exercise definition"
+- extendedWaitUntil:
+    notVisible: { id: "exercise-editor-name-input" }
+    timeout: 15000
+- openLink: "boga3://progress?breakdown=exercise"
+- extendedWaitUntil:
+    visible: { id: "stats-search-input" }
+    timeout: 15000
+- scrollUntilVisible:
+    element: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
+    direction: DOWN
+- assertNotVisible: { id: "stats-exercise-selection-controls" }
+- takeScreenshot: "09-combined-browsing"
+- swipe:
+    from: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
+    direction: UP
+    duration: 650
+- assertNotVisible: { id: "stats-exercise-selection-controls" }
+- scrollUntilVisible:
+    element: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
+    direction: DOWN
+- longPressOn: { id: "stats-exercise-row-maestro_m24_unmapped_exercise" }
+- assertVisible: { id: "stats-exercise-selection-controls" }
+- assertNotVisible: { id: "stats-exercise-history-view-chip-row" }
+- assertVisible: { id: "stats-exercise-selection-show", enabled: false }
+- takeScreenshot: "09a-combined-one-selected"
+- scrollUntilVisible:
+    element: { id: "stats-exercise-row-seed_barbell_back_squat" }
+    direction: UP
+- tapOn: { id: "stats-exercise-row-seed_barbell_back_squat" }
+- scrollUntilVisible:
+    element: { id: "stats-exercise-row-seed_barbell_bench_press" }
+    direction: UP
+- tapOn: { id: "stats-exercise-row-seed_barbell_bench_press" }
+- assertVisible: { id: "stats-exercise-selection-count", text: ".*3.*" }
+- takeScreenshot: "10-combined-selection"
+- tapOn: { id: "stats-exercise-selection-show" }
+- extendedWaitUntil:
+    visible: { id: "stats-exercise-history-view-chip-row" }
+    timeout: 15000
+- assertVisible: { id: "progress-history-title-text", text: "3 exercises" }
+- tapOn: { id: "progress-history-title" }
+- assertVisible: { id: "selected-exercise-seed_barbell_back_squat" }
+- assertVisible: { id: "selected-exercise-maestro_m24_unmapped_exercise" }
+- assertVisible: { id: "selected-exercise-seed_barbell_bench_press" }
+- takeScreenshot: "11-combined-names"
+# The modal hides its backdrop from the accessibility tree; tap above the panel.
+- tapOn: { point: "50%,8%" }
+- extendedWaitUntil:
+    notVisible: { id: "selected-exercises-sheet" }
+    timeout: 10000
+- takeScreenshot: "11a-combined-grid"
+- tapOn: { id: "stats-exercise-history-view-chip-weekly" }
+- takeScreenshot: "12-combined-weekly"
+- tapOn: { id: "stats-exercise-history-view-chip-timeline" }
+- extendedWaitUntil:
+    visible: { id: "^stats-exercise-history-week-sets(-empty)?$" }
+    timeout: 15000
+# Just after Monday midnight the recent fixture sessions belong to last week.
+- runFlow:
+    when:
+      visible: { id: "stats-exercise-history-week-sets-empty" }
+    commands:
+      - tapOn: { id: "stats-exercise-history-timeline-previous-week" }
+- extendedWaitUntil:
+    visible: { id: "stats-exercise-history-week-sets" }
+    timeout: 15000
+- takeScreenshot: "12b-combined-timeline"
+- tapOn: { id: "progress-history-options-button" }
+- assertNotVisible: { id: "progress-history-rm-curve" }
+- takeScreenshot: "12c-combined-options"
+- scrollUntilVisible:
+    element: { id: "progress-history-muscle-triceps" }
+    direction: DOWN
+- takeScreenshot: "12d-combined-last-muscle"
+- scrollUntilVisible:
+    element: { id: "progress-history-exercise-history" }
+    direction: UP
+- tapOn: { id: "progress-history-exercise-history" }
+- extendedWaitUntil:
+    visible: { id: "exercise-history-exercise-name-maestro_m24_completion_unmapped_exercise" }
+    timeout: 15000
+- assertNotVisible: { id: "exercise-history-best-card" }
+- takeScreenshot: "13-combined-chronological-history"
+- tapOn: { id: "exercise-history-back" }
+- extendedWaitUntil:
+    visible: { id: "progress-history-title-text", text: "3 exercises" }
+    timeout: 10000
+- runFlow:
+    when: { platform: iOS }
+    commands:
+      - tapOn: { id: "BackButton" }
+- runFlow:
+    when: { platform: Android }
+    commands:
+      - back
+- extendedWaitUntil:
+    visible: { id: "stats-exercise-selection-count", text: ".*3.*" }
+    timeout: 10000
+- tapOn: { id: "stats-exercise-selection-cancel" }
+- assertVisible: { id: "stats-search-input" }
+- assertNotVisible: { id: "stats-exercise-selection-controls" }

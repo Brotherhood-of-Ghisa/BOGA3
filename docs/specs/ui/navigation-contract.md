@@ -83,16 +83,16 @@ one access level. Screens never redirect to gate themselves:
 | --- | --- | --- |
 | `/progress`, `/stats-history` | `period=7` | This week; absent or any other value uses the configured window |
 | | `breakdown=exercise` | opens exercise browsing; anything else opens muscles |
-| `/progress-history` | `exerciseDefinitionId` \| `muscleGroupId` | exactly one catalogue id; both, neither, blank or missing from the catalogue renders unavailable. Names come from the catalogue |
+| `/progress-history` | `exerciseDefinitionId` \| `exerciseDefinitionIds` \| `muscleGroupId` | one scope; plural: JSON array of 2–5 catalogue ids. Invalid/ambiguous/missing targets render unavailable |
 | | `secondary`, `secondaryVolume` | muscle Sets/Volume: `shown`/`hidden` overrides defaults; otherwise inherits. Re-entry distinguishes three states |
-| | `metric=volume\|sets\|1rm\|weight` | The chart metric, carried over; absent or invalid opens on Volume |
+| | `metric=volume\|sets\|1rm\|weight` | combined: Sets/Volume; unsupported/invalid opens on Volume |
 | | `view=timeline\|daily\|weekly` | entry override only; absent/invalid uses the saved view. Selector changes still save |
 | | `gymId` | either subject’s scope via `src/utils/gym-scope-route.ts` ([[gym.view-filter]]) |
 | | `day`, `week` | Muscle/exercise detail: one valid local day/week within History look-back. Invalid/ambiguous links render unavailable |
 | `/rm-curve` | `exerciseDefinitionId` | required; trimmed first value when repeated. A changed id remounts chart scope; invalid targets stay unavailable in route. The window anchors on focus |
 | `/sessions` | `week`, `day` | where the list opens; malformed: the top |
 | session exercise | `setId` | optional initial row; invalid: first unfinished |
-| `/exercise-history` | `exerciseDefinitionId` | required |
+| `/exercise-history` | `exerciseDefinitionId` \| `exerciseDefinitionIds` | one scope; plural follows Progress's bounded JSON encoding |
 | | `period` | `week` (legacy `7`), `progress`, `history`; otherwise History look-back ([[comparison.allowed-periods]]) |
 | | `tagDefinitionId`, `gymId`, `currentGymId` | pre-applied filters; `currentGymId` applies only under the current-gym past-records preference |
 | `/notes` | `exerciseId` | optional; absent: every note |
@@ -145,15 +145,15 @@ Only the transitions below navigate; other routes never navigate on their own.
 | `/session/<id>/exercise/<id>` | `/progress-history`, `/exercise-history` | the records panel's `Progress` (`progressHistoryHref`) and ⋮ `Exercise history` (`exerciseHistoryHref`, gym per [[gym.view-filter]]); `push` |
 | `/session/<id>/exercise/<id>` | `/notes?exerciseId=<id>` | ⋮ `Notes` (`notesHref`); `push` |
 | `/session/<id>/exercise/<id>`, `/exercise-catalog` | `/exercise-link?exerciseDefinitionId=<id>` | ⋮ `Link to group exercise…` (sheet closes, then `push`); signed in only, and not for a deleted exercise. The open session is untouched |
-| `/progress-history?exerciseDefinitionId=<id>` | `/exercise-history?exerciseDefinitionId=<id>` | ⋮ `History` (`exerciseHistoryHref`, `push`), preserving gym selection |
+| `/progress-history` (exercise scope) | `/exercise-history` | ⋮ `History` preserves ids/gym; plural opens chronological labelled cards without combined bests |
 | `/exercise-catalog` | `/exercise-history?exerciseDefinitionId=<id>` | exercise actions `History` (`exerciseHistoryHref`, `push`), no pre-applied filters |
-| `/progress`, `/stats-history` | `/progress-history?muscleGroupId=<id>`, `?exerciseDefinitionId=<id>` | Muscle list/Exercise → saved view; 3D header → chosen view; contributor → Timeline (`progressHistoryHref`, `push`). Carry metric/gym and muscle counting choices. Back preserves filters, layout, selection and scroll; focus returns to launcher |
+| `/progress`, `/stats-history` | `/progress-history` | Muscle/Exercise uses saved view; 3D uses chosen view; contributors use Timeline. Hold/accessibility selects 2–5 exercises; Show progress carries ids/metric/gym. Back restores state/scroll/focus |
 | `/progress`, `/stats-history` | `/sessions` | the Sessions link row |
 | `/progress-history` | `/progress-history?muscleGroupId=…`, `?exerciseDefinitionId=…`, with `day` or `week` | Day/week → set cards (`historyDetailHref`), with metric/gym; Back restores chart |
 | `/progress-history` | `/train`, `/completed-session/<id>` | Set card → its workout; active → Train, completed → full session. Muscle card progress action carries metric/gym |
 | `/progress-history` | `/rm-curve?exerciseDefinitionId=<id>` | live exercise Options → RM curve (`rmCurveHref`, `push`); chart scope stays local |
 | `/rm-curve` | originating History, else `/progress` | Back pops unchanged History metric/week/scroll; without history, replaces to Progress. Workout drafts stay untouched |
-| `/progress-history?exerciseDefinitionId=<id>` | `/progress-history?muscleGroupId=<id>` | header ⋮ muscle rows carry gym and supported metric (`progressHistoryHref`, `push`) |
+| `/progress-history` (exercise scope) | `/progress-history?muscleGroupId=<id>` | ⋮ muscles follow [[muscle.no-breakdown]]; opens whole-muscle progress with gym/metric |
 | `/sessions` | `/completed-session/<id>` | a completed row (`push`). `/sessions` never completes an active session directly |
 | `/planner` | `/session-plan/new`, `/session-plan/<planId>` | `Plan session` action and plan rows (`push`). Save `replace`s to detail; edit returns `back()` |
 | `/planner` | `/programme/new`, `/programme/<programmeId>` | `New programme` action and programme rows (`push`). Save `replace`s to detail; edit returns `back()` |

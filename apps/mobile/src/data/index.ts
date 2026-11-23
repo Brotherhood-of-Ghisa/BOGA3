@@ -165,11 +165,17 @@ export {
   type LoadExercisePerformanceHistoryOptions,
 } from './exercise-history';
 export {
+  loadCombinedExerciseHistory,
+  type CombinedExerciseHistorySummary,
+  type ExerciseHistoryViewSummary,
+} from './combined-exercise-history';
+export {
   aggregateExerciseDailyEffort,
   aggregateExerciseWeeklyEffort,
   computeSelectedExerciseDailyEffort,
   computeSelectedExerciseWeeklyEffort,
   computeSelectedExerciseHistoryEffort,
+  computeSelectedExercisesHistoryEffort,
   type ComputeSelectedExerciseDailyEffortOptions,
   type ComputeSelectedExerciseWeeklyEffortOptions,
   type ExerciseRawSession,

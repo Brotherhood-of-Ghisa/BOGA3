@@ -14,6 +14,7 @@ import type { DailyEffortMetrics, SelectedMuscleWeeklyEffort } from './muscle-an
 import { selectDatedInProgressSession } from './in-progress-session';
 import { exerciseDefinitions, exerciseSets, gyms, sessionExercises, sessions, userSettings } from './schema';
 import type { GymScopeOption } from '@/src/utils/gym-scope-route';
+import { exerciseScopeIds, type ExerciseReadScope } from '@/src/utils/exercise-selection';
 
 // Same shape as SelectedMuscleWeeklyEffort; aliased to allow CalendarHeatmap reuse without casts.
 export type SelectedExerciseWeeklyEffort = SelectedMuscleWeeklyEffort;
@@ -220,8 +221,7 @@ const aggregateExerciseWeeksFromDaily = (dailyEffort: DailyEffortMetrics[]): Sel
   return result;
 };
 
-export type ComputeSelectedExerciseWeeklyEffortOptions = {
-  exerciseDefinitionId: string;
+export type ComputeSelectedExerciseWeeklyEffortOptions = ExerciseReadScope & {
   start: Date;
   end: Date;
   timeZone?: string;
@@ -237,6 +237,7 @@ const loadExerciseRawSessions = async (
   options: ComputeSelectedExerciseWeeklyEffortOptions
 ): Promise<ExerciseRawSession[]> => {
   const database = await bootstrapLocalDataLayer();
+  const definitionIds = exerciseScopeIds(options);
   const resolveWeight = loadAsOfWeightResolver(database);
   const bodyweightCalculationsEnabled = database
     .select({ enabled: userSettings.bodyweightCalculationsEnabled })
@@ -272,16 +273,16 @@ const loadExerciseRawSessions = async (
   const sessionIds = sessionCompletedRows.map((row) => row.id);
   if (sessionIds.length === 0) return [];
 
-  const definition = database.select().from(exerciseDefinitions)
-    .where(eq(exerciseDefinitions.id, options.exerciseDefinitionId)).get();
+  const definitions = new Map(database.select().from(exerciseDefinitions)
+    .where(inArray(exerciseDefinitions.id, [...definitionIds])).all().map(definition => [definition.id, definition]));
 
   const sessionExerciseRows = database
-    .select({ id: sessionExercises.id, sessionId: sessionExercises.sessionId })
+    .select({ id: sessionExercises.id, sessionId: sessionExercises.sessionId, exerciseDefinitionId: sessionExercises.exerciseDefinitionId })
     .from(sessionExercises)
     .where(
       and(
         inArray(sessionExercises.sessionId, sessionIds),
-        eq(sessionExercises.exerciseDefinitionId, options.exerciseDefinitionId),
+        inArray(sessionExercises.exerciseDefinitionId, [...definitionIds]),
         isNull(sessionExercises.deletedAt)
       )
     )
@@ -341,7 +342,7 @@ const loadExerciseRawSessions = async (
       completedAt: session.completedAt,
       gymId: session.gymId,
       gymName: session.gymName,
-      loadContext: personalCalculationContext(bodyweightCalculationsEnabled, definition, session),
+      loadContext: personalCalculationContext(bodyweightCalculationsEnabled, definitions.get(seRow.exerciseDefinitionId ?? ''), session),
       sets: setsByExerciseId.get(seRow.id) ?? [],
     });
   }
@@ -382,13 +383,23 @@ export const computeSelectedExerciseDailyEffort = async (
   return aggregateExerciseDailyEffort(rawSessions, options.timeZone);
 };
 
+/** One bounded workload scope, sharing a graph read across all three chart views. */
+export const computeSelectedExercisesHistoryEffort = async (options: ComputeSelectedExerciseDailyEffortOptions & { exerciseDefinitionIds: readonly string[] }) => {
+  const allSessions = await loadExerciseRawSessions(options);
+  const rawSessions = inGymScope(allSessions, options.gymId);
+  // A selection is workload, never a strength estimate or a new record book.
+  const daily = aggregateExerciseDailyEffort(rawSessions, options.timeZone)
+    .map(day => ({ ...day, estimatedRM1: null, highestWeight: null }));
+  return { daily, weekly: aggregateExerciseWeeksFromDaily(daily), gyms: exerciseHistoryGymOptions(allSessions) };
+};
+
 /**
- * Both chart views share one graph read and one daily aggregation. A day's PR
+ * All chart views share one graph read and one daily aggregation. A day's PR
  * marks are the whole exercise's (`pr_*`) while every gym is in view; with a
  * gym chosen they are each session's own (`own_pr_*`) — on a split exercise
  * that gym's book, and for no gym the whole exercise's ([[gym.split]]). `gyms` lists the window's choices, unfiltered.
  */
-export const computeSelectedExerciseHistoryEffort = async (options: ComputeSelectedExerciseDailyEffortOptions) => {
+export const computeSelectedExerciseHistoryEffort = async (options: ComputeSelectedExerciseDailyEffortOptions & { exerciseDefinitionId: string }) => {
   const allSessions = await loadExerciseRawSessions(options);
   const rawSessions = inGymScope(allSessions, options.gymId);
   const facts = new Map((await loadExerciseSessionFacts(options.exerciseDefinitionId)).map(fact => [fact.sessionId, fact]));

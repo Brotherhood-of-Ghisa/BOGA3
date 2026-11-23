@@ -95,6 +95,10 @@ not_requires frontend  apps/mobile/.maestro/flows/smoke-launch.yaml
 # flow names only its iOS lane
 requires ios-data-smoke     apps/mobile/.maestro/flows/data-runtime-smoke.yaml
 requires android-data-smoke apps/mobile/.maestro/flows/data-runtime-smoke.yaml
+requires ios-data-smoke     apps/mobile/.maestro/flows/combined-exercise-progress.yaml
+requires android-data-smoke apps/mobile/.maestro/flows/combined-exercise-progress.yaml
+requires ios-combined-progress apps/mobile/.maestro/flows/combined-exercise-progress.yaml
+not_requires frontend      apps/mobile/.maestro/flows/combined-exercise-progress.yaml
 requires ios-data-smoke     apps/mobile/.maestro/flows/session-completion-states-fixture.yaml
 not_requires android-data-smoke apps/mobile/.maestro/flows/session-completion-states-fixture.yaml
 # an unlisted (new) flow falls back to the full gate

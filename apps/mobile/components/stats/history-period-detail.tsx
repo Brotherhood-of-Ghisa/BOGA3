@@ -42,7 +42,7 @@ export function HistoryPeriodDetail({ subject, period, metric, onSelectMetric, f
   const target = subject.kind === 'muscle'
     ? { muscleGroupIds: [subject.id], gymId: subject.gymId, countSecondary: subject.countSecondary,
       countSecondaryVolume: subject.countSecondaryVolume, metric: muscleMetric }
-    : { exerciseDefinitionId: subject.id, gymId: subject.gymId };
+    : { ...(subject.kind === 'exercises' ? { exerciseDefinitionIds: subject.ids } : { exerciseDefinitionId: subject.id }), gymId: subject.gymId };
   const sets = usePeriodSets({ ...target, includeInProgress: true },
   period, refresh + revision, accountRevision, lookbackWeeks);
   // A focus refresh must not shrink the scroll content before Back settles.
@@ -53,11 +53,11 @@ export function HistoryPeriodDetail({ subject, period, metric, onSelectMetric, f
   const label = metric === 'totalVolume' ? 'Volume' : value === '1' ? 'Set' : 'Sets';
   const heading = period.dayKey ? formatCompactDate(new Date(`${period.dayKey}T12:00:00`), dateFormat)
     : formatCalendarWeekHeading(period.weekKey, dateFormat);
-  const testID = `${subject.kind}-period-detail`;
+  const testID = `${subject.kind === 'muscle' ? 'muscle' : 'exercise'}-period-detail`;
   return <View style={styles.body} testID={testID}>
     <View style={styles.controls}>
       <ToggleChip accessibilityLabel="Effort metric" onChange={onSelectMetric}
-        options={subject.kind === 'muscle' ? MUSCLE_HISTORY_METRIC_OPTIONS : EXERCISE_HISTORY_METRIC_OPTIONS}
+        options={subject.kind === 'exercise' ? EXERCISE_HISTORY_METRIC_OPTIONS : MUSCLE_HISTORY_METRIC_OPTIONS}
         testID={`${testID}-metric`} value={metric} />
       {filters}
     </View>
