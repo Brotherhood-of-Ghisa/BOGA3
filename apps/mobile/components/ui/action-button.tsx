@@ -4,6 +4,7 @@ import { uiEdge } from '@/components/ui/edge';
 import { useUiGround } from '@/components/ui/ground';
 import { Icon } from '@/components/ui/icon';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import type { UiRoles } from '@/components/ui/theme';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
 
@@ -57,9 +58,7 @@ export function ActionButton({
   // A text or link button has no ground of its own: on the page it takes the
   // page inks, and a press keeps the page's ground.
   const ground = useUiGround();
-  const bareOnPage = (variant === 'text' || variant === 'link') && ground === 'page';
-  const labelDisabled = bareOnPage ? styles.labelDisabledOnPage : styles.labelDisabled;
-  const chevron = disabled ? (bareOnPage ? roles.pageInkFaint : roles.inkFaint) : bareOnPage ? roles.pageInkMuted : roles.inkMuted;
+  const inks = groundInks((variant === 'text' || variant === 'link') && ground === 'page', { roles, styles, textTones });
   return (
     <Pressable
       accessibilityHint={accessibilityHint}
@@ -78,28 +77,49 @@ export function ActionButton({
         variant === 'outline' ? [styles.outline, danger ? styles.outlineDanger : null] : null,
         disabled && variant === 'primary' ? styles.primaryDisabled : null,
         disabled && variant === 'outline' ? styles.outlineDisabled : null,
-        pressed && !disabled ? (variant === 'primary' ? styles.primaryPressed : bareOnPage ? styles.pressedOnPage : styles.pressed) : null,
+        pressed && !disabled ? (variant === 'primary' ? styles.primaryPressed : inks.pressed) : null,
       ]}
       testID={testID}>
       <Text
         allowFontScaling={false}
-        style={variant === 'link' ? [textRoles.label, bareOnPage ? textTones.pageMuted : null, disabled ? labelDisabled : null] : [
+        style={variant === 'link' ? [textRoles.label, inks.link, disabled ? inks.disabled : null] : [
           textRoles.button,
           size === 'compact' ? [textRoles.label, textTones.ink] : null,
-          bareOnPage ? textTones.page : null,
+          inks.button,
           size === 'large' ? styles.labelLarge : null,
           variant === 'primary' ? styles.labelPrimary : null,
           danger ? styles.labelDanger : null,
-          disabled && variant !== 'primary' ? labelDisabled : null,
+          disabled && variant !== 'primary' ? inks.disabled : null,
         ]}>
         {label}
       </Text>
-      {variant === 'link' ? <Icon color={chevron} name="chevron-right" size="xs" /> : null}
+      {variant === 'link' ? <Icon color={disabled ? inks.chevronDisabled : inks.chevron} name="chevron-right" size="xs" /> : null}
     </Pressable>
   );
 }
 
 const COMPACT_HIT_SLOP = (uiGeometry.tapTarget - uiGeometry.compactControlHeight) / 2;
+
+type GroundInputs = {
+  roles: UiRoles;
+  styles: ReturnType<typeof useStyles>;
+  textTones: ReturnType<typeof useUiTextTone>;
+};
+
+// What a label, chevron and press draw in: the page inks and the page's ground
+// for a text or link button on the page, else the card's.
+function groundInks(onPage: boolean, { roles, styles, textTones }: GroundInputs) {
+  return onPage
+    ? {
+        button: textTones.page,
+        link: textTones.pageMuted,
+        disabled: styles.labelDisabledOnPage,
+        chevron: roles.pageInkMuted,
+        chevronDisabled: roles.pageInkFaint,
+        pressed: styles.pressedOnPage,
+      }
+    : { button: null, link: null, disabled: styles.labelDisabled, chevron: roles.inkMuted, chevronDisabled: roles.inkFaint, pressed: styles.pressed };
+}
 
 const useStyles = makeStyles((roles, mode) => ({
   base: {
