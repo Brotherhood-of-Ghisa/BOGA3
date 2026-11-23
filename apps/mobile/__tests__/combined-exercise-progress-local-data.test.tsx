@@ -108,7 +108,8 @@ it('uses all three charts and only additive metrics, with a names sheet and dire
   expect(await screen.findByTestId('stats-exercise-history-heatmap-panel-weekly')).toBeTruthy();
   fireEvent.press(screen.getByTestId('stats-exercise-history-view-chip-timeline'));
   expect(await screen.findByTestId('stats-exercise-history-timeline')).toBeTruthy();
-  await screen.findByTestId('stats-exercise-history-week-sets');
+  await waitFor(() => expect(screen.queryByTestId('stats-exercise-history-week-sets')
+    ?? screen.queryByTestId('stats-exercise-history-week-sets-empty')).not.toBeNull());
   fireEvent.press(screen.getByTestId('progress-history-title'));
   expect(screen.getByTestId(`selected-exercise-${BENCH}`)).toHaveTextContent('Barbell Bench Press');
   const sheets = screen.UNSAFE_getAllByType(Sheet);

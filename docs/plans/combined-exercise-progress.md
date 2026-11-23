@@ -78,71 +78,75 @@ calendar and isometric/repetition rules.
 5. [x] Add Jest coverage using the real local-data fixtures for combined totals,
    hold/repetition cases, gym scopes, selection/navigation, all chart views,
    records, chronology, roles, malformed routes and superseded/account reads.
-6. [ ] Update owning UI/spec docs and any required product fact; capture native
+6. [x] Update owning UI/spec docs and any required product fact; capture native
    comparison evidence against the target at small/normal phone widths.
-7. [ ] Run agreed gates and quality targets, obtain independent code/product
-   reviews, and open a reviewable PR. Merge only on explicit approval.
+7. [x] Run agreed gates and quality targets, obtain independent code/product
+   reviews, and prepare the reviewable PR. Merge only on explicit approval.
 
-## Verification proposal
+## Verification agreement and results
 
-- Always: `./boga test fast`.
-- Quality targets: `jest-coverage`, `complexity`, `dependencies` once finished.
-- Path default: `frontend-ui` for screen/component/navigation work.
-- Agreed with independent reviewer `implementation_reviewer`: `fast`,
-  `ios-data-smoke`, `ios-exercise-page`, `ios-rm-curve`, `jest-coverage`,
-  `complexity`, `dependencies`. Backend omitted as `covered-by-jest` while the
-  diff remains local readers with no schema/sync/auth/backend changes. The two
-  other frontend-ui lanes add no affected journey while ListRow only forwards
-  optional props. Reassess if these boundaries change. Optional sweep suggested
-  to the operator because ListRow is shared.
-- Native lane: `ios-data-smoke`, extending its existing
-  Progress journey if needed. New scenario justification: RN's native hold,
-  scroll cancellation, release-vs-navigation, real stack Back and sheet/scroll
-  reachability cannot be proven by Jest event invocation. Counting and route
-  combinations stay in Jest. Reviewer agent must agree before non-fast lanes.
-- No migration, sync, auth, root-stack or native dependency changes intended;
-  reassess lanes if implementation reaches one of those boundaries.
-- `./boga doctor`: passed on the allocated slot before implementation.
+Independent reviewer `implementation_reviewer` agreed the finished lane set:
+`fast`, `ios-data-smoke`, `ios-combined-progress` at normal/small widths,
+`ios-exercise-page`, `ios-rm-curve`, `jest-coverage`, `complexity`, and
+`dependencies`. Backend is covered by Jest for these local readers, with no
+schema, sync, auth or server changes. `ios-smoke`/`ios-session-view` add no
+changed journey; ListRow only forwards optional props. Android is not this
+macOS host's platform lane. The optional full sweep was suggested, not run.
 
-## Progress
+New native scenario justification (agreed before writing it): RN hold/release,
+scroll cancellation, native stack Back, wrapping and reaching the last muscle
+link in a bounded sheet cannot be proved by Jest event invocation. Counting,
+route permutations and all seven union links remain covered in Jest.
 
-- Issue updated with the agreed scope, preserving its original screenshots.
-- Worktree created from latest `origin/main` (`d1e8e94f`); slot 10 allocated.
-- Current main's Timeline menu action is `View sets` and pushes scoped day/week
-  detail; preserve it for combined selections. Its newer `Add to session…`
-  remains single-exercise, without introducing a bulk-add action.
-- First typecheck passed; initial Jest regression run: 509 suites passed and
-  one new route test expected an outdated no-gym sentinel (corrected).
-- Combined readers, routes, selection UI and History cards are implemented;
-  screen, native, quality and final review verification remain in progress.
-- Full `fast` gate passed, including real-data selection, chart and History
-  screen tests. Native gesture checks and the three quality targets are next.
-- Final Jest run: 511 suites and 8,219 tests passed. Coverage passed at 88.79%
-  branches and 95.93% lines; complexity and dependencies passed. No thresholds,
-  suppressions, dependency baselines or calculation revisions changed.
-- Independent code review: no actionable findings after the complexity
-  extractions. Product review: clean after two fact citations; no new fact.
-- Native selection and hold/scroll/release checks passed. The names-sheet
-  dismissal step was corrected to the existing backdrop-tap pattern; the full
-  native lane and final visual comparison remain outstanding.
-- The complete combined native journey passed, including all three charts,
-  menu roles, chronological History, Back and Cancel. Screenshot review found
-  the Timeline name lacked its card inset; the exact existing summary spacing
-  was applied. Reviewer agreed it is cosmetic: repeat fast and fresh small/
-  normal screenshots, reuse unchanged behavioral/quality checks.
-- The full data-smoke run also exposed an existing injury-flow test tapping
-  Save behind the software keyboard. Its failure screenshot shows the editor
-  still open and a stray typed character. Added explicit keyboard dismissal
-  after entry; no injury app behavior changed. The chosen lane set is unchanged.
-- Large muscle unions can exceed a phone viewport. Reuse the existing scrolling
-  sheet body for Options. Native justification: Jest proves the complete union
-  and destinations, but cannot prove that the last link and History remain
-  reachable through a bounded native modal. Extend the same native journey to
-  three exercises and scroll to the last secondary link, then back to History;
-  capture small/normal layouts and long current exercise names.
-- Reviewer agreed the final menu delta gates: fast, data-smoke on normal/small,
-  and exercise-page on normal. Earlier RM-curve and quality passes remain
-  applicable: handlers/data/metrics are unchanged, while fresh combined and
-  single-exercise journeys exercise the changed Options wrapper. Final product
-  review is clean. Fast and the additional final Jest run (511 suites / 8,219
-  tests) passed; normal data-smoke passed all seven flows. Small is running.
+- `doctor`: green for slot 10, created from latest `origin/main` (`d1e8e94f`).
+- `fast`: green; final additional Jest run: 511 suites / 8,219 tests green.
+- `jest-coverage`: green, 88.79% branches / 95.93% lines. `complexity` and
+  `dependencies`: green; no thresholds, suppressions or baselines changed.
+- Normal `ios-data-smoke`: all seven flows green, including the combined
+  scenario before extraction. `ios-rm-curve`: green. Reviewer agreed to reuse
+  these and the quality results after the final sheet-only/style changes.
+- Focused `ios-combined-progress`: normal and 375×667 small phone green.
+  Fresh `ios-exercise-page`: green, exercising the single-exercise Options body.
+- Final dispatch/meta and generated-doc checks rerun after flow extraction.
+- Independent code review: no actionable findings, including final test-only
+  Monday-midnight fixture guards. Independent product review: clean. Product
+  facts: none; current counting, eligibility and record rules are unchanged.
+
+Evidence is retained locally under
+`apps/mobile/artifacts/combined-exercise-progress/`: lane logs plus `evidence.md`.
+Native comparison captures are under the corresponding Maestro run roots:
+
+- Normal broad: `combined-exercise-progress/20261122-232150-30856`.
+- Normal focused: `combined-exercise-progress/20261122-235600-97814`.
+- Small focused: `combined-exercise-progress-small/20261122-235421-77510`.
+- Fresh single-exercise: `combined-exercise-progress/20261122-235751-99618`.
+
+## Delivery notes
+
+- Issue updated with all agreed scope/UX decisions and chronological History,
+  preserving original screenshots. Current `View sets` drill-downs and
+  single-only `Add to session…` are retained.
+- Comparison against the approved target passed at both widths: concealed
+  contextual controls, full names, all three charts, accessible muscle union,
+  chronological labelled cards and Back restoration. Intentional adaptations:
+  current theme tokens and round selection glyphs. A missing Timeline name
+  inset was corrected to use the existing summary spacing; Options now scrolls
+  beneath the fixed title so every primary/secondary link is reachable.
+- The normal smoke gate exposed a pre-existing injury test tapping Save behind
+  its keyboard. Added explicit keyboard dismissal, retaining all assertions;
+  no injury app behavior changed.
+- Small broad smoke failed before this feature (first a URL confirmation on
+  the fresh simulator, then legacy Train-tab navigation). Retained failure
+  evidence rather than expanding product scope. Reviewer agreed to extract
+  the same combined journey into a resettable flow and an `extra` focused lane;
+  both platform data-smoke aggregates still include it immediately after the
+  original data-runtime flow. Bootstrap/orchestration is unchanged.
+- The fresh small simulator's UIKit icon-change notice is acknowledged by a
+  bounded, iOS-only guard; all other readiness failures remain failures. The
+  focused small journey then passed. Relative fixture sessions can fall into
+  the preceding week at Monday midnight, so only an empty current week moves
+  back once, then still requires the real set list.
+- Worktree and lease stay allocated while the PR awaits explicit merge
+  approval. Stop its local Supabase stack after opening the PR; remove the
+  temporary small simulator created for this task. Release the worktree after
+  merge, and delete this ephemeral plan when the feature ships.
