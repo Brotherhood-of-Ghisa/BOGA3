@@ -518,13 +518,12 @@ describe('Today: the Progress card over real data', () => {
     expect(within(body).queryByTestId('today-latest-session-rows', { includeHiddenElements: true })).toBeNull();
     // The link is the session card's own; the section heading carries none.
     expect(within(text('today-session-card')).getByTestId('today-sessions-button')).toBeTruthy();
-    // The header row is set like a plain card title: the card's top inset above, a micro-label's step
-    // below, no tap-height floor, and the compact link taking only a label's line of it.
+    // The header row is set like This week's title: 12 either side, no tap-height floor, and the
+    // compact link taking only a label's line of it.
     expect(text('today-latest-session-header')).not.toHaveStyle({ minHeight: uiGeometry.tapTarget });
-    expect(text('today-latest-session-header')).toHaveStyle({ paddingTop: uiSpace.sm, marginBottom: uiSpace.xs - uiSpace.sm });
-    expect(text('today-sessions-link-slot')).toHaveStyle({
-      marginVertical: -(uiGeometry.compactControlHeight - uiTypography.lineHeight.xxs) / 2,
-    });
+    expect(text('today-latest-session-header')).toHaveStyle({ paddingTop: 12, marginBottom: 4 });
+    expect(text('today-session-card')).toHaveStyle({ gap: 8 });
+    expect(text('today-sessions-link-slot')).toHaveStyle({ marginVertical: -7 });
     for (const id of ['today-latest-session-step-older', 'today-latest-session-step-newer']) {
       expect(text(id)).toHaveStyle({ height: STEP_ARROW_HEIGHT });
     }

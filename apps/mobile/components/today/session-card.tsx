@@ -253,12 +253,12 @@ const useStyles = makeStyles((roles) => ({
     flexShrink: 1,
     minHeight: 0,
   },
-  // The stepped start and the Sessions link share one row set like a plain
-  // card title: the card's top inset above, a micro-label's step below. The
-  // arrows and the link reach 44 across; vertically, only what the card holds.
+  // The stepped start and the Sessions link share one row set like the This
+  // week card's title above it: a step of `md` either side. The arrows and
+  // the link reach 44 across; vertically, only what the card holds.
   header: {
-    paddingTop: uiSpace.sm,
-    marginBottom: uiSpace.xs - uiSpace.sm,
+    paddingTop: uiSpace.md,
+    marginBottom: uiSpace.md - uiSpace.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

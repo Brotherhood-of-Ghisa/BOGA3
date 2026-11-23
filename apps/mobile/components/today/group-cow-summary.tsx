@@ -128,7 +128,8 @@ export function TodayCoWSummaries({ groupId, userId }: { groupId: string; userId
 }
 
 const useStyles = makeStyles(() => ({
-  content: { paddingHorizontal: uiSpace.md, paddingVertical: uiSpace.sm, gap: uiSpace.xs },
+  // The title sits a step of `md` from the top, as Recent's does.
+  content: { paddingHorizontal: uiSpace.md, paddingTop: uiSpace.md, paddingBottom: uiSpace.sm, gap: uiSpace.xs },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
   title: { flexShrink: 1 },
   // The arrows overhang the dates' line, so the row stays a plain title's height.

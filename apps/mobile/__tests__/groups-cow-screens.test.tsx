@@ -32,7 +32,6 @@ import type { CoWDefinitionWire, CoWResultWire } from '@/src/groups/cow-wire';
 import { coWDateRange } from '@/src/groups/cow-presentation';
 import { createCoWId } from '@/src/groups/cow-draft';
 import { ChoiceRow } from '@/components/ui';
-import { uiTypography } from '@/components/ui/tokens';
 import { STEP_ARROW_HEIGHT } from '@/components/today/step-arrows';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { AppThemeProvider } from '@/components/ui/theme-context';
@@ -747,7 +746,8 @@ it('Today shows this week’s CoW in its own card, ranked by 1RM alone, opening 
   expect(screen.getByTestId('today-cow-week-later')).toBeDisabled();
   // The week arrows are glyph-sized and overhang the dates' line, so the title row stays a plain
   // title's height; they reach 44 across, and vertically only what the card holds.
-  expect(screen.getByTestId('today-cow-week')).toHaveStyle({ marginVertical: -(STEP_ARROW_HEIGHT - uiTypography.lineHeight.sm) / 2 });
+  expect(screen.getByTestId('today-cow-week')).toHaveStyle({ marginVertical: -2 });
+  expect(screen.getByTestId('today-cow-current')).toHaveStyle({ paddingTop: 12 });
   for (const id of ['today-cow-week-earlier', 'today-cow-week-later']) {
     expect(screen.getByTestId(id)).toHaveStyle({ height: STEP_ARROW_HEIGHT });
   }
