@@ -3,6 +3,8 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import { StyleSheet, Text } from 'react-native';
 
+import { GroupBoardTitle } from '@/components/groups/group-board-title';
+import { GroupsTitle } from '@/components/groups/group-screen-header';
 import { headerStyleOptions } from '@/components/navigation/header-style';
 import { SessionTopBar } from '@/components/session-view/session-top-bar';
 import { ActionButton } from '@/components/ui/action-button';
@@ -12,6 +14,7 @@ import { HeaderTitleMenu } from '@/components/ui/header-title-menu';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { Notice } from '@/components/ui/notice';
+import { HistoryTitle } from '@/components/stats/history-title';
 import { PageHeader, SectionHeader } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
 import { SwipePages } from '@/components/ui/swipe-pages';
@@ -65,6 +68,9 @@ describe('page-level text on Ink + paper', () => {
         testID="pager"
       />,
     ],
+    ['a history page’s header title', <HistoryTitle key="history" title="Bench Press" />],
+    ['a group board’s header title', <GroupBoardTitle key="board" name="Bench Press" testID="board-title" view="1RM leaderboard" />],
+    ['the Groups header title', <GroupsTitle canSwitch key="groups" maxWidth={220} name="Iron Crew" onPress={() => {}} />],
     [
       'a header title menu',
       <HeaderTitleMenu currentId="a" key="menu" onChoose={() => {}} options={[{ id: 'a', label: 'Bench Press' }]} sheetTitle="Exercise" testID="menu" />,
@@ -111,7 +117,7 @@ describe('page-level text on Ink + paper', () => {
 
 // `paper` is the page and nothing on it (`design-language.md` §2): a pressed
 // row or control, the row that is mine, an action strip or a quieter panel
-// inside a card sinks to `well`, so on Ink + paper the card's inks still read
+// inside a card sinks to `inset`, so on Ink + paper the card's inks still read
 // on it. The files below draw a page, or read the page's colour for what it
 // draws (the theme files, the preview and swatch of another theme, the status
 // bar and headers, the 3D body's neutral and a page-level control's press).

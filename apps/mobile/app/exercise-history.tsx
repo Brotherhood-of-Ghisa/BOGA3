@@ -263,13 +263,14 @@ function HistorySessionCards({ summary, historyStart, onPressSession }: {
 }) {
   const styles = useStyles();
   const text = useUiText();
+  const tone = useUiTextTone();
   const firstOlder = historyStart ? summary.sessions.findIndex(entry => entry.completedAt < historyStart) : -1;
   return summary.sessions.map((entry, index) => (
     <Fragment key={entry.sessionExerciseId}>
       {index === firstOlder ? (
         <View style={styles.olderDivider} testID="exercise-history-older-divider">
           <View style={styles.olderRule} />
-          <Text accessibilityRole="header" allowFontScaling={false} style={text.meta}>Older sessions</Text>
+          <Text accessibilityRole="header" allowFontScaling={false} style={[text.meta, tone.pageMuted]}>Older sessions</Text>
           <View style={styles.olderRule} />
         </View>
       ) : null}

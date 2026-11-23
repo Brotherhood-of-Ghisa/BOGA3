@@ -187,17 +187,17 @@ function WeekHeading({ section, dateFormat }: { section: HistoryWeekSection; dat
       {section.emptyWeeksBefore > 0 ? (
         <View style={styles.gap} testID={`completed-history-gap-${section.key}`}>
           <View style={styles.gapRule} />
-          <Text allowFontScaling={false} style={[text.label, tone.faint]}>
+          <Text allowFontScaling={false} style={[text.label, tone.pageFaint]}>
             {formatEmptyWeeks(section.emptyWeeksBefore)}
           </Text>
           <View style={styles.gapRule} />
         </View>
       ) : null}
       <View accessibilityRole="header" accessible style={styles.weekTitleRow}>
-        <Text allowFontScaling={false} style={[text.label, tone.ink]}>
+        <Text allowFontScaling={false} style={[text.label, tone.page]}>
           {heading.title}
         </Text>
-        <Text allowFontScaling={false} style={[text.label, tone.faint]}>
+        <Text allowFontScaling={false} style={[text.label, tone.pageFaint]}>
           {heading.detail}
         </Text>
       </View>

@@ -51,7 +51,7 @@ export function InjuryWarningBanner({
             </Text>
           </View>
         </View>
-  
+
         {contraindicationsText ? (
           <View style={styles.contraindicationsBox}>
             <Text allowFontScaling={false} style={[text.label, styles.contraindicationsLabel]}>
@@ -62,7 +62,7 @@ export function InjuryWarningBanner({
             </Text>
           </View>
         ) : null}
-  
+
         <View style={styles.actions}>
           <ActionButton
             label="Swap exercise"

@@ -33,8 +33,8 @@ Values are generated per theme; `useUiRoles()` is the only source;
 Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 
 - **One value per role.** Two roles that cannot be told apart are one role.
-  Exempt: the on-colour roles, each named by its fill, `ink`-direction changes,
-  and page inks off Ink + paper.
+  Exempt: on-colour roles, named by their fill, `ink`-direction changes, and
+  page inks and `inset` off Ink + paper.
   `accent` and `record` stay ΔE\*ab ≥ 5 from `danger`, `gain`, `loss` and the
   regimes.
 - **`record` is never `accent`**, and clears 4.5:1 as text on `paper` and

@@ -120,7 +120,7 @@ export function ViewSessionScreen({
           testIDPrefix="view-session-section"
         />
         {section === 'summary' ? summaryContent : model.cards.length === 0 ? (
-          <Text allowFontScaling={false} style={[text.body, tone.muted]} testID="completed-session-detail-no-exercises">
+          <Text allowFontScaling={false} style={[text.body, tone.pageMuted]} testID="completed-session-detail-no-exercises">
             No exercises logged in this session.
           </Text>
         ) : (
