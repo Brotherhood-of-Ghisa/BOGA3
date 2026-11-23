@@ -233,6 +233,7 @@ const styles = StyleSheet.create({
   },
   rampStep: {
     flex: 1,
+    ...uiMark.bar,
   },
   page: {
     gap: uiSpace.md,
