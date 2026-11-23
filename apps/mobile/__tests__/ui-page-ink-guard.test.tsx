@@ -4,7 +4,9 @@ import { join, relative } from 'path';
 import { StyleSheet, Text } from 'react-native';
 
 import { GroupBoardTitle } from '@/components/groups/group-board-title';
+import { GroupHomeStepper } from '@/components/groups/group-home-stepper';
 import { GroupsTitle } from '@/components/groups/group-screen-header';
+import { GroupStreamMembershipItem } from '@/components/groups/stream-membership-item';
 import { headerStyleOptions } from '@/components/navigation/header-style';
 import { SessionInsightPresentation } from '@/components/session-recorder/session-insight-presentation';
 import { SessionTopBar } from '@/components/session-view/session-top-bar';
@@ -17,6 +19,8 @@ import { IconButton } from '@/components/ui/icon-button';
 import { Notice } from '@/components/ui/notice';
 import { HistoryTitle } from '@/components/stats/history-title';
 import { PageHeader, SectionHeader } from '@/components/ui/page-header';
+import { PageSheet } from '@/components/ui/page-sheet';
+import { Sheet } from '@/components/ui/sheet';
 import { StatePanel } from '@/components/ui/state-panel';
 import { SwipePages } from '@/components/ui/swipe-pages';
 import { uiTextFor } from '@/components/ui/text-roles';
@@ -135,6 +139,7 @@ describe('`paper` is the page', () => {
     'components/appearance/theme-preview.tsx',
     'components/exercise-page/exercise-page-screen.tsx',
     'components/groups/screen-styles.ts',
+    'components/groups/stream-membership-item.tsx',
     'components/navigation/header-style.ts',
     'components/navigation/main-tab-bar.tsx',
     'components/navigation/navigation-theme.ts',
@@ -233,5 +238,38 @@ describe('the remaining page-level words on Ink + paper', () => {
     screen.unmount();
     renderWithTheme(<Card><SessionInsightPresentation exerciseComparisons={[]} historyState="loading" /></Card>);
     expect(StyleSheet.flatten(screen.getByTestId('session-insight-empty').props.style).color).toBe(roles.inkMuted);
+  });
+});
+
+describe('sheets and the Groups tab on Ink + paper', () => {
+  const INK = { theme: 'ink-paper', mode: 'light', custom: null } as const;
+  const glyph = (id: string) => within(screen.getByTestId(id)).UNSAFE_getByType(Icon).props.colorRole;
+
+  it('draws a page sheet’s close X and a sheet’s header action in the inks: the sheet is a card', async () => {
+    renderWithTheme(
+      <>
+        <PageSheet closeLabel="Close" onDismiss={() => {}} testID="page-sheet" title="Swap" visible>{null}</PageSheet>
+        <Sheet headerActions={<IconButton accessibilityLabel="More" name="more-vertical" onPress={() => {}} testID="sheet-action" />}
+          dismissLabel="Dismiss options" onDismiss={() => {}} title="Options" visible>{null}</Sheet>
+      </>,
+    );
+    await switchTheme(INK);
+    expect(glyph('page-sheet-close')).toBe('ink');
+    expect(glyph('sheet-action')).toBe('ink');
+  });
+
+  it('draws the At a glance week label and a stream’s joined row in the page inks', async () => {
+    renderWithTheme(
+      <>
+        <GroupHomeStepper canGoLater={false} label="This week" onEarlier={() => {}} onLater={() => {}} period="week" />
+        <GroupStreamMembershipItem item={{ kind: 'membership', key: 'k', sentence: 'Sam joined', groupId: 'g', groupName: 'Iron Crew' }} showGroupName />
+      </>,
+    );
+    await switchTheme(INK);
+    const roles = rolesFor(INK);
+    const colour = (words: string) => StyleSheet.flatten(screen.getByText(words).props.style).color;
+    expect(colour('This week')).toBe(roles.pageInk);
+    expect(colour('Sam joined')).toBe(roles.pageInkMuted);
+    expect(colour('Iron Crew')).toBe(roles.pageInkMuted);
   });
 });

@@ -199,7 +199,7 @@ export function Sheet({
             ) : null}
           </View>
         </GestureDetector>
-        <OnCard>{children}</OnCard>
+        {children}
       </Animated.View>
     </>
   );
@@ -218,10 +218,10 @@ export function Sheet({
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={[styles.root, { paddingTop: insets.top }]}>
-            {content}
+            <OnCard>{content}</OnCard>
           </KeyboardAvoidingView>
         ) : (
-          <View style={[styles.root, { paddingTop: insets.top }]}>{content}</View>
+          <View style={[styles.root, { paddingTop: insets.top }]}><OnCard>{content}</OnCard></View>
         )}
       </GestureHandlerRootView>
     </Modal>

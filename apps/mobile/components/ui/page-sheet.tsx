@@ -209,6 +209,7 @@ export function PageSheet({
           onLayout={handleLayout}
           style={[styles.sheet, { paddingBottom: insets.bottom }]}
           testID={testID}>
+          <OnCard>
           <PageSheetHeader
             actions={headerActions}
             closeDisabled={dismissDisabled}
@@ -227,11 +228,12 @@ export function PageSheet({
               keyboardVerticalOffset={keyboardOffset}
               style={styles.body}
               testID={testID ? `${testID}-keyboard` : undefined}>
-              <OnCard>{children}</OnCard>
+              {children}
             </KeyboardAvoidingView>
           ) : (
-            <OnCard>{children}</OnCard>
+            children
           )}
+          </OnCard>
         </View>
       </GestureHandlerRootView>
     </Modal>
