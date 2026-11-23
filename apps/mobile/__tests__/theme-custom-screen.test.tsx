@@ -642,6 +642,20 @@ it('stores a muted text let go back where it is stored while a save of it is sti
   await waitFor(() => expect(storedCustom()?.muted?.lightness).toBe(60));
 });
 
+it('saves the whole muted text shown when another of its controls is let go where it is stored, after a failed save', async () => {
+  store(OWN);
+  mockPart = 'muted';
+  jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
+  render(<ThemeCustomRoute />);
+  await step(slider('Lightness'), 'increment');
+  expect(await screen.findByText('Couldn’t save the colour. Nothing changed.')).toBeTruthy();
+  expect(storedCustom()).toEqual(OWN);
+
+  fireEvent(screen.getByTestId('theme-custom-strength-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
+  await act(async () => tap(slider('Strength')).onEnd({ x: OWN.muted!.strength }, true));
+  await waitFor(() => expect(storedCustom()?.muted).toEqual({ ...OWN.muted, lightness: 65 }));
+});
+
 it('keeps a secondary text saved meanwhile when the mode is switched, resetting only its lightness', async () => {
   store(OWN);
   render(<ThemeCustomRoute />);
