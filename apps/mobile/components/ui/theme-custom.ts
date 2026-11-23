@@ -80,9 +80,9 @@ export const inkDefault = (mode: ThemeMode): number => inkStep(mode).lightness;
 
 // Each seed's L* and the chroma a strength of 100 gives it. The L* are the
 // shipped seeds' (the neutral `inkMuted`, the accent's and the brass's 43,
-// which clear 4.5:1 on the light `paper`), so a converted preset keeps its look. `ink`'s seed only paints its hue
-// bar: primary text is drawn by `gamutColour`; so does the highlight's, at the
-// accent's.
+// which clear 4.5:1 on the light `paper`), so a converted preset keeps its
+// look. `ink`'s seed only paints its hue bar: primary text is drawn by
+// `gamutColour`; so does the highlight's, at the accent's.
 const SEED: Record<CustomColourPart, { lightness: number; chroma: number }> = {
   background: { lightness: 42.4, chroma: 40 },
   ink: { lightness: 42.4, chroma: 40 },

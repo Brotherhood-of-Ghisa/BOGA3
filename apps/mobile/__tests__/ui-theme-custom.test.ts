@@ -64,13 +64,13 @@ const withBackground = (colours: CustomColours, background: Partial<CustomColour
 describe('a preset converted to custom colours', () => {
   it.each(themePresets.flatMap((preset) => (['light', 'dark'] as ThemeMode[]).map((mode) => [preset.id, mode, preset.seeds] as const)))(
     'keeps %s in %s within ΔE*ab 3 of every role',
-    (_id, mode, seeds) => {
+    (id, mode, seeds) => {
       const preset = generateRoles(seeds, mode);
       const custom = generateCustomRoles(customFromSeeds(seeds, mode));
       // A light preset's accent is its seed as given; a custom accent is drawn
       // at the custom L* 43, which a darker preset accent (Plum's L* 39, Sage's
       // deepest step at 33, 14 from it) is further.
-      const limit = (role: keyof UiRoles) => (mode === 'light' && role === 'accent' ? (_id === 'sage' ? 14 : 7) : 3);
+      const limit = (role: keyof UiRoles) => (mode === 'light' && role === 'accent' ? (id === 'sage' ? 14 : 7) : 3);
       const drift = ROLE_COLOURS(preset)
         .map(([role, hex]) => ({ role, delta: deltaE(hex, custom[role]) }))
         .filter(({ role, delta }) => delta > limit(role));
