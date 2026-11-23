@@ -355,13 +355,12 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
     change: (field) => (value) => setDraft((current) => editOf(current, field, value)),
     end: (field) => (value) => {
       const edited = editOf(draft, field, value);
-      // A secondary or muted text let go where it is stored (or drawn), with
-      // the saves on their way, stores nothing new. Compared with that, not
-      // the draft: a drag has already moved the draft to the value let go at.
+      // A secondary or muted text let go as it is stored (or drawn), with the
+      // saves on their way, stores nothing new; otherwise both are stored.
       void save((intended) => {
         if (!isOwnInkPart(part)) return { [part]: edited };
         const inks = ownInks(intended);
-        return inks[part][field as keyof OwnInk] === value ? {} : { ...inks, [part]: edited };
+        return JSON.stringify(inks[part]) === JSON.stringify(edited) ? {} : { ...inks, [part]: edited };
       });
     },
     save: (patchOf) => {

@@ -104,9 +104,9 @@ export function themeLabel(appearance: AppearanceChoice): string {
 }
 
 // A custom part's value as a row shows it: its hue's name and strength (the
-// secondary's and muted text's as drawn); for
-// the background its mode and lightness first; a highlight that matches the
-// accent says so; the direction its name.
+// secondary's and muted text's as drawn); for the background its mode and
+// lightness first; a highlight that matches the accent says so; the
+// direction its name.
 export function customPartLabel(appearance: AppearanceChoice, part: CustomPart): string {
   const colours = appearance.custom;
   if (!colours) return '';

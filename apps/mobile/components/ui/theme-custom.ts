@@ -249,8 +249,8 @@ const short = (lightness: number, page: number, limit: number): number =>
 // Every role for a custom theme. The ladder of its mode is generated from the
 // seeds, then moved onto the chosen page (`moveRole`): depth scales the
 // grounds and empty cells, borders the hairlines, the text seed's contrast
-// the secondary and muted text until they are stored, the highlight's its band. `surface` and `raised` take the page's hue and
-// chroma. Primary text sits at its own L*, and so do the secondary and the
+// the secondary and muted text until they are stored, the highlight's its
+// band. `surface` and `raised` take the page's hue and chroma. Primary text sits at its own L*, and so do the secondary and the
 // muted text once they have one (`ownInkRoles`); every other role keeps its
 // place measured from the ladder's `ink`. The `ink` direction draws both
 // changes in the drawn `ink`.

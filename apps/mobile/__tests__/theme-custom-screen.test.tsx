@@ -618,6 +618,40 @@ it.each(['secondary', 'muted'] as const)('saves %s text when a drag is let go, a
   await waitFor(() => expect(storedCustom()).toEqual({ ...OWN, [part]: { ...OWN[part], lightness: 80 } }));
 });
 
+it('stores a muted text let go back where it is stored while a save of it is still on its way', async () => {
+  store(OWN);
+  mockPart = 'muted';
+  let finish: () => void = () => undefined;
+  const setItem = jest.spyOn(Storage, 'setItem');
+  setItem.mockImplementationOnce((key, value) => new Promise<void>((resolve) => {
+    finish = () => {
+      Storage.setItemSync(key, value as string);
+      resolve();
+    };
+  }));
+  render(<ThemeCustomRoute />);
+  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
+
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 320 }, true));
+  await waitFor(() => expect(setItem).toHaveBeenCalledTimes(1));
+  // Back at the stored L* while 80 is still on its way: that is a move.
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 240 }, true));
+  await act(async () => finish());
+
+  await waitFor(() => expect(setItem).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(storedCustom()?.muted?.lightness).toBe(60));
+});
+
+it('keeps a secondary text saved meanwhile when the mode is switched, resetting only its lightness', async () => {
+  store(OWN);
+  render(<ThemeCustomRoute />);
+  // Another part's save, stored after this page drew.
+  const saved = { ...OWN.secondary!, hue: 20, strength: 90 };
+  store({ ...OWN, secondary: saved });
+  await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Dark' })));
+  await waitFor(() => expect(storedCustom()?.secondary).toEqual({ ...saved, lightness: 65 }));
+});
+
 it('stores both inks on a drag let go on a theme that has not stored them', async () => {
   store(CUSTOM);
   mockPart = 'secondary';
