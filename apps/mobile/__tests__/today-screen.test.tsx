@@ -517,8 +517,9 @@ describe('Today: the Progress card over real data', () => {
     expect(within(body).queryByTestId('today-latest-session-rows', { includeHiddenElements: true })).toBeNull();
     // The link is the session card's own; the section heading carries none.
     expect(within(text('today-session-card')).getByTestId('today-sessions-button')).toBeTruthy();
-    // The header row keeps a tap height of its own: the compact link no longer holds it open.
-    expect(text('today-latest-session-header')).toHaveStyle({ minHeight: uiGeometry.tapTarget });
+    // The header row is a plain card title's height: no tap-height floor, the reach comes from hit slop.
+    expect(text('today-latest-session-header')).not.toHaveStyle({ minHeight: uiGeometry.tapTarget });
+    expect(text('today-latest-session-header')).toHaveStyle({ paddingTop: uiSpace.sm });
   });
 
   it('compares against an earlier period with the arrows around its range, never later than the previous one', async () => {

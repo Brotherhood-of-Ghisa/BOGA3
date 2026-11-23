@@ -15,7 +15,7 @@ import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { LatestSessionSummary, SessionExerciseLine } from '@/src/progress-summary';
 import { formatClockTime, formatCompactDate, formatLocalDateTime } from '@/src/utils/local-time';
@@ -251,10 +251,10 @@ const useStyles = makeStyles((roles) => ({
     flexShrink: 1,
     minHeight: 0,
   },
-  // The stepped start and the Sessions link share one tap-height row; the
-  // compact link no longer holds it open, so the row does.
+  // The stepped start and the Sessions link share one row, a plain card
+  // title's height: the arrows and the compact link reach 44pt by hit slop.
   header: {
-    minHeight: uiGeometry.tapTarget,
+    paddingTop: uiSpace.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
