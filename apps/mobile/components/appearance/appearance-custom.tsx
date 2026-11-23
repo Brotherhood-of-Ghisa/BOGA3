@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { CUSTOM_PART_LABELS, customPartLabel } from '@/components/appearance/chosen-theme';
 import type { CommitFailure, CommitOutcome } from '@/components/appearance/use-appearance-commit';
-import { ChoiceRow, FormSection, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { ChoiceRow, FormSection, uiHairline, uiMark, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
 import { CUSTOM_PARTS } from '@/components/ui/theme-custom';
 import type { AppearanceChoice } from '@/components/ui/theme-presets';
@@ -62,10 +62,10 @@ function Swatch({ roles, testID }: { roles: UiRoles; testID?: string }) {
   return (
     <View
       importantForAccessibility="no-hide-descendants"
-      style={[styles.swatch, { backgroundColor: roles.paper, borderColor: roles.rule }]}
+      style={[styles.swatch, { backgroundColor: roles.paper, ...uiHairline(roles, { shape: 'control' }) }]}
       testID={testID}>
       {[roles.ink, roles.accent, roles.record, roles.viz3].map((colour, index) => (
-        <View key={index} style={[styles.swatchMark, { backgroundColor: colour }]} />
+        <View key={index} style={[styles.swatchMark, uiMark.bar, { backgroundColor: colour }]} />
       ))}
     </View>
   );
@@ -81,12 +81,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: uiSpace.xs,
     padding: uiSpace.xs,
-    borderWidth: uiBorder.width,
-    borderRadius: uiGeometry.radius.control,
   },
   swatchMark: {
     width: uiSpace.md,
     height: uiSpace.xl,
-    borderRadius: uiGeometry.radius.control / 2,
   },
 });

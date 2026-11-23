@@ -169,7 +169,7 @@ const useStyles = makeStyles((roles) => ({
     paddingBottom: uiSpace.xs,
     backgroundColor: roles.surface,
     borderBottomWidth: uiBorder.width,
-    borderBottomColor: roles.rule,
+    borderBottomColor: roles.ruleSoft,
   },
   title: {
     flex: 1,

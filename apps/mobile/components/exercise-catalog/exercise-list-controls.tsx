@@ -2,6 +2,7 @@ import { memo, useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { uiEdge } from '@/components/ui/edge';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
@@ -9,7 +10,7 @@ import { StatePanel } from '@/components/ui/state-panel';
 import { Tag } from '@/components/ui/tag';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import {
   type ExerciseListItem,
   type ExerciseListPreferences,
@@ -291,7 +292,7 @@ function getFamilyGroupTestId(familyName: string): string {
   return `exercise-family-group-${familyName.toLowerCase().replace(/\s+/g, '-')}`;
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   // One row; on the narrowest phones the last chip wraps rather than scrolling.
   controlsRow: {
     flexDirection: 'row',
@@ -309,9 +310,7 @@ const useStyles = makeStyles((roles) => ({
     gap: uiSpace.xs,
     paddingHorizontal: uiSpace.sm,
     backgroundColor: roles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
-    borderRadius: uiGeometry.radius.pill,
+    ...uiEdge(roles, mode, { shape: 'pill' }),
   },
   compact: {
     minHeight: uiGeometry.compactControlHeight,
@@ -330,7 +329,7 @@ const useStyles = makeStyles((roles) => ({
   },
   chipOn: {
     backgroundColor: roles.ink,
-    borderColor: roles.ink,
+    ...uiEdge(roles, mode, { shape: 'pill', tone: 'ink' }),
   },
   chipPressed: {
     backgroundColor: roles.paper,

@@ -122,7 +122,7 @@ function MuscleBodyHeader({ orientation, onOrientationChange, focus, focusAvaila
       else onPrev();
     });
   return <>
-    <View style={[styles.headerRow, { borderBottomColor: roles.rule }]}>
+    <View style={[styles.headerRow, { borderBottomWidth: uiBorder.width, borderBottomColor: roles.ruleSoft }]}>
       <GestureDetector gesture={swipe}>
         <Pressable
           accessibilityActions={[{ name: 'previous', label: 'Previous muscle' }, { name: 'next', label: 'Next muscle' }]}
@@ -428,7 +428,7 @@ function MuscleBodyComparison({ selectedMuscle, metric, layout }: {
   const roles = useUiRoles();
   const values = <ComparisonValues compact row={selectedMuscle} metric={metric} layout={layout}
     prefix="stats-muscle-body-comparison" />;
-  return <View style={[styles.comparison, { borderTopColor: roles.rule }]} testID="stats-muscle-body-comparison">
+  return <View style={[styles.comparison, { borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft }]} testID="stats-muscle-body-comparison">
     <ComparisonHeaders compact axis={false} layout={layout} metric={metric} name={null}
       testID="stats-muscle-body-comparison-header" />
     <StatsTableRow divider={false} meta={layout.stacked ? undefined : values}>
@@ -682,8 +682,8 @@ export function MuscleBodyCard({
 const styles = StyleSheet.create({
   viewer: { padding: uiSpace.md, gap: uiSpace.sm },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm,
-    borderBottomWidth: uiBorder.width, paddingBottom: uiSpace.sm },
-  comparison: { borderTopWidth: uiBorder.width, paddingTop: uiSpace.xs, paddingBottom: uiSpace.sm },
+    paddingBottom: uiSpace.sm },
+  comparison: { paddingTop: uiSpace.xs, paddingBottom: uiSpace.sm },
   toolbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
   pickerTrigger: {
     flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget,

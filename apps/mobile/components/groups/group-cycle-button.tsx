@@ -1,6 +1,6 @@
 import { Pressable, Text, type StyleProp, type ViewStyle } from 'react-native';
 
-import { makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { makeStyles, uiEdge, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 
 /** `spokenLabel`: what VoiceOver says for an abbreviated `label` (`GR`). */
 export type GroupCycleOption<TValue extends string> = { value: TValue; label: string; spokenLabel?: string };
@@ -40,7 +40,7 @@ export function GroupCycleButton<TValue extends string>({ options, value, onChan
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   pill: {
     flex: 1,
     minHeight: uiGeometry.tapTarget,
@@ -48,9 +48,7 @@ const useStyles = makeStyles((roles) => ({
     justifyContent: 'center',
     paddingHorizontal: uiSpace.sm,
     backgroundColor: roles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
-    borderRadius: uiGeometry.radius.pill,
+    ...uiEdge(roles, mode, { shape: 'pill' }),
   },
   pressed: {
     backgroundColor: roles.paper,

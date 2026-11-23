@@ -1,4 +1,4 @@
-import { makeStyles, uiBorder, uiGeometry, uiSpace } from '@/components/ui';
+import { makeStyles, uiCardSlice, uiSpace, useUiRoles } from '@/components/ui';
 
 /**
  * Shared page shell for the group routes: the `Screen` / `ScreenScroll` ground
@@ -28,7 +28,7 @@ export const useGroupScreenStyles = makeStyles((roles) => ({
   /**
    * A paged `FlatList` whose rows read as one `Card` (the board, its history):
    * no gap between cells, the header and footer spaced by their own styles,
-   * and each cell a slice of the card (`cardListItem`, plus `-First` / `-Last`).
+   * and each cell a slice of the card (`uiCardSlice`).
    */
   cardListContent: {
     padding: uiSpace.lg,
@@ -39,23 +39,6 @@ export const useGroupScreenStyles = makeStyles((roles) => ({
   cardListFooter: {
     paddingTop: uiSpace.md,
   },
-  cardListItem: {
-    overflow: 'hidden',
-    borderLeftWidth: uiBorder.width,
-    borderRightWidth: uiBorder.width,
-    borderColor: roles.rule,
-    backgroundColor: roles.surface,
-  },
-  cardListItemFirst: {
-    borderTopWidth: uiBorder.width,
-    borderTopLeftRadius: uiGeometry.radius.card,
-    borderTopRightRadius: uiGeometry.radius.card,
-  },
-  cardListItemLast: {
-    borderBottomWidth: uiBorder.width,
-    borderBottomLeftRadius: uiGeometry.radius.card,
-    borderBottomRightRadius: uiGeometry.radius.card,
-  },
 }));
 
 /**
@@ -63,10 +46,6 @@ export const useGroupScreenStyles = makeStyles((roles) => ({
  * styles, `index` of `count`.
  */
 export function useCardListItemStyles() {
-  const styles = useGroupScreenStyles();
-  return (index: number, count: number) => [
-    styles.cardListItem,
-    index === 0 ? styles.cardListItemFirst : null,
-    index === count - 1 ? styles.cardListItemLast : null,
-  ];
+  const roles = useUiRoles();
+  return (index: number, count: number) => uiCardSlice(roles, index, count);
 }

@@ -2,12 +2,13 @@ import { useMemo } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { PageSheet } from '@/components/ui/page-sheet';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 import { useExerciseCatalog } from '@/src/exercise-catalog/cache';
 import { resolveExerciseSubstitutions } from '@/src/injuries/injury-substitutions';
 import type { ExerciseMuscleMappingTarget } from '@/src/injuries/injury-warning-engine';
@@ -59,7 +60,7 @@ export function InjurySubstitutionSheet({
             <Text allowFontScaling={false} style={[text.label, styles.sectionHeader]}>
               Recommended Joint-Friendly Alternatives
             </Text>
-            <View style={styles.list}>
+            <Card>
               {substitutions.curated.map((item) => (
                 <ListRow
                   key={item.exercise.id}
@@ -73,7 +74,7 @@ export function InjurySubstitutionSheet({
                   trailing={<Icon colorRole="inkFaint" name="chevron-right" size="sm" />}
                 />
               ))}
-            </View>
+            </Card>
           </View>
         ) : null}
 
@@ -82,7 +83,7 @@ export function InjurySubstitutionSheet({
             <Text allowFontScaling={false} style={[text.label, styles.sectionHeader]}>
               Same Muscle Group Alternatives
             </Text>
-            <View style={styles.list}>
+            <Card>
               {substitutions.alternatives.slice(0, 10).map((item) => (
                 <ListRow
                   key={item.exercise.id}
@@ -95,7 +96,7 @@ export function InjurySubstitutionSheet({
                   trailing={<Icon colorRole="inkFaint" name="chevron-right" size="sm" />}
                 />
               ))}
-            </View>
+            </Card>
           </View>
         ) : null}
 
@@ -139,13 +140,6 @@ const useStyles = makeStyles((roles) => ({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     paddingHorizontal: uiSpace.xs,
-  },
-  list: {
-    borderRadius: uiGeometry.radius.card,
-    overflow: 'hidden',
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
-    backgroundColor: roles.surface,
   },
   emptyBox: {
     padding: uiSpace.lg,

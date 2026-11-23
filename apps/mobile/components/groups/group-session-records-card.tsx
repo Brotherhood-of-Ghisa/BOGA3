@@ -1,7 +1,7 @@
 import { useRouter, type Href } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 
-import { FigureText, makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { FigureText, makeStyles, uiBorder, uiEdge, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { GroupRole } from '@/src/groups';
 import type { SessionRecordRow } from '@/src/groups/competition-session-records-view-model';
 import { speakHoldSeconds } from '@/src/groups/competition-view-model';
@@ -74,12 +74,10 @@ function RecordRow({ row, ...rest }: { row: SessionRecordRow } & Omit<CardProps,
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   card: {
     backgroundColor: roles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: roles.recordRule,
-    borderRadius: uiGeometry.radius.card,
+    ...uiEdge(roles, mode, { shape: 'card', tone: 'recordRule' }),
     overflow: 'hidden',
   },
   header: {
@@ -95,7 +93,7 @@ const useStyles = makeStyles((roles) => ({
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     borderTopWidth: uiBorder.width,
-    borderTopColor: roles.recordRule,
+    borderTopColor: roles.ruleSoft,
   },
   link: {
     flexDirection: 'row',

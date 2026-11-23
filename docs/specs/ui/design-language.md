@@ -205,8 +205,9 @@ style object, read their role's fields.
 
 - **One edge, the only shadow** (`apps/mobile/components/ui/edge.ts`): a card
   or control takes `uiEdge`, a `rule` hairline and a 1pt lift; a track
-  `uiWell`, sunken; a static `Tag` the hairline alone. A guardrail blocks any
-  other shadow.
+  `uiWell`, sunken; a static `Tag` the hairline alone. Outside `components/ui`
+  a container draws no edge of its own (a guardrail); a row divider is a
+  `ruleSoft` hairline.
 - Cards are `surface` on `paper`, fields on a card `raised`; cards and
   controls take radius 4.
 - Sheets are bottom-anchored with a dimmed backdrop (`scrim`), top radius 16,
@@ -219,9 +220,7 @@ style object, read their role's fields.
 - **Geometry lives in `uiGeometry`, spacing in `uiSpace`** — the one spacing
   scale — both in `apps/mobile/components/ui/tokens.ts`, which states what each
   value is for. **A screen derives its measures from these** instead of
-  adding values (the logger's Effort field leads at two tap targets, its
-  Weight field caps at the same two tap targets plus one XL step, and its Reps
-  field is one field height wide), and spacing a design draws off-scale snaps to
+  adding values (the logger's Effort field leads at two tap targets), and spacing a design draws off-scale snaps to
   the scale (sheet gutters 20→16, sheet rows ≥60, interactive list rows ≥44).
   Passive rows inside a card do not acquire a separate tap-target minimum.
   A row's padding must not inflate an already full-height child control.

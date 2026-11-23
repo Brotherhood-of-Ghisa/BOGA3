@@ -15,6 +15,7 @@ import {
   IconButton,
   Notice,
   PageSheet,
+  uiHairline,
   uiSpace,
   makeStyles,
   useUiText,
@@ -673,7 +674,7 @@ export function ProgrammeFormScreen({
 
 // The one sheet that draws a colour: a plan card with a problem.
 const useErrorStyles = makeStyles((roles) => ({
-  planCardError: { borderColor: roles.danger, borderWidth: 1 },
+  planCardError: uiHairline(roles, { shape: 'card', tone: 'danger' }),
 }));
 
 const styles = StyleSheet.create({

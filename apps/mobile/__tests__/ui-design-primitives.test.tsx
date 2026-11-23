@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 
 import { MainTabs } from '@/components/navigation/main-tabs';
-import { ActionButton, Card, ChipGroup, Icon, FormField, FormSection, IconButton, InputRow, ListRow, Notice, PageHeader, ScreenScroll, SearchField, SectionHeader, SegmentedControl, Sheet, SliderRow, Stat, StatePanel, SwitchRow, Tag, ToggleChip, uiEdge, uiGeometry, uiHairline, uiSpace, uiTypography, uiWell } from '@/components/ui';
+import { ActionButton, Card, ChipGroup, Icon, FormField, FormSection, IconButton, InputRow, ListRow, Notice, PageHeader, ScreenScroll, SearchField, SectionHeader, SegmentedControl, Sheet, SliderRow, Stat, StatePanel, SwitchRow, Tag, ToggleChip, uiCardSlice, uiCorner, uiEdge, uiMark, uiGeometry, uiHairline, uiSpace, uiTypography, uiWell } from '@/components/ui';
 import { withAlpha } from '@/components/ui/lch';
 import { uiTextFor } from '@/components/ui/text-roles';
 import { generateRoles, defaultThemeSeeds } from '@/components/ui/theme';
@@ -80,6 +80,52 @@ describe('the edge (`edge.ts`)', () => {
   it('offers the hairline alone, with no shadow', () => {
     expect(uiHairline(roles)).toEqual({ borderWidth: 1, borderColor: roles.rule });
   });
+
+  it('draws the corner of a shape: card and control 4, pill fully rounded', () => {
+    expect(uiEdge(roles, 'light', { shape: 'card' })).toMatchObject({ borderRadius: 4, boxShadow: LIFT });
+    expect(uiHairline(roles, { shape: 'control' })).toEqual({ borderWidth: 1, borderColor: roles.rule, borderRadius: 4 });
+    expect(uiHairline(roles, { shape: 'pill' })).toMatchObject({ borderRadius: 999 });
+    expect(uiWell(roles, 'light', { shape: 'control' })).toEqual({ backgroundColor: roles.well, boxShadow: WELL_SHADE, borderRadius: 4 });
+  });
+
+  it('recolours the hairline by role and dashes an absent thing, leaving the lift alone', () => {
+    expect(uiEdge(roles, 'light', { tone: 'danger' })).toEqual({ borderWidth: 1, borderColor: roles.danger, boxShadow: LIFT });
+    expect(uiHairline(roles, { tone: 'ruleSoft', dashed: true })).toEqual({
+      borderWidth: 1,
+      borderColor: roles.ruleSoft,
+      borderStyle: 'dashed',
+    });
+  });
+});
+
+describe('the corner and the card slice (`edge.ts`)', () => {
+  it('uiCorner is the corner of a shape and nothing else', () => {
+    expect(uiCorner('control')).toEqual({ borderRadius: uiGeometry.radius.control });
+    expect(uiCorner('card')).toEqual({ borderRadius: uiGeometry.radius.card });
+    expect(uiCorner('pill')).toEqual({ borderRadius: uiGeometry.radius.pill });
+  });
+
+  it('uiCardSlice draws the card sides on every cell and the corners and cap on the first and last', () => {
+    const [first, middle, last, only] = [uiCardSlice(roles, 0, 3), uiCardSlice(roles, 1, 3), uiCardSlice(roles, 2, 3), uiCardSlice(roles, 0, 1)];
+    const sides = { overflow: 'hidden', backgroundColor: roles.surface, borderLeftWidth: 1, borderRightWidth: 1, borderColor: roles.rule };
+
+    expect(middle).toEqual(sides);
+    expect(first).toEqual({ ...sides, borderTopWidth: 1, borderTopLeftRadius: 4, borderTopRightRadius: 4 });
+    expect(last).toEqual({ ...sides, borderBottomWidth: 1, borderBottomLeftRadius: 4, borderBottomRightRadius: 4 });
+    expect(only).toMatchObject({ borderTopWidth: 1, borderBottomWidth: 1, borderTopLeftRadius: 4, borderBottomRightRadius: 4 });
+  });
+});
+
+describe('uiMark (`marks.ts`)', () => {
+  it('rounds a bar like a control, and a dot or disc to a circle of its size', () => {
+    expect(uiMark.bar).toEqual({ borderRadius: 4 });
+    expect(uiMark.round(12)).toEqual({ width: 12, height: 12, borderRadius: 6 });
+  });
+
+  it('outlines a ring in a colour, one hairline thick unless told otherwise', () => {
+    expect(uiMark.ring(roles.ink, 12)).toEqual({ width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: roles.ink });
+    expect(uiMark.ring(roles.onInk, 16, 2)).toMatchObject({ borderWidth: 2, borderColor: roles.onInk, borderRadius: 8 });
+  });
 });
 
 describe('Card', () => {
@@ -113,6 +159,25 @@ describe('Card', () => {
     expect(card.props.accessibilityRole).toBe('link');
     fireEvent.press(card);
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('lifts a pressable card on a plain view around it, so no view is both a clipping accessibility element and a shadow', () => {
+    render(
+      <Card accessibilityLabel="Open session" onPress={jest.fn()} style={{ marginHorizontal: 16, flex: 1, padding: 8, gap: 4 }} testID="card">
+        <Text testID="card-child">Body</Text>
+      </Card>,
+    );
+
+    const card = screen.getByTestId('card');
+    const lift = framed(card.parent as HostNode);
+    expect(flatStyle(card)).toMatchObject({ overflow: 'hidden', borderWidth: 1, borderColor: roles.rule, borderRadius: uiGeometry.radius.card, padding: 8, gap: 4 });
+    expect(flatStyle(card).boxShadow).toBeUndefined();
+    expect(lift).not.toBe(card);
+    expect((lift.props as { testID?: string }).testID).toBeUndefined();
+    expect(flatStyle(lift)).toMatchObject({ borderRadius: uiGeometry.radius.card, marginHorizontal: 16, flex: 1 });
+    expect(flatStyle(lift).boxShadow).toHaveLength(1);
+    expect(flatStyle(lift).overflow).toBeUndefined();
+    expect(within(card).getByTestId('card-child')).toBeTruthy();
   });
 });
 

@@ -5,7 +5,6 @@
 
 import { StyleSheet } from 'react-native';
 
-import type { UiRoles } from '@/components/ui/theme';
 import { uiSpace } from '@/components/ui/tokens';
 
 export const heatmapStyles = StyleSheet.create({
@@ -13,6 +12,3 @@ export const heatmapStyles = StyleSheet.create({
   // A tile or row that opens its sessions, while held (as ActionButton's press).
   pressed: { opacity: 0.7 },
 });
-
-// An empty (`viz0`) cell needs a hairline to read against `surface`.
-export const heatmapRestCell = (roles: UiRoles) => ({ borderColor: roles.rule });

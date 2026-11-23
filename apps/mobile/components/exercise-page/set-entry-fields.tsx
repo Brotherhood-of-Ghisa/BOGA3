@@ -99,10 +99,11 @@ const useStyles = makeStyles((roles, mode) => ({
     paddingTop: uiSpace.xs,
     // A field on a card: `raised` inside the edge, as `FormField`.
     backgroundColor: roles.raised,
-    ...uiEdge(roles, mode),
-    borderRadius: uiGeometry.radius.control,
+    ...uiEdge(roles, mode, { shape: 'control' }),
   },
-  invalid: { borderColor: roles.danger },
+  invalid: uiEdge(roles, mode, { shape: 'control', tone: 'danger' }),
+  // Field widths come from the geometry scale, not literals: Effort and Duration lead at two
+  // tap targets, Weight fills but caps at that plus one XL step, Reps is a field height plus one MD step.
   effortField: { width: uiGeometry.tapTarget * 2 },
   weightField: { flex: 1, maxWidth: uiGeometry.tapTarget * 2 + uiSpace.xl },
   durationField: { width: uiGeometry.tapTarget * 2 },

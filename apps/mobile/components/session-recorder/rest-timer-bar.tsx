@@ -207,7 +207,7 @@ const useStyles = makeStyles((roles) => ({
   bar: {
     backgroundColor: roles.surface,
     borderBottomWidth: uiBorder.width,
-    borderBottomColor: roles.rule,
+    borderBottomColor: roles.ruleSoft,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.xs,
     gap: uiSpace.xs,

@@ -2,6 +2,7 @@ import { fireEvent, screen } from '@testing-library/react-native';
 
 import { ExerciseVolumeCard } from '@/components/session-complete/exercise-volume-card';
 import type { ExerciseVolumeComparison } from '@/src/session-insights';
+import { uiSpace } from '@/components/ui/tokens';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
@@ -68,7 +69,7 @@ it.each(['app', 'share'] as const)('shows quartiles after six observations in th
   expect(screen.getByTestId('card-median', { includeHiddenElements: true })).toHaveStyle({ left: '50%' });
   expect(screen.getByTestId('card-p25', { includeHiddenElements: true })).toHaveStyle({ left: '30%' });
   expect(screen.getByTestId('card-p75', { includeHiddenElements: true })).toHaveStyle({ left: '90%' });
-  expect(screen.getByTestId('card-current', { includeHiddenElements: true })).toHaveStyle({ left: '70%', backgroundColor: roles.ink, borderRadius: 999 });
+  expect(screen.getByTestId('card-current', { includeHiddenElements: true })).toHaveStyle({ left: '70%', backgroundColor: roles.ink, borderRadius: uiSpace.md / 2 });
   expect(screen.queryByText(/prior sessions|P5$|P95$|Below P|Above P/)).toBeNull();
   expect(screen.getByLabelText(/twenty-fifth to seventy-fifth percentile 300 to 600/)).toBeTruthy();
 });

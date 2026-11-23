@@ -2,7 +2,7 @@ import { GroupsSignInRequired } from '@/components/groups/sign-in-required';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, findNodeHandle, Keyboard, Pressable, Text, View, type ViewInstance } from 'react-native';
-import { ActionButton, ChoiceRow, FigureText, FormSection, Icon, ScreenScroll, makeStyles, uiBorder, uiGeometry, uiSpace, useUiText } from '@/components/ui';
+import { ActionButton, ChoiceRow, FigureText, FormSection, Icon, ScreenScroll, makeStyles, uiBorder, uiGeometry, uiHairline, uiSpace, useUiText } from '@/components/ui';
 import { GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupWriteNotice } from '@/components/groups/write-notice';
 import { CoWExercisePicker } from '@/components/groups/cow-exercise-picker';
@@ -107,6 +107,6 @@ function CoWEditorFields({ model, groupId, editing, picker, setPicker, onSave, o
 const useStyles = makeStyles((roles) => ({
   week: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: uiSpace.md, flexWrap: 'wrap' }, dates: { alignItems: 'flex-end', gap: uiSpace.xs },
   checkRow: { minHeight: uiGeometry.tapTarget, padding: uiSpace.md, flexDirection: 'row', alignItems: 'center', gap: uiSpace.md },
-  box: { width: uiSpace.lg, height: uiSpace.lg, borderWidth: uiBorder.width, borderColor: roles.ink, borderRadius: uiGeometry.radius.control, alignItems: 'center', justifyContent: 'center' },
+  box: { width: uiSpace.lg, height: uiSpace.lg, ...uiHairline(roles, { shape: 'control', tone: 'ink' }), alignItems: 'center', justifyContent: 'center' },
   checked: { backgroundColor: roles.ink }, divider: { borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft }, name: { flex: 1 },
 }));

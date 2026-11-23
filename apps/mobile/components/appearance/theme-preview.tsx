@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { FigureText, uiBorder, uiCorner, uiGeometry, uiHairline, uiMark, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
 import type { CustomPart } from '@/components/ui/theme-custom';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
@@ -30,9 +30,9 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
     <View
       accessibilityLabel="Preview of the theme"
       importantForAccessibility="no-hide-descendants"
-      style={[styles.page, { backgroundColor: roles.paper, borderColor: roles.rule }]}
+      style={[styles.page, { backgroundColor: roles.paper, ...uiHairline(roles, { shape: 'card' }) }]}
       testID={testID}>
-      <View style={[styles.card, { backgroundColor: roles.surface, borderColor: roles.rule }]}>
+      <View style={[styles.card, { backgroundColor: roles.surface, ...uiHairline(roles, { shape: 'card' }) }]}>
         <View style={styles.cardHeader}>
           <Text allowFontScaling={false} style={[type.title, text(roles.ink)]}>
             Bench Press
@@ -41,7 +41,7 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
             <FigureText>{`1 set · 1RM ${PREVIEW_ONE_REP_MAX.performed}`}</FigureText>
           </Text>
         </View>
-        <View style={[styles.setRow, { borderTopColor: roles.ruleSoft }]}>
+        <View style={[styles.setRow, { borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft }]}>
           <Text allowFontScaling={false} style={[type.figure, styles.setIndex, text(roles.inkFaint)]}>
             1
           </Text>
@@ -52,7 +52,7 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
             <FigureText>{`1RM ${PREVIEW_ONE_REP_MAX.performed}`}</FigureText>
           </Text>
         </View>
-        <View style={[styles.setRow, { borderTopColor: roles.ruleSoft, backgroundColor: roles.accentWash }]}>
+        <View style={[styles.setRow, { borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft, backgroundColor: roles.accentWash }]}>
           <Text allowFontScaling={false} style={[type.figure, styles.setIndex, text(roles.accent)]}>
             2
           </Text>
@@ -63,7 +63,7 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
             <FigureText>{`1RM ${PREVIEW_ONE_REP_MAX.planned}`}</FigureText>
           </Text>
         </View>
-        <View style={[styles.record, { backgroundColor: roles.recordWash, borderTopColor: roles.recordRule }]}>
+        <View style={[styles.record, { backgroundColor: roles.recordWash, borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft }]}>
           <Text allowFontScaling={false} style={[type.label, text(roles.record)]}>
             BEST EVER
           </Text>
@@ -79,18 +79,18 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
             style={[
               styles.cell,
               { backgroundColor: roles[role] },
-              role === 'viz0' ? { borderWidth: uiBorder.width, borderColor: roles.rule } : null,
+              role === 'viz0' ? uiHairline(roles, { shape: 'control' }) : null,
             ]}
           />
         ))}
       </View>
       <View style={styles.actions}>
-        <View style={[styles.button, styles.buttonOutline, { borderColor: roles.danger, backgroundColor: roles.surface }]}>
+        <View style={[styles.button, styles.buttonOutline, { backgroundColor: roles.surface, ...uiHairline(roles, { shape: 'control', tone: 'danger' }) }]}>
           <Text allowFontScaling={false} style={[type.button, text(roles.danger)]}>
             DELETE
           </Text>
         </View>
-        <View style={[styles.button, styles.buttonPrimary, { backgroundColor: roles.accent }]}>
+        <View style={[styles.button, styles.buttonPrimary, uiCorner('control'), { backgroundColor: roles.accent }]}>
           <Text allowFontScaling={false} style={[type.button, text(roles.onAccent)]}>
             LOG SET
           </Text>
@@ -175,12 +175,12 @@ export function PartSpotlight({ part, roles, testID }: { part: CustomPart; roles
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[styles.page, styles.spotlight, { backgroundColor: roles.paper, borderColor: roles.rule }]}
+      style={[styles.page, styles.spotlight, { backgroundColor: roles.paper, ...uiHairline(roles, { shape: 'card' }) }]}
       testID={testID}>
       {SPOTLIGHT[part].map((sample, index) => (
         <View key={index} style={styles.sample}>
           <View
-            style={[styles.tile, { backgroundColor: roles[sample.kind === 'fill' ? sample.role : sample.ground], borderColor: roles.rule }]}
+            style={[styles.tile, { backgroundColor: roles[sample.kind === 'fill' ? sample.role : sample.ground], ...uiHairline(roles, { shape: 'control' }) }]}
             testID={`${testID}-${index}`}>
             {sample.kind === 'text' ? (
               <Text allowFontScaling={false} style={[type.title, { color: roles[sample.role] }]}>
@@ -212,8 +212,6 @@ const styles = StyleSheet.create({
     height: uiGeometry.tapTarget,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: uiBorder.width,
-    borderRadius: uiGeometry.radius.control,
   },
   line: {
     alignSelf: 'stretch',
@@ -222,12 +220,8 @@ const styles = StyleSheet.create({
   page: {
     gap: uiSpace.md,
     padding: uiSpace.md,
-    borderWidth: uiBorder.width,
-    borderRadius: uiGeometry.radius.card,
   },
   card: {
-    borderWidth: uiBorder.width,
-    borderRadius: uiGeometry.radius.card,
     overflow: 'hidden',
   },
   cardHeader: {
@@ -240,7 +234,6 @@ const styles = StyleSheet.create({
     gap: uiSpace.md,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-    borderTopWidth: uiBorder.width,
   },
   setIndex: {
     width: uiSpace.lg,
@@ -254,7 +247,6 @@ const styles = StyleSheet.create({
     gap: uiSpace.md,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-    borderTopWidth: uiBorder.width,
   },
   recordFigure: {
     textAlign: 'right',
@@ -266,7 +258,7 @@ const styles = StyleSheet.create({
   cell: {
     flex: 1,
     aspectRatio: 1,
-    borderRadius: uiGeometry.radius.control / 2,
+    ...uiMark.bar,
   },
   actions: {
     flexDirection: 'row',
@@ -276,11 +268,9 @@ const styles = StyleSheet.create({
     height: uiGeometry.tapTarget,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: uiGeometry.radius.control,
   },
   buttonOutline: {
     flex: 1,
-    borderWidth: uiBorder.width,
   },
   buttonPrimary: {
     flex: 2,

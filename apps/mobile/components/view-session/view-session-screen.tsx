@@ -3,12 +3,13 @@ import { Text, View } from 'react-native';
 
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { ActionButton } from '@/components/ui/action-button';
+import { Card } from '@/components/ui/card';
 import { Icon } from '@/components/ui/icon';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 import type { CompletedSessionDetailModel } from '@/src/session-recorder/completed-session-detail-model';
 
 import { ViewSessionOptionsSheet } from './view-session-sheets';
@@ -81,10 +82,12 @@ export function ViewSessionScreen({
       />
       <ScreenScroll keyboardShouldPersistTaps="handled" testID="completed-session-detail-screen">
         {summary.deleted ? (
-          <View style={styles.band} testID="completed-session-detail-deleted-band">
-            <Icon colorRole="inkMuted" name="trash" size="xs" />
-            <Text allowFontScaling={false} style={text.label}>Deleted · hidden from history</Text>
-          </View>
+          <Card style={styles.band} testID="completed-session-detail-deleted-band">
+            <View style={styles.bandRow}>
+              <Icon colorRole="inkMuted" name="trash" size="xs" />
+              <Text allowFontScaling={false} style={text.label}>Deleted · hidden from history</Text>
+            </View>
+          </Card>
         ) : null}
         {error ? (
           <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger]} testID="completed-session-detail-error-notice">
@@ -162,14 +165,13 @@ export function ViewSessionScreen({
 
 const useStyles = makeStyles((roles) => ({
   band: {
+    backgroundColor: roles.paper,
+  },
+  bandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
-    backgroundColor: roles.paper,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
-    borderRadius: uiGeometry.radius.card,
   },
 }));

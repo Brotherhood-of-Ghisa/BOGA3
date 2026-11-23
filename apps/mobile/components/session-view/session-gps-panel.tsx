@@ -1,9 +1,10 @@
 import { StyleSheet, Text, View } from 'react-native';
 
+import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 import { DEFAULT_SUGGESTION_RADIUS_M } from '@/src/location/gym-location-matcher';
 import { SESSION_POSITION_GOOD_ACCURACY_M, type SessionPositionState } from '@/src/location/session-position';
 
@@ -105,7 +106,7 @@ export function SessionGpsPanel({ state, nearbyGymCount, suggestionCount }: Sess
   ];
 
   return (
-    <View style={styles.panel} testID="session-gps-panel">
+    <Card style={styles.panel} testID="session-gps-panel">
       <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, styles.title]}>
         GPS state
       </Text>
@@ -115,14 +116,13 @@ export function SessionGpsPanel({ state, nearbyGymCount, suggestionCount }: Sess
           <Text allowFontScaling={false} style={[text.meta, tone.ink, uiTextEmphasis.strong, styles.value]} testID={`session-gps-value-${row.key}`}><FigureText strong>{row.value}</FigureText></Text>
         </View>
       ))}
-    </View>
+    </Card>
   );
 }
 
 const useStyles = makeStyles((roles) => ({
   panel: {
     backgroundColor: roles.paper,
-    borderRadius: uiGeometry.radius.card,
     marginBottom: uiSpace.md,
     marginHorizontal: uiSpace.lg,
     padding: uiSpace.md,
@@ -138,7 +138,7 @@ const useStyles = makeStyles((roles) => ({
   },
   rowDivider: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: roles.rule,
+    borderTopColor: roles.ruleSoft,
   },
   value: {
     flexShrink: 1,

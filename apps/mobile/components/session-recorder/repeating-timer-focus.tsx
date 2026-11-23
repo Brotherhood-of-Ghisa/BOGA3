@@ -150,7 +150,7 @@ function TimerRing({ diameter, view }: { diameter: number; view: RepeatingTimerM
 const useStyles = makeStyles((roles) => ({
   trigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: uiGeometry.tapTarget, gap: uiSpace.sm },
   screen: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: uiSpace.lg, paddingVertical: uiSpace.sm, borderBottomWidth: uiBorder.width, borderBottomColor: roles.rule },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: uiSpace.lg, paddingVertical: uiSpace.sm, borderBottomWidth: uiBorder.width, borderBottomColor: roles.ruleSoft },
   body: { flexGrow: 1, alignItems: 'center', padding: uiSpace.lg, gap: uiSpace.lg },
   meter: { alignItems: 'center', justifyContent: 'center' },
   readout: { width: '80%', alignItems: 'center', gap: uiSpace.sm },
@@ -158,7 +158,7 @@ const useStyles = makeStyles((roles) => ({
   countdown: { alignSelf: 'stretch', textAlign: 'center', fontFamily: uiFonts.figure.family, fontWeight: '700', fontVariant: ['tabular-nums'], color: roles.ink },
   primary: { alignSelf: 'stretch' },
   reset: { marginTop: 'auto', paddingTop: uiSpace.lg, alignSelf: 'stretch' },
-  intervalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: uiSpace.sm, borderTopWidth: uiBorder.width, borderTopColor: roles.rule, paddingTop: uiSpace.lg },
+  intervalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: uiSpace.sm, borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft, paddingTop: uiSpace.lg },
   intervalControl: { width: '29%' },
   interval: { alignItems: 'center', gap: uiSpace.xs },
 }));

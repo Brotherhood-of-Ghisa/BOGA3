@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Pressable, Text, View, type AccessibilityActionEvent } from 'react-native';
 
+import { uiHairline } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace, type UiRoleToken } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace, type UiRoleToken } from '@/components/ui/tokens';
 import type { RestTimerView } from '@/src/session-recorder/rest-timer';
 
 export type TitleBarTimerProps = {
@@ -139,18 +140,15 @@ const useStyles = makeStyles((roles) => ({
     gap: uiSpace.xs,
     height: uiGeometry.compactControlHeight,
     paddingHorizontal: uiSpace.sm,
-    borderRadius: uiGeometry.radius.pill,
-    borderWidth: uiBorder.width,
   },
   running: {
-    borderColor: roles.rule,
+    ...uiHairline(roles, { shape: 'pill' }),
   },
   paused: {
-    borderColor: roles.ruleSoft,
-    borderStyle: 'dashed',
+    ...uiHairline(roles, { shape: 'pill', tone: 'ruleSoft', dashed: true }),
   },
   done: {
-    borderColor: roles.ink,
+    ...uiHairline(roles, { shape: 'pill', tone: 'ink' }),
     backgroundColor: roles.ink,
   },
 }));

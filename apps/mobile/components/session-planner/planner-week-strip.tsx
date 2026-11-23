@@ -6,9 +6,11 @@ import { formatCalendarWeekHeading, formatDayMonth } from '@/src/utils/local-tim
 import { Pressable, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { uiCorner, uiHairline } from '@/components/ui/edge';
+import { uiMark } from '@/components/ui/marks';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 
 export type PlannerWeekStripProps = {
   plans: PlanSummaryView[];
@@ -157,13 +159,10 @@ const useStyles = makeStyles((roles) => ({
     flex: 1,
     alignItems: 'center',
     paddingVertical: uiSpace.xs,
-    borderRadius: uiGeometry.radius.control,
+    ...uiCorner('control'),
     gap: uiSpace.xs,
   },
-  dayToday: {
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
-  },
+  dayToday: uiHairline(roles, { shape: 'control' }),
   daySelected: {
     backgroundColor: roles.ink,
   },
@@ -175,11 +174,7 @@ const useStyles = makeStyles((roles) => ({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  dot: {
-    width: uiSpace.xs,
-    height: uiSpace.xs,
-    borderRadius: uiGeometry.radius.pill,
-  },
+  dot: uiMark.round(uiSpace.xs),
   dotActive: {
     backgroundColor: roles.accent,
   },
