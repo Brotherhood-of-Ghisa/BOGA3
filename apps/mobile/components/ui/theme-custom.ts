@@ -202,7 +202,7 @@ const short = (lightness: number, page: number, limit: number): number =>
 export function generateCustomRoles(colours: CustomColours): UiRoles {
   const mode = customMode(colours);
   const reference: UiRoles = {
-    ...generateRoles(customSeeds(colours), mode),
+    ...generateRoles(customSeeds(colours), mode, colours.background.hue),
     ink: customInk(mode, colours.ink),
     ...ownHighlight(colours, mode),
   };

@@ -294,14 +294,13 @@ additionally render faded ([[set.row-figures]], §6).
   Volume `2560` — except Today’s tonnes ([[copy.no-weight-unit]]) (`tech/training-metrics-contract.md` §4,
   `format.ts`).
 - **No thousands separators.** `2560`, not `2 560`.
-- **A numeric change carries its direction**, in colour as well as in its sign: an
+- **A numeric change carries its direction** in its sign, and in colour: an
   improvement is `gain`, a decrease `loss`, and no direction — level,
   unavailable — stays `ink`. A figure with no earlier value to fall from
   (`new`) is an improvement. This holds for a change against an earlier period
   ([[comparison.change-display]]) and against a reference (a session's Volume
-  on its median). The two colours are fixed in every theme, like `danger`, so
-  "better" never follows the picked accent's hue; they sit at one lightness and
-  differ only in hue, so neither shouts. **Colour is never the only channel:**
+  on its median). The pair follows `direction` (§2), never the accent;
+  `ink` leaves the sign alone. **Colour is never the only channel:**
   the figure still says `+3`, `−12%`, `0`, `new` or `—`. One rule, every
   change figure — `changeToneColourIn` (`components/ui/change-tone.ts`) is where
   it lives, and no screen picks a delta colour of its own. 3D muscles follow [[comparison.colour-scale]].

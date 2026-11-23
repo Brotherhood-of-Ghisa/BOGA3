@@ -342,8 +342,22 @@ describe('the change directions', () => {
 
   it('draws blue and orange from the blue-orange direction', () => {
     const roles = generateRoles({ ...defaultThemeSeeds, direction: 'blue-orange' });
-    expect(hueDistance(hexToLch(roles.gain).hue, 272)).toBeLessThanOrEqual(5);
+    expect(hueDistance(hexToLch(roles.gain).hue, 255)).toBeLessThanOrEqual(5);
     expect(hueDistance(hexToLch(roles.loss).hue, 55)).toBeLessThanOrEqual(5);
+  });
+
+  it.each(MODES)('keeps every pair a visible step from every preset’s accent and record in %s mode', (mode) => {
+    // A custom theme starts from the preset in use, so its direction must not
+    // land on that preset's accent or brass.
+    for (const preset of themePresets) {
+      const roles = generateRoles(preset.seeds, mode);
+      for (const pair of Object.values(DIRECTION_PAIRS)) {
+        for (const change of [pair[mode].gain, pair[mode].loss]) {
+          expect(deltaE(change, roles.accent)).toBeGreaterThanOrEqual(5);
+          expect(deltaE(change, roles.record)).toBeGreaterThanOrEqual(5);
+        }
+      }
+    }
   });
 
   it.each(MODES)('draws both directions in `ink` under the ink direction, in %s mode, moving nothing else', (mode) => {

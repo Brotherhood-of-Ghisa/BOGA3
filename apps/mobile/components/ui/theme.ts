@@ -202,10 +202,11 @@ export const DIRECTION_PAIRS: Record<Exclude<ThemeDirection, 'ink'>, Record<Them
     dark: { gain: '#58AC76', loss: '#FF6881' },
   },
   // L* 44 and 64: a blue and an orange, for a reader who tells red from green
-  // poorly.
+  // poorly. The blue leans to 255° and the orange sits at 55°, so neither
+  // reads as a preset's accent (Slate's blue, Warm's orange) or the brass.
   'blue-orange': {
-    light: { gain: '#006BB3', loss: '#AB4C0C' },
-    dark: { gain: '#5B9EEB', loss: '#E87F40' },
+    light: { gain: '#006F9E', loss: '#AB4C0C' },
+    dark: { gain: '#07A5E8', loss: '#E87F40' },
   },
 };
 
@@ -222,8 +223,8 @@ function changePair(direction: ThemeDirection, mode: ThemeMode, ink: string): Ch
 const RAMP_CHROMA_GAIN = 2.7;
 const RAMP_CHROMA_FLOOR = 12;
 
-function rampColour(background: Lch): Lch {
-  return { ...background, chroma: Math.max(background.chroma * RAMP_CHROMA_GAIN, RAMP_CHROMA_FLOOR) };
+function rampColour(background: Lch, hue: number): Lch {
+  return { ...background, hue, chroma: Math.max(background.chroma * RAMP_CHROMA_GAIN, RAMP_CHROMA_FLOOR) };
 }
 
 // The dark backdrop behind a sheet. Light mode dims with `ink`; dark mode's
@@ -284,8 +285,8 @@ export type UiRoles = {
   // Destructive actions only.
   danger: string;
   // A change against an earlier period: `gain` an improvement, `loss` a
-  // decrease (`changeToneColourIn` in `change-tone.ts` is the only caller), as
-  // the theme's `direction` draws them. The sign is always drawn too — colour
+  // decrease (`changeToneColourIn` in `change-tone.ts`; Today's met weekly
+  // target also takes `gain`), as the theme's `direction` draws them. The sign is always drawn too — colour
   // is never the only channel, and under `ink` it is the only one.
   gain: string;
   loss: string;
@@ -332,15 +333,17 @@ export function washLightness(mode: ThemeMode): number {
 
 // Every colour role from the seeds, on the light or the dark ladder. Pure and
 // synchronous: `tokens.ts` calls it once at module load. Throws on a seed that
-// is not `#RRGGBB`.
-export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light'): UiRoles {
+// is not `#RRGGBB`. `rampHue` replaces the hue the ramp reads back from
+// `background`: a custom theme passes the hue the user picked, which a
+// near-grey seed's hex no longer holds.
+export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light', rampHue?: number): UiRoles {
   const background = hexToLch(seeds.background);
   const seedLch: Record<SeedName, Lch> = {
     background,
     text: hexToLch(seeds.text),
     accent: hexToLch(seeds.accent),
     record: hexToLch(seeds.record),
-    ramp: rampColour(background),
+    ramp: rampColour(background, rampHue ?? background.hue),
   };
   const at = ({ seed, lightness, chroma }: Step) =>
     lchToHex({ lightness, chroma: seedLch[seed].chroma * chroma, hue: seedLch[seed].hue });

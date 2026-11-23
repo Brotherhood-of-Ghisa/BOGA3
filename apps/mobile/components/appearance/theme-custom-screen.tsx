@@ -269,8 +269,9 @@ function PartControls(controls: Controls) {
   }
 }
 
-// A part with one field moved.
-const editOf = (draft: Draft, field: Field, value: number): Draft => ({ ...(draft as HueStrength), [field]: value }) as Draft;
+// A part with one field moved. Only a colour part has sliders; the direction
+// is returned as it is.
+const editOf = (draft: Draft, field: Field, value: number): Draft => (typeof draft === 'string' ? draft : ({ ...draft, [field]: value } as Draft));
 
 // Settings → Appearance → Custom → one part (background, primary text,
 // secondary text, accent, highlight, best ever): a hue on a painted bar and
@@ -301,7 +302,7 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
     if (next !== undefined) setDraft(next);
     await commit(
       { theme: 'custom', custom: { ...intended, ...patch } },
-      { message: 'Couldn’t save the colour. Nothing changed.', context: { part, value: patch } },
+      { message: `Couldn’t save the ${isColourPart(part) ? 'colour' : 'direction'}. Nothing changed.`, context: { part, value: patch } },
     );
   };
   const controls: Controls = {

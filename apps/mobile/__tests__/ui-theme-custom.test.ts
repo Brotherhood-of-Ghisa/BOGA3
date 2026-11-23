@@ -166,6 +166,16 @@ describe('the hairlines and the chart ramp', () => {
     expect([...gaps].sort((a, b) => a - b)).toEqual(gaps);
   });
 
+  it('keep the ramp on the picked hue at a low strength, where the page’s hex holds none', () => {
+    for (const hue of [30, 80, 200, 330]) {
+      const offHue = [0, 1, 2, 3, 5].filter((strength) => {
+        const roles = generateCustomRoles(withBackground(WARM_LIGHT, { hue, strength }));
+        return hueDistance(hexToLch(roles.viz4).hue, hue) > 10;
+      });
+      expect({ hue, offHue }).toEqual({ hue, offHue: [] });
+    }
+  });
+
   it('keep a tinted ramp on a grey page', () => {
     const roles = generateCustomRoles(withBackground(WARM_LIGHT, { strength: 0 }));
     expect(hexToLch(roles.paper).chroma).toBeLessThan(1);
@@ -360,7 +370,7 @@ function rolesBefore(saved: SavedBefore, ink: { hue: number; strength: number })
     record: customSeed('record', saved.record),
     direction: 'green-crimson' as const,
   };
-  const reference = { ...generateRoles(seeds, mode), ink: customInk(mode, ink) };
+  const reference = { ...generateRoles(seeds, mode, saved.background.hue), ink: customInk(mode, ink) };
   const paperRef = hexToLch(reference.paper).lightness;
   const end = hexToLch(reference.ink).lightness;
   const { lightness: page, depth } = saved.background;
