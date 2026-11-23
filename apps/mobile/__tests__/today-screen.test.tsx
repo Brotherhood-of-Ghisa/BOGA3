@@ -31,6 +31,7 @@ import { ShareBar } from '@/components/today';
 import { CHART_RIGHT_GUTTER } from '@/components/today/progress-format';
 import { Storage } from 'expo-sqlite/kv-store';
 import { uiFonts, uiGeometry, uiIconSize, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { STEP_ARROW_HEIGHT } from '@/components/today/step-arrows';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 import { uiWell } from '@/components/ui/edge';
 import { renderWithTheme, rolesFor } from './helpers/theme';
@@ -517,8 +518,15 @@ describe('Today: the Progress card over real data', () => {
     expect(within(body).queryByTestId('today-latest-session-rows', { includeHiddenElements: true })).toBeNull();
     // The link is the session card's own; the section heading carries none.
     expect(within(text('today-session-card')).getByTestId('today-sessions-button')).toBeTruthy();
-    // The header row keeps a tap height of its own: the compact link no longer holds it open.
-    expect(text('today-latest-session-header')).toHaveStyle({ minHeight: uiGeometry.tapTarget });
+    // The header row is set like This week's title: 12 either side, no tap-height floor, and the
+    // compact link taking only a label's line of it.
+    expect(text('today-latest-session-header')).not.toHaveStyle({ minHeight: uiGeometry.tapTarget });
+    expect(text('today-latest-session-header')).toHaveStyle({ paddingTop: 12, marginBottom: 4 });
+    expect(text('today-session-card')).toHaveStyle({ gap: 8 });
+    expect(text('today-sessions-link-slot')).toHaveStyle({ marginVertical: -7 });
+    for (const id of ['today-latest-session-step-older', 'today-latest-session-step-newer']) {
+      expect(text(id)).toHaveStyle({ height: STEP_ARROW_HEIGHT });
+    }
   });
 
   it('compares against an earlier period with the arrows around its range, never later than the previous one', async () => {

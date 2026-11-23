@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
-import { Card, CompactHeader, FigureText, Icon, IconButton, makeStyles, uiGeometry, uiSpace, useUiText } from '@/components/ui';
+import { Card, CompactHeader, FigureText, Icon, makeStyles, uiGeometry, uiSpace, uiTypography, useUiText } from '@/components/ui';
 import { CoWRows } from '@/components/groups/cow-preview';
 import { GroupInlineError, GroupMissingDataState, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
@@ -14,6 +14,8 @@ import type { GroupResourceState } from '@/src/groups/use-group-resource';
 import { coWsHref } from '@/src/navigation/routes';
 import { useDateFormat } from '@/src/preferences/hooks';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
+
+import { STEP_ARROW_HEIGHT, StepArrow } from './step-arrows';
 
 /** Today ranks by 1RM; a CoW without it shows its first metric. */
 export const todayCoWRanking = (result: CoWResultWire): CoWRankingWire | undefined =>
@@ -37,14 +39,12 @@ function WeekStepper({ label, accessibilityLabel, onEarlier, onLater, testID }: 
 }) {
   const styles = useStyles();
   const text = useUiText();
-  return <View style={styles.stepper}>
-    <IconButton accessibilityLabel="Last week's CoW" disabled={!onEarlier} name="chevron-left" onPress={() => onEarlier?.()}
-      testID={`${testID}-earlier`} tone="muted" />
+  return <View style={styles.stepper} testID={testID}>
+    <StepArrow direction="left" label="Last week's CoW" onPress={onEarlier ?? null} testID={`${testID}-earlier`} />
     <Text allowFontScaling={false} numberOfLines={1} accessibilityLabel={accessibilityLabel} style={text.meta} testID={`${testID}-dates`}>
       <FigureText>{label}</FigureText>
     </Text>
-    <IconButton accessibilityLabel="This week's CoW" disabled={!onLater} name="chevron-right" onPress={() => onLater?.()}
-      testID={`${testID}-later`} tone="muted" />
+    <StepArrow direction="right" label="This week's CoW" onPress={onLater ?? null} testID={`${testID}-later`} />
   </View>;
 }
 
@@ -128,10 +128,13 @@ export function TodayCoWSummaries({ groupId, userId }: { groupId: string; userId
 }
 
 const useStyles = makeStyles(() => ({
-  content: { paddingHorizontal: uiSpace.md, paddingVertical: uiSpace.sm, gap: uiSpace.xs },
+  // The title sits a step of `md` from the top, as Recent's does.
+  content: { paddingHorizontal: uiSpace.md, paddingTop: uiSpace.md, paddingBottom: uiSpace.sm, gap: uiSpace.xs },
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
   title: { flexShrink: 1 },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  // The arrows overhang the dates' line, so the row stays a plain title's height.
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: 0,
+    marginVertical: -(STEP_ARROW_HEIGHT - uiTypography.lineHeight.sm) / 2 },
   open: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm, minHeight: uiGeometry.tapTarget },
   name: { flex: 1, minWidth: 0 },
 }));
