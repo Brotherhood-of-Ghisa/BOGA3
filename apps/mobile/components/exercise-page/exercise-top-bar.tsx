@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { TitleBarTimer, type TitleBarTimerProps } from '@/components/session-recorder/title-bar-timer';
+import { OnCard } from '@/components/ui/ground';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { useUiText } from '@/components/ui/text-roles';
@@ -38,52 +39,54 @@ export function ExerciseTopBar({
   const styles = useStyles();
   const text = useUiText();
   return (
-    <View style={styles.bar}>
-      <IconButton accessibilityLabel="Back to session" name="chevron-left" onPress={onBack} testID="exercise-page-back" />
-      {onOpenSwitcher ? (
-        // The label is the bare name, so a title match by text still finds it.
-        <Pressable
-          accessibilityHint="Switch to another exercise of this session"
-          accessibilityLabel={title}
-          accessibilityRole="button"
-          onPress={onOpenSwitcher}
-          style={({ pressed }) => [styles.switcher, pressed ? styles.pressed : null]}
-          testID="exercise-page-title">
-          <Text allowFontScaling={false} numberOfLines={1} style={[text.title, styles.switcherTitle]}>
-            {title}
-          </Text>
-          <Icon colorRole="inkMuted" name="chevron-down" size="sm" />
-          {injuryBadge}
-        </Pressable>
-      ) : (
-        <View style={styles.staticTitleGroup}>
-          <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[text.title, styles.title]} testID="exercise-page-title">
-            {title}
-          </Text>
-          {injuryBadge}
-        </View>
-      )}
-      {titleBarTimer ? (
-        <TitleBarTimer {...titleBarTimer} testID="exercise-page-rest-timer-button" />
-      ) : onToggleRestTimer ? (
-        <IconButton
-          accessibilityLabel={restTimerActive ? 'Dismiss rest timer' : 'Start rest timer'}
-          name="timer"
-          onPress={onToggleRestTimer}
-          testID="exercise-page-rest-timer-button"
-        />
-      ) : null}
-      {onOpenOptions ? (
-        <IconButton
-          accessibilityLabel="Exercise options"
-          name="more-vertical"
-          onPress={onOpenOptions}
-          testID="exercise-page-options"
-        />
-      ) : (
-        <View style={styles.spacer} />
-      )}
-    </View>
+    <OnCard>
+      <View style={styles.bar}>
+        <IconButton accessibilityLabel="Back to session" name="chevron-left" onPress={onBack} testID="exercise-page-back" />
+        {onOpenSwitcher ? (
+          // The label is the bare name, so a title match by text still finds it.
+          <Pressable
+            accessibilityHint="Switch to another exercise of this session"
+            accessibilityLabel={title}
+            accessibilityRole="button"
+            onPress={onOpenSwitcher}
+            style={({ pressed }) => [styles.switcher, pressed ? styles.pressed : null]}
+            testID="exercise-page-title">
+            <Text allowFontScaling={false} numberOfLines={1} style={[text.title, styles.switcherTitle]}>
+              {title}
+            </Text>
+            <Icon colorRole="inkMuted" name="chevron-down" size="sm" />
+            {injuryBadge}
+          </Pressable>
+        ) : (
+          <View style={styles.staticTitleGroup}>
+            <Text allowFontScaling={false} accessibilityRole="header" numberOfLines={1} style={[text.title, styles.title]} testID="exercise-page-title">
+              {title}
+            </Text>
+            {injuryBadge}
+          </View>
+        )}
+        {titleBarTimer ? (
+          <TitleBarTimer {...titleBarTimer} testID="exercise-page-rest-timer-button" />
+        ) : onToggleRestTimer ? (
+          <IconButton
+            accessibilityLabel={restTimerActive ? 'Dismiss rest timer' : 'Start rest timer'}
+            name="timer"
+            onPress={onToggleRestTimer}
+            testID="exercise-page-rest-timer-button"
+          />
+        ) : null}
+        {onOpenOptions ? (
+          <IconButton
+            accessibilityLabel="Exercise options"
+            name="more-vertical"
+            onPress={onOpenOptions}
+            testID="exercise-page-options"
+          />
+        ) : (
+          <View style={styles.spacer} />
+        )}
+      </View>
+    </OnCard>
   );
 }
 

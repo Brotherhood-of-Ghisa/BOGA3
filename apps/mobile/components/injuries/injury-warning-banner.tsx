@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { OnCard } from '@/components/ui/ground';
 import { uiCorner, uiEdge } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
@@ -33,51 +34,53 @@ export function InjuryWarningBanner({
       : null;
 
   return (
-    <View
-      accessibilityRole="alert"
-      accessibilityLabel={`Injury warning: ${injury.label}. ${onsetText}.${painLabel ? ` ${painLabel}.` : ''}`}
-      style={styles.banner}
-      testID={testID}>
-      <View style={styles.header}>
-        <Icon colorRole="danger" name="warning" size="sm" />
-        <View style={styles.headerText}>
-          <Text allowFontScaling={false} numberOfLines={1} style={[text.title, styles.title]}>
-            {injury.label}
-          </Text>
-          <Text allowFontScaling={false} style={[text.meta, tone.faint]}>
-            {[onsetText, painLabel].filter(Boolean).join(' · ')}
-          </Text>
+    <OnCard>
+      <View
+        accessibilityRole="alert"
+        accessibilityLabel={`Injury warning: ${injury.label}. ${onsetText}.${painLabel ? ` ${painLabel}.` : ''}`}
+        style={styles.banner}
+        testID={testID}>
+        <View style={styles.header}>
+          <Icon colorRole="danger" name="warning" size="sm" />
+          <View style={styles.headerText}>
+            <Text allowFontScaling={false} numberOfLines={1} style={[text.title, styles.title]}>
+              {injury.label}
+            </Text>
+            <Text allowFontScaling={false} style={[text.meta, tone.faint]}>
+              {[onsetText, painLabel].filter(Boolean).join(' · ')}
+            </Text>
+          </View>
+        </View>
+  
+        {contraindicationsText ? (
+          <View style={styles.contraindicationsBox}>
+            <Text allowFontScaling={false} style={[text.label, styles.contraindicationsLabel]}>
+              Caution
+            </Text>
+            <Text allowFontScaling={false} style={[text.body, styles.contraindicationsText]}>
+              {contraindicationsText}
+            </Text>
+          </View>
+        ) : null}
+  
+        <View style={styles.actions}>
+          <ActionButton
+            label="Swap exercise"
+            onPress={onSwap}
+            size="compact"
+            testID="injury-warning-swap"
+            variant="outline"
+          />
+          <ActionButton
+            label="Dismiss for this session"
+            onPress={onDismiss}
+            size="compact"
+            testID="injury-warning-dismiss"
+            variant="text"
+          />
         </View>
       </View>
-
-      {contraindicationsText ? (
-        <View style={styles.contraindicationsBox}>
-          <Text allowFontScaling={false} style={[text.label, styles.contraindicationsLabel]}>
-            Caution
-          </Text>
-          <Text allowFontScaling={false} style={[text.body, styles.contraindicationsText]}>
-            {contraindicationsText}
-          </Text>
-        </View>
-      ) : null}
-
-      <View style={styles.actions}>
-        <ActionButton
-          label="Swap exercise"
-          onPress={onSwap}
-          size="compact"
-          testID="injury-warning-swap"
-          variant="outline"
-        />
-        <ActionButton
-          label="Dismiss for this session"
-          onPress={onDismiss}
-          size="compact"
-          testID="injury-warning-dismiss"
-          variant="text"
-        />
-      </View>
-    </View>
+    </OnCard>
   );
 }
 
@@ -104,7 +107,7 @@ const useStyles = makeStyles((roles, mode) => ({
     color: roles.ink,
   },
   contraindicationsBox: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
     padding: uiSpace.sm,
     ...uiCorner('control'),
     gap: uiSpace.xs,

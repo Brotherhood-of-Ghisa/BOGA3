@@ -163,9 +163,9 @@ const useStyles = makeStyles((roles, mode) => ({
   outlineDisabled: {
     borderColor: roles.ruleSoft,
   },
-  // Pressed sinks to the well: the button's own inks still read on it.
+  // Pressed sinks to the inset: a step below the card, inside it.
   pressed: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
     opacity: 0.7,
   },
   pressedOnPage: {

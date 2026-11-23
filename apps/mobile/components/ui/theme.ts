@@ -64,16 +64,18 @@ export type ThemeLadder = 'standard' | 'ink-paper';
 type PageInkRole = 'pageInk' | 'pageInkMuted' | 'pageInkFaint';
 
 // A ladder whose page and cards are one family of lightness: the page inks are
-// the inks.
-const withPageInks = (ladder: Record<Exclude<SteppedRole, PageInkRole>, Step>): Record<SteppedRole, Step> => ({
+// the inks, and the step below a card, inside it, is the page.
+const withPageInks = (ladder: Record<Exclude<SteppedRole, PageInkRole | 'inset'>, Step>): Record<SteppedRole, Step> => ({
   ...ladder,
   pageInk: ladder.ink,
   pageInkMuted: ladder.inkMuted,
   pageInkFaint: ladder.inkFaint,
+  inset: ladder.paper,
 });
 
 type SteppedRole =
   | PageInkRole
+  | 'inset'
   | 'ink'
   | 'inkMuted'
   | 'inkFaint'
@@ -155,10 +157,11 @@ const DARK_STEPS = withPageInks({
 // Ink + paper's ladder, in both modes: the page is the ink family gone dark
 // (`text` at L* 13) and the cards are paper (`background` at L* 95). Every
 // well and field sits on a card, so here alone the well is lighter than the
-// page: `paper` 13 < `well` 89.5 < `surface` 95 < `raised` 100. What a card
-// holds is drawn as on the light ladder; text on the page takes the page inks,
-// the paper's own colour and two steps of the ink family, each clearing its
-// floor on the dark page.
+// page: `paper` 13 < `well` 89.5 < `surface` 95 < `raised` 100, with the
+// in-card `inset` at 92, where the light ladder's page sits. What a card holds
+// is drawn as on the light ladder; text on the page takes the page inks, the
+// paper's own colour and two steps of the ink family, each clearing its floor
+// on the dark page.
 const INK_PAPER_STEPS: Record<SteppedRole, Step> = {
   ...LIGHT_STEPS,
   ink: step('text', 10, 0.9),
@@ -166,6 +169,7 @@ const INK_PAPER_STEPS: Record<SteppedRole, Step> = {
   inkFaint: step('text', 51, 0.85),
   paper: step('text', 13, 1.1),
   well: step('background', 89.5, 0.8),
+  inset: step('background', 92, 0.7),
   surface: step('background', 95, 0.57),
   raised: step('background', 100, 0),
   rule: step('background', 85, 0.9),
@@ -303,15 +307,17 @@ export type UiRoles = {
   pageInkMuted: string;
   pageInkFaint: string;
   // The four grounds, lightest last in light mode and in dark (Ink + paper
-  // alone lays its dark `paper` lowest): `well` is sunken, on a card or a
-  // control (the track of a segmented control, a slider or a bar; a pressed
-  // row or control; the row that is mine; an action strip inside a card);
-  // `paper` the page; `surface` cards, sheets and controls; `raised` an input
-  // or field drawn on a card.
+  // alone lays its dark `paper` lowest): `well` is sunken (the track of a
+  // segmented control, a slider or a bar); `paper` the page; `surface` cards,
+  // sheets and controls; `raised` an input or field drawn on a card.
   well: string;
   paper: string;
   surface: string;
   raised: string;
+  // A step below a card, inside it: a pressed row or control, the row that is
+  // mine, an action strip or a quieter panel. The page's `paper` in every
+  // theme but Ink + paper, whose page is dark under its cards.
+  inset: string;
   // Active Progress/history filters: fixed in every theme, black in light
   // mode and white in dark.
   selection: string;

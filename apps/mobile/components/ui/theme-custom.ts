@@ -223,8 +223,8 @@ export function generateCustomRoles(colours: CustomColours): UiRoles {
   ) as UiRoles;
   const inked = atLadder ? moved : { ...moved, ink: gamutColour(colours.ink.lightness, colours.ink) };
   // A custom page and its cards are one family of lightness: text on the page
-  // is drawn in the inks.
-  const paged = { ...inked, pageInk: inked.ink, pageInkMuted: inked.inkMuted, pageInkFaint: inked.inkFaint };
+  // is drawn in the inks, and the step below a card is the page.
+  const paged = { ...inked, pageInk: inked.ink, pageInkMuted: inked.inkMuted, pageInkFaint: inked.inkFaint, inset: inked.paper };
   const drawn = colours.direction === 'ink' ? { ...paged, gain: paged.ink, loss: paged.ink } : paged;
   // The backdrop behind a sheet: the drawn `ink` at 42% on a light page, as
   // the light ladder draws it; the dark ladder's black otherwise.

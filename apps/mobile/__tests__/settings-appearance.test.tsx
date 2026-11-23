@@ -532,4 +532,22 @@ describe('mode', () => {
     expect(await screen.findByLabelText('Appearance, Warm, Dark mode')).toBeTruthy();
     expect(within(screen.getByTestId('settings-appearance-row')).getByText('Warm, dark')).toBeTruthy();
   });
+
+  it('offers no Mode for Ink + paper, which draws the same in every mode, and names it alone on Settings home', async () => {
+    await act(async () => {
+      await saveAppearance({ theme: 'ink-paper', mode: 'dark', custom: null });
+    });
+    render(
+      <>
+        <SettingsRoute />
+        <SettingsAppearanceRoute />
+      </>,
+    );
+    expect(screen.queryByTestId('settings-appearance-mode')).toBeNull();
+    expect(await screen.findByLabelText('Appearance, Ink + paper')).toBeTruthy();
+    expect(within(screen.getByTestId('settings-appearance-row')).getByText('Ink + paper')).toBeTruthy();
+    await act(async () => {
+      await saveAppearance(DEFAULT_APPEARANCE);
+    });
+  });
 });

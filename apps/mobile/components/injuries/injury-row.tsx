@@ -118,7 +118,7 @@ const useStyles = makeStyles((roles) => ({
     borderBottomColor: roles.ruleSoft,
   },
   pressed: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
   },
   main: {
     flex: 1,

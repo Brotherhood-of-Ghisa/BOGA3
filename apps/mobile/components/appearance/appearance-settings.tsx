@@ -17,9 +17,10 @@ import { applyingHeaderRight } from '@/components/appearance/theme-header';
 import { ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
 import { SubPage } from '@/components/settings/sub-page';
-import { ActionRow, ChoiceRow, FormSection, Notice, RadioRow, uiSpace, useUiText } from '@/components/ui';
+import { ActionRow, ChoiceRow, FormSection, Notice, RadioRow, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { ThemeMode } from '@/components/ui/theme';
 import {
+  choiceTakesMode,
   DEFAULT_THEME_PRESET_ID,
   presetRoles,
   startingCustom,
@@ -122,11 +123,8 @@ export function AppearanceSettingsScreen() {
           />
         ) : null}
       </FormSection>
-      {custom ? (
-        <CustomSection appearance={appearance} />
-      ) : (
-        <ModeSection appearance={appearance} commit={commit} />
-      )}
+      {custom ? <CustomSection appearance={appearance} /> : null}
+      {choiceTakesMode(appearance) ? <ModeSection appearance={appearance} commit={commit} /> : null}
       {saveError ? <Notice icon="warning" live message={saveError} testID="settings-appearance-error" tone="danger" /> : null}
       <PreviewBlock appearance={appearance} phoneScheme={phoneScheme} />
     </SubPage>
@@ -136,9 +134,10 @@ export function AppearanceSettingsScreen() {
 // The choice drawn on a small mock of the app.
 function PreviewBlock({ appearance, phoneScheme }: { appearance: AppearanceChoice; phoneScheme: ColorSchemeName | null }) {
   const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.preview}>
-      <Text accessibilityRole="header" allowFontScaling={false} style={text.label}>
+      <Text accessibilityRole="header" allowFontScaling={false} style={[text.label, tone.pageMuted]}>
         Preview
       </Text>
       <ThemePreview roles={appearanceRoles(appearance, phoneScheme)} testID="settings-appearance-preview" />

@@ -96,6 +96,6 @@ const useStyles = makeStyles((roles) => ({
     ...uiCorner('control'),
   },
   pressed: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
   },
 }));

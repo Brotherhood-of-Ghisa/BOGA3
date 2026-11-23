@@ -178,7 +178,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
       testID="group-screen">
       {header}
       <View style={styles.calendar} testID="group-screen-time-zone">
-        <Text allowFontScaling={false} accessibilityRole="header" style={text.label}>Group time zone</Text>
+        <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.pageMuted]}>Group time zone</Text>
         {calendar.firstPage ? <>
           <Text allowFontScaling={false} style={text.body} testID="group-screen-time-zone-value">{calendar.firstPage.time_zone ?? 'Not set'}</Text>
           {calendarError ? <GroupInlineError error={calendarError} onRetry={() => void refreshCalendar()} testID="group-screen-time-zone-error" /> : null}

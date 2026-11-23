@@ -489,7 +489,7 @@ const useStyles = makeStyles((roles) => ({
     justifyContent: 'center',
   },
   dayCellRest: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
   },
   dayCellTrained: {
     backgroundColor: roles.viz2,

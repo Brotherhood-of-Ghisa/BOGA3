@@ -91,8 +91,8 @@ const useStyles = makeStyles((roles, mode) => ({
   },
   lift: uiLift(roles, mode, { shape: 'card' }),
   fill: { flexGrow: 1 },
-  // Pressed sinks to the well: the card's own inks still read on it.
+  // Pressed sinks to the inset: a step below the card, inside it.
   pressed: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
   },
 }));

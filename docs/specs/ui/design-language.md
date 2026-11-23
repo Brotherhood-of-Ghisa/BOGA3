@@ -27,8 +27,8 @@ and effort show wherever known, never behind a detail tap.
 ## 2. Colour roles
 
 Semantic roles, not a palette: **a screen names the role, never the hex.**
-Values are generated per theme; `useUiRoles()` is the only source, and
-`UiRoles` (`apps/mobile/components/ui/theme.ts`) documents each role.
+Values are generated per theme; `useUiRoles()` is the only source;
+`UiRoles` (`apps/mobile/components/ui/theme.ts`) documents each.
 
 Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 
@@ -54,22 +54,23 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   clearing 4.5:1 on `paper`/`surface`; `loss` stays off `danger`'s hue.
 
 `regimeOlder` / `regimeNewer` are fixed categorical hues for the RM chart's
-fitted periods, legible as text, apart from the `viz` ramp and gain/loss.
+fitted periods, legible, apart from the `viz` ramp and gain/loss.
 
 **Four seeds and `direction` make a theme** (`generateRoles(seeds)`):
 `background`, `text`, `accent`, `record`. A seed sets hue and chroma; the
 role sets its own fixed L\* — contrast depends on lightness, so the text floors
-hold whatever the seed. In light mode `accent` and `record` are used as given, so
-their floors are the seed's to meet.
+hold whatever the seed. In light mode `accent` and `record` are used as given;
+their floors are the seed's.
 
 **Two ladders, one set of seeds:** `generateRoles(seeds, mode)`. Each steps
-four grounds, `well` < `paper` < `surface` < `raised` (tracks and pressed
-rows, page, cards, fields), a card ≥ 4 L\* off the page. Ink + paper's third ladder,
-one for both modes, sets a `text`-hued page (L\*13) under light-mode
+four grounds, `well` < `paper` < `surface` < `raised` (tracks, page, cards,
+fields), a card ≥ 4 L\* off the page; `inset`, inside a card (pressed and own
+rows, strips), is `paper` but on Ink + paper. Ink + paper's third ladder,
+one for both modes: a `text`-hued page (L\*13) under light-mode
 `background` cards: alone, `paper` < `well` < `surface` < `raised`, as every
-well sits on a card. Words off a card (`ground.tsx`: titles, tabs, headers,
-`Notice`) take `pageInk`, `pageInkMuted`, `pageInkFaint` (4.5 / 4.5 / 3:1 on
-it); elsewhere these are the inks (`ui-page-ink-guard.test.ts`). Light ≈ 90 / 92 / 97 / 100, so
+well sits on a card; its other floors hold on the cards. Words off a card
+(`ground.tsx`) take `pageInk`, `pageInkMuted`, `pageInkFaint` (4.5 / 4.5 / 3:1
+on it); elsewhere these are the inks (`ui-page-ink-guard.test.tsx`). Light ≈ 90 / 92 / 97 / 100, so
 `accent` and `record` (L\* ≤ 43) clear 4.5:1 on `paper`; `ink-faint` clears 3:1
 on it and `surface`. Dark ≈ 7 / 10 / 15 / 20, `ink` at L\*95.
 `accent` (L\*72, `onAccent` black) and `record` (L\*66) take their seed's hue;
@@ -85,7 +86,8 @@ Ink + paper or Custom — per device, stored as
 repaints every mounted screen (`theme-context.tsx`). With no record, the older
 `boga3.appearance.v2` converts (a matching preset stays one, anything else
 becomes the custom theme it drew), then the accent id `boga3.themePreset.v1`;
-the first save writes the record, leaving both. A preset takes `mode`: `light` (default), `dark` or `system` (the
+the first save writes the record, leaving both. A preset takes `mode`
+([[appearance.ink-paper-mode]]): `light` (default), `dark` or `system` (the
 phone's, followed live). Native UI is pinned to the drawn mode, unpinned under
 `system`, since a pinned OS reports the pin (`theme-native.ts`). An unknown id,
 an invalid record or an unreadable store opens, logged, in the default. `record`
@@ -113,16 +115,16 @@ every launcher alias. Seasonal identity follows [[appearance.november]]; its
 alternates need a native build.
 
 **Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
-empty / rest, `viz1`…`viz4` the weakest to the strongest intensity; the steps
-are even in lightness, so each bucket reads as "more" without relying on hue,
-and no step is `accent` or `record`. **Text on a `viz` ground is `ink`**,
+empty / rest, `viz1`…`viz4` the weakest to the strongest intensity; even L\*
+steps, so each bucket reads as "more" without hue; no step is `accent` or
+`record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included; `Stat` takes
 `ground="viz"`. **Colour is never the only channel** — counts and accessibility
 labels still say how much. An empty `viz0` cell takes a `rule` hairline; a
 bar's empty track is a well. A filter showing all its values at once marks the one in
 force in `selection` (black; white in dark) with `onSelection` text
-(`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`
-shows one value and has no unselected peer, so it carries `ink` on `surface`. Heatmap tiles and bars take no `selection` outline;
+(`SegmentedControl`'s `selectedGround`): the history views. A `ToggleChip`,
+one value with no unselected peer, carries `ink` on `surface`. Heatmap tiles and bars take no `selection` outline;
 weekly selection is a caret and accessible state.
 
 ## 3. Typography

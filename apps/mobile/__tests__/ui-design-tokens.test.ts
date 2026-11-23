@@ -38,6 +38,7 @@ describe('design-language tokens', () => {
         'ink',
         'inkFaint',
         'inkMuted',
+        'inset',
         'loss',
         'onAccent',
         'onDanger',
@@ -134,9 +135,10 @@ describe('design-language tokens', () => {
       it('gives no two roles the same value', () => {
         // Two roles that cannot be told apart are one role (design-language.md "Colour roles").
         // An on-colour role is named by the fill it sits on, so it may repeat
-        // another role's value; off Ink + paper a page ink is its ink.
+        // another role's value; off Ink + paper a page ink is its ink and the
+        // inset is the page.
         const byValue = new Map<string, string[]>();
-        for (const [role, value] of Object.entries(roles).filter(([name]) => !/^(on[A-Z]|pageInk)/.test(name))) {
+        for (const [role, value] of Object.entries(roles).filter(([name]) => !/^(on[A-Z]|pageInk|inset$)/.test(name))) {
           byValue.set(value, [...(byValue.get(value) ?? []), role]);
         }
         const shared = [...byValue.values()].filter((names) => names.length > 1);

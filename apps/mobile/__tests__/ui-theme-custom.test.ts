@@ -388,8 +388,9 @@ function rolesBefore(saved: SavedBefore, ink: { hue: number; strength: number })
       return [role, lchToHex({ ...lch, lightness: Math.min(100, Math.max(0, page + share * (end - page))) })];
     }),
   ) as UiRoles;
-  // The page inks came later, as the inks under a second name.
-  const paged = { ...moved, pageInk: moved.ink, pageInkMuted: moved.inkMuted, pageInkFaint: moved.inkFaint };
+  // The page inks and the inset came later, as the inks and the page under a
+  // second name.
+  const paged = { ...moved, pageInk: moved.ink, pageInkMuted: moved.inkMuted, pageInkFaint: moved.inkFaint, inset: moved.paper };
   return mode === 'light' ? { ...paged, scrim: withAlpha(paged.ink, 0.42) } : paged;
 }
 

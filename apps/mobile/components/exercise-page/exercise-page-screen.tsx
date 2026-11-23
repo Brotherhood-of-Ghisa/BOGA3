@@ -816,14 +816,14 @@ const useStyles = makeStyles((roles) => ({
     justifyContent: 'center',
     gap: uiSpace.xs,
     minHeight: uiGeometry.tapTarget,
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
   },
   addSetDivider: {
     borderTopWidth: uiBorder.width,
     borderTopColor: roles.ruleSoft,
   },
   pressed: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
   },
   // An outline, not a second `accent`: the logger's tick is the screen's one
   // primary (`design-language.md` §5).

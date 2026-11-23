@@ -10,6 +10,7 @@ import { readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/compo
 import {
   appearanceMode,
   appearanceRoles as rolesInMode,
+  choiceTakesMode,
   getThemePreset,
   type AppearanceChoice,
   type AppearanceMode,
@@ -117,10 +118,10 @@ export function customPartLabel(appearance: AppearanceChoice, part: CustomPart):
 }
 
 // The whole choice for Settings home's row: the theme, and a preset's mode
-// when it is not the default light.
+// when it is not the default light and the preset takes one.
 export function appearanceLabel(appearance: AppearanceChoice): string {
   const label = themeLabel(appearance);
-  if (appearance.theme === 'custom' || appearance.mode === 'light') return label;
+  if (!choiceTakesMode(appearance) || appearance.mode === 'light') return label;
   return `${label}, ${MODE_LABELS[appearance.mode]} mode`;
 }
 
@@ -132,10 +133,10 @@ export function appearanceRoles(appearance: AppearanceChoice, phoneScheme: Color
 }
 
 // What fits at the end of Settings home's row: the theme, then a preset's mode
-// when it is not light. The row's accessibility label carries
+// when it is not light and the preset takes one. The row's accessibility label carries
 // `appearanceLabel`.
 export function appearanceSummary(appearance: AppearanceChoice): string {
   const label = themeLabel(appearance);
-  if (appearance.theme === 'custom' || appearance.mode === 'light') return label;
+  if (!choiceTakesMode(appearance) || appearance.mode === 'light') return label;
   return `${label}, ${MODE_LABELS[appearance.mode].toLowerCase()}`;
 }

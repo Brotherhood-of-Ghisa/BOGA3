@@ -291,9 +291,10 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const text = useUiText();
+  const tone = useUiTextTone();
   return (
     <View style={styles.section}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={text.label}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.pageMuted]}>
         {title}
       </Text>
       {children}

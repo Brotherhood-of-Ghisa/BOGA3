@@ -57,6 +57,6 @@ const useStreamRowStyles = makeStyles((roles) => ({
     borderLeftColor: roles.ruleSoft,
   },
   pressed: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
   },
 }));

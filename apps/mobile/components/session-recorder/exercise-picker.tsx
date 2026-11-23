@@ -3,6 +3,7 @@ import { Keyboard, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useOpenExerciseEditor, type ExerciseEditorSaveInput } from '@/components/exercise-catalog/exercise-editor-request';
+import { OnCard } from '@/components/ui/ground';
 import {
   ExerciseListContent,
   ExerciseListPreferenceControls,
@@ -306,7 +307,7 @@ export function ExercisePicker({
   const noExercisesText = exerciseOptions.length === 0 ? 'No active exercises available.' : 'No exercises match that filter.';
 
   return (
-    <>
+    <OnCard>
       <View style={[styles.screen, { paddingBottom: insets.bottom }]} testID="exercise-picker">
         <PageSheetHeader
           actions={
@@ -418,7 +419,7 @@ export function ExercisePicker({
         onAddAsNew={openAddAsNewFromGroupPickSheet}
       />
 
-    </>
+    </OnCard>
   );
 }
 

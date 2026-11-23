@@ -257,7 +257,7 @@ so header and page read as one surface ("Pages").
 
 Settings → Appearance: Theme (seven presets and Custom as radio rows with
 swatches; Custom folds presets behind `Show presets`), then Mode (Light, Dark,
-System) for a preset or one row per Custom part, then a live `ThemePreview`.
+System) for a preset ([[appearance.ink-paper-mode]]) or one row per Custom part, then a live `ThemePreview`.
 A part's picker (its title switches part): a painted hue `SliderRow`,
 strength, then its own controls (background: Dark switch, lightness over the
 mode's range, depth; highlight: Match accent, contrast; texts: lightness or

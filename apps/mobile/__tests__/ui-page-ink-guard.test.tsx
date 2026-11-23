@@ -1,14 +1,16 @@
-import { screen } from '@testing-library/react-native';
+import { screen, within } from '@testing-library/react-native';
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join, relative } from 'path';
 import { StyleSheet, Text } from 'react-native';
 
 import { headerStyleOptions } from '@/components/navigation/header-style';
+import { SessionTopBar } from '@/components/session-view/session-top-bar';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { FormSection } from '@/components/ui/form-section';
 import { HeaderTitleMenu } from '@/components/ui/header-title-menu';
 import { Icon } from '@/components/ui/icon';
+import { IconButton } from '@/components/ui/icon-button';
 import { Notice } from '@/components/ui/notice';
 import { PageHeader, SectionHeader } from '@/components/ui/page-header';
 import { StatePanel } from '@/components/ui/state-panel';
@@ -179,5 +181,28 @@ describe('a text or link button on Ink + paper', () => {
     const colour = (label: string) => StyleSheet.flatten(screen.getByText(label).props.style).color;
     expect([roles.pageInk, roles.pageInkMuted]).toContain(colour('On page'));
     expect([roles.ink, roles.inkMuted]).toContain(colour('On card'));
+  });
+});
+
+describe('an icon button on Ink + paper', () => {
+  const INK = { theme: 'ink-paper', mode: 'light', custom: null } as const;
+
+  it('draws its glyph in the page inks on the page, and in the inks on a card or a light bar', async () => {
+    renderWithTheme(
+      <>
+        <IconButton accessibilityLabel="Back" name="chevron-left" onPress={() => {}} testID="on-page" />
+        <IconButton accessibilityLabel="Options" name="more-vertical" onPress={() => {}} testID="on-page-muted" tone="muted" />
+        <Card>
+          <IconButton accessibilityLabel="Card options" name="more-vertical" onPress={() => {}} testID="on-card" />
+        </Card>
+        <SessionTopBar mode="active" onFinish={() => {}} onOpenOptions={() => {}} startedAt={new Date(0)} />
+      </>,
+    );
+    await switchTheme(INK);
+    const role = (id: string) => within(screen.getByTestId(id)).UNSAFE_getByType(Icon).props.colorRole;
+    expect(role('on-page')).toBe('pageInk');
+    expect(role('on-page-muted')).toBe('pageInkMuted');
+    expect(role('on-card')).toBe('ink');
+    expect(role('session-view-options-button')).toBe('ink');
   });
 });

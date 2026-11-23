@@ -675,12 +675,12 @@ describe('ActionButton', () => {
     expect(screen.getByTestId('toggle').props.accessibilityState).toEqual({ disabled: false, checked: true });
   });
 
-  it('dims and sinks to the well when pressed', () => {
+  it('dims and sinks to the inset when pressed', () => {
     render(<ActionButton label="Outline" onPress={jest.fn()} testID="button" variant="outline" />);
     const button = screen.getByTestId('button');
     fireEvent(button, 'responderGrant', { nativeEvent: { timestamp: Date.now() }, persist: () => {} });
     expect(flatStyle(button)).toMatchObject({
-      backgroundColor: roles.well,
+      backgroundColor: roles.inset,
       opacity: 0.7,
     });
   });

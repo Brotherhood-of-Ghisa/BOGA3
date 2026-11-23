@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { OnCard } from '@/components/ui/ground';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control';
@@ -61,98 +62,100 @@ export function RestTimerBar({
   const stepSec = isRepeating ? REPEATING_TIMER_STEP_SEC : REST_TIMER_STEP_SEC;
 
   return (
-    <View style={styles.bar} testID="rest-timer-bar">
-      <View style={styles.headerRow}>
-        <SegmentedControl
-          accessibilityLabel="Timer mode"
-          density="compact"
-          layout="inline"
-          onChange={(nextMode) => onSwitchMode?.(nextMode)}
-          options={MODE_OPTIONS}
-          testIDPrefix="timer-mode-selector"
-          value={isRepeating ? 'repeating' : 'rest'}
-        />
-        <View style={styles.headerActions}>
-          {onCollapse ? (
+    <OnCard>
+      <View style={styles.bar} testID="rest-timer-bar">
+        <View style={styles.headerRow}>
+          <SegmentedControl
+            accessibilityLabel="Timer mode"
+            density="compact"
+            layout="inline"
+            onChange={(nextMode) => onSwitchMode?.(nextMode)}
+            options={MODE_OPTIONS}
+            testIDPrefix="timer-mode-selector"
+            value={isRepeating ? 'repeating' : 'rest'}
+          />
+          <View style={styles.headerActions}>
+            {onCollapse ? (
+              <IconButton
+                accessibilityLabel="Hide timer controls"
+                name="chevron-up"
+                onPress={onCollapse}
+                size="sm"
+                testID="rest-timer-collapse"
+                tone="muted"
+              />
+            ) : null}
             <IconButton
-              accessibilityLabel="Hide timer controls"
-              name="chevron-up"
-              onPress={onCollapse}
+              accessibilityLabel="Dismiss timer"
+              name="x"
+              onPress={onDismiss}
               size="sm"
-              testID="rest-timer-collapse"
+              testID="rest-timer-dismiss"
               tone="muted"
             />
-          ) : null}
-          <IconButton
-            accessibilityLabel="Dismiss timer"
-            name="x"
-            onPress={onDismiss}
-            size="sm"
-            testID="rest-timer-dismiss"
-            tone="muted"
-          />
+          </View>
         </View>
-      </View>
-      <View style={[styles.actionRow, isRepeating ? styles.repeatingActionRow : null]}>
-        {isRepeating ? (
-          <RepeatingTimerFocus
-            key={view.sessionId}
-            onAdjust={onAdjust}
-            onReset={onResetRepeating ?? onRestart}
-            onToggle={onToggleRepeating ?? onRestart}
-            view={view}>
-            <TimerReadout view={view} />
-          </RepeatingTimerFocus>
-        ) : <TimerReadout view={view} />}
-        <View style={styles.controls}>
-          <ActionButton
-            accessibilityLabel={`Subtract ${stepSec} seconds`}
-            label={`-${stepSec}s`}
-            onPress={() => onAdjust(-stepSec)}
-            size="compact"
-            testID={isRepeating ? 'repeating-timer-minus-15' : 'rest-timer-minus-15'}
-            variant="outline"
-          />
-          <ActionButton
-            accessibilityLabel={`Add ${stepSec} seconds`}
-            label={`+${stepSec}s`}
-            onPress={() => onAdjust(stepSec)}
-            size="compact"
-            testID={isRepeating ? 'repeating-timer-plus-15' : 'rest-timer-plus-15'}
-            variant="outline"
-          />
+        <View style={[styles.actionRow, isRepeating ? styles.repeatingActionRow : null]}>
           {isRepeating ? (
-            <>
-              <ActionButton
-                accessibilityLabel={isPaused ? 'Resume repeating timer' : 'Pause repeating timer'}
-                label={isPaused ? 'Resume' : 'Pause'}
-                onPress={onToggleRepeating ?? onRestart}
-                size="compact"
-                testID="repeating-timer-toggle"
-                variant="outline"
-              />
-              <ActionButton
-                accessibilityLabel="Reset repeating timer"
-                label="Reset"
-                onPress={onResetRepeating ?? onRestart}
-                size="compact"
-                testID="repeating-timer-reset"
-                variant="outline"
-              />
-            </>
-          ) : (
+            <RepeatingTimerFocus
+              key={view.sessionId}
+              onAdjust={onAdjust}
+              onReset={onResetRepeating ?? onRestart}
+              onToggle={onToggleRepeating ?? onRestart}
+              view={view}>
+              <TimerReadout view={view} />
+            </RepeatingTimerFocus>
+          ) : <TimerReadout view={view} />}
+          <View style={styles.controls}>
             <ActionButton
-              accessibilityLabel="Restart rest timer"
-              label="Restart"
-              onPress={onRestart}
+              accessibilityLabel={`Subtract ${stepSec} seconds`}
+              label={`-${stepSec}s`}
+              onPress={() => onAdjust(-stepSec)}
               size="compact"
-              testID="rest-timer-restart"
+              testID={isRepeating ? 'repeating-timer-minus-15' : 'rest-timer-minus-15'}
               variant="outline"
             />
-          )}
+            <ActionButton
+              accessibilityLabel={`Add ${stepSec} seconds`}
+              label={`+${stepSec}s`}
+              onPress={() => onAdjust(stepSec)}
+              size="compact"
+              testID={isRepeating ? 'repeating-timer-plus-15' : 'rest-timer-plus-15'}
+              variant="outline"
+            />
+            {isRepeating ? (
+              <>
+                <ActionButton
+                  accessibilityLabel={isPaused ? 'Resume repeating timer' : 'Pause repeating timer'}
+                  label={isPaused ? 'Resume' : 'Pause'}
+                  onPress={onToggleRepeating ?? onRestart}
+                  size="compact"
+                  testID="repeating-timer-toggle"
+                  variant="outline"
+                />
+                <ActionButton
+                  accessibilityLabel="Reset repeating timer"
+                  label="Reset"
+                  onPress={onResetRepeating ?? onRestart}
+                  size="compact"
+                  testID="repeating-timer-reset"
+                  variant="outline"
+                />
+              </>
+            ) : (
+              <ActionButton
+                accessibilityLabel="Restart rest timer"
+                label="Restart"
+                onPress={onRestart}
+                size="compact"
+                testID="rest-timer-restart"
+                variant="outline"
+              />
+            )}
+          </View>
         </View>
       </View>
-    </View>
+    </OnCard>
   );
 }
 

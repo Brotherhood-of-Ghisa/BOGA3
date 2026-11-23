@@ -84,7 +84,7 @@ const useStyles = makeStyles((roles) => ({
     borderTopColor: roles.ruleSoft,
   },
   pressed: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
   },
   disabled: {
     opacity: 0.5,

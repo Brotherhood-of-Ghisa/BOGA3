@@ -85,6 +85,13 @@ export function getThemePreset(id: ThemePresetId): ThemePreset {
   return preset;
 }
 
+// Whether a choice's mode changes what it draws: not for a custom theme (its
+// page sets it) nor for Ink + paper, the same in every mode
+// ([[appearance.ink-paper-mode]]).
+export function choiceTakesMode(appearance: AppearanceChoice): boolean {
+  return appearance.theme !== 'custom' && getThemePreset(appearance.theme).ladder !== 'ink-paper';
+}
+
 // Every role a preset draws in a mode, on its own ladder.
 export function presetRoles(preset: ThemePreset, mode: ThemeMode): UiRoles {
   return generateRoles(preset.seeds, mode, { ladder: preset.ladder });

@@ -219,9 +219,9 @@ const useStyles = makeStyles((roles) => ({
     flex: 1,
     minHeight: 0,
   },
-  // A pressed row takes the `well` ground, as `ListRow` does.
+  // A pressed row takes the `inset` ground, as `ListRow` does.
   pressed: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
   },
   sessionsCard: {
     paddingHorizontal: uiSpace.md,

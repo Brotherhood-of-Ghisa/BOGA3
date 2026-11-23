@@ -2,7 +2,7 @@ import { GroupsSignInRequired } from '@/components/groups/sign-in-required';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { AccessibilityInfo, Alert, findNodeHandle, Keyboard, Pressable, Text, View, type ViewInstance } from 'react-native';
-import { ActionButton, ChoiceRow, FigureText, FormSection, Icon, ScreenScroll, makeStyles, uiBorder, uiGeometry, uiHairline, uiSpace, useUiText } from '@/components/ui';
+import { ActionButton, ChoiceRow, FigureText, FormSection, Icon, ScreenScroll, makeStyles, uiBorder, uiGeometry, uiHairline, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import { GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupWriteNotice } from '@/components/groups/write-notice';
 import { CoWExercisePicker } from '@/components/groups/cow-exercise-picker';
@@ -51,6 +51,7 @@ function CoWEditorFields({ model, groupId, editing, picker, setPicker, onSave, o
   const router = useRouter();
   const styles = useStyles();
   const text = useUiText();
+  const tone = useUiTextTone();
   const dateFormat = useDateFormat();
   const launcher = useRef<ViewInstance>(null);
   const metricsLauncher = useRef<ViewInstance>(null);
@@ -72,10 +73,10 @@ function CoWEditorFields({ model, groupId, editing, picker, setPicker, onSave, o
     if (target) requestAnimationFrame(() => { if (!mounted.current) return; const handle = findNodeHandle(target); if (typeof handle === 'number') AccessibilityInfo.setAccessibilityFocus(handle); });
   };
   return <>
-    <Text allowFontScaling={false} style={text.title}>{model.group.data!.group.name}</Text>
+    <Text allowFontScaling={false} style={[text.title, tone.page]}>{model.group.data!.group.name}</Text>
     <View style={styles.week}>
-      <Text allowFontScaling={false} style={text.label}>Next week</Text>
-      {week ? <View style={styles.dates}><Text allowFontScaling={false} style={text.figure} accessibilityLabel={coWAccessibleDates(week, dateFormat)}><FigureText>{coWDateRange(week, dateFormat)}</FigureText></Text><Text allowFontScaling={false} style={text.meta}>{zone}</Text></View> : null}
+      <Text allowFontScaling={false} style={[text.label, tone.pageMuted]}>Next week</Text>
+      {week ? <View style={styles.dates}><Text allowFontScaling={false} style={[text.figure, tone.page]} accessibilityLabel={coWAccessibleDates(week, dateFormat)}><FigureText>{coWDateRange(week, dateFormat)}</FigureText></Text><Text allowFontScaling={false} style={[text.meta, tone.pageMuted]}>{zone}</Text></View> : null}
     </View>
     {!model.calendar.firstPage ? <GroupMissingDataState error={pickInlineError(model.calendar.error)} offline={model.calendar.offline} onRetry={() => void model.calendar.refresh()} testIDPrefix="cow-form-calendar" />
       : !zone ? <GroupStateView title="Group time zone not set" testID="cow-form-zone-unset" /> : null}

@@ -122,7 +122,7 @@ export function SessionGpsPanel({ state, nearbyGymCount, suggestionCount }: Sess
 
 const useStyles = makeStyles((roles) => ({
   panel: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
     marginBottom: uiSpace.md,
     marginHorizontal: uiSpace.lg,
     padding: uiSpace.md,

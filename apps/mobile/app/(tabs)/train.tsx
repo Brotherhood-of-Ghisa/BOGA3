@@ -344,7 +344,7 @@ function TrainPlanning({
 
   return (
     <View style={styles.planning} testID="train-planning-section">
-      <Text allowFontScaling={false} style={text.label}>Planned</Text>
+      <Text allowFontScaling={false} style={[text.label, tone.pageMuted]}>Planned</Text>
       <Card style={styles.planRow} testID="train-planned-session-card">
         <View style={styles.planCopy}>
           <Text allowFontScaling={false} numberOfLines={1} style={text.bodyStrong}>

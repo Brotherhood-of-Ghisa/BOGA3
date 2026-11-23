@@ -110,7 +110,7 @@ const useStyles = makeStyles((roles, mode) => ({
     borderColor: roles.ink,
   },
   pressed: {
-    backgroundColor: roles.well,
+    backgroundColor: roles.inset,
   },
   label: {
     ...uiTextFor(roles).label,

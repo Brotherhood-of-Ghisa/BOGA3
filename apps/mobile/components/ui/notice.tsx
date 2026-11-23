@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { uiEdge } from '@/components/ui/edge';
+import { OnCard } from '@/components/ui/ground';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -54,7 +55,7 @@ export function Notice({ message, title, tone = 'neutral', icon, live = false, a
       ) : (
         words
       )}
-      {action}
+      {danger ? <OnCard>{action}</OnCard> : action}
     </View>
   );
 }
