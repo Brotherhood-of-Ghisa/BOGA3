@@ -11,6 +11,7 @@ type ScanResult = {
 };
 
 const {
+  findBorderViolations,
   findEdgeShadowViolations,
   findLegacyVocabularyViolations,
   findRawColorLiteralViolations,
@@ -18,6 +19,10 @@ const {
   evaluateRatchet,
   updateConfigBudgets,
 } = guardrailScript as {
+  findBorderViolations: (options?: { rootDir?: string; ownerPrefix?: string }) => ScanResult & {
+    filesScanned: number;
+    ownerPrefix: string;
+  };
   findEdgeShadowViolations: (options?: { rootDir?: string; ownerFile?: string }) => ScanResult & {
     filesScanned: number;
     ownerFile: string;
@@ -247,6 +252,118 @@ if (style.elevation === 2 || boxShadow == null) {}
   it('names the edge helper in the shipped config, so nothing else may own a shadow', () => {
     expect(findEdgeShadowViolations().ownerFile).toBe(OWNER);
     expect(literalsOf(findEdgeShadowViolations())).toEqual([]);
+  });
+});
+
+describe('UI guardrail border rule', () => {
+  const OWNER = 'components/ui/';
+
+  function scan(files: Record<string, string>) {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-guardrail-border-'));
+    for (const [relativePath, content] of Object.entries(files)) writeFile(tempRoot, relativePath, content);
+    return literalsOf(findBorderViolations({ rootDir: tempRoot, ownerPrefix: OWNER }));
+  }
+
+  it.each(['app', 'components', 'src'])('flags a container border, colour, radius or dash under %s/', (root) => {
+    const literals = scan({
+      [`${root}/box.tsx`]: `const styles = { box: { borderWidth: 1, borderColor: roles.rule, borderRadius: 4, borderStyle: 'dashed' } };
+`,
+      [`${root}/corners.ts`]: `export const corners = { borderTopLeftRadius: uiGeometry.radius.card, borderBottomEndRadius: 2 };
+`,
+    });
+
+    expect(literals.sort()).toEqual(
+      [
+        'borderWidth: 1',
+        'borderColor: roles.rule',
+        'borderRadius: 4',
+        "borderStyle: 'dashed'",
+        'borderTopLeftRadius: uiGeometry.radius.card',
+        'borderBottomEndRadius: 2',
+      ].sort()
+    );
+  });
+
+  it('flags an inline override and a box edge drawn per side or per axis', () => {
+    expect(
+      scan({
+        'components/row.tsx': `<View style={[styles.row, { borderColor: roles.danger }]} />;
+const styles = { frame: { borderHorizontalWidth: 1, borderLeftWidth: 1, borderRightWidth: 1, borderTopColor: roles.rule } };
+`,
+      })
+    ).toEqual(['borderColor: roles.danger', 'borderHorizontalWidth: 1', 'borderLeftWidth: 1', 'borderRightWidth: 1', 'borderTopColor: roles.rule']);
+  });
+
+  it('passes a single-side ruleSoft row divider, on any side and in a one-line or multi-line style', () => {
+    expect(
+      scan({
+        'components/rows.tsx': `const styles = {
+  top: { borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft },
+  bottom: {
+    paddingTop: uiSpace.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: liveRoles.ruleSoft,
+  },
+  guide: { borderLeftWidth: uiBorder.width, borderLeftColor: roles.ruleSoft },
+  end: { borderEndWidth: 1, borderEndColor: roles.ruleSoft },
+};
+`,
+      })
+    ).toEqual([]);
+  });
+
+  it('flags a single-side divider that is not ruleSoft, or whose colour is another side or another object', () => {
+    expect(
+      scan({
+        'components/rows.tsx': `const styles = {
+  loud: { borderTopWidth: 1, borderTopColor: roles.rule },
+  accent: { borderLeftWidth: 4, borderLeftColor: roles.accent },
+  bare: { borderBottomWidth: 1 },
+  wrongSide: { borderTopWidth: 1, borderBottomColor: roles.ruleSoft },
+  split: { borderTopWidth: 1 },
+  elsewhere: { borderTopColor: roles.ruleSoft, nested: { borderTopWidth: 1 } },
+};
+`,
+      })
+    ).toEqual([
+      'borderTopWidth: 1',
+      'borderTopColor: roles.rule',
+      'borderLeftWidth: 4',
+      'borderLeftColor: roles.accent',
+      'borderBottomWidth: 1',
+      'borderTopWidth: 1',
+      'borderTopWidth: 1',
+      'borderTopWidth: 1',
+    ]);
+  });
+
+  it('treats a zero width or radius as the absence of an edge', () => {
+    expect(
+      scan({
+        'components/reset.tsx': `const styles = { flush: { borderTopWidth: 0, borderRadius: 0, borderWidth: 0 } };
+`,
+      })
+    ).toEqual([]);
+  });
+
+  it('exempts only components/ui, and ignores tests and longer names', () => {
+    expect(
+      scan({
+        'components/ui/card.tsx': `export const card = { borderWidth: 1, borderColor: roles.rule, borderRadius: 4 };
+`,
+        'components/__tests__/card.test.tsx': `expect(style).toMatchObject({ borderRadius: 4 });
+`,
+        'components/ui-extras/box.tsx': `const s = { borderColorScheme: 'x', myborderRadius: 4, borderRadiusScale: 2 };
+`,
+      })
+    ).toEqual([]);
+  });
+
+  it('holds the shipped repo at zero, with components/ui as the one owner', () => {
+    const result = findBorderViolations();
+
+    expect(result.ownerPrefix).toBe(OWNER);
+    expect(literalsOf(result)).toEqual([]);
   });
 });
 
