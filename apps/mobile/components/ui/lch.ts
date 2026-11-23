@@ -53,6 +53,21 @@ export function colourDistance(first: string, second: string): number {
   return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
+// WCAG 2.1 contrast between two `#RRGGBB` colours: 4.5:1 is the floor for
+// words, 3:1 for a glyph, a mark or large text.
+export function contrastRatio(foreground: string, background: string): number {
+  const [lighter, darker] = [relativeLuminance(foreground), relativeLuminance(background)].sort((a, b) => b - a);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function relativeLuminance(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((offset) => {
+    const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
 // `#RRGGBB` at an opacity, as React Native's `rgba()` string.
 export function withAlpha(hex: string, alpha: number): string {
   const [r, g, b] = [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16));

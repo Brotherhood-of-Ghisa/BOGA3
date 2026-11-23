@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
 
-import { useUiGround } from '@/components/ui/ground';
+import { useUiGround, type UiGround } from '@/components/ui/ground';
+import { contrastRatio } from '@/components/ui/lch';
 import type { UiRoles } from '@/components/ui/theme';
 import { useUiRoles } from '@/components/ui/theme-context';
 import { uiFonts, uiGeometry, uiTypography } from '@/components/ui/tokens';
@@ -211,13 +212,63 @@ export function useUiTextTone() {
   return uiTextToneFor(useUiRoles());
 }
 
-// The three ink tones for words on the ground the caller sits on: the page
-// inks on the page, the inks on a card or a sheet (`ground.tsx`).
+// A coloured word drawn straight on the page: its own colour where that clears
+// `floor` on the page, else `pageInk`. Every preset's page holds its coloured
+// words (`design-language.md` §2); Ink + paper's dark page holds none, so there
+// a coloured word is drawn in the page ink and its sign, glyph or words carry
+// what the colour did.
+export function pageWordColour(roles: UiRoles, colour: string, floor = 4.5): string {
+  return readsOnPage(roles, colour, floor) ? colour : roles.pageInk;
+}
+
+// The inks and coloured words for the page, cached per theme as the tones are.
+const buildPageTone = (roles: UiRoles) =>
+  StyleSheet.create({
+    ink: { color: roles.pageInk },
+    muted: { color: roles.pageInkMuted },
+    faint: { color: roles.pageInkFaint },
+    accent: { color: pageWordColour(roles, roles.accent) },
+    danger: { color: pageWordColour(roles, roles.danger) },
+    record: { color: pageWordColour(roles, roles.record), fontWeight: '700' },
+  });
+const pageToneFor = cachedBy(buildPageTone);
+
+// The tones for words on the ground the caller sits on (`ground.tsx`): the
+// page inks and page-safe coloured words on the page, the inks and the roles
+// themselves on a card or a sheet.
 export function useUiGroundTone() {
-  const tone = useUiTextTone();
+  const roles = useUiRoles();
+  const tone = uiTextToneFor(roles);
   return useUiGround() === 'page'
-    ? { ink: tone.page, muted: tone.pageMuted, faint: tone.pageFaint }
-    : { ink: tone.ink, muted: tone.muted, faint: tone.faint };
+    ? pageToneFor(roles)
+    : { ink: tone.ink, muted: tone.muted, faint: tone.faint, accent: tone.accent, danger: tone.danger, record: tone.record };
+}
+
+// The three inks as colours, for a glyph, a mark or a line drawn on `ground`.
+export function groundInks(roles: UiRoles, ground: UiGround): { ink: string; inkMuted: string; inkFaint: string } {
+  return ground === 'page'
+    ? { ink: roles.pageInk, inkMuted: roles.pageInkMuted, inkFaint: roles.pageInkFaint }
+    : { ink: roles.ink, inkMuted: roles.inkMuted, inkFaint: roles.inkFaint };
+}
+
+// `groundInks` on the ground the caller sits on.
+export function useUiGroundInks() {
+  return groundInks(useUiRoles(), useUiGround());
+}
+
+// A selected pill on `ground`: an `ink` pill with its `onInk` label, set off
+// from the unselected `surface` pills by its fill. Its edge is `ink` where
+// that stands off the ground, and `pageInk` where it does not (Ink + paper's
+// page, as dark as `ink`), so the pill keeps its outline there. `edge` is a
+// role, for `uiEdge`'s `tone`.
+export function selectedPill(roles: UiRoles, ground: UiGround): { fill: string; label: string; edge: 'ink' | 'pageInk' } {
+  const edge = ground === 'page' && !readsOnPage(roles, roles.ink, 3) ? 'pageInk' : 'ink';
+  return { fill: roles.ink, label: roles.onInk, edge };
+}
+
+/** Whether `colour` clears `floor` on the page. */
+export function readsOnPage(roles: UiRoles, colour: string, floor: number): boolean {
+  return contrastRatio(colour, roles.paper) >= floor;
 }
 
 // One embedded weight up, for the row that is mine, a live session, the gym.

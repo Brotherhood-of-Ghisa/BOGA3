@@ -7,8 +7,9 @@ import { join, relative } from 'path';
 // that fill's on-colour role
 // (`onAccent`, `onSelection`, `onDanger`, `onInk`), so a ground that stops being
 // white cannot make it vanish. Every `surface` in `app/` and `components/`
-// must therefore paint a ground: a `backgroundColor`, a shape's `fill`, or the
-// `surface` key of a role set handed on. Anything else — `color`, `stroke`,
+// must therefore paint a ground: a `backgroundColor`, a shape's `fill`, a
+// spinner's `progressBackgroundColor` disc, or the `surface` key of a role set
+// handed on. Anything else — `color`, `stroke`,
 // `tintColor`, `borderColor`, an SVG text's `fill`, or an alias the key cannot
 // be read from — fails here.
 
@@ -18,7 +19,7 @@ const SURFACE = /\b(?:uiRoles|roles)\.surface\b/g;
 // The prop or style key a value is set on: `key: value` or `prop={value}`. A
 // ternary's ` : ` has a space before the colon, so it is not a key.
 const KEY = /([A-Za-z_]\w*)(?::\s|=\{)/g;
-const GROUND_KEYS = new Set(['backgroundColor', 'fill', 'surface']);
+const GROUND_KEYS = new Set(['backgroundColor', 'fill', 'surface', 'progressBackgroundColor']);
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {

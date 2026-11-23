@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, findNodeHandle, FlatList, Platform, Text, View, type ViewInstance } from 'react-native';
 import { Card, FigureText, Icon, ListRow, ScreenScroll, SegmentedControl, Sheet, StatePanel } from '@/components/ui';
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
 import type { CurveMode, UncertaintyMethod } from '@/src/strength-regimes/assessment';
 import type { RmCurveModel, RmCurveRange } from '@/src/rm-curve/model';
@@ -121,7 +121,8 @@ function CurveResult({ mode, method, model, pointId, dateFormat, onSelect, onPic
 }) {
   const styles = useCurveStyles();
   const text = useUiText();
-  const tone = useUiTextTone();
+  // The count line and the excluded note sit on the page, around the cards.
+  const tone = useUiGroundTone();
   const result = useRegimeAssessment(model, mode, method);
   const points = model.observations, point = points.find(p => p.setId === pointId);
   if (!points.length) {
@@ -133,7 +134,7 @@ function CurveResult({ mode, method, model, pointId, dateFormat, onSelect, onPic
   const factor = model.definition.loadInputMode === 'per_side_load' ? 2 : 1;
   const sessionsCount = new Set(points.map(p => p.sessionId)).size;
   return <>
-    <Text allowFontScaling={false} style={text.body}><FigureText>{`${points.length} ${points.length === 1 ? 'set' : 'sets'} · ${sessionsCount} ${sessionsCount === 1 ? 'session' : 'sessions'}`}</FigureText></Text>
+    <Text allowFontScaling={false} style={[text.body, tone.ink]}><FigureText>{`${points.length} ${points.length === 1 ? 'set' : 'sets'} · ${sessionsCount} ${sessionsCount === 1 ? 'session' : 'sessions'}`}</FigureText></Text>
     <Card style={styles.card}>
       <RmCurveHelp />
       <Text allowFontScaling={false} style={text.label}>LOAD{points.some(p => p.loadKg !== p.weightKg) ? ' (WITH DATED BODYWEIGHT)' : ''}{factor === 2 ? ' · PER SIDE' : ''}</Text>

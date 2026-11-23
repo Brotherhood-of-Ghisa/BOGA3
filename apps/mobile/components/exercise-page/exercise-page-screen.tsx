@@ -19,6 +19,7 @@ import { useOpenExerciseEditor } from '@/components/exercise-catalog/exercise-ed
 import { RecordBand } from '@/components/session-detail';
 import { Card } from '@/components/ui/card';
 import { uiHairline } from '@/components/ui/edge';
+import { FormError } from '@/components/ui/form-section';
 import { Icon } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { ScreenScroll } from '@/components/ui/screen';
@@ -699,13 +700,7 @@ export function ExercisePageScreen({
             </Pressable>
           </Card>
           {draft.saveError ? (
-            <Text
-              allowFontScaling={false}
-              accessibilityLiveRegion="polite"
-              style={[text.body, tone.danger]}
-              testID="exercise-save-error">
-              {`Not saved: ${draft.saveError}`}
-            </Text>
+            <FormError message={`Not saved: ${draft.saveError}`} testID="exercise-save-error" textRole="body" />
           ) : null}
           {/* In the scroll, after the set list — not a pinned footer, which
               cost a row of screen above the keyboard on every set. */}

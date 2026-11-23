@@ -1,6 +1,7 @@
 import { Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { uiEdge } from '@/components/ui/edge';
+import { FormError } from '@/components/ui/form-section';
 import { uiTextFor, useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
@@ -62,13 +63,7 @@ export function FormField({
         />
       </View>
       {error && showErrorText ? (
-        <Text
-          allowFontScaling={false}
-          accessibilityLiveRegion="polite"
-          style={styles.error}
-          testID={errorTestID ?? (testID ? `${testID}-error` : undefined)}>
-          {error}
-        </Text>
+        <FormError message={error} testID={errorTestID ?? (testID ? `${testID}-error` : undefined)} />
       ) : null}
       {hint ? <Text allowFontScaling={false} style={[textRoles.meta, groundTone.muted]}>{hint}</Text> : null}
     </View>
@@ -103,9 +98,5 @@ const useStyles = makeStyles((roles, mode) => ({
   input: {
     flex: 1,
     padding: 0,
-  },
-  error: {
-    ...uiTextFor(roles).meta,
-    color: roles.danger,
   },
 }));

@@ -6,7 +6,7 @@ import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { FigureText, makeStyles, uiBorder, uiGeometry, uiSpace } from '@/components/ui';
-import { useUiText } from '@/components/ui/text-roles';
+import { useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import { buildCalendarMonths, type CalendarMonth, type CalendarWeek } from './daily-calendar';
 import { CalendarTile } from './calendar-tile';
 import { heatmapStyles } from './heatmap-style';
@@ -41,9 +41,10 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
   const dateFormat = useDateFormat();
   const styles = useStyles();
   const text = useUiText();
+  const tone = useUiGroundTone();
   const week = row.week;
   return <View style={styles.row} testID={`${testID}-row-${row.weekStartDateKey}`}>
-    <Text allowFontScaling={false} accessibilityLabel={`Week of ${formatCalendarDate(row.weekStartDateKey, dateFormat)}`} style={[text.figureSmall, styles.rowLabel]}
+    <Text allowFontScaling={false} accessibilityLabel={`Week of ${formatCalendarDate(row.weekStartDateKey, dateFormat)}`} style={[text.figureSmall, tone.muted, styles.rowLabel]}
       testID={`${testID}-row-label-${row.weekStartDateKey}`}>{row.startDay}</Text>
     <View style={[styles.cells, { gap }]}>
       {row.days.map(day => day.day && !day.future ? <CalendarTile key={day.dateKey} cell={day.day} dateLabel={formatCalendarDate(day.dateKey, dateFormat)}
@@ -68,14 +69,15 @@ function CalendarRow({ row, monthKey, data, metricLabel, formatValue, testID, ga
 function Month({ month, ...props }: { month: CalendarMonth } & Omit<Parameters<typeof CalendarRow>[0], 'row' | 'monthKey'>) {
   const styles = useStyles();
   const text = useUiText();
+  const tone = useUiGroundTone();
   const hasTraining = month.weeks.some(row => row.days.some(({ day, future }) =>
     !future && day && (day.hasTraining ?? day.value > 0)));
   return <View style={styles.month} testID={`${props.testID}-month-${month.key}`}>
-    <Text allowFontScaling={false} accessibilityRole="header" style={text.meta} testID={`${props.testID}-month-title-${month.key}`}><FigureText>{month.title}</FigureText></Text>
+    <Text allowFontScaling={false} accessibilityRole="header" style={[text.meta, tone.muted]} testID={`${props.testID}-month-title-${month.key}`}><FigureText>{month.title}</FigureText></Text>
     {hasTraining ? <View style={styles.calendar}>
       <View style={styles.row}>
         <View style={styles.labelSpacer} />
-        <View style={[styles.cells, { gap: props.gap }]}>{HEADERS.map(label => <Text key={label} allowFontScaling={false} style={[text.label, styles.column, label === 'Week' && heatmapStyles.weekColumn]}>{label}</Text>)}</View>
+        <View style={[styles.cells, { gap: props.gap }]}>{HEADERS.map(label => <Text key={label} allowFontScaling={false} style={[text.label, tone.muted, styles.column, label === 'Week' && heatmapStyles.weekColumn]}>{label}</Text>)}</View>
       </View>
       {month.weeks.map(row => <CalendarRow key={row.weekStartDateKey} {...props} row={row} monthKey={month.key} />)}
       {/* Eight equal columns, with an extra Week margin: place the rule at

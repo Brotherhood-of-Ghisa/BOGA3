@@ -14,7 +14,8 @@ import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FigureText, makeStyles, uiGeometry, uiMark, uiSpace, uiTypography, useUiRoles, uiWell } from '@/components/ui';
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { useUiGround } from '@/components/ui/ground';
+import { readsOnPage, useUiGroundInks, useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 import { calculateLinearPercentile } from '@/src/session-insights/calculations';
@@ -70,7 +71,12 @@ function WeeklyAnnotations({ references, testID, children }: {
 }) {
   const styles = useStyles();
   const text = useUiText();
-  const tone = useUiTextTone();
+  const tone = useUiGroundTone();
+  const inks = useUiGroundInks();
+  const roles = useUiRoles();
+  // A reference line crosses the page and the track: `inkMuted`, or on a page
+  // it does not read on (Ink + paper's), `pageInkFaint`, which reads on both.
+  const referenceColour = useUiGround() === 'page' && !readsOnPage(roles, roles.inkMuted, 3) ? roles.pageInkFaint : roles.inkMuted;
   const [plotWidth, setPlotWidth] = useState(0);
   const [labelWidths, setLabelWidths] = useState<Record<string, number>>({});
   // Prefer the median, then lower, then upper, without moving any tick.
@@ -105,7 +111,7 @@ function WeeklyAnnotations({ references, testID, children }: {
       return <React.Fragment key={annotation.id}>
         <View accessible={!children} accessibilityRole="text" accessibilityLabel={annotation.description}
           testID={`${testID}-${annotation.id}`}
-          style={[children ? styles.reference : styles.axisReference, { left: `${annotation.position}%` }]} />
+          style={[children ? [styles.reference, { backgroundColor: referenceColour }] : [styles.axisReference, { backgroundColor: inks.inkMuted }], { left: `${annotation.position}%` }]} />
         {children ? <View {...annotationProps}>
           <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.muted]}>{annotation.label}</Text>
           <View style={styles.annotationGap} />
@@ -125,7 +131,7 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
   const styles = useStyles();
   const roles = useUiRoles();
   const text = useUiText();
-  const tone = useUiTextTone();
+  const tone = useUiGroundTone();
   const [beforeYear, year, afterYear] = formatCalendarWeekHeading(week.weekStartDateKey, dateFormat).split(/(\d{4})/);
   const value = weekValue(week, formatValue);
   const prCount = week.prCount ?? 0;
@@ -142,16 +148,16 @@ function WeeklyRow({ week, onPress, formatValue, metricLabel, targetAveraged, po
   </View>;
   const content = <View style={styles.row} testID={`${testID}-plot-row-${week.weekStartDateKey}`}>
     <View style={styles.date} testID={`${testID}-date-gutter-${week.weekStartDateKey}`}>
-      <Text allowFontScaling={false} numberOfLines={1} style={text.body} testID={`${testID}-date-${week.weekStartDateKey}`}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.body, tone.ink]} testID={`${testID}-date-${week.weekStartDateKey}`}>
         <FigureText>{`${beforeYear}${afterYear}`.trim()}</FigureText>
       </Text>
-      <Text allowFontScaling={false} numberOfLines={1} style={text.figureSmall} testID={`${testID}-date-year-${week.weekStartDateKey}`}>{year}</Text>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.figureSmall, tone.muted]} testID={`${testID}-date-year-${week.weekStartDateKey}`}>{year}</Text>
     </View>
     <View style={styles.plot} testID={`${testID}-plot-${week.weekStartDateKey}`}>
       {references.length ? <WeeklyAnnotations key={references.map(reference => `${reference.id}:${reference.text}`).join()} references={references} testID={testID}>{track}</WeeklyAnnotations> : track}
     </View>
     <View style={[styles.valueColumn, { width: valueWidth }]} testID={`${testID}-value-column-${week.weekStartDateKey}`}>
-      <Text allowFontScaling={false} style={[text.figure, styles.value]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
+      <Text allowFontScaling={false} style={[text.figure, tone.ink, styles.value]} testID={`${testID}-value-${week.weekStartDateKey}`}>{value}</Text>
       {prCount > 0 ? <Text allowFontScaling={false} style={[text.meta, tone.record, styles.prs]} testID={`${testID}-prs-${week.weekStartDateKey}`}><FigureText figureStyle={tone.record}>{`${prCount} PR${prCount === 1 ? '' : 's'}`}</FigureText></Text> : null}
     </View>
   </View>;
@@ -165,6 +171,7 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
   formatReferenceValue = formatValue, metricLabel = 'Value', header }: Props) {
   const styles = useStyles();
   const text = useUiText();
+  const tone = useUiGroundTone();
   const windowWeeks = useMemo(() => data.weekly.filter(week => week.weekStartDateKey <= data.todayDateKey), [data.weekly, data.todayDateKey]);
   const rows = useMemo(() => {
     const months = new Map<string, WeekCell[]>();
@@ -216,8 +223,8 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
         return <View accessible accessibilityRole="text" accessibilityLabel={`${title}, No training`}
           style={styles.row} testID={`${testID}-empty-month-${item.monthKey}`}>
           <View style={styles.date}>
-            <Text allowFontScaling={false} numberOfLines={1} style={text.body}>{month}</Text>
-            <Text allowFontScaling={false} numberOfLines={1} style={text.figureSmall}>{year}</Text>
+            <Text allowFontScaling={false} numberOfLines={1} style={[text.body, tone.ink]}>{month}</Text>
+            <Text allowFontScaling={false} numberOfLines={1} style={[text.figureSmall, tone.muted]}>{year}</Text>
           </View>
           <View style={styles.monthRule} />
         </View>;
@@ -247,9 +254,11 @@ const useStyles = makeStyles((roles, mode) => ({
     textAlign: 'right' },
   referencePlot: { height: ROW_HEIGHT },
   annotatedTrack: { position: 'absolute', top: uiTypography.lineHeight.xxs + uiSpace.xs, left: 0, right: 0 },
-  reference: { position: 'absolute', top: uiTypography.lineHeight.xxs, height: uiSpace.lg + uiSpace.sm, width: 1, backgroundColor: roles.inkMuted },
+  // Its colour is set where it is drawn.
+  reference: { position: 'absolute', top: uiTypography.lineHeight.xxs, height: uiSpace.lg + uiSpace.sm, width: 1 },
   annotationGap: { height: uiSpace.lg + uiSpace.xs * 2 },
-  axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1, backgroundColor: roles.inkMuted },
+  // Its colour is the ground's muted ink, set where it is drawn.
+  axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1 },
   axisRow: { flexDirection: 'row', gap: uiSpace.sm, marginTop: uiSpace.xs },
   axisPlot: { flex: 1 },
   axis: { height: uiTypography.lineHeight.xxs + uiSpace.sm },

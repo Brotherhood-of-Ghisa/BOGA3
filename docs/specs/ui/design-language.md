@@ -70,7 +70,7 @@ one for both modes: a `text`-hued page (L\*13) under light-mode
 `background` cards: alone, `paper` < `well` < `surface` < `raised`, as every
 well sits on a card; its other floors hold on the cards. Words off a card
 (`ground.tsx`) take `pageInk`, `pageInkMuted`, `pageInkFaint` (4.5 / 4.5 / 3:1
-on it); elsewhere these are the inks (`ui-page-ink-guard.test.tsx`). Light ≈ 90 / 92 / 97 / 100, so
+on it); elsewhere these are the inks (`ui-page-ink-guard.test.tsx`). A coloured word there keeps its role where it clears 4.5:1 on the page, else takes `pageInk` (an error behind a warning sign); a selected `ink` pill there is outlined in `pageInk`, the refresh spinner `pageInkMuted` (`text-roles.ts`, `ui-ink-paper-page-floors.test.tsx`). Light ≈ 90 / 92 / 97 / 100, so
 `accent` and `record` (L\* ≤ 43) clear 4.5:1 on `paper`; `ink-faint` clears 3:1
 on it and `surface`. Dark ≈ 7 / 10 / 15 / 20, `ink` at L\*95.
 `accent` (L\*72, `onAccent` black) and `record` (L\*66) take their seed's hue;

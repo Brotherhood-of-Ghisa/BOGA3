@@ -14,6 +14,7 @@ import { customFromSeeds, generateCustomRoles } from '@/components/ui/theme-cust
 import { hueName, hueThemeId, parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
 import { DEFAULT_APPEARANCE, DEFAULT_THEME_PRESET_ID, getThemePreset, presetRoles, themePresets } from '@/components/ui/theme-presets';
 
+import { contrastRatio, isAscending, lightnessOf } from './helpers/contrast';
 import { rolesFor } from './helpers/theme';
 import themeRolesLight from './fixtures/theme-roles-light.json';
 
@@ -760,18 +761,11 @@ function neutralLadder(roles: UiRoles, mode: ThemeMode): string[] {
   return [roles.well, roles.paper, roles.surface, roles.viz0, roles.raised, roles.ruleSoft, roles.rule, roles.inkFaint, roles.inkMuted, roles.ink];
 }
 
-const lightnessOf = (hex: string): number => hexToLch(hex).lightness;
-
 // How far each step of the ramp moves away from the page in L*, `viz0` →
 // `viz4`: darker on the light page, lighter on the dark one.
 function vizSteps(roles: UiRoles, mode: ThemeMode): number[] {
   const ramp = [roles.viz0, roles.viz1, roles.viz2, roles.viz3, roles.viz4].map((hex) => hexToLch(hex).lightness);
   return ramp.slice(1).map((lightness, index) => (mode === 'light' ? ramp[index] - lightness : lightness - ramp[index]));
-}
-
-function isAscending(colours: string[]): boolean {
-  const ladder = colours.map((hex) => hexToLch(hex).lightness);
-  return ladder.every((lightness, index) => index === 0 || lightness > ladder[index - 1]);
 }
 
 // CIE76 ΔE*ab: Euclidean distance in L*a*b*. ~2.3 is a just-noticeable
@@ -789,19 +783,6 @@ function deltaE(first: string, second: string): number {
 function hueDistance(a: number, b: number): number {
   const distance = Math.abs(a - b) % 360;
   return distance > 180 ? 360 - distance : distance;
-}
-
-function contrastRatio(foreground: string, background: string): number {
-  const [lighter, darker] = [relativeLuminance(foreground), relativeLuminance(background)].sort((a, b) => b - a);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-function relativeLuminance(hex: string): number {
-  const [r, g, b] = [1, 3, 5].map((offset) => {
-    const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
-    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
 it('keeps temporal regime identities distinct and readable across presets', () => {

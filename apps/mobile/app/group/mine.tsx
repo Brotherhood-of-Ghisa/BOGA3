@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { FlatList, RefreshControl, View } from 'react-native';
+import { FlatList, View } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 
 import {
   GroupInlineError,
@@ -85,7 +86,7 @@ function MyGroupsContent({ userId }: { userId: string }) {
       contentContainerStyle={groupScreenStyles.cardListContent}
       data={groups ?? []}
       keyExtractor={(group) => group.group_id}
-      refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
+      refreshControl={<PageRefreshControl onRefresh={onRefresh} refreshing={pulling} />}
       renderItem={({ item, index }) => (
         <View style={cardListItemStyles(index, groups?.length ?? 0)}>
           <GroupSummaryRow divider={index > 0} group={item} onPress={(group) => router.push(`/group/${group.group_id}`)} />

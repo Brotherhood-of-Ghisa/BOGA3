@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { Text, TextInput, View, type KeyboardTypeOptions, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { uiEdge } from '@/components/ui/edge';
@@ -7,7 +7,7 @@ import { useUiGround } from '@/components/ui/ground';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
-import { uiTextFor, useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { pageWordColour, useUiGroundTone, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
@@ -54,14 +54,50 @@ export function FormSection({ title, titleAccessory, children, error, errorTestI
   );
 }
 
-/** A field's or section's validation message, the one way forms show one. */
-export function FormError({ message, testID }: { message?: string | null; testID?: string }) {
+export type FormErrorProps = {
+  message?: string | null;
+  testID?: string;
+  // `meta` under a field or section; `body` or `bodyStrong` for a screen's own
+  // error line under the control that failed.
+  textRole?: 'meta' | 'body' | 'bodyStrong';
+  align?: 'start' | 'center';
+  // Spacing only: the colour is the ground's.
+  style?: StyleProp<ViewStyle>;
+  accessibilityRole?: 'alert';
+};
+
+/**
+ * An error line under the field, section or control that failed: the one way a
+ * form or screen shows one. It is `danger` on the ground it sits on; where
+ * `danger` does not read on the page (Ink + paper), it is the page ink behind
+ * a warning sign (`pageWordColour`).
+ */
+export function FormError({ message, testID, textRole = 'meta', align = 'start', style, accessibilityRole }: FormErrorProps) {
   const styles = useStyles();
-  return message ? (
-    <Text allowFontScaling={false} accessibilityLiveRegion="polite" selectable style={styles.error} testID={testID}>
+  const roles = useUiRoles();
+  const text = useUiText();
+  const tone = useUiGroundTone();
+  const onPage = useUiGround() === 'page';
+  if (!message) return null;
+  const signed = onPage && pageWordColour(roles, roles.danger) !== roles.danger;
+  const words = (
+    <Text
+      accessibilityLiveRegion="polite"
+      accessibilityRole={accessibilityRole}
+      allowFontScaling={false}
+      selectable
+      style={[text[textRole], tone.danger, align === 'center' ? styles.centred : null, signed ? styles.signedWords : style]}
+      testID={testID}>
       {message}
     </Text>
-  ) : null;
+  );
+  if (!signed) return words;
+  return (
+    <View style={[styles.signed, align === 'center' ? styles.signedCentred : null, style]}>
+      <Icon colorRole="pageInk" name="warning" size="sm" />
+      {words}
+    </View>
+  );
 }
 
 export type ChoiceRowProps = {
@@ -208,10 +244,10 @@ const useStyles = makeStyles((roles, mode) => ({
   cardInvalid: {
     borderColor: roles.danger,
   },
-  error: {
-    ...uiTextFor(roles).meta,
-    color: roles.danger,
-  },
+  centred: { textAlign: 'center' },
+  signed: { flexDirection: 'row', alignItems: 'flex-start', gap: uiSpace.xs },
+  signedCentred: { justifyContent: 'center' },
+  signedWords: { flexShrink: 1 },
   value: {
     flexShrink: 1,
     maxWidth: '60%',

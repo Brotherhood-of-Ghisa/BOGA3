@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
-import { RefreshControl, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 import { ActionButton, CompactCard, FigureText, Icon, ScreenScroll, uiGeometry, uiSpace, useUiGroundTone, useUiText } from '@/components/ui';
 import { GroupInlineError, GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
@@ -63,7 +64,7 @@ export function GroupCoWsPage({ userId, groupId, metric = null, embedded = false
   const preview = shown ? <CoWPreview key={`${shown.cow.cow_id}:${metric}`} result={shown} userId={userId} dateFormat={dateFormat}
     initialMetric={metric} testID="cows-preview" onOpen={selected => open(shown.cow, selected)} browseLabel="Full standings" onBrowse={selected => open(shown.cow, selected)} /> : null;
   const manager = Boolean(group.data && canManageGroup(group.data.group.my_role));
-  return <ScreenScroll testID="cows-screen" contentContainerStyle={embedded ? { padding: 0 } : undefined} refreshControl={<RefreshControl refreshing={cows.refreshing || summary.refreshing} onRefresh={() => void refresh()} />}>
+  return <ScreenScroll testID="cows-screen" contentContainerStyle={embedded ? { padding: 0 } : undefined} refreshControl={<PageRefreshControl refreshing={cows.refreshing || summary.refreshing} onRefresh={() => void refresh()} />}>
     {!embedded ? <Text allowFontScaling={false} style={[text.title, page.ink]}>{group.data?.group.name ?? 'Group'}</Text> : null}
     {offline ? <GroupOfflineBanner lastUpdatedAtMs={summary.lastUpdatedAtMs} /> : null}
     {error && (summary.data || cows.firstPage) ? <GroupInlineError error={error} onRetry={() => void refresh()} testID="cows-error" /> : null}

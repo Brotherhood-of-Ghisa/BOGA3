@@ -13,6 +13,7 @@ import {
   ActionButton,
   Card,
   FigureText,
+  FormError,
   ScreenScroll,
   StatePanel,
   uiSpace,
@@ -166,8 +167,6 @@ export function TrainScreen({
   sessionEntry = DEFAULT_SESSION_ENTRY_COORDINATOR,
   renderWorkout = renderSessionView,
 }: TrainScreenProps) {
-  const text = useUiText();
-  const tone = useUiTextTone();
   const insets = useSafeAreaInsets();
   const launchInFlightRef = useRef(false);
   const [launchError, setLaunchError] = useState<{
@@ -259,9 +258,7 @@ export function TrainScreen({
             testID="train-start-empty-button"
           />
           {launchError?.kind === 'empty' ? (
-            <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger, styles.errorText]} testID="train-empty-launch-error">
-              {launchError.message}
-            </Text>
+            <FormError align="center" message={launchError.message} testID="train-empty-launch-error" textRole="bodyStrong" />
           ) : null}
         </View>
         {ready ? (
@@ -365,9 +362,7 @@ function TrainPlanning({
         />
       </Card>
       {launchError ? (
-        <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger, styles.errorText]} testID="train-planned-launch-error">
-          {launchError}
-        </Text>
+        <FormError align="center" message={launchError} testID="train-planned-launch-error" textRole="bodyStrong" />
       ) : null}
       <View style={styles.planningLink}>
         <ActionButton
@@ -517,8 +512,5 @@ const styles = StyleSheet.create({
   },
   planningLink: {
     alignItems: 'center',
-  },
-  errorText: {
-    textAlign: 'center',
   },
 });

@@ -1,6 +1,7 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { useMemo, useState, type ReactElement } from 'react';
-import { FlatList, RefreshControl, type StyleProp, type ViewStyle } from 'react-native';
+import { FlatList, type StyleProp, type ViewStyle } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 import { StatePanel } from '@/components/ui';
 import type { GroupRole, GroupStreamState, StreamMembershipViewModel } from '@/src/groups';
 import { buildCompetitionStreamModels, DEFAULT_HIDDEN_STREAM_EVENT_KINDS, type CompetitionSessionCard,
@@ -51,7 +52,7 @@ export function GroupStreamList({ stream,userId,roleForGroup,onCertificationChan
       contentContainerStyle={[groupScreenStyles.content,contentContainerStyle]} data={models}
       keyExtractor={item => `${item.kind}:${item.key}`} renderItem={renderItem}
       onEndReached={() => void stream.loadMore()} onEndReachedThreshold={0.5}
-      refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
+      refreshControl={<PageRefreshControl onRefresh={onRefresh} refreshing={pulling} />}
       style={groupScreenStyles.screen} testID={testID} />
     {live?.kind === 'competition' && live.event.kind === 'record' ?
       <GroupMetricStreamRecordSheet key={`${userId}:${live.key}`} record={live.event} detail={live.record} userId={userId}

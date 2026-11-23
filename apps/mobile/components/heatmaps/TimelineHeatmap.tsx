@@ -26,7 +26,9 @@ import {
 import Svg, { Line, Path, Rect } from 'react-native-svg';
 
 import { FigureText, IconButton, uiGeometry, uiSpace, uiTypography, useUiRoles } from '@/components/ui';
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { contrastRatio } from '@/components/ui/lch';
+import { useUiGround } from '@/components/ui/ground';
+import { groundInks, useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import type { CalendarHeatmapMetric } from '@/src/data';
 
 import type { HeatmapData } from './heatmapData';
@@ -95,20 +97,20 @@ function Readout({ week, figure, onStep, hasPrevious, hasNext, testID }: {
 }) {
   const dateFormat = useDateFormat();
   const text = useUiText();
-  const tone = useUiTextTone();
+  const tone = useUiGroundTone();
   return <View style={styles.readout}>
     <View style={styles.weekNav}>
       <IconButton accessibilityLabel="Previous week" disabled={!hasPrevious} name="chevron-left"
         onPress={() => onStep(-1)} testID={`${testID}-previous-week`} />
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.weekColumn}>
-        <Text allowFontScaling={false} style={text.title}
+        <Text allowFontScaling={false} style={[text.title, tone.ink]}
           testID={`${testID}-readout-week`}><FigureText figureStyle={TITLE_FIGURE}>{weekLabel(week.monday, dateFormat)}</FigureText></Text>
       </View>
       <IconButton accessibilityLabel="Next week" disabled={!hasNext} name="chevron-right"
         onPress={() => onStep(1)} testID={`${testID}-next-week`} />
     </View>
     <Text importantForAccessibility="no" accessibilityElementsHidden allowFontScaling={false}
-      style={text.figureLarge} testID={`${testID}-readout-value`}>
+      style={[text.figureLarge, tone.ink]} testID={`${testID}-readout-value`}>
       {figure.value}{figure.unit ? <Text allowFontScaling={false} style={[text.label, tone.faint]}> {figure.unit}</Text> : null}
     </Text>
   </View>;
@@ -118,7 +120,7 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
   metricLabel, unitLabel, header, children }: Props) {
   const dateFormat = useDateFormat();
   const text = useUiText();
-  const tone = useUiTextTone();
+  const tone = useUiGroundTone();
   const testID = `${testIDPrefix}-timeline`;
   const series = useMemo(() => buildTimelineSeries(data.weekly, metric), [data.weekly, metric]);
   const [plotWidth, setPlotWidth] = useState(FALLBACK_PLOT_WIDTH);
@@ -205,14 +207,18 @@ function TimelinePlot({ geometry, focusedIndex, testID }: {
 }) {
   const roles = useUiRoles();
   const { width, height, columnWidth } = geometry;
+  // The focused bar is drawn in the ground's ink, on a `ruleSoft` band where
+  // that bar reads on it (not on Ink + paper's dark page, whose ink is light).
+  const focusedFill = groundInks(roles, useUiGround()).ink;
+  const band = contrastRatio(focusedFill, roles.ruleSoft) >= 3;
   return <View pointerEvents="none">
     <Svg height={height} width={width}>
-      {focusedIndex >= 0 ? <Rect fill={roles.ruleSoft} height={height} testID={`${testID}-selected`}
+      {focusedIndex >= 0 && band ? <Rect fill={roles.ruleSoft} height={height} testID={`${testID}-selected`}
         width={columnWidth} x={focusedIndex * columnWidth} y={0} /> : null}
       {geometry.ticks.map((tick, index) => <Line key={tick.value} stroke={index === 0 ? roles.rule : roles.ruleSoft}
         strokeWidth={1} x1={0} x2={width} y1={tick.y} y2={tick.y} />)}
       {geometry.bars.map(bar => <Path key={bar.weekStartDateKey} d={barPath(bar)}
-        fill={bar.index === focusedIndex ? roles.ink : roles.viz4} testID={`${testID}-bar-${bar.weekStartDateKey}`} />)}
+        fill={bar.index === focusedIndex ? focusedFill : roles.viz4} testID={`${testID}-bar-${bar.weekStartDateKey}`} />)}
     </Svg>
   </View>;
 }

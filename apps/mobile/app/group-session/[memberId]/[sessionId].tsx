@@ -1,7 +1,7 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useCallback } from 'react';
-import { RefreshControl } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 
 import {
   FriendSessionContent,
@@ -130,7 +130,7 @@ function GroupSessionContent({ userId, groupId, memberId, sessionId }: { userId:
 
   return (
     <ScreenScroll
-      refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
+      refreshControl={<PageRefreshControl onRefresh={onRefresh} refreshing={pulling} />}
       testID="group-session-screen">
       <GroupSessionHeader groupName={group.data?.group.name ?? null} session={session} userId={userId} />
       {detail.lostAccess || records.lostAccess ? (

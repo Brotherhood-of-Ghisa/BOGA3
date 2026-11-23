@@ -1,16 +1,16 @@
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useConnectedAgentNames } from '@/components/more/use-connected-agent-names';
 import {
   Card,
+  FormError,
   Icon,
   ListRow,
   ScreenScroll,
   uiSpace,
-  useUiText, useUiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { MORE_GROUPS, type MoreDestination } from '@/src/navigation/more-destinations';
@@ -18,8 +18,6 @@ import { getAgentConnectUrl } from '@/src/utils/agent-connect';
 
 // Like the other tabs, More has no title: two untitled cards of destinations.
 export default function MoreScreen() {
-  const text = useUiText();
-  const tone = useUiTextTone();
   const router = useRouter();
   const { user } = useAuth();
   const agentNames = useConnectedAgentNames(user?.id ?? null);
@@ -80,13 +78,7 @@ export default function MoreScreen() {
                   }
                 />
                 {isConnect && connectError ? (
-                  <Text
-                    allowFontScaling={false}
-                    accessibilityLiveRegion="polite"
-                    style={[text.bodyStrong, tone.danger, styles.inlineError]}
-                    testID="more-connect-ai-error">
-                    {connectError}
-                  </Text>
+                  <FormError message={connectError} style={styles.inlineError} testID="more-connect-ai-error" textRole="bodyStrong" />
                 ) : null}
               </View>
             );

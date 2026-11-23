@@ -1,7 +1,8 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { Stack, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Text, FlatList, RefreshControl, View } from 'react-native';
+import { Text, FlatList, View } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 
 import { Icon, IconButton, ListRow, Sheet, uiSpace, useUiGroundTone, useUiText } from '@/components/ui';
 import { canManageGroup, getGroup, groupCacheKeys, useGroupOnlinePages, useGroupResource, type GroupBoardScope, type GroupGetResult } from '@/src/groups';
@@ -117,7 +118,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
         onRetry={() => void board.loadMore()} noun="rows" testIDPrefix="group-board" />}
       data={rebuilding ? [] : rows} keyExtractor={row => row.key} testID="group-board-list"
       onEndReached={() => { if (!staleCursor) void board.loadMore(); }} onEndReachedThreshold={0.5}
-      refreshControl={<RefreshControl refreshing={pulling} onRefresh={onRefresh} />}
+      refreshControl={<PageRefreshControl refreshing={pulling} onRefresh={onRefresh} />}
       renderItem={({ item, index }) => <GroupBoardRow row={item} index={index} count={rows.length}
         onPress={() => setSelected(board.items.find(row => row.member.user_id === item.key) ?? null)} />} />
     {liveSelected && !rebuilding ? <GroupMetricRecordSheet key={`${liveSelected.member.user_id}:${liveSelected.performance.set_id}:${metric}:${exercise.rules.rules_revision}`}

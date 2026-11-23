@@ -3,7 +3,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
 import { uiHairline } from '@/components/ui/edge';
 import { uiMark } from '@/components/ui/marks';
@@ -15,7 +15,7 @@ export function HeatmapLegend({ target = false }: { target?: boolean }) {
   const styles = useStyles();
   const roles = useUiRoles();
   const text = useUiText();
-  const tone = useUiTextTone();
+  const tone = useUiGroundTone();
   return (
     <View style={styles.legend}>
       <Text allowFontScaling={false} style={[text.label, tone.faint]}>

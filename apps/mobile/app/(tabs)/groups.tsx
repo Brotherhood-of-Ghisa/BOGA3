@@ -3,7 +3,8 @@ import { getCompetitionPodiums } from '@/src/groups/api';
 import type { CompetitionPodiumsWire as GroupMetricPodiumWire } from '@/src/groups/competition-wire';
 import { useFocusEffect, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useReducer, useState, type ReactElement, type ReactNode } from 'react';
-import { RefreshControl, ScrollView, View, type RefreshControlProps } from 'react-native';
+import { ScrollView, View, type RefreshControlProps } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 
 import {
   GroupGlancePage,
@@ -163,7 +164,7 @@ function GroupsTabContent({ userId }: { userId: string }) {
   const offline = mine.offline || segmentResource.offline;
   const inlineError = pickInlineError(mine.error, segmentResource.error);
   const hasGroups = groups !== null && groups.length > 0;
-  const refreshControl = <RefreshControl onRefresh={onRefresh} refreshing={pulling} />;
+  const refreshControl = <PageRefreshControl onRefresh={onRefresh} refreshing={pulling} />;
 
   const groupName = groups?.find((group) => group.group_id === selectedGroupId)?.name ?? 'Groups';
   const titleBar = (

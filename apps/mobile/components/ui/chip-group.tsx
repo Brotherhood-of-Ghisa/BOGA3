@@ -1,7 +1,8 @@
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { uiEdge } from '@/components/ui/edge';
-import { uiTextFor } from '@/components/ui/text-roles';
+import { useUiGround } from '@/components/ui/ground';
+import { selectedPill, uiTextFor } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
@@ -44,11 +45,12 @@ export type ChipGroupProps<TValue extends string | number> = ChipGroupBaseProps<
   );
 
 // Pills that wrap onto more lines rather than scrolling sideways, each a
-// control inside the edge; an `ink` pill is on. `single` reads as a tab list (`selected`), `multi` as checkboxes
+// control inside the edge; an `ink` pill is on (outlined in `pageInk` where the page is as dark: `selectedPill`). `single` reads as a tab list (`selected`), `multi` as checkboxes
 // (`checked`), so state never rides colour alone.
 export function ChipGroup<TValue extends string | number>(props: ChipGroupProps<TValue>) {
   const { options, testIDPrefix, accessibilityLabel, style } = props;
   const styles = useStyles();
+  const onPage = useUiGround() === 'page';
   const isOn = (value: TValue) =>
     props.mode === 'single' ? props.value === value : props.values.includes(value);
 
@@ -76,7 +78,7 @@ export function ChipGroup<TValue extends string | number>(props: ChipGroupProps<
                 props.onChange(props.clearValue);
               }
             }}
-            style={({ pressed }) => [styles.chip, on ? styles.chipOn : null, pressed && !on ? styles.pressed : null]}
+            style={({ pressed }) => [styles.chip, on ? (onPage ? styles.chipOnPage : styles.chipOn) : null, pressed && !on ? styles.pressed : null]}
             testID={`${testIDPrefix}-${option.value}`}>
             <Text
               allowFontScaling={false}
@@ -108,6 +110,10 @@ const useStyles = makeStyles((roles, mode) => ({
   chipOn: {
     backgroundColor: roles.ink,
     borderColor: roles.ink,
+  },
+  chipOnPage: {
+    backgroundColor: selectedPill(roles, 'page').fill,
+    borderColor: roles[selectedPill(roles, 'page').edge],
   },
   pressed: {
     backgroundColor: roles.inset,

@@ -1,7 +1,8 @@
 import { CoWGroupPreview } from '@/components/groups/cow-group-preview';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 
 import {
   GroupExercisesPage,
@@ -109,7 +110,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
   const inlineError = pickInlineError(group.error, exercises.error);
   const calendarError = pickInlineError(calendar.error);
   const lastUpdatedAtMs = exercises.lastUpdatedAtMs ?? group.lastUpdatedAtMs;
-  const refreshControl = <RefreshControl onRefresh={onRefresh} refreshing={pulling} />;
+  const refreshControl = <PageRefreshControl onRefresh={onRefresh} refreshing={pulling} />;
   const data = group.data;
 
   if (!data) {
