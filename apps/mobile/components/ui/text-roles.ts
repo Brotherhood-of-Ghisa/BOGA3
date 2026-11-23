@@ -218,7 +218,7 @@ export function useUiTextTone() {
 // a coloured word is drawn in the page ink and its sign, glyph or words carry
 // what the colour did.
 export function pageWordColour(roles: UiRoles, colour: string, floor = 4.5): string {
-  return contrastRatio(colour, roles.paper) >= floor ? colour : roles.pageInk;
+  return readsOnPage(roles, colour, floor) ? colour : roles.pageInk;
 }
 
 // The inks and coloured words for the page, cached per theme as the tones are.
@@ -256,13 +256,19 @@ export function useUiGroundInks() {
   return groundInks(useUiRoles(), useUiGround());
 }
 
-// A selected pill's fill and label on `ground`: an `ink` pill with its
-// `onInk` label on a card; on the page, a `pageInk` pill, labelled in
-// `onInk` where that reads on it and in the page's own colour where it
-// does not (Ink + paper, whose page ink is light).
-export function selectedPill(roles: UiRoles, ground: UiGround): { fill: string; label: string } {
-  if (ground === 'card') return { fill: roles.ink, label: roles.onInk };
-  return { fill: roles.pageInk, label: contrastRatio(roles.onInk, roles.pageInk) >= 4.5 ? roles.onInk : roles.paper };
+// A selected pill on `ground`: an `ink` pill with its `onInk` label, set off
+// from the unselected `surface` pills by its fill. Its edge is `ink` where
+// that stands off the ground, and `pageInk` where it does not (Ink + paper's
+// page, as dark as `ink`), so the pill keeps its outline there. `edge` is a
+// role, for `uiEdge`'s `tone`.
+export function selectedPill(roles: UiRoles, ground: UiGround): { fill: string; label: string; edge: 'ink' | 'pageInk' } {
+  const edge = ground === 'page' && !readsOnPage(roles, roles.ink, 3) ? 'pageInk' : 'ink';
+  return { fill: roles.ink, label: roles.onInk, edge };
+}
+
+/** Whether `colour` clears `floor` on the page. */
+export function readsOnPage(roles: UiRoles, colour: string, floor: number): boolean {
+  return contrastRatio(colour, roles.paper) >= floor;
 }
 
 // One embedded weight up, for the row that is mine, a live session, the gym.

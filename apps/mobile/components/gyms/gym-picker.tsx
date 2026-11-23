@@ -2,12 +2,10 @@ import { useRef, useState, type ComponentRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
-import { useUiGround } from '@/components/ui/ground';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { Sheet } from '@/components/ui/sheet';
-import { selectedPill, useUiText } from '@/components/ui/text-roles';
-import { useUiRoles } from '@/components/ui/theme-context';
+import { useUiText } from '@/components/ui/text-roles';
 import {
   ALL_GYMS_LABEL,
   SELECTED_GYM_LABEL,
@@ -86,8 +84,6 @@ export function GymPicker({ value, options, onChange, allSessionCount, size = 'p
 }
 
 export function GymPickerButton({ value, options, onPress, size = 'pill', testID }: GymPickerButtonProps) {
-  // The chevron on a selected chip takes the pill's label colour.
-  const onLabel = selectedPill(useUiRoles(), useUiGround()).label;
   const offered = offeredOptions(value, options);
   if (!showsGymPicker(value, offered)) return null;
   const label = gymScopeLabel(value, offered);
@@ -98,7 +94,7 @@ export function GymPickerButton({ value, options, onPress, size = 'pill', testID
       accessibilityRole="button"
       label={label}
       size={size}
-      trailing={size !== 'compact' ? undefined : value !== undefined ? <Icon color={onLabel} name="chevron-down" size="xs" /> : <Icon colorRole="inkMuted" name="chevron-down" size="xs" />}
+      trailing={size === 'compact' ? <Icon colorRole={value !== undefined ? 'onInk' : 'inkMuted'} name="chevron-down" size="xs" /> : undefined}
       on={value !== undefined}
       onPress={onPress}
       testID={testID}

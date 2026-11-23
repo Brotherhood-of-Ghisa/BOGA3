@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { StyleSheet, Text, TextInput, View, type KeyboardTypeOptions, type StyleProp, type ViewStyle } from 'react-native';
+import { Text, TextInput, View, type KeyboardTypeOptions, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { uiEdge } from '@/components/ui/edge';
@@ -7,7 +7,7 @@ import { useUiGround } from '@/components/ui/ground';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
-import { useUiGroundTone, useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { pageWordColour, useUiGroundTone, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
@@ -77,8 +77,9 @@ export function FormError({ message, testID, textRole = 'meta', align = 'start',
   const roles = useUiRoles();
   const text = useUiText();
   const tone = useUiGroundTone();
+  const onPage = useUiGround() === 'page';
   if (!message) return null;
-  const signed = StyleSheet.flatten(tone.danger)?.color !== roles.danger;
+  const signed = onPage && pageWordColour(roles, roles.danger) !== roles.danger;
   const words = (
     <Text
       accessibilityLiveRegion="polite"

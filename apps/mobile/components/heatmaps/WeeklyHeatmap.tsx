@@ -14,7 +14,8 @@ import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FigureText, makeStyles, uiGeometry, uiMark, uiSpace, uiTypography, useUiRoles, uiWell } from '@/components/ui';
-import { useUiGroundInks, useUiGroundTone, useUiText } from '@/components/ui/text-roles';
+import { useUiGround } from '@/components/ui/ground';
+import { readsOnPage, useUiGroundInks, useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
 import { calculateLinearPercentile } from '@/src/session-insights/calculations';
@@ -72,6 +73,10 @@ function WeeklyAnnotations({ references, testID, children }: {
   const text = useUiText();
   const tone = useUiGroundTone();
   const inks = useUiGroundInks();
+  const roles = useUiRoles();
+  // A reference line crosses the page and the track: `inkMuted`, or on a page
+  // it does not read on (Ink + paper's), `pageInkFaint`, which reads on both.
+  const referenceColour = useUiGround() === 'page' && !readsOnPage(roles, roles.inkMuted, 3) ? roles.pageInkFaint : roles.inkMuted;
   const [plotWidth, setPlotWidth] = useState(0);
   const [labelWidths, setLabelWidths] = useState<Record<string, number>>({});
   // Prefer the median, then lower, then upper, without moving any tick.
@@ -106,7 +111,7 @@ function WeeklyAnnotations({ references, testID, children }: {
       return <React.Fragment key={annotation.id}>
         <View accessible={!children} accessibilityRole="text" accessibilityLabel={annotation.description}
           testID={`${testID}-${annotation.id}`}
-          style={[children ? styles.reference : [styles.axisReference, { backgroundColor: inks.inkMuted }], { left: `${annotation.position}%` }]} />
+          style={[children ? [styles.reference, { backgroundColor: referenceColour }] : [styles.axisReference, { backgroundColor: inks.inkMuted }], { left: `${annotation.position}%` }]} />
         {children ? <View {...annotationProps}>
           <Text allowFontScaling={false} numberOfLines={1} style={[text.label, tone.muted]}>{annotation.label}</Text>
           <View style={styles.annotationGap} />
@@ -249,7 +254,8 @@ const useStyles = makeStyles((roles, mode) => ({
     textAlign: 'right' },
   referencePlot: { height: ROW_HEIGHT },
   annotatedTrack: { position: 'absolute', top: uiTypography.lineHeight.xxs + uiSpace.xs, left: 0, right: 0 },
-  reference: { position: 'absolute', top: uiTypography.lineHeight.xxs, height: uiSpace.lg + uiSpace.sm, width: 1, backgroundColor: roles.inkMuted },
+  // Its colour is set where it is drawn.
+  reference: { position: 'absolute', top: uiTypography.lineHeight.xxs, height: uiSpace.lg + uiSpace.sm, width: 1 },
   annotationGap: { height: uiSpace.lg + uiSpace.xs * 2 },
   // Its colour is the ground's muted ink, set where it is drawn.
   axisReference: { position: 'absolute', bottom: 0, height: uiSpace.sm, width: 1 },

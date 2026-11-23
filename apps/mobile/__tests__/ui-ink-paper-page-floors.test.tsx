@@ -19,6 +19,8 @@ import { contrastRatio } from '@/components/ui/lch';
 import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 import { pageWordColour, selectedPill } from '@/components/ui/text-roles';
 import { generateRoles, type UiRoles } from '@/components/ui/theme';
+import { customFromSeeds, generateCustomRoles } from '@/components/ui/theme-custom';
+import { seedsFromHue } from '@/components/ui/theme-hue';
 import { themePresets, type AppearanceChoice } from '@/components/ui/theme-presets';
 import type { DailyEffortMetrics } from '@/src/data';
 import { loadRmCurve } from '@/src/rm-curve/repository';
@@ -41,6 +43,8 @@ import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 const INK_PAPER: AppearanceChoice = { theme: 'ink-paper', mode: 'light', custom: null };
 const WARM: AppearanceChoice = { theme: 'warm', mode: 'light', custom: null };
 const roles = (): UiRoles => rolesFor(INK_PAPER);
+const MODES = ['light', 'dark'] as const;
+const OTHER_PRESETS = themePresets.filter((preset) => preset.ladder === undefined);
 
 const HEX = /^#[0-9A-F]{6}$/i;
 const SHAPES = [Path, Rect, Circle, Line, Ellipse, Polyline];
@@ -83,7 +87,15 @@ function belowFloor(): string[] {
     .flatMap((node) => [node.props.stroke, node.props.fill]
       .filter((paint): paint is string => typeof paint === 'string' && HEX.test(paint))
       .map((colour) => ({ what: `${String((node.type as { displayName?: string }).displayName ?? 'shape')}`, colour, ground: groundOf(node, page), floor: 3 })));
-  return [...words, ...glyphs]
+  // A mark drawn as a thin view: a tick, a reference line, a rule.
+  const marks = hostNodes('View')
+    .filter((node) => {
+      const style = StyleSheet.flatten(node.props.style) ?? {};
+      return typeof style.backgroundColor === 'string' && HEX.test(style.backgroundColor)
+        && ((typeof style.width === 'number' && style.width <= 2) || (typeof style.height === 'number' && style.height <= 2));
+    })
+    .map((node) => ({ what: 'mark', colour: StyleSheet.flatten(node.props.style)?.backgroundColor as string, ground: groundOf(node, page), floor: 3 }));
+  return [...words, ...glyphs, ...marks]
     .filter(({ ground }) => ground === page)
     .filter(({ colour, ground, floor }) => colour !== undefined && HEX.test(colour) && contrastRatio(colour, ground) < floor)
     .map(({ what, colour, ground }) => `${what}: ${colour} on ${ground}`);
@@ -94,22 +106,26 @@ beforeEach(async () => {
 });
 
 describe('the page-safe colours', () => {
-  it('keep a coloured word’s own colour wherever it reads on the page: every other preset and hue theme', () => {
-    const others = [
-      ...themePresets.filter((preset) => preset.ladder === undefined).flatMap((preset) => (['light', 'dark'] as const).map((mode) => rolesFor({ theme: preset.id, mode, custom: null }))),
-      ...Array.from({ length: 360 }, (_, hue) => generateRoles({ background: '#6B6358', text: '#6B6358', accent: '#B83902', record: '#845F0F', direction: 'green-crimson' }, hue % 2 ? 'dark' : 'light')),
-    ];
-    for (const each of others) {
-      for (const colour of [each.danger, each.accent, each.record]) expect(pageWordColour(each, colour)).toBe(colour);
-      expect(selectedPill(each, 'page')).toEqual({ fill: each.ink, label: each.onInk });
-    }
+  it('keep a coloured word’s own colour, and a selected pill’s `ink`, in every other preset, every hue theme and custom theme', () => {
+    const others = MODES.flatMap((mode) => [
+      ...OTHER_PRESETS.map((preset) => rolesFor({ theme: preset.id, mode, custom: null })),
+      ...Array.from({ length: 360 }, (_, hue) => generateRoles(seedsFromHue(hue), mode)),
+      ...themePresets.map((preset) => generateCustomRoles(customFromSeeds(preset.seeds, mode))),
+    ]);
+    const moved = others.filter((each) =>
+      [each.danger, each.accent, each.record].some((colour) => pageWordColour(each, colour) !== colour)
+      || JSON.stringify(selectedPill(each, 'page')) !== JSON.stringify({ fill: each.ink, label: each.onInk, edge: 'ink' }));
+    expect(moved).toEqual([]);
   });
 
-  it('draws Ink + paper’s coloured words on the page in the page ink, and its selected pill in the page ink with a page-coloured label', () => {
+  it('draws Ink + paper’s coloured words on the page in the page ink, and outlines its selected `ink` pill in the page ink', () => {
     for (const colour of [roles().danger, roles().accent, roles().record]) expect(pageWordColour(roles(), colour)).toBe(roles().pageInk);
     const pill = selectedPill(roles(), 'page');
-    expect(contrastRatio(pill.fill, roles().paper)).toBeGreaterThanOrEqual(3);
+    expect(pill).toEqual({ fill: roles().ink, label: roles().onInk, edge: 'pageInk' });
+    expect(contrastRatio(roles()[pill.edge], roles().paper)).toBeGreaterThanOrEqual(3);
     expect(contrastRatio(pill.label, pill.fill)).toBeGreaterThanOrEqual(4.5);
+    // Told apart from an unselected `surface` pill.
+    expect(contrastRatio(pill.fill, roles().surface)).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -127,12 +143,16 @@ describe('an error line', () => {
     expect(screen.UNSAFE_queryAllByProps({ name: 'warning' })).toHaveLength(1);
   });
 
-  it('is `danger` with no sign on the page of every other preset', async () => {
-    await switchTheme(WARM);
-    renderWithTheme(<FormError message="Not saved" testID="error" />);
-    expect(StyleSheet.flatten(screen.getByTestId('error').props.style).color).toBe(rolesFor(WARM).danger);
-    expect(screen.UNSAFE_queryAllByProps({ name: 'warning' })).toHaveLength(0);
-  });
+  it.each(MODES.flatMap((mode) => OTHER_PRESETS.map((preset) => [preset.id, mode] as const)))(
+    'is `danger` with no sign on the page of %s in %s mode',
+    async (theme, mode) => {
+      const choice: AppearanceChoice = { theme, mode, custom: null };
+      await switchTheme(choice);
+      renderWithTheme(<FormError message="Not saved" testID="error" />);
+      expect(StyleSheet.flatten(screen.getByTestId('error').props.style).color).toBe(rolesFor(choice).danger);
+      expect(screen.UNSAFE_queryAllByProps({ name: 'warning' })).toHaveLength(0);
+    },
+  );
 
   it('under a field on the page reads too', () => {
     renderWithTheme(<FormField error="Use a whole number." label="Reps" onChangeText={jest.fn()} testID="reps" value="x" />);
@@ -208,16 +228,30 @@ describe('the RM curve’s count lines', () => {
 });
 
 describe('a selected chip on the page', () => {
+  const styleOf = (node: ReactTestInstance) => StyleSheet.flatten(node.props.style) ?? {};
+  const pills = (fill: string) => hostNodes('View').filter((node) => styleOf(node).backgroundColor === fill);
+
   it.each([
     ['ChipGroup', <ChipGroup key="c" mode="single" onChange={jest.fn()} options={[{ value: 'a', label: 'All' }, { value: 'b', label: 'Mine' }]} testIDPrefix="chips" value="a" />],
-    ['FilterChip', <FilterChip key="f" accessibilityLabel="Filter" accessibilityRole="button" label="Chest" on onPress={jest.fn()} testID="filter" />],
-    ['a compact gym chip', <GymPickerButton key="g" onPress={jest.fn()} options={[{ gymId: 'g1', name: 'Home' }, { gymId: 'g2', name: 'Club' }]}
-      size="compact" testID="gym" value="g1" />],
-  ] as [string, ReactElement][])('stands off the page, its label readable: %s', (_name, view) => {
+    ['FilterChip', (
+      <View key="f">
+        <FilterChip accessibilityLabel="Chest" accessibilityRole="button" label="Chest" on onPress={jest.fn()} testID="on" />
+        <FilterChip accessibilityLabel="Back" accessibilityRole="button" label="Back" on={false} onPress={jest.fn()} testID="off" />
+      </View>
+    )],
+  ] as [string, ReactElement][])('is an outlined `ink` pill among `surface` ones: %s', (_name, view) => {
     renderWithTheme(view);
     expect(belowFloor()).toEqual([]);
-    const fills = hostNodes('View').map((node) => StyleSheet.flatten(node.props.style)?.backgroundColor).filter((colour) => colour === roles().pageInk);
-    expect(fills.length).toBeGreaterThan(0);
+    const [selected] = pills(roles().ink);
+    const [unselected] = pills(roles().surface);
+    expect(contrastRatio(styleOf(selected).borderColor as string, roles().paper)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(roles().ink, styleOf(unselected).backgroundColor as string)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps a compact gym chip’s label and chevron readable on its pill', () => {
+    renderWithTheme(<GymPickerButton onPress={jest.fn()} options={[{ gymId: 'g1', name: 'Home' }, { gymId: 'g2', name: 'Club' }]} size="compact" testID="gym" value="g1" />);
+    expect(belowFloor()).toEqual([]);
+    expect(contrastRatio(styleOf(pills(roles().ink)[0]).borderColor as string, roles().paper)).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -227,6 +261,17 @@ describe('pull to refresh', () => {
     const control = screen.UNSAFE_getByType(RefreshControl);
     expect(control.props.tintColor).toBe(roles().pageInkMuted);
     expect(contrastRatio(control.props.tintColor, roles().paper)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('passes on the style and the scroll view Android’s ScrollView clones into it', () => {
+    renderWithTheme(
+      <PageRefreshControl onRefresh={jest.fn()} refreshing={false} style={{ flex: 1 }}>
+        <View testID="scroll-content" />
+      </PageRefreshControl>,
+    );
+    const control = screen.UNSAFE_getByType(RefreshControl);
+    expect(control.props.style).toEqual({ flex: 1 });
+    expect(control.props.children.props.testID).toBe('scroll-content');
   });
 
   it('is offered only through `PageRefreshControl`', () => {

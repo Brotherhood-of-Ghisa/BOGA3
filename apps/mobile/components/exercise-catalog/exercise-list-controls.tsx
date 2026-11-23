@@ -90,7 +90,7 @@ export function FilterChip({ label, size = 'pill', leading, trailing, on, onPres
       style={({ pressed }) => [styles.chip, compact && styles.compact, on ? (onPage ? styles.chipOnPage : styles.chipOn) : null, pressed && !on ? styles.chipPressed : null]}
       testID={testID}>
       {leading}
-      <Text allowFontScaling={false} numberOfLines={1} style={[text.label, compact ? styles.compactLabel : tone.ink, on ? (onPage ? styles.chipLabelOnPage : styles.chipLabelOn) : null]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.label, compact ? styles.compactLabel : tone.ink, on ? styles.chipLabelOn : null]}>
         {label}
       </Text>
       {trailing}
@@ -341,13 +341,10 @@ const useStyles = makeStyles((roles, mode) => ({
   chipLabelOn: {
     color: roles.onInk,
   },
-  // On the page the pill is `pageInk` (`selectedPill`).
+  // On the page its edge is `selectedPill`'s: `pageInk` where `ink` is as dark as the page.
   chipOnPage: {
-    ...uiEdge(roles, mode, { shape: 'pill', tone: 'pageInk' }),
+    ...uiEdge(roles, mode, { shape: 'pill', tone: selectedPill(roles, 'page').edge }),
     backgroundColor: selectedPill(roles, 'page').fill,
-  },
-  chipLabelOnPage: {
-    color: selectedPill(roles, 'page').label,
   },
   sections: {
     gap: uiSpace.sm,

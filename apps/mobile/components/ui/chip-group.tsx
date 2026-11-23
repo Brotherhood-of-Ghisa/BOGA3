@@ -45,7 +45,7 @@ export type ChipGroupProps<TValue extends string | number> = ChipGroupBaseProps<
   );
 
 // Pills that wrap onto more lines rather than scrolling sideways, each a
-// control inside the edge; an `ink` pill is on (`pageInk` on the page: `selectedPill`). `single` reads as a tab list (`selected`), `multi` as checkboxes
+// control inside the edge; an `ink` pill is on (outlined in `pageInk` where the page is as dark: `selectedPill`). `single` reads as a tab list (`selected`), `multi` as checkboxes
 // (`checked`), so state never rides colour alone.
 export function ChipGroup<TValue extends string | number>(props: ChipGroupProps<TValue>) {
   const { options, testIDPrefix, accessibilityLabel, style } = props;
@@ -83,7 +83,7 @@ export function ChipGroup<TValue extends string | number>(props: ChipGroupProps<
             <Text
               allowFontScaling={false}
               numberOfLines={1}
-              style={[styles.label, on ? (onPage ? styles.labelOnPage : styles.labelOn) : option.faint ? styles.labelFaint : null]}>
+              style={[styles.label, on ? styles.labelOn : option.faint ? styles.labelFaint : null]}>
               {option.label}
             </Text>
           </Pressable>
@@ -113,7 +113,7 @@ const useStyles = makeStyles((roles, mode) => ({
   },
   chipOnPage: {
     backgroundColor: selectedPill(roles, 'page').fill,
-    borderColor: selectedPill(roles, 'page').fill,
+    borderColor: roles[selectedPill(roles, 'page').edge],
   },
   pressed: {
     backgroundColor: roles.inset,
@@ -124,9 +124,6 @@ const useStyles = makeStyles((roles, mode) => ({
   },
   labelOn: {
     color: roles.onInk,
-  },
-  labelOnPage: {
-    color: selectedPill(roles, 'page').label,
   },
   labelFaint: {
     color: roles.inkFaint,
