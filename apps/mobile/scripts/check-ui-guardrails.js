@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const { edgeShadowRule, legacyVocabularyRule, rawColorLiteralRule, ratchetRules } = require('./ui-guardrails.config');
+const { borderRule, edgeShadowRule, legacyVocabularyRule, rawColorLiteralRule, ratchetRules } = require('./ui-guardrails.config');
 const { findCompactPatternViolations } = require('./compact-pattern-guardrail');
 const { findListPatternViolations } = require('./list-pattern-guardrail');
 const { findTablePatternViolations } = require('./table-pattern-guardrail');
@@ -83,6 +83,56 @@ const EDGE_SHADOW_REGEX = /\b(?:shadow[A-Z]\w*|boxShadow|elevation)\s*(?::|=(?!=
 
 const EDGE_SHADOW_REMEDY =
   'spread uiEdge / uiWell (or uiHairline) from @/components/ui into the style instead of setting a shadow';
+
+// A container's own edge outside `components/ui` (`borderRule.ownerPrefix`): any
+// `borderColor`, `borderWidth`, `border*Radius`, `borderStyle` or per-side
+// `border*Width` / `border*Color` key, as a style key or an inline override.
+// Exactly one shape passes — the row divider: a single-side `border<Side>Width`
+// whose own object sets `border<Side>Color` to `ruleSoft` (a `0` width or radius is
+// the absence of an edge). A card, field, pill or swatch edge lives in a
+// primitive (`Card`, `Tag`, `ChipGroup`…), `uiEdge` / `uiHairline` or a
+// `uiMark` shape, all under `components/ui`, so the rule needs no per-file list.
+const BORDER_KEY_REGEX =
+  /\b(border(?:Top|Bottom|Left|Right|Start|End|Horizontal|Vertical)?(?:Width|Color)|border(?:Top|Bottom)?(?:Left|Right|Start|End)?Radius|borderStyle)\b\s*:\s*([^,}\n]*)/g;
+
+const BORDER_REMEDY =
+  'draw a container with Card / Notice / Tag / ChipGroup / FormField from @/components/ui, a shape with uiMark, or a row divider as a single-side ' +
+  'border<Side>Width with border<Side>Color: roles.ruleSoft';
+
+const SINGLE_SIDE_WIDTH_REGEX = /^border(Top|Bottom|Left|Right|Start|End)Width$/;
+const SINGLE_SIDE_COLOR_REGEX = /^border(Top|Bottom|Left|Right|Start|End)Color$/;
+const RULE_SOFT_VALUE_REGEX = /^\w+\.ruleSoft$/;
+
+// The `{ … }` that holds `index`: scan out to the unmatched braces on each side.
+function enclosingObject(source, index) {
+  let start = index;
+  for (let depth = 0; start > 0; start -= 1) {
+    const char = source[start - 1];
+    if (char === '}') depth += 1;
+    if (char === '{') {
+      if (depth === 0) break;
+      depth -= 1;
+    }
+  }
+  let end = index;
+  for (let depth = 0; end < source.length; end += 1) {
+    const char = source[end];
+    if (char === '{') depth += 1;
+    if (char === '}') {
+      if (depth === 0) break;
+      depth -= 1;
+    }
+  }
+  return source.slice(start, end);
+}
+
+function isRowDividerKey(source, key, value, index) {
+  if (/^0(?:\.0+)?$/.test(value)) return true;
+  if (SINGLE_SIDE_COLOR_REGEX.test(key)) return RULE_SOFT_VALUE_REGEX.test(value);
+  const side = SINGLE_SIDE_WIDTH_REGEX.exec(key)?.[1];
+  if (!side) return false;
+  return new RegExp(`\\bborder${side}Color\\s*:\\s*\\w+\\.ruleSoft\\b`).test(enclosingObject(source, index));
+}
 
 const UI_SCOPE = { targets: ['app', 'components'], extensions: ['.tsx'] };
 
@@ -264,6 +314,43 @@ function findEdgeShadowViolations({ rootDir, ownerFile = edgeShadowRule?.ownerFi
   return { ...result, ownerFile, violations, blockingViolations: violations };
 }
 
+function findBorderViolations({ rootDir, ownerPrefix = borderRule?.ownerPrefix } = {}) {
+  if (!ownerPrefix) {
+    throw new Error('borderRule.ownerPrefix is not set in scripts/ui-guardrails.config.js');
+  }
+  const resolvedRootDir = rootDir || path.resolve(__dirname, '..');
+  const files = collectUiFiles(resolvedRootDir, LEGACY_VOCABULARY_SCOPE);
+  const violations = [];
+
+  for (const relativePath of files) {
+    if (relativePath.startsWith(ownerPrefix)) continue;
+    const source = fs.readFileSync(path.join(resolvedRootDir, relativePath), 'utf8');
+    const lines = source.split(/\r?\n/);
+    for (const match of source.matchAll(BORDER_KEY_REGEX)) {
+      const [literal, key, rawValue] = match;
+      if (isRowDividerKey(source, key, rawValue.trim(), match.index)) continue;
+      const lineNumber = source.slice(0, match.index).split('\n').length;
+      violations.push({
+        file: relativePath,
+        line: lineNumber,
+        literal: `${key}: ${rawValue.trim()}`.trim() || literal,
+        allowlisted: false,
+        reason: null,
+        lineText: lines[lineNumber - 1].trim(),
+      });
+    }
+  }
+
+  return {
+    rootDir: resolvedRootDir,
+    filesScanned: files.length,
+    skippedAllowlistedFiles: [],
+    ownerPrefix,
+    violations,
+    blockingViolations: violations,
+  };
+}
+
 function findRatchetRuleViolations({
   ruleId,
   rootDir,
@@ -393,6 +480,22 @@ function formatEdgeShadowSummary(result) {
   return lines.join('\n');
 }
 
+function formatBorderSummary(result) {
+  const lines = [];
+  lines.push(`UI guardrail: container border or radius outside ${result.ownerPrefix}`);
+  lines.push(`Files scanned: ${result.filesScanned}`);
+  lines.push(`Blocking violations: ${result.blockingViolations.length}`);
+
+  if (result.blockingViolations.length > 0) {
+    lines.push('');
+    lines.push(`FAIL a container draws its own edge — ${BORDER_REMEDY}.`);
+    lines.push('');
+    formatViolationGroups(lines, result.blockingViolations);
+  }
+
+  return lines.join('\n');
+}
+
 function formatRatchetSummary(result, ratchet, { verbose = false } = {}) {
   const lines = [];
   lines.push(`UI guardrail: ${result.definition.title}`);
@@ -469,6 +572,10 @@ function runUiGuardrailCheck(options = {}) {
   write('');
   write(formatEdgeShadowSummary(edgeShadowResult));
 
+  const borderResult = findBorderViolations(options);
+  write('');
+  write(formatBorderSummary(borderResult));
+
   const compactViolations = findCompactPatternViolations(options);
   write('');
   write(`Compact patterns: ${compactViolations.length === 0 ? 'PASS' : 'FAIL'}`);
@@ -507,7 +614,7 @@ function runUiGuardrailCheck(options = {}) {
       write(`${BUDGET_LINE_INDENT}${ruleId}: ${count}`);
     }
 
-    return { color: colorResult, legacy: legacyResult, edgeShadow: edgeShadowResult, ratchets: ratchetResults, counts, ok: true };
+    return { color: colorResult, legacy: legacyResult, edgeShadow: edgeShadowResult, border: borderResult, ratchets: ratchetResults, counts, ok: true };
   }
 
   const ok =
@@ -518,9 +625,10 @@ function runUiGuardrailCheck(options = {}) {
     colorResult.blockingViolations.length === 0 &&
     legacyResult.blockingViolations.length === 0 &&
     edgeShadowResult.blockingViolations.length === 0 &&
+    borderResult.blockingViolations.length === 0 &&
     ratchetResults.every((entry) => entry.ratchet.ok);
 
-  return { color: colorResult, legacy: legacyResult, edgeShadow: edgeShadowResult, ratchets: ratchetResults, counts, ok };
+  return { color: colorResult, legacy: legacyResult, edgeShadow: edgeShadowResult, border: borderResult, ratchets: ratchetResults, counts, ok };
 }
 
 function parseArgs(argv) {
@@ -538,6 +646,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  BORDER_KEY_REGEX,
   EDGE_SHADOW_REGEX,
   RAW_COLOR_LITERAL_REGEX,
   RAW_FONT_SIZE_REGEX,
@@ -547,10 +656,12 @@ module.exports = {
   buildLegacyVocabularyRegex,
   collectUiFiles,
   evaluateRatchet,
+  findBorderViolations,
   findEdgeShadowViolations,
   findLegacyVocabularyViolations,
   findRawColorLiteralViolations,
   findRatchetRuleViolations,
+  formatBorderSummary,
   formatEdgeShadowSummary,
   formatLegacyVocabularySummary,
   formatRatchetSummary,
