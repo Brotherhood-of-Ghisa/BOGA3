@@ -10,7 +10,7 @@
 > that already exists. Update this doc when a reusable component is added,
 > removed, renamed or changes role (`README.md` "Maintenance rules") — the
 > `docs-check` lane fails until a new primitive or component folder is named
-> here, so the inventory cannot quietly go stale.
+> here.
 
 **Reuse before adding.** Build from `apps/mobile/components/ui/index.ts`.
 Token guardrails apply to every composition (`ux-rules.md`, "Styling guardrails").
@@ -19,7 +19,7 @@ Token guardrails apply to every composition (`ux-rules.md`, "Styling guardrails"
 
 CompactCard/CompactHeader serve Stream and embedded CoW headers; SummaryTile
 serves Group stats. ListCard and compact ListRow serve the two weekly boards.
-StatsTable now composes the compact row foundation for Muscle/contributor tables.
+StatsTable composes the compact row foundation for Muscle/contributor tables.
 For a new block or derivative, follow the selection and review workflow in
 `docs/specs/08-ux-delivery-standard.md` before building.
 
@@ -43,7 +43,7 @@ For a new block or derivative, follow the selection and review workflow in
 | A row in a list, a card or a sheet | `ListRow` (`list-row.tsx`); `compact` shares the list/table content rhythm and preserves full control targets |
 | A picker or menu: row actions, options, a choice of one value, a short form | `Sheet` (`sheet.tsx`) |
 | A title switching sibling pages | `HeaderTitleMenu` (`header-title-menu.tsx`) |
-| A sub-page over the current screen: a browser, an editor, a preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
+| A sub-page over the current screen: a browser, editor, preview | `PageSheet` (`page-sheet.tsx`); its `PageSheetHeader` also heads the exercise picker route |
 | The screen's one primary action, or an outline / text button; `size="compact"` for a row-level action; `variant="link"` for a heading's link | `ActionButton` (`action-button.tsx`) |
 | A line of words with figures in it (`2 exercises · 3 sets`) | `FigureText` (`figure-text.tsx`) |
 | An icon-only control | `IconButton` (`icon-button.tsx`); optional `nativeHeader` uses the native button host |
@@ -64,7 +64,7 @@ For a new block or derivative, follow the selection and review workflow in
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`); every other page takes the native header (`ux-rules.md` "Pages") |
 | Live theme colours: a stylesheet (its builder also gets the mode), a colour prop, the mode | `makeStyles`, `useUiRoles`, `useUiMode` (`theme-context.tsx`), `useUiText` (`text-roles.ts`) |
-| A card's or control's edge, or a sunken track: the only shadows | `uiEdge` (hairline + lift), `uiWell`, `uiHairline` (`edge.ts`). `uiEdge`: Card, Notice, FormField, SearchField, InputRow, outline ActionButton, ToggleChip, ChipGroup, the tab pill. `uiWell`: SegmentedControl (inside its hairline), SliderRow, bar tracks. `Tag`: `uiHairline` |
+| Card or control edge, sunken track: the only shadows | `uiEdge` (hairline + lift), `uiWell`, `uiHairline` (`edge.ts`; options `shape`, `tone`). `uiCorner`: corner alone. `uiCardSlice`: list cells as one card. `uiEdge`: Card, Notice, FormField, SearchField, InputRow, outline ActionButton, ToggleChip, ChipGroup, the tab pill. `uiWell`: SegmentedControl, SliderRow, bar tracks. `Tag`: `uiHairline`. Bar fills, dots, rings: `uiMark` (`marks.ts`) |
 | Fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |
 
 ### Gallery and adoption scope

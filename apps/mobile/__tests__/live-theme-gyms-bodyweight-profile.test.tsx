@@ -48,14 +48,16 @@ describe('live theme: gyms, body weight, profile and notifications', () => {
 
   it('repaints the gym editor row (a sheet) and its text', async () => {
     renderWithTheme(<GymEditor gym={null} onCancel={jest.fn()} onDone={jest.fn()} onLocationChanged={jest.fn()} />);
-    expect(screen.getByTestId('gym-editor')).toHaveStyle({ backgroundColor: before.accentWash, borderLeftColor: before.accent });
+    expect(screen.getByTestId('gym-editor')).toHaveStyle({ backgroundColor: before.accentWash });
+    expect(screen.getByTestId('gym-editor-stripe')).toHaveStyle({ backgroundColor: before.accent });
     expect(screen.getByTestId('gym-editor-location-status')).toHaveStyle({ color: before.ink });
 
     await switchTheme(SLATE_DARK);
 
     expect(after.accentWash).not.toBe(before.accentWash);
     expect(after.ink).not.toBe(before.ink);
-    expect(screen.getByTestId('gym-editor')).toHaveStyle({ backgroundColor: after.accentWash, borderLeftColor: after.accent });
+    expect(screen.getByTestId('gym-editor')).toHaveStyle({ backgroundColor: after.accentWash });
+    expect(screen.getByTestId('gym-editor-stripe')).toHaveStyle({ backgroundColor: after.accent });
     expect(screen.getByTestId('gym-editor-location-status')).toHaveStyle({ color: after.ink });
   });
 

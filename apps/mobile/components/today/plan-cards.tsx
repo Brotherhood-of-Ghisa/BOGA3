@@ -6,11 +6,13 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
+import { uiCorner, uiHairline } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
+import { uiMark } from '@/components/ui/marks';
 import { statsTableColumnWidth } from '@/components/stats/stats-table';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
+import { uiBorder, uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
 import { formatWholeSetCount, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import { localDateKey } from '@/src/utils/calendar-weeks';
 import { localWeekWindow } from '@/src/utils/local-calendar';
@@ -365,7 +367,7 @@ const GROUP_BLEED = uiSpace.sm;
 
 const useMarkStyles = makeStyles((roles) => ({
   trained: { backgroundColor: roles.ink },
-  planned: { borderWidth: 2, borderColor: roles.accent },
+  planned: uiMark.ring(roles.accent, MARK, uiBorder.width * 2),
   nothing: { backgroundColor: roles.ruleSoft },
 }));
 
@@ -428,7 +430,7 @@ const useStyles = makeStyles((roles) => ({
     // the band itself separates the groups, so no hairline.
     marginHorizontal: -GROUP_BLEED,
     paddingHorizontal: GROUP_BLEED,
-    borderRadius: uiGeometry.radius.card,
+    ...uiCorner('card'),
     backgroundColor: roles.accentWash,
   },
   childName: { paddingLeft: uiSpace.md },
@@ -439,7 +441,7 @@ const useStyles = makeStyles((roles) => ({
     bottom: uiSpace.xs,
     width: 2,
     backgroundColor: roles.accent,
-    borderRadius: uiGeometry.radius.control,
+    ...uiMark.bar,
   },
   chevronGutter: { width: uiIconSize.sm },
   // Gutters either side of the day grid keep it clear of the name and the target.
@@ -482,7 +484,7 @@ const useStyles = makeStyles((roles) => ({
   dayCell: {
     width: DAY_CELL,
     height: DAY_CELL_HEIGHT,
-    borderRadius: uiGeometry.radius.control,
+    ...uiMark.bar,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -497,8 +499,7 @@ const useStyles = makeStyles((roles) => ({
   },
   groupCellZero: {
     backgroundColor: roles.surface,
-    borderWidth: 1,
-    borderColor: roles.accent,
+    ...uiHairline(roles, { shape: 'control', tone: 'accent' }),
   },
   groupFigureTrained: { color: roles.onAccent },
   weekCell: {
@@ -523,16 +524,12 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'center',
     gap: uiSpace.xs,
     paddingVertical: uiSpace.xs,
-    borderRadius: uiGeometry.radius.control,
+    ...uiCorner('control'),
   },
   weekDayToday: {
     backgroundColor: roles.accentWash,
   },
-  mark: {
-    width: MARK,
-    height: MARK,
-    borderRadius: uiGeometry.radius.control,
-  },
+  mark: uiMark.round(MARK),
   empty: {
     paddingTop: uiSpace.md,
   },

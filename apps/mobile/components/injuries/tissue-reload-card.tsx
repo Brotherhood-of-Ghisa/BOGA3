@@ -1,11 +1,12 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { uiEdge } from '@/components/ui/edge';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiSpace, uiTypography } from '@/components/ui/tokens';
 import { InjuryBadge } from '@/components/injuries/injury-badge';
 import type { TissueReloadMetrics } from '@/src/injuries/tissue-reload';
 
@@ -121,7 +122,7 @@ function RecoveringStructureRow({ item, isSelected, onSelect }: StructureRowProp
   const heading = `${sidePrefix}${muscleName}`;
 
   const content = (
-    <View
+    <Card
       style={[
         styles.structureRow,
         isSelected ? styles.structureRowSelected : null,
@@ -144,7 +145,7 @@ function RecoveringStructureRow({ item, isSelected, onSelect }: StructureRowProp
       </View>
       <ReloadMetricsSummary metrics={item} />
       {item.isCautionAlert ? <ReloadCautionBanner metrics={item} /> : null}
-    </View>
+    </Card>
   );
 
   if (onSelect) {
@@ -221,7 +222,7 @@ export function TissueReloadCard({
   );
 }
 
-const useStyles = makeStyles(roles => ({
+const useStyles = makeStyles((roles, mode) => ({
   card: {
     padding: uiSpace.md,
     gap: uiSpace.md,
@@ -244,15 +245,9 @@ const useStyles = makeStyles(roles => ({
   },
   structureRow: {
     padding: uiSpace.sm,
-    borderRadius: uiGeometry.radius.card,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
-    backgroundColor: roles.surface,
     gap: uiSpace.xs,
   },
-  structureRowSelected: {
-    borderColor: roles.accent,
-  },
+  structureRowSelected: uiEdge(roles, mode, { shape: 'card', tone: 'accent' }),
   structureHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -276,9 +271,7 @@ const useStyles = makeStyles(roles => ({
   cautionBanner: {
     marginTop: uiSpace.xs,
     padding: uiSpace.xs,
-    borderRadius: uiGeometry.radius.card,
-    borderWidth: uiBorder.width,
-    borderColor: roles.danger,
+    ...uiEdge(roles, mode, { shape: 'card', tone: 'danger' }),
     backgroundColor: roles.surface,
     gap: uiSpace.xs,
   },

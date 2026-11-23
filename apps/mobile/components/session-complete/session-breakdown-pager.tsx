@@ -2,6 +2,7 @@ import { useRef, useState, type ComponentRef } from 'react';
 import { Pressable, ScrollView, Text, View, type LayoutChangeEvent, type NativeSyntheticEvent, type NativeScrollEvent } from 'react-native';
 
 import { FigureText } from '@/components/ui/figure-text';
+import { uiMark } from '@/components/ui/marks';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
@@ -283,9 +284,7 @@ const useStyles = makeStyles((roles) => ({
     gap: uiSpace.sm,
   },
   dot: {
-    width: uiSpace.sm,
-    height: uiSpace.sm,
-    borderRadius: uiGeometry.radius.pill,
+    ...uiMark.round(uiSpace.sm),
     backgroundColor: roles.inkGhost,
   },
   dotActive: {

@@ -1,10 +1,11 @@
 import { Text, View } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { uiCorner, uiEdge } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiSpace } from '@/components/ui/tokens';
 import type { InjuryWarning } from '@/src/injuries/injury-warning-engine';
 import { describePainScore } from '@/src/injuries/injury-presentation';
 
@@ -80,12 +81,10 @@ export function InjuryWarningBanner({
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   banner: {
     backgroundColor: roles.surface,
-    borderColor: roles.danger,
-    borderWidth: uiBorder.width,
-    borderRadius: uiGeometry.radius.card,
+    ...uiEdge(roles, mode, { shape: 'card', tone: 'danger' }),
     padding: uiSpace.md,
     gap: uiSpace.sm,
     marginHorizontal: uiSpace.lg,
@@ -107,7 +106,7 @@ const useStyles = makeStyles((roles) => ({
   contraindicationsBox: {
     backgroundColor: roles.paper,
     padding: uiSpace.sm,
-    borderRadius: uiGeometry.radius.control,
+    ...uiCorner('control'),
     gap: uiSpace.xs,
   },
   contraindicationsLabel: {

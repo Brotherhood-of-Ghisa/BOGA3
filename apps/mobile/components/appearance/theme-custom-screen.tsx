@@ -13,7 +13,7 @@ import {
 import { applyingHeaderRight } from '@/components/appearance/theme-header';
 import { PartSpotlight, ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
-import { FormSection, HeaderTitleMenu, Notice, RadioRow, Screen, SliderRow, SwitchRow, uiBorder, uiGeometry, uiSpace, useUiRoles } from '@/components/ui';
+import { FormSection, HeaderTitleMenu, Notice, RadioRow, Screen, SliderRow, SwitchRow, uiGeometry, uiHairline, uiSpace, useUiRoles } from '@/components/ui';
 import { THEME_DIRECTIONS, type ThemeMode, type UiRoles } from '@/components/ui/theme';
 import {
   CUSTOM_COLOUR_PARTS,
@@ -316,7 +316,7 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
       void save(patchOf);
     },
     swatch: isColourPart(part) ? (
-      <View style={[styles.swatch, { backgroundColor: roles[PART_ROLE[part]], borderColor: liveRoles.rule }]} testID="theme-custom-hue-swatch" />
+      <View style={[styles.swatch, { backgroundColor: roles[PART_ROLE[part]], ...uiHairline(liveRoles, { shape: 'control' }) }]} testID="theme-custom-hue-swatch" />
     ) : null,
   };
 
@@ -353,7 +353,5 @@ const styles = StyleSheet.create({
   swatch: {
     width: uiGeometry.tapTarget / 2,
     height: uiGeometry.tapTarget / 2,
-    borderWidth: uiBorder.width,
-    borderRadius: uiGeometry.radius.control,
   },
 });

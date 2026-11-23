@@ -1,9 +1,9 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { makeStyles, uiBorder, uiGeometry, uiSpace, useUiRoles } from '@/components/ui';
+import { makeStyles, uiGeometry, uiHairline, uiSpace, useUiRoles } from '@/components/ui';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { heatRamp } from './heatmap-metric';
-import { heatmapRestCell, heatmapStyles } from './heatmap-style';
+import { heatmapStyles } from './heatmap-style';
 import type { DayCell, WeekCell } from './heatmapData';
 
 type Props = {
@@ -64,8 +64,7 @@ export function CalendarTile(props: Props) {
 const useStyles = makeStyles((roles) => ({
   pr: { position: 'absolute', top: uiSpace.xs, right: uiSpace.xs },
   tile: { flex: 1, minWidth: 0, minHeight: uiGeometry.tapTarget,
-    borderRadius: uiGeometry.radius.control, borderWidth: StyleSheet.hairlineWidth,
-    ...heatmapRestCell(roles), justifyContent: 'center' },
-  unavailable: { borderStyle: 'dashed', borderWidth: uiBorder.width, borderColor: roles.rule },
+    ...uiHairline(roles, { shape: 'control' }), justifyContent: 'center' },
+  unavailable: uiHairline(roles, { shape: 'control', dashed: true }),
   value: { textAlign: 'center' },
 }));

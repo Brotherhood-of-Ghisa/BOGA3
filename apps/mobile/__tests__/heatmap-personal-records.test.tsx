@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData } from '@/components/heatmaps';
+import { uiBorder } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
 import { renderWithTheme } from './helpers/theme';
 
@@ -30,7 +31,7 @@ it.each([
     .toContain(`${dailyCount} PR${dailyCount === 1 ? '' : 's'}`);
   expect(screen.queryByTestId('records-heatmap-cell-2026-10-06-pr', { includeHiddenElements: true })).toBeNull();
   expect(screen.queryByTestId('records-heatmap-day-detail')).toBeNull();
-  expect(StyleSheet.flatten(screen.getByTestId('records-heatmap-cell-2026-10-05').props.style).borderWidth).toBe(StyleSheet.hairlineWidth);
+  expect(StyleSheet.flatten(screen.getByTestId('records-heatmap-cell-2026-10-05').props.style).borderWidth).toBe(uiBorder.width);
   unmount();
   renderWithTheme(<WeeklyHeatmap data={data} metric={metric} testIDPrefix={PREFIX} metricLabel={label} formatValue={String} />);
   if (weeklyCount > 0) {

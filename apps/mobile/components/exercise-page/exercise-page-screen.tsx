@@ -18,6 +18,7 @@ import { useBodyweightCalculationsEnabled } from '@/src/bodyweight/calculation-p
 import { useOpenExerciseEditor } from '@/components/exercise-catalog/exercise-editor-request';
 import { RecordBand } from '@/components/session-detail';
 import { Card } from '@/components/ui/card';
+import { uiHairline } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { Notice } from '@/components/ui/notice';
 import { ScreenScroll } from '@/components/ui/screen';
@@ -830,8 +831,6 @@ const useStyles = makeStyles((roles) => ({
     minHeight: uiGeometry.tapTarget,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: uiBorder.width,
-    borderColor: roles.ink,
-    borderRadius: uiGeometry.radius.control,
+    ...uiHairline(roles, { shape: 'control', tone: 'ink' }),
   },
 }));

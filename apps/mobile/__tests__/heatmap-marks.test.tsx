@@ -3,6 +3,7 @@ import { FlatList, StyleSheet } from 'react-native';
 import { HeatmapLegend } from '@/components/heatmaps/HeatmapLegend';
 
 import { DailyHeatmap, WeeklyHeatmap, buildHeatmapData, heatRamp } from '@/components/heatmaps';
+import { uiBorder } from '@/components/ui';
 import type { DailyEffortMetrics } from '@/src/data';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 import { renderWithTheme, rolesFor } from './helpers/theme';
@@ -57,7 +58,7 @@ describe('DailyHeatmap marks', () => {
     renderDaily();
 
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`).props.accessibilityState).toBeUndefined();
-    expect(border(`${PREFIX}-heatmap-cell-${TODAY}`)).toEqual({ borderWidth: StyleSheet.hairlineWidth, borderColor: roles.rule });
+    expect(border(`${PREFIX}-heatmap-cell-${TODAY}`)).toEqual({ borderWidth: uiBorder.width, borderColor: roles.rule });
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-${TODAY}`).props.accessibilityLabel).toContain('Today');
     expect(screen.queryByTestId(`${PREFIX}-heatmap-day-detail`)).toBeNull();
   });
@@ -69,7 +70,7 @@ describe('DailyHeatmap marks', () => {
     expect(tile).toHaveProp('accessibilityRole', 'text');
     expect(tile.props.onPress).toBeUndefined();
     expect(tile.props.accessibilityState).toBeUndefined();
-    expect(border(`${PREFIX}-heatmap-cell-2026-05-11`)).toEqual({ borderWidth: StyleSheet.hairlineWidth, borderColor: roles.rule });
+    expect(border(`${PREFIX}-heatmap-cell-2026-05-11`)).toEqual({ borderWidth: uiBorder.width, borderColor: roles.rule });
     expect(screen.getByTestId(`${PREFIX}-heatmap-cell-2026-05-11-value`)).toHaveTextContent('1200');
   });
 
@@ -78,7 +79,7 @@ describe('DailyHeatmap marks', () => {
 
     expect(style(`${PREFIX}-heatmap-cell-2026-05-12`)).toMatchObject({
       backgroundColor: roles.viz0,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderWidth: uiBorder.width,
       borderColor: roles.rule,
     });
 

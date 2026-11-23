@@ -89,8 +89,7 @@ const useStyles = makeStyles((roles, mode) => ({
   shell: {
     flexDirection: 'row',
     overflow: 'hidden',
-    ...uiEdge(roles, mode),
-    borderRadius: uiGeometry.radius.card,
+    ...uiEdge(roles, mode, { shape: 'card' }),
     backgroundColor: roles.surface,
   },
   tab: {

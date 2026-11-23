@@ -95,7 +95,7 @@ const useStyles = makeStyles((roles) => ({
     paddingHorizontal: uiSpace.xs,
     backgroundColor: roles.surface,
     borderBottomWidth: uiBorder.width,
-    borderBottomColor: roles.rule,
+    borderBottomColor: roles.ruleSoft,
   },
   spacer: {
     width: uiGeometry.tapTarget,

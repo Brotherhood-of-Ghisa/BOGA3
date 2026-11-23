@@ -206,8 +206,7 @@ function ExerciseRow({ row, metric, layout, onHistory, hideRole, axis }: {
 }
 
 const useStyles = makeStyles((roles) => ({
-  contributions: { backgroundColor: roles.ruleSoft, borderTopWidth: uiBorder.width,
-    borderBottomWidth: uiBorder.width, borderColor: roles.rule },
+  contributions: { backgroundColor: roles.ruleSoft },
   // The selected muscle keeps its ink rule, and its contributions hang off it.
   selected: { position: 'absolute', left: 0, top: 0, bottom: 0, width: uiBorder.width * 3, backgroundColor: roles.ink },
 }));
