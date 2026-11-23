@@ -33,7 +33,7 @@ import {
 // - `mode`: `light`, `dark` or `system`; a custom theme ignores it.
 // - `custom`: null, or `{background, ink, text, accent, highlight, record,
 //   direction}`, each colour a `{hue, strength}`; the background also `{mode,
-//   lightness, depth}`, the highlight `{match, contrast}`, `ink`
+//   lightness, depth, borders?}`, the highlight `{match, contrast}`, `ink`
 //   `{lightness}` and `text` `{contrast}`; `direction` a `ThemeDirection`
 //   (`theme-custom.ts`). Never null while `theme` is `custom`. Every part and
 //   field added since the first custom themes may be absent: its default draws

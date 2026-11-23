@@ -16,18 +16,18 @@ import { normaliseHue } from '@/components/ui/theme-hue';
 // A custom theme (`docs/specs/ui/design-language.md` §2, "Custom"): the user
 // picks a hue and a strength for each of the four colour seeds, for the
 // highlight (`accentWash`) and for the primary text (`ink`, which presets step
-// from the text seed); the page's mode, lightness and depth; the texts' and
+// from the text seed); the page's mode, lightness, depth and borders; the texts' and
 // the highlight's contrast; and the direction. Everything else is derived:
-// the hairlines and the chart ramp from the page. No readability floor is gated here — only the
+// the chart ramp from the page. No readability floor is gated here — only the
 // presets are hand-checked.
 
 // A hue (0–359) and a strength (0–100, a share of the part's most chroma).
 export type HueStrength = { hue: number; strength: number };
-// The page: its mode (the ladder it draws on), its L* (in steps of 0.25) and
-// its depth (0–300, a percentage of the shipped steps from the page to the
-// other grounds — wells, cards, fields on a card — the hairlines and empty
-// cells).
-export type CustomBackground = HueStrength & { mode: ThemeMode; lightness: number; depth: number };
+// The page: its mode (the ladder it draws on), its L* (in steps of 0.25), its
+// depth (0–300, a percentage of the shipped steps from the page to the other
+// grounds — wells, cards, fields on a card — and empty cells) and its borders
+// (0–300, the same for the hairlines; absent, the depth).
+export type CustomBackground = HueStrength & { mode: ThemeMode; lightness: number; depth: number; borders?: number };
 // The highlight: `accentWash`, the band behind the row being edited, the
 // current set and today's plan. The accent's hue and strength while `match`,
 // else its own, a share of the most chroma its ladder's L* holds; `contrast`
@@ -61,6 +61,7 @@ export const LIGHTNESS_MAX = 100;
 // lives in the first few L*.
 export const LIGHTNESS_STEP = 0.25;
 export const DEPTH_MAX = 300;
+export const BORDERS_MAX = 300;
 export const DEFAULT_DEPTH = 100;
 export const TEXT_CONTRAST_MAX = 150;
 export const HIGHLIGHT_CONTRAST_MAX = 300;
@@ -154,9 +155,10 @@ function ownHighlight({ highlight }: CustomColours, mode: ThemeMode): Partial<Ui
   return highlight.match ? {} : { accentWash: gamutColour(washLightness(mode), highlight) };
 }
 
-// The other grounds, the hairlines and empty cells: depth spreads or flattens
-// them.
-const GROUND_ROLES = new Set<keyof UiRoles>(['well', 'surface', 'raised', 'rule', 'ruleSoft', 'viz0']);
+// The other grounds and empty cells: depth spreads or flattens them.
+const GROUND_ROLES = new Set<keyof UiRoles>(['well', 'surface', 'raised', 'viz0']);
+// The hairlines: borders spread or flatten them.
+const RULE_ROLES = new Set<keyof UiRoles>(['rule', 'ruleSoft']);
 // Grounds that take the page's hue and chroma, so a tinted page has tinted
 // cards and fields (the light ladder's `raised` is white, with no hue of its own).
 const PAGE_TINTED_ROLES = new Set<keyof UiRoles>(['surface', 'raised']);
@@ -165,14 +167,19 @@ const HIGHLIGHT_ROLES = new Set<keyof UiRoles>(['accentWash']);
 // Roles that are the ladder's ends whatever the page: black or white.
 const KEPT_ROLES = new Set<keyof UiRoles>(['selection', 'onAccent', 'onSelection', 'onDanger', 'onInk', 'scrim']);
 
-// How far a role's step from the page is scaled: by depth, the secondary
-// text's contrast, the highlight's contrast, or not at all.
+// How far a role's step from the page is scaled: by depth, borders, the
+// secondary text's contrast, the highlight's contrast, or not at all.
 function roleScale(role: keyof UiRoles, colours: CustomColours): number {
   if (GROUND_ROLES.has(role)) return colours.background.depth / DEFAULT_DEPTH;
+  if (RULE_ROLES.has(role)) return bordersOf(colours.background) / DEFAULT_DEPTH;
   if (SECONDARY_ROLES.has(role)) return colours.text.contrast / DEFAULT_CONTRAST;
   if (HIGHLIGHT_ROLES.has(role)) return colours.highlight.contrast / DEFAULT_CONTRAST;
   return 1;
 }
+
+// The borders a page draws: its own, else its depth (how a theme saved before
+// borders existed drew its hairlines).
+export const bordersOf = ({ borders, depth }: Pick<CustomBackground, 'borders' | 'depth'>): number => borders ?? depth;
 
 // The reference ladder's `paper` and `ink` L*, and the chosen page.
 type Frame = { paper: Lch; end: number; page: number };
@@ -194,7 +201,7 @@ const short = (lightness: number, page: number, limit: number): number =>
 
 // Every role for a custom theme. The ladder of its mode is generated from the
 // seeds, then moved onto the chosen page (`moveRole`): depth scales the
-// grounds, hairlines and empty cells, the secondary text's contrast its inks,
+// grounds and empty cells, borders the hairlines, the secondary text's contrast its inks,
 // the highlight's its band. `surface` and `raised` take the page's hue and
 // chroma. Primary text sits at its own L*; every other role keeps its place
 // measured from the ladder's `ink`. The `ink` direction draws both changes in
@@ -288,7 +295,9 @@ function parseBackground(value: unknown): CustomBackground | null {
   const { lightness, depth } = value;
   if (!isLightness(lightness) || !isInteger(DEPTH_MAX)(depth)) return null;
   const mode = optional(value.mode, isMode, lightness >= 50 ? 'light' : 'dark');
-  return mode === null ? null : { ...colour, mode, lightness, depth };
+  if (mode === null) return null;
+  if (value.borders === undefined) return { ...colour, mode, lightness, depth };
+  return isInteger(BORDERS_MAX)(value.borders) ? { ...colour, mode, lightness, depth, borders: value.borders } : null;
 }
 
 function parseHighlight(value: unknown): CustomHighlight | null {
@@ -329,8 +338,9 @@ export const matchingHighlight = (accent: HueStrength, mode: ThemeMode): CustomH
 // draws what the theme drew before the field existed: the mode from the
 // lightness, a highlight that matches the accent, the primary text from the
 // secondary at its ladder's L*, the shipped text contrast, green and crimson.
-// The parts since removed — `borders` (the hairlines follow the page) and
-// `viz` (the ramp follows the page) — are ignored like any unknown field.
+// The top-level parts since removed — `borders` (it is `background.borders`
+// now, absent following the depth) and `viz` (the ramp follows the page) — are
+// ignored like any unknown field.
 export function parseCustomColours(value: unknown): CustomColours | null {
   if (!isFields(value)) return null;
   const background = parseBackground(value.background);

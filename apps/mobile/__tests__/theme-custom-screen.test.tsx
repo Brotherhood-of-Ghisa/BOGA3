@@ -319,6 +319,40 @@ it('opens Primary text with a hue, a strength and its lightness, and saves it as
   await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, ink: { ...CUSTOM.ink, strength: 35 } }));
 });
 
+it('offers Borders after Depth on the background only, and saves a VoiceOver step on it', async () => {
+  store(CUSTOM);
+  render(<ThemeCustomRoute />);
+  const names = screen.getAllByRole('adjustable').map((element) => element.props.accessibilityLabel);
+  expect(names.indexOf('Borders')).toBe(names.indexOf('Depth') + 1);
+  expect(slider('Borders').props.accessibilityValue).toEqual({ text: '100%' });
+
+  await step(slider('Borders'), 'decrement');
+  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, background: { ...CUSTOM.background, borders: 85 } }));
+
+  mockPart = 'accent';
+  screen.unmount();
+  render(<ThemeCustomRoute />);
+  expect(screen.queryByRole('adjustable', { name: 'Borders' })).toBeNull();
+});
+
+it('shows the stored borders, and writes nothing when a tap lands on the value already stored', async () => {
+  store({ ...CUSTOM, background: { ...CUSTOM.background, borders: 150 } });
+  render(<ThemeCustomRoute />);
+  expect(slider('Borders').props.accessibilityValue).toEqual({ text: '150%' });
+  fireEvent(screen.getByTestId('theme-custom-borders-track'), 'layout', { nativeEvent: { layout: { width: 300 } } });
+  await act(async () => tap(slider('Borders')).onEnd({ x: 150 }, true));
+  expect(storedCustom()?.background.borders).toBe(150);
+  expect(mockLogEvent).not.toHaveBeenCalled();
+});
+
+it('pins the borders where they were when depth moves on a page without its own', async () => {
+  store({ ...CUSTOM, background: { ...CUSTOM.background, depth: 60 } });
+  render(<ThemeCustomRoute />);
+  expect(slider('Borders').props.accessibilityValue).toEqual({ text: '60%' });
+  await step(slider('Depth'), 'increment');
+  await waitFor(() => expect(storedCustom()?.background).toMatchObject({ depth: 75, borders: 60 }));
+});
+
 it('saves a VoiceOver step on depth at once', async () => {
   store(CUSTOM);
   render(<ThemeCustomRoute />);
