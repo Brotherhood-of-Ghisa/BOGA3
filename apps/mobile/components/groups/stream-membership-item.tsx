@@ -45,7 +45,7 @@ export function GroupStreamMembershipItem({ item, showGroupName, onPress }: Grou
   );
 }
 
-/** The stream's light row: words on the page ground behind a `rule` hairline. */
+/** The stream's light row: words on the page ground behind a `ruleSoft` hairline. */
 const useStreamRowStyles = makeStyles((roles) => ({
   row: {
     minHeight: uiGeometry.tapTarget,
@@ -54,7 +54,7 @@ const useStreamRowStyles = makeStyles((roles) => ({
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     borderLeftWidth: uiBorder.width,
-    borderLeftColor: roles.rule,
+    borderLeftColor: roles.ruleSoft,
   },
   pressed: {
     backgroundColor: roles.paper,

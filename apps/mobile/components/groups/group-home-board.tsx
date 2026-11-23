@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { FigureText, ListCard, ListCardHeader, ListRow, makeStyles, uiGeometry, uiSpace, useUiText, useUiTextTone, uiWell } from '@/components/ui';
+import { FigureText, ListCard, ListCardHeader, ListRow, makeStyles, uiMark, uiSpace, useUiText, useUiTextTone, uiWell } from '@/components/ui';
 import { statsTableColumnWidth } from '@/components/stats/stats-table';
 import { GROUP_HOME_METRIC_COLUMN, type GroupHomeBoard as BoardModel, type GroupHomeBoardRow } from '@/src/groups/home-view-model';
 import type { GroupHomeMetric } from '@/src/groups/home-periods';
@@ -55,7 +55,7 @@ const useStyles = makeStyles((roles, mode) => ({
   rank: { width: 14 },
   name: { width: 76 },
   value: { textAlign: 'right' },
-  track: { flex: 1, minWidth: 0, height: 12, borderRadius: uiGeometry.radius.control, ...uiWell(roles, mode), overflow: 'hidden' },
-  fill: { height: 12, borderRadius: uiGeometry.radius.control, backgroundColor: roles.viz3 },
+  track: { flex: 1, minWidth: 0, height: 12, ...uiWell(roles, mode, { shape: 'control' }), overflow: 'hidden' },
+  fill: { height: 12, ...uiMark.bar, backgroundColor: roles.viz3 },
   fillLeader: { backgroundColor: roles.viz4 },
 }));

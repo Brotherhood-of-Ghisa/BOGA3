@@ -1,9 +1,10 @@
 import { Pressable, Text, View } from 'react-native';
 
+import { uiHairline } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
+import { uiMark } from '@/components/ui/marks';
 import { makeStyles } from '@/components/ui/theme-context';
 import {
-  uiBorder,
   uiFonts,
   uiGeometry,
   uiSpace,
@@ -55,7 +56,7 @@ export function StartDisc({
         }}
         style={({ pressed }) => [
           styles.disc,
-          { width: disc, height: disc },
+          uiMark.round(disc),
           pressed && !busy ? styles.discPressed : null,
         ]}
         testID={testID}>
@@ -72,15 +73,12 @@ const useStyles = makeStyles((roles) => ({
   ring: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: uiGeometry.radius.pill,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    ...uiHairline(roles, { shape: 'pill' }),
   },
   disc: {
     alignItems: 'center',
     justifyContent: 'center',
     gap: uiSpace.sm,
-    borderRadius: uiGeometry.radius.pill,
     backgroundColor: roles.accent,
   },
   // As the primary button: depth is never an elevation.

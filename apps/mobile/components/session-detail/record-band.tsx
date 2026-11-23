@@ -44,11 +44,11 @@ const useStyles = makeStyles((roles) => ({
   },
   footer: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: roles.recordRule,
+    borderTopColor: roles.ruleSoft,
   },
   header: {
     borderBottomWidth: uiBorder.width,
-    borderBottomColor: roles.recordRule,
+    borderBottomColor: roles.ruleSoft,
   },
   line: {
     flexDirection: 'row',
@@ -59,7 +59,7 @@ const useStyles = makeStyles((roles) => ({
   },
   lineRuled: {
     borderTopWidth: uiBorder.width,
-    borderTopColor: roles.recordRule,
+    borderTopColor: roles.ruleSoft,
   },
   label: {
     flexShrink: 1,

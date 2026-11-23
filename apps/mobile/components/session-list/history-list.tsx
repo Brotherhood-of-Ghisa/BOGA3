@@ -9,7 +9,8 @@ import {
   type SessionSummaryFigures,
 } from '@/components/today/progress-format';
 import { SessionSummaryRow } from '@/components/today/session-summary-row';
-import { Card, StatePanel, Tag, makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { Card, StatePanel, Tag, makeStyles, uiBorder, uiSpace, useUiRoles, useUiText, useUiTextTone } from '@/components/ui';
+import { uiCardSlice } from '@/components/ui/marks';
 import { useExerciseListPreferences } from '@/src/exercise-catalog/list-preferences';
 import { logEvent } from '@/src/logging';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
@@ -109,8 +110,8 @@ export function HistoryList({
       renderItem={({ item, index, section }) => (
         <HistoryRow
           dateFormat={resolvedDateFormat}
-          first={index === 0}
-          last={index === section.data.length - 1}
+          count={section.data.length}
+          index={index}
           onOpen={onOpenCompletedSession}
           session={item}
         />
@@ -207,24 +208,25 @@ function WeekHeading({ section, dateFormat }: { section: HistoryWeekSection; dat
 
 function HistoryRow({
   session,
-  first,
-  last,
+  index,
+  count,
   dateFormat,
   onOpen,
 }: {
   session: SessionListItem;
-  first: boolean;
-  last: boolean;
+  index: number;
+  count: number;
   dateFormat: ExerciseDateFormat;
   onOpen: (sessionId: string) => void;
 }) {
   const styles = useStyles();
+  const roles = useUiRoles();
   const deleted = session.deletedAt !== null;
   const figures = toSummaryFigures(session);
   const label = sessionSummaryAccessibilityLabel(figures, dateFormat);
   return (
     <View
-      style={[styles.cell, first ? styles.cellFirst : styles.cellDivider, last ? styles.cellLast : null]}
+      style={[uiCardSlice(roles, index, count), index === 0 ? null : styles.cellDivider]}
       testID={`completed-session-row-${session.id}`}>
       <SessionSummaryRow
         accessibilityHint="Opens the completed session"
@@ -330,27 +332,10 @@ const useStyles = makeStyles((roles) => ({
   gapRule: {
     flex: 1,
     borderTopWidth: uiBorder.width,
-    borderTopColor: roles.rule,
+    borderTopColor: roles.ruleSoft,
   },
-  // A week's rows read as one `Card`: each cell draws its share of the
-  // border, so the list can recycle rows one by one.
-  cell: {
-    overflow: 'hidden',
-    backgroundColor: roles.surface,
-    borderColor: roles.rule,
-    borderLeftWidth: uiBorder.width,
-    borderRightWidth: uiBorder.width,
-  },
-  cellFirst: {
-    borderTopWidth: uiBorder.width,
-    borderTopLeftRadius: uiGeometry.radius.card,
-    borderTopRightRadius: uiGeometry.radius.card,
-  },
-  cellLast: {
-    borderBottomWidth: uiBorder.width,
-    borderBottomLeftRadius: uiGeometry.radius.card,
-    borderBottomRightRadius: uiGeometry.radius.card,
-  },
+  // A week's rows read as one `Card` (`uiCardSlice`), so the list can recycle
+  // rows one by one; the rows inside it divide on `ruleSoft`.
   cellDivider: {
     borderTopWidth: uiBorder.width,
     borderTopColor: roles.ruleSoft,

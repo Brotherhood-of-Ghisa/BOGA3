@@ -1,8 +1,9 @@
 import { Pressable, Text, View } from 'react-native';
 
+import { uiHairline } from '@/components/ui/edge';
 import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiSpace, uiTypography } from '@/components/ui/tokens';
 import type { InjuryStatus } from '@/src/data/injuries';
 import type { InjuryWarningSeverity } from '@/src/injuries/injury-warning-engine';
 
@@ -82,21 +83,12 @@ const useStyles = makeStyles((roles) => ({
     alignSelf: 'center',
     paddingHorizontal: uiSpace.xs,
     paddingVertical: 0,
-    borderWidth: uiBorder.width,
-    borderRadius: uiGeometry.radius.pill,
-    backgroundColor: roles.surface,
-    borderColor: roles.rule,
-  },
-  badgeAcute: {
-    borderColor: roles.danger,
+    ...uiHairline(roles, { shape: 'pill' }),
     backgroundColor: roles.surface,
   },
-  badgeManaging: {
-    borderColor: roles.rule,
-  },
-  badgeMonitoring: {
-    borderColor: roles.ruleSoft,
-  },
+  badgeAcute: uiHairline(roles, { shape: 'pill', tone: 'danger' }),
+  badgeManaging: uiHairline(roles, { shape: 'pill' }),
+  badgeMonitoring: uiHairline(roles, { shape: 'pill', tone: 'ruleSoft' }),
   labelText: {
     color: roles.inkMuted,
     fontSize: uiTypography.size.xs,

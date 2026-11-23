@@ -1,11 +1,13 @@
 // Colour reference above the Progress chart it explains.
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
-import { uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiHairline } from '@/components/ui/edge';
+import { uiMark } from '@/components/ui/marks';
+import { uiSpace } from '@/components/ui/tokens';
 
 import { heatRamp } from './heatmap-metric';
 
@@ -48,10 +50,7 @@ const useStyles = makeStyles((roles) => ({
   swatch: {
     width: 12,
     height: 12,
-    borderRadius: uiGeometry.radius.control,
+    ...uiMark.bar,
   },
-  restSwatch: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: roles.rule,
-  },
+  restSwatch: uiHairline(roles, { shape: 'control' }),
 }));

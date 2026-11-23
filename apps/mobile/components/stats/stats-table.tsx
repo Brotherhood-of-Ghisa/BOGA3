@@ -131,7 +131,7 @@ const useStyles = makeStyles((roles) => ({
   disclosure: { width: uiGeometry.tapTarget, minHeight: uiGeometry.tapTarget, alignItems: 'center', justifyContent: 'center' },
   numericSortHeader: { flexDirection: 'row-reverse', justifyContent: 'flex-start' },
   family: { paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
-    paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderColor: roles.rule },
+    paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft },
   pressed: { backgroundColor: roles.paper },
   indicator: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
   recency: { width: 64 },

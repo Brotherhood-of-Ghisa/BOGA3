@@ -8,6 +8,7 @@ import { MAX_SET_DURATION_SEC, parseSetDuration } from '@/src/exercise-calculati
 import { Notice } from '@/components/ui/notice';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon } from '@/components/ui/icon';
+import { uiMark } from '@/components/ui/marks';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import {
@@ -81,6 +82,7 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
 
   return (
     <View style={styles.logger} testID="exercise-set-logger">
+      <View pointerEvents="none" style={styles.stripe} />
       <View
         accessibilityActions={[
           ...(onConfirm ? [{ name: 'confirm', label: `Confirm set ${number}` }] : []),
@@ -134,21 +136,27 @@ export const SetLogger = forwardRef<TextInputInstance, SetLoggerProps>(function 
 });
 
 const useStyles = makeStyles((roles) => ({
-  // The row being edited: `accent-wash` ground with an `accent` rule on its
-  // leading edge. Rule + padding keep the tick on the list's control axis.
+  // The row being edited: `accent-wash` ground with an `accent` stripe on its
+  // leading edge. Stripe + padding keep the tick on the list's control axis.
   logger: {
     gap: uiSpace.sm,
     paddingTop: uiSpace.sm,
     paddingBottom: uiSpace.md,
-    paddingLeft: uiSpace.sm,
+    paddingLeft: uiSpace.sm + uiSpace.xs,
     paddingRight: uiSpace.md,
     backgroundColor: roles.accentWash,
-    borderLeftWidth: uiSpace.xs,
-    borderLeftColor: roles.accent,
     borderTopWidth: uiBorder.width,
     borderBottomWidth: uiBorder.width,
     borderTopColor: roles.ruleSoft,
     borderBottomColor: roles.ruleSoft,
+  },
+  stripe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: uiSpace.xs,
+    backgroundColor: roles.accent,
   },
   header: {
     flexDirection: 'row',
@@ -163,9 +171,7 @@ const useStyles = makeStyles((roles) => ({
     justifyContent: 'center',
   },
   tick: {
-    width: uiGeometry.tapTarget,
-    height: uiGeometry.tapTarget,
-    borderRadius: uiGeometry.radius.pill,
+    ...uiMark.round(uiGeometry.tapTarget),
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: roles.accent,

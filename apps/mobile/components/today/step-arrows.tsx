@@ -92,7 +92,6 @@ const useStyles = makeStyles((roles) => ({
     height: ARROW_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: uiGeometry.radius.control,
   },
   pressed: {
     backgroundColor: roles.paper,

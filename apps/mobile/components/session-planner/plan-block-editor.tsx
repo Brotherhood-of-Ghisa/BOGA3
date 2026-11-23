@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Keyboard, Pressable, Text, View } from 'react-native';
 
-import { IconButton, ListRow, Sheet, makeStyles, uiBorder, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { Card, IconButton, ListRow, Sheet, makeStyles, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { EffortChoice } from '@/src/exercise-calculations/effort-policy';
 import { SetEntryFields } from '@/components/exercise-page/set-entry-fields';
 import { EffortSheet } from '@/components/exercise-page/exercise-sheets';
@@ -61,7 +61,7 @@ export function PlanBlockEditor({
   const blockPath = `${prefix}.${index}`;
 
   return (
-    <View style={styles.block} testID={`plan-form-block-${index + 1}`}>
+    <Card style={styles.block} testID={`plan-form-block-${index + 1}`}>
       <View style={styles.blockHeader}>
         <Pressable
           accessibilityLabel={block.name.length > 0 ? `Exercise ${block.name}` : 'Choose exercise'}
@@ -208,7 +208,7 @@ export function PlanBlockEditor({
         }}
         testID={`plan-form-block-${index + 1}-add-set`}
       />
-    </View>
+    </Card>
   );
 }
 
@@ -219,10 +219,6 @@ const useStyles = makeStyles((roles) => ({
   block: {
     gap: uiSpace.sm,
     padding: uiSpace.md,
-    backgroundColor: roles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
-    borderRadius: uiGeometry.radius.card,
   },
   blockActions: {
     flexDirection: 'row',

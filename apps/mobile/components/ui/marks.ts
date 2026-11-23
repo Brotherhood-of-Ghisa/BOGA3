@@ -43,21 +43,3 @@ export function uiCardSlice(roles: UiRoles, index: number, count: number): ViewS
     ...(index === count - 1 ? cap('Bottom') : {}),
   };
 }
-
-/**
- * One row of a virtualised list that reads as a single card: each row draws its
- * share of the hairline (the sides, plus the top on the `first` row and the
- * bottom on the `last`) and the corners at the ends, so rows can recycle one by
- * one. The rows' own ground and dividers stay with the caller.
- */
-export function uiCardSlice(roles: UiRoles, { first, last }: { first: boolean; last: boolean }): ViewStyle {
-  const radius = uiGeometry.radius.card;
-  return {
-    overflow: 'hidden',
-    borderColor: roles.rule,
-    borderLeftWidth: uiBorder.width,
-    borderRightWidth: uiBorder.width,
-    ...(first ? { borderTopWidth: uiBorder.width, borderTopLeftRadius: radius, borderTopRightRadius: radius } : {}),
-    ...(last ? { borderBottomWidth: uiBorder.width, borderBottomLeftRadius: radius, borderBottomRightRadius: radius } : {}),
-  };
-}

@@ -99,10 +99,9 @@ const useStyles = makeStyles((roles, mode) => ({
     paddingTop: uiSpace.xs,
     // A field on a card: `raised` inside the edge, as `FormField`.
     backgroundColor: roles.raised,
-    ...uiEdge(roles, mode),
-    borderRadius: uiGeometry.radius.control,
+    ...uiEdge(roles, mode, { shape: 'control' }),
   },
-  invalid: { borderColor: roles.danger },
+  invalid: uiEdge(roles, mode, { shape: 'control', tone: 'danger' }),
   effortField: { width: uiGeometry.tapTarget * 2 },
   weightField: { flex: 1, maxWidth: uiGeometry.tapTarget * 2 + uiSpace.xl },
   durationField: { width: uiGeometry.tapTarget * 2 },

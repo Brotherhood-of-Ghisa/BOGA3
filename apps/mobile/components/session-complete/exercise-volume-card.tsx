@@ -4,10 +4,12 @@ import { Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { changeToneColourIn, type ChangeTone } from '@/components/ui/change-tone';
+import { uiHairline } from '@/components/ui/edge';
 import { FigureText } from '@/components/ui/figure-text';
+import { uiMark } from '@/components/ui/marks';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiBorder, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { hasVolumeReference, type ExerciseVolumeComparison } from '@/src/session-insights';
 
 type ExerciseVolumeCardProps = {
@@ -171,7 +173,7 @@ const MARKER = uiSpace.md;
 
 const useStyles = makeStyles((roles) => ({
   shareCard: {
-    borderColor: roles.ruleSoft,
+    ...uiHairline(roles, { tone: 'ruleSoft' }),
   },
   body: {
     paddingHorizontal: uiSpace.md,
@@ -221,13 +223,13 @@ const useStyles = makeStyles((roles) => ({
   },
   track: {
     height: uiSpace.xs,
-    borderRadius: uiGeometry.radius.pill,
+    ...uiMark.bar,
     backgroundColor: roles.ruleSoft,
   },
   interval: {
     position: 'absolute',
     height: uiSpace.xs,
-    borderRadius: uiGeometry.radius.pill,
+    ...uiMark.bar,
     backgroundColor: roles.rule,
   },
   referenceMarker: {
@@ -239,12 +241,8 @@ const useStyles = makeStyles((roles) => ({
   },
   currentMarker: {
     position: 'absolute',
-    width: MARKER,
-    height: MARKER,
+    ...uiMark.ring(roles.onInk, MARKER, uiBorder.width * 2),
     marginLeft: -MARKER / 2,
-    borderRadius: uiGeometry.radius.pill,
-    borderWidth: uiBorder.width * 2,
-    borderColor: roles.onInk,
     backgroundColor: roles.ink,
   },
 }));

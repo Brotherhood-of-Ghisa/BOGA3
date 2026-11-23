@@ -6,8 +6,9 @@ import { FigureText } from '@/components/ui/figure-text';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import type { UiRoles } from '@/components/ui/theme';
 import { uiWell } from '@/components/ui/edge';
+import { uiMark } from '@/components/ui/marks';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
-import { uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
+import { uiIconSize, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
 import type { ProgressMetric } from '@/src/preferences/model';
 
@@ -186,13 +187,12 @@ const useStyles = makeStyles((roles, mode) => ({
   },
   track: {
     height: BAR_HEIGHT,
-    borderRadius: uiGeometry.radius.control,
-    ...uiWell(roles, mode),
+    ...uiWell(roles, mode, { shape: 'control' }),
     marginTop: uiSpace.xs,
     overflow: 'hidden',
   },
   fill: {
     height: BAR_HEIGHT,
-    borderRadius: uiGeometry.radius.control,
+    ...uiMark.bar,
   },
 }));

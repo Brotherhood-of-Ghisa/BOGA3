@@ -1,5 +1,5 @@
 import { Text, View } from 'react-native';
-import { FigureText, useUiRoles } from '@/components/ui';
+import { FigureText, uiMark, useUiRoles } from '@/components/ui';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { ExerciseDateFormat } from '@/src/preferences/model';
@@ -10,6 +10,8 @@ import type { useRegimeAssessment } from '@/src/strength-regimes/use-assessment'
 import { formatShortDate } from '@/src/utils/local-time';
 import { RmCurveChart, periodColour } from './chart';
 import { useCurveStyles } from './styles';
+
+const LEGEND_DOT = 12;
 
 /** Fitted amplitudes and observation-error scales; unsupported histories stay exploratory. */
 export function RmRegimes({ model, result, method, selectedId, dateFormat, onPick }: {
@@ -31,7 +33,7 @@ export function RmRegimes({ model, result, method, selectedId, dateFormat, onPic
     </Text>
     {assessment ? <Text allowFontScaling={false} style={text.body}><FigureText>{`${assessment.sampledSessions} fitting sessions`}</FigureText></Text> : null}
     {assessment?.curves.map(curve => <View key={curve.period} style={styles.legend}>
-      <View style={[styles.dot, { borderColor: periodColour(roles, curve.period), backgroundColor: 'transparent' }, curve.period === 'newer' ? { borderRadius: 0, transform: [{ rotate: '45deg' }] } : null]} />
+      <View style={[uiMark.ring(periodColour(roles, curve.period), LEGEND_DOT), curve.period === 'newer' ? { borderRadius: 0, transform: [{ rotate: '45deg' }] } : null]} />
       <Text allowFontScaling={false} style={[text.body, styles.shrink, { color: periodColour(roles, curve.period) }]}>
         <FigureText>{`${periodLabel(curve.period, assessment.boundary, dateFormat)} · 1RM ${formatOneRepMax(curve.totalRm / factor)}${factor === 2 ? ' per side' : ''}`}</FigureText>
       </Text>

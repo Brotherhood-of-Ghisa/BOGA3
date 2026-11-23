@@ -45,14 +45,14 @@ describe('live theme: Progress', () => {
       onSelect={jest.fn()} onMuscleHistory={jest.fn()} onExerciseHistory={jest.fn()} sortMode="now-desc" />);
     const sorted = () => within(screen.getByTestId('stats-muscle-sort-now')).getByText('Now');
     const change = () => screen.getByTestId('stats-muscle-row-back_lats-change');
-    expect(screen.getByTestId('stats-contributions')).toHaveStyle({ backgroundColor: before.ruleSoft, borderColor: before.rule });
+    expect(screen.getByTestId('stats-contributions')).toHaveStyle({ backgroundColor: before.ruleSoft });
     expect(style(sorted()).color).toBe(before.ink);
     expect(style(change()).color).toBe(before.gain);
 
     await switchTheme(SLATE_DARK);
 
     expect(after.ruleSoft).not.toBe(before.ruleSoft);
-    expect(screen.getByTestId('stats-contributions')).toHaveStyle({ backgroundColor: after.ruleSoft, borderColor: after.rule });
+    expect(screen.getByTestId('stats-contributions')).toHaveStyle({ backgroundColor: after.ruleSoft });
     expect(style(sorted()).color).toBe(after.ink);
     expect(style(change()).color).toBe(after.gain);
   });

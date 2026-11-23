@@ -65,7 +65,7 @@ it('exposes read-only day and week values without selection or black outlines', 
     expect(tile).toHaveProp('accessibilityRole', 'text');
     expect(tile.props.onPress).toBeUndefined();
     expect(tile.props.accessibilityState).toBeUndefined();
-    expect(style(id)).toMatchObject({ borderWidth: StyleSheet.hairlineWidth, borderColor: roles.rule });
+    expect(style(id)).toMatchObject({ borderWidth: uiBorder.width, borderColor: roles.rule });
   }
   expect(screen.queryAllByRole('button')).toEqual([]);
   expect(screen.getByTestId(`calendar-heatmap-cell-${today}`).props.accessibilityLabel).toContain('Today');
@@ -149,7 +149,7 @@ it.each(['2026-10-10', '2026-10-11', '2026-10-12'])('adds a seven-day Week tile 
   else {
     expect(screen.getByTestId(`${id}-value`)).toHaveTextContent('3400');
     expect(screen.getByTestId(id).props.accessibilityLabel.includes('Current week')).toBe(date === '2026-10-11');
-    expect(style(id)).toMatchObject({ borderWidth: StyleSheet.hairlineWidth, borderColor: roles.rule });
+    expect(style(id)).toMatchObject({ borderWidth: uiBorder.width, borderColor: roles.rule });
   }
 });
 

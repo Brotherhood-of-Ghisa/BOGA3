@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { ScrollView, Text, View, type ViewInstance, type LayoutChangeEvent } from 'react-native';
 
 import { ActionButton } from '@/components/ui/action-button';
+import { uiHairline } from '@/components/ui/edge';
 import { PageSheet } from '@/components/ui/page-sheet';
 import { useUiText, uiTextEmphasis, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -286,9 +287,7 @@ const useStyles = makeStyles((roles) => ({
     padding: uiSpace.lg,
     gap: uiSpace.sm,
     backgroundColor: roles.paper,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
-    borderRadius: uiGeometry.radius.card,
+    ...uiHairline(roles, { shape: 'card' }),
   },
   brandRow: {
     flexDirection: 'row',
@@ -331,9 +330,7 @@ const useStyles = makeStyles((roles) => ({
   },
   records: {
     backgroundColor: roles.recordWash,
-    borderWidth: uiBorder.width,
-    borderColor: roles.recordRule,
-    borderRadius: uiGeometry.radius.card,
+    ...uiHairline(roles, { shape: 'card', tone: 'recordRule' }),
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     gap: uiSpace.xs,
@@ -345,7 +342,7 @@ const useStyles = makeStyles((roles) => ({
   recordRow: {
     paddingTop: uiSpace.xs,
     borderTopWidth: uiBorder.width,
-    borderTopColor: roles.recordRule,
+    borderTopColor: roles.ruleSoft,
   },
   recordNameRow: {
     flexDirection: 'row',

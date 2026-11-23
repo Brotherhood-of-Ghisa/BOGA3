@@ -115,7 +115,7 @@ const useStyles = makeStyles((roles) => ({
   wrap: { flex: 1 },
   content: { paddingVertical: uiSpace.lg, paddingHorizontal: uiSpace.sm, gap: uiSpace.lg },
   header: { gap: uiSpace.lg, paddingTop: uiSpace.xs },
-  month: { gap: uiSpace.xs, paddingBottom: uiSpace.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: roles.rule },
+  month: { gap: uiSpace.xs, paddingBottom: uiSpace.lg, borderBottomWidth: uiBorder.width, borderBottomColor: roles.ruleSoft },
   calendar: { position: 'relative', gap: uiSpace.xs },
   weekSeparator: { position: 'absolute', top: 0, bottom: 0, right: '12.5%', width: uiBorder.width, backgroundColor: roles.rule },
   row: { flexDirection: 'row', gap: uiSpace.xs, alignItems: 'center' },

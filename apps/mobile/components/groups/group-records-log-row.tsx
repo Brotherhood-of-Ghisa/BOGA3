@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, Icon, makeStyles, uiBorder, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { FigureText, Icon, makeStyles, uiBorder, uiMark, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { RecordsLogRow } from '@/src/groups/records-history-view-model';
 import { speakHoldSeconds } from '@/src/groups/competition-view-model';
 
@@ -60,9 +60,9 @@ const useStyles = makeStyles((roles) => ({
   entry: { flexDirection: 'row', gap: uiSpace.sm, paddingHorizontal: uiSpace.md, paddingVertical: uiSpace.sm },
   rule: { borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft },
   earlier: { opacity: EARLIER_RULES_OPACITY },
-  mark: { width: MARK_SIZE, height: MARK_SIZE, borderRadius: MARK_SIZE / 2, alignItems: 'center', justifyContent: 'center' },
-  markLead: { borderWidth: uiBorder.width, borderColor: roles.record },
-  markBest: { borderWidth: uiBorder.width, borderColor: roles.accent },
+  mark: { alignItems: 'center', justifyContent: 'center' },
+  markLead: uiMark.ring(roles.record, MARK_SIZE),
+  markBest: uiMark.ring(roles.accent, MARK_SIZE),
   body: { flex: 1, gap: uiSpace.xs },
   line: { flexDirection: 'row', alignItems: 'baseline', gap: uiSpace.sm },
   grow: { flex: 1 },
