@@ -114,9 +114,9 @@ describe('depth', () => {
   };
   const atDepth = (depth: number) => withBackground(WARM_LIGHT, { lightness: 70, depth });
 
-  const spread = ['well', 'surface', 'raised', 'rule', 'ruleSoft', 'viz0'] as const;
+  const spread = ['well', 'surface', 'raised', 'viz0'] as const;
 
-  it('flattens the grounds, hairlines and empty cells onto the page at 0', () => {
+  it('flattens the grounds and empty cells onto the page at 0', () => {
     const roles = generateCustomRoles(atDepth(0));
     expect(spread.map((role) => hexToLch(roles[role]).lightness)).toEqual(
       Array(spread.length).fill(expect.closeTo(hexToLch(roles.paper).lightness, 0)),
@@ -133,6 +133,55 @@ describe('depth', () => {
     const deep = generateCustomRoles(withBackground(WARM_LIGHT, { depth: 300 }));
     (['ink', 'inkMuted', 'inkFaint', 'accent', 'record', 'viz1', 'viz4', 'danger', 'gain'] as const).forEach((role) =>
       expect(deep[role]).toBe(flat[role]),
+    );
+  });
+});
+
+describe('borders', () => {
+  const HAIRLINES = ['rule', 'ruleSoft'] as const;
+  const GROUNDS = ['well', 'surface', 'raised', 'viz0'] as const;
+  const page = (borders: number | undefined, depth = 100) => withBackground(WARM_LIGHT, { lightness: 70, depth, borders });
+  const gap = (colours: CustomColours, role: keyof UiRoles) => {
+    const roles = generateCustomRoles(colours);
+    return Math.abs(hexToLch(roles[role]).lightness - hexToLch(roles.paper).lightness);
+  };
+
+  it('draws a theme without borders as it drew it, whatever its depth, even with the legacy top-level key', () => {
+    [0, 40, 100, 300].forEach((depth) => {
+      const stored = JSON.parse(JSON.stringify(page(undefined, depth)));
+      const legacy = { ...stored, borders: { hue: 10, strength: 50 } };
+      expect(parseCustomColours(stored)!.background.borders).toBeUndefined();
+      expect(generateCustomRoles(parseCustomColours(legacy)!)).toEqual(generateCustomRoles(page(depth, depth)));
+      expect(generateCustomRoles(parseCustomColours(stored)!)).toEqual(generateCustomRoles(page(depth, depth)));
+    });
+  });
+
+  it('flattens the hairlines onto the page at 0 and spreads them as it grows', () => {
+    HAIRLINES.forEach((role) => {
+      expect(gap(page(0), role)).toBeCloseTo(0, 0);
+      expect(gap(page(300), role)).toBeGreaterThan(gap(page(100), role));
+      expect(gap(page(100), role)).toBeGreaterThan(gap(page(50), role));
+    });
+  });
+
+  it('moves the hairlines only', () => {
+    const [flat, shipped, wide] = [0, 100, 300].map((borders) => generateCustomRoles(page(borders)));
+    const changed = (a: UiRoles, b: UiRoles) => (Object.keys(a) as (keyof UiRoles)[]).filter((role) => a[role] !== b[role]);
+    expect(changed(flat, shipped).sort()).toEqual([...HAIRLINES].sort());
+    expect(changed(shipped, wide).sort()).toEqual([...HAIRLINES].sort());
+  });
+
+  it('leaves the hairlines where they are when depth moves, and moves the grounds and `viz0`', () => {
+    const [flat, deep] = [0, 300].map((depth) => generateCustomRoles(page(100, depth)));
+    HAIRLINES.forEach((role) => expect(deep[role]).toBe(flat[role]));
+    GROUNDS.forEach((role) => expect(deep[role]).not.toBe(flat[role]));
+  });
+
+  it('reads a stored value, and rejects one out of range or not whole', () => {
+    expect(parseCustomColours(JSON.parse(JSON.stringify(page(250))))!.background.borders).toBe(250);
+    expect(parseCustomColours(JSON.parse(JSON.stringify(page(0))))!.background.borders).toBe(0);
+    [301, -1, 12.5, '100', null].forEach((borders) =>
+      expect(parseCustomColours(withBackground(WARM_LIGHT, { borders: borders as never }))).toBeNull(),
     );
   });
 });

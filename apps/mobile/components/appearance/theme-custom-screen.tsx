@@ -18,6 +18,8 @@ import { THEME_DIRECTIONS, type ThemeMode, type UiRoles } from '@/components/ui/
 import {
   CUSTOM_COLOUR_PARTS,
   CUSTOM_PARTS,
+  BORDERS_MAX,
+  bordersOf,
   customSeed,
   DEPTH_MAX,
   HIGHLIGHT_CONTRAST_MAX,
@@ -41,7 +43,7 @@ import { startingCustom, type AppearanceChoice } from '@/components/ui/theme-pre
 
 type Draft = CustomColours[CustomPart];
 // A slider's field of a part.
-type Field = 'hue' | 'strength' | 'lightness' | 'depth' | 'contrast';
+type Field = 'hue' | 'strength' | 'lightness' | 'depth' | 'borders' | 'contrast';
 
 const percent = (value: number): string => `${value}%`;
 const HUE_MAX = 359;
@@ -120,7 +122,7 @@ function HueStrengthRows({ change, end, swatch, part, colour, divider }: Control
 }
 
 // The page: its mode, hue and strength, lightness over the mode's range, and
-// depth. Switching the mode puts the page and the primary text at that
+// depth and borders. Switching the mode puts the page and the primary text at that
 // ladder's defaults.
 function BackgroundControls(controls: Controls) {
   const { colours, change, end, save } = controls;
@@ -158,6 +160,16 @@ function BackgroundControls(controls: Controls) {
         onChangeEnd={end('depth')}
         testID="theme-custom-depth"
         value={background.depth}
+      />
+      <SliderRow
+        divider
+        format={percent}
+        label="Borders"
+        max={BORDERS_MAX}
+        onChange={change('borders')}
+        onChangeEnd={end('borders')}
+        testID="theme-custom-borders"
+        value={bordersOf(background)}
       />
     </>
   );
@@ -270,13 +282,18 @@ function PartControls(controls: Controls) {
 }
 
 // A part with one field moved. Only a colour part has sliders; the direction
-// is returned as it is.
-const editOf = (draft: Draft, field: Field, value: number): Draft => (typeof draft === 'string' ? draft : ({ ...draft, [field]: value } as Draft));
+// is returned as it is. Moving the depth of a page that has no borders of its
+// own pins them where they are, so the hairlines stay put.
+const editOf = (draft: Draft, field: Field, value: number): Draft => {
+  if (typeof draft === 'string') return draft;
+  const pinned = field === 'depth' && 'depth' in draft && draft.borders === undefined && draft.depth !== value ? { borders: draft.depth } : {};
+  return { ...draft, ...pinned, [field]: value } as Draft;
+};
 
 // Settings → Appearance → Custom → one part (background, primary text,
 // secondary text, accent, highlight, best ever): a hue on a painted bar and
-// a strength, and the part's own controls — the page's mode, lightness and
-// depth; the highlight's match and contrast; the texts' lightness or contrast.
+// a strength, and the part's own controls — the page's mode, lightness,
+// depth and borders; the highlight's match and contrast; the texts' lightness or contrast.
 // The direction's page offers its three choices instead.
 // Then the part's roles alone (`PartSpotlight`) and the whole theme on a
 // small mock, both live while a control is held. A part saves when a slider
