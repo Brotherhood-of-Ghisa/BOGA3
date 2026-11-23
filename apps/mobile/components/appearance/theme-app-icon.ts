@@ -11,13 +11,13 @@ import { isNovember, watchNovemberAppearance } from '@/src/utils/seasonal-appear
 
 let inFlight: Promise<void> | null = null;
 
-// Each preset has its own icon, every custom colour shares Rainbow, and Warm (the
-// default) is the primary icon and the fallback; names match the config plugin.
+// Each preset names its own icon (`appIcon`), every custom colour shares
+// Rainbow, and Warm (the default) is the primary icon and the fallback; names
+// match the config plugin.
 async function applyThemeAppIcon(
   preset: ResolvedTheme['preset'], november: boolean, interrupted: () => boolean,
 ): Promise<boolean> {
-  const themeName = preset.id === 'custom' ? 'Rainbow' : preset.label;
-  const iconName = november ? `${themeName}November` : preset.id === DEFAULT_THEME_PRESET_ID ? null : themeName;
+  const iconName = november ? `${preset.appIcon}November` : preset.id === DEFAULT_THEME_PRESET_ID ? null : preset.appIcon;
   try {
     if (getAppIconName() === iconName) return true;
     await setAlternateAppIcon(iconName);

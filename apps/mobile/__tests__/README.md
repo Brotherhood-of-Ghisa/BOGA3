@@ -104,8 +104,9 @@
   these or does not ship. It also sweeps every floor over the background ×
   text × accent grid (`components/ui/theme-neutrals.ts`), and checks that an
   untouched background and text draw every preset and custom hue as
-  `fixtures/theme-roles-light.json` records, but for the grounds and hairlines
-  the ground ladder re-stepped, which its calibration pins instead. `ui-theme-launch.test.ts` covers
+  `fixtures/theme-roles-light.json` records, but for the roles re-stepped on
+  purpose (grounds, hairlines, `inkFaint`, `accent`, `record`, washes), which its
+  calibration pins instead. `ui-theme-launch.test.ts` covers
   the stored choice: the appearance record's parser, the older accent id read
   while no record exists and left in place, the default fallback for an
   unknown id, an invalid record or an unreadable store, and that each

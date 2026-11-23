@@ -31,7 +31,7 @@ const HIT_SLOP = {
 
 type ArrowDirection = 'left' | 'right' | 'up' | 'down';
 
-/** One step arrow, disabled (ghost ink) when `onPress` is null; up and down pass their own reach. */
+/** One step arrow, disabled (faint ink) when `onPress` is null; up and down pass their own reach. */
 export function StepArrow({
   direction,
   onPress,
@@ -57,7 +57,7 @@ export function StepArrow({
       onPress={onPress ?? undefined}
       style={({ pressed }) => [styles.arrow, pressed && !disabled ? styles.pressed : null]}
       testID={testID}>
-      <Icon colorRole={disabled ? 'inkGhost' : 'inkMuted'} name={`chevron-${direction}`} size="sm" />
+      <Icon colorRole={disabled ? 'inkFaint' : 'inkMuted'} name={`chevron-${direction}`} size="sm" />
     </Pressable>
   );
 }

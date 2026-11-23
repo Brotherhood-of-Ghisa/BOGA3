@@ -60,12 +60,21 @@ afterEach(async () => {
 });
 
 it.each<[ThemePresetId, string | null]>([
-  ['warm', null], ['slate', 'Slate'], ['forest', 'Forest'], ['plum', 'Plum'],
-])('applies %s using the native icon name', async (id, expectedName) => {
+  ['warm', null], ['slate', 'Slate'], ['forest', 'Forest'], ['plum', 'Plum'], ['graphite', 'Slate'], ['sage', 'Forest'],
+])('applies %s using the native icon name its preset names', async (id, expectedName) => {
   jest.mocked(appIcons.getAppIconName).mockReturnValue('PreviousIcon');
   await applyThemeAppIcon(getThemePreset(id));
   expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith(expectedName);
 });
+
+it.each<[ThemePresetId, string]>([['warm', 'WarmNovember'], ['graphite', 'SlateNovember'], ['sage', 'ForestNovember']])(
+  'applies the November variant of the icon %s names',
+  async (id, expectedName) => {
+    jest.useFakeTimers({ now: new Date(2026, 10, 20), doNotFake: ['setImmediate'] });
+    await applyThemeAppIcon(getThemePreset(id));
+    expect(appIcons.setAlternateAppIcon).toHaveBeenCalledWith(expectedName);
+  },
+);
 
 it('uses the Rainbow icon for a custom theme', async () => {
   jest.mocked(appIcons.getAppIconName).mockReturnValue('Forest');

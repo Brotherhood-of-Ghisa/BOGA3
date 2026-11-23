@@ -255,7 +255,7 @@ the navigators take `useUiMode()`, never a fixed mode or colour
 (`app.config.ts`). The stack header takes `paper` (no shadow line) and `ink`, so
 header and page read as one surface ("Pages").
 
-Settings → Appearance: Theme (four presets and Custom as radio rows with
+Settings → Appearance: Theme (six presets and Custom as radio rows with
 swatches; Custom folds presets behind `Show presets`), then Mode (Light, Dark,
 System) for a preset or one row per Custom part, then a live `ThemePreview`.
 A part's picker (its title switches part): a painted hue `SliderRow`,

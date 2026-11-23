@@ -35,8 +35,8 @@ export type CustomBackground = HueStrength & { mode: ThemeMode; lightness: numbe
 export type CustomHighlight = HueStrength & { match: boolean; contrast: number };
 // Primary text: `ink` alone, at its own L*.
 export type CustomInk = HueStrength & { lightness: number };
-// Secondary text: `inkMuted`, `inkFaint` and `inkGhost`; `contrast` (0–150) is
-// a percentage of their shipped steps from the page.
+// Secondary text: `inkMuted` and `inkFaint`; `contrast` (0–150) is a
+// percentage of their shipped steps from the page.
 export type CustomText = HueStrength & { contrast: number };
 export type CustomColours = {
   background: CustomBackground;
@@ -79,17 +79,17 @@ export const PAGE_DEFAULT: Record<ThemeMode, number> = { dark: paperLightness('d
 export const inkDefault = (mode: ThemeMode): number => inkStep(mode).lightness;
 
 // Each seed's L* and the chroma a strength of 100 gives it. The L* are the
-// shipped seeds' (the neutral `inkMuted`, the custom accent's 46, the brass's
-// 45), so a converted preset keeps its look. `ink`'s seed only paints its hue
-// bar: primary text is drawn by `gamutColour`; so does the highlight's, at the
-// accent's.
+// shipped seeds' (the neutral `inkMuted`, the accent's and the brass's 43,
+// which clear 4.5:1 on the light `paper`), so a converted preset keeps its
+// look. `ink`'s seed only paints its hue bar: primary text is drawn by
+// `gamutColour`; so does the highlight's, at the accent's.
 const SEED: Record<CustomColourPart, { lightness: number; chroma: number }> = {
   background: { lightness: 42.4, chroma: 40 },
   ink: { lightness: 42.4, chroma: 40 },
   text: { lightness: 42.4, chroma: 40 },
-  accent: { lightness: 46, chroma: 100 },
-  highlight: { lightness: 46, chroma: 100 },
-  record: { lightness: 45, chroma: 100 },
+  accent: { lightness: 43, chroma: 100 },
+  highlight: { lightness: 43, chroma: 100 },
+  record: { lightness: 43, chroma: 100 },
 };
 
 // The seed a part's hue and strength make. Out-of-gamut chroma is reduced.
@@ -160,7 +160,7 @@ const GROUND_ROLES = new Set<keyof UiRoles>(['well', 'surface', 'raised', 'rule'
 // Grounds that take the page's hue and chroma, so a tinted page has tinted
 // cards and fields (the light ladder's `raised` is white, with no hue of its own).
 const PAGE_TINTED_ROLES = new Set<keyof UiRoles>(['surface', 'raised']);
-const SECONDARY_ROLES = new Set<keyof UiRoles>(['inkMuted', 'inkFaint', 'inkGhost']);
+const SECONDARY_ROLES = new Set<keyof UiRoles>(['inkMuted', 'inkFaint']);
 const HIGHLIGHT_ROLES = new Set<keyof UiRoles>(['accentWash']);
 // Roles that are the ladder's ends whatever the page: black or white.
 const KEPT_ROLES = new Set<keyof UiRoles>(['selection', 'onAccent', 'onSelection', 'onDanger', 'onInk', 'scrim']);

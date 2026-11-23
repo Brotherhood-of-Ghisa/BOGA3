@@ -130,7 +130,7 @@ describe('ActionRow', () => {
     view.rerender(<ActionRow kind="danger" label="Wipe local" onPress={jest.fn()} />);
     expect(screen.getByText('Wipe local')).toHaveStyle({ color: roles.danger });
     view.rerender(<ActionRow kind="danger" disabled label="Wipe local" onPress={jest.fn()} />);
-    expect(screen.getByText('Wipe local')).toHaveStyle({ color: roles.inkGhost });
+    expect(screen.getByText('Wipe local')).toHaveStyle({ color: roles.inkFaint });
   });
 
   it('presses a danger or act row, and blocks a disabled one', () => {

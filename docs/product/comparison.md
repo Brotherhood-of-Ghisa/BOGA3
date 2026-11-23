@@ -20,9 +20,9 @@ Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/m
 ### comparison.change-colour · presentation · accepted
 
 A change's colour follows the theme's direction: `Green / crimson` (every
-preset; Custom's default), `Blue / orange`, or `Ink only`, where both
+preset but Sage; Custom's default), `Blue / orange` (Sage's), or `Ink only`, where both
 directions draw in ink and the sign alone reads
-([[comparison.change-display]]). Only Custom offers the choice. Improvements
+([[comparison.change-display]]). Only Custom offers the choice; a preset fixes its own. Improvements
 and `new` take the gain colour, decreases the loss colour; no change and
 unavailable stay ink.
 

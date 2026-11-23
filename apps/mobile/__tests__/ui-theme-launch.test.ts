@@ -104,13 +104,22 @@ describe('the appearance record', () => {
   });
 
   it('reads every preset and mode, and keeps custom colours while a preset is chosen', () => {
-    for (const theme of ['warm', 'slate', 'forest', 'plum']) {
+    for (const theme of ['warm', 'slate', 'forest', 'plum', 'graphite', 'sage']) {
       for (const mode of ['light', 'dark', 'system']) {
         expect(parseAppearanceRecord(JSON.stringify({ theme, mode, custom: null })).appearance).toEqual({ theme, mode, custom: null });
       }
     }
     const kept = { theme: 'slate', mode: 'dark', custom: CUSTOM } as const;
     expect(parseAppearanceRecord(JSON.stringify(kept)).appearance).toEqual(kept);
+  });
+
+  it('opens a stored graphite or sage record in that preset, and the four older ids still open theirs', () => {
+    for (const theme of ['graphite', 'sage', 'warm', 'slate', 'forest', 'plum'] as const) {
+      Storage.setItemSync(APPEARANCE_STORAGE_KEY, serialiseAppearanceRecord({ ...DEFAULT_APPEARANCE, theme }));
+      const opened = readLaunchTheme();
+      expect(opened.problem).toBeNull();
+      expect(opened.preset).toBe(getThemePreset(theme));
+    }
   });
 
   it('ignores fields it does not know', () => {
@@ -165,7 +174,7 @@ describe('records the previous build wrote', () => {
     expect(parseAppearanceRecord(record('custom', withDirection)).appearance?.custom).toEqual({ ...CUSTOM, direction: 'ink' });
   });
 
-  it.each(['warm', 'slate', 'forest', 'plum'].flatMap((theme) => ['light', 'dark', 'system'].map((mode) => [theme, mode] as const)))(
+  it.each(['warm', 'slate', 'forest', 'plum', 'graphite', 'sage'].flatMap((theme) => ['light', 'dark', 'system'].map((mode) => [theme, mode] as const)))(
     'opens the %s preset in %s, keeping older custom colours it held',
     (theme, mode) => {
       expect(parseAppearanceRecord(record(theme, 'null', mode)).appearance).toEqual({ theme, mode, custom: null });

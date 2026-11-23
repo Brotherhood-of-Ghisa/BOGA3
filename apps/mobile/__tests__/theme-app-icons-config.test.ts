@@ -4,11 +4,17 @@ import path from 'path';
 import { spawnSync } from 'node:child_process';
 
 import appConfig from '../app.config';
-import { themePresets } from '@/components/ui/theme-presets';
+import { CUSTOM_THEME, themePresets } from '@/components/ui/theme-presets';
 
 const config = appConfig({ config: {} as never });
 const root = path.resolve(__dirname, '..');
-const ordinaryIcons = [...themePresets, { id: 'rainbow', label: 'Rainbow' }];
+// The icons the config plugin registers: one per distinct name a preset's
+// `appIcon` field gives (Graphite and Sage draw Slate's and Forest's), and the
+// Rainbow every custom theme shares.
+const ordinaryIcons = [
+  ...themePresets.filter((preset) => preset.appIcon === preset.label),
+  { id: 'rainbow', label: 'Rainbow' },
+];
 const seasonalIcons = ordinaryIcons.map(({ id, label }) => ({ id: `${id}-november`, label: `${label}November` }));
 const alternateIcons = [...ordinaryIcons.filter(({ id }) => id !== 'warm'), ...seasonalIcons];
 
@@ -23,6 +29,18 @@ describe('bundled theme app icons', () => {
         android: { foregroundImage: `./assets/images/app-icons/${id}.png` },
       })),
     ]);
+  });
+
+  it.each([...themePresets, CUSTOM_THEME])('registers the icon $id names, and its November variant', ({ appIcon }) => {
+    const names = (config.plugins as unknown[][]).find((plugin) => plugin[0] === 'expo-alternate-app-icons')?.[1] as { name: string }[];
+    const registered = names.map(({ name }) => name);
+    expect(ordinaryIcons.map(({ label }) => label)).toContain(appIcon);
+    expect([...registered, 'Warm']).toContain(appIcon);
+    expect(registered).toContain(`${appIcon}November`);
+  });
+
+  it('names Graphite’s and Sage’s icons after Slate’s and Forest’s, with their November variants', () => {
+    expect(themePresets.filter(({ id }) => id === 'graphite' || id === 'sage').map(({ appIcon }) => appIcon)).toEqual(['Slate', 'Forest']);
   });
 
   it.each([...ordinaryIcons, ...seasonalIcons])('$label has an opaque, square PNG large enough for an iOS icon', ({ id }) => {

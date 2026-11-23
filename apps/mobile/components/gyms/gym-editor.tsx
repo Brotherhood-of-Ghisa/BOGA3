@@ -239,7 +239,7 @@ export function GymEditor({ gym, onDone, onLocationChanged, onCancel, readPositi
       />
 
       <FormSection title="Location">
-        <ListRow density="list" divider={false} leading={<Icon colorRole={hasLocation ? 'ink' : 'inkGhost'} name="location" size="sm" />}>
+        <ListRow density="list" divider={false} leading={<Icon colorRole={hasLocation ? 'ink' : 'inkFaint'} name="location" size="sm" />}>
           <Text allowFontScaling={false} style={text.bodyStrong} testID="gym-editor-location-status">
             {hasLocation ? (gym ? 'Location saved' : 'Location ready') : 'No location saved'}
           </Text>

@@ -41,7 +41,7 @@ so you can describe the way you actually lift.
   alongside freeform training.
 - **Control your analysis.** Adjust effort preferences, weekly muscle targets,
   progress periods and history look-back, with filters for browsing your data.
-- **Make it yours visually.** Choose Warm, Slate, Forest or Plum, or pick a
+- **Make it yours visually.** Choose Warm, Slate, Forest, Plum, Graphite or Sage, or pick a
   custom colour with a preview of the resulting interface.
 
 A compatible AI coach can connect through BoGa's authenticated MCP service to

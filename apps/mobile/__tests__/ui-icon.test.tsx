@@ -93,7 +93,7 @@ describe('Icon', () => {
     const planned = renderWithTheme(<Icon name="set-planned" />);
     const arcs = planned.UNSAFE_getAllByType(Path);
     expect(arcs).toHaveLength(8);
-    expect(arcs.every((arc) => arc.props.stroke === roles.inkGhost)).toBe(true);
+    expect(arcs.every((arc) => arc.props.stroke === roles.inkFaint)).toBe(true);
   });
 });
 

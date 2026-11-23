@@ -29,8 +29,8 @@ export type StatProps = {
   // Stacked: `primary` is a headline figure (a summary card), `secondary` a
   // figure in a row of a list (a Progress muscle row).
   rank?: StatRank;
-  // A planned value is not yet realised: it is shown, but faded — the value in
-  // `ink-faint`, the legend in `inkGhost`.
+  // A planned value is not yet realised: it is shown, but faded — the value
+  // and its legend in `inkFaint`.
   state?: StatState;
   // `record`: bold `record`, an all-time best — the one superlative. Ignored
   // for planned values, which cannot be one (`design-language.md` §5).
@@ -98,7 +98,7 @@ export function Stat({
   const legendStyle = [
     textRoles.label,
     textTones.faint,
-    planned ? styles.legendPlanned : null,
+    planned ? styles.planned : null,
     ground === 'viz' ? styles.legendOnViz : null,
   ];
   const valueStyle = [
@@ -107,7 +107,7 @@ export function Stat({
       : kind === 'figure' && rank === 'secondary'
         ? stackedValueStyles.rowFigure
         : stackedValueStyles[kind],
-    planned ? styles.valuePlanned : emphasisStyles[emphasis],
+    planned ? styles.planned : emphasisStyles[emphasis],
   ];
 
   if (layout === 'inline') {
@@ -136,13 +136,10 @@ export function Stat({
 }
 
 const useStyles = makeStyles((roles) => ({
-  legendPlanned: {
-    color: roles.inkGhost,
-  },
   legendOnViz: {
     color: roles.ink,
   },
-  valuePlanned: {
+  planned: {
     color: roles.inkFaint,
   },
   inline: {

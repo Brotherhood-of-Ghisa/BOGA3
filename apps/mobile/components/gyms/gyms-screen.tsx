@@ -84,7 +84,7 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
         density="list"
         divider={index > 0}
         key={gym.id}
-        leading={<Icon colorRole={located ? 'ink' : 'inkGhost'} name="location" size="sm" />}
+        leading={<Icon colorRole={located ? 'ink' : 'inkFaint'} name="location" size="sm" />}
         onPress={() => setEditing(gym.id)}
         testID={`gyms-row-${gym.id}`}
         trailing={<Icon colorRole="inkMuted" name="chevron-right" />}>

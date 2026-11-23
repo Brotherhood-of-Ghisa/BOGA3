@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import appConfig from '../app.config';
+import { CUSTOM_THEME, themePresets } from '@/components/ui/theme-presets';
 
 const plugin = require('../plugins/with-android-app-icon-state');
 const root = path.resolve(__dirname, '..');
@@ -53,4 +54,15 @@ it('registers only an Android mod and applies it to the native source before com
     fs.writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({ version: '9.0.0' }));
     await expect(config.mods.android.dangerous(request)).rejects.toThrow(/before upgrading.*8\.0\.0/);
   } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
+});
+
+it('has a launcher alias for every icon a preset names, and its November variant', () => {
+  const alternates = appConfig({ config: {} as never }).plugins?.flatMap((entry) =>
+    Array.isArray(entry) && entry[0] === 'expo-alternate-app-icons' ? (entry[1] as { name: string }[]).map(({ name }) => name) : [],
+  );
+  for (const { appIcon } of [...themePresets, CUSTOM_THEME]) {
+    // Warm is the primary icon, so it has no alias of its own.
+    if (appIcon !== 'Warm') expect(alternates).toContain(appIcon);
+    expect(alternates).toContain(`${appIcon}November`);
+  }
 });

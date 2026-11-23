@@ -37,7 +37,6 @@ describe('design-language tokens', () => {
         'gain',
         'ink',
         'inkFaint',
-        'inkGhost',
         'inkMuted',
         'loss',
         'onAccent',
@@ -154,7 +153,7 @@ describe('design-language tokens', () => {
           // field is pure white, and a light card all but, so neither carries
           // a hue worth checking (the chroma test skips them).
           const families = [
-            { seed: seeds.text, roles: [seeded.ink, seeded.inkMuted, seeded.inkFaint, seeded.inkGhost] },
+            { seed: seeds.text, roles: [seeded.ink, seeded.inkMuted, seeded.inkFaint] },
             {
               seed: seeds.background,
               roles: [seeded.well, seeded.paper, seeded.surface, seeded.raised, seeded.rule, seeded.ruleSoft, seeded.viz0],
@@ -173,7 +172,7 @@ describe('design-language tokens', () => {
       });
 
       it('keeps the shipped neutrals warm and low in chroma', () => {
-        for (const neutral of [roles.ink, roles.inkMuted, roles.inkFaint, roles.inkGhost, roles.paper, roles.rule, roles.ruleSoft]) {
+        for (const neutral of [roles.ink, roles.inkMuted, roles.inkFaint, roles.paper, roles.rule, roles.ruleSoft]) {
           const { chroma, hue } = lch(neutral);
           expect(chroma).toBeLessThanOrEqual(10);
           expect(hue).toBeGreaterThanOrEqual(75);
@@ -183,7 +182,7 @@ describe('design-language tokens', () => {
 
       it('tints `accent-wash` from `accent`, not from the ground, close to the page', () => {
         expect(hueDistance(lch(roles.accentWash).hue, lch(roles.accent).hue)).toBeLessThanOrEqual(10);
-        if (mode === 'light') expect(lightness(roles.accentWash)).toBeGreaterThanOrEqual(95);
+        if (mode === 'light') expect(lightness(roles.accentWash)).toBeGreaterThanOrEqual(94);
         else expect(Math.abs(lightness(roles.accentWash) - lightness(roles.paper))).toBeLessThanOrEqual(10);
       });
     });

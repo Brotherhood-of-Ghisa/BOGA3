@@ -410,7 +410,7 @@ function ExerciseCatalogScreen() {
         title={actionTarget?.name}
         visible={actionTarget !== null}>
         <ListRow accessibilityLabel="Add exercise to session" disabled={isActionTargetDeleted}
-          label="Add to session…" leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'ink'} name="plus" size="md" />}
+          label="Add to session…" leading={<Icon colorRole={isActionTargetDeleted ? 'inkFaint' : 'ink'} name="plus" size="md" />}
           onPress={() => {
             if (actionTarget && !actionTarget.deletedAt) setQueuedSessionEntry(actionTarget);
             setExerciseActionMenuTarget(null);
@@ -419,7 +419,7 @@ function ExerciseCatalogScreen() {
           accessibilityLabel="Edit exercise from actions"
           disabled={isActionTargetDeleted}
           label="Edit"
-          leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'ink'} name="pencil" size="md" />}
+          leading={<Icon colorRole={isActionTargetDeleted ? 'inkFaint' : 'ink'} name="pencil" size="md" />}
           onPress={() => {
             setExerciseActionMenuTarget(null);
             if (actionTarget && !actionTarget.deletedAt) {
@@ -434,7 +434,7 @@ function ExerciseCatalogScreen() {
             // A soft-deleted exercise is never linked from the UI.
             disabled={isActionTargetDeleted}
             label="Link to group exercise"
-            leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'ink'} name="link" size="md" />}
+            leading={<Icon colorRole={isActionTargetDeleted ? 'inkFaint' : 'ink'} name="link" size="md" />}
             onPress={() => {
               setExerciseActionMenuTarget(null);
               if (actionTarget && !actionTarget.deletedAt) {
@@ -458,7 +458,7 @@ function ExerciseCatalogScreen() {
           accessibilityLabel="Duplicate exercise from actions"
           disabled={isActionTargetDeleted}
           label="Duplicate"
-          leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'ink'} name="copy" size="md" />}
+          leading={<Icon colorRole={isActionTargetDeleted ? 'inkFaint' : 'ink'} name="copy" size="md" />}
           onPress={() => {
             setExerciseActionMenuTarget(null);
             if (actionTarget && !actionTarget.deletedAt) {
@@ -472,7 +472,7 @@ function ExerciseCatalogScreen() {
             accessibilityLabel="Share exercise with group from actions"
             disabled={isActionTargetDeleted}
             label="Share with group…"
-            leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'ink'} name="share" size="md" />}
+            leading={<Icon colorRole={isActionTargetDeleted ? 'inkFaint' : 'ink'} name="share" size="md" />}
             onPress={() => {
               if (actionTarget && !actionTarget.deletedAt) {
                 void handleShareExercise(actionTarget);
@@ -482,7 +482,7 @@ function ExerciseCatalogScreen() {
           />
         ) : null}
         <ListRow accessibilityLabel="Merge exercise from actions" label="Merge into…"
-          leading={<Icon colorRole={isActionTargetDeleted ? 'inkGhost' : 'danger'} name="swap" size="md" />}
+          leading={<Icon colorRole={isActionTargetDeleted ? 'inkFaint' : 'danger'} name="swap" size="md" />}
           disabled={isActionTargetDeleted} tone="danger" testID="exercise-action-merge"
           onPress={() => {
             if (actionTarget && !actionTarget.deletedAt) {

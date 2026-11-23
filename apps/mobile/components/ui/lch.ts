@@ -41,6 +41,18 @@ export function lchToHex({ lightness, chroma, hue }: Lch): string {
   return `#${rgb.map((channel) => toHexByte(fromLinear(channel))).join('')}`.toUpperCase();
 }
 
+// CIE76 ΔE*ab, the distance between two colours in L*a*b*: about 2.3 is a
+// just-noticeable difference side by side.
+export function colourDistance(first: string, second: string): number {
+  const lab = (hex: string) => {
+    const { lightness, chroma, hue } = hexToLch(hex);
+    const radians = (hue * Math.PI) / 180;
+    return [lightness, chroma * Math.cos(radians), chroma * Math.sin(radians)];
+  };
+  const [a, b] = [lab(first), lab(second)];
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
 // `#RRGGBB` at an opacity, as React Native's `rgba()` string.
 export function withAlpha(hex: string, alpha: number): string {
   const [r, g, b] = [1, 3, 5].map((offset) => parseInt(hex.slice(offset, offset + 2), 16));

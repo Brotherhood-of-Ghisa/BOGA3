@@ -72,7 +72,7 @@ export function RadioRow({ label, description, checked, meta, onPress, divider =
       disabled={disabled}
       divider={divider}
       label={label}
-      leading={<Icon colorRole={disabled ? 'inkGhost' : 'ink'} name={checked ? 'radio-on' : 'radio-off'} />}
+      leading={<Icon colorRole={disabled ? 'inkFaint' : 'ink'} name={checked ? 'radio-on' : 'radio-off'} />}
       meta={meta}
       onPress={onPress}
       testID={testID}
@@ -101,7 +101,7 @@ export function CheckRow({ label, note, checked, onPress, divider = false, disab
       meta={note ? <Text allowFontScaling={false} numberOfLines={1} style={[textRoles.meta, textTones.muted]}>{note}</Text> : undefined}
       onPress={onPress}
       testID={testID}
-      trailing={checked ? <Icon colorRole={disabled ? 'inkGhost' : 'accent'} name="check" size="md" /> : null}
+      trailing={checked ? <Icon colorRole={disabled ? 'inkFaint' : 'accent'} name="check" size="md" /> : null}
     />
   );
 }

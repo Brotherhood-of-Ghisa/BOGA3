@@ -241,7 +241,7 @@ const useStyles = makeStyles((roles) => ({
     color: roles.accent,
   },
   labelDisabled: {
-    color: roles.inkGhost,
+    color: roles.inkFaint,
   },
 }));
 

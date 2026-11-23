@@ -31,7 +31,7 @@ export type IconProps = IconColour & {
 const DEFAULT_ROLES: Partial<Record<IconName, UiRoleToken>> = {
   'set-done': 'ink',
   'set-current': 'accent',
-  'set-planned': 'inkGhost',
+  'set-planned': 'inkFaint',
 };
 
 // A `knockout` mark is the mark cut into a glyph's own fill, which is `ink`

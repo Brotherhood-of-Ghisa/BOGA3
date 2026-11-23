@@ -50,7 +50,7 @@ export function IconButton({
 }: IconButtonProps) {
   const styles = useStyles();
   const roles = useUiRoles();
-  const glyph = <Icon colorRole={disabled && tone !== 'accent' ? 'inkGhost' : GLYPH_ROLE[tone]} name={name} size={size} />;
+  const glyph = <Icon colorRole={disabled && tone !== 'accent' ? 'inkFaint' : GLYPH_ROLE[tone]} name={name} size={size} />;
   if (nativeHeader) return (
     <Touchable
       accessible accessibilityHint={accessibilityHint} accessibilityLabel={accessibilityLabel} accessibilityRole="button"
@@ -94,7 +94,7 @@ const useStyles = makeStyles((roles) => ({
     backgroundColor: roles.accent,
   },
   accentDisabled: {
-    backgroundColor: roles.inkGhost,
+    backgroundColor: roles.inkFaint,
   },
   accentPressed: {
     opacity: 0.85,
