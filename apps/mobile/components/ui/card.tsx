@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   Pressable,
+  StyleSheet,
   View,
   type AccessibilityActionEvent,
   type AccessibilityActionInfo,
@@ -8,9 +9,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { uiEdge } from '@/components/ui/edge';
+import { uiHairline, uiLift } from '@/components/ui/edge';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiGeometry } from '@/components/ui/tokens';
 
 type CardBaseProps = {
   children: ReactNode;
@@ -32,40 +32,64 @@ type CardProps = CardBaseProps &
       }
   );
 
+// What places a pressable card among its siblings. The rest of a caller's style
+// (padding, gap, direction) lays out the card's own content.
+const PLACEMENT_KEYS = new Set([
+  'flex', 'flexGrow', 'flexShrink', 'flexBasis', 'alignSelf', 'position', 'top', 'right', 'bottom', 'left', 'start', 'end',
+  'zIndex', 'width', 'height', 'minWidth', 'maxWidth', 'minHeight', 'maxHeight', 'aspectRatio', 'opacity', 'transform', 'display',
+]);
+
+function splitPlacement(style: StyleProp<ViewStyle>): { placement: ViewStyle; content: ViewStyle } {
+  const placement: Record<string, unknown> = {};
+  const content: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(StyleSheet.flatten(style) ?? {})) {
+    (PLACEMENT_KEYS.has(key) || key.startsWith('margin') ? placement : content)[key] = value;
+  }
+  return { placement, content };
+}
+
 // Design-language card (`design-language.md` §4): `surface` on `paper`, the
 // edge (`rule` hairline and a lift). It clips its content so a band or divider meets the
 // rounded corners, and carries no padding — the content owns its insets.
+//
+// A pressable card is an accessibility element that clips, so its lift sits on a
+// plain view around it: on one view, iOS hides the children's testIDs from the
+// accessibility tree.
 export function Card({ children, style, testID, onPress, accessibilityLabel, accessibilityActions, onAccessibilityAction }: CardProps) {
   const styles = useStyles();
   if (!onPress) {
     return (
-      <View accessibilityLabel={accessibilityLabel} style={[styles.card, style]} testID={testID}>
+      <View accessibilityLabel={accessibilityLabel} style={[styles.card, styles.lift, style]} testID={testID}>
         {children}
       </View>
     );
   }
 
+  const { placement, content } = splitPlacement(style);
   return (
-    <Pressable
-      accessibilityActions={accessibilityActions}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="link"
-      onAccessibilityAction={onAccessibilityAction}
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed ? styles.pressed : null, style]}
-      testID={testID}>
-      {children}
-    </Pressable>
+    <View style={[styles.lift, placement]}>
+      <Pressable
+        accessibilityActions={accessibilityActions}
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole="link"
+        onAccessibilityAction={onAccessibilityAction}
+        onPress={onPress}
+        style={({ pressed }) => [styles.card, styles.fill, pressed ? styles.pressed : null, content]}
+        testID={testID}>
+        {children}
+      </Pressable>
+    </View>
   );
 }
 
 const useStyles = makeStyles((roles, mode) => ({
   card: {
     overflow: 'hidden',
-    ...uiEdge(roles, mode),
-    borderRadius: uiGeometry.radius.card,
+    ...uiHairline(roles, { shape: 'card' }),
     backgroundColor: roles.surface,
   },
+  lift: uiLift(roles, mode, { shape: 'card' }),
+  fill: { flexGrow: 1 },
   // Pressed sinks to the page's ground.
   pressed: {
     backgroundColor: roles.paper,

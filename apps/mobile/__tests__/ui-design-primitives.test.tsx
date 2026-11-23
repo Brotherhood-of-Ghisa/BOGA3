@@ -160,6 +160,25 @@ describe('Card', () => {
     fireEvent.press(card);
     expect(onPress).toHaveBeenCalledTimes(1);
   });
+
+  it('lifts a pressable card on a plain view around it, so no view is both a clipping accessibility element and a shadow', () => {
+    render(
+      <Card accessibilityLabel="Open session" onPress={jest.fn()} style={{ marginHorizontal: 16, flex: 1, padding: 8, gap: 4 }} testID="card">
+        <Text testID="card-child">Body</Text>
+      </Card>,
+    );
+
+    const card = screen.getByTestId('card');
+    const lift = framed(card.parent as HostNode);
+    expect(flatStyle(card)).toMatchObject({ overflow: 'hidden', borderWidth: 1, borderColor: roles.rule, borderRadius: uiGeometry.radius.card, padding: 8, gap: 4 });
+    expect(flatStyle(card).boxShadow).toBeUndefined();
+    expect(lift).not.toBe(card);
+    expect((lift.props as { testID?: string }).testID).toBeUndefined();
+    expect(flatStyle(lift)).toMatchObject({ borderRadius: uiGeometry.radius.card, marginHorizontal: 16, flex: 1 });
+    expect(flatStyle(lift).boxShadow).toHaveLength(1);
+    expect(flatStyle(lift).overflow).toBeUndefined();
+    expect(within(card).getByTestId('card-child')).toBeTruthy();
+  });
 });
 
 describe('Stat', () => {

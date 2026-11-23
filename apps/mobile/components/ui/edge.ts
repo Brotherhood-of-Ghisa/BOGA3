@@ -40,9 +40,14 @@ const corner = (shape: EdgeShape | undefined): ViewStyle => (shape ? { borderRad
 /** The corner alone, for a container that has a ground but no edge: a wash, a pressed state, a selected tile. */
 export const uiCorner = (shape: EdgeShape): ViewStyle => corner(shape);
 
+/** The lift alone, with its corner. For a view that is both a shadow and an accessible, clipping element, put it on a plain view around it. */
+export function uiLift(roles: UiRoles, mode: ThemeMode, options: Pick<EdgeOptions, 'shape'> = {}): ViewStyle {
+  return { ...corner(options.shape), boxShadow: [{ ...LIFT, color: edgeShades(roles.ink, mode).lift }] };
+}
+
 /** A card's or a control's edge: the `rule` hairline and a lift. */
 export function uiEdge(roles: UiRoles, mode: ThemeMode, options: EdgeOptions = {}): ViewStyle {
-  return { ...uiHairline(roles, options), boxShadow: [{ ...LIFT, color: edgeShades(roles.ink, mode).lift }] };
+  return { ...uiHairline(roles, options), ...uiLift(roles, mode) };
 }
 
 /** The hairline alone, for an edge that must not read as pressable or lifted: a static `Tag`, a colour sample. */
