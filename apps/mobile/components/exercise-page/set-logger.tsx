@@ -150,6 +150,7 @@ const useStyles = makeStyles((roles) => ({
     borderTopColor: roles.ruleSoft,
     borderBottomColor: roles.ruleSoft,
   },
+  // A selection mark on the leading edge, not a container edge: never copy it to frame a card.
   stripe: {
     position: 'absolute',
     left: 0,

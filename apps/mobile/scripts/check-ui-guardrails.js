@@ -79,20 +79,21 @@ const LEGACY_VOCABULARY_REMEDY =
 // legacy rule it blocks on sight, scans `src/**` and `.ts` too, and has no
 // budget or allowlist: the owner is the one file the edge lives in.
 // `=` as a prop, never `==` / `===` (a comparison sets no style).
-const EDGE_SHADOW_REGEX = /\b(?:shadow[A-Z]\w*|boxShadow|elevation)\s*(?::|=(?!=))/g;
+const EDGE_SHADOW_REGEX = /\b(?:shadow[A-Z]\w*|boxShadow|elevation)['"]?\]?\s*(?::|=(?!=))/g;
 
 const EDGE_SHADOW_REMEDY =
   'spread uiEdge / uiWell (or uiHairline) from @/components/ui into the style instead of setting a shadow';
 
 // A container's own edge outside `components/ui` (`borderRule.ownerPrefix`): any
 // `border*` or `outline*` style key (`borderWidth`, `borderTopColor`,
-// `outlineWidth`…, quoted or computed too), as a style key or an inline override. Exactly one shape passes — the row divider: a single-side
-// `border<Side>Width` of one hairline whose own object sets `border<Side>Color` to
-// `ruleSoft`, with dividers on at most two sides and never both left and right (a
-// box is a container). A `0` width or radius is the absence of an edge. A card,
-// field, pill or swatch edge lives in a primitive (`Card`, `Tag`, `ChipGroup`…),
-// `uiEdge` / `uiHairline` or a `uiMark` shape, all under `components/ui`, so the
-// rule needs no per-file list.
+// `outlineWidth`…, quoted or computed too), as a style key or an inline override.
+// Exactly one shape passes — the row divider: a single-side `border<Side>Width` of
+// one hairline whose own object sets `border<Side>Color` to `ruleSoft`, on one
+// side or as a top and bottom band (any other pair is part of a frame, a
+// container). A `0` width or radius is the absence of an edge. A card, field, pill
+// or swatch edge lives in a primitive (`Card`, `Tag`, `ChipGroup`…), `uiEdge` /
+// `uiHairline` or a `uiMark` shape, all under `components/ui`, so the rule needs
+// no per-file list.
 const BORDER_KEY_REGEX = /(?<![\w.])['"[]?\s*\b(border(?:Top|Bottom|Left|Right|Start|End|Horizontal|Vertical|Block|Inline)*(?:Width|Color|Radius|Style)|outline(?:Width|Color|Style|Offset))\s*['"]?\]?\s*:\s*([^,}\n]*)/g;
 
 const BORDER_REMEDY =
@@ -103,7 +104,6 @@ const SINGLE_SIDE_WIDTH_REGEX = /^border(Top|Bottom|Left|Right|Start|End)Width$/
 const SINGLE_SIDE_COLOR_REGEX = /^border(Top|Bottom|Left|Right|Start|End)Color$/;
 const RULE_SOFT_VALUE_REGEX = /^\w+\.ruleSoft$/;
 const HAIRLINE_VALUE_REGEX = /^(?:1|uiBorder\.width|(?:StyleSheet\.)?hairlineWidth)$/;
-const LEFT_RIGHT_SIDES = [['Left', 'Right'], ['Start', 'End']];
 
 // The `{ … }` that holds `index`, with every nested `{ … }` blanked out so a
 // key nested in a child object is never read as this object's own.
@@ -147,8 +147,8 @@ function isRowDividerKey(source, key, value, index) {
   const object = ownObject(source, index);
   if (!new RegExp(`\\bborder${side}Color\\s*:\\s*\\w+\\.ruleSoft\\b`).test(object)) return false;
   const sides = dividerSides(object);
-  if (sides.size > 2) return false;
-  return !LEFT_RIGHT_SIDES.some(([first, second]) => sides.has(first) && sides.has(second));
+  // Two sides pass only as a band, top and bottom; any other pair is half a frame.
+  return sides.size < 2 || (sides.size === 2 && sides.has('Top') && sides.has('Bottom'));
 }
 
 const UI_SCOPE = { targets: ['app', 'components'], extensions: ['.tsx'] };

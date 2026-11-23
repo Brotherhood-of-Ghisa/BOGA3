@@ -230,6 +230,16 @@ describe('UI guardrail edge shadow rule', () => {
     );
   });
 
+  it('flags a quoted or computed shadow key', () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-guardrail-edge-'));
+    writeFile(tempRoot, 'components/quoted.tsx', `const styles = { a: { 'boxShadow': 'x' }, b: { ["shadowColor"]: 'red' }, c: { "elevation": 2 } };
+`);
+
+    const result = findEdgeShadowViolations({ rootDir: tempRoot, ownerFile: OWNER });
+
+    expect(literalsOf(result).map((literal) => literal.replace(/[\s:=\]'"]+$/, '')).sort()).toEqual(['boxShadow', 'elevation', 'shadowColor']);
+  });
+
   it('lets the edge helper set its shadows, and ignores tests, comments without a key and longer names', () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-guardrail-edge-'));
 
@@ -337,7 +347,7 @@ const styles = { frame: { borderHorizontalWidth: 1, borderLeftWidth: 1, borderRi
     ]);
   });
 
-  it('flags a box built from dividers, a thick bar, an outline, a quoted key and a colour nested one level down', () => {
+  it('flags a box built in one object from dividers, a frame of two sides, a thick bar, an outline, a quoted key and a colour nested one level down', () => {
     expect(
       scan({
         'components/loopholes.tsx': `const styles = {
@@ -347,6 +357,7 @@ const styles = { frame: { borderHorizontalWidth: 1, borderLeftWidth: 1, borderRi
     borderLeftWidth: 1, borderLeftColor: roles.ruleSoft,
   },
   sides: { borderLeftWidth: 1, borderLeftColor: roles.ruleSoft, borderRightWidth: 1, borderRightColor: roles.ruleSoft },
+  corner: { borderTopWidth: 1, borderTopColor: roles.ruleSoft, borderStartWidth: 1, borderStartColor: roles.ruleSoft },
   bar: { borderLeftWidth: 8, borderLeftColor: roles.ruleSoft },
   ring: { outlineWidth: 1, outlineColor: roles.rule, outlineOffset: 2 },
   quoted: { 'borderWidth': 1, ["borderRadius"]: 4 },
@@ -360,6 +371,8 @@ const styles = { frame: { borderHorizontalWidth: 1, borderLeftWidth: 1, borderRi
       'borderLeftWidth: 1',
       'borderLeftWidth: 1',
       'borderRightWidth: 1',
+      'borderTopWidth: 1',
+      'borderStartWidth: 1',
       'borderLeftWidth: 8',
       'outlineWidth: 1',
       'outlineColor: roles.rule',
