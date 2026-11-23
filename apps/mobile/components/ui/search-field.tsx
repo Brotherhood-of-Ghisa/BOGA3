@@ -1,10 +1,11 @@
 import { TextInput, View, type TextInputProps } from 'react-native';
 
+import { uiEdge } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { IconButton } from '@/components/ui/icon-button';
 import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type SearchFieldProps = Omit<TextInputProps, 'style' | 'placeholderTextColor' | 'value' | 'onChangeText'> & {
   value: string;
@@ -17,7 +18,7 @@ export type SearchFieldProps = Omit<TextInputProps, 'style' | 'placeholderTextCo
 };
 
 // A filter or search field: a search glyph, the text, and a clear control while
-// there is text to clear; the query at the size of the rows it finds. One tap target tall, `radius.control`, `rule` hairline.
+// there is text to clear; the query at the size of the rows it finds. One tap target tall, `radius.control`, `raised` inside the edge.
 // The keyboard's Search key closes the keyboard (single-line fields blur on
 // submit).
 export function SearchField({
@@ -60,16 +61,15 @@ export function SearchField({
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   field: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: uiSpace.sm,
     minHeight: uiGeometry.tapTarget,
     paddingLeft: uiSpace.md,
-    backgroundColor: roles.surface,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    backgroundColor: roles.raised,
+    ...uiEdge(roles, mode),
     borderRadius: uiGeometry.radius.control,
   },
   input: {

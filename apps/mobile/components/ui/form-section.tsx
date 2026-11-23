@@ -2,12 +2,13 @@ import type { ComponentProps, ReactNode } from 'react';
 import { Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 
 import { Card } from '@/components/ui/card';
+import { uiEdge } from '@/components/ui/edge';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { uiTextFor, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 // The form grammar (`ux-rules.md` "Forms"): every field of an edit page sits in
 // a `FormSection` — a micro-label naming the group over one card of rows — and
@@ -196,7 +197,7 @@ export function ActionRow({ label, kind = 'navigate', icon, onPress, divider = f
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   heading: { flexDirection: 'row', alignItems: 'center' },
   section: {
     gap: uiSpace.sm,
@@ -213,14 +214,15 @@ const useStyles = makeStyles((roles) => ({
     maxWidth: '60%',
     textAlign: 'right',
   },
-  // One field-height box at the row's end, framed like a `FormField`.
+  // One field-height box at the row's end, framed like a `FormField`: `raised`
+  // inside the edge.
   input: {
     minWidth: uiGeometry.tapTarget * 2,
     height: uiGeometry.tapTarget - uiSpace.xs * 2,
     paddingHorizontal: uiSpace.sm,
     paddingVertical: 0,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    backgroundColor: roles.raised,
+    ...uiEdge(roles, mode),
     borderRadius: uiGeometry.radius.control,
     textAlign: 'right',
   },

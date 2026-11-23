@@ -80,7 +80,7 @@ describe('Icon', () => {
     const done = renderWithTheme(<Icon name="set-done" />);
     const [disc] = done.UNSAFE_getAllByType(Circle);
     expect(disc.props).toMatchObject({ fill: roles.ink, stroke: roles.ink });
-    expect(done.UNSAFE_getAllByType(Path)[0].props.stroke).toBe(roles.surface);
+    expect(done.UNSAFE_getAllByType(Path)[0].props.stroke).toBe(roles.onInk);
     done.unmount();
 
     const current = renderWithTheme(<Icon name="set-current" />);

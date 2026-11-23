@@ -3,10 +3,11 @@ import { hexToLch, lchToHex, withAlpha, type Lch } from '@/components/ui/lch';
 // The colours a theme is made from (`docs/specs/ui/design-language.md` §2,
 // "Derivation"). The palette follows these seeds; danger, the two change
 // directions, filter selection, the regimes and the on-colour roles keep fixed
-// colours per mode in every theme, and light mode's cards stay white.
+// colours per mode in every theme.
 export type ThemeSeeds = {
-  // A mid neutral. Its hue and chroma tint the ground family: `paper`, the two
-  // rules and `viz0`, so the page reads as one warm (or cool) family.
+  // A mid neutral. Its hue and chroma tint the ground family: the four grounds
+  // (`well`, `paper`, `surface`, `raised`), the two rules and `viz0`, so the
+  // page reads as one warm (or cool) family.
   background: string;
   // A mid neutral. Its hue and chroma tint the ink family, `ink` to
   // `inkGhost`, and `scrim`. A theme that has not split them gives both
@@ -50,7 +51,10 @@ type SteppedRole =
   | 'inkMuted'
   | 'inkFaint'
   | 'inkGhost'
+  | 'well'
   | 'paper'
+  | 'surface'
+  | 'raised'
   | 'rule'
   | 'ruleSoft'
   | 'accentWash'
@@ -62,19 +66,26 @@ type SteppedRole =
   | 'viz3'
   | 'viz4';
 
-// The light ladder and chroma factors are the values the shipped roles were
-// picked at (calibrated 2026-10-01), so the default seeds reproduce the
-// shipped palette within ΔE*ab 3.
+// The light ladder. The inks, washes and ramp are the values the shipped roles
+// were picked at. The grounds are a ladder, `well` < `paper` < `surface` <
+// `raised`: a card stands off the page by 4 L*, and the page stays light enough for every
+// preset's `accent`, used as given, to clear 4.5:1 on it. The hairlines are
+// about 8% ink over a card.
 const LIGHT_STEPS: Record<SteppedRole, Step> = {
   ink: step('text', 8, 0.53),
   inkMuted: step('text', 42.4, 1),
   inkFaint: step('text', 61.6, 0.83),
   inkGhost: step('text', 72.9, 0.89),
-  paper: step('background', 96.2, 0.35),
-  // Hairlines sit on `paper` and `surface`, so they belong to the ground they
-  // divide, not to the text drawn on it.
-  rule: step('background', 87.9, 0.88),
-  ruleSoft: step('background', 92.8, 0.72),
+  // Sunken: the track of a segmented control, a slider or a bar.
+  well: step('background', 92, 0.4),
+  paper: step('background', 95.5, 0.35),
+  surface: step('background', 99.8, 0.1),
+  // An input or field on a card: white.
+  raised: step('background', 100, 0),
+  // Hairlines sit on the grounds, so they belong to the ground they divide,
+  // not to the text drawn on it.
+  rule: step('background', 90.5, 0.7),
+  ruleSoft: step('background', 93, 0.6),
   accentWash: step('accent', 96.9, 0.064),
   recordWash: step('record', 96, 0.19),
   recordRule: step('record', 89, 0.38),
@@ -87,18 +98,21 @@ const LIGHT_STEPS: Record<SteppedRole, Step> = {
   viz4: step('viz', 58, 1),
 };
 
-// The dark ladder mirrors the light one about the page: the inks lighten, the
-// grounds darken, and a card is lifted off the page by a lighter ground,
-// never a shadow — so `surface` (L* 15) sits above `paper` (L* 10). `ink-muted`
-// at L* 65 clears 4.5:1 on `surface`.
+// The dark ladder mirrors the light one about the page: the inks lighten and
+// the grounds darken, each ground a step lighter than the one below it —
+// `well` (L* 7) under `paper` (10), `surface` (15) over it and `raised` (21.5)
+// over a card. `ink-muted` at L* 65 clears 4.5:1 on `raised`.
 const DARK_STEPS: Record<SteppedRole, Step> = {
   ink: step('text', 95, 0.3),
   inkMuted: step('text', 65, 0.8),
   inkFaint: step('text', 49, 0.75),
   inkGhost: step('text', 37, 0.7),
+  well: step('background', 7, 0.35),
   paper: step('background', 10, 0.35),
-  rule: step('background', 30, 0.5),
-  ruleSoft: step('background', 24, 0.45),
+  surface: step('background', 15, 0.35),
+  raised: step('background', 21.5, 0.35),
+  rule: step('background', 27, 0.5),
+  ruleSoft: step('background', 23.5, 0.45),
   // Washes are a dark band of their role: `record` still clears 4.5:1 on its own.
   accentWash: step('accent', 19, 0.18),
   recordWash: step('record', 20, 0.3),
@@ -113,12 +127,11 @@ const DARK_STEPS: Record<SteppedRole, Step> = {
   viz4: step('viz', 45.5, 1),
 };
 
-// Roles the dark ladder steps that light mode takes elsewhere: light cards are
-// white, and light `accent` and `record` are the seeds as given. In dark each
-// clears 4.5:1 as text on `paper` and `surface`. `accent` sits at L* 72, apart
-// from the fixed roles' L* 64, so a red or teal accent never reads as `danger`
-// or a regime; it carries a black label.
-const DARK_SURFACE = step('background', 15, 0.35);
+// Roles the dark ladder steps that light mode takes as given: light `accent`
+// and `record` are the seeds. In dark each clears 4.5:1 as text on `paper` and
+// `surface`. `accent` sits at L* 72, apart from the fixed roles' L* 64, so a
+// red or teal accent never reads as `danger` or a regime; it carries a black
+// label.
 const DARK_ACCENT = step('accent', 72, 1);
 const DARK_RECORD = step('record', 66, 1);
 
@@ -181,6 +194,19 @@ const FIXED: Record<ThemeMode, Pick<UiRoles, FixedRole>> = {
 // `ink` is pale, so it dims with black.
 const DARK_SCRIM = 'rgba(0, 0, 0, 0.6)';
 
+// The shadows the edge draws (`edge.ts`), per mode: `lift` under a card or a
+// control, a 1pt drop barely darker than the page; `well` the inner shade at
+// the top of a sunken track. Light mode shades with `ink`, so the shadow is
+// the page's own dark; dark mode's `ink` is pale, so it shades with black,
+// stronger, since a shadow reads less on a dark ground.
+export type EdgeShades = { lift: string; well: string };
+
+const DARK_SHADES: EdgeShades = { lift: 'rgba(0, 0, 0, 0.45)', well: 'rgba(0, 0, 0, 0.6)' };
+
+export function edgeShades(ink: string, mode: ThemeMode): EdgeShades {
+  return mode === 'light' ? { lift: withAlpha(ink, 0.05), well: withAlpha(ink, 0.09) } : DARK_SHADES;
+}
+
 // What each role is for (`docs/specs/ui/design-language.md` §2). One value per
 // role: two roles that cannot be told apart are one role.
 export type UiRoles = {
@@ -194,16 +220,20 @@ export type UiRoles = {
   // themselves use `inkFaint`, §6), absent values, placeholders and disabled
   // controls.
   inkGhost: string;
-  // The page; also a pressed control and an action strip inside a card.
+  // The four grounds, lightest last in light mode and in dark: `well` is
+  // sunken (the track of a segmented control, a slider or a bar); `paper` the
+  // page, a pressed control and an action strip inside a card; `surface`
+  // cards, sheets and controls; `raised` an input or field drawn on a card.
+  well: string;
   paper: string;
-  // Cards, sheets and inputs.
   surface: string;
+  raised: string;
   // Active Progress/history filters: fixed in every theme, black in light
   // mode and white in dark.
   selection: string;
-  // Hairlines. Depth is a rule plus a ground change — never a shadow. `rule`
-  // borders cards and controls and draws the sheet handle; `ruleSoft` divides
-  // rows inside a card or panel.
+  // Hairlines. Depth is a ground change plus the edge (`edge.ts`): `rule` is
+  // the hairline round cards and controls and draws the sheet handle;
+  // `ruleSoft` divides rows inside a card or panel.
   rule: string;
   ruleSoft: string;
   // The one primary action on a screen, and the row or field being edited.
@@ -252,6 +282,11 @@ export function inkStep(mode: ThemeMode): { lightness: number; chroma: number } 
   return { lightness, chroma };
 }
 
+// The L* of a mode's `paper`: where a custom page starts.
+export function paperLightness(mode: ThemeMode): number {
+  return (mode === 'light' ? LIGHT_STEPS : DARK_STEPS).paper.lightness;
+}
+
 // The L* of a mode's `accentWash`: where a custom highlight of its own is
 // drawn.
 export function washLightness(mode: ThemeMode): number {
@@ -285,14 +320,12 @@ export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light'): UiR
   const own =
     mode === 'light'
       ? {
-          // Cards stay white in light mode; the background's tint is carried by `paper`.
-          surface: '#FFFFFF',
           accent: seeds.accent.toUpperCase(),
           record: seeds.record.toUpperCase(),
           // `ink` at 42%, so the page behind reads as the same ground gone dark
           // rather than as a neutral grey.
           scrim: withAlpha(stepped.ink, 0.42),
         }
-      : { surface: at(DARK_SURFACE), accent: at(DARK_ACCENT), record: at(DARK_RECORD), scrim: DARK_SCRIM };
+      : { accent: at(DARK_ACCENT), record: at(DARK_RECORD), scrim: DARK_SCRIM };
   return { ...stepped, ...own, ...FIXED[mode] };
 }

@@ -106,3 +106,4 @@ export {
   type UiRoleToken,
   type UiSpaceToken,
 } from '@/components/ui/tokens';
+export { uiEdge, uiHairline, uiWell } from '@/components/ui/edge';

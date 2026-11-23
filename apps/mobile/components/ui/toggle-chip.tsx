@@ -1,9 +1,10 @@
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { uiEdge } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { uiTextFor } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 export type ToggleChipOption<TValue extends string | number> = {
   value: TValue;
@@ -72,7 +73,7 @@ export function ToggleChip<TValue extends string | number>({
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   // `flex: 1` with no basis: every chip in a row takes an equal share, so the
   // row reads as one control strip whichever values are in force.
   chip: {
@@ -85,8 +86,7 @@ const useStyles = makeStyles((roles) => ({
     gap: uiSpace.xs,
     paddingHorizontal: uiSpace.sm,
     paddingVertical: uiSpace.xs,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    ...uiEdge(roles, mode),
     borderRadius: uiGeometry.radius.control,
     backgroundColor: roles.surface,
   },

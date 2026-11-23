@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
+import { uiEdge } from '@/components/ui/edge';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 // `neutral`: information — offline, saved, unavailable. `danger`: something
 // failed. There is no success or warning hue: the glyph and the words carry the
@@ -26,8 +27,8 @@ export type NoticeProps = {
   testID?: string;
 };
 
-// A band that states something about the screen: `paper` on a `rule`
-// hairline at the card radius, an optional leading glyph and the words.
+// A band that states something about the screen: `paper` inside the edge at
+// the card radius, an optional leading glyph and the words.
 export function Notice({ message, title, tone = 'neutral', icon, live = false, action, testID }: NoticeProps) {
   const styles = useStyles();
   const textRoles = useUiText();
@@ -57,7 +58,7 @@ export function Notice({ message, title, tone = 'neutral', icon, live = false, a
   );
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   band: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -65,8 +66,7 @@ const useStyles = makeStyles((roles) => ({
     paddingHorizontal: uiSpace.md,
     paddingVertical: uiSpace.sm,
     backgroundColor: roles.paper,
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    ...uiEdge(roles, mode),
     borderRadius: uiGeometry.radius.card,
   },
   // A titled notice reads top-down: the glyph sits level with the title.

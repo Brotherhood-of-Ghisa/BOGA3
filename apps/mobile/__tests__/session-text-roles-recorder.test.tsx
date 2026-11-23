@@ -107,7 +107,7 @@ describe('Recorder: the rest timer', () => {
 
   it.each([
     ['running', { mode: 'rest', status: 'running', sessionId: 's1', remainingSec: 60, formatted: '1:00', durationSec: 90 }, defaultRoles.ink],
-    ['done', { mode: 'rest', status: 'completed', sessionId: 's1', remainingSec: 0, formatted: '0:00', durationSec: 90 }, defaultRoles.surface],
+    ['done', { mode: 'rest', status: 'completed', sessionId: 's1', remainingSec: 0, formatted: '0:00', durationSec: 90 }, defaultRoles.onInk],
     ['paused', {
       mode: 'repeating', status: 'paused', sessionId: 's1', round: 2, remainingSec: 30, formatted: '0:30', intervalSec: 60, isPaused: true,
     }, defaultRoles.inkMuted],

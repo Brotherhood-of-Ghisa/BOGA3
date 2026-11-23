@@ -287,7 +287,7 @@ describe('text roles', () => {
   it.each([
     ['a pill chip in ink', {}, themeRoles.ink],
     ['a compact chip muted', { size: 'compact' as const }, themeRoles.inkMuted],
-    ['a selected chip in the surface colour on its ink pill', { on: true }, themeRoles.surface],
+    ['a selected chip in the on-ink colour on its ink pill', { on: true }, themeRoles.onInk],
   ])('labels %s', (_, props, color) => {
     chip(props);
     expect(styleOf(screen.getByText('Chest'))).toMatchObject({ ...LABEL, color });

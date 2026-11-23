@@ -245,12 +245,12 @@ it('spotlights every role the part moves, live as a control moves', () => {
     render(<ThemeCustomRoute />);
     const tile = (index: number) => StyleSheet.flatten(screen.getByTestId(`theme-custom-spotlight-${index}`).props.style).backgroundColor;
     const roles = generateCustomRoles(CUSTOM);
-    expect([0, 1, 2].map(tile)).toEqual([roles.paper, roles.surface, roles.viz0]);
+    expect([0, 1, 2, 3, 4].map(tile)).toEqual([roles.well, roles.paper, roles.surface, roles.raised, roles.viz0]);
     expect(screen.getByText('Divider')).toBeTruthy();
 
     fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
     act(() => drag(slider('Lightness')).onUpdate({ x: 20 }));
-    expect(tile(0)).toBe(generateCustomRoles({ ...CUSTOM, background: { ...CUSTOM.background, lightness: 72 } }).paper);
+    expect(tile(1)).toBe(generateCustomRoles({ ...CUSTOM, background: { ...CUSTOM.background, lightness: 72 } }).paper);
   } finally {
     configure({ defaultIncludeHiddenElements: false });
   }

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
-import { Card, ListCard, ListCardHeader, ListRow, makeStyles, uiGeometry, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { Card, ListCard, ListCardHeader, ListRow, makeStyles, uiGeometry, uiSpace, useUiText, useUiTextTone, uiWell } from '@/components/ui';
 import { statsTableColumnWidth } from '@/components/stats/stats-table';
 import type { WeekBoardRowViewModel, WeekBoardViewModel } from '@/src/groups';
 import { spokenGroupRecordCount } from '@/src/groups/record-boards';
@@ -78,12 +78,12 @@ export function TodayWeekBoardCard({ board, range, accessibilityRange, onOpenGro
   </Card>;
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   content: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   name: { width: 104 },
   figures: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   figure: { textAlign: 'right' },
-  track: { flex: 1, minWidth: 0, height: 12, borderRadius: uiGeometry.radius.control, backgroundColor: roles.viz0, overflow: 'hidden' },
+  track: { flex: 1, minWidth: 0, height: 12, borderRadius: uiGeometry.radius.control, ...uiWell(roles, mode), overflow: 'hidden' },
   bar: { height: 12, borderRadius: uiGeometry.radius.control, backgroundColor: roles.viz3 },
   barLeader: { backgroundColor: roles.viz4 },
 }));

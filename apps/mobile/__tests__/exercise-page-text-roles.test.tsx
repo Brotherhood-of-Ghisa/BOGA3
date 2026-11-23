@@ -11,6 +11,7 @@ import { ExerciseTopBar } from '@/components/exercise-page/exercise-top-bar';
 import { RecordsPanel, type RecordsView } from '@/components/exercise-page/records-panel';
 import { SetLogger } from '@/components/exercise-page/set-logger';
 import { SetRow } from '@/components/exercise-page/set-row';
+import { uiEdge } from '@/components/ui/edge';
 import { uiFonts, uiTypography } from '@/components/ui/tokens';
 import type { SetRowView } from '@/src/session-recorder/exercise-page-model';
 import type { ExerciseRecords, LastSession } from '@/src/session-recorder/exercise-records';
@@ -75,6 +76,16 @@ describe('Exercise page: the logger', () => {
     const hero = { fontFamily: uiFonts.figure.family, fontWeight: '700', fontSize: uiTypography.size.xxl, lineHeight: uiTypography.lineHeight.xxl };
     expect(style(screen.getByLabelText('Set 3 weight'))).toMatchObject(hero);
     expect(style(screen.getByLabelText('Set 3 reps'))).toMatchObject(hero);
+  });
+
+  it('draws each field raised inside the edge, as a FormField', () => {
+    renderLogger();
+    for (const input of ['Set 3 weight', 'Set 3 reps']) {
+      // The input's frame: its nearest ancestor drawing a shadow.
+      let frame: ReturnType<typeof screen.getByLabelText> | null = screen.getByLabelText(input);
+      while (frame && style(frame as never).boxShadow === undefined) frame = frame.parent as typeof frame;
+      expect(style(frame as never)).toMatchObject({ ...uiEdge(themeRoles, 'light'), backgroundColor: themeRoles.raised });
+    }
   });
 
   it('writes the preview in words with its figures in the figure face', () => {

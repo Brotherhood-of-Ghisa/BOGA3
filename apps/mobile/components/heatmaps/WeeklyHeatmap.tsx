@@ -13,7 +13,7 @@ import { useDateFormat } from '@/src/preferences/hooks';
 import React, { useMemo, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { FigureText, makeStyles, uiGeometry, uiSpace, uiTypography, useUiRoles } from '@/components/ui';
+import { FigureText, makeStyles, uiGeometry, uiSpace, uiTypography, useUiRoles, uiWell } from '@/components/ui';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { MIN_HISTORY_OBSERVATIONS } from '@/src/utils/history-reference';
 
@@ -230,7 +230,7 @@ export function WeeklyHeatmap({ data, metric, onOpenWeek, testIDPrefix, formatVa
   />;
 }
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   list: { flex: 1 },
   content: { padding: uiSpace.lg },
   week: { minHeight: uiGeometry.tapTarget },
@@ -238,7 +238,7 @@ const useStyles = makeStyles((roles) => ({
   date: { width: DATE_WIDTH },
   monthRule: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: roles.rule },
   plot: { flex: 1, alignSelf: 'stretch', justifyContent: 'center' },
-  track: { height: uiSpace.lg, backgroundColor: roles.ruleSoft, borderRadius: uiGeometry.radius.control },
+  track: { height: uiSpace.lg, ...uiWell(roles, mode), borderRadius: uiGeometry.radius.control },
   bar: { height: '100%', borderRadius: uiGeometry.radius.control },
   value: { textAlign: 'right' },
   valueColumn: { position: 'relative' },

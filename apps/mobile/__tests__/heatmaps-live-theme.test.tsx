@@ -51,12 +51,12 @@ it('repaints the weekly bars and rules when the theme is saved', async () => {
   const week = data.weekly.find((cell) => cell.value > 0)!;
   const bar = `live-heatmap-bar-${week.weekStartDateKey}`;
   expect(style(bar).backgroundColor).toBe(heatRamp(launch)[week.level]);
-  expect(style(`live-heatmap-track-${week.weekStartDateKey}`).backgroundColor).toBe(launch.ruleSoft);
+  expect(style(`live-heatmap-track-${week.weekStartDateKey}`).backgroundColor).toBe(launch.well);
 
   await switchTheme(SLATE_DARK);
 
   expect(style(bar).backgroundColor).toBe(heatRamp(slate)[week.level]);
-  expect(style(`live-heatmap-track-${week.weekStartDateKey}`).backgroundColor).toBe(slate.ruleSoft);
+  expect(style(`live-heatmap-track-${week.weekStartDateKey}`).backgroundColor).toBe(slate.well);
 });
 
 it('repaints the timeline selection band when the theme is saved', async () => {

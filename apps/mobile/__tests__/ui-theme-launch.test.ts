@@ -6,7 +6,7 @@ jest.mock('@/src/logging', () => ({ logEvent: (...args: unknown[]) => mockLogEve
 import { Storage } from 'expo-sqlite/kv-store';
 import { Appearance } from 'react-native';
 
-import { customFromSeeds, type CustomColours } from '@/components/ui/theme-custom';
+import { customFromSeeds, PAGE_DEFAULT, type CustomColours } from '@/components/ui/theme-custom';
 import {
   APPEARANCE_STORAGE_KEY,
   LEGACY_APPEARANCE_STORAGE_KEY,
@@ -168,7 +168,8 @@ describe('the record before custom themes', () => {
   it('draws a tinted system theme on the page of the OS’s mode as read', () => {
     const { appearance } = parseLegacyAppearanceRecord(legacy({ background: 'cool', mode: 'system' }), 'dark');
     expect(appearance).toEqual({ theme: 'custom', mode: 'system', custom: customFromSeeds(withNeutrals(WARM.seeds, 'cool', 'match'), 'dark') });
-    expect(parseLegacyAppearanceRecord(legacy({ background: 'cool', mode: 'system' })).appearance?.custom?.background.lightness).toBe(96);
+    // A light OS: the page at the light ladder's `paper`.
+    expect(parseLegacyAppearanceRecord(legacy({ background: 'cool', mode: 'system' })).appearance?.custom?.background.lightness).toBe(PAGE_DEFAULT.light);
   });
 
   it('reports an accent no preset has as an unknown preset', () => {

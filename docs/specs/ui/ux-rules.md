@@ -215,7 +215,8 @@ What a set *is* and which sets count are [[set.performed]] and
 `apps/mobile/scripts/check-ui-guardrails.js` runs in fast and CI.
 Rules and budgets live in `apps/mobile/scripts/ui-guardrails.config.js`,
 values in `apps/mobile/components/ui/tokens.ts`. Raw colour, `fontSize`,
-spacing/radius literals and retired vocabulary are forbidden in app/components.
+spacing/radius literals, retired vocabulary and shadows outside `edge.ts` are
+forbidden.
 
 1. **Raising a budget is never the fix.** A value the scale lacks is a case
    for changing the scale in `tokens.ts` and `design-language.md`, agreed as a

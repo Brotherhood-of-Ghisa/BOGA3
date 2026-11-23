@@ -7,12 +7,12 @@ import type { UiRoles } from '@/components/ui/theme';
 // is on `UiRoles`.
 
 // The geometry (`docs/specs/ui/design-language.md` §4): the radii, fixed
-// widths and label tracking every screen is drawn with. Decided
-// 2026-09-22.
+// widths and label tracking every screen is drawn with. Cards and controls
+// share one corner.
 export const uiGeometry = {
   radius: {
-    // Cards: `surface` on `paper`, 1px `rule`.
-    card: 6,
+    // Cards: `surface` on `paper`, inside the edge (`edge.ts`).
+    card: 4,
     // A sheet's two top corners.
     sheet: 16,
     // Controls inside a screen: input fields, a segmented selector, an outline

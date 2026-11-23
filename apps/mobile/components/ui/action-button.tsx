@@ -1,9 +1,10 @@
 import { Pressable, Text } from 'react-native';
 
+import { uiEdge } from '@/components/ui/edge';
 import { Icon } from '@/components/ui/icon';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
-import { uiBorder, uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
 
 export type ActionButtonVariant = 'primary' | 'outline' | 'text' | 'link';
 export type ActionButtonTone = 'default' | 'danger';
@@ -92,7 +93,7 @@ export function ActionButton({
 
 const COMPACT_HIT_SLOP = (uiGeometry.tapTarget - uiGeometry.compactControlHeight) / 2;
 
-const useStyles = makeStyles((roles) => ({
+const useStyles = makeStyles((roles, mode) => ({
   base: {
     minHeight: uiGeometry.tapTarget,
     paddingHorizontal: uiSpace.md,
@@ -121,11 +122,10 @@ const useStyles = makeStyles((roles) => ({
   primaryPressed: {
     opacity: 0.85,
   },
-  // A hairline in `rule`, as a card's edge: the ink label carries the action,
-  // so the outline never outweighs the text it frames.
+  // A card's edge: the ink label carries the action, so the outline never
+  // outweighs the text it frames.
   outline: {
-    borderWidth: uiBorder.width,
-    borderColor: roles.rule,
+    ...uiEdge(roles, mode),
     backgroundColor: roles.surface,
   },
   outlineDanger: {
@@ -135,7 +135,7 @@ const useStyles = makeStyles((roles) => ({
   outlineDisabled: {
     borderColor: roles.ruleSoft,
   },
-  // Depth is a ground change, never an elevation.
+  // Pressed sinks to the page's ground.
   pressed: {
     backgroundColor: roles.paper,
     opacity: 0.7,

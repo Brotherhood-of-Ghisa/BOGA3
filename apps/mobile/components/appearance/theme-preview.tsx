@@ -115,8 +115,10 @@ type Sample = { label: string; context?: true } & (
 // chart cell and an edited row, so it is shown there.
 export const SPOTLIGHT: Record<CustomPart, readonly Sample[]> = {
   background: [
+    { kind: 'fill', role: 'well', label: 'Track' },
     { kind: 'fill', role: 'paper', label: 'Page' },
     { kind: 'fill', role: 'surface', label: 'Card' },
+    { kind: 'fill', role: 'raised', label: 'Field' },
     { kind: 'fill', role: 'viz0', label: 'Empty' },
     // Borders that match the page take its hue and strength.
     { kind: 'line', role: 'rule', ground: 'surface', label: 'Border', context: true },
