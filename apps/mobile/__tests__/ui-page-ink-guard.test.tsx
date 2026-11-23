@@ -4,6 +4,7 @@ import { join, relative } from 'path';
 import { StyleSheet, Text } from 'react-native';
 
 import { headerStyleOptions } from '@/components/navigation/header-style';
+import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { FormSection } from '@/components/ui/form-section';
 import { HeaderTitleMenu } from '@/components/ui/header-title-menu';
@@ -135,6 +136,7 @@ describe('`paper` is the page', () => {
     'components/session-list/history-list.tsx',
     'components/stats/muscle-body-projection.ts',
     'components/stats/muscle-wireframe-renderer.ts',
+    'components/ui/action-button.tsx',
     'components/ui/icon-button.tsx',
     'components/ui/notice.tsx',
     'components/ui/screen.tsx',
@@ -157,5 +159,25 @@ describe('`paper` is the page', () => {
       .map((path) => relative(MOBILE_ROOT, path))
       .filter((path) => !PAGE_FILES.includes(path));
     expect(naming).toEqual([]);
+  });
+});
+
+describe('a text or link button on Ink + paper', () => {
+  const INK = { theme: 'ink-paper', mode: 'light', custom: null } as const;
+
+  it.each(['text', 'link'] as const)('draws a %s button on the page in the page inks, and on a card in the inks', async (variant) => {
+    renderWithTheme(
+      <>
+        <ActionButton label="On page" onPress={() => {}} testID="on-page" variant={variant} />
+        <Card>
+          <ActionButton label="On card" onPress={() => {}} testID="on-card" variant={variant} />
+        </Card>
+      </>,
+    );
+    await switchTheme(INK);
+    const roles = rolesFor(INK);
+    const colour = (label: string) => StyleSheet.flatten(screen.getByText(label).props.style).color;
+    expect([roles.pageInk, roles.pageInkMuted]).toContain(colour('On page'));
+    expect([roles.ink, roles.inkMuted]).toContain(colour('On card'));
   });
 });
