@@ -3,7 +3,7 @@ import { Stack, useRouter, type Href } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Text, FlatList, RefreshControl, View } from 'react-native';
 
-import { Icon, IconButton, ListRow, Sheet, uiSpace, useUiText } from '@/components/ui';
+import { Icon, IconButton, ListRow, Sheet, uiSpace, useUiGroundTone, useUiText } from '@/components/ui';
 import { canManageGroup, getGroup, groupCacheKeys, useGroupOnlinePages, useGroupResource, type GroupBoardScope, type GroupGetResult } from '@/src/groups';
 import { getCompetitionBoard } from '@/src/groups/api';
 import { competitionMetrics,isCompetitionMetric as isGroupMetric,type CompetitionMetric as GroupMetric } from '@/src/groups/competition-contract';
@@ -31,6 +31,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
   const dateFormat = useDateFormat();
   const router = useRouter();
   const text = useUiText();
+  const groundTone = useUiGroundTone();
   const groupScreenStyles = useGroupScreenStyles();
   const allowed = competitionMetrics({ defaultMetric: initialExercise.rules.default_metric });
   const metricOptions = allowed.map(value => ({ value, label: GROUP_METRIC_SHORT_LABELS[value] }));
@@ -82,7 +83,7 @@ export function GroupMetricBoard({ userId, groupId, exercise: initialExercise, i
       headerTitle: () => <GroupBoardTitle name={exercise.name} view={`${competitionViewLabel(metric,exercise.rules)} leaderboard`} testID="group-board-title" />,
       headerRight: () => <IconButton nativeHeader accessibilityLabel="Leaderboard options" name="more-vertical"
         onPress={() => setOptionsVisible(true)} testID="group-board-options-button" /> }} />
-    {exercise.archived_at_ms !== null || board.firstPage?.state === 'archived' ? <Text allowFontScaling={false} style={text.body} testID="group-board-archived">Archived · read-only</Text> : null}
+    {exercise.archived_at_ms !== null || board.firstPage?.state === 'archived' ? <Text allowFontScaling={false} style={[text.body, groundTone.ink]} testID="group-board-archived">Archived · read-only</Text> : null}
     <View style={{ flexDirection: 'row', gap: uiSpace.sm }} testID="group-board-filters">
       <GroupCycleButton accessibilityLabel="Metric" options={metricOptions} value={metric}
         onChange={value => selectView(value, scope)} testID="group-board-metric" />

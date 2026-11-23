@@ -1,7 +1,7 @@
 import { Text, TextInput, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { uiEdge } from '@/components/ui/edge';
-import { uiTextFor, useUiText } from '@/components/ui/text-roles';
+import { uiTextFor, useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
@@ -46,6 +46,8 @@ export function FormField({
   const styles = useStyles();
   const roles = useUiRoles();
   const textRoles = useUiText();
+  // The hint sits under the field, on whatever holds it.
+  const groundTone = useUiGroundTone();
   return (
     <View style={[styles.column, containerStyle]}>
       <View style={[styles.field, multiline ? styles.fieldMultiline : null, error ? styles.fieldInvalid : null]}>
@@ -68,7 +70,7 @@ export function FormField({
           {error}
         </Text>
       ) : null}
-      {hint ? <Text allowFontScaling={false} style={textRoles.meta}>{hint}</Text> : null}
+      {hint ? <Text allowFontScaling={false} style={[textRoles.meta, groundTone.muted]}>{hint}</Text> : null}
     </View>
   );
 }

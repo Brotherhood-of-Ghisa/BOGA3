@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 import { RefreshControl, Text, View } from 'react-native';
-import { ActionButton, CompactCard, FigureText, Icon, ScreenScroll, uiGeometry, uiSpace, useUiText } from '@/components/ui';
+import { ActionButton, CompactCard, FigureText, Icon, ScreenScroll, uiGeometry, uiSpace, useUiGroundTone, useUiText } from '@/components/ui';
 import { GroupInlineError, GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
 import { CoWPreview } from '@/components/groups/cow-preview';
@@ -26,6 +26,7 @@ export function GroupCoWsPage({ userId, groupId, metric = null, embedded = false
   userId: string; groupId: string; cowId?: string | null; metric?: string | null; embedded?: boolean;
 }) {
   const text = useUiText();
+  const page = useUiGroundTone();
   const router = useRouter();
   const dateFormat = useDateFormat();
   const groupFetcher = useCallback(() => getGroup(groupId), [groupId]);
@@ -63,14 +64,14 @@ export function GroupCoWsPage({ userId, groupId, metric = null, embedded = false
     initialMetric={metric} testID="cows-preview" onOpen={selected => open(shown.cow, selected)} browseLabel="Full standings" onBrowse={selected => open(shown.cow, selected)} /> : null;
   const manager = Boolean(group.data && canManageGroup(group.data.group.my_role));
   return <ScreenScroll testID="cows-screen" contentContainerStyle={embedded ? { padding: 0 } : undefined} refreshControl={<RefreshControl refreshing={cows.refreshing || summary.refreshing} onRefresh={() => void refresh()} />}>
-    {!embedded ? <Text allowFontScaling={false} style={text.title}>{group.data?.group.name ?? 'Group'}</Text> : null}
+    {!embedded ? <Text allowFontScaling={false} style={[text.title, page.ink]}>{group.data?.group.name ?? 'Group'}</Text> : null}
     {offline ? <GroupOfflineBanner lastUpdatedAtMs={summary.lastUpdatedAtMs} /> : null}
     {error && (summary.data || cows.firstPage) ? <GroupInlineError error={error} onRetry={() => void refresh()} testID="cows-error" /> : null}
-    <Text allowFontScaling={false} style={text.label}>This week</Text>
-    {summary.data ? summary.data.selection === 'current' ? preview : <Text allowFontScaling={false} style={text.meta}>No CoW this week</Text>
+    <Text allowFontScaling={false} style={[text.label, page.muted]}>This week</Text>
+    {summary.data ? summary.data.selection === 'current' ? preview : <Text allowFontScaling={false} style={[text.meta, page.muted]}>No CoW this week</Text>
       : <GroupMissingDataState error={pickInlineError(summary.error)} offline={summary.offline} onRetry={() => void summary.refresh()} testIDPrefix="cows-current" />}
     <CoWNextSection calendar={calendar} cows={cows} next={next} manager={manager} groupId={groupId} name={name} open={open} dateFormat={dateFormat} />
-    <Text allowFontScaling={false} style={text.label}>Past CoWs</Text>
+    <Text allowFontScaling={false} style={[text.label, page.muted]}>Past CoWs</Text>
     <CoWPastSection cows={cows} past={past} name={name} open={open} dateFormat={dateFormat} />
     {!group.data && error ? <GroupStateView title="Couldn't load CoWs" actionLabel="Retry" onAction={() => void refresh()} testID="cows-unavailable" /> : null}
   </ScreenScroll>;
@@ -83,14 +84,15 @@ function CoWNextSection({ calendar, cows, next, manager, groupId, name, open, da
   open: (cow: CoWDefinitionWire) => void; dateFormat: ExerciseDateFormat;
 }) {
   const text = useUiText();
+  const page = useUiGroundTone();
   const router = useRouter();
   const week = next?.week_start ?? calendar.firstPage?.next_week_start;
   const zone = next?.time_zone ?? calendar.firstPage?.time_zone;
   return <>
-    <Text allowFontScaling={false} style={text.label}>Next week</Text>
-    {!next && week ? <Text allowFontScaling={false} style={[text.meta, { textAlign: 'right' }]} accessibilityLabel={`${coWAccessibleDates(week, dateFormat)} · ${zone ?? ''}`}><FigureText>{`${coWDateRange(week, dateFormat)} · ${zone ?? ''}`}</FigureText></Text> : null}
+    <Text allowFontScaling={false} style={[text.label, page.muted]}>Next week</Text>
+    {!next && week ? <Text allowFontScaling={false} style={[text.meta, page.muted, { textAlign: 'right' }]} accessibilityLabel={`${coWAccessibleDates(week, dateFormat)} · ${zone ?? ''}`}><FigureText>{`${coWDateRange(week, dateFormat)} · ${zone ?? ''}`}</FigureText></Text> : null}
     {cows.firstPage ? next ? <CoWSummaryCard cow={next} name={name(next)} open={open} dateFormat={dateFormat} showZone testID="cows-next" />
-      : <Text allowFontScaling={false} style={text.meta}>Nothing scheduled</Text>
+      : <Text allowFontScaling={false} style={[text.meta, page.muted]}>Nothing scheduled</Text>
       : <GroupMissingDataState error={pickInlineError(cows.error)} offline={cows.offline} onRetry={() => void cows.refresh()} testIDPrefix="cows-list" />}
     {manager && cows.firstPage ? <ActionButton variant="text" label={next ? 'Edit next CoW' : 'Schedule next CoW'}
       testID="cows-schedule" onPress={() => router.push(coWScheduleHref(groupId, next?.cow_id))} /> : null}
@@ -102,9 +104,10 @@ function CoWPastSection({ cows, past, name, open, dateFormat }: {
   name: (cow: CoWDefinitionWire) => string; open: (cow: CoWDefinitionWire) => void; dateFormat: ExerciseDateFormat;
 }) {
   const text = useUiText();
+  const page = useUiGroundTone();
   return cows.firstPage || past.length > 0 ? <View style={{ gap: uiSpace.sm }}>{past.map(cow =>
     <CoWSummaryCard key={cow.cow_id} cow={cow} name={name(cow)} open={open} dateFormat={dateFormat} testID={`cows-past-${cow.cow_id}`} />)}
-      {past.length === 0 ? <Text allowFontScaling={false} style={text.meta}>No past CoWs</Text> : null}
+      {past.length === 0 ? <Text allowFontScaling={false} style={[text.meta, page.muted]}>No past CoWs</Text> : null}
       {cows.hasMore ? <ActionButton label={cows.loadingMore ? 'Loading…' : 'More CoWs'} disabled={cows.loadingMore} variant="text" onPress={() => void cows.loadMore()} testID="cows-more" /> : null}
       {cows.loadMoreError ? <GroupInlineError error={cows.loadMoreError} onRetry={() => void cows.loadMore()} testID="cows-more-error" /> : null}
     </View> : null;

@@ -43,7 +43,8 @@ import CoWScheduleRoute from '@/app/group/[groupId]/cows/schedule';
 import GroupRoute from '@/app/group/[groupId]';
 import EditGroupRoute from '@/app/group/[groupId]/edit';
 import { waitForGone } from './helpers/wait-for-gone';
-import { renderWithTheme } from './helpers/theme';
+import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
+import { renderWithTheme, rolesFor, switchTheme } from './helpers/theme';
 
 const api = groupApi as jest.Mocked<typeof groupApi>;
 // The live text roles, read once before any render under test: `renderHook`
@@ -216,6 +217,20 @@ it('renders a previous-final fallback exactly once, without a podium or second s
   const next = screen.getByTestId('cows-next');
   expect(within(next).getByText(scheduled().time_zone)).toBeTruthy();
   expect(screen.getAllByText(coWDateRange(scheduled().week_start, 'DD-MM-YYYY'))).toHaveLength(1);
+});
+it('draws the page headings and empty lines in the page inks on Ink + paper', async () => {
+  const value = summary(); value.selection = 'previous_final'; value.result.cow = past();
+  api.getCoWSummary.mockResolvedValue(value);
+  api.listCoWs.mockResolvedValue({ cows: [scheduled(), past()], next_cursor: null });
+  renderWithTheme(<CoWsRoute />);
+  await screen.findByText('No CoW this week');
+  const inkPaper = { theme: 'ink-paper', mode: 'light', custom: null } as const;
+  await switchTheme(inkPaper);
+  const roles = rolesFor(inkPaper);
+  for (const words of ['This week', 'No CoW this week', 'Next week', 'Past CoWs']) {
+    expect(screen.getByText(words)).toHaveStyle({ color: roles.pageInkMuted });
+  }
+  await switchTheme(DEFAULT_APPEARANCE);
 });
 it('keeps the stored exercise name when the archive and catalogue cannot load', async () => {
   const value = summary(); value.selection = 'previous_final'; value.result.cow = past();

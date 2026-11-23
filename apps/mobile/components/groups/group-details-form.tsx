@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { ActionButton, FormField, SegmentedControl, uiSpace, useUiText } from '@/components/ui';
+import { ActionButton, FormField, SegmentedControl, uiSpace, useUiGroundTone, useUiText } from '@/components/ui';
 import {
   GROUP_DESCRIPTION_MAX_LENGTH,
   GROUP_NAME_MAX_LENGTH,
@@ -50,6 +50,7 @@ export function GroupDetailsFormFields({
   initialBodyweightCalculationsEnabled,positiveContributionCount=null,submitLabel,pendingLabel,pending,errorMessage,onSubmit,draft,
 }: GroupDetailsFormProps & { draft: ReturnType<typeof useGroupDetailsDraft> }) {
   const text = useUiText();
+  const groundTone = useUiGroundTone();
   const { name,description,bodyweightCalculationsEnabled,setName,setDescription,setBodyweightCalculationsEnabled }=draft;
   const [showErrors, setShowErrors] = useState(false);
   const validation = validateGroupDetails(name, description);
@@ -95,13 +96,13 @@ export function GroupDetailsFormFields({
           testID="group-form-description-input"
           value={description}
         />
-        <Text allowFontScaling={false} style={[text.figureSmall, styles.counter]} testID="group-form-description-counter">
+        <Text allowFontScaling={false} style={[text.figureSmall, groundTone.ink, styles.counter]} testID="group-form-description-counter">
           {`${description.trim().length}/${GROUP_DESCRIPTION_MAX_LENGTH}`}
         </Text>
       </View>
       {initialBodyweightCalculationsEnabled !== undefined ? (
         <View style={styles.field}>
-          <Text allowFontScaling={false} style={text.label}>Bodyweight calculations</Text>
+          <Text allowFontScaling={false} style={[text.label, groundTone.muted]}>Bodyweight calculations</Text>
           <SegmentedControl
             accessibilityLabel="Bodyweight calculations"
             disabled={pending || positiveContributionCount === null}
