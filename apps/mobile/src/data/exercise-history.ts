@@ -48,6 +48,10 @@ export type ExerciseHistorySetEntry = {
 export type ExerciseHistorySessionEntry = ResolvedSessionWeight & {
   sessionId: string;
   sessionExerciseId: string;
+  /** Current definition label and original block position, retained for merged feeds. */
+  exerciseDefinitionId?: string;
+  exerciseName?: string;
+  orderIndex?: number;
   completedAt: Date;
   gymId?: string | null;
   gymName: string | null;
@@ -137,6 +141,7 @@ export type ExerciseHistorySummary = {
 export type ExerciseHistorySessionRow = ResolvedSessionWeight & {
   sessionId: string;
   sessionExerciseId: string;
+  orderIndex?: number;
   completedAt: Date;
   gymId?: string | null;
   gymName: string | null;
@@ -261,13 +266,15 @@ const compareSetOrder = (left: ExerciseHistorySetRow, right: ExerciseHistorySetR
   return left.setId.localeCompare(right.setId);
 };
 
-const compareCompletedDesc = (
-  left: ExerciseHistorySessionRow,
-  right: ExerciseHistorySessionRow
+export const compareExerciseHistoryOrder = (
+  left: Pick<ExerciseHistorySessionRow, 'completedAt' | 'sessionId' | 'sessionExerciseId' | 'orderIndex'>,
+  right: Pick<ExerciseHistorySessionRow, 'completedAt' | 'sessionId' | 'sessionExerciseId' | 'orderIndex'>,
 ) => {
   const diff = right.completedAt.getTime() - left.completedAt.getTime();
   if (diff !== 0) return diff;
-  return left.sessionId.localeCompare(right.sessionId);
+  return left.sessionId.localeCompare(right.sessionId)
+    || (left.orderIndex ?? 0) - (right.orderIndex ?? 0)
+    || left.sessionExerciseId.localeCompare(right.sessionExerciseId);
 };
 
 const buildSessionEntry = (
@@ -314,6 +321,9 @@ const buildSessionEntry = (
   return {
     sessionId: sessionRow.sessionId,
     sessionExerciseId: sessionRow.sessionExerciseId,
+    exerciseDefinitionId: definition.id,
+    exerciseName: definition.name,
+    orderIndex: sessionRow.orderIndex,
     completedAt: sessionRow.completedAt,
     gymId: sessionRow.gymId,
     gymName: sessionRow.gymName,
@@ -453,7 +463,7 @@ export const aggregateExerciseHistory = (
     filteredSessionRows = filteredSessionRows.filter((row) => (row.gymId ?? null) === appliedGymId);
   }
 
-  const orderedSessionRows = [...filteredSessionRows].sort(compareCompletedDesc);
+  const orderedSessionRows = [...filteredSessionRows].sort(compareExerciseHistoryOrder);
   const sessions = orderedSessionRows
     .map((row) =>
       buildSessionEntry(
@@ -530,6 +540,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       .select({
         sessionId: sessions.id,
         sessionExerciseId: sessionExercises.id,
+        orderIndex: sessionExercises.orderIndex,
         completedAt: sessions.completedAt,
         gymId: sessions.gymId,
         gymName: gyms.name,
@@ -539,7 +550,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       .innerJoin(sessions, eq(sessionExercises.sessionId, sessions.id))
       .leftJoin(gyms, eq(sessions.gymId, gyms.id))
       .where(and(...conditions))
-      .orderBy(desc(sessions.completedAt), asc(sessionExercises.orderIndex))
+      .orderBy(desc(sessions.completedAt), asc(sessions.id), asc(sessionExercises.orderIndex), asc(sessionExercises.id))
       .all();
 
     return rows
@@ -550,6 +561,7 @@ export const createDrizzleExerciseHistoryStore = (): ExerciseHistoryStore => ({
       .map((row) => ({
         sessionId: row.sessionId,
         sessionExerciseId: row.sessionExerciseId,
+        orderIndex: row.orderIndex,
         completedAt: row.completedAt,
         gymId: row.gymId ?? null,
         gymName: row.gymName ?? null,

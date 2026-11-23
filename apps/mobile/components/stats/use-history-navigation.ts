@@ -20,7 +20,7 @@ export function useHistoryNavigation(subject: HistorySubject | null, metric: Cal
     const scope = subject.kind === 'muscle'
       ? { muscleGroupId: subject.id, gymId: subject.gymId, countSecondary: subject.countSecondary,
         countSecondaryVolume: subject.countSecondaryVolume }
-      : { exerciseDefinitionId: subject.id, gymId: subject.gymId };
+      : { ...(subject.kind === 'exercises' ? { exerciseDefinitionIds: subject.ids } : { exerciseDefinitionId: subject.id }), gymId: subject.gymId };
     router.push(historyDetailHref(scope, period, metric));
   }, [router, subject, metric]);
   const openDay = useCallback((day: DayCell) => {

@@ -65,6 +65,7 @@ apps/mobile/scripts/ios-sim-boot.sh	frontend,meta-tests	simulator boot-wait (+ i
 apps/mobile/.maestro/**	frontend,meta-tests	Maestro flows / config (+ fixture-user rule)
 apps/mobile/.maestro/flows/smoke-launch.yaml	-frontend,ios-smoke,android-smoke	single flow → the lanes that run it
 apps/mobile/.maestro/flows/data-runtime-smoke.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
+apps/mobile/.maestro/flows/combined-exercise-progress.yaml	-frontend,ios-data-smoke,android-data-smoke,ios-combined-progress	single flow → aggregate and focused lanes
 apps/mobile/.maestro/flows/session-completion-states-fixture.yaml	-frontend,ios-data-smoke	single flow → the lane that runs it (iOS-only: asserts the iOS share sheet)
 apps/mobile/.maestro/flows/exercise-catalogue.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it
 apps/mobile/.maestro/flows/session-plan.yaml	-frontend,ios-data-smoke,android-data-smoke	single flow → the lanes that run it

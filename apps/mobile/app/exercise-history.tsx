@@ -36,8 +36,10 @@ import {
 } from '@/components/ui';
 import {
   loadExercisePerformanceHistory,
+  loadCombinedExerciseHistory,
   type ExerciseHistorySessionEntry,
   type ExerciseHistorySummary,
+  type ExerciseHistoryViewSummary,
   type ExerciseHistoryTagOption,
 } from '@/src/data';
 import { parseSetReps, parseSetWeight } from '@/src/exercise-calculations';
@@ -46,6 +48,8 @@ import { GymPickerButton, GymPickerSheet } from '@/components/gyms/gym-picker';
 import { decodeGymRouteParam, gymScopeLabel } from '@/src/utils/gym-scope-route';
 import { mainTabHref, type MainTabKey } from '@/src/navigation/main-tabs';
 import { historyWeekBounds } from '@/src/utils/calendar-weeks';
+import { parseExerciseSelection } from '@/src/utils/exercise-selection';
+import { HistoryTitle } from '@/components/stats/history-title';
 import { historyBlockRecord } from '@/src/session-recorder/exercise-history-view';
 import {
   cardRecordBand,
@@ -90,7 +94,7 @@ const emptyHistoryMessage = (gymId: string | null | undefined, tagId: string | n
 };
 
 export type ExerciseHistoryScreenShellProps = {
-  summary: ExerciseHistorySummary | null;
+  summary: ExerciseHistoryViewSummary | null;
   period: ExerciseHistoryPeriod;
   appliedTagDefinitionId: string | null;
   /** Unset: every gym. `null`: the sessions with no gym. Otherwise that gym. */
@@ -191,15 +195,7 @@ export function ExerciseHistoryScreenShell({
 
         {summary ? (
           <>
-            {summary.exerciseDeletedAt ? (
-              <Notice
-                icon="warning"
-                message="This exercise has been deleted. Historical data remains available."
-                testID="exercise-history-deleted-banner"
-              />
-            ) : null}
-
-            <BestCard best={summary.allTimeBest} gymLabel={gymLabel} onPressSession={onPressSession} />
+            <HistoryExerciseBests summary={summary} gymLabel={gymLabel} onPressSession={onPressSession} />
 
             {summary.sessions.length === 0 ? (
               <Card>
@@ -245,8 +241,23 @@ export function ExerciseHistoryScreenShell({
   );
 }
 
+/** Collective workload has no collective bests; single-exercise History retains its banner. */
+function HistoryExerciseBests({ summary, gymLabel, onPressSession }: {
+  summary: ExerciseHistoryViewSummary;
+  gymLabel: string | null;
+  onPressSession: (sessionId: string) => void;
+}) {
+  if (!('allTimeBest' in summary)) return null;
+  return <>
+    {summary.exerciseDeletedAt ? <Notice icon="warning"
+      message="This exercise has been deleted. Historical data remains available."
+      testID="exercise-history-deleted-banner" /> : null}
+    <BestCard best={summary.allTimeBest} gymLabel={gymLabel} onPressSession={onPressSession} />
+  </>;
+}
+
 function HistorySessionCards({ summary, historyStart, onPressSession }: {
-  summary: ExerciseHistorySummary;
+  summary: ExerciseHistoryViewSummary;
   historyStart?: Date;
   onPressSession: (sessionId: string) => void;
 }) {
@@ -262,7 +273,8 @@ function HistorySessionCards({ summary, historyStart, onPressSession }: {
           <View style={styles.olderRule} />
         </View>
       ) : null}
-      <SessionCard entry={entry} onPress={() => onPressSession(entry.sessionId)} tagOptions={summary.tagOptions} />
+      <SessionCard entry={entry} onPress={() => onPressSession(entry.sessionId)} tagOptions={summary.tagOptions}
+        showExerciseName={'exerciseDefinitionIds' in summary} />
     </Fragment>
   ));
 }
@@ -359,10 +371,12 @@ function SessionCard({
   entry,
   tagOptions,
   onPress,
+  showExerciseName = false,
 }: {
   entry: ExerciseHistorySessionEntry;
   tagOptions: ExerciseHistoryTagOption[];
   onPress: () => void;
+  showExerciseName?: boolean;
 }) {
   const styles = useStyles();
   const text = useUiText();
@@ -392,7 +406,7 @@ function SessionCard({
 
   return (
     <ExerciseSetsCard
-      accessibilityLabel={`Open session from ${date}`}
+      accessibilityLabel={`Open ${showExerciseName ? `${entry.exerciseName ?? ''} ` : ''}session from ${date}`}
       count={`${entry.workingSetCount} ${entry.workingSetCount === 1 ? 'set' : 'sets'}`}
       name={date}
       onPress={onPress}
@@ -401,6 +415,8 @@ function SessionCard({
       rows={rows}
       summary={
         <View style={styles.sessionSummary}>
+          {showExerciseName ? <Text allowFontScaling={false} style={text.bodyStrong}
+            testID={`exercise-history-exercise-name-${entry.sessionExerciseId}`}>{entry.exerciseName}</Text> : null}
           <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, uiTextEmphasis.strong]}>
             {entry.gymName?.trim() ? entry.gymName : 'No gym'}
           </Text>
@@ -425,11 +441,17 @@ function SessionCard({
 }
 
 export default function ExerciseHistoryRoute() {
+  const { accountRevision } = useAccountLocalPreferenceState();
+  return <ExerciseHistoryRouteContent key={accountRevision} />;
+}
+
+function ExerciseHistoryRouteContent() {
   const styles = useStyles();
   const router = useRouter();
   const openMainTab = useOpenMainTabFromPage();
   const params = useLocalSearchParams<{
     exerciseDefinitionId?: string | string[];
+    exerciseDefinitionIds?: string | string[];
     tagDefinitionId?: string | string[];
     period?: string | string[];
     gymId?: string | string[];
@@ -439,6 +461,9 @@ export default function ExerciseHistoryRoute() {
   const { values: { targetWindowWeeks, historyLookbackWeeks }, accountRevision } = useAccountLocalPreferenceState();
 
   const exerciseDefinitionId = coerceRouteParam(params.exerciseDefinitionId);
+  const selection = parseExerciseSelection(params.exerciseDefinitionIds);
+  const selectionKey = !exerciseDefinitionId && selection ? JSON.stringify(selection) : '';
+  const invalidSelection = params.exerciseDefinitionIds !== undefined && !selectionKey;
   const initialTagDefinitionId = coerceRouteParam(params.tagDefinitionId);
   const initialPeriod = parsePeriodParam(coerceRouteParam(params.period));
 
@@ -463,7 +488,7 @@ export default function ExerciseHistoryRoute() {
   const [appliedTagDefinitionId, setAppliedTagDefinitionId] = useState<string | null>(
     initialTagDefinitionId
   );
-  const [summary, setSummary] = useState<ExerciseHistorySummary | null>(null);
+  const [summary, setSummary] = useState<ExerciseHistoryViewSummary | null>(null);
   const [historyStart, setHistoryStart] = useState<Date>();
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -477,28 +502,30 @@ export default function ExerciseHistoryRoute() {
       nextGymId: string | null | undefined
     ) => {
       const generation = ++readGeneration.current;
-      if (!exerciseDefinitionId) {
+      if (invalidSelection || (!exerciseDefinitionId && !selectionKey)) {
         setSummary(null);
         setIsLoading(false);
-        setErrorMessage('Missing exerciseDefinitionId in route');
+        setErrorMessage(invalidSelection ? 'This exercise selection is not available.' : 'Missing exerciseDefinitionId in route');
         return;
       }
       setIsLoading(true);
       setSummary(current => nextPeriod === 'all' && current?.period.kind === 'history'
-        && current.exerciseDefinitionId === exerciseDefinitionId
+        && ('exerciseDefinitionIds' in current ? JSON.stringify(current.exerciseDefinitionIds) === selectionKey
+          : current.exerciseDefinitionId === exerciseDefinitionId)
         && current.appliedTagDefinitionId === nextTagDefinitionId && current.appliedGymId === nextGymId
         ? current : null);
       setErrorMessage(null);
       const now = new Date();
       try {
-        const next = await loadExercisePerformanceHistory({
-          exerciseDefinitionId,
+        const shared = {
           now,
-          period: nextPeriod === 'all' ? { kind: 'all' } : { weeks: nextPeriod === 'week' ? 1 : nextPeriod === 'progress' ? targetWindowWeeks : historyLookbackWeeks,
-            kind: nextPeriod === 'history' ? 'history' : 'progress' },
+          period: nextPeriod === 'all' ? { kind: 'all' as const } : { weeks: nextPeriod === 'week' ? 1 : nextPeriod === 'progress' ? targetWindowWeeks : historyLookbackWeeks,
+            kind: nextPeriod === 'history' ? 'history' as const : 'progress' as const },
           tagDefinitionId: nextTagDefinitionId,
           ...(nextGymId === undefined ? {} : { gymId: nextGymId }),
-        });
+        };
+        const next = selectionKey ? await loadCombinedExerciseHistory({ ...shared, exerciseDefinitionIds: parseExerciseSelection(selectionKey)! })
+          : await loadExercisePerformanceHistory({ ...shared, exerciseDefinitionId: exerciseDefinitionId! });
         if (generation !== readGeneration.current) return;
         if (next === null) {
           setSummary(null);
@@ -513,7 +540,7 @@ export default function ExerciseHistoryRoute() {
         if (generation === readGeneration.current) setIsLoading(false);
       }
     },
-    [exerciseDefinitionId, targetWindowWeeks, historyLookbackWeeks]
+    [exerciseDefinitionId, selectionKey, invalidSelection, targetWindowWeeks, historyLookbackWeeks]
   );
 
   useFocusEffect(
@@ -534,13 +561,16 @@ export default function ExerciseHistoryRoute() {
     sessionCount: option.occurrenceCount,
   })), [summary]);
 
-  const title = summary?.exerciseName ?? 'Exercise History';
+  const singleSummary = summary && 'exerciseDefinitionId' in summary ? summary : null;
+  const combinedSummary = summary && 'exerciseDefinitionIds' in summary ? summary : null;
+  const title = singleSummary?.exerciseName ?? (selectionKey ? `${parseExerciseSelection(selectionKey)!.length} exercises` : 'Exercise History');
 
   return (
     <>
       <Stack.Screen
         options={{
           title,
+          headerTitle: combinedSummary ? () => <HistoryTitle title={title} exercises={combinedSummary.exercises} /> : undefined,
           headerBackVisible: false,
           // The native back item can stop dispatching on iOS 26.4 after
           // reaching this screen from an active session (as on Body weight).
@@ -561,14 +591,14 @@ export default function ExerciseHistoryRoute() {
             <View style={styles.headerActions}>
               <GymPickerButton onPress={() => setGymSheetVisible(true)} options={gymOptions} size="compact"
                 testID="exercise-history-gym" value={appliedGymId} />
-              {!summary.exerciseDeletedAt ? <IconButton accessibilityLabel="Add exercise to session" name="plus"
+              {singleSummary && !singleSummary.exerciseDeletedAt ? <IconButton accessibilityLabel="Add exercise to session" name="plus"
                 onPress={() => setSessionEntryVisible(true)} testID="exercise-history-add-to-session" /> : null}
             </View>
           ) : undefined,
         }}
       />
-      <ExerciseSessionEntrySheet exercise={sessionEntryVisible && summary && !summary.exerciseDeletedAt
-        ? { id: summary.exerciseDefinitionId, name: summary.exerciseName } : null} onDismiss={() => setSessionEntryVisible(false)} />
+      <ExerciseSessionEntrySheet exercise={sessionEntryVisible && singleSummary && !singleSummary.exerciseDeletedAt
+        ? { id: singleSummary.exerciseDefinitionId, name: singleSummary.exerciseName } : null} onDismiss={() => setSessionEntryVisible(false)} />
       <GymPickerSheet onChange={handleSelectGym} onClose={() => setGymSheetVisible(false)} options={gymOptions}
         testID="exercise-history-gym" value={appliedGymId} visible={gymSheetVisible} />
       <ExerciseHistoryScreenShell

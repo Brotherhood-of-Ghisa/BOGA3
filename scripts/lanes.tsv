@@ -47,6 +47,7 @@ android-smoke	slow-frontend-android	android	no	apps/mobile	./scripts/maestro-run
 android-data-smoke	slow-frontend-android	android	no	apps/mobile	./scripts/maestro-run-lane.sh android-data-smoke
 handles	extra	none	no	apps/mobile	npm run test:handles
 ios-gates	extra	ios	no	apps/mobile	./scripts/maestro-ios-gates.sh
+ios-combined-progress	extra	ios	no	apps/mobile	./scripts/maestro-run-lane.sh combined-progress
 jest-sync	extra	none	no	apps/mobile	npm run test:sync
 jest-coverage	extra	none	no	apps/mobile	npm run test:coverage
 complexity	extra	none	no	apps/mobile	npm run lint:complexity
