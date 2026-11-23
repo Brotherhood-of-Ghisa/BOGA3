@@ -32,7 +32,8 @@ import type { CoWDefinitionWire, CoWResultWire } from '@/src/groups/cow-wire';
 import { coWDateRange } from '@/src/groups/cow-presentation';
 import { createCoWId } from '@/src/groups/cow-draft';
 import { ChoiceRow } from '@/components/ui';
-import { uiGeometry } from '@/components/ui/tokens';
+import { uiTypography } from '@/components/ui/tokens';
+import { STEP_ARROW_HEIGHT } from '@/components/today/step-arrows';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { AppThemeProvider } from '@/components/ui/theme-context';
 import { CoWPreview } from '@/components/groups/cow-preview';
@@ -744,11 +745,11 @@ it('Today shows this week’s CoW in its own card, ranked by 1RM alone, opening 
   expect(screen.queryByText('1,800')).toBeNull();
   // No previous-week step until last week has a CoW; the later step is off on this week.
   expect(screen.getByTestId('today-cow-week-later')).toBeDisabled();
-  // The week arrows are glyph-sized, so the title row stays a plain title's height; hit slop takes each to 44pt.
+  // The week arrows are glyph-sized and overhang the dates' line, so the title row stays a plain
+  // title's height; they reach 44 across, and vertically only what the card holds.
+  expect(screen.getByTestId('today-cow-week')).toHaveStyle({ marginVertical: -(STEP_ARROW_HEIGHT - uiTypography.lineHeight.sm) / 2 });
   for (const id of ['today-cow-week-earlier', 'today-cow-week-later']) {
-    const arrow = screen.getByTestId(id);
-    expect(arrow).toHaveStyle({ height: 20 });
-    expect(20 + arrow.props.hitSlop.top + arrow.props.hitSlop.bottom).toBe(uiGeometry.tapTarget);
+    expect(screen.getByTestId(id)).toHaveStyle({ height: STEP_ARROW_HEIGHT });
   }
   fireEvent.press(screen.getByTestId('today-cow-current-open'));
   expect(mockRouter.push).toHaveBeenCalledWith('/group/g1/cows?cowId=cow1&metric=e1rm');

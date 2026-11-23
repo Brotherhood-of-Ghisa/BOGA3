@@ -20,7 +20,8 @@ export type StepArrowsProps = {
 // the hit slop takes each tap target to the 44pt minimum, reaching outward
 // only, so the two never overlap.
 const ARROW_WIDTH = 32;
-const ARROW_HEIGHT = 20;
+export const STEP_ARROW_HEIGHT = 20;
+const ARROW_HEIGHT = STEP_ARROW_HEIGHT;
 const ARROW_GAP = uiSpace.xs;
 const VERTICAL_SLOP = (uiGeometry.tapTarget - ARROW_HEIGHT) / 2;
 const OUTER_SLOP = uiGeometry.tapTarget - ARROW_WIDTH - ARROW_GAP / 2;

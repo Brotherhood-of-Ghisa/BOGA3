@@ -15,7 +15,7 @@ import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
-import { uiSpace } from '@/components/ui/tokens';
+import { uiGeometry, uiSpace, uiTypography } from '@/components/ui/tokens';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
 import type { LatestSessionSummary, SessionExerciseLine } from '@/src/progress-summary';
 import { formatClockTime, formatCompactDate, formatLocalDateTime } from '@/src/utils/local-time';
@@ -221,7 +221,9 @@ export function TodaySessionCard({
         ) : (
           stamp
         )}
-        <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-sessions-button" variant="link" />
+        <View style={styles.headerLink} testID="today-sessions-link-slot">
+          <ActionButton label="Sessions" onPress={onOpenSessions} testID="today-sessions-button" variant="link" />
+        </View>
       </View>
       <View style={[styles.body, styles.fillBody]}>
         <Pressable
@@ -251,16 +253,22 @@ const useStyles = makeStyles((roles) => ({
     flexShrink: 1,
     minHeight: 0,
   },
-  // The stepped start and the Sessions link share one row, a plain card
-  // title's height: the arrows and the compact link reach 44pt by hit slop.
+  // The stepped start and the Sessions link share one row set like a plain
+  // card title: the card's top inset above, a micro-label's step below. The
+  // arrows and the link reach 44 across; vertically, only what the card holds.
   header: {
     paddingTop: uiSpace.sm,
+    marginBottom: uiSpace.xs - uiSpace.sm,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: uiSpace.sm,
     marginLeft: -uiSpace.sm,
     marginRight: -uiSpace.sm,
+  },
+  // The compact link draws 28 but takes only a micro-label's line of the row.
+  headerLink: {
+    marginVertical: -(uiGeometry.compactControlHeight - uiTypography.lineHeight.xxs) / 2,
   },
   body: {
     gap: uiSpace.lg,

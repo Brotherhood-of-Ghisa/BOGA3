@@ -220,12 +220,13 @@ style object, read their role's fields.
   dismisses; sheets carry no Cancel button.** A sub-page is the native iOS
   page sheet instead: grabber, title, X (`ux-rules.md` "Sheets").
 - Tap targets ≥44; a compact control draws 28 (`compactControlHeight`) and
-  keeps 44 by hit slop. The iOS status bar and the tab bar are never redrawn in
+  keeps 44 by hit slop. Card-title step arrows: 44 across, vertically what
+  the card holds. The iOS status bar and the tab bar are never redrawn in
   content.
 - **Geometry lives in `uiGeometry`, spacing in `uiSpace`** — the one spacing
   scale — both in `apps/mobile/components/ui/tokens.ts`, which states what each
   value is for. **A screen derives its measures from these** instead of
-  adding values (the logger's Effort field leads at two tap targets), and spacing a design draws off-scale snaps to
+  adding values, and spacing a design draws off-scale snaps to
   the scale (sheet gutters 20→16, sheet rows ≥60, interactive list rows ≥44).
   Passive rows inside a card do not acquire a separate tap-target minimum.
   A row's padding must not inflate an already full-height child control.
