@@ -91,8 +91,8 @@ function customOf(appearance: AppearanceChoice, phoneScheme: ColorSchemeName | n
 const shownFor = (part: CustomPart, colours: CustomColours): CustomColours =>
   isOwnInkPart(part) ? { ...colours, ...ownInks(colours) } : colours;
 
-// A part's value; the muted text's drawn when not yet stored.
-const partOf = (colours: CustomColours, part: CustomPart): Draft => colours[part] ?? ownInks(colours).muted;
+// A part's value; the secondary's or muted text's as drawn when not yet stored.
+const partOf = (colours: CustomColours, part: CustomPart): Draft => (isOwnInkPart(part) ? ownInks(colours)[part] : colours[part]);
 
 // What a part's controls are given: the colours being made (the draft in
 // place), a live and a let-go handler per slider, a save of several parts at
@@ -120,7 +120,8 @@ function HueStrengthRows({ change, end, swatch, part, colour, divider }: Control
         testID="theme-custom-hue"
         trackColours={isColourPart(part) ? HUE_PAINT[part] : undefined}
         trailing={swatch}
-        value={colour.hue}
+        // A drawn hue (unrounded) can lie just past 359.
+        value={Math.min(colour.hue, HUE_MAX)}
       />
       <SliderRow
         divider
@@ -354,11 +355,14 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
     change: (field) => (value) => setDraft((current) => editOf(current, field, value)),
     end: (field) => (value) => {
       const edited = editOf(draft, field, value);
-      // A secondary or muted text let go where it is stored (or drawn) stores
-      // nothing new. Compared with the stored part, not the draft: a drag has
-      // already moved the draft to the value it is let go at.
-      const moved = !isOwnInkPart(part) || (partOf(shown, part) as OwnInk)[field as keyof OwnInk] !== value;
-      void save((intended) => (moved ? { ...(isOwnInkPart(part) ? ownInks(intended) : {}), [part]: edited } : {}));
+      // A secondary or muted text let go where it is stored (or drawn), with
+      // the saves on their way, stores nothing new. Compared with that, not
+      // the draft: a drag has already moved the draft to the value let go at.
+      void save((intended) => {
+        if (!isOwnInkPart(part)) return { [part]: edited };
+        const inks = ownInks(intended);
+        return inks[part][field as keyof OwnInk] === value ? {} : { ...inks, [part]: edited };
+      });
     },
     save: (patchOf) => {
       void save(patchOf);
