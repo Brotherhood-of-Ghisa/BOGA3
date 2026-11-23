@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 import { ExerciseSetsCard, SessionFactsCard } from '@/components/session-detail';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
+import { FormError } from '@/components/ui/form-section';
 import { Icon } from '@/components/ui/icon';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
@@ -90,9 +91,7 @@ export function ViewSessionScreen({
           </Card>
         ) : null}
         {error ? (
-          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger]} testID="completed-session-detail-error-notice">
-            {error}
-          </Text>
+          <FormError message={error} testID="completed-session-detail-error-notice" textRole="bodyStrong" />
         ) : null}
         {error && onOpenActive ? (
           <ActionButton label="Open current session" onPress={onOpenActive} testID="completed-session-detail-open-active" variant="link" />

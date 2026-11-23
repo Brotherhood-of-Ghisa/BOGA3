@@ -53,17 +53,18 @@ For a new block or derivative, follow the selection and review workflow in
 | A loading, empty, message or error state — whole-screen or inside a card | `StatePanel` (`state-panel.tsx`) |
 | The inline outcome of an action | `Notice` (`notice.tsx`) |
 | A labelled free-text input (a form's name or title) | `FormField` (`form-field.tsx`) |
-| A form's section (optional `title`, `footnote`) and its rows: a choice that opens a picker (optional leading `icon`), a short figure in place, an action (`ActionRow` `kind`: `navigate` chevron, `act` accent, `danger`), a section error | `FormSection`, `ChoiceRow`, `InputRow`, `ActionRow`, `FormError` (`form-section.tsx`; `ux-rules.md` "Forms") |
+| A form's section (optional `title`, `footnote`) and its rows: a choice that opens a picker (optional leading `icon`), a short figure in place, an action (`ActionRow` `kind`: `navigate` chevron, `act` accent, `danger`), an error line | `FormSection`, `ChoiceRow`, `InputRow`, `ActionRow`, `FormError` (`form-section.tsx`; `ux-rules.md` "Forms") |
 | A Settings row: one of ≤3 options under its label, the one chosen of many (radio, optional `meta` swatch), several (checkbox), a read-only value (one accessible element unless it has a `valueTestID`; optional glyph, `danger` tone), a number on a stepped track (`SliderRow`) | `SegmentRow`, `RadioRow`, `CheckRow`, `ValueRow` (`form-rows.tsx`), `SliderRow` (`slider-row.tsx`; `ux-rules.md` "Settings pages") |
 | A search input | `SearchField` (`search-field.tsx`) |
 | Full-width pages swiped between under tabs that name them (UX pattern 15) | `SwipePages` (`swipe-pages.tsx`) |
 | One choice from a few | `SegmentedControl` (`segmented-control.tsx`) — neutral, or `selection` for filters (black; white in dark) |
 | One filter of a few values where a row of them cannot afford every label | `ToggleChip` (`toggle-chip.tsx`) — the value in force plus the `swap` glyph; a tap steps to the next |
 | Wrapping pills, single- or multi-select | `ChipGroup` (`chip-group.tsx`) |
-| One option or setting on or off, in a sheet (`Show deleted sessions`) or a form card (`Track each gym separately`, `density="list"`, optional `description`) | `SwitchRow` (`switch-row.tsx`) |
+| A setting on or off, in a sheet or a form card (`density="list"`, optional `description`) | `SwitchRow` (`switch-row.tsx`) |
 | A static label naming a state (`Archived`, `Deleted`, a role) | `Tag` (`tag.tsx`) |
 | A tab screen's in-content title, or a section heading | `PageHeader` / `SectionHeader` (`page-header.tsx`); every other page takes the native header (`ux-rules.md` "Pages") |
-| Words on the page or a card | `useUiGround`, `OnCard` (`ground.tsx`) |
+| Words on the page or a card | `useUiGround`, `OnCard` (`ground.tsx`); `useUiGroundInks`, `selectedPill` (`text-roles.ts`) |
+| Pull to refresh | `PageRefreshControl` (`page-refresh-control.tsx`) |
 | Live theme colours: a stylesheet (its builder also gets the mode), a colour prop, the mode | `makeStyles`, `useUiRoles`, `useUiMode` (`theme-context.tsx`), `useUiText`, `useUiGroundTone` (`text-roles.ts`) |
 | Card or control edge, sunken track: the only shadows | `uiEdge` (hairline + lift), `uiWell`, `uiHairline` (`edge.ts`; options `shape`, `tone`). `uiCorner`: corner alone. `uiCardSlice`: list cells as one card. `uiEdge`: Card, Notice, FormField, SearchField, InputRow, outline ActionButton, ToggleChip, ChipGroup, the tab pill. `uiWell`: SegmentedControl, SliderRow, bar tracks. `Tag`: `uiHairline`. Bar fills, dots, rings: `uiMark` (`marks.ts`) |
 | Fonts, geometry, spacing, type and icon sizes | `tokens.ts` — `uiFonts`, `uiGeometry`, `uiSpace`, `uiTypography`, `uiIconSize`, `uiBorder`; theme seeds in `theme.ts`, `theme-presets.ts`, `theme-launch.ts` |

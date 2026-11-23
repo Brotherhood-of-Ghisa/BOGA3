@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, View } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 
 import {
   GroupHeaderCard,
@@ -151,7 +152,7 @@ function GroupMembersContent({ userId, groupId }: { userId: string; groupId: str
 
   const data = group.data;
   const inlineError = pickInlineError(group.error);
-  const refreshControl = <RefreshControl onRefresh={onRefresh} refreshing={pulling} />;
+  const refreshControl = <PageRefreshControl onRefresh={onRefresh} refreshing={pulling} />;
 
   if (!data) {
     return (

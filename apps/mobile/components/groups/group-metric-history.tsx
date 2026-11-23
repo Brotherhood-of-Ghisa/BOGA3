@@ -1,7 +1,8 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, View } from 'react-native';
+import { FlatList, View } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 
 import { uiSpace } from '@/components/ui';
 import { useGroupOnlinePages, type GroupBoardScope } from '@/src/groups';
@@ -83,7 +84,7 @@ export function GroupMetricHistory({ userId, groupId, exercise, initialMetric, i
     ListFooterComponent={<GroupPagesFooter loadingMore={history.loadingMore} loadMoreError={history.loadMoreError}
       onRetry={() => void history.loadMore()} noun="history" testIDPrefix="group-board-history" />}
     style={groupScreenStyles.screen} contentContainerStyle={groupScreenStyles.cardListContent}
-    refreshControl={<RefreshControl refreshing={pulling} onRefresh={onRefresh} />}
+    refreshControl={<PageRefreshControl refreshing={pulling} onRefresh={onRefresh} />}
     data={rows} keyExtractor={row => row.key}
     ListEmptyComponent={history.firstPage ? <GroupStateView title={scope === 'certified' ? 'No certified #1 yet' : 'No records yet'}
       testID="group-board-history-empty" />

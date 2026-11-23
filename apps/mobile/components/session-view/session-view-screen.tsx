@@ -1,6 +1,6 @@
 import { Stack, useFocusEffect, useRouter, type Href } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MainTabBar } from '@/components/navigation/main-tab-bar';
@@ -15,9 +15,9 @@ import { SessionOptionsSheet } from '@/components/session-view/session-options-s
 import { SessionSummaryCard } from '@/components/session-view/session-summary-card';
 import { SessionTopBar } from '@/components/session-view/session-top-bar';
 import { ActionButton } from '@/components/ui/action-button';
+import { FormError } from '@/components/ui/form-section';
 import { Screen, ScreenScroll } from '@/components/ui/screen';
 import { StatePanel } from '@/components/ui/state-panel';
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { sessionAddExerciseHref, sessionCompareHref, sessionExerciseHref } from '@/src/navigation/active-session-entry';
 import { GYMS_ROUTE } from '@/src/navigation/routes';
@@ -141,8 +141,6 @@ function SessionViewBody({ state, sessionId, model, times, control, reload, endW
   reload: () => Promise<void>; endWorkout: () => void; openGymPicker: () => void;
   router: ReturnType<typeof useRouter>; notice: string | null;
 }): ReactNode {
-  const text = useUiText();
-  const tone = useUiTextTone();
   let body: ReactNode;
   if (state.status === 'loading') {
     body = <StatePanel kind="loading" testID="session-view-loading" />;
@@ -201,9 +199,7 @@ function SessionViewBody({ state, sessionId, model, times, control, reload, endW
           variant="outline"
         /> : null}
         {notice ? (
-          <Text allowFontScaling={false} accessibilityLiveRegion="polite" style={[text.bodyStrong, tone.danger]} testID="session-view-notice">
-            {notice}
-          </Text>
+          <FormError message={notice} testID="session-view-notice" textRole="bodyStrong" />
         ) : null}
       </ScreenScroll>
     );

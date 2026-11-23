@@ -4,11 +4,12 @@ import { Pressable, Text, View } from 'react-native';
 import { Card } from '@/components/ui/card';
 import { uiEdge } from '@/components/ui/edge';
 import { FigureText } from '@/components/ui/figure-text';
+import { useUiGround } from '@/components/ui/ground';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { StatePanel } from '@/components/ui/state-panel';
 import { Tag } from '@/components/ui/tag';
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { selectedPill, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
 import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 import {
@@ -79,16 +80,17 @@ export function FilterChip({ label, size = 'pill', leading, trailing, on, onPres
   const styles = useStyles();
   const text = useUiText();
   const tone = useUiTextTone();
+  const onPage = useUiGround() === 'page';
   const compact = size === 'compact';
   return (
     <Pressable
       {...a11y}
       hitSlop={compact ? uiSpace.sm : undefined}
       onPress={onPress}
-      style={({ pressed }) => [styles.chip, compact && styles.compact, on ? styles.chipOn : null, pressed && !on ? styles.chipPressed : null]}
+      style={({ pressed }) => [styles.chip, compact && styles.compact, on ? (onPage ? styles.chipOnPage : styles.chipOn) : null, pressed && !on ? styles.chipPressed : null]}
       testID={testID}>
       {leading}
-      <Text allowFontScaling={false} numberOfLines={1} style={[text.label, compact ? styles.compactLabel : tone.ink, on ? styles.chipLabelOn : null]}>
+      <Text allowFontScaling={false} numberOfLines={1} style={[text.label, compact ? styles.compactLabel : tone.ink, on ? (onPage ? styles.chipLabelOnPage : styles.chipLabelOn) : null]}>
         {label}
       </Text>
       {trailing}
@@ -338,6 +340,14 @@ const useStyles = makeStyles((roles, mode) => ({
   // the on-ink colour here.
   chipLabelOn: {
     color: roles.onInk,
+  },
+  // On the page the pill is `pageInk` (`selectedPill`).
+  chipOnPage: {
+    ...uiEdge(roles, mode, { shape: 'pill', tone: 'pageInk' }),
+    backgroundColor: selectedPill(roles, 'page').fill,
+  },
+  chipLabelOnPage: {
+    color: selectedPill(roles, 'page').label,
   },
   sections: {
     gap: uiSpace.sm,

@@ -60,6 +60,7 @@ export {
   type PageSheetProps,
 } from '@/components/ui/page-sheet';
 export { Screen, ScreenScroll, type ScreenGutter } from '@/components/ui/screen';
+export { PageRefreshControl } from '@/components/ui/page-refresh-control';
 export { SearchField, type SearchFieldProps } from '@/components/ui/search-field';
 export {
   SegmentedControl,
@@ -87,7 +88,7 @@ export {
   type StatePanelProps,
 } from '@/components/ui/state-panel';
 export { Tag, type TagProps, type TagTone } from '@/components/ui/tag';
-export { uiTextEmphasis, uiTextFor, uiTextToneFor, useUiGroundTone, useUiText, useUiTextTone } from '@/components/ui/text-roles';
+export { groundInks, pageWordColour, selectedPill, uiTextEmphasis, uiTextFor, uiTextToneFor, useUiGroundInks, useUiGroundTone, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 export { AppThemeProvider, makeStyles, useAppTheme, useUiMode, useUiRoles, type AppTheme } from '@/components/ui/theme-context';
 export {
   ToggleChip,

@@ -1,7 +1,8 @@
 import { GroupsSignInRequired } from '@/components/groups/sign-in-required';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { View } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 import { ActionButton, Card, ScreenScroll, uiSpace } from '@/components/ui';
 import { GroupInlineError, GroupLostAccessState, GroupMissingDataState, GroupStateView, pickInlineError } from '@/components/groups/group-state-view';
 import { GroupOfflineBanner } from '@/components/groups/offline-banner';
@@ -65,7 +66,7 @@ function CoWStandingsBody({ board, definitionOffline, error, metric, userId, onS
   const dateFormat = useDateFormat();
   const result = board.firstPage;
   const stale = board.loadMoreError?.code === 'CONFLICT' || board.loadMoreError?.code === 'VALIDATION';
-  return <ScreenScroll testID="cow-standings" refreshControl={<RefreshControl refreshing={board.refreshing} onRefresh={() => void refresh()} />}>
+  return <ScreenScroll testID="cow-standings" refreshControl={<PageRefreshControl refreshing={board.refreshing} onRefresh={() => void refresh()} />}>
     <Stack.Screen options={{ title: 'CoW standings' }} />
     {board.offline || definitionOffline ? <GroupOfflineBanner lastUpdatedAtMs={board.loadedAtMs} /> : null}
     {result ? <>

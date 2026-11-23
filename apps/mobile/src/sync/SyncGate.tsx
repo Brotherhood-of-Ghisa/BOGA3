@@ -3,12 +3,12 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import {
   ActionButton,
   Card,
+  FormError,
   Notice,
   Screen,
   uiSpace,
   useUiRoles,
   useUiText,
-  useUiTextTone,
 } from '@/components/ui';
 import { useAuth } from '@/src/auth';
 import { SYNC_VERSION_MISMATCH_MESSAGE } from '@/src/sync/cycle-error-signal';
@@ -138,12 +138,9 @@ function GateError({
   detail: string | null;
 }) {
   const text = useUiText();
-  const tone = useUiTextTone();
   return (
     <View style={styles.body}>
-      <Text allowFontScaling={false} accessibilityRole="alert" style={[text.bodyStrong, tone.danger, styles.errorMessage]} testID={SYNC_GATE_TEST_IDS.errorMessage}>
-        {ERROR_MESSAGES[errorCode]}
-      </Text>
+      <FormError accessibilityRole="alert" align="center" message={ERROR_MESSAGES[errorCode]} testID={SYNC_GATE_TEST_IDS.errorMessage} textRole="bodyStrong" />
       <Text allowFontScaling={false} selectable style={[text.figureSmall, styles.errorDetail]} testID={SYNC_GATE_TEST_IDS.errorDetail}>
         {detail ? `${errorCode}: ${detail}` : errorCode}
       </Text>
@@ -220,10 +217,6 @@ const styles = StyleSheet.create({
   // The failure's code + sanitized exception text: diagnostic, so Plex Mono and
   // muted like the activity counters; selectable so it can be copied.
   errorDetail: {
-    textAlign: 'center',
-  },
-  // An error, so `danger`, beside the one `accent` Retry.
-  errorMessage: {
     textAlign: 'center',
   },
 });

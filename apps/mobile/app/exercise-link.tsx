@@ -1,6 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { PageRefreshControl } from '@/components/ui/page-refresh-control';
 
 import {
   GroupInlineError,
@@ -166,7 +167,7 @@ function ExerciseLinkContent({ userId }: { userId: string }) {
   return (
     <ScreenScroll
       keyboardShouldPersistTaps="handled"
-      refreshControl={<RefreshControl onRefresh={onRefresh} refreshing={pulling} />}
+      refreshControl={<PageRefreshControl onRefresh={onRefresh} refreshing={pulling} />}
       testID="exercise-link-screen">
       <Stack.Screen options={{ title }} />
       {linking.offline ? <GroupOfflineBanner lastUpdatedAtMs={linking.lastUpdatedAtMs} /> : null}

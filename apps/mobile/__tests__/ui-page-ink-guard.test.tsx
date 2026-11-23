@@ -125,7 +125,8 @@ describe('page-level text on Ink + paper', () => {
 // inside a card sinks to `inset`, so on Ink + paper the card's inks still read
 // on it. The files below draw a page, or read the page's colour for what it
 // draws (the theme files, the preview and swatch of another theme, the status
-// bar and headers, the 3D body's neutral and a page-level control's press).
+// bar and headers, the 3D body's neutral, a page-level control's press, and
+// the words and selected pill drawn on the page in `text-roles.ts`).
 // Any other file that names `paper` is drawing on the page from inside a card.
 describe('`paper` is the page', () => {
   const MOBILE_ROOT = join(__dirname, '..');
@@ -155,6 +156,7 @@ describe('`paper` is the page', () => {
     'components/ui/notice.tsx',
     'components/ui/screen.tsx',
     'components/ui/swipe-pages.tsx',
+    'components/ui/text-roles.ts',
     'components/ui/theme-custom.ts',
     'components/ui/theme.ts',
     'components/view-session/view-session-screen.tsx',
