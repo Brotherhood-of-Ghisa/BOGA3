@@ -16,9 +16,9 @@ export type StepArrowsProps = {
   testID: string;
 };
 
-// A glyph-sized pair: the row they sit in stays a micro-label's height, and
-// the hit slop takes each tap target to the 44pt minimum, reaching outward
-// only, so the two never overlap.
+// A glyph-sized pair: the row they sit in stays a micro-label's height. The
+// hit slop takes each to 44 across, reaching outward only so the two never
+// overlap; vertically it reaches what the card around them holds.
 const ARROW_WIDTH = 32;
 export const STEP_ARROW_HEIGHT = 20;
 const ARROW_HEIGHT = STEP_ARROW_HEIGHT;
