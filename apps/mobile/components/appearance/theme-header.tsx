@@ -13,7 +13,7 @@ function ApplyingIndicator({ testID }: { testID: string }) {
   const roles = useUiRoles();
   return (
     <View accessibilityLabel="Applying the theme" accessibilityRole="progressbar" accessible testID={testID}>
-      <ActivityIndicator color={roles.inkMuted} size="small" />
+      <ActivityIndicator color={roles.pageInkMuted} size="small" />
     </View>
   );
 }

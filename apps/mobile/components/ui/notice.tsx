@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { uiEdge } from '@/components/ui/edge';
-import { OnCard } from '@/components/ui/ground';
+import { OnCard, useUiGround } from '@/components/ui/ground';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -28,26 +28,30 @@ export type NoticeProps = {
   testID?: string;
 };
 
-// A band that states something about the screen: `paper` inside the edge at
-// the card radius, an optional leading glyph and the words, in the page inks.
-// A failure stands on a card's `surface`, where `danger` reads in every theme.
+// A band that states something about the screen: inside the edge at the card
+// radius, an optional leading glyph and the words. On the page it is `paper`
+// with the page inks; inside a card, the card's `inset` with the inks. A
+// failure stands on a card's `surface`, where `danger` reads in every theme.
 export function Notice({ message, title, tone = 'neutral', icon, live = false, action, testID }: NoticeProps) {
   const styles = useStyles();
   const textRoles = useUiText();
   const danger = tone === 'danger';
+  const onPage = useUiGround() === 'page';
+  // The neutral band's words: the page inks only on the page's own ground.
+  const neutral = onPage ? styles.pageWords : null;
   const words = (
-    <Text allowFontScaling={false} style={[textRoles.body, title ? null : styles.fill, danger ? styles.messageDanger : styles.pageWords]}>{message}</Text>
+    <Text allowFontScaling={false} style={[textRoles.body, title ? null : styles.fill, danger ? styles.messageDanger : neutral]}>{message}</Text>
   );
   return (
     <View
       accessibilityLiveRegion={live ? 'polite' : undefined}
       accessibilityRole={danger ? 'alert' : undefined}
-      style={[styles.band, title ? styles.bandTitled : null, danger ? styles.bandDanger : null]}
+      style={[styles.band, onPage ? null : styles.bandOnCard, title ? styles.bandTitled : null, danger ? styles.bandDanger : null]}
       testID={testID}>
-      {icon ? <Icon colorRole={danger ? 'danger' : 'pageInkMuted'} name={icon} size="sm" /> : null}
+      {icon ? <Icon colorRole={danger ? 'danger' : onPage ? 'pageInkMuted' : 'inkMuted'} name={icon} size="sm" /> : null}
       {title ? (
         <View style={styles.words}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={[textRoles.title, danger ? styles.messageDanger : styles.pageWords]}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[textRoles.title, danger ? styles.messageDanger : neutral]}>
             {title}
           </Text>
           {words}
@@ -74,6 +78,9 @@ const useStyles = makeStyles((roles, mode) => ({
   // A titled notice reads top-down: the glyph sits level with the title.
   bandTitled: {
     alignItems: 'flex-start',
+  },
+  bandOnCard: {
+    backgroundColor: roles.inset,
   },
   bandDanger: {
     backgroundColor: roles.surface,

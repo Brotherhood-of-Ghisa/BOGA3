@@ -102,7 +102,7 @@ export function GymsScreen({ readPosition }: GymsScreenProps) {
   if (directory.status === 'loading') {
     body = (
       <View style={styles.state} testID="gyms-loading">
-        <ActivityIndicator color={roles.inkMuted} />
+        <ActivityIndicator color={roles.pageInkMuted} />
       </View>
     );
   } else if (directory.status === 'error') {

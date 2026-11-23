@@ -1,7 +1,7 @@
 import { useDateFormat } from '@/src/preferences/hooks';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { Card, FigureText, IconButton, ListRow, Tag, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
+import { Card, FigureText, IconButton, ListRow, Tag, uiSpace, useUiGroundTone, useUiText, useUiTextTone } from '@/components/ui';
 import type { PlanDetailView } from '@/src/session-planner';
 import { blockCountsLabel, planDateLabel, planOutcomeLabel } from './progress-labels';
 
@@ -18,6 +18,7 @@ export function ProgrammePlanList({
 }: ProgrammePlanListProps) {
   const text = useUiText();
   const tone = useUiTextTone();
+  const groundTone = useUiGroundTone();
   const dateFormat = useDateFormat();
   const movePlan = (index: number, step: -1 | 1) => {
     if (!onReorderPlans) return;
@@ -31,7 +32,7 @@ export function ProgrammePlanList({
 
   return (
     <View style={styles.container} testID="programme-plan-list">
-      <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, groundTone.faint]}>
         Sessions ({plans.length})
       </Text>
 

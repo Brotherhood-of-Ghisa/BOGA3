@@ -180,7 +180,7 @@ function GroupScreenContent({ userId, groupId }: { userId: string; groupId: stri
       <View style={styles.calendar} testID="group-screen-time-zone">
         <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.pageMuted]}>Group time zone</Text>
         {calendar.firstPage ? <>
-          <Text allowFontScaling={false} style={text.body} testID="group-screen-time-zone-value">{calendar.firstPage.time_zone ?? 'Not set'}</Text>
+          <Text allowFontScaling={false} style={[text.body, tone.page]} testID="group-screen-time-zone-value">{calendar.firstPage.time_zone ?? 'Not set'}</Text>
           {calendarError ? <GroupInlineError error={calendarError} onRetry={() => void refreshCalendar()} testID="group-screen-time-zone-error" /> : null}
         </> : <GroupMissingDataState error={calendarError} offline={calendar.offline} onRetry={() => void refreshCalendar()} testIDPrefix="group-screen-time-zone" />}
         {canManageGroup(summary.my_role) ? <ActionButton label="Set time zone" variant="outline"

@@ -18,6 +18,7 @@ import {
   uiHairline,
   uiSpace,
   makeStyles,
+  useUiGroundTone,
   useUiText,
   useUiTextTone,
 } from '@/components/ui';
@@ -546,6 +547,7 @@ export function ProgrammeFormScreen({
 }: ProgrammeFormScreenProps) {
   const text = useUiText();
   const tone = useUiTextTone();
+  const groundTone = useUiGroundTone();
   const [form, setForm] = useState<ProgrammeFormState>(initialForm);
   const [editingPlanIndex, setEditingPlanIndex] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -619,7 +621,7 @@ export function ProgrammeFormScreen({
 
       <View style={styles.sessionsHeader}>
         <View style={styles.sessionsHeaderTitle}>
-          <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
+          <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, groundTone.faint]}>
             Sessions ({form.plans.length})
           </Text>
         </View>

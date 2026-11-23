@@ -6,6 +6,7 @@ import { StyleSheet, Text } from 'react-native';
 import { GroupBoardTitle } from '@/components/groups/group-board-title';
 import { GroupsTitle } from '@/components/groups/group-screen-header';
 import { headerStyleOptions } from '@/components/navigation/header-style';
+import { SessionInsightPresentation } from '@/components/session-recorder/session-insight-presentation';
 import { SessionTopBar } from '@/components/session-view/session-top-bar';
 import { ActionButton } from '@/components/ui/action-button';
 import { Card } from '@/components/ui/card';
@@ -210,5 +211,27 @@ describe('an icon button on Ink + paper', () => {
     expect(role('on-page-muted')).toBe('pageInkMuted');
     expect(role('on-card')).toBe('ink');
     expect(role('session-view-options-button')).toBe('ink');
+  });
+});
+
+describe('the remaining page-level words on Ink + paper', () => {
+  const INK = { theme: 'ink-paper', mode: 'light', custom: null } as const;
+
+  it('draws a neutral notice inside a card on the inset, in the inks', async () => {
+    renderWithTheme(<Card><Notice message="Blocked by an injury." testID="in-card" /></Card>);
+    await switchTheme(INK);
+    const roles = rolesFor(INK);
+    expect(StyleSheet.flatten(screen.getByTestId('in-card').props.style).backgroundColor).toBe(roles.inset);
+    expect(StyleSheet.flatten(screen.getByText('Blocked by an injury.').props.style).color).toBe(roles.ink);
+  });
+
+  it('draws the Volume section’s waiting line in `pageInkMuted` on the page, and in `inkMuted` inside a card', async () => {
+    renderWithTheme(<SessionInsightPresentation exerciseComparisons={[]} historyState="loading" />);
+    await switchTheme(INK);
+    const roles = rolesFor(INK);
+    expect(StyleSheet.flatten(screen.getByTestId('session-insight-empty').props.style).color).toBe(roles.pageInkMuted);
+    screen.unmount();
+    renderWithTheme(<Card><SessionInsightPresentation exerciseComparisons={[]} historyState="loading" /></Card>);
+    expect(StyleSheet.flatten(screen.getByTestId('session-insight-empty').props.style).color).toBe(roles.inkMuted);
   });
 });

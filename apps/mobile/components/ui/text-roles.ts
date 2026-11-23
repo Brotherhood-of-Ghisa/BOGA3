@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 
+import { useUiGround } from '@/components/ui/ground';
 import type { UiRoles } from '@/components/ui/theme';
 import { useUiRoles } from '@/components/ui/theme-context';
 import { uiFonts, uiGeometry, uiTypography } from '@/components/ui/tokens';
@@ -208,6 +209,15 @@ export function useUiText() {
 // `uiTextToneFor`, in the colours the app is drawn in now.
 export function useUiTextTone() {
   return uiTextToneFor(useUiRoles());
+}
+
+// The three ink tones for words on the ground the caller sits on: the page
+// inks on the page, the inks on a card or a sheet (`ground.tsx`).
+export function useUiGroundTone() {
+  const tone = useUiTextTone();
+  return useUiGround() === 'page'
+    ? { ink: tone.page, muted: tone.pageMuted, faint: tone.pageFaint }
+    : { ink: tone.ink, muted: tone.muted, faint: tone.faint };
 }
 
 // One embedded weight up, for the row that is mine, a live session, the gym.

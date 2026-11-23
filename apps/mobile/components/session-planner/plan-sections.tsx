@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { FigureText } from '@/components/ui/figure-text';
 import { Tag } from '@/components/ui/tag';
 import { StatePanel } from '@/components/ui/state-panel';
-import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
+import { useUiGroundTone, useUiText, useUiTextTone } from '@/components/ui/text-roles';
 import { uiSpace } from '@/components/ui/tokens';
 import { planQueries, type PlanSummaryView, type ProgrammeSummaryView } from '@/src/session-planner';
 import { blockCountsLabel, planDateLabel, planOutcomeLabel, routineOutcomeLine } from './progress-labels';
@@ -59,6 +59,7 @@ export function PlanSection({
 }: PlanSectionProps) {
   const text = useUiText();
   const tone = useUiTextTone();
+  const groundTone = useUiGroundTone();
   const dateFormat = useDateFormat();
   const empty = plans.length === 0 && programmes.length === 0;
   if (empty && !emptyMessage && !isLoading && !errorMessage) {
@@ -66,7 +67,7 @@ export function PlanSection({
   }
   return (
     <View style={styles.section} testID={testID}>
-      <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, tone.faint]}>
+      <Text allowFontScaling={false} accessibilityRole="header" style={[text.label, groundTone.faint]}>
         {label}
       </Text>
       {errorMessage ? <StatePanel action={onRetry ? { label: 'Retry', onPress: onRetry, testID: `${testID}-retry` } : undefined}
