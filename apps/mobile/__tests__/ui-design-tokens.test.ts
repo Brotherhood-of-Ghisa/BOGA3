@@ -236,10 +236,10 @@ describe('design-language tokens', () => {
         expect(hueDistance(lch(roles.loss).hue, lch(roles.danger).hue)).toBeGreaterThanOrEqual(10);
       });
 
-      it('is fixed in every theme, whatever the seeds', () => {
+      it('is fixed in every theme of one direction, whatever the seeds', () => {
         // `danger` and the two directions are not seeded: a decrease stays red
         // and an improvement green however the accent is picked.
-        const rose = generateRoles({ background: '#6A5F62', text: '#6A5F62', accent: '#B4235A', record: '#7A6A12', viz: '#9A7480' }, mode);
+        const rose = generateRoles({ background: '#6A5F62', text: '#6A5F62', accent: '#B4235A', record: '#7A6A12', direction: 'green-crimson' }, mode);
         expect(rose.danger).toBe(roles.danger);
         expect(rose.gain).toBe(roles.gain);
         expect(rose.loss).toBe(roles.loss);

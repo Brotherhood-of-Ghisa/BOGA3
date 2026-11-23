@@ -34,7 +34,7 @@ values are generated per theme, so neither a doc nor a screen may hold one —
 Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.ts`:
 
 - **One value per role.** Two roles that cannot be told apart are one role.
-  The on-colour roles are exempt: each is named by the fill it sits on.
+  Exempt: the on-colour roles, each named by its fill, and `ink`-direction changes.
   `accent` and `record` stay ΔE\*ab ≥ 5 from `danger`, `gain`, `loss` and the
   regimes.
 - **`record` is never `accent`**, and clears 4.5:1 as text on `paper` and
@@ -42,7 +42,7 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   button that commits" must not read as the same mark.
 - **Each neutral family is one hue.** The inks (`ink` → `ink-muted` →
   `ink-faint` → `ink-ghost`) take the `text` seed's; in light mode `scrim`
-  follows `ink`, at 42%. The grounds, rules and `viz0` take the
+  follows `ink`, at 42%. The grounds, rules and ramp take the
   `background` seed's. The shipped default keeps both at 75–95, chroma ≤ 10.
 - **`surface` is a ground, never a foreground.** A label, glyph, ring or
   stroke on a filled role takes that fill's on-colour role: `onAccent`,
@@ -51,15 +51,16 @@ Invariants, gated in both modes by `apps/mobile/__tests__/ui-design-tokens.test.
   rejects `surface` anywhere but a ground.
 - **A wash is a tint of its role**, within 10° of its hue, so the edited row
   carries the accent's hue rather than the ground's.
-- **`danger` and the two change directions are not seeded** (§6): a decrease
-  must not read as a delete, so `loss` keeps its own hue away from `danger`'s.
+- **`danger` is fixed; `direction` sets `gain`/`loss`** (§6): `green-crimson`
+  (presets), `blue-orange`, or `ink` (sign only). Each pair shares one L\*,
+  clearing 4.5:1 on `paper`/`surface`; `loss` stays off `danger`'s hue.
 
 `regimeOlder` / `regimeNewer` are fixed categorical hues for the RM chart's fitted periods,
 with readable text contrast; they do not reuse the sequential `viz` ramp or
 the gain/loss meanings.
 
-**Five seeds make a theme.** `generateRoles(seeds)` turns `background`,
-`text`, `accent`, `record` and `viz` into every role. A seed sets hue and chroma; the
+**Four seeds and `direction` make a theme** (`generateRoles(seeds)`):
+`background`, `text`, `accent`, `record`. A seed sets hue and chroma; the
 role sets its own fixed L\* — contrast depends on lightness, so the text floors
 hold whatever the seed. In light mode `accent` and `record` are used as given, so
 their floors are the seed's to meet.
@@ -71,7 +72,7 @@ for every preset's `accent` at 4.5:1. Dark puts `paper` at L\*10, `ink` at L\*95
 `accent` (L\*72, `onAccent` black) and `record` (L\*66) take their seed's hue;
 `danger`, `gain`, `loss` and the regimes keep their light hues at L\*64;
 `selection` turns white, `scrim` 60% black. The `viz` ramp lightens in even
-steps, ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
+steps on `background`'s hue (chroma ≥ 12), ending where `ink` holds 4.5:1. `ui-theme.test.ts` sweeps both modes.
 The roles take the drawn mode's ladder; `useUiMode()` reads that mode.
 
 **Choosing one.** A theme — four presets or Custom — per device, stored as
@@ -87,15 +88,14 @@ an invalid record or an unreadable store opens, logged, in the default. `record`
 stays brass across presets. Its editor: `ux-rules.md` "Appearance".
 
 **Custom** (`theme-custom.ts`): a hue and strength (0–100% of its
-chroma cap) per seed, borders, highlight and `ink`. The page picks
+chroma cap) per colour seed, highlight and `ink`, and a direction. The page picks
 its mode, L\* (dark 0–35, light 65–100; quarter steps), depth. Each role
 keeps its hue, chroma and share of the `paper` → `ink` distance on the
-page; depth (0–300%) scales the grounds and `viz0`, border contrast
-(0–300%) `rule`/`rule-soft` (the page's tint unless unmatched), highlight
+page; depth (0–300%) scales the grounds, rules and `viz0`, highlight
 contrast (0–300%) `accent-wash` (the accent's band unless unmatched), text
-contrast (0–150%) the lesser inks, never past `ink`'s L\*. Chart and
-highlight strength are a share of each L\*'s sRGB maximum; dark chart steps
-reach L\*58. Absent newer fields draw as before. Custom starts from the
+contrast (0–150%) the lesser inks, never past `ink`'s L\*. Highlight
+strength is a share of its L\*'s sRGB maximum. Absent newer fields draw as
+before; stored `borders`/`viz` parts are ignored. Custom starts from the
 preset in use, ungated against the floors above (`ui-theme-custom.test.ts`).
 
 The launcher icon follows the drawn theme: one per preset, one

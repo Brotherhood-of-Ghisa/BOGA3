@@ -1,13 +1,13 @@
 import { hexToLch, lchToHex, withAlpha, type Lch } from '@/components/ui/lch';
 
 // The colours a theme is made from (`docs/specs/ui/design-language.md` §2,
-// "Derivation"). The palette follows these seeds; danger, the two change
-// directions, filter selection, the regimes and the on-colour roles keep fixed
-// colours per mode in every theme.
+// "Derivation"): four seeds and a direction. The palette follows these; danger,
+// filter selection, the regimes and the on-colour roles keep fixed colours per
+// mode in every theme.
 export type ThemeSeeds = {
   // A mid neutral. Its hue and chroma tint the ground family: the four grounds
   // (`well`, `paper`, `surface`, `raised`), the two rules and `viz0`, so the
-  // page reads as one warm (or cool) family.
+  // page reads as one warm (or cool) family. The chart ramp takes its hue too.
   background: string;
   // A mid neutral. Its hue and chroma tint the ink family, `ink` to
   // `inkGhost`, and `scrim`. A theme that has not split them gives both
@@ -17,20 +17,25 @@ export type ThemeSeeds = {
   accent: string;
   // An all-time best, used as given. Keep it a different hue from `accent`.
   record: string;
-  // The strongest data-visualisation step. The ramp takes its hue and chroma
-  // and lightens in fixed steps toward `viz1`.
-  viz: string;
+  // How `gain` and `loss` are drawn (`DIRECTION_PAIRS`).
+  direction: ThemeDirection;
 };
 
+// A change's two directions as a pair of hues, or both in `ink`: the sign is
+// always drawn, so `ink` still reads.
+export type ThemeDirection = 'green-crimson' | 'blue-orange' | 'ink';
+export const THEME_DIRECTIONS: readonly ThemeDirection[] = ['green-crimson', 'blue-orange', 'ink'];
+export const DEFAULT_DIRECTION: ThemeDirection = 'green-crimson';
+
 // The shipped theme. `background` and `text` are both `inkMuted`, the mid
-// neutral the others were picked around; `accent`, `record` and `viz` are those
-// roles as picked on device (2026-09-22 and 2026-09-25).
+// neutral the others were picked around; `accent` and `record` are those
+// roles as picked on device (2026-09-22).
 export const defaultThemeSeeds: ThemeSeeds = {
   background: '#6B6358',
   text: '#6B6358',
   accent: '#C2410C',
   record: '#8A6516',
-  viz: '#A4866B',
+  direction: DEFAULT_DIRECTION,
 };
 
 // The two lightness ladders a theme is drawn on. `light` is a dark ink on a
@@ -38,7 +43,9 @@ export const defaultThemeSeeds: ThemeSeeds = {
 // a seed sets hue and chroma, the ladder sets lightness.
 export type ThemeMode = 'light' | 'dark';
 
-type SeedName = keyof ThemeSeeds;
+// The colours a step is taken from: the four seeds, and the chart ramp's
+// colour, which `background` gives (`rampColour`).
+type SeedName = Exclude<keyof ThemeSeeds, 'direction'> | 'ramp';
 
 // A role as a step of a seed: the role's own L*, at the seed's hue, with the
 // seed's chroma scaled by `chroma`.
@@ -92,10 +99,10 @@ const LIGHT_STEPS: Record<SteppedRole, Step> = {
   // Empty / rest is a neutral, not a step of the ramp's hue.
   viz0: step('background', 93.6, 0.39),
   // Even L* steps, so each bucket reads as "more" without relying on hue.
-  viz1: step('viz', 87, 0.44),
-  viz2: step('viz', 78, 0.64),
-  viz3: step('viz', 68, 0.83),
-  viz4: step('viz', 58, 1),
+  viz1: step('ramp', 87, 0.44),
+  viz2: step('ramp', 78, 0.64),
+  viz3: step('ramp', 68, 0.83),
+  viz4: step('ramp', 58, 1),
 };
 
 // The dark ladder mirrors the light one about the page: the inks lighten and
@@ -121,10 +128,10 @@ const DARK_STEPS: Record<SteppedRole, Step> = {
   // "More" is still stronger: the ramp lightens away from the dark ground in
   // even steps of 6.5 L* (sRGB rounding costs up to 0.35), from 11 above
   // `surface` to L* 45.5, which keeps `ink` above 4.5:1 on `viz4`.
-  viz1: step('viz', 26, 0.44),
-  viz2: step('viz', 32.5, 0.64),
-  viz3: step('viz', 39, 0.83),
-  viz4: step('viz', 45.5, 1),
+  viz1: step('ramp', 26, 0.44),
+  viz2: step('ramp', 32.5, 0.64),
+  viz3: step('ramp', 39, 0.83),
+  viz4: step('ramp', 45.5, 1),
 };
 
 // Roles the dark ladder steps that light mode takes as given: light `accent`
@@ -138,8 +145,6 @@ const DARK_RECORD = step('record', 66, 1);
 type FixedRole =
   | 'selection'
   | 'danger'
-  | 'gain'
-  | 'loss'
   | 'regimeOlder'
   | 'regimeNewer'
   | 'onAccent'
@@ -165,30 +170,61 @@ const FIXED: Record<ThemeMode, Pick<UiRoles, FixedRole>> = {
     selection: '#000000',
     // Destructive actions only — red means "this deletes" in every theme.
     danger: '#A4262C',
-    // A change's direction (`design-language.md` §6): an improvement and a
-    // decrease. Fixed in every theme, like `danger`, so "better" and "worse"
-    // never follow the picked accent's hue. One L* (≈41), two hues: the pair
-    // reads as equals that differ only in direction, and `loss` is a crimson
-    // rather than `danger`'s brick, so a decrease does not read as a delete.
-    gain: '#15703F',
-    loss: '#C01048',
     regimeOlder: '#006C70',
     regimeNewer: '#7A286B',
     ...onFill('#FFFFFF'),
   },
   // The light values' hues at L* 64, so each clears 4.5:1 as text on the dark
-  // `paper` and `surface`; `gain` and `loss` keep one L*. `selection` inverts
-  // to white.
+  // `paper` and `surface`. `selection` inverts to white.
   dark: {
     selection: '#FFFFFF',
     danger: '#F7716B',
-    gain: '#58AC76',
-    loss: '#FF6881',
     regimeOlder: '#54A8AC',
     regimeNewer: '#D57DC1',
     ...onFill('#000000'),
   },
 };
+
+type ChangePair = Pick<UiRoles, 'gain' | 'loss'>;
+
+// A change's direction (`design-language.md` §6): an improvement and a
+// decrease, as the theme's `direction` draws them. Never seeded from the
+// accent, so "better" and "worse" do not follow the picked hue. Each pair is
+// one L*, two hues: the pair reads as equals that differ only in direction,
+// and each clears 4.5:1 as text on `paper` and `surface`. Light mode's L* is
+// the pair's own; dark mode's is 64, as the fixed roles'. `ink` draws both in
+// `ink` (`generateRoles`).
+export const DIRECTION_PAIRS: Record<Exclude<ThemeDirection, 'ink'>, Record<ThemeMode, ChangePair>> = {
+  // L* ≈41. `loss` is a crimson rather than `danger`'s brick, so a decrease
+  // does not read as a delete.
+  'green-crimson': {
+    light: { gain: '#15703F', loss: '#C01048' },
+    dark: { gain: '#58AC76', loss: '#FF6881' },
+  },
+  // L* 44 and 64: a blue and an orange, for a reader who tells red from green
+  // poorly.
+  'blue-orange': {
+    light: { gain: '#006BB3', loss: '#AB4C0C' },
+    dark: { gain: '#5B9EEB', loss: '#E87F40' },
+  },
+};
+
+// The pair a direction draws, given the theme's `ink`.
+function changePair(direction: ThemeDirection, mode: ThemeMode, ink: string): ChangePair {
+  return direction === 'ink' ? { gain: ink, loss: ink } : DIRECTION_PAIRS[direction][mode];
+}
+
+// The chart ramp's colour: `background`'s hue, at a chroma that scales with
+// the background's (the shipped presets' ramps sat about 2.7 times their
+// neutral's) but never under a floor, so a near-grey theme still draws a
+// tinted ramp rather than one more grey. A grey's hue is about 297°, a cool
+// blue-grey.
+const RAMP_CHROMA_GAIN = 2.7;
+const RAMP_CHROMA_FLOOR = 12;
+
+function rampColour(background: Lch): Lch {
+  return { ...background, chroma: Math.max(background.chroma * RAMP_CHROMA_GAIN, RAMP_CHROMA_FLOOR) };
+}
 
 // The dark backdrop behind a sheet. Light mode dims with `ink`; dark mode's
 // `ink` is pale, so it dims with black.
@@ -248,8 +284,9 @@ export type UiRoles = {
   // Destructive actions only.
   danger: string;
   // A change against an earlier period: `gain` an improvement, `loss` a
-  // decrease (`changeToneColourIn` in `change-tone.ts` is the only caller). The
-  // sign is always drawn too — colour is never the only channel.
+  // decrease (`changeToneColourIn` in `change-tone.ts` is the only caller), as
+  // the theme's `direction` draws them. The sign is always drawn too — colour
+  // is never the only channel, and under `ink` it is the only one.
   gain: string;
   loss: string;
   // Data visualisation: one sequential ramp, one meaning ("more"). `viz0` is
@@ -293,22 +330,17 @@ export function washLightness(mode: ThemeMode): number {
   return (mode === 'light' ? LIGHT_STEPS : DARK_STEPS).accentWash.lightness;
 }
 
-// The L* of a mode's `viz1`…`viz4`, weakest first.
-export function rampLightness(mode: ThemeMode): number[] {
-  const ladder = mode === 'light' ? LIGHT_STEPS : DARK_STEPS;
-  return [ladder.viz1, ladder.viz2, ladder.viz3, ladder.viz4].map((rampStep) => rampStep.lightness);
-}
-
 // Every colour role from the seeds, on the light or the dark ladder. Pure and
 // synchronous: `tokens.ts` calls it once at module load. Throws on a seed that
 // is not `#RRGGBB`.
 export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light'): UiRoles {
+  const background = hexToLch(seeds.background);
   const seedLch: Record<SeedName, Lch> = {
-    background: hexToLch(seeds.background),
+    background,
     text: hexToLch(seeds.text),
     accent: hexToLch(seeds.accent),
     record: hexToLch(seeds.record),
-    viz: hexToLch(seeds.viz),
+    ramp: rampColour(background),
   };
   const at = ({ seed, lightness, chroma }: Step) =>
     lchToHex({ lightness, chroma: seedLch[seed].chroma * chroma, hue: seedLch[seed].hue });
@@ -327,5 +359,5 @@ export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light'): UiR
           scrim: withAlpha(stepped.ink, 0.42),
         }
       : { accent: at(DARK_ACCENT), record: at(DARK_RECORD), scrim: DARK_SCRIM };
-  return { ...stepped, ...own, ...FIXED[mode] };
+  return { ...stepped, ...own, ...FIXED[mode], ...changePair(seeds.direction, mode, stepped.ink) };
 }

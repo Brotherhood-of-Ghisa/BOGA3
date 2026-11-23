@@ -260,9 +260,8 @@ swatches; Custom folds presets behind `Show presets`), then Mode (Light, Dark,
 System) for a preset or one row per Custom part, then a live `ThemePreview`.
 A part's picker (its title switches part): a painted hue `SliderRow`,
 strength, then its own controls (background: Dark switch, lightness over the
-mode's range, depth; borders: Match background, contrast; highlight: Match
-accent, contrast; texts: lightness or
-contrast); the part's roles; the preview. A tap, release or switch saves at once, writing nothing when already stored,
+mode's range, depth; highlight: Match accent, contrast; texts: lightness or
+contrast; Direction: radios alone); the part's roles; the preview. A tap, release or switch saves at once, writing nothing when already stored,
 and the app repaints in it; a header spinner shows until it has.
 A failed save shows a danger `Notice` saying nothing changed and is logged.
 Settings home names the choice.

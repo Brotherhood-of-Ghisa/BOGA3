@@ -33,24 +33,24 @@ jest.mock('expo-router', () => ({
   },
 }));
 
-import { act, configure, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Storage } from 'expo-sqlite/kv-store';
 import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 
-import { SPOTLIGHT } from '@/components/appearance/theme-preview';
+import { sampleRoles, SPOTLIGHT } from '@/components/appearance/theme-preview';
 import { hexToLch } from '@/components/ui/lch';
 import { pointToValue } from '@/components/ui/slider-row';
 import {
+  CUSTOM_COLOUR_PARTS,
   CUSTOM_PARTS,
   customFromSeeds,
   customSeed,
   generateCustomRoles,
+  type CustomColourPart,
   type CustomColours,
-  type CustomPart,
 } from '@/components/ui/theme-custom';
 import { useUiRoles } from '@/components/ui/theme-context';
 import { APPEARANCE_STORAGE_KEY } from '@/components/ui/theme-launch';
-import { hueName } from '@/components/ui/theme-hue';
 import { getThemePreset } from '@/components/ui/theme-presets';
 import ThemeCustomRoute from '../app/theme-custom';
 import { waitForGone } from './helpers/wait-for-gone';
@@ -58,16 +58,13 @@ import { renderWithTheme } from './helpers/theme';
 
 const CUSTOM: CustomColours = {
   background: { hue: 80, strength: 20, mode: 'light', lightness: 90, depth: 100 },
-  // Borders of their own, so a change to the background's hue does not move
-  // them and a change to theirs does.
-  borders: { hue: 200, strength: 30, match: false, contrast: 100 },
   ink: { hue: 265, strength: 30, lightness: 8 },
   text: { hue: 60, strength: 10, contrast: 100 },
   accent: { hue: 30, strength: 70 },
   // A highlight of its own, so a change to its hue moves the band.
   highlight: { hue: 300, strength: 40, match: false, contrast: 100 },
   record: { hue: 90, strength: 50 },
-  viz: { hue: 150, strength: 40, gamut: true },
+  direction: 'green-crimson',
 };
 
 const store = (custom: CustomColours, theme = 'custom') =>
@@ -196,13 +193,13 @@ it('repaints the app in the part let go, behind the page as well as on it', asyn
 
 it('saves a hue when the bar is let go, keeping the other parts', async () => {
   store(CUSTOM);
-  mockPart = 'viz';
+  mockPart = 'record';
   render(<ThemeCustomRoute />);
   fireEvent(screen.getByTestId('theme-custom-hue-track'), 'layout', { nativeEvent: { layout: { width: 359 } } });
 
   await act(async () => drag(hueBar()).onEnd({ x: 90 }, true));
 
-  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, viz: { ...CUSTOM.viz, hue: 90 } }));
+  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, record: { ...CUSTOM.record, hue: 90 } }));
 });
 
 it('paints the hue bar in the part’s colours, words for VoiceOver only, and swatches the part as it would be drawn', () => {
@@ -234,8 +231,8 @@ it('switches to another part from the title, and only closes the menu for the pa
   expect(mockSetParams).not.toHaveBeenCalled();
 
   fireEvent.press(screen.getByRole('button', { name: 'Secondary text, switch colour' }));
-  fireEvent.press(screen.getByTestId('theme-custom-title-option-viz'));
-  expect(mockSetParams).toHaveBeenCalledWith({ part: 'viz' });
+  fireEvent.press(screen.getByTestId('theme-custom-title-option-direction'));
+  expect(mockSetParams).toHaveBeenCalledWith({ part: 'direction' });
 });
 
 it('spotlights every role the part moves, live as a control moves', () => {
@@ -245,8 +242,10 @@ it('spotlights every role the part moves, live as a control moves', () => {
     render(<ThemeCustomRoute />);
     const tile = (index: number) => StyleSheet.flatten(screen.getByTestId(`theme-custom-spotlight-${index}`).props.style).backgroundColor;
     const roles = generateCustomRoles(CUSTOM);
-    expect([0, 1, 2, 3, 4].map(tile)).toEqual([roles.well, roles.paper, roles.surface, roles.raised, roles.viz0]);
+    expect([0, 1, 2, 3].map(tile)).toEqual([roles.well, roles.paper, roles.surface, roles.raised]);
     expect(screen.getByText('Divider')).toBeTruthy();
+    // The chart's tile is its empty cell, its steps standing in it.
+    expect(tile(6)).toBe(roles.viz0);
 
     fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
     act(() => drag(slider('Lightness')).onUpdate({ x: 20 }));
@@ -262,17 +261,17 @@ it('spotlights, for each part, only roles a hue and strength change of that part
   const channels = (colour: string) =>
     colour.startsWith('#') ? [1, 3, 5].map((at) => parseInt(colour.slice(at, at + 2), 16)) : (colour.match(/[\d.]+/g) ?? []).map(Number);
   const differs = (a: string, b: string) => channels(a).some((value, index) => Math.abs(value - channels(b)[index]) > 6);
-  const moved = (part: CustomPart) => {
+  const moved = (part: CustomColourPart) => {
     const before = generateCustomRoles(CUSTOM);
     const shifted = { ...CUSTOM, [part]: { ...CUSTOM[part], hue: (CUSTOM[part].hue + 120) % 360, strength: 100 } };
     const after = generateCustomRoles(shifted);
     return new Set((Object.keys(before) as (keyof typeof before)[]).filter((role) => before[role] !== after[role] && differs(before[role], after[role])));
   };
-  CUSTOM_PARTS.forEach((part) => {
-    const roles = SPOTLIGHT[part].flatMap((sample) => (sample.kind === 'fill' ? [sample.role] : [sample.role, sample.ground]));
+  CUSTOM_COLOUR_PARTS.forEach((part) => {
+    const roles = SPOTLIGHT[part].flatMap(sampleRoles);
     // Each sample but a context one draws at least one role of its own part.
     SPOTLIGHT[part].filter((sample) => !sample.context).forEach((sample) => {
-      const own = sample.kind === 'fill' ? [sample.role] : [sample.role, sample.ground];
+      const own = sampleRoles(sample);
       expect({ part, sample: sample.label, moves: own.some((role) => moved(part).has(role)) }).toEqual({ part, sample: sample.label, moves: true });
     });
     // And every role the part moves is among them.
@@ -407,29 +406,48 @@ it('shows a page saved outside its mode’s range as it is, until it is moved in
   await waitFor(() => expect(storedCustom()?.background.lightness).toBe(65));
 });
 
-it('gives the borders their own hue and strength, or the page’s, and a contrast', async () => {
+it('offers no Borders or Charts part: an old link opens the background', () => {
   store(CUSTOM);
-  mockPart = 'borders';
+  expect(CUSTOM_PARTS).toEqual(['background', 'ink', 'text', 'accent', 'highlight', 'record', 'direction']);
+  for (const gone of ['borders', 'viz']) {
+    mockPart = gone;
+    render(<ThemeCustomRoute />);
+    expect(mockTitles[mockTitles.length - 1]).toBe('Background');
+    screen.unmount();
+  }
   render(<ThemeCustomRoute />);
-  expect(mockTitles).toContain('Borders');
-  const match = () => screen.getByRole('switch', { name: 'Match background' });
-  expect(match().props.accessibilityState).toEqual({ checked: false });
-  expect(hueBar().props.accessibilityValue).toEqual({ text: 'Teal, 200 degrees' });
+  fireEvent.press(screen.getByRole('button', { name: 'Background, switch colour' }));
+  expect(screen.queryByTestId('theme-custom-title-option-borders')).toBeNull();
+  expect(screen.queryByTestId('theme-custom-title-option-viz')).toBeNull();
+});
 
-  await step(slider('Contrast'), 'increment');
-  await waitFor(() => expect(storedCustom()?.borders).toEqual({ ...CUSTOM.borders, contrast: 115 }));
-
-  await act(async () => fireEvent.press(match()));
-  await waitFor(() => expect(storedCustom()?.borders.match).toBe(true));
+it('offers three directions, saves the one tapped, and spotlights the pair it draws', async () => {
+  store(CUSTOM);
+  mockPart = 'direction';
+  renderWithTheme(<ThemeCustomRoute />);
+  expect(mockTitles).toContain('Direction');
   expect(screen.queryByRole('adjustable', { name: 'Hue' })).toBeNull();
-  expect(screen.queryByRole('adjustable', { name: 'Strength' })).toBeNull();
+  const option = (label: string) => screen.getByRole('radio', { name: label });
+  expect(screen.getAllByRole('radio').map((row) => row.props.accessibilityLabel ?? row.props.children)).toHaveLength(3);
+  expect(option('Green / crimson').props.accessibilityState).toMatchObject({ checked: true });
+  expect(option('Blue / orange').props.accessibilityState).toMatchObject({ checked: false });
+  expect(option('Ink only').props.accessibilityState).toMatchObject({ checked: false });
+  const tile = (index: number) =>
+    StyleSheet.flatten(
+      within(screen.getByTestId(`theme-custom-spotlight-${index}`, { includeHiddenElements: true })).getByText('Aa', { includeHiddenElements: true }).props.style,
+    ).color;
+  expect(tile(0)).toBe(generateCustomRoles(CUSTOM).gain);
 
-  // Unmatching starts from the page's colour, so nothing jumps.
-  await act(async () => fireEvent.press(match()));
-  await waitFor(() =>
-    expect(storedCustom()?.borders).toEqual({ hue: CUSTOM.background.hue, strength: CUSTOM.background.strength, match: false, contrast: 115 }),
-  );
-  expect(hueBar().props.accessibilityValue).toEqual({ text: `${hueName(CUSTOM.background.hue)}, ${CUSTOM.background.hue} degrees` });
+  await act(async () => fireEvent.press(option('Blue / orange')));
+  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, direction: 'blue-orange' }));
+  expect(option('Blue / orange').props.accessibilityState).toMatchObject({ checked: true });
+  const blue = generateCustomRoles({ ...CUSTOM, direction: 'blue-orange' });
+  expect([tile(0), tile(1)]).toEqual([blue.gain, blue.loss]);
+
+  await act(async () => fireEvent.press(option('Ink only')));
+  await waitFor(() => expect(storedCustom()?.direction).toBe('ink'));
+  const ink = generateCustomRoles({ ...CUSTOM, direction: 'ink' });
+  expect([tile(0), tile(1)]).toEqual([ink.ink, ink.ink]);
 });
 
 it('gives the highlight its own hue and strength, or the accent’s, and a contrast', async () => {
@@ -483,14 +501,6 @@ it('saves the secondary text’s contrast', async () => {
   expect(slider('Contrast').props.accessibilityValue).toEqual({ text: '100%' });
   await step(slider('Contrast'), 'increment');
   await waitFor(() => expect(storedCustom()?.text).toEqual({ ...CUSTOM.text, contrast: 108 }));
-});
-
-it('draws the charts on the gamut from their first edit', async () => {
-  store({ ...CUSTOM, viz: { ...CUSTOM.viz, gamut: false } });
-  mockPart = 'viz';
-  render(<ThemeCustomRoute />);
-  await step(slider('Strength'), 'increment');
-  await waitFor(() => expect(storedCustom()?.viz).toEqual({ ...CUSTOM.viz, strength: 45, gamut: true }));
 });
 
 describe('pointToValue', () => {

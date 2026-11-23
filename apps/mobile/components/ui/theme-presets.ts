@@ -1,6 +1,6 @@
 import type { ColorSchemeName } from 'react-native';
 
-import { defaultThemeSeeds, generateRoles, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
+import { DEFAULT_DIRECTION, defaultThemeSeeds, generateRoles, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
 import { customFromSeeds, customMode, generateCustomRoles, type CustomColours } from '@/components/ui/theme-custom';
 import { parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
 
@@ -24,13 +24,14 @@ export const DEFAULT_THEME_PRESET_ID: ThemePresetId = 'warm';
 // one mid neutral, which its background and text both take.
 export const themePresets: readonly ThemePreset[] = [
   { id: 'warm', label: 'Warm', seeds: defaultThemeSeeds },
-  { id: 'slate', label: 'Slate', seeds: oneNeutral('#5B6470', { accent: '#1F6FB2', record: '#8A6516', viz: '#5F7F96' }) },
-  { id: 'forest', label: 'Forest', seeds: oneNeutral('#5E6659', { accent: '#2F7D4F', record: '#8C5A12', viz: '#6E8A62' }) },
-  { id: 'plum', label: 'Plum', seeds: oneNeutral('#665D66', { accent: '#8E3B8A', record: '#7A6A12', viz: '#8A6F8A' }) },
+  { id: 'slate', label: 'Slate', seeds: oneNeutral('#5B6470', { accent: '#1F6FB2', record: '#8A6516' }) },
+  { id: 'forest', label: 'Forest', seeds: oneNeutral('#5E6659', { accent: '#2F7D4F', record: '#8C5A12' }) },
+  { id: 'plum', label: 'Plum', seeds: oneNeutral('#665D66', { accent: '#8E3B8A', record: '#7A6A12' }) },
 ];
 
-function oneNeutral(neutral: string, rest: Omit<ThemeSeeds, 'background' | 'text'>): ThemeSeeds {
-  return { background: neutral, text: neutral, ...rest };
+// A preset fixes its own direction: each shipped one draws green and crimson.
+function oneNeutral(neutral: string, rest: Pick<ThemeSeeds, 'accent' | 'record'>): ThemeSeeds {
+  return { background: neutral, text: neutral, ...rest, direction: DEFAULT_DIRECTION };
 }
 
 export function findThemePreset(id: string): ThemePreset | undefined {

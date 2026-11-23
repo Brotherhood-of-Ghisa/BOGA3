@@ -49,13 +49,12 @@ const WARM = getThemePreset('warm');
 // Custom colours far from any preset: a dark teal page, a high-strength accent.
 const CUSTOM: CustomColours = {
   background: { hue: 200, strength: 30, mode: 'dark', lightness: 20, depth: 150 },
-  borders: { hue: 200, strength: 30, match: true, contrast: 150 },
   ink: { hue: 265, strength: 30, lightness: 95 },
   text: { hue: 60, strength: 10, contrast: 100 },
   accent: { hue: 330, strength: 80 },
   highlight: { hue: 330, strength: 20, match: true, contrast: 100 },
   record: { hue: 90, strength: 60 },
-  viz: { hue: 150, strength: 50, gamut: false },
+  direction: 'green-crimson',
 };
 const CHOSEN: AppearanceChoice = { theme: 'custom', mode: 'light', custom: CUSTOM };
 
@@ -140,6 +139,64 @@ describe('the appearance record', () => {
     ['custom', '{"theme":"warm","mode":"light","custom":{"text":{"hue":1,"strength":1}}}'],
   ])('reports a record with a bad %s field: %s', (field, stored) => {
     expect(parseAppearanceRecord(stored)).toEqual({ appearance: null, problem: { kind: 'invalid-record', field, stored } });
+  });
+});
+
+// Every record a build before the four-seed model could write, as it wrote
+// it, opens in the closest theme this build draws: the same preset, or the
+// same custom colours with the parts since removed ignored and the default
+// direction. No newer key is written.
+describe('records the previous build wrote', () => {
+  // A custom theme as that build serialised it: its own borders and charts.
+  const OLDER_CUSTOM =
+    '{"background":{"hue":200,"strength":30,"mode":"dark","lightness":20,"depth":150},' +
+    '"borders":{"hue":120,"strength":70,"match":false,"contrast":250},' +
+    '"ink":{"hue":265,"strength":30,"lightness":95},"text":{"hue":60,"strength":10,"contrast":100},' +
+    '"accent":{"hue":330,"strength":80},"highlight":{"hue":330,"strength":20,"match":true,"contrast":100},' +
+    '"record":{"hue":90,"strength":60},"viz":{"hue":150,"strength":50,"gamut":true}}';
+  const record = (theme: string, custom: string, mode = 'light') => `{"theme":"${theme}","mode":"${mode}","custom":${custom}}`;
+
+  it('opens a custom theme with borders and charts parts in its colours, green and crimson', () => {
+    expect(parseAppearanceRecord(record('custom', OLDER_CUSTOM))).toEqual({ appearance: CHOSEN, problem: null });
+  });
+
+  it('opens a custom theme with a direction in that direction', () => {
+    const withDirection = OLDER_CUSTOM.replace(/}$/, ',"direction":"ink"}');
+    expect(parseAppearanceRecord(record('custom', withDirection)).appearance?.custom).toEqual({ ...CUSTOM, direction: 'ink' });
+  });
+
+  it.each(['warm', 'slate', 'forest', 'plum'].flatMap((theme) => ['light', 'dark', 'system'].map((mode) => [theme, mode] as const)))(
+    'opens the %s preset in %s, keeping older custom colours it held',
+    (theme, mode) => {
+      expect(parseAppearanceRecord(record(theme, 'null', mode)).appearance).toEqual({ theme, mode, custom: null });
+      expect(parseAppearanceRecord(record(theme, OLDER_CUSTOM, mode)).appearance).toEqual({ theme, mode, custom: CUSTOM });
+    },
+  );
+
+  it('converts the record before custom themes and the accent id alone, green and crimson', () => {
+    const legacy = parseLegacyAppearanceRecord('{"accent":"hue:200","background":"cool","text":"navy","mode":"light"}');
+    expect(legacy.appearance?.custom?.direction).toBe('green-crimson');
+    expect(parseLegacyAppearanceRecord('{"accent":"plum","background":"match","text":"match","mode":"dark"}').appearance).toEqual({
+      theme: 'plum',
+      mode: 'dark',
+      custom: null,
+    });
+    expect(resolveThemePreset('hue:47').appearance.custom?.direction).toBe('green-crimson');
+  });
+
+  it.each(['"red-green"', '7', 'null'])('reports a custom theme with a direction of %s as an invalid record', (direction) => {
+    const stored = record('custom', OLDER_CUSTOM.replace(/}$/, `,"direction":${direction}}`));
+    expect(parseAppearanceRecord(stored)).toEqual({ appearance: null, problem: { kind: 'invalid-record', field: 'custom', stored } });
+  });
+
+  it('writes a direction inside custom only, and keeps the key', async () => {
+    await saveAppearance({ ...CHOSEN, custom: { ...CUSTOM, direction: 'blue-orange' } });
+    expect(APPEARANCE_STORAGE_KEY).toBe('boga3.appearance.v3');
+    const written = storedRecord() as Record<string, unknown>;
+    expect(Object.keys(written)).toEqual(['theme', 'mode', 'custom']);
+    expect((written.custom as Record<string, unknown>).direction).toBe('blue-orange');
+    expect(Object.keys(written.custom as object)).not.toContain('borders');
+    expect(Object.keys(written.custom as object)).not.toContain('viz');
   });
 });
 

@@ -1,7 +1,15 @@
 import { createHash } from 'crypto';
 
 import { hexToLch, lchToHex, withAlpha } from '@/components/ui/lch';
-import { defaultThemeSeeds, generateRoles, type ThemeMode, type ThemeSeeds, type UiRoles } from '@/components/ui/theme';
+import {
+  defaultThemeSeeds,
+  DIRECTION_PAIRS,
+  generateRoles,
+  THEME_DIRECTIONS,
+  type ThemeMode,
+  type ThemeSeeds,
+  type UiRoles,
+} from '@/components/ui/theme';
 import { hueName, hueThemeId, parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
 import { DEFAULT_APPEARANCE, DEFAULT_THEME_PRESET_ID, getThemePreset, themePresets } from '@/components/ui/theme-presets';
 
@@ -9,15 +17,16 @@ import { rolesFor } from './helpers/theme';
 import themeRolesLight from './fixtures/theme-roles-light.json';
 
 // The theme generator (`docs/specs/ui/design-language.md` §2, "Derivation"
-// and "Presets"): every colour role is generated from five seeds, on a light
-// or a dark ladder. These tests pin that the default seeds reproduce the picked
+// and "Presets"): every colour role is generated from four seeds and a
+// direction, on a light or a dark ladder. These tests pin that the default seeds reproduce the picked
 // palette, that the rules the palette is gated on hold in both modes for every
 // shipped preset and for seeds no preset ships, and that each preset's `accent`
 // and `record` — used as given in light mode — meet their own floors. Custom
 // themes are not gated (`ui-theme-custom.test.ts`).
 
 // The palette as picked on device, its grounds and hairlines on the ground
-// ladder. The generator is calibrated to it; a role drifting further than ΔE*ab 3 from it
+// ladder and its chart ramp on the background's hue. The generator is
+// calibrated to it; a role drifting further than ΔE*ab 3 from it
 // is a visible change and needs its own design decision.
 const PICKED_PALETTE: Omit<UiRoles, 'scrim' | OnColourRole> = {
   ink: '#1B1712',
@@ -42,21 +51,24 @@ const PICKED_PALETTE: Omit<UiRoles, 'scrim' | OnColourRole> = {
   gain: '#15703F',
   loss: '#C01048',
   viz0: '#F0ECE7',
-  viz1: '#E7D7CA',
-  viz2: '#D3BDAB',
-  viz3: '#BCA18A',
-  viz4: '#A4866B',
+  viz1: '#E4D8C9',
+  viz2: '#CEBFA9',
+  viz3: '#B6A388',
+  viz4: '#9D8869',
 };
 
 // Seeds no preset ships with, chosen to pull the generator away from the
-// shipped ones: a teal, an indigo and a rose ground, with accents, records and
-// ramps on other parts of the wheel. They prove the generator, not a theme.
+// shipped ones: a teal, an indigo and a rose ground, with accents and records
+// on other parts of the wheel, and a grey one. They prove the generator, not a
+// theme.
 const OTHER_SEEDS: Record<string, ThemeSeeds> = {
-  harbour: { background: '#5A6666', text: '#5A6666', accent: '#0F766E', record: '#8A6516', viz: '#5E8A88' },
-  indigo: { background: '#5F5F6E', text: '#5F5F6E', accent: '#4F46E5', record: '#8A6516', viz: '#7472A0' },
-  rose: { background: '#6A5F62', text: '#6A5F62', accent: '#B4235A', record: '#7A6A12', viz: '#9A7480' },
+  harbour: { background: '#5A6666', text: '#5A6666', accent: '#0F766E', record: '#8A6516', direction: 'green-crimson' },
+  indigo: { background: '#5F5F6E', text: '#5F5F6E', accent: '#4F46E5', record: '#8A6516', direction: 'green-crimson' },
+  rose: { background: '#6A5F62', text: '#6A5F62', accent: '#B4235A', record: '#7A6A12', direction: 'green-crimson' },
   // Background and text apart: a cool page under a warm ink.
-  split: { background: '#5B6470', text: '#6B5848', accent: '#C2410C', record: '#8A6516', viz: '#A4866B' },
+  split: { background: '#5B6470', text: '#6B5848', accent: '#C2410C', record: '#8A6516', direction: 'green-crimson' },
+  // A near-grey page: its ramp still takes a hue, at the chroma floor.
+  grey: { background: '#6B6B6C', text: '#6B6B6C', accent: '#C2410C', record: '#8A6516', direction: 'green-crimson' },
 };
 
 type OnColourRole = 'onAccent' | 'onSelection' | 'onDanger' | 'onInk';
@@ -125,6 +137,25 @@ describe('lch colour space', () => {
 });
 
 describe('theme generator', () => {
+  it('is made of four seeds and a direction', () => {
+    expect(Object.keys(defaultThemeSeeds).sort()).toEqual(['accent', 'background', 'direction', 'record', 'text']);
+    for (const preset of themePresets) expect(Object.keys(preset.seeds).sort()).toEqual(Object.keys(defaultThemeSeeds).sort());
+    expect(Object.keys(seedsFromHue(200)).sort()).toEqual(Object.keys(defaultThemeSeeds).sort());
+  });
+
+  it('draws the chart ramp on the background’s hue, with a chroma floor for a near-grey page', () => {
+    for (const seeds of [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS)]) {
+      const roles = generateRoles(seeds);
+      for (const role of ['viz1', 'viz2', 'viz3', 'viz4'] as const) {
+        expect(hueDistance(hexToLch(roles[role]).hue, hexToLch(seeds.background).hue)).toBeLessThanOrEqual(10);
+      }
+    }
+    const grey = generateRoles(OTHER_SEEDS.grey);
+    expect(hexToLch(OTHER_SEEDS.grey.background).chroma).toBeLessThan(1);
+    expect(hexToLch(grey.viz4).chroma).toBeGreaterThanOrEqual(11);
+    expect(hexToLch(grey.viz4).chroma).toBeGreaterThan(hexToLch(grey.viz0).chroma + 10);
+  });
+
   it('is what the app ships: the default appearance draws the default seeds, generated', () => {
     expect(rolesFor(DEFAULT_APPEARANCE)).toEqual(generateRoles(defaultThemeSeeds));
   });
@@ -279,6 +310,52 @@ describe('the dark ladder', () => {
   });
 });
 
+// A change's direction (`design-language.md` §2): each pair, or `ink`, on every
+// preset's and every hue theme's grounds, in both modes.
+describe('the change directions', () => {
+  const everyHue = Array.from({ length: 360 }, (_, hue) => seedsFromHue(hue));
+  const allSeeds = [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS), ...everyHue];
+
+  it.each(MODES.flatMap((mode) => THEME_DIRECTIONS.map((direction) => [direction, mode] as const)))(
+    'draws %s legibly as text on `paper` and `surface` in %s mode, for every preset and hue',
+    (direction, mode) => {
+      const failures = allSeeds
+        .map((seeds) => generateRoles({ ...seeds, direction }, mode))
+        .filter((roles) => [roles.gain, roles.loss].some((colour) => [roles.paper, roles.surface].some((ground) => contrastRatio(colour, ground) < 4.5)));
+      expect(failures).toEqual([]);
+    },
+  );
+
+  it.each(MODES)('keeps each colour pair at one L*, two hues well apart, in %s mode', (mode) => {
+    for (const pair of Object.values(DIRECTION_PAIRS)) {
+      const [gain, loss] = [hexToLch(pair[mode].gain), hexToLch(pair[mode].loss)];
+      expect(Math.abs(gain.lightness - loss.lightness)).toBeLessThanOrEqual(1);
+      expect(hueDistance(gain.hue, loss.hue)).toBeGreaterThanOrEqual(90);
+    }
+  });
+
+  it('draws green and crimson by default: every preset, and the values shipped before directions', () => {
+    for (const seeds of Object.values(PRESET_SEEDS)) expect(seeds.direction).toBe('green-crimson');
+    expect(generateRoles(defaultThemeSeeds)).toMatchObject({ gain: '#15703F', loss: '#C01048' });
+    expect(generateRoles(defaultThemeSeeds, 'dark')).toMatchObject({ gain: '#58AC76', loss: '#FF6881' });
+  });
+
+  it('draws blue and orange from the blue-orange direction', () => {
+    const roles = generateRoles({ ...defaultThemeSeeds, direction: 'blue-orange' });
+    expect(hueDistance(hexToLch(roles.gain).hue, 272)).toBeLessThanOrEqual(5);
+    expect(hueDistance(hexToLch(roles.loss).hue, 55)).toBeLessThanOrEqual(5);
+  });
+
+  it.each(MODES)('draws both directions in `ink` under the ink direction, in %s mode, moving nothing else', (mode) => {
+    for (const seeds of [...Object.values(PRESET_SEEDS), ...Object.values(OTHER_SEEDS)]) {
+      const pair = generateRoles(seeds, mode);
+      const ink = generateRoles({ ...seeds, direction: 'ink' }, mode);
+      expect([ink.gain, ink.loss]).toEqual([ink.ink, ink.ink]);
+      expect({ ...ink, gain: pair.gain, loss: pair.loss }).toEqual(pair);
+    }
+  });
+});
+
 // The ground ladder (`design-language.md` §2): a sunken well, the page, a
 // card and a field on a card, in that order of lightness in both modes, for
 // every preset and every one of the 360 hue themes.
@@ -357,8 +434,8 @@ describe('hue seeds', () => {
   it('put both neutrals, the accent and the ramp on the picked hue', () => {
     const seeds = seedsFromHue(200);
     expect(seeds.text).toBe(seeds.background);
-    for (const seed of [seeds.background, seeds.accent, seeds.viz]) {
-      expect(hueDistance(hexToLch(seed).hue, 200)).toBeLessThanOrEqual(3);
+    for (const colour of [seeds.background, seeds.accent, generateRoles(seeds).viz4]) {
+      expect(hueDistance(hexToLch(colour).hue, 200)).toBeLessThanOrEqual(3);
     }
   });
 
@@ -404,9 +481,10 @@ describe('hue seeds', () => {
 // Every role as each preset and custom hue drew it before background and
 // text were separate seeds (`fixtures/theme-roles-light.json`, generated from
 // the one-`ground` generator). An untouched choice must draw the same theme,
-// but for the grounds and hairlines the ground ladder re-stepped, which the
-// calibration above pins instead. `digest` covers the other roles.
-const RESTEPPED_ROLES: readonly string[] = ['paper', 'surface', 'rule', 'ruleSoft'];
+// but for the grounds and hairlines the ground ladder re-stepped and the
+// ramp that now follows the background, which the calibration above pins
+// instead. `digest` covers the other roles.
+const RESTEPPED_ROLES: readonly string[] = ['paper', 'surface', 'rule', 'ruleSoft', 'viz1', 'viz2', 'viz3', 'viz4'];
 const LEGACY_ROLES = (Object.keys(themeRolesLight.presets.warm) as (keyof UiRoles)[]).filter(
   (role) => !RESTEPPED_ROLES.includes(role),
 );
