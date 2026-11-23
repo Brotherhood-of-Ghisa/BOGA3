@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { StatusStrip } from '@/components/navigation/status-strip';
 import { ActionButton } from '@/components/ui/action-button';
 import { IconButton } from '@/components/ui/icon-button';
 import { FigureText } from '@/components/ui/figure-text';
@@ -29,6 +30,7 @@ export function ViewSessionTopBar({ onBack, onOpenOptions, onEdit, title = 'View
   const text = useUiText();
   return (
     <View style={[styles.bar, { paddingTop: insets.top }]} testID="completed-session-detail-top-bar">
+      <StatusStrip height={insets.top} />
       <IconButton accessibilityLabel="Back" name="chevron-left" onPress={onBack} testID="completed-session-detail-back" />
       {/* Shrinks to fit rather than truncate, as the active session's title does. */}
       <Text allowFontScaling={false} accessibilityRole="header" adjustsFontSizeToFit minimumFontScale={0.7}

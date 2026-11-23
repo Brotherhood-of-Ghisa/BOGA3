@@ -104,7 +104,7 @@ const useStyles = makeStyles((roles, mode) => ({
     color: roles.ink,
   },
   contraindicationsBox: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.well,
     padding: uiSpace.sm,
     ...uiCorner('control'),
     gap: uiSpace.xs,

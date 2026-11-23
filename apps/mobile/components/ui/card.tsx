@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import { uiHairline, uiLift } from '@/components/ui/edge';
+import { OnCard } from '@/components/ui/ground';
 import { makeStyles } from '@/components/ui/theme-context';
 
 type CardBaseProps = {
@@ -60,7 +61,7 @@ export function Card({ children, style, testID, onPress, accessibilityLabel, acc
   if (!onPress) {
     return (
       <View accessibilityLabel={accessibilityLabel} style={[styles.card, styles.lift, style]} testID={testID}>
-        {children}
+        <OnCard>{children}</OnCard>
       </View>
     );
   }
@@ -76,7 +77,7 @@ export function Card({ children, style, testID, onPress, accessibilityLabel, acc
         onPress={onPress}
         style={({ pressed }) => [styles.card, styles.fill, pressed ? styles.pressed : null, content]}
         testID={testID}>
-        {children}
+        <OnCard>{children}</OnCard>
       </Pressable>
     </View>
   );
@@ -90,8 +91,8 @@ const useStyles = makeStyles((roles, mode) => ({
   },
   lift: uiLift(roles, mode, { shape: 'card' }),
   fill: { flexGrow: 1 },
-  // Pressed sinks to the page's ground.
+  // Pressed sinks to the well: the card's own inks still read on it.
   pressed: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.well,
   },
 }));

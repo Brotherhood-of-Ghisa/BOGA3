@@ -3,6 +3,7 @@ import { Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 
 import { Card } from '@/components/ui/card';
 import { uiEdge } from '@/components/ui/edge';
+import { useUiGround } from '@/components/ui/ground';
 import { FigureText } from '@/components/ui/figure-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
@@ -34,15 +35,17 @@ export function FormSection({ title, titleAccessory, children, error, errorTestI
   const styles = useStyles();
   const textRoles = useUiText();
   const textTones = useUiTextTone();
+  // The heading and footnote sit on whatever holds the section: the page, or a sheet.
+  const onPage = useUiGround() === 'page';
   const heading = title ? (
-    <Text allowFontScaling={false} accessibilityRole="header" style={textRoles.label}>{title}</Text>
+    <Text allowFontScaling={false} accessibilityRole="header" style={[textRoles.label, onPage ? textTones.pageMuted : null]}>{title}</Text>
   ) : null;
   return (
     <View style={styles.section} testID={testID}>
       {title && titleAccessory ? <View style={styles.heading}>{heading}{titleAccessory}</View> : heading}
       <Card style={error ? styles.cardInvalid : null}>{children}</Card>
       {footnote ? (
-        <Text allowFontScaling={false} style={[textRoles.meta, textTones.muted]} testID={testID ? `${testID}-footnote` : undefined}>
+        <Text allowFontScaling={false} style={[textRoles.meta, onPage ? textTones.pageMuted : textTones.muted]} testID={testID ? `${testID}-footnote` : undefined}>
           {footnote}
         </Text>
       ) : null}

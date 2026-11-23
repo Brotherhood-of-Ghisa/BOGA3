@@ -39,7 +39,7 @@ it('retains selected/own emphasis and the independent row action', () => {
   const open = jest.fn();
   const view = render(<ListRow density="compact" own label="You" onPress={open} testID="row" />);
   expect(screen.getByText('You')).toHaveStyle(textRoles.bodyStrong);
-  expect(screen.getByTestId('row')).toHaveStyle({ minHeight: uiGeometry.tapTarget, backgroundColor: roles.paper });
+  expect(screen.getByTestId('row')).toHaveStyle({ minHeight: uiGeometry.tapTarget, backgroundColor: roles.well });
   fireEvent.press(screen.getByTestId('row'));
   expect(open).toHaveBeenCalledTimes(1);
   view.rerender(<ListRow density="compact" selected label="Selected" testID="row" />);

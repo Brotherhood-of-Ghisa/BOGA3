@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { StatusStrip } from '@/components/navigation/status-strip';
 import { TitleBarTimer, type TitleBarTimerProps } from '@/components/session-recorder/title-bar-timer';
 import { ActionButton } from '@/components/ui/action-button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -100,6 +101,7 @@ export function SessionTopBar(props: SessionTopBarProps) {
     <View
       style={[styles.bar, { paddingTop: insets.top }]}
       testID={props.mode === 'complete' ? 'session-completion-top-bar' : 'session-view-top-bar'}>
+      <StatusStrip height={insets.top} />
       {props.mode === 'active' ? (
         <ActiveTitle now={props.now ?? systemNow} startedAt={props.startedAt} />
       ) : (

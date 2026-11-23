@@ -135,9 +135,9 @@ const useStyles = makeStyles((roles, mode) => ({
   outlineDisabled: {
     borderColor: roles.ruleSoft,
   },
-  // Pressed sinks to the page's ground.
+  // Pressed sinks to the well: the button's own inks still read on it.
   pressed: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.well,
     opacity: 0.7,
   },
   // The full-screen repeating timer's controls: display art, so off the roles

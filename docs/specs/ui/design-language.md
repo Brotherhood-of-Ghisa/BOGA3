@@ -63,13 +63,13 @@ hold whatever the seed. In light mode `accent` and `record` are used as given, s
 their floors are the seed's to meet.
 
 **Two ladders, one set of seeds:** `generateRoles(seeds, mode)`. Each steps
-four grounds, `well` < `paper` < `surface` < `raised` (tracks, page, cards,
-fields on a card), a card ≥ 4 L\* off the page. Ink + paper's third ladder,
+four grounds, `well` < `paper` < `surface` < `raised` (tracks and pressed
+rows, page, cards, fields), a card ≥ 4 L\* off the page. Ink + paper's third ladder,
 one for both modes, sets a `text`-hued page (L\*13) under light-mode
 `background` cards: alone, `paper` < `well` < `surface` < `raised`, as every
-well sits on a card. Page-level text (titles, pager tabs, headers, `Notice`)
-takes `pageInk`, `pageInkMuted`, `pageInkFaint` (4.5 / 4.5 / 3:1 on it);
-elsewhere they are the inks (`ui-page-ink-guard.test.ts`). Light ≈ 90 / 92 / 97 / 100, so
+well sits on a card. Words off a card (`ground.tsx`: titles, tabs, headers,
+`Notice`) take `pageInk`, `pageInkMuted`, `pageInkFaint` (4.5 / 4.5 / 3:1 on
+it); elsewhere these are the inks (`ui-page-ink-guard.test.ts`). Light ≈ 90 / 92 / 97 / 100, so
 `accent` and `record` (L\* ≤ 43) clear 4.5:1 on `paper`; `ink-faint` clears 3:1
 on it and `surface`. Dark ≈ 7 / 10 / 15 / 20, `ink` at L\*95.
 `accent` (L\*72, `onAccent` black) and `record` (L\*66) take their seed's hue;

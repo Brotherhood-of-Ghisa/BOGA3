@@ -51,6 +51,6 @@ const useStyles = makeStyles((roles, mode) => ({
     ...uiEdge(roles, mode, { shape: 'pill' }),
   },
   pressed: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.well,
   },
 }));

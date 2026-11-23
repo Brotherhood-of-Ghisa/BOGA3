@@ -302,10 +302,12 @@ export type UiRoles = {
   pageInk: string;
   pageInkMuted: string;
   pageInkFaint: string;
-  // The four grounds, lightest last in light mode and in dark: `well` is
-  // sunken (the track of a segmented control, a slider or a bar); `paper` the
-  // page, a pressed control and an action strip inside a card; `surface`
-  // cards, sheets and controls; `raised` an input or field drawn on a card.
+  // The four grounds, lightest last in light mode and in dark (Ink + paper
+  // alone lays its dark `paper` lowest): `well` is sunken, on a card or a
+  // control (the track of a segmented control, a slider or a bar; a pressed
+  // row or control; the row that is mine; an action strip inside a card);
+  // `paper` the page; `surface` cards, sheets and controls; `raised` an input
+  // or field drawn on a card.
   well: string;
   paper: string;
   surface: string;

@@ -281,7 +281,8 @@ const useStyles = makeStyles((roles) => ({
   centered: {
     textAlign: 'center',
   },
-  // The captured image: `paper` so it reads as the app does, cards on top.
+  // The captured image: `paper` so it reads as the app does, cards on top;
+  // the words on it in the page inks.
   shareCard: {
     width: '100%',
     padding: uiSpace.lg,
@@ -301,32 +302,32 @@ const useStyles = makeStyles((roles) => ({
     fontSize: uiTypography.size.xl,
     lineHeight: uiTypography.lineHeight.xl,
     letterSpacing: uiTypography.size.xl * uiGeometry.microLabelTracking,
-    color: roles.ink,
+    color: roles.pageInk,
   },
   tagline: {
     ...microLabel,
-    color: roles.inkFaint,
+    color: roles.pageInkFaint,
   },
   shareTitle: {
     fontFamily: uiFonts.display.family,
     fontWeight: '800',
     fontSize: uiTypography.size.xxl,
     lineHeight: uiTypography.lineHeight.xxl,
-    color: roles.ink,
+    color: roles.pageInk,
   },
   totals: {
     fontFamily: uiFonts.figure.family,
     fontWeight: '600',
     fontSize: uiTypography.size.base,
     lineHeight: uiTypography.lineHeight.base,
-    color: roles.ink,
+    color: roles.pageInk,
   },
   meta: {
     fontFamily: uiFonts.figure.family,
     fontWeight: '500',
     fontSize: uiTypography.size.sm,
     lineHeight: uiTypography.lineHeight.sm,
-    color: roles.inkMuted,
+    color: roles.pageInkMuted,
   },
   records: {
     backgroundColor: roles.recordWash,
@@ -378,11 +379,11 @@ const useStyles = makeStyles((roles) => ({
   },
   sectionTitle: {
     ...microLabel,
-    color: roles.inkFaint,
+    color: roles.pageInkFaint,
   },
   madeWith: {
     ...microLabel,
     textAlign: 'center',
-    color: roles.inkFaint,
+    color: roles.pageInkFaint,
   },
 }));

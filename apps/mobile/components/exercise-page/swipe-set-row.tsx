@@ -242,7 +242,7 @@ const useStyles = makeStyles((roles) => ({
     backgroundColor: roles.accentWash,
   },
   washLeft: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.well,
   },
   solidRight: {
     backgroundColor: roles.accent,

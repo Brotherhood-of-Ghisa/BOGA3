@@ -4,7 +4,7 @@ import { Storage } from 'expo-sqlite/kv-store';
 import { createElement } from 'react';
 import { Appearance } from 'react-native';
 
-import { navigationTheme, statusBarStyleFor, useNavigationTheme } from '@/components/navigation/navigation-theme';
+import { navigationTheme, statusBarStyleFor, statusStripGround, useNavigationTheme } from '@/components/navigation/navigation-theme';
 import { defaultThemeSeeds, generateRoles } from '@/components/ui/theme';
 import { APPEARANCE_STORAGE_KEY } from '@/components/ui/theme-launch';
 import { DEFAULT_APPEARANCE, getThemePreset, presetRoles } from '@/components/ui/theme-presets';
@@ -38,6 +38,15 @@ describe('statusBarStyleFor', () => {
     expect(statusBarStyleFor(generateRoles(defaultThemeSeeds, 'light').paper)).toBe('dark');
     expect(statusBarStyleFor(generateRoles(defaultThemeSeeds, 'dark').paper)).toBe('light');
     expect(statusBarStyleFor(presetRoles(getThemePreset('ink-paper'), 'light').paper)).toBe('light');
+  });
+
+  it('keeps a light bar’s own ground behind the clock unless the clock is styled for a dark page', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      const roles = generateRoles(defaultThemeSeeds, mode);
+      expect(statusStripGround(roles, roles.surface)).toBe(roles.surface);
+    }
+    const inkPaper = presetRoles(getThemePreset('ink-paper'), 'light');
+    expect(statusStripGround(inkPaper, inkPaper.surface)).toBe(inkPaper.paper);
   });
 });
 

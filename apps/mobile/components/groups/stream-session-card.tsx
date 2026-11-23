@@ -122,7 +122,7 @@ const useStyles = makeStyles((roles) => ({
     paddingVertical: uiSpace.xs,
   },
   recordPressed: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.well,
   },
   recordExercise: {
     flexShrink: 1,

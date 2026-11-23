@@ -714,9 +714,9 @@ export function ExercisePageScreen({
             accessibilityState={{ busy: isCompleting }}
             disabled={isCompleting}
             onPress={onComplete}
-            style={({ pressed }) => [styles.complete, pressed ? styles.pressed : null]}
+            style={({ pressed }) => [styles.complete, pressed ? styles.completePressed : null]}
             testID="exercise-complete">
-            <Text allowFontScaling={false} style={[text.label, tone.ink]}>Complete exercise</Text>
+            <Text allowFontScaling={false} style={[text.label, tone.page]}>Complete exercise</Text>
           </Pressable>
         </ScreenScroll>
       </KeyboardAvoidingView>
@@ -816,14 +816,14 @@ const useStyles = makeStyles((roles) => ({
     justifyContent: 'center',
     gap: uiSpace.xs,
     minHeight: uiGeometry.tapTarget,
-    backgroundColor: roles.paper,
+    backgroundColor: roles.well,
   },
   addSetDivider: {
     borderTopWidth: uiBorder.width,
     borderTopColor: roles.ruleSoft,
   },
   pressed: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.well,
   },
   // An outline, not a second `accent`: the logger's tick is the screen's one
   // primary (`design-language.md` §5).
@@ -831,6 +831,10 @@ const useStyles = makeStyles((roles) => ({
     minHeight: uiGeometry.tapTarget,
     alignItems: 'center',
     justifyContent: 'center',
-    ...uiHairline(roles, { shape: 'control', tone: 'ink' }),
+    // On the page, below the card: drawn in the page's ink.
+    ...uiHairline(roles, { shape: 'control', tone: 'pageInk' }),
+  },
+  completePressed: {
+    backgroundColor: roles.paper,
   },
 }));

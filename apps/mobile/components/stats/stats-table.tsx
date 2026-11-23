@@ -132,7 +132,7 @@ const useStyles = makeStyles((roles) => ({
   numericSortHeader: { flexDirection: 'row-reverse', justifyContent: 'flex-start' },
   family: { paddingTop: uiSpace.md, paddingBottom: uiSpace.sm,
     paddingHorizontal: uiSpace.md, borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft },
-  pressed: { backgroundColor: roles.paper },
+  pressed: { backgroundColor: roles.well },
   indicator: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.xs },
   recency: { width: 64 },
   hidden: { opacity: 0 },

@@ -38,3 +38,9 @@ export function useNavigationTheme(): Theme {
 export function statusBarStyleFor(paper: string): 'dark' | 'light' {
   return hexToLch(paper).lightness < 50 ? 'light' : 'dark';
 }
+
+// The ground behind the status bar over a bar drawn in `ground`: the bar's own
+// where the clock, styled for the page, reads on it; else the page's.
+export function statusStripGround(roles: UiRoles, ground: string): string {
+  return statusBarStyleFor(ground) === statusBarStyleFor(roles.paper) ? ground : roles.paper;
+}

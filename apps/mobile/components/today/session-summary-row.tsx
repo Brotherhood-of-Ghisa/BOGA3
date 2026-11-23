@@ -118,9 +118,9 @@ const useStyles = makeStyles((roles) => ({
     gap: uiSpace.md,
     minHeight: uiGeometry.tapTarget,
   },
-  // A pressed row takes the `paper` ground, as `ListRow` does.
+  // A pressed row takes the `well` ground, as `ListRow` does.
   pressed: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.well,
   },
   copy: {
     flex: 1,

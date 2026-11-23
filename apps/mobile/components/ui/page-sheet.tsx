@@ -11,6 +11,7 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OnCard } from '@/components/ui/ground';
 import { IconButton } from '@/components/ui/icon-button';
 import { useUiText } from '@/components/ui/text-roles';
 import { makeStyles } from '@/components/ui/theme-context';
@@ -226,10 +227,10 @@ export function PageSheet({
               keyboardVerticalOffset={keyboardOffset}
               style={styles.body}
               testID={testID ? `${testID}-keyboard` : undefined}>
-              {children}
+              <OnCard>{children}</OnCard>
             </KeyboardAvoidingView>
           ) : (
-            children
+            <OnCard>{children}</OnCard>
           )}
         </View>
       </GestureHandlerRootView>

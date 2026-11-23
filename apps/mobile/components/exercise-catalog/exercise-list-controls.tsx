@@ -332,7 +332,7 @@ const useStyles = makeStyles((roles, mode) => ({
     ...uiEdge(roles, mode, { shape: 'pill', tone: 'ink' }),
   },
   chipPressed: {
-    backgroundColor: roles.paper,
+    backgroundColor: roles.well,
   },
   // The ink pill's label: no text tone draws on ink, so the selected chip takes
   // the on-ink colour here.

@@ -250,7 +250,7 @@ the phone live. Native UI (alerts, keyboard, date picker)
 draws in the same mode (decision register,
 `docs/specs/03-technical-architecture.md`). Presets, seeds and the live rule
 are `design-language.md` "Choosing one". The date picker and navigators take
-`useUiMode()`, the status bar the page's lightness, never a fixed mode or colour
+`useUiMode()`, the status bar the page's lightness (`status-strip.tsx`), never a fixed mode or colour
 (`apps/mobile/__tests__/ui-mode-literal-guard.test.ts`). The splash stays white
 (`app.config.ts`). The stack header takes `paper` (no shadow line) and `pageInk`,
 so header and page read as one surface ("Pages").
