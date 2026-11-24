@@ -12,17 +12,21 @@ type ThemePreviewProps = {
   testID?: string;
 };
 
-// The mock's two sets and their 1RM through the real formula ([[1rm.formula]]):
-// a performed 80 × 8 and a planned 82.5 × 8 ([[set.row-figures]]).
-// The header counts the one performed set ([[set.count-display]]).
+// The mock's three sets and their 1RM through the real formula
+// ([[1rm.formula]]): a performed 80 × 8, an 82.5 × 8 being edited and a
+// planned 85 × 8, its figures faded ([[set.row-figures]]). The header counts
+// the one performed set ([[set.count-display]]).
 const oneRepMax = (weight: number, reps: number) => formatOneRepMax(estimateOneRepMax(weight, reps)!);
-const PREVIEW_ONE_REP_MAX = { performed: oneRepMax(80, 8), planned: oneRepMax(82.5, 8) };
+const PREVIEW_ONE_REP_MAX = { performed: oneRepMax(80, 8), editing: oneRepMax(82.5, 8), planned: oneRepMax(85, 8) };
 
 const HEATMAP: (keyof UiRoles)[] = ['viz0', 'viz2', 'viz1', 'viz0', 'viz3', 'viz4', 'viz2', 'viz0', 'viz1', 'viz3', 'viz4', 'viz0'];
 
 // A small mock of the app drawn in another theme's roles: the screens are drawn
 // in the saved theme, so the preview cannot reuse their colours. Every colour
-// here comes from `roles`; the layout comes from the shared tokens.
+// here comes from `roles`; the layout comes from the shared tokens. Each
+// custom part shows at a size that reads: the secondary text as the header's
+// line and the figures beside each set, the muted text as a planned set's
+// figures, the direction as a change up and one down.
 export function ThemePreview({ roles, testID }: ThemePreviewProps) {
   const type = useUiText();
   const tone = useUiTextTone();
@@ -38,19 +42,19 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
           <Text allowFontScaling={false} style={[type.title, text(roles.ink)]}>
             Bench Press
           </Text>
-          <Text allowFontScaling={false} style={[type.meta, text(roles.inkMuted)]}>
+          <Text allowFontScaling={false} style={[type.body, text(roles.inkMuted)]} testID={testID ? `${testID}-secondary` : undefined}>
             <FigureText>{`1 set · 1RM ${PREVIEW_ONE_REP_MAX.performed}`}</FigureText>
           </Text>
         </View>
         <View style={[styles.setRow, { borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft }]}>
-          <Text allowFontScaling={false} style={[type.figure, styles.setIndex, text(roles.inkFaint)]}>
+          <Text allowFontScaling={false} style={[type.figure, styles.setIndex, text(roles.inkMuted)]}>
             1
           </Text>
           <Text allowFontScaling={false} style={[type.figure, styles.figureCell, text(roles.ink)]}>
             80 × 8
           </Text>
-          <Text allowFontScaling={false} style={[type.meta, text(roles.inkFaint)]}>
-            <FigureText>{`1RM ${PREVIEW_ONE_REP_MAX.performed}`}</FigureText>
+          <Text allowFontScaling={false} style={[type.body, text(roles.inkMuted)]}>
+            <FigureText>{PREVIEW_ONE_REP_MAX.performed}</FigureText>
           </Text>
         </View>
         <View style={[styles.setRow, { borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft, backgroundColor: roles.accentWash }]}>
@@ -60,8 +64,19 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
           <Text allowFontScaling={false} style={[type.figure, styles.figureCell, text(roles.ink)]}>
             82.5 × 8
           </Text>
-          <Text allowFontScaling={false} style={[type.meta, text(roles.inkFaint)]}>
-            <FigureText>{`1RM ${PREVIEW_ONE_REP_MAX.planned}`}</FigureText>
+          <Text allowFontScaling={false} style={[type.body, text(roles.inkMuted)]}>
+            <FigureText>{PREVIEW_ONE_REP_MAX.editing}</FigureText>
+          </Text>
+        </View>
+        <View style={[styles.setRow, { borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft }]} testID={testID ? `${testID}-planned` : undefined}>
+          <Text allowFontScaling={false} style={[type.figure, styles.setIndex, text(roles.inkFaint)]}>
+            3
+          </Text>
+          <Text allowFontScaling={false} style={[type.figure, styles.figureCell, text(roles.inkFaint)]}>
+            85 × 8
+          </Text>
+          <Text allowFontScaling={false} style={[type.body, text(roles.inkFaint)]}>
+            <FigureText>{PREVIEW_ONE_REP_MAX.planned}</FigureText>
           </Text>
         </View>
         <View style={[styles.record, { backgroundColor: roles.recordWash, borderTopWidth: uiBorder.width, borderTopColor: roles.ruleSoft }]}>
@@ -72,6 +87,17 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
             105.0
           </Text>
         </View>
+      </View>
+      <View style={styles.changes} testID={testID ? `${testID}-changes` : undefined}>
+        <Text allowFontScaling={false} style={[type.body, styles.figureCell, text(roles.pageInkMuted)]}>
+          Since last week
+        </Text>
+        <Text allowFontScaling={false} style={[type.figure, text(roles.gain)]}>
+          <FigureText>+2.5</FigureText>
+        </Text>
+        <Text allowFontScaling={false} style={[type.figure, text(roles.loss)]}>
+          <FigureText>−1</FigureText>
+        </Text>
       </View>
       <View style={styles.heatmap}>
         {HEATMAP.map((role, index) => (
@@ -317,6 +343,11 @@ const styles = StyleSheet.create({
   },
   recordFigure: {
     textAlign: 'right',
+  },
+  changes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: uiSpace.md,
   },
   heatmap: {
     flexDirection: 'row',

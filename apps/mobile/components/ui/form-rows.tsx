@@ -5,8 +5,10 @@ import { FigureText } from '@/components/ui/figure-text';
 import { Icon, type IconName } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
 import { SegmentedControl, type SegmentedControlOption } from '@/components/ui/segmented-control';
+import { uiHairline } from '@/components/ui/edge';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
-import { uiSpace } from '@/components/ui/tokens';
+import { useUiRoles } from '@/components/ui/theme-context';
+import { uiGeometry, uiSpace } from '@/components/ui/tokens';
 
 // The rest of the Settings row vocabulary (`ux-rules.md` "Forms"), beside the
 // rows of `form-section.tsx`: all at `ListRow`'s list density, label left,
@@ -115,6 +117,10 @@ export type ValueRowProps = {
   // longer reads as one element, which would hide the value from the flow.
   valueTestID?: string;
   valueIconTestID?: string;
+  // A colour shown as a swatch before the value (a colour picker's choice,
+  // the value its hex), on a hairline so a colour like the ground still shows.
+  valueSwatch?: string;
+  valueSwatchTestID?: string;
   // `danger`: the value is a failure (an error row), in `danger` words.
   tone?: 'default' | 'danger';
   divider?: boolean;
@@ -124,8 +130,9 @@ export type ValueRowProps = {
 
 /** A read-only figure or status: the label and its value (a sentence wraps), no chevron, read as one element. */
 export function ValueRow({
-  label, value, valueIcon, valueTestID, valueIconTestID, tone = 'default', divider = false, accessibilityLabel, testID,
+  label, value, valueIcon, valueTestID, valueIconTestID, valueSwatch, valueSwatchTestID, tone = 'default', divider = false, accessibilityLabel, testID,
 }: ValueRowProps) {
+  const roles = useUiRoles();
   const textRoles = useUiText();
   const textTones = useUiTextTone();
   return (
@@ -138,6 +145,9 @@ export function ValueRow({
       meta={
         <View style={styles.valueGroup}>
           {valueIcon ? <Icon colorRole="inkMuted" name={valueIcon} size="sm" testID={valueIconTestID} /> : null}
+          {valueSwatch ? (
+            <View style={[styles.swatch, { backgroundColor: valueSwatch, ...uiHairline(roles, { shape: 'control' }) }]} testID={valueSwatchTestID} />
+          ) : null}
           <Text
             allowFontScaling={false}
             accessibilityLiveRegion={tone === 'danger' ? 'polite' : undefined}
@@ -163,6 +173,10 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     gap: uiSpace.xs,
     maxWidth: '60%',
+  },
+  swatch: {
+    width: uiGeometry.tapTarget * 2,
+    height: (uiGeometry.tapTarget * 2) / 3,
   },
   value: {
     flexShrink: 1,

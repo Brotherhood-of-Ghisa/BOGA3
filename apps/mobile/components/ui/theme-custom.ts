@@ -21,7 +21,9 @@ import { normaliseHue } from '@/components/ui/theme-hue';
 // picks a hue and a strength for each of the four colour seeds, for the
 // highlight (`accentWash`) and for the three inks (which presets step from the
 // text seed); the page's mode, lightness, depth and borders; the inks', the
-// accent's and the best ever's L*; the highlight's contrast; the chart ramp's
+// accent's, the best ever's and an unmatched highlight's L* (each over the
+// whole range, so every sRGB colour is reachable); a matching highlight's
+// contrast; the chart ramp's
 // ends, or the page's ramp, and solid bars; and the direction. Everything else
 // is derived. No readability floor is gated here — only the presets are
 // hand-checked.
@@ -46,8 +48,11 @@ export type CustomBackground = HueStrength & Tinted & { mode: ThemeMode; lightne
 // The highlight: `accentWash`, the band behind the row being edited, the
 // current set and today's plan. The accent's hue and strength while `match`,
 // else its own, a share of the most chroma its ladder's L* holds; `contrast`
-// (0–300) is a percentage of its shipped step from the page.
-export type CustomHighlight = HueStrength & { match: boolean; contrast: number };
+// (0–300) is a percentage of its shipped step from the page. A highlight of
+// its own may have its own L* (`lightness`, 0–100): its strength is then a
+// share of the most chroma there, hue and strength unrounded like an
+// `OwnInk`, and `contrast` does not move it. Absent, it draws as before.
+export type CustomHighlight = HueStrength & { match: boolean; contrast: number; lightness?: number };
 // Primary text: `ink` alone, at its own L*.
 export type CustomInk = HueStrength & { lightness: number };
 // The text seed, which no page edits any more: its hue and strength, and
@@ -120,12 +125,6 @@ export const TEXT_CONTRAST_MAX = 150;
 export const HIGHLIGHT_CONTRAST_MAX = 300;
 export const DEFAULT_CONTRAST = 100;
 
-export type LightnessRange = { min: number; max: number };
-// The useful L* of each mode's page and primary text: a dark page and pale
-// text, or a pale page and dark text. A theme saved outside its range keeps
-// its value until it is moved.
-export const PAGE_RANGE: Record<ThemeMode, LightnessRange> = { dark: { min: 0, max: 35 }, light: { min: 65, max: 100 } };
-export const INK_RANGE: Record<ThemeMode, LightnessRange> = { dark: { min: 60, max: 100 }, light: { min: 0, max: 40 } };
 // Where a page lands when its mode is switched, or a preset is first made
 // custom: the ladder's `paper`.
 export const PAGE_DEFAULT: Record<ThemeMode, number> = { dark: paperLightness('dark'), light: paperLightness('light') };
@@ -165,6 +164,22 @@ export function customSeeds(colours: CustomColours): ThemeSeeds {
 
 // The most chroma sRGB holds at an L* and hue.
 const gamut = (lightness: number, hue: number): number => hexToLch(lchToHex({ lightness, chroma: 150, hue })).chroma;
+
+// A hue at its most vivid: the most chroma sRGB holds at that hue, at the L*
+// that holds it (whole L*s). What a hue picker paints, whatever the part's L*.
+const vivid = new Map<number, string>();
+export function vividColour(hue: number): string {
+  const known = vivid.get(hue);
+  if (known !== undefined) return known;
+  let best = { lightness: 50, chroma: 0 };
+  for (let lightness = 1; lightness < LIGHTNESS_MAX; lightness += 1) {
+    const chroma = gamut(lightness, hue);
+    if (chroma > best.chroma) best = { lightness, chroma };
+  }
+  const colour = lchToHex({ ...best, hue });
+  vivid.set(hue, colour);
+  return colour;
+}
 
 // Whether every strength is a share of the most chroma its part's L* holds.
 export const isGamutScaled = ({ scale }: Pick<CustomColours, 'scale'>): boolean => scale === GAMUT_SCALE;
@@ -514,6 +529,7 @@ export function generateCustomRoles(colours: CustomColours): UiRoles {
     ...moved,
     ...(atLadder ? {} : { ink: gamutColour(colours.ink.lightness, colours.ink) }),
     ...ownInkRoles(colours),
+    ...ownHighlightRole(colours),
     ...gamutRoles(colours),
     ...(colours.chart === undefined || colours.chart.follow ? {} : chartRamp(colours.chart)),
   };
@@ -535,6 +551,31 @@ function ownInkRoles({ secondary, muted }: CustomColours): Partial<UiRoles> {
     ...(secondary === undefined ? {} : { inkMuted: gamutColour(secondary.lightness, secondary) }),
     ...(muted === undefined ? {} : { inkFaint: gamutColour(muted.lightness, muted) }),
   };
+}
+
+// A highlight of its own at its own L*, which its contrast does not move.
+function ownHighlightRole({ highlight }: CustomColours): Partial<UiRoles> {
+  return highlight.match || highlight.lightness === undefined ? {} : { accentWash: gamutColour(highlight.lightness, highlight) };
+}
+
+// The highlight as the editor shows it: matching the accent, or at its own
+// L*, as stored; else at the L* and strength (unrounded, its hue kept) it
+// draws now, so storing that repaints nothing.
+export function highlightOf(colours: CustomColours): CustomHighlight {
+  const { highlight } = colours;
+  if (highlight.match || highlight.lightness !== undefined) return highlight;
+  const { lightness, chroma } = hexToLch(generateCustomRoles(colours).accentWash);
+  const at = clamp(lightness);
+  return { ...highlight, strength: shareAt(at, highlight.hue, chroma), lightness: at };
+}
+
+// A highlight without its own L*: drawn at the ladder's wash, moved by its
+// contrast, its hue and strength whole as such a highlight is stored (one at
+// its own L* holds them unrounded).
+export function washHighlight(highlight: CustomHighlight): CustomHighlight {
+  if (highlight.lightness === undefined) return highlight;
+  const { lightness: _lightness, hue, strength, ...rest } = highlight;
+  return { ...rest, hue: Math.round(hue) % 360, strength: Math.round(strength) };
 }
 
 // The custom colours nearest a theme's seeds, drawn on a mode: each seed's hue
@@ -655,9 +696,12 @@ function parseChart(value: unknown): CustomChart | null | undefined {
   return isBoolean(follow) && isBoolean(solid) && start !== null && end !== null ? { follow, solid, start, end } : null;
 }
 
+// A highlight; with its own L*, its hue and strength unrounded (`OwnInk`).
 function parseHighlight(value: unknown): CustomHighlight | null {
-  const colour = parseHueStrength(value);
-  if (colour === null || !isFields(value)) return null;
+  if (!isFields(value)) return null;
+  const own = value.lightness === undefined ? null : parseOwnInk(value);
+  const colour = value.lightness === undefined ? parseHueStrength(value) : own;
+  if (colour === null) return null;
   const { match, contrast } = value;
   return isBoolean(match) && isInteger(HIGHLIGHT_CONTRAST_MAX)(contrast) ? { ...colour, match, contrast } : null;
 }

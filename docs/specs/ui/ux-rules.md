@@ -258,11 +258,11 @@ Settings → Appearance: Theme (seven presets and Custom as radio rows with
 swatches; Custom folds presets behind `Show presets`), then Mode (Light, Dark,
 System) for a preset ([[appearance.ink-paper-mode]]) or one row per Custom
 part, then a live `ThemePreview`. A part's picker (its title switches part): a
-painted hue `SliderRow`, strength, then its own controls (background: Dark
-switch, lightness over the mode's range, depth, borders; highlight: Match
-accent, contrast; texts, accent, best ever: lightness); Chart instead Follow
-background, else Start/End hue, strength, lightness, Solid bars; Direction
-radios alone; the part's roles; the preview. A tap, release or switch saves at
+Colour row (swatch, hex); hue (every hue at its most vivid), strength (grey →
+full), lightness 0–100 (black → white), bars painted at the colour's other
+values; background adds Dark, depth, borders; highlight Match accent (on:
+contrast only); Chart: Follow background, else both ends, Solid bars;
+Direction radios; roles; preview. A tap, release or switch saves at
 once (nothing when already stored) and the app repaints; a header spinner
 shows until then. A failed save is logged and shows a danger `Notice`: nothing
 changed. Settings home names the choice.

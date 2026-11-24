@@ -102,6 +102,12 @@ describe('CheckRow', () => {
 });
 
 describe('ValueRow', () => {
+  it('shows a colour as a swatch before its value', () => {
+    const view = render(<ValueRow label="Colour" testID="colour" value="#FF0000" valueSwatch="#FF0000" valueSwatchTestID="colour-swatch" />);
+    expect(StyleSheet.flatten(view.getByTestId('colour-swatch').props.style).backgroundColor).toBe('#FF0000');
+    expect(view.getByTestId('colour')).toHaveTextContent('Colour#FF0000');
+  });
+
   it('reads its label and value as one element, with no chevron and nothing to press', () => {
     const view = render(<ValueRow label="Last backup" testID="value" value="Today, 09:41" />);
     expect(screen.getByLabelText('Last backup: Today, 09:41')).toBeOnTheScreen();
