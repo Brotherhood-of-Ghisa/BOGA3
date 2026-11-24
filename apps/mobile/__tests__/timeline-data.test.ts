@@ -149,6 +149,33 @@ describe('timelineGeometry', () => {
     expect(Math.max(...geometry.months.map(month => month.x)) + MONTH_LABEL_WIDTH).toBeLessThanOrEqual(geometry.width);
   });
 
+  it('spaces landscape labels further apart as more weeks fit on the plot', () => {
+    const long = series([], 'totalVolume', 520);
+    const plotWidth = 440;
+    const geometry = (span: number) => timelineGeometry(long, plotWidth, 100, { start: long.weeks.length - span, span });
+
+    expect(geometry(52).months.some(month => month.label === 'Aug')).toBe(true);
+    expect(geometry(130).months.map(month => month.label)).toContain('Apr');
+    expect(geometry(130).months.map(month => month.label)).not.toContain('May');
+    expect(geometry(260).months.map(month => month.label)).toContain('Jul');
+    expect(geometry(260).months.map(month => month.label)).not.toContain('Apr');
+
+    const full = geometry(long.weeks.length);
+    expect(full.months.map(month => month.year)).toEqual([2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]);
+    full.months.forEach(({ x }, index) => {
+      expect(x).toBeLessThanOrEqual(plotWidth - MONTH_LABEL_WIDTH);
+      if (index > 0) expect(x - full.months[index - 1].x).toBeGreaterThanOrEqual(MONTH_LABEL_WIDTH);
+    });
+  });
+
+  it('keeps adjacent bars in their own weeks even in a sub-point column', () => {
+    const long = series([day('2026-09-28'), day('2026-10-05')], 'totalVolume', 520);
+    const geometry = timelineGeometry(long, 300, 100, { start: 0, span: long.weeks.length });
+    const [earlier, later] = geometry.bars;
+    expect(earlier.width).toBeLessThanOrEqual(geometry.columnWidth);
+    expect(earlier.x + earlier.width).toBeCloseTo(later.x);
+  });
+
   it('draws a column with a rounded top and a square baseline', () => {
     expect(barPath({ weekStartDateKey: 'w', index: 0, x: 2, y: 10, width: 8, height: 30 }))
       .toBe('M 2,40V14Q2,10 6,10H6Q10,10 10,14V40Z');

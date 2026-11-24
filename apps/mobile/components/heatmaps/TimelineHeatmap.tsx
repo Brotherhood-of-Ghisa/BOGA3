@@ -11,7 +11,7 @@ import type { ExerciseDateFormat } from '@/src/preferences/model';
 // `children` (the week's sets) follow the chart. The page's ⋮ opens that week's
 // sessions. VoiceOver reads the plot as one adjustable element stepping through
 // weeks. The landscape viewport can pan and zoom horizontally. Pinches settle
-// on whole weeks and the zoom buttons move one week at a time.
+// on whole weeks and the buttons take larger steps beyond the one-year overview.
 import React, { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Pressable,
