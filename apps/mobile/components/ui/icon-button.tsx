@@ -1,4 +1,5 @@
-import { Pressable } from 'react-native';
+import type { Ref } from 'react';
+import { Pressable, type ViewInstance } from 'react-native';
 import { Touchable } from 'react-native-gesture-handler';
 
 import { useUiGround } from '@/components/ui/ground';
@@ -25,6 +26,7 @@ export type IconButtonProps = {
   testID?: string;
   /** Use a native control inside UIKit headers, which otherwise also scroll on tap. */
   nativeHeader?: boolean;
+  ref?: Ref<ViewInstance>;
 };
 
 const GLYPH_ROLE: Record<IconButtonTone, UiRoleToken> = {
@@ -55,6 +57,7 @@ export function IconButton({
   accessibilityHint,
   testID,
   nativeHeader = false,
+  ref,
 }: IconButtonProps) {
   const styles = useStyles();
   const roles = useUiRoles();
@@ -74,6 +77,7 @@ export function IconButton({
   );
   return (
     <Pressable
+      ref={ref}
       accessibilityHint={accessibilityHint}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"

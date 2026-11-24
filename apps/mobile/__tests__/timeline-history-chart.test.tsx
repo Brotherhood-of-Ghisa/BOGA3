@@ -1,4 +1,5 @@
 import React from 'react';
+import { TimelineDetailsWindow } from '@/components/stats/timeline-details-window';
 import { fireEvent, screen } from '@testing-library/react-native';
 
 import { TimelineHeatmap, buildHeatmapData } from '@/components/heatmaps';
@@ -201,4 +202,34 @@ it('labels months at the first week starting in each, which wider columns all ha
   expect(screen.getByTestId(`${ID}-month-7`)).toHaveTextContent('Aug');
   expect(screen.getByTestId(`${ID}-month-12`)).toHaveTextContent('Sep');
   expect(screen.getByTestId(`${ID}-month-16`)).toHaveTextContent('Oct');
+});
+
+it('keeps a moved details window inside the chart when its content grows', () => {
+  const area = { width: 280, height: 240, initialX: 120, maxX: 120 };
+  const window = () => (
+    <TimelineDetailsWindow area={area} heading="24-11-2026" gym="Canal Street Gym" onClose={jest.fn()} testID="week-details">
+      <Text>Session sets</Text>
+    </TimelineDetailsWindow>
+  );
+  const { rerender } = renderWithTheme(window());
+  const control = screen.getByTestId('week-details-move');
+  expect(control).toHaveAccessibleName('24-11-2026, Canal Street Gym, Move week details');
+  const move = (actionName: string) => fireEvent(control, 'accessibilityAction', { nativeEvent: { actionName } });
+  const measure = (height: number) => fireEvent(screen.getByTestId('week-details-position'), 'layout', { nativeEvent: { layout: { height } } });
+  const expectPosition = (x: number, y: number) => {
+    rerender(window());
+    expect(screen.getByTestId('week-details-position')).toHaveStyle({ transform: [{ translateX: x }, { translateY: y }] });
+  };
+
+  measure(160);
+  move('moveRight');
+  expectPosition(120, 0);
+  move('moveLeft');
+  move('moveDown');
+  move('moveDown');
+  expectPosition(76, 80);
+  measure(220);
+  expectPosition(76, 20);
+  move('moveUp');
+  expectPosition(76, 0);
 });

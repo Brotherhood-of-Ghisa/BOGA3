@@ -19,6 +19,7 @@ import {
   Text,
   View,
   type AccessibilityActionEvent,
+  type AccessibilityActionInfo,
   type GestureResponderEvent,
   type LayoutChangeEvent,
   type ScrollViewInstance,
@@ -42,6 +43,8 @@ import {
   type TimelineWeek,
 } from './timeline';
 
+export type TimelineDetailsArea = { width: number; height: number; initialX: number; maxX: number };
+
 interface Props {
   data: HeatmapData;
   metric: CalendarHeatmapMetric;
@@ -55,9 +58,18 @@ interface Props {
   unitLabel: (value: number) => string;
   header?: ReactNode;
   children?: ReactNode;
+  display?: {
+    expanded: boolean;
+    action?: ReactNode;
+    onInspect?: () => void;
+    details?: (area: TimelineDetailsArea) => ReactNode;
+  };
 }
 
 const PLOT_HEIGHT = 160;
+const OVERLAY_TOP = uiGeometry.tapTarget + uiSpace.lg + uiSpace.md;
+const MONTH_AXIS_HEIGHT = uiTypography.lineHeight.xxs * 2 + uiSpace.xs;
+const LANDSCAPE_CHART_INSETS = uiSpace.lg * 2 + uiGeometry.tapTarget + uiSpace.md + uiSpace.xs + MONTH_AXIS_HEIGHT;
 // Until the first layout pass reports the plot's width (and in Jest, where
 // none runs): roughly a 390pt phone's plot beside its axis.
 const FALLBACK_PLOT_WIDTH = 300;
@@ -91,9 +103,9 @@ const TITLE_FIGURE = { fontWeight: uiTypography.weight.bold };
 
 // The focused week, its figure, and the two steps away from it. The label is
 // read by neither arrow nor plot: the plot's adjustable value speaks for it.
-function Readout({ week, figure, onStep, hasPrevious, hasNext, testID }: {
+function Readout({ week, figure, onStep, hasPrevious, hasNext, testID, action }: {
   week: TimelineWeek; figure: Figure;
-  onStep: (delta: number) => void; hasPrevious: boolean; hasNext: boolean; testID: string;
+  onStep: (delta: number) => void; hasPrevious: boolean; hasNext: boolean; testID: string; action?: ReactNode;
 }) {
   const dateFormat = useDateFormat();
   const text = useUiText();
@@ -109,23 +121,26 @@ function Readout({ week, figure, onStep, hasPrevious, hasNext, testID }: {
       <IconButton accessibilityLabel="Next week" disabled={!hasNext} name="chevron-right"
         onPress={() => onStep(1)} testID={`${testID}-next-week`} />
     </View>
-    <Text importantForAccessibility="no" accessibilityElementsHidden allowFontScaling={false}
-      style={[text.figureLarge, tone.ink]} testID={`${testID}-readout-value`}>
-      {figure.value}{figure.unit ? <Text allowFontScaling={false} style={[text.label, tone.faint]}> {figure.unit}</Text> : null}
-    </Text>
+    <View style={styles.readoutEnd}>
+      <Text importantForAccessibility="no" accessibilityElementsHidden allowFontScaling={false}
+        style={[text.figureLarge, tone.ink]} testID={`${testID}-readout-value`}>
+        {figure.value}{figure.unit ? <Text allowFontScaling={false} style={[text.label, tone.faint]}> {figure.unit}</Text> : null}
+      </Text>
+      {action}
+    </View>
   </View>;
 }
 
 export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, testIDPrefix, formatValue,
-  metricLabel, unitLabel, header, children }: Props) {
+  metricLabel, unitLabel, header, children, display }: Props) {
   const dateFormat = useDateFormat();
   const text = useUiText();
   const tone = useUiGroundTone();
   const testID = `${testIDPrefix}-timeline`;
   const series = useMemo(() => buildTimelineSeries(data.weekly, metric), [data.weekly, metric]);
-  const [plotWidth, setPlotWidth] = useState(FALLBACK_PLOT_WIDTH);
-  const scroll = useRef<ScrollViewInstance>(null);
-  const geometry = useMemo(() => timelineGeometry(series, plotWidth, PLOT_HEIGHT), [series, plotWidth]);
+  const viewport = useTimelineViewport(display?.expanded === true);
+  const { plotWidth, plotHeight, scroll, scrollX } = viewport;
+  const geometry = useMemo(() => timelineGeometry(series, plotWidth, plotHeight), [series, plotWidth, plotHeight]);
   const weeks = series.weeks;
   const selectedIndex = weeks.findIndex(week => week.weekStartDateKey === selectedWeekKey);
   // One week is always focused, so the readout, the band, the `ink` column and
@@ -138,16 +153,13 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
   const tickLabels = geometry.ticks.map(tick => Number.isInteger(tick.value) ? String(tick.value) : formatValue(tick.value));
   const axisWidth = Math.ceil(Math.max(uiSpace.lg, ...tickLabels.map(label => label.length * TICK_CHAR_WIDTH)) + uiSpace.xs);
 
-  const onLayout = (event: LayoutChangeEvent) => {
-    const measured = Math.round(event.nativeEvent.layout.width);
-    if (measured > 0 && measured !== plotWidth) setPlotWidth(measured);
-  };
   const onPress = (event: GestureResponderEvent) => {
     const x = event.nativeEvent.locationX;
     // A VoiceOver double tap presses the whole plot with no location: the
     // announced week is the focused one already, so nothing moves.
     if (weeks.length === 0 || !Number.isFinite(x)) return;
     onSelectWeek(weeks[timelineWeekIndexAt(x, geometry.columnWidth, weeks.length)].weekStartDateKey);
+    display?.onInspect?.();
   };
   // The arrows walk the window one week at a time and bring their week into
   // view, which a tap never needs to: it landed on a visible column.
@@ -162,44 +174,94 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
       });
     }
   };
-  // Swipes step through weeks.
-  const onAccessibilityAction = (event: AccessibilityActionEvent) =>
-    onStep(event.nativeEvent.actionName === 'increment' ? 1 : -1);
+  const onAccessibilityAction = (event: AccessibilityActionEvent) => {
+    const { actionName } = event.nativeEvent;
+    if (actionName === 'showDetails') display?.onInspect?.();
+    else onStep(actionName === 'increment' ? 1 : -1);
+  };
+  const actions: AccessibilityActionInfo[] = [{ name: 'increment' }, { name: 'decrement' }];
+  if (display?.onInspect) actions.push({ name: 'showDetails', label: 'Show week details' });
+  const selectedCenter = (focusedIndex + 0.5) * geometry.columnWidth - scrollX;
+  const windowWidth = plotWidth < 420 ? plotWidth : Math.min(360, Math.max(240, (plotWidth - geometry.columnWidth) / 2 - uiSpace.xs));
+  const maxX = plotWidth - windowWidth;
+  const detailsArea = {
+    width: windowWidth, height: Math.max(uiGeometry.tapTarget, viewport.height - OVERLAY_TOP - uiSpace.sm), maxX,
+    initialX: selectedCenter < plotWidth / 2 ? maxX : 0,
+  };
 
-  return <ScrollView style={styles.scroll} contentContainerStyle={styles.content} testID={testID}>
-    {header}
-    {focused && figure ? <Readout week={focused} figure={figure} onStep={onStep}
-      hasPrevious={focusedIndex > 0} hasNext={focusedIndex < weeks.length - 1}
-      testID={testID} /> : null}
-    <View style={styles.chartRow}>
-      <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={[styles.axis, { width: axisWidth }]}>
-        {geometry.ticks.map((tick, index) => <Text key={tick.value} allowFontScaling={false} numberOfLines={1}
-          style={[text.label, tone.faint, styles.tick, { top: tick.y - uiTypography.lineHeight.xxs / 2 }]}
-          testID={`${testID}-tick-${tick.value}`}>{tickLabels[index]}</Text>)}
-      </View>
-      <View style={styles.plot} onLayout={onLayout}>
-        <ScrollView ref={scroll} horizontal scrollEnabled={overflows} showsHorizontalScrollIndicator={false}
-          onContentSizeChange={() => { if (overflows) scroll.current?.scrollToEnd({ animated: false }); }}
-          testID={`${testID}-scroll`}>
-          <Pressable accessible accessibilityRole="adjustable"
-            accessibilityLabel={`${metricLabel} by week, ${weeks.length} weeks`}
-            accessibilityValue={focused && figure ? { text: weekDescription(focused, figure, metricLabel, dateFormat) } : undefined}
-            accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-            onAccessibilityAction={onAccessibilityAction}
-            onPress={onPress} testID={`${testID}-plot`} style={{ width: geometry.width }}>
-            <TimelinePlot geometry={geometry} focusedIndex={focusedIndex} testID={testID} />
-            <View pointerEvents="none" style={styles.months}>
-              {geometry.months.map(month => <View key={month.index} style={[styles.month, { left: month.x }]}>
-                <Text allowFontScaling={false} style={[text.label, tone.faint]} testID={`${testID}-month-${month.index}`}>{month.label}</Text>
-                {month.year === undefined ? null : <Text allowFontScaling={false} style={[text.label, tone.faint]}>{month.year}</Text>}
-              </View>)}
-            </View>
-          </Pressable>
-        </ScrollView>
-      </View>
+  return (
+    <View style={styles.scroll} onLayout={viewport.onViewportLayout}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} testID={testID}>
+        {header}
+        {focused && figure ? <Readout week={focused} figure={figure} onStep={onStep}
+          hasPrevious={focusedIndex > 0} hasNext={focusedIndex < weeks.length - 1}
+          action={display?.action} testID={testID} /> : null}
+        <View style={styles.chartRow}>
+          <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={{ width: axisWidth, height: plotHeight }}>
+            {geometry.ticks.map((tick, index) => <Text key={tick.value} allowFontScaling={false} numberOfLines={1}
+              style={[text.label, tone.faint, styles.tick, { top: tick.y - uiTypography.lineHeight.xxs / 2 }]}
+              testID={`${testID}-tick-${tick.value}`}>{tickLabels[index]}</Text>)}
+          </View>
+          <View style={styles.plot} onLayout={viewport.onPlotLayout}>
+            <ScrollView ref={scroll} horizontal scrollEnabled={overflows} showsHorizontalScrollIndicator={false}
+              onContentSizeChange={() => viewport.keepFocusedWeekVisible(geometry, selectedIndex)}
+              onScroll={event => viewport.setScrollX(event.nativeEvent.contentOffset.x)}
+              scrollEventThrottle={32}
+              testID={`${testID}-scroll`}>
+              <Pressable accessible accessibilityRole="adjustable"
+                accessibilityLabel={`${metricLabel} by week, ${weeks.length} weeks`}
+                accessibilityValue={focused && figure ? { text: weekDescription(focused, figure, metricLabel, dateFormat) } : undefined}
+                accessibilityActions={actions}
+                onAccessibilityAction={onAccessibilityAction}
+                onPress={onPress} testID={`${testID}-plot`} style={{ width: geometry.width }}>
+                <TimelinePlot geometry={geometry} focusedIndex={focusedIndex} testID={testID} />
+                <View pointerEvents="none" style={styles.months}>
+                  {geometry.months.map(month => <View key={month.index} style={[styles.month, { left: month.x }]}>
+                    <Text allowFontScaling={false} style={[text.label, tone.faint]} testID={`${testID}-month-${month.index}`}>{month.label}</Text>
+                    {month.year === undefined ? null : <Text allowFontScaling={false} style={[text.label, tone.faint]}>{month.year}</Text>}
+                  </View>)}
+                </View>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </View>
+        {children}
+      </ScrollView>
+      {display?.details ? (
+        <View pointerEvents="box-none" style={[styles.overlay, { left: uiSpace.lg + uiSpace.sm + axisWidth }]}>
+          {display.details(detailsArea)}
+        </View>
+      ) : null}
     </View>
-    {children}
-  </ScrollView>;
+  );
+}
+
+function useTimelineViewport(expanded: boolean) {
+  const scroll = useRef<ScrollViewInstance>(null);
+  const [plotWidth, setPlotWidth] = useState(FALLBACK_PLOT_WIDTH);
+  const [height, setHeight] = useState(0);
+  const [scrollX, setScrollX] = useState(0);
+  const plotHeight = expanded ? Math.max(PLOT_HEIGHT, height - LANDSCAPE_CHART_INSETS) : PLOT_HEIGHT;
+  const onPlotLayout = (event: LayoutChangeEvent) => {
+    const measured = Math.round(event.nativeEvent.layout.width);
+    if (measured > 0) setPlotWidth(measured);
+  };
+  const keepFocusedWeekVisible = (geometry: ReturnType<typeof timelineGeometry>, selectedIndex: number) => {
+    const max = geometry.width - plotWidth;
+    if (max <= 0.5) { setScrollX(0); return; }
+    if (selectedIndex < 0) {
+      scroll.current?.scrollToEnd({ animated: false });
+      setScrollX(max);
+      return;
+    }
+    const start = selectedIndex * geometry.columnWidth;
+    if (start >= scrollX && start + geometry.columnWidth <= scrollX + plotWidth) return;
+    const x = Math.min(max, Math.max(0, start - (plotWidth - geometry.columnWidth) / 2));
+    scroll.current?.scrollTo({ x, animated: false });
+    setScrollX(x);
+  };
+  const onViewportLayout = (event: LayoutChangeEvent) => setHeight(event.nativeEvent.layout.height);
+  return { scroll, plotWidth, plotHeight, height, scrollX, setScrollX, onPlotLayout, onViewportLayout, keepFocusedWeekVisible };
 }
 
 function TimelinePlot({ geometry, focusedIndex, testID }: {
@@ -225,6 +287,10 @@ function TimelinePlot({ geometry, focusedIndex, testID }: {
 
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
+  overlay: {
+    position: 'absolute', top: OVERLAY_TOP, bottom: uiSpace.sm, right: uiSpace.lg,
+  },
+  readoutEnd: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   content: { gap: uiSpace.md, padding: uiSpace.lg },
   readout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },
   // The focused week between its two steps. The arrows are flush with the
@@ -232,10 +298,9 @@ const styles = StyleSheet.create({
   weekNav: { flexDirection: 'row', alignItems: 'center', marginHorizontal: -uiSpace.md, flexShrink: 1 },
   weekColumn: { alignItems: 'flex-start', flexShrink: 1 },
   chartRow: { flexDirection: 'row', gap: uiSpace.sm },
-  axis: { height: PLOT_HEIGHT },
   tick: { position: 'absolute', right: 0, textAlign: 'right' },
   plot: { flex: 1 },
-  months: { height: uiTypography.lineHeight.xxs * 2 + uiSpace.xs, marginTop: uiSpace.xs },
+  months: { height: MONTH_AXIS_HEIGHT, marginTop: uiSpace.xs },
   month: { position: 'absolute', top: 0 },
 });
 

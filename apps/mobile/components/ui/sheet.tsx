@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, Text, View, useWindowDimensions, type ModalProps } from 'react-native';
 import { GestureDetector, GestureHandlerRootView, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation, ReduceMotion, runOnJS, useAnimatedStyle, useReducedMotion, useSharedValue, withTiming,
@@ -37,6 +37,7 @@ export type SheetProps = {
   headerActions?: ReactNode;
   // Lifts the panel above the keyboard, for a sheet with a text field in it.
   keyboardAvoiding?: boolean;
+  supportedOrientations?: ModalProps['supportedOrientations'];
   // Usually `ListRow`s.
   children: ReactNode;
   // `<testID>` on the panel, `<testID>-backdrop` on the backdrop, `<testID>-header`
@@ -140,6 +141,7 @@ export function Sheet({
   headerLeading,
   headerActions,
   keyboardAvoiding = false,
+  supportedOrientations,
   children,
   testID,
 }: SheetProps) {
@@ -206,6 +208,7 @@ export function Sheet({
 
   return (
     <Modal
+      supportedOrientations={supportedOrientations}
       animationType="fade"
       onDismiss={Platform.OS === 'ios' ? handleDismissed : undefined}
       onRequestClose={onDismiss}

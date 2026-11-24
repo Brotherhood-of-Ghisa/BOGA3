@@ -21,6 +21,8 @@ type ExerciseSetsCardBaseProps = {
   rows: SessionViewSetRow[];
   hideDerivedMetrics?: boolean;
   percentageMetrics?: boolean;
+  embedded?: boolean;
+  hideHeader?: boolean;
   // The `record` band, one line per record this card holds; empty for none.
   record?: readonly RecordLine[];
   // Under the header, before the set rows (exercise history's gym, tags and
@@ -58,6 +60,8 @@ export function ExerciseSetsCard({
   rows,
   hideDerivedMetrics = false,
   percentageMetrics = false,
+  embedded = false,
+  hideHeader = false,
   record = [],
   summary,
   accessory,
@@ -72,15 +76,15 @@ export function ExerciseSetsCard({
   const tone = useUiTextTone();
   const content = (
     <>
-      <View style={styles.header}>
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.title, styles.name]}>
+      {hideHeader ? null : <View style={styles.header}>
+        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={embedded ? undefined : 1} style={[text.title, styles.name]}>
           <FigureText strong>{name}</FigureText>
         </Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, styles.count, countMuted ? tone.faint : null]} testID={`${testID}-count`}>
+        <Text allowFontScaling={false} numberOfLines={embedded ? undefined : 1} style={[text.meta, styles.count, countMuted ? tone.faint : null]} testID={`${testID}-count`}>
           <FigureText>{count}</FigureText>
         </Text>
         {accessory}
-      </View>
+      </View>}
       {summary}
       {rows.length > 0 ? (
         <View style={styles.rows}>
@@ -90,6 +94,7 @@ export function ExerciseSetsCard({
               row={row}
               hideDerivedMetrics={hideDerivedMetrics}
               percentageMetrics={percentageMetrics}
+              wrapMetrics={embedded}
               testID={rowTestID ? rowTestID(row, index) : `${testID}-set-${index + 1}`}
             />
           ))}
@@ -102,6 +107,7 @@ export function ExerciseSetsCard({
   return onPress ? (
     <Card
       accessibilityActions={accessibilityActions}
+      embedded={embedded}
       accessibilityLabel={accessibilityLabel}
       onAccessibilityAction={onAccessibilityAction}
       onPress={onPress}
@@ -109,7 +115,7 @@ export function ExerciseSetsCard({
       {content}
     </Card>
   ) : (
-    <Card accessibilityLabel={accessibilityLabel} testID={testID}>
+    <Card accessibilityLabel={accessibilityLabel} embedded={embedded} testID={testID}>
       {content}
     </Card>
   );

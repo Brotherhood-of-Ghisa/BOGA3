@@ -17,6 +17,7 @@ type CardBaseProps = {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  embedded?: boolean;
 };
 
 // A pressable card is one target that navigates (the session view's exercise
@@ -56,11 +57,13 @@ function splitPlacement(style: StyleProp<ViewStyle>): { placement: ViewStyle; co
 // A pressable card is an accessibility element that clips, so its lift sits on a
 // plain view around it: on one view, iOS hides the children's testIDs from the
 // accessibility tree.
-export function Card({ children, style, testID, onPress, accessibilityLabel, accessibilityActions, onAccessibilityAction }: CardProps) {
+export function Card({ children, style, testID, onPress, accessibilityLabel, accessibilityActions, onAccessibilityAction, embedded = false }: CardProps) {
   const styles = useStyles();
+  const surface = embedded ? styles.embedded : styles.card;
+  const lift = embedded ? null : styles.lift;
   if (!onPress) {
     return (
-      <View accessibilityLabel={accessibilityLabel} style={[styles.card, styles.lift, style]} testID={testID}>
+      <View accessibilityLabel={accessibilityLabel} style={[surface, lift, style]} testID={testID}>
         <OnCard>{children}</OnCard>
       </View>
     );
@@ -68,14 +71,14 @@ export function Card({ children, style, testID, onPress, accessibilityLabel, acc
 
   const { placement, content } = splitPlacement(style);
   return (
-    <View style={[styles.lift, placement]}>
+    <View style={[lift, placement]}>
       <Pressable
         accessibilityActions={accessibilityActions}
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="link"
         onAccessibilityAction={onAccessibilityAction}
         onPress={onPress}
-        style={({ pressed }) => [styles.card, styles.fill, pressed ? styles.pressed : null, content]}
+        style={({ pressed }) => [surface, styles.fill, pressed ? styles.pressed : null, content]}
         testID={testID}>
         <OnCard>{children}</OnCard>
       </Pressable>
@@ -91,6 +94,7 @@ const useStyles = makeStyles((roles, mode) => ({
   },
   lift: uiLift(roles, mode, { shape: 'card' }),
   fill: { flexGrow: 1 },
+  embedded: { overflow: 'hidden' },
   // Pressed sinks to the inset: a step below the card, inside it.
   pressed: {
     backgroundColor: roles.inset,

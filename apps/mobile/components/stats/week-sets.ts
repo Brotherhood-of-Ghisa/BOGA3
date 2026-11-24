@@ -191,9 +191,8 @@ export type WeekSetsState = { groups: WeekSetGroup[]; loading: boolean; error: s
  * cards stay listed, so a week, gym or secondary-set change swaps the cards
  * once instead of blanking the list; another subject's cards never show.
  */
-export function useWeekSets(target: WeekSetsTarget | null, weekKey: string | null, revision = 0): WeekSetsState {
-  const { groups, loading, error } = usePeriodSets(target, weekKey === null ? null : { weekKey }, revision);
-  return { groups, loading, error };
+export function useWeekSets(target: WeekSetsTarget | null, weekKey: string | null, revision = 0) {
+  return usePeriodSets(target, weekKey === null ? null : { weekKey }, revision);
 }
 
 /** Shares the Timeline's reader with day/week detail; account changes discard old cards. */
