@@ -92,9 +92,9 @@ const chartHuePaint = (lightness: number): string[] =>
 const CHART_END_LABELS: Record<ChartEndName, string> = { start: 'Start', end: 'End' };
 // The ramp step a chart end draws: what its hue bar's swatch shows.
 const CHART_END_ROLE: Record<ChartEndName, keyof UiRoles> = { start: 'viz1', end: 'viz4' };
-// What VoiceOver hears for a hue; the bar itself shows no words.
 // What a failed save names, for a part that is not one colour.
 const SAVE_NOUN: Partial<Record<CustomPart, string>> = { chart: 'chart', direction: 'direction' };
+// What VoiceOver hears for a hue; the bar itself shows no words.
 const hueLabel = (hue: number): string => `${hueName(hue)}, ${normaliseHue(hue)} degrees`;
 const lightnessLabel = (value: number): string =>
   value === 0 ? 'Black' : value === LIGHTNESS_MAX ? 'White' : `${Math.round(value / LIGHTNESS_STEP) * LIGHTNESS_STEP}`;

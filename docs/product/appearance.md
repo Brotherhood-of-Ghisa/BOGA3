@@ -28,3 +28,17 @@ Ink + paper would dim its cards below the text floors.
 Code: `apps/mobile/components/ui/theme-presets.ts` (`choiceTakesMode`);
 `apps/mobile/components/appearance/appearance-settings.tsx`;
 `apps/mobile/components/appearance/chosen-theme.ts`.
+
+### appearance.solid-bars · presentation · accepted
+
+Only a Custom theme's Chart part offers Solid bars, off by default and on no
+preset. On, every bar mark takes the ramp's end (`viz4`) instead of its step:
+Today's and a group's board bars, the week-figure and At a glance lap bars,
+and Recovery's trained days. Laps past the first and the board leader then
+show only in their figures and rank. Heatmap tiles and the body map keep the
+ramp.
+
+Why: a user who wants one bar colour gets it without flattening the ramp that
+grades intensity.
+Code: `apps/mobile/components/ui/theme-context.tsx` (`useBarFills`);
+`apps/mobile/components/ui/theme-presets.ts` (`appearanceSolidBars`).

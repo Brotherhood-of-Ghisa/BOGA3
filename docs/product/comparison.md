@@ -12,7 +12,8 @@
 More is better; zero is unsigned; colour never replaces the sign.
 
 Today's week figures and a group's At a glance total show none: each fills a
-bar in laps of the previous week's total.
+bar in laps of the previous week's total (one colour under
+[[appearance.solid-bars]]).
 
 Why: counts and strength differences read directly; ratios make Volume changes comparable.
 Code: `formatCountDelta`, `formatVolumeDelta`, `formatOneRepMaxDelta` in `apps/mobile/components/stats/comparison-format.ts`; `changeToneColourIn` in `apps/mobile/components/ui/change-tone.ts`; `weekShare` in `apps/mobile/components/today/progress-format.ts`; `apps/mobile/components/today/period-pace.tsx`; `apps/mobile/components/groups/group-week-totals.tsx`.
@@ -85,7 +86,7 @@ percentage changes against body-wide finite extrema: middle-to-strong gains,
 middle-to-weak losses; displayed −100% neutral while scaling losses. Filters
 may rescale Volume; rotation/selection cannot. Unchanged middle;
 empty/unavailable neutral; `new`/overflow strongest, outside extrema.
-Strong darkens in light mode, lightens in dark. Both views use opaque effort
+Strong darkens in light mode, lightens in dark, except a Custom chosen ramp. Both views use opaque effort
 fills and a separate selection colour, attenuated through covering layers.
 Wireframe adds contrasting triangle edges over the fills and selected anatomy.
 Both keep the selected comparison; no legend.

@@ -6,7 +6,7 @@ facts as needed. Authoring: load `docs/procedures/product-facts-authoring.md`.
 
 | File | Load when your task touches |
 | --- | --- |
-| `appearance.md` | seasonal icons and human figures; which presets take a mode |
+| `appearance.md` | seasonal icons and human figures; which presets take a mode; which marks Solid bars recolours |
 | `exercise.md` | browser history, quick workout entry, merging definitions, history conversion, stale-edit recovery |
 | `set.md` | any set, set count, record, Volume or 1RM figure; set rows |
 | `copy.md` | any words on screen (every UI change); dates; blank history cells |
