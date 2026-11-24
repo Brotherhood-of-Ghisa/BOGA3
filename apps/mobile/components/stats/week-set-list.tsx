@@ -28,7 +28,8 @@ type Props = WeekSetsState & {
   testID: string;
   contributionMetric?: 'workingSetCount' | 'totalVolume';
   period?: 'day' | 'week';
-  windowContent?: boolean;
+  // When the window displays a lone exercise session's date and gym, it owns that block's header.
+  windowContent?: 'rows' | 'blocks';
 };
 
 const OPEN_EXERCISE_ACTION = 'openExercise';
@@ -53,7 +54,7 @@ function ContributionLine({ credit, role, testID }: { credit: string | null; rol
   </Text>;
 }
 
-export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLink, onRetry, testID, contributionMetric, period = 'week', windowContent = false }: Props) {
+export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLink, onRetry, testID, contributionMetric, period = 'week', windowContent }: Props) {
   const text = useUiText();
   const windowStyles = useWindowStyles();
   const showLoading = useDelayedFlag(loading, WEEK_SETS_LOADING_DELAY_MS);
@@ -73,7 +74,7 @@ export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLin
       {windowContent && index > 0 ? <View style={windowStyles.divider} /> : null}
       <WeekSetCard exerciseLink={exerciseLink} group={group} contributionMetric={contributionMetric}
         onOpenSession={onOpenSession} testID={`${testID}-card-${group.key}`}
-        embedded={windowContent} hideHeader={windowContent && groups.length === 1} />
+        embedded={windowContent !== undefined} hideHeader={windowContent === 'rows'} />
     </Fragment>)}
   </View>;
 }

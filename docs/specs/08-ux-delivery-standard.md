@@ -133,7 +133,7 @@ Use this section as the single source of truth for reusable UX patterns.
    - Rules: each page fills the height between its tabs and the tab bar, as its own cards (You: progress over session; a group: board over sessions) or, for a panel, one `Card`; each page's cards take the full width (no peek of the next) and paging snaps; tabs above name every page and move to it on tap, so a swipe is never the only way; each page has one elastic part that takes the height left (the chart, or the sessions list) above a fixed floor, and a list too long for its card scrolls inside it rather than clips; links are text buttons inside the cards (`Sessions`), never a chevron row; a page's own controls sit in its cards, never beside the tabs (the group's name and switch head its board card).
 
 16. Chart details window pattern
-   - Usage: expanded exercise Timeline.
+   - Usage: expanded Progress Timelines for single exercises, combined exercises and muscles.
    - Rules: select a plotted week or use the plot’s accessibility action to open details. The window floats beside the selected week when space allows. Its header holds the close icon and moves the window by drag or accessible directions. Its body scrolls independently. Dismissal retains the selected week and plot position.
 
 ## Quality and closeout
