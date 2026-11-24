@@ -58,6 +58,8 @@ export const ICON_GLYPHS = {
 
   // Lucide `maximize-2` and `minimize-2`.
   'expand-chart': [path('M15 3h6v6'), path('m21 3-7 7'), path('M9 21H3v-6'), path('m3 21 7-7')],
+  // Lucide `grip-vertical`.
+  'move-window': [circle(9, 5, 1), circle(9, 12, 1), circle(9, 19, 1), circle(15, 5, 1), circle(15, 12, 1), circle(15, 19, 1)],
   'collapse-chart': [path('M10 3v7H3'), path('m3 3 7 7'), path('M14 21v-7h7'), path('m21 21-7-7')],
 
   // --- Actions ---

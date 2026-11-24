@@ -465,6 +465,11 @@ describe('The history page over real data', () => {
     // The newest week is the last column; a tap must work even when it was already focused.
     fireEvent.press(chart(), { nativeEvent: { locationX: plotWidth - 1 } });
     const window = screen.getByTestId(details);
+    const move = within(window).getByTestId(`${details}-move`);
+    expect(move.props.accessibilityActions.map((action: { name: string }) => action.name))
+      .toEqual(['moveLeft', 'moveRight', 'moveUp', 'moveDown']);
+    fireEvent(move, 'accessibilityAction', { nativeEvent: { actionName: 'moveLeft' } });
+    expect(current()).toBe(newest);
     expect(chart().props.style.width).toBe(plotWidth);
     expect(within(window).getAllByTestId(new RegExp(`^${list}-card-.*-set-\\d+$`)).map(row => row.props.testID)).toEqual(compactRows);
     const values = within(window).getByTestId(`${compactRows[0]}-values`);

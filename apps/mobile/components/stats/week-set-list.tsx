@@ -3,11 +3,13 @@
 // (a muscle's exercise and day, an exercise's day and gym). A card opens its
 // session; on a muscle's list, its header also marks the block's primary or
 // secondary work, and its progress button opens its exercise's history.
+import { Fragment } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { ExerciseSetsCard } from '@/components/session-detail';
 import { useDelayedFlag } from '@/components/stats/use-delayed-flag';
 import { FigureText, Icon, IconButton, StatePanel, uiGeometry, uiSpace, uiTypography } from '@/components/ui';
+import { makeStyles } from '@/components/ui/theme-context';
 import { useUiText } from '@/components/ui/text-roles';
 import { formatVolume, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 
@@ -26,7 +28,7 @@ type Props = WeekSetsState & {
   testID: string;
   contributionMetric?: 'workingSetCount' | 'totalVolume';
   period?: 'day' | 'week';
-  wrapSetRows?: boolean;
+  windowContent?: boolean;
 };
 
 const OPEN_EXERCISE_ACTION = 'openExercise';
@@ -51,8 +53,9 @@ function ContributionLine({ credit, role, testID }: { credit: string | null; rol
   </Text>;
 }
 
-export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLink, onRetry, testID, contributionMetric, period = 'week', wrapSetRows }: Props) {
+export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLink, onRetry, testID, contributionMetric, period = 'week', windowContent = false }: Props) {
   const text = useUiText();
+  const windowStyles = useWindowStyles();
   const showLoading = useDelayedFlag(loading, WEEK_SETS_LOADING_DELAY_MS);
   if (error) {
     return <StatePanel action={onRetry ? { label: 'Retry', onPress: onRetry, testID: `${testID}-retry` } : undefined}
@@ -63,21 +66,26 @@ export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLin
     return showLoading ? <StatePanel body="Loading sets..." fill={false} kind="loading" testID={`${testID}-loading`} /> : null;
   }
   if (groups.length === 0) {
-    return <Text allowFontScaling={false} style={text.meta} testID={`${testID}-empty`}>No sets this {period}</Text>;
+    return <Text allowFontScaling={false} style={[text.meta, windowContent && styles.windowEmpty]} testID={`${testID}-empty`}>No sets this {period}</Text>;
   }
-  return <View style={styles.list} testID={testID}>
-    {groups.map((group) => <WeekSetCard key={group.key} exerciseLink={exerciseLink} group={group} contributionMetric={contributionMetric}
-      onOpenSession={onOpenSession} testID={`${testID}-card-${group.key}`} wrapSetRows={wrapSetRows} />)}
+  return <View style={windowContent ? undefined : styles.list} testID={testID}>
+    {groups.map((group, index) => <Fragment key={group.key}>
+      {windowContent && index > 0 ? <View style={windowStyles.divider} /> : null}
+      <WeekSetCard exerciseLink={exerciseLink} group={group} contributionMetric={contributionMetric}
+        onOpenSession={onOpenSession} testID={`${testID}-card-${group.key}`}
+        embedded={windowContent} hideHeader={windowContent && groups.length === 1} />
+    </Fragment>)}
   </View>;
 }
 
-function WeekSetCard({ group, onOpenSession, exerciseLink, testID, contributionMetric, wrapSetRows }: {
+function WeekSetCard({ group, onOpenSession, exerciseLink, testID, contributionMetric, embedded, hideHeader }: {
   group: WeekSetGroup;
   onOpenSession: (sessionId: string) => void;
   exerciseLink?: WeekSetExerciseLink;
   testID: string;
   contributionMetric?: Props['contributionMetric'];
-  wrapSetRows?: boolean;
+  embedded: boolean;
+  hideHeader: boolean;
 }) {
   const text = useUiText();
   const credit = contributionCredit(group, contributionMetric);
@@ -104,17 +112,18 @@ function WeekSetCard({ group, onOpenSession, exerciseLink, testID, contributionM
           testID={`${testID}-exercise`} />
       </View> : null}
     </> : undefined}
-    count={group.detail}
+    count={group.detail} embedded={embedded} hideHeader={hideHeader}
     summary={<>
       {group.exerciseName ? <Text allowFontScaling={false} style={[text.bodyStrong, styles.contribution]} testID={`${testID}-exercise-name`}>{group.exerciseName}</Text> : null}
       <ContributionLine credit={credit} role={group.role} testID={testID} />
     </>}
     name={group.title} onPress={() => onOpenSession(group.sessionId)} rows={group.rows} record={group.record}
-    testID={testID} wrapSetRows={wrapSetRows} />;
+    testID={testID} />;
 }
 
 const styles = StyleSheet.create({
   list: { gap: uiSpace.md },
+  windowEmpty: { paddingHorizontal: uiSpace.md, paddingBottom: uiSpace.md },
   contribution: { paddingHorizontal: uiSpace.md, paddingBottom: uiSpace.xs },
   // A 44pt target that leaves the header its text height: it overhangs the
   // name's line and pulls into the card's right inset.
@@ -123,3 +132,7 @@ const styles = StyleSheet.create({
     marginRight: -uiSpace.sm,
   },
 });
+
+const useWindowStyles = makeStyles(roles => ({
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: roles.rule },
+}));

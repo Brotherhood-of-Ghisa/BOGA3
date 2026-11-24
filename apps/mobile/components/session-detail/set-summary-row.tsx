@@ -70,8 +70,8 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: uiSpace.sm,
   },
-  wrappingRow: { flexWrap: 'wrap' },
-  wrappingWeight: { minWidth: 105 },
+  wrappingRow: { flexWrap: 'wrap', columnGap: uiSpace.xs },
+  wrappingWeight: { minWidth: 86 },
   wrappingMetrics: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: uiSpace.sm, marginLeft: 'auto' },
   effortColumn: {
     width: uiGeometry.tapTarget,

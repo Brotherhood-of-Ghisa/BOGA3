@@ -134,7 +134,7 @@ Use this section as the single source of truth for reusable UX patterns.
 
 16. Chart details window pattern
    - Usage: expanded exercise Timeline.
-   - Rules: select a plotted week or use the plot’s accessibility action to open details. The window floats beside the selected week when space allows. It has a close icon and an independently scrolling body. Dismissal retains the selected week and plot position.
+   - Rules: select a plotted week or use the plot’s accessibility action to open details. The window floats beside the selected week when space allows. Its header holds the close icon and moves the window by drag or accessible directions. Its body scrolls independently. Dismissal retains the selected week and plot position.
 
 ## Quality and closeout
 

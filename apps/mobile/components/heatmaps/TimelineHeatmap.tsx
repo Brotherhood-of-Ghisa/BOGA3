@@ -43,6 +43,8 @@ import {
   type TimelineWeek,
 } from './timeline';
 
+export type TimelineDetailsArea = { width: number; height: number; initialX: number; maxX: number };
+
 interface Props {
   data: HeatmapData;
   metric: CalendarHeatmapMetric;
@@ -60,11 +62,12 @@ interface Props {
     expanded: boolean;
     action?: ReactNode;
     onInspect?: () => void;
-    details?: ReactNode;
+    details?: (area: TimelineDetailsArea) => ReactNode;
   };
 }
 
 const PLOT_HEIGHT = 160;
+const OVERLAY_TOP = uiGeometry.tapTarget + uiSpace.lg + uiSpace.md;
 const MONTH_AXIS_HEIGHT = uiTypography.lineHeight.xxs * 2 + uiSpace.xs;
 const LANDSCAPE_CHART_INSETS = uiSpace.lg * 2 + uiGeometry.tapTarget + uiSpace.md + uiSpace.xs + MONTH_AXIS_HEIGHT;
 // Until the first layout pass reports the plot's width (and in Jest, where
@@ -179,11 +182,12 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
   const actions: AccessibilityActionInfo[] = [{ name: 'increment' }, { name: 'decrement' }];
   if (display?.onInspect) actions.push({ name: 'showDetails', label: 'Show week details' });
   const selectedCenter = (focusedIndex + 0.5) * geometry.columnWidth - scrollX;
-  const overlayWidth = (plotWidth - geometry.columnWidth) / 2 - uiSpace.xs;
-  const leftOverlay = { left: uiSpace.lg + uiSpace.sm + axisWidth };
-  const overlayPlacement = plotWidth < 420
-    ? [styles.overlayNarrow, leftOverlay]
-    : [{ width: overlayWidth }, selectedCenter < plotWidth / 2 ? styles.overlayRight : leftOverlay];
+  const windowWidth = plotWidth < 420 ? plotWidth : Math.min(360, Math.max(240, (plotWidth - geometry.columnWidth) / 2 - uiSpace.xs));
+  const maxX = plotWidth - windowWidth;
+  const detailsArea = {
+    width: windowWidth, height: Math.max(uiGeometry.tapTarget, viewport.height - OVERLAY_TOP - uiSpace.sm), maxX,
+    initialX: selectedCenter < plotWidth / 2 ? maxX : 0,
+  };
 
   return (
     <View style={styles.scroll} onLayout={viewport.onViewportLayout}>
@@ -224,8 +228,8 @@ export function TimelineHeatmap({ data, metric, selectedWeekKey, onSelectWeek, t
         {children}
       </ScrollView>
       {display?.details ? (
-        <View pointerEvents="box-none" style={[styles.overlay, overlayPlacement]}>
-          {display.details}
+        <View pointerEvents="box-none" style={[styles.overlay, { left: uiSpace.lg + uiSpace.sm + axisWidth }]}>
+          {display.details(detailsArea)}
         </View>
       ) : null}
     </View>
@@ -257,7 +261,7 @@ function useTimelineViewport(expanded: boolean) {
     setScrollX(x);
   };
   const onViewportLayout = (event: LayoutChangeEvent) => setHeight(event.nativeEvent.layout.height);
-  return { scroll, plotWidth, plotHeight, scrollX, setScrollX, onPlotLayout, onViewportLayout, keepFocusedWeekVisible };
+  return { scroll, plotWidth, plotHeight, height, scrollX, setScrollX, onPlotLayout, onViewportLayout, keepFocusedWeekVisible };
 }
 
 function TimelinePlot({ geometry, focusedIndex, testID }: {
@@ -284,11 +288,8 @@ function TimelinePlot({ geometry, focusedIndex, testID }: {
 const styles = StyleSheet.create({
   scroll: { flex: 1 },
   overlay: {
-    position: 'absolute', top: uiGeometry.tapTarget + uiSpace.xl + uiSpace.md,
-    bottom: uiSpace.xl, maxWidth: 360, justifyContent: 'flex-start',
+    position: 'absolute', top: OVERLAY_TOP, bottom: uiSpace.sm, right: uiSpace.lg,
   },
-  overlayNarrow: { right: uiSpace.lg, width: 'auto', maxHeight: '48%', bottom: undefined },
-  overlayRight: { right: uiSpace.lg },
   readoutEnd: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   content: { gap: uiSpace.md, padding: uiSpace.lg },
   readout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },

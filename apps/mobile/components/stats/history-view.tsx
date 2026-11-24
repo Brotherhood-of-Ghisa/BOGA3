@@ -11,10 +11,10 @@ import {
   DailyHeatmap, TimelineHeatmap, WeeklyHeatmap, buildHeatmapData,
   type BuildHeatmapDataOptions, type DayCell, type FocusedTimelineWeek,
 } from '@/components/heatmaps';
+import { TimelineDetailsWindow } from '@/components/stats/timeline-details-window';
 import { WeekSetList, type WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { useWeekSets, type WeekSetsTarget } from '@/components/stats/week-sets';
 import {
-  Card,
   IconButton,
   SegmentedControl,
   StatePanel,
@@ -144,21 +144,6 @@ function TimelineExpandButton({ onPress, restoreFocus, testID }: {
   return <IconButton ref={button} name="expand-chart" accessibilityLabel="Expand chart" onPress={onPress} testID={testID} />;
 }
 
-function TimelineWeekOverlay({ children, onClose, testID }: { children: ReactNode; onClose: () => void; testID: string }) {
-  return (
-    <Card style={styles.weekOverlay} testID={testID}>
-      <View onAccessibilityEscape={onClose} style={styles.weekOverlay}>
-        <View style={styles.overlayActions}>
-          <IconButton name="x" accessibilityLabel="Close week details" onPress={onClose} testID={`${testID}-close`} />
-        </View>
-        <ScrollView style={styles.overlayScroll} contentContainerStyle={styles.overlayContent}>
-          {children}
-        </ScrollView>
-      </View>
-    </Card>
-  );
-}
-
 const VIEWS: readonly HeatmapView[] = ['timeline', 'daily', 'weekly'];
 
 const sameFocusedWeek = (left: FocusedTimelineWeek | null, right: FocusedTimelineWeek | null): boolean =>
@@ -239,9 +224,11 @@ function HistoryHeatmap({
   // A failed read drops the chart entirely, and the page's week goes with it.
   useEffect(() => () => report.current?.(null), []);
   const expanded = timelineDisplay?.expanded === true;
+  const groups = expanded && !weekSets.sameScope ? [] : weekSets.groups;
+  const singleSession = groups.length === 1 ? groups[0] : undefined;
   const setList = (
-    <WeekSetList {...weekSets} groups={expanded && !weekSets.sameScope ? [] : weekSets.groups}
-      exerciseLink={exerciseLink} onOpenSession={onOpenSession} onRetry={retryWeekSets} wrapSetRows={expanded} testID={`${testIDPrefix}-week-sets`} />
+    <WeekSetList {...weekSets} groups={groups} exerciseLink={exerciseLink} onOpenSession={onOpenSession}
+      onRetry={retryWeekSets} windowContent={expanded} testID={`${testIDPrefix}-week-sets`} />
   );
   const timelineChart = (
     <TimelineHeatmap
@@ -259,9 +246,10 @@ function HistoryHeatmap({
         action: timelineDisplay && !expanded ? <TimelineExpandButton onPress={inspection.expand} restoreFocus={inspection.restoreFocus}
           testID={`${testIDPrefix}-timeline-expand`} /> : undefined,
         onInspect: expanded ? inspection.open : undefined,
-        details: inspection.showDetails ? <TimelineWeekOverlay onClose={inspection.close} testID={`${testIDPrefix}-timeline-details`}>
+        details: inspection.showDetails ? area => <TimelineDetailsWindow area={area} heading={singleSession?.title ?? focusedWeek?.label}
+          gym={singleSession?.detail} onClose={inspection.close} testID={`${testIDPrefix}-timeline-details`}>
           {setList}
-        </TimelineWeekOverlay> : undefined,
+        </TimelineDetailsWindow> : undefined,
       }}>
       {expanded ? null : setList}
     </TimelineHeatmap>
@@ -498,10 +486,6 @@ const styles = StyleSheet.create({
   },
   landscapeControls: { paddingTop: 0, paddingBottom: 0 },
   landscapeTitle: { flex: 1 },
-  weekOverlay: { flexShrink: 1 },
-  overlayActions: { alignItems: 'flex-end', paddingHorizontal: uiSpace.xs },
-  overlayScroll: { flexGrow: 0, flexShrink: 1 },
-  overlayContent: { paddingHorizontal: uiSpace.sm, paddingBottom: uiSpace.sm },
   scroll: {
     flex: 1,
   },
