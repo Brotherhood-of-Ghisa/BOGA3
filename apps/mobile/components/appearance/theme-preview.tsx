@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { FigureText, uiBorder, uiCorner, uiGeometry, uiHairline, uiMark, uiSpace, useUiText, useUiTextTone } from '@/components/ui';
 import type { UiRoles } from '@/components/ui/theme';
+import { barFills } from '@/components/ui/theme-context';
 import type { CustomPart } from '@/components/ui/theme-custom';
 import { estimateOneRepMax } from '@/src/exercise-calculations';
 import { formatOneRepMax } from '@/src/exercise-calculations/format';
@@ -103,17 +104,19 @@ export function ThemePreview({ roles, testID }: ThemePreviewProps) {
 type Role = keyof UiRoles;
 
 // One sample of a role in the use the app gives it: a fill, text (`Aa`) or a
-// hairline, on a ground, or a ramp of fills side by side. A `context` sample
-// is another part's role, shown for comparison.
+// hairline, on a ground, a ramp of fills side by side, or bars filled in the
+// steps a bar mark takes (`barFills`), on a card. A `context` sample is
+// another part's role, shown for comparison.
 type Sample = { label: string; context?: true } & (
   | { kind: 'fill'; role: Role }
   | { kind: 'text' | 'line'; role: Role; ground: Role }
   | { kind: 'ramp'; roles: readonly Role[] }
+  | { kind: 'bars'; roles: readonly ('viz2' | 'viz3' | 'viz4')[] }
 );
 
 // The roles a sample draws.
 export const sampleRoles = (sample: Sample): Role[] =>
-  sample.kind === 'fill' ? [sample.role] : sample.kind === 'ramp' ? [...sample.roles] : [sample.role, sample.ground];
+  sample.kind === 'fill' ? [sample.role] : sample.kind === 'ramp' || sample.kind === 'bars' ? [...sample.roles] : [sample.role, sample.ground];
 
 // Every role a custom part moves (`generateCustomRoles`), each drawn as the
 // app uses it and named by that use. Primary text is also the text on a
@@ -162,18 +165,43 @@ export const SPOTLIGHT: Record<CustomPart, readonly Sample[]> = {
     { kind: 'text', role: 'record', ground: 'recordWash', label: 'Band' },
     { kind: 'line', role: 'recordRule', ground: 'recordWash', label: 'Band line' },
   ],
+  // The ramp, its two ends, and bars as the boards and figures draw them:
+  // the ramp's steps, or the end alone under solid bars.
+  chart: [
+    { kind: 'ramp', roles: ['viz0', 'viz1', 'viz2', 'viz3', 'viz4'], label: 'Ramp' },
+    { kind: 'fill', role: 'viz1', label: 'Start' },
+    { kind: 'fill', role: 'viz4', label: 'End' },
+    { kind: 'bars', roles: ['viz2', 'viz3', 'viz4'], label: 'Bars' },
+  ],
   direction: [
     { kind: 'text', role: 'gain', ground: 'surface', label: 'Up' },
     { kind: 'text', role: 'loss', ground: 'surface', label: 'Down' },
   ],
 };
 
-// A sample's tile: its ground, and the text, hairline or ramp drawn on it.
-function SampleTile({ sample, roles, testID }: { sample: Sample; roles: UiRoles; testID: string }) {
+// The ground a sample's tile is drawn on.
+const groundOf = (sample: Sample): Role => {
+  switch (sample.kind) {
+    case 'fill':
+      return sample.role;
+    case 'ramp':
+      return sample.roles[0];
+    case 'bars':
+      return 'surface';
+    default:
+      return sample.ground;
+  }
+};
+
+// A bar's length in a `bars` sample, shortest first.
+const BAR_WIDTHS = ['40%', '70%', '100%'] as const;
+
+// A sample's tile: its ground, and the text, hairline, ramp or bars drawn on it.
+function SampleTile({ sample, roles, solidBars, testID }: { sample: Sample; roles: UiRoles; solidBars: boolean; testID: string }) {
   const type = useUiText();
-  const ground = sample.kind === 'fill' ? sample.role : sample.kind === 'ramp' ? sample.roles[0] : sample.ground;
+  const tileStyle = sample.kind === 'ramp' ? styles.ramp : sample.kind === 'bars' ? styles.bars : null;
   return (
-    <View style={[styles.tile, sample.kind === 'ramp' ? styles.ramp : null, { backgroundColor: roles[ground], ...uiHairline(roles, { shape: 'control' }) }]} testID={testID}>
+    <View style={[styles.tile, tileStyle, { backgroundColor: roles[groundOf(sample)], ...uiHairline(roles, { shape: 'control' }) }]} testID={testID}>
       {sample.kind === 'text' ? (
         <Text allowFontScaling={false} style={[type.title, { color: roles[sample.role] }]}>
           Aa
@@ -183,13 +211,19 @@ function SampleTile({ sample, roles, testID }: { sample: Sample; roles: UiRoles;
       {sample.kind === 'ramp'
         ? sample.roles.slice(1).map((role) => <View key={role} style={[styles.rampStep, { backgroundColor: roles[role] }]} />)
         : null}
+      {sample.kind === 'bars'
+        ? sample.roles.map((role, index) => (
+            <View key={role} style={[styles.bar, { width: BAR_WIDTHS[index], backgroundColor: barFills(roles, solidBars)[role] }]} testID={`${testID}-${role}`} />
+          ))
+        : null}
     </View>
   );
 }
 
 // The part being edited, alone: each role it moves as a tile on the theme's
 // page, named by its use. Drawn above the whole mock on the part's page.
-export function PartSpotlight({ part, roles, testID }: { part: CustomPart; roles: UiRoles; testID: string }) {
+// `solidBars` draws the chart's bars as the theme draws them.
+export function PartSpotlight({ part, roles, solidBars = false, testID }: { part: CustomPart; roles: UiRoles; solidBars?: boolean; testID: string }) {
   const type = useUiText();
   return (
     <View
@@ -199,7 +233,7 @@ export function PartSpotlight({ part, roles, testID }: { part: CustomPart; roles
       testID={testID}>
       {SPOTLIGHT[part].map((sample, index) => (
         <View key={index} style={styles.sample}>
-          <SampleTile roles={roles} sample={sample} testID={`${testID}-${index}`} />
+          <SampleTile roles={roles} sample={sample} solidBars={solidBars} testID={`${testID}-${index}`} />
           <Text allowFontScaling={false} numberOfLines={1} style={[type.meta, { color: roles.inkMuted }]}>
             {sample.label}
           </Text>
@@ -237,6 +271,17 @@ const styles = StyleSheet.create({
   },
   rampStep: {
     flex: 1,
+    ...uiMark.bar,
+  },
+  // Bars stand in the card's tile, one under another, from its start.
+  bars: {
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    gap: uiSpace.xs / 2,
+    padding: uiSpace.xs,
+  },
+  bar: {
+    height: uiSpace.xs,
     ...uiMark.bar,
   },
   page: {

@@ -4,27 +4,36 @@ import {
   DIRECTION_PAIRS,
   generateRoles,
   inkStep,
+  rampLightness,
   THEME_DIRECTIONS,
   type ThemeDirection,
   type ThemeMode,
   type UiRoles,
 } from '@/components/ui/theme';
 import {
+  chartInMode,
+  chartOf,
+  chartRamp,
   customFromSeeds,
   customInk,
   customMode,
   customSeed,
   customSeeds,
+  drawnEnds,
   gamutColour,
   generateCustomRoles,
   highlightFromAccent,
+  hueTurn,
   inksInMode,
   ownInks,
   parseCustomColours,
+  solidBars,
+  type CustomChart,
   type CustomColours,
   type OwnInk,
 } from '@/components/ui/theme-custom';
 import { themePresets } from '@/components/ui/theme-presets';
+import BEFORE_CHART_ROLES from './fixtures/custom-before-chart-roles.json';
 import TEXT_CONTRAST_ROLES from './fixtures/custom-text-contrast-roles.json';
 
 // A custom theme (`docs/specs/ui/design-language.md` §2, "Custom"): a hue and
@@ -464,6 +473,173 @@ describe('secondary and muted text', () => {
   it('starts absent when a preset is converted', () => {
     expect(WARM_LIGHT.secondary).toBeUndefined();
     expect(WARM_LIGHT.muted).toBeUndefined();
+  });
+});
+
+describe('the chart', () => {
+  const RAMP = ['viz1', 'viz2', 'viz3', 'viz4'] as const;
+  const changed = (before: CustomColours, after: CustomColours) => {
+    const [a, b] = [generateCustomRoles(before), generateCustomRoles(after)];
+    return (Object.keys(a) as (keyof UiRoles)[]).filter((role) => a[role] !== b[role]).sort();
+  };
+  const chosen = (start: OwnInk, end: OwnInk, base = WARM_LIGHT): CustomColours => ({ ...base, chart: { follow: false, solid: false, start, end } });
+  // Where a ramp step should sit: a share of the way from start to end in LCh.
+  const between = (start: OwnInk, end: OwnInk, share: number) => {
+    const lch = (end: OwnInk) => ({ ...end, chroma: hexToLch(gamutColour(end.lightness, end)).chroma });
+    const [a, b] = [lch(start), lch(end)];
+    // A grey end shows no hue: the steps take the other end's.
+    const [from, to] = [a.chroma < 0.5 ? b.hue : a.hue, b.chroma < 0.5 ? a.hue : b.hue];
+    return {
+      lightness: a.lightness + share * (b.lightness - a.lightness),
+      chroma: a.chroma + share * (b.chroma - a.chroma),
+      hue: (((from + share * hueTurn(from, to)) % 360) + 360) % 360,
+    };
+  };
+
+  it('draws a theme stored without it byte for byte as the build before it, the legacy `viz` key ignored', () => {
+    const drift = BEFORE_CHART_ROLES.cases.filter(({ stored, roles }) => {
+      const read = parseCustomColours(JSON.parse(JSON.stringify(stored)))!;
+      return read.chart !== undefined || JSON.stringify(generateCustomRoles(read)) !== JSON.stringify(roles);
+    });
+    expect(BEFORE_CHART_ROLES.cases.length).toBeGreaterThanOrEqual(56);
+    expect(BEFORE_CHART_ROLES.cases.filter(({ stored }) => 'viz' in stored).length).toBeGreaterThan(0);
+    expect(new Set(BEFORE_CHART_ROLES.cases.map(({ stored }) => stored.background.mode))).toEqual(new Set(['light', 'dark']));
+    expect(drift).toEqual([]);
+  });
+
+  it('draws the page’s ramp while it follows the background, with Solid bars on or off', () => {
+    BEFORE_CHART_ROLES.cases.forEach(({ stored, roles }) => {
+      const read = parseCustomColours(JSON.parse(JSON.stringify(stored)))!;
+      [false, true].forEach((solid) => {
+        const followed = { ...read, chart: { ...chartOf(read), solid, start: { hue: 10, strength: 90, lightness: 30 } } };
+        expect(JSON.stringify(generateCustomRoles(followed))).toBe(JSON.stringify(roles));
+      });
+    });
+  });
+
+  it('starts following the background with steps on the bars, its ends as drawn', () => {
+    const chart = chartOf(WARM_LIGHT);
+    expect(chart).toMatchObject({ follow: true, solid: false });
+    expect(chart).toEqual({ follow: true, solid: false, ...drawnEnds(WARM_LIGHT) });
+    expect(solidBars(WARM_LIGHT)).toBe(false);
+    expect(solidBars({ chart: { ...chart, solid: true } })).toBe(true);
+    const stored: CustomChart = { follow: false, solid: true, start: { hue: 1, strength: 2, lightness: 3 }, end: { hue: 4, strength: 5, lightness: 6 } };
+    expect(chartOf({ ...WARM_LIGHT, chart: stored })).toBe(stored);
+  });
+
+  it.each(themePresets.flatMap((preset) => (['light', 'dark'] as ThemeMode[]).map((mode) => [preset.id, mode, preset.seeds] as const)))(
+    'repaints neither end when %s in %s leaves the page’s ramp at its ends as drawn',
+    (_id, mode, seeds) => {
+      const base = customFromSeeds(seeds, mode);
+      const before = generateCustomRoles(base);
+      const after = generateCustomRoles({ ...base, chart: { follow: false, solid: false, ...drawnEnds(base) } });
+      expect([after.viz1, after.viz4]).toEqual([before.viz1, before.viz4]);
+      expect(changed(base, { ...base, chart: { follow: false, solid: false, ...drawnEnds(base) } }).every((role) => role === 'viz2' || role === 'viz3')).toBe(true);
+    },
+  );
+
+  it('draws the chosen start and end exactly, and nothing else but the steps between', () => {
+    const start = { hue: 200, strength: 40, lightness: 88 };
+    const end = { hue: 280, strength: 70, lightness: 45 };
+    const roles = generateCustomRoles(chosen(start, end));
+    expect(roles.viz1).toBe(gamutColour(88, start));
+    expect(roles.viz4).toBe(gamutColour(45, end));
+    expect(changed(WARM_LIGHT, chosen(start, end))).toEqual([...RAMP]);
+    expect(roles.viz0).toBe(generateCustomRoles(WARM_LIGHT).viz0);
+  });
+
+  it.each([
+    ['a light', { hue: 200, strength: 40, lightness: 88 }, { hue: 280, strength: 70, lightness: 45 }],
+    ['a dark', { hue: 60, strength: 30, lightness: 26 }, { hue: 20, strength: 60, lightness: 50 }],
+    ['a grey-to-colour', { hue: 90, strength: 0, lightness: 90 }, { hue: 150, strength: 50, lightness: 55 }],
+  ])('puts `viz2` and `viz3` a third and two thirds of the way in LCh, on %s ramp', (_name, start, end) => {
+    const roles = chartRamp({ start, end });
+    ([['viz2', 1 / 3], ['viz3', 2 / 3]] as const).forEach(([role, share]) => {
+      const drawn = hexToLch(roles[role]);
+      const expected = between(start, end, share);
+      expect(Math.abs(drawn.lightness - expected.lightness)).toBeLessThan(0.5);
+      expect(Math.abs(drawn.chroma - expected.chroma)).toBeLessThan(0.8);
+      if (expected.chroma > 5) expect(hueDistance(drawn.hue, expected.hue)).toBeLessThan(1.5);
+    });
+  });
+
+  it.each([
+    ['start', { hue: 270, strength: 0, lightness: 90 }, { hue: 40, strength: 80, lightness: 50 }],
+    ['end', { hue: 40, strength: 80, lightness: 85 }, { hue: 270, strength: 0, lightness: 30 }],
+  ])('keeps the steps on the coloured end’s hue when the %s is a grey, whatever its hue slider says', (_grey, start, end) => {
+    const roles = chartRamp({ start, end });
+    (['viz2', 'viz3'] as const).forEach((role) => {
+      const drawn = hexToLch(roles[role]);
+      expect(drawn.chroma).toBeGreaterThan(5);
+      expect(hueDistance(drawn.hue, 40)).toBeLessThan(3);
+    });
+  });
+
+  it('takes the hue the short way round, across 0/360 either way', () => {
+    const at = (hue: number) => ({ hue, strength: 60, lightness: 60 });
+    const up = chartRamp({ start: at(340), end: at(20) });
+    expect(hueDistance(hexToLch(up.viz2).hue, 353.33)).toBeLessThan(1.5);
+    expect(hueDistance(hexToLch(up.viz3).hue, 6.67)).toBeLessThan(1.5);
+    const down = chartRamp({ start: at(20), end: at(340) });
+    expect(hueDistance(hexToLch(down.viz2).hue, 6.67)).toBeLessThan(1.5);
+    expect(hueDistance(hexToLch(down.viz3).hue, 353.33)).toBeLessThan(1.5);
+  });
+
+  it('turns the short way, and up through rising hue when the ends are opposite', () => {
+    expect(hueTurn(340, 20)).toBe(40);
+    expect(hueTurn(20, 340)).toBe(-40);
+    expect(hueTurn(10, 190)).toBe(180);
+    expect(hueTurn(190, 10)).toBe(180);
+    expect(hueTurn(0, 180)).toBe(180);
+    expect(hueTurn(30, 30)).toBe(0);
+    const opposite = chartRamp({ start: { hue: 0, strength: 50, lightness: 60 }, end: { hue: 180, strength: 50, lightness: 60 } });
+    expect(hueDistance(hexToLch(opposite.viz2).hue, 60)).toBeLessThan(2);
+  });
+
+  it('moves each control of each end only the ramp', () => {
+    const start = chosen({ hue: 200, strength: 40, lightness: 88 }, { hue: 280, strength: 70, lightness: 45 });
+    (['start', 'end'] as const).forEach((which) => {
+      ([['hue', 30], ['strength', 90], ['lightness', 60]] as const).forEach(([field, value]) => {
+        const moved = { ...start, chart: { ...start.chart!, [which]: { ...start.chart![which], [field]: value } } };
+        const roles = changed(start, moved);
+        expect(roles.length).toBeGreaterThan(0);
+        expect(roles.every((role) => (RAMP as readonly string[]).includes(role))).toBe(true);
+      });
+    });
+  });
+
+  it('puts the ends at the new ladder’s `viz1` and `viz4` L* when the mode is switched, and stores none it had not', () => {
+    const start = chosen({ hue: 200, strength: 40, lightness: 88 }, { hue: 280, strength: 70, lightness: 45 });
+    expect(chartInMode(start, 'dark')).toEqual({
+      chart: { ...start.chart, start: { ...start.chart!.start, lightness: rampLightness('dark', 'viz1') }, end: { ...start.chart!.end, lightness: rampLightness('dark', 'viz4') } },
+    });
+    expect(rampLightness('light', 'viz1')).toBe(87);
+    expect(chartInMode(WARM_LIGHT, 'dark')).toEqual({});
+  });
+
+  it('round-trips through the store, unrounded', () => {
+    const chart: CustomChart = { follow: false, solid: true, start: { hue: 359.5, strength: 12.345, lightness: 0 }, end: { hue: 0, strength: 100, lightness: 100 } };
+    expect(parseCustomColours(JSON.parse(JSON.stringify({ ...WARM_LIGHT, chart })))).toEqual({ ...WARM_LIGHT, chart });
+  });
+
+  const END = { hue: 10, strength: 10, lightness: 50 };
+  const CHART = { follow: true, solid: false, start: END, end: END };
+  it.each([
+    ['null', null],
+    ['not an object', true],
+    ['no follow', { solid: false, start: END, end: END }],
+    ['a follow that is not a boolean', { ...CHART, follow: 'yes' }],
+    ['no solid', { follow: true, start: END, end: END }],
+    ['a solid that is not a boolean', { ...CHART, solid: 1 }],
+    ['no start', { follow: false, solid: false, end: END }],
+    ['no end', { follow: true, solid: false, start: END }],
+    ['an end hue of 360', { ...CHART, end: { ...END, hue: 360 } }],
+    ['a negative start hue', { ...CHART, start: { ...END, hue: -1 } }],
+    ['a start strength over 100', { ...CHART, start: { ...END, strength: 100.5 } }],
+    ['an end lightness over 100', { ...CHART, end: { ...END, lightness: 101 } }],
+    ['an end without a lightness', { ...CHART, end: { hue: 10, strength: 10 } }],
+  ])('rejects a chart with %s', (_name, chart) => {
+    expect(parseCustomColours({ ...WARM_LIGHT, chart })).toBeNull();
   });
 });
 

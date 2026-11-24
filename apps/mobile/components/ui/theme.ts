@@ -374,6 +374,12 @@ export function inkStep(mode: ThemeMode, role: 'ink' | 'inkMuted' | 'inkFaint' =
   return { lightness, chroma };
 }
 
+// The L* of a ramp step on a mode's ladder: where a custom chart's ends go
+// when its mode is switched.
+export function rampLightness(mode: ThemeMode, role: 'viz1' | 'viz4'): number {
+  return (mode === 'light' ? LIGHT_STEPS : DARK_STEPS)[role].lightness;
+}
+
 // The L* of a mode's `paper`: where a custom page starts.
 export function paperLightness(mode: ThemeMode): number {
   return (mode === 'light' ? LIGHT_STEPS : DARK_STEPS).paper.lightness;

@@ -43,7 +43,9 @@ import { pointToValue } from '@/components/ui/slider-row';
 import {
   CUSTOM_COLOUR_PARTS,
   CUSTOM_PARTS,
+  chartOf,
   customFromSeeds,
+  drawnEnds,
   customSeed,
   generateCustomRoles,
   ownInks,
@@ -451,9 +453,9 @@ it('shows a page saved outside its mode’s range as it is, until it is moved in
   await waitFor(() => expect(storedCustom()?.background.lightness).toBe(65));
 });
 
-it('offers no Borders, Charts or text-seed part: an old link opens the background', () => {
+it('offers no Borders or text-seed part, and the chart as `chart` alone: an old link opens the background', () => {
   store(CUSTOM);
-  expect(CUSTOM_PARTS).toEqual(['background', 'ink', 'secondary', 'muted', 'accent', 'highlight', 'record', 'direction']);
+  expect(CUSTOM_PARTS).toEqual(['background', 'ink', 'secondary', 'muted', 'accent', 'highlight', 'record', 'chart', 'direction']);
   for (const gone of ['borders', 'viz', 'text']) {
     mockPart = gone;
     render(<ThemeCustomRoute />);
@@ -683,6 +685,112 @@ it('puts stored secondary and muted text at the dark ladder’s L* when the page
   await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Dark' })));
   await waitFor(() => expect(storedCustom()?.background.mode).toBe('dark'));
   expect(storedCustom()).toMatchObject({ secondary: { ...OWN.secondary, lightness: 65 }, muted: { ...OWN.muted, lightness: 49 } });
+});
+
+describe('the chart', () => {
+  // CUSTOM with a ramp of its own.
+  const CHOSEN: CustomColours = {
+    ...CUSTOM,
+    chart: { follow: false, solid: false, start: { hue: 200, strength: 30, lightness: 85 }, end: { hue: 320, strength: 80, lightness: 40 } },
+  };
+  const switchNamed = (name: string) => screen.getByRole('switch', { name });
+  const ENDS = ['Start hue', 'Start strength', 'Start lightness', 'End hue', 'End strength', 'End lightness'];
+  const spotlightBar = (role: string) =>
+    StyleSheet.flatten(screen.getByTestId(`theme-custom-spotlight-3-${role}`, { includeHiddenElements: true }).props.style).backgroundColor;
+
+  beforeEach(() => {
+    mockPart = 'chart';
+  });
+
+  it('opens with Follow background on and Solid bars off, and no ends to set', () => {
+    store(CUSTOM);
+    render(<ThemeCustomRoute />);
+    expect(mockTitles).toContain('Chart');
+    expect(switchNamed('Follow background').props.accessibilityState).toEqual({ checked: true });
+    expect(switchNamed('Solid bars').props.accessibilityState).toEqual({ checked: false });
+    ENDS.forEach((name) => expect(screen.queryByRole('adjustable', { name })).toBeNull());
+    expect(screen.queryByRole('adjustable', { name: 'Hue' })).toBeNull();
+  });
+
+  it('starts its own ramp at the ends the page draws when Follow background is turned off, so neither end moves', async () => {
+    store(CUSTOM);
+    render(<ThemeCustomRoute />);
+    const before = generateCustomRoles(CUSTOM);
+
+    await act(async () => fireEvent.press(switchNamed('Follow background')));
+
+    await waitFor(() => expect(storedCustom()?.chart).toEqual({ follow: false, solid: false, ...drawnEnds(CUSTOM) }));
+    const after = generateCustomRoles(storedCustom()!);
+    expect([after.viz1, after.viz4]).toEqual([before.viz1, before.viz4]);
+    expect(switchNamed('Follow background').props.accessibilityState).toEqual({ checked: false });
+    ENDS.forEach((name) => expect(slider(name)).toBeTruthy());
+    expect(StyleSheet.flatten(screen.getByTestId('theme-custom-end-swatch').props.style).backgroundColor).toBe(after.viz4);
+  });
+
+  it('saves a let-go end, moving the ramp, and writes nothing when it is let go where it is stored', async () => {
+    store(CHOSEN);
+    render(<ThemeCustomRoute />);
+    expect(slider('End lightness').props.accessibilityValue).toEqual({ text: '40' });
+    expect(slider('Start hue').props.accessibilityValue).toEqual({ text: 'Teal, 200 degrees' });
+
+    await step(slider('End lightness'), 'increment');
+    await waitFor(() => expect(storedCustom()?.chart?.end).toEqual({ ...CHOSEN.chart!.end, lightness: 45 }));
+    expect(storedCustom()?.chart?.start).toEqual(CHOSEN.chart!.start);
+    expect(StyleSheet.flatten(screen.getByTestId('theme-custom-end-swatch').props.style).backgroundColor).toBe(generateCustomRoles(storedCustom()!).viz4);
+
+    const setItem = jest.spyOn(Storage, 'setItem');
+    fireEvent(screen.getByTestId('theme-custom-start-strength-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
+    await act(async () => tap(slider('Start strength')).onEnd({ x: 30 }, true));
+    expect(setItem).not.toHaveBeenCalled();
+  });
+
+  it('saves Solid bars, and shows the spotlight’s bars in the end colour while it is on', async () => {
+    store(CUSTOM);
+    render(<ThemeCustomRoute />);
+    const roles = generateCustomRoles(CUSTOM);
+    expect(spotlightBar('viz2')).toBe(roles.viz2);
+
+    await act(async () => fireEvent.press(switchNamed('Solid bars')));
+
+    await waitFor(() => expect(storedCustom()?.chart).toEqual({ ...chartOf(CUSTOM), solid: true }));
+    expect(switchNamed('Solid bars').props.accessibilityState).toEqual({ checked: true });
+    expect(['viz2', 'viz3', 'viz4'].map(spotlightBar)).toEqual([roles.viz4, roles.viz4, roles.viz4]);
+    // The page's ramp is drawn as before.
+    expect(generateCustomRoles(storedCustom()!)).toEqual(roles);
+
+    await act(async () => fireEvent.press(switchNamed('Solid bars')));
+    await waitFor(() => expect(storedCustom()?.chart?.solid).toBe(false));
+  });
+
+  it('follows the background again, keeping the ends it had and the page’s ramp drawn', async () => {
+    store({ ...CHOSEN, chart: { ...CHOSEN.chart!, solid: true } });
+    render(<ThemeCustomRoute />);
+    await act(async () => fireEvent.press(switchNamed('Follow background')));
+    await waitFor(() => expect(storedCustom()?.chart).toEqual({ ...CHOSEN.chart, follow: true, solid: true }));
+    expect(screen.queryByRole('adjustable', { name: 'Start hue' })).toBeNull();
+    expect(generateCustomRoles(storedCustom()!)).toEqual(generateCustomRoles(CUSTOM));
+  });
+
+  it('puts a stored chart’s ends at the dark ladder’s ramp ends when the page switches to dark', async () => {
+    mockPart = 'background';
+    store(CHOSEN);
+    render(<ThemeCustomRoute />);
+    await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Dark' })));
+    await waitFor(() => expect(storedCustom()?.background.mode).toBe('dark'));
+    expect(storedCustom()?.chart).toEqual({
+      ...CHOSEN.chart,
+      start: { ...CHOSEN.chart!.start, lightness: 26 },
+      end: { ...CHOSEN.chart!.end, lightness: 45.5 },
+    });
+  });
+
+  it('says the chart could not be saved when the save fails', async () => {
+    store(CUSTOM);
+    jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
+    render(<ThemeCustomRoute />);
+    await act(async () => fireEvent.press(switchNamed('Solid bars')));
+    await waitFor(() => expect(screen.getByTestId('theme-custom-error')).toHaveTextContent('Couldn’t save the chart. Nothing changed.'));
+  });
 });
 
 describe('pointToValue', () => {

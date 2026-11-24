@@ -4,7 +4,7 @@ import { StyleSheet, type ColorSchemeName } from 'react-native';
 import type { ThemeMode, UiRoles } from '@/components/ui/theme';
 import { launchTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
 import { followsPhone, pinNativeMode, readPhoneScheme, subscribePhoneScheme } from '@/components/ui/theme-native';
-import { appearanceMode, appearanceRoles, type AppearanceChoice } from '@/components/ui/theme-presets';
+import { appearanceMode, appearanceRoles, appearanceSolidBars, type AppearanceChoice } from '@/components/ui/theme-presets';
 import { logEvent } from '@/src/logging';
 
 // The appearance the app is drawn in while it runs: the stored choice, the
@@ -119,6 +119,28 @@ export function useAppTheme(): AppTheme {
 // svg `fill`, an `ActivityIndicator`'s `color`.
 export function useUiRoles(): UiRoles {
   return useContext(AppThemeContext).roles;
+}
+
+// The ramp steps a bar mark is drawn in — a filled share of a track, or a
+// trained day: the theme's own steps, or each its ramp's end (`viz4`) when a
+// custom theme draws solid bars. Heatmap tiles and the body map read the
+// ramp itself (`useUiRoles()`).
+export type BarFills = Pick<UiRoles, 'viz2' | 'viz3' | 'viz4'>;
+
+const solidFills = new WeakMap<UiRoles, BarFills>();
+
+export function barFills(roles: UiRoles, solid: boolean): BarFills {
+  if (!solid) return roles;
+  const cached = solidFills.get(roles);
+  if (cached) return cached;
+  const fills = { viz2: roles.viz4, viz3: roles.viz4, viz4: roles.viz4 };
+  solidFills.set(roles, fills);
+  return fills;
+}
+
+export function useBarFills(): BarFills {
+  const { appearance, roles } = useContext(AppThemeContext);
+  return barFills(roles, appearanceSolidBars(appearance));
 }
 
 // The mode the app is drawn in now: what a native surface takes when it is

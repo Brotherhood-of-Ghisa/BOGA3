@@ -356,6 +356,24 @@ describe('custom', () => {
     expect(screen.getByLabelText(`Muted text, ${hueName(muted.hue)}, ${Math.round(muted.strength)}%`)).toBeTruthy();
   });
 
+  it('names the chart by what its ramp follows, or its ends’ hues, then solid bars, and pushes its picker', () => {
+    const end = { strength: 50, lightness: 50 };
+    const cases: [object | undefined, string][] = [
+      [undefined, 'Follows background'],
+      [{ follow: true, solid: true, start: { ...end, hue: 200 }, end: { ...end, hue: 300 } }, 'Follows background, solid bars'],
+      [{ follow: false, solid: false, start: { ...end, hue: 200 }, end: { ...end, hue: 300 } }, 'Teal to Indigo'],
+      [{ follow: false, solid: true, start: { ...end, hue: 200 }, end: { ...end, hue: 300 } }, 'Teal to Indigo, solid bars'],
+    ];
+    cases.forEach(([chart, label]) => {
+      Storage.setItemSync(APPEARANCE_STORAGE_KEY, JSON.stringify({ theme: 'custom', mode: 'light', custom: { ...CUSTOM, chart } }));
+      const view = render(<SettingsAppearanceRoute />);
+      expect(screen.getByLabelText(`Chart, ${label}`)).toBeTruthy();
+      fireEvent.press(screen.getByTestId('settings-appearance-custom-chart'));
+      expect(mockPush).toHaveBeenLastCalledWith('/theme-custom?part=chart');
+      view.unmount();
+    });
+  });
+
   it('names a highlight of its own by its hue and strength', () => {
     Storage.setItemSync(
       APPEARANCE_STORAGE_KEY,
