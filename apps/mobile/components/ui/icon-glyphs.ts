@@ -56,6 +56,10 @@ export const ICON_GLYPHS = {
   // BoGa: a solid pointer, for marking a selected column from above.
   'caret-down': [path('M6 8h12l-6 8z', 'solid')],
 
+  // Lucide `maximize-2` and `minimize-2`.
+  'expand-chart': [path('M15 3h6v6'), path('m21 3-7 7'), path('M9 21H3v-6'), path('m3 21 7-7')],
+  'collapse-chart': [path('M10 3v7H3'), path('m3 3 7 7'), path('M14 21v-7h7'), path('m21 21-7-7')],
+
   // --- Actions ---
   // Lucide `info`: open an on-demand explanation.
   info: [circle(12, 12, 10), path('M12 16v-4'), path('M12 8h.01')],

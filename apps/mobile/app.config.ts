@@ -71,7 +71,8 @@ export default ({ config }: { config: ExpoConfig }) => ({
     name: process.env.APP_NAME ?? "Boga3",
     slug: "boga3",
     version: "2.2.0",
-    orientation: "portrait",
+    // The root stack keeps screens in portrait and lets the expanded Timeline rotate.
+    orientation: "default",
     icon: "./assets/images/app-icons/warm.png",
     scheme: APP_SCHEME,
     // "automatic", so the app can read and follow the phone's mode: a pinned
@@ -129,6 +130,7 @@ export default ({ config }: { config: ExpoConfig }) => ({
         ],
         "./plugins/with-android-app-icon-state",
         "expo-router",
+        ["expo-screen-orientation", { initialOrientation: "PORTRAIT" }],
         [
             "expo-splash-screen",
             {

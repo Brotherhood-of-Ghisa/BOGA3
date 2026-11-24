@@ -4,7 +4,7 @@ import { AccessibilityInfo, findNodeHandle, Platform, ScrollView, StyleSheet, Te
 import { FilterChip } from '@/components/exercise-catalog/exercise-list-controls';
 import { Icon } from '@/components/ui/icon';
 import { ListRow } from '@/components/ui/list-row';
-import { Sheet } from '@/components/ui/sheet';
+import { Sheet, type SheetProps } from '@/components/ui/sheet';
 import { useUiText } from '@/components/ui/text-roles';
 import {
   ALL_GYMS_LABEL,
@@ -39,6 +39,7 @@ export type GymPickerSheetProps = GymScopeChoiceProps & {
   /** Sessions in the whole view, beside `All gyms`, when the options count theirs. */
   allSessionCount?: number;
   onDismissed?: () => void;
+  supportedOrientations?: SheetProps['supportedOrientations'];
   /** The button's: the sheet is `<testID>-sheet`, its rows `<testID>-option-<gym>`. */
   testID: string;
 };
@@ -62,7 +63,7 @@ const offeredOptions = (value: string | null | undefined, options: readonly GymS
  * `GymPicker` is both in place; a page whose button lives in its header draws
  * `GymPickerButton` there and `GymPickerSheet` in its body.
  */
-export function GymPicker({ value, options, onChange, allSessionCount, size = 'pill', testID }: GymPickerProps) {
+export function GymPicker({ value, options, onChange, allSessionCount, size = 'pill', supportedOrientations, testID }: GymPickerProps) {
   const [open, setOpen] = useState(false);
   const origin = useRef<ComponentRef<typeof View> | null>(null);
   // The button that opened the sheet takes the reader's focus back.
@@ -78,7 +79,7 @@ export function GymPicker({ value, options, onChange, allSessionCount, size = 'p
         <GymPickerButton onPress={() => setOpen(true)} options={options} size={size} testID={testID} value={value} />
       </View>
       <GymPickerSheet allSessionCount={allSessionCount} onChange={onChange} onClose={() => setOpen(false)}
-        onDismissed={restoreFocus} options={options} testID={testID} value={value} visible={open} />
+        onDismissed={restoreFocus} options={options} supportedOrientations={supportedOrientations} testID={testID} value={value} visible={open} />
     </>
   );
 }
@@ -103,7 +104,7 @@ export function GymPickerButton({ value, options, onPress, size = 'pill', testID
 }
 
 export function GymPickerSheet({
-  visible, onClose, onChange, onDismissed, value, options, allSessionCount, testID,
+  visible, onClose, onChange, onDismissed, value, options, allSessionCount, supportedOrientations, testID,
 }: GymPickerSheetProps) {
   const choose = (gymId: string | null | undefined) => {
     onClose();
@@ -114,6 +115,7 @@ export function GymPickerSheet({
       dismissLabel="Dismiss gyms"
       onDismiss={onClose}
       onDismissed={onDismissed}
+      supportedOrientations={supportedOrientations}
       testID={`${testID}-sheet`}
       title="Gym"
       visible={visible}>

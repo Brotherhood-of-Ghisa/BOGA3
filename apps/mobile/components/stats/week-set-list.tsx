@@ -26,6 +26,7 @@ type Props = WeekSetsState & {
   testID: string;
   contributionMetric?: 'workingSetCount' | 'totalVolume';
   period?: 'day' | 'week';
+  wrapSetRows?: boolean;
 };
 
 const OPEN_EXERCISE_ACTION = 'openExercise';
@@ -50,7 +51,7 @@ function ContributionLine({ credit, role, testID }: { credit: string | null; rol
   </Text>;
 }
 
-export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLink, onRetry, testID, contributionMetric, period = 'week' }: Props) {
+export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLink, onRetry, testID, contributionMetric, period = 'week', wrapSetRows }: Props) {
   const text = useUiText();
   const showLoading = useDelayedFlag(loading, WEEK_SETS_LOADING_DELAY_MS);
   if (error) {
@@ -66,16 +67,17 @@ export function WeekSetList({ groups, loading, error, onOpenSession, exerciseLin
   }
   return <View style={styles.list} testID={testID}>
     {groups.map((group) => <WeekSetCard key={group.key} exerciseLink={exerciseLink} group={group} contributionMetric={contributionMetric}
-      onOpenSession={onOpenSession} testID={`${testID}-card-${group.key}`} />)}
+      onOpenSession={onOpenSession} testID={`${testID}-card-${group.key}`} wrapSetRows={wrapSetRows} />)}
   </View>;
 }
 
-function WeekSetCard({ group, onOpenSession, exerciseLink, testID, contributionMetric }: {
+function WeekSetCard({ group, onOpenSession, exerciseLink, testID, contributionMetric, wrapSetRows }: {
   group: WeekSetGroup;
   onOpenSession: (sessionId: string) => void;
   exerciseLink?: WeekSetExerciseLink;
   testID: string;
   contributionMetric?: Props['contributionMetric'];
+  wrapSetRows?: boolean;
 }) {
   const text = useUiText();
   const credit = contributionCredit(group, contributionMetric);
@@ -108,7 +110,7 @@ function WeekSetCard({ group, onOpenSession, exerciseLink, testID, contributionM
       <ContributionLine credit={credit} role={group.role} testID={testID} />
     </>}
     name={group.title} onPress={() => onOpenSession(group.sessionId)} rows={group.rows} record={group.record}
-    testID={testID} />;
+    testID={testID} wrapSetRows={wrapSetRows} />;
 }
 
 const styles = StyleSheet.create({

@@ -275,6 +275,7 @@ describe('RootLayout auth bootstrap wiring', () => {
     expect(mockStack).toHaveBeenCalledWith({
       screenOptions: {
         headerBackButtonDisplayMode: 'minimal',
+        orientation: 'portrait',
         // One design-language header style on every stack route: the page's
         // own `paper` ground with no shadow line, and the title role.
         headerStyle: { backgroundColor: launchRoles.paper },

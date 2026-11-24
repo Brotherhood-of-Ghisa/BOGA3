@@ -15,6 +15,7 @@ import { isUiGalleryAllowed } from '@/src/utils/isUiGalleryAllowed';
  */
 const ROOT_STACK_SCREEN_OPTIONS = {
   headerBackButtonDisplayMode: 'minimal',
+  orientation: 'portrait',
 } as const;
 
 /**

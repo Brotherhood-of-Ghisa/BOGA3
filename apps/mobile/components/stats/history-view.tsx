@@ -1,9 +1,11 @@
+import { useFocusEffect } from 'expo-router';
 import { useDateFormat } from '@/src/preferences/hooks';
 import { formatCalendarWeek } from '@/src/utils/local-time';
 import type { HeatmapView } from '@/src/preferences/model';
 import { formatOneRepMax, formatVolume, formatWeight, formatWholeSetCount } from '@/src/exercise-calculations/format';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, BackHandler, ScrollView, StyleSheet, Text, View, findNodeHandle, type ViewInstance } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   DailyHeatmap, TimelineHeatmap, WeeklyHeatmap, buildHeatmapData,
@@ -12,10 +14,13 @@ import {
 import { WeekSetList, type WeekSetExerciseLink } from '@/components/stats/week-set-list';
 import { useWeekSets, type WeekSetsTarget } from '@/components/stats/week-sets';
 import {
+  Card,
+  IconButton,
   SegmentedControl,
   StatePanel,
   ToggleChip,
   uiSpace,
+  useUiText,
 } from '@/components/ui';
 import type {
   CalendarHeatmapMetric,
@@ -88,6 +93,72 @@ export type TimelineLinks = {
   exerciseLink?: WeekSetExerciseLink;
 };
 
+type TimelineDisplay = { expanded: boolean; onToggle: () => void };
+type TimelineInspection = ReturnType<typeof useTimelineInspection>;
+
+function useTimelineInspection(display: TimelineDisplay | undefined) {
+  const expanded = display?.expanded === true;
+  const toggle = display?.onToggle;
+  const [showDetails, setShowDetails] = useState(false);
+  const [restoreFocus, setRestoreFocus] = useState(false);
+  const open = useCallback(() => setShowDetails(true), []);
+  const close = useCallback(() => setShowDetails(false), []);
+  const expand = () => {
+    close();
+    setRestoreFocus(false);
+    toggle?.();
+  };
+  const collapse = useCallback(() => {
+    close();
+    setRestoreFocus(true);
+    toggle?.();
+  }, [close, toggle]);
+  return { showDetails: expanded && showDetails, open, close, expand, collapse, restoreFocus };
+}
+
+function TimelineBackHandler({ inspection }: { inspection: TimelineInspection }) {
+  const { showDetails, close, collapse } = inspection;
+  useFocusEffect(useCallback(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (showDetails) close();
+      else collapse();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [showDetails, close, collapse]));
+  return null;
+}
+
+function TimelineExpandButton({ onPress, restoreFocus, testID }: {
+  onPress: () => void; restoreFocus: boolean; testID: string;
+}) {
+  const button = useRef<ViewInstance>(null);
+  useEffect(() => {
+    if (!restoreFocus) return;
+    const frame = requestAnimationFrame(() => {
+      const target = findNodeHandle(button.current);
+      if (typeof target === 'number') AccessibilityInfo.setAccessibilityFocus(target);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [restoreFocus]);
+  return <IconButton ref={button} name="expand-chart" accessibilityLabel="Expand chart" onPress={onPress} testID={testID} />;
+}
+
+function TimelineWeekOverlay({ children, onClose, testID }: { children: ReactNode; onClose: () => void; testID: string }) {
+  return (
+    <Card style={styles.weekOverlay} testID={testID}>
+      <View onAccessibilityEscape={onClose} style={styles.weekOverlay}>
+        <View style={styles.overlayActions}>
+          <IconButton name="x" accessibilityLabel="Close week details" onPress={onClose} testID={`${testID}-close`} />
+        </View>
+        <ScrollView style={styles.overlayScroll} contentContainerStyle={styles.overlayContent}>
+          {children}
+        </ScrollView>
+      </View>
+    </Card>
+  );
+}
+
 const VIEWS: readonly HeatmapView[] = ['timeline', 'daily', 'weekly'];
 
 const sameFocusedWeek = (left: FocusedTimelineWeek | null, right: FocusedTimelineWeek | null): boolean =>
@@ -108,6 +179,8 @@ function HistoryHeatmap({
   status,
   timeline,
   onFocusWeek,
+  timelineDisplay,
+  inspection,
 }: {
   dailyMetrics: DailyEffortMetrics[];
   metric: CalendarHeatmapMetric;
@@ -122,6 +195,8 @@ function HistoryHeatmap({
   status: ReactNode;
   timeline: TimelineLinks;
   onFocusWeek?: (week: FocusedTimelineWeek | null) => void;
+  timelineDisplay?: TimelineDisplay;
+  inspection: TimelineInspection;
 }) {
   const dateFormat = useDateFormat();
   // Every view spans the saved window and scrolls vertically.
@@ -163,23 +238,33 @@ function HistoryHeatmap({
   }, [focusedWeek, onFocusWeek]);
   // A failed read drops the chart entirely, and the page's week goes with it.
   useEffect(() => () => report.current?.(null), []);
-  const timelineChart = useMemo(
-    () => (
-      <TimelineHeatmap
-        data={data}
-        metric={metric}
-        selectedWeekKey={selectedWeekKey}
-        onSelectWeek={setSelection}
-        testIDPrefix={testIDPrefix}
-        formatValue={formatDailyValue}
-        metricLabel={metricLabel}
-        unitLabel={UNIT_LABELS[metric]}
-        header={status}>
-        <WeekSetList {...weekSets} exerciseLink={exerciseLink} onOpenSession={onOpenSession} onRetry={retryWeekSets}
-          testID={`${testIDPrefix}-week-sets`} />
-      </TimelineHeatmap>
-    ),
-    [data, metric, selectedWeekKey, testIDPrefix, formatDailyValue, metricLabel, status, weekSets, onOpenSession, exerciseLink, retryWeekSets]
+  const expanded = timelineDisplay?.expanded === true;
+  const setList = (
+    <WeekSetList {...weekSets} groups={expanded && !weekSets.sameScope ? [] : weekSets.groups}
+      exerciseLink={exerciseLink} onOpenSession={onOpenSession} onRetry={retryWeekSets} wrapSetRows={expanded} testID={`${testIDPrefix}-week-sets`} />
+  );
+  const timelineChart = (
+    <TimelineHeatmap
+      data={data}
+      metric={metric}
+      selectedWeekKey={selectedWeekKey}
+      onSelectWeek={setSelection}
+      testIDPrefix={testIDPrefix}
+      formatValue={formatDailyValue}
+      metricLabel={metricLabel}
+      unitLabel={UNIT_LABELS[metric]}
+      header={expanded ? undefined : status}
+      display={{
+        expanded,
+        action: timelineDisplay && !expanded ? <TimelineExpandButton onPress={inspection.expand} restoreFocus={inspection.restoreFocus}
+          testID={`${testIDPrefix}-timeline-expand`} /> : undefined,
+        onInspect: expanded ? inspection.open : undefined,
+        details: inspection.showDetails ? <TimelineWeekOverlay onClose={inspection.close} testID={`${testIDPrefix}-timeline-details`}>
+          {setList}
+        </TimelineWeekOverlay> : undefined,
+      }}>
+      {expanded ? null : setList}
+    </TimelineHeatmap>
   );
   const dailyHeatmap = useMemo(
     () => (
@@ -275,6 +360,7 @@ export type HistoryViewProps<TMetric extends CalendarHeatmapMetric> = {
   onFocusWeek?: (week: FocusedTimelineWeek | null) => void;
   // The page's gym button or Filters, closing the selector row.
   filters?: ReactNode;
+  timelineDisplay?: TimelineDisplay;
 };
 
 export function HistoryView<TMetric extends CalendarHeatmapMetric>({
@@ -298,8 +384,13 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
   timeline,
   onFocusWeek,
   filters,
+  timelineDisplay,
 }: HistoryViewProps<TMetric>) {
   const prefix = `stats-${kind}-history`;
+  const expanded = timelineDisplay?.expanded === true;
+  const inspection = useTimelineInspection(timelineDisplay);
+  const insets = useSafeAreaInsets();
+  const text = useUiText();
   const metricLabel = metricOptions.find(option => option.value === metric)?.label ?? METRIC_LABELS[metric];
   const named = subject ? `${subject} ` : '';
   // A reload keeps the last read's chart up (`useHistory`), so only a page with
@@ -336,11 +427,14 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
   </>;
 
   return (
-    <View style={styles.body} testID={`${prefix}-overlay`}>
-      {/* One row: the view as icons, the metric as one chip that steps to
-          the next on a tap, then the page's gym or filters. */}
-      <View style={styles.controls}>
-        <SegmentedControl
+    <View style={[styles.body, expanded && {
+      paddingTop: insets.top, paddingLeft: insets.left, paddingRight: insets.right, paddingBottom: insets.bottom,
+    }]} testID={`${prefix}-overlay`}>
+      {expanded ? <TimelineBackHandler inspection={inspection} /> : null}
+      <View style={[styles.controls, expanded && styles.landscapeControls]}>
+        {expanded ? (
+          <Text accessibilityRole="header" allowFontScaling={false} numberOfLines={1} style={[text.title, styles.landscapeTitle]}>{subject}</Text>
+        ) : <SegmentedControl
           accessibilityLabel="Select history view"
           density="compact"
           // Icon segments are 32pt wide: hit slop keeps the 44pt target
@@ -352,7 +446,7 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
           selectedGround="selection"
           testIDPrefix={`${prefix}-view-chip`}
           value={view}
-        />
+        />}
         <ToggleChip
           accessibilityLabel="Effort metric"
           onChange={onSelectMetric}
@@ -361,6 +455,8 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
           value={metric}
         />
         {filters}
+        {expanded ? <IconButton accessibilityLabel="Collapse chart" name="collapse-chart" onPress={inspection.collapse}
+          testID={`${prefix}-timeline-collapse`} /> : null}
       </View>
 
       {!!errorMessage || firstLoad ? (
@@ -379,6 +475,8 @@ export function HistoryView<TMetric extends CalendarHeatmapMetric>({
         status={status}
         timeline={timeline}
         onFocusWeek={onFocusWeek}
+        timelineDisplay={timelineDisplay}
+        inspection={inspection}
       />}
     </View>
   );
@@ -398,6 +496,12 @@ const styles = StyleSheet.create({
     paddingTop: uiSpace.md,
     paddingBottom: uiSpace.md,
   },
+  landscapeControls: { paddingTop: 0, paddingBottom: 0 },
+  landscapeTitle: { flex: 1 },
+  weekOverlay: { flexShrink: 1 },
+  overlayActions: { alignItems: 'flex-end', paddingHorizontal: uiSpace.xs },
+  overlayScroll: { flexGrow: 0, flexShrink: 1 },
+  overlayContent: { paddingHorizontal: uiSpace.sm, paddingBottom: uiSpace.sm },
   scroll: {
     flex: 1,
   },

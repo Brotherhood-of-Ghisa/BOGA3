@@ -21,6 +21,7 @@ type ExerciseSetsCardBaseProps = {
   rows: SessionViewSetRow[];
   hideDerivedMetrics?: boolean;
   percentageMetrics?: boolean;
+  wrapSetRows?: boolean;
   // The `record` band, one line per record this card holds; empty for none.
   record?: readonly RecordLine[];
   // Under the header, before the set rows (exercise history's gym, tags and
@@ -58,6 +59,7 @@ export function ExerciseSetsCard({
   rows,
   hideDerivedMetrics = false,
   percentageMetrics = false,
+  wrapSetRows = false,
   record = [],
   summary,
   accessory,
@@ -73,10 +75,10 @@ export function ExerciseSetsCard({
   const content = (
     <>
       <View style={styles.header}>
-        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1} style={[text.title, styles.name]}>
+        <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={wrapSetRows ? undefined : 1} style={[text.title, styles.name]}>
           <FigureText strong>{name}</FigureText>
         </Text>
-        <Text allowFontScaling={false} numberOfLines={1} style={[text.meta, styles.count, countMuted ? tone.faint : null]} testID={`${testID}-count`}>
+        <Text allowFontScaling={false} numberOfLines={wrapSetRows ? undefined : 1} style={[text.meta, styles.count, countMuted ? tone.faint : null]} testID={`${testID}-count`}>
           <FigureText>{count}</FigureText>
         </Text>
         {accessory}
@@ -90,6 +92,7 @@ export function ExerciseSetsCard({
               row={row}
               hideDerivedMetrics={hideDerivedMetrics}
               percentageMetrics={percentageMetrics}
+              wrapMetrics={wrapSetRows}
               testID={rowTestID ? rowTestID(row, index) : `${testID}-set-${index + 1}`}
             />
           ))}

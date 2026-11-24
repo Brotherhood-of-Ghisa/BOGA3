@@ -11,49 +11,52 @@ import type { SessionViewSetRow } from '@/src/session-recorder/session-view-mode
 // figure in a row shares the row's colour and weight; only the record set's
 // 1RM and Weight records stand out, in `record`, as on the exercise page
 // (decided on device 2026-09-23: per-column bests read as noise).
-export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percentageMetrics = false }:
-  { row: SessionViewSetRow; testID: string; hideDerivedMetrics?: boolean; percentageMetrics?: boolean }) {
+export function SetSummaryRow({ row, testID, hideDerivedMetrics = false, percentageMetrics = false, wrapMetrics = false }:
+  { row: SessionViewSetRow; testID: string; hideDerivedMetrics?: boolean; percentageMetrics?: boolean; wrapMetrics?: boolean }) {
   const text = useUiText();
   const tone = useUiTextTone();
   const state = row.done ? 'realised' : 'planned';
+  const display = (value: string) => percentageMetrics ? value.replace(' %BW', '%') : value;
+  const metrics = !hideDerivedMetrics && row.recordingMode !== 'hold' ? <>
+    <View style={[styles.metricColumn, !wrapMetrics && styles.oneRepMaxColumn]} testID={`${testID}-1rm-column`}>
+      <Stat
+        emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}
+        label="1RM"
+        layout="inline"
+        state={state}
+        testID={`${testID}-1rm`}
+        value={display(row.oneRepMax)}
+        spokenValue={row.oneRepMax}
+        valueWidth="hug"
+      />
+    </View>
+    <View style={[styles.metricColumn, !wrapMetrics && styles.volumeColumn, percentageMetrics && styles.percentageVolumeColumn]} testID={`${testID}-vol-column`}>
+      <Stat
+        label="Vol"
+        layout="inline"
+        state={state}
+        testID={`${testID}-vol`}
+        value={display(row.volume)}
+        spokenValue={row.volume}
+        valueWidth="hug"
+      />
+    </View>
+  </> : null;
+
   return (
-    <View style={[styles.setRow, percentageMetrics && styles.percentageRow]} testID={testID}>
+    <View style={[styles.setRow, percentageMetrics && styles.percentageRow, wrapMetrics && styles.wrappingRow]} testID={testID}>
       <Text accessibilityLabel={row.typeLabel} allowFontScaling={false} numberOfLines={1} style={[text.label, row.done ? tone.ink : tone.faint, styles.effortColumn]}>
         <FigureText>{row.typeLabel === 'Technique' ? 'Tech' : row.typeLabel}</FigureText>
       </Text>
       <Text
         allowFontScaling={false}
         accessibilityLabel={row.recordingMode === 'hold' ? row.weightReps.replace(/ s$/, ' seconds') : percentageMetrics ? row.weightReps : undefined}
-        numberOfLines={1}
-        style={[text.figure, row.done ? (row.weightRecord ? tone.record : null) : tone.faint, styles.weightReps]}
+        numberOfLines={wrapMetrics ? undefined : 1}
+        style={[text.figure, row.done ? (row.weightRecord ? tone.record : null) : tone.faint, styles.weightReps, wrapMetrics && styles.wrappingWeight]}
         testID={`${testID}-values`}>
-        {percentageMetrics ? row.weightReps.replace(' %BW', '%') : row.weightReps}
+        {display(row.weightReps)}
       </Text>
-      {!hideDerivedMetrics && row.recordingMode !== 'hold' ? <>
-      <View style={[styles.metricColumn, styles.oneRepMaxColumn]} testID={`${testID}-1rm-column`}>
-        <Stat
-          emphasis={row.done && row.oneRepMaxRecord ? 'record' : 'none'}
-          label="1RM"
-          layout="inline"
-          state={state}
-          testID={`${testID}-1rm`}
-          value={percentageMetrics ? row.oneRepMax.replace(' %BW', '%') : row.oneRepMax}
-          spokenValue={row.oneRepMax}
-          valueWidth="hug"
-        />
-      </View>
-      <View style={[styles.metricColumn, styles.volumeColumn, percentageMetrics && styles.percentageVolumeColumn]} testID={`${testID}-vol-column`}>
-        <Stat
-          label="Vol"
-          layout="inline"
-          state={state}
-          testID={`${testID}-vol`}
-          value={percentageMetrics ? row.volume.replace(' %BW', '%') : row.volume}
-          spokenValue={row.volume}
-          valueWidth="hug"
-        />
-      </View>
-      </> : null}
+      {wrapMetrics && metrics ? <View style={styles.wrappingMetrics}>{metrics}</View> : metrics}
     </View>
   );
 }
@@ -67,6 +70,9 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
     gap: uiSpace.sm,
   },
+  wrappingRow: { flexWrap: 'wrap' },
+  wrappingWeight: { minWidth: 105 },
+  wrappingMetrics: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: uiSpace.sm, marginLeft: 'auto' },
   effortColumn: {
     width: uiGeometry.tapTarget,
   },
