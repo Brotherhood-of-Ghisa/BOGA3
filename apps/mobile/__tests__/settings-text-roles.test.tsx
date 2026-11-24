@@ -20,6 +20,7 @@ const defaultRoles = rolesFor(DEFAULT_APPEARANCE);
 const TITLE = { fontFamily: uiFonts.display.family, fontWeight: '700', fontSize: uiTypography.size.lg, lineHeight: uiTypography.lineHeight.lg } as const;
 const FIGURE = { fontFamily: uiFonts.figure.family, fontWeight: '500', fontSize: uiTypography.size.base } as const;
 const META = { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.sm } as const;
+const BODY = { fontFamily: uiFonts.body.family, fontWeight: '400', fontSize: uiTypography.size.base } as const;
 
 describe('ThemePreview', () => {
   // The preview is decoration, hidden from accessibility (`no-hide-descendants`).
@@ -40,14 +41,29 @@ describe('ThemePreview', () => {
     const preview = renderPreview();
     expect(preview.getByText('80 × 8')).toHaveStyle(FIGURE);
     // The first `1` is the header's set count; the second, the set's number.
-    expect(preview.getAllByText('1')[1]).toHaveStyle({ ...FIGURE, color: roles.inkFaint });
+    expect(preview.getAllByText('1')[1]).toHaveStyle({ ...FIGURE, color: roles.inkMuted });
     expect(preview.getByText('2')).toHaveStyle({ ...FIGURE, color: roles.accent });
   });
 
-  it('keeps words out of Plex Mono on the meta lines, only their figures in it', () => {
+  it('shows the secondary text, the muted text and the direction at a size that reads', () => {
+    const preview = renderPreview();
+    // The secondary text: the header's line, and each done set's 1RM beside it.
+    expect(preview.getByText(/^1 set · 1RM/)).toHaveStyle({ ...BODY, color: roles.inkMuted });
+    // The muted text: a planned set, every figure faded ([[set.row-figures]]).
+    const planned = within(screen.getByTestId('preview-planned'));
+    expect(planned.getByText('3')).toHaveStyle({ ...FIGURE, color: roles.inkFaint });
+    expect(planned.getByText('85 × 8')).toHaveStyle({ ...FIGURE, color: roles.inkFaint });
+    // The direction: a change up and one down.
+    const changes = within(screen.getByTestId('preview-changes'));
+    expect(changes.getByText('+2.5')).toHaveStyle({ fontFamily: uiFonts.figure.family, color: roles.gain });
+    expect(changes.getByText('−1')).toHaveStyle({ fontFamily: uiFonts.figure.family, color: roles.loss });
+  });
+
+  it('keeps words out of Plex Mono on the body lines, only their figures in it', () => {
     const preview = renderPreview();
     const header = preview.getByText(/^1 set · 1RM/);
-    expect(header).toHaveStyle({ ...META, color: roles.inkMuted });
+    expect(header).toHaveStyle({ ...BODY, color: roles.inkMuted });
+    expect(preview.getByText('Since last week')).toHaveStyle({ ...BODY, color: roles.pageInkMuted });
     expect(within(header).getAllByText(/^\d/).length).toBeGreaterThan(0);
     within(header).getAllByText(/^\d/).forEach((figure) => expect(figure).toHaveStyle({ fontFamily: uiFonts.figure.family }));
   });

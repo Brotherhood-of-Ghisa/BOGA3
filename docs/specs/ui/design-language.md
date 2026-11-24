@@ -94,11 +94,12 @@ an invalid record or an unreadable store opens, logged, in the default. `record`
 stays brass across presets. Its editor: `ux-rules.md` "Appearance".
 
 **Custom** (`theme-custom.ts`): a hue and strength per seed, highlight, ink
-and ramp end; a direction. The page sets mode, L\* (dark 0–35, light 65–100;
-quarter steps), depth, borders. Roles keep hue, chroma and `paper` → `ink`
+and ramp end; a direction. The page sets mode, L\* (0–100, quarter steps),
+depth, borders. Roles keep hue, chroma and `paper` → `ink`
 share, scaled 0–300%: depth the grounds and `viz0`, borders (absent, the
-depth) the rules, highlight contrast `accent-wash`. Inks (primary: light
-0–40, dark 60–100), ramp ends, accent, record: own, ungapped L\* (0–100).
+depth) the rules, a matching highlight's contrast `accent-wash`. Page, inks,
+ramp ends, accent, record, an unmatched highlight: own, ungapped L\* (0–100), so
+every sRGB colour is reachable.
 Strengths share their L\*'s sRGB maximum. The ramp follows the page or runs
 `viz1` → `viz4` via LCh thirds (short hue arc); Solid bars: [[appearance.solid-bars]]. Absent fields (and, until
 moved, fixed-chroma strengths) draw as before; old `borders`/`viz` ignored.

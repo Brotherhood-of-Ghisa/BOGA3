@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
-import { useMemo, useState, type ReactNode } from 'react';
-import { StyleSheet, View, type ColorSchemeName } from 'react-native';
+import { useMemo, useState } from 'react';
+import { StyleSheet, Text, View, type ColorSchemeName } from 'react-native';
 
 import {
   appearanceRoles,
@@ -13,7 +13,19 @@ import {
 import { applyingHeaderRight } from '@/components/appearance/theme-header';
 import { PartSpotlight, ThemePreview } from '@/components/appearance/theme-preview';
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
-import { FormSection, HeaderTitleMenu, Notice, RadioRow, Screen, SliderRow, SwitchRow, uiGeometry, uiHairline, uiSpace, useUiRoles } from '@/components/ui';
+import {
+  FormSection,
+  HeaderTitleMenu,
+  Notice,
+  RadioRow,
+  Screen,
+  SliderRow,
+  SwitchRow,
+  ValueRow,
+  uiSpace,
+  useUiText,
+  useUiTextTone,
+} from '@/components/ui';
 import { THEME_DIRECTIONS, type ThemeMode, type UiRoles } from '@/components/ui/theme';
 import { hexToLch } from '@/components/ui/lch';
 import {
@@ -31,7 +43,7 @@ import {
   gamutPart,
   HIGHLIGHT_CONTRAST_MAX,
   highlightFromAccent,
-  INK_RANGE,
+  highlightOf,
   inkDefault,
   inksInMode,
   isGamutScaled,
@@ -42,11 +54,11 @@ import {
   onGamutScale,
   ownInks,
   PAGE_DEFAULT,
-  isColourPart,
-  PAGE_RANGE,
   solidBars,
   STRENGTH_MAX,
   untinted,
+  vividColour,
+  washHighlight,
   type ChartEnd,
   type CustomColourPart,
   type CustomColours,
@@ -70,8 +82,8 @@ type Field = ColourField | 'depth' | 'borders' | 'contrast' | `${ChartEndName}.$
 const percent = (value: number): string => `${Math.round(value)}%`;
 const HUE_MAX = 359;
 const HUE_SEGMENTS = 36;
-// The role that stands for a colour part: what the hue bar's swatch shows, in
-// the theme being made.
+// The role that stands for a colour part: what its Colour row shows, in the
+// theme being made.
 const PART_ROLE: Record<CustomColourPart, keyof UiRoles> = {
   background: 'paper',
   ink: 'ink',
@@ -82,19 +94,27 @@ const PART_ROLE: Record<CustomColourPart, keyof UiRoles> = {
   record: 'record',
 };
 const PART_OPTIONS = CUSTOM_PARTS.map((id) => ({ id, label: CUSTOM_PART_LABELS[id] }));
-// A hue bar: each segment the colour its hue gives at full strength at the
-// part's L*, so the bar shows what each hue can reach there.
-const huePaint = (lightness: number): string[] =>
-  Array.from({ length: HUE_SEGMENTS }, (_, index) =>
-    gamutColour(lightness, { hue: ((index + 0.5) * (HUE_MAX + 1)) / HUE_SEGMENTS, strength: STRENGTH_MAX }),
-  );
+// The hue bar: each segment its hue at its most vivid (`vividColour`), the
+// same for every part, whatever its L*.
+const HUE_PAINT: readonly string[] = Array.from({ length: HUE_SEGMENTS }, (_, index) =>
+  vividColour(Math.round(((index + 0.5) * (HUE_MAX + 1)) / HUE_SEGMENTS)),
+);
+const RAMP_SEGMENTS = 24;
+const ramp = (colourAt: (share: number) => string): string[] =>
+  Array.from({ length: RAMP_SEGMENTS }, (_, index) => colourAt((index + 0.5) / RAMP_SEGMENTS));
+// The strength bar: grey to the most the hue holds, at the colour's L*.
+const strengthPaint = (lightness: number, hue: number): string[] =>
+  ramp((share) => gamutColour(lightness, { hue, strength: share * STRENGTH_MAX }));
+// The lightness bar: black to white, at the colour's hue and strength.
+const lightnessPaint = (colour: HueStrength): string[] => ramp((share) => gamutColour(share * LIGHTNESS_MAX, colour));
 const CHART_END_LABELS: Record<ChartEndName, string> = { start: 'Start', end: 'End' };
-// The ramp step a chart end draws: what its hue bar's swatch shows.
+// The ramp step a chart end draws: what its Colour row shows.
 const CHART_END_ROLE: Record<ChartEndName, keyof UiRoles> = { start: 'viz1', end: 'viz4' };
 // What a failed save names, for a part that is not one colour.
 const SAVE_NOUN: Partial<Record<CustomPart, string>> = { chart: 'chart', direction: 'direction' };
 // What VoiceOver hears for a hue; the bar itself shows no words.
 const hueLabel = (hue: number): string => `${hueName(hue)}, ${normaliseHue(hue)} degrees`;
+const hueDegrees = (hue: number): string => `${normaliseHue(hue)}°`;
 const lightnessLabel = (value: number): string =>
   value === 0 ? 'Black' : value === LIGHTNESS_MAX ? 'White' : `${Math.round(value / LIGHTNESS_STEP) * LIGHTNESS_STEP}`;
 
@@ -113,10 +133,12 @@ const shownFor = (part: CustomPart, stored: CustomColours): CustomColours => {
 
 // A part's value; the secondary's or muted text's, and the chart's, as drawn
 // when not yet stored; a tinted page, accent or best ever at the strength
-// and L* it draws (`gamutPart`).
+// and L* it draws (`gamutPart`); a highlight of its own at the L* it draws
+// (`highlightOf`).
 function partOf(colours: CustomColours, part: CustomPart): Draft {
   if (isOwnInkPart(part)) return ownInks(colours)[part];
   if (isTintedPart(part)) return gamutPart(colours, part);
+  if (part === 'highlight') return highlightOf(colours);
   return part === 'chart' ? chartOf(colours) : colours[part];
 }
 
@@ -125,60 +147,132 @@ function partOf(colours: CustomColours, part: CustomPart): Draft {
 const CONVERTING_FIELDS = new Set<Field>(['strength', 'lightness', 'start.strength', 'start.lightness', 'end.strength', 'end.lightness']);
 
 // What a part's controls are given: the colours being made (the draft in
-// place), a live and a let-go handler per slider, a save of several parts at
-// once (a switch) built on the colours the saves on their way will store, and
-// the hue bar's swatch (none for the direction).
+// place), a live and a let-go handler per slider, and a save of several parts
+// at once (a switch) built on the colours the saves on their way will store.
 type Controls = {
   part: CustomPart;
   colours: CustomColours;
   change: (field: Field) => (value: number) => void;
   end: (field: Field) => (value: number) => void;
   save: (patchOf: (intended: CustomColours) => Partial<CustomColours>) => void;
-  swatch: ReactNode;
-  // The theme being made, for a swatch a part draws itself (the chart's ends),
-  // and the live one, for its hairline.
+  // The theme being made, for the colour a part draws.
   roles: UiRoles;
-  liveRoles: UiRoles;
 };
 
-// The L* a colour part's hue bar is painted at: its role's, as drawn.
-const paintLightness = (part: CustomPart, roles: UiRoles): number | null => (isColourPart(part) ? hexToLch(roles[PART_ROLE[part]]).lightness : null);
+// The colour picked, as the theme being made draws it: a wide swatch and its
+// hex, so it reads apart from where the theme uses it.
+function ColourRow({ colour, divider, label = 'Colour', testID }: { colour: string; divider: boolean; label?: string; testID: string }) {
+  return (
+    <ValueRow
+      accessibilityLabel={`${label}, ${colour}`}
+      divider={divider}
+      label={label}
+      testID={testID}
+      value={colour}
+      valueSwatch={colour}
+      valueSwatchTestID={`${testID}-swatch`}
+    />
+  );
+}
 
-function HueStrengthRows({ change, end, swatch, part, colour, divider, roles }: Controls & { colour: HueStrength; divider: boolean }) {
-  const at = paintLightness(part, roles);
-  const paint = useMemo(() => (at === null ? undefined : huePaint(at)), [at]);
+// A colour's three sliders' rows: its hue on a bar of every hue at its most
+// vivid, its strength on a bar from grey to the most there, and (given) its
+// L* on a bar from black to white — each bar painted at the colour's other
+// values, so each shows where it goes. `lightness` is the L* the colour is
+// drawn at; `lightnessValue` the lightness slider's (by default the same).
+type ColourRowsProps = {
+  colour: HueStrength;
+  lightness: number;
+  fields: { hue: Field; strength: Field; lightness?: Field };
+  change: Controls['change'];
+  end: Controls['end'];
+  labels?: { hue: string; strength: string; lightness: string };
+  testIDs?: { hue: string; strength: string; lightness: string };
+  lightnessValue?: number;
+};
+
+const COLOUR_LABELS = { hue: 'Hue', strength: 'Strength', lightness: 'Lightness' };
+const COLOUR_TEST_IDS = { hue: 'theme-custom-hue', strength: 'theme-custom-strength', lightness: 'theme-custom-lightness' };
+
+function ColourSliders({ colour, lightness, fields, change, end, labels = COLOUR_LABELS, testIDs = COLOUR_TEST_IDS, lightnessValue = lightness }: ColourRowsProps) {
+  const type = useUiText();
+  const tone = useUiTextTone();
+  const strengthTrack = useMemo(() => strengthPaint(lightness, colour.hue), [lightness, colour.hue]);
+  const lightnessTrack = useMemo(() => lightnessPaint(colour), [colour]);
+  const lightnessField = fields.lightness;
   return (
     <>
       <SliderRow
-        divider={divider}
+        divider
         format={hueLabel}
-        label="Hue"
+        label={labels.hue}
         max={HUE_MAX}
-        onChange={change('hue')}
-        onChangeEnd={end('hue')}
-        testID="theme-custom-hue"
-        trackColours={paint}
-        trailing={swatch}
+        onChange={change(fields.hue)}
+        onChangeEnd={end(fields.hue)}
+        testID={testIDs.hue}
+        trackColours={HUE_PAINT}
+        trailing={
+          <Text accessibilityElementsHidden allowFontScaling={false} importantForAccessibility="no" style={[type.meta, tone.muted, styles.degrees]} testID={`${testIDs.hue}-degrees`}>
+            {hueDegrees(colour.hue)}
+          </Text>
+        }
         // A drawn hue (unrounded) can lie just past 359.
         value={Math.min(colour.hue, HUE_MAX)}
       />
       <SliderRow
         divider
         format={percent}
-        label="Strength"
+        label={labels.strength}
         max={STRENGTH_MAX}
-        onChange={change('strength')}
-        onChangeEnd={end('strength')}
-        testID="theme-custom-strength"
+        onChange={change(fields.strength)}
+        onChangeEnd={end(fields.strength)}
+        testID={testIDs.strength}
+        trackColours={strengthTrack}
         value={colour.strength}
+      />
+      {lightnessField === undefined ? null : (
+        <SliderRow
+          divider
+          format={lightnessLabel}
+          label={labels.lightness}
+          max={LIGHTNESS_MAX}
+          onChange={change(lightnessField)}
+          onChangeEnd={end(lightnessField)}
+          step={LIGHTNESS_STEP}
+          testID={testIDs.lightness}
+          trackColours={lightnessTrack}
+          value={lightnessValue}
+        />
+      )}
+    </>
+  );
+}
+
+// The L* a colour part is drawn at: its role's.
+const drawnLightness = (part: CustomColourPart, roles: UiRoles): number => hexToLch(roles[PART_ROLE[part]]).lightness;
+
+// A colour part's Colour row and its sliders: hue, strength and, for every
+// part but the highlight that matches, its lightness over the whole range.
+function PartColour({ part, colour, lightness, controls, divider }: { part: CustomColourPart; colour: HueStrength; lightness: number; controls: Controls; divider: boolean }) {
+  const { roles, change, end } = controls;
+  return (
+    <>
+      <ColourRow colour={roles[PART_ROLE[part]]} divider={divider} testID="theme-custom-colour" />
+      <ColourSliders
+        change={change}
+        colour={colour}
+        end={end}
+        fields={{ hue: 'hue', strength: 'strength', lightness: 'lightness' }}
+        lightness={drawnLightness(part, roles)}
+        lightnessValue={lightness}
       />
     </>
   );
 }
 
-// The page: its mode, hue and strength, lightness over the mode's range, and
-// depth and borders. Switching the mode puts the page and the inks at that
-// ladder's defaults (`inksInMode`).
+// The page: its mode, its colour (lightness over the whole range), and depth
+// and borders. Switching the mode puts the page, the inks, the chart's ends,
+// the fills and the highlight at that ladder's defaults (`inksInMode`).
 function BackgroundControls(controls: Controls) {
   const { colours, change, end, save } = controls;
   const { background } = colours;
@@ -190,25 +284,13 @@ function BackgroundControls(controls: Controls) {
       ...inksInMode(intended, mode),
       ...chartInMode(intended, mode),
       ...fillsInMode(intended, mode),
+      highlight: washHighlight(intended.highlight),
     }));
   };
-  const range = PAGE_RANGE[background.mode];
   return (
     <>
       <SwitchRow density="list" label="Dark" onValueChange={switchMode} testID="theme-custom-dark" value={background.mode === 'dark'} />
-      <HueStrengthRows {...controls} colour={background} divider />
-      <SliderRow
-        divider
-        format={lightnessLabel}
-        label="Lightness"
-        max={range.max}
-        min={range.min}
-        onChange={change('lightness')}
-        onChangeEnd={end('lightness')}
-        step={LIGHTNESS_STEP}
-        testID="theme-custom-lightness"
-        value={background.lightness}
-      />
+      <PartColour colour={background} controls={controls} divider lightness={background.lightness} part="background" />
       <SliderRow
         divider
         format={percent}
@@ -233,147 +315,72 @@ function BackgroundControls(controls: Controls) {
   );
 }
 
-// The highlight: matching the accent or a hue and strength of its own, and
-// how far it steps from the page. Unmatching starts from the band the accent
-// draws, so nothing jumps.
+// The highlight: matching the accent, a wash of it whose step from the page
+// is its contrast; or a colour of its own, hue, strength and lightness over
+// the whole range. Unmatching starts from the band the accent draws, so
+// nothing jumps.
 function HighlightControls(controls: Controls) {
-  const { colours, change, end, save } = controls;
+  const { colours, change, end, save, roles } = controls;
   const { highlight } = colours;
   const match = (on: boolean) =>
     save((intended) => ({
-      highlight: on ? { ...highlight, match: true } : { ...highlight, match: false, ...highlightFromAccent(accentSeed(intended), intended.background.mode) },
+      highlight: on
+        ? { ...intended.highlight, match: true }
+        : { ...washHighlight(intended.highlight), match: false, ...highlightFromAccent(accentSeed(intended), intended.background.mode) },
     }));
   return (
     <>
       <SwitchRow density="list" label="Match accent" onValueChange={match} testID="theme-custom-match" value={highlight.match} />
-      {highlight.match ? null : <HueStrengthRows {...controls} colour={highlight} divider />}
-      <SliderRow
-        divider
-        format={percent}
-        label="Contrast"
-        max={HIGHLIGHT_CONTRAST_MAX}
-        onChange={change('contrast')}
-        onChangeEnd={end('contrast')}
-        testID="theme-custom-contrast"
-        value={highlight.contrast}
-      />
+      {highlight.match ? (
+        <>
+          <ColourRow colour={roles.accentWash} divider testID="theme-custom-colour" />
+          <SliderRow
+            divider
+            format={percent}
+            label="Contrast"
+            max={HIGHLIGHT_CONTRAST_MAX}
+            onChange={change('contrast')}
+            onChangeEnd={end('contrast')}
+            testID="theme-custom-contrast"
+            value={highlight.contrast}
+          />
+        </>
+      ) : (
+        <PartColour colour={highlight} controls={controls} divider lightness={highlight.lightness ?? drawnLightness('highlight', roles)} part="highlight" />
+      )}
     </>
   );
 }
 
-// Primary text: a hue and strength, and its L* over its mode's range.
-function InkControls(controls: Controls) {
-  const { colours, change, end } = controls;
-  const range = INK_RANGE[colours.background.mode];
-  return (
-    <>
-      <HueStrengthRows {...controls} colour={colours.ink} divider={false} />
-      <SliderRow
-        divider
-        format={lightnessLabel}
-        label="Lightness"
-        max={range.max}
-        min={range.min}
-        onChange={change('lightness')}
-        onChangeEnd={end('lightness')}
-        step={LIGHTNESS_STEP}
-        testID="theme-custom-lightness"
-        value={colours.ink.lightness}
-      />
-    </>
-  );
+// Primary, secondary or muted text: its colour, its L* over the whole range,
+// with no limit against the page or the other inks.
+function InkControls(controls: Controls & { part: 'ink' | 'secondary' | 'muted'; colour: OwnInk }) {
+  const { colour, part } = controls;
+  return <PartColour colour={colour} controls={controls} divider={false} lightness={colour.lightness} part={part} />;
 }
 
-// Secondary or muted text: a hue and strength, and its L* over the whole
-// range, with no limit against the other inks.
-function OwnInkControls(controls: Controls & { colour: OwnInk }) {
-  const { colour, change, end } = controls;
-  return (
-    <>
-      <HueStrengthRows {...controls} colour={colour} divider={false} />
-      <SliderRow
-        divider
-        format={lightnessLabel}
-        label="Lightness"
-        max={LIGHTNESS_MAX}
-        onChange={change('lightness')}
-        onChangeEnd={end('lightness')}
-        step={LIGHTNESS_STEP}
-        testID="theme-custom-lightness"
-        value={colour.lightness}
-      />
-    </>
-  );
-}
-
-// The accent or best ever: a hue and strength, and its L* over the whole
-// range, at the mode's by default (`fillLightness`).
+// The accent or best ever: its colour, its L* over the whole range, at the
+// mode's by default (`fillLightness`).
 function FillControls(controls: Controls & { part: FillPart }) {
-  const { colours, change, end, part } = controls;
-  const colour = colours[part];
-  return (
-    <>
-      <HueStrengthRows {...controls} colour={colour} divider={false} />
-      <SliderRow
-        divider
-        format={lightnessLabel}
-        label="Lightness"
-        max={LIGHTNESS_MAX}
-        onChange={change('lightness')}
-        onChangeEnd={end('lightness')}
-        step={LIGHTNESS_STEP}
-        testID="theme-custom-lightness"
-        value={fillLightness(colours, part)}
-      />
-    </>
-  );
+  const { colours, part } = controls;
+  return <PartColour colour={colours[part]} controls={controls} divider={false} lightness={fillLightness(colours, part)} part={part} />;
 }
 
-// One end of the chart's ramp: a hue on a bar painted at its L*, a strength
-// and its L* over the whole range.
-function ChartEndRows({ change, end, roles, liveRoles, which, colour }: Controls & { which: ChartEndName; colour: ChartEnd }) {
-  const paint = useMemo(() => huePaint(colour.lightness), [colour.lightness]);
+// One end of the chart's ramp: its Colour row, then its hue, strength and L*
+// over the whole range.
+function ChartEndRows({ change, end, roles, which, colour }: Controls & { which: ChartEndName; colour: ChartEnd }) {
   const name = CHART_END_LABELS[which];
   return (
     <>
-      <SliderRow
-        divider
-        format={hueLabel}
-        label={`${name} hue`}
-        max={HUE_MAX}
-        onChange={change(`${which}.hue`)}
-        onChangeEnd={end(`${which}.hue`)}
-        testID={`theme-custom-${which}-hue`}
-        trackColours={paint}
-        trailing={
-          <View
-            style={[styles.swatch, { backgroundColor: roles[CHART_END_ROLE[which]], ...uiHairline(liveRoles, { shape: 'control' }) }]}
-            testID={`theme-custom-${which}-swatch`}
-          />
-        }
-        // A drawn hue (unrounded) can lie just past 359.
-        value={Math.min(colour.hue, HUE_MAX)}
-      />
-      <SliderRow
-        divider
-        format={percent}
-        label={`${name} strength`}
-        max={STRENGTH_MAX}
-        onChange={change(`${which}.strength`)}
-        onChangeEnd={end(`${which}.strength`)}
-        testID={`theme-custom-${which}-strength`}
-        value={colour.strength}
-      />
-      <SliderRow
-        divider
-        format={lightnessLabel}
-        label={`${name} lightness`}
-        max={LIGHTNESS_MAX}
-        onChange={change(`${which}.lightness`)}
-        onChangeEnd={end(`${which}.lightness`)}
-        step={LIGHTNESS_STEP}
-        testID={`theme-custom-${which}-lightness`}
-        value={colour.lightness}
+      <ColourRow colour={roles[CHART_END_ROLE[which]]} divider label={`${name} colour`} testID={`theme-custom-${which}-colour`} />
+      <ColourSliders
+        change={change}
+        colour={colour}
+        end={end}
+        fields={{ hue: `${which}.hue`, strength: `${which}.strength`, lightness: `${which}.lightness` }}
+        labels={{ hue: `${name} hue`, strength: `${name} strength`, lightness: `${name} lightness` }}
+        lightness={colour.lightness}
+        testIDs={{ hue: `theme-custom-${which}-hue`, strength: `theme-custom-${which}-strength`, lightness: `theme-custom-${which}-lightness` }}
       />
     </>
   );
@@ -426,11 +433,11 @@ function PartControls(controls: Controls) {
     case 'direction':
       return <DirectionControls {...controls} />;
     case 'ink':
-      return <InkControls {...controls} />;
+      return <InkControls {...controls} colour={controls.colours.ink} part="ink" />;
     case 'secondary':
     case 'muted': {
       const inks = ownInks(controls.colours);
-      return <OwnInkControls {...controls} colour={inks[controls.part]} />;
+      return <InkControls {...controls} colour={inks[controls.part]} part={controls.part} />;
     }
     case 'highlight':
       return <HighlightControls {...controls} />;
@@ -487,20 +494,25 @@ const leftTint = (part: CustomPart, draft: Draft): boolean =>
 // gamut scale (`onGamutScale`), and any other the field alone, as that theme
 // stores it. A secondary or muted text let go as it is stored (or drawn),
 // with the saves on their way, stores nothing new; otherwise both are stored.
+// So does a highlight of its own let go where it draws.
 function letGoPatch(intended: CustomColours, part: CustomPart, field: Field, value: number, draft: Draft): Partial<CustomColours> {
   const converting = !isGamutScaled(intended) && (CONVERTING_FIELDS.has(field) || leftTint(part, draft));
   const base = converting ? onGamutScale(intended) : intended;
   const edited = editOf(isGamutScaled(base) ? draft : storedBefore(part, draft), field, value);
   const conversion = converting ? base : {};
+  // A highlight of its own let go where it draws, not yet at its own L*,
+  // stores nothing new.
+  if (part === 'highlight' && JSON.stringify(highlightOf(base)) === JSON.stringify(edited) && base.highlight.lightness === undefined) return conversion;
   if (!isOwnInkPart(part)) return { ...conversion, [part]: edited };
   const inks = ownInks(base);
   return JSON.stringify(inks[part]) === JSON.stringify(edited) ? conversion : { ...conversion, ...inks, [part]: edited };
 }
 
 // Settings → Appearance → Custom → one part (background, primary, secondary
-// and muted text, accent, highlight, best ever): a hue on a painted bar and
-// a strength, and the part's own controls — the page's mode, lightness,
-// depth and borders; the highlight's match and contrast; the inks' lightness.
+// and muted text, accent, highlight, best ever): the colour picked (a
+// swatch and its hex), its hue, strength and lightness over the whole gamut,
+// and the part's own controls — the page's mode, depth and borders; the
+// highlight's match, and its contrast while it matches.
 // The secondary and the muted text are stored together: the first move of
 // either stores both as drawn (`ownInks`), so the other does not jump.
 // The chart's page offers Follow background, the ramp's two ends when it does
@@ -520,7 +532,6 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
   const colours: CustomColours = { ...shown, [part]: draft };
   const chosen: AppearanceChoice = { ...appearance, theme: 'custom', custom: colours };
   const roles = appearanceRoles(chosen, phoneScheme);
-  const liveRoles = useUiRoles();
 
   // `patchOf` is given the colours the saves on their way will store, so
   // another part's save is not overwritten; this part's values are the ones
@@ -544,11 +555,7 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
     save: (patchOf) => {
       void save(patchOf);
     },
-    swatch: isColourPart(part) ? (
-      <View style={[styles.swatch, { backgroundColor: roles[PART_ROLE[part]], ...uiHairline(liveRoles, { shape: 'control' }) }]} testID="theme-custom-hue-swatch" />
-    ) : null,
     roles,
-    liveRoles,
   };
 
   return (
@@ -580,9 +587,7 @@ const styles = StyleSheet.create({
     gap: uiSpace.lg,
     padding: uiSpace.lg,
   },
-  // The part's own role in the theme being made, on this page's ground.
-  swatch: {
-    width: uiGeometry.tapTarget / 2,
-    height: uiGeometry.tapTarget / 2,
+  degrees: {
+    textAlign: 'right',
   },
 });

@@ -28,6 +28,7 @@ import {
   gamutPart,
   generateCustomRoles,
   highlightFromAccent,
+  highlightOf,
   hueTurn,
   inksInMode,
   onGamutScale,
@@ -35,6 +36,8 @@ import {
   parseCustomColours,
   solidBars,
   untinted,
+  vividColour,
+  washHighlight,
   type CustomChart,
   type CustomColours,
   type OwnInk,
@@ -302,6 +305,66 @@ describe('highlight', () => {
 
   it('is a grey at a strength of 0', () => {
     expect(hexToLch(generateCustomRoles(withHighlight({ match: false, strength: 0 })).accentWash).chroma).toBeLessThan(1);
+  });
+
+  it.each(['light', 'dark'] as const)('stores an unmatched band as drawn at its own L*, repainting nothing, in %s', (mode) => {
+    for (const contrast of [0, 100, 300]) {
+      const base = withHighlight({ match: false, hue: 150, strength: 60, contrast }, customFromSeeds(defaultThemeSeeds, mode));
+      const own = highlightOf(base);
+      expect(own.lightness).toBeDefined();
+      expect(deltaE(generateCustomRoles({ ...base, highlight: own }).accentWash, generateCustomRoles(base).accentWash)).toBeLessThan(0.5);
+    }
+  });
+
+  it('draws a band at its own L* over the whole range, ignoring its contrast, and moving only the band', () => {
+    const before = generateCustomRoles(WARM_LIGHT);
+    for (const lightness of [0, 30, 55, 100]) {
+      const own = withHighlight({ match: false, hue: 90, strength: 100, lightness });
+      const roles = generateCustomRoles(own);
+      expect(roles.accentWash).toBe(gamutColour(lightness, { hue: 90, strength: 100 }));
+      expect(generateCustomRoles({ ...own, highlight: { ...own.highlight, contrast: 250 } }).accentWash).toBe(roles.accentWash);
+      expect((Object.keys(before) as (keyof UiRoles)[]).filter((role) => before[role] !== roles[role])).toEqual(['accentWash']);
+    }
+  });
+
+  it('takes the accent’s band while it matches, its own L* kept but unused, and drops it when washed', () => {
+    const matched = withHighlight({ match: true, lightness: 20 });
+    expect(generateCustomRoles(matched).accentWash).toBe(generateCustomRoles(WARM_LIGHT).accentWash);
+    expect(highlightOf(matched)).toBe(matched.highlight);
+    expect(washHighlight(matched.highlight)).toEqual(WARM_LIGHT.highlight);
+  });
+
+  it('washes an own highlight to whole hue and strength, so it is stored validly', () => {
+    const own = withHighlight({ match: false, hue: 359.6, strength: 57.38, lightness: 40 });
+    const washed = washHighlight(own.highlight);
+    expect(washed).toEqual({ ...WARM_LIGHT.highlight, match: false, hue: 0, strength: 57 });
+    expect(parseCustomColours({ ...own, highlight: washed })).toEqual({ ...own, highlight: washed });
+    // One without an own L* is left as it is.
+    expect(washHighlight(WARM_LIGHT.highlight)).toBe(WARM_LIGHT.highlight);
+  });
+
+  it('round-trips its own L* through the store, unrounded, and rejects one out of range', () => {
+    const own = withHighlight({ match: false, hue: 120.5, strength: 33.3, lightness: 61.7 });
+    expect(parseCustomColours(JSON.parse(JSON.stringify(own)))).toEqual(own);
+    expect(parseCustomColours({ ...own, highlight: { ...own.highlight, lightness: 101 } })).toBeNull();
+    expect(parseCustomColours({ ...own, highlight: { ...own.highlight, lightness: 'pale' } })).toBeNull();
+    // Without one, a hue and strength are whole as before.
+    expect(parseCustomColours({ ...WARM_LIGHT, highlight: { ...WARM_LIGHT.highlight, strength: 33.3 } })).toBeNull();
+  });
+});
+
+describe('vividColour', () => {
+  it('draws each hue at the most chroma sRGB holds for it, at any L*', () => {
+    for (const hue of [0, 30, 90, 150, 210, 270, 330]) {
+      const vivid = hexToLch(vividColour(hue));
+      expect(hueDistance(vivid.hue, hue)).toBeLessThan(3);
+      for (let lightness = 5; lightness < 100; lightness += 5) {
+        expect(vivid.chroma).toBeGreaterThanOrEqual(hexToLch(gamutColour(lightness, { hue, strength: 100 })).chroma - 0.5);
+      }
+    }
+    // sRGB's primaries, near enough.
+    expect(deltaE(vividColour(Math.round(hexToLch('#FF0000').hue)), '#FF0000')).toBeLessThan(3);
+    expect(deltaE(vividColour(Math.round(hexToLch('#0000FF').hue)), '#0000FF')).toBeLessThan(3);
   });
 });
 

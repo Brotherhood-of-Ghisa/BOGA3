@@ -50,8 +50,11 @@ import {
   GAMUT_SCALE,
   gamutPart,
   generateCustomRoles,
+  highlightOf,
+  parseCustomColours,
   onGamutScale,
   ownInks,
+  vividColour,
   type CustomColourPart,
   type CustomColours,
 } from '@/components/ui/theme-custom';
@@ -159,13 +162,13 @@ it('repaints the preview as a slider moves, and saves only when it is let go', a
   const track = screen.getByTestId('theme-custom-lightness-track');
   fireEvent(track, 'layout', { nativeEvent: { layout: { width: 200 } } });
 
-  // A light page's slider runs over L* 65–100 in quarter steps.
-  act(() => drag(slider('Lightness')).onUpdate({ x: 20 }));
-  const darker = { ...CUSTOM, background: { ...CUSTOM.background, lightness: 68.5 } };
+  // A page's slider runs over L* 0–100 in quarter steps, whatever its mode.
+  act(() => drag(slider('Lightness')).onUpdate({ x: 41 }));
+  const darker = { ...CUSTOM, background: { ...CUSTOM.background, lightness: 20.5 } };
   expect(previewGround()).toBe(generateCustomRoles(darker).paper);
   expect(storedCustom()).toEqual(CUSTOM);
 
-  await act(async () => drag(slider('Lightness')).onEnd({ x: 20 }, true));
+  await act(async () => drag(slider('Lightness')).onEnd({ x: 41 }, true));
   await waitFor(() => expect(storedCustom()).toEqual(darker));
   expect(screen.queryByText(/next launch/i)).toBeNull();
 });
@@ -218,24 +221,59 @@ it('saves a hue when the bar is let go, keeping the other parts', async () => {
   await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, record: { ...CUSTOM.record, hue: 90 } }));
 });
 
-it('paints the hue bar in the part’s colours, words for VoiceOver only, and swatches the part as it would be drawn', () => {
+it('paints the hue bar in every hue at its most vivid, whatever the part’s lightness, with words for VoiceOver only', () => {
+  // A pale page and a dark primary text paint the same raw hues.
+  for (const part of ['background', 'ink', 'accent']) {
+    store(CUSTOM);
+    mockPart = part;
+    render(<ThemeCustomRoute />);
+    const paint: { props: { style: StyleProp<ViewStyle> } }[] = screen.getByTestId('theme-custom-hue-paint').props.children;
+    expect(paint).toHaveLength(36);
+    const colours = paint.map((segment) => StyleSheet.flatten(segment.props.style)?.backgroundColor);
+    expect(colours[0]).toBe(vividColour(5));
+    expect(colours[12]).toBe(vividColour(125));
+    // Each a hue at full chroma: none a pastel or a shade.
+    colours.forEach((colour) => expect(hexToLch(colour as string).chroma).toBeGreaterThan(35));
+    expect(screen.queryByTestId('theme-custom-hue-value')).toBeNull();
+    expect(screen.queryByText(/degrees|Red/)).toBeNull();
+    screen.unmount();
+  }
+});
+
+it('paints the strength bar grey to full and the lightness bar black to white, at the colour’s other values', () => {
   store(CUSTOM);
   mockPart = 'accent';
   render(<ThemeCustomRoute />);
-  const paint: { props: { style: StyleProp<ViewStyle> } }[] = screen.getByTestId('theme-custom-hue-paint').props.children;
-  expect(paint).toHaveLength(36);
-  const colours = paint.map((segment) => StyleSheet.flatten(segment.props.style)?.backgroundColor);
-  expect(new Set(colours).size).toBeGreaterThan(30);
-  // At the accent's L*, as drawn: a share of each hue's most there.
+  const segments = (id: string) =>
+    (screen.getByTestId(`${id}-paint`).props.children as { props: { style: StyleProp<ViewStyle> } }[]).map(
+      (segment) => StyleSheet.flatten(segment.props.style)?.backgroundColor as string,
+    );
+  const strength = segments('theme-custom-strength');
+  expect(hexToLch(strength[0]).chroma).toBeLessThan(hexToLch(strength[strength.length - 1]).chroma);
   const accentLightness = hexToLch(generateCustomRoles(CUSTOM).accent).lightness;
-  expect(colours[0]).toBe(gamutColour(accentLightness, { hue: 5, strength: 100 }));
-  expect(screen.queryByTestId('theme-custom-hue-value')).toBeNull();
-  expect(screen.queryByText(/degrees|Red/)).toBeNull();
-  const swatch = () => StyleSheet.flatten(screen.getByTestId('theme-custom-hue-swatch').props.style).backgroundColor;
+  expect(strength[strength.length - 1]).toBe(gamutColour(accentLightness, { hue: 30, strength: (100 * 23.5) / 24 }));
+  const lightness = segments('theme-custom-lightness');
+  expect(hexToLch(lightness[0]).lightness).toBeLessThan(5);
+  expect(hexToLch(lightness[lightness.length - 1]).lightness).toBeGreaterThan(95);
+  // The bars still show their values.
+  expect(screen.getByTestId('theme-custom-strength-value')).toHaveTextContent('70%');
+});
+
+it('shows the colour picked in a swatch with its hex, live as a slider moves', () => {
+  store(CUSTOM);
+  mockPart = 'accent';
+  render(<ThemeCustomRoute />);
+  const swatch = () => StyleSheet.flatten(screen.getByTestId('theme-custom-colour-swatch').props.style).backgroundColor;
   expect(swatch()).toBe(generateCustomRoles(CUSTOM).accent);
+  expect(screen.getByTestId('theme-custom-colour')).toHaveTextContent(`Colour${generateCustomRoles(CUSTOM).accent}`);
+  expect(screen.getByTestId('theme-custom-colour').props.accessibilityLabel).toBe(`Colour, ${generateCustomRoles(CUSTOM).accent}`);
+  expect(screen.getByTestId('theme-custom-hue-degrees', { includeHiddenElements: true })).toHaveTextContent('30°');
+  expect(screen.queryByTestId('theme-custom-hue-degrees')).toBeNull();
 
   act(() => drag(hueBar()).onUpdate({ x: 0 }));
-  expect(swatch()).toBe(generateCustomRoles({ ...CUSTOM, accent: { hue: 0, strength: 70 } }).accent);
+  const moved = generateCustomRoles({ ...CUSTOM, accent: { hue: 0, strength: 70 } }).accent;
+  expect(swatch()).toBe(moved);
+  expect(screen.getByTestId('theme-custom-colour')).toHaveTextContent(`Colour${moved}`);
 });
 
 it('switches to another part from the title, and only closes the menu for the part already open', () => {
@@ -267,7 +305,7 @@ it('spotlights every role the part moves, live as a control moves', () => {
 
     fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
     act(() => drag(slider('Lightness')).onUpdate({ x: 20 }));
-    expect(tile(1)).toBe(generateCustomRoles({ ...CUSTOM, background: { ...CUSTOM.background, lightness: 72 } }).paper);
+    expect(tile(1)).toBe(generateCustomRoles({ ...CUSTOM, background: { ...CUSTOM.background, lightness: 20 } }).paper);
   } finally {
     configure({ defaultIncludeHiddenElements: false });
   }
@@ -437,10 +475,12 @@ it('switches the page to dark: the switch saves the mode, the page and the prima
     }),
   );
   expect(dark().props.accessibilityState).toEqual({ checked: true });
-  // The dark page's slider runs over L* 0–35.
-  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 140 } } });
+  // The dark page's slider runs over L* 0–100 too.
+  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
   await act(async () => tap(slider('Lightness')).onEnd({ x: 9 }, true));
   await waitFor(() => expect(storedCustom()?.background.lightness).toBe(2.25));
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 360 }, true));
+  await waitFor(() => expect(storedCustom()?.background.lightness).toBe(90));
   expect(previewGround()).toBe(generateCustomRoles(storedCustom()!).paper);
 });
 
@@ -456,12 +496,12 @@ it('keeps a primary text saved meanwhile when the mode is switched, resetting on
   await waitFor(() => expect(storedCustom()?.ink).toEqual({ ...inkSaved, lightness: 95 }));
 });
 
-it('shows a page saved outside its mode’s range as it is, until it is moved into it', async () => {
+it('moves a light page’s lightness anywhere in 0–100, a dark one included', async () => {
   store({ ...CUSTOM, background: { ...CUSTOM.background, lightness: 50 } });
   render(<ThemeCustomRoute />);
   expect(slider('Lightness').props.accessibilityValue).toEqual({ text: '50' });
   await step(slider('Lightness'), 'decrement');
-  await waitFor(() => expect(storedCustom()?.background.lightness).toBe(65));
+  await waitFor(() => expect(storedCustom()?.background).toEqual({ ...CUSTOM.background, lightness: 45 }));
 });
 
 it('offers no Borders or text-seed part, and the chart as `chart` alone: an old link opens the background', () => {
@@ -508,7 +548,7 @@ it('offers three directions, saves the one tapped, and spotlights the pair it dr
   expect([tile(0), tile(1)]).toEqual([ink.ink, ink.ink]);
 });
 
-it('gives the highlight its own hue and strength, or the accent’s, and a contrast', async () => {
+it('gives the highlight a colour of its own over the whole gamut, or the accent’s wash and a contrast', async () => {
   store(CUSTOM);
   mockPart = 'highlight';
   render(<ThemeCustomRoute />);
@@ -519,37 +559,101 @@ it('gives the highlight its own hue and strength, or the accent’s, and a contr
   const band = () =>
     StyleSheet.flatten(screen.getByTestId('theme-custom-spotlight-0', { includeHiddenElements: true }).props.style).backgroundColor;
   expect(band()).toBe(generateCustomRoles(CUSTOM).accentWash);
+  // Its own: a hue, a strength and a lightness, opened as it draws; no contrast.
+  expect(screen.getAllByRole('adjustable').map((element) => element.props.accessibilityLabel)).toEqual(['Hue', 'Strength', 'Lightness']);
+  const drawn = highlightOf(CUSTOM);
+  expect(slider('Lightness').props.accessibilityValue).toEqual({ text: `${Math.round(drawn.lightness! * 4) / 4}` });
 
-  await step(slider('Contrast'), 'increment');
-  await waitFor(() => expect(storedCustom()?.highlight).toEqual({ ...CUSTOM.highlight, contrast: 115 }));
-
+  // The first move stores it at its own L*, drawn where it was.
   fireEvent(screen.getByTestId('theme-custom-hue-track'), 'layout', { nativeEvent: { layout: { width: 359 } } });
   await act(async () => drag(hueBar()).onEnd({ x: 90 }, true));
-  await waitFor(() => expect(storedCustom()?.highlight).toEqual({ ...CUSTOM.highlight, hue: 90, contrast: 115 }));
-  expect(band()).toBe(generateCustomRoles({ ...CUSTOM, highlight: { ...CUSTOM.highlight, hue: 90, contrast: 115 } }).accentWash);
+  await waitFor(() => expect(storedCustom()?.highlight).toEqual({ ...drawn, hue: 90 }));
+  expect(band()).toBe(generateCustomRoles(storedCustom()!).accentWash);
+  expect(hexToLch(band()).lightness).toBeCloseTo(drawn.lightness!, 0);
+
+  // To black and to white: the whole range.
+  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 0 }, true));
+  await waitFor(() => expect(storedCustom()?.highlight.lightness).toBe(0));
+  expect(band()).toBe('#000000');
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 200 }, true));
+  fireEvent(screen.getByTestId('theme-custom-strength-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
+  await act(async () => tap(slider('Strength')).onEnd({ x: 400 }, true));
+  await waitFor(() => expect(storedCustom()?.highlight).toMatchObject({ lightness: 50, strength: 100 }));
+  expect(band()).toBe(gamutColour(50, { hue: 90, strength: 100 }));
 
   await act(async () => fireEvent.press(match()));
   await waitFor(() => expect(storedCustom()?.highlight.match).toBe(true));
   expect(screen.queryByRole('adjustable', { name: 'Hue' })).toBeNull();
-  const matched = generateCustomRoles({ ...CUSTOM, highlight: { ...CUSTOM.highlight, match: true, contrast: 115 } }).accentWash;
+  const matched = generateCustomRoles({ ...CUSTOM, highlight: { ...CUSTOM.highlight, match: true } }).accentWash;
   expect(band()).toBe(matched);
+  expect(StyleSheet.flatten(screen.getByTestId('theme-custom-colour-swatch').props.style).backgroundColor).toBe(matched);
 
-  // Unmatching starts from the band the accent draws, so nothing jumps.
+  await step(slider('Contrast'), 'increment');
+  await waitFor(() => expect(storedCustom()?.highlight.contrast).toBe(115));
+
+  // Unmatching starts from the band the accent draws, so nothing jumps, and
+  // drops its own L*.
+  const washed = generateCustomRoles(storedCustom()!).accentWash;
   await act(async () => fireEvent.press(match()));
   await waitFor(() => expect(storedCustom()?.highlight).toMatchObject({ match: false, contrast: 115 }));
-  const [own, accent] = [hexToLch(band()), hexToLch(matched)];
+  expect(storedCustom()?.highlight.lightness).toBeUndefined();
+  const [own, accent] = [hexToLch(band()), hexToLch(washed)];
   expect(own.lightness).toBeCloseTo(accent.lightness, 0);
   expect(Math.abs(own.chroma - accent.chroma)).toBeLessThan(1);
   expect(Math.abs(own.hue - accent.hue)).toBeLessThan(3);
 });
 
-it('moves the primary text’s lightness in quarter steps over its mode’s range', async () => {
+it('stores nothing when an unmatched highlight is let go where it draws', async () => {
+  store(CUSTOM);
+  mockPart = 'highlight';
+  render(<ThemeCustomRoute />);
+  fireEvent(screen.getByTestId('theme-custom-hue-track'), 'layout', { nativeEvent: { layout: { width: 359 } } });
+  // Its hue let go where it is: the colour it draws is unchanged.
+  await act(async () => drag(hueBar()).onEnd({ x: CUSTOM.highlight.hue }, true));
+  expect(storedCustom()).toEqual(CUSTOM);
+  // Moved, it is stored at its own L*.
+  await act(async () => drag(hueBar()).onEnd({ x: 90 }, true));
+  await waitFor(() => expect(storedCustom()?.highlight).toEqual({ ...highlightOf(CUSTOM), hue: 90 }));
+});
+
+it('keeps a highlight at its own lightness readable after the page switches mode, matched or not', async () => {
+  for (const matchFirst of [false, true]) {
+    store(CUSTOM);
+    mockPart = 'highlight';
+    render(<ThemeCustomRoute />);
+    fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
+    await act(async () => tap(slider('Lightness')).onEnd({ x: 210 }, true));
+    await waitFor(() => expect(storedCustom()?.highlight.lightness).toBe(52.5));
+    // Its strength is the share it draws: unrounded.
+    expect(Number.isInteger(storedCustom()!.highlight.strength)).toBe(false);
+    if (matchFirst) {
+      await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Match accent' })));
+      await waitFor(() => expect(storedCustom()?.highlight.match).toBe(true));
+    }
+    screen.unmount();
+    mockPart = 'background';
+    render(<ThemeCustomRoute />);
+    await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Dark' })));
+    await waitFor(() => expect(storedCustom()?.background.mode).toBe('dark'));
+    const stored = storedCustom()!;
+    expect(stored.highlight.lightness).toBeUndefined();
+    expect(parseCustomColours(JSON.parse(JSON.stringify(stored)))).toEqual(stored);
+    screen.unmount();
+  }
+});
+
+it('moves the primary text’s lightness in quarter steps over the whole range', async () => {
   store(CUSTOM);
   mockPart = 'ink';
   render(<ThemeCustomRoute />);
-  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 160 } } });
+  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
   await act(async () => tap(slider('Lightness')).onEnd({ x: 81 }, true));
   await waitFor(() => expect(storedCustom()?.ink).toEqual({ ...CUSTOM.ink, lightness: 20.25 }));
+  // A light page's text can be as pale as the page itself.
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 400 }, true));
+  await waitFor(() => expect(storedCustom()?.ink.lightness).toBe(100));
+  expect(slider('Lightness').props.accessibilityValue).toEqual({ text: 'White' });
 });
 
 it('names three ink parts: Primary, Secondary and Muted text', () => {
@@ -572,7 +676,7 @@ it.each(['secondary', 'muted'] as const)('opens %s text with a hue, a strength a
   expect(slider('Strength').props.accessibilityValue).toEqual({ text: `${Math.round(drawn.strength)}%` });
   expect(slider('Lightness').props.accessibilityValue).toEqual({ text: `${Math.round(drawn.lightness * 4) / 4}` });
   // Its swatch is its role as drawn.
-  const swatch = StyleSheet.flatten(screen.getByTestId('theme-custom-hue-swatch').props.style).backgroundColor;
+  const swatch = StyleSheet.flatten(screen.getByTestId('theme-custom-colour-swatch').props.style).backgroundColor;
   expect(swatch).toBe(generateCustomRoles(CUSTOM)[part === 'secondary' ? 'inkMuted' : 'inkFaint']);
 });
 
@@ -741,7 +845,7 @@ describe('the gamut scale', () => {
     expect(slider('Strength').props.accessibilityValue).toEqual({ text: `${Math.round(accent.strength)}%` });
     // Its L* as drawn: moved with the page (L* 90, not the ladder's 92).
     expect(slider('Lightness').props.accessibilityValue).toEqual({ text: `${Math.round(accent.lightness! * 4) / 4}` });
-    expect(StyleSheet.flatten(screen.getByTestId('theme-custom-hue-swatch').props.style).backgroundColor).toBe(generateCustomRoles(LEGACY).accent);
+    expect(StyleSheet.flatten(screen.getByTestId('theme-custom-colour-swatch').props.style).backgroundColor).toBe(generateCustomRoles(LEGACY).accent);
   });
 
   it.each([
@@ -864,7 +968,7 @@ describe('the chart', () => {
     expect([after.viz1, after.viz4]).toEqual([before.viz1, before.viz4]);
     expect(switchNamed('Follow background').props.accessibilityState).toEqual({ checked: false });
     ENDS.forEach((name) => expect(slider(name)).toBeTruthy());
-    expect(StyleSheet.flatten(screen.getByTestId('theme-custom-end-swatch').props.style).backgroundColor).toBe(after.viz4);
+    expect(StyleSheet.flatten(screen.getByTestId('theme-custom-end-colour-swatch').props.style).backgroundColor).toBe(after.viz4);
   });
 
   it('saves a let-go end, moving the ramp, and writes nothing when it is let go where it is stored', async () => {
@@ -876,7 +980,7 @@ describe('the chart', () => {
     await step(slider('End lightness'), 'increment');
     await waitFor(() => expect(storedCustom()?.chart?.end).toEqual({ ...CHOSEN.chart!.end, lightness: 45 }));
     expect(storedCustom()?.chart?.start).toEqual(CHOSEN.chart!.start);
-    expect(StyleSheet.flatten(screen.getByTestId('theme-custom-end-swatch').props.style).backgroundColor).toBe(generateCustomRoles(storedCustom()!).viz4);
+    expect(StyleSheet.flatten(screen.getByTestId('theme-custom-end-colour-swatch').props.style).backgroundColor).toBe(generateCustomRoles(storedCustom()!).viz4);
 
     const setItem = jest.spyOn(Storage, 'setItem');
     fireEvent(screen.getByTestId('theme-custom-start-strength-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
