@@ -54,7 +54,8 @@ export type ChartEnd = OwnInk;
 // The chart: `follow` draws the ramp the page gives; off, `viz1` is the
 // start, `viz4` the end and `viz2`/`viz3` sit between them (`chartRamp`).
 // `solid` draws every bar mark in `viz4` instead of the ramp's steps
-// (`appearanceSolidBars`). The ends are stored with it, followed or not.
+// (`appearanceSolidBars`). The ends are stored with it, followed or not;
+// turning `follow` off restarts them at the ends the page's ramp draws.
 export type CustomChart = { follow: boolean; solid: boolean; start: ChartEnd; end: ChartEnd };
 export type CustomColours = {
   background: CustomBackground;

@@ -86,8 +86,9 @@ percentage changes against body-wide finite extrema: middle-to-strong gains,
 middle-to-weak losses; displayed −100% neutral while scaling losses. Filters
 may rescale Volume; rotation/selection cannot. Unchanged middle;
 empty/unavailable neutral; `new`/overflow strongest, outside extrema.
-Strong darkens in light mode, lightens in dark, except a Custom chosen ramp. Both views use opaque effort
-fills and a separate selection colour, attenuated through covering layers.
+Strong darkens in light mode, lightens in dark, except a Custom chosen ramp.
+Both views use opaque effort fills and a separate selection colour, attenuated
+through covering layers.
 Wireframe adds contrasting triangle edges over the fills and selected anatomy.
 Both keep the selected comparison; no legend.
 

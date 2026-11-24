@@ -245,8 +245,8 @@ after a cleanup).
 
 ## Appearance
 
-Every screen draws in one mode: Light (default), Dark, or System (the
-phone's, live). Native UI (alerts, keyboard, date picker) follows it
+Every screen draws in Light (default), Dark, or System (the phone's,
+live). Native UI (alerts, keyboard, date picker) follows it
 (`docs/specs/03-technical-architecture.md`). Presets, seeds and the live rule
 are `design-language.md` "Choosing one". The date picker and navigators take
 `useUiMode()`, the status bar the page's lightness (`status-strip.tsx`), never a fixed mode or colour
@@ -261,10 +261,10 @@ A part's picker (its title switches part): a painted hue `SliderRow`,
 strength, then its own controls (background: Dark switch, lightness over the
 mode's range, depth, borders; highlight: Match accent, contrast; texts:
 lightness); Chart instead Follow background, else Start/End hue, strength,
-lightness, then Solid bars; Direction radios alone; the part's roles; the
+lightness, Solid bars; Direction radios alone; the part's roles; the
 preview. A tap, release or switch saves at once, writing nothing when already
 stored, and the app repaints; a header spinner shows until it has. A failed
-save shows a danger `Notice` and is logged.
+save shows a danger `Notice` saying nothing changed and is logged.
 Settings home names the choice.
 
 ## Screen rules no other source states
