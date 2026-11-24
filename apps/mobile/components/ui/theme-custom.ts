@@ -463,6 +463,16 @@ function moveRole(role: keyof UiRoles, value: string, frame: Frame, scale: numbe
   return lchToHex({ ...lch, lightness: limit === null ? lightness : short(lightness, page, limit) });
 }
 
+// The ladder's `paper`, whose hue and chroma `surface` and `raised` take: on
+// the gamut scale, a page not tinted gives its own as drawn (at the ladder's
+// L* the chroma its L* holds may not fit).
+function framePaper(colours: CustomColours, paper: string): Lch {
+  const ladder = hexToLch(paper);
+  if (!drawsOnGamut(colours, 'background')) return ladder;
+  const { background } = colours;
+  return { ...ladder, chroma: hexToLch(gamutColour(background.lightness, background)).chroma, hue: background.hue };
+}
+
 // An L* on the page's side of `limit`.
 const short = (lightness: number, page: number, limit: number): number =>
   page <= limit ? Math.min(lightness, limit) : Math.max(lightness, limit);
@@ -485,7 +495,7 @@ export function generateCustomRoles(colours: CustomColours): UiRoles {
     ink: customInk(mode, colours.ink),
     ...ownHighlight(colours, mode),
   };
-  const frame: Frame = { paper: hexToLch(reference.paper), end: hexToLch(reference.ink).lightness, page: colours.background.lightness };
+  const frame: Frame = { paper: framePaper(colours, reference.paper), end: hexToLch(reference.ink).lightness, page: colours.background.lightness };
   // At its ladder's L*, `ink` is moved like every role (onto the ladder's
   // end); elsewhere it is drawn at the chosen L*. The two paths differ only
   // by rounding, but the first keeps a theme saved before the lightness

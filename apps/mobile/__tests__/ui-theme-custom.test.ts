@@ -973,6 +973,21 @@ describe('the gamut scale', () => {
     });
   });
 
+  it.each([
+    ['dark', 30, 100],
+    ['light', 80, 250],
+  ] as const)('gives cards and fields the chroma a %s page at L* %d draws, not the ladder’s clipped one', (mode, lightness, hue) => {
+    const theme: CustomColours = { ...SCALED, background: { hue, strength: 100, mode, lightness, depth: 100 } };
+    const roles = generateCustomRoles(theme);
+    const page = hexToLch(roles.paper).chroma;
+    expect(page).toBeGreaterThan(30);
+    // Each card colour holds the page's chroma, or as much as its own L* holds.
+    (['surface', 'raised'] as const).forEach((role) => {
+      const drawn = hexToLch(roles[role]);
+      expect({ role, chroma: drawn.chroma > Math.min(page, most(drawn.lightness, hue)) - 1.5 }).toEqual({ role, chroma: true });
+    });
+  });
+
   it('draws a bright red accent: hue 35, strength 100 at L* 55', () => {
     const red = generateCustomRoles({ ...SCALED, accent: { hue: 35, strength: 100, lightness: 55 } }).accent;
     const { lightness, chroma, hue } = hexToLch(red);

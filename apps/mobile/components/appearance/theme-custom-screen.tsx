@@ -458,6 +458,14 @@ const editOf = (draft: Draft, field: Field, value: number): Draft => {
   return CONVERTING_FIELDS.has(field) ? untinted(edited as CustomFill) : edited;
 };
 
+// A draft as it shows while held: a tinted part whose hue moves at the
+// strength and L* it draws at that hue (`gamutPart`), so its sliders do not
+// jump when let go.
+function liveEdit(shown: CustomColours, part: CustomPart, edited: Draft, field: Field): Draft {
+  if (field !== 'hue' || !isTintedPart(part) || typeof edited === 'string' || !('tint' in edited) || edited.tint === undefined) return edited;
+  return gamutPart({ ...shown, [part]: edited }, part);
+}
+
 // A tinted page, accent or best ever (`gamutPart`) as a theme saved before
 // stores it: its tint its strength, and a fill with no L* of its own. Any
 // other part is the same on both scales.
@@ -507,7 +515,7 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
   const phoneScheme = usePhoneScheme();
   // The colours as stored (with the inks as drawn on their pages); the draft
   // in place of this part while a control is held.
-  const shown = shownFor(part, customOf(appearance, phoneScheme));
+  const shown = useMemo(() => shownFor(part, customOf(appearance, phoneScheme)), [part, appearance, phoneScheme]);
   const [draft, setDraft] = useState<Draft>(() => partOf(shown, part));
   const colours: CustomColours = { ...shown, [part]: draft };
   const chosen: AppearanceChoice = { ...appearance, theme: 'custom', custom: colours };
@@ -529,7 +537,7 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
   const controls: Controls = {
     part,
     colours,
-    change: (field) => (value) => setDraft((current) => editOf(current, field, value)),
+    change: (field) => (value) => setDraft((current) => liveEdit(shown, part, editOf(current, field, value), field)),
     end: (field) => (value) => {
       void save((intended) => letGoPatch(intended, part, field, value, draft));
     },

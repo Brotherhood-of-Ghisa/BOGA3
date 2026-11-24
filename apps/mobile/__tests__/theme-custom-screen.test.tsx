@@ -744,15 +744,21 @@ describe('the gamut scale', () => {
     expect(StyleSheet.flatten(screen.getByTestId('theme-custom-hue-swatch').props.style).backgroundColor).toBe(generateCustomRoles(LEGACY).accent);
   });
 
-  it.each(['background', 'accent', 'ink'] as const)(
-    'converts a theme saved before on the first strength move of the %s, saving it once, every other part drawn as before',
-    async (part) => {
+  it.each([
+    ['background', 'Strength'],
+    ['accent', 'Strength'],
+    ['ink', 'Strength'],
+    ['accent', 'Lightness'],
+    ['record', 'Lightness'],
+  ] as const)(
+    'converts a theme saved before on the first move of the %s’s %s, saving it once, every other part drawn as before',
+    async (part, control) => {
       store(LEGACY);
       mockPart = part;
       const setItem = jest.spyOn(Storage, 'setItem');
       render(<ThemeCustomRoute />);
 
-      await step(slider('Strength'), 'increment');
+      await step(slider(control), 'increment');
 
       await waitFor(() => expect(storedCustom()?.scale).toBe(GAMUT_SCALE));
       expect(setItem).toHaveBeenCalledTimes(1);
@@ -786,6 +792,18 @@ describe('the gamut scale', () => {
     await act(async () => drag(hueBar()).onEnd({ x: 200 }, true));
     await waitFor(() => expect(storedCustom()?.record).toEqual({ ...LEGACY.record, hue: 200 }));
     expect(storedCustom()).not.toHaveProperty('scale');
+  });
+
+  it('shows a tinted accent’s strength as drawn at the hue it is dragged to', () => {
+    const converted = onGamutScale(LEGACY);
+    store(converted);
+    mockPart = 'accent';
+    render(<ThemeCustomRoute />);
+    fireEvent(screen.getByTestId('theme-custom-hue-track'), 'layout', { nativeEvent: { layout: { width: 359 } } });
+    act(() => drag(hueBar()).onUpdate({ x: 250 }));
+    const drawn = gamutPart({ ...converted, accent: { ...converted.accent, hue: 250 } }, 'accent');
+    expect(Math.round(drawn.strength)).not.toBe(Math.round(gamutPart(converted, 'accent').strength));
+    expect(slider('Strength').props.accessibilityValue).toEqual({ text: `${Math.round(drawn.strength)}%` });
   });
 
   it('keeps a converted accent’s tint through a hue move, and its own L* through a page switched to dark', async () => {
