@@ -180,30 +180,48 @@ fi
 corrupt_poster_configs() {
   local store="$HOME/Library/Developer/CoreSimulator/Devices/$1/data/Library/Application Support/PRBPosterExtensionDataStore"
   [[ -d "$store" ]] || return 0
-  find "$store" -mindepth 5 -maxdepth 5 -type d -path '*/Extensions/*/configurations/*' 2>/dev/null \
+  # A find error (an unreadable or vanishing dir) must not abort the boot
+  # under pipefail; whatever it did list is still checked.
+  { find "$store" -mindepth 5 -maxdepth 5 -type d -path '*/Extensions/*/configurations/*' 2>/dev/null || true; } \
     | while IFS= read -r config; do
         [[ -e "$config/com.apple.posterkit.provider.descriptor.identifier" ]] || echo "$config"
       done
 }
 
+# "<state><TAB><name>" of a device, from simctl's JSON; empty when not listed.
+sim_state_and_name() {
+  run_bounded 15 xcrun simctl list devices -j 2>/dev/null | node -e '
+    const raw = require("fs").readFileSync(0, "utf8");
+    const data = raw ? JSON.parse(raw) : {};
+    for (const devices of Object.values(data.devices ?? {})) {
+      const device = (devices ?? []).find((entry) => entry.udid === process.argv[1]);
+      if (device) { process.stdout.write(`${device.state ?? ""}\t${device.name ?? ""}`); break; }
+    }
+  ' "$1" || true
+}
+
 # Erase a lane sim whose poster store is corrupt. Erasing is safe for a lane
-# sim for the same reason recreating one is: every lane reinstalls the dev
-# client. Only a slot-named lane sim resolved by name is erased; anything else
-# gets the diagnosis and the command.
+# sim for the same reason recreating one is: its callers reinstall the dev
+# client (app data on it is lost). Only a SHUT-DOWN, slot-named lane sim
+# resolved by name is erased: on a booted sim PosterBoard may be mid-save (a
+# configuration briefly without its descriptor), and the device may be in use.
+# Anything else gets the diagnosis and the command.
 repair_poster_store() {
-  local corrupt count
+  local corrupt count fields state name
   corrupt="$(corrupt_poster_configs "$SIM_UDID")"
   [[ -n "$corrupt" ]] || return 0
   count="$(printf '%s\n' "$corrupt" | wc -l | tr -d ' ')"
+  fields="$(sim_state_and_name "$SIM_UDID")"
+  state="${fields%%$'\t'*}"
+  name="${fields#*$'\t'}"
+  [[ -n "$name" ]] || name="$IOS_SIM_DEVICE"
 
-  if [[ -n "$IOS_SIM_UDID" ]] || ! boga_is_lane_sim_name "$IOS_SIM_DEVICE"; then
-    echo "[ios-sim-boot] WARN: simulator '$IOS_SIM_DEVICE' ($SIM_UDID) has a corrupt PosterBoard store ($count poster configurations lack a descriptor identifier); PosterBoard will crash-loop while it is booted. Only a slot lane sim resolved by name is erased automatically; to repair: xcrun simctl shutdown $SIM_UDID && xcrun simctl erase $SIM_UDID" >&2
+  if [[ -n "$IOS_SIM_UDID" ]] || ! boga_is_lane_sim_name "$IOS_SIM_DEVICE" || [[ "$state" != "Shutdown" ]]; then
+    echo "[ios-sim-boot] WARN: simulator '$name' ($SIM_UDID, ${state:-unknown state}) has a corrupt PosterBoard store ($count poster configurations lack a descriptor identifier); PosterBoard will crash-loop while it is booted. Only a shut-down slot lane sim resolved by name is erased automatically; to repair: xcrun simctl shutdown $SIM_UDID; xcrun simctl erase $SIM_UDID" >&2
     return 0
   fi
 
-  echo "[ios-sim-boot] sim \"${IOS_SIM_DEVICE}\" ($SIM_UDID) has a corrupt PosterBoard store ($count poster configurations lack a descriptor identifier), so PosterBoard would crash-loop — erasing it (the lane reinstalls the dev client)" >&2
-  # Shutting down an already-shutdown device exits non-zero; only erase must succeed.
-  run_bounded "$IOS_SIM_CREATE_TIMEOUT_SECONDS" xcrun simctl shutdown "$SIM_UDID" >/dev/null 2>&1 || true
+  echo "[ios-sim-boot] sim \"${IOS_SIM_DEVICE}\" ($SIM_UDID) has a corrupt PosterBoard store ($count poster configurations lack a descriptor identifier), so PosterBoard would crash-loop — erasing it (its app data is lost; the dev client is reinstalled)" >&2
   run_bounded "$IOS_SIM_CREATE_TIMEOUT_SECONDS" xcrun simctl erase "$SIM_UDID" >/dev/null || {
     echo "[ios-sim-boot] FAIL: could not erase simulator \"${IOS_SIM_DEVICE}\" ($SIM_UDID) to repair its PosterBoard store." >&2
     exit 1

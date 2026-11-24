@@ -43,7 +43,8 @@ case "$*" in
     node -e '
       const [rt26, rt27, type17] = [process.env.RT26, process.env.RT27, process.env.TYPE17];
       const device = (udid, name, deviceTypeIdentifier = type17) =>
-        ({ udid, name, isAvailable: true, state: "Shutdown", deviceTypeIdentifier });
+        ({ udid, name, isAvailable: true, deviceTypeIdentifier,
+           state: udid === process.env.SLOT_UDID ? (process.env.STUB_SLOT_STATE || "Shutdown") : "Shutdown" });
       const devices = { [rt26]: [], [rt27]: [] };
       if (process.env.STUB_SIM_PRESENT !== "0") {
         devices[process.env.STUB_SIM_RUNTIME || rt26].push(
@@ -115,6 +116,13 @@ case "$*" in
     esac ;;
 esac
 STUB
+cat > "$WORK/bin/find" <<'STUB'
+#!/usr/bin/env bash
+/usr/bin/find "$@"
+[[ "${STUB_FIND_FAIL:-0}" == 1 ]] && { echo "find: vanished: No such file or directory" >&2; exit 1; }
+exit 0
+STUB
+chmod +x "$WORK/bin/find"
 cat > "$WORK/bin/pgrep" <<'STUB'
 #!/usr/bin/env bash
 exit "${STUB_PGREP_EXIT:-1}"
@@ -313,6 +321,7 @@ run_boot_by_name "$SLOT_NAME" STUB_BOOTSTATUS=ok STUB_SIM_RUNTIME="$RT27"
 assert '[[ $rc == 0 && $out == "$SLOT_UDID" ]]' "a corrupt slot sim is repaired and booted (rc=$rc out=$out)"
 assert_err "has a corrupt PosterBoard store (5 poster configurations lack a descriptor identifier)"
 assert '[[ $(grep -c "simctl erase $SLOT_UDID" "$STUB_LOG") == 1 ]]' "the corrupt slot sim is erased"
+assert '! grep -q "simctl shutdown" "$STUB_LOG"' "a shut-down sim is erased without a shutdown call"
 assert 'grep -n "simctl erase $SLOT_UDID" "$STUB_LOG" | cut -d: -f1 |
   xargs -I{} test {} -lt "$(grep -n "simctl boot $SLOT_UDID" "$STUB_LOG" | cut -d: -f1 | head -n 1)"' \
   "erase is logged before boot"
@@ -328,7 +337,7 @@ assert '! grep -qE "simctl (erase|shutdown)" "$STUB_LOG"' "a healthy poster stor
 POSTER_FIXTURE="$UDID corrupt"
 run_boot STUB_BOOTSTATUS=ok
 assert '[[ $rc == 0 && $out == "$UDID" ]]' "an explicit UDID with a corrupt store still boots (rc=$rc)"
-assert_err "WARN: simulator 'BOGA test' ($UDID) has a corrupt PosterBoard store"
+assert_err "WARN: simulator 'BOGA test' ($UDID, Shutdown) has a corrupt PosterBoard store"
 assert_err "xcrun simctl erase $UDID"
 assert '! grep -q "simctl erase" "$STUB_LOG"' "an explicit IOS_SIM_UDID is never erased"
 
@@ -338,6 +347,21 @@ run_boot_by_name "$SLOT_NAME" STUB_BOOTSTATUS=ok STUB_SIM_RUNTIME="$RT27" STUB_E
 assert '[[ $rc == 1 && -z $out ]]' "a failed erase fails the run (rc=$rc out=$out)"
 assert_err "could not erase simulator"
 assert '! grep -q "simctl boot" "$STUB_LOG"' "nothing is booted when the erase failed"
+POSTER_FIXTURE=""
+
+# 17. A BOOTED slot sim is never erased (PosterBoard may be mid-save, the device
+#     may be in use): warn with the commands and boot as usual.
+POSTER_FIXTURE="$SLOT_UDID corrupt"
+run_boot_by_name "$SLOT_NAME" STUB_BOOTSTATUS=ok STUB_SIM_RUNTIME="$RT27" STUB_SLOT_STATE=Booted
+assert '[[ $rc == 0 && $out == "$SLOT_UDID" ]]' "a booted corrupt slot sim still boots (rc=$rc)"
+assert_err "WARN: simulator '$SLOT_NAME' ($SLOT_UDID, Booted) has a corrupt PosterBoard store"
+assert '! grep -qE "simctl (erase|shutdown)" "$STUB_LOG"' "a booted slot sim is never shut down or erased"
+
+# 18. A find error inside the store must not abort the boot (set -e + pipefail).
+POSTER_FIXTURE="$SLOT_UDID corrupt"
+run_boot_by_name "$SLOT_NAME" STUB_BOOTSTATUS=ok STUB_SIM_RUNTIME="$RT27" STUB_FIND_FAIL=1
+assert '[[ $rc == 0 && $out == "$SLOT_UDID" ]]' "a find error does not abort the boot (rc=$rc out=$out)"
+assert '[[ $(grep -c "simctl erase $SLOT_UDID" "$STUB_LOG") == 1 ]]' "what find did list is still repaired"
 POSTER_FIXTURE=""
 
 echo "ios-sim-boot.test.sh: ${PASS} assertions passed"
