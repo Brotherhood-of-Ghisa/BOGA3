@@ -100,7 +100,7 @@ share, scaled 0–300%: depth the grounds and `viz0`, borders (absent, the
 depth) the rules, highlight contrast `accent-wash`. Inks, ramp ends, accent
 and record have own L\* (0–100, ungapped). Strengths share their L\*'s sRGB
 maximum. The ramp follows the page or runs `viz1` → `viz4` via LCh thirds
-(short hue arc); Solid bars fills bars with `viz4`. Absent fields (and, until
+(short hue arc); Solid bars: [[appearance.solid-bars]]. Absent fields (and, until
 moved, fixed-chroma strengths) draw as before; old `borders`/`viz` ignored.
 Starts from the preset in use; floors ungated (`ui-theme-custom.test.ts`).
 
