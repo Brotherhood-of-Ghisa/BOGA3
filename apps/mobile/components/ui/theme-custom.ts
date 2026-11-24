@@ -197,7 +197,7 @@ export function inksInMode({ secondary, muted }: CustomColours, mode: ThemeMode)
 
 // The chart as stored, else the page's ramp with steps on the bars, its ends
 // as the theme draws them now: switching the ramp from the page starts there,
-// so nothing jumps.
+// so neither end moves (the steps between become the LCh thirds).
 export function chartOf(colours: CustomColours): CustomChart {
   return colours.chart ?? { follow: true, solid: false, ...drawnEnds(colours) };
 }
@@ -227,17 +227,23 @@ export function hueTurn(from: number, to: number): number {
   return turn === -180 ? 180 : turn;
 }
 
+// Below this chroma an end is a grey: its hue is not seen, so the steps
+// between take the other end's.
+const GREY_CHROMA = 0.5;
+
 // The ramp between a chosen start (`viz1`) and end (`viz4`): `viz2` and `viz3`
 // a third and two thirds of the way in L*, C* and hue, the hue the short way
-// round. The ends are drawn exactly; a step out of gamut loses chroma.
+// round (a grey end takes the other's hue). The ends are drawn exactly; a step
+// out of gamut loses chroma.
 export function chartRamp({ start, end }: Pick<CustomChart, 'start' | 'end'>): Pick<UiRoles, 'viz1' | 'viz2' | 'viz3' | 'viz4'> {
   const [from, to] = [endLch(start), endLch(end)];
-  const turn = hueTurn(from.hue, to.hue);
+  const fromHue = from.chroma < GREY_CHROMA ? to.hue : from.hue;
+  const turn = hueTurn(fromHue, to.chroma < GREY_CHROMA ? fromHue : to.hue);
   const at = (share: number): string =>
     lchToHex({
       lightness: from.lightness + share * (to.lightness - from.lightness),
       chroma: from.chroma + share * (to.chroma - from.chroma),
-      hue: (((from.hue + share * turn) % 360) + 360) % 360,
+      hue: (((fromHue + share * turn) % 360) + 360) % 360,
     });
   return { viz1: gamutColour(start.lightness, start), viz2: at(1 / 3), viz3: at(2 / 3), viz4: gamutColour(end.lightness, end) };
 }

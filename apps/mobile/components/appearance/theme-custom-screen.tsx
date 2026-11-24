@@ -344,7 +344,7 @@ function ChartEndRows({ change, end, roles, liveRoles, which, colour }: Controls
 
 // The chart: its ramp following the page, or from a start to an end of the
 // user's; and solid bars. Leaving the page's ramp starts from its ends as
-// drawn, so nothing jumps.
+// drawn, so neither end moves.
 function ChartControls(controls: Controls) {
   const { colours, save } = controls;
   const chart = chartOf(colours);

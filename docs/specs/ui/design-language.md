@@ -93,7 +93,7 @@ phone's, followed live). Native UI is pinned to the drawn mode, unpinned under
 an invalid record or an unreadable store opens, logged, in the default. `record`
 stays brass across presets. Its editor: `ux-rules.md` "Appearance".
 
-**Custom** (`theme-custom.ts`): a hue and strength per colour seed, highlight,
+**Custom** (`theme-custom.ts`): a hue and strength per seed, highlight,
 ink and ramp end; a direction. The page sets mode, L\* (dark 0–35, light
 65–100; quarter steps), depth, borders. Roles keep hue, chroma and `paper` →
 `ink` share, scaled 0–300%: depth the grounds and `viz0`, borders (absent, the
@@ -115,7 +115,7 @@ every launcher alias. Seasonal identity follows [[appearance.november]]; its
 alternates need a native build.
 
 **Data visualisation:** one sequential ramp, one meaning — **more**. `viz0` is
-empty / rest, `viz1`…`viz4` weakest to strongest; even L\*
+empty / rest, `viz1`…`viz4` weakest to strongest; even preset L\*
 steps, so each bucket reads as "more" without hue; no step is `accent` or
 `record`. **Text on a `viz` ground is `ink`**,
 legends and deltas included; `Stat` takes

@@ -487,10 +487,12 @@ describe('the chart', () => {
   const between = (start: OwnInk, end: OwnInk, share: number) => {
     const lch = (end: OwnInk) => ({ ...end, chroma: hexToLch(gamutColour(end.lightness, end)).chroma });
     const [a, b] = [lch(start), lch(end)];
+    // A grey end shows no hue: the steps take the other end's.
+    const [from, to] = [a.chroma < 0.5 ? b.hue : a.hue, b.chroma < 0.5 ? a.hue : b.hue];
     return {
       lightness: a.lightness + share * (b.lightness - a.lightness),
       chroma: a.chroma + share * (b.chroma - a.chroma),
-      hue: (((a.hue + share * hueTurn(a.hue, b.hue)) % 360) + 360) % 360,
+      hue: (((from + share * hueTurn(from, to)) % 360) + 360) % 360,
     };
   };
 
@@ -558,6 +560,18 @@ describe('the chart', () => {
       expect(Math.abs(drawn.lightness - expected.lightness)).toBeLessThan(0.5);
       expect(Math.abs(drawn.chroma - expected.chroma)).toBeLessThan(0.8);
       if (expected.chroma > 5) expect(hueDistance(drawn.hue, expected.hue)).toBeLessThan(1.5);
+    });
+  });
+
+  it.each([
+    ['start', { hue: 270, strength: 0, lightness: 90 }, { hue: 40, strength: 80, lightness: 50 }],
+    ['end', { hue: 40, strength: 80, lightness: 85 }, { hue: 270, strength: 0, lightness: 30 }],
+  ])('keeps the steps on the coloured end’s hue when the %s is a grey, whatever its hue slider says', (_grey, start, end) => {
+    const roles = chartRamp({ start, end });
+    (['viz2', 'viz3'] as const).forEach((role) => {
+      const drawn = hexToLch(roles[role]);
+      expect(drawn.chroma).toBeGreaterThan(5);
+      expect(hueDistance(drawn.hue, 40)).toBeLessThan(3);
     });
   });
 
