@@ -46,8 +46,11 @@ import {
   chartOf,
   customFromSeeds,
   drawnEnds,
-  customSeed,
+  gamutColour,
+  GAMUT_SCALE,
+  gamutPart,
   generateCustomRoles,
+  onGamutScale,
   ownInks,
   type CustomColourPart,
   type CustomColours,
@@ -59,7 +62,10 @@ import ThemeCustomRoute from '../app/theme-custom';
 import { waitForGone } from './helpers/wait-for-gone';
 import { renderWithTheme } from './helpers/theme';
 
+// A theme on the gamut scale: every strength a share of the most chroma its
+// part's L* holds (`LEGACY` below is one saved before).
 const CUSTOM: CustomColours = {
+  scale: GAMUT_SCALE,
   background: { hue: 80, strength: 20, mode: 'light', lightness: 90, depth: 100 },
   ink: { hue: 265, strength: 30, lightness: 8 },
   text: { hue: 60, strength: 10, contrast: 100 },
@@ -117,7 +123,7 @@ it('titles the page with its part, and opens the background for an unknown one',
   expect(slider('Lightness')).toBeTruthy();
 });
 
-it('offers lightness and depth for the background only', () => {
+it('offers depth for the background only, and lightness for the page, the accent and the best ever', () => {
   store(CUSTOM);
   render(<ThemeCustomRoute />);
   expect(slider('Strength').props.accessibilityValue).toEqual({ text: '20%' });
@@ -129,7 +135,7 @@ it('offers lightness and depth for the background only', () => {
   render(<ThemeCustomRoute />);
   expect(hueBar().props.accessibilityValue).toEqual({ text: 'Red, 30 degrees' });
   expect(slider('Strength').props.accessibilityValue).toEqual({ text: '70%' });
-  expect(screen.queryByRole('adjustable', { name: 'Lightness' })).toBeNull();
+  expect(screen.queryByRole('adjustable', { name: 'Depth' })).toBeNull();
   expect(screen.getAllByRole('button').map((button) => button.props.accessibilityLabel)).toEqual(['Accent, switch colour']);
 });
 
@@ -220,7 +226,9 @@ it('paints the hue bar in the part’s colours, words for VoiceOver only, and sw
   expect(paint).toHaveLength(36);
   const colours = paint.map((segment) => StyleSheet.flatten(segment.props.style)?.backgroundColor);
   expect(new Set(colours).size).toBeGreaterThan(30);
-  expect(colours[0]).toBe(customSeed('accent', { hue: 5, strength: 100 }));
+  // At the accent's L*, as drawn: a share of each hue's most there.
+  const accentLightness = hexToLch(generateCustomRoles(CUSTOM).accent).lightness;
+  expect(colours[0]).toBe(gamutColour(accentLightness, { hue: 5, strength: 100 }));
   expect(screen.queryByTestId('theme-custom-hue-value')).toBeNull();
   expect(screen.queryByText(/degrees|Red/)).toBeNull();
   const swatch = () => StyleSheet.flatten(screen.getByTestId('theme-custom-hue-swatch').props.style).backgroundColor;
@@ -423,6 +431,9 @@ it('switches the page to dark: the switch saves the mode, the page and the prima
       ...CUSTOM,
       background: { ...CUSTOM.background, mode: 'dark', lightness: 10 },
       ink: { ...CUSTOM.ink, lightness: 95 },
+      // The accent and the best ever at the dark ladder's L*.
+      accent: { ...CUSTOM.accent, lightness: 72 },
+      record: { ...CUSTOM.record, lightness: 66 },
     }),
   );
   expect(dark().props.accessibilityState).toEqual({ checked: true });
@@ -685,6 +696,135 @@ it('puts stored secondary and muted text at the dark ladder’s L* when the page
   await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Dark' })));
   await waitFor(() => expect(storedCustom()?.background.mode).toBe('dark'));
   expect(storedCustom()).toMatchObject({ secondary: { ...OWN.secondary, lightness: 65 }, muted: { ...OWN.muted, lightness: 49 } });
+});
+
+describe('the gamut scale', () => {
+  // CUSTOM as saved before strengths were shares of each L*'s most chroma.
+  const { scale: _scale, ...LEGACY } = CUSTOM;
+
+  it.each([
+    ['accent', 'light', 43],
+    ['record', 'light', 43],
+    ['accent', 'dark', 72],
+    ['record', 'dark', 66],
+  ] as const)('opens the %s on a %s page with a lightness at the mode’s, over 0–100', (part, mode, lightness) => {
+    store({ ...CUSTOM, background: { ...CUSTOM.background, mode, lightness: mode === 'light' ? 90 : 10 } });
+    mockPart = part;
+    render(<ThemeCustomRoute />);
+    expect(screen.getAllByRole('adjustable').map((element) => element.props.accessibilityLabel)).toEqual(['Hue', 'Strength', 'Lightness']);
+    expect(slider('Lightness').props.accessibilityValue).toEqual({ text: `${lightness}` });
+  });
+
+  it('saves the accent’s lightness, to black and white, and paints its hue bar at it', async () => {
+    store(CUSTOM);
+    mockPart = 'accent';
+    render(<ThemeCustomRoute />);
+    fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
+    const firstSegment = () => StyleSheet.flatten(screen.getByTestId('theme-custom-hue-paint').props.children[0].props.style).backgroundColor;
+
+    await act(async () => tap(slider('Lightness')).onEnd({ x: 220 }, true));
+    await waitFor(() => expect(storedCustom()?.accent).toEqual({ ...CUSTOM.accent, lightness: 55 }));
+    expect(firstSegment()).toBe(gamutColour(hexToLch(generateCustomRoles(storedCustom()!).accent).lightness, { hue: 5, strength: 100 }));
+
+    await act(async () => tap(slider('Lightness')).onEnd({ x: 0 }, true));
+    await waitFor(() => expect(storedCustom()?.accent.lightness).toBe(0));
+    expect(slider('Lightness').props.accessibilityValue).toEqual({ text: 'Black' });
+    await act(async () => tap(slider('Lightness')).onEnd({ x: 400 }, true));
+    await waitFor(() => expect(storedCustom()?.accent.lightness).toBe(100));
+  });
+
+  it('shows a theme saved before at the strength and lightness it draws on the gamut scale', () => {
+    store(LEGACY);
+    mockPart = 'accent';
+    render(<ThemeCustomRoute />);
+    const accent = gamutPart(onGamutScale(LEGACY), 'accent');
+    expect(slider('Strength').props.accessibilityValue).toEqual({ text: `${Math.round(accent.strength)}%` });
+    // Its L* as drawn: moved with the page (L* 90, not the ladder's 92).
+    expect(slider('Lightness').props.accessibilityValue).toEqual({ text: `${Math.round(accent.lightness! * 4) / 4}` });
+    expect(StyleSheet.flatten(screen.getByTestId('theme-custom-hue-swatch').props.style).backgroundColor).toBe(generateCustomRoles(LEGACY).accent);
+  });
+
+  it.each([
+    ['background', 'Strength'],
+    ['accent', 'Strength'],
+    ['ink', 'Strength'],
+    ['accent', 'Lightness'],
+    ['record', 'Lightness'],
+  ] as const)(
+    'converts a theme saved before on the first move of the %s’s %s, saving it once, every other part drawn as before',
+    async (part, control) => {
+      store(LEGACY);
+      mockPart = part;
+      const setItem = jest.spyOn(Storage, 'setItem');
+      render(<ThemeCustomRoute />);
+
+      await step(slider(control), 'increment');
+
+      await waitFor(() => expect(storedCustom()?.scale).toBe(GAMUT_SCALE));
+      expect(setItem).toHaveBeenCalledTimes(1);
+      const saved = storedCustom()!;
+      const converted = onGamutScale(LEGACY);
+      // The part moved leaves its tint; the rest is the theme converted.
+      expect({ ...saved, [part]: undefined }).toEqual({ ...converted, [part]: undefined });
+      expect(saved[part]).not.toHaveProperty('tint');
+      const after = generateCustomRoles(saved);
+      if (part === 'ink') {
+        // Primary text is on the gamut scale both ways: the theme draws what
+        // it would have drawn before with that strength.
+        expect(after).toEqual(generateCustomRoles({ ...LEGACY, ink: saved.ink }));
+      } else {
+        const before = generateCustomRoles(LEGACY);
+        (['ink', 'inkMuted', 'inkFaint'] as const).forEach((role) => expect({ role, colour: after[role] }).toEqual({ role, colour: before[role] }));
+      }
+    },
+  );
+
+  it('keeps a theme saved before as it is stored when a hue or the depth moves', async () => {
+    store(LEGACY);
+    render(<ThemeCustomRoute />);
+    await step(slider('Depth'), 'decrement');
+    await waitFor(() => expect(storedCustom()).toEqual({ ...LEGACY, background: { ...LEGACY.background, depth: 85, borders: 100 } }));
+
+    mockPart = 'record';
+    screen.unmount();
+    render(<ThemeCustomRoute />);
+    fireEvent(screen.getByTestId('theme-custom-hue-track'), 'layout', { nativeEvent: { layout: { width: 359 } } });
+    await act(async () => drag(hueBar()).onEnd({ x: 200 }, true));
+    await waitFor(() => expect(storedCustom()?.record).toEqual({ ...LEGACY.record, hue: 200 }));
+    expect(storedCustom()).not.toHaveProperty('scale');
+  });
+
+  it('shows a tinted accent’s strength as drawn at the hue it is dragged to', () => {
+    const converted = onGamutScale(LEGACY);
+    store(converted);
+    mockPart = 'accent';
+    render(<ThemeCustomRoute />);
+    fireEvent(screen.getByTestId('theme-custom-hue-track'), 'layout', { nativeEvent: { layout: { width: 359 } } });
+    act(() => drag(hueBar()).onUpdate({ x: 250 }));
+    const drawn = gamutPart({ ...converted, accent: { ...converted.accent, hue: 250 } }, 'accent');
+    expect(Math.round(drawn.strength)).not.toBe(Math.round(gamutPart(converted, 'accent').strength));
+    expect(slider('Strength').props.accessibilityValue).toEqual({ text: `${Math.round(drawn.strength)}%` });
+  });
+
+  it('keeps a converted accent’s tint through a hue move, and its own L* through a page switched to dark', async () => {
+    const converted = onGamutScale(LEGACY);
+    store(converted);
+    mockPart = 'accent';
+    render(<ThemeCustomRoute />);
+    fireEvent(screen.getByTestId('theme-custom-hue-track'), 'layout', { nativeEvent: { layout: { width: 359 } } });
+    await act(async () => drag(hueBar()).onEnd({ x: 200 }, true));
+    await waitFor(() => expect(storedCustom()?.accent).toMatchObject({ hue: 200, tint: LEGACY.accent.strength }));
+    expect(generateCustomRoles(storedCustom()!).accent).toBe(generateCustomRoles({ ...LEGACY, accent: { ...LEGACY.accent, hue: 200 } }).accent);
+
+    mockPart = 'background';
+    screen.unmount();
+    render(<ThemeCustomRoute />);
+    await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Dark' })));
+    await waitFor(() => expect(storedCustom()?.background.mode).toBe('dark'));
+    // Tinted, it draws from its tint as before; the best ever too.
+    expect(storedCustom()?.accent.tint).toBe(LEGACY.accent.strength);
+    expect(storedCustom()?.record).toEqual(converted.record);
+  });
 });
 
 describe('the chart', () => {

@@ -93,16 +93,16 @@ phone's, followed live). Native UI is pinned to the drawn mode, unpinned under
 an invalid record or an unreadable store opens, logged, in the default. `record`
 stays brass across presets. Its editor: `ux-rules.md` "Appearance".
 
-**Custom** (`theme-custom.ts`): a hue and strength per seed, highlight,
-ink and ramp end; a direction. The page sets mode, L\* (dark 0–35, light
-65–100; quarter steps), depth, borders. Roles keep hue, chroma and `paper` →
-`ink` share, scaled 0–300%: depth the grounds and `viz0`, borders (absent, the
-depth) the rules, highlight contrast `accent-wash`. Inks and ramp ends have
-own L\* (`ink-muted`, `ink-faint`, ends: 0–100, ungapped); their strength, as
-the highlight's, shares its sRGB maximum. The ramp follows the page or runs
-`viz1` → `viz4` via LCh thirds (short hue arc); Solid bars fills bars with
-`viz4`. Absent fields draw as before; old `borders`/`viz` ignored. Starts
-from the preset in use, ungated by floors (`ui-theme-custom.test.ts`).
+**Custom** (`theme-custom.ts`): a hue and strength per seed, highlight, ink
+and ramp end; a direction. The page sets mode, L\* (dark 0–35, light 65–100;
+quarter steps), depth, borders. Roles keep hue, chroma and `paper` → `ink`
+share, scaled 0–300%: depth the grounds and `viz0`, borders (absent, the
+depth) the rules, highlight contrast `accent-wash`. Inks, ramp ends, accent
+and record have own L\* (0–100, ungapped). Strengths share their L\*'s sRGB
+maximum. The ramp follows the page or runs `viz1` → `viz4` via LCh thirds
+(short hue arc); Solid bars: [[appearance.solid-bars]]. Absent fields (and, until
+moved, fixed-chroma strengths) draw as before; old `borders`/`viz` ignored.
+Starts from the preset in use; floors ungated (`ui-theme-custom.test.ts`).
 
 The launcher icon follows the drawn theme: each preset's `appIcon` field
 names one (Graphite, Ink + paper → Slate; Sage → Forest), one rainbow icon serves every

@@ -380,9 +380,19 @@ export function rampLightness(mode: ThemeMode, role: 'viz1' | 'viz4'): number {
   return (mode === 'light' ? LIGHT_STEPS : DARK_STEPS)[role].lightness;
 }
 
-// The L* of a mode's `paper`: where a custom page starts.
-export function paperLightness(mode: ThemeMode): number {
-  return (mode === 'light' ? LIGHT_STEPS : DARK_STEPS).paper.lightness;
+// A mode's `paper` step: its L* (where a custom page starts) and the share of
+// the background seed's chroma it takes.
+export function paperStep(mode: ThemeMode): { lightness: number; chroma: number } {
+  const { lightness, chroma } = (mode === 'light' ? LIGHT_STEPS : DARK_STEPS).paper;
+  return { lightness, chroma };
+}
+
+export const paperLightness = (mode: ThemeMode): number => paperStep(mode).lightness;
+
+// The L* the dark ladder draws `accent` or `record` at; the light one takes
+// each seed as given.
+export function darkFillLightness(role: 'accent' | 'record'): number {
+  return (role === 'accent' ? DARK_ACCENT : DARK_RECORD).lightness;
 }
 
 // The L* of a mode's `accentWash`: where a custom highlight of its own is
@@ -397,11 +407,13 @@ export function washLightness(mode: ThemeMode): number {
 // `tokens.ts` calls it once at module load. Throws on a seed that is not
 // `#RRGGBB`. `rampHue` replaces the hue the ramp reads back from `background`:
 // a custom theme passes the hue the user picked, which a near-grey seed's hex
-// no longer holds.
-export type RoleOptions = { rampHue?: number; ladder?: ThemeLadder };
+// no longer holds. `backgroundChroma` replaces its chroma: a custom page can
+// ask more than a hex at the seed's L* holds.
+export type RoleOptions = { rampHue?: number; backgroundChroma?: number; ladder?: ThemeLadder };
 
-export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light', { rampHue, ladder = 'standard' }: RoleOptions = {}): UiRoles {
-  const background = hexToLch(seeds.background);
+export function generateRoles(seeds: ThemeSeeds, mode: ThemeMode = 'light', { rampHue, backgroundChroma, ladder = 'standard' }: RoleOptions = {}): UiRoles {
+  const read = hexToLch(seeds.background);
+  const background = backgroundChroma === undefined ? read : { ...read, chroma: backgroundChroma };
   const seedLch: Record<SeedName, Lch> = {
     background,
     text: hexToLch(seeds.text),

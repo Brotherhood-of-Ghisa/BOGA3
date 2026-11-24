@@ -15,35 +15,44 @@ import { PartSpotlight, ThemePreview } from '@/components/appearance/theme-previ
 import { useAppearanceCommit } from '@/components/appearance/use-appearance-commit';
 import { FormSection, HeaderTitleMenu, Notice, RadioRow, Screen, SliderRow, SwitchRow, uiGeometry, uiHairline, uiSpace, useUiRoles } from '@/components/ui';
 import { THEME_DIRECTIONS, type ThemeMode, type UiRoles } from '@/components/ui/theme';
+import { hexToLch } from '@/components/ui/lch';
 import {
-  CUSTOM_COLOUR_PARTS,
+  accentSeed,
   CUSTOM_PARTS,
   BORDERS_MAX,
   bordersOf,
   chartInMode,
   chartOf,
-  customSeed,
   drawnEnds,
   DEPTH_MAX,
+  fillLightness,
+  fillsInMode,
   gamutColour,
+  gamutPart,
   HIGHLIGHT_CONTRAST_MAX,
   highlightFromAccent,
   INK_RANGE,
   inkDefault,
   inksInMode,
+  isGamutScaled,
   isOwnInkPart,
+  isTintedPart,
   LIGHTNESS_MAX,
   LIGHTNESS_STEP,
+  onGamutScale,
   ownInks,
   PAGE_DEFAULT,
   isColourPart,
   PAGE_RANGE,
   solidBars,
   STRENGTH_MAX,
+  untinted,
   type ChartEnd,
   type CustomColourPart,
   type CustomColours,
+  type CustomFill,
   type CustomPart,
+  type FillPart,
   type HueStrength,
   type OwnInk,
 } from '@/components/ui/theme-custom';
@@ -61,17 +70,6 @@ type Field = ColourField | 'depth' | 'borders' | 'contrast' | `${ChartEndName}.$
 const percent = (value: number): string => `${Math.round(value)}%`;
 const HUE_MAX = 359;
 const HUE_SEGMENTS = 36;
-// The hue bar's paint for each colour part: each segment the colour its hue
-// gives at full strength, so the bar shows what each hue can reach (some lose
-// chroma). Computed once, not on every drag move.
-const HUE_PAINT = Object.fromEntries(
-  CUSTOM_COLOUR_PARTS.map((part) => [
-    part,
-    Array.from({ length: HUE_SEGMENTS }, (_, index) =>
-      customSeed(part, { hue: ((index + 0.5) * (HUE_MAX + 1)) / HUE_SEGMENTS, strength: STRENGTH_MAX }),
-    ),
-  ]),
-) as Record<CustomColourPart, string[]>;
 // The role that stands for a colour part: what the hue bar's swatch shows, in
 // the theme being made.
 const PART_ROLE: Record<CustomColourPart, keyof UiRoles> = {
@@ -84,8 +82,9 @@ const PART_ROLE: Record<CustomColourPart, keyof UiRoles> = {
   record: 'record',
 };
 const PART_OPTIONS = CUSTOM_PARTS.map((id) => ({ id, label: CUSTOM_PART_LABELS[id] }));
-// A chart end's hue bar: each hue at full strength at the end's own L*.
-const chartHuePaint = (lightness: number): string[] =>
+// A hue bar: each segment the colour its hue gives at full strength at the
+// part's L*, so the bar shows what each hue can reach there.
+const huePaint = (lightness: number): string[] =>
   Array.from({ length: HUE_SEGMENTS }, (_, index) =>
     gamutColour(lightness, { hue: ((index + 0.5) * (HUE_MAX + 1)) / HUE_SEGMENTS, strength: STRENGTH_MAX }),
   );
@@ -104,17 +103,26 @@ function customOf(appearance: AppearanceChoice, phoneScheme: ColorSchemeName | n
   return startingCustom(appearance, previewMode(appearance, phoneScheme));
 }
 
-// The colours a part's page shows: the secondary's and the muted text's
+// The colours a part's page shows, on the gamut scale (`onGamutScale`: what a
+// theme saved before draws, unchanged): the secondary's and the muted text's
 // pages show both at their own L*, as the theme draws them now (`ownInks`).
-const shownFor = (part: CustomPart, colours: CustomColours): CustomColours =>
-  isOwnInkPart(part) ? { ...colours, ...ownInks(colours) } : colours;
+const shownFor = (part: CustomPart, stored: CustomColours): CustomColours => {
+  const colours = onGamutScale(stored);
+  return isOwnInkPart(part) ? { ...colours, ...ownInks(colours) } : colours;
+};
 
 // A part's value; the secondary's or muted text's, and the chart's, as drawn
-// when not yet stored.
+// when not yet stored; a tinted page, accent or best ever at the strength
+// and L* it draws (`gamutPart`).
 function partOf(colours: CustomColours, part: CustomPart): Draft {
   if (isOwnInkPart(part)) return ownInks(colours)[part];
+  if (isTintedPart(part)) return gamutPart(colours, part);
   return part === 'chart' ? chartOf(colours) : colours[part];
 }
+
+// The moves that put a theme saved before on the gamut scale: a strength or a
+// lightness, of any part.
+const CONVERTING_FIELDS = new Set<Field>(['strength', 'lightness', 'start.strength', 'start.lightness', 'end.strength', 'end.lightness']);
 
 // What a part's controls are given: the colours being made (the draft in
 // place), a live and a let-go handler per slider, a save of several parts at
@@ -133,7 +141,12 @@ type Controls = {
   liveRoles: UiRoles;
 };
 
-function HueStrengthRows({ change, end, swatch, part, colour, divider }: Controls & { colour: HueStrength; divider: boolean }) {
+// The L* a colour part's hue bar is painted at: its role's, as drawn.
+const paintLightness = (part: CustomPart, roles: UiRoles): number | null => (isColourPart(part) ? hexToLch(roles[PART_ROLE[part]]).lightness : null);
+
+function HueStrengthRows({ change, end, swatch, part, colour, divider, roles }: Controls & { colour: HueStrength; divider: boolean }) {
+  const at = paintLightness(part, roles);
+  const paint = useMemo(() => (at === null ? undefined : huePaint(at)), [at]);
   return (
     <>
       <SliderRow
@@ -144,7 +157,7 @@ function HueStrengthRows({ change, end, swatch, part, colour, divider }: Control
         onChange={change('hue')}
         onChangeEnd={end('hue')}
         testID="theme-custom-hue"
-        trackColours={isColourPart(part) ? HUE_PAINT[part] : undefined}
+        trackColours={paint}
         trailing={swatch}
         // A drawn hue (unrounded) can lie just past 359.
         value={Math.min(colour.hue, HUE_MAX)}
@@ -172,10 +185,11 @@ function BackgroundControls(controls: Controls) {
   const switchMode = (dark: boolean) => {
     const mode: ThemeMode = dark ? 'dark' : 'light';
     save((intended) => ({
-      background: { ...background, mode, lightness: PAGE_DEFAULT[mode] },
+      background: { ...intended.background, mode, lightness: PAGE_DEFAULT[mode] },
       ink: { ...intended.ink, lightness: inkDefault(mode) },
       ...inksInMode(intended, mode),
       ...chartInMode(intended, mode),
+      ...fillsInMode(intended, mode),
     }));
   };
   const range = PAGE_RANGE[background.mode];
@@ -226,8 +240,8 @@ function HighlightControls(controls: Controls) {
   const { colours, change, end, save } = controls;
   const { highlight } = colours;
   const match = (on: boolean) =>
-    save(({ accent, background }) => ({
-      highlight: on ? { ...highlight, match: true } : { ...highlight, match: false, ...highlightFromAccent(customSeed('accent', accent), background.mode) },
+    save((intended) => ({
+      highlight: on ? { ...highlight, match: true } : { ...highlight, match: false, ...highlightFromAccent(accentSeed(intended), intended.background.mode) },
     }));
   return (
     <>
@@ -292,10 +306,33 @@ function OwnInkControls(controls: Controls & { colour: OwnInk }) {
   );
 }
 
+// The accent or best ever: a hue and strength, and its L* over the whole
+// range, at the mode's by default (`fillLightness`).
+function FillControls(controls: Controls & { part: FillPart }) {
+  const { colours, change, end, part } = controls;
+  const colour = colours[part];
+  return (
+    <>
+      <HueStrengthRows {...controls} colour={colour} divider={false} />
+      <SliderRow
+        divider
+        format={lightnessLabel}
+        label="Lightness"
+        max={LIGHTNESS_MAX}
+        onChange={change('lightness')}
+        onChangeEnd={end('lightness')}
+        step={LIGHTNESS_STEP}
+        testID="theme-custom-lightness"
+        value={fillLightness(colours, part)}
+      />
+    </>
+  );
+}
+
 // One end of the chart's ramp: a hue on a bar painted at its L*, a strength
 // and its L* over the whole range.
 function ChartEndRows({ change, end, roles, liveRoles, which, colour }: Controls & { which: ChartEndName; colour: ChartEnd }) {
-  const paint = useMemo(() => chartHuePaint(colour.lightness), [colour.lightness]);
+  const paint = useMemo(() => huePaint(colour.lightness), [colour.lightness]);
   const name = CHART_END_LABELS[which];
   return (
     <>
@@ -399,15 +436,17 @@ function PartControls(controls: Controls) {
       return <HighlightControls {...controls} />;
     case 'chart':
       return <ChartControls {...controls} />;
-    default:
-      return <HueStrengthRows {...controls} colour={controls.colours[controls.part]} divider={false} />;
+    case 'accent':
+    case 'record':
+      return <FillControls {...controls} part={controls.part} />;
   }
 }
 
 // A part with one field moved. Only a colour part and the chart have
 // sliders; the direction is returned as it is. A chart end's field moves that
 // end. Moving the depth of a page that has no borders of its own pins them
-// where they are, so the hairlines stay put.
+// where they are, so the hairlines stay put. Moving a tinted part's strength
+// or lightness drops its tint (`untinted`).
 const editOf = (draft: Draft, field: Field, value: number): Draft => {
   if (typeof draft === 'string') return draft;
   if ('follow' in draft) {
@@ -415,8 +454,48 @@ const editOf = (draft: Draft, field: Field, value: number): Draft => {
     return { ...draft, [which]: { ...draft[which], [colourField]: value } };
   }
   const pinned = field === 'depth' && 'depth' in draft && draft.borders === undefined && draft.depth !== value ? { borders: draft.depth } : {};
-  return { ...draft, ...pinned, [field]: value } as Draft;
+  const edited = { ...draft, ...pinned, [field]: value } as Draft;
+  return CONVERTING_FIELDS.has(field) ? untinted(edited as CustomFill) : edited;
 };
+
+// A draft as it shows while held: a tinted part whose hue moves at the
+// strength and L* it draws at that hue (`gamutPart`), so its sliders do not
+// jump when let go.
+function liveEdit(shown: CustomColours, part: CustomPart, edited: Draft, field: Field): Draft {
+  if (field !== 'hue' || !isTintedPart(part) || typeof edited === 'string' || !('tint' in edited) || edited.tint === undefined) return edited;
+  return gamutPart({ ...shown, [part]: edited }, part);
+}
+
+// A tinted page, accent or best ever (`gamutPart`) as a theme saved before
+// stores it: its tint its strength, and a fill with no L* of its own. Any
+// other part is the same on both scales.
+function storedBefore(part: CustomPart, draft: Draft): Draft {
+  if (!isTintedPart(part) || typeof draft === 'string' || !('tint' in draft) || draft.tint === undefined) return draft;
+  const { tint, ...rest } = draft;
+  if (part === 'background') return { ...rest, strength: tint } as Draft;
+  const { lightness: _lightness, ...fill } = rest as CustomFill;
+  return { ...fill, strength: tint };
+}
+
+// Whether a draft of a page, accent or best ever has left its tint: a move
+// of its strength or lightness that did not save.
+const leftTint = (part: CustomPart, draft: Draft): boolean =>
+  isTintedPart(part) && typeof draft !== 'string' && 'strength' in draft && (draft as CustomFill).tint === undefined;
+
+// What letting a slider go stores: on a theme saved before, a move that
+// converts it (or a draft that left its tint) stores the whole theme on the
+// gamut scale (`onGamutScale`), and any other the field alone, as that theme
+// stores it. A secondary or muted text let go as it is stored (or drawn),
+// with the saves on their way, stores nothing new; otherwise both are stored.
+function letGoPatch(intended: CustomColours, part: CustomPart, field: Field, value: number, draft: Draft): Partial<CustomColours> {
+  const converting = !isGamutScaled(intended) && (CONVERTING_FIELDS.has(field) || leftTint(part, draft));
+  const base = converting ? onGamutScale(intended) : intended;
+  const edited = editOf(isGamutScaled(base) ? draft : storedBefore(part, draft), field, value);
+  const conversion = converting ? base : {};
+  if (!isOwnInkPart(part)) return { ...conversion, [part]: edited };
+  const inks = ownInks(base);
+  return JSON.stringify(inks[part]) === JSON.stringify(edited) ? conversion : { ...conversion, ...inks, [part]: edited };
+}
 
 // Settings → Appearance → Custom → one part (background, primary, secondary
 // and muted text, accent, highlight, best ever): a hue on a painted bar and
@@ -436,7 +515,7 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
   const phoneScheme = usePhoneScheme();
   // The colours as stored (with the inks as drawn on their pages); the draft
   // in place of this part while a control is held.
-  const shown = shownFor(part, customOf(appearance, phoneScheme));
+  const shown = useMemo(() => shownFor(part, customOf(appearance, phoneScheme)), [part, appearance, phoneScheme]);
   const [draft, setDraft] = useState<Draft>(() => partOf(shown, part));
   const colours: CustomColours = { ...shown, [part]: draft };
   const chosen: AppearanceChoice = { ...appearance, theme: 'custom', custom: colours };
@@ -449,8 +528,7 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
   const save = async (patchOf: (intended: CustomColours) => Partial<CustomColours>) => {
     const intended = customOf(readIntendedAppearance(appearance), phoneScheme);
     const patch = patchOf(intended);
-    const next = patch[part];
-    if (next !== undefined) setDraft(next);
+    if (patch[part] !== undefined) setDraft(partOf(shownFor(part, { ...intended, ...patch }), part));
     await commit(
       { theme: 'custom', custom: { ...intended, ...patch } },
       { message: `Couldn’t save the ${SAVE_NOUN[part] ?? 'colour'}. Nothing changed.`, context: { part, value: patch } },
@@ -459,16 +537,9 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
   const controls: Controls = {
     part,
     colours,
-    change: (field) => (value) => setDraft((current) => editOf(current, field, value)),
+    change: (field) => (value) => setDraft((current) => liveEdit(shown, part, editOf(current, field, value), field)),
     end: (field) => (value) => {
-      const edited = editOf(draft, field, value);
-      // A secondary or muted text let go as it is stored (or drawn), with the
-      // saves on their way, stores nothing new; otherwise both are stored.
-      void save((intended) => {
-        if (!isOwnInkPart(part)) return { [part]: edited };
-        const inks = ownInks(intended);
-        return JSON.stringify(inks[part]) === JSON.stringify(edited) ? {} : { ...inks, [part]: edited };
-      });
+      void save((intended) => letGoPatch(intended, part, field, value, draft));
     },
     save: (patchOf) => {
       void save(patchOf);

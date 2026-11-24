@@ -4,6 +4,7 @@ import {
   DIRECTION_PAIRS,
   generateRoles,
   inkStep,
+  paperLightness,
   rampLightness,
   THEME_DIRECTIONS,
   type ThemeDirection,
@@ -20,20 +21,27 @@ import {
   customSeed,
   customSeeds,
   drawnEnds,
+  fillDefault,
+  fillsInMode,
   gamutColour,
+  GAMUT_SCALE,
+  gamutPart,
   generateCustomRoles,
   highlightFromAccent,
   hueTurn,
   inksInMode,
+  onGamutScale,
   ownInks,
   parseCustomColours,
   solidBars,
+  untinted,
   type CustomChart,
   type CustomColours,
   type OwnInk,
 } from '@/components/ui/theme-custom';
 import { themePresets } from '@/components/ui/theme-presets';
 import BEFORE_CHART_ROLES from './fixtures/custom-before-chart-roles.json';
+import BEFORE_GAMUT_ROLES from './fixtures/custom-before-gamut-scale-roles.json';
 import TEXT_CONTRAST_ROLES from './fixtures/custom-text-contrast-roles.json';
 
 // A custom theme (`docs/specs/ui/design-language.md` §2, "Custom"): a hue and
@@ -827,6 +835,226 @@ describe('parseCustomColours', () => {
     ['a muted text that is not an object', { ...WARM_LIGHT, muted: 50 }],
     ['a secondary text of null', { ...WARM_LIGHT, secondary: null }],
     ['a direction that is not a string', { ...WARM_LIGHT, direction: 1 }],
+  ])('rejects %s', (_name, value) => {
+    expect(parseCustomColours(value)).toBeNull();
+  });
+});
+
+// Strengths as shares of each L*'s sRGB maximum (`GAMUT_SCALE`): a theme
+// saved before the marker draws byte-identical roles, converting it repaints
+// nothing (well under the 1 ΔE, CIE76, the operator accepts at that moment),
+// a tinted part draws from its old strength until its own strength or
+// lightness moves, and every part's strength 100 reaches the most chroma its
+// L* and hue hold.
+describe('the gamut scale', () => {
+  const stored = (value: unknown): CustomColours => parseCustomColours(JSON.parse(JSON.stringify(value)))!;
+  // The most chroma sRGB holds at an L* and hue.
+  const most = (lightness: number, hue: number) => hexToLch(lchToHex({ lightness, chroma: 150, hue })).chroma;
+  const SCALED: CustomColours = { ...WARM_LIGHT, scale: GAMUT_SCALE };
+
+  it('draws every theme saved before the marker as the build before it did, in both modes, with every field since added', () => {
+    const drift = BEFORE_GAMUT_ROLES.cases.filter(({ stored: saved, roles }) => JSON.stringify(generateCustomRoles(stored(saved))) !== JSON.stringify(roles));
+    expect(BEFORE_GAMUT_ROLES.cases.length).toBeGreaterThanOrEqual(54);
+    expect(new Set(BEFORE_GAMUT_ROLES.cases.map(({ stored: saved }) => saved.background.mode))).toEqual(new Set(['light', 'dark']));
+    (['borders', 'secondary', 'muted', 'chart'] as const).forEach((field) =>
+      expect({ field, cases: BEFORE_GAMUT_ROLES.cases.some(({ stored: saved }) => field in saved || field in saved.background) }).toEqual({ field, cases: true }),
+    );
+    expect(drift).toEqual([]);
+  });
+
+  it('draws every preset as the build before it did', () => {
+    const drift = BEFORE_GAMUT_ROLES.presets.filter(({ id, mode, roles }) => {
+      const preset = themePresets.find((candidate) => candidate.id === id)!;
+      return JSON.stringify(generateRoles(preset.seeds, mode as ThemeMode, { ladder: preset.ladder })) !== JSON.stringify(roles);
+    });
+    expect(BEFORE_GAMUT_ROLES.presets).toHaveLength(themePresets.length * 2);
+    expect(drift).toEqual([]);
+  });
+
+  it('converts a theme saved before to the gamut scale, writing the marker and repainting no role', () => {
+    BEFORE_GAMUT_ROLES.cases.forEach(({ stored: saved }) => {
+      const read = stored(saved);
+      const converted = stored(onGamutScale(read));
+      expect(converted.scale).toBe(GAMUT_SCALE);
+      const [before, after] = [generateCustomRoles(read), generateCustomRoles(converted)];
+      ROLE_COLOURS(before).forEach(([role, colour]) => expect({ role, shift: deltaE(colour, after[role]) }).toEqual({ role, shift: 0 }));
+      expect(after.scrim).toBe(before.scrim);
+    });
+  });
+
+  it('converts each part to the nearest values: tinted by its old strength, at the strength and L* it draws', () => {
+    const read = customFromSeeds(defaultThemeSeeds, 'dark');
+    const converted = onGamutScale(read);
+    const roles = generateCustomRoles(read);
+    expect(converted).toMatchObject({ background: { tint: read.background.strength }, accent: { tint: read.accent.strength }, record: { tint: read.record.strength } });
+    // Primary text, the highlight and the inks were already on it.
+    expect([converted.ink, converted.highlight, converted.text]).toEqual([read.ink, read.highlight, read.text]);
+    const { accent } = converted;
+    expect(accent.lightness).toBeCloseTo(hexToLch(roles.accent).lightness, 6);
+    expect(deltaE(gamutColour(accent.lightness!, accent), roles.accent)).toBeLessThan(1);
+    expect(deltaE(gamutColour(converted.background.lightness, converted.background), roles.paper)).toBeLessThan(1);
+    expect(onGamutScale(converted)).toBe(converted);
+  });
+
+  it('draws a tinted part from its old strength through a hue move, and on the gamut scale once untinted', () => {
+    const converted = onGamutScale(WARM_LIGHT);
+    const hued = { ...converted, accent: { ...converted.accent, hue: 200 } };
+    expect(generateCustomRoles(hued)).toEqual(generateCustomRoles({ ...WARM_LIGHT, accent: { ...WARM_LIGHT.accent, hue: 200 } }));
+    const own = { ...converted, accent: untinted(converted.accent) };
+    expect(own.accent).not.toHaveProperty('tint');
+    expect(generateCustomRoles(own).accent).toBe(gamutColour(own.accent.lightness!, own.accent));
+    expect(untinted(WARM_LIGHT.accent)).toBe(WARM_LIGHT.accent);
+  });
+
+  // A converted part's first strength or lightness move drops its tint: the
+  // jump is that part's own, measured on every stored case and bounded here.
+  const OWN_ROLES = { accent: ['accent', 'accentWash'], record: ['record', 'recordRule', 'recordWash'] } as const;
+  const FIXED_HUES = ['danger', 'regimeNewer', 'regimeOlder'] as const;
+  it.each([
+    ['accent', 9],
+    ['record', 10],
+    ['background', 56],
+  ] as const)('confines the first move of a converted %s to its own roles, within %s ΔE', (part, bound) => {
+    const jumps = BEFORE_GAMUT_ROLES.cases.map(({ stored: saved }) => {
+      const converted = onGamutScale(stored(saved));
+      const [before, after] = [generateCustomRoles(converted), generateCustomRoles({ ...converted, [part]: untinted(converted[part]) })];
+      const shift = (role: keyof UiRoles) => deltaE(before[role], after[role]);
+      const own: readonly (keyof UiRoles)[] = part === 'background' ? ROLE_COLOURS(before).map(([role]) => role) : OWN_ROLES[part];
+      const others = part === 'background' ? [...OWN_ROLES.accent, ...OWN_ROLES.record, ...FIXED_HUES] : ROLE_COLOURS(before).map(([role]) => role).filter((role) => !own.includes(role));
+      return { own: Math.max(...own.map(shift)), others: Math.max(...others.map(shift)), exact: part !== 'background' && others.every((role) => before[role] === after[role]) };
+    });
+    expect(Math.max(...jumps.map(({ own }) => own))).toBeLessThanOrEqual(bound);
+    // Another part's roles stay put; under a page move they shift only by rounding.
+    expect(Math.max(...jumps.map(({ others }) => others))).toBeLessThan(1);
+    if (part !== 'background') expect(jumps.every(({ exact }) => exact)).toBe(true);
+  });
+
+  it('reads a tinted part at the strength and L* it draws now', () => {
+    const converted = onGamutScale(withBackground(WARM_LIGHT, { lightness: 80 }));
+    const roles = generateCustomRoles(converted);
+    const record = gamutPart(converted, 'record');
+    expect(record.tint).toBe(WARM_LIGHT.record.strength);
+    expect(record.lightness).toBeCloseTo(hexToLch(roles.record).lightness, 6);
+    expect(gamutPart(converted, 'background').strength).toBeCloseTo((hexToLch(roles.paper).chroma / most(80, converted.background.hue)) * 100, 6);
+    expect(gamutPart(SCALED, 'accent')).toBe(SCALED.accent);
+  });
+
+  describe.each(['light', 'dark'] as ThemeMode[])('at strength 100 on a %s page', (mode) => {
+    // At the ladder's `paper`, so the highlight's band sits at its ladder's L*.
+    const page = paperLightness(mode);
+    const full = (hue: number) => ({ hue, strength: 100 });
+    const theme: CustomColours = {
+      ...customFromSeeds(defaultThemeSeeds, mode),
+      scale: GAMUT_SCALE,
+      background: { ...full(250), mode, lightness: page, depth: 100 },
+      ink: { ...full(20), lightness: mode === 'light' ? 20 : 85 },
+      secondary: { ...full(140), lightness: 50 },
+      muted: { ...full(300), lightness: 60 },
+      accent: { ...full(35), lightness: 55 },
+      highlight: { ...full(180), match: false, contrast: 100 },
+      record: { ...full(90), lightness: 80 },
+      chart: { follow: false, solid: false, start: { ...full(10), lightness: 30 }, end: { ...full(200), lightness: 70 } },
+    };
+    const roles = generateCustomRoles(theme);
+    it.each([
+      ['background', 'paper', 250],
+      ['ink', 'ink', 20],
+      ['secondary', 'inkMuted', 140],
+      ['muted', 'inkFaint', 300],
+      ['accent', 'accent', 35],
+      ['highlight', 'accentWash', 180],
+      ['record', 'record', 90],
+      ['chart start', 'viz1', 10],
+      ['chart end', 'viz4', 200],
+    ] as const)('reaches the most chroma the %s’s L* and hue hold', (_part, role, hue) => {
+      const drawn = hexToLch(roles[role]);
+      expect(drawn.chroma).toBeGreaterThan(most(drawn.lightness, hue) - 1.5);
+      expect(hueDistance(drawn.hue, hue)).toBeLessThan(2);
+    });
+  });
+
+  it.each([
+    ['dark', 30, 100],
+    ['light', 80, 250],
+  ] as const)('gives cards and fields the chroma a %s page at L* %d draws, not the ladder’s clipped one', (mode, lightness, hue) => {
+    const theme: CustomColours = { ...SCALED, background: { hue, strength: 100, mode, lightness, depth: 100 } };
+    const roles = generateCustomRoles(theme);
+    const page = hexToLch(roles.paper).chroma;
+    expect(page).toBeGreaterThan(30);
+    // Each card colour holds the page's chroma, or as much as its own L* holds.
+    (['surface', 'raised'] as const).forEach((role) => {
+      const drawn = hexToLch(roles[role]);
+      expect({ role, chroma: drawn.chroma > Math.min(page, most(drawn.lightness, hue)) - 1.5 }).toEqual({ role, chroma: true });
+    });
+  });
+
+  it('draws a bright red accent: hue 35, strength 100 at L* 55', () => {
+    const red = generateCustomRoles({ ...SCALED, accent: { hue: 35, strength: 100, lightness: 55 } }).accent;
+    const { lightness, chroma, hue } = hexToLch(red);
+    expect(lightness).toBeCloseTo(55, 0);
+    expect(hueDistance(hue, 35)).toBeLessThan(2);
+    // Brighter and stronger than any strength the fixed scale's L* 43 reached.
+    expect(chroma).toBeGreaterThan(hexToLch(generateCustomRoles({ ...WARM_LIGHT, accent: { hue: 35, strength: 100 } }).accent).chroma + 5);
+    expect(parseInt(red.slice(1, 3), 16)).toBeGreaterThan(0xe0);
+  });
+
+  it.each([
+    ['accent', 0, '#000000'],
+    ['accent', 100, '#FFFFFF'],
+    ['record', 0, '#000000'],
+    ['record', 100, '#FFFFFF'],
+  ] as const)('accepts a %s lightness of %d, drawn %s', (part, lightness, colour) => {
+    const read = stored({ ...SCALED, [part]: { hue: 35, strength: 80, lightness } });
+    expect(read[part].lightness).toBe(lightness);
+    expect(deltaE(generateCustomRoles(read)[part], colour)).toBeLessThan(0.5);
+  });
+
+  it.each([
+    ['light', 'accent', 43],
+    ['light', 'record', 43],
+    ['dark', 'accent', 72],
+    ['dark', 'record', 66],
+  ] as const)('draws a %s %s without a lightness at the mode’s, %d', (mode, part, lightness) => {
+    const theme = { ...customFromSeeds(defaultThemeSeeds, mode), scale: GAMUT_SCALE } as CustomColours;
+    expect(fillDefault(mode, part)).toBe(lightness);
+    expect(hexToLch(generateCustomRoles(theme)[part]).lightness).toBeCloseTo(lightness, 0);
+  });
+
+  it('puts the fills not tinted at the new mode’s L*, and leaves a tinted one and a theme saved before', () => {
+    const converted = onGamutScale(WARM_LIGHT);
+    const own = { ...converted, accent: untinted(converted.accent) };
+    expect(fillsInMode(own, 'dark')).toEqual({ accent: { ...own.accent, lightness: 72 } });
+    expect(fillsInMode(WARM_LIGHT, 'dark')).toEqual({});
+  });
+
+  it('matches the highlight to the accent as drawn on the gamut scale', () => {
+    const accent = { hue: 35, strength: 100, lightness: 55 };
+    const { highlight: _highlight, ...saved } = { ...SCALED, accent };
+    expect(stored(saved).highlight).toEqual({ ...highlightFromAccent(gamutColour(55, accent), 'light'), match: true, contrast: 100 });
+  });
+
+  it('keeps unrounded strengths, a tint and a fill’s L* on the gamut scale, and ignores the last two before it', () => {
+    const value = {
+      ...SCALED,
+      background: { ...SCALED.background, strength: 12.5, tint: 19 },
+      accent: { hue: 30, strength: 40.25, lightness: 61.5, tint: 70 },
+      record: { hue: 80, strength: 99.9 },
+    };
+    expect(stored(value)).toEqual(value);
+    const before = stored({ ...WARM_LIGHT, accent: { ...WARM_LIGHT.accent, lightness: 61.5, tint: 70 } });
+    expect(before.accent).toEqual(WARM_LIGHT.accent);
+  });
+
+  it.each([
+    ['an unknown scale', { ...SCALED, scale: 3 }],
+    ['a scale that is not a number', { ...SCALED, scale: '2' }],
+    ['a fractional strength before the scale', { ...WARM_LIGHT, background: { ...WARM_LIGHT.background, strength: 12.5 } }],
+    ['an accent lightness over 100', { ...SCALED, accent: { hue: 30, strength: 40, lightness: 100.5 } }],
+    ['a negative best ever lightness', { ...SCALED, record: { hue: 30, strength: 40, lightness: -1 } }],
+    ['a fractional tint', { ...SCALED, accent: { hue: 30, strength: 40, tint: 10.5 } }],
+    ['a page tint over 100', { ...SCALED, background: { ...SCALED.background, tint: 101 } }],
+    ['a strength over 100 on the scale', { ...SCALED, record: { hue: 30, strength: 100.5 } }],
+    ['a fractional hue on the scale', { ...SCALED, accent: { hue: 30.5, strength: 40 } }],
   ])('rejects %s', (_name, value) => {
     expect(parseCustomColours(value)).toBeNull();
   });
