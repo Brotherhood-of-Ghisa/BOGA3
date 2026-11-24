@@ -147,6 +147,8 @@ jest.mock('react-native-gesture-handler', () => {
         ? React.cloneElement(children, { gesture } as any)
         : (children ?? null),
     usePanGesture: () => ({}),
+    usePinchGesture: () => ({}),
+    useSimultaneousGestures: () => ({}),
     Gesture: {
       Pan: () => chainable('pan'),
       Tap: () => chainable('tap'),
@@ -186,6 +188,7 @@ jest.mock('react-native-reanimated', () => {
         set: (value: unknown) => { ref.current.value = value; } });
     },
     useAnimatedStyle: (fn: () => unknown) => fn(),
+    useAnimatedReaction: () => undefined,
     withTiming: (toValue: unknown, _config?: unknown, callback?: (finished: boolean) => void) => {
       callback?.(true);
       return toValue;
