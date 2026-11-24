@@ -84,6 +84,7 @@ case "$*" in
   "simctl list devices"*) printf -- '-- iOS 26.2 --\n    BOGA test (%s) (%s) \n' "$UDID" "${STUB_DEVICE_STATE:-Booted}" ;;
   "simctl shutdown "*) exit "${STUB_SHUTDOWN_EXIT:-0}" ;;
   "simctl delete "*) exit "${STUB_DELETE_EXIT:-0}" ;;
+  "simctl erase "*) exit "${STUB_ERASE_EXIT:-0}" ;;
   "simctl create "*) printf '%s\n' "$NEW_UDID" ;;
   "simctl boot "*)
     # cross-second: return 50ms past the next wall-clock second boundary, so a
@@ -128,9 +129,27 @@ assert_err() {
   grep -qF -- "$1" "$WORK/stderr" || { echo "FAIL: stderr missing '$1'" >&2; cat "$WORK/stderr" >&2; exit 1; }
   PASS=$((PASS + 1))
 }
+# POSTER_FIXTURE="<udid> <healthy|corrupt>" seeds that device's PosterBoard
+# store for the next run: 8 clock configurations, the corrupt one with 5 missing
+# their descriptor identifier (the shape found on the crash-looping wt12).
+POSTER_FIXTURE=""
+seed_poster_store() {
+  [[ -n "$POSTER_FIXTURE" ]] || return 0
+  local udid="${POSTER_FIXTURE% *}" kind="${POSTER_FIXTURE#* }" i config
+  local root="$WORK/home/Library/Developer/CoreSimulator/Devices/$udid/data/Library/Application Support/PRBPosterExtensionDataStore/61/Extensions/com.apple.ClockPoster.ClockPosterExtension/configurations"
+  for i in 1 2 3 4 5 6 7 8; do
+    config="$root/config-$i"
+    mkdir -p "$config/versions"
+    : > "$config/com.apple.posterkit.role.identifier"
+    if [[ "$kind" == healthy ]] || (( i > 5 )); then
+      : > "$config/com.apple.posterkit.provider.descriptor.identifier"
+    fi
+  done
+}
 run_boot() {
   : > "$STUB_LOG"
   rm -rf "${STUB_STATE:?}"/* "$WORK/home/Library"
+  seed_poster_store
   rc=0
   started=$SECONDS
   out="$(env PATH="$WORK/bin:$PATH" HOME="$WORK/home" IOS_SIM_UDID="$UDID" IOS_SIM_DEVICE="BOGA test" \
@@ -144,6 +163,7 @@ run_boot_by_name() {
   local name="$1"; shift
   : > "$STUB_LOG"
   rm -rf "${STUB_STATE:?}"/* "$WORK/home/Library"
+  seed_poster_store
   rc=0
   out="$(env PATH="$WORK/bin:$PATH" HOME="$WORK/home" IOS_SIM_DEVICE="$name" IOS_SIM_AUTO_CREATE=1 \
     "$@" "$BOOT_SCRIPT" 2>"$WORK/stderr")" || rc=$?
@@ -283,5 +303,41 @@ run_boot_by_name "$SLOT_NAME" STUB_BOOTSTATUS=ok STUB_SIM_RUNTIME="$RT26" STUB_D
 assert '[[ $rc == 1 && -z $out ]]' "a failed delete fails the run (rc=$rc out=$out)"
 assert_err "could not delete simulator"
 assert '! grep -q "simctl boot" "$STUB_LOG"' "nothing is booted when the recreate could not complete"
+
+# ---------- corrupt PosterBoard store (2026-10-29 wt5, 2026-11-24 wt12) ----------
+
+# 14. A slot sim with poster configurations missing their descriptor identifier
+#     is shut down and erased before it boots; a healthy one is left alone.
+POSTER_FIXTURE="$SLOT_UDID corrupt"
+run_boot_by_name "$SLOT_NAME" STUB_BOOTSTATUS=ok STUB_SIM_RUNTIME="$RT27"
+assert '[[ $rc == 0 && $out == "$SLOT_UDID" ]]' "a corrupt slot sim is repaired and booted (rc=$rc out=$out)"
+assert_err "has a corrupt PosterBoard store (5 poster configurations lack a descriptor identifier)"
+assert '[[ $(grep -c "simctl erase $SLOT_UDID" "$STUB_LOG") == 1 ]]' "the corrupt slot sim is erased"
+assert 'grep -n "simctl erase $SLOT_UDID" "$STUB_LOG" | cut -d: -f1 |
+  xargs -I{} test {} -lt "$(grep -n "simctl boot $SLOT_UDID" "$STUB_LOG" | cut -d: -f1 | head -n 1)"' \
+  "erase is logged before boot"
+assert '! grep -q "simctl delete" "$STUB_LOG"' "repairing the poster store deletes nothing"
+assert_untouched "poster repair"
+
+POSTER_FIXTURE="$SLOT_UDID healthy"
+run_boot_by_name "$SLOT_NAME" STUB_BOOTSTATUS=ok STUB_SIM_RUNTIME="$RT27"
+assert '[[ $rc == 0 && $out == "$SLOT_UDID" ]]' "a healthy slot sim boots (rc=$rc)"
+assert '! grep -qE "simctl (erase|shutdown)" "$STUB_LOG"' "a healthy poster store is never erased"
+
+# 15. An explicit IOS_SIM_UDID with a corrupt store is diagnosed, never erased.
+POSTER_FIXTURE="$UDID corrupt"
+run_boot STUB_BOOTSTATUS=ok
+assert '[[ $rc == 0 && $out == "$UDID" ]]' "an explicit UDID with a corrupt store still boots (rc=$rc)"
+assert_err "WARN: simulator 'BOGA test' ($UDID) has a corrupt PosterBoard store"
+assert_err "xcrun simctl erase $UDID"
+assert '! grep -q "simctl erase" "$STUB_LOG"' "an explicit IOS_SIM_UDID is never erased"
+
+# 16. An erase that fails fails the run rather than booting into the crash loop.
+POSTER_FIXTURE="$SLOT_UDID corrupt"
+run_boot_by_name "$SLOT_NAME" STUB_BOOTSTATUS=ok STUB_SIM_RUNTIME="$RT27" STUB_ERASE_EXIT=1
+assert '[[ $rc == 1 && -z $out ]]' "a failed erase fails the run (rc=$rc out=$out)"
+assert_err "could not erase simulator"
+assert '! grep -q "simctl boot" "$STUB_LOG"' "nothing is booted when the erase failed"
+POSTER_FIXTURE=""
 
 echo "ios-sim-boot.test.sh: ${PASS} assertions passed"

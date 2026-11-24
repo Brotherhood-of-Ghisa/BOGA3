@@ -46,6 +46,11 @@ instead of restating this contract.
    `IOS_SIM_RUNTIME` in the environment for a deliberate one-off run.
    `./boga doctor` reports whether the pin is installed and whether this slot's
    sim matches (a mismatch is a warning: the next lane run recreates it).
+   The same script erases the slot-named lane sim before booting it when its
+   PosterBoard store is corrupt (a poster configuration lacking
+   `com.apple.posterkit.provider.descriptor.identifier`), which otherwise makes
+   PosterBoard crash-loop for as long as the sim is booted while lanes still
+   pass; any other sim gets a warning with the erase command.
 
 ## 2. Config files
 

@@ -168,6 +168,50 @@ if [[ "$MODE" == "--udid-only" ]]; then
   exit 0
 fi
 
+# PosterBoard's on-disk store can be left corrupt: poster configurations whose
+# `com.apple.posterkit.provider.descriptor.identifier` file is missing. From
+# then on PosterBoard dies at every launch (EXC_BREAKPOINT in
+# -[PRPosterDescriptor _initWithPath:]) and launchd relaunches it every few
+# seconds for as long as the device is booted, so lanes still pass while
+# DiagnosticReports fills with PosterBoard-*.ips. Nothing in the simulator
+# repairs it; erasing does. Measured 2026-11-24: 51 healthy lane sims have the
+# file in all 8 configurations; the crash-looping one lacked it in 5.
+# Suspected cause: a shutdown cutting PosterBoard off mid-save after boot.
+corrupt_poster_configs() {
+  local store="$HOME/Library/Developer/CoreSimulator/Devices/$1/data/Library/Application Support/PRBPosterExtensionDataStore"
+  [[ -d "$store" ]] || return 0
+  find "$store" -mindepth 5 -maxdepth 5 -type d -path '*/Extensions/*/configurations/*' 2>/dev/null \
+    | while IFS= read -r config; do
+        [[ -e "$config/com.apple.posterkit.provider.descriptor.identifier" ]] || echo "$config"
+      done
+}
+
+# Erase a lane sim whose poster store is corrupt. Erasing is safe for a lane
+# sim for the same reason recreating one is: every lane reinstalls the dev
+# client. Only a slot-named lane sim resolved by name is erased; anything else
+# gets the diagnosis and the command.
+repair_poster_store() {
+  local corrupt count
+  corrupt="$(corrupt_poster_configs "$SIM_UDID")"
+  [[ -n "$corrupt" ]] || return 0
+  count="$(printf '%s\n' "$corrupt" | wc -l | tr -d ' ')"
+
+  if [[ -n "$IOS_SIM_UDID" ]] || ! boga_is_lane_sim_name "$IOS_SIM_DEVICE"; then
+    echo "[ios-sim-boot] WARN: simulator '$IOS_SIM_DEVICE' ($SIM_UDID) has a corrupt PosterBoard store ($count poster configurations lack a descriptor identifier); PosterBoard will crash-loop while it is booted. Only a slot lane sim resolved by name is erased automatically; to repair: xcrun simctl shutdown $SIM_UDID && xcrun simctl erase $SIM_UDID" >&2
+    return 0
+  fi
+
+  echo "[ios-sim-boot] sim \"${IOS_SIM_DEVICE}\" ($SIM_UDID) has a corrupt PosterBoard store ($count poster configurations lack a descriptor identifier), so PosterBoard would crash-loop — erasing it (the lane reinstalls the dev client)" >&2
+  # Shutting down an already-shutdown device exits non-zero; only erase must succeed.
+  run_bounded "$IOS_SIM_CREATE_TIMEOUT_SECONDS" xcrun simctl shutdown "$SIM_UDID" >/dev/null 2>&1 || true
+  run_bounded "$IOS_SIM_CREATE_TIMEOUT_SECONDS" xcrun simctl erase "$SIM_UDID" >/dev/null || {
+    echo "[ios-sim-boot] FAIL: could not erase simulator \"${IOS_SIM_DEVICE}\" ($SIM_UDID) to repair its PosterBoard store." >&2
+    exit 1
+  }
+}
+
+repair_poster_store
+
 CRASH_DIR="$HOME/Library/Logs/DiagnosticReports"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ios-sim-boot.XXXXXX")"
 trap 'rm -rf "$WORK_DIR"' EXIT
