@@ -145,7 +145,7 @@ describe('useWeekSets over local data', () => {
     ]);
 
     rerender({ target: { muscleGroupIds: ['chest'] }, week: null });
-    expect(result.current).toEqual({ groups: [], loading: false, error: null });
+    expect(result.current).toEqual({ groups: [], loading: false, error: null, sameScope: false });
   });
 
   it('keeps an exercise week to its page\'s gym: every gym unset, no gym, or one gym', async () => {

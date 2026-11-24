@@ -1,6 +1,7 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { lockAsync, OrientationLock } from 'expo-screen-orientation';
+import { useCallback, useMemo, useState } from 'react';
+import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ExerciseSessionEntrySheet } from '@/components/session-recorder/exercise-session-entry-sheet';
 import type { FocusedTimelineWeek } from '@/components/heatmaps';
@@ -145,7 +146,7 @@ const invalidDetailPeriod = (subject: HistorySubject | null, period: SetPeriod |
 
 // The page's ⋮ offers applicable week, muscle and exercise-chart actions.
 // With no applicable action, hide the button rather than opening an empty sheet.
-function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, entryExercise, detailPeriod, selectedExercises }: {
+function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMuscle, onOpenHistory, onOpenCurve, entryExercise, detailPeriod, selectedExercises, landscape = false }: {
   title: string;
   /** A muscle page's title switches between the user's muscles. */
   titleSwitch?: { muscles: readonly HistoryTitleMuscle[]; currentId: string; onChoose: (muscleGroupId: string) => void };
@@ -158,6 +159,7 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
   entryExercise?: { id: string; name: string; deletedAt: Date | null } | null;
   detailPeriod?: SetPeriod | null;
   selectedExercises?: readonly SelectedExercise[];
+  landscape?: boolean;
 }) {
   const [optionsVisible, setOptionsVisible] = useState(false);
   const [queuedSessionEntry, setQueuedSessionEntry] = useState(false);
@@ -180,6 +182,9 @@ function HistoryHeader({ title, titleSwitch, week, muscles, onOpenWeek, onOpenMu
       <Stack.Screen
         options={{
           title,
+          headerShown: !landscape,
+          gestureEnabled: !landscape,
+          orientation: landscape ? 'landscape' : 'portrait',
           headerTitle: () => <HistoryTitle title={title} exercises={selectedExercises} {...titleSwitch} />,
           // Named either way — options are merged across renders, so leaving
           // the key out would keep the last button on screen.
@@ -318,6 +323,8 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   const { values, pending, accountRevision, error: preferenceError, retry: retryPreferences } = useAccountLocalPreferenceState();
   const router = useRouter();
   const revision = useBodyWeightContextRevision();
+  const [landscapeRequested, setTimelineLandscape] = useState(false);
+  const toggleTimelineLandscape = useCallback(() => setTimelineLandscape(value => !value), []);
   const [entryView, setEntryView] = useState<HeatmapView | null>(initialView ?? null);
   const [metric, setMetric] = useState<CalendarHeatmapMetric>(initialMetric ?? 'totalVolume');
   const muscleMetric = isProgressMetric(metric) ? metric : 'totalVolume';
@@ -333,6 +340,20 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     countSecondaryVolume: routeSubject.countSecondaryVolume ?? !values.muscleVolumePrimaryOnly,
   } : routeSubject, chosenGym, chosenSecondary, chosenSecondaryVolume),
   [routeSubject, chosenGym, chosenSecondary, chosenSecondaryVolume, values.progressCountSecondary, values.muscleVolumePrimaryOnly]);
+  const view = entryView ?? pending.heatmapView ?? values.heatmapView;
+  const canExpandTimeline = subject?.kind === 'exercise' && detailPeriod === undefined && view === 'timeline' && Platform.OS !== 'web';
+  const landscape = canExpandTimeline && landscapeRequested;
+  useFocusEffect(useCallback(() => {
+    if (!landscape) return;
+    let focused = true;
+    void lockAsync(OrientationLock.LANDSCAPE).catch(() => {
+      if (focused) setTimelineLandscape(false);
+    });
+    return () => {
+      focused = false;
+      void lockAsync(OrientationLock.PORTRAIT_UP).catch(() => {});
+    };
+  }, [landscape]));
   const gymId = subject?.gymId;
   const shownMetric = subject?.kind === 'muscle' || subject?.kind === 'exercises' ? muscleMetric : metric;
 
@@ -381,7 +402,8 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         {/* Both keys are named: options merge across renders, so a subject that
             disappears from the catalogue while its page is open would otherwise
             keep its name and a live options button over this panel. */}
-        <Stack.Screen options={{ headerRight: undefined, headerTitle: undefined, title: PROGRESS_HISTORY_TITLE }} />
+        <Stack.Screen options={{ headerRight: undefined, headerTitle: undefined, headerShown: true, gestureEnabled: true,
+          orientation: 'portrait', title: PROGRESS_HISTORY_TITLE }} />
         <StatePanel
           body="Open it again from Progress."
           testID="progress-history-unavailable"
@@ -399,7 +421,8 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   };
   const muscleFilters = subject.kind === 'muscle' ? <MuscleHistoryFilters gym={gym} metric={muscleMetric} subject={subject}
     onChangeSets={setChosenSecondary} onChangeVolume={setChosenSecondaryVolume} /> : null;
-  const filters = muscleFilters ?? <GymPicker {...gym} size="compact" testID="stats-exercise-history-gym" />;
+  const filters = muscleFilters ?? <GymPicker {...gym} size="compact"
+    supportedOrientations={landscape ? ['landscape'] : undefined} testID="stats-exercise-history-gym" />;
   const shared = {
     dailyMetrics: history.daily,
     errorMessage: history.error,
@@ -417,7 +440,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     todayDateKey,
     // A view whose save failed stays the chosen one here, as a draft the
     // preference store will retry; the band below says it is not saved yet.
-    view: entryView ?? pending.heatmapView ?? values.heatmapView,
+    view,
     weeklyEffort: history.weekly,
     timeline: {
       weekSetsTarget: timelineTarget(subject, muscleMetric),
@@ -430,6 +453,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     <Screen testID="progress-history-screen">
       <HistoryHeader
         entryExercise={exercise}
+        landscape={landscape}
         muscles={muscleLinks}
         {...exerciseHistoryActions(subject, exercise, router)}
         selectedExercises={subject.kind === 'exercises' ? selectedExercises : undefined}
@@ -442,7 +466,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
       />
       {/* The view selector writes a preference; this is the only screen that
           now offers it, so a failed save says so here, with its Retry. */}
-      {preferenceError ? (
+      {preferenceError && !landscape ? (
         <View style={styles.notice}>
           <Notice
             action={<ActionButton label="Retry" onPress={() => void retryPreferences()} size="compact"
@@ -459,7 +483,8 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
         exerciseLink={exerciseLink} accountRevision={accountRevision} revision={revision} lookbackWeeks={values.historyLookbackWeeks} /> : (
         <HistoryView {...shared} kind={subject.kind === 'muscle' ? 'muscle' : 'exercise'} filters={filters} metric={shownMetric}
           metricOptions={subject.kind === 'exercise' ? EXERCISE_HISTORY_METRIC_OPTIONS : MUSCLE_HISTORY_METRIC_OPTIONS}
-          muscleTargets={muscleTargets} onSelectMetric={setMetric} />
+          muscleTargets={muscleTargets} onSelectMetric={setMetric}
+          timelineDisplay={canExpandTimeline ? { expanded: landscape, onToggle: toggleTimelineLandscape } : undefined} />
       )}
     </Screen>
   );

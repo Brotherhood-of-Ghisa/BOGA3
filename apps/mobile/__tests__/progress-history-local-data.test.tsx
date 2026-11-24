@@ -24,8 +24,14 @@ jest.mock('@/src/data/bootstrap', () =>
   require('./helpers/local-data').localDataBootstrapModule()
 );
 
+jest.mock('expo-screen-orientation', () => ({
+  lockAsync: jest.fn().mockResolvedValue(undefined), OrientationLock: { LANDSCAPE: 5, PORTRAIT_UP: 3 },
+}));
+
 let mockScreenOptions: {
   title?: string;
+  headerShown?: boolean;
+  orientation?: 'portrait' | 'landscape';
   headerTitle?: (props: { children: string }) => mockReact.ReactNode;
   headerRight?: () => mockReact.ReactNode;
 } = {};
@@ -41,6 +47,7 @@ jest.mock('expo-router', () => ({
   Stack: {
     Screen: ({ options }: { options: typeof mockScreenOptions }) => {
       mockScreenOptions = options;
+      if (options.headerShown === false) return null;
       return mockReact.createElement(mockReact.Fragment, null,
         options.headerTitle?.({ children: options.title ?? '' }), options.headerRight?.());
     },
@@ -57,6 +64,7 @@ jest.mock('expo-router', () => ({
   },
 }));
 
+import { lockAsync, OrientationLock } from 'expo-screen-orientation';
 import ProgressHistoryRoute from '../app/progress-history';
 import type { CalendarMonth } from '@/components/heatmaps/daily-calendar';
 import * as exerciseAnalytics from '@/src/data/exercise-analytics';
@@ -430,6 +438,64 @@ describe('The history page over real data', () => {
 
     await act(async () => { fireEvent.press(screen.getByTestId('stats-exercise-history-view-chip-daily')); });
     expect(screen.getByTestId('stats-exercise-history-heatmap-panel-daily')).toHaveProp('pointerEvents', 'auto');
+  });
+
+  it('keeps the Timeline full width and the selected week when inspecting and dismissing its sets in landscape', async () => {
+    await loadMaestroFixture('exercise-block-history');
+    await openHistory({ exerciseDefinitionId: SQUAT, view: 'timeline', metric: 'volume' });
+    const timeline = 'stats-exercise-history-timeline';
+    const details = `${timeline}-details`;
+    const list = 'stats-exercise-history-week-sets';
+    const chart = () => screen.getByTestId(`${timeline}-plot`);
+    const current = () => chart().props.accessibilityValue.text;
+    const expand = await screen.findByTestId(`${timeline}-expand`);
+    const [card] = await screen.findAllByTestId(new RegExp(`^${list}-card-[^-]+$`));
+    const cardID = card.props.testID;
+    const compactRows = screen.getAllByTestId(new RegExp(`^${list}-card-.*-set-\\d+$`)).map(row => row.props.testID);
+    const newest = current();
+
+    fireEvent.press(expand);
+    expect(mockScreenOptions).toMatchObject({ orientation: 'landscape', headerShown: false });
+    expect(lockAsync).toHaveBeenLastCalledWith(OrientationLock.LANDSCAPE);
+    expect(current()).toBe(newest);
+    expect(screen.queryByTestId(details)).toBeNull();
+    expect(screen.queryByTestId(list)).toBeNull();
+    const plotWidth = chart().props.style.width;
+
+    // The newest week is the last column; a tap must work even when it was already focused.
+    fireEvent.press(chart(), { nativeEvent: { locationX: plotWidth - 1 } });
+    const window = screen.getByTestId(details);
+    const move = within(window).getByTestId(`${details}-move`);
+    expect(move.props.accessibilityActions.map((action: { name: string }) => action.name))
+      .toEqual(['moveLeft', 'moveRight', 'moveUp', 'moveDown']);
+    fireEvent(move, 'accessibilityAction', { nativeEvent: { actionName: 'moveLeft' } });
+    expect(current()).toBe(newest);
+    expect(chart().props.style.width).toBe(plotWidth);
+    expect(within(window).getAllByTestId(new RegExp(`^${list}-card-.*-set-\\d+$`)).map(row => row.props.testID)).toEqual(compactRows);
+    const values = within(window).getByTestId(`${compactRows[0]}-values`);
+    expect(values.props.numberOfLines).toBeUndefined();
+    expect(values.props.children).toEqual(expect.stringContaining(' × '));
+    fireEvent.press(within(window).getByTestId(cardID));
+    await waitFor(() => expect(mockPush).toHaveBeenLastCalledWith(expect.stringMatching(/^\/completed-session\//)));
+
+    fireEvent.press(chart(), { nativeEvent: { locationX: 1 } });
+    expect(current()).not.toBe(newest);
+    const olderWeek = current();
+    expect(within(screen.getByTestId(details)).queryByTestId(cardID)).toBeNull();
+    expect(await within(screen.getByTestId(details)).findByText('No sets this week')).toBeTruthy();
+
+    fireEvent.press(screen.getByRole('button', { name: 'Close week details' }));
+    expect(screen.queryByTestId(details)).toBeNull();
+    expect(current()).toBe(olderWeek);
+    expect(chart().props.style.width).toBe(plotWidth);
+
+    fireEvent(chart(), 'accessibilityAction', { nativeEvent: { actionName: 'showDetails' } });
+    expect(screen.getByTestId(details)).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Collapse chart' }));
+    expect(mockScreenOptions).toMatchObject({ orientation: 'portrait', headerShown: true });
+    expect(lockAsync).toHaveBeenLastCalledWith(OrientationLock.PORTRAIT_UP);
+    expect(current()).toBe(olderWeek);
+    expect(screen.getByTestId(`${list}-empty`)).toBeTruthy();
   });
 
   it('focuses the newest week from the start, and the arrows move the list with it', async () => {
