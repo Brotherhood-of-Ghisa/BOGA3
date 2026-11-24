@@ -32,10 +32,11 @@ import {
 // - `theme`: a preset id, or `custom`.
 // - `mode`: `light`, `dark` or `system`; a custom theme ignores it.
 // - `custom`: null, or `{background, ink, text, secondary?, muted?, accent,
-//   highlight, record, direction}`, each colour a `{hue, strength}`; the
-//   background also `{mode, lightness, depth, borders?}`, the highlight
+//   highlight, record, chart?, direction}`, each colour a `{hue, strength}`;
+//   the background also `{mode, lightness, depth, borders?}`, the highlight
 //   `{match, contrast}`, `ink`, `secondary` and `muted` `{lightness}` (the
-//   last two unrounded) and `text` `{contrast}`; `direction` a `ThemeDirection`
+//   last two unrounded) and `text` `{contrast}`; `chart` is `{follow, solid,
+//   start, end}`, its ends unrounded like `secondary`; `direction` a `ThemeDirection`
 //   (`theme-custom.ts`). Never null while `theme` is `custom`. Every part and
 //   field added since the first custom themes may be absent: its default draws
 //   what the theme drew before it (`parseCustomColours`). The `borders` and

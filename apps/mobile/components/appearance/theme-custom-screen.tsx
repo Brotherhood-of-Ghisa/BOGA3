@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View, type ColorSchemeName } from 'react-native';
 
 import {
@@ -20,8 +20,12 @@ import {
   CUSTOM_PARTS,
   BORDERS_MAX,
   bordersOf,
+  chartInMode,
+  chartOf,
   customSeed,
+  drawnEnds,
   DEPTH_MAX,
+  gamutColour,
   HIGHLIGHT_CONTRAST_MAX,
   highlightFromAccent,
   INK_RANGE,
@@ -34,7 +38,9 @@ import {
   PAGE_DEFAULT,
   isColourPart,
   PAGE_RANGE,
+  solidBars,
   STRENGTH_MAX,
+  type ChartEnd,
   type CustomColourPart,
   type CustomColours,
   type CustomPart,
@@ -45,8 +51,10 @@ import { hueName, normaliseHue } from '@/components/ui/theme-hue';
 import { startingCustom, type AppearanceChoice } from '@/components/ui/theme-presets';
 
 type Draft = NonNullable<CustomColours[CustomPart]>;
-// A slider's field of a part.
-type Field = 'hue' | 'strength' | 'lightness' | 'depth' | 'borders' | 'contrast';
+// A slider's field of a part; a chart end's as `start.hue`.
+type ColourField = 'hue' | 'strength' | 'lightness';
+type ChartEndName = 'start' | 'end';
+type Field = ColourField | 'depth' | 'borders' | 'contrast' | `${ChartEndName}.${ColourField}`;
 
 // The secondary and the muted text store unrounded values (`OwnInk`): shown
 // whole.
@@ -76,7 +84,17 @@ const PART_ROLE: Record<CustomColourPart, keyof UiRoles> = {
   record: 'record',
 };
 const PART_OPTIONS = CUSTOM_PARTS.map((id) => ({ id, label: CUSTOM_PART_LABELS[id] }));
+// A chart end's hue bar: each hue at full strength at the end's own L*.
+const chartHuePaint = (lightness: number): string[] =>
+  Array.from({ length: HUE_SEGMENTS }, (_, index) =>
+    gamutColour(lightness, { hue: ((index + 0.5) * (HUE_MAX + 1)) / HUE_SEGMENTS, strength: STRENGTH_MAX }),
+  );
+const CHART_END_LABELS: Record<ChartEndName, string> = { start: 'Start', end: 'End' };
+// The ramp step a chart end draws: what its hue bar's swatch shows.
+const CHART_END_ROLE: Record<ChartEndName, keyof UiRoles> = { start: 'viz1', end: 'viz4' };
 // What VoiceOver hears for a hue; the bar itself shows no words.
+// What a failed save names, for a part that is not one colour.
+const SAVE_NOUN: Partial<Record<CustomPart, string>> = { chart: 'chart', direction: 'direction' };
 const hueLabel = (hue: number): string => `${hueName(hue)}, ${normaliseHue(hue)} degrees`;
 const lightnessLabel = (value: number): string =>
   value === 0 ? 'Black' : value === LIGHTNESS_MAX ? 'White' : `${Math.round(value / LIGHTNESS_STEP) * LIGHTNESS_STEP}`;
@@ -91,8 +109,12 @@ function customOf(appearance: AppearanceChoice, phoneScheme: ColorSchemeName | n
 const shownFor = (part: CustomPart, colours: CustomColours): CustomColours =>
   isOwnInkPart(part) ? { ...colours, ...ownInks(colours) } : colours;
 
-// A part's value; the secondary's or muted text's as drawn when not yet stored.
-const partOf = (colours: CustomColours, part: CustomPart): Draft => (isOwnInkPart(part) ? ownInks(colours)[part] : colours[part]);
+// A part's value; the secondary's or muted text's, and the chart's, as drawn
+// when not yet stored.
+function partOf(colours: CustomColours, part: CustomPart): Draft {
+  if (isOwnInkPart(part)) return ownInks(colours)[part];
+  return part === 'chart' ? chartOf(colours) : colours[part];
+}
 
 // What a part's controls are given: the colours being made (the draft in
 // place), a live and a let-go handler per slider, a save of several parts at
@@ -105,6 +127,10 @@ type Controls = {
   end: (field: Field) => (value: number) => void;
   save: (patchOf: (intended: CustomColours) => Partial<CustomColours>) => void;
   swatch: ReactNode;
+  // The theme being made, for a swatch a part draws itself (the chart's ends),
+  // and the live one, for its hairline.
+  roles: UiRoles;
+  liveRoles: UiRoles;
 };
 
 function HueStrengthRows({ change, end, swatch, part, colour, divider }: Controls & { colour: HueStrength; divider: boolean }) {
@@ -149,6 +175,7 @@ function BackgroundControls(controls: Controls) {
       background: { ...background, mode, lightness: PAGE_DEFAULT[mode] },
       ink: { ...intended.ink, lightness: inkDefault(mode) },
       ...inksInMode(intended, mode),
+      ...chartInMode(intended, mode),
     }));
   };
   const range = PAGE_RANGE[background.mode];
@@ -265,6 +292,78 @@ function OwnInkControls(controls: Controls & { colour: OwnInk }) {
   );
 }
 
+// One end of the chart's ramp: a hue on a bar painted at its L*, a strength
+// and its L* over the whole range.
+function ChartEndRows({ change, end, roles, liveRoles, which, colour }: Controls & { which: ChartEndName; colour: ChartEnd }) {
+  const paint = useMemo(() => chartHuePaint(colour.lightness), [colour.lightness]);
+  const name = CHART_END_LABELS[which];
+  return (
+    <>
+      <SliderRow
+        divider
+        format={hueLabel}
+        label={`${name} hue`}
+        max={HUE_MAX}
+        onChange={change(`${which}.hue`)}
+        onChangeEnd={end(`${which}.hue`)}
+        testID={`theme-custom-${which}-hue`}
+        trackColours={paint}
+        trailing={
+          <View
+            style={[styles.swatch, { backgroundColor: roles[CHART_END_ROLE[which]], ...uiHairline(liveRoles, { shape: 'control' }) }]}
+            testID={`theme-custom-${which}-swatch`}
+          />
+        }
+        // A drawn hue (unrounded) can lie just past 359.
+        value={Math.min(colour.hue, HUE_MAX)}
+      />
+      <SliderRow
+        divider
+        format={percent}
+        label={`${name} strength`}
+        max={STRENGTH_MAX}
+        onChange={change(`${which}.strength`)}
+        onChangeEnd={end(`${which}.strength`)}
+        testID={`theme-custom-${which}-strength`}
+        value={colour.strength}
+      />
+      <SliderRow
+        divider
+        format={lightnessLabel}
+        label={`${name} lightness`}
+        max={LIGHTNESS_MAX}
+        onChange={change(`${which}.lightness`)}
+        onChangeEnd={end(`${which}.lightness`)}
+        step={LIGHTNESS_STEP}
+        testID={`theme-custom-${which}-lightness`}
+        value={colour.lightness}
+      />
+    </>
+  );
+}
+
+// The chart: its ramp following the page, or from a start to an end of the
+// user's; and solid bars. Leaving the page's ramp starts from its ends as
+// drawn, so nothing jumps.
+function ChartControls(controls: Controls) {
+  const { colours, save } = controls;
+  const chart = chartOf(colours);
+  const follow = (on: boolean) => save((intended) => ({ chart: { ...chartOf(intended), follow: on, ...(on ? {} : drawnEnds(intended)) } }));
+  const solid = (on: boolean) => save((intended) => ({ chart: { ...chartOf(intended), solid: on } }));
+  return (
+    <>
+      <SwitchRow density="list" label="Follow background" onValueChange={follow} testID="theme-custom-follow" value={chart.follow} />
+      {chart.follow ? null : (
+        <>
+          <ChartEndRows {...controls} colour={chart.start} which="start" />
+          <ChartEndRows {...controls} colour={chart.end} which="end" />
+        </>
+      )}
+      <SwitchRow density="list" divider label="Solid bars" onValueChange={solid} testID="theme-custom-solid" value={chart.solid} />
+    </>
+  );
+}
+
 // The direction a change is drawn in: one of three, saved on a tap.
 function DirectionControls({ colours, save }: Controls) {
   return (
@@ -298,16 +397,23 @@ function PartControls(controls: Controls) {
     }
     case 'highlight':
       return <HighlightControls {...controls} />;
+    case 'chart':
+      return <ChartControls {...controls} />;
     default:
       return <HueStrengthRows {...controls} colour={controls.colours[controls.part]} divider={false} />;
   }
 }
 
-// A part with one field moved. Only a colour part has sliders; the direction
-// is returned as it is. Moving the depth of a page that has no borders of its
-// own pins them where they are, so the hairlines stay put.
+// A part with one field moved. Only a colour part and the chart have
+// sliders; the direction is returned as it is. A chart end's field moves that
+// end. Moving the depth of a page that has no borders of its own pins them
+// where they are, so the hairlines stay put.
 const editOf = (draft: Draft, field: Field, value: number): Draft => {
   if (typeof draft === 'string') return draft;
+  if ('follow' in draft) {
+    const [which, colourField] = field.split('.') as [ChartEndName, ColourField];
+    return { ...draft, [which]: { ...draft[which], [colourField]: value } };
+  }
   const pinned = field === 'depth' && 'depth' in draft && draft.borders === undefined && draft.depth !== value ? { borders: draft.depth } : {};
   return { ...draft, ...pinned, [field]: value } as Draft;
 };
@@ -318,7 +424,8 @@ const editOf = (draft: Draft, field: Field, value: number): Draft => {
 // depth and borders; the highlight's match and contrast; the inks' lightness.
 // The secondary and the muted text are stored together: the first move of
 // either stores both as drawn (`ownInks`), so the other does not jump.
-// The direction's page offers its three choices instead.
+// The chart's page offers Follow background, the ramp's two ends when it does
+// not, and Solid bars; the direction's its three choices.
 // Then the part's roles alone (`PartSpotlight`) and the whole theme on a
 // small mock, both live while a control is held. A part saves when a slider
 // is let go (or a VoiceOver step is made) or a switch is flipped, and the app
@@ -346,7 +453,7 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
     if (next !== undefined) setDraft(next);
     await commit(
       { theme: 'custom', custom: { ...intended, ...patch } },
-      { message: `Couldn’t save the ${isColourPart(part) ? 'colour' : 'direction'}. Nothing changed.`, context: { part, value: patch } },
+      { message: `Couldn’t save the ${SAVE_NOUN[part] ?? 'colour'}. Nothing changed.`, context: { part, value: patch } },
     );
   };
   const controls: Controls = {
@@ -369,6 +476,8 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
     swatch: isColourPart(part) ? (
       <View style={[styles.swatch, { backgroundColor: roles[PART_ROLE[part]], ...uiHairline(liveRoles, { shape: 'control' }) }]} testID="theme-custom-hue-swatch" />
     ) : null,
+    roles,
+    liveRoles,
   };
 
   return (
@@ -387,7 +496,7 @@ export function ThemeCustomScreen({ part, onChoosePart }: { part: CustomPart; on
         <FormSection>
           <PartControls {...controls} />
         </FormSection>
-        <PartSpotlight part={part} roles={roles} testID="theme-custom-spotlight" />
+        <PartSpotlight part={part} roles={roles} solidBars={solidBars(colours)} testID="theme-custom-spotlight" />
         <ThemePreview roles={roles} testID="theme-custom-preview" />
         {saveError ? <Notice icon="warning" live message={saveError} testID="theme-custom-error" tone="danger" /> : null}
       </View>

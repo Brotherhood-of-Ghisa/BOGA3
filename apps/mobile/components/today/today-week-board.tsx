@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
-import { Card, ListCard, ListCardHeader, ListRow, makeStyles, uiMark, uiSpace, useUiText, useUiTextTone, uiWell } from '@/components/ui';
+import { Card, ListCard, ListCardHeader, ListRow, makeStyles, uiMark, uiSpace, useBarFills, useUiText, useUiTextTone, uiWell } from '@/components/ui';
 import { statsTableColumnWidth } from '@/components/stats/stats-table';
 import type { WeekBoardRowViewModel, WeekBoardViewModel } from '@/src/groups';
 import { spokenGroupRecordCount } from '@/src/groups/record-boards';
@@ -26,6 +26,7 @@ function BoardRow({ row, columns }: { row: WeekBoardRowViewModel; columns: Board
   const styles = useStyles();
   const text = useUiText();
   const tone = useUiTextTone();
+  const bars = useBarFills();
   const testID = `today-group-board-row-${row.userId}`;
   return <ListRow density="compact" own={row.isMe} testID={testID}
     leading={<Text allowFontScaling={false} style={[text.figure, tone.muted, { width: columns.rank }]} testID={`${testID}-rank`}>{row.rank}</Text>}
@@ -33,8 +34,8 @@ function BoardRow({ row, columns }: { row: WeekBoardRowViewModel; columns: Board
     <View style={styles.content}>
       <Text allowFontScaling={false} ellipsizeMode="tail" numberOfLines={1}
         style={[row.isMe ? text.bodyStrong : text.body, styles.name]} testID={`${testID}-name`}>{row.name}</Text>
-      <View style={styles.track}><View style={[styles.bar, { width: `${Math.round(row.fraction * 100)}%` },
-        row.leader ? styles.barLeader : null]} testID={`${testID}-fill`} /></View>
+      <View style={styles.track}><View style={[styles.bar, { width: `${Math.round(row.fraction * 100)}%`,
+        backgroundColor: row.leader ? bars.viz4 : bars.viz3 }]} testID={`${testID}-fill`} /></View>
     </View>
   </ListRow>;
 }
@@ -84,6 +85,6 @@ const useStyles = makeStyles((roles, mode) => ({
   figures: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   figure: { textAlign: 'right' },
   track: { flex: 1, minWidth: 0, height: 12, ...uiWell(roles, mode, { shape: 'control' }), overflow: 'hidden' },
-  bar: { height: 12, ...uiMark.bar, backgroundColor: roles.viz3 },
-  barLeader: { backgroundColor: roles.viz4 },
+  // Filled in `viz3`, the leader in `viz4` (`useBarFills`).
+  bar: { height: 12, ...uiMark.bar },
 }));

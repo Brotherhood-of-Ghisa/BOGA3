@@ -11,7 +11,7 @@ import { Icon } from '@/components/ui/icon';
 import { uiMark } from '@/components/ui/marks';
 import { statsTableColumnWidth } from '@/components/stats/stats-table';
 import { uiTextEmphasis, useUiText, useUiTextTone } from '@/components/ui/text-roles';
-import { makeStyles } from '@/components/ui/theme-context';
+import { makeStyles, useBarFills } from '@/components/ui/theme-context';
 import { uiBorder, uiGeometry, uiIconSize, uiSpace } from '@/components/ui/tokens';
 import { formatWholeSetCount, formatWorkingSetCount } from '@/src/exercise-calculations/format';
 import { localDateKey } from '@/src/utils/calendar-weeks';
@@ -86,10 +86,11 @@ function DayCell({ count, weekStart, testID, aggregate = false, compact = false,
   const styles = useStyles();
   const text = useUiText();
   const tone = useUiTextTone();
+  const bars = useBarFills();
   return (
     <RecoveryDayColumn compact={compact} edge={edge} weekStart={weekStart} width={width}>
       <View style={[styles.dayCell, compact ? styles.compactDayCell : null, aggregate ? (count ? styles.groupCellTrained : styles.groupCellZero)
-        : count === null ? styles.dayCellRest : styles.dayCellTrained]} testID={testID}>
+        : count === null ? styles.dayCellRest : { backgroundColor: bars.viz2 }]} testID={testID}>
         <Text allowFontScaling={false} style={[text.figureSmall, tone.ink,
           aggregate ? [uiTextEmphasis.strong, count ? styles.groupFigureTrained : tone.accent] : null]}>
           {count === null ? '' : wholeSets(count)}
@@ -488,11 +489,9 @@ const useStyles = makeStyles((roles) => ({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // A trained day is filled in `viz2` (`useBarFills`).
   dayCellRest: {
     backgroundColor: roles.inset,
-  },
-  dayCellTrained: {
-    backgroundColor: roles.viz2,
   },
   groupCellTrained: {
     backgroundColor: roles.accent,

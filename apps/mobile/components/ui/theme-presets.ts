@@ -9,7 +9,7 @@ import {
   type ThemeSeeds,
   type UiRoles,
 } from '@/components/ui/theme';
-import { customFromSeeds, customMode, generateCustomRoles, type CustomColours } from '@/components/ui/theme-custom';
+import { customFromSeeds, customMode, generateCustomRoles, solidBars, type CustomColours } from '@/components/ui/theme-custom';
 import { parseHueThemeId, seedsFromHue } from '@/components/ui/theme-hue';
 
 // The themes a user can choose (`docs/specs/ui/design-language.md` §2,
@@ -171,6 +171,12 @@ export function appearanceMode(appearance: AppearanceChoice, osScheme: ColorSche
 export function appearanceRoles(appearance: AppearanceChoice, mode: ThemeMode): UiRoles {
   if (appearance.theme === 'custom' && appearance.custom) return generateCustomRoles(appearance.custom);
   return presetRoles(getThemePreset(appearance.theme as ThemePresetId), mode);
+}
+
+// Whether a choice draws every bar mark in its ramp's end, `viz4`: a custom
+// theme's Solid bars. A preset never does.
+export function appearanceSolidBars(appearance: AppearanceChoice): boolean {
+  return appearance.theme === 'custom' && appearance.custom !== null && solidBars(appearance.custom);
 }
 
 // Custom colours to start from: the ones already chosen, else the preset in

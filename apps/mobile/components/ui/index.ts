@@ -89,7 +89,7 @@ export {
 } from '@/components/ui/state-panel';
 export { Tag, type TagProps, type TagTone } from '@/components/ui/tag';
 export { groundInks, pageWordColour, readsOnPage, selectedPill, uiTextEmphasis, uiTextFor, uiTextToneFor, useUiGroundInks, useUiGroundTone, useUiText, useUiTextTone } from '@/components/ui/text-roles';
-export { AppThemeProvider, makeStyles, useAppTheme, useUiMode, useUiRoles, type AppTheme } from '@/components/ui/theme-context';
+export { AppThemeProvider, makeStyles, useAppTheme, useBarFills, useUiMode, useUiRoles, type AppTheme, type BarFills } from '@/components/ui/theme-context';
 export {
   ToggleChip,
   type ToggleChipOption,

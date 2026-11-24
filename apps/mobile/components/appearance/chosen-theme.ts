@@ -4,7 +4,7 @@ import type { ColorSchemeName } from 'react-native';
 import type { ThemeDirection, ThemeMode, UiRoles } from '@/components/ui/theme';
 import { useAppTheme } from '@/components/ui/theme-context';
 import { followsPhone } from '@/components/ui/theme-native';
-import { isOwnInkPart, ownInks, type CustomPart } from '@/components/ui/theme-custom';
+import { isOwnInkPart, ownInks, type CustomColours, type CustomPart } from '@/components/ui/theme-custom';
 import { hueName } from '@/components/ui/theme-hue';
 import { readIntendedTheme, readStoredTheme, subscribeThemeSaved } from '@/components/ui/theme-launch';
 import {
@@ -75,6 +75,7 @@ export const CUSTOM_PART_LABELS: Record<CustomPart, string> = {
   accent: 'Accent',
   highlight: 'Highlight',
   record: 'Best ever',
+  chart: 'Chart',
   direction: 'Direction',
 };
 
@@ -105,12 +106,14 @@ export function themeLabel(appearance: AppearanceChoice): string {
 
 // A custom part's value as a row shows it: its hue's name and strength (the
 // secondary's and muted text's as drawn); for the background its mode and
-// lightness first; a highlight that matches the accent says so; the
-// direction its name.
+// lightness first; a highlight that matches the accent says so; the chart
+// what its ramp follows, or its ends' hues, then solid bars; the direction
+// its name.
 export function customPartLabel(appearance: AppearanceChoice, part: CustomPart): string {
   const colours = appearance.custom;
   if (!colours) return '';
   if (part === 'direction') return DIRECTION_LABELS[colours.direction];
+  if (part === 'chart') return chartLabel(colours);
   if (part === 'highlight' && colours.highlight.match) return 'Match accent';
   // The secondary and the muted text as their pages show them (unrounded).
   const { hue, strength } = isOwnInkPart(part) ? ownInks(colours)[part] : colours[part];
@@ -118,6 +121,11 @@ export function customPartLabel(appearance: AppearanceChoice, part: CustomPart):
   if (part !== 'background') return words.join(', ');
   const { mode, lightness } = colours.background;
   return [MODE_LABELS[mode], ...words, `lightness ${lightness}`].join(', ');
+}
+
+function chartLabel({ chart }: CustomColours): string {
+  const ramp = chart === undefined || chart.follow ? 'Follows background' : `${hueName(chart.start.hue)} to ${hueName(chart.end.hue)}`;
+  return chart?.solid ? `${ramp}, solid bars` : ramp;
 }
 
 // The whole choice for Settings home's row: the theme, and a preset's mode

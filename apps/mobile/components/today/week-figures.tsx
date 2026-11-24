@@ -4,10 +4,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/ui/icon';
 import { FigureText } from '@/components/ui/figure-text';
 import { useUiText, useUiTextTone } from '@/components/ui/text-roles';
-import type { UiRoles } from '@/components/ui/theme';
 import { uiWell } from '@/components/ui/edge';
 import { uiMark } from '@/components/ui/marks';
-import { makeStyles, useUiRoles } from '@/components/ui/theme-context';
+import { makeStyles, useBarFills, type BarFills } from '@/components/ui/theme-context';
 import { uiIconSize, uiSpace } from '@/components/ui/tokens';
 import type { TodayProgressWeek } from '@/src/progress-summary';
 import type { ProgressMetric } from '@/src/preferences/model';
@@ -17,17 +16,17 @@ import { formatPaceValue, formatPeriodRange, formatWeekRange, weekFigureAccessib
 type ShareBarProps = { current: number | null; previous: number | null; testID?: string };
 
 // One `viz` step per lap of `previous` (`weekShare`): `viz2` up to it, `viz3`
-// up to twice it, `viz4` beyond. A lap fills over the one before, full; the
-// first over the empty `well` track.
-const lapFills = (roles: UiRoles) => [roles.viz2, roles.viz3, roles.viz4] as const;
+// up to twice it, `viz4` beyond (each `viz4` under solid bars, `useBarFills`).
+// A lap fills over the one before, full; the first over the empty `well` track.
+const lapFills = (bars: BarFills) => [bars.viz2, bars.viz3, bars.viz4] as const;
 
 // A thin bar on the `viz` ramp: `current` as a share of `previous`, in laps.
 export function ShareBar({ current, previous, testID }: ShareBarProps) {
   const styles = useStyles();
-  const roles = useUiRoles();
+  const bars = useBarFills();
   if (current === null || previous === null) return <View style={styles.track} testID={testID} />;
   const { lap, fraction } = weekShare({ current, previous });
-  const fills = lapFills(roles);
+  const fills = lapFills(bars);
   return (
     <View
       style={[styles.track, lap > 0 ? { backgroundColor: fills[lap - 1] } : null]}

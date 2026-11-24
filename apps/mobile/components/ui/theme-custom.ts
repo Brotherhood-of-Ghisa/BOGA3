@@ -4,6 +4,7 @@ import {
   generateRoles,
   inkStep,
   paperLightness,
+  rampLightness,
   THEME_DIRECTIONS,
   washLightness,
   type ThemeDirection,
@@ -17,9 +18,9 @@ import { normaliseHue } from '@/components/ui/theme-hue';
 // picks a hue and a strength for each of the four colour seeds, for the
 // highlight (`accentWash`) and for the three inks (which presets step from the
 // text seed); the page's mode, lightness, depth and borders; the inks' L*; the
-// highlight's contrast; and the direction. Everything else is derived:
-// the chart ramp from the page. No readability floor is gated here — only the
-// presets are hand-checked.
+// highlight's contrast; the chart ramp's ends, or the page's ramp, and solid
+// bars; and the direction. Everything else is derived. No readability floor
+// is gated here — only the presets are hand-checked.
 
 // A hue (0–359) and a strength (0–100, a share of the part's most chroma).
 export type HueStrength = { hue: number; strength: number };
@@ -46,6 +47,15 @@ export type CustomText = HueStrength & { contrast: number };
 // stored unrounded, so storing the inks a theme draws repaints neither
 // (`ownInks`).
 export type OwnInk = HueStrength & { lightness: number };
+// One end of the chart ramp (`viz1` the start, `viz4` the end): a colour at
+// its own L*, unrounded like an `OwnInk`, so storing the ends a ramp draws
+// repaints neither.
+export type ChartEnd = OwnInk;
+// The chart: `follow` draws the ramp the page gives; off, `viz1` is the
+// start, `viz4` the end and `viz2`/`viz3` sit between them (`chartRamp`).
+// `solid` draws every bar mark in `viz4` instead of the ramp's steps
+// (`appearanceSolidBars`). The ends are stored with it, followed or not.
+export type CustomChart = { follow: boolean; solid: boolean; start: ChartEnd; end: ChartEnd };
 export type CustomColours = {
   background: CustomBackground;
   ink: CustomInk;
@@ -57,15 +67,19 @@ export type CustomColours = {
   accent: HueStrength;
   highlight: CustomHighlight;
   record: HueStrength;
+  // Absent (a theme saved before it was a part): the page's ramp, steps on
+  // the bars.
+  chart?: CustomChart;
   direction: ThemeDirection;
 };
 
-// What the editor offers, one page each: the colour parts, then the direction.
+// What the editor offers, one page each: the colour parts (one hue and
+// strength each), the chart, then the direction.
 export type CustomPart = Exclude<keyof CustomColours, 'text'>;
-export type CustomColourPart = Exclude<CustomPart, 'direction'>;
+export type CustomColourPart = Exclude<CustomPart, 'chart' | 'direction'>;
 export const CUSTOM_COLOUR_PARTS: readonly CustomColourPart[] = ['background', 'ink', 'secondary', 'muted', 'accent', 'highlight', 'record'];
-export const CUSTOM_PARTS: readonly CustomPart[] = [...CUSTOM_COLOUR_PARTS, 'direction'];
-export const isColourPart = (part: CustomPart): part is CustomColourPart => part !== 'direction';
+export const CUSTOM_PARTS: readonly CustomPart[] = [...CUSTOM_COLOUR_PARTS, 'chart', 'direction'];
+export const isColourPart = (part: CustomPart): part is CustomColourPart => part !== 'chart' && part !== 'direction';
 // The secondary and the muted text: stored together, at their own L*.
 export type OwnInkPart = 'secondary' | 'muted';
 export const isOwnInkPart = (part: CustomPart): part is OwnInkPart => part === 'secondary' || part === 'muted';
@@ -180,6 +194,56 @@ export function inksInMode({ secondary, muted }: CustomColours, mode: ThemeMode)
   };
 }
 
+// The chart as stored, else the page's ramp with steps on the bars, its ends
+// as the theme draws them now: switching the ramp from the page starts there,
+// so nothing jumps.
+export function chartOf(colours: CustomColours): CustomChart {
+  return colours.chart ?? { follow: true, solid: false, ...drawnEnds(colours) };
+}
+
+// The ramp's ends as a theme draws them now, each at its own L*.
+export function drawnEnds(colours: CustomColours): Pick<CustomChart, 'start' | 'end'> {
+  const { viz1, viz4 } = generateCustomRoles(colours);
+  return { start: ownInkOf(viz1), end: ownInkOf(viz4) };
+}
+
+// The chart on a newly chosen mode: its ends at that ladder's `viz1` and
+// `viz4` L* (as the inks go to theirs); none stored, none.
+export function chartInMode({ chart }: CustomColours, mode: ThemeMode): Pick<CustomColours, 'chart'> {
+  if (chart === undefined) return {};
+  const { start, end } = chart;
+  return { chart: { ...chart, start: { ...start, lightness: rampLightness(mode, 'viz1') }, end: { ...end, lightness: rampLightness(mode, 'viz4') } } };
+}
+
+// A chart end in LCh: its strength a share of the most chroma its L* and hue
+// hold, as `gamutColour` draws it.
+const endLch = ({ lightness, hue, strength }: ChartEnd): Lch => ({ lightness, chroma: (gamut(lightness, hue) * strength) / STRENGTH_MAX, hue });
+
+// The turn from one hue to another the short way round, in degrees: −180 to
+// 180, and +180 (rising hue) when they are opposite.
+export function hueTurn(from: number, to: number): number {
+  const turn = ((((to - from) % 360) + 540) % 360) - 180;
+  return turn === -180 ? 180 : turn;
+}
+
+// The ramp between a chosen start (`viz1`) and end (`viz4`): `viz2` and `viz3`
+// a third and two thirds of the way in L*, C* and hue, the hue the short way
+// round. The ends are drawn exactly; a step out of gamut loses chroma.
+export function chartRamp({ start, end }: Pick<CustomChart, 'start' | 'end'>): Pick<UiRoles, 'viz1' | 'viz2' | 'viz3' | 'viz4'> {
+  const [from, to] = [endLch(start), endLch(end)];
+  const turn = hueTurn(from.hue, to.hue);
+  const at = (share: number): string =>
+    lchToHex({
+      lightness: from.lightness + share * (to.lightness - from.lightness),
+      chroma: from.chroma + share * (to.chroma - from.chroma),
+      hue: (((from.hue + share * turn) % 360) + 360) % 360,
+    });
+  return { viz1: gamutColour(start.lightness, start), viz2: at(1 / 3), viz3: at(2 / 3), viz4: gamutColour(end.lightness, end) };
+}
+
+// Whether a custom theme draws every bar mark in its ramp's end.
+export const solidBars = ({ chart }: Pick<CustomColours, 'chart'>): boolean => chart?.solid === true;
+
 // The ladder a custom theme draws on: its page's chosen mode.
 export function customMode({ background }: Pick<CustomColours, 'background'>): ThemeMode {
   return background.mode;
@@ -252,7 +316,8 @@ const short = (lightness: number, page: number, limit: number): number =>
 // the secondary and muted text until they are stored, the highlight's its
 // band. `surface` and `raised` take the page's hue and chroma. Primary text sits at its own L*, and so do the secondary and the
 // muted text once they have one (`ownInkRoles`); every other role keeps its
-// place measured from the ladder's `ink`. The `ink` direction draws both
+// place measured from the ladder's `ink`. A chart that does not follow the
+// page draws its own ramp (`chartRamp`). The `ink` direction draws both
 // changes in the drawn `ink`.
 export function generateCustomRoles(colours: CustomColours): UiRoles {
   const mode = customMode(colours);
@@ -276,7 +341,12 @@ export function generateCustomRoles(colours: CustomColours): UiRoles {
       return [role, moveRole(role, value, frame, roleScale(role, colours), SECONDARY_ROLES.has(role) ? inkLightness : null)];
     }),
   ) as UiRoles;
-  const inked = { ...moved, ...(atLadder ? {} : { ink: gamutColour(colours.ink.lightness, colours.ink) }), ...ownInkRoles(colours) };
+  const inked = {
+    ...moved,
+    ...(atLadder ? {} : { ink: gamutColour(colours.ink.lightness, colours.ink) }),
+    ...ownInkRoles(colours),
+    ...(colours.chart === undefined || colours.chart.follow ? {} : chartRamp(colours.chart)),
+  };
   // A custom page and its cards are one family of lightness: text on the page
   // is drawn in the inks, and the step below a card is the page.
   const paged = { ...inked, pageInk: inked.ink, pageInkMuted: inked.inkMuted, pageInkFaint: inked.inkFaint, inset: inked.paper };
@@ -380,6 +450,15 @@ function parseOwnInks(stored: Fields): Partial<Record<OwnInkPart, OwnInk>> | nul
   return inks;
 }
 
+// A chart: both switches and both ends. Absent is `undefined`, invalid null.
+function parseChart(value: unknown): CustomChart | null | undefined {
+  if (value === undefined) return undefined;
+  if (!isFields(value)) return null;
+  const { follow, solid } = value;
+  const [start, end] = [parseOwnInk(value.start), parseOwnInk(value.end)];
+  return isBoolean(follow) && isBoolean(solid) && start !== null && end !== null ? { follow, solid, start, end } : null;
+}
+
 function parseHighlight(value: unknown): CustomHighlight | null {
   const colour = parseHueStrength(value);
   if (colour === null || !isFields(value)) return null;
@@ -418,10 +497,10 @@ export const matchingHighlight = (accent: HueStrength, mode: ThemeMode): CustomH
 // draws what the theme drew before the field existed: the mode from the
 // lightness, a highlight that matches the accent, the primary text from the
 // secondary at its ladder's L*, the shipped text contrast, the secondary and
-// muted text stepped from the page by it (absent `secondary`, `muted`), green
-// and crimson.
+// muted text stepped from the page by it (absent `secondary`, `muted`), the
+// page's ramp with steps on the bars (absent `chart`), green and crimson.
 // The top-level parts since removed — `borders` (it is `background.borders`
-// now, absent following the depth) and `viz` (the ramp follows the page) — are
+// now, absent following the depth) and `viz` (the ramp is `chart` now) — are
 // ignored like any unknown field.
 export function parseCustomColours(value: unknown): CustomColours | null {
   if (!isFields(value)) return null;
@@ -432,7 +511,8 @@ export function parseCustomColours(value: unknown): CustomColours | null {
   const textColour = withField(text, value.text, 'contrast', isInteger(TEXT_CONTRAST_MAX), DEFAULT_CONTRAST);
   const inks = parseOwnInks(value);
   const highlight = value.highlight === undefined ? matchingHighlight(accent, background.mode) : parseHighlight(value.highlight);
+  const chart = parseChart(value.chart);
   const direction = optional(value.direction, isDirection, DEFAULT_DIRECTION);
-  if (ink === null || textColour === null || inks === null || highlight === null || direction === null) return null;
-  return { background, ink, text: textColour, ...inks, accent, highlight, record, direction };
+  if (ink === null || textColour === null || inks === null || highlight === null || chart === null || direction === null) return null;
+  return { background, ink, text: textColour, ...inks, accent, highlight, record, ...(chart === undefined ? {} : { chart }), direction };
 }
