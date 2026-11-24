@@ -206,17 +206,16 @@ it('labels months at the first week starting in each, which wider columns all ha
 });
 
 it('tracks fractional weeks around the pinch anchor and settles within the loaded history', () => {
-  const limits = { count: 52, maxSpan: 20 };
-  expect(resizeTimelineWindow(limits, 26, 0.25, 9.4, false)).toEqual({ start: 23.65, span: 9.4 });
-  expect(resizeTimelineWindow(limits, 26, 0.25, 9.4, true)).toEqual({ start: 24, span: 9 });
-  expect(resizeTimelineWindow(limits, 0, 0.95, 40, true)).toEqual({ start: 0, span: 20 });
-  expect(resizeTimelineWindow(limits, 52, 0.05, 0.2, true)).toEqual({ start: 51, span: 1 });
+  expect(resizeTimelineWindow(52, 26, 0.25, 9.4, false)).toEqual({ start: 23.65, span: 9.4 });
+  expect(resizeTimelineWindow(52, 26, 0.25, 9.4, true)).toEqual({ start: 24, span: 9 });
+  expect(resizeTimelineWindow(105, 60, 0.5, 90, false)).toEqual({ start: 15, span: 90 });
+  expect(resizeTimelineWindow(105, 60, 0.5, 130, true)).toEqual({ start: 0, span: 105 });
+  expect(resizeTimelineWindow(52, 52, 0.05, 0.2, true)).toEqual({ start: 51, span: 1 });
 });
 
 it('steps one whole week around a visible selection or the middle of the browsed range', () => {
-  const limits = { count: 30, maxSpan: 10 };
-  expect(stepTimelineZoom({ start: 6.5, span: 8 }, limits, 14, -1)).toEqual({ start: 7, span: 7 });
-  expect(stepTimelineZoom({ start: 6.5, span: 8 }, limits, 0, 1)).toEqual({ start: 6, span: 9 });
+  expect(stepTimelineZoom({ start: 6.5, span: 8 }, 30, 14, -1)).toEqual({ start: 7, span: 7 });
+  expect(stepTimelineZoom({ start: 6.5, span: 8 }, 30, 0, 1)).toEqual({ start: 6, span: 9 });
 });
 
 it('offers accessible landscape zoom buttons without changing selection, values or opening details', () => {
@@ -250,6 +249,35 @@ it('offers accessible landscape zoom buttons without changing selection, values 
   rerender(chart({ display: { expanded: true } }));
   expect(zoomOut()).toBeDisabled();
   expect(plot()).toHaveProp('accessibilityHint', '5 weeks visible');
+});
+
+it('opens at one year and steps out to every loaded week, including the partial week', () => {
+  const onSelectWeek = jest.fn();
+  const onInspect = jest.fn();
+  renderWithTheme(chart({ weeks: 78, onSelectWeek, display: { expanded: true, onInspect } }));
+  const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
+  const zoomOut = screen.getByRole('button', { name: 'Zoom out' });
+  const plot = screen.getByTestId(`${ID}-plot`);
+  const focus = plot.props.accessibilityValue;
+  expect(plot).toHaveProp('accessibilityHint', '52 weeks visible');
+
+  for (const span of [65, 78, 79]) {
+    expect(zoomOut).toBeEnabled();
+    fireEvent.press(zoomOut);
+    expect(plot).toHaveProp('accessibilityHint', `${span} weeks visible`);
+  }
+  expect(zoomOut).toBeDisabled();
+  expect(plot).toHaveProp('accessibilityValue', focus);
+  expect(onSelectWeek).not.toHaveBeenCalled();
+
+  fireEvent.press(plot, { nativeEvent: { locationX: 1 } });
+  expect(onSelectWeek).toHaveBeenCalledWith('2025-04-07');
+  expect(onInspect).toHaveBeenCalledTimes(1);
+
+  for (const span of [66, 53, 52, 51]) {
+    fireEvent.press(zoomIn);
+    expect(plot).toHaveProp('accessibilityHint', `${span} weeks visible`);
+  }
 });
 
 it('keeps a moved details window inside the chart when its content grows', () => {

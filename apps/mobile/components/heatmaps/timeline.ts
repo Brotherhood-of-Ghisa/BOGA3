@@ -9,7 +9,7 @@ import { formatCalendarWeek, formatCalendarWeekHeading } from '@/src/utils/local
 import type { CalendarHeatmapMetric } from '@/src/data';
 
 import type { WeekCell } from './heatmapData';
-import type { TimelineWindow } from './timeline-window';
+import { timelineOverviewSpan, type TimelineWindow } from './timeline-window';
 
 export type TimelineWeekState = 'training' | 'rest' | 'unavailable';
 
@@ -123,18 +123,11 @@ export function buildTimelineSeries(weekly: WeekCell[], metric: CalendarHeatmapM
  */
 export const MIN_TIMELINE_COLUMN_WIDTH = 32;
 
-/** Landscape fits up to a year of weekly columns. Longer histories can pan. */
-export const timelineOverviewSpan = (count: number): number => Math.max(1, Math.min(count, 52));
 const MAX_BAR_WIDTH = 24;
 const BAR_GAP = 2;
 /** The data end of a column is rounded; its baseline end stays square. */
 export const BAR_RADIUS = 4;
-/**
- * Room a month label needs (`SEP`, `2026`). A month is labelled at most every
- * fourth column, so the column floor keeps four times this much between any
- * two labels: none is ever dropped for a collision, and the last one fits
- * inside the drawn width because its column is the width's final one.
- */
+/** Room for a month label or its year, including the gap to the next label. */
 export const MONTH_LABEL_WIDTH = 30;
 
 export type TimelineBar = { weekStartDateKey: string; index: number; x: number; y: number; width: number; height: number };
@@ -146,14 +139,14 @@ export interface TimelineGeometry {
   height: number;
   bars: TimelineBar[];
   ticks: { value: number; y: number }[];
-  /** Every month that starts in the window, at its column. */
+  /** Calendar labels positioned at the starts of their months. */
   months: (TimelineMonth & { x: number })[];
 }
 
 const columnBars = (series: TimelineSeries, columnWidth: number, height: number, window: TimelineWindow, zoomScale: number): TimelineBar[] => {
   const top = series.ticks[series.ticks.length - 1] || 1;
   const maxBarWidth = MAX_BAR_WIDTH * Math.min(3, zoomScale);
-  const width = Math.max(1, Math.min(maxBarWidth, columnWidth - BAR_GAP));
+  const width = Math.min(columnWidth, Math.max(1, Math.min(maxBarWidth, columnWidth - BAR_GAP)));
   const first = Math.floor(window.start);
   return series.weeks.slice(first, Math.ceil(window.start + window.span)).flatMap((week, offset) => {
     const index = first + offset;
@@ -163,18 +156,35 @@ const columnBars = (series: TimelineSeries, columnWidth: number, height: number,
   });
 };
 
+function visibleAxisMonths(series: TimelineSeries, window: TimelineWindow, columnWidth: number, width: number) {
+  // Every month contains at least four Mondays. Thin to calendar-aligned
+  // quarters, half years or years as weeks get narrower.
+  const interval = [1, 3, 6, 12].find(months => months * 4 * columnWidth >= MONTH_LABEL_WIDTH) ?? 12;
+  const labels: TimelineGeometry['months'] = [];
+  for (const month of series.months) {
+    const x = (month.index - window.start) * columnWidth;
+    if (x < 0 || x > width - MONTH_LABEL_WIDTH) continue;
+    const monday = series.weeks[month.index].monday;
+    if (monday.getUTCMonth() % interval !== 0) continue;
+    const previous = labels.at(-1);
+    if (previous && x - previous.x < MONTH_LABEL_WIDTH) continue;
+    labels.push({ ...month, x, year: previous ? month.year : monday.getUTCFullYear() });
+  }
+  const first = Math.floor(window.start);
+  const firstMonday = series.weeks[first]?.monday;
+  if (labels.length === 0 && firstMonday) {
+    labels.push({ index: first, x: 0, label: MONTHS[firstMonday.getUTCMonth()], year: firstMonday.getUTCFullYear() });
+  }
+  return labels;
+}
+
 export function timelineGeometry(series: TimelineSeries, plotWidth: number, height: number, window?: TimelineWindow): TimelineGeometry {
   const count = Math.max(1, series.weeks.length);
   const columnWidth = window ? plotWidth / window.span : Math.max(MIN_TIMELINE_COLUMN_WIDTH, plotWidth / count);
   const width = window ? plotWidth : columnWidth * count;
   const weekWindow = window ?? { start: 0, span: count };
-  const months = series.months.map(month => ({ ...month, x: (month.index - weekWindow.start) * columnWidth }));
-  const visibleMonths = window ? months.filter(month => month.x >= 0 && month.x <= width - MONTH_LABEL_WIDTH) : months;
-  const first = Math.floor(weekWindow.start);
-  const firstMonday = series.weeks[first]?.monday;
-  if (window && visibleMonths.length === 0 && firstMonday) {
-    visibleMonths.push({ index: first, x: 0, label: MONTHS[firstMonday.getUTCMonth()], year: firstMonday.getUTCFullYear() });
-  }
+  const months = window ? visibleAxisMonths(series, window, columnWidth, width)
+    : series.months.map(month => ({ ...month, x: month.index * columnWidth }));
   const top = series.ticks[series.ticks.length - 1] || 1;
   return {
     columnWidth,
@@ -182,7 +192,7 @@ export function timelineGeometry(series: TimelineSeries, plotWidth: number, heig
     height,
     bars: columnBars(series, columnWidth, height, weekWindow, window ? timelineOverviewSpan(count) / window.span : 1),
     ticks: series.ticks.map(value => ({ value, y: height - (value / top) * height })),
-    months: visibleMonths,
+    months,
   };
 }
 

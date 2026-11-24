@@ -3,19 +3,19 @@ import { usePanGesture, usePinchGesture, useSimultaneousGestures } from 'react-n
 import { cancelAnimation, useAnimatedReaction, useSharedValue, withDecay } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { timelineOverviewSpan } from './timeline';
-import { clampTimelineStart, focusTimelineWindow, resizeTimelineWindow, stepTimelineZoom, type TimelineWindow } from './timeline-window';
+import {
+  clampTimelineStart, focusTimelineWindow, resizeTimelineWindow, stepTimelineZoom, timelineOverviewSpan, type TimelineWindow,
+} from './timeline-window';
 
 // Keep the moving viewport in week coordinates on the UI thread. React draws
-// only the visible columns, so a long look-back costs the same per frame.
+// only the visible part of the timeline.
 export function useTimelineZoom({ expanded, width, count, oldestWeek, focusedIndex }: {
   expanded: boolean; width: number; count: number; oldestWeek?: string; focusedIndex: number;
 }) {
   const total = Math.max(1, count);
-  const maxSpan = timelineOverviewSpan(total);
-  const limits = { count: total, maxSpan };
   const scope = `${expanded}/${width}/${oldestWeek}/${count}`;
-  const initial = focusTimelineWindow({ start: total - maxSpan, span: maxSpan }, focusedIndex, total);
+  const overviewSpan = timelineOverviewSpan(total);
+  const initial = focusTimelineWindow({ start: total - overviewSpan, span: overviewSpan }, focusedIndex, total);
   const [frame, setFrame] = useState({ scope, window: initial });
   const start = useSharedValue(initial.start);
   const span = useSharedValue(initial.span);
@@ -40,7 +40,7 @@ export function useTimelineZoom({ expanded, width, count, oldestWeek, focusedInd
   });
 
   const pinch = usePinchGesture({
-    enabled: expanded && maxSpan > 1,
+    enabled: expanded && total > 1,
     onActivate: event => {
       'worklet';
       cancelAnimation(start);
@@ -54,7 +54,7 @@ export function useTimelineZoom({ expanded, width, count, oldestWeek, focusedInd
       const origin = pinching.get();
       if (!origin || event.scale <= 0) return;
       const focal = Math.max(0, Math.min(1, event.focalX / width));
-      const next = resizeTimelineWindow(limits, origin.anchor, focal, origin.window.span / event.scale, false);
+      const next = resizeTimelineWindow(total, origin.anchor, focal, origin.window.span / event.scale, false);
       pinching.set({ ...origin, focal });
       start.set(next.start);
       span.set(next.span);
@@ -63,7 +63,7 @@ export function useTimelineZoom({ expanded, width, count, oldestWeek, focusedInd
       'worklet';
       const origin = pinching.get();
       if (!origin) return;
-      const next = event.canceled ? origin.window : resizeTimelineWindow(limits, origin.anchor, origin.focal, span.get(), true);
+      const next = event.canceled ? origin.window : resizeTimelineWindow(total, origin.anchor, origin.focal, span.get(), true);
       start.set(next.start);
       span.set(next.span);
       pinching.set(null);
@@ -108,8 +108,8 @@ export function useTimelineZoom({ expanded, width, count, oldestWeek, focusedInd
   };
   const current = () => ({ start: start.get(), span: span.get() });
   return {
-    gesture, window, maxSpan,
-    zoom: (delta: number) => apply(stepTimelineZoom(current(), limits, focusedIndex, delta)),
+    gesture, window, maxSpan: total,
+    zoom: (delta: -1 | 1) => apply(stepTimelineZoom(current(), total, focusedIndex, delta)),
     focus: (index: number) => apply(focusTimelineWindow(current(), index, total)),
     weekAt: (x: number) => {
       // Use the painted frame so a tap while the plot is coasting hits the
