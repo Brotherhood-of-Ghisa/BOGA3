@@ -83,13 +83,13 @@ The roles take the drawn mode's ladder; `useUiMode()` reads that mode.
 (neutral ground), Sage (tinted ground, deepest-step accent, `blue-orange`),
 Ink + paper or Custom — per device, stored as
 `boga3.appearance.v3`, `{theme, mode, custom}` (`theme-record.ts`). Each save
-repaints every mounted screen (`theme-context.tsx`). With no record, the older
+repaints every mounted screen (`theme-context.tsx`). With no record,
 `boga3.appearance.v2` converts (a matching preset stays one, anything else
 becomes the custom theme it drew), then the accent id `boga3.themePreset.v1`;
 the first save writes the record, leaving both. A preset takes `mode`
 ([[appearance.ink-paper-mode]]): `light` (default), `dark` or `system` (the
 phone's, followed live). Native UI is pinned to the drawn mode, unpinned under
-`system` (`theme-native.ts`). An unknown id,
+`system`, since a pinned OS reports the pin (`theme-native.ts`). An unknown id,
 an invalid record or an unreadable store opens, logged, in the default. `record`
 stays brass across presets. Its editor: `ux-rules.md` "Appearance".
 
@@ -97,10 +97,10 @@ stays brass across presets. Its editor: `ux-rules.md` "Appearance".
 and ramp end; a direction. The page sets mode, L\* (dark 0–35, light 65–100;
 quarter steps), depth, borders. Roles keep hue, chroma and `paper` → `ink`
 share, scaled 0–300%: depth the grounds and `viz0`, borders (absent, the
-depth) the rules, highlight contrast `accent-wash`. Inks, ramp ends, accent
-and record have own L\* (0–100, ungapped; primary text light 0–40, dark 60–100). Strengths share their L\*'s sRGB
-maximum. The ramp follows the page or runs `viz1` → `viz4` via LCh thirds
-(short hue arc); Solid bars: [[appearance.solid-bars]]. Absent fields (and, until
+depth) the rules, highlight contrast `accent-wash`. Inks (primary: light
+0–40, dark 60–100), ramp ends, accent, record: own, ungapped L\* (0–100).
+Strengths share their L\*'s sRGB maximum. The ramp follows the page or runs
+`viz1` → `viz4` via LCh thirds (short hue arc); Solid bars: [[appearance.solid-bars]]. Absent fields (and, until
 moved, fixed-chroma strengths) draw as before; old `borders`/`viz` ignored.
 Starts from the preset in use; floors ungated (`ui-theme-custom.test.ts`).
 
