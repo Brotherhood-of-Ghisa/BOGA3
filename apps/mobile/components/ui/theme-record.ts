@@ -31,8 +31,10 @@ import {
 //
 // - `theme`: a preset id, or `custom`.
 // - `mode`: `light`, `dark` or `system`; a custom theme ignores it.
-// - `custom`: null, or `{background, ink, text, secondary?, muted?, accent,
-//   highlight, record, chart?, direction}`, each colour a `{hue, strength}`;
+// - `custom`: null, or `{scale?, background, ink, text, secondary?, muted?,
+//   accent, highlight, record, chart?, direction}`, each colour a `{hue,
+//   strength}`; with `scale` (2) the background's, accent's and record's
+//   strengths unrounded, each with a `tint?`, and the last two a `lightness?`;
 //   the background also `{mode, lightness, depth, borders?}`, the highlight
 //   `{match, contrast}`, `ink`, `secondary` and `muted` `{lightness}` (the
 //   last two unrounded) and `text` `{contrast}`; `chart` is `{follow, solid,
