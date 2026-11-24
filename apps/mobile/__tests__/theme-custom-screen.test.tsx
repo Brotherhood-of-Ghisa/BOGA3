@@ -46,6 +46,7 @@ import {
   customFromSeeds,
   customSeed,
   generateCustomRoles,
+  ownInks,
   type CustomColourPart,
   type CustomColours,
 } from '@/components/ui/theme-custom';
@@ -65,6 +66,13 @@ const CUSTOM: CustomColours = {
   highlight: { hue: 300, strength: 40, match: false, contrast: 100 },
   record: { hue: 90, strength: 50 },
   direction: 'green-crimson',
+};
+
+// CUSTOM with its secondary and muted text stored at their own L*.
+const OWN: CustomColours = {
+  ...CUSTOM,
+  secondary: { hue: 200, strength: 20, lightness: 45 },
+  muted: { hue: 120, strength: 30, lightness: 60 },
 };
 
 const store = (custom: CustomColours, theme = 'custom') =>
@@ -222,12 +230,12 @@ it('paints the hue bar in the part’s colours, words for VoiceOver only, and sw
 
 it('switches to another part from the title, and only closes the menu for the part already open', () => {
   store(CUSTOM);
-  mockPart = 'text';
+  mockPart = 'secondary';
   render(<ThemeCustomRoute />);
   fireEvent.press(screen.getByRole('button', { name: 'Secondary text, switch colour' }));
-  expect(screen.getByTestId('theme-custom-title-option-text').props.accessibilityState).toMatchObject({ checked: true });
+  expect(screen.getByTestId('theme-custom-title-option-secondary').props.accessibilityState).toMatchObject({ checked: true });
 
-  fireEvent.press(screen.getByTestId('theme-custom-title-option-text'));
+  fireEvent.press(screen.getByTestId('theme-custom-title-option-secondary'));
   expect(mockSetParams).not.toHaveBeenCalled();
 
   fireEvent.press(screen.getByRole('button', { name: 'Secondary text, switch colour' }));
@@ -261,9 +269,10 @@ it('spotlights, for each part, only roles a hue and strength change of that part
   const channels = (colour: string) =>
     colour.startsWith('#') ? [1, 3, 5].map((at) => parseInt(colour.slice(at, at + 2), 16)) : (colour.match(/[\d.]+/g) ?? []).map(Number);
   const differs = (a: string, b: string) => channels(a).some((value, index) => Math.abs(value - channels(b)[index]) > 6);
+  // The secondary and the muted text at their own L*, as a first move stores them.
   const moved = (part: CustomColourPart) => {
-    const before = generateCustomRoles(CUSTOM);
-    const shifted = { ...CUSTOM, [part]: { ...CUSTOM[part], hue: (CUSTOM[part].hue + 120) % 360, strength: 100 } };
+    const before = generateCustomRoles(OWN);
+    const shifted = { ...OWN, [part]: { ...OWN[part], hue: (OWN[part]!.hue + 120) % 360, strength: 100 } };
     const after = generateCustomRoles(shifted);
     // A custom theme's page inks are its inks, and its inset its page, under a second name.
     return new Set((Object.keys(before) as (keyof typeof before)[])
@@ -362,11 +371,11 @@ it('saves a VoiceOver step on depth at once', async () => {
 
 it('makes Custom the theme when a part is saved from a preset', async () => {
   store(CUSTOM, 'plum');
-  mockPart = 'text';
+  mockPart = 'record';
   render(<ThemeCustomRoute />);
   await step(slider('Strength'), 'increment');
   await waitFor(() => expect(JSON.parse(Storage.getItemSync(APPEARANCE_STORAGE_KEY)!).theme).toBe('custom'));
-  expect(storedCustom()?.text).toEqual({ hue: 60, strength: 15, contrast: 100 });
+  expect(storedCustom()?.record).toEqual({ hue: 90, strength: 55 });
 });
 
 it('writes nothing when a slider is let go at the value already stored', async () => {
@@ -442,10 +451,10 @@ it('shows a page saved outside its mode’s range as it is, until it is moved in
   await waitFor(() => expect(storedCustom()?.background.lightness).toBe(65));
 });
 
-it('offers no Borders or Charts part: an old link opens the background', () => {
+it('offers no Borders, Charts or text-seed part: an old link opens the background', () => {
   store(CUSTOM);
-  expect(CUSTOM_PARTS).toEqual(['background', 'ink', 'text', 'accent', 'highlight', 'record', 'direction']);
-  for (const gone of ['borders', 'viz']) {
+  expect(CUSTOM_PARTS).toEqual(['background', 'ink', 'secondary', 'muted', 'accent', 'highlight', 'record', 'direction']);
+  for (const gone of ['borders', 'viz', 'text']) {
     mockPart = gone;
     render(<ThemeCustomRoute />);
     expect(mockTitles[mockTitles.length - 1]).toBe('Background');
@@ -530,13 +539,150 @@ it('moves the primary text’s lightness in quarter steps over its mode’s rang
   await waitFor(() => expect(storedCustom()?.ink).toEqual({ ...CUSTOM.ink, lightness: 20.25 }));
 });
 
-it('saves the secondary text’s contrast', async () => {
+it('names three ink parts: Primary, Secondary and Muted text', () => {
   store(CUSTOM);
-  mockPart = 'text';
+  mockPart = 'muted';
   render(<ThemeCustomRoute />);
-  expect(slider('Contrast').props.accessibilityValue).toEqual({ text: '100%' });
-  await step(slider('Contrast'), 'increment');
-  await waitFor(() => expect(storedCustom()?.text).toEqual({ ...CUSTOM.text, contrast: 108 }));
+  expect(mockTitles).toContain('Muted text');
+  fireEvent.press(screen.getByRole('button', { name: 'Muted text, switch colour' }));
+  const label = (id: string) => within(screen.getByTestId(`theme-custom-title-option-${id}`)).getByText(/text$/).props.children;
+  expect(['ink', 'secondary', 'muted'].map(label)).toEqual(['Primary text', 'Secondary text', 'Muted text']);
+});
+
+it.each(['secondary', 'muted'] as const)('opens %s text with a hue, a strength and a lightness over 0–100, and no contrast, as the theme draws it', (part) => {
+  store(CUSTOM);
+  mockPart = part;
+  render(<ThemeCustomRoute />);
+  expect(screen.getAllByRole('adjustable').map((element) => element.props.accessibilityLabel)).toEqual(['Hue', 'Strength', 'Lightness']);
+  expect(screen.queryByRole('adjustable', { name: 'Contrast' })).toBeNull();
+  const drawn = ownInks(CUSTOM)[part];
+  expect(slider('Strength').props.accessibilityValue).toEqual({ text: `${Math.round(drawn.strength)}%` });
+  expect(slider('Lightness').props.accessibilityValue).toEqual({ text: `${Math.round(drawn.lightness * 4) / 4}` });
+  // Its swatch is its role as drawn.
+  const swatch = StyleSheet.flatten(screen.getByTestId('theme-custom-hue-swatch').props.style).backgroundColor;
+  expect(swatch).toBe(generateCustomRoles(CUSTOM)[part === 'secondary' ? 'inkMuted' : 'inkFaint']);
+});
+
+it.each([
+  ['secondary', 'muted', 'inkFaint'],
+  ['muted', 'secondary', 'inkMuted'],
+] as const)('stores both inks as drawn on the first move of %s text, the other’s hex unchanged', async (part, other, otherRole) => {
+  store(CUSTOM);
+  mockPart = part;
+  render(<ThemeCustomRoute />);
+  const drawn = ownInks(CUSTOM);
+
+  // A VoiceOver step on the 0–100 quarter-step slider moves 5 L*.
+  await step(slider('Lightness'), 'decrement');
+
+  await waitFor(() => expect(storedCustom()?.[part]).toBeDefined());
+  const saved = storedCustom()!;
+  expect(saved).toEqual({ ...CUSTOM, [other]: drawn[other], [part]: { ...drawn[part], lightness: expect.closeTo(drawn[part].lightness - 5, 5) } });
+  expect(generateCustomRoles(saved)[otherRole]).toBe(generateCustomRoles(CUSTOM)[otherRole]);
+});
+
+it('moves a stored muted text to L* 0 and 100, past the primary text, and writes nothing when let go where it is', async () => {
+  store(OWN);
+  mockPart = 'muted';
+  const setItem = jest.spyOn(Storage, 'setItem');
+  render(<ThemeCustomRoute />);
+  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
+
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 240 }, true));
+  expect(setItem).not.toHaveBeenCalled();
+
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 0 }, true));
+  await waitFor(() => expect(storedCustom()).toEqual({ ...OWN, muted: { ...OWN.muted, lightness: 0 } }));
+  expect(slider('Lightness').props.accessibilityValue).toEqual({ text: 'Black' });
+
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 400 }, true));
+  await waitFor(() => expect(storedCustom()?.muted?.lightness).toBe(100));
+});
+
+it.each(['secondary', 'muted'] as const)('saves %s text when a drag is let go, and nothing when it is let go where it is stored', async (part) => {
+  store(OWN);
+  mockPart = part;
+  const setItem = jest.spyOn(Storage, 'setItem');
+  render(<ThemeCustomRoute />);
+  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
+  const at = (lightness: number) => lightness * 4;
+
+  // Dragged away and back: let go at the stored L*.
+  act(() => drag(slider('Lightness')).onUpdate({ x: at(10) }));
+  act(() => drag(slider('Lightness')).onUpdate({ x: at(OWN[part]!.lightness) }));
+  await act(async () => drag(slider('Lightness')).onEnd({ x: at(OWN[part]!.lightness) }, true));
+  expect(setItem).not.toHaveBeenCalled();
+
+  act(() => drag(slider('Lightness')).onUpdate({ x: at(80) }));
+  await act(async () => drag(slider('Lightness')).onEnd({ x: at(80) }, true));
+  await waitFor(() => expect(storedCustom()).toEqual({ ...OWN, [part]: { ...OWN[part], lightness: 80 } }));
+});
+
+it('stores a muted text let go back where it is stored while a save of it is still on its way', async () => {
+  store(OWN);
+  mockPart = 'muted';
+  let finish: () => void = () => undefined;
+  const setItem = jest.spyOn(Storage, 'setItem');
+  setItem.mockImplementationOnce((key, value) => new Promise<void>((resolve) => {
+    finish = () => {
+      Storage.setItemSync(key, value as string);
+      resolve();
+    };
+  }));
+  render(<ThemeCustomRoute />);
+  fireEvent(screen.getByTestId('theme-custom-lightness-track'), 'layout', { nativeEvent: { layout: { width: 400 } } });
+
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 320 }, true));
+  await waitFor(() => expect(setItem).toHaveBeenCalledTimes(1));
+  // Back at the stored L* while 80 is still on its way: that is a move.
+  await act(async () => tap(slider('Lightness')).onEnd({ x: 240 }, true));
+  await act(async () => finish());
+
+  await waitFor(() => expect(setItem).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(storedCustom()?.muted?.lightness).toBe(60));
+});
+
+it('saves the whole muted text shown when another of its controls is let go where it is stored, after a failed save', async () => {
+  store(OWN);
+  mockPart = 'muted';
+  jest.spyOn(Storage, 'setItem').mockRejectedValueOnce(new Error('disk full'));
+  render(<ThemeCustomRoute />);
+  await step(slider('Lightness'), 'increment');
+  expect(await screen.findByText('Couldn’t save the colour. Nothing changed.')).toBeTruthy();
+  expect(storedCustom()).toEqual(OWN);
+
+  fireEvent(screen.getByTestId('theme-custom-strength-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
+  await act(async () => tap(slider('Strength')).onEnd({ x: OWN.muted!.strength }, true));
+  await waitFor(() => expect(storedCustom()?.muted).toEqual({ ...OWN.muted, lightness: 65 }));
+});
+
+it('keeps a secondary text saved meanwhile when the mode is switched, resetting only its lightness', async () => {
+  store(OWN);
+  render(<ThemeCustomRoute />);
+  // Another part's save, stored after this page drew.
+  const saved = { ...OWN.secondary!, hue: 20, strength: 90 };
+  store({ ...OWN, secondary: saved });
+  await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Dark' })));
+  await waitFor(() => expect(storedCustom()?.secondary).toEqual({ ...saved, lightness: 65 }));
+});
+
+it('stores both inks on a drag let go on a theme that has not stored them', async () => {
+  store(CUSTOM);
+  mockPart = 'secondary';
+  render(<ThemeCustomRoute />);
+  fireEvent(screen.getByTestId('theme-custom-strength-track'), 'layout', { nativeEvent: { layout: { width: 100 } } });
+  act(() => drag(slider('Strength')).onUpdate({ x: 70 }));
+  await act(async () => drag(slider('Strength')).onEnd({ x: 70 }, true));
+  const drawn = ownInks(CUSTOM);
+  await waitFor(() => expect(storedCustom()).toEqual({ ...CUSTOM, muted: drawn.muted, secondary: { ...drawn.secondary, strength: 70 } }));
+});
+
+it('puts stored secondary and muted text at the dark ladder’s L* when the page switches to dark', async () => {
+  store(OWN);
+  render(<ThemeCustomRoute />);
+  await act(async () => fireEvent.press(screen.getByRole('switch', { name: 'Dark' })));
+  await waitFor(() => expect(storedCustom()?.background.mode).toBe('dark'));
+  expect(storedCustom()).toMatchObject({ secondary: { ...OWN.secondary, lightness: 65 }, muted: { ...OWN.muted, lightness: 49 } });
 });
 
 describe('pointToValue', () => {

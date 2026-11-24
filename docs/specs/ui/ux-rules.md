@@ -261,7 +261,7 @@ System) for a preset ([[appearance.ink-paper-mode]]) or one row per Custom part,
 A part's picker (its title switches part): a painted hue `SliderRow`,
 strength, then its own controls (background: Dark switch, lightness over the
 mode's range, depth, borders; highlight: Match accent, contrast; texts:
-lightness/contrast; Direction: radios alone); the part's roles; the preview. A tap, release or switch saves at once, writing nothing when already stored,
+lightness; Direction: radios alone); the part's roles; the preview. A tap, release or switch saves at once, writing nothing when already stored,
 and the app repaints in it; a header spinner shows until it has.
 A failed save shows a danger `Notice` saying nothing changed and is logged.
 Settings home names the choice.

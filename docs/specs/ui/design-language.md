@@ -94,13 +94,13 @@ an invalid record or an unreadable store opens, logged, in the default. `record`
 stays brass across presets. Its editor: `ux-rules.md` "Appearance".
 
 **Custom** (`theme-custom.ts`): a hue and strength (0–100% of its
-chroma cap) per colour seed, highlight and `ink`; a direction. The page sets
+chroma cap) per colour seed, highlight and ink; a direction. The page sets
 mode, L\* (dark 0–35, light 65–100; quarter steps), depth, borders. Each
 role keeps its hue, chroma and `paper` → `ink` share on the page; depth (0–300%) scales the grounds and `viz0`, borders (0–300%; absent,
 the depth) the rules, highlight contrast (0–300%) `accent-wash` (the accent's
-unless unmatched), text contrast (0–150%) the lesser inks, never past
-`ink`'s L\*. Highlight strength is a share of its L\*'s sRGB maximum. Absent
-newer fields draw as before; old `borders`/`viz` parts are ignored.
+unless unmatched). Each ink has its own L\* (`ink-muted`, `ink-faint`:
+0–100, ungapped); ink and highlight strengths share that L\*'s sRGB maximum.
+Absent fields draw as before; old `borders`/`viz` parts ignored.
 Custom starts from the preset in use, ungated by the floors
 (`ui-theme-custom.test.ts`).
 
