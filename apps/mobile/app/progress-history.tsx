@@ -118,7 +118,7 @@ type HistoryMuscleLink = { id: string; name: string; role: 'primary' | 'secondar
 const ROLE_LABELS = { primary: 'Primary', secondary: 'Secondary' } as const;
 
 /** The history page's gym ([[gym.view-filter]]), chosen in the selector row. */
-type HistoryGymChoice = Pick<GymPickerSheetProps, 'value' | 'options' | 'onChange' | 'allSessionCount'>;
+type HistoryGymChoice = Pick<GymPickerSheetProps, 'value' | 'options' | 'onChange' | 'allSessionCount' | 'supportedOrientations'>;
 
 function MuscleHistoryFilters({ gym, metric, subject, onChangeSets, onChangeVolume }: {
   gym: HistoryGymChoice;
@@ -341,19 +341,6 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   } : routeSubject, chosenGym, chosenSecondary, chosenSecondaryVolume),
   [routeSubject, chosenGym, chosenSecondary, chosenSecondaryVolume, values.progressCountSecondary, values.muscleVolumePrimaryOnly]);
   const view = entryView ?? pending.heatmapView ?? values.heatmapView;
-  const canExpandTimeline = subject?.kind === 'exercise' && detailPeriod === undefined && view === 'timeline' && Platform.OS !== 'web';
-  const landscape = canExpandTimeline && landscapeRequested;
-  useFocusEffect(useCallback(() => {
-    if (!landscape) return;
-    let focused = true;
-    void lockAsync(OrientationLock.LANDSCAPE).catch(() => {
-      if (focused) setTimelineLandscape(false);
-    });
-    return () => {
-      focused = false;
-      void lockAsync(OrientationLock.PORTRAIT_UP).catch(() => {});
-    };
-  }, [landscape]));
   const gymId = subject?.gymId;
   const shownMetric = subject?.kind === 'muscle' || subject?.kind === 'exercises' ? muscleMetric : metric;
 
@@ -376,6 +363,19 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   );
   const unavailable = !subject || (catalog.status === 'ready' && name === null)
     || invalidDetailPeriod(subject, detailPeriod, values.historyLookbackWeeks);
+  const canExpandTimeline = !unavailable && detailPeriod === undefined && view === 'timeline' && Platform.OS !== 'web';
+  const landscape = canExpandTimeline && landscapeRequested;
+  useFocusEffect(useCallback(() => {
+    if (!landscape) return;
+    let focused = true;
+    void lockAsync(OrientationLock.LANDSCAPE).catch(() => {
+      if (focused) setTimelineLandscape(false);
+    });
+    return () => {
+      focused = false;
+      void lockAsync(OrientationLock.PORTRAIT_UP).catch(() => {});
+    };
+  }, [landscape]));
   // A subject that no longer exists is never read for.
   const history = useHistory(unavailable ? null : subject, values.historyLookbackWeeks, revision, accountRevision);
   const { openDay, openWeek, openSession } = useHistoryNavigation(subject, shownMetric, accountRevision);
@@ -417,12 +417,12 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
     value: gymId,
     options: history.gyms,
     onChange: next => setChosenGym({ gymId: next }),
+    supportedOrientations: landscape ? ['landscape'] : undefined,
     allSessionCount: history.gyms.reduce((sum, option) => sum + (option.sessionCount ?? 0), 0),
   };
   const muscleFilters = subject.kind === 'muscle' ? <MuscleHistoryFilters gym={gym} metric={muscleMetric} subject={subject}
     onChangeSets={setChosenSecondary} onChangeVolume={setChosenSecondaryVolume} /> : null;
-  const filters = muscleFilters ?? <GymPicker {...gym} size="compact"
-    supportedOrientations={landscape ? ['landscape'] : undefined} testID="stats-exercise-history-gym" />;
+  const filters = muscleFilters ?? <GymPicker {...gym} size="compact" testID="stats-exercise-history-gym" />;
   const shared = {
     dailyMetrics: history.daily,
     errorMessage: history.error,

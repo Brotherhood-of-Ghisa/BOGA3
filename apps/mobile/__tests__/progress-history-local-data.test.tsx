@@ -498,6 +498,58 @@ describe('The history page over real data', () => {
     expect(screen.getByTestId(`${list}-empty`)).toBeTruthy();
   });
 
+  it('expands a combined Timeline and keeps both exercise names, metric and gym in scope', async () => {
+    const gymId = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;
+    const exerciseDefinitionIds = JSON.stringify([SQUAT, EXERCISE_BLOCK_HISTORY_FIXTURE.secondaryExerciseId]);
+    await loadMaestroFixture('exercise-block-history');
+    await openHistory({ exerciseDefinitionIds, gymId, view: 'timeline', metric: 'sets' });
+    const timeline = 'stats-exercise-history-timeline';
+    fireEvent.press(await screen.findByTestId(`${timeline}-expand`));
+    expect(mockScreenOptions).toMatchObject({ orientation: 'landscape', headerShown: false });
+    expect(screen.getByRole('header', { name: '2 exercises' })).toBeTruthy();
+    expect(shownMetric('exercise')).toBe('workingSetCount');
+    expect(screen.getByTestId(GYM_BUTTON.exercise)).toHaveAccessibleName(gymButtonLabel('Maestro Block History Gym'));
+
+    const plot = screen.getByTestId(`${timeline}-plot`);
+    fireEvent.press(plot, { nativeEvent: { locationX: plot.props.style.width - 1 } });
+    const details = within(screen.getByTestId(`${timeline}-details`));
+    expect(await details.findAllByText('Barbell Back Squat')).not.toHaveLength(0);
+    expect(await details.findByText('Barbell Bench Press')).toBeTruthy();
+    const selected = plot.props.accessibilityValue;
+    fireEvent.press(screen.getByRole('button', { name: 'Close week details' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Collapse chart' }));
+    expect(mockScreenOptions).toMatchObject({ orientation: 'portrait', headerShown: true });
+    expect(screen.getByTestId(`${timeline}-plot`)).toHaveProp('accessibilityValue', selected);
+    expect(shownMetric('exercise')).toBe('workingSetCount');
+  });
+
+  it('keeps the role and exercise link on a lone muscle workout in the expanded Timeline', async () => {
+    const gymId = EXERCISE_BLOCK_HISTORY_FIXTURE.gymId;
+    await loadMaestroFixture('exercise-block-history');
+    await openHistory({ muscleGroupId: 'quads', gymId, secondary: 'hidden', view: 'timeline', metric: 'sets' });
+    const timeline = 'stats-muscle-history-timeline';
+    const cardID = 'stats-muscle-history-week-sets-card-maestro_exercise_block_history_squat_5_a';
+    await screen.findByTestId(`${timeline}-expand`);
+    // This fixture trains quads on 15 September. It is the only block in that week.
+    fireEvent.press(screen.getByTestId(`${timeline}-previous-week`));
+    fireEvent.press(screen.getByTestId(`${timeline}-previous-week`));
+    await screen.findByTestId(cardID);
+    fireEvent.press(screen.getByTestId(`${timeline}-expand`));
+    expect(mockScreenOptions).toMatchObject({ orientation: 'landscape', headerShown: false });
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', expect.objectContaining({ checked: true }));
+    const plot = screen.getByTestId(`${timeline}-plot`);
+    fireEvent(plot, 'accessibilityAction', { nativeEvent: { actionName: 'showDetails' } });
+
+    const details = within(screen.getByTestId(`${timeline}-details`));
+    const card = await details.findByTestId(cardID);
+    expect(within(card).getByTestId(`${cardID}-role-primary`, { includeHiddenElements: true })).toBeTruthy();
+    fireEvent.press(within(card).getByLabelText('Open Barbell Back Squat progress'));
+    expect(mockPush).toHaveBeenLastCalledWith(progressHistoryHref({ exerciseDefinitionId: SQUAT, gymId }, 'workingSetCount'));
+    fireEvent.press(screen.getByRole('button', { name: 'Collapse chart' }));
+    expect(screen.getByTestId(SECONDARY_CHIP)).toHaveProp('accessibilityState', expect.objectContaining({ checked: true }));
+    expect(screen.getByTestId(cardID)).toBeTruthy();
+  });
+
   it('focuses the newest week from the start, and the arrows move the list with it', async () => {
     await loadMaestroFixture('exercise-block-history');
     act(() => updatePreferences({ heatmapView: 'timeline' }));

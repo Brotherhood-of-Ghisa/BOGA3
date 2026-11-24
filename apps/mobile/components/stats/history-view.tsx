@@ -225,10 +225,11 @@ function HistoryHeatmap({
   useEffect(() => () => report.current?.(null), []);
   const expanded = timelineDisplay?.expanded === true;
   const groups = expanded && !weekSets.sameScope ? [] : weekSets.groups;
-  const singleSession = groups.length === 1 ? groups[0] : undefined;
+  // Muscle blocks keep their role and exercise link in their own header.
+  const inlineSession = expanded && groups.length === 1 && !exerciseLink ? groups[0] : undefined;
   const setList = (
     <WeekSetList {...weekSets} groups={groups} exerciseLink={exerciseLink} onOpenSession={onOpenSession}
-      onRetry={retryWeekSets} windowContent={expanded} testID={`${testIDPrefix}-week-sets`} />
+      onRetry={retryWeekSets} windowContent={expanded ? (inlineSession ? 'rows' : 'blocks') : undefined} testID={`${testIDPrefix}-week-sets`} />
   );
   const timelineChart = (
     <TimelineHeatmap
@@ -246,8 +247,8 @@ function HistoryHeatmap({
         action: timelineDisplay && !expanded ? <TimelineExpandButton onPress={inspection.expand} restoreFocus={inspection.restoreFocus}
           testID={`${testIDPrefix}-timeline-expand`} /> : undefined,
         onInspect: expanded ? inspection.open : undefined,
-        details: inspection.showDetails ? area => <TimelineDetailsWindow area={area} heading={singleSession?.title ?? focusedWeek?.label}
-          gym={singleSession?.detail} onClose={inspection.close} testID={`${testIDPrefix}-timeline-details`}>
+        details: inspection.showDetails ? area => <TimelineDetailsWindow area={area} heading={inlineSession?.title ?? focusedWeek?.label}
+          gym={inlineSession?.detail} onClose={inspection.close} testID={`${testIDPrefix}-timeline-details`}>
           {setList}
         </TimelineDetailsWindow> : undefined,
       }}>
