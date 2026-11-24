@@ -12,7 +12,7 @@ export function useTimelineZoom({ expanded, width, count, oldestWeek, focusedInd
   expanded: boolean; width: number; count: number; oldestWeek?: string; focusedIndex: number;
 }) {
   const total = Math.max(1, count);
-  const maxSpan = timelineOverviewSpan(width, total);
+  const maxSpan = timelineOverviewSpan(total);
   const limits = { count: total, maxSpan };
   const scope = `${expanded}/${width}/${oldestWeek}/${count}`;
   const initial = focusTimelineWindow({ start: total - maxSpan, span: maxSpan }, focusedIndex, total);

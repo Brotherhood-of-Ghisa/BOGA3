@@ -30,7 +30,7 @@ import Svg, { Line, Path, Rect } from 'react-native-svg';
 
 import { Card, FigureText, IconButton, uiGeometry, uiSpace, uiTypography, useUiRoles } from '@/components/ui';
 import { contrastRatio } from '@/components/ui/lch';
-import { useUiGround } from '@/components/ui/ground';
+import { OnCard, useUiGround } from '@/components/ui/ground';
 import { groundInks, useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import type { CalendarHeatmapMetric } from '@/src/data';
 
@@ -135,16 +135,23 @@ function Readout({ week, figure, onStep, hasPrevious, hasNext, testID, action, z
   </View>;
 }
 
+function ZoomButton({ name, label, disabled, onPress, testID }: {
+  name: 'minus' | 'plus'; label: string; disabled: boolean; onPress: () => void; testID: string;
+}) {
+  return <View>
+    <Card style={styles.zoomButtonFace}>{null}</Card>
+    <OnCard>
+      <IconButton accessibilityLabel={label} name={name} size="sm" disabled={disabled} onPress={onPress} testID={testID} />
+    </OnCard>
+  </View>;
+}
+
 function ZoomButtons({ zoom, testID }: { zoom: ReturnType<typeof useTimelineZoom>; testID: string }) {
   return <View style={styles.zoomButtons}>
-    <Card>
-      <IconButton accessibilityLabel="Zoom out" name="minus" disabled={zoom.window.span >= zoom.maxSpan}
-        onPress={() => zoom.zoom(1)} testID={`${testID}-zoom-out`} />
-    </Card>
-    <Card>
-      <IconButton accessibilityLabel="Zoom in" name="plus" disabled={zoom.window.span <= 1}
-        onPress={() => zoom.zoom(-1)} testID={`${testID}-zoom-in`} />
-    </Card>
+    <ZoomButton label="Zoom out" name="minus" disabled={zoom.window.span >= zoom.maxSpan}
+      onPress={() => zoom.zoom(1)} testID={`${testID}-zoom-out`} />
+    <ZoomButton label="Zoom in" name="plus" disabled={zoom.window.span <= 1}
+      onPress={() => zoom.zoom(-1)} testID={`${testID}-zoom-in`} />
   </View>;
 }
 
@@ -323,7 +330,11 @@ const styles = StyleSheet.create({
   overlay: {
     position: 'absolute', top: OVERLAY_TOP, bottom: uiSpace.sm, right: uiSpace.lg,
   },
-  zoomButtons: { flexDirection: 'row', gap: uiSpace.xs, flexShrink: 0 },
+  zoomButtons: { flexDirection: 'row', flexShrink: 0 },
+  zoomButtonFace: {
+    position: 'absolute', top: uiSpace.sm, left: uiSpace.sm,
+    width: uiGeometry.compactControlHeight, height: uiGeometry.compactControlHeight,
+  },
   readoutEnd: { flexDirection: 'row', alignItems: 'center', gap: uiSpace.sm },
   content: { gap: uiSpace.md, padding: uiSpace.lg },
   readout: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: uiSpace.sm },

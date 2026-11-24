@@ -123,9 +123,8 @@ export function buildTimelineSeries(weekly: WeekCell[], metric: CalendarHeatmapM
  */
 export const MIN_TIMELINE_COLUMN_WIDTH = 32;
 
-/** The overview packs whole weeks at the existing minimum target width. */
-export const timelineOverviewSpan = (plotWidth: number, count: number): number =>
-  Math.max(1, Math.min(count, Math.floor(plotWidth / MIN_TIMELINE_COLUMN_WIDTH)));
+/** Landscape fits up to a year of weekly columns. Longer histories can pan. */
+export const timelineOverviewSpan = (count: number): number => Math.max(1, Math.min(count, 52));
 const MAX_BAR_WIDTH = 24;
 const BAR_GAP = 2;
 /** The data end of a column is rounded; its baseline end stays square. */
@@ -181,7 +180,7 @@ export function timelineGeometry(series: TimelineSeries, plotWidth: number, heig
     columnWidth,
     width,
     height,
-    bars: columnBars(series, columnWidth, height, weekWindow, window ? timelineOverviewSpan(plotWidth, count) / window.span : 1),
+    bars: columnBars(series, columnWidth, height, weekWindow, window ? timelineOverviewSpan(count) / window.span : 1),
     ticks: series.ticks.map(value => ({ value, y: height - (value / top) * height })),
     months: visibleMonths,
   };
