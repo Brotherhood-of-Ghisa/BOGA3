@@ -906,6 +906,29 @@ describe('the gamut scale', () => {
     expect(untinted(WARM_LIGHT.accent)).toBe(WARM_LIGHT.accent);
   });
 
+  // A converted part's first strength or lightness move drops its tint: the
+  // jump is that part's own, measured on every stored case and bounded here.
+  const OWN_ROLES = { accent: ['accent', 'accentWash'], record: ['record', 'recordRule', 'recordWash'] } as const;
+  const FIXED_HUES = ['danger', 'regimeNewer', 'regimeOlder'] as const;
+  it.each([
+    ['accent', 9],
+    ['record', 10],
+    ['background', 56],
+  ] as const)('confines the first move of a converted %s to its own roles, within %s ΔE', (part, bound) => {
+    const jumps = BEFORE_GAMUT_ROLES.cases.map(({ stored: saved }) => {
+      const converted = onGamutScale(stored(saved));
+      const [before, after] = [generateCustomRoles(converted), generateCustomRoles({ ...converted, [part]: untinted(converted[part]) })];
+      const shift = (role: keyof UiRoles) => deltaE(before[role], after[role]);
+      const own: readonly (keyof UiRoles)[] = part === 'background' ? ROLE_COLOURS(before).map(([role]) => role) : OWN_ROLES[part];
+      const others = part === 'background' ? [...OWN_ROLES.accent, ...OWN_ROLES.record, ...FIXED_HUES] : ROLE_COLOURS(before).map(([role]) => role).filter((role) => !own.includes(role));
+      return { own: Math.max(...own.map(shift)), others: Math.max(...others.map(shift)), exact: part !== 'background' && others.every((role) => before[role] === after[role]) };
+    });
+    expect(Math.max(...jumps.map(({ own }) => own))).toBeLessThanOrEqual(bound);
+    // Another part's roles stay put; under a page move they shift only by rounding.
+    expect(Math.max(...jumps.map(({ others }) => others))).toBeLessThan(1);
+    if (part !== 'background') expect(jumps.every(({ exact }) => exact)).toBe(true);
+  });
+
   it('reads a tinted part at the strength and L* it draws now', () => {
     const converted = onGamutScale(withBackground(WARM_LIGHT, { lightness: 80 }));
     const roles = generateCustomRoles(converted);
