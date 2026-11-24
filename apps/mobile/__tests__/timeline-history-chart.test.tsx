@@ -7,6 +7,7 @@ import { Text } from 'react-native';
 import { Path } from 'react-native-svg';
 
 import { MIN_TIMELINE_COLUMN_WIDTH } from '@/components/heatmaps/timeline';
+import { resizeTimelineWindow, stepTimelineZoom } from '@/components/heatmaps/timeline-window';
 import { uiFonts, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
@@ -32,12 +33,12 @@ const UNITS: Record<CalendarHeatmapMetric, (value: number) => string> = {
 };
 const barFill = (id: string) => screen.UNSAFE_getAllByType(Path).find(mark => mark.props.testID === id)?.props.fill;
 
-const chart = ({ metric = 'totalVolume', weeks = 4, selectedWeekKey = null, onSelectWeek = jest.fn(), days = DAYS, children }: {
+const chart = ({ metric = 'totalVolume', weeks = 4, selectedWeekKey = null, onSelectWeek = jest.fn(), days = DAYS, children, display }: {
   metric?: CalendarHeatmapMetric; weeks?: number; selectedWeekKey?: string | null;
   onSelectWeek?: (key: string) => void; days?: DailyEffortMetrics[];
-  children?: React.ReactNode;
+  children?: React.ReactNode; display?: React.ComponentProps<typeof TimelineHeatmap>['display'];
 } = {}) => <TimelineHeatmap data={buildHeatmapData(days, metric, { todayDateKey: TODAY, weeks })} metric={metric}
-  selectedWeekKey={selectedWeekKey} onSelectWeek={onSelectWeek} testIDPrefix="history"
+  selectedWeekKey={selectedWeekKey} onSelectWeek={onSelectWeek} testIDPrefix="history" display={display}
   formatValue={metric === 'totalVolume' || metric === 'workingSetCount' ? String : (value: number) => value.toFixed(1)} metricLabel={metric === 'totalVolume' ? 'Volume' : '1RM'} unitLabel={UNITS[metric]}>
   {children}
 </TimelineHeatmap>;
@@ -202,6 +203,53 @@ it('labels months at the first week starting in each, which wider columns all ha
   expect(screen.getByTestId(`${ID}-month-7`)).toHaveTextContent('Aug');
   expect(screen.getByTestId(`${ID}-month-12`)).toHaveTextContent('Sep');
   expect(screen.getByTestId(`${ID}-month-16`)).toHaveTextContent('Oct');
+});
+
+it('tracks fractional weeks around the pinch anchor and settles within the loaded history', () => {
+  const limits = { count: 52, maxSpan: 20 };
+  expect(resizeTimelineWindow(limits, 26, 0.25, 9.4, false)).toEqual({ start: 23.65, span: 9.4 });
+  expect(resizeTimelineWindow(limits, 26, 0.25, 9.4, true)).toEqual({ start: 24, span: 9 });
+  expect(resizeTimelineWindow(limits, 0, 0.95, 40, true)).toEqual({ start: 0, span: 20 });
+  expect(resizeTimelineWindow(limits, 52, 0.05, 0.2, true)).toEqual({ start: 51, span: 1 });
+});
+
+it('steps one whole week around a visible selection or the middle of the browsed range', () => {
+  const limits = { count: 30, maxSpan: 10 };
+  expect(stepTimelineZoom({ start: 6.5, span: 8 }, limits, 14, -1)).toEqual({ start: 7, span: 7 });
+  expect(stepTimelineZoom({ start: 6.5, span: 8 }, limits, 0, 1)).toEqual({ start: 6, span: 9 });
+});
+
+it('offers accessible landscape zoom buttons without changing selection, values or opening details', () => {
+  const onInspect = jest.fn();
+  const onSelectWeek = jest.fn();
+  const { rerender } = renderWithTheme(chart({ onSelectWeek, display: { expanded: true, onInspect } }));
+  const zoomIn = () => screen.getByRole('button', { name: 'Zoom in' });
+  const zoomOut = () => screen.getByRole('button', { name: 'Zoom out' });
+  const plot = () => screen.getByTestId(`${ID}-plot`);
+  const focus = plot().props.accessibilityValue;
+  expect(zoomOut()).toBeDisabled();
+  for (let span = 4; span >= 1; span -= 1) {
+    fireEvent.press(zoomIn());
+    expect(plot()).toHaveProp('accessibilityHint', span === 1 ? '1 week visible' : `${span} weeks visible`);
+  }
+  expect(zoomIn()).toBeDisabled();
+  expect(plot()).toHaveProp('accessibilityValue', focus);
+  expect(hidden(`${ID}-tick-400`)).toHaveTextContent('400');
+  expect(hidden(`${ID}-month-4`)).toHaveTextContent('Oct');
+  expect(onSelectWeek).not.toHaveBeenCalled();
+  expect(onInspect).not.toHaveBeenCalled();
+
+  fireEvent.press(zoomOut());
+  expect(plot()).toHaveProp('accessibilityHint', '2 weeks visible');
+  fireEvent.press(plot(), { nativeEvent: { locationX: 40 } });
+  expect(onSelectWeek).toHaveBeenLastCalledWith('2026-09-28');
+  expect(onInspect).toHaveBeenCalledTimes(1);
+
+  rerender(chart({ display: { expanded: false } }));
+  expect(screen.queryByRole('button', { name: 'Zoom in' })).toBeNull();
+  rerender(chart({ display: { expanded: true } }));
+  expect(zoomOut()).toBeDisabled();
+  expect(plot()).toHaveProp('accessibilityHint', '5 weeks visible');
 });
 
 it('keeps a moved details window inside the chart when its content grows', () => {

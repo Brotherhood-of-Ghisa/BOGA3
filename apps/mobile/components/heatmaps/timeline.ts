@@ -9,6 +9,7 @@ import { formatCalendarWeek, formatCalendarWeekHeading } from '@/src/utils/local
 import type { CalendarHeatmapMetric } from '@/src/data';
 
 import type { WeekCell } from './heatmapData';
+import type { TimelineWindow } from './timeline-window';
 
 export type TimelineWeekState = 'training' | 'rest' | 'unavailable';
 
@@ -121,6 +122,10 @@ export function buildTimelineSeries(weekly: WeekCell[], metric: CalendarHeatmapM
  * weeks on a phone.
  */
 export const MIN_TIMELINE_COLUMN_WIDTH = 32;
+
+/** The overview packs whole weeks at the existing minimum target width. */
+export const timelineOverviewSpan = (plotWidth: number, count: number): number =>
+  Math.max(1, Math.min(count, Math.floor(plotWidth / MIN_TIMELINE_COLUMN_WIDTH)));
 const MAX_BAR_WIDTH = 24;
 const BAR_GAP = 2;
 /** The data end of a column is rounded; its baseline end stays square. */
@@ -146,27 +151,39 @@ export interface TimelineGeometry {
   months: (TimelineMonth & { x: number })[];
 }
 
-const columnBars = (series: TimelineSeries, columnWidth: number, height: number): TimelineBar[] => {
+const columnBars = (series: TimelineSeries, columnWidth: number, height: number, window: TimelineWindow, zoomScale: number): TimelineBar[] => {
   const top = series.ticks[series.ticks.length - 1] || 1;
-  const width = Math.max(1, Math.min(MAX_BAR_WIDTH, columnWidth - BAR_GAP));
-  return series.weeks.flatMap((week, index) => {
+  const maxBarWidth = MAX_BAR_WIDTH * Math.min(3, zoomScale);
+  const width = Math.max(1, Math.min(maxBarWidth, columnWidth - BAR_GAP));
+  const first = Math.floor(window.start);
+  return series.weeks.slice(first, Math.ceil(window.start + window.span)).flatMap((week, offset) => {
+    const index = first + offset;
     if (week.value === null || week.value <= 0) return [];
     const barHeight = (week.value / top) * height;
-    return [{ weekStartDateKey: week.weekStartDateKey, index, x: index * columnWidth + (columnWidth - width) / 2, y: height - barHeight, width, height: barHeight }];
+    return [{ weekStartDateKey: week.weekStartDateKey, index, x: (index - window.start) * columnWidth + (columnWidth - width) / 2, y: height - barHeight, width, height: barHeight }];
   });
 };
 
-export function timelineGeometry(series: TimelineSeries, plotWidth: number, height: number): TimelineGeometry {
+export function timelineGeometry(series: TimelineSeries, plotWidth: number, height: number, window?: TimelineWindow): TimelineGeometry {
   const count = Math.max(1, series.weeks.length);
-  const columnWidth = Math.max(MIN_TIMELINE_COLUMN_WIDTH, plotWidth / count);
+  const columnWidth = window ? plotWidth / window.span : Math.max(MIN_TIMELINE_COLUMN_WIDTH, plotWidth / count);
+  const width = window ? plotWidth : columnWidth * count;
+  const weekWindow = window ?? { start: 0, span: count };
+  const months = series.months.map(month => ({ ...month, x: (month.index - weekWindow.start) * columnWidth }));
+  const visibleMonths = window ? months.filter(month => month.x >= 0 && month.x <= width - MONTH_LABEL_WIDTH) : months;
+  const first = Math.floor(weekWindow.start);
+  const firstMonday = series.weeks[first]?.monday;
+  if (window && visibleMonths.length === 0 && firstMonday) {
+    visibleMonths.push({ index: first, x: 0, label: MONTHS[firstMonday.getUTCMonth()], year: firstMonday.getUTCFullYear() });
+  }
   const top = series.ticks[series.ticks.length - 1] || 1;
   return {
     columnWidth,
-    width: columnWidth * count,
+    width,
     height,
-    bars: columnBars(series, columnWidth, height),
+    bars: columnBars(series, columnWidth, height, weekWindow, window ? timelineOverviewSpan(plotWidth, count) / window.span : 1),
     ticks: series.ticks.map(value => ({ value, y: height - (value / top) * height })),
-    months: series.months.map(month => ({ ...month, x: month.index * columnWidth })),
+    months: visibleMonths,
   };
 }
 
