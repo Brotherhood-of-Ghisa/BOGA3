@@ -3,13 +3,15 @@ import { TimelineDetailsWindow } from '@/components/stats/timeline-details-windo
 import { fireEvent, screen } from '@testing-library/react-native';
 
 import { TimelineHeatmap, buildHeatmapData } from '@/components/heatmaps';
-import { Text } from 'react-native';
+import { timelineExerciseFills } from '@/components/heatmaps/heatmap-metric';
+import { processColor, StyleSheet, Text } from 'react-native';
 import { Path } from 'react-native-svg';
 
-import { MIN_TIMELINE_COLUMN_WIDTH } from '@/components/heatmaps/timeline';
+import { MIN_TIMELINE_COLUMN_WIDTH, type TimelineExercise } from '@/components/heatmaps/timeline';
 import { resizeTimelineWindow, stepTimelineZoom } from '@/components/heatmaps/timeline-window';
 import { uiFonts, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
+import { colourDistance } from '@/components/ui/lch';
 import { DEFAULT_APPEARANCE } from '@/components/ui/theme-presets';
 import { renderWithTheme, rolesFor } from './helpers/theme';
 
@@ -33,12 +35,13 @@ const UNITS: Record<CalendarHeatmapMetric, (value: number) => string> = {
 };
 const barFill = (id: string) => screen.UNSAFE_getAllByType(Path).find(mark => mark.props.testID === id)?.props.fill;
 
-const chart = ({ metric = 'totalVolume', weeks = 4, selectedWeekKey = null, onSelectWeek = jest.fn(), days = DAYS, children, display }: {
+const chart = ({ metric = 'totalVolume', weeks = 4, selectedWeekKey = null, onSelectWeek = jest.fn(), days = DAYS, children, display, exerciseSeries }: {
   metric?: CalendarHeatmapMetric; weeks?: number; selectedWeekKey?: string | null;
   onSelectWeek?: (key: string) => void; days?: DailyEffortMetrics[];
   children?: React.ReactNode; display?: React.ComponentProps<typeof TimelineHeatmap>['display'];
+  exerciseSeries?: readonly TimelineExercise[];
 } = {}) => <TimelineHeatmap data={buildHeatmapData(days, metric, { todayDateKey: TODAY, weeks })} metric={metric}
-  selectedWeekKey={selectedWeekKey} onSelectWeek={onSelectWeek} testIDPrefix="history" display={display}
+  selectedWeekKey={selectedWeekKey} onSelectWeek={onSelectWeek} testIDPrefix="history" display={display} exerciseSeries={exerciseSeries}
   formatValue={metric === 'totalVolume' || metric === 'workingSetCount' ? String : (value: number) => value.toFixed(1)} metricLabel={metric === 'totalVolume' ? 'Volume' : '1RM'} unitLabel={UNITS[metric]}>
   {children}
 </TimelineHeatmap>;
@@ -308,4 +311,81 @@ it('keeps a moved details window inside the chart when its content grows', () =>
   expectPosition(76, 20);
   move('moveUp');
   expectPosition(76, 0);
+});
+
+const exerciseWeek = (weekStartDateKey: string, totalVolume: number | null, workingSetCount: number) =>
+  [weekStartDateKey, { weekStartDateKey, monthKey: weekStartDateKey.slice(0, 7), weekOfMonth: 1,
+    totalVolume, workingSetCount, estimatedRM1: null, highestWeight: null }] as const;
+
+const exercises: readonly TimelineExercise[] = [
+  { id: 'squat', name: 'Barbell Back Squat', weeks: new Map([
+    exerciseWeek('2026-09-28', null, 2), exerciseWeek('2026-10-05', 25, 1),
+  ]) },
+  { id: 'bench', name: 'Barbell Bench Press', weeks: new Map([exerciseWeek('2026-10-05', 75, 3)]) },
+  { id: 'press', name: 'Shoulder Press', weeks: new Map([exerciseWeek('2026-10-05', 0, 0)]) },
+];
+
+it('derives a fifth exercise shade from the trained steps of a custom theme ramp', () => {
+  const customRamp = { ...roles, viz1: '#aad0e6', viz2: '#68aad9', viz3: '#4886b9', viz4: '#26658d' };
+  expect(timelineExerciseFills(customRamp)).toEqual([
+    customRamp.viz4, customRamp.viz2, customRamp.viz3, customRamp.viz1, '#5898c9',
+  ]);
+});
+
+it('derives visibly distinct shades when a Custom theme uses matching ramp ends', () => {
+  const base = '#6998A3';
+  const fills = timelineExerciseFills({ ...roles, viz1: base, viz2: base, viz3: base, viz4: base });
+  expect(fills[0]).toBe(base);
+  fills.forEach((fill, index) => {
+    for (const other of fills.slice(0, index)) expect(colourDistance(fill, other)).toBeGreaterThanOrEqual(5);
+  });
+});
+
+it('keeps the stack in legend order and retains its colours through focus, zoom and metric changes', () => {
+  const display = { expanded: true, onInspect: jest.fn() };
+  const days = [day('2026-10-05', { workingSetCount: 4 })];
+  const { rerender } = renderWithTheme(chart({ days, display, exerciseSeries: exercises }));
+  const bar = (index: number) => screen.getByTestId(`${ID}-segment-2026-10-05-${index}`);
+  const swatch = (id: string) => screen.getByTestId(`${ID}-legend-swatch-${id}`);
+  const fill = (id: string) => ({ type: 0, payload: processColor(StyleSheet.flatten(swatch(id).props.style).backgroundColor) });
+  const squat = fill('squat');
+  const bench = fill('bench');
+  expect(swatch('squat')).toHaveStyle({ backgroundColor: roles.viz4 });
+  expect(swatch('bench')).toHaveStyle({ backgroundColor: roles.viz2 });
+  expect(swatch('press')).toHaveStyle({ backgroundColor: roles.viz3 });
+  expect(bar(0)).toHaveProp('fill', squat);
+  expect(bar(1)).toHaveProp('fill', bench);
+  expect(bar(0)).toHaveProp('y', 120);
+  expect(bar(0)).toHaveProp('height', 40);
+  expect(screen.queryByTestId(`${ID}-segment-2026-10-05-2`)).toBeNull();
+  expect(screen.getByTestId(`${ID}-plot`).props.accessibilityValue.text)
+    .toContain('Volume 100, Current week, Barbell Back Squat 25, Barbell Bench Press 75, Shoulder Press 0');
+
+  fireEvent.press(screen.getByTestId(`${ID}-zoom-in`));
+  fireEvent.press(screen.getByTestId(`${ID}-plot`), { nativeEvent: { locationX: 299 } });
+  expect(display.onInspect).toHaveBeenCalledTimes(1);
+  rerender(chart({ days, display, metric: 'workingSetCount', selectedWeekKey: '2026-10-05', exerciseSeries: exercises }));
+  expect(bar(0)).toHaveProp('fill', squat);
+  expect(bar(1)).toHaveProp('fill', bench);
+  expect(screen.getByTestId(`${ID}-plot`).props.accessibilityValue.text).toContain('Barbell Back Squat 1, Barbell Bench Press 3');
+
+  rerender(chart({ days, display: { expanded: false }, exerciseSeries: exercises }));
+  expect(screen.queryByTestId(`${ID}-legend`)).toBeNull();
+  expect(barFill(`${ID}-bar-2026-10-05`)).toBe(roles.ink);
+});
+
+it('offers a bounded legend move action and leaves rest and unavailable weeks without segments', () => {
+  const days = [day('2026-09-28', { totalVolume: null })];
+  const props = { days, display: { expanded: true }, exerciseSeries: exercises };
+  const { rerender } = renderWithTheme(chart({ ...props, selectedWeekKey: '2026-09-28' }));
+  expect(screen.queryAllByTestId(/history-timeline-segment-/)).toHaveLength(0);
+  const plot = screen.getByTestId(`${ID}-plot`);
+  expect(plot.props.accessibilityValue.text).toContain('Volume Unavailable, Barbell Back Squat Unavailable, Barbell Bench Press No sets');
+  const control = screen.getByRole('adjustable', { name: 'Move exercise legend' });
+  for (let step = 0; step < 3; step += 1) {
+    fireEvent(control, 'accessibilityAction', { nativeEvent: { actionName: 'moveRight' } });
+  }
+  rerender(chart({ ...props, selectedWeekKey: '2026-09-21' }));
+  expect(screen.getByTestId(`${ID}-legend-position`)).toHaveStyle({ transform: [{ translateX: 108 }, { translateY: 0 }] });
+  expect(screen.getByTestId(`${ID}-plot`).props.accessibilityValue.text).toContain('Barbell Back Squat No sets');
 });

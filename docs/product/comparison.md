@@ -82,22 +82,21 @@ Code: `historyWeekBounds` in `apps/mobile/src/utils/calendar-weeks.ts`;
 
 Progress 3D Sets grade [[muscle.weekly-targets]] over [[comparison.window]],
 capped at 100%: zero neutral, positive weak-to-strong. Volume grades rounded
-percentage changes against body-wide finite extrema: middle-to-strong gains,
-middle-to-weak losses; displayed −100% neutral while scaling losses. Filters
-may rescale Volume; rotation/selection cannot. Unchanged middle;
-empty/unavailable neutral; `new`/overflow strongest, outside extrema.
-Strong darkens in light mode, lightens in dark, except a Custom chosen ramp.
-Both views use opaque effort fills and a separate selection colour, attenuated
-through covering layers.
-Wireframe adds contrasting triangle edges over the fills and selected anatomy.
-Both keep the selected comparison; no legend.
+percentage changes across body-wide finite extrema: middle-to-strong gains,
+middle-to-weak losses; displayed −100% neutral when scaling losses. Filters
+may rescale Volume; rotation/selection cannot. Unchanged middle; empty/unavailable neutral;
+`new`/overflow strongest, outside extrema. Strong darkens in light, lightens
+in dark, unless Custom overrides. Both views draw opaque effort fills and an
+attenuated selection colour, keep selection, and omit legends. Wireframe adds
+contrasting triangle edges over fills and selected anatomy.
 
-History legends precede charts: muscle Sets `% of target`, capped at the
-effective weekly target; others `% of max` over History look-back, daily Grid
-values, weekly Sets/Volume sums or weekly strength bests. Empty/all-zero samples
-stay neutral.
+Heatmap legends precede charts. Muscle Sets uses capped `% of target`;
+others use `% of max` over History look-back (daily Grid, weekly sums or
+strength bests). Empty/all-zero samples stay neutral. Landscape exercise stacks use
+theme intensity shades. The movable legend hides during week inspection.
 
 Why: Sets show goal attainment; Volume shows period change; history shows training intensity.
 Code: `apps/mobile/components/heatmaps/heatmap-metric.ts`;
+`apps/mobile/components/heatmaps/TimelineHeatmap.tsx`;
 `apps/mobile/components/stats/muscle-body-projection.ts`;
 `apps/mobile/components/stats/muscle-wireframe-renderer.ts`.
