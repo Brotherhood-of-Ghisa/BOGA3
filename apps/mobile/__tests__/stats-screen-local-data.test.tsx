@@ -100,6 +100,11 @@ const renderSeededStats = async () => {
 
 const showBody = () => act(async () => { updatePreferences({ progressMuscleLayout: '3d' }); });
 
+const openMuscleView = (layout: 'list' | '3d') => {
+  fireEvent.press(screen.getByTestId(layout === 'list' ? 'stats-muscle-list-view' : 'stats-muscle-body-view'));
+  return within(screen.getByTestId('stats-muscle-body-view-sheet'));
+};
+
 const replayFocus = () =>
   act(async () => {
     mockFocusCallbacks.forEach((cleanup, callback) => {
@@ -489,32 +494,61 @@ describe('Stats over real data', () => {
     await waitForGone(() => screen.queryByTestId('stats-error-state'));
   });
 
-  it('retains filters and selection across List and 3D, and restores the saved layout', async () => {
+  it('switches from a List default for the visit and retains filters and selection across layouts', async () => {
     mockSearchParams = { period: '7', breakdown: 'muscle' };
     await loadMaestroFixture('exercise-block-history');
     await renderStats();
     await screen.findByTestId('stats-muscle-table');
+    expect(openMuscleView('list').getByText('List')).toBeTruthy();
+    expect(screen.getByTestId('stats-muscle-view-list')).toHaveProp('accessibilityState', { checked: true });
+    fireEvent(screen.getByTestId('stats-muscle-body-view-sheet'), 'accessibilityEscape');
+    expect(screen.queryByTestId('stats-muscle-body-view-sheet')).toBeNull();
+    expect(screen.getByTestId('stats-muscle-table')).toBeTruthy();
     chooseFilter('metric', 'Volume');
+    fireEvent.changeText(screen.getByTestId('stats-muscle-search-input'), 'Quads');
     fireEvent.press(screen.getByTestId('stats-muscle-select-quads'));
     expect(screen.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent('3550');
-    await showBody();
-    expect(screen.getByTestId('stats-muscle-body-card')).toBeTruthy();
+    fireEvent.press(openMuscleView('list').getByText('Patches'));
+    expect(await screen.findByTestId('stats-muscle-body-patches')).toBeTruthy();
     expect(screen.getByTestId(`stats-contribution-${SQUAT}-now`)).toHaveTextContent('3550');
     expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Volume');
     expect(screen.getByTestId('stats-period-chip')).toHaveTextContent('This week');
     fireEvent.press(screen.getByTestId('stats-contributions-view-daily'));
     expect(mockPush).toHaveBeenLastCalledWith('/progress-history?muscleGroupId=quads&metric=volume&secondary=hidden&secondaryVolume=shown&view=daily');
-    await act(async () => updatePreferences({ progressMuscleLayout: 'list' }));
+    const bodyView = openMuscleView('3d');
+    expect(bodyView.getByTestId('stats-muscle-body-material-contour')).toHaveProp('accessibilityState', { checked: true });
+    fireEvent.press(bodyView.getByText('List'));
+    expect(screen.getByTestId('stats-muscle-search-input')).toHaveProp('value', 'Quads');
     expect(within(screen.getByTestId('stats-muscle-block-quads')).getByTestId('stats-contributions')).toBeTruthy();
     fireEvent.press(screen.getByTestId('stats-muscle-select-quads'));
     expect(screen.queryByTestId('stats-contributions')).toBeNull();
-    await showBody();
+    fireEvent.press(openMuscleView('list').getByText('Wireframe'));
+    expect(await screen.findByTestId('stats-muscle-body-wireframe')).toBeTruthy();
+    expect(getAccountLocalPreferenceState().values.progressMuscleLayout).toBe('list');
     screen.unmount();
     await renderStats();
-    await screen.findByTestId('stats-muscle-body-card');
-    expect(screen.queryByTestId('stats-muscle-table')).toBeNull();
-    // The layout is a saved setting; the metric chosen on the page was only for that visit.
+    await screen.findByTestId('stats-muscle-table');
+    expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
     expect(screen.getByTestId('stats-metric-chip')).toHaveTextContent('Sets');
+  });
+
+  it('opens on the 3D default and lets a changed Settings default replace the visit choice', async () => {
+    mockSearchParams = { period: '7', breakdown: 'muscle' };
+    await loadMaestroFixture('exercise-block-history');
+    await showBody();
+    await renderStats();
+    await screen.findByTestId('stats-muscle-body-wireframe');
+    const view = openMuscleView('3d');
+    expect(view.getByTestId('stats-muscle-body-material-wireframe')).toHaveProp('accessibilityState', { checked: true });
+    fireEvent.press(view.getByText('List'));
+    expect(screen.getByTestId('stats-muscle-table')).toBeTruthy();
+    expect(getAccountLocalPreferenceState().values.progressMuscleLayout).toBe('3d');
+    fireEvent.press(openMuscleView('list').getByText('Patches'));
+    expect(await screen.findByTestId('stats-muscle-body-patches')).toBeTruthy();
+    act(() => updatePreferences({ progressMuscleLayout: 'list' }));
+    expect(screen.getByTestId('stats-muscle-table')).toBeTruthy();
+    chooseFilter('view-mode', 'Exercise');
+    expect(screen.queryByTestId('stats-muscle-list-view')).toBeNull();
   });
 
   it.each(['Sets', 'Volume'] as const)('keeps list history and inline contributors on the selected %s metric', async metric => {
@@ -595,7 +629,7 @@ describe('Stats over real data', () => {
     await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^7$/));
     chooseGym(gym);
     await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^5$/));
-    await showBody();
+    fireEvent.press(openMuscleView('list').getByText('Wireframe'));
     // Muscle 3D counts every gym, so its Filters hold only secondary sets.
     expect(inFilters(() => [screen.queryAllByTestId(/^stats-gym-option-/).length, screen.queryByTestId('stats-secondary-toggle') !== null]))
       .toEqual([0, true]);
@@ -608,6 +642,9 @@ describe('Stats over real data', () => {
       .toEqual(computeMuscleScores(allGyms.muscles, body.metric, body.setTargets));
     fireEvent.press(screen.getByRole('link', { name: 'Open Barbell Back Squat history' }));
     expect(mockPush).toHaveBeenLastCalledWith(`/progress-history?exerciseDefinitionId=${SQUAT}&metric=sets&view=timeline`);
+    fireEvent.press(openMuscleView('3d').getByText('List'));
+    await waitFor(() => expect(screen.getByTestId('stats-muscle-row-quads-now')).toHaveTextContent(/^5$/));
+    expect(chosenGym()).toBe(gym);
     chooseFilter('view-mode', 'Exercise');
     expect(screen.queryByTestId('stats-muscle-body-card')).toBeNull();
     await waitFor(() => expect(squatNow()).toHaveTextContent(/^5$/));
