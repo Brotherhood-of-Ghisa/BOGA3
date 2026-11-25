@@ -13,7 +13,7 @@ Progress pushes (`components/stats/history-view.tsx`, route
 | `DailyHeatmap.tsx`  | **Daily** — month calendars stacked newest first, Monday–Sunday plus Week tiles; a training day or week opens its sets. |
 | `timeline.ts`       | `buildTimelineSeries(weekly, metric)` → per-week values, zero-based y ticks and month labels; `timelineGeometry` → the columns and where each month label sits; `weekLabel` → a week's name on screen. Pure. |
 | `TimelineHeatmap.tsx` | **Timeline** — the metric week by week as zero-based columns, oldest on the left: readout with the focused week between its previous / next arrows, y axis, month axis, the focused single-series column in `ink` on a `ruleSoft` band; sideways scroll past `MIN_TIMELINE_COLUMN_WIDTH`, a column wide enough to tap; `children` (the week's sets, `components/stats/week-set-list.tsx`) below. The only view that selects a week; the host keeps the selection and is told which week is focused (`FocusedTimelineWeek`), for the page's ⋮. |
-| `TimelineExerciseLegend.tsx` | The movable swatch key for exercise stacks in landscape. |
+| `TimelineLegend.tsx` | The movable swatch key for stacks in landscape. |
 | `WeeklyHeatmap.tsx` | **Weekly** — newest-first horizontal bars in a virtualized list; it computes their lengths and references, colour independently; a training week opens its sets. |
 
 ## Data flow
@@ -114,10 +114,10 @@ choices use Daily; a valid saved choice survives restart and account
 switching. Timeline reads its week list while visible. Progress history takes
 one or 2–5 reported muscle IDs or exercise definition IDs. Combined exercise
 history uses each definition's private calculation context and one gym scope,
-with Sets and Volume. The expanded Timeline stacks by exercise
-([[comparison.colour-scale]]). The legend uses the week-details drag handle
-and move actions. Tapping a column opens the full week's sets and hides the
-legend until the window closes.
+with Sets and Volume. The expanded Timeline stacks by selected exercise or
+muscle ([[comparison.colour-scale]], [[muscle.set-count]]). The legend uses
+the week-details drag handle and move actions. Tapping a column opens the
+full week's sets and hides the legend until the window closes.
 Numeric `weeks` controls query/grid coverage under [[comparison.history-window]];
 short windows have no implicit 52-week minimum.
 

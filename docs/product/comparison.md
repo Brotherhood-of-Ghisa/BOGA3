@@ -93,8 +93,8 @@ triangles and selected anatomy.
 Heatmap legends precede charts. Muscle Sets uses `% of target`, averaging
 capped attainment across all selected muscles. Other metrics use `% of max`
 over History look-back (daily Grid, weekly sums or strength bests).
-Empty/all-zero samples stay neutral. Landscape exercise stacks use theme
-intensity shades. The movable legend hides during week inspection.
+Empty/all-zero samples stay neutral. Landscape stacks for selected exercises
+or muscles use theme shades. The movable legend hides during week inspection.
 
 Why: Sets show goal attainment; Volume shows period change; history shows training intensity.
 Code: `apps/mobile/components/heatmaps/heatmap-metric.ts`;

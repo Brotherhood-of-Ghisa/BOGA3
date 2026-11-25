@@ -938,6 +938,54 @@ describe('Muscle day/week details over real data', () => {
       localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'primary' WHERE exercise_definition_id = ? AND muscle_group_id = 'glutes_max'").run(SQUAT);
     });
 
+    it('stacks the deduplicated week with a movable muscle legend and keeps the week on collapse', async () => {
+      jest.setSystemTime(new Date(2026, 9, 4, 12));
+      localDataClient().prepare("UPDATE exercise_muscle_mappings SET role = 'primary' WHERE exercise_definition_id = ? AND muscle_group_id = 'adductors'").run(SQUAT);
+      const muscleGroupIds = ['quads', 'glutes_max', 'adductors', 'back_lats'];
+      await openHistory({ muscleGroupIds: JSON.stringify(muscleGroupIds), view: 'timeline', metric: 'sets',
+        gymId: 'no-gym', secondary: 'shown', secondaryVolume: 'hidden' });
+      const timeline = 'stats-muscle-history-timeline';
+      const week = '2026-09-28';
+      const plot = () => screen.getByTestId(`${timeline}-plot`);
+      const segments = () => screen.getAllByTestId(new RegExp(`^${timeline}-segment-${week}-`));
+      const expand = await screen.findByTestId(`${timeline}-expand`);
+      const portraitWeek = plot().props.accessibilityValue;
+      expect(screen.getByTestId(`${timeline}-bar-${week}`)).toBeTruthy();
+      expect(screen.queryByTestId(`${timeline}-legend`)).toBeNull();
+      fireEvent.press(expand);
+
+      const legend = within(screen.getByTestId(`${timeline}-legend`));
+      for (const id of muscleGroupIds) expect(legend.getByTestId(`${timeline}-legend-swatch-${id}`)).toBeTruthy();
+      expect(plot().props.accessibilityValue.text).toContain('Sets 4, Current week, Quads 1.3, Glute Max 1.3, Adductors 1.3, Lats No sets');
+      expect(segments()).toHaveLength(3);
+      fireEvent(legend.getByRole('adjustable', { name: 'Move muscle legend' }), 'accessibilityAction', {
+        nativeEvent: { actionName: 'moveRight' },
+      });
+      fireEvent.press(plot(), { nativeEvent: { locationX: plot().props.style.width - 1 } });
+      const details = within(screen.getByTestId(`${timeline}-details`));
+      expect(screen.queryByTestId(`${timeline}-legend`)).toBeNull();
+      expect(await details.findByTestId('stats-muscle-history-week-sets-card-detail-one-squat')).toBeTruthy();
+      fireEvent.press(screen.getByRole('button', { name: 'Close week details' }));
+      expect(screen.getByTestId(`${timeline}-legend-position`)).toHaveStyle({ transform: [{ translateX: 44 }, { translateY: 0 }] });
+      fireEvent.press(screen.getByRole('button', { name: 'Collapse chart' }));
+      expect(plot()).toHaveProp('accessibilityValue', portraitWeek);
+      expect(screen.queryByTestId(`${timeline}-legend`)).toBeNull();
+    });
+
+    it('uses the same allocated Volume and secondary filter in muscle stacks and the combined total', async () => {
+      jest.setSystemTime(new Date(2026, 9, 4, 12));
+      await openHistory({ muscleGroupIds: JSON.stringify(['quads', 'glutes_max', 'adductors']), view: 'timeline',
+        metric: 'volume', gymId: 'no-gym', secondary: 'hidden', secondaryVolume: 'hidden' });
+      const timeline = 'stats-muscle-history-timeline';
+      const plot = () => screen.getByTestId(`${timeline}-plot`);
+      fireEvent.press(await screen.findByTestId(`${timeline}-expand`));
+      expect(plot().props.accessibilityValue.text).toContain('Volume 800, Current week, Quads 400, Glute Max 400, Adductors No sets');
+      fireEvent.press(screen.getByTestId(SECONDARY_CHIP));
+      await waitFor(() => expect(plot().props.accessibilityValue.text)
+        .toContain('Volume 1000, Current week, Quads 400, Glute Max 400, Adductors 200'));
+      expect(screen.getByTestId(`${timeline}-segment-2026-09-28-2`)).toBeTruthy();
+    });
+
     it('carries the combined scope through every chart and averages capped targets separately from the set count', async () => {
       jest.setSystemTime(new Date(2026, 9, 4, 12));
       act(() => updatePreferences({ heatmapView: 'daily', muscleTargetMode: 'per-muscle', weeklyWorkingSetTarget: 10,

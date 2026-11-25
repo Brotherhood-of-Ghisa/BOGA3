@@ -5,6 +5,7 @@ import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ExerciseSessionEntrySheet } from '@/components/session-recorder/exercise-session-entry-sheet';
 import type { FocusedTimelineWeek } from '@/components/heatmaps';
+import type { TimelineStack } from '@/components/heatmaps/timeline';
 import {
   EXERCISE_HISTORY_METRIC_OPTIONS,
   HistoryView,
@@ -317,6 +318,25 @@ function useHistorySubjectCatalog(subject: HistorySubject | null) {
   return { catalog, muscleSetup, exercise, selection, name, muscleLinks };
 }
 
+function useHistoryStack(selection: ComponentProps<typeof HistoryTitle>['selection'], history: ReturnType<typeof useHistory>) {
+  const kind = selection?.kind;
+  const selected = selection?.items;
+  const { weekly, weeklyByExercise } = history;
+  return useMemo<TimelineStack | undefined>(() => {
+    if (!selected || selected.length < 2) return undefined;
+    if (kind === 'muscle') {
+      return { kind, items: selected.map(({ id, name }) => ({ id, name,
+        weeks: new Map(weekly.flatMap(({ weekStartDateKey, muscleShares }) => {
+          const share = muscleShares?.get(id);
+          return share ? [[weekStartDateKey, share] as const] : [];
+        })),
+      })) };
+    }
+    if (weeklyByExercise?.size !== selected.length) return undefined;
+    return { kind: 'exercise', items: selected.map(({ id, name }) => ({ id, name, weeks: weeklyByExercise.get(id)! })) };
+  }, [kind, selected, weekly, weeklyByExercise]);
+}
+
 /** Single-only destinations stay absent from a combined workload's menu. */
 const exerciseHistoryActions = (subject: HistorySubject, exercise: { id: string; deletedAt: Date | null } | null, router: ReturnType<typeof useRouter>) => {
   const ids = subject.kind === 'exercises' ? subject.ids : exercise?.id;
@@ -404,12 +424,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
   }, [landscape]));
   // A subject that no longer exists is never read for.
   const history = useHistory(unavailable || resolvingSelection ? null : subject, values.historyLookbackWeeks, revision, accountRevision);
-  const { weeklyByExercise } = history;
-  const selectedExercises = selection?.kind === 'exercise' ? selection.items : undefined;
-  const exerciseSeries = useMemo(() => {
-    if (!weeklyByExercise || !selectedExercises || selectedExercises.length < 2 || selectedExercises.length !== weeklyByExercise.size) return undefined;
-    return selectedExercises.map(({ id, name }) => ({ id, name, weeks: weeklyByExercise.get(id)! }));
-  }, [weeklyByExercise, selectedExercises]);
+  const stack = useHistoryStack(selection, history);
   const { openDay, openWeek, openSession } = useHistoryNavigation(subject, shownMetric, accountRevision);
   // A muscle's week list links each card's exercise to its own history, on
   // the metric shown here; one the catalogue no longer holds has no page.
@@ -465,7 +480,7 @@ export function ProgressHistoryScreen({ subject: routeSubject, initialMetric, in
       weekSetsTarget: historySetsTarget(subject, muscleMetric),
       onOpenSession: openSession,
       exerciseLink,
-      exerciseSeries,
+      stack,
     },
   };
 

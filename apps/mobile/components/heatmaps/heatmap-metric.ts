@@ -17,8 +17,8 @@ export type CalendarHeatmapBucket = 0 | 1 | 2 | 3 | 4;
 export const heatRamp = (roles: UiRoles) =>
   [roles.viz0, roles.viz1, roles.viz2, roles.viz3, roles.viz4] as const;
 
-/** Exercise identities use the trained shades, with one extra shade for a fifth exercise. */
-export function timelineExerciseFills({ viz1, viz2, viz3, viz4 }: UiRoles): readonly string[] {
+/** Stacked contributors use the trained shades, with one extra shade for a fifth item. */
+export function timelineStackFills({ viz1, viz2, viz3, viz4 }: UiRoles): readonly string[] {
   const middle = [1, 3, 5].map(offset => {
     const from = parseInt(viz2.slice(offset, offset + 2), 16);
     const to = parseInt(viz3.slice(offset, offset + 2), 16);

@@ -3,11 +3,11 @@ import { TimelineDetailsWindow } from '@/components/stats/timeline-details-windo
 import { fireEvent, screen } from '@testing-library/react-native';
 
 import { TimelineHeatmap, buildHeatmapData } from '@/components/heatmaps';
-import { timelineExerciseFills } from '@/components/heatmaps/heatmap-metric';
+import { timelineStackFills } from '@/components/heatmaps/heatmap-metric';
 import { processColor, StyleSheet, Text } from 'react-native';
 import { Path } from 'react-native-svg';
 
-import { MIN_TIMELINE_COLUMN_WIDTH, type TimelineExercise } from '@/components/heatmaps/timeline';
+import { MIN_TIMELINE_COLUMN_WIDTH, type TimelineContributor } from '@/components/heatmaps/timeline';
 import { resizeTimelineWindow, stepTimelineZoom } from '@/components/heatmaps/timeline-window';
 import { uiFonts, uiTypography } from '@/components/ui';
 import type { CalendarHeatmapMetric, DailyEffortMetrics } from '@/src/data';
@@ -39,9 +39,9 @@ const chart = ({ metric = 'totalVolume', weeks = 4, selectedWeekKey = null, onSe
   metric?: CalendarHeatmapMetric; weeks?: number; selectedWeekKey?: string | null;
   onSelectWeek?: (key: string) => void; days?: DailyEffortMetrics[];
   children?: React.ReactNode; display?: React.ComponentProps<typeof TimelineHeatmap>['display'];
-  exerciseSeries?: readonly TimelineExercise[];
+  exerciseSeries?: readonly TimelineContributor[];
 } = {}) => <TimelineHeatmap data={buildHeatmapData(days, metric, { todayDateKey: TODAY, weeks })} metric={metric}
-  selectedWeekKey={selectedWeekKey} onSelectWeek={onSelectWeek} testIDPrefix="history" display={display} exerciseSeries={exerciseSeries}
+  selectedWeekKey={selectedWeekKey} onSelectWeek={onSelectWeek} testIDPrefix="history" display={display} stack={exerciseSeries && { kind: 'exercise', items: exerciseSeries }}
   formatValue={metric === 'totalVolume' || metric === 'workingSetCount' ? String : (value: number) => value.toFixed(1)} metricLabel={metric === 'totalVolume' ? 'Volume' : '1RM'} unitLabel={UNITS[metric]}>
   {children}
 </TimelineHeatmap>;
@@ -317,7 +317,7 @@ const exerciseWeek = (weekStartDateKey: string, totalVolume: number | null, work
   [weekStartDateKey, { weekStartDateKey, monthKey: weekStartDateKey.slice(0, 7), weekOfMonth: 1,
     totalVolume, workingSetCount, estimatedRM1: null, highestWeight: null }] as const;
 
-const exercises: readonly TimelineExercise[] = [
+const exercises: readonly TimelineContributor[] = [
   { id: 'squat', name: 'Barbell Back Squat', weeks: new Map([
     exerciseWeek('2026-09-28', null, 2), exerciseWeek('2026-10-05', 25, 1),
   ]) },
@@ -327,14 +327,14 @@ const exercises: readonly TimelineExercise[] = [
 
 it('derives a fifth exercise shade from the trained steps of a custom theme ramp', () => {
   const customRamp = { ...roles, viz1: '#aad0e6', viz2: '#68aad9', viz3: '#4886b9', viz4: '#26658d' };
-  expect(timelineExerciseFills(customRamp)).toEqual([
+  expect(timelineStackFills(customRamp)).toEqual([
     customRamp.viz4, customRamp.viz2, customRamp.viz3, customRamp.viz1, '#5898c9',
   ]);
 });
 
 it('derives visibly distinct shades when a Custom theme uses matching ramp ends', () => {
   const base = '#6998A3';
-  const fills = timelineExerciseFills({ ...roles, viz1: base, viz2: base, viz3: base, viz4: base });
+  const fills = timelineStackFills({ ...roles, viz1: base, viz2: base, viz3: base, viz4: base });
   expect(fills[0]).toBe(base);
   fills.forEach((fill, index) => {
     for (const other of fills.slice(0, index)) expect(colourDistance(fill, other)).toBeGreaterThanOrEqual(5);

@@ -279,6 +279,38 @@ const buildAnalyticsInput = (
   ...overrides,
 });
 
+it('splits the strongest set credit equally and keeps allocated Volume independent', () => {
+  const primary = ['chest_sternal', 'chest_clavicular', 'front_delts'];
+  const secondary = ['triceps', 'back_lats'];
+  const exerciseDefinitionId = 'ex-press';
+  const input = buildAnalyticsInput({
+    sessions: [{ id: 'session', completedAt: new Date('2026-07-22T12:00:00Z') }],
+    sessionExercises: [{ id: 'block', sessionId: 'session', exerciseDefinitionId }],
+    exerciseSets: [{ id: 'set', sessionExerciseId: 'block', setType: null, weightValue: '60', repsValue: '10' }],
+    muscleMappings: [
+      ...primary.map(muscleGroupId => ({ exerciseDefinitionId, muscleGroupId, role: 'primary' as const })),
+      ...secondary.map(muscleGroupId => ({ exerciseDefinitionId, muscleGroupId, role: 'secondary' as const })),
+    ],
+  });
+  const week = (muscleGroupIds: string[], options = input) => aggregateSelectedMuscleWeeklyEffort(
+    aggregateSelectedMuscleDailyEffort(options, { muscleGroupIds, timeZone: 'UTC' }), true,
+  )[0];
+  const combined = week([...primary, ...secondary]);
+  expect(combined).toMatchObject({ workingSetCount: 1, totalVolume: 900 });
+  for (const id of primary) {
+    expect(combined.muscleShares?.get(id)).toMatchObject({ workingSetCount: 1 / 3, totalVolume: 200 });
+  }
+  for (const id of secondary) {
+    expect(combined.muscleShares?.get(id)).toMatchObject({ workingSetCount: 0, totalVolume: 150 });
+  }
+  const secondaryOnly = week(secondary, { ...input, countSecondaryVolume: false });
+  expect(secondaryOnly).toMatchObject({ workingSetCount: 0.5, totalVolume: 0 });
+  for (const id of secondary) {
+    expect(secondaryOnly.muscleShares?.get(id)).toMatchObject({ workingSetCount: 0.25, totalVolume: 0 });
+  }
+  expect(week(secondary, { ...input, countSecondarySets: false })).toMatchObject({ workingSetCount: 0, totalVolume: 300 });
+});
+
 describe('getMuscleContributionRoleWeight', () => {
   it('preserves current Stats role contribution weights', () => {
     expect(getMuscleContributionRoleWeight('primary')).toBe(1);

@@ -115,7 +115,7 @@ leaving a matching icon alone. `app.config.ts` bundles the PNGs in
 every launcher alias. Seasonal identity follows [[appearance.november]]; its
 alternates need a native build.
 
-**Data visualisation:** the ramp grades **more**. Exercise stacks follow
+**Data visualisation:** the ramp grades **more**. Timeline stacks follow
 [[comparison.colour-scale]]. `viz0` is
 empty / rest, `viz1`…`viz4` weakest to strongest; even preset L\*
 steps, so each bucket reads as "more" without hue; no step is `accent` or

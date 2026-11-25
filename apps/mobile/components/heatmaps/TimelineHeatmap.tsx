@@ -33,8 +33,9 @@ import { contrastRatio } from '@/components/ui/lch';
 import { OnCard, useUiGround } from '@/components/ui/ground';
 import { groundInks, readsOnPage, useUiGroundTone, useUiText } from '@/components/ui/text-roles';
 import type { CalendarHeatmapMetric } from '@/src/data';
+import { formatWorkingSetCount } from '@/src/exercise-calculations/format';
 
-import { timelineExerciseFills } from './heatmap-metric';
+import { timelineStackFills } from './heatmap-metric';
 import type { HeatmapData } from './heatmapData';
 import {
   barPath,
@@ -45,16 +46,16 @@ import {
   weekLabel,
   weekRangeLabel,
   type TimelineBar,
-  type TimelineExercise,
+  type TimelineStack,
   type TimelineWeek,
 } from './timeline';
-import { TimelineExerciseLegend } from './TimelineExerciseLegend';
+import { TimelineLegend } from './TimelineLegend';
 import type { TimelineOverlayArea } from './use-timeline-overlay-position';
 import { useTimelineZoom } from './use-timeline-zoom';
 
 interface Props {
   data: HeatmapData;
-  exerciseSeries?: readonly TimelineExercise[];
+  stack?: TimelineStack;
   metric: CalendarHeatmapMetric;
   /** The week the host holds; `null` focuses the newest week in the window. */
   selectedWeekKey: string | null;
@@ -108,11 +109,13 @@ const weekDescription = (week: TimelineWeek, figure: Figure, metricLabel: string
   return `Week of ${range}, ${metricLabel} ${figure.value}${unit}${week.isCurrentWeek ? ', Current week' : ''}`;
 };
 
-function exerciseDescription(week: TimelineWeek, exercises: readonly TimelineExercise[] | undefined, formatValue: Props['formatValue']) {
-  if (!exercises || !week.contributions) return '';
-  return exercises.map(({ name }, index) => {
+function contributionDescription(week: TimelineWeek, stack: TimelineStack | undefined, metric: CalendarHeatmapMetric,
+  formatValue: Props['formatValue']) {
+  if (!stack || !week.contributions) return '';
+  const format = stack.kind === 'muscle' && metric === 'workingSetCount' ? formatWorkingSetCount : formatValue;
+  return stack.items.map(({ name }, index) => {
     const value = week.contributions?.[index];
-    const description = value === undefined ? 'No sets' : value === null ? 'Unavailable' : formatValue(value);
+    const description = value === undefined ? 'No sets' : value === null ? 'Unavailable' : format(value);
     return `, ${name} ${description}`;
   }).join('');
 }
@@ -171,17 +174,18 @@ function ZoomButtons({ zoom, testID }: { zoom: ReturnType<typeof useTimelineZoom
   </View>;
 }
 
-export function TimelineHeatmap({ data, exerciseSeries, metric, selectedWeekKey, onSelectWeek, testIDPrefix, formatValue,
+export function TimelineHeatmap({ data, stack, metric, selectedWeekKey, onSelectWeek, testIDPrefix, formatValue,
   metricLabel, unitLabel, header, children, display }: Props) {
   const dateFormat = useDateFormat();
   const text = useUiText();
   const tone = useUiGroundTone();
   const testID = `${testIDPrefix}-timeline`;
   const expanded = display?.expanded === true;
-  const exercises = expanded && isSum(metric) ? exerciseSeries : undefined;
+  const activeStack = expanded && isSum(metric) ? stack : undefined;
+  const contributors = activeStack?.items;
   const roles = useUiRoles();
-  const fills = useMemo(() => exercises ? timelineExerciseFills(roles) : undefined, [exercises, roles]);
-  const series = useMemo(() => buildTimelineSeries(data.weekly, metric, exercises), [data.weekly, metric, exercises]);
+  const fills = useMemo(() => contributors ? timelineStackFills(roles) : undefined, [contributors, roles]);
+  const series = useMemo(() => buildTimelineSeries(data.weekly, metric, contributors), [data.weekly, metric, contributors]);
   const viewport = useTimelineViewport(expanded);
   const { plotWidth, plotHeight, scroll, scrollX } = viewport;
   const weeks = series.weeks;
@@ -244,7 +248,7 @@ export function TimelineHeatmap({ data, exerciseSeries, metric, selectedWeekKey,
   const legendWidth = Math.min(LEGEND_WIDTH, plotWidth);
   const visibleWeeks = Math.round(zoom.window.span);
   const spokenWeek = focused && figure
-    ? weekDescription(focused, figure, metricLabel, dateFormat) + exerciseDescription(focused, exercises, formatValue)
+    ? weekDescription(focused, figure, metricLabel, dateFormat) + contributionDescription(focused, activeStack, metric, formatValue)
     : undefined;
   const plot = (
     <Pressable accessible accessibilityRole="adjustable"
@@ -292,11 +296,11 @@ export function TimelineHeatmap({ data, exerciseSeries, metric, selectedWeekKey,
         </View>
         {children}
       </ScrollView>
-      {exercises || display?.details ? (
+      {activeStack || display?.details ? (
         <View pointerEvents="box-none" style={[styles.overlay, { left: uiSpace.lg + uiSpace.sm + axisWidth }]}>
-          {exercises && fills ? <TimelineExerciseLegend
+          {activeStack && fills ? <TimelineLegend
             area={{ width: legendWidth, height: detailsArea.height, initialX: 0, maxX: plotWidth - legendWidth }}
-            exercises={exercises} fills={fills} hidden={!!display?.details} testID={`${testIDPrefix}-timeline-legend`} /> : null}
+            stack={activeStack} fills={fills} hidden={!!display?.details} testID={`${testIDPrefix}-timeline-legend`} /> : null}
           {display?.details?.(detailsArea)}
         </View>
       ) : null}
@@ -334,7 +338,7 @@ function useTimelineViewport(expanded: boolean) {
 
 type TimelineStacks = { weeks: TimelineWeek[]; fills: readonly string[] };
 
-function TimelineStack({ bar, stacks, outlines, testID }: {
+function StackedColumn({ bar, stacks, outlines, testID }: {
   bar: TimelineBar; stacks: TimelineStacks; outlines: readonly (string | undefined)[]; testID: string;
 }) {
   const segments = timelineBarSegments(bar, stacks.weeks[bar.index]);
@@ -371,7 +375,7 @@ function TimelinePlot({ geometry, focusedIndex, selectedX, testID, stacks }: {
       {geometry.ticks.map((tick, index) => <Line key={tick.value} stroke={index === 0 ? roles.rule : roles.ruleSoft}
         strokeWidth={1} x1={0} x2={width} y1={tick.y} y2={tick.y} />)}
       {geometry.bars.map(bar => stacks
-        ? <TimelineStack key={bar.weekStartDateKey} bar={bar} stacks={stacks}
+        ? <StackedColumn key={bar.weekStartDateKey} bar={bar} stacks={stacks}
             outlines={bar.index === focusedIndex ? focusedOutlines : outlines} testID={testID} />
         : <Path key={bar.weekStartDateKey} d={barPath(bar)} fill={bar.index === focusedIndex ? focusedFill : roles.viz4}
             testID={`${testID}-bar-${bar.weekStartDateKey}`} />)}
